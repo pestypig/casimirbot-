@@ -1,4 +1,4 @@
-import { HelixAskConsole } from "@/components/helix/ask-console";
+import { HelixAskConsole } from "@/components/helix/ask-console/HelixAskConsole";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
 

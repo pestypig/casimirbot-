@@ -1,15 +1,17 @@
 import React, { Suspense } from "react";
 import { HelixLoadingMark } from "@/components/common/HelixLoadingMark";
-import {
-  HelixAskMinimalRuntimeShell,
-  type HelixAskMinimalRuntimeShellProps,
-} from "./HelixAskMinimalRuntimeShell";
+import type { HelixAskMinimalRuntimeShellProps } from "./HelixAskMinimalRuntimeShell";
 import type { HelixAskConsoleProps } from "./HelixAskConsoleState";
 import { buildHelixAskConsoleRuntimeBridgeProps } from "./HelixAskConsoleRuntimeShellProps";
 
 const HelixAskLegacyRuntimeBridge = React.lazy(async () => {
   const module = await import("./HelixAskLegacyRuntimeBridge");
   return { default: module.HelixAskLegacyRuntimeBridge };
+});
+
+const HelixAskMinimalRuntimeShell = React.lazy(async () => {
+  const module = await import("./HelixAskMinimalRuntimeShell");
+  return { default: module.HelixAskMinimalRuntimeShell };
 });
 
 export type HelixAskConsoleRuntimeImplementation = "legacy_bridge" | "minimal_runtime_shell";
@@ -28,7 +30,11 @@ export function HelixAskConsoleRuntimeShell({
   ...props
 }: HelixAskConsoleRuntimeShellProps) {
   if (runtimeImplementation === "minimal_runtime_shell") {
-    return <HelixAskMinimalRuntimeShell {...props} {...minimalRuntime} />;
+    return (
+      <Suspense fallback={<HelixLoadingMark title="Loading Helix Ask" compact />}>
+        <HelixAskMinimalRuntimeShell {...props} {...minimalRuntime} />
+      </Suspense>
+    );
   }
 
   return (

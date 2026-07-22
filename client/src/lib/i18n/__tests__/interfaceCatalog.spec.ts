@@ -12,6 +12,10 @@ import { enMessages } from "@/lib/i18n/messages/en";
 import { hawMessages } from "@/lib/i18n/messages/haw";
 import { INTERFACE_TARGET_CATALOGS } from "@/lib/i18n/messages/targetCatalogs";
 import {
+  INTERFACE_CATALOG_REVIEWED_COUNTS,
+  INTERFACE_MESSAGE_COUNT,
+} from "@/lib/i18n/messages/catalogMetadata";
+import {
   INTERFACE_MESSAGE_IDS,
   interfaceSourceMessages,
   type InterfaceMessageId,
@@ -38,6 +42,8 @@ describe("interface catalog integrity", () => {
   it("derives the message ID list from source metadata and keeps English complete", () => {
     const sourceIds = Object.keys(interfaceSourceMessages).sort();
     expect([...INTERFACE_MESSAGE_IDS].sort()).toEqual(sourceIds);
+    expect(INTERFACE_MESSAGE_COUNT).toBe(INTERFACE_MESSAGE_IDS.length);
+    expect(INTERFACE_CATALOG_REVIEWED_COUNTS.en).toBe(INTERFACE_MESSAGE_IDS.length);
 
     for (const id of INTERFACE_MESSAGE_IDS) {
       expect(interfaceSourceMessages[id].id).toBe(id);
@@ -58,6 +64,7 @@ describe("interface catalog integrity", () => {
       const option = INTERFACE_LANGUAGE_OPTIONS.find((entry) => entry.code === code);
       expect(option?.translationMode).toBe("procedural_catalog");
       expect(Object.keys(catalog).length).toBeLessThanOrEqual(INTERFACE_MESSAGE_IDS.length);
+      expect(INTERFACE_CATALOG_REVIEWED_COUNTS[code]).toBe(Object.keys(catalog).length);
       expect(option ? getInterfaceLanguageReadiness(option) : "").toBe(
         `${Object.keys(catalog).length}/${INTERFACE_MESSAGE_IDS.length} catalog strings`,
       );
@@ -81,7 +88,7 @@ describe("interface catalog integrity", () => {
     setWorkstationDebugEnabled(true);
     clearWorkstationDebugEvents();
 
-    const resolver = createInterfaceTextResolver("haw");
+    const resolver = createInterfaceTextResolver("haw", hawMessages);
     expect(resolver.t("missing.id" as never)).toBe("missing.id");
 
     expect(getWorkstationDebugSnapshot().events).toHaveLength(0);
@@ -91,7 +98,7 @@ describe("interface catalog integrity", () => {
     setWorkstationDebugEnabled(true);
     clearWorkstationDebugEvents();
 
-    const resolver = createInterfaceTextResolver("haw");
+    const resolver = createInterfaceTextResolver("haw", hawMessages);
     expect(resolver.t("account.language.title")).toBe("ʻŌlelo");
     expect(resolver.t("account.header.title")).toBe("Moʻokāki a me nā kau");
     expect(resolver.t("account.usage.threads")).toBe("Nā thread");
@@ -100,7 +107,7 @@ describe("interface catalog integrity", () => {
   });
 
   it("routes representative workstation panel titles through the interface catalog", () => {
-    const resolver = createInterfaceTextResolver("haw");
+    const resolver = createInterfaceTextResolver("haw", hawMessages);
 
     expect(getInterfacePanelTitle(resolver.t, "account-session", "Account & Sessions")).toBe(
       "Mo\u02bbok\u0101ki a me n\u0101 kau",

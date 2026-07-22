@@ -7,7 +7,7 @@ import { HelixWorkstationShell } from "@/components/workstation/HelixWorkstation
 import { Dialog } from "@/components/ui/dialog";
 import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogContent";
 import SplashCursor from "@/components/SplashCursor";
-import { HelixAskConsole } from "@/components/helix/ask-console";
+import { HelixAskConsole } from "@/components/helix/ask-console/HelixAskConsole";
 import {
   PROFILE_STORAGE_KEY,
   useHelixStartSettings,

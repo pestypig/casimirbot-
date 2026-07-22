@@ -148,6 +148,19 @@ describe("physics atlas blocks", () => {
     expect(byId.get("casimir_cavity_modes")?.primaryBadgeIds).toContain("casimir.material_receipts");
     expect(byId.get("casimir_cavity_modes")?.primaryBadgeIds).toContain("casimir.material.lifshitz_receipt");
     expect(byId.get("casimir_cavity_modes")?.primaryBadgeIds).toContain("casimir.geometry.beyond_pfa_validity");
+    expect(byId.get("casimir_dp_quantum_foam")?.status).toBe("seed");
+    expect(byId.get("casimir_dp_quantum_foam")?.primaryBadgeIds).toContain(
+      "study.casimir_dp.observable_separation_gate",
+    );
+    expect(byId.get("casimir_dp_quantum_foam")?.primaryBadgeIds).toContain(
+      "study.casimir_dp.experiment_design_campaign",
+    );
+    expect(byId.get("casimir_dp_quantum_foam")?.primaryBadgeIds).toContain(
+      "study.casimir_dp.gated_computations_stage1",
+    );
+    expect(byId.get("casimir_dp_quantum_foam")?.claimBoundaryBadgeIds).toContain(
+      "study.casimir_dp.claim_boundary",
+    );
     expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.source.wall_t00_trace");
     expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.closure.wall_t00_source_residual");
     expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.tensor.full_authority_gate");

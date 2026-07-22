@@ -148,6 +148,8 @@ export {
 export { HelixAskComposer } from "./HelixAskComposer";
 export { HelixAskComposerTextareaSurface } from "./HelixAskComposerTextareaSurface";
 export { buildHelixAskComposerTextareaState } from "./HelixAskComposerTextareaState";
+export { createHelixAskComposerTextareaSizingController } from "./HelixAskComposerTextareaSizing";
+export type { HelixAskComposerTextareaSizingController } from "./HelixAskComposerTextareaSizing";
 export { HelixAskErrorBoundary } from "./HelixAskErrorBoundary";
 export {
   HELIX_ASK_CONSOLE_MAX_PROMPT_LINES,
@@ -278,6 +280,11 @@ export {
 export {
   createHelixAskRealtimeProviderEventHandler,
 } from "./HelixAskRealtimeProviderEventHandler";
+export {
+  HELIX_ASK_REALTIME_COMPLETED_OUTPUT_TRANSCRIPT_SCHEMA,
+  createHelixAskRealtimeOutputTranscriptTracker,
+  isHelixAskRealtimeOutputTranscriptEvent,
+} from "./HelixAskRealtimeOutputTranscriptDebug";
 export { useHelixAskLiveRuntimeSession } from "./useHelixAskLiveRuntimeSession";
 export { useHelixAskVisualFrameAttachmentIngress } from "./useHelixAskVisualFrameAttachmentIngress";
 export {
@@ -920,6 +927,9 @@ export type {
   HelixAskRealtimeProviderEventHandler,
   HelixAskRealtimeProviderEventProjection,
 } from "./HelixAskRealtimeProviderEventHandler";
+export type {
+  HelixAskRealtimeCompletedOutputTranscript,
+} from "./HelixAskRealtimeOutputTranscriptDebug";
 export type {
   HelixAskSituationRoomSourceDerivedStateOptions,
   HelixAskSituationRoomSourceStateOptions,

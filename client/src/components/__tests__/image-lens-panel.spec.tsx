@@ -4,6 +4,7 @@ import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as agiApi from "@/lib/agi/api";
 import ImageLensPanel from "@/components/workstation/ImageLensPanel";
 import { HELIX_ASK_LIVE_EVENT_BUS_EVENT } from "@/lib/helix/liveEventsBus";
 import { useDocumentImageRegionStore } from "@/store/useDocumentImageRegionStore";
@@ -222,6 +223,53 @@ describe("ImageLensPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
     expect(await screen.findByLabelText("Page")).toHaveValue("3");
     expect(screen.getByLabelText("Source kind")).toHaveValue("pdf_page_render");
+  });
+
+  it("loads a typed PDF page when Enter is pressed in the advanced page field", async () => {
+    useDocumentImageRegionStore.getState().setSourceImage({
+      sourceImageUrl: "data:image/png;base64,pdf-page-three",
+      sourceAttachmentId: "pdf-page-render:panel:3",
+      sourceKind: "pdf_page_render",
+      pageNumber: 3,
+      pageCount: 11,
+      pageImageRef: "data:image/png;base64,pdf-page-three",
+      sourceId: "pdf-page-render:source:3",
+      scholarlySourcePdfRef: "artifact://scholarly-pdf/panel.pdf",
+      scholarlyPdfCachePath: "C:/workspace/artifacts/helix/scholarly-pdfs/panel.pdf",
+    });
+    const oneShot = vi.spyOn(agiApi, "runCapabilityLaneOneShot").mockImplementation(async (payload) => {
+      useDocumentImageRegionStore.getState().setSourceImage({
+        sourceImageUrl: "data:image/png;base64,pdf-page-seven",
+        sourceAttachmentId: "pdf-page-render:panel:7",
+        sourceKind: "pdf_page_render",
+        pageNumber: 7,
+        pageCount: 11,
+        pageImageRef: "data:image/png;base64,pdf-page-seven",
+        sourceId: "pdf-page-render:source:7",
+        scholarlySourcePdfRef: "artifact://scholarly-pdf/panel.pdf",
+        scholarlyPdfCachePath: "C:/workspace/artifacts/helix/scholarly-pdfs/panel.pdf",
+      });
+      return { ok: true };
+    });
+
+    render(<ImageLensPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
+    const pageInput = await screen.findByTestId("image-lens-page-input");
+    fireEvent.change(pageInput, { target: { value: "7" } });
+    fireEvent.keyDown(pageInput, { key: "Enter", code: "Enter" });
+
+    await waitFor(() => expect(oneShot).toHaveBeenCalledTimes(1));
+    expect(oneShot).toHaveBeenCalledWith(expect.objectContaining({
+      capability_lane_call: expect.objectContaining({
+        capability: "visual_analysis.inspect_image_region",
+        page_number: 7,
+        scholarly_source_pdf_ref: "artifact://scholarly-pdf/panel.pdf",
+        scholarly_pdf_cache_path: "C:/workspace/artifacts/helix/scholarly-pdfs/panel.pdf",
+        source_mount_only: true,
+      }),
+    }));
+    expect(await screen.findByTestId("image-lens-mounted-pdf-source")).toHaveTextContent("PDF page 7 / 11");
+    expect(screen.getByText("PDF page 7 loaded.")).toBeInTheDocument();
   });
 
   it("hydrates the status strip from compact scientific workflow memory", async () => {

@@ -40,6 +40,7 @@ export type HelixAgentContinuationAffordance = {
   capability_id: string | null;
   action: HelixAgentContinuationAction | null;
   args: Record<string, unknown>;
+  lane_request: Record<string, unknown> | null;
   source_ref: string | null;
   reason: string | null;
   admissible: boolean;
@@ -102,6 +103,11 @@ export type HelixAgentContinuationState = {
   missing_requirement_ids: string[];
   last_attempt: HelixAgentContinuationAttempt | null;
   next_admissible_affordances: HelixAgentContinuationAffordance[];
+  capability_proposal?: {
+    allowed: boolean;
+    admitted_capability_ids: string[];
+    authority: "helix_policy_admits_runtime_proposal";
+  };
   tried_action_fingerprints: string[];
   progress: {
     made_progress: boolean;

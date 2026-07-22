@@ -7,6 +7,7 @@ export const PHYSICS_ATLAS_BLOCK_IDS = [
   "cosmic_distance_ladder",
   "solar_surface_spectrum",
   "casimir_cavity_modes",
+  "casimir_dp_quantum_foam",
   "warp_gr_nhm2",
   "nhm2_full_solve",
   "qei_stress_energy",

@@ -44,6 +44,10 @@ import { runScholarlyResearchLookup } from "../retrieval/scholarly-research-look
 import { runScholarlyFullTextFetch } from "../retrieval/scholarly-full-text-fetch";
 import { runScholarlyNumericParameterExtraction } from "../retrieval/scholarly-numeric-parameters";
 import {
+  extractScholarlyArxivId,
+  normalizeScholarlyFullTextSourceUrl,
+} from "../scholarly-research-intent";
+import {
   HELIX_RESEARCH_LIBRARY_OBSERVATION_SCHEMA,
   HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
 } from "@shared/helix-research-library";
@@ -8144,8 +8148,19 @@ export const callWorkstationGatewayCapability = async (
   if (manifest.capability_id === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) {
     const args = readArguments(input.arguments);
     const query = normalizeExternalSearchQuery(args.query ?? args.prompt ?? args.paper_result_id ?? args.source_url ?? "paper full text");
-    const sourceUrl = optionalString(args.source_url ?? args.sourceUrl);
     const paperResultId = optionalString(args.paper_result_id ?? args.paperResultId ?? args.source_ref ?? args.sourceRef);
+    const explicitArxivId = optionalString(args.arxiv_id ?? args.arxivId);
+    const arxivId = extractScholarlyArxivId(
+      explicitArxivId
+        ? `arXiv:${explicitArxivId}`
+        : paperResultId
+          ? `paper ${paperResultId}`
+          : "",
+    );
+    const sourceUrl = normalizeScholarlyFullTextSourceUrl(
+      optionalString(args.source_url ?? args.sourceUrl) ??
+        (arxivId ? `https://arxiv.org/abs/${arxivId}` : null),
+    );
     const paper = readRecord(args.paper);
     const papers = readArray(args.papers).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
     const hasFetchableSource =

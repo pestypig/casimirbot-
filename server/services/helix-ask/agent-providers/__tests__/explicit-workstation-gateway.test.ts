@@ -753,6 +753,179 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("ignores a legacy Realtime transport label when deriving semantic route authority", () => {
+    const body: Record<string, unknown> = {
+      agent_runtime: "codex",
+      question: "Okay, can you look for papers about a magnetar?",
+      workspace_context_snapshot: {
+        activePanel: "docs-viewer",
+        activeDocPath: "docs/research/example.md",
+      },
+      route_metadata: {
+        schema: "helix.ask.route_metadata.v1",
+        source: "realtime_stage_play",
+        invocationKind: "stage_play_realtime_transcript_handoff",
+        sourceTarget: "operator_text",
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          source: "stage_play_realtime_handoff",
+          target_source: "operator_text",
+          target_kind: "realtime_transcript",
+          strength: "hard",
+          allow_no_tool_direct: true,
+        },
+      },
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:legacy-realtime-magnetar-papers",
+      selectedRoute: "/ask",
+    });
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body,
+    });
+
+    expect(body.source_target_intent).toMatchObject({
+      target_source: "scholarly_research",
+      target_kind: "scholarly_research",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(capabilities(requests)).toContain("scholarly-research.lookup_papers");
+    expect(capabilities(requests)).not.toContain("docs.search");
+    expect(body.committed_ask_route).toMatchObject({
+      route: {
+        source_target: "scholarly_research",
+        target_kind: "scholarly_research",
+      },
+      terminal_product: {
+        evidence_reentry_required: true,
+      },
+    });
+  });
+
+  it("repairs stale model-only authority for a natural selected-paper follow-up", () => {
+    const body: Record<string, unknown> = {
+      agent_runtime: "codex",
+      question: "Let's use this one. Pull out the useful parts.",
+      runtime_goal_session: {
+        allowed_workstation_tools: ["scholarly-research.lookup_papers"],
+      },
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "magnetar-paper",
+            source_ref: "chat.final_answer.previous:magnetar-paper",
+            text: [
+              "Use Thompson and Duncan (1995), The soft gamma repeaters as very strongly magnetized neutron stars - I.",
+              "DOI: 10.1093/mnras/275.2.255.",
+            ].join(" "),
+          },
+        },
+      },
+      source_target_intent: {
+        target_source: "unknown",
+        target_kind: "unknown",
+        requested_outputs: ["direct_answer_text"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+        allowed_terminal_artifact_kinds: ["direct_answer_text"],
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "model_only",
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+        allowed_terminal_artifact_kinds: ["direct_answer_text"],
+      },
+      tool_call_admission_decision: {
+        required: false,
+        admitted_tool_families: ["model_only"],
+      },
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: "ask:natural-selected-paper-followup",
+        route: {
+          source_target: "unknown",
+          target_kind: "unknown",
+          route_reason: "no_explicit_source_target",
+        },
+        canonical_goal: {
+          goal_kind: "model_only_concept",
+          required_terminal_kind: "direct_answer_text",
+          allowed_terminal_artifact_kinds: ["direct_answer_text"],
+          forbidden_terminal_artifact_kinds: [],
+        },
+        capability_policy: {
+          allowed_tool_families: ["model_only"],
+          suppressed_tool_families: [],
+          required_capability_families: [],
+        },
+        terminal_product: {
+          allowed_terminal_artifact_kinds: ["direct_answer_text"],
+          forbidden_terminal_artifact_kinds: [],
+          evidence_reentry_required: false,
+          followup_reasoning_required: false,
+          required_terminal_product: "direct_answer_text",
+        },
+      },
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:natural-selected-paper-followup",
+      selectedRoute: "/ask",
+    });
+
+    expect(body.source_target_intent).toMatchObject({
+      target_source: "scholarly_research",
+      target_kind: "scholarly_research_followup",
+      requested_outputs: expect.arrayContaining(["scholarly_full_text"]),
+      allow_no_tool_direct: false,
+    });
+    expect(body.route_product_contract).toMatchObject({
+      source_target: "scholarly_research",
+      goal_kind: "scholarly_research_followup",
+      required_terminal_kind: "scholarly_research_answer",
+      evidence_reentry_required: true,
+      forbidden_terminal_artifact_kinds: expect.arrayContaining(["direct_answer_text"]),
+    });
+    expect(body.canonical_goal_frame).toMatchObject({
+      goal_kind: "scholarly_research_followup",
+      required_terminal_kind: "scholarly_research_answer",
+      forbidden_terminal_artifact_kinds: expect.arrayContaining(["direct_answer_text"]),
+    });
+    expect(body.tool_call_admission_decision).toMatchObject({
+      required: true,
+      compound_requested_capabilities: expect.arrayContaining([
+        "scholarly-research.lookup_papers",
+        "scholarly-research.fetch_full_text",
+      ]),
+    });
+    expect(body.runtime_goal_session).toMatchObject({
+      allowed_workstation_tools: expect.arrayContaining([
+        "scholarly-research.lookup_papers",
+        "scholarly-research.fetch_full_text",
+      ]),
+    });
+    expect(body.committed_ask_route).toMatchObject({
+      route: { source_target: "scholarly_research" },
+      canonical_goal: {
+        required_terminal_kind: "scholarly_research_answer",
+      },
+      terminal_product: {
+        evidence_reentry_required: true,
+        required_terminal_product: "scholarly_research_answer",
+      },
+    });
+  });
+
   it("admits affirmative interface-language preference prompts onto the account-session gateway action", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -805,6 +978,8 @@ describe("explicit workstation gateway derived calls", () => {
       "The screen label says set interface language to Hawaiian.",
       "In the future we might change the account language to French.",
       "What does account_session.set_interface_language mean?",
+      "Use English examples while explaining the interface language setting.",
+      "Use the workstation agent to verify which panel is active, tell me you're checking, then give me the verified result when it returns.",
     ];
 
     for (const question of prompts) {
@@ -816,6 +991,56 @@ describe("explicit workstation gateway derived calls", () => {
         },
       })).toEqual([]);
     }
+  });
+
+  it("routes the Live verification prompt to active context without admitting a language mutation", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Use the workstation agent to verify which panel is active, tell me you're checking, then give me the verified result when it returns.",
+        workspace_context_snapshot: {
+          activePanel: "account-session",
+          openPanels: ["account-session"],
+        },
+      },
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "workstation.active_context",
+        mode: "read",
+      }),
+    ]);
+  });
+
+  it("fails closed for mutating requests carried by a read-only Realtime handoff", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Set the workstation interface language to Hawaiian.",
+        routeMetadata: {
+          source: "realtime_stage_play",
+          invocationKind: "stage_play_realtime_transcript_handoff",
+          forbiddenCapabilities: [
+            "workstation_mutation",
+            "workstation_action_execution",
+          ],
+          source_target_intent: {
+            admitted_readonly_handoff: true,
+          },
+          realtimeWorkerAdmission: {
+            dispatch: {
+              read_only: true,
+              workstation_action_execution_allowed: false,
+            },
+          },
+        },
+      },
+    });
+
+    expect(requests).toEqual([]);
   });
 
   it("materializes retained current-document context even when another panel is focused", () => {

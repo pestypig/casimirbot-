@@ -80,4 +80,61 @@ describe("scholarly evidence demand", () => {
       minimum_satisfying_depth: "page_image_parse",
     });
   });
+
+  it("requires full text for a natural request to pull useful parts from a selected paper", () => {
+    expect(deriveScholarlyEvidenceDemand({
+      promptText: "Let's use this one. Pull out the useful parts.",
+    })).toMatchObject({
+      satisfaction: "all_of",
+      required_modes: ["full_text"],
+      optional_modes: [],
+      minimum_satisfying_depth: "full_text",
+      alternatives: [{
+        product: "full_text_summary",
+        minimum_depth: "full_text",
+        exactness: "bounded",
+      }],
+      derivation_reasons: ["full_text_output_requested"],
+    });
+  });
+
+  it("requires full text when a user naturally asks to get the selected paper PDF", () => {
+    expect(deriveScholarlyEvidenceDemand({
+      promptText: "Can you get the PDF for that paper and tell me what measurements it reports?",
+    })).toMatchObject({
+      satisfaction: "all_of",
+      required_modes: ["full_text"],
+      optional_modes: [],
+      minimum_satisfying_depth: "full_text",
+      derivation_reasons: ["full_text_output_requested"],
+    });
+  });
+
+  it("does not attach a later identifier qualifier to an explicit full-text command", () => {
+    expect(deriveScholarlyEvidenceDemand({
+      promptText: [
+        'Find one PDF-accessible primary paper for "Magnetar".',
+        "Select exactly one paper, fetch or materialize its full text, and report its DOI or arXiv ID when available.",
+      ].join(" "),
+      workflow: "full_text_summary",
+    })).toMatchObject({
+      satisfaction: "all_of",
+      required_modes: ["full_text"],
+      optional_modes: [],
+      minimum_satisfying_depth: "full_text",
+      derivation_reasons: ["full_text_output_requested"],
+    });
+  });
+
+  it("keeps an immediately qualified full-text fetch optional", () => {
+    expect(deriveScholarlyEvidenceDemand({
+      promptText: "Find the paper and fetch accessible full text if available, then report its metadata.",
+      workflow: "full_text_summary",
+    })).toMatchObject({
+      required_modes: [],
+      optional_modes: ["full_text"],
+      minimum_satisfying_depth: "metadata_lookup",
+      derivation_reasons: ["conditional_full_text_allows_metadata_fallback"],
+    });
+  });
 });

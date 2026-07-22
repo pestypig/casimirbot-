@@ -253,6 +253,10 @@ import { buildHelixAskMoodAvatarState } from "@/components/helix/ask-console/Hel
 import { buildHelixAskComposerActionToolbarState } from "@/components/helix/ask-console/HelixAskComposerActionToolbarState";
 import { buildHelixAskComposerTextareaState } from "@/components/helix/ask-console/HelixAskComposerTextareaState";
 import {
+  createHelixAskComposerTextareaSizingController,
+  type HelixAskComposerTextareaSizingController,
+} from "@/components/helix/ask-console/HelixAskComposerTextareaSizing";
+import {
   createHelixAskComposerInputFrameScheduler,
   type HelixAskComposerInputFrameInput,
   type HelixAskComposerInputFrameScheduler,
@@ -347,14 +351,20 @@ import {
 } from "@/components/helix/ask-console/HelixAskPromptHistory";
 import {
   HelixAskSlashCommandMenu,
+} from "@/components/helix/ask-console/HelixAskSlashCommandMenu";
+import {
   buildHelixAskSlashCommandMenuItems,
-  buildHelixAskSlashCommandMenuState,
-  insertHelixAskSlashCommandPrompt,
-  resolveHelixAskSlashCommandMenuKey,
-  resolveHelixAskSlashCommandTrigger,
   type HelixAskSlashCommandMenuItem,
+} from "@/components/helix/ask-console/HelixAskSlashCommandCatalog";
+import {
+  buildHelixAskSlashCommandMenuState,
+  resolveHelixAskSlashCommandMenuKey,
+} from "@/components/helix/ask-console/HelixAskSlashCommandMenuState";
+import {
+  insertHelixAskSlashCommandPrompt,
+  resolveHelixAskSlashCommandTrigger,
   type HelixAskSlashCommandTrigger,
-} from "@/components/helix/ask-console";
+} from "@/components/helix/ask-console/HelixAskSlashCommandInsertion";
 import {
   applyHelixAskVoiceTimelineVersionError,
   applyHelixAskVoiceTimelineVersionPayload,
@@ -4127,7 +4137,6 @@ const HELIX_ASK_CONTEXT_TOKENS = clampNumber(
   512,
   8192,
 );
-const HELIX_ASK_MAX_PROMPT_LINES = HELIX_ASK_CONSOLE_MAX_PROMPT_LINES;
 const HELIX_ASK_LIVE_EVENT_LIMIT = 28;
 const HELIX_ASK_QUEUE_LIMIT = 12;
 const HELIX_ASK_LIVE_EVENT_MAX_CHARS = clampNumber(
@@ -6398,6 +6407,12 @@ export function HelixAskPill({
   const helixAskSessionRef = useRef<string | null>(null);
   const helixAskSessionContextRef = useRef<string | null>(null);
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const askTextareaSizingControllerRef = useRef<HelixAskComposerTextareaSizingController | null>(null);
+  if (!askTextareaSizingControllerRef.current) {
+    askTextareaSizingControllerRef.current = createHelixAskComposerTextareaSizingController({
+      maxPromptLines: HELIX_ASK_CONSOLE_MAX_PROMPT_LINES,
+    });
+  }
   const askImageInputRef = useRef<HTMLInputElement | null>(null);
   const [agentRuntimeMenuOpen, setAgentRuntimeMenuOpen] = useState(false);
   const [agentRuntimeProviders, setAgentRuntimeProviders] = useState<HelixAgentRuntimeDescriptor[]>(
@@ -11086,17 +11101,7 @@ export function HelixAskPill({
   }, [getHelixAskSessionId, onOpenConversation, setActive]);
 
   const resizeTextarea = useCallback((target?: HTMLTextAreaElement | null) => {
-    const el = target ?? askInputRef.current;
-    if (!el || typeof window === "undefined") return;
-    el.style.height = "auto";
-    const styles = window.getComputedStyle(el);
-    const lineHeight = Number.parseFloat(styles.lineHeight || "20");
-    const paddingTop = Number.parseFloat(styles.paddingTop || "0");
-    const paddingBottom = Number.parseFloat(styles.paddingBottom || "0");
-    const maxHeight = lineHeight * HELIX_ASK_MAX_PROMPT_LINES + paddingTop + paddingBottom;
-    const nextHeight = Math.min(el.scrollHeight, maxHeight);
-    el.style.height = `${nextHeight}px`;
-    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+    askTextareaSizingControllerRef.current?.resize(target ?? askInputRef.current);
   }, []);
 
   useEffect(() => {
@@ -11114,14 +11119,9 @@ export function HelixAskPill({
     ) => {
       const input = options?.target ?? askInputRef.current;
       if (input) {
-        input.value = nextValue;
-        if (options?.focus) {
-          input.focus();
-          const cursor = input.value.length;
-          input.setSelectionRange(cursor, cursor);
-        }
-        resizeTextarea(input);
-        input.scrollTop = input.scrollHeight;
+        askTextareaSizingControllerRef.current?.syncValue(input, nextValue, {
+          focus: options?.focus,
+        });
       }
       askDraftRef.current = nextValue;
       const contextCapsuleIds = extractContextCapsuleIdsFromText(nextValue);

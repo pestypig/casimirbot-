@@ -121,6 +121,7 @@
     "helix:ask:api-parity": "tsx scripts/helix-ask-api-parity-probe.ts",
     "helix:ask:image-lens:acceptance": "tsx scripts/helix-ask-image-lens-acceptance-probe.ts",
     "helix:ask:scholarly-pdf-workbench": "tsx scripts/helix-ask-scholarly-pdf-workbench-probe.ts",
+    "helix:ask:research-workflow-replay": "tsx scripts/helix-ask-research-workflow-conversation-probe.ts",
     "helix:ask:live-spine-smoke": "tsx scripts/helix-ask-live-spine-smoke.ts",
     "helix:ask:user-prompt-corpus": "tsx scripts/helix-ask-user-prompt-corpus-probe.ts",
     "helix:ask:compound-live-probe": "tsx scripts/helix-ask-compound-capability-live-probe.ts",

@@ -47,6 +47,14 @@ export class CodexAppServerJsonRpcClient {
   private serverRequestHandler:
     | ((method: string, params: unknown) => Promise<unknown> | unknown)
     | null = null;
+  private serverResponseSentHandler:
+    | ((input: {
+        id: CodexAppServerJsonRpcId;
+        method: string;
+        params: unknown;
+        result: unknown;
+      }) => void)
+    | null = null;
 
   constructor(private readonly transport: CodexAppServerTransport) {
     transport.setMessageHandler((message: CodexAppServerJsonRpcMessage) => this.receive(message));
@@ -57,6 +65,17 @@ export class CodexAppServerJsonRpcClient {
     handler: (method: string, params: unknown) => Promise<unknown> | unknown,
   ): void {
     this.serverRequestHandler = handler;
+  }
+
+  setServerResponseSentHandler(
+    handler: (input: {
+      id: CodexAppServerJsonRpcId;
+      method: string;
+      params: unknown;
+      result: unknown;
+    }) => void,
+  ): void {
+    this.serverResponseSentHandler = handler;
   }
 
   onNotification(handler: (method: string, params: unknown) => void): () => void {
@@ -143,6 +162,18 @@ export class CodexAppServerJsonRpcClient {
       }
       const result = await this.serverRequestHandler(method, message.params);
       this.transport.send({ id: message.id, result: result ?? {} });
+      if (message.id !== undefined) {
+        try {
+          this.serverResponseSentHandler?.({
+            id: message.id,
+            method,
+            params: message.params,
+            result: result ?? {},
+          });
+        } catch {
+          // Debug lifecycle observers must not alter the app-server protocol.
+        }
+      }
     } catch (error) {
       const messageText = error instanceof Error ? error.message : String(error);
       this.transport.send({

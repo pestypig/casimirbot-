@@ -10,11 +10,15 @@ import {
 import { useMobileAppStore } from "@/store/useMobileAppStore";
 import { useWorkstationActionExecutionStore } from "@/store/useWorkstationActionExecutionStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
-import { recordWorkstationProcessGraphEvent } from "@/store/useWorkstationProcessGraphStore";
+import {
+  flushQueuedWorkstationProcessGraphEvents,
+  recordWorkstationProcessGraphEvent,
+} from "@/store/useWorkstationProcessGraphStore";
 import {
   WORKSTATION_PROCESS_GRAPH_EVENT,
   isWorkstationProcessGraphEvent,
 } from "./processGraphEvents";
+import type { WorkstationProcessGraphEvent } from "./processGraphTypes";
 
 const SELF_PANEL_ID = "workstation-process-graph";
 
@@ -60,27 +64,62 @@ function graphArtifactLabel(artifact: Record<string, unknown>, fallback: string)
   );
 }
 
-function recordPanelSnapshot(panelIds: string[], activePanelId?: string): void {
-  panelIds.forEach((panelId) => {
-    recordWorkstationProcessGraphEvent({
-      type: activePanelId === panelId ? "panel.focused" : "panel.opened",
+export type ProcessGraphPanelSnapshot = {
+  panelIds: ReadonlySet<string>;
+  activePanelId?: string;
+};
+
+export function diffProcessGraphPanelSnapshots(
+  previous: ProcessGraphPanelSnapshot,
+  next: ProcessGraphPanelSnapshot,
+): WorkstationProcessGraphEvent[] {
+  const events: WorkstationProcessGraphEvent[] = [];
+  next.panelIds.forEach((panelId) => {
+    if (previous.panelIds.has(panelId)) return;
+    events.push({
+      type: next.activePanelId === panelId ? "panel.focused" : "panel.opened",
       panelId,
       label: panelLabel(panelId),
     });
   });
+  if (
+    next.activePanelId &&
+    next.activePanelId !== previous.activePanelId &&
+    previous.panelIds.has(next.activePanelId)
+  ) {
+    events.push({
+      type: "panel.focused",
+      panelId: next.activePanelId,
+      label: panelLabel(next.activePanelId),
+    });
+  }
+  previous.panelIds.forEach((panelId) => {
+    if (next.panelIds.has(panelId)) return;
+    events.push({
+      type: "panel.closed",
+      panelId,
+      label: panelLabel(panelId),
+    });
+  });
+  return events;
 }
 
 export function startProcessGraphCapture(): () => void {
   if (typeof window === "undefined") return () => undefined;
 
-  let lastLayoutPanels = new Set<string>();
-  let lastMobilePanels = new Set<string>();
+  let lastLayoutSnapshot: ProcessGraphPanelSnapshot = { panelIds: new Set() };
+  let lastMobileSnapshot: ProcessGraphPanelSnapshot = { panelIds: new Set() };
   const executionStatuses = new Map<string, string>();
+  const record = (event: WorkstationProcessGraphEvent) => recordWorkstationProcessGraphEvent(event);
+  const recordPanelTransition = (
+    previous: ProcessGraphPanelSnapshot,
+    next: ProcessGraphPanelSnapshot,
+  ) => diffProcessGraphPanelSnapshots(previous, next).forEach(record);
 
   const onProcessGraphEvent = (event: Event) => {
     const detail = (event as CustomEvent<unknown>)?.detail;
     if (isWorkstationProcessGraphEvent(detail)) {
-      recordWorkstationProcessGraphEvent(detail);
+      record(detail);
     }
   };
 
@@ -88,7 +127,7 @@ export function startProcessGraphCapture(): () => void {
     const payload = (event as CustomEvent<HelixWorkstationProceduralStepPayload | null>)?.detail;
     if (!payload) return;
     const operationId = `${payload.traceId}:${payload.step}`;
-    recordWorkstationProcessGraphEvent({
+    record({
       type: "operation.started",
       operationId,
       operationKind: payload.step,
@@ -97,7 +136,7 @@ export function startProcessGraphCapture(): () => void {
       ts: new Date().toISOString(),
     });
     if (payload.panelId) {
-      recordWorkstationProcessGraphEvent({
+      record({
         type: "panel.focused",
         panelId: payload.panelId,
         label: panelLabel(payload.panelId),
@@ -122,7 +161,7 @@ export function startProcessGraphCapture(): () => void {
       const actionId = asString(action?.action_id) ?? asString(action?.action);
       const tool = panelId && actionId ? `${panelId}.${actionId}` : payload.entry.tool ?? "workstation.action";
       if (panelId === SELF_PANEL_ID) {
-        recordWorkstationProcessGraphEvent({
+        record({
           type: "panel.focused",
           panelId,
           label: panelLabel(panelId),
@@ -132,7 +171,7 @@ export function startProcessGraphCapture(): () => void {
         return;
       }
       if (panelId && (action?.action === "open_panel" || actionId === "open")) {
-        recordWorkstationProcessGraphEvent({
+        record({
           type: "panel.opened",
           panelId,
           label: panelLabel(panelId),
@@ -140,7 +179,7 @@ export function startProcessGraphCapture(): () => void {
           ts,
         });
       }
-      recordWorkstationProcessGraphEvent({
+      record({
         type: ok ? "tool.completed" : "tool.failed",
         tool,
         traceId,
@@ -150,7 +189,7 @@ export function startProcessGraphCapture(): () => void {
         ts,
       });
       if (artifact) {
-        recordWorkstationProcessGraphEvent({
+        record({
           type: "artifact.attached",
           artifactId: graphArtifactId(traceId, artifact, tool),
           artifactKind: graphArtifactKind(artifact),
@@ -166,7 +205,7 @@ export function startProcessGraphCapture(): () => void {
     if (kind === "job_started" || kind === "job_step_receipt" || kind === "job_completed") {
       const panelId = asString(meta?.panel_id);
       const jobId = asString(meta?.job_id) ?? traceId;
-      recordWorkstationProcessGraphEvent({
+      record({
         type: kind === "job_completed" ? "job.completed" : kind === "job_started" ? "job.started" : "job.step",
         jobId,
         label: payload.entry.text,
@@ -176,7 +215,7 @@ export function startProcessGraphCapture(): () => void {
         meta: meta ?? undefined,
       });
       if (artifact) {
-        recordWorkstationProcessGraphEvent({
+        record({
           type: "artifact.attached",
           artifactId: graphArtifactId(traceId, artifact, "job-artifact"),
           artifactKind: graphArtifactKind(artifact),
@@ -191,43 +230,22 @@ export function startProcessGraphCapture(): () => void {
 
   const stopLayout = useWorkstationLayoutStore.subscribe((state) => {
     const panelIds = Object.values(state.groups).flatMap((group) => group.panelIds);
-    const next = new Set(panelIds);
-    const activePanelId = state.groups[state.activeGroupId]?.activePanelId ?? undefined;
-    panelIds.forEach((panelId) => {
-      if (!lastLayoutPanels.has(panelId) || panelId === activePanelId) {
-        recordWorkstationProcessGraphEvent({
-          type: panelId === activePanelId ? "panel.focused" : "panel.opened",
-          panelId,
-          label: panelLabel(panelId),
-        });
-      }
-    });
-    lastLayoutPanels.forEach((panelId) => {
-      if (!next.has(panelId)) {
-        recordWorkstationProcessGraphEvent({
-          type: "panel.closed",
-          panelId,
-          label: panelLabel(panelId),
-        });
-      }
-    });
-    lastLayoutPanels = next;
+    const next: ProcessGraphPanelSnapshot = {
+      panelIds: new Set(panelIds),
+      activePanelId: state.groups[state.activeGroupId]?.activePanelId ?? undefined,
+    };
+    recordPanelTransition(lastLayoutSnapshot, next);
+    lastLayoutSnapshot = next;
   });
 
   const stopMobile = useMobileAppStore.subscribe((state) => {
     const panelIds = state.stack.map((entry) => entry.panelId);
-    const next = new Set(panelIds);
-    recordPanelSnapshot(panelIds, state.activeId);
-    lastMobilePanels.forEach((panelId) => {
-      if (!next.has(panelId)) {
-        recordWorkstationProcessGraphEvent({
-          type: "panel.closed",
-          panelId,
-          label: panelLabel(panelId),
-        });
-      }
-    });
-    lastMobilePanels = next;
+    const next: ProcessGraphPanelSnapshot = {
+      panelIds: new Set(panelIds),
+      activePanelId: state.activeId ?? undefined,
+    };
+    recordPanelTransition(lastMobileSnapshot, next);
+    lastMobileSnapshot = next;
   });
 
   const stopExecutions = useWorkstationActionExecutionStore.subscribe((state) => {
@@ -239,7 +257,7 @@ export function startProcessGraphCapture(): () => void {
       const traceId = execution.trace_id ?? execution.execution_id;
       const tool = `${execution.panel_id}.${execution.action_id}`;
       if (execution.status === "planned" || execution.status === "dispatched") {
-        recordWorkstationProcessGraphEvent({
+        record({
           type: "tool.requested",
           tool,
           traceId,
@@ -254,12 +272,17 @@ export function startProcessGraphCapture(): () => void {
   window.addEventListener(HELIX_ASK_LIVE_EVENT_BUS_EVENT, onLiveEvent as EventListener);
 
   const layoutState = useWorkstationLayoutStore.getState();
-  recordPanelSnapshot(
-    Object.values(layoutState.groups).flatMap((group) => group.panelIds),
-    layoutState.groups[layoutState.activeGroupId]?.activePanelId ?? undefined,
-  );
+  lastLayoutSnapshot = {
+    panelIds: new Set(Object.values(layoutState.groups).flatMap((group) => group.panelIds)),
+    activePanelId: layoutState.groups[layoutState.activeGroupId]?.activePanelId ?? undefined,
+  };
+  recordPanelTransition({ panelIds: new Set() }, lastLayoutSnapshot);
   const mobileState = useMobileAppStore.getState();
-  recordPanelSnapshot(mobileState.stack.map((entry) => entry.panelId), mobileState.activeId);
+  lastMobileSnapshot = {
+    panelIds: new Set(mobileState.stack.map((entry) => entry.panelId)),
+    activePanelId: mobileState.activeId ?? undefined,
+  };
+  recordPanelTransition({ panelIds: new Set() }, lastMobileSnapshot);
 
   return () => {
     window.removeEventListener(WORKSTATION_PROCESS_GRAPH_EVENT, onProcessGraphEvent as EventListener);
@@ -268,5 +291,6 @@ export function startProcessGraphCapture(): () => void {
     stopLayout();
     stopMobile();
     stopExecutions();
+    flushQueuedWorkstationProcessGraphEvents();
   };
 }

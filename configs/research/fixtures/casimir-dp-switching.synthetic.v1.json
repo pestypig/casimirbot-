@@ -1,0 +1,31 @@
+{
+  "schema_version": "casimir_dp_acquisition_sidecar/1",
+  "sidecar_id": "switching-synthetic-fixture-v1",
+  "candidate_id": "superconducting-nonlinear-force-boundary",
+  "evidence_class": "synthetic_fixture",
+  "acquisition_window_s": 1,
+  "blinded_boundary_label": "boundary-B",
+  "calibration_refs": [
+    "synthetic-calibration://switch-drive-v1",
+    "synthetic-calibration://thermometry-v1",
+    "synthetic-calibration://force-channel-v1"
+  ],
+  "observable_order": [
+    "modulation_frequency_Hz",
+    "dissipated_power_W",
+    "coupled_heat_W",
+    "force_mismatch_N"
+  ],
+  "observables": {
+    "modulation_frequency_Hz": { "value": 1000, "standard_uncertainty": 0.1, "unit": "Hz" },
+    "dissipated_power_W": { "value": 1e-9, "standard_uncertainty": 1e-11, "unit": "W" },
+    "coupled_heat_W": { "value": 2e-12, "standard_uncertainty": 2e-13, "unit": "W" },
+    "force_mismatch_N": { "value": 1e-15, "standard_uncertainty": 2e-16, "unit": "N" }
+  },
+  "covariance": [
+    [0.01, 0, 0, 0],
+    [0, 1e-22, 2e-25, 0],
+    [0, 2e-25, 4e-26, 0],
+    [0, 0, 0, 4e-32]
+  ]
+}

@@ -209,6 +209,35 @@ describe("research-paper-to-proposal workflow demo", () => {
     expect(projection.qte?.prompt).toContain("repeat pages 2");
   });
 
+  it("treats prose-only OCR from an equation-scoped page as a bounded retry signal", () => {
+    const payload = {
+      turn_id: "ask:page-2-prose-only",
+      observation: {
+        schema: "helix.image_lens_region_inspection_observation.v1",
+        capability: "visual_analysis.inspect_image_region",
+        source_id: "pdf-page-render:page-2",
+        page_number: 2,
+        extraction_status: "partial",
+        text_candidate: "The central engine remains active after the initial burst.",
+        latex_candidate: null,
+        quality_flags: [
+          "partial_extraction_status",
+          "no_ocr_or_latex_candidate",
+          "non_equation_text_candidate",
+        ],
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+    };
+
+    expect(extractHelixWorkflowDemoRetrySignalFromPayload(payload)).toMatchObject({
+      stepId: "ocr_math_candidate",
+      reason: "no_ocr_or_latex_candidate",
+      pageNumber: 2,
+      sourceId: "pdf-page-render:page-2",
+    });
+  });
+
   it("advances bounded retries from page 1 to page 3 and then exposes an exhausted typed blocker", () => {
     const session = sessionWith({
       ...createEmptyHelixWorkflowDemoEvidence(),

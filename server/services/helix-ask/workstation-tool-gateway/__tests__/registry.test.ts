@@ -4476,6 +4476,46 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.selected_chunks?.[0]?.citation_ref).toBe("paper#page=1");
   });
 
+  it("derives a canonical PDF URL from a bare old-style arXiv paper result id", async () => {
+    const requestedUrls: string[] = [];
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      requestedUrls.push(String(input));
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
+        arrayBuffer: async () => new TextEncoder().encode([
+          "<html><body>",
+          "<p>The magnetar analysis reports a bounded field-strength estimate and its observational assumptions.</p>",
+          "</body></html>",
+        ].join(" ")).buffer,
+      };
+    }) as typeof fetch;
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      arguments: {
+        query: "magnetar paper",
+        paper_result_id: "astro-ph/0503030v1",
+      },
+      turnId: "ask:test:gateway-scholarly-old-style-arxiv-id",
+      iteration: 8,
+    });
+
+    expect(requestedUrls).toContain("https://arxiv.org/pdf/astro-ph/0503030v1.pdf");
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      observation: {
+        source_url: "https://arxiv.org/pdf/astro-ph/0503030v1.pdf",
+        evidence_state: "full_text_usable",
+        selected_for_answer: true,
+      },
+    });
+  });
+
   it("tries later scholarly full-text candidates when the first selected paper is blocked", async () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

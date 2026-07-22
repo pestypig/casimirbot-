@@ -2,6 +2,11 @@
 
 Status: operational instruction.
 
+The canonical event sequence and runtime-versus-policy authority matrix are
+defined in `docs/architecture/helix-ask-canonical-turn-lifecycle.md`. Any new
+provider projection, continuation rule, or terminal shortcut must conform to
+that lifecycle contract.
+
 This note compares the current Helix Ask backend posture against the bundled
 Codex clone and sets the boundary for future work. It is intentionally a
 procedure contract, not a claim that Helix Ask behavior is deterministic.

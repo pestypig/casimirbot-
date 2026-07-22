@@ -1,6 +1,52 @@
 import { describe, expect, it } from "vitest";
 
 import { buildSolverArtifactReentryAudit } from "../services/helix-ask/solver-artifact-reentry-audit";
+import { createHelixTurnLifecycleRecorder } from "../services/helix-ask/runtime/turn-lifecycle";
+
+const buildVerifiedLifecycleWithoutObservations = (turnId: string) => {
+  const recorder = createHelixTurnLifecycleRecorder({
+    turnId,
+    scope: "codex_native_provider_cycle",
+    now: () => 100,
+  });
+  const started = recorder.append({
+    kind: "turn.started",
+    producer: "helix_adapter",
+    status: "started",
+  });
+  const message = recorder.append({
+    kind: "agent.message.completed",
+    producer: "codex_runtime",
+    status: "succeeded",
+    causation_id: started.event_id,
+    native_item_id: "agent-message:no-observation",
+    message_sha256: "hash:no-observation",
+  });
+  const runtime = recorder.append({
+    kind: "runtime.turn.completed",
+    producer: "codex_runtime",
+    status: "succeeded",
+    causation_id: message.event_id,
+    native_turn_id: "native-turn:no-observation",
+  });
+  const eligibility = recorder.append({
+    kind: "terminal.eligibility.checked",
+    producer: "helix_policy",
+    status: "succeeded",
+    causation_id: runtime.event_id,
+    terminal_kind: "agent_provider_terminal_candidate",
+    terminal_eligible: true,
+  });
+  recorder.append({
+    kind: "turn.completed",
+    producer: "helix_adapter",
+    status: "succeeded",
+    causation_id: eligibility.event_id,
+    terminal_kind: "agent_provider_terminal_candidate",
+    terminal_eligible: true,
+  });
+  return recorder.snapshot();
+};
 
 const basePayload = () => ({
   canonical_goal_frame: {
@@ -34,6 +80,75 @@ const basePayload = () => ({
 });
 
 describe("Helix solver artifact re-entry audit", () => {
+  it("does not let selected projections override a verified runtime event log", () => {
+    const turnId = "ask:verified-no-reentry";
+    const audit = buildSolverArtifactReentryAudit({
+      turnId,
+      terminalArtifactKind: "situation_context_pack",
+      terminalArtifactId: "artifact:terminal",
+      finalAnswerSource: "artifact_synthesis",
+      payload: {
+        ...basePayload(),
+        native_provider_turn_lifecycle: buildVerifiedLifecycleWithoutObservations(turnId),
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: "artifact:evidence",
+            kind: "doc_candidate_validation",
+            payload: { evidence_refs: ["obs:selected-only"] },
+          },
+        ],
+        capability_result: {
+          schema: "helix.capability_result.v1",
+          turn_id: turnId,
+          capability_plan_id: "capability_plan:selected-only",
+          status: "succeeded",
+          receipt_refs: [],
+          evidence_refs: ["obs:selected-only"],
+          selected_for_answer: true,
+          reentered_solver: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        loop_parity_trace: {
+          evidence_selected_for_answer: ["artifact:evidence"],
+          evidence_rejected_for_answer: [],
+        },
+        ask_turn_solver_trace: {
+          schema: "helix.ask_turn_solver_trace.v1",
+          completed_solver_path: true,
+          evidence_reentry_gate: {
+            selected_evidence_refs: ["obs:selected-only"],
+            receipts_reentered: [],
+            projections_reentered: [],
+            rejected_evidence_refs: [],
+          },
+        },
+      },
+    });
+
+    expect(audit).toMatchObject({
+      ok: false,
+      reentry_authority: "runtime_event_log",
+      runtime_lifecycle_verified: true,
+    });
+    expect(audit.failure_codes).toEqual(expect.arrayContaining([
+      "artifact_not_reentered",
+      "capability_result_not_reentered",
+    ]));
+    expect(audit.terminal_relevant_artifacts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        ref: "artifact:evidence",
+        selected_as_support: true,
+        reentered_solver: false,
+      }),
+      expect.objectContaining({
+        kind: "capability_result",
+        reentered_solver: false,
+        failure_codes: expect.arrayContaining(["capability_result_not_reentered"]),
+      }),
+    ]));
+  });
+
   it("flags selected artifacts that never re-entered the solver", () => {
     const audit = buildSolverArtifactReentryAudit({
       turnId: "ask:not-reentered",

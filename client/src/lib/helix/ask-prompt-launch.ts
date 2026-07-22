@@ -1,5 +1,6 @@
 import { navigate } from "wouter/use-browser-location";
 import type { ResearchPaperToProposalStepId } from "@shared/contracts/helix-workflow-demo.v1";
+import type { HelixRealtimeGroundedFeedbackBindingV1 } from "@shared/contracts/helix-realtime-stage-play.v1";
 import {
   isHelixAgentRuntimeId,
   type HelixAgentRuntimeId,
@@ -88,6 +89,8 @@ export type HelixAskGenericRouteMetadata = {
   contextResumeFrame?: Record<string, unknown> | null;
   selectedRuntimeAgentProvider?: string | null;
   selected_runtime_agent_provider?: string | null;
+  realtimeGroundedFeedbackBinding?: HelixRealtimeGroundedFeedbackBindingV1;
+  realtime_grounded_feedback_binding?: HelixRealtimeGroundedFeedbackBindingV1;
 };
 
 export type HelixAskRouteMetadata =

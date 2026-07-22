@@ -1,0 +1,179 @@
+{
+  "schema_version": "casimir_dp_next_computations/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-gated-computations-stage1-v1",
+  "evidence_cutoff": "2026-07-21",
+  "claim_tier": "diagnostic",
+  "run_order": [
+    "freeze_gated_computation_protocol",
+    "validate_equilibrium_lifshitz_solver",
+    "apply_finite_geometry_and_material_authority_gates",
+    "ingest_switching_and_decoherence_sidecars",
+    "compute_rigid_sphere_dp_convergence",
+    "apply_dp_bounds_and_provenance_gate",
+    "estimate_rate_only_statistical_power",
+    "apply_dynamics_signature_identifiability_gate",
+    "audit_manifold_response_registration",
+    "write_hashed_stage1_receipt",
+    "update_study_evidence_ledger"
+  ],
+  "lifshitz_cases": [
+    {
+      "case_id": "ideal-parallel-plate-validation-300K-100nm",
+      "input": {
+        "schema_version": "casimir_lifshitz/1",
+        "gap_m": 1e-7,
+        "temperature_K": 300,
+        "material_1": {
+          "kind": "ideal_conductor",
+          "label": "ideal conductor reference A",
+          "evidence_class": "literature_anchored",
+          "source_ref": "https://doi.org/10.1103/RevModPhys.81.1827",
+          "artifact_sha256": null
+        },
+        "material_2": {
+          "kind": "ideal_conductor",
+          "label": "ideal conductor reference B",
+          "evidence_class": "literature_anchored",
+          "source_ref": "https://doi.org/10.1103/RevModPhys.81.1827",
+          "artifact_sha256": null
+        },
+        "geometry": { "kind": "parallel_plates", "area_m2": 1e-8 },
+        "numerics": {
+          "max_matsubara_terms": 1024,
+          "integration_subdivisions": 400,
+          "integration_tail_y": 40,
+          "relative_term_tolerance": 1e-8,
+          "consecutive_small_terms": 6
+        }
+      }
+    },
+    {
+      "case_id": "gold-drude-sphere-plate-pfa-300K-100nm",
+      "input": {
+        "schema_version": "casimir_lifshitz/1",
+        "gap_m": 1e-7,
+        "temperature_K": 300,
+        "material_1": {
+          "kind": "drude",
+          "label": "gold-like Drude literature model A",
+          "evidence_class": "literature_anchored",
+          "source_ref": "https://doi.org/10.1103/RevModPhys.81.1827",
+          "artifact_sha256": null,
+          "plasma_frequency_rad_s": 1.367e16,
+          "damping_rad_s": 5.317e13
+        },
+        "material_2": {
+          "kind": "drude",
+          "label": "gold-like Drude literature model B",
+          "evidence_class": "literature_anchored",
+          "source_ref": "https://doi.org/10.1103/RevModPhys.81.1827",
+          "artifact_sha256": null,
+          "plasma_frequency_rad_s": 1.367e16,
+          "damping_rad_s": 5.317e13
+        },
+        "geometry": { "kind": "sphere_plate_pfa", "sphere_radius_m": 5e-5 },
+        "numerics": {
+          "max_matsubara_terms": 1024,
+          "integration_subdivisions": 400,
+          "integration_tail_y": 40,
+          "relative_term_tolerance": 1e-8,
+          "consecutive_small_terms": 6
+        }
+      }
+    }
+  ],
+  "unsupported_boundary_models": [
+    {
+      "candidate_id": "cryo-levitated-gated-2d",
+      "status": "not_ready",
+      "required_operator": "finite-temperature 2D conductivity/reflection matrix with gate-state receipts"
+    },
+    {
+      "candidate_id": "cryo-resonator-superconducting",
+      "status": "not_ready",
+      "required_operator": "superconducting optical response across transition plus finite drum geometry"
+    },
+    {
+      "candidate_id": "matter-wave-photo-semiconductor",
+      "status": "not_ready",
+      "required_operator": "time-resolved photoexcited dielectric response and nonequilibrium force model"
+    }
+  ],
+  "switching_sidecar": {
+    "sidecar_id": "levitated-switching-design-assumption-v1",
+    "candidate_id": "cryo-levitated-gated-2d",
+    "modulation_frequency": { "value": 1000, "standard_uncertainty": 10, "unit": "Hz", "evidence_class": "design_assumption", "source_ref": "campaign-config", "raw_artifact_sha256": null },
+    "dissipated_power": { "value": 1e-9, "standard_uncertainty": 5e-10, "unit": "W", "evidence_class": "design_assumption", "source_ref": "campaign-config", "raw_artifact_sha256": null },
+    "coupled_heat": { "value": 1e-12, "standard_uncertainty": 5e-13, "unit": "W", "evidence_class": "design_assumption", "source_ref": "campaign-config", "raw_artifact_sha256": null },
+    "force_mismatch": { "value": 1.634e-26, "standard_uncertainty": 1.634e-26, "unit": "N", "evidence_class": "design_assumption", "source_ref": "ideal-reference-screen", "raw_artifact_sha256": null },
+    "acquisition_window_s": 0.1,
+    "calibration_refs": []
+  },
+  "decoherence_sidecar": {
+    "sidecar_id": "levitated-decoherence-design-assumption-v1",
+    "candidate_id": "cryo-levitated-gated-2d",
+    "terms": {
+      "gas": { "value": 0.05, "standard_uncertainty": 0.025, "unit": "s^-1", "evidence_class": "design_assumption", "source_ref": "campaign-config", "raw_artifact_sha256": null },
+      "blackbody": { "value": 0.2, "standard_uncertainty": 0.1, "unit": "s^-1", "evidence_class": "design_assumption", "source_ref": "campaign-config", "raw_artifact_sha256": null },
+      "thermal": { "value": 0.4, "standard_uncertainty": 0.2, "unit": "s^-1", "evidence_class": "design_assumption", "source_ref": "campaign-config", "raw_artifact_sha256": null },
+      "vibration": { "value": 0.3, "standard_uncertainty": 0.15, "unit": "s^-1", "evidence_class": "design_assumption", "source_ref": "campaign-config", "raw_artifact_sha256": null },
+      "electromagnetic": { "value": 0.5, "standard_uncertainty": 0.25, "unit": "s^-1", "evidence_class": "design_assumption", "source_ref": "campaign-config", "raw_artifact_sha256": null },
+      "readout": { "value": 0.6, "standard_uncertainty": 0.3, "unit": "s^-1", "evidence_class": "design_assumption", "source_ref": "campaign-config", "raw_artifact_sha256": null },
+      "switching": { "value": 0.1, "standard_uncertainty": 0.05, "unit": "s^-1", "evidence_class": "design_assumption", "source_ref": "campaign-config", "raw_artifact_sha256": null }
+    },
+    "covariance_s2": null,
+    "acquisition_window_s": 0.1,
+    "blinded_boundary_labels": true
+  },
+  "dp_campaign": {
+    "campaign_id": "levitated-rigid-sphere-grid-convergence-v1",
+    "candidate_id": "cryo-levitated-gated-2d",
+    "mass_kg": 1e-18,
+    "radius_m": 5e-8,
+    "branch_separation_m": 2e-8,
+    "ell_m": 2e-9,
+    "grid_dimensions": [12, 14, 16],
+    "padding_radii": 1,
+    "max_voxels": 4096,
+    "density_evidence_class": "design_assumption",
+    "density_source_ref": "campaign-config",
+    "convergence_relative_tolerance": 0.25
+  },
+  "power_plan": {
+    "baseline_rate_s": 2.15,
+    "observation_time_s": 0.1,
+    "type_i_error": 0.05,
+    "target_power": 0.9,
+    "technical_variance_inflation": 2,
+    "target_rate_source": "rigid_sphere_dp_campaign"
+  },
+  "dynamics_signature": {
+    "schema_version": "casimir_dp_dynamics_signature/1",
+    "observable_ids": ["coherence_rate", "phase_shift", "heating_rate", "switch_correlation"],
+    "standard_decoherence_signature": [1, 1, 1, 1],
+    "collapse_signature": null,
+    "one_sigma_uncertainties": [0.1, 0.1, 0.1, 0.1],
+    "collapse_signature_source_ref": null,
+    "maximum_whitened_cosine": 0.95
+  },
+  "manifold_response_registration": {
+    "status": "blocked",
+    "model_id": null,
+    "source_ref": null,
+    "renormalized_stress_tensor_prescription": null,
+    "stress_noise_kernel_prescription": null,
+    "causal_metric_response_kernel": null,
+    "gauge_and_coordinate_contract": null,
+    "metric_to_coherence_dynamics": null,
+    "complete_positivity_or_consistency_proof": null,
+    "standard_model_recovery_limit": null,
+    "frozen_parameter_manifest": null,
+    "required_falsifiers": [
+      "matched-heating control removes an apparent boundary residual",
+      "cavity-detuned control preserves the residual when the proposed stress change vanishes",
+      "registered gap/material/separation scaling disagrees with held-out data",
+      "secondary phase/correlation observable follows an ordinary switching model"
+    ]
+  }
+}

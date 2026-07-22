@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { HelixWorkstationGatewayListResult } from "../workstation-tool-gateway/types";
 import type {
   HelixCapabilityLaneGoalDispatchAdmission,
@@ -11,6 +12,65 @@ import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
 
 const toDebugRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+const INLINE_IMAGE_DATA_URL_PATTERN =
+  /data:(image\/[a-z0-9.+-]+);base64,[a-z0-9+/_=\r\n-]+(?:#[^\s"'\\}\]]+)?/gi;
+
+export const sanitizeHelixAgentProviderPublicPayload = <T extends Record<string, unknown>>(payload: T): T => {
+  const seen = new WeakSet<object>();
+  const replacementCache = new Map<string, string>();
+  let redactedReferenceCount = 0;
+  let redactedEncodedChars = 0;
+
+  const sanitizeString = (value: string): string =>
+    value.replace(INLINE_IMAGE_DATA_URL_PATTERN, (matched, mediaType: string) => {
+      redactedReferenceCount += 1;
+      redactedEncodedChars += matched.length;
+      const cached = replacementCache.get(matched);
+      if (cached) return cached;
+      const replacement = [
+        "helix-inline-image-ref:redacted",
+        `mime=${mediaType.toLowerCase()}`,
+        `sha256=${crypto.createHash("sha256").update(matched).digest("hex")}`,
+        `encoded_chars=${matched.length}`,
+      ].join(";");
+      replacementCache.set(matched, replacement);
+      return replacement;
+    });
+
+  const visit = (value: unknown): void => {
+    if (!value || typeof value !== "object" || seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      value.forEach((entry, index) => {
+        if (typeof entry === "string") value[index] = sanitizeString(entry);
+        else visit(entry);
+      });
+      return;
+    }
+    const record = value as Record<string, unknown>;
+    Object.entries(record).forEach(([key, entry]) => {
+      if (typeof entry === "string") record[key] = sanitizeString(entry);
+      else visit(entry);
+    });
+  };
+
+  visit(payload);
+  const sizeControl = {
+    schema: "helix.agent_provider_public_payload_size_control.v1",
+    inline_image_references_redacted: redactedReferenceCount,
+    unique_inline_images_redacted: replacementCache.size,
+    inline_image_encoded_chars_removed: redactedEncodedChars,
+    raw_inline_images_included: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+  payload.provider_response_size_control = sizeControl;
+  const debug = toDebugRecord(payload.debug);
+  if (Object.keys(debug).length > 0) debug.provider_response_size_control = sizeControl;
+  return payload;
+};
 
 const buildSelectedAgentProviderProjection = (provider: HelixAgentProvider) => ({
   id: provider.id,
@@ -240,7 +300,7 @@ export const buildHelixAgentProviderAskPayload = (input: {
     gatewayManifest: input.gatewayManifest,
   });
 
-  return {
+  const payload = {
     ...input.providerResult,
     turn_id: input.turnId,
     ...committedRouteProjection,
@@ -256,4 +316,5 @@ export const buildHelixAgentProviderAskPayload = (input: {
       ...projectionFields,
     },
   };
+  return sanitizeHelixAgentProviderPublicPayload(payload);
 };

@@ -1,3 +1,5 @@
+import { readVerifiedHelixRuntimeLifecycleFromPayload } from "./runtime/turn-lifecycle";
+
 type RecordLike = Record<string, unknown>;
 
 const readRecord = (value: unknown): RecordLike | null =>
@@ -71,6 +73,16 @@ export const providerPostObservationCompletionMaterialized = (input: {
   const providerBridge =
     readRecord(input.payload.provider_terminal_authority_bridge) ??
     ledgerProviderBridge(ledger, input.turnId);
+  const verifiedRuntimeLifecycle = readVerifiedHelixRuntimeLifecycleFromPayload({
+    payload: input.payload,
+    turnId: input.turnId,
+  });
+  const runtimeSolverCompletionObserved = Boolean(
+    verifiedRuntimeLifecycle?.reduction.runtime_turn_completed &&
+    verifiedRuntimeLifecycle.reduction.terminal_outcome === "completed" &&
+    verifiedRuntimeLifecycle.reduction.post_observation_reasoning_completed &&
+    verifiedRuntimeLifecycle.reduction.final_agent_message_event_id,
+  );
 
   const candidateRef =
     readString(writer?.selected_terminal_artifact_ref) ||
@@ -114,7 +126,7 @@ export const providerPostObservationCompletionMaterialized = (input: {
     readString(providerReentry?.turn_id) === input.turnId &&
     readString(providerReentry?.status) === "completed" &&
     providerReentry?.evidence_reentered === true &&
-    providerReentry?.solver_completed === true &&
+    (providerReentry?.solver_completed === true || runtimeSolverCompletionObserved) &&
     providerReentry?.goal_satisfaction_compatible === true &&
     readString(providerReentry?.provider_terminal_candidate_ref) === candidateRef;
   const bridgeProvesCompletion =
@@ -122,7 +134,7 @@ export const providerPostObservationCompletionMaterialized = (input: {
     providerBridge?.terminal_authority_granted === true &&
     providerBridge?.final_visible_answer_authorized === true &&
     providerBridge?.all_observations_succeeded === true &&
-    providerBridge?.solver_completed === true &&
+    (providerBridge?.solver_completed === true || runtimeSolverCompletionObserved) &&
     providerBridge?.goal_satisfaction_compatible === true &&
     readString(providerBridge?.provider_terminal_candidate_ref) === candidateRef;
 

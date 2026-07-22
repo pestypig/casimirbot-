@@ -101,6 +101,7 @@ export const updateAdmittedRealtimeSession = (input: {
     HelixRealtimeAdmittedSession,
     | "providerCallId"
     | "providerCallRef"
+    | "threadId"
     | "sidebandState"
     | "inputSpeechActive"
     | "responseActive"

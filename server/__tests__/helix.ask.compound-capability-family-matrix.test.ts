@@ -654,6 +654,54 @@ describe("Helix Ask compound capability family matrix", () => {
     ]));
   });
 
+  it("keeps a multi-step scholarly pipeline on the route-authorized scholarly answer product", () => {
+    const payload = {
+      canonical_goal_frame: {
+        goal_kind: "agent_provider_gateway_turn",
+        required_terminal_kind: "scholarly_research_answer",
+      },
+      route_product_contract: {
+        required_terminal_kind: "scholarly_research_answer",
+        allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+      },
+      compound_capability_contract: {
+        requires_all_subgoals: true,
+        subgoals: [
+          {
+            requested_capability: "scholarly-research.lookup_papers",
+            runtime_capability: "scholarly-research.lookup_papers",
+          },
+          {
+            requested_capability: "scholarly-research.fetch_full_text",
+            runtime_capability: "scholarly-research.fetch_full_text",
+          },
+        ],
+      },
+      compound_capability_synthesis_readiness: {
+        applies: true,
+        complete: false,
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        subgoal_terminal_kinds: ["scholarly_research_answer"],
+        terminal_contribution_kinds: ["scholarly_research_answer"],
+      },
+    };
+
+    const policy = readCompoundTerminalPolicy(payload);
+    const applied = applyCompoundTerminalPolicy(payload, {
+      allowed: ["scholarly_research_answer", "typed_failure"],
+      forbidden: [],
+      requiredTerminalKind: "scholarly_research_answer",
+    });
+
+    expect(policy).toMatchObject({
+      active: true,
+      required_terminal_kind: "scholarly_research_answer",
+    });
+    expect(policy.allowed_terminal_artifact_kinds).toContain("scholarly_research_answer");
+    expect(applied.requiredTerminalKind).toBe("scholarly_research_answer");
+    expect(applied.allowed).toContain("scholarly_research_answer");
+  });
+
   it("reads compound terminal policy from the runtime intent packet itinerary", () => {
     const payload = {
       runtime_intent_packet: {

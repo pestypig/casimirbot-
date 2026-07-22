@@ -34,4 +34,29 @@ describe("Realtime workstation source binding", () => {
       document_ref: "Authorization: Bearer secret-token-value",
     })).toEqual({ focus_panel_id: "docs-viewer" });
   });
+
+  it("preserves admitted shared-room identity while refreshing workstation context", () => {
+    expect(mergeRealtimeWorkstationSourceBinding({
+      base: {
+        thread_id: "helix-ask:room:room-1",
+        room_id: "room-1",
+        room_runtime_id: "room-runtime-1",
+        participant_id: "participant-owner",
+        shared_context_mode: "single_shared_model",
+        focus_panel_id: "docs-viewer",
+      },
+      current: {
+        room_id: "room-spoofed",
+        participant_id: "participant-spoofed",
+        focus_panel_id: "image-lens",
+      },
+    })).toEqual({
+      thread_id: "helix-ask:room:room-1",
+      room_id: "room-1",
+      room_runtime_id: "room-runtime-1",
+      participant_id: "participant-owner",
+      shared_context_mode: "single_shared_model",
+      focus_panel_id: "image-lens",
+    });
+  });
 });

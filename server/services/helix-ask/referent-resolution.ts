@@ -306,6 +306,34 @@ const conversationalReferentPhrase = (prompt: string): string | null => {
   ) {
     return null;
   }
+  if (
+    /\b(?:do\s+not|don't|dont|without|avoid|ignore|disregard)\b[\s\S]{0,100}\b(?:this|that|the|same|selected)\s+(?:doc(?:ument)?|paper|pdf|source|page|one)\b/i.test(unquoted) ||
+    /\b(?:later|eventually|next\s+time|in\s+the\s+future|previously|earlier|historically)\b[\s\S]{0,120}\b(?:find|get|fetch|open|retrieve|download|extract|inspect|read|use|choose|pick|take|search|locate|go\s+with|work\s+with)\b[\s\S]{0,100}\b(?:this|that|the|same|selected)\s+(?:doc(?:ument)?|paper|pdf|source|page|one)\b/i.test(unquoted)
+  ) {
+    return null;
+  }
+  const naturalSelectionReferent =
+    /\b(?:(?:let['’]?s|please|ok(?:ay)?|then|now)\s+)?(?:use|choose|pick|take|go\s+with|work\s+with|continue\s+with)\s+(?:this|that|the)\s+one\b/i.test(unquoted);
+  const naturalSourceExtraction =
+    /\b(?:pull\s+out|extract|summari[sz]e|identify|show|list|walk\s+(?:me\s+)?through)\b[\s\S]{0,100}\b(?:useful|important|key|relevant|main|substantive|scientific)\b[\s\S]{0,50}\b(?:parts?|points?|sections?|passages?|findings?|content|material)\b/i.test(unquoted);
+  if (naturalSelectionReferent && naturalSourceExtraction) {
+    return "deictic_previous_evidence_source";
+  }
+  if (naturalSelectionReferent) {
+    return "deictic_previous_assistant_answer";
+  }
+  if (
+    /\b(?:get|fetch|open|retrieve|download|read|inspect|parse|analy[sz]e)\b[\s\S]{0,100}\b(?:this|that|the|same|selected)\s+(?:doc(?:ument)?|paper|pdf|source)\b/i.test(unquoted) ||
+    /\b(?:tell\s+me|report|summari[sz]e|explain|list|identify)\b[\s\S]{0,100}\b(?:what\s+)?(?:it|this\s+paper|that\s+paper|the\s+paper)\s+(?:reports?|reported|measures?|measured|shows?|showed|finds?|found|contains?)\b/i.test(unquoted)
+  ) {
+    return "deictic_previous_evidence_source";
+  }
+  if (
+    /\b(?:find|extract|inspect|read|use|search|locate|identify|show|summarize|analyse|analyze)\b[\s\S]{0,140}\b(?:in|from|within|on|using)\s+(?:this|that|the|same|selected)\s+(?:doc(?:ument)?|paper|pdf|source|page)\b/i.test(unquoted) ||
+    /\b(?:in|from|within|on|using)\s+(?:this|that|the|same|selected)\s+(?:doc(?:ument)?|paper|pdf|source|page)\b[\s\S]{0,140}\b(?:find|extract|inspect|read|use|search|locate|identify|show|summarize|analyse|analyze)\b/i.test(unquoted)
+  ) {
+    return "deictic_previous_evidence_source";
+  }
   if (isAffirmativeTheoryBadgeGraphReferentPrompt(prompt)) {
     return "deictic_previous_assistant_answer";
   }
@@ -359,7 +387,9 @@ export const resolveHelixAskConversationalReferent = (
   }
   const minimumTopicMatches = Math.max(1, Math.ceil(topicTerms.length * 0.6));
   const theoryGraphReferentPrompt = isAffirmativeTheoryBadgeGraphReferentPrompt(readQuestion(body));
-  const substantiveCandidates = theoryGraphReferentPrompt
+  const evidenceSourceReferentPrompt = referentPhrase === "deictic_previous_evidence_source";
+  const skipNonSubstantiveCandidates = theoryGraphReferentPrompt || evidenceSourceReferentPrompt;
+  const substantiveCandidates = skipNonSubstantiveCandidates
     ? candidates.filter((candidate) =>
         !conversationalReferentTextCannotSupplyRequestedEvidence(candidate.text))
     : candidates;
@@ -386,7 +416,7 @@ export const resolveHelixAskConversationalReferent = (
       }),
     };
   }
-  if (theoryGraphReferentPrompt && matchingCandidates.length === 0) {
+  if (skipNonSubstantiveCandidates && matchingCandidates.length === 0) {
     return {
       resolvedText: null,
       trace: blankConversationalReferentTrace({
@@ -406,7 +436,7 @@ export const resolveHelixAskConversationalReferent = (
   }
   const selectedAnswer = matchingCandidates[0] ?? candidates[0]!;
   const skippedNonSubstantiveLatest = Boolean(
-    theoryGraphReferentPrompt &&
+    skipNonSubstantiveCandidates &&
     candidates[0] &&
     selectedAnswer.ref !== candidates[0].ref,
   );

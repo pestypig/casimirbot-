@@ -5,6 +5,7 @@ import {
   appendHelixTerminalRejectionObservationToPayload,
   buildHelixAgentContinuationState,
   buildHelixTerminalRejectionObservation,
+  formatHelixAgentContinuationStateForRuntime,
   resolveHelixContinuationBudgetExtension,
 } from "../agent-continuation-state";
 
@@ -88,6 +89,40 @@ describe("agent continuation state", () => {
     });
   });
 
+  it("lets the runtime propose an initial manifest capability without granting execution authority", () => {
+    const state = buildHelixAgentContinuationState({
+      payload: {
+        goal_satisfaction_evaluation: { satisfaction: "unknown" },
+        current_turn_artifact_ledger: [],
+      },
+      turnId: "ask:continuation",
+      trigger: "initial",
+      capabilityProposal: {
+        allowed: true,
+        admittedCapabilityIds: [
+          "live_translation.translate_text",
+          "visual_analysis.inspect_image_region",
+        ],
+      },
+    });
+
+    expect(state).toMatchObject({
+      allowed_decisions: ["act", "answer"],
+      next_admissible_affordances: [],
+      capability_proposal: {
+        allowed: true,
+        admitted_capability_ids: [
+          "live_translation.translate_text",
+          "visual_analysis.inspect_image_region",
+        ],
+        authority: "helix_policy_admits_runtime_proposal",
+      },
+    });
+    expect(formatHelixAgentContinuationStateForRuntime(state)).toContain(
+      "This is a proposal, not admission: Helix independently validates",
+    );
+  });
+
   it("marks new observations and resolved requirements as progress after an attempt", () => {
     const firstPayload: Record<string, unknown> = {
       goal_satisfaction_evaluation: {
@@ -139,6 +174,117 @@ describe("agent continuation state", () => {
     });
   });
 
+  it("preserves inline scholarly recovery arguments as an executable lane request", () => {
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: ["semantic_scholar_http_429"],
+      },
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [
+        artifact({
+          id: "ask:continuation:scholarly-lookup:1",
+          kind: "scholarly_research_observation",
+          payload: {
+            next_affordances: [{
+              capability: "scholarly-research.lookup_papers",
+              reason: "semantic_scholar_http_429",
+              query: "magnetar primary research observations",
+            }],
+          },
+        }),
+      ],
+    };
+
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: {
+        attempt_id: "attempt:scholarly-lookup",
+        capability_id: "scholarly-research.lookup_papers",
+        args: { query: "magnetar primary research" },
+        status: "failed",
+        failure_code: "semantic_scholar_http_429",
+        retryability: "retryable",
+      },
+    });
+
+    expect(state.next_admissible_affordances).toEqual([
+      expect.objectContaining({
+        capability_id: "scholarly-research.lookup_papers",
+        args: { query: "magnetar primary research observations" },
+        lane_request: {
+          capability: "scholarly-research.lookup_papers",
+          query: "magnetar primary research observations",
+        },
+        admissible: true,
+        tried: false,
+      }),
+    ]);
+    expect(state.allowed_decisions).toEqual(expect.arrayContaining(["act", "retry"]));
+    expect(state.allowed_decisions).not.toContain("answer");
+  });
+
+  it("includes nested lane request arguments in affordance identity", () => {
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: ["full_text_evidence"],
+      },
+      current_turn_artifact_ledger: [
+        artifact({
+          id: "ask:continuation:full-text-affordance",
+          kind: "scholarly_full_text_observation",
+          payload: {
+            next_admissible_affordances: [{
+              affordance_id: "affordance:fetch-selected-paper",
+              lane_request: {
+                capability: "scholarly-research.fetch_full_text",
+                paper_result_id: "paper:magnetar:1",
+                source_url: "https://example.test/magnetar.pdf",
+              },
+              reason: "selected_paper_requires_full_text",
+            }],
+          },
+        }),
+      ],
+    };
+
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+    });
+
+    expect(state.next_admissible_affordances[0]).toMatchObject({
+      capability_id: "scholarly-research.fetch_full_text",
+      args: {
+        paper_result_id: "paper:magnetar:1",
+        source_url: "https://example.test/magnetar.pdf",
+      },
+      lane_request: {
+        capability: "scholarly-research.fetch_full_text",
+        paper_result_id: "paper:magnetar:1",
+        source_url: "https://example.test/magnetar.pdf",
+      },
+    });
+    const alternatePayload = structuredClone(payload);
+    const alternateLedger = alternatePayload.current_turn_artifact_ledger as Array<Record<string, unknown>>;
+    const alternateArtifactPayload = alternateLedger[0]?.payload as Record<string, unknown>;
+    const alternateAffordance = (alternateArtifactPayload.next_admissible_affordances as Array<Record<string, unknown>>)[0];
+    expect(alternateAffordance).toBeDefined();
+    if (!alternateAffordance) throw new Error("expected alternate scholarly affordance fixture");
+    (alternateAffordance.lane_request as Record<string, unknown>).paper_result_id = "paper:magnetar:2";
+    const alternateState = buildHelixAgentContinuationState({
+      payload: alternatePayload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+    });
+    expect(alternateState.next_admissible_affordances[0]?.action_fingerprint)
+      .not.toBe(state.next_admissible_affordances[0]?.action_fingerprint);
+  });
+
   it.each([
     "docs.read_current",
     "visual_analysis.inspect_image_region",
@@ -183,7 +329,8 @@ describe("agent continuation state", () => {
       hard: { iterations: 8, tool_calls: 6, model_decisions: 8 },
     });
 
-    expect(state.allowed_decisions).toEqual(expect.arrayContaining(["act", "retry", "answer"]));
+    expect(state.allowed_decisions).toEqual(expect.arrayContaining(["act", "retry"]));
+    expect(state.allowed_decisions).not.toContain("answer");
     expect(extension).toEqual({
       extend: true,
       reason: "progress_under_soft_budget_pressure",
@@ -412,7 +559,7 @@ describe("agent continuation state", () => {
       failure_code: "missing_post_tool_model_step",
       retryability: "retryable",
     });
-    expect(state.allowed_decisions).toEqual(expect.arrayContaining(["retry", "answer"]));
+    expect(state.allowed_decisions).toEqual(["retry"]);
   });
 
   it("reopens a previously satisfied goal when terminal authority rejects the answer", () => {
@@ -450,7 +597,38 @@ describe("agent continuation state", () => {
       failure_code: "route_requires_synthesis",
       retryability: "retryable",
     });
-    expect(state.allowed_decisions).toEqual(expect.arrayContaining(["retry", "answer"]));
+    expect(state.allowed_decisions).toEqual(["retry"]);
+  });
+
+  it("lets the runtime propose one bounded recovery when retry is allowed without a concrete affordance", () => {
+    const state = buildHelixAgentContinuationState({
+      payload: {
+        goal_satisfaction_evaluation: {
+          satisfaction: "unsatisfied",
+          missing_requirement_ids: ["scholarly_pdf_cache_unavailable"],
+        },
+        agent_loop_budget: budget(),
+        current_turn_artifact_ledger: [],
+      },
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: {
+        attempt_id: "attempt:image-lens-page-2",
+        capability_id: "visual_analysis.inspect_image_region",
+        status: "failed",
+        failure_class: "missing_evidence",
+        failure_code: "scholarly_pdf_cache_unavailable",
+        failure_message: "Fetch the exact paper full text before rendering page 2.",
+        retryability: "retryable",
+      },
+    });
+
+    expect(state.allowed_decisions).toEqual(["retry"]);
+    expect(state.next_admissible_affordances).toEqual([]);
+    const runtimeText = formatHelixAgentContinuationStateForRuntime(state);
+    expect(runtimeText).toContain("propose exactly one bounded recovery capability");
+    expect(runtimeText).toContain("Helix must independently admit the capability and arguments");
+    expect(runtimeText).not.toContain("Tools and retries require an admitted affordance");
   });
 
   it("treats the hard boundary as a resource stop while retaining answer authority", () => {

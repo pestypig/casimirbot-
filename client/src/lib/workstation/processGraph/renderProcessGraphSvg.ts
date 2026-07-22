@@ -8,7 +8,7 @@ import type {
 import { escapeSvgText } from "./svgEscape";
 
 type RenderProcessGraphSvgOptions = {
-  graph: WorkstationProcessGraphState;
+  graph: Pick<WorkstationProcessGraphState, "nodes" | "edges">;
   width?: number;
   height?: number;
   mood?: LumaMood;

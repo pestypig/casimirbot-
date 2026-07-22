@@ -23,7 +23,7 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
   lineCountAtInventory: 23740,
-  exportedComponentStartsAtLine: 6374,
+  exportedComponentStartsAtLine: 6383,
   liveRenderSliceStartsAtLine: 23524,
   liveLegacyConsoleViewStartsAtLine: 23524,
   inventoryReason:
@@ -212,6 +212,13 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
     source: "ask-console",
     evidence:
       "The live composer textarea props now run through buildHelixAskComposerTextareaState while draft syncing, paste handling, submit request wiring, input refs, and prompt admission remain in the bridge.",
+  },
+  {
+    key: "composer_textarea_sizing_controller",
+    classification: "behavior_sensitive_recrowned_with_parity",
+    source: "ask-console",
+    evidence:
+      "Textarea value synchronization, focus/cursor placement, bounded auto-sizing, cached style metrics, native-input write avoidance, and scroll positioning now run through HelixAskComposerTextareaSizing while the legacy bridge retains only the textarea ref and controller call-through.",
   },
   {
     key: "composer_prompt_history_navigation",

@@ -19,6 +19,10 @@ import { explicitCapabilityContractForCapability } from "./explicit-capability-c
 import { buildToolUseRestatement } from "./internet-search-intent";
 import { asksForScientificImageTextEvidenceComparison } from "@shared/helix-scientific-image-intent";
 import { resolveAuthoritativeLivePipelineRoute } from "./live-pipeline-route-authority";
+import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+} from "./contextual-tool-admission";
 
 type RecordLike = Record<string, unknown>;
 
@@ -36,6 +40,20 @@ const readStringArray = (value: unknown): string[] =>
     : [];
 
 const unique = (entries: string[]): string[] => Array.from(new Set(entries.filter(Boolean)));
+
+const asksForScholarlyPdfImageLensWorkflow = (promptText: string): boolean => {
+  const suppression = detectContextualToolAdmissionSuppression(promptText);
+  if (contextualToolSuppressionBlocksFamily(suppression, "visual_capture")) {
+    return false;
+  }
+  const unquoted = promptText.replace(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g, " ");
+  return (
+    /\b(?:open|render|load|mount|inspect|read|extract|show)\b/i.test(unquoted) &&
+    /\b(?:image[_\s-]?lens|visual_analysis\.inspect_image_region)\b/i.test(unquoted) &&
+    /\b(?:pdf\s+)?page\s*(?:number\s*)?\d{1,4}\b/i.test(unquoted) &&
+    /\b(?:doi|arxiv|pdf|paper|article|full[-\s]?text)\b|\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i.test(unquoted)
+  );
+};
 
 const readLedgerArtifactRefsByKind = (payload: RecordLike, kind: string): string[] => {
   const ledger: unknown[] = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
@@ -425,6 +443,8 @@ export function buildCommittedAskRoute(input: {
 }): HelixCommittedAskRoute {
   const affirmativeScientificImageComparison =
     asksForScientificImageTextEvidenceComparison(input.promptText);
+  const affirmativeScholarlyPdfImageLensWorkflow =
+    asksForScholarlyPdfImageLensWorkflow(input.promptText);
   const authoritativeLivePipelineRoute = resolveAuthoritativeLivePipelineRoute({
     turnId: input.turnId,
     canonicalGoalFrame: readRecord(input.payload.canonical_goal_frame),
@@ -460,10 +480,23 @@ export function buildCommittedAskRoute(input: {
       (
         existing.route.source_target === "agent_provider_gateway_turn" ||
         existing.canonical_goal.required_terminal_kind === "scholarly_recovery_plan" ||
-        existing.canonical_goal.goal_kind === "agent_provider_gateway_turn"
+          existing.canonical_goal.goal_kind === "agent_provider_gateway_turn"
+      );
+    const shouldRepairExistingScholarlyPdfImageLensRoute =
+      affirmativeScholarlyPdfImageLensWorkflow &&
+      (
+        existing.route.source_target !== "scholarly_research" ||
+        existing.route.target_kind !== "scholarly_research" ||
+        existing.canonical_goal.required_terminal_kind !== "scholarly_research_answer" ||
+        !existing.capability_policy.allowed_tool_families.includes("visual_analysis") ||
+        !existing.capability_policy.allowed_tool_families.includes("scholarly_research") ||
+        !existing.capability_policy.required_capability_families.includes("visual_analysis") ||
+        existing.terminal_product.evidence_reentry_required !== true ||
+        existing.terminal_product.followup_reasoning_required !== true
       );
     const shouldRepairExistingExplicitCapabilityRoute =
       !shouldRepairExistingScientificImageComparisonRoute &&
+      !shouldRepairExistingScholarlyPdfImageLensRoute &&
       Boolean(explicitCapabilityContract) &&
       explicitCapabilityContract?.required_terminal_kind !== existing.canonical_goal.required_terminal_kind;
     const existingRawGoal = readCanonicalGoal(input.payload);
@@ -494,6 +527,12 @@ export function buildCommittedAskRoute(input: {
             "workstation_tool_evaluation",
             "typed_failure",
           ])
+      : shouldRepairExistingScholarlyPdfImageLensRoute
+        ? unique([
+            ...existing.canonical_goal.allowed_terminal_artifact_kinds,
+            "scholarly_research_answer",
+            "typed_failure",
+          ])
       : shouldRepairExistingScientificImageComparisonRoute
         ? unique([
             ...existing.canonical_goal.allowed_terminal_artifact_kinds,
@@ -514,6 +553,10 @@ export function buildCommittedAskRoute(input: {
           )
       : shouldRepairExistingCalculatorGatewayRoute
         ? existing.canonical_goal.forbidden_terminal_artifact_kinds.filter((kind) => kind !== "workstation_tool_evaluation")
+      : shouldRepairExistingScholarlyPdfImageLensRoute
+        ? existing.canonical_goal.forbidden_terminal_artifact_kinds.filter(
+            (kind) => normalizeCommittedRouteTerminalKind(kind) !== "scholarly_research_answer",
+          )
       : shouldRepairExistingScientificImageComparisonRoute
         ? existing.canonical_goal.forbidden_terminal_artifact_kinds.filter((kind) =>
             ![
@@ -529,6 +572,8 @@ export function buildCommittedAskRoute(input: {
         ? explicitCapabilityContract.required_terminal_kind
       : shouldRepairExistingCalculatorGatewayRoute
         ? "workstation_tool_evaluation"
+      : shouldRepairExistingScholarlyPdfImageLensRoute
+        ? "scholarly_research_answer"
       : shouldRepairExistingScientificImageComparisonRoute
         ? "scholarly_research_answer"
       : existing.canonical_goal.required_terminal_kind;
@@ -542,6 +587,7 @@ export function buildCommittedAskRoute(input: {
       !shouldRepairExistingModelOnlyRoute &&
       !shouldRepairExistingCalculatorGatewayRoute &&
       !shouldRepairExistingExplicitCapabilityRoute &&
+      !shouldRepairExistingScholarlyPdfImageLensRoute &&
       !shouldRepairExistingScientificImageComparisonRoute
     ) return existing;
     const requiredTerminalProduct =
@@ -557,6 +603,8 @@ export function buildCommittedAskRoute(input: {
             ? explicitCapabilityContract.plan_family
           : shouldRepairExistingCalculatorGatewayRoute
             ? "calculator_solve"
+          : shouldRepairExistingScholarlyPdfImageLensRoute
+            ? "scholarly_research_lookup"
           : shouldRepairExistingScientificImageComparisonRoute
             ? "scholarly_research_lookup"
           : existing.canonical_goal.goal_kind,
@@ -572,6 +620,14 @@ export function buildCommittedAskRoute(input: {
             strength: "hard",
             route_reason: "explicit_capability_contract",
           }
+        : shouldRepairExistingScholarlyPdfImageLensRoute
+          ? {
+              ...existing.route,
+              source_target: "scholarly_research",
+              target_kind: "scholarly_research",
+              strength: "hard",
+              route_reason: "retained_scholarly_pdf_image_lens_workflow",
+            }
         : shouldRepairExistingScientificImageComparisonRoute
           ? {
               ...existing.route,
@@ -596,6 +652,20 @@ export function buildCommittedAskRoute(input: {
               familyForSourceTarget(explicitCapabilityContract.source_target),
             ]),
           }
+        : shouldRepairExistingScholarlyPdfImageLensRoute
+          ? {
+              ...existing.capability_policy,
+              allowed_tool_families: unique([
+                ...existing.capability_policy.allowed_tool_families,
+                "scholarly_research",
+                "visual_analysis",
+              ]),
+              required_capability_families: unique([
+                ...existing.capability_policy.required_capability_families,
+                "scholarly_research",
+                "visual_analysis",
+              ]),
+            }
         : shouldRepairExistingScientificImageComparisonRoute
           ? {
               ...existing.capability_policy,
@@ -610,10 +680,15 @@ export function buildCommittedAskRoute(input: {
         : existing.capability_policy,
       terminal_product: {
         ...existing.terminal_product,
-        evidence_reentry_required: shouldRepairExistingExplicitCapabilityRoute || shouldRepairExistingScientificImageComparisonRoute
+        evidence_reentry_required:
+          shouldRepairExistingExplicitCapabilityRoute ||
+          shouldRepairExistingScholarlyPdfImageLensRoute ||
+          shouldRepairExistingScientificImageComparisonRoute
           ? true
           : existing.terminal_product.evidence_reentry_required,
-        followup_reasoning_required: shouldRepairExistingScientificImageComparisonRoute
+        followup_reasoning_required:
+          shouldRepairExistingScholarlyPdfImageLensRoute ||
+          shouldRepairExistingScientificImageComparisonRoute
           ? true
           : shouldRepairExistingExplicitCapabilityRoute
           ? false
@@ -641,6 +716,13 @@ export function buildCommittedAskRoute(input: {
         targetKind: "scientific_image_evidence_sidecar",
         strength: "hard" as const,
         reason: "retained_scientific_image_text_comparison",
+      }
+    : affirmativeScholarlyPdfImageLensWorkflow
+    ? {
+        sourceTarget: "scholarly_research",
+        targetKind: "scholarly_research",
+        strength: "hard" as const,
+        reason: "scholarly_pdf_image_lens_workflow",
       }
     : explicitCapabilityContract
     ? {
@@ -698,6 +780,8 @@ export function buildCommittedAskRoute(input: {
       }
     : affirmativeScientificImageComparison
     ? { goalKind: "scholarly_research_lookup", requiredTerminalKind: "scholarly_research_answer" }
+    : affirmativeScholarlyPdfImageLensWorkflow
+    ? { goalKind: "scholarly_research_lookup", requiredTerminalKind: "scholarly_research_answer" }
     : shouldUseModelOnlyGoal
     ? { goalKind: "model_only_concept", requiredTerminalKind: "direct_answer_text" }
     : explicitCapabilityContract
@@ -721,6 +805,9 @@ export function buildCommittedAskRoute(input: {
           "model_synthesized_answer",
           "typed_failure",
         ]
+      : []),
+    ...(affirmativeScholarlyPdfImageLensWorkflow
+      ? ["scholarly_research_answer", "typed_failure"]
       : []),
     ...modelOnlyTerminalAliases,
     goal.requiredTerminalKind !== "unknown" ? goal.requiredTerminalKind : "",
@@ -746,12 +833,16 @@ export function buildCommittedAskRoute(input: {
   });
   const allowedTerminalKinds = compoundPolicy.allowed;
   const forbiddenTerminalKinds = compoundPolicy.forbidden;
-  const suppressedFamilies = suppressedFamiliesFromPayload(input.payload, input.promptInterpretation);
+  const rawSuppressedFamilies = suppressedFamiliesFromPayload(input.payload, input.promptInterpretation);
+  const suppressedFamilies = affirmativeScholarlyPdfImageLensWorkflow
+    ? rawSuppressedFamilies.filter((family) => !["scholarly_research", "visual_analysis"].includes(family))
+    : rawSuppressedFamilies;
   const allowedFamilies = unique([
     ...allowedFamiliesFromPayload(input.payload, effectiveRoute.sourceTarget),
     ...(explicitCapabilityContract?.admission_families ?? []),
     ...(explicitCapabilityContract ? [explicitCapabilityContract.capability_family] : []),
     ...toolUseRestatement.requiredToolFamilies,
+    ...(affirmativeScholarlyPdfImageLensWorkflow ? ["scholarly_research", "visual_analysis"] : []),
   ])
     .filter((family) => !suppressedFamilies.includes(family));
   const sourceTargetIntent = readRecord(input.payload.source_target_intent);
@@ -817,7 +908,11 @@ export function buildCommittedAskRoute(input: {
     capability_policy: {
       allowed_tool_families: allowedFamilies,
       suppressed_tool_families: suppressedFamilies,
-      required_capability_families: requiredFamily ? [requiredFamily] : [],
+      required_capability_families: affirmativeScholarlyPdfImageLensWorkflow
+        ? ["scholarly_research", "visual_analysis"]
+        : requiredFamily
+          ? [requiredFamily]
+          : [],
       mutating_families_allowed: suppressedFamilies.length === 0 && negativeConstraints.length === 0,
     },
     suppression: {
@@ -830,10 +925,12 @@ export function buildCommittedAskRoute(input: {
       terminal_authority_required: true,
       evidence_reentry_required:
         affirmativeScientificImageComparison ||
+        affirmativeScholarlyPdfImageLensWorkflow ||
         sourceBacked ||
         readStringArray(routeContract?.required_artifact_refs).length > 0,
       followup_reasoning_required:
         affirmativeScientificImageComparison ||
+        affirmativeScholarlyPdfImageLensWorkflow ||
         (sourceBacked && terminalProductRequiresFollowupReasoning(requiredTerminalProduct)),
       required_terminal_product: requiredTerminalProduct,
     },

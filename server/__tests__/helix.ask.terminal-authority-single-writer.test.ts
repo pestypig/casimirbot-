@@ -388,6 +388,113 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.selected_final_answer).toBe(answerText);
   });
 
+  it("blocks terminal selection while the runtime agent still owes an admitted continuation action", () => {
+    const turnId = "ask:test:agent-continuation-action-pending";
+    const directAnswerRef = `${turnId}:direct_answer_text`;
+    const artifacts = [{
+      artifact_id: directAnswerRef,
+      kind: "direct_answer_text",
+      payload: {
+        schema: "helix.direct_answer_text.v1",
+        artifact_id: directAnswerRef,
+        text: "A premature bounded answer.",
+        answer_text: "A premature bounded answer.",
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    }];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      response_type: "final_answer",
+      final_status: "completed",
+      selected_final_answer: "A premature bounded answer.",
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "direct_answer_text",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_kind: "direct_answer_text",
+        allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+      agent_continuation_state: {
+        schema: "helix.agent_continuation_state.v1",
+        state_id: `${turnId}:agent_continuation_state:2`,
+        allowed_decisions: ["act", "retry"],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("solver_continuation_pending");
+    expect(String(payload.selected_final_answer)).toContain("solver continuation is required");
+    expect(result.rejected_candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ reason: "solver_continuation_pending" }),
+    ]));
+  });
+
+  it("does not project stale answer prose through a newly selected typed failure", () => {
+    const turnId = "ask:test:agent-continuation-stale-failure-projection";
+    const staleAnswer = "The observed search found two relevant magnetar reviews.";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      ok: false,
+      response_type: "final_failure",
+      final_status: "final_failure",
+      selected_final_answer: staleAnswer,
+      answer: staleAnswer,
+      text: staleAnswer,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      agent_continuation_state: {
+        schema: "helix.agent_continuation_state.v1",
+        state_id: `${turnId}:agent_continuation_state:2`,
+        allowed_decisions: ["act", "retry"],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [],
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.visible_text).toContain("solver continuation is required");
+    expect(result.visible_text).not.toBe(staleAnswer);
+    expect(result.writes).toMatchObject({
+      payload_text: result.visible_text,
+      payload_answer: result.visible_text,
+      payload_selected_final_answer: result.visible_text,
+      terminal_presentation_concise_text: result.visible_text,
+      debug_selected_final_answer: result.visible_text,
+    });
+    expect(payload.selected_final_answer).toBe(result.visible_text);
+    expect((payload.terminal_presentation as Record<string, unknown>).concise_text)
+      .toBe(result.visible_text);
+  });
+
   it("surfaces an authorized provider terminal candidate after Moral Graph observation re-entry", () => {
     const turnId = "ask:test:moral-graph-provider-terminal";
     const observationRef = `${turnId}:codex_normalized:moral_graph_reflection:1`;
@@ -894,6 +1001,192 @@ describe("Helix terminal authority single writer", () => {
     ]));
   });
 
+  it("materializes an authorized scholarly answer after lookup and full-text steps stay within one route family", () => {
+    const turnId = "ask:test:scholarly-provider-same-family-pipeline";
+    const lookupRef = `${turnId}:workstation_gateway:scholarly-research.lookup_papers:1`;
+    const fullTextRef = `${turnId}:workstation_gateway:scholarly-research.fetch_full_text:1`;
+    const observationRefs = [lookupRef, fullTextRef];
+    const providerCandidateRef = `${turnId}:agent_provider_terminal_candidate:codex:scholarly`;
+    const answerText = [
+      "The selected magnetar paper was fetched as machine-readable full text.",
+      "It reports observing frequencies, flux-density changes, pulse-profile evolution, and scatter broadening.",
+      "The reported measurements are grounded in the selected scholarly observations.",
+    ].join(" ");
+    const artifacts = [
+      {
+        artifact_id: lookupRef,
+        kind: "provider_gateway_observation_packet",
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          turn_id: turnId,
+          capability_key: "scholarly-research.lookup_papers",
+          status: "succeeded",
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: fullTextRef,
+        kind: "provider_gateway_observation_packet",
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          turn_id: turnId,
+          capability_key: "scholarly-research.fetch_full_text",
+          status: "succeeded",
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const terminalAuthority = {
+      schema: "helix.turn_terminal_authority.v1",
+      thread_id: "thread:test",
+      turn_id: turnId,
+      route: "/ask",
+      terminal_kind: "answer",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_item_id: providerCandidateRef,
+      server_authoritative: true,
+      terminal_eligible: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const terminalPresentation = {
+      schema: "helix.terminal_presentation.v1",
+      turn_id: turnId,
+      concise_text: answerText,
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_authority_ref: providerCandidateRef,
+      selected_observation_refs: observationRefs,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const providerCandidate = {
+      schema: "helix.agent_provider_terminal_candidate.v1",
+      candidate_id: providerCandidateRef,
+      turn_id: turnId,
+      candidate_text: answerText,
+      grounded_in_observation_refs: observationRefs,
+      normalized_observation_refs: observationRefs,
+      evidence_reentry_required: true,
+      provider_reasoning_completed: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Can you get the PDF for that paper and tell me what measurements it reports?",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "scholarly_research",
+        required_terminal_kind: "scholarly_research_answer",
+        allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "agent_provider_gateway_turn",
+        required_terminal_kind: "scholarly_research_answer",
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "source_backed",
+        relevant_tool_families: ["scholarly_research"],
+        terminal_success_criteria: {
+          required_observation_families: ["scholarly_research"],
+          requires_post_observation_synthesis: true,
+        },
+      },
+      compound_capability_contract: {
+        schema: "helix.compound_capability_contract.v1",
+        turn_id: turnId,
+        requires_all_subgoals: true,
+        terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+        subgoals: [
+          {
+            subgoal_id: `${turnId}:codex_compound_subgoal:1`,
+            requested_capability: "scholarly-research.lookup_papers",
+            runtime_capability: "scholarly-research.lookup_papers",
+          },
+          {
+            subgoal_id: `${turnId}:codex_compound_subgoal:2`,
+            requested_capability: "scholarly-research.fetch_full_text",
+            runtime_capability: "scholarly-research.fetch_full_text",
+          },
+        ],
+      },
+      current_turn_artifact_ledger: artifacts,
+      terminal_answer_authority: terminalAuthority,
+      terminal_presentation: terminalPresentation,
+      provider_terminal_candidate: providerCandidate,
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        turn_id: turnId,
+        status: "completed",
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        normalized_observations_ready: true,
+        all_observations_succeeded: true,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        successful_gateway_observation_refs: observationRefs,
+        normalized_observation_refs: observationRefs,
+        terminal_answer_authority: terminalAuthority,
+        terminal_presentation: terminalPresentation,
+        provider_terminal_candidate: providerCandidate,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("scholarly_research_answer");
+    expect(result.visible_text).toBe(answerText);
+    expect(payload.provider_route_product_materialization).toMatchObject({
+      materialized_terminal_artifact_kind: "scholarly_research_answer",
+      selected_observation_refs: observationRefs,
+      status: "materialized",
+    });
+    expect(payload.provider_route_product_materialization_diagnostic).toMatchObject({
+      required_terminal_kind: "scholarly_research_answer",
+      provider_route_product_materialized: true,
+      provider_route_product_eligibility: {
+        target_kind: "scholarly_research_answer",
+        route_allows_target_kind: true,
+        rejection_reason: null,
+      },
+    });
+    expect(payload.terminal_error_code).toBeUndefined();
+  });
+
   it("preserves a current-turn authorized provider bridge when a later typed failure overwrites top-level terminal fields", () => {
     const turnId = "ask:test:docs-provider-bridge-recovery";
     const observationRef = `${turnId}:workstation_gateway:docs.search:1`;
@@ -1003,6 +1296,119 @@ describe("Helix terminal authority single writer", () => {
       authority_shape_valid: true,
       presentation_shape_valid: true,
       current_turn_support_ref_count: 1,
+      rejection_reason: null,
+    });
+  });
+
+  it("materializes an authorized provider candidate as route-required direct answer text", () => {
+    const turnId = "ask:test:provider-direct-answer-route-product";
+    const observationRef = `${turnId}:capability_lane:live_translation.translate_text:1`;
+    const providerCandidateRef = `${turnId}:agent_provider_terminal_candidate:codex:translation`;
+    const answerText = "The translation is hola.";
+    const terminalAuthority = {
+      schema: "helix.turn_terminal_authority.v1",
+      thread_id: "thread:test",
+      turn_id: turnId,
+      route: "/ask/turn",
+      terminal_kind: "answer",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_item_id: providerCandidateRef,
+      server_authoritative: true,
+    };
+    const terminalPresentation = {
+      schema: "helix.terminal_presentation.v1",
+      turn_id: turnId,
+      concise_text: answerText,
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_authority_ref: providerCandidateRef,
+      selected_observation_refs: [observationRef],
+    };
+    const artifacts = [{
+      artifact_id: observationRef,
+      kind: "agent_step_observation_packet",
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: turnId,
+        capability_key: "live_translation.translate_text",
+        status: "succeeded",
+      },
+    }];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt: "Translate hello to Spanish.",
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        route: { selected_route: "/ask/turn", source_target: "model_only" },
+        canonical_goal: {
+          goal_kind: "model_only_concept",
+          required_terminal_kind: "direct_answer_text",
+          allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+        },
+      },
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_kind: "direct_answer_text",
+        allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+      },
+      route_evidence_authority: {
+        turn_id: turnId,
+        terminal_product_allowed: true,
+        required_terminal_kind: "direct_answer_text",
+        allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+      },
+      current_turn_artifact_ledger: artifacts,
+      terminal_answer_authority: terminalAuthority,
+      terminal_presentation: terminalPresentation,
+      provider_terminal_candidate: {
+        candidate_id: providerCandidateRef,
+        candidate_text: answerText,
+        grounded_in_observation_refs: [observationRef],
+        normalized_observation_refs: [observationRef],
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        terminal_answer_authority: terminalAuthority,
+        terminal_presentation: terminalPresentation,
+      },
+    };
+
+    const materialized = materializeAgentProviderRouteProductTerminal({
+      payload,
+      artifacts,
+      turnId,
+      requiredTerminalKind: "direct_answer_text",
+      routeAllowsTerminalKind: (kind) => kind === "direct_answer_text",
+    });
+
+    expect(materialized).toMatchObject({
+      kind: "direct_answer_text",
+      text: answerText,
+      supportRefs: [observationRef],
+      artifact: {
+        kind: "direct_answer_text",
+        payload: { schema: "helix.direct_answer_text.v1" },
+      },
+    });
+    expect(inspectAgentProviderRouteProductEligibility({
+      payload,
+      artifacts,
+      turnId,
+      requiredTerminalKind: "direct_answer_text",
+      routeAllowsTerminalKind: (kind) => kind === "direct_answer_text",
+    })).toMatchObject({
+      target_kind: "direct_answer_text",
+      provider_authored_target_kind: true,
+      route_allows_target_kind: true,
       rejection_reason: null,
     });
   });
@@ -4027,9 +4433,129 @@ describe("Helix terminal authority single writer", () => {
         failure_class: "terminal_authority",
         retryability: "retryable",
       },
-      allowed_decisions: expect.arrayContaining(["retry", "answer"]),
+      allowed_decisions: ["retry"],
       terminal_eligible: false,
       assistant_answer: false,
+    });
+  });
+
+  it("preserves a grounded provider observation blocker as a specific typed failure", () => {
+    const turnId = "ask:test:grounded-provider-observation-blocker";
+    const observation = makePostToolObservation(turnId);
+    const observationRef = String(observation.artifact_id);
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:visual`;
+    const blockerText = [
+      "Page 2 inspection cannot be completed from the re-entered evidence.",
+      `- Observation ref: \`${observationRef}\``,
+      "- Extraction status: `blocked_missing_visual_extraction_fields`",
+      "The current-turn packet exposes the observation reference but not its extraction payload, so asserting an equation would invent evidence.",
+    ].join("\n");
+    const artifacts = [observation];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "Opening panel: Image Lens.",
+      terminal_artifact_kind: "workspace_action_receipt",
+      final_answer_source: "legacy_fallback",
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        provider_terminal_candidate_ref: candidateRef,
+        capability_lane_observation_refs: [observationRef],
+        successful_capability_lane_observation_refs: [],
+        normalized_observation_refs: [observationRef],
+        all_observations_succeeded: false,
+        terminal_authority_status: "blocked_by_observation_state",
+        terminal_authority_granted: false,
+        final_visible_answer_authorized: false,
+      },
+      provider_terminal_candidate: {
+        schema: "helix.agent_provider_terminal_candidate.v1",
+        candidate_id: candidateRef,
+        turn_id: turnId,
+        candidate_text_preview: blockerText,
+        grounded_in_observation_refs: [observationRef],
+        normalized_observation_refs: [observationRef],
+        provider_reasoning_completed: true,
+        terminal_eligible: false,
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("blocked_missing_visual_extraction_fields");
+    expect(payload.selected_final_answer).toBe(blockerText);
+    expect(payload.typed_failure).toMatchObject({
+      error_code: "blocked_missing_visual_extraction_fields",
+      provider_terminal_candidate_ref: candidateRef,
+      grounded_observation_refs: [observationRef],
+      provider_terminal_authority_status: "blocked_by_observation_state",
+    });
+  });
+
+  it("preserves a Research Library sign-in precondition as the terminal failure", () => {
+    const turnId = "ask:test:research-library-profile-session-required";
+    const observation = {
+      artifact_id: `${turnId}:obs`,
+      kind: "agent_step_observation_packet",
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: turnId,
+        capability_key: "research-library.read_document",
+        status: "blocked",
+        missing_requirements: [{
+          code: "profile_session_required",
+          message: "Sign in before reading private saved research evidence.",
+          repair_action: "ask_user",
+        }],
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    const artifacts = [observation];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      current_turn_artifact_ledger: artifacts,
+      workstation_gateway_call_results: [{
+        schema: "helix.workstation_tool_gateway.call_result.v1",
+        ok: false,
+        capability_id: "research-library.read_document",
+        error: "profile_session_required",
+        gateway_admission: {
+          requested_capability: "research-library.read_document",
+          admission_status: "blocked",
+          blocked_reason: "profile_session_required",
+        },
+      }],
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("profile_session_required");
+    expect(payload.selected_final_answer).toBe(
+      "Sign in to access the private Research Library, then retry this request.",
+    );
+    expect(payload.typed_failure).toMatchObject({
+      error_code: "profile_session_required",
+      first_broken_rail: "tool_admission",
+      repair_target: "account_session",
+      selected_capability: "research-library.read_document",
     });
   });
 
@@ -4196,6 +4722,96 @@ describe("Helix terminal authority single writer", () => {
       complete: false,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("derives a fail-closed itinerary from a committed source-backed route", () => {
+    const turnId = "ask:test:committed-scholarly-route-missing-observation";
+    const draftText = "A plausible bibliography produced without a scholarly observation.";
+    const artifacts = [{
+      artifact_id: `${turnId}:final_answer_draft`,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        text: draftText,
+        authority: "llm_post_observation_composer",
+      },
+    }];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        canonical_goal: {
+          goal_kind: "scholarly_research_lookup",
+          required_terminal_kind: "scholarly_research_answer",
+          allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+          forbidden_terminal_artifact_kinds: ["direct_answer_text"],
+        },
+        route: {
+          selected_route: "/ask",
+          source_target: "scholarly_research",
+          target_kind: "scholarly_research",
+          route_reason: "scholarly_research_source_admission",
+          strength: "hard",
+        },
+        capability_policy: {
+          allowed_tool_families: ["scholarly_research"],
+          suppressed_tool_families: [],
+          required_capability_families: ["scholarly_research"],
+          mutating_families_allowed: false,
+        },
+        terminal_product: {
+          terminal_authority_required: true,
+          evidence_reentry_required: true,
+          followup_reasoning_required: true,
+          required_terminal_product: "scholarly_research_answer",
+        },
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "scholarly_research",
+        allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+      },
+      canonical_goal_frame: {
+        goal_kind: "scholarly_research_lookup",
+        required_terminal_kind: "scholarly_research_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("capability_itinerary_observations_missing");
+    expect(payload.selected_final_answer).not.toBe(draftText);
+    expect(payload.capability_itinerary).toMatchObject({
+      schema: "helix.capability_itinerary.v1",
+      prompt_shape: "source_backed",
+      source: "committed_ask_route_terminal_fallback",
+      terminal_success_criteria: {
+        required_observation_families: ["scholarly_research"],
+        requires_post_observation_synthesis: true,
+      },
+    });
+    expect(payload.capability_itinerary_execution_state).toMatchObject({
+      applies: true,
+      observed_families: [],
+      missing_observation_families: ["scholarly_research"],
+      complete: false,
     });
   });
 

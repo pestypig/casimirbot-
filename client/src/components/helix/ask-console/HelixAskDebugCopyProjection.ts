@@ -2,6 +2,7 @@ import { hashDebugExportText } from "@/lib/agi/debugExport";
 import {
   normalizedDebugReplyText,
 } from "@/lib/helix/ask-debug-event-display";
+import { sanitizeHelixAskTurnAdmissionContinuationDebug } from "@/lib/agi/helixAskTurnAdmissionContinuation";
 import { readAgentLoopAuditRecord } from "@/lib/helix/ask-runtime-authority-readers";
 import {
   buildVoiceClientDebugProjectionFields,
@@ -67,10 +68,19 @@ export function buildHelixAskClientProjectionDebugFields(
 ): Record<string, unknown> {
   const liveVoiceSnapshot = getVoiceCaptureDiagnosticsSnapshot();
   const liveVoice = liveVoiceSnapshot ? sanitizeVoiceDiagnosticsForExport(liveVoiceSnapshot) : null;
-  return buildVoiceClientDebugProjectionFields({
-    localPayload,
-    liveVoice,
-  });
+  const localDebug = readAgentLoopAuditRecord(localPayload.debug);
+  const askTurnAdmissionContinuation = sanitizeHelixAskTurnAdmissionContinuationDebug(
+    localPayload.client_ask_turn_admission_continuation ??
+      localPayload.ask_turn_admission_continuation ??
+      localDebug?.ask_turn_admission_continuation,
+  );
+  return {
+    ...buildVoiceClientDebugProjectionFields({
+      localPayload,
+      liveVoice,
+    }),
+    ask_turn_admission_continuation: askTurnAdmissionContinuation,
+  };
 }
 
 function readMaterializedTerminal(parsed: Record<string, unknown>): {
@@ -242,7 +252,7 @@ export async function resolveHelixAskAuthoritativeDebugExportPayload(localPayloa
     const clientWorkflowDemoDebug =
       readAgentLoopAuditRecord(parsed.workflow_demo_debug) ??
       readAgentLoopAuditRecord(readAgentLoopAuditRecord(parsed.channels)?.workflowDemo);
-    const mergedPayload = {
+    const mergedPayload: Record<string, unknown> = {
       ...authoritativePayload,
       ...mergeHelixAskRuntimeGoalDebugFields(authoritativePayload, parsed),
       debug_export_source: "backend_endpoint",
@@ -253,6 +263,8 @@ export async function resolveHelixAskAuthoritativeDebugExportPayload(localPayloa
       client_console_assembly_debug: clientConsoleAssemblyDebug,
       client_projection_payload_hash: hashDebugExportText(localPayload),
       client_debug_projection: clientProjection,
+      client_ask_turn_admission_continuation:
+        clientProjection.ask_turn_admission_continuation ?? null,
       client_voice_debug: clientProjection.voice,
       client_voice_authority_debug: clientProjection.voice_authority_debug,
       client_voice_playback_receipts: clientProjection.voice_playback_receipts,

@@ -23,11 +23,15 @@ import {
   subscribeVisualFrameProducerFrames,
   type VisualFrameProducerClientFrame,
 } from "@/lib/helix/visualFrameProducer";
-import { createHelixAskRealtimeProviderEventHandler } from "./HelixAskRealtimeProviderEventHandler";
+import {
+  createHelixAskRealtimeProviderEventHandler,
+  type HelixAskRealtimeProviderEventProjection,
+} from "./HelixAskRealtimeProviderEventHandler";
 import { getAudioFocusSnapshot } from "@/lib/audio-focus";
 import {
   beginHelixAskLiveRuntimeClientDebugAttempt,
   recordHelixAskLiveRuntimeClientDebugEvent,
+  recordHelixAskLiveRuntimeCompletedOutputTranscript,
   recordHelixAskLiveRuntimeServerStagePlayDebug,
   recordHelixAskLiveRuntimeVisualFrameReceipt,
 } from "./HelixAskLiveRuntimeDebugState";
@@ -112,6 +116,7 @@ export const useHelixAskLiveRuntimeSession = (input: {
   mode: HelixLiveRuntimeAgentMode;
   authority: HelixLiveRuntimeAgentAuthority;
   selectedRuntimeAgentProvider: HelixAgentRuntimeId;
+  directVisualInputSuppressed?: boolean;
   initialLifecycleState?: HelixAskLiveRuntimeLifecycleState;
   initialTransportState?: HelixAskLiveRuntimeTransportControllerState;
 }) => {
@@ -259,7 +264,12 @@ export const useHelixAskLiveRuntimeSession = (input: {
           sourceBinding: readLiveRuntimeSourceBinding(),
           selectedRuntimeAgentProvider: selectedRuntimeAgentProviderRef.current,
         }),
-        onProjection: (projection) => {
+        onProjection: (projection: HelixAskRealtimeProviderEventProjection) => {
+          if (projection.completed_output_transcript) {
+            recordHelixAskLiveRuntimeCompletedOutputTranscript(
+              projection.completed_output_transcript,
+            );
+          }
           if (projection.vad_state) {
             runtimeContextRef.current.vadState = projection.vad_state;
           }
@@ -606,7 +616,12 @@ export const useHelixAskLiveRuntimeSession = (input: {
 
   useEffect(() => {
     const sessionId = state.realtimeSessionId;
-    if (!state.active || !state.visualInputEnabled || !sessionId) return;
+    if (
+      !state.active ||
+      !state.visualInputEnabled ||
+      !sessionId ||
+      input.directVisualInputSuppressed === true
+    ) return;
     let lastClientFrameId: string | null = null;
     const routeFrame = (frame: VisualFrameProducerClientFrame): void => {
       if (
@@ -646,7 +661,14 @@ export const useHelixAskLiveRuntimeSession = (input: {
       routeFrame(latestFrame);
     }
     return unsubscribe;
-  }, [applyVisualFrameReceipt, state.active, state.realtimeSessionId, state.visualInputEnabled, visualTransportRevision]);
+  }, [
+    applyVisualFrameReceipt,
+    input.directVisualInputSuppressed,
+    state.active,
+    state.realtimeSessionId,
+    state.visualInputEnabled,
+    visualTransportRevision,
+  ]);
 
   useEffect(() => {
     const sessionId = state.realtimeSessionId;

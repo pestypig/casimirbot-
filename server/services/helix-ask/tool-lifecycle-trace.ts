@@ -12,6 +12,7 @@ import {
   resolveToolFamilyContract,
   type ToolFamilyContract,
 } from "./tool-family-contract";
+import { resolveHelixRuntimeObservationReentry } from "./runtime/turn-lifecycle";
 
 type RecordLike = Record<string, unknown>;
 
@@ -270,6 +271,7 @@ const lifecycleFromPayload = (input: {
   result: RecordLike | null;
   executedCapability: string | null;
   failureReason: string | null;
+  reentryObserved: boolean;
 }): { stage: HelixToolLifecycleStage; status: HelixToolLifecycleStatus } => {
   const admissionStatus = readString(input.plan?.admission_status);
   const resultStatus = readString(input.result?.status);
@@ -279,10 +281,7 @@ const lifecycleFromPayload = (input: {
   }
   if (resultStatus === "failed") return { stage: "failed", status: "failed" };
   if (input.failureReason && isExternalChangeFailure(input.failureReason)) return { stage: "failed", status: "failed" };
-  if (readBoolean(input.result?.reentered_solver)) return { stage: "reentered_solver", status: "completed" };
-  if (hasCompletedToolEvidence(input.payload, input.executedCapability)) {
-    return { stage: "reentered_solver", status: "completed" };
-  }
+  if (input.reentryObserved) return { stage: "reentered_solver", status: "completed" };
   if (resultStatus === "succeeded" || resultStatus === "partial" || resultStatus === "not_run") {
     return { stage: "completed", status: resultStatus === "not_run" ? "blocked" : "completed" };
   }
@@ -303,7 +302,7 @@ const terminalEligible = (input: {
 }): boolean => {
   if (input.status === "running" || input.status === "failed" || input.status === "blocked") return false;
   if (input.contract?.requiredReentry && input.stage !== "reentered_solver") return false;
-  if (input.stage !== "reentered_solver" && input.result && !readBoolean(input.result.reentered_solver)) return false;
+  if (input.stage !== "reentered_solver" && input.result) return false;
   if (readString(input.operationalEvaluation?.next_decision) && readString(input.operationalEvaluation?.next_decision) !== "allow_terminal") {
     return false;
   }
@@ -369,12 +368,24 @@ export const buildToolLifecycleTrace = (input: {
     readString(readRecord(input.payload.adapter_result)?.failure_reason) ||
     readString(readRecord(input.payload.capability_adapter_result)?.failure_reason) ||
     null;
+  const toolObservationRefs = observationRefs(input.payload);
+  const toolReceiptRefs = receiptRefs(input.payload, result);
+  const toolEvidenceRefs = evidenceRefs(input.payload, result, operationalEvaluation);
+  const reentry = resolveHelixRuntimeObservationReentry({
+    payload: input.payload,
+    turnId: input.turnId,
+    candidateRefs: unique([...toolObservationRefs, ...toolReceiptRefs, ...toolEvidenceRefs]),
+    compatibilityProjected:
+      readBoolean(result?.reentered_solver) ||
+      hasCompletedToolEvidence(input.payload, executedCapability),
+  });
   const lifecycle = lifecycleFromPayload({
     payload: input.payload,
     plan,
     result,
     executedCapability,
     failureReason,
+    reentryObserved: reentry.reentered,
   });
   const familyContract = resolveToolFamilyContract({
     toolName: executedCapability ?? admittedCapability ?? requestedCapability ?? readString(plan?.requested_action),
@@ -413,9 +424,12 @@ export const buildToolLifecycleTrace = (input: {
     status: lifecycle.status,
     session_ref: refs.sessionRef,
     process_ref: refs.processRef,
-    observation_refs: observationRefs(input.payload),
-    receipt_refs: receiptRefs(input.payload, result),
-    evidence_refs: evidenceRefs(input.payload, result, operationalEvaluation),
+    observation_refs: toolObservationRefs,
+    receipt_refs: toolReceiptRefs,
+    evidence_refs: toolEvidenceRefs,
+    reentry_authority: reentry.authority,
+    runtime_lifecycle_verified: reentry.runtime_lifecycle_verified,
+    matched_reentry_refs: reentry.matched_reentry_refs,
     failure_reason: failureReason,
     retry_recommendation: recommendation,
     fallback_used: readBoolean(operationalEvaluation?.fallback_used),
@@ -481,7 +495,7 @@ export const buildToolFollowupDecision = (input: {
     required_surface_satisfied:
       !readString(operationalEvaluation?.required_surface) ||
       readBoolean(operationalEvaluation?.requested_surface_satisfied),
-    evidence_reentered: trace.lifecycle_stage === "reentered_solver" || readBoolean(readRecord(input.payload.capability_result)?.reentered_solver),
+    evidence_reentered: trace.lifecycle_stage === "reentered_solver",
     assistant_answer: false,
     raw_content_included: false,
   };

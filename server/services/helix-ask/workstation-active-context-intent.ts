@@ -1,6 +1,9 @@
 const CURRENT_PANEL_VIEWING_CUE_PATTERN =
   /\b(?:which|what)\s+(?:workstation\s+)?panel\b[\s\S]{0,100}?\b(?:currently|right\s+now|now)\b[\s\S]{0,80}?\b(?:look(?:ing)?\s+at|view(?:ing)?|focus(?:ed)?|active|visible|open)\b/gi;
 
+const AFFIRMATIVE_WORKSTATION_AGENT_PANEL_DELEGATION_PATTERN =
+  /^\s*(?:(?:please|kindly)\s+|(?:can|could|would|will)\s+you\s+|you\s+(?:can|may|should)\s+|i\s+(?:need|want)\s+you\s+to\s+)?(?:use|ask|have|let)\b[\s\S]{0,100}\b(?:the\s+)?(?:workstation(?:\s+runtime)?|runtime|codex)\s+agent\b[\s\S]{0,100}\b(?:verify|check|inspect|identify|read|observe|show)\b/i;
+
 const hasAffirmativeCurrentPanelViewingCue = (prompt: string): boolean => {
   for (const match of prompt.matchAll(CURRENT_PANEL_VIEWING_CUE_PATTERN)) {
     const prefix = prompt.slice(Math.max(0, (match.index ?? 0) - 180), match.index ?? 0);
@@ -34,10 +37,17 @@ export const isActiveWorkstationContextPrompt = (prompt: string): boolean => {
   }
   const clauses = unquotedPrompt.split(/[.!?;\n]|\b(?:but|however|instead)\b/i);
   return clauses.some((clause) => {
+    const questionAnchorIndex = clause.search(
+      /\b(?:what|which|where|list|show|tell\s+me|identify|inspect|read)\b/i,
+    );
+    const contextPrefix = questionAnchorIndex >= 0
+      ? clause.slice(0, questionAnchorIndex)
+      : clause;
     if (
-      /\b(?:not|don'?t|do\s+not|without|avoid|no\s+need\s+to)\b[\s\S]{0,100}\b(?:ask|asking|answer|identify|inspect|tell|use|read|explain)\b/i.test(clause) ||
-      /\b(?:if|when|before|after|later|future|eventually|hypothetically|previously|earlier|historically|last\s+turn)\b/i.test(clause) ||
-      /\b(?:screen|page|button|label|ui|text|sentence|phrase)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions)\b/i.test(clause)
+      /\b(?:not|don'?t|do\s+not|without|avoid|no\s+need\s+to)\b[\s\S]{0,100}\b(?:ask|asking|answer|identify|inspect|tell|use|read|verify|check|observe|explain)\b/i.test(contextPrefix) ||
+      /\b(?:if|when|before|after)\b/i.test(contextPrefix) ||
+      /\b(?:later|future|eventually|hypothetically|previously|earlier|historically|last\s+turn)\b/i.test(clause) ||
+      /\b(?:screen|page|button|label|ui|text|sentence|phrase)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions)\b/i.test(contextPrefix)
     ) {
       return false;
     }
@@ -50,6 +60,8 @@ export const isActiveWorkstationContextPrompt = (prompt: string): boolean => {
       /\b(?:what|which)\s+(?:workstation\s+)?panels?\b.{0,60}\b(?:looking\s+at|viewing|focused\s+on)\b/i.test(clause) ||
       hasAffirmativeCurrentPanelViewingCue(clause);
     const asksForContext = /\b(?:what|which|where|list|show|tell\s+me|identify|inspect|read)\b/i.test(clause);
-    return mentionsPanelContext && asksForContext;
+    const delegatesPanelObservation =
+      AFFIRMATIVE_WORKSTATION_AGENT_PANEL_DELEGATION_PATTERN.test(clause);
+    return mentionsPanelContext && (asksForContext || delegatesPanelObservation);
   });
 };

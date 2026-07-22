@@ -153,13 +153,16 @@ export function HelixAskActionToolbar({
   const visualSourceLabel = visualSourceKind === "camera" ? "Camera" : "Screen";
   const nextVisualSourceLabel =
     visualSourceKind === "camera" ? "screen" : "camera";
-  const visualCaptureTitle = visualSituationSourceStatus === "requesting"
+  const visualCaptureAriaLabel = visualSituationSourceStatus === "requesting"
     ? `Cancel ${visualSourceLabel.toLowerCase()} sharing request`
     : visualSituationSourceStatus === "active"
       ? `Stop ${visualSourceLabel.toLowerCase()} sharing`
       : visualSituationSourceStatus === "error"
         ? `Retry ${visualSourceLabel.toLowerCase()} sharing`
         : `Start ${visualSourceLabel.toLowerCase()} sharing`;
+  const visualCaptureTitle = visualSituationSourceStatus === "requesting"
+    ? visualCaptureAriaLabel
+    : `${visualCaptureAriaLabel} with automatic 10-second captures`;
 
   return (
     <div className="relative min-w-0 flex-1">
@@ -275,7 +278,7 @@ export function HelixAskActionToolbar({
               <button
                 type="button"
                 data-helix-ask-action-item="true"
-                aria-label={visualCaptureTitle}
+                aria-label={visualCaptureAriaLabel}
                 aria-pressed={visualSituationSourceStatus === "active"}
                 title={visualCaptureTitle}
                 className={`${actionButtonBaseClassName} ${readVisualSourceButtonClassName(visualSituationSourceStatus)}`}

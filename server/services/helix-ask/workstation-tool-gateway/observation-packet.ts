@@ -25,7 +25,8 @@ export const buildWorkstationGatewayObservationPacket = (input: {
   producedAffordanceKinds?: HelixWorkstationTypedAffordanceKind[];
   missingAffordanceKinds?: HelixWorkstationTypedAffordanceKind[];
 }): HelixAgentStepObservationPacket => {
-  const artifactRef = `${input.turnId}:workstation_gateway:${input.capabilityId}:${hashShort(input.observation)}`;
+  const observationHash = hashShort(input.observation);
+  const artifactRef = `${input.turnId}:workstation_gateway:${input.capabilityId}:${observationHash}`;
   const producedAffordanceKinds = input.producedAffordanceKinds ?? Array.from(new Set(
     (input.producedAffordances ?? []).map((affordance) => affordance.kind),
   ));
@@ -37,8 +38,8 @@ export const buildWorkstationGatewayObservationPacket = (input: {
     schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
     turn_id: input.turnId,
     iteration: input.iteration,
-    call_id: `${input.turnId}:workstation_gateway:${input.capabilityId}:call`,
-    decision_id: `${input.turnId}:workstation_gateway:${input.capabilityId}:decision`,
+    call_id: `${input.turnId}:workstation_gateway:${input.capabilityId}:${input.iteration}:${observationHash}:call`,
+    decision_id: `${input.turnId}:workstation_gateway:${input.capabilityId}:${input.iteration}:${observationHash}:decision`,
     capability_key: input.capabilityId,
     panel_id: input.panelId,
     action: input.action,

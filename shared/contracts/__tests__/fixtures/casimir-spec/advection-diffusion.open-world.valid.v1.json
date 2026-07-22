@@ -1,0 +1,883 @@
+{
+  "artifactId": "casimir_spec_scientific_claim_ir",
+  "schemaVersion": "casimir_spec_scientific_claim_ir/v1",
+  "generatedAt": "2026-07-21T00:00:00.000Z",
+  "specId": "casimir-spec:advection-diffusion:open-world-fixture",
+  "title": "Open-world one-dimensional advection-diffusion claim",
+  "semanticSha256": "3a06872d33bc65ef6eee4cc5d742754ad1476191a5f960a5008915d29eab357d",
+  "artifactSha256": "a62e2ed18995fad5824547ad23ea21fbd24a87c231d0fd82e97aa7418991f7c3",
+  "source": {
+    "kind": "ir_native",
+    "language": "casimir_spec",
+    "languageVersion": "casimir_spec/v1",
+    "artifact": {
+      "path": null,
+      "sha256": null
+    }
+  },
+  "world": {
+    "model": "open_world",
+    "exhaustive": false,
+    "graphId": null,
+    "masterProblemPlanId": null,
+    "badgeIds": [],
+    "coverageBasis": "unmeasured",
+    "representedProbabilityMass": null,
+    "outOfGraphProbability": null,
+    "interpretation": "coverage_uncertainty_not_truth_probability"
+  },
+  "catalogBindings": [],
+  "foundations": [
+    {
+      "foundationId": "foundation:lean4-unpinned",
+      "formalSystem": "Lean4",
+      "formalSystemVersion": null,
+      "logicProfileId": "dependent-type-theory-with-explicit-axiom-ledger",
+      "profileSemanticSha256": null,
+      "environmentLockProvenanceId": null,
+      "provenanceIds": ["provenance:user-proposal"]
+    }
+  ],
+  "provenanceLedger": [
+    {
+      "provenanceId": "provenance:user-proposal",
+      "kind": "prompt",
+      "locator": "conversation:casimir-spec-goal",
+      "contentSha256": null,
+      "fragment": "Use Lean and a governed Lanyon/AdvectionDiffusion backend while preserving open-world scientific claim boundaries.",
+      "citation": null
+    }
+  ],
+  "symbols": [
+    {
+      "symbolId": "symbol:concentration",
+      "localName": "u",
+      "displayName": "concentration field",
+      "identity": {
+        "kind": "local",
+        "semanticId": "semantic:fixture:concentration-field"
+      },
+      "role": "physical_quantity",
+      "typeExpression": "scalar field over one spatial coordinate and time",
+      "mathematicalType": "scalar",
+      "unitBinding": {
+        "status": "specified",
+        "unit": "mol m^-3",
+        "dimensions": {
+          "mass": "0",
+          "length": "-3",
+          "time": "0",
+          "current": "0",
+          "temperature": "0",
+          "amount": "1",
+          "luminousIntensity": "0"
+        }
+      },
+      "frameBinding": {
+        "status": "bound",
+        "frameDefinitionId": "definition:lab-frame"
+      },
+      "definitionId": "definition:concentration",
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "symbolId": "symbol:diffusivity",
+      "localName": "D",
+      "displayName": "diffusivity",
+      "identity": {
+        "kind": "local",
+        "semanticId": "semantic:fixture:diffusivity"
+      },
+      "role": "parameter",
+      "typeExpression": "nonnegative real scalar parameter",
+      "mathematicalType": "scalar",
+      "unitBinding": {
+        "status": "specified",
+        "unit": "m^2 s^-1",
+        "dimensions": {
+          "mass": "0",
+          "length": "2",
+          "time": "-1",
+          "current": "0",
+          "temperature": "0",
+          "amount": "0",
+          "luminousIntensity": "0"
+        }
+      },
+      "frameBinding": {
+        "status": "invariant",
+        "frameDefinitionId": null
+      },
+      "definitionId": "definition:diffusivity",
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "symbolId": "symbol:position",
+      "localName": "x",
+      "displayName": "laboratory position",
+      "identity": {
+        "kind": "local",
+        "semanticId": "semantic:fixture:lab-position"
+      },
+      "role": "coordinate",
+      "typeExpression": "real spatial coordinate",
+      "mathematicalType": "scalar",
+      "unitBinding": {
+        "status": "specified",
+        "unit": "m",
+        "dimensions": {
+          "mass": "0",
+          "length": "1",
+          "time": "0",
+          "current": "0",
+          "temperature": "0",
+          "amount": "0",
+          "luminousIntensity": "0"
+        }
+      },
+      "frameBinding": {
+        "status": "bound",
+        "frameDefinitionId": "definition:lab-frame"
+      },
+      "definitionId": "definition:position",
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "symbolId": "symbol:source",
+      "localName": "S",
+      "displayName": "source density rate",
+      "identity": {
+        "kind": "local",
+        "semanticId": "semantic:fixture:source-density-rate"
+      },
+      "role": "physical_quantity",
+      "typeExpression": "scalar source field over one spatial coordinate and time",
+      "mathematicalType": "scalar",
+      "unitBinding": {
+        "status": "specified",
+        "unit": "mol m^-3 s^-1",
+        "dimensions": {
+          "mass": "0",
+          "length": "-3",
+          "time": "-1",
+          "current": "0",
+          "temperature": "0",
+          "amount": "1",
+          "luminousIntensity": "0"
+        }
+      },
+      "frameBinding": {
+        "status": "bound",
+        "frameDefinitionId": "definition:lab-frame"
+      },
+      "definitionId": "definition:source",
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "symbolId": "symbol:time",
+      "localName": "t",
+      "displayName": "laboratory time",
+      "identity": {
+        "kind": "local",
+        "semanticId": "semantic:fixture:lab-time"
+      },
+      "role": "coordinate",
+      "typeExpression": "real time coordinate",
+      "mathematicalType": "scalar",
+      "unitBinding": {
+        "status": "specified",
+        "unit": "s",
+        "dimensions": {
+          "mass": "0",
+          "length": "0",
+          "time": "1",
+          "current": "0",
+          "temperature": "0",
+          "amount": "0",
+          "luminousIntensity": "0"
+        }
+      },
+      "frameBinding": {
+        "status": "bound",
+        "frameDefinitionId": "definition:lab-frame"
+      },
+      "definitionId": "definition:time",
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "symbolId": "symbol:velocity",
+      "localName": "v",
+      "displayName": "advection velocity",
+      "identity": {
+        "kind": "local",
+        "semanticId": "semantic:fixture:advection-velocity"
+      },
+      "role": "parameter",
+      "typeExpression": "real scalar velocity in the laboratory frame",
+      "mathematicalType": "scalar",
+      "unitBinding": {
+        "status": "specified",
+        "unit": "m s^-1",
+        "dimensions": {
+          "mass": "0",
+          "length": "1",
+          "time": "-1",
+          "current": "0",
+          "temperature": "0",
+          "amount": "0",
+          "luminousIntensity": "0"
+        }
+      },
+      "frameBinding": {
+        "status": "bound",
+        "frameDefinitionId": "definition:lab-frame"
+      },
+      "definitionId": "definition:velocity",
+      "provenanceIds": ["provenance:user-proposal"]
+    }
+  ],
+  "definitions": [
+    {
+      "definitionId": "definition:concentration",
+      "kind": "mathematical",
+      "name": "ConcentrationField",
+      "display": "u(x,t) is a scalar concentration field in the laboratory frame.",
+      "expression": {
+        "kind": "apply",
+        "operatorId": "casimir.core::field",
+        "arguments": [
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:concentration"
+          },
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:position"
+          },
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:time"
+          }
+        ]
+      },
+      "expressionSha256": "d67d743698e2eb1f2fa4a62057f11f0b59385551364f64d508e343440c2c3910",
+      "definesSymbolIds": ["symbol:concentration"],
+      "dependencyDefinitionIds": [
+        "definition:lab-frame",
+        "definition:position",
+        "definition:time"
+      ],
+      "assumptionIds": [],
+      "validityDomain": {
+        "scaleLog10M": null,
+        "frameDefinitionIds": ["definition:lab-frame"],
+        "conditions": ["One-dimensional continuum description."]
+      },
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "definitionId": "definition:diffusivity",
+      "kind": "model",
+      "name": "Diffusivity",
+      "display": "D is the scalar diffusivity parameter.",
+      "expression": {
+        "kind": "apply",
+        "operatorId": "casimir.core::declares",
+        "arguments": [
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:diffusivity"
+          }
+        ]
+      },
+      "expressionSha256": "70dd16c9f6d589db8ac181515712a60f553d4be0dd806c4b5c787e1bb3fbb98d",
+      "definesSymbolIds": ["symbol:diffusivity"],
+      "dependencyDefinitionIds": [],
+      "assumptionIds": ["assumption:diffusivity-nonnegative"],
+      "validityDomain": {
+        "scaleLog10M": null,
+        "frameDefinitionIds": [],
+        "conditions": ["Scalar isotropic diffusivity approximation."]
+      },
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "definitionId": "definition:lab-frame",
+      "kind": "frame",
+      "name": "LaboratoryFrame",
+      "display": "The coordinates x and t are interpreted in a declared laboratory frame.",
+      "expression": {
+        "kind": "apply",
+        "operatorId": "casimir.core::frame_definition",
+        "arguments": []
+      },
+      "expressionSha256": "f30dd361c3f8b1bbf29737511824e41b8f71180b647e74961d48a662c80d0435",
+      "definesSymbolIds": [],
+      "dependencyDefinitionIds": [],
+      "assumptionIds": [],
+      "validityDomain": {
+        "scaleLog10M": null,
+        "frameDefinitionIds": [],
+        "conditions": ["Frame calibration is not supplied by this fixture."]
+      },
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "definitionId": "definition:observation",
+      "kind": "operational",
+      "name": "ConcentrationObservation",
+      "display": "An observation reports u at a specified laboratory position and time; no instrument response is claimed.",
+      "expression": {
+        "kind": "apply",
+        "operatorId": "casimir.core::declares",
+        "arguments": [
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:concentration"
+          }
+        ]
+      },
+      "expressionSha256": "ac67adc3756b6acfbba03feef82e859a10dbf5d0e34cc6dba3e408976aa72b39",
+      "definesSymbolIds": [],
+      "dependencyDefinitionIds": [
+        "definition:concentration",
+        "definition:lab-frame",
+        "definition:position",
+        "definition:time"
+      ],
+      "assumptionIds": [],
+      "validityDomain": {
+        "scaleLog10M": null,
+        "frameDefinitionIds": ["definition:lab-frame"],
+        "conditions": ["Instrument response remains unspecified."]
+      },
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "definitionId": "definition:pde",
+      "kind": "model",
+      "name": "AdvectionDiffusionEquation1D",
+      "display": "The model equation is partial_t u + v partial_x u = D partial_xx u + S.",
+      "expression": {
+        "kind": "apply",
+        "operatorId": "casimir.core::eq",
+        "arguments": [
+          {
+            "kind": "apply",
+            "operatorId": "casimir.core::add",
+            "arguments": [
+              {
+                "kind": "apply",
+                "operatorId": "casimir.core::partial_t",
+                "arguments": [
+                  {
+                    "kind": "symbol_ref",
+                    "symbolId": "symbol:concentration"
+                  }
+                ]
+              },
+              {
+                "kind": "apply",
+                "operatorId": "casimir.core::mul",
+                "arguments": [
+                  {
+                    "kind": "symbol_ref",
+                    "symbolId": "symbol:velocity"
+                  },
+                  {
+                    "kind": "apply",
+                    "operatorId": "casimir.core::partial_x",
+                    "arguments": [
+                      {
+                        "kind": "symbol_ref",
+                        "symbolId": "symbol:concentration"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "apply",
+            "operatorId": "casimir.core::add",
+            "arguments": [
+              {
+                "kind": "apply",
+                "operatorId": "casimir.core::mul",
+                "arguments": [
+                  {
+                    "kind": "symbol_ref",
+                    "symbolId": "symbol:diffusivity"
+                  },
+                  {
+                    "kind": "apply",
+                    "operatorId": "casimir.core::partial_xx",
+                    "arguments": [
+                      {
+                        "kind": "symbol_ref",
+                        "symbolId": "symbol:concentration"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "symbol_ref",
+                "symbolId": "symbol:source"
+              }
+            ]
+          }
+        ]
+      },
+      "expressionSha256": "e5eff9c0028010d83fb6cbf832b0c53b86aa2c7035a800eed13d09cf6ff4de92",
+      "definesSymbolIds": [],
+      "dependencyDefinitionIds": [
+        "definition:concentration",
+        "definition:diffusivity",
+        "definition:lab-frame",
+        "definition:position",
+        "definition:source",
+        "definition:time",
+        "definition:velocity"
+      ],
+      "assumptionIds": [
+        "assumption:diffusivity-nonnegative",
+        "assumption:velocity-constant"
+      ],
+      "validityDomain": {
+        "scaleLog10M": null,
+        "frameDefinitionIds": ["definition:lab-frame"],
+        "conditions": [
+          "Boundary and initial conditions are not yet admitted.",
+          "One-dimensional constant-coefficient model."
+        ]
+      },
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "definitionId": "definition:position",
+      "kind": "mathematical",
+      "name": "PositionCoordinate",
+      "display": "x is the spatial coordinate in the laboratory frame.",
+      "expression": {
+        "kind": "apply",
+        "operatorId": "casimir.core::declares",
+        "arguments": [
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:position"
+          }
+        ]
+      },
+      "expressionSha256": "8388e1fd2e5c3527fc0b09488bd41833b440036c967236479928f4262e9d722f",
+      "definesSymbolIds": ["symbol:position"],
+      "dependencyDefinitionIds": ["definition:lab-frame"],
+      "assumptionIds": [],
+      "validityDomain": {
+        "scaleLog10M": null,
+        "frameDefinitionIds": ["definition:lab-frame"],
+        "conditions": []
+      },
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "definitionId": "definition:source",
+      "kind": "model",
+      "name": "SourceDensityRate",
+      "display": "S(x,t) is the model source density rate.",
+      "expression": {
+        "kind": "apply",
+        "operatorId": "casimir.core::field",
+        "arguments": [
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:source"
+          },
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:position"
+          },
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:time"
+          }
+        ]
+      },
+      "expressionSha256": "69ad16c8fe4a594abc648526845f774bec3dd193fd8865d18cdcdd4fd1f32e5e",
+      "definesSymbolIds": ["symbol:source"],
+      "dependencyDefinitionIds": [
+        "definition:lab-frame",
+        "definition:position",
+        "definition:time"
+      ],
+      "assumptionIds": [],
+      "validityDomain": {
+        "scaleLog10M": null,
+        "frameDefinitionIds": ["definition:lab-frame"],
+        "conditions": ["Source regularity is not yet specified."]
+      },
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "definitionId": "definition:time",
+      "kind": "mathematical",
+      "name": "TimeCoordinate",
+      "display": "t is the time coordinate in the laboratory frame.",
+      "expression": {
+        "kind": "apply",
+        "operatorId": "casimir.core::declares",
+        "arguments": [
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:time"
+          }
+        ]
+      },
+      "expressionSha256": "b1781dfe0d7aa688361767e56ba7b840eed1617e785e2e509a60d10dfc443607",
+      "definesSymbolIds": ["symbol:time"],
+      "dependencyDefinitionIds": ["definition:lab-frame"],
+      "assumptionIds": [],
+      "validityDomain": {
+        "scaleLog10M": null,
+        "frameDefinitionIds": ["definition:lab-frame"],
+        "conditions": []
+      },
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "definitionId": "definition:velocity",
+      "kind": "model",
+      "name": "AdvectionVelocity",
+      "display": "v is the constant advection velocity in the laboratory frame.",
+      "expression": {
+        "kind": "apply",
+        "operatorId": "casimir.core::declares",
+        "arguments": [
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:velocity"
+          }
+        ]
+      },
+      "expressionSha256": "ce2e54229f341b2a2d2c8f7829d29ec33fb800ce1f90fa739315824e7323c608",
+      "definesSymbolIds": ["symbol:velocity"],
+      "dependencyDefinitionIds": ["definition:lab-frame"],
+      "assumptionIds": ["assumption:velocity-constant"],
+      "validityDomain": {
+        "scaleLog10M": null,
+        "frameDefinitionIds": ["definition:lab-frame"],
+        "conditions": ["Constant-velocity approximation."]
+      },
+      "provenanceIds": ["provenance:user-proposal"]
+    }
+  ],
+  "assumptions": [
+    {
+      "assumptionId": "assumption:diffusivity-nonnegative",
+      "kind": "model_assumption",
+      "displayStatement": "D is nonnegative.",
+      "proposition": {
+        "kind": "apply",
+        "operatorId": "casimir.core::ge",
+        "arguments": [
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:diffusivity"
+          },
+          {
+            "kind": "rational_literal",
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ]
+      },
+      "propositionSha256": "8ad17d7ca9de4cc63a99e2dccfca65b2950af2cd43287fd347cadb7d67d49c83",
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "assumptionId": "assumption:velocity-constant",
+      "kind": "model_assumption",
+      "displayStatement": "v is constant over the stated validity domain.",
+      "proposition": {
+        "kind": "apply",
+        "operatorId": "casimir.core::is_constant",
+        "arguments": [
+          {
+            "kind": "symbol_ref",
+            "symbolId": "symbol:velocity"
+          }
+        ]
+      },
+      "propositionSha256": "e7fe215b907dc18222b69e4a9d1c51c9678209e01f5d5e15a2292699e4511dec",
+      "provenanceIds": ["provenance:user-proposal"]
+    }
+  ],
+  "axiomLedger": {
+    "admissionPolicy": "exact_allowlist",
+    "hiddenAxiomsAllowed": false,
+    "entries": []
+  },
+  "observables": [
+    {
+      "observableId": "observable:concentration-lab",
+      "canonicalObservableId": "observable.canonical.concentration_at_lab_event",
+      "symbolId": "symbol:concentration",
+      "quantity": "concentration at a declared laboratory position and time",
+      "mathematicalType": "scalar",
+      "unitBinding": {
+        "status": "specified",
+        "unit": "mol m^-3",
+        "dimensions": {
+          "mass": "0",
+          "length": "-3",
+          "time": "0",
+          "current": "0",
+          "temperature": "0",
+          "amount": "1",
+          "luminousIntensity": "0"
+        }
+      },
+      "frameBinding": {
+        "status": "bound",
+        "frameDefinitionId": "definition:lab-frame"
+      },
+      "operationalDefinitionId": "definition:observation",
+      "responseModelDefinitionId": null,
+      "validityDomain": {
+        "scaleLog10M": null,
+        "frameDefinitionIds": ["definition:lab-frame"],
+        "conditions": ["No instrument response or calibration is asserted."]
+      },
+      "provenanceIds": ["provenance:user-proposal"]
+    }
+  ],
+  "bridges": [],
+  "blockers": [
+    {
+      "blockerId": "blocker:boundary-conditions",
+      "kind": "missing_definition",
+      "description": "Initial and boundary conditions are not specified.",
+      "claimIds": ["claim:advection-diffusion-equation"],
+      "resolutionRequirement": "Admit typed initial and boundary condition definitions with provenance.",
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "blockerId": "blocker:formal-environment",
+      "kind": "formal_environment_unpinned",
+      "description": "Lean version, imports, and environment lock are not pinned.",
+      "claimIds": ["claim:advection-diffusion-equation"],
+      "resolutionRequirement": "Pin the Lean toolchain, imports, logic profile hash, and environment artifact.",
+      "provenanceIds": ["provenance:user-proposal"]
+    },
+    {
+      "blockerId": "blocker:proof-not-run",
+      "kind": "formal_proof_not_run",
+      "description": "No formal elaboration or kernel replay has run.",
+      "claimIds": ["claim:advection-diffusion-equation"],
+      "resolutionRequirement": "Compile an admitted proposition and replay it with the pinned formal kernel.",
+      "provenanceIds": ["provenance:user-proposal"]
+    }
+  ],
+  "excludedClaims": [
+    {
+      "excludedClaimId": "excluded:empirical-validation",
+      "kind": "empirical_validation",
+      "statement": "The specification does not establish agreement with measurements.",
+      "reason": "No observation or calibration receipt is present.",
+      "requiredEvidenceKinds": [
+        "calibration_receipt",
+        "measurement_receipt",
+        "uncertainty_budget"
+      ]
+    },
+    {
+      "excludedClaimId": "excluded:floating-point-refinement",
+      "kind": "floating_point_refinement",
+      "statement": "The specification does not establish floating-point refinement to a real-number model.",
+      "reason": "No generated implementation or refinement proof exists.",
+      "requiredEvidenceKinds": [
+        "floating_point_error_bound",
+        "refinement_certificate"
+      ]
+    },
+    {
+      "excludedClaimId": "excluded:implementation-correctness",
+      "kind": "implementation_correctness",
+      "statement": "The specification does not establish correctness of Lean, Racket, C, or another implementation artifact.",
+      "reason": "No backend artifact has been emitted or replayed.",
+      "requiredEvidenceKinds": [
+        "artifact_hash",
+        "backend_receipt",
+        "source_map"
+      ]
+    },
+    {
+      "excludedClaimId": "excluded:independence",
+      "kind": "independence",
+      "statement": "The specification does not establish independence from any formal system.",
+      "reason": "No scoped metatheoretic certificate exists.",
+      "requiredEvidenceKinds": ["metatheoretic_certificate"]
+    },
+    {
+      "excludedClaimId": "excluded:numerical-convergence",
+      "kind": "numerical_convergence",
+      "statement": "The specification does not establish convergence of a numerical scheme.",
+      "reason": "No discretization or convergence receipt exists.",
+      "requiredEvidenceKinds": [
+        "convergence_study",
+        "numerical_method_contract"
+      ]
+    },
+    {
+      "excludedClaimId": "excluded:physical-mechanism",
+      "kind": "physical_mechanism",
+      "statement": "The specification does not establish a physical transport mechanism.",
+      "reason": "A mathematical PDE statement is not evidence of a realized mechanism.",
+      "requiredEvidenceKinds": ["mechanism_evidence"]
+    },
+    {
+      "excludedClaimId": "excluded:physical-truth",
+      "kind": "physical_truth",
+      "statement": "The specification does not establish that the model is physically true.",
+      "reason": "Formal consistency and empirical validity are separate questions.",
+      "requiredEvidenceKinds": ["empirical_validation_receipt"]
+    },
+    {
+      "excludedClaimId": "excluded:theory-completeness",
+      "kind": "theory_completeness",
+      "statement": "The specification does not establish completeness of the model, graph, catalog, or formal system.",
+      "reason": "The world policy is explicitly open and non-exhaustive.",
+      "requiredEvidenceKinds": ["scope_specific_completeness_argument"]
+    }
+  ],
+  "claims": [
+    {
+      "claimId": "claim:advection-diffusion-equation",
+      "name": "AdvectionDiffusionEquationCandidate",
+      "displayStatement": "Under the listed model assumptions, u satisfies partial_t u + v partial_x u = D partial_xx u + S within the declared validity domain.",
+      "proposition": {
+        "kind": "apply",
+        "operatorId": "casimir.core::implies",
+        "arguments": [
+          {
+            "kind": "apply",
+            "operatorId": "casimir.core::and",
+            "arguments": [
+              {
+                "kind": "assumption_ref",
+                "assumptionId": "assumption:diffusivity-nonnegative"
+              },
+              {
+                "kind": "assumption_ref",
+                "assumptionId": "assumption:velocity-constant"
+              }
+            ]
+          },
+          {
+            "kind": "definition_ref",
+            "definitionId": "definition:pde"
+          }
+        ]
+      },
+      "propositionSha256": "35368b46e58130d83cf5f09f682f799efe48f8ee5780ca81970889fddd20c09f",
+      "foundationId": "foundation:lean4-unpinned",
+      "definitionIds": [
+        "definition:concentration",
+        "definition:diffusivity",
+        "definition:lab-frame",
+        "definition:observation",
+        "definition:pde",
+        "definition:position",
+        "definition:source",
+        "definition:time",
+        "definition:velocity"
+      ],
+      "assumptionIds": [
+        "assumption:diffusivity-nonnegative",
+        "assumption:velocity-constant"
+      ],
+      "allowedAxiomIds": [],
+      "symbolIds": [
+        "symbol:concentration",
+        "symbol:diffusivity",
+        "symbol:position",
+        "symbol:source",
+        "symbol:time",
+        "symbol:velocity"
+      ],
+      "observableIds": ["observable:concentration-lab"],
+      "bridgeIds": [],
+      "excludedClaimIds": [
+        "excluded:empirical-validation",
+        "excluded:floating-point-refinement",
+        "excluded:implementation-correctness",
+        "excluded:independence",
+        "excluded:numerical-convergence",
+        "excluded:physical-mechanism",
+        "excluded:physical-truth",
+        "excluded:theory-completeness"
+      ],
+      "provenanceIds": ["provenance:user-proposal"],
+      "sourceMap": [
+        {
+          "mapId": "map:equation",
+          "displayFragment": "partial_t u + v partial_x u = D partial_xx u + S",
+          "expressionPath": "/",
+          "definitionIds": ["definition:pde"],
+          "symbolIds": [
+            "symbol:concentration",
+            "symbol:diffusivity",
+            "symbol:source",
+            "symbol:velocity"
+          ]
+        }
+      ],
+      "axes": {
+        "logical": {
+          "declaration": "conjecture",
+          "resolution": "unassessed"
+        },
+        "computational": {
+          "status": "reference_only",
+          "reason": "Boundary conditions and a pinned formal/numerical environment are absent.",
+          "blockerIds": [
+            "blocker:boundary-conditions",
+            "blocker:formal-environment"
+          ]
+        },
+        "scientific": {
+          "status": "empirically_unvalidated",
+          "receiptProvenanceIds": []
+        },
+        "coverage": {
+          "status": "unknown",
+          "blockerIds": [
+            "blocker:boundary-conditions",
+            "blocker:formal-environment",
+            "blocker:proof-not-run"
+          ]
+        }
+      },
+      "maturityCeiling": "exploratory"
+    }
+  ],
+  "claimBoundary": {
+    "semanticSpecificationOnly": true,
+    "externalSemanticAdmissionRequired": true,
+    "proofStatusRequiresExternalCertificate": true,
+    "empiricalStatusRequiresExternalReceipt": true,
+    "humanRenderingAuthority": false,
+    "semanticIdentityAuthority": false,
+    "executesTools": false,
+    "validatesTheory": false,
+    "validatesPhysicalMechanism": false,
+    "proofAuthority": false,
+    "empiricalAuthority": false,
+    "implementationCorrectnessAuthority": false,
+    "promotionAllowed": false,
+    "assistantAnswer": false,
+    "terminalEligible": false,
+    "postToolModelStepRequired": true
+  }
+}

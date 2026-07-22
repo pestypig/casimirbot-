@@ -33,6 +33,9 @@ export type HelixCapabilityLifecycleLedger = {
   turn_id: string;
   capability_plan_id: string | null;
   capability_result_id: string | null;
+  reentry_authority?: "runtime_event_log" | "compatibility_projection";
+  runtime_lifecycle_verified?: boolean;
+  matched_reentry_refs?: string[];
   stages: HelixCapabilityLifecycleStage[];
   failure_codes: HelixCapabilityLifecycleFailureCode[];
   ok: boolean;

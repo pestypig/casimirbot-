@@ -56,6 +56,7 @@ import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 import { appendHelixRuntimeIntentPacketToPayload, type HelixTurnArtifact } from "./runtime/runtime-intent-packet";
 import { resolvePublishedWorkstationToolTerminal } from "./terminal-identity-precedence";
 import { providerPostObservationCompletionMaterialized } from "./provider-terminal-completion";
+import { readVerifiedHelixRuntimeLifecycleFromPayload } from "./runtime/turn-lifecycle";
 
 type RecordLike = Record<string, unknown>;
 
@@ -195,6 +196,15 @@ export type HelixAskTurnSolverTrace = {
     skipped_reason?: string;
   };
   followup_reasoning_gate: HelixFollowupReasoningGate;
+  runtime_lifecycle_facts?: {
+    scope: "codex_native_provider_cycle" | "helix_ask_turn";
+    integrity: "verified";
+    runtime_turn_completed: boolean;
+    observation_reentry_refs: string[];
+    post_observation_reasoning_completed: boolean;
+    latest_reentry_event_id: string | null;
+    final_agent_message_event_id: string | null;
+  };
   live_source_identity_audit?: HelixLiveSourceIdentityAudit;
   live_source_identity_audit_ref?: string | null;
   capability_plan?: HelixCapabilityPlan;
@@ -370,15 +380,19 @@ const buildCompoundPromptCoverage = (
 };
 
 const readTerminalGoalFrame = (payload: RecordLike): { goalKind: string; requiredTerminalKind: string } => {
+  const committedRoute = readCommittedAskRoute(payload);
+  const committedGoal = committedRoute?.canonical_goal;
   const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
   const universalGoalFrame = readRecord(payload.universal_goal_frame);
   const universalUserGoal = readRecord(universalGoalFrame?.user_goal);
   return {
     goalKind:
+      readString(committedGoal?.goal_kind) ||
       readString(canonicalGoalFrame?.goal_kind) ||
       readString(universalGoalFrame?.goal_kind) ||
       readString(universalUserGoal?.goal_kind),
     requiredTerminalKind:
+      readString(committedGoal?.required_terminal_kind) ||
       readString(canonicalGoalFrame?.required_terminal_kind) ||
       readString(universalGoalFrame?.required_terminal_kind) ||
       readString(universalUserGoal?.required_terminal_kind),
@@ -585,11 +599,34 @@ const compoundSynthesisTerminalPathMaterialized = (input: {
   );
 };
 
+const providerRouteProductAllowedByCurrentContracts = (
+  payload: RecordLike,
+  terminalArtifactKind: string,
+): boolean => {
+  const committedRoute = readCommittedAskRoute(payload);
+  const committedGoal = committedRoute?.canonical_goal;
+  const routeProductContract = readRecord(payload.route_product_contract);
+  if (!committedGoal || readString(routeProductContract?.schema) !== "helix.route_product_contract.v1") {
+    return false;
+  }
+  const committedAllowed = readStringArray(committedGoal.allowed_terminal_artifact_kinds);
+  const committedForbidden = readStringArray(committedGoal.forbidden_terminal_artifact_kinds);
+  const routeAllowed = readStringArray(routeProductContract?.allowed_terminal_artifact_kinds);
+  const routeForbidden = readStringArray(routeProductContract?.forbidden_terminal_artifact_kinds);
+  return (
+    committedAllowed.includes(terminalArtifactKind) &&
+    !committedForbidden.includes(terminalArtifactKind) &&
+    routeAllowed.includes(terminalArtifactKind) &&
+    !routeForbidden.includes(terminalArtifactKind)
+  );
+};
+
 const providerTerminalPathMaterialized = (input: {
   payload: RecordLike;
   turnId: string;
   terminalArtifactKind: string;
   finalAnswerSource: string;
+  runtimeSolverCompletionObserved?: boolean;
 }): boolean => {
   const terminalUsesProviderCandidate =
     input.terminalArtifactKind === "agent_provider_terminal_candidate" ||
@@ -635,7 +672,7 @@ const providerTerminalPathMaterialized = (input: {
     readString(providerReasoningReentry?.status) === "completed" &&
     providerReasoningReentry?.evidence_reentry_required === false &&
     providerReasoningReentry?.evidence_reentered === true &&
-    readBoolean(providerReasoningReentry?.solver_completed) === true &&
+    (readBoolean(providerReasoningReentry?.solver_completed) === true || input.runtimeSolverCompletionObserved === true) &&
     readBoolean(providerReasoningReentry?.goal_satisfaction_compatible) === true &&
     readBoolean(terminalAuthority?.server_authoritative) === true &&
     readString(terminalAuthority?.terminal_artifact_kind) === input.terminalArtifactKind &&
@@ -656,7 +693,7 @@ const providerTerminalPathMaterialized = (input: {
     providerBridge?.final_visible_answer_authorized === true &&
     readString(providerReasoningReentry?.status) === "completed" &&
     providerReasoningReentry?.evidence_reentered === true &&
-    readBoolean(providerReasoningReentry?.solver_completed) === true &&
+    (readBoolean(providerReasoningReentry?.solver_completed) === true || input.runtimeSolverCompletionObserved === true) &&
     readBoolean(providerReasoningReentry?.goal_satisfaction_compatible) === true &&
     readBoolean(terminalAuthority?.server_authoritative) === true &&
     readString(terminalAuthority?.terminal_artifact_kind) === input.terminalArtifactKind &&
@@ -666,7 +703,10 @@ const providerTerminalPathMaterialized = (input: {
   if (!terminalUsesProviderCandidate && !terminalUsesMaterializedProviderRouteProduct) return false;
   if (presentationSupportRefs.length === 0) return false;
   if (terminalUsesMaterializedProviderRouteProduct) {
-    return terminalMatchesCanonicalGoalContract(input.payload, input.terminalArtifactKind);
+    return (
+      terminalMatchesCanonicalGoalContract(input.payload, input.terminalArtifactKind) ||
+      providerRouteProductAllowedByCurrentContracts(input.payload, input.terminalArtifactKind)
+    );
   }
   const canonicalProviderTerminal = terminalMatchesCanonicalGoalContract(
     input.payload,
@@ -1622,6 +1662,21 @@ export function buildAskTurnSolverTrace(input: {
   );
   const liveSourceIdentityAudit = readRecord(input.payload.live_source_identity_audit) as HelixLiveSourceIdentityAudit | null;
   const liveSourceIdentityAuditRef = readString(liveSourceIdentityAudit?.audit_id) || null;
+  const verifiedRuntimeLifecycle = readVerifiedHelixRuntimeLifecycleFromPayload({
+    payload: input.payload,
+    turnId: input.turnId,
+  });
+  const runtimeLifecycleCycleCompleted = Boolean(
+    verifiedRuntimeLifecycle?.reduction.runtime_turn_completed &&
+    verifiedRuntimeLifecycle.reduction.terminal_outcome === "completed" &&
+    verifiedRuntimeLifecycle.reduction.final_agent_message_event_id,
+  );
+  const runtimeObservationReentryRefs = runtimeLifecycleCycleCompleted
+    ? verifiedRuntimeLifecycle?.reduction.observation_reentry_refs ?? []
+    : [];
+  const runtimePostObservationReasoningCompleted = runtimeLifecycleCycleCompleted
+    ? verifiedRuntimeLifecycle?.reduction.post_observation_reasoning_completed
+    : undefined;
   const finalArbitrationRan = Boolean(
     (readRecord(input.payload.route_authority_audit) || readBoolean(loopTrace?.route_authority_ok)) &&
     readRecord(input.payload.poison_audit) &&
@@ -1642,6 +1697,8 @@ export function buildAskTurnSolverTrace(input: {
     turnId: input.turnId,
     terminalArtifactKind,
     finalAnswerSource,
+    runtimeSolverCompletionObserved:
+      runtimeLifecycleCycleCompleted && runtimePostObservationReasoningCompleted === true,
   });
   const effectiveFinalArbitrationRan =
     finalArbitrationRan ||
@@ -1657,6 +1714,9 @@ export function buildAskTurnSolverTrace(input: {
     terminalArtifactKind,
     finalAnswerSource,
     finalArbitrationRan: effectiveFinalArbitrationRan,
+    runtimeLifecycleVerified: Boolean(verifiedRuntimeLifecycle),
+    runtimeObservationReentryRefs,
+    postEvidenceReasoningCompleted: runtimePostObservationReasoningCompleted,
     sourceEvidenceRequired: evidenceRequired,
     allowedTerminalProducts: committedAskRoute.canonical_goal.allowed_terminal_artifact_kinds,
     toolUseRestatement,
@@ -1670,6 +1730,7 @@ export function buildAskTurnSolverTrace(input: {
     selectedEvidenceCount: evidenceReentryGate.selected_evidence_refs.length,
     conflictingHypotheses: intentHypotheses.length > 1 && secondary.length > 0,
     finalArbitrationRan: effectiveFinalArbitrationRan,
+    postEvidenceReasoningCompleted: runtimePostObservationReasoningCompleted,
     routeFollowupReasoningRequired: routeApprovedSelfTerminalProduct
       ? false
       : undefined,
@@ -1693,21 +1754,7 @@ export function buildAskTurnSolverTrace(input: {
     readString(goalSatisfaction?.satisfaction) === "satisfied" &&
     readString(goalSatisfaction?.next_decision) === "allow_terminal" &&
     terminalMatchesCanonicalGoalContract(input.payload, terminalArtifactKind);
-  const capabilityResult = readRecord(input.payload.capability_result);
-  const routeAuthorizedReceiptEvidenceReentered =
-    routeAuthorizedReceiptTerminalAllowed &&
-    (
-      evidenceReentryGate.completed ||
-      capabilityResult?.reentered_solver === true ||
-      readStringArray(capabilityResult?.receipt_refs).length > 0
-    );
-  const effectiveEvidenceReentryGate: typeof evidenceReentryGate = routeAuthorizedReceiptEvidenceReentered
-    ? {
-        ...evidenceReentryGate,
-        completed: true,
-        violation_codes: [],
-      }
-    : evidenceReentryGate;
+  const effectiveEvidenceReentryGate = evidenceReentryGate;
   const effectiveFollowupReasoningGate: typeof followupReasoningGate = routeAuthorizedReceiptTerminalAllowed
     ? {
         schema: followupReasoningGate.schema,
@@ -1856,6 +1903,21 @@ export function buildAskTurnSolverTrace(input: {
       ...(effectiveFollowupReasoningGate.completed ? {} : { skipped_reason: effectiveFollowupReasoningGate.skipped_reason ?? "final_arbitration_missing_after_evidence_or_tool_result" }),
     },
     followup_reasoning_gate: effectiveFollowupReasoningGate,
+    ...(verifiedRuntimeLifecycle && runtimeLifecycleCycleCompleted
+      ? {
+          runtime_lifecycle_facts: {
+            scope: verifiedRuntimeLifecycle.scope,
+            integrity: "verified" as const,
+            runtime_turn_completed: verifiedRuntimeLifecycle.reduction.runtime_turn_completed,
+            observation_reentry_refs: runtimeObservationReentryRefs,
+            post_observation_reasoning_completed:
+              verifiedRuntimeLifecycle.reduction.post_observation_reasoning_completed,
+            latest_reentry_event_id: verifiedRuntimeLifecycle.reduction.latest_reentry_event_id,
+            final_agent_message_event_id:
+              verifiedRuntimeLifecycle.reduction.final_agent_message_event_id,
+          },
+        }
+      : {}),
     ...(liveSourceIdentityAudit
       ? {
           live_source_identity_audit: liveSourceIdentityAudit,

@@ -1392,7 +1392,6 @@ const buildResearchQuantifyReflectRequests = (body: Record<string, unknown>): Re
 const buildScholarlyResearchWorkflowRequests = (body: Record<string, unknown>): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
-  if (hasDirectScholarlyFullTextSourceIntent(prompt)) return [];
   if (isScientificImageEvidenceRefRevisionPrompt(prompt)) return [];
   if (isResearchQuantifyReflectPrompt(prompt, body)) return [];
   const unquoted = unquotePrompt(prompt);
@@ -1403,6 +1402,18 @@ const buildScholarlyResearchWorkflowRequests = (body: Record<string, unknown>): 
   }
   const intent = detectScholarlyResearchIntent(prompt);
   if (!intent.researchRequested) return [];
+  const scholarlySourceTargets = intent.sourceTargets ?? [];
+  const requiresMetadataResolutionBeforeFullText =
+    scholarlySourceTargets.length > 0 &&
+    scholarlySourceTargets.every((target) => target.kind === "doi" || target.kind === "pubmed");
+  // A directly fetchable PDF/arXiv target is handled by the prompt-named tool
+  // path. DOI/PMID targets still need the compound lookup -> fetch binding.
+  if (
+    hasDirectScholarlyFullTextSourceIntent(prompt) &&
+    !requiresMetadataResolutionBeforeFullText
+  ) {
+    return [];
+  }
   const conversationalReferent = resolveHelixAskConversationalReferent(body);
   const hasExplicitCurrentTurnTarget = Boolean(intent.doi || intent.arxivId);
   // Compound fallback planning must not turn an anaphoric conversation request

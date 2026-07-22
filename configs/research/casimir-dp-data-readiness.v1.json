@@ -1,0 +1,148 @@
+{
+  "schema_version": "casimir_dp_data_readiness/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-data-readiness-stage1-v1",
+  "evidence_cutoff": "2026-07-21",
+  "claim_tier": "diagnostic",
+  "run_order": [
+    "freeze_blinded_secondary_observable_protocol",
+    "audit_primary_source_data_availability",
+    "verify_optical_fixture_artifact_hash",
+    "validate_kramers_kronig_against_analytic_lorentz_model",
+    "apply_measured_optical_response_gate",
+    "verify_switching_sidecar_hash_calibration_and_covariance",
+    "verify_decoherence_sidecar_hash_calibration_and_covariance",
+    "estimate_secondary_cross_correlation_power",
+    "apply_collapse_dynamics_identifiability_gate",
+    "write_hashed_data_readiness_receipt",
+    "update_study_evidence_ledger"
+  ],
+  "optical_validation_fixture": {
+    "path": "configs/research/fixtures/casimir-optical-lorentz.synthetic.v1.json",
+    "sha256": "1cf80068d2a1b9148b292cf64cd778ecd66ced6bfe6f8281ce630879304744b8",
+    "evidence_class": "synthetic_fixture"
+  },
+  "switching_sidecar": {
+    "path": "configs/research/fixtures/casimir-dp-switching.synthetic.v1.json",
+    "sha256": "f1f941d251c69f6c8dfe4b6a61ae36575c8d1f71c3d0588f7d6431fc5513f14e",
+    "evidence_class": "synthetic_fixture"
+  },
+  "decoherence_sidecar": {
+    "path": "configs/research/fixtures/casimir-dp-decoherence.synthetic.v1.json",
+    "sha256": "448713920f291d529abfd6c59c6ffba1692a0168a8e33731f3513fd45e94f5bd",
+    "evidence_class": "synthetic_fixture"
+  },
+  "dataset_manifest": [
+    {
+      "dataset_id": "pedalino-na-cluster-2025",
+      "title": "Probing quantum mechanics with nanoparticle matter-wave interferometry - Dataset and code",
+      "study_doi": "10.1038/s41586-025-09917-9",
+      "access_url": "https://zenodo.org/api/records/17502163",
+      "repository": "Zenodo",
+      "access_status": "open_machine_package",
+      "retrieved_metadata_utc": "2026-07-21T00:00:00.000Z",
+      "file_name": "Na-Cluster-Interference.zip",
+      "repository_checksum": "md5:7917961b27676f4e9df3af6d3b01c374",
+      "intended_use": "External interferometer-analysis and visibility-data benchmark; not an apparatus-matched Casimir switching measurement.",
+      "admissible_as_study_measurement": false
+    },
+    {
+      "dataset_id": "tebbenjohanns-cryogenic-levitation-2021",
+      "title": "Source data for quantum control of a nanoparticle optically levitated in cryogenic free space",
+      "study_doi": "10.1038/s41586-021-03617-w",
+      "access_url": "https://doi.org/10.3929/ethz-b-000480147",
+      "repository": "ETH Zurich Research Collection",
+      "access_status": "repository_landing_page",
+      "retrieved_metadata_utc": "2026-07-21T00:00:00.000Z",
+      "file_name": null,
+      "repository_checksum": null,
+      "intended_use": "External calibration, thermometry, feedback, and decoherence-method benchmark.",
+      "admissible_as_study_measurement": false
+    },
+    {
+      "dataset_id": "donadi-gran-sasso-dp-2021",
+      "title": "Source data for underground test of gravity-related wave function collapse",
+      "study_doi": "10.1038/s41567-020-1008-4",
+      "access_url": "https://www.nature.com/articles/s41567-020-1008-4#Sec16",
+      "repository": "Nature Physics source data",
+      "access_status": "open_source_data",
+      "retrieved_metadata_utc": "2026-07-21T00:00:00.000Z",
+      "file_name": "Source Data Fig. 3.xlsx; Source Data Fig. 4.xlsx",
+      "repository_checksum": null,
+      "intended_use": "Independent DP-parameter exclusion context; not evidence for the proposed boundary-controlled coherence residual.",
+      "admissible_as_study_measurement": false
+    },
+    {
+      "dataset_id": "dejong-superconductor-force-2026",
+      "title": "Measurement of a strong nonlinear force between superconductors compatible with the Casimir force",
+      "study_doi": "10.1038/s41467-026-75261-9",
+      "access_url": "https://www.nature.com/articles/s41467-026-75261-9",
+      "repository": "Nature Communications supplementary information",
+      "access_status": "supplement_only_raw_not_authenticated",
+      "retrieved_metadata_utc": "2026-07-21T00:00:00.000Z",
+      "file_name": "Supplementary Information.pdf",
+      "repository_checksum": null,
+      "intended_use": "Closest boundary-force apparatus reference; raw measurement package still requires author/repository acquisition and hashing.",
+      "admissible_as_study_measurement": false
+    },
+    {
+      "dataset_id": "klimchitskaya-lifshitz-review-2009",
+      "title": "The Casimir force between real materials: Experiment and theory",
+      "study_doi": "10.1103/RevModPhys.81.1827",
+      "access_url": "https://journals.aps.org/rmp/abstract/10.1103/RevModPhys.81.1827",
+      "repository": "Physical Review",
+      "access_status": "theory_reference_no_dataset",
+      "retrieved_metadata_utc": "2026-07-21T00:00:00.000Z",
+      "file_name": null,
+      "repository_checksum": null,
+      "intended_use": "Primary formalism authority for real-material equilibrium Lifshitz calculations and optical-data continuation.",
+      "admissible_as_study_measurement": false
+    }
+  ],
+  "secondary_observable_protocol": {
+    "preregistration_id": "casimir-dp-secondary-observables-blinded-v1",
+    "blinded_boundary_labels": true,
+    "primary_observable": "coherence_decay_rate_s",
+    "secondary_observables": [
+      "interferometric_phase_rad",
+      "coupled_heat_W",
+      "force_mismatch_N",
+      "switch_cross_correlation"
+    ],
+    "negative_controls": [
+      "matched_heating",
+      "detuned_boundary",
+      "identical_boundary",
+      "label_permutation",
+      "switch_disabled"
+    ],
+    "registered_null": "After conditioning on measured heating, force mismatch, vibration, electromagnetic pickup, gas, blackbody, readout, and drift covariates, the blinded boundary label has no residual effect on coherence decay or phase.",
+    "registered_alternative": "The blinded boundary label leaves a repeatable coherence residual with a preregistered secondary-observable pattern that is not collinear with the measured environmental coupling vector.",
+    "collapse_signature_source_ref": null,
+    "identifiability_status": "blocked"
+  },
+  "correlation_power_cases": [
+    {
+      "case_id": "small-switch-correlation-rho-0p10",
+      "input": {
+        "schema_version": "casimir_dp_correlation_power/1",
+        "null_correlation": 0,
+        "alternative_correlation": 0.1,
+        "type_i_error": 0.05,
+        "target_power": 0.9,
+        "multiplicity": 4
+      }
+    },
+    {
+      "case_id": "moderate-switch-correlation-rho-0p20",
+      "input": {
+        "schema_version": "casimir_dp_correlation_power/1",
+        "null_correlation": 0,
+        "alternative_correlation": 0.2,
+        "type_i_error": 0.05,
+        "target_power": 0.9,
+        "multiplicity": 4
+      }
+    }
+  ]
+}

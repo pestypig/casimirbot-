@@ -19,7 +19,7 @@ import { recordPanelActivity } from "@/lib/essence/activityReporter";
 import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
 import { ProcessGraphSurfaceLayer } from "@/components/workstation/ProcessGraphSurfaceLayer";
-import { HelixAskConsole } from "@/components/helix/ask-console";
+import { HelixAskConsole } from "@/components/helix/ask-console/HelixAskConsole";
 import { useLumaMoodTheme } from "@/lib/luma-mood-theme";
 import { Dialog } from "@/components/ui/dialog";
 import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogContent";

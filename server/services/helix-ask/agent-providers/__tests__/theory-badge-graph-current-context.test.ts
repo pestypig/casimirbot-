@@ -107,6 +107,7 @@ describe("Theory Badge Graph current-context admission", () => {
     "Now compare determinism and probability with the Theory Badge Graph.",
     "Next, compare determinism and probability with the Theory Badge Graph.",
     "Then reflect this interpretation with the Theory Badge Graph.",
+    "Now reflect what we learned from this paper, the equation search, and the calculator check into the Theory Badge Graph. Separate what the evidence supports from what remains unresolved.",
   ])("admits an affirmative discourse-prefixed Theory command: %s", (question) => {
     expect(isAffirmativeTheoryBadgeGraphReflectionPrompt(question)).toBe(true);
     expect(buildPromptDerivedTheoryReflectionGatewayCallRequests({ question })).toHaveLength(1);

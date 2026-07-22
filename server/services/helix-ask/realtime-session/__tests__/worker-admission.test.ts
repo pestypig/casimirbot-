@@ -3,6 +3,7 @@ import type { HelixRealtimeStagePlayGoalBindingV1 } from "@shared/contracts/heli
 import {
   buildRealtimeTranscriptWorkerAdmission,
   resolveRealtimeFinalWorkerAdmission,
+  resolveRealtimeTranscriptSourceTargetIntent,
 } from "../worker-admission";
 
 const buildAdmission = (
@@ -25,6 +26,39 @@ const buildAdmission = (
 });
 
 describe("Realtime transcript worker admission", () => {
+  it("admits a natural paper lookup through the scholarly read-only worker route", () => {
+    const transcriptText = "Okay, can you look for papers about a magnetar?";
+    const sourceTargetIntent = resolveRealtimeTranscriptSourceTargetIntent({
+      handoffId: "handoff:magnetar-papers",
+      threadId: "helix-ask:desktop",
+      transcriptText,
+      sourceBinding: {
+        focus_panel_id: "docs-viewer",
+        document_ref: "docs/research/example.md",
+      },
+    });
+    const admission = buildAdmission(transcriptText, "magnetar-papers");
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "scholarly_research",
+      target_kind: "scholarly_research",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(admission).toMatchObject({
+      outcome: "worker_grounded",
+      selected_route: "scholarly_research",
+      candidate_readonly_capability_ids: ["scholarly-research.lookup_papers"],
+      action_candidate_capability_ids: [],
+      dispatch: {
+        kind: "ask_runtime",
+        requested: true,
+        read_only: true,
+      },
+      spoken_relay_eligible: true,
+    });
+  });
+
   it("keeps greeting-only conversation local despite a soft freshness suggestion", () => {
     const admission = buildAdmission("How are you today?", "smalltalk");
 
@@ -124,6 +158,90 @@ describe("Realtime transcript worker admission", () => {
     if (capability) {
       expect(admission.candidate_readonly_capability_ids).toContain(capability);
     }
+  });
+
+  it("keeps a delayed-result clause attached to the affirmative active-panel query", () => {
+    const admission = buildAdmission(
+      "Use the workstation agent to verify which panel is active, tell me you're checking, then give me the verified result when it returns.",
+      "active-panel-delayed-result",
+    );
+
+    expect(admission).toMatchObject({
+      outcome: "worker_grounded",
+      candidate_readonly_capability_ids: ["workstation.active_context"],
+      action_candidate_capability_ids: [],
+      dispatch: {
+        kind: "ask_runtime",
+        read_only: true,
+      },
+      spoken_relay_eligible: true,
+    });
+  });
+
+  it.each([
+    "Use the workstation agent to verify the active panel.",
+    "You can use the workstation agent to verify the active panel.",
+    "Could you ask the runtime agent to check the current workspace?",
+  ])("dispatches an explicit active-context delegation without a wh-question: %s", (prompt) => {
+    const admission = buildAdmission(prompt, `active-panel-delegation:${prompt.length}`);
+
+    expect(admission).toMatchObject({
+      outcome: "worker_grounded",
+      candidate_readonly_capability_ids: ["workstation.active_context"],
+      action_candidate_capability_ids: [],
+      dispatch: {
+        kind: "ask_runtime",
+        requested: true,
+        read_only: true,
+      },
+      worker_turn_dispatched: false,
+      spoken_relay_eligible: true,
+    });
+  });
+
+  it("keeps a bare panel transcript fragment in the local Realtime conversation", () => {
+    const admission = buildAdmission("active panel", "active-panel-fragment");
+
+    expect(admission).toMatchObject({
+      outcome: "conversation_local",
+      selected_route: "workspace_panel",
+      candidate_readonly_capability_ids: [],
+      action_candidate_capability_ids: [],
+      dispatch: {
+        kind: "none",
+        state: "not_required",
+        requested: false,
+        suppress_parallel_ask_turn: true,
+      },
+      worker_turn_dispatched: false,
+      spoken_relay_eligible: false,
+    });
+    expect(admission.reason_codes).toContain(
+      "realtime_workspace_panel_fragment_without_affirmative_request",
+    );
+    expect(admission.reason_codes).not.toContain("source_target_workspace_panel");
+  });
+
+  it.each([
+    "The button says \"active panel\".",
+    "Earlier we discussed the active panel.",
+    "If the active panel changes later, we can inspect it then.",
+    "Do not answer which panel is active; explain the phrase.",
+    "I am not asking about the current open panels; explain what a panel means in general.",
+  ])("does not dispatch contextual panel wording as an Ask turn: %s", (prompt) => {
+    const admission = buildAdmission(prompt, `panel-context:${prompt.length}`);
+
+    expect(admission).toMatchObject({
+      outcome: "conversation_local",
+      candidate_readonly_capability_ids: [],
+      action_candidate_capability_ids: [],
+      dispatch: {
+        kind: "none",
+        requested: false,
+      },
+      worker_turn_dispatched: false,
+      spoken_relay_eligible: false,
+    });
   });
 
   it("binds a transcript to the existing durable runtime goal without transferring authority", () => {

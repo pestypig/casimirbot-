@@ -179,17 +179,18 @@ const normalizeInterfaceLanguageText = (value: string): string =>
 
 const readInterfaceLanguageCodeFromText = (value: string): SharedInterfaceLanguageCode | null => {
   const normalized = normalizeInterfaceLanguageText(value);
-  const tokens = new Set(normalized.split(/\s+/).filter(Boolean));
+  const padded = ` ${normalized} `;
+  let selected: { code: SharedInterfaceLanguageCode; index: number } | null = null;
   for (const code of SHARED_INTERFACE_LANGUAGE_CODES) {
-    if (tokens.has(code)) return code;
-  }
-  for (const code of SHARED_INTERFACE_LANGUAGE_CODES) {
-    for (const alias of interfaceLanguageAliases[code]) {
+    for (const alias of new Set([code, ...interfaceLanguageAliases[code]])) {
       const normalizedAlias = normalizeInterfaceLanguageText(alias);
-      if (normalized === normalizedAlias || normalized.includes(normalizedAlias)) return code;
+      const index = padded.indexOf(` ${normalizedAlias} `);
+      if (index >= 0 && (!selected || index < selected.index)) {
+        selected = { code, index };
+      }
     }
   }
-  return null;
+  return selected?.code ?? null;
 };
 
 const hasContextualInterfaceLanguageActionMention = (prompt: string): boolean => {
@@ -212,8 +213,9 @@ const extractInterfaceLanguageActionCode = (prompt: string): SharedInterfaceLang
   if (hasContextualInterfaceLanguageActionMention(prompt)) return null;
   const unquoted = unquotePrompt(prompt);
   const hasAffirmativeLanguageAction =
-    /\b(?:set|switch|change|update|use)\b[\s\S]{0,120}\b(?:interface|ui|workstation|account|session)?\s*language\b/i.test(unquoted) ||
-    /\b(?:set|switch|change|update|use)\b[\s\S]{0,120}\b(?:interface|ui|workstation)\b[\s\S]{0,120}\b(?:to|into)\b/i.test(unquoted) ||
+    /\b(?:set|switch|change|update)\b[\s\S]{0,120}\b(?:interface|ui|workstation|account|session)?\s*language\b/i.test(unquoted) ||
+    /\b(?:set|switch|change|update)\b[\s\S]{0,80}\b(?:interface|ui)\b[\s\S]{0,40}\b(?:to|into)\b/i.test(unquoted) ||
+    /\buse\b[\s\S]{0,60}\b(?:as|for)\s+(?:the\s+)?(?:(?:interface|ui)(?:\s+language)?|(?:workstation|account|session)\s+language)\b/i.test(unquoted) ||
     (
       hasPromptNamedCapability(prompt, ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY) &&
       !hasNegatedToolInstruction(prompt, promptNamedCapabilityPattern(ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY))
@@ -1005,6 +1007,21 @@ export const extractCalculatorPercentOfExpression = (value: string | null | unde
   return match ? `${match[1]}% of ${match[2]}` : null;
 };
 
+const extractNaturalArithmeticExpression = (value: string): string | null => {
+  const number = "(-?\\d+(?:\\.\\d+)?(?:e[+-]?\\d+)?)";
+  const operations: Array<[RegExp, string]> = [
+    [new RegExp(`${number}\\s*(?:times|multiplied\\s+by)\\s*${number}`, "i"), "*"],
+    [new RegExp(`${number}\\s*(?:divided\\s+by|over)\\s*${number}`, "i"), "/"],
+    [new RegExp(`${number}\\s*(?:plus|added\\s+to)\\s*${number}`, "i"), "+"],
+    [new RegExp(`${number}\\s*(?:minus|less)\\s*${number}`, "i"), "-"],
+  ];
+  for (const [pattern, operator] of operations) {
+    const match = value.match(pattern);
+    if (match?.[1] && match?.[2]) return `${match[1]} ${operator} ${match[2]}`;
+  }
+  return null;
+};
+
 export const extractCalculatorExpressionFromPrompt = (prompt: string): string | null => {
   if (hasNegatedCalculatorExecutionInstruction(prompt)) {
     return null;
@@ -1021,6 +1038,10 @@ export const extractCalculatorExpressionFromPrompt = (prompt: string): string | 
   }
   const percentOfExpression = extractCalculatorPercentOfExpression(unquoted);
   if (percentOfExpression) return percentOfExpression;
+  if (/\b(?:scientific\s+calculator|calculator|calc)\b/i.test(unquoted)) {
+    const naturalArithmeticExpression = extractNaturalArithmeticExpression(unquoted);
+    if (naturalArithmeticExpression) return naturalArithmeticExpression;
+  }
   const explicitCapability =
     unquoted.match(/\bscientific-calculator\.(?:solve_expression|solve_with_steps|solve)\b[\s\S]{0,80}\b(?:for|with|expression|calculate|evaluate|solve|compute)?\s*:?\s*([0-9(][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
     unquoted.match(/\b(?:scientific\s+calculator|calculator|calc)\b[\s\S]{0,100}\b(?:calculate|evaluate|solve|compute|expression)\s*:?\s*([0-9(][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
@@ -1528,6 +1549,15 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
   const hasExplicitIdentifierOrSourceTarget = Boolean(
     intent.doi || intent.arxivId || intent.pmid || intent.pmcid || intent.sourceTargets.length > 0,
   );
+  if (
+    conversationalReferent.trace.referent_phrase === "deictic_previous_evidence_source" &&
+    !hasExplicitIdentifierOrSourceTarget
+  ) {
+    // "This document" names retained evidence, not a new paper-search query.
+    // The runtime may inspect or re-materialize that evidence through the
+    // scholarly workbench, but lookup_papers must not replace its identity.
+    return [];
+  }
   const explicitTopicFallbackQuery = conversationalReferent.trace.explicit_topic_phrase?.trim() ?? "";
   const normalizeReferentClaim = (value: string): string =>
     value

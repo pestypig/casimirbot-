@@ -11,9 +11,16 @@ import {
   resetRealtimeGroundedAnswerRelaysForTests,
   suppressRealtimeGroundedAnswerRelay,
 } from "./grounded-answer-relay";
+import { resolveRealtimeGroundedFeedbackBinding } from "./grounded-answer-feedback-binding";
+import {
+  readRealtimeGroundedFeedbackObserverAudit,
+  resetRealtimeGroundedFeedbackObserverAuditsForTests,
+  updateRealtimeGroundedFeedbackObserverAudit,
+} from "./grounded-answer-feedback-audit";
+import { evaluateRealtimeGroundingEvidence } from "./grounded-answer-evidence";
+import { createRealtimeGroundedFinalResponseCapture } from "./grounded-answer-final-response-capture";
 import { resolveRealtimeFinalWorkerAdmission } from "./worker-admission";
 
-const MAX_CAPTURE_BYTES = 1_250_000;
 const groundedAnswersByHandoffId = new Map<string, HelixRealtimeStagePlayGroundedAnswerV1>();
 
 type RecordLike = Record<string, unknown>;
@@ -52,90 +59,6 @@ const readDebug = (payload: RecordLike): RecordLike | null => {
   }
 };
 
-const readFinalPayloadFromCapture = (captured: string): RecordLike | null => {
-  if (!captured.trim()) return null;
-  if (/^\s*event:\s*turn_final\s*$/m.test(captured)) {
-    const blocks = captured.split(/\r?\n\r?\n/);
-    for (const block of blocks.reverse()) {
-      if (!/^event:\s*turn_final\s*$/m.test(block)) continue;
-      const data = block
-        .split(/\r?\n/)
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice(5).trimStart())
-        .join("\n");
-      if (!data) continue;
-      try {
-        return readRecord(JSON.parse(data));
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
-  try {
-    return readRecord(JSON.parse(captured));
-  } catch {
-    return null;
-  }
-};
-
-const readHandoffId = (body: unknown): string | null => {
-  const request = readRecord(body);
-  const routeMetadata = readRecord(request?.routeMetadata ?? request?.route_metadata);
-  const sourceTargetIntent = readRecord(
-    routeMetadata?.source_target_intent ?? request?.source_target_intent,
-  );
-  const invocationKind = readString(routeMetadata?.invocationKind ?? routeMetadata?.invocation_kind);
-  if (invocationKind !== "stage_play_realtime_transcript_handoff") return null;
-  return readString(
-    routeMetadata?.handoffId ??
-    routeMetadata?.handoff_id ??
-    sourceTargetIntent?.handoff_id ??
-    sourceTargetIntent?.handoffId,
-  );
-};
-
-const collectGatewayResults = (payload: RecordLike, debug: RecordLike | null): RecordLike[] => [
-  ...readRecordArray(payload.workstation_gateway_call_results),
-  ...readRecordArray(debug?.workstation_gateway_call_results),
-];
-
-const gatewayResultEvidenceRefs = (result: RecordLike): string[] => {
-  const observationPacket = readRecord(result.observation_packet);
-  return unique([
-    ...readStringArray(result.artifact_refs),
-    ...readStringArray(observationPacket?.produced_artifact_refs),
-    readString(observationPacket?.call_id),
-  ]);
-};
-
-const requiredGroundingSatisfied = (input: {
-  requiredCapabilityIds: string[];
-  payload: RecordLike;
-  debug: RecordLike | null;
-  evidenceContinuationCompleted: boolean;
-}): { satisfied: boolean; evidenceRefs: string[] } => {
-  if (input.requiredCapabilityIds.length === 0) return { satisfied: true, evidenceRefs: [] };
-  if (!input.evidenceContinuationCompleted) {
-    return { satisfied: false, evidenceRefs: [] };
-  }
-  const gatewayResults = collectGatewayResults(input.payload, input.debug);
-  const selectedResults = input.requiredCapabilityIds.map((capabilityId) =>
-    gatewayResults.find((result) => {
-      const observationPacket = readRecord(result.observation_packet);
-      return (
-        readString(result.capability_id ?? result.capabilityId) === capabilityId &&
-        result.ok === true &&
-        observationPacket?.status === "succeeded"
-      );
-    }) ?? null);
-  if (selectedResults.some((result) => !result)) return { satisfied: false, evidenceRefs: [] };
-  return {
-    satisfied: true,
-    evidenceRefs: unique(selectedResults.flatMap((result) => gatewayResultEvidenceRefs(result!))),
-  };
-};
-
 const recordAcceptedRealtimeGroundedAnswer = (input: {
   handoff: HelixRealtimeStagePlayAskHandoffV1;
   payload: RecordLike;
@@ -146,6 +69,7 @@ const recordAcceptedRealtimeGroundedAnswer = (input: {
   finalAnswerSource: string;
   terminalArtifactKind: string;
   groundingEvidenceRefs: string[];
+  groundingProofSource: "gateway_call_results" | "canonical_solver_trace" | null;
   askTurnId?: string | null;
   additionalEvidenceRefs?: string[];
   nowMs: number;
@@ -213,11 +137,28 @@ const recordAcceptedRealtimeGroundedAnswer = (input: {
     evidenceRefs,
     nowMs: input.nowMs,
   });
-  enqueueRealtimeGroundedAnswerRelay({
+  const relay = enqueueRealtimeGroundedAnswerRelay({
     handoff: input.handoff,
     feedback,
     workerAdmission,
     answerText: input.answerText,
+    nowMs: input.nowMs,
+  });
+  updateRealtimeGroundedFeedbackObserverAudit({
+    handoff: input.handoff,
+    patch: {
+      turn_final_status: "captured",
+      terminal_authority_status: "validated",
+      grounding_evidence_status: input.handoff.required_grounding_capability_ids.length > 0
+        ? "validated"
+        : "not_required",
+      grounding_proof_source: input.groundingProofSource,
+      feedback_status: "recorded",
+      relay_status: relay.status,
+      ask_turn_id: askTurnId,
+      failure_code: null,
+      completed_at_ms: input.nowMs,
+    },
     nowMs: input.nowMs,
   });
   return feedback;
@@ -253,10 +194,17 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
     readString(input.payload.text);
   const evidenceReentry = readRecord(solverTrace?.evidence_reentry);
   const followupReasoning = readRecord(solverTrace?.followup_reasoning);
-  const grounding = requiredGroundingSatisfied({
+  const groundingTurnId =
+    input.askTurnId ??
+    readString(input.payload.turn_id) ??
+    readString(solverTrace?.turn_id) ??
+    "";
+  const grounding = evaluateRealtimeGroundingEvidence({
+    turnId: groundingTurnId,
     requiredCapabilityIds: handoff.required_grounding_capability_ids,
     payload: input.payload,
     debug,
+    solverTrace,
     evidenceContinuationCompleted:
       evidenceReentry?.required === true &&
       evidenceReentry.completed === true &&
@@ -280,10 +228,38 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
                 ? "required_grounding_evidence_missing"
                 : null;
   if (rejectionReason) {
-    suppressRealtimeGroundedAnswerRelay({
+    const relay = suppressRealtimeGroundedAnswerRelay({
       handoffId: handoff.handoff_id,
       reason: rejectionReason,
       failureCode: rejectionReason,
+      nowMs,
+    });
+    const terminalAuthorityValidated = Boolean(
+      completedSolverPath &&
+      serverAuthoritative &&
+      answerText &&
+      terminalArtifactKind &&
+      finalAnswerSource,
+    );
+    updateRealtimeGroundedFeedbackObserverAudit({
+      handoff,
+      patch: {
+        turn_final_status: "captured",
+        terminal_authority_status: terminalAuthorityValidated ? "validated" : "rejected",
+        grounding_evidence_status: handoff.required_grounding_capability_ids.length === 0
+          ? "not_required"
+          : grounding.satisfied
+            ? "validated"
+            : "rejected",
+        grounding_proof_source: grounding.proofSource,
+        feedback_status: "suppressed",
+        relay_status: relay?.status ?? null,
+        ask_turn_id:
+          readString(input.askTurnId) ??
+          readString(input.payload.turn_id ?? input.payload.turnId),
+        failure_code: rejectionReason,
+        completed_at_ms: nowMs,
+      },
       nowMs,
     });
     return null;
@@ -298,6 +274,7 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
     finalAnswerSource: finalAnswerSource as string,
     terminalArtifactKind: terminalArtifactKind as string,
     groundingEvidenceRefs: grounding.evidenceRefs,
+    groundingProofSource: grounding.proofSource,
     askTurnId: input.askTurnId,
     nowMs,
   });
@@ -361,10 +338,16 @@ export const recordRealtimeGroundedAnswerFromRuntimeGoalPayload = (input: {
     evidenceReentered &&
     terminalAuthorityEvaluated &&
     providerTerminalAuthority?.server_authoritative === true;
-  const grounding = requiredGroundingSatisfied({
+  const grounding = evaluateRealtimeGroundingEvidence({
+    turnId:
+      readString(input.payload.turn_id) ??
+      readString(input.payload.ask_turn_id) ??
+      readString(runtimeGoalSession?.turn_id) ??
+      "",
     requiredCapabilityIds: handoff.required_grounding_capability_ids,
     payload: input.payload,
     debug,
+    solverTrace: null,
     evidenceContinuationCompleted: evidenceReentered && terminalAuthorityEvaluated,
   });
   const nowMs = input.nowMs ?? Date.now();
@@ -380,10 +363,34 @@ export const recordRealtimeGroundedAnswerFromRuntimeGoalPayload = (input: {
           ? "required_grounding_evidence_missing"
           : null;
   if (rejectionReason) {
-    suppressRealtimeGroundedAnswerRelay({
+    const relay = suppressRealtimeGroundedAnswerRelay({
       handoffId: handoff.handoff_id,
       reason: rejectionReason,
       failureCode: rejectionReason,
+      nowMs,
+    });
+    updateRealtimeGroundedFeedbackObserverAudit({
+      handoff,
+      patch: {
+        turn_final_status: "captured",
+        terminal_authority_status:
+          completedGoalSolverPath && terminalAuthority?.server_authoritative === true
+            ? "validated"
+            : "rejected",
+        grounding_evidence_status: handoff.required_grounding_capability_ids.length === 0
+          ? "not_required"
+          : grounding.satisfied
+            ? "validated"
+            : "rejected",
+        grounding_proof_source: grounding.proofSource,
+        feedback_status: "suppressed",
+        relay_status: relay?.status ?? null,
+        ask_turn_id:
+          readString(input.askTurnId) ??
+          readString(input.payload.turn_id ?? input.payload.turnId),
+        failure_code: rejectionReason,
+        completed_at_ms: nowMs,
+      },
       nowMs,
     });
     return null;
@@ -398,7 +405,8 @@ export const recordRealtimeGroundedAnswerFromRuntimeGoalPayload = (input: {
     finalAnswerSource: finalAnswerSource as string,
     terminalArtifactKind: terminalArtifactKind as string,
     groundingEvidenceRefs: grounding.evidenceRefs,
-    additionalEvidenceRefs: [wakeEventId],
+    groundingProofSource: grounding.proofSource,
+    additionalEvidenceRefs: wakeEventId ? [wakeEventId] : [],
     askTurnId: input.askTurnId,
     nowMs,
   });
@@ -413,53 +421,102 @@ export const createRealtimeGroundedAnswerFeedbackMiddleware = (): RequestHandler
       next();
       return;
     }
-    const handoffId = readHandoffId(req.body);
-    if (!handoffId || !readRealtimeStagePlayAskHandoff(handoffId)) {
+    const bindingResolution = resolveRealtimeGroundedFeedbackBinding(req.body);
+    if (bindingResolution.failureCode || !bindingResolution.handoff) {
+      const existingAudit = bindingResolution.handoff
+        ? readRealtimeGroundedFeedbackObserverAudit(bindingResolution.handoff.handoff_id)
+        : null;
+      if (
+        bindingResolution.handoff &&
+        existingAudit?.binding_status !== "validated" &&
+        existingAudit?.feedback_status !== "recorded"
+      ) {
+        updateRealtimeGroundedFeedbackObserverAudit({
+          handoff: bindingResolution.handoff,
+          patch: {
+            binding_status: "rejected",
+            binding_source: bindingResolution.bindingSource,
+            failure_code: bindingResolution.failureCode,
+          },
+        });
+      }
       next();
       return;
     }
+    const handoff = bindingResolution.handoff;
+    const handoffId = handoff.handoff_id;
+    updateRealtimeGroundedFeedbackObserverAudit({
+      handoff,
+      patch: {
+        binding_status: "validated",
+        binding_source: bindingResolution.bindingSource,
+        failure_code: null,
+      },
+    });
 
-    const chunks: Buffer[] = [];
-    let capturedBytes = 0;
-    const capture = (chunk: unknown, encoding?: BufferEncoding): void => {
-      if (chunk === undefined || chunk === null) return;
-      const buffer = Buffer.isBuffer(chunk)
-        ? chunk
-        : Buffer.from(String(chunk), encoding ?? "utf8");
-      chunks.push(buffer);
-      capturedBytes += buffer.length;
-      while (capturedBytes > MAX_CAPTURE_BYTES && chunks.length > 0) {
-        const overflow = capturedBytes - MAX_CAPTURE_BYTES;
-        const first = chunks[0];
-        if (first.length <= overflow) {
-          chunks.shift();
-          capturedBytes -= first.length;
-        } else {
-          chunks[0] = first.subarray(overflow);
-          capturedBytes -= overflow;
-        }
-      }
-    };
+    const responseCapture = createRealtimeGroundedFinalResponseCapture({
+      streaming: req.path === "/ask/turn/stream",
+    });
     const originalWrite = res.write.bind(res);
     const originalEnd = res.end.bind(res);
     res.write = ((chunk: unknown, ...args: unknown[]) => {
       const encoding = typeof args[0] === "string" ? args[0] as BufferEncoding : undefined;
-      capture(chunk, encoding);
+      responseCapture.capture(chunk, encoding);
       return originalWrite(chunk as never, ...(args as never[]));
     }) as typeof res.write;
     res.end = ((chunk?: unknown, ...args: unknown[]) => {
       const encoding = typeof args[0] === "string" ? args[0] as BufferEncoding : undefined;
-      capture(chunk, encoding);
+      responseCapture.capture(chunk, encoding);
       return originalEnd(chunk as never, ...(args as never[]));
     }) as typeof res.end;
     res.once("finish", () => {
-      const payload = readFinalPayloadFromCapture(Buffer.concat(chunks).toString("utf8"));
-      if (!payload) return;
+      const nowMs = Date.now();
+      const captureResult = responseCapture.finish();
+      const payload = captureResult.payload;
       const request = readRecord(req.body);
+      const requestAskTurnId = readString(
+        request?.turnId ?? request?.turn_id ?? request?.traceId,
+      );
+      if (!payload) {
+        const failureCode = captureResult.failureCode ??
+          "realtime_feedback_turn_final_payload_missing";
+        const relay = suppressRealtimeGroundedAnswerRelay({
+          handoffId,
+          reason: failureCode,
+          failureCode,
+          nowMs,
+        });
+        updateRealtimeGroundedFeedbackObserverAudit({
+          handoff,
+          patch: {
+            turn_final_status: "rejected",
+            feedback_status: "suppressed",
+            relay_status: relay?.status ?? null,
+            ask_turn_id: requestAskTurnId,
+            failure_code: failureCode,
+            completed_at_ms: nowMs,
+          },
+          nowMs,
+        });
+        return;
+      }
+      const askTurnId =
+        requestAskTurnId ??
+        readString(payload.turn_id ?? payload.turnId);
+      updateRealtimeGroundedFeedbackObserverAudit({
+        handoff,
+        patch: {
+          turn_final_status: "captured",
+          ask_turn_id: askTurnId,
+          failure_code: null,
+        },
+        nowMs,
+      });
       recordRealtimeGroundedAnswerFromPayload({
         handoffId,
         payload,
-        askTurnId: readString(request?.turnId ?? request?.turn_id ?? request?.traceId),
+        askTurnId,
+        nowMs,
       });
     });
     next();
@@ -472,5 +529,6 @@ export const readRealtimeGroundedAnswer = (
 
 export const resetRealtimeGroundedAnswerFeedbackForTests = (): void => {
   groundedAnswersByHandoffId.clear();
+  resetRealtimeGroundedFeedbackObserverAuditsForTests();
   resetRealtimeGroundedAnswerRelaysForTests();
 };

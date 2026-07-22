@@ -22,6 +22,7 @@ import {
 } from "@/lib/document-image/documentImageRegions";
 import { captureFrameDataUrlFromStream } from "@/lib/helix/visualFrameProducer";
 import { submitImageLensCropFrame } from "@/lib/helix/imageLensVisualFrame";
+import { runCapabilityLaneOneShot } from "@/lib/agi/api";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
@@ -184,6 +185,7 @@ export default function ImageLensPanel() {
   const initialStatusRef = useRef(initialStatusMessage);
   const [sourceKind, setSourceKind] = useState<DocumentImageSourceKindV1>("manual_image_url");
   const [pageDraft, setPageDraft] = useState("1");
+  const [pageNavigationPending, setPageNavigationPending] = useState(false);
   const [kind, setKind] = useState<DocumentImageRegionKindV1>("unknown");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -308,6 +310,62 @@ export default function ImageLensPanel() {
       width: naturalSize.width,
       height: naturalSize.height,
     });
+  };
+
+  const navigateToPdfPage = async () => {
+    if (pageNavigationPending || sourceKind !== "pdf_page_render" || !source) return;
+    const parsedPage = Number.parseInt(pageDraft.trim(), 10);
+    const maxPage = source.pageCount && source.pageCount > 0 ? source.pageCount : null;
+    if (!Number.isInteger(parsedPage) || parsedPage < 1 || (maxPage !== null && parsedPage > maxPage)) {
+      setStatusMessage(maxPage
+        ? `Enter a PDF page from 1 to ${maxPage}.`
+        : "Enter a positive PDF page number.");
+      return;
+    }
+    if (source.pageNumber === parsedPage) {
+      setPageDraft(String(parsedPage));
+      setStatusMessage(`PDF page ${parsedPage} is already loaded.`);
+      return;
+    }
+
+    setPageNavigationPending(true);
+    setStatusMessage(`Loading PDF page ${parsedPage}...`);
+    try {
+      const sourceIdentity = source.scholarlySourcePdfRef ?? source.sourceAttachmentId;
+      const sourceId = `pdf-page-render:${hashDocumentImageString(`${sourceIdentity}:page:${parsedPage}`).replace("fnv1a32:", "")}`;
+      const result = await runCapabilityLaneOneShot({
+        turn_id: `image-lens:page-navigation:${Date.now()}`,
+        capability_lane_call: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: sourceId,
+          source_attachment_id: sourceId,
+          source_kind: "pdf_page_render",
+          page_number: parsedPage,
+          page_count: maxPage,
+          scholarly_source_pdf_ref: source.scholarlySourcePdfRef ?? null,
+          scholarly_pdf_cache_path: source.scholarlyPdfCachePath ?? null,
+          source_mount_only: true,
+          bbox_px: { x: 0, y: 0, width: 1, height: 1 },
+          question: `Mount PDF page ${parsedPage} as the active Image Lens source.`,
+          reason_for_crop: "Direct Image Lens page navigation.",
+          region_label: `scholarly_pdf_page_${parsedPage}_source_mount`,
+          region_kind: "unknown",
+          detail: "high",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      });
+      if (result.ok !== true) {
+        throw new Error(result.message ?? result.error ?? "pdf_page_navigation_failed");
+      }
+      setPageDraft(String(parsedPage));
+      setStatusMessage(`PDF page ${parsedPage} loaded.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "pdf_page_navigation_failed";
+      setStatusMessage(`Unable to load PDF page ${parsedPage}: ${message}`);
+    } finally {
+      setPageNavigationPending(false);
+    }
   };
 
   const startCropDrag = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -650,9 +708,19 @@ export default function ImageLensPanel() {
                   <label className="block text-xs text-slate-300">
                     {t("imageLens.advanced.page")}
                     <input
+                      type="number"
+                      min={1}
+                      max={source?.pageCount ?? undefined}
                       value={pageDraft}
                       onChange={(event: React.ChangeEvent<HTMLInputElement>) => setPageDraft(event.target.value)}
-                      disabled={sourceKind !== "pdf_page_render"}
+                      onKeyDown={(event: React.KeyboardEvent<HTMLInputElement>) => {
+                        if (event.key !== "Enter") return;
+                        event.preventDefault();
+                        void navigateToPdfPage();
+                      }}
+                      disabled={sourceKind !== "pdf_page_render" || pageNavigationPending}
+                      title="Press Enter to load this PDF page"
+                      data-testid="image-lens-page-input"
                       className="mt-1 w-full rounded border border-white/10 bg-slate-900 px-2 py-1.5 text-xs disabled:opacity-50"
                     />
                   </label>

@@ -377,6 +377,50 @@ describe("Helix Ask conversational referent resolution", () => {
     });
   });
 
+  it("resolves this-document equation work to the latest substantive retained evidence answer", () => {
+    const resolution = resolveHelixAskConversationalReferent(
+      bodyWithRecentAnswers(
+        "Ok can you find an equation we can use in this doc?",
+        [
+          {
+            id: "failed-page-inspection",
+            text: "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.",
+          },
+          {
+            id: "mounted-paper",
+            text: "Mounted the selected 21-page paper at artifact://magnetar.pdf and rendered page 2 as pdf-page-render:magnetar-page-2 in Image Lens.",
+          },
+        ],
+      ),
+    );
+
+    expect(resolution.resolvedText).toContain("artifact://magnetar.pdf");
+    expect(resolution.trace).toMatchObject({
+      referent_detected: true,
+      referent_phrase: "deictic_previous_evidence_source",
+      resolved_source_ref: "chat.final_answer.recent:mounted-paper",
+      candidate_count: 2,
+      matched_candidate_count: 1,
+      selection_policy: "latest_substantive_answer",
+      resolution_confidence: "high",
+    });
+  });
+
+  it.each([
+    "Do not use this doc to find an equation.",
+    "Later, find an equation we can use in this document.",
+    "Earlier you tried to find an equation in this PDF.",
+    'The screen says "find an equation in this doc"; explain that message.',
+  ])("does not execute contextual, negated, future, or quoted document-referent text: %s", (question) => {
+    const resolution = resolveHelixAskConversationalReferent(bodyWithPreviousAnswer(question));
+
+    expect(resolution.resolvedText).toBeNull();
+    expect(resolution.trace).toMatchObject({
+      referent_detected: false,
+      resolution_confidence: "not_applicable",
+    });
+  });
+
   it.each([
     "Do not reflect this with the Theory Badge Graph.",
     "Do not reflect this in the Theory Badge Graph.",
@@ -539,5 +583,72 @@ describe("Helix Ask conversational referent resolution", () => {
 
     expect(resolution.resolvedText).toBe("Navigation team is ready for the next burn window.");
     expect(resolution.trace.resolution_confidence).toBe("high");
+  });
+
+  it("resolves a natural paper-selection follow-up to the prior scholarly answer", () => {
+    const resolution = resolveHelixAskConversationalReferent(
+      bodyWithRecentAnswers(
+        "Let's use this one. Pull out the useful parts.",
+        [{
+          id: "magnetar-paper",
+          text: [
+            "Use Thompson and Duncan (1995), The soft gamma repeaters as very strongly magnetized neutron stars - I.",
+            "DOI: 10.1093/mnras/275.2.255.",
+          ].join(" "),
+        }],
+      ),
+    );
+
+    expect(resolution.resolvedText).toContain("10.1093/mnras/275.2.255");
+    expect(resolution.trace).toMatchObject({
+      referent_detected: true,
+      referent_phrase: "deictic_previous_evidence_source",
+      source_kind: "chat_history",
+      resolution_confidence: "high",
+      context_role: "evidence_for_followup_reasoning",
+    });
+  });
+
+  it("resolves a natural PDF and measurements follow-up to the selected prior paper", () => {
+    const resolution = resolveHelixAskConversationalReferent(
+      bodyWithRecentAnswers(
+        "Can you get the PDF for that paper and tell me what measurements it reports?",
+        [{
+          id: "selected-magnetar-paper",
+          text: [
+            "Selected Rea et al. (2013), The Outburst Decay of the Low Magnetic Field Magnetar SGR 0418+5729.",
+            "DOI: 10.1088/0004-637X/770/1/65.",
+          ].join(" "),
+        }],
+      ),
+    );
+
+    expect(resolution.resolvedText).toContain("10.1088/0004-637X/770/1/65");
+    expect(resolution.trace).toMatchObject({
+      referent_detected: true,
+      referent_phrase: "deictic_previous_evidence_source",
+      source_kind: "chat_history",
+      resolution_confidence: "high",
+      context_role: "evidence_for_followup_reasoning",
+    });
+  });
+
+  it.each([
+    "Do not use this one. Pull out the useful parts.",
+    "Later, use this one and pull out the useful parts.",
+    "Do not get the PDF for that paper or report its measurements.",
+    "Later, get the PDF for that paper and report its measurements.",
+    'The UI says "get the PDF for that paper"; explain the instruction generally.',
+    'The screen says "Let\'s use this one. Pull out the useful parts." Explain that instruction.',
+  ])("keeps non-affirmative natural paper-selection text dormant: %s", (question) => {
+    const resolution = resolveHelixAskConversationalReferent(
+      bodyWithRecentAnswers(question, [{
+        id: "magnetar-paper",
+        text: "Magnetar paper DOI: 10.1093/mnras/275.2.255.",
+      }]),
+    );
+
+    expect(resolution.resolvedText).toBeNull();
+    expect(resolution.trace.resolution_confidence).toBe("not_applicable");
   });
 });

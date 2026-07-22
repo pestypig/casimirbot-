@@ -169,10 +169,13 @@ export const extractHelixWorkflowDemoRetrySignalFromPayload = (
     const latexCandidate = readString(inspection.latex_candidate);
     const qualityFlags = readStringArray(inspection.quality_flags);
     const explicitlyMissingCandidate = qualityFlags.some((flag) =>
-      flag === "no_ocr_or_latex_candidate" || flag === "no_text_or_latex_candidate"
+      flag === "no_ocr_or_latex_candidate" ||
+      flag === "no_text_or_latex_candidate" ||
+      flag === "non_equation_text_candidate"
     );
     const retryableStatus = extractionStatus === "failed" || extractionStatus === "partial" || extractionStatus === "not_run";
-    if (textCandidate || latexCandidate || (!retryableStatus && !explicitlyMissingCandidate)) continue;
+    const usableEquationCandidate = Boolean(textCandidate || latexCandidate) && !explicitlyMissingCandidate;
+    if (usableEquationCandidate || (!retryableStatus && !explicitlyMissingCandidate)) continue;
     const pageNumber = readPositiveInteger(inspection.page_number);
     const pageCount = readPositiveInteger(inspection.page_count);
     const sourceId = readString(inspection.source_id) ?? readString(inspection.source_image_ref);

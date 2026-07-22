@@ -5,6 +5,12 @@ import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-o
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
 import { buildHelixTurnTerminalAuthority } from "../turn-terminal-authority";
 import { HELIX_SCHOLARLY_TERMINAL_READY_EVIDENCE_STATES } from "@shared/helix-scholarly-research-observation";
+import {
+  hasRuntimeSelectedUsableScholarlyLookupEvidence,
+  hasRuntimeSelectedUsableScholarlyFullTextEvidence,
+  isRuntimeSelectedUsableScholarlyLookupResult,
+  isRuntimeSelectedUsableScholarlyFullTextResult,
+} from "./scholarly-gateway-evidence";
 
 const sha256 = (value: string): string =>
   crypto.createHash("sha256").update(value).digest("hex");
@@ -158,6 +164,10 @@ const scholarlyIntentForGatewayResult = (
 const isOptionalScholarlyFailureObservation = (
   result: HelixWorkstationGatewayCallResult,
   gatewayCallResults: HelixWorkstationGatewayCallResult[],
+  options: {
+    selectedScholarlyResultIds?: string[];
+    structuredNumericEvidenceRequired?: boolean;
+  },
 ): boolean => {
   if (result.ok === true || !isScholarlyGatewayCapability(result)) return false;
   const sourceTargetIntent = readRecord(result.gateway_admission.source_target_intent);
@@ -169,6 +179,16 @@ const isOptionalScholarlyFailureObservation = (
     readBoolean(sourceTargetIntent?.supporting_sources_only) === true ||
     readBoolean(scholarlyIntent?.supporting_sources_only) === true;
   if (supportingSourcesOnly) return true;
+  if (
+    gatewayCapability(result) === "scholarly-research.extract_numeric_parameters" &&
+    options.structuredNumericEvidenceRequired !== true &&
+    hasRuntimeSelectedUsableScholarlyFullTextEvidence({
+      gatewayCallResults,
+      selectedResultIds: options.selectedScholarlyResultIds,
+    })
+  ) {
+    return true;
+  }
   if (
     gatewayCapability(result) !== "scholarly-research.fetch_full_text" ||
     requiredModes.includes("full_text") ||
@@ -186,10 +206,22 @@ const isOptionalScholarlyFailureObservation = (
 const isGatewayObservationCompatibleWithProviderReasoning = (
   result: HelixWorkstationGatewayCallResult,
   gatewayCallResults: HelixWorkstationGatewayCallResult[],
+  options: {
+    selectedScholarlyResultIds?: string[];
+    structuredNumericEvidenceRequired?: boolean;
+  },
 ): boolean =>
+  isRuntimeSelectedUsableScholarlyLookupResult({
+    result,
+    selectedResultIds: options.selectedScholarlyResultIds,
+  }) ||
+  isRuntimeSelectedUsableScholarlyFullTextResult({
+    result,
+    selectedResultIds: options.selectedScholarlyResultIds,
+  }) ||
   isGatewayObservationReenteredForProviderReasoning(result) ||
   scholarlyGatewayAttemptWasSupersededByUsableEvidence(result, gatewayCallResults) ||
-  isOptionalScholarlyFailureObservation(result, gatewayCallResults);
+  isOptionalScholarlyFailureObservation(result, gatewayCallResults, options);
 
 const isTextToSpeechReceiptObservation = (packet: HelixAgentStepObservationPacket): boolean => {
   if (packet.capability_key !== "text_to_speech.speak_text") return false;
@@ -230,6 +262,8 @@ export const buildHelixProviderReasoningReentry = (input: {
   solverCompleted?: boolean;
   goalSatisfied?: boolean;
   modelOnlyDirectAnswerAllowed?: boolean;
+  selectedScholarlyResultIds?: string[];
+  structuredNumericEvidenceRequired?: boolean;
 }) => {
   const capabilityLaneObservationPackets = input.capabilityLaneObservationPackets ?? [];
   const priorEvidenceObservationPackets = input.priorEvidenceObservationPackets ?? [];
@@ -250,7 +284,10 @@ export const buildHelixProviderReasoningReentry = (input: {
   ];
   const successfulGatewayObservationRefs = input.gatewayCallResults
     .filter((result) =>
-      isGatewayObservationCompatibleWithProviderReasoning(result, input.gatewayCallResults)
+      isGatewayObservationCompatibleWithProviderReasoning(result, input.gatewayCallResults, {
+        selectedScholarlyResultIds: input.selectedScholarlyResultIds,
+        structuredNumericEvidenceRequired: input.structuredNumericEvidenceRequired,
+      })
     )
     .flatMap((result) => result.artifact_refs);
   const successfulObservationRefs = [
@@ -274,7 +311,10 @@ export const buildHelixProviderReasoningReentry = (input: {
   const allGatewayCallsSucceeded =
     input.gatewayCallResults.length === 0 ||
     input.gatewayCallResults.every((result) =>
-      isGatewayObservationCompatibleWithProviderReasoning(result, input.gatewayCallResults)
+      isGatewayObservationCompatibleWithProviderReasoning(result, input.gatewayCallResults, {
+        selectedScholarlyResultIds: input.selectedScholarlyResultIds,
+        structuredNumericEvidenceRequired: input.structuredNumericEvidenceRequired,
+      })
     );
   const allCapabilityLaneObservationsSucceeded =
     capabilityLaneObservationPackets.length === 0 ||
@@ -295,17 +335,22 @@ export const buildHelixProviderReasoningReentry = (input: {
       normalizedObservationPackets.length >= evidenceSourceCount &&
       normalizedObservationPackets.length > 0
     );
-  const solverAuthoritySatisfied = input.solverCompleted === true && input.goalSatisfied !== false;
   const candidateId = input.ok && input.providerText.trim()
     ? `${input.turnId}:agent_provider_terminal_candidate:${input.runtime}:${sha256(input.providerText).slice(0, 16)}`
     : null;
+  const providerReasoningCompleted = Boolean(candidateId && input.solverCompleted === true);
+  const evidenceReentered = Boolean(
+    noEvidenceDirectAnswerReady ||
+      (evidenceReentryRequired && normalizedObservationsReady && providerReasoningCompleted),
+  );
+  const solverAuthoritySatisfied = providerReasoningCompleted && input.goalSatisfied !== false;
   const pendingVoiceHandoffOverclaim = Boolean(
     candidateId &&
       capabilityLaneObservationPackets.some(isPendingTextToSpeechHandoffObservation) &&
       providerTextClaimsVoicePlaybackCompleted(input.providerText),
   );
   const terminalAuthorityMayUseProviderText =
-    Boolean(candidateId && normalizedObservationsReady && solverAuthoritySatisfied && !pendingVoiceHandoffOverclaim);
+    Boolean(candidateId && evidenceReentered && solverAuthoritySatisfied && !pendingVoiceHandoffOverclaim);
   const terminalAuthorityStatus = terminalAuthorityMayUseProviderText
     ? noEvidenceDirectAnswerReady
       ? "authorized_by_model_only_direct_answer_contract"
@@ -363,6 +408,8 @@ export const buildHelixProviderReasoningReentry = (input: {
     provider_label: input.providerLabel,
     status: terminalAuthorityMayUseProviderText
       ? "completed"
+      : candidateId && providerReasoningCompleted
+        ? "completed_not_terminal"
       : candidateId
         ? "pending_helix_solver_reentry"
         : input.ok
@@ -375,10 +422,22 @@ export const buildHelixProviderReasoningReentry = (input: {
     prior_evidence_observation_packet_count: priorEvidenceObservationPackets.length,
     evidence_reentry_required: evidenceReentryRequired,
     model_only_direct_answer_allowed: input.modelOnlyDirectAnswerAllowed === true,
+    runtime_selected_scholarly_result_ids: input.selectedScholarlyResultIds ?? [],
+    structured_numeric_evidence_required: input.structuredNumericEvidenceRequired === true,
+    runtime_selected_usable_lookup_evidence:
+      hasRuntimeSelectedUsableScholarlyLookupEvidence({
+        gatewayCallResults: input.gatewayCallResults,
+        selectedResultIds: input.selectedScholarlyResultIds,
+      }),
+    runtime_selected_usable_full_text_evidence:
+      hasRuntimeSelectedUsableScholarlyFullTextEvidence({
+        gatewayCallResults: input.gatewayCallResults,
+        selectedResultIds: input.selectedScholarlyResultIds,
+      }),
     provider_terminal_candidate_ref: candidateId,
     provider_terminal_candidate_present: Boolean(candidateId),
-    post_tool_model_step_required: Boolean(candidateId && !terminalAuthorityMayUseProviderText),
-    evidence_reentered: terminalAuthorityMayUseProviderText,
+    post_tool_model_step_required: Boolean(candidateId && !providerReasoningCompleted),
+    evidence_reentered: evidenceReentered,
     solver_completed: input.solverCompleted === true,
     goal_satisfaction_compatible: input.goalSatisfied === true,
     assistant_answer: false,

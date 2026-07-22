@@ -380,6 +380,62 @@ describe("Helix Ask Realtime provider event handler", () => {
     expect(launchPrompt).not.toHaveBeenCalled();
   });
 
+  it("captures a completed output-audio transcript without exporting deltas as payload", async () => {
+    const postEvent = vi.fn();
+    const projections = vi.fn();
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:output-transcript",
+      runtimeAgentAuthority: "observe_only",
+      postEvent,
+      launchPrompt: vi.fn(),
+      onProjection: projections,
+      nowMs: () => 500,
+    });
+
+    const partial = await handler.handle({
+      type: "response.output_audio_transcript.delta",
+      event_id: "event:output-transcript:delta",
+      response_id: "response:output-transcript",
+      item_id: "item:output-audio",
+      content_index: 0,
+      delta: "The active panel is ",
+    });
+    const completed = await handler.handle({
+      type: "response.output_audio_transcript.done",
+      event_id: "event:output-transcript:done",
+      response_id: "response:output-transcript",
+      item_id: "item:output-audio",
+      content_index: 0,
+      transcript: "The active panel is Account & Sessions.",
+    });
+
+    expect(partial).toMatchObject({
+      event_kind: "output_transcript",
+      provider_response_ref: "response:output-transcript",
+      completed_output_transcript: null,
+      raw_content_included: false,
+    });
+    expect(completed).toMatchObject({
+      event_kind: "output_transcript",
+      provider_response_ref: "response:output-transcript",
+      transcript_char_count: 39,
+      completed_output_transcript: {
+        capture_status: "captured",
+        provider_response_ref: "response:output-transcript",
+        provider_item_ref: "item:output-audio",
+        sanitized_transcript_text: "The active panel is Account & Sessions.",
+        transcript_delta_count: 1,
+        provider_payload_included: false,
+        output_audio_transcript_deltas_included: false,
+        answer_authority: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
+    expect(postEvent).not.toHaveBeenCalled();
+    expect(projections).toHaveBeenCalledTimes(2);
+  });
+
   it("deduplicates non-terminal client playback receipts", async () => {
     const postEvent = vi.fn(async () => ({ ok: true }));
     const handler = createHelixAskRealtimeProviderEventHandler({

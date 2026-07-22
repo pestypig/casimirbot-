@@ -35,6 +35,10 @@ export type BuildHelixAgentContinuationStateArgs = {
   trigger: ContinuationStateTrigger;
   previousState?: HelixAgentContinuationState | null;
   lastAttempt?: Partial<HelixAgentContinuationAttempt> | RecordLike | null;
+  capabilityProposal?: {
+    allowed: boolean;
+    admittedCapabilityIds: string[];
+  };
   nowMs?: number;
 };
 
@@ -417,12 +421,55 @@ const collectTriedFingerprints = (
   const iterations = Array.isArray(loop?.iterations) ? loop.iterations : [];
   for (const rawIteration of iterations) {
     const iteration = readRecord(rawIteration);
-    values.push(iteration?.action_fingerprint, iteration?.executed_action_fingerprint);
+    const iterationFingerprints = uniqueStrings([
+      iteration?.action_fingerprint,
+      iteration?.executed_action_fingerprint,
+    ]);
+    values.push(...iterationFingerprints);
     const capability = readString(iteration?.chosen_capability) ?? readString(iteration?.executed_action_key);
-    if (capability) values.push(`capability:${capability}`);
+    // Capability-only fingerprints are a fallback for legacy iterations that
+    // did not record arguments. Recording both forms makes every later call to
+    // the same capability look tried, even when it targets a different page,
+    // crop, source, or query.
+    if (capability && iterationFingerprints.length === 0) values.push(`capability:${capability}`);
   }
   return uniqueStrings(values);
 };
+
+const AFFORDANCE_CONTROL_KEYS = new Set([
+  "schema",
+  "affordance_id",
+  "hint_id",
+  "capability_id",
+  "capability",
+  "capabilityId",
+  "suggested_capability",
+  "tool_name",
+  "action",
+  "suggested_action",
+  "args",
+  "suggested_args",
+  "lane_request",
+  "capability_lane_call",
+  "capabilityLaneCall",
+  "source_ref",
+  "reason",
+  "admissible",
+  "allowed",
+  "tried",
+  "action_fingerprint",
+  "mode",
+  "terminal_eligible",
+  "assistant_answer",
+  "raw_content_included",
+]);
+
+const inlineAffordanceArgs = (record: RecordLike): RecordLike =>
+  Object.fromEntries(
+    Object.entries(record).filter(([key, value]) =>
+      !AFFORDANCE_CONTROL_KEYS.has(key) && value !== undefined
+    ),
+  );
 
 const normalizeAffordanceCandidate = (args: {
   value: unknown;
@@ -433,16 +480,42 @@ const normalizeAffordanceCandidate = (args: {
   const record = readRecord(args.value);
   if (!record) return null;
   const action = (readRecord(record.action) ?? readRecord(record.suggested_action)) as HelixAgentContinuationAction | null;
-  const affordanceArgs = readRecord(record.args) ?? readRecord(record.suggested_args) ?? readRecord(action?.args) ?? {};
+  const suppliedLaneRequest =
+    readRecord(record.lane_request) ??
+    readRecord(record.capability_lane_call) ??
+    readRecord(record.capabilityLaneCall);
   const capabilityId =
     readString(record.capability_id) ??
     readString(record.capability) ??
+    readString(record.capabilityId) ??
     readString(record.suggested_capability) ??
     readString(record.tool_name) ??
+    readString(suppliedLaneRequest?.capability) ??
+    readString(suppliedLaneRequest?.capability_id) ??
+    readString(suppliedLaneRequest?.capabilityId) ??
     (readString(action?.panel_id) && readString(action?.action_id)
       ? `${readString(action?.panel_id)}.${readString(action?.action_id)}`
       : null);
   if (!capabilityId && !action) return null;
+  const affordanceArgs = {
+    ...inlineAffordanceArgs(record),
+    ...inlineAffordanceArgs(suppliedLaneRequest ?? {}),
+    ...(readRecord(action?.args) ?? {}),
+    ...(readRecord(record.suggested_args) ?? {}),
+    ...(readRecord(record.args) ?? {}),
+  };
+  const laneRequest = capabilityId
+    ? {
+        ...affordanceArgs,
+        ...(readString(record.mode) ? { mode: readString(record.mode) } : {}),
+        ...(suppliedLaneRequest ?? {}),
+        capability:
+          readString(suppliedLaneRequest?.capability) ??
+          readString(suppliedLaneRequest?.capability_id) ??
+          readString(suppliedLaneRequest?.capabilityId) ??
+          capabilityId,
+      }
+    : suppliedLaneRequest;
   const fingerprint = actionFingerprint(capabilityId, action, affordanceArgs);
   const capabilityOnlyFingerprint = capabilityId ? `capability:${capabilityId}` : null;
   return {
@@ -453,6 +526,7 @@ const normalizeAffordanceCandidate = (args: {
     capability_id: capabilityId,
     action,
     args: affordanceArgs,
+    lane_request: laneRequest,
     source_ref: args.sourceRef,
     reason: args.reason ?? readString(record.reason),
     admissible: readBoolean(record.admissible) ?? readBoolean(record.allowed) ?? true,
@@ -553,16 +627,27 @@ const resolveAllowedDecisions = (args: {
   goalSatisfied: boolean;
   lastAttempt: HelixAgentContinuationAttempt | null;
   affordances: HelixAgentContinuationAffordance[];
+  capabilityProposalAllowed: boolean;
   missingRequirementIds: string[];
   budget: HelixAgentContinuationBudget;
 }): HelixAgentContinuationDecision[] => {
   const decisions = new Set<HelixAgentContinuationDecision>();
-  decisions.add("answer");
   if (args.goalSatisfied) return ["answer"];
-  if (!args.budget.hard.exhausted && args.affordances.some((affordance: HelixAgentContinuationAffordance) => affordance.admissible && !affordance.tried)) {
+  const canAct =
+    !args.budget.hard.exhausted &&
+    (
+      args.capabilityProposalAllowed ||
+      args.affordances.some((affordance: HelixAgentContinuationAffordance) => affordance.admissible && !affordance.tried)
+    );
+  const canRetry = !args.budget.hard.exhausted && args.lastAttempt?.retryability === "retryable";
+  if (canAct) {
     decisions.add("act");
   }
-  if (!args.budget.hard.exhausted && args.lastAttempt?.retryability === "retryable") decisions.add("retry");
+  if (canRetry) decisions.add("retry");
+  // A model may answer directly before any attempt, or give a bounded answer
+  // after the admitted recovery surface is exhausted. It must not terminate an
+  // unsatisfied post-tool path while a concrete act/retry decision remains.
+  if (!args.lastAttempt || (!canAct && !canRetry)) decisions.add("answer");
   if (
     args.goalStatus === "needs_user_input" ||
     args.lastAttempt?.retryability === "requires_user_input" ||
@@ -573,7 +658,7 @@ const resolveAllowedDecisions = (args: {
   if (
     args.budget.hard.exhausted ||
     args.lastAttempt?.retryability === "non_retryable" ||
-    args.goalStatus === "blocked"
+    (args.goalStatus === "blocked" && !canAct && !canRetry)
   ) {
     decisions.add("fail");
   }
@@ -584,20 +669,30 @@ export const buildHelixAgentContinuationState = (
   args: BuildHelixAgentContinuationStateArgs,
 ): HelixAgentContinuationState => {
   const previousState = args.previousState ?? null;
-  const sequence = previousState ? previousState.sequence + 1 : 1;
+  const previousSequence = Number.isFinite(previousState?.sequence)
+    ? previousState?.sequence ?? 0
+    : 0;
+  const sequence = previousSequence + 1;
   const observations = collectObservationRefs(args.payload, args.turnId);
-  const previousObservations = new Set(previousState?.observation_refs.all ?? []);
+  const previousObservations = new Set(previousState?.observation_refs?.all ?? []);
   const newObservations = observations.filter((ref: string) => !previousObservations.has(ref));
   const existingObservations = observations.filter((ref: string) => previousObservations.has(ref));
-  const missingRequirementIds = collectMissingRequirementIds(args.payload);
+  const lastAttempt = normalizeAttempt(args.payload, args.turnId, args.lastAttempt);
+  const missingRequirementIds = uniqueStrings([
+    collectMissingRequirementIds(args.payload),
+    lastAttempt?.failure_class === "missing_evidence" ? lastAttempt.failure_code : null,
+  ]);
   const previousMissing = new Set(previousState?.missing_requirement_ids ?? []);
   const currentMissing = new Set(missingRequirementIds);
   const resolvedRequirements = [...previousMissing].filter((id: string) => !currentMissing.has(id));
   const addedRequirements = missingRequirementIds.filter((id: string) => !previousMissing.has(id));
-  const lastAttempt = normalizeAttempt(args.payload, args.turnId, args.lastAttempt);
   const triedFingerprints = collectTriedFingerprints(args.payload, previousState, lastAttempt);
   const affordances = collectAffordances(args.payload, args.turnId, triedFingerprints);
-  const previousAffordanceIds = new Set(previousState?.next_admissible_affordances.map((entry: HelixAgentContinuationAffordance) => entry.affordance_id) ?? []);
+  const previousAffordanceIds = new Set(
+    previousState?.next_admissible_affordances?.map(
+      (entry: HelixAgentContinuationAffordance) => entry.affordance_id,
+    ) ?? [],
+  );
   const newAffordanceCount = affordances.filter((entry: HelixAgentContinuationAffordance) => !previousAffordanceIds.has(entry.affordance_id)).length;
   const failedAttemptHasOnlyBookkeepingObservations = Boolean(
     lastAttempt &&
@@ -617,7 +712,7 @@ export const buildHelixAgentContinuationState = (
   const noProgressRepeatCount = madeProgress
     ? 0
     : previousState
-      ? previousState.progress.no_progress_repeat_count + (repeatedFingerprint || lastAttempt ? 1 : 0)
+      ? (previousState.progress?.no_progress_repeat_count ?? 0) + (repeatedFingerprint || lastAttempt ? 1 : 0)
       : 0;
   const normalizedGoal = normalizeGoalStatus(args.payload);
   const recoverableTerminalRejectionPending = Boolean(
@@ -633,6 +728,14 @@ export const buildHelixAgentContinuationState = (
       }
     : normalizedGoal;
   const budget = readBudget(args.payload);
+  const capabilityProposal = {
+    allowed:
+      args.capabilityProposal?.allowed === true &&
+      !budget.hard.exhausted &&
+      uniqueStrings(args.capabilityProposal.admittedCapabilityIds).length > 0,
+    admitted_capability_ids: uniqueStrings(args.capabilityProposal?.admittedCapabilityIds ?? []).sort(),
+    authority: "helix_policy_admits_runtime_proposal" as const,
+  };
   const reasonCodes = uniqueStrings([
     newObservations.length > 0 ? "new_observation" : null,
     resolvedRequirements.length > 0 ? "requirements_resolved" : null,
@@ -649,6 +752,7 @@ export const buildHelixAgentContinuationState = (
     goalSatisfied: goal.satisfied,
     lastAttempt,
     affordances,
+    capabilityProposalAllowed: capabilityProposal.allowed,
     missingRequirementIds,
     budget,
   });
@@ -676,6 +780,7 @@ export const buildHelixAgentContinuationState = (
     missing_requirement_ids: missingRequirementIds,
     last_attempt: lastAttempt,
     next_admissible_affordances: affordances,
+    capability_proposal: capabilityProposal,
     tried_action_fingerprints: triedFingerprints,
     progress: {
       made_progress: madeProgress,
@@ -853,8 +958,27 @@ export const resolveHelixContinuationBudgetExtension = (args: {
 
 export const formatHelixAgentContinuationStateForRuntime = (
   state: HelixAgentContinuationState,
-): string => [
-  "Helix continuation state (non-terminal adapter evidence):",
-  JSON.stringify(state, null, 2),
-  "Choose exactly one allowed decision. Tools and retries require an admitted affordance; answer when the user goal is satisfied or when a bounded best-effort answer is appropriate. Budgets are resource boundaries, not conclusions.",
-].join("\n");
+): string => {
+  const hasUntriedLaneRequest = state.next_admissible_affordances.some(
+    (affordance) => affordance.admissible && !affordance.tried && Boolean(affordance.lane_request),
+  );
+  const mayProposeBoundedRecovery =
+    state.allowed_decisions.includes("retry") &&
+    !hasUntriedLaneRequest &&
+    !state.budget.hard.exhausted;
+  const mayProposeManifestCapability =
+    state.capability_proposal?.allowed === true &&
+    state.allowed_decisions.includes("act") &&
+    state.capability_proposal.admitted_capability_ids.length > 0;
+  return [
+    "Helix continuation state (non-terminal adapter evidence):",
+    JSON.stringify(state, null, 2),
+    "Choose exactly one allowed decision. An untried lane_request in next_admissible_affordances is authoritative: copy it exactly rather than inventing a replacement.",
+    mayProposeBoundedRecovery
+      ? "Retry is allowed but no concrete lane_request was prescribed. You may propose exactly one bounded recovery capability grounded in the failed observation, its missing requirements, and the same source identity. Helix must independently admit the capability and arguments before execution. Do not broaden the source, invent identifiers, or repeat an unchanged failed request."
+      : mayProposeManifestCapability
+        ? "Act may be satisfied by proposing exactly one capability_id from capability_proposal.admitted_capability_ids with the minimum arguments needed for the user goal. This is a proposal, not admission: Helix independently validates the capability, arguments, permissions, source identity, and route before execution."
+      : "Tool actions and retries require an untried admitted affordance.",
+    "If answer is absent from allowed_decisions, do not produce a terminal answer or bounded failure. Continue with the permitted act/retry, or ask the user only when ask_user is allowed and no bounded recovery can be grounded. Answer when the goal is satisfied or when the admitted recovery surface is exhausted. Budgets are resource boundaries, not conclusions.",
+  ].join("\n");
+};

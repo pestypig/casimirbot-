@@ -205,6 +205,11 @@ Stage 3 (Certified / Policy-gated)
 | DP_COLLAPSE | server/services/dp-adapter-build.ts | Stage 0 | Build DP adapter inputs from stress-energy + GR evolve bricks.          | tests/collapse-benchmark.phase2.routes.spec.ts |
 | DP_COLLAPSE | shared/dp-planner.ts                | Stage 0 | DP planning calculator schema (visibility, detectability, tau).         | tests/dp-planner.spec.ts                       |
 | DP_COLLAPSE | server/services/dp-planner.ts       | Stage 0 | DP planning calculator (visibility decay, detectability ratio).         | tests/dp-planner.spec.ts                       |
+| CASIMIR_DP_STAGE1 | shared/casimir-lifshitz.ts | Stage 1 | Equilibrium planar Matsubara/reflection-coefficient solver with ideal-reference convergence; measured-material and finite-geometry gates remain separate. | tests/casimir-lifshitz.spec.ts |
+| CASIMIR_DP_STAGE1 | shared/casimir-dp-inference.ts | Stage 1 | Independent-binomial rate-power and uncertainty-whitened signature diagnostics; rate-only evidence cannot identify collapse. | tests/casimir-dp-next-computations.spec.ts |
+| CASIMIR_DP_DATA_READINESS | shared/casimir-optical-response.ts | Stage 1 | Kramers-Kronig optical-response conversion with artifact, calibration, coverage, tails, and uncertainty gates; synthetic validation does not close measured-material authority. | tests/casimir-optical-response.spec.ts |
+| CASIMIR_DP_DATA_READINESS | shared/casimir-dp-data-readiness.ts | Diagnostic | Sidecar hash/calibration/covariance validation and Fisher-z secondary-channel power; collapse identification remains blocked. | tests/casimir-dp-data-readiness.spec.ts |
+| CASIMIR_DP_PROPOSAL_CLOSURE | shared/casimir-dp-proposal-readiness.ts | Diagnostic | Transverse-branch proposal closure, Casimir-Polder reference scale, phase-force risk, systematics coverage, commissioning order, power, blinding, and claim ceilings; hardware and mechanism gates remain open. | tests/casimir-dp-proposal-closure.spec.ts |
 
 ## Observability + Audit Modules (Tagged)
 

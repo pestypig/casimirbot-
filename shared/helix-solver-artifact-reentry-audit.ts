@@ -39,6 +39,8 @@ export type HelixSolverArtifactReentryAudit = {
   schema: typeof HELIX_SOLVER_ARTIFACT_REENTRY_AUDIT_SCHEMA;
   audit_id: string;
   turn_id: string;
+  reentry_authority: "runtime_event_log" | "compatibility_projection";
+  runtime_lifecycle_verified: boolean;
   terminal_artifact_kind: string;
   terminal_artifact_id: string | null;
   final_answer_source: string;

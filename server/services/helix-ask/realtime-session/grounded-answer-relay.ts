@@ -29,7 +29,10 @@ type RelayJob = {
 
 const jobsByRelayId = new Map<string, RelayJob>();
 const relayIdByHandoffId = new Map<string, string>();
-const latestHandoffBySessionId = new Map<string, { handoffId: string; createdAtMs: number }>();
+const latestSupersedingHandoffBySessionId = new Map<
+  string,
+  { handoffId: string; createdAtMs: number }
+>();
 const activeRelayIdBySessionId = new Map<string, string>();
 
 const clearActiveRelayIfCurrent = (realtimeSessionId: string, relayId: string): void => {
@@ -65,6 +68,10 @@ const isOpenRelayStatus = (status: HelixRealtimeGroundedRelayStatusV1): boolean 
   "response_requested",
   "speaking",
 ].includes(status);
+
+const handoffSupersedesOpenRelays = (
+  workerAdmission: HelixRealtimeWorkerAdmission,
+): boolean => workerAdmission.outcome !== "conversation_local";
 
 const transition = (input: {
   relayId: string;
@@ -214,7 +221,7 @@ const attemptRelayDelivery = (
   if (!job || !job.answerProjection || !job.artifact.worker_admission.spoken_relay_eligible) {
     return job?.artifact ?? null;
   }
-  const latest = latestHandoffBySessionId.get(job.artifact.realtime_session_id);
+  const latest = latestSupersedingHandoffBySessionId.get(job.artifact.realtime_session_id);
   if (latest && latest.handoffId !== job.artifact.handoff_id) {
     return transition({
       relayId,
@@ -299,9 +306,10 @@ export const startRealtimeGroundedRelayForHandoff = (input: {
   const existing = existingId ? jobsByRelayId.get(existingId)?.artifact : null;
   if (existing) return existing;
   const nowMs = input.nowMs ?? input.handoff.created_at_ms;
-  const latest = latestHandoffBySessionId.get(input.handoff.realtime_session_id);
-  if (!latest || latest.createdAtMs <= input.handoff.created_at_ms) {
-    latestHandoffBySessionId.set(input.handoff.realtime_session_id, {
+  const supersedesOpenRelays = handoffSupersedesOpenRelays(input.workerAdmission);
+  const latest = latestSupersedingHandoffBySessionId.get(input.handoff.realtime_session_id);
+  if (supersedesOpenRelays && (!latest || latest.createdAtMs <= input.handoff.created_at_ms)) {
+    latestSupersedingHandoffBySessionId.set(input.handoff.realtime_session_id, {
       handoffId: input.handoff.handoff_id,
       createdAtMs: input.handoff.created_at_ms,
     });
@@ -651,7 +659,7 @@ export const listRealtimeGroundedAnswerRelays = (input: {
 export const resetRealtimeGroundedAnswerRelaysForTests = (): void => {
   jobsByRelayId.clear();
   relayIdByHandoffId.clear();
-  latestHandoffBySessionId.clear();
+  latestSupersedingHandoffBySessionId.clear();
   activeRelayIdBySessionId.clear();
 };
 

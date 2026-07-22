@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import type { HelixTurnLifecycle } from "@shared/helix-turn-lifecycle";
 import type { HelixRuntimeSemanticRouteProposal } from "../../runtime/runtime-intent-packet";
 import { normalizeHelixRuntimeSemanticRouteProposal } from "../../runtime/runtime-intent-packet";
 import {
@@ -7,6 +8,8 @@ import {
   type HelixWorkstationGatewayAccountContext,
 } from "../../workstation-tool-gateway/account-policy";
 import type { HelixWorkstationGatewayCallResult } from "../../workstation-tool-gateway/types";
+import { HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY } from "@shared/helix-scholarly-research-observation";
+import { enrichScholarlyNumericArgumentsFromGatewayResults } from "../scholarly-gateway-evidence";
 import {
   runCodexNativeAppServerTurn,
   type CodexNativeAppServerTurnResult,
@@ -64,6 +67,7 @@ export type CodexNativeWorkstationTurnResult = {
     native_final_item_id: string | null;
     native_turn_status: string | null;
     terminal_candidate_present: boolean;
+    turn_lifecycle: HelixTurnLifecycle | null;
     compatibility_fallback_required: boolean;
     compatibility_fallback_reason: string | null;
     terminal_eligible: false;
@@ -183,6 +187,7 @@ export const runCodexNativeWorkstationTurn = async (input: {
     native_final_item_id: null,
     native_turn_status: null,
     terminal_candidate_present: false,
+    turn_lifecycle: null,
     compatibility_fallback_required:
       accountBindingBlocked || admittedCapabilitySetEmpty,
     compatibility_fallback_reason: accountBindingBlocked
@@ -345,12 +350,15 @@ export const runCodexNativeWorkstationTurn = async (input: {
           observationRef: `${input.turnId}:${capabilityId}:${iteration}:blocked`,
         };
       }
+      const governedArguments = capabilityId === HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY
+        ? enrichScholarlyNumericArgumentsFromGatewayResults(gatewayCallResults, args)
+        : args;
       const governed = await callAccountAuthorizedWorkstationGatewayCapability({
         accountContext: input.accountContext,
         requestedMode,
         requestedRuntime: "codex",
         capabilityId,
-        arguments: args,
+        arguments: governedArguments,
         turnId: input.turnId,
         iteration,
       });
@@ -396,6 +404,7 @@ export const runCodexNativeWorkstationTurn = async (input: {
       native_final_item_id: native.debug.native_final_item_id,
       native_turn_status: native.debug.native_turn_status,
       terminal_candidate_present: native.debug.terminal_candidate_present,
+      turn_lifecycle: native.debug.turn_lifecycle,
       compatibility_fallback_required: !native.ok,
       compatibility_fallback_reason: native.failReason,
     },

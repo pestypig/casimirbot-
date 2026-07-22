@@ -24,12 +24,24 @@ describe("account capability policy identity events", () => {
     window.addEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, listener);
     try {
       cacheAccountCapabilityPolicy(HELIX_USER_ACCOUNT_POLICY, "profile:a");
-      cacheAccountCapabilityPolicy(HELIX_USER_ACCOUNT_POLICY, "profile:a");
+      const eventCountAfterInitialProfile = details.length;
+      cacheAccountCapabilityPolicy({
+        ...HELIX_USER_ACCOUNT_POLICY,
+        allowed_panels: [...HELIX_USER_ACCOUNT_POLICY.allowed_panels],
+        locked_panels: [...HELIX_USER_ACCOUNT_POLICY.locked_panels],
+        locked_features: [...HELIX_USER_ACCOUNT_POLICY.locked_features],
+        allowed_runtime_agents: [...HELIX_USER_ACCOUNT_POLICY.allowed_runtime_agents],
+        allowed_workstation_capabilities: [
+          ...HELIX_USER_ACCOUNT_POLICY.allowed_workstation_capabilities,
+        ],
+        locked_workstation_capabilities: [
+          ...HELIX_USER_ACCOUNT_POLICY.locked_workstation_capabilities,
+        ],
+        feature_flags: [...HELIX_USER_ACCOUNT_POLICY.feature_flags],
+        quotas: { ...HELIX_USER_ACCOUNT_POLICY.quotas },
+      }, "profile:a");
+      expect(details).toHaveLength(eventCountAfterInitialProfile);
       cacheAccountCapabilityPolicy(HELIX_USER_ACCOUNT_POLICY, "profile:b");
-      expect(details.at(-2)).toMatchObject({
-        account_profile_id: "profile:a",
-        account_profile_changed: false,
-      });
       expect(details.at(-1)).toMatchObject({
         account_profile_id: "profile:b",
         account_profile_changed: true,

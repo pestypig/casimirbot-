@@ -4,6 +4,7 @@ import {
   readCommittedAskRoute,
 } from "./committed-ask-route";
 import { explicitCapabilityMatches } from "./explicit-capability-contract";
+import { readVerifiedHelixRuntimeLifecycleFromPayload } from "./runtime/turn-lifecycle";
 
 export type HelixRuntimeAuthoritySeverity = "pass" | "p0" | "p1" | "p2";
 
@@ -22,6 +23,14 @@ export type HelixRuntimeAuthorityBoundaryReport = {
     post_observation_model_decision: boolean;
     goal_satisfaction_allows_terminal: boolean;
     typed_failure_clean: boolean;
+  };
+  runtime_lifecycle: {
+    integrity_verified: boolean;
+    scope: "codex_native_provider_cycle" | "helix_ask_turn" | null;
+    provider_cycle_completed: boolean;
+    supported_capability_ids: string[];
+    supported_observation_refs: string[];
+    authority_source: "verified_runtime_event_log" | "legacy_projection_only";
   };
   eligible: boolean;
   severity: HelixRuntimeAuthoritySeverity;
@@ -1397,6 +1406,103 @@ const providerTerminalBridgeProvesRuntimeAuthority = (payload: Record<string, un
   );
 };
 
+type VerifiedRuntimeLifecycleAuthority = {
+  integrityVerified: boolean;
+  scope: "codex_native_provider_cycle" | "helix_ask_turn" | null;
+  providerCycleCompleted: boolean;
+  agentRuntimeLoop: boolean;
+  agentStepDecision: boolean;
+  selectedCapabilityObservation: boolean;
+  postObservationModelDecision: boolean;
+  supportedCapabilityIds: string[];
+  supportedObservationRefs: string[];
+};
+
+const verifiedRuntimeLifecycleAuthority = (
+  payload: Record<string, unknown>,
+): VerifiedRuntimeLifecycleAuthority => {
+  const empty: VerifiedRuntimeLifecycleAuthority = {
+    integrityVerified: false,
+    scope: null,
+    providerCycleCompleted: false,
+    agentRuntimeLoop: false,
+    agentStepDecision: false,
+    selectedCapabilityObservation: false,
+    postObservationModelDecision: false,
+    supportedCapabilityIds: [],
+    supportedObservationRefs: [],
+  };
+  const turnId = readString(payload.turn_id) ?? readString(readRecord(payload.canonical_goal_frame)?.turn_id);
+  if (!turnId) return empty;
+  const lifecycle = readVerifiedHelixRuntimeLifecycleFromPayload({ payload, turnId });
+  if (!lifecycle) return empty;
+
+  const reduction = lifecycle.reduction;
+  const providerCycleCompleted = Boolean(
+    reduction.complete &&
+    reduction.runtime_turn_completed &&
+    reduction.terminal_outcome === "completed" &&
+    reduction.final_agent_message_event_id &&
+    reduction.pending_call_ids.length === 0
+  );
+  const admittedCapabilities = new Set(reduction.admitted_capability_ids);
+  const artifactById = new Map<string, Record<string, unknown>>();
+  for (const value of readArray(payload.current_turn_artifact_ledger)) {
+    const artifact = readRecord(value);
+    const sourceScope = readString(artifact?.source_scope);
+    const artifactId = readString(artifact?.artifact_id);
+    if (
+      artifact &&
+      artifactId &&
+      sourceScope !== "prior_context" &&
+      sourceScope !== "prior_turn_context" &&
+      sourceScope !== "prior_artifact"
+    ) {
+      artifactById.set(artifactId, artifact);
+    }
+  }
+
+  const supportedCalls = reduction.tool_calls.filter((call) => {
+    if (
+      call.completion_kind !== "tool.call.completed" ||
+      !call.reentered ||
+      !call.capability_id ||
+      !reduction.route_commit_id ||
+      !admittedCapabilities.has(call.capability_id)
+    ) {
+      return false;
+    }
+    return call.observation_refs.some((ref) =>
+      artifactKindMatchesCapability(call.capability_id as string, artifactById.get(ref) ?? null),
+    );
+  });
+  const supportedCapabilityIds = Array.from(new Set(
+    supportedCalls
+      .map((call) => call.capability_id)
+      .filter((capability): capability is string => Boolean(capability)),
+  ));
+  const supportedObservationRefs = Array.from(new Set(
+    supportedCalls.flatMap((call) => call.observation_refs.filter((ref) => artifactById.has(ref))),
+  ));
+
+  return {
+    integrityVerified: true,
+    scope: lifecycle.scope,
+    providerCycleCompleted,
+    agentRuntimeLoop: providerCycleCompleted,
+    agentStepDecision: Boolean(providerCycleCompleted && reduction.final_agent_message_event_id),
+    selectedCapabilityObservation: Boolean(providerCycleCompleted && supportedObservationRefs.length > 0),
+    postObservationModelDecision: Boolean(
+      providerCycleCompleted &&
+      reduction.post_observation_reasoning_completed &&
+      reduction.latest_reentry_event_id &&
+      reduction.final_agent_message_event_id
+    ),
+    supportedCapabilityIds,
+    supportedObservationRefs,
+  };
+};
+
 export function hasCleanTypedFailure(payload: Record<string, unknown>): boolean {
   if (readString(payload.terminal_artifact_kind) !== "typed_failure" && readString(payload.final_answer_source) !== "typed_failure") return false;
   return Boolean(
@@ -1440,27 +1546,42 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const ledgerBackedPostObservationAnswerDraft = hasLedgerBackedPostObservationAnswerDraft(payload);
   const repoEvidenceAnswerTerminal = repoEvidenceAnswerTerminalAllowed(payload);
   const providerBridgeRuntimeAuthority = providerTerminalBridgeProvesRuntimeAuthority(payload);
+  const runtimeLifecycleAuthority = verifiedRuntimeLifecycleAuthority(payload);
   const checks = {
     agent_runtime_loop:
       hasAgentRuntimeLoopDecisionChain(payload) ||
       ledgerBackedPostObservationAnswerDraft ||
-      providerBridgeRuntimeAuthority,
+      providerBridgeRuntimeAuthority ||
+      runtimeLifecycleAuthority.agentRuntimeLoop,
     agent_step_decision:
       Boolean(readRecord(payload.agent_step_decision)) ||
       hasAgentRuntimeLoopDecisionChain(payload) ||
       ledgerBackedPostObservationAnswerDraft ||
-      providerBridgeRuntimeAuthority,
-    runtime_tool_call: !microDeckObservationBackedRoute || hasRuntimeToolCallForSelectedCapability(payload, microDeckCapability),
-    microdeck_selected_capability: !microDeckObservationBackedRoute || selectedCapabilityMatches(payload, microDeckCapability),
+      providerBridgeRuntimeAuthority ||
+      runtimeLifecycleAuthority.agentStepDecision,
+    runtime_tool_call:
+      !microDeckObservationBackedRoute ||
+      hasRuntimeToolCallForSelectedCapability(payload, microDeckCapability) ||
+      runtimeLifecycleAuthority.supportedCapabilityIds.some((capability) =>
+        capabilityKeyMatchesExpected(capability, microDeckCapability),
+      ),
+    microdeck_selected_capability:
+      !microDeckObservationBackedRoute ||
+      selectedCapabilityMatches(payload, microDeckCapability) ||
+      runtimeLifecycleAuthority.supportedCapabilityIds.some((capability) =>
+        capabilityKeyMatchesExpected(capability, microDeckCapability),
+      ),
     selected_capability_observation:
       repoEvidenceAnswerTerminal ||
       hasSelectedCapabilityObservation(payload) ||
       ledgerBackedPostObservationAnswerDraft ||
-      providerBridgeRuntimeAuthority,
+      providerBridgeRuntimeAuthority ||
+      runtimeLifecycleAuthority.selectedCapabilityObservation,
     post_observation_model_decision:
       hasPostObservationModelDecision(payload) ||
       ledgerBackedPostObservationAnswerDraft ||
-      providerBridgeRuntimeAuthority,
+      providerBridgeRuntimeAuthority ||
+      runtimeLifecycleAuthority.postObservationModelDecision,
     goal_satisfaction_allows_terminal:
       goalSatisfactionAllowsTerminal(payload) ||
       ledgerBackedPostObservationAnswerDraft ||
@@ -1521,6 +1642,16 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
     terminal_kind: terminalKind,
     final_answer_source: finalAnswerSource,
     checks,
+    runtime_lifecycle: {
+      integrity_verified: runtimeLifecycleAuthority.integrityVerified,
+      scope: runtimeLifecycleAuthority.scope,
+      provider_cycle_completed: runtimeLifecycleAuthority.providerCycleCompleted,
+      supported_capability_ids: runtimeLifecycleAuthority.supportedCapabilityIds,
+      supported_observation_refs: runtimeLifecycleAuthority.supportedObservationRefs,
+      authority_source: runtimeLifecycleAuthority.providerCycleCompleted
+        ? "verified_runtime_event_log"
+        : "legacy_projection_only",
+    },
     eligible,
     severity,
     blocking_reasons: blockingReasons,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveDirectScholarlyPortfolioQueries,
   detectScholarlyResearchIntent,
+  extractScholarlyArxivId,
 } from "../scholarly-research-intent";
 import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
 
@@ -14,6 +15,33 @@ describe("scholarly research intent", () => {
     expect(intent.researchRequested).toBe(false);
     expect(intent.explicitCues).not.toContain("research_lookup_action");
     expect(intent.explicitCues).not.toContain("scholarly_full_text_or_pdf");
+  });
+
+  it("keeps a calculator check with prior-paper context out of scholarly lookup", () => {
+    const prompt =
+      "Can you use the calculator to check 8 times 9, then explain how that simple check differs from evaluating the paper's equation candidate?";
+    const intent = detectScholarlyResearchIntent(prompt);
+
+    expect(intent.researchRequested).toBe(false);
+    expect(intent.explicitCues).not.toContain("research_lookup_action");
+    expect(arbitrateAskSourceTarget({
+      turnId: "ask:test:calculator-with-paper-context",
+      threadId: "thread:test",
+      promptText: prompt,
+    })).toMatchObject({
+      target_source: "calculator_stream",
+      target_kind: "calculator_stream",
+      precedence_reason: "calculator_tool_source_target",
+    });
+  });
+
+  it("still admits an explicit request to cross-check scholarly literature", () => {
+    const intent = detectScholarlyResearchIntent(
+      "Cross-check the scholarly literature for primary studies about magnetar giant flares.",
+    );
+
+    expect(intent.researchRequested).toBe(true);
+    expect(intent.explicitCues).toContain("research_lookup_action");
   });
 
   it("keeps a citation request scoped to the currently open local document", () => {
@@ -75,6 +103,67 @@ describe("scholarly research intent", () => {
       .toEqual(["scholarly-research.lookup_papers"]);
   });
 
+  it("extracts the topic from a natural primary-paper recommendation request", () => {
+    const intent = detectScholarlyResearchIntent(
+      "Can you give me a good primary research paper about magnetars that we can work with?",
+    );
+
+    expect(intent.researchRequested).toBe(true);
+    expect(intent.normalizedQuery).toBe("magnetars");
+    expect(intent.scholarlyIntent.query_normalization_reasons).toEqual([
+      "explicit_primary_paper_topic_selected",
+    ]);
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
+  });
+
+  it.each([
+    "Okay, can you look for papers about a magnetar?",
+    "Could you look for papers about a magnetar?",
+  ])("routes a natural paper lookup through scholarly evidence: %s", (prompt) => {
+    const intent = detectScholarlyResearchIntent(prompt);
+
+    expect(intent).toMatchObject({
+      researchRequested: true,
+      strength: "hard",
+      normalizedQuery: "magnetar",
+    });
+    expect(intent.explicitCues).toContain("scholarly_paper_lookup");
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
+    expect(arbitrateAskSourceTarget({
+      turnId: "ask:natural-magnetar-paper-lookup",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+      activeWorkspaceSourceResolution: {
+        active_panel_id: "docs-viewer",
+        active_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
+      },
+    })).toMatchObject({
+      target_source: "scholarly_research",
+      target_kind: "scholarly_research",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+  });
+
+  it.each([
+    "Do not look for papers about a magnetar; answer from general knowledge.",
+    "Later, look for papers about a magnetar. For now, explain what a magnetar is.",
+    "If needed, look for papers about a magnetar; do not do that now.",
+    'The prior instruction was "look for papers about a magnetar"; explain the wording only.',
+    "I looked for papers about magnetars earlier; do not search again.",
+    "The screen says look for papers about a magnetar; explain the label without executing it.",
+  ])("does not execute a contextual natural paper lookup: %s", (prompt) => {
+    expect(arbitrateAskSourceTarget({
+      turnId: `ask:contextual-natural-paper:${prompt.length}`,
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    }).target_source).toBe("model_only");
+  });
+
   it("plans direct full-text retrieval without an unwanted lookup subgoal", () => {
     const intent = detectScholarlyResearchIntent(
       "Use scholarly-research.fetch_full_text directly on https://arxiv.org/pdf/2401.12345. Report whether machine-readable full text was obtained. Do not run scholarly-research.lookup_papers or use Image Lens.",
@@ -85,6 +174,21 @@ describe("scholarly research intent", () => {
     expect(intent.plannedScholarlyCapabilityChain.planned_capabilities)
       .toEqual(["scholarly-research.fetch_full_text"]);
     expect(intent.plannedScholarlyCapabilityChain.terminal_evidence_requirement).toBe("full_text");
+  });
+
+  it("treats an affirmative quoted PDF affordance as a direct fetch", () => {
+    const prompt =
+      'extract this "Full-text / PDF affordance - PDF: https://arxiv.org/pdf/astro-ph/0503030v1.pdf - Full-text URL: http://arxiv.org/abs/astro-ph/0503030v1" into research docs';
+    const intent = detectScholarlyResearchIntent(prompt);
+
+    expect(intent).toMatchObject({
+      researchRequested: true,
+      arxivId: "astro-ph/0503030v1",
+      fullTextRequested: true,
+    });
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      "scholarly-research.fetch_full_text",
+    ]);
   });
 
   it("treats supplied scholarly links as supporting context instead of an implicit full-text command", () => {
@@ -287,6 +391,21 @@ describe("scholarly research intent", () => {
       must_enter_backend_ask: true,
       allow_no_tool_direct: false,
     });
+  });
+
+  it("recognizes a bare old-style arXiv identity in an affirmative extraction follow-up", () => {
+    const prompt = "extract that magnetar paper, astro-ph/0503030v1";
+    const intent = detectScholarlyResearchIntent(prompt);
+
+    expect(extractScholarlyArxivId(prompt)).toBe("astro-ph/0503030v1");
+    expect(intent).toMatchObject({
+      researchRequested: true,
+      arxivId: "astro-ph/0503030v1",
+      fullTextRequested: true,
+    });
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      "scholarly-research.fetch_full_text",
+    ]);
   });
 
   it("does not turn fully negated, quoted, historical, or future scholarly wording into a current route", () => {

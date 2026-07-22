@@ -1,5 +1,6 @@
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
+import type { HelixRealtimeGroundedFeedbackBindingV1 } from "@shared/contracts/helix-realtime-stage-play.v1";
 import type { HelixAskRouteMetadata } from "@/lib/helix/ask-prompt-launch";
 
 import {
@@ -27,6 +28,8 @@ export type HelixAskMinimalRuntimeTurnPayload = {
   workspace_context_snapshot?: Record<string, unknown>;
   routeMetadata?: HelixAskRouteMetadata;
   route_metadata?: HelixAskRouteMetadata;
+  realtimeGroundedFeedbackBinding?: HelixRealtimeGroundedFeedbackBindingV1;
+  realtime_grounded_feedback_binding?: HelixRealtimeGroundedFeedbackBindingV1;
   bypassWorkstationDispatch?: boolean;
   bypass_workstation_dispatch?: boolean;
   forceReasoningDispatch?: boolean;

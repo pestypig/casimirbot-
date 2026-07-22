@@ -1,7 +1,10 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { HelixTurnLifecycle } from "@shared/helix-turn-lifecycle";
 import type { HelixRuntimeSemanticRouteProposal } from "../../runtime/runtime-intent-packet";
+import { createHelixTurnLifecycleRecorder } from "../../runtime/turn-lifecycle";
 import type { HelixWorkstationCapabilityManifest } from "../../workstation-tool-gateway/types";
 import {
   buildCodexNativeDynamicToolCatalog,
@@ -63,6 +66,7 @@ export type CodexNativeAppServerDebug = {
   native_error_code: string | null;
   native_error_http_status: number | null;
   terminal_candidate_present: boolean;
+  turn_lifecycle: HelixTurnLifecycle;
 };
 
 export type CodexNativeAppServerTurnResult = {
@@ -207,6 +211,15 @@ export const runCodexNativeAppServerTurnWithTransport = async (
   input: RunCodexNativeAppServerTurnInput,
   transport: CodexAppServerTransport,
 ): Promise<CodexNativeAppServerTurnResult> => {
+  const lifecycle = createHelixTurnLifecycleRecorder({
+    turnId: input.turnId,
+    scope: "codex_native_provider_cycle",
+  });
+  const turnStartedEvent = lifecycle.append({
+    kind: "turn.started",
+    producer: "helix_adapter",
+    status: "started",
+  });
   const catalog = buildCodexNativeDynamicToolCatalog(input.capabilities);
   const client = new CodexAppServerJsonRpcClient(transport);
   const modelVisibleTools = input.capabilities.map(
@@ -220,7 +233,13 @@ export const runCodexNativeAppServerTurnWithTransport = async (
   const observationRefs: string[] = [];
   const nativeItemTypes: string[] = [];
   const forbiddenItems: string[] = [];
+  const pendingReentryByCallId = new Map<string, {
+    completionEventId: string;
+    capabilityId: string | null;
+    observationRefs: string[];
+  }>();
   let routeAdmission: CodexNativeRouteAdmission | null = null;
+  let activeRouteCommitId: string | null = null;
   let nativeThreadId: string | null = null;
   let nativeTurnId: string | null = null;
   let nativeTurnStatus: string | null = null;
@@ -228,6 +247,63 @@ export const runCodexNativeAppServerTurnWithTransport = async (
   let nativeErrorCode: string | null = null;
   let nativeErrorHttpStatus: number | null = null;
   let answer = "";
+
+  const recordToolResponse = (args: {
+    callId: string;
+    capabilityId: string | null;
+    kind: "tool.call.completed" | "tool.call.failed" | "tool.call.rejected";
+    content: unknown;
+    success: boolean;
+    reasonCode?: string;
+    observationRefs?: string[];
+    causationId?: string;
+  }): ReturnType<typeof toolResponse> => {
+    const completionEvent = lifecycle.append({
+      kind: args.kind,
+      producer: args.kind === "tool.call.rejected" ? "helix_policy" : "helix_adapter",
+      status:
+        args.kind === "tool.call.completed"
+          ? "succeeded"
+          : args.kind === "tool.call.rejected"
+            ? "blocked"
+            : "failed",
+      causation_id: args.causationId,
+      route_commit_id: activeRouteCommitId ?? undefined,
+      call_id: args.callId,
+      capability_id: args.capabilityId ?? undefined,
+      observation_refs: args.observationRefs ?? [],
+      reason_code: args.reasonCode,
+    });
+    pendingReentryByCallId.set(args.callId, {
+      completionEventId: completionEvent.event_id,
+      capabilityId: args.capabilityId,
+      observationRefs: args.observationRefs ?? [],
+    });
+    return toolResponse(args.content, args.success);
+  };
+
+  client.setServerResponseSentHandler(({ id, method, params }) => {
+    if (method !== "item/tool/call") return;
+    const request = readRecord(params);
+    const callId =
+      readString(request.callId) ??
+      readString(request.call_id) ??
+      String(id);
+    const pending = pendingReentryByCallId.get(callId);
+    if (!pending) return;
+    lifecycle.append({
+      kind: "observation.reentered",
+      producer: "helix_adapter",
+      status: "succeeded",
+      causation_id: pending.completionEventId,
+      route_commit_id: activeRouteCommitId ?? undefined,
+      native_request_id: String(id),
+      call_id: callId,
+      capability_id: pending.capabilityId ?? undefined,
+      observation_refs: pending.observationRefs,
+    });
+    pendingReentryByCallId.delete(callId);
+  });
 
   client.setServerRequestHandler(async (method: string, rawParams: unknown) => {
     if (method !== "item/tool/call") {
@@ -240,6 +316,10 @@ export const runCodexNativeAppServerTurnWithTransport = async (
     const params = readRecord(rawParams);
     const toolName = readString(params.tool) ?? "";
     const args = readRecord(params.arguments);
+    const callId =
+      readString(params.callId) ??
+      readString(params.call_id) ??
+      `${input.turnId}:native-tool:${requestedTools.length + 1}`;
 
     if (toolName === HELIX_CODEX_ROUTE_PROPOSAL_TOOL) {
       if (routeAdmission) {
@@ -254,6 +334,29 @@ export const runCodexNativeAppServerTurnWithTransport = async (
           false,
         );
       }
+      const proposedCapabilityIds = uniqueStrings([
+        readString(args.proposed_capability_id),
+        ...(Array.isArray(args.proposed_capability_ids)
+          ? args.proposed_capability_ids.map(readString)
+          : []),
+      ].filter((value): value is string => Boolean(value)));
+      const routeProposedEvent = lifecycle.append({
+        kind: "route.proposed",
+        producer: "codex_runtime",
+        status: "succeeded",
+        causation_id: turnStartedEvent.event_id,
+        native_request_id: callId,
+        capability_ids: proposedCapabilityIds,
+      });
+      for (const capabilityId of proposedCapabilityIds) {
+        lifecycle.append({
+          kind: "capability.proposed",
+          producer: "codex_runtime",
+          status: "succeeded",
+          causation_id: routeProposedEvent.event_id,
+          capability_id: capabilityId,
+        });
+      }
       const proposedAdmission = await input.validateRouteProposal(args);
       routeAdmission = {
         ...proposedAdmission,
@@ -263,6 +366,30 @@ export const runCodexNativeAppServerTurnWithTransport = async (
           ),
         ),
       };
+      const routeDecisionEvent = lifecycle.append({
+        kind: routeAdmission.ok ? "route.committed" : "route.rejected",
+        producer: "helix_policy",
+        status: routeAdmission.ok ? "succeeded" : "blocked",
+        causation_id: routeProposedEvent.event_id,
+        route_commit_id: routeAdmission.ok
+          ? `${input.turnId}:route:${routeProposedEvent.sequence}`
+          : undefined,
+        capability_ids: routeAdmission.admittedCapabilityIds,
+        reason_code: routeAdmission.reason,
+      });
+      activeRouteCommitId = routeDecisionEvent.route_commit_id ?? null;
+      for (const capabilityId of proposedCapabilityIds) {
+        const admitted = routeAdmission.admittedCapabilityIds.includes(capabilityId);
+        lifecycle.append({
+          kind: admitted ? "capability.admitted" : "capability.rejected",
+          producer: "helix_policy",
+          status: admitted ? "succeeded" : "blocked",
+          causation_id: routeDecisionEvent.event_id,
+          route_commit_id: activeRouteCommitId ?? undefined,
+          capability_id: capabilityId,
+          reason_code: admitted ? routeAdmission.reason : "capability_not_admitted",
+        });
+      }
       return toolResponse(
         {
           schema: "helix.codex_native_route_admission.v1",
@@ -281,21 +408,28 @@ export const runCodexNativeAppServerTurnWithTransport = async (
     const capabilityId = catalog.capabilityIdByToolName.get(toolName);
     if (!capabilityId) {
       requestedTools.push(`unknown:${toolName || "missing"}`);
-      return toolResponse(
-        {
+      return recordToolResponse({
+        callId,
+        capabilityId: null,
+        kind: "tool.call.rejected",
+        content: {
           schema: "helix.codex_native_tool_block.v1",
           ok: false,
           reason: "dynamic_tool_not_registered",
           terminal_eligible: false,
           assistant_answer: false,
         },
-        false,
-      );
+        success: false,
+        reasonCode: "dynamic_tool_not_registered",
+      });
     }
     requestedTools.push(capabilityId);
     if (!routeAdmission?.ok) {
-      return toolResponse(
-        {
+      return recordToolResponse({
+        callId,
+        capabilityId,
+        kind: "tool.call.rejected",
+        content: {
           schema: "helix.codex_native_tool_block.v1",
           ok: false,
           capability_id: capabilityId,
@@ -303,12 +437,16 @@ export const runCodexNativeAppServerTurnWithTransport = async (
           terminal_eligible: false,
           assistant_answer: false,
         },
-        false,
-      );
+        success: false,
+        reasonCode: "route_proposal_required",
+      });
     }
     if (!routeAdmission.admittedCapabilityIds.includes(capabilityId)) {
-      return toolResponse(
-        {
+      return recordToolResponse({
+        callId,
+        capabilityId,
+        kind: "tool.call.rejected",
+        content: {
           schema: "helix.codex_native_tool_block.v1",
           ok: false,
           capability_id: capabilityId,
@@ -316,10 +454,19 @@ export const runCodexNativeAppServerTurnWithTransport = async (
           terminal_eligible: false,
           assistant_answer: false,
         },
-        false,
-      );
+        success: false,
+        reasonCode: "capability_outside_committed_route",
+      });
     }
 
+    const toolStartedEvent = lifecycle.append({
+      kind: "tool.call.started",
+      producer: "codex_runtime",
+      status: "started",
+      route_commit_id: activeRouteCommitId ?? undefined,
+      call_id: callId,
+      capability_id: capabilityId,
+    });
     const execution = await input.executeCapability({
       capabilityId,
       arguments: args,
@@ -329,7 +476,16 @@ export const runCodexNativeAppServerTurnWithTransport = async (
     if (execution.ok) successfulTools.push(capabilityId);
     else failedTools.push(capabilityId);
     if (execution.observationRef) observationRefs.push(execution.observationRef);
-    return toolResponse(execution.content, execution.ok);
+    return recordToolResponse({
+      callId,
+      capabilityId,
+      kind: execution.ok ? "tool.call.completed" : "tool.call.failed",
+      content: execution.content,
+      success: execution.ok,
+      observationRefs: execution.observationRef ? [execution.observationRef] : [],
+      causationId: toolStartedEvent.event_id,
+      reasonCode: execution.ok ? undefined : "capability_execution_failed",
+    });
   });
 
   let resolveCompleted: (value: void) => void = () => undefined;
@@ -373,6 +529,20 @@ export const runCodexNativeAppServerTurnWithTransport = async (
       if (method === "item/completed" && itemType === "agentMessage") {
         answer = readString(item.text) ?? answer;
         nativeFinalItemId = readString(item.id) ?? nativeFinalItemId;
+        if (answer) {
+          lifecycle.append({
+            kind: "agent.message.completed",
+            producer: "codex_runtime",
+            status: "succeeded",
+            causation_id:
+              lifecycle.latest("observation.reentered")?.event_id ??
+              turnStartedEvent.event_id,
+            route_commit_id: activeRouteCommitId ?? undefined,
+            native_item_id: nativeFinalItemId ?? undefined,
+            native_turn_id: nativeTurnId ?? undefined,
+            message_sha256: crypto.createHash("sha256").update(answer).digest("hex"),
+          });
+        }
       }
     }
     if (method === "turn/completed") {
@@ -382,6 +552,18 @@ export const runCodexNativeAppServerTurnWithTransport = async (
       const failure = readNativeProviderFailure(turn);
       nativeErrorCode = failure.code ?? nativeErrorCode;
       nativeErrorHttpStatus = failure.httpStatus ?? nativeErrorHttpStatus;
+      lifecycle.append({
+        kind: nativeTurnStatus === "completed" ? "runtime.turn.completed" : "runtime.turn.failed",
+        producer: "codex_runtime",
+        status: nativeTurnStatus === "completed" ? "succeeded" : "failed",
+        causation_id:
+          lifecycle.latest("agent.message.completed")?.event_id ??
+          lifecycle.latest("observation.reentered")?.event_id ??
+          turnStartedEvent.event_id,
+        route_commit_id: activeRouteCommitId ?? undefined,
+        native_turn_id: nativeTurnId ?? undefined,
+        reason_code: nativeTurnStatus === "completed" ? undefined : nativeErrorCode ?? nativeTurnStatus,
+      });
       resolveCompleted();
     }
   });
@@ -435,9 +617,9 @@ export const runCodexNativeAppServerTurnWithTransport = async (
     );
     nativeTurnId = readString(readRecord(turnResponse.turn).id);
     await completed;
-    const successfulToolSet = new Set(successfulTools);
+    const observedToolSet = new Set(executedTools);
     const routeUnobservedTools = routeAdmission?.admittedCapabilityIds.filter(
-      (capabilityId: string) => !successfulToolSet.has(capabilityId),
+      (capabilityId: string) => !observedToolSet.has(capabilityId),
     ) ?? [];
     if (nativeTurnStatus !== "completed") {
       failReason = nativeErrorCode
@@ -465,6 +647,31 @@ export const runCodexNativeAppServerTurnWithTransport = async (
     client.close();
   }
 
+  const eligibilityEvent = lifecycle.append({
+    kind: "terminal.eligibility.checked",
+    producer: "helix_policy",
+    status: failReason === null ? "succeeded" : "blocked",
+    causation_id:
+      lifecycle.latest("runtime.turn.completed")?.event_id ??
+      lifecycle.latest("runtime.turn.failed")?.event_id ??
+      lifecycle.latest()?.event_id ??
+      turnStartedEvent.event_id,
+    route_commit_id: activeRouteCommitId ?? undefined,
+    terminal_kind: "agent_provider_terminal_candidate",
+    terminal_eligible: failReason === null,
+    reason_code: failReason ?? undefined,
+  });
+  lifecycle.append({
+    kind: failReason === null ? "turn.completed" : "turn.failed",
+    producer: "helix_adapter",
+    status: failReason === null ? "succeeded" : "failed",
+    causation_id: eligibilityEvent.event_id,
+    route_commit_id: activeRouteCommitId ?? undefined,
+    terminal_kind: failReason === null ? "agent_provider_terminal_candidate" : "typed_failure",
+    terminal_eligible: failReason === null,
+    reason_code: failReason ?? undefined,
+  });
+
   const debug: CodexNativeAppServerDebug = {
     schema: "helix.codex_native_app_server_debug.v1",
     transport: "app_server_stdio_jsonl",
@@ -485,7 +692,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
     failed_tools: failedTools,
     route_unobserved_tools:
       routeAdmission?.admittedCapabilityIds.filter(
-        (capabilityId: string) => !new Set(successfulTools).has(capabilityId),
+        (capabilityId: string) => !new Set(executedTools).has(capabilityId),
       ) ?? [],
     observation_reentry_refs: observationRefs,
     native_item_types: uniqueStrings(nativeItemTypes),
@@ -499,6 +706,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
     native_error_code: nativeErrorCode,
     native_error_http_status: nativeErrorHttpStatus,
     terminal_candidate_present: Boolean(answer.trim()),
+    turn_lifecycle: lifecycle.snapshot(),
   };
   return {
     ok: failReason === null,
@@ -530,6 +738,40 @@ export const runCodexNativeAppServerTurn = async (
       error instanceof CodexAppServerProtocolError
         ? error.code
         : "native_app_server_launch_failed";
+    const lifecycle = createHelixTurnLifecycleRecorder({
+      turnId: input.turnId,
+      scope: "codex_native_provider_cycle",
+    });
+    const started = lifecycle.append({
+      kind: "turn.started",
+      producer: "helix_adapter",
+      status: "started",
+    });
+    const runtimeFailure = lifecycle.append({
+      kind: "runtime.turn.failed",
+      producer: "helix_adapter",
+      status: "failed",
+      causation_id: started.event_id,
+      reason_code: failReason,
+    });
+    const eligibility = lifecycle.append({
+      kind: "terminal.eligibility.checked",
+      producer: "helix_policy",
+      status: "blocked",
+      causation_id: runtimeFailure.event_id,
+      terminal_kind: "typed_failure",
+      terminal_eligible: false,
+      reason_code: failReason,
+    });
+    lifecycle.append({
+      kind: "turn.failed",
+      producer: "helix_adapter",
+      status: "failed",
+      causation_id: eligibility.event_id,
+      terminal_kind: "typed_failure",
+      terminal_eligible: false,
+      reason_code: failReason,
+    });
     return {
       ok: false,
       answer: "",
@@ -568,6 +810,7 @@ export const runCodexNativeAppServerTurn = async (
         native_error_code: null,
         native_error_http_status: null,
         terminal_candidate_present: false,
+        turn_lifecycle: lifecycle.snapshot(),
       },
     };
   } finally {

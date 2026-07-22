@@ -16,6 +16,11 @@ import {
   parseHelixRealtimeWorkerAdmissionV2,
   type HelixAskRealtimeGoalWakeRequest,
 } from "./HelixAskRealtimeWorkerDispatch";
+import {
+  createHelixAskRealtimeOutputTranscriptTracker,
+  isHelixAskRealtimeOutputTranscriptEvent,
+  type HelixAskRealtimeCompletedOutputTranscript,
+} from "./HelixAskRealtimeOutputTranscriptDebug";
 
 export const HELIX_REALTIME_BARGE_MIN_SPEECH_MS = 700;
 
@@ -30,6 +35,7 @@ export type HelixAskRealtimeProviderEventProjection = {
     | "interruption"
     | "response"
     | "playback"
+    | "output_transcript"
     | "ignored";
   transcript_char_count: number | null;
   vad_state: "speech_started" | "speech_stopped" | null;
@@ -50,6 +56,7 @@ export type HelixAskRealtimeProviderEventProjection = {
   worker_dispatch_state: string | null;
   worker_turn_dispatched: boolean;
   runtime_goal_wake_requested: boolean;
+  completed_output_transcript: HelixAskRealtimeCompletedOutputTranscript | null;
   tool_execution_attempted: false;
   workstation_action_executed: false;
   reentry_required: boolean;
@@ -92,6 +99,9 @@ const classifyEvent = (
   if (type === "input_audio_buffer.speech_started" || type === "input_audio_buffer.speech_stopped") {
     return "vad";
   }
+  if (isHelixAskRealtimeOutputTranscriptEvent(type)) {
+    return "output_transcript";
+  }
   const responseStatus = readString(readRecord(event.response).status ?? event.status);
   if (type === "conversation.item.truncated" || (type === "response.done" && responseStatus === "cancelled")) {
     return "interruption";
@@ -132,6 +142,7 @@ const buildProjection = (input: {
   workerDispatchState?: string | null;
   workerTurnDispatched?: boolean;
   runtimeGoalWakeRequested?: boolean;
+  completedOutputTranscript?: HelixAskRealtimeCompletedOutputTranscript | null;
 }): HelixAskRealtimeProviderEventProjection => ({
   schema: "helix.ask.realtime.provider_event_projection.v1",
   event_ref: input.eventRef,
@@ -156,6 +167,7 @@ const buildProjection = (input: {
   worker_dispatch_state: input.workerDispatchState ?? null,
   worker_turn_dispatched: input.workerTurnDispatched === true,
   runtime_goal_wake_requested: input.runtimeGoalWakeRequested === true,
+  completed_output_transcript: input.completedOutputTranscript ?? null,
   tool_execution_attempted: false,
   workstation_action_executed: false,
   reentry_required: input.kind === "input_transcript_final",
@@ -208,6 +220,7 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
     0,
     input.bargeMinSpeechMs ?? HELIX_REALTIME_BARGE_MIN_SPEECH_MS,
   );
+  const outputTranscriptTracker = createHelixAskRealtimeOutputTranscriptTracker();
   let activeSpeech: { startedAtMs: number; terminalVoiceOverlap: boolean } | null = null;
   let completedSpeech: { durationMs: number; terminalVoiceOverlap: boolean } | null = null;
 
@@ -220,6 +233,28 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
       const transcript = clipTranscript(
         readString(event.transcript ?? event.text ?? event.delta) ?? "",
       );
+      if (kind === "output_transcript") {
+        const completedOutputTranscript = await outputTranscriptTracker.observe({
+          event,
+          type,
+          eventRef,
+          observedAtMs: nowMs(),
+        });
+        const response = readRecord(event.response);
+        const providerResponseRef = completedOutputTranscript?.provider_response_ref ?? readString(
+          event.response_id ?? event.responseId ?? response.id,
+        );
+        const projection = buildProjection({
+          eventRef,
+          type,
+          kind,
+          transcriptCharCount: completedOutputTranscript?.transcript_text_char_count ?? null,
+          providerResponseRef,
+          completedOutputTranscript,
+        });
+        input.onProjection?.(projection);
+        return projection;
+      }
       if (kind === "vad" || kind === "interruption") {
         const vadState = type.endsWith("speech_started")
           ? "speech_started"

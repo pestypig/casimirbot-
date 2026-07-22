@@ -120,7 +120,10 @@ describe("HelixAskActionToolbar visual source controls", () => {
       screen.getByRole("button", { name: "Visual source: Camera. Switch to screen" }),
     ).toBeDisabled();
     const stopCapture = screen.getByRole("button", { name: "Stop camera sharing" });
-    expect(stopCapture).toHaveAttribute("title", "Stop camera sharing");
+    expect(stopCapture).toHaveAttribute(
+      "title",
+      "Stop camera sharing with automatic 10-second captures",
+    );
     expect(stopCapture).toHaveAttribute("aria-pressed", "true");
     expect(stopCapture).toBeEnabled();
   });
@@ -137,7 +140,10 @@ describe("HelixAskActionToolbar visual source controls", () => {
     );
 
     const startCapture = screen.getByRole("button", { name: "Start screen sharing" });
-    expect(startCapture).toHaveAttribute("title", "Start screen sharing");
+    expect(startCapture).toHaveAttribute(
+      "title",
+      "Start screen sharing with automatic 10-second captures",
+    );
     expect(startCapture).toHaveAttribute("aria-pressed", "false");
     expect(startCapture).toBeEnabled();
 
@@ -154,7 +160,10 @@ describe("HelixAskActionToolbar visual source controls", () => {
       screen.getByRole("button", { name: "Visual source: Screen. Switch to camera" }),
     ).toBeEnabled();
     const retryCapture = screen.getByRole("button", { name: "Retry screen sharing" });
-    expect(retryCapture).toHaveAttribute("title", "Retry screen sharing");
+    expect(retryCapture).toHaveAttribute(
+      "title",
+      "Retry screen sharing with automatic 10-second captures",
+    );
     expect(retryCapture).toHaveAttribute("aria-pressed", "false");
     expect(retryCapture).toBeEnabled();
 

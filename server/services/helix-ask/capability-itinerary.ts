@@ -123,7 +123,9 @@ const requestedDocsFamilies = (promptText: string): HelixCapabilityItineraryFami
 
 const observationKindsFor = (family: HelixCapabilityItineraryFamily, promptText: string): string[] => {
   if (family === "scholarly_research") {
-    const kinds = detectScholarlyResearchIntent(promptText).fullTextRequested
+    const scholarlyIntent = detectScholarlyResearchIntent(promptText);
+    const fullTextRequired = scholarlyIntent.scholarlyIntent.evidence_demand.required_modes.includes("full_text");
+    const kinds = fullTextRequired
       ? ["scholarly_research_observation", "scholarly_full_text_observation"]
       : ["scholarly_research_observation"];
     return theoryFrontierRequested(promptText)
@@ -155,7 +157,8 @@ const observationKindsFor = (family: HelixCapabilityItineraryFamily, promptText:
 
 const capabilityHintFor = (family: HelixCapabilityItineraryFamily, promptText: string): string | null => {
   if (family === "scholarly_research") {
-    return detectScholarlyResearchIntent(promptText).fullTextRequested
+    const scholarlyIntent = detectScholarlyResearchIntent(promptText);
+    return scholarlyIntent.scholarlyIntent.evidence_demand.required_modes.includes("full_text")
       ? HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY
       : HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
   }
@@ -523,6 +526,12 @@ export function buildHelixCapabilityItinerary(input: {
   const compoundRequiredCapabilities = compoundSubgoals
     .map((subgoal) => readString(subgoal.requested_capability))
     .filter(Boolean);
+  const scholarlyIntent = compoundSubgoals.length === 0 && researchFamilies.includes("scholarly_research")
+    ? detectScholarlyResearchIntent(input.promptText)
+    : null;
+  const requiredScholarlyCapabilities = scholarlyIntent?.scholarlyIntent.evidence_demand.required_modes.includes("full_text")
+    ? scholarlyIntent.plannedScholarlyCapabilityChain.planned_capabilities
+    : [];
   const forbiddenTerminalArtifactKinds = compoundSubgoals.length > 1
     ? [...COMPOUND_FORBIDDEN_RECEIPT_TERMINAL_KINDS]
     : [];
@@ -594,7 +603,10 @@ export function buildHelixCapabilityItinerary(input: {
     ],
     terminal_success_criteria: {
       required_observation_families: relevantFamilies,
-      required_capabilities: compoundRequiredCapabilities,
+      required_capabilities: unique([
+        ...compoundRequiredCapabilities,
+        ...requiredScholarlyCapabilities,
+      ]),
       allowed_terminal_artifact_kinds: allowedTerminalArtifactKinds,
       forbidden_terminal_artifact_kinds: forbiddenTerminalArtifactKinds,
       ...(compoundSubgoals.length > 1

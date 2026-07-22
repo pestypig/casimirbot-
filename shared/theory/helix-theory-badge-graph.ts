@@ -64,6 +64,9 @@ import {
   buildCurvatureCollapseTheoryBadgesV1,
 } from "./curvature-collapse-theory-badges";
 import {
+  buildCasimirDpStudyTheoryBadgesV1,
+} from "./casimir-dp-study-theory-badges";
+import {
   buildOrchOrCoherenceTheoryBadgesV1,
 } from "./orch-or-coherence-theory-badges";
 import {
@@ -954,6 +957,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   const galactic = buildGalacticDynamicsTheoryBadgesV1();
   const granularTidal = buildGranularTidalLoveNumberTheoryBadgesV1();
   const curvature = buildCurvatureCollapseTheoryBadgesV1();
+  const casimirDpStudy = buildCasimirDpStudyTheoryBadgesV1();
   const orchOr = buildOrchOrCoherenceTheoryBadgesV1();
   const nucleosynthesisOrigins = buildNucleosynthesisOriginTheoryBadgesV1();
   const nuclearBindingFirstPrinciples = buildNuclearBindingFirstPrinciplesTheoryBadgesV1();
@@ -989,6 +993,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...galactic.badges,
       ...granularTidal.badges,
       ...curvature.badges,
+      ...casimirDpStudy.badges,
       ...orchOr.badges,
       ...nucleosynthesisOrigins.badges,
       ...nuclearBindingFirstPrinciples.badges,
@@ -1019,6 +1024,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...galactic.edges,
       ...granularTidal.edges,
       ...curvature.edges,
+      ...casimirDpStudy.edges,
       ...orchOr.edges,
       ...nucleosynthesisOrigins.edges,
       ...nuclearBindingFirstPrinciples.edges,

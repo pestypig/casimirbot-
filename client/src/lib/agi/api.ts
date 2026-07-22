@@ -63,6 +63,14 @@ import { ingestPostulateReviewReceiptsFromAskPayload } from "@/lib/agi/proposals
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { ingestScientificEvidenceWorkflowStatusFromAskPayload } from "@/store/useScientificEvidenceWorkflowStore";
 import { asksForScientificImageTextEvidenceComparison } from "@shared/helix-scientific-image-intent";
+import {
+  isHelixRealtimeGroundedFeedbackBindingV1,
+  type HelixRealtimeGroundedFeedbackBindingV1,
+} from "@shared/contracts/helix-realtime-stage-play.v1";
+import {
+  continueHelixAskTurnAfterAdmission,
+  HELIX_ASK_TURN_ADMISSION_CONTINUATION_SCHEMA,
+} from "./helixAskTurnAdmissionContinuation";
 
 const HELIX_CONTEXT_CAPSULE_MAX_IDS = 12;
 
@@ -783,6 +791,8 @@ type RunAskTurnPayload = {
   answerContract?: HelixAskAnswerContract;
   routeMetadata?: HelixAskRouteMetadata;
   route_metadata?: HelixAskRouteMetadata;
+  realtimeGroundedFeedbackBinding?: HelixRealtimeGroundedFeedbackBindingV1;
+  realtime_grounded_feedback_binding?: HelixRealtimeGroundedFeedbackBindingV1;
   capability_lane_call?: Record<string, unknown> | Array<Record<string, unknown>>;
   capabilityLaneCall?: Record<string, unknown> | Array<Record<string, unknown>>;
   capability_lane_session_call?: Record<string, unknown> | Array<Record<string, unknown>>;
@@ -1035,6 +1045,13 @@ const appendHelixAskRouteMetadataToBody = (
 ): void => {
   if (!routeMetadata) return;
   body.route_metadata = routeMetadata;
+  const routeMetadataRecord = routeMetadata as unknown as Record<string, unknown>;
+  const groundedFeedbackBinding =
+    routeMetadataRecord.realtime_grounded_feedback_binding ??
+    routeMetadataRecord.realtimeGroundedFeedbackBinding;
+  if (isHelixRealtimeGroundedFeedbackBindingV1(groundedFeedbackBinding)) {
+    body.realtime_grounded_feedback_binding = groundedFeedbackBinding;
+  }
   if (routeMetadata.source_target_intent) {
     body.source_target_intent = routeMetadata.source_target_intent;
   }
@@ -2412,6 +2429,12 @@ const buildRunAskTurnBody = (payload: RunAskTurnPayload): Record<string, unknown
     body.capsuleIds = payload.capsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS);
   }
   if (payload.answerContract) body.answer_contract = payload.answerContract;
+  const realtimeGroundedFeedbackBinding =
+    payload.realtimeGroundedFeedbackBinding ??
+    payload.realtime_grounded_feedback_binding;
+  if (isHelixRealtimeGroundedFeedbackBindingV1(realtimeGroundedFeedbackBinding)) {
+    body.realtime_grounded_feedback_binding = realtimeGroundedFeedbackBinding;
+  }
   const capabilityLaneCall = payload.capability_lane_call ?? payload.capabilityLaneCall;
   if (capabilityLaneCall) body.capability_lane_call = capabilityLaneCall;
   const capabilityLaneSessionCall =
@@ -2423,16 +2446,26 @@ const buildRunAskTurnBody = (payload: RunAskTurnPayload): Record<string, unknown
 
 export async function runAskTurn(payload: RunAskTurnPayload): Promise<LocalAskResponse> {
   const body = buildRunAskTurnBody(payload);
-  const response = await fetch("/api/agi/ask/turn", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(body),
+  return continueHelixAskTurnAfterAdmission({
     signal: payload.signal,
+    expectedTurnId: payload.turnId,
+    attempt: async () => {
+      const response = await fetch("/api/agi/ask/turn", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: payload.signal,
+      });
+      return normalizeLocalAskResponse(await asJson<unknown>(response));
+    },
+    onQueued: (admission) => {
+      body.turnId = admission.turnId;
+      body.turn_id = admission.turnId;
+    },
   });
-  return normalizeLocalAskResponse(await asJson<unknown>(response));
 }
 
 export async function submitRuntimeGoalWakeCandidate(
@@ -2744,17 +2777,18 @@ const askTurnStreamRetryableFailureCode = (response: LocalAskResponse): string |
   return null;
 };
 
-export async function runAskTurnStream(
+const runAskTurnStreamAttempt = async (
   payload: RunAskTurnPayload,
+  body: Record<string, unknown>,
   onEvent?: (event: HelixAskTurnStreamEvent) => void,
-): Promise<LocalAskResponse> {
+): Promise<LocalAskResponse> => {
   const response = await fetch("/api/agi/ask/turn/stream", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "text/event-stream",
     },
-    body: JSON.stringify(buildRunAskTurnBody(payload)),
+    body: JSON.stringify(body),
     signal: payload.signal,
   });
   if (!response.ok || !response.body) {
@@ -2817,6 +2851,35 @@ export async function runAskTurnStream(
     throw new Error(`ask_turn_stream_retryable_final:${retryableFailureCode}`);
   }
   return normalized;
+};
+
+export async function runAskTurnStream(
+  payload: RunAskTurnPayload,
+  onEvent?: (event: HelixAskTurnStreamEvent) => void,
+): Promise<LocalAskResponse> {
+  const body = buildRunAskTurnBody(payload);
+  return continueHelixAskTurnAfterAdmission({
+    signal: payload.signal,
+    expectedTurnId: payload.turnId,
+    attempt: () => runAskTurnStreamAttempt(payload, body, onEvent),
+    onQueued: (admission) => {
+      body.turnId = admission.turnId;
+      body.turn_id = admission.turnId;
+      onEvent?.({
+        event: "turn_admission_wait",
+        data: {
+          schema: HELIX_ASK_TURN_ADMISSION_CONTINUATION_SCHEMA,
+          turn_id: admission.turnId,
+          reason: admission.reason,
+          queue_position: admission.queuePosition,
+          retry_after_ms: admission.retryAfterMs,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      });
+    },
+  });
 }
 
 export type PlanRequestOptions = {

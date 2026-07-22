@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "./useHelixStartSettings";
 import { getInterfaceLanguageOption, normalizeInterfaceLanguageCode } from "@/lib/i18n/interfaceLanguage";
 import { createInterfaceTextResolver } from "@/lib/i18n/interfaceText";
+import { arMessages } from "@/lib/i18n/messages/ar";
+import { esMessages } from "@/lib/i18n/messages/es";
+import { hawMessages } from "@/lib/i18n/messages/haw";
 
 describe("Helix Start settings defaults", () => {
   it("keeps the legacy Helix Ask observer lane opt-in", () => {
@@ -30,10 +33,10 @@ describe("Helix Start settings defaults", () => {
   });
 
   it("resolves interface message catalogs with English fallback", () => {
-    expect(createInterfaceTextResolver("haw").t("account.language.title")).toBe("\u02bb\u014clelo");
-    expect(createInterfaceTextResolver("haw").t("account.header.title")).toBe("Mo\u02bbok\u0101ki a me n\u0101 kau");
-    expect(createInterfaceTextResolver("es").t("account.language.interfaceLabel")).toBe("Interface language");
-    expect(createInterfaceTextResolver("ar").t("account.language.interfaceLabel")).toBe("Interface language");
+    expect(createInterfaceTextResolver("haw", hawMessages).t("account.language.title")).toBe("\u02bb\u014clelo");
+    expect(createInterfaceTextResolver("haw", hawMessages).t("account.header.title")).toBe("Mo\u02bbok\u0101ki a me n\u0101 kau");
+    expect(createInterfaceTextResolver("es", esMessages).t("account.language.interfaceLabel")).toBe("Idioma de la interfaz");
+    expect(createInterfaceTextResolver("ar", arMessages).t("account.language.interfaceLabel")).toBe("لغة الواجهة");
     expect(createInterfaceTextResolver("zz").t("account.language.interfaceLabel")).toBe("Interface language");
   });
 });

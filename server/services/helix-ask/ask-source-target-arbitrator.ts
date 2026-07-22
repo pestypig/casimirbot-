@@ -697,6 +697,57 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
+  const affirmativeTheoryReflection = isAffirmativeTheoryBadgeGraphReflectionPrompt(prompt);
+  if (affirmativeTheoryReflection || isTheoryBadgeGraphCurrentContextPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "theory_locator",
+      targetKind: "theory_locator",
+      strength: "hard",
+      explicitCues: affirmativeTheoryReflection
+        ? ["affirmative_theory_badge_graph_reflection"]
+        : ["current_theory_badge_graph_selection"],
+      reasons: [
+        affirmativeTheoryReflection
+          ? "affirmative_theory_badge_graph_reflection_source_target"
+          : "theory_badge_graph_current_context_source_target",
+        affirmativeTheoryReflection
+          ? "theory_reflection_requires_bounded_graph_observation"
+          : "deictic_badge_selection_requires_bounded_workstation_observation",
+      ],
+      requestedOutputs: ["theory_context_reflection", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: [
+        "model_only_concept",
+        "no_tool_direct",
+        "client_projection",
+        "panel_generated_answer",
+      ],
+      precedenceReason: affirmativeTheoryReflection
+        ? "affirmative_theory_badge_graph_reflection_source_target"
+        : "theory_badge_graph_current_context_source_target",
+      confidence: 0.98,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isCalculatorSolvePrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "calculator_stream",
+      targetKind: "calculator_stream",
+      strength: "hard",
+      explicitCues: ["scientific_calculator_solve"],
+      reasons: ["calculator_tool_source_target", "scientific_calculator_solve_phrase"],
+      requestedOutputs: ["tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: ["active_doc_identity", "active_doc_summary", "doc_open_best", "situation_context_question", "visual_deictic", "visual_frame_evidence", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "calculator_tool_source_target",
+      confidence: 0.95,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   const liveSourceContinuationIntent = classifyLiveSourceContinuationIntent(prompt);
   if (liveSourceContinuationIntent) {
     const bindingDiagnosis = liveSourceContinuationIntent.kind === "live_environment_binding_diagnosis";
@@ -1071,40 +1122,6 @@ export function arbitrateAskSourceTarget(input: {
       suppressedRoutes: ["active_doc_identity", "active_doc_summary", "doc_open_best", "live_pipeline_control", "model_only_concept", "no_tool_direct"],
       precedenceReason: "explicit_live_capture_content_source_target",
       confidence: 0.96,
-      allowClientShortcut: false,
-      allowNoToolDirect: false,
-    });
-  }
-  const affirmativeTheoryReflection = isAffirmativeTheoryBadgeGraphReflectionPrompt(prompt);
-  if (affirmativeTheoryReflection || isTheoryBadgeGraphCurrentContextPrompt(prompt)) {
-    return toSourceTargetIntent({
-      turnId: input.turnId,
-      threadId: input.threadId,
-      target: "theory_locator",
-      targetKind: "theory_locator",
-      strength: "hard",
-      explicitCues: affirmativeTheoryReflection
-        ? ["affirmative_theory_badge_graph_reflection"]
-        : ["current_theory_badge_graph_selection"],
-      reasons: [
-        affirmativeTheoryReflection
-          ? "affirmative_theory_badge_graph_reflection_source_target"
-          : "theory_badge_graph_current_context_source_target",
-        affirmativeTheoryReflection
-          ? "theory_reflection_requires_bounded_graph_observation"
-          : "deictic_badge_selection_requires_bounded_workstation_observation",
-      ],
-      requestedOutputs: ["theory_context_reflection", "tool_call_eligibility", "typed_failure"],
-      suppressedRoutes: [
-        "model_only_concept",
-        "no_tool_direct",
-        "client_projection",
-        "panel_generated_answer",
-      ],
-      precedenceReason: affirmativeTheoryReflection
-        ? "affirmative_theory_badge_graph_reflection_source_target"
-        : "theory_badge_graph_current_context_source_target",
-      confidence: 0.98,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });
@@ -1498,23 +1515,6 @@ export function arbitrateAskSourceTarget(input: {
       suppressedRoutes: ["situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept"],
       precedenceReason: "explicit_document_acquisition_source_target",
       confidence: 0.96,
-      allowClientShortcut: false,
-      allowNoToolDirect: false,
-    });
-  }
-  if (isCalculatorSolvePrompt(prompt)) {
-    return toSourceTargetIntent({
-      turnId: input.turnId,
-      threadId: input.threadId,
-      target: "calculator_stream",
-      targetKind: "calculator_stream",
-      strength: "hard",
-      explicitCues: ["scientific_calculator_solve"],
-      reasons: ["calculator_tool_source_target", "scientific_calculator_solve_phrase"],
-      requestedOutputs: ["tool_call_eligibility", "typed_failure"],
-      suppressedRoutes: ["active_doc_identity", "active_doc_summary", "doc_open_best", "situation_context_question", "visual_deictic", "visual_frame_evidence", "model_only_concept", "no_tool_direct"],
-      precedenceReason: "calculator_tool_source_target",
-      confidence: 0.95,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });

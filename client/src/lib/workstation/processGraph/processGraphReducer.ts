@@ -406,6 +406,13 @@ export function applyWorkstationProcessGraphEvent(
   return state;
 }
 
+export function applyWorkstationProcessGraphEvents(
+  current: WorkstationProcessGraphState,
+  events: readonly WorkstationProcessGraphEvent[],
+): WorkstationProcessGraphState {
+  return events.reduce(applyWorkstationProcessGraphEvent, current);
+}
+
 export function buildWorkstationProcessGraphSnapshot(
   state: WorkstationProcessGraphState,
   options: { maxNodes?: number; includeTimeline?: boolean; includeArtifacts?: boolean } = {},

@@ -1,0 +1,210 @@
+{
+  "schema_version": "casimir_dp_experiment_design/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "boundary-coherence-platform-screen-v1",
+  "evidence_cutoff": "2026-07-21",
+  "claim_tier": "diagnostic",
+  "objective": "Compare realistic boundary-control and material-superposition platforms without assigning a manifold-response rate before dynamics are registered.",
+  "thresholds": {
+    "minimum_casimir_force_snr": 5,
+    "minimum_environmental_visibility": 0.5,
+    "maximum_unmodeled_phase_rad": 0.1,
+    "minimum_dp_to_environment_rate_ratio": 0.1
+  },
+  "run_order": [
+    "freeze_design_protocol",
+    "load_platform_candidates",
+    "compute_ideal_casimir_references",
+    "evaluate_material_and_geometry_authority",
+    "compute_switching_disturbance_budget",
+    "compute_standard_decoherence_budget",
+    "compute_dp_branch_diagnostic",
+    "apply_dp_experimental_bounds_gate",
+    "apply_manifold_response_model_gate",
+    "apply_collapse_identifiability_gate",
+    "rank_engineering_readiness_only",
+    "write_hashed_design_receipt"
+  ],
+  "candidates": [
+    {
+      "id": "cryo-levitated-gated-2d",
+      "label": "Cryogenic levitated nanoparticle with symmetric electrically gated 2D boundaries",
+      "study_role": "integrated_development_candidate",
+      "platform_class": "levitated_nanoparticle",
+      "boundary_actuator": "electrically_gated_2d_material",
+      "evidence_refs": [
+        "https://doi.org/10.1038/s41586-021-03617-w",
+        "https://doi.org/10.1038/ncomms14699"
+      ],
+      "casimir": {
+        "gap_m": 5e-7,
+        "active_area_m2": 7.853981633974482e-15,
+        "temperature_K": 4,
+        "symmetry_mode": "common_mode_matched",
+        "branch_force_mismatch_fraction": 1e-10,
+        "force_noise_N_rms": 1e-18,
+        "material_model_status": "literature_model",
+        "geometry_model_status": "pfa_reference"
+      },
+      "superposition": {
+        "mass_kg": 1e-18,
+        "branch_separation_m": 2e-8,
+        "effective_radius_m": 5e-8,
+        "observation_time_s": 0.1,
+        "trap_stiffness_N_m": 1e-6,
+        "branch_provenance": "design_assumption"
+      },
+      "switching": {
+        "modulation_hz": 10,
+        "dissipated_power_W": 1e-9,
+        "thermal_transfer_fraction": 0.001,
+        "evidence_class": "design_assumption"
+      },
+      "decoherence_rates": {
+        "gas": { "rate_s": 0.1, "evidence_class": "design_assumption", "note": "Cryogenic UHV design target." },
+        "blackbody": { "rate_s": 0.05, "evidence_class": "design_assumption", "note": "Low-temperature emission and absorption target." },
+        "thermal": { "rate_s": 0.1, "evidence_class": "design_assumption", "note": "Boundary-to-particle thermal coupling target." },
+        "vibration": { "rate_s": 0.2, "evidence_class": "design_assumption", "note": "Common-mode residual motion target." },
+        "electromagnetic": { "rate_s": 0.5, "evidence_class": "design_assumption", "note": "Patch, charge, Johnson, and dielectric-loss target." },
+        "readout": { "rate_s": 1, "evidence_class": "literature_anchored", "note": "Measurement backaction is retained as an explicit leading term." },
+        "switching": { "rate_s": 0.2, "evidence_class": "design_assumption", "note": "Electrical switching disturbance target." }
+      },
+      "dp": {
+        "mode": "gaussian_proxy",
+        "sigma_m": 5e-8,
+        "ell_m": 2e-10,
+        "grid_dim": 24,
+        "max_voxels": 1728,
+        "evidence_class": "design_assumption"
+      },
+      "manifold_response": {
+        "status": "blocked",
+        "rate_s": null,
+        "reason": "missing_registered_tensor_metric_coherence_response"
+      },
+      "notes": [
+        "Symmetric boundaries are intended to suppress deterministic branch-force phase.",
+        "Electrical charge and patch noise may dominate the target coherence residual."
+      ]
+    },
+    {
+      "id": "cryo-resonator-superconducting",
+      "label": "Cryogenic nanomechanical resonator with superconducting-transition boundary",
+      "study_role": "casimir_calibration_candidate",
+      "platform_class": "nanomechanical_resonator",
+      "boundary_actuator": "superconducting_transition",
+      "evidence_refs": [
+        "https://doi.org/10.1038/s41378-020-00221-2",
+        "https://doi.org/10.1038/s41467-026-75261-9"
+      ],
+      "casimir": {
+        "gap_m": 1e-7,
+        "active_area_m2": 1e-10,
+        "temperature_K": 0.02,
+        "symmetry_mode": "common_mode_matched",
+        "branch_force_mismatch_fraction": 1e-14,
+        "force_noise_N_rms": 1e-15,
+        "material_model_status": "literature_model",
+        "geometry_model_status": "pfa_reference"
+      },
+      "superposition": {
+        "mass_kg": 1e-12,
+        "branch_separation_m": 1e-15,
+        "effective_radius_m": 1e-6,
+        "observation_time_s": 0.001,
+        "trap_stiffness_N_m": 100,
+        "branch_provenance": "design_assumption"
+      },
+      "switching": {
+        "modulation_hz": 1,
+        "dissipated_power_W": 1e-6,
+        "thermal_transfer_fraction": 0.01,
+        "evidence_class": "design_assumption"
+      },
+      "decoherence_rates": {
+        "gas": { "rate_s": 0.01, "evidence_class": "design_assumption", "note": "Cryogenic vacuum target." },
+        "blackbody": { "rate_s": 0.01, "evidence_class": "design_assumption", "note": "Millikelvin radiation target." },
+        "thermal": { "rate_s": 20, "evidence_class": "design_assumption", "note": "Transition-driven heating and internal damping target." },
+        "vibration": { "rate_s": 5, "evidence_class": "design_assumption", "note": "Support and cavity motion target." },
+        "electromagnetic": { "rate_s": 10, "evidence_class": "design_assumption", "note": "Superconducting circuit and dielectric-loss target." },
+        "readout": { "rate_s": 20, "evidence_class": "design_assumption", "note": "Microwave or optical readout backaction target." },
+        "switching": { "rate_s": 50, "evidence_class": "design_assumption", "note": "Superconducting transition disturbance target." }
+      },
+      "dp": {
+        "mode": "unresolved",
+        "reason": "The assumed femtometre branch displacement is below a credible material-density grid and requires an analytic elastic-body DP model.",
+        "evidence_class": "unregistered"
+      },
+      "manifold_response": {
+        "status": "blocked",
+        "rate_s": null,
+        "reason": "missing_registered_tensor_metric_coherence_response"
+      },
+      "notes": [
+        "Large total mass does not compensate automatically for a femtometre branch separation.",
+        "A phonon or circuit cat state is not assumed to be a rigid center-of-mass spatial branch."
+      ]
+    },
+    {
+      "id": "matter-wave-photo-semiconductor",
+      "label": "Free-flight nanoparticle matter wave with photoexcited semiconductor boundary",
+      "study_role": "spatial_superposition_benchmark",
+      "platform_class": "free_flight_matter_wave",
+      "boundary_actuator": "photoexcited_semiconductor",
+      "evidence_refs": [
+        "https://doi.org/10.1038/s41586-025-09917-9",
+        "https://doi.org/10.1103/PhysRevB.76.035338"
+      ],
+      "casimir": {
+        "gap_m": 1e-6,
+        "active_area_m2": 5.026548245743669e-17,
+        "temperature_K": 300,
+        "symmetry_mode": "differential_calibration",
+        "branch_force_mismatch_fraction": 1,
+        "force_noise_N_rms": 1e-20,
+        "material_model_status": "literature_model",
+        "geometry_model_status": "pfa_reference"
+      },
+      "superposition": {
+        "mass_kg": 2.8e-22,
+        "branch_separation_m": 1.33e-7,
+        "effective_radius_m": 4e-9,
+        "observation_time_s": 0.01,
+        "trap_stiffness_N_m": null,
+        "branch_provenance": "literature_anchored"
+      },
+      "switching": {
+        "modulation_hz": 100,
+        "dissipated_power_W": 0.001,
+        "thermal_transfer_fraction": 0.001,
+        "evidence_class": "literature_anchored"
+      },
+      "decoherence_rates": {
+        "gas": { "rate_s": 5, "evidence_class": "design_assumption", "note": "Near-surface collision target." },
+        "blackbody": { "rate_s": 10, "evidence_class": "design_assumption", "note": "Room-temperature cluster radiation target." },
+        "thermal": { "rate_s": 5, "evidence_class": "design_assumption", "note": "Photoexcited boundary heating target." },
+        "vibration": { "rate_s": 1, "evidence_class": "design_assumption", "note": "Grating and boundary motion target." },
+        "electromagnetic": { "rate_s": 20, "evidence_class": "design_assumption", "note": "Surface charge, patch, and carrier-noise target." },
+        "readout": { "rate_s": 1, "evidence_class": "design_assumption", "note": "Detection disturbance target." },
+        "switching": { "rate_s": 100, "evidence_class": "design_assumption", "note": "Scattered switching photons are expected to be a leading confounder." }
+      },
+      "dp": {
+        "mode": "gaussian_proxy",
+        "sigma_m": 8e-9,
+        "ell_m": 2e-10,
+        "grid_dim": 24,
+        "max_voxels": 1728,
+        "evidence_class": "design_assumption"
+      },
+      "manifold_response": {
+        "status": "blocked",
+        "rate_s": null,
+        "reason": "missing_registered_tensor_metric_coherence_response"
+      },
+      "notes": [
+        "This candidate has the strongest demonstrated spatial-superposition provenance.",
+        "The one-sided calibration geometry intentionally exposes the deterministic Casimir phase problem."
+      ]
+    }
+  ]
+}

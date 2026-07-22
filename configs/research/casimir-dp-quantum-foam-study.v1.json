@@ -1,0 +1,93 @@
+{
+  "schema_version": "casimir_dp_quantum_foam_study/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "run_label": "diagnostic-smoke-v1",
+  "evidence_cutoff": "2026-07-21",
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "gap_m": 1e-7,
+    "plate_radius_m": 0.0001,
+    "temperature_K": 300,
+    "model": "ideal_parallel_plate_zero_temperature",
+    "notes": [
+      "Reference baseline only; material, roughness, patch-potential, geometry, and thermal receipts are not supplied by this smoke config."
+    ]
+  },
+  "dp": {
+    "schema_version": "dp_collapse/1",
+    "ell_m": 2e-10,
+    "grid": {
+      "dims": [24, 24, 24],
+      "voxel_size_m": [1e-9, 1e-9, 1e-9],
+      "origin_m": [0, 0, 0]
+    },
+    "branch_a": {
+      "kind": "analytic",
+      "label": "synthetic-gaussian-left",
+      "primitives": [
+        {
+          "kind": "gaussian",
+          "mass_kg": 5e-16,
+          "sigma_m": 1.6e-9,
+          "center_m": [-2e-9, 0, 0]
+        }
+      ]
+    },
+    "branch_b": {
+      "kind": "analytic",
+      "label": "synthetic-gaussian-right",
+      "primitives": [
+        {
+          "kind": "gaussian",
+          "mass_kg": 5e-16,
+          "sigma_m": 1.6e-9,
+          "center_m": [2e-9, 0, 0]
+        }
+      ]
+    },
+    "method": {
+      "kernel": "plummer",
+      "max_voxels": 1728
+    },
+    "notes": [
+      "Synthetic branch distributions exercise the solver and are not apparatus measurements."
+    ]
+  },
+  "hypothesis_bridge": {
+    "status": "blocked",
+    "reason": "missing_registered_observable_bridge",
+    "from_observable": "casimir_force_residual_N",
+    "to_observable": "dp_gravitational_self_energy_difference_J",
+    "notes": [
+      "Casimir force or energy is not a substitute for the DP mass-density branch difference.",
+      "Quantum-foam language remains a candidate hypothesis until it supplies a quantitative response model and independent falsifier."
+    ]
+  },
+  "manifold_response": {
+    "status": "blocked",
+    "math_maturity": "stage_0_exploratory",
+    "measured_observable": "boundary_conditioned_coherence_decay_rate_residual_s^-1",
+    "reason": "missing_registered_tensor_metric_coherence_response",
+    "ordinary_decoherence_budget_required": true,
+    "notes": [
+      "The cavity boundary setting is not a DP mass-density branch.",
+      "Semiclassical mean stress, stochastic metric fluctuations, ordinary decoherence, and objective collapse remain separate model classes.",
+      "Negative renormalized energy density does not by itself define a scalar negative-curvature response."
+    ]
+  },
+  "run_order": [
+    "freeze_protocol",
+    "casimir_reference_baseline",
+    "casimir_material_and_metrology_gate",
+    "boundary_condition_coherence_protocol",
+    "standard_decoherence_budget_gate",
+    "dp_branch_provenance_gate",
+    "dp_self_energy_diagnostic",
+    "dp_experimental_bounds_gate",
+    "manifold_response_model_gate",
+    "observable_bridge_gate",
+    "sensitivity_and_negative_controls",
+    "cold_start_reproduction",
+    "paper_evidence_ledger_update"
+  ]
+}

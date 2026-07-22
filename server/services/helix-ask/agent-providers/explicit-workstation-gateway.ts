@@ -89,6 +89,7 @@ import {
 } from "../committed-ask-route";
 import { isAskTurnCapabilityHelpIntent } from "../capability-catalog-intent";
 import { HELIX_RESEARCH_LIBRARY_READ_CAPABILITY } from "@shared/helix-research-library";
+import { filterRealtimeReadOnlyHandoffGatewayRequests } from "../realtime-session/read-only-handoff-policy";
 
 const MORAL_SUBSTRATE_PRIMARY_CAPABILITY = "moral-graph.reflect_living_substrate_context" as const;
 const MORAL_GRAPH_PRIMARY_CAPABILITIES = new Set([
@@ -326,9 +327,10 @@ const filterRequestsAllowedByCommittedRoute = (
   body: Record<string, unknown>,
   requests: Record<string, unknown>[],
 ): Record<string, unknown>[] => {
+  const handoffSafeRequests = filterRealtimeReadOnlyHandoffGatewayRequests(body, requests);
   const committedRoute = readCommittedAskRoute(body);
-  if (!committedRoute) return requests;
-  return requests.filter((request) => {
+  if (!committedRoute) return handoffSafeRequests;
+  return handoffSafeRequests.filter((request) => {
     const capabilityId = readString(request.capability_id) ?? readString(request.capabilityId);
     if (!capabilityId) return false;
     return assertCapabilityAllowedByCommittedRoute({

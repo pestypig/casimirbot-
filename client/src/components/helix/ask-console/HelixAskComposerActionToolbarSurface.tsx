@@ -131,6 +131,26 @@ export function HelixAskComposerActionToolbarSurface({
   const effectiveToggleMic = liveOwnsMicrophone
     ? () => liveRuntimeBridge?.toggleMicrophone()
     : onToggleMic;
+  const visualCaptureStarting =
+    visualSituationSourceStatus !== "active" &&
+    visualSituationSourceStatus !== "requesting";
+  const ensureVisualSourceCapture = useCallback(() => {
+    if (visualCaptureStarting) onCaptureVisualSource();
+  }, [onCaptureVisualSource, visualCaptureStarting]);
+  const handleVisualSourceCapture = useCallback(() => {
+    if (liveRuntimeBridge?.active) {
+      if (visualCaptureStarting && !liveRuntimeBridge.visualInputEnabled) {
+        // The Live bridge invokes ensureVisualSourceCapture before granting
+        // visual consent, so this explicit click starts exactly one producer.
+        liveRuntimeBridge.toggleVisualInput();
+        return;
+      }
+      if (!visualCaptureStarting && liveRuntimeBridge.visualInputEnabled) {
+        liveRuntimeBridge.toggleVisualInput();
+      }
+    }
+    onCaptureVisualSource();
+  }, [liveRuntimeBridge, onCaptureVisualSource, visualCaptureStarting]);
 
   return (
     <HelixAskActionToolbar
@@ -163,7 +183,7 @@ export function HelixAskComposerActionToolbarSurface({
       visualSourceSelectionDisabled={visualSourceSelectionDisabled}
       onToggleVisualSourceKind={onToggleVisualSourceKind}
       visualSituationSourceStatus={visualSituationSourceStatus}
-      onCaptureVisualSource={onCaptureVisualSource}
+      onCaptureVisualSource={handleVisualSourceCapture}
       visualSituationIncludeAudio={visualSituationIncludeAudio}
       displayAudioStatus={displayAudioStatus}
       visualAudioToggleDisabled={visualAudioToggleDisabled}
@@ -173,6 +193,7 @@ export function HelixAskComposerActionToolbarSurface({
           <HelixAskLiveRuntimeControls
             model={liveRuntimeControlsModel}
             onToolbarBridgeChange={handleLiveRuntimeBridgeChange}
+            onVisualInputEnableRequested={ensureVisualSourceCapture}
           />
         ) : null
       }

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-20T07:57:51.612Z",
-  "registryCount": 186,
+  "generatedAt": "2026-07-21T18:39:58.393Z",
+  "registryCount": 191,
   "coverage": {
     "exploratory": {
       "count": 19,
@@ -27,7 +27,7 @@
       ]
     },
     "reduced-order": {
-      "count": 38,
+      "count": 41,
       "modules": [
         "modules/gr/stress-energy.ts",
         "server/gr/gr-constraint-policy.ts",
@@ -62,6 +62,9 @@
         "shared/starsim-fusion-profile-import.ts",
         "shared/starsim-fusion-profile-validation.ts",
         "shared/starsim-fusion-profile-artifact.ts",
+        "shared/casimir-lifshitz.ts",
+        "shared/casimir-dp-inference.ts",
+        "shared/casimir-optical-response.ts",
         "shared/curvature-proxy.ts",
         "client/src/physics/curvature.ts",
         "client/src/lib/warp-proof-math.ts",
@@ -70,7 +73,7 @@
       ]
     },
     "diagnostic": {
-      "count": 122,
+      "count": 124,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -188,6 +191,8 @@
         "shared/er-epr-tiny-syk-convergence.ts",
         "shared/er-epr-tiny-syk-control-aggregate.ts",
         "shared/er-epr-tiny-syk-validation-safe-language.ts",
+        "shared/casimir-dp-data-readiness.ts",
+        "shared/casimir-dp-proposal-readiness.ts",
         "server/modules/halobank-solar/ephemeris-core.ts",
         "server/modules/halobank-solar/derived.ts",
         "server/routes/halobank-solar.ts",
@@ -282,7 +287,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 186,
+    "entriesWithUnits": 191,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -291,13 +296,13 @@
         "missing": []
       },
       "reduced-order": {
-        "total": 38,
-        "withUnits": 38,
+        "total": 41,
+        "withUnits": 41,
         "missing": []
       },
       "diagnostic": {
-        "total": 122,
-        "withUnits": 122,
+        "total": 124,
+        "withUnits": 124,
         "missing": []
       },
       "certified": {
@@ -318,8 +323,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 2598,
-    "edgeCount": 6147
+    "nodeCount": 2620,
+    "edgeCount": 6192
   },
   "evidenceProfiles": [
     {

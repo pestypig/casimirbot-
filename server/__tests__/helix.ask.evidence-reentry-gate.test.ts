@@ -31,6 +31,66 @@ const authorityPayload = (input: {
 });
 
 describe("Helix Ask evidence re-entry and follow-up gates", () => {
+  it("uses factual post-observation completion ahead of inferred finalization", () => {
+    const observationRef = "turn:factual-reentry:observation:1";
+    const baseInput = {
+      turnId: "turn:factual-reentry",
+      payload: {},
+      loopTrace: {
+        evidence_selected_for_answer: [observationRef],
+        evidence_rejected_for_answer: [],
+      },
+      primaryIntent: "content_question" as const,
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+      sourceEvidenceRequired: true,
+      allowedTerminalProducts: ["model_synthesized_answer", "typed_failure"],
+    };
+
+    const factualComplete = buildEvidenceReentryGate({
+      ...baseInput,
+      finalArbitrationRan: false,
+      runtimeLifecycleVerified: true,
+      runtimeObservationReentryRefs: [observationRef],
+      postEvidenceReasoningCompleted: true,
+    });
+    const factualIncomplete = buildEvidenceReentryGate({
+      ...baseInput,
+      finalArbitrationRan: true,
+      runtimeLifecycleVerified: true,
+      runtimeObservationReentryRefs: [observationRef],
+      postEvidenceReasoningCompleted: false,
+    });
+
+    expect(factualComplete).toMatchObject({ completed: true, violation_codes: [] });
+    expect(factualIncomplete).toMatchObject({
+      completed: false,
+      violation_codes: ["evidence_selected_but_finalizer_missing"],
+    });
+  });
+
+  it("uses factual post-observation completion for required follow-up reasoning", () => {
+    const baseInput = {
+      turnId: "turn:factual-followup",
+      primaryIntent: "content_question" as const,
+      secondaryIntentKinds: [],
+      sourceTarget: "docs_viewer",
+      terminalArtifactKind: "model_synthesized_answer",
+      selectedEvidenceCount: 1,
+    };
+
+    expect(buildFollowupReasoningGate({
+      ...baseInput,
+      finalArbitrationRan: false,
+      postEvidenceReasoningCompleted: true,
+    }).completed).toBe(true);
+    expect(buildFollowupReasoningGate({
+      ...baseInput,
+      finalArbitrationRan: true,
+      postEvidenceReasoningCompleted: false,
+    }).completed).toBe(false);
+  });
+
   it("recognizes ledger-backed evidence selected by a provider-authored route product", () => {
     const turnId = "turn:provider-route-product";
     const observationRef = `${turnId}:workstation_gateway:docs.search:1`;
@@ -470,6 +530,11 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
 
     expect(trace.selected_primary_intent).toBe("control_command");
     expect(trace.evidence_reentry_gate.violation_codes).toEqual([]);
+    expect(trace.evidence_reentry_gate.receipts_reentered).toEqual([]);
+    expect(trace.evidence_reentry_gate.self_terminal_receipt_refs).toEqual(expect.arrayContaining([
+      "receipt:cadence",
+      "live_pipeline_receipt",
+    ]));
     expect(trace.followup_reasoning_gate).toMatchObject({
       schema: "helix.followup_reasoning_gate.v1",
       required: false,
@@ -477,6 +542,49 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
       reason: "pure_control_receipt",
     });
     expect(trace.solver_risk_flags).not.toContain("missing_followup_reasoning");
+  });
+
+  it("does not relabel selected receipts as runtime re-entry when a verified lifecycle omits them", () => {
+    const gate = buildEvidenceReentryGate({
+      turnId: "turn:verified-receipt-not-reentered",
+      payload: {},
+      loopTrace: {
+        actual_tool_calls: [{
+          tool_id: "research-library.read_document",
+          family: "scholarly_research",
+          admitted: true,
+          mutating: false,
+          result_ref: "receipt:paper-read",
+        }],
+        observations_created: [],
+        evidence_selected_for_answer: ["receipt:paper-read"],
+        evidence_rejected_for_answer: [],
+      },
+      primaryIntent: "content_question",
+      terminalArtifactKind: "paper_read_receipt",
+      finalAnswerSource: "paper_read_receipt",
+      finalArbitrationRan: true,
+      runtimeLifecycleVerified: true,
+      runtimeObservationReentryRefs: [],
+      sourceEvidenceRequired: true,
+      allowedTerminalProducts: ["model_synthesized_answer", "typed_failure"],
+    });
+
+    expect(gate).toMatchObject({
+      reentry_authority: "runtime_event_log",
+      runtime_lifecycle_verified: true,
+      receipts_reentered: [],
+      self_terminal_receipt_refs: [],
+      completed: false,
+    });
+    expect(gate.receipts_not_reentered).toEqual(expect.arrayContaining([
+      "receipt:paper-read",
+      "paper_read_receipt",
+    ]));
+    expect(gate.violation_codes).toEqual(expect.arrayContaining([
+      "receipt_terminal_without_reentry",
+      "tool_result_terminal_without_reentry",
+    ]));
   });
 
   it("allows route-authorized docs open receipts to terminal without phantom follow-up reasoning", () => {

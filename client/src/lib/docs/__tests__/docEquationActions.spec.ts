@@ -21,6 +21,16 @@ const NHM2_WHITEPAPER_ACTION_SOURCE_PATH = path.resolve(
   process.cwd(),
   "docs/research/nhm2-current-status-whitepaper.equation-actions.source.json",
 );
+const CASIMIR_DP_STUDY = "docs/research/casimir-dp-quantum-foam-study.md";
+const CASIMIR_DP_STUDY_PATH = path.resolve(process.cwd(), CASIMIR_DP_STUDY);
+const CASIMIR_DP_STUDY_ACTIONS_PATH = path.resolve(
+  process.cwd(),
+  "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
+);
+const CASIMIR_DP_STUDY_ACTION_SOURCE_PATH = path.resolve(
+  process.cwd(),
+  "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
+);
 
 type TestDocEquationActionEntry = {
   equationId: string;
@@ -34,6 +44,15 @@ function readNhm2GeneratedEntry(equationId: string): TestDocEquationActionEntry 
   };
   const entry = manifest.entries.find((candidate) => candidate.equationId === equationId);
   if (!entry) throw new Error(`Missing generated NHM2 sidecar entry: ${equationId}`);
+  return entry;
+}
+
+function readCasimirDpGeneratedEntry(equationId: string): TestDocEquationActionEntry {
+  const manifest = JSON.parse(readFileSync(CASIMIR_DP_STUDY_ACTIONS_PATH, "utf8")) as {
+    entries: TestDocEquationActionEntry[];
+  };
+  const entry = manifest.entries.find((candidate) => candidate.equationId === equationId);
+  if (!entry) throw new Error(`Missing generated Casimir-DP study sidecar entry: ${equationId}`);
   return entry;
 }
 
@@ -85,6 +104,98 @@ describe("doc equation actions", () => {
 
     expect(entry?.equationId).toBe("nhm2-same-chart-full-tensor-ledger");
     expect(getDocEquationTheoryActions(entry)[0]?.preferredBadgeId).toBe("nhm2.tensor.same_chart_full_tensor");
+  });
+
+  it("keeps the Casimir-DP study equation markers synchronized with both sidecars", () => {
+    const markdown = readFileSync(CASIMIR_DP_STUDY_PATH, "utf8");
+    const source = JSON.parse(readFileSync(CASIMIR_DP_STUDY_ACTION_SOURCE_PATH, "utf8")) as {
+      entries: Array<{ equationId: string }>;
+    };
+    const generated = JSON.parse(readFileSync(CASIMIR_DP_STUDY_ACTIONS_PATH, "utf8")) as {
+      entries: Array<{ equationId: string }>;
+    };
+    const markerIds = Array.from(
+      markdown.matchAll(/<!--\s*helix-doc-equation-action\/v1\s+id=([A-Za-z0-9._:-]+)\s*-->/g),
+      (match) => match[1],
+    );
+
+    expect(source.entries.map((entry) => entry.equationId).sort()).toEqual([...markerIds].sort());
+    expect(generated.entries.map((entry) => entry.equationId).sort()).toEqual([...markerIds].sort());
+  });
+
+  it("opens the Casimir-DP observable-separation theory path from the study", async () => {
+    const generatedEntry = readCasimirDpGeneratedEntry("cdp-observable-separation-gate");
+    const entry = getDocEquationActionEntryForLatex(`/${CASIMIR_DP_STUDY}`, generatedEntry.latex);
+    const fetchImpl = vi.fn(async () => ({ ok: false }) as Response);
+
+    expect(entry?.equationId).toBe("cdp-observable-separation-gate");
+    expect(getDocEquationTheoryActions(entry)[0]?.preferredBadgeId).toBe(
+      "study.casimir_dp.observable_separation_gate",
+    );
+
+    await executeDocEquationAction({
+      currentPath: CASIMIR_DP_STUDY,
+      actionId: "open-cdp-full-study-protocol",
+      latex: generatedEntry.latex,
+      fetchImpl,
+    });
+
+    const graphState = useTheoryBadgeGraphPanelStore.getState();
+    const runState = useTheoryCompoundRunStore.getState();
+    expect(graphState.activeAtlasLensId).toBe("casimir_dp_quantum_foam");
+    expect(graphState.selectedBadgeId).toBe("study.casimir_dp.observable_separation_gate");
+    expect(runState.activeTheoryRun?.targetBadgeIds).toContain("study.casimir_dp.observable_separation_gate");
+  });
+
+  it("locates the manifold-response and decoherence/collapse gates from their study equations", () => {
+    const manifoldEquation = readCasimirDpGeneratedEntry("cdp-manifold-response-slot");
+    const decoherenceEquation = readCasimirDpGeneratedEntry("cdp-decoherence-collapse-gate");
+    const manifoldEntry = getDocEquationActionEntryForLatex(`/${CASIMIR_DP_STUDY}`, manifoldEquation.latex);
+    const decoherenceEntry = getDocEquationActionEntryForLatex(`/${CASIMIR_DP_STUDY}`, decoherenceEquation.latex);
+
+    expect(manifoldEntry?.equationId).toBe("cdp-manifold-response-slot");
+    expect(getDocEquationTheoryActions(manifoldEntry)[0]?.preferredBadgeId).toBe(
+      "study.casimir_dp.manifold_response_hypothesis",
+    );
+    expect(decoherenceEntry?.equationId).toBe("cdp-decoherence-collapse-gate");
+    expect(getDocEquationTheoryActions(decoherenceEntry)[0]?.preferredBadgeId).toBe(
+      "study.casimir_dp.decoherence_collapse_gate",
+    );
+  });
+
+  it("opens the Compton/DP/cavity separation badge from both frequency equations", () => {
+    for (const equationId of [
+      "cdp-compton-dp-frequency-identities",
+      "cdp-frequency-cavity-bridge-gate",
+    ]) {
+      const generatedEquation = readCasimirDpGeneratedEntry(equationId);
+      const entry = getDocEquationActionEntryForLatex(`/${CASIMIR_DP_STUDY}`, generatedEquation.latex);
+
+      expect(entry?.equationId).toBe(equationId);
+      expect(getDocEquationTheoryActions(entry)[0]?.preferredBadgeId).toBe(
+        "study.casimir_dp.frequency_bridge_gate",
+      );
+    }
+  });
+
+  it("opens the experiment-design badge from the accessible-rate equation", () => {
+    const rateEquation = readCasimirDpGeneratedEntry("cdp-accessible-rate-ratio");
+    const entry = getDocEquationActionEntryForLatex(`/${CASIMIR_DP_STUDY}`, rateEquation.latex);
+
+    expect(entry?.equationId).toBe("cdp-accessible-rate-ratio");
+    expect(getDocEquationTheoryActions(entry)[0]?.preferredBadgeId).toBe(
+      "study.casimir_dp.experiment_design_campaign",
+    );
+  });
+
+  it("opens the Stage-1 gated-computations badge from the Lifshitz integral", () => {
+    const lifshitzEquation = readCasimirDpGeneratedEntry("cdp-stage1-lifshitz-free-energy");
+    const entry = getDocEquationActionEntryForLatex(`/${CASIMIR_DP_STUDY}`, lifshitzEquation.latex);
+
+    expect(entry?.equationId).toBe("cdp-stage1-lifshitz-free-energy");
+    expect(getDocEquationTheoryActions(entry)[0]?.preferredBadgeId).toBe(
+      "study.casimir_dp.gated_computations_stage1",
+    );
   });
 
   it("opens an artifact-backed theory orientation from a whitepaper equation action", async () => {

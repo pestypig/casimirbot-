@@ -9,6 +9,7 @@ import {
   type HelixCapabilityLifecycleStageStatus,
 } from "@shared/helix-capability-lifecycle-ledger";
 import { capabilityPlanId } from "./capability-result-gate";
+import { resolveHelixRuntimeObservationReentry } from "./runtime/turn-lifecycle";
 import { evaluateToolFamilyTerminalPolicy, isReceiptTerminalKind } from "./tool-family-terminal-policy";
 
 type RecordLike = Record<string, unknown>;
@@ -207,10 +208,20 @@ export const buildCapabilityLifecycleLedger = (input: {
     satisfiedWorkstationEvaluation ||
     Boolean(result && (result.status === "succeeded" || (result.status === "partial" && result.evidence_refs.length > 0))) ||
     admissibleExplicitNotRun;
-  const reentered =
-    satisfiedWorkstationEvaluation ||
-    Boolean(result?.reentered_solver) ||
-    admissibleExplicitNotRun;
+  const reentryCandidateRefs = unique([
+    ...(result ? [...result.receipt_refs, ...result.evidence_refs] : []),
+    ...derivedWorkstationRefs,
+  ]);
+  const reentry = resolveHelixRuntimeObservationReentry({
+    payload: input.payload,
+    turnId: input.turnId,
+    candidateRefs: reentryCandidateRefs,
+    compatibilityProjected:
+      satisfiedWorkstationEvaluation ||
+      Boolean(result?.reentered_solver) ||
+      admissibleExplicitNotRun,
+  });
+  const reentered = reentry.reentered;
   const terminalAllowed = terminalReceiptAllowed({
     terminalArtifactKind: input.terminalArtifactKind,
     plan,
@@ -224,7 +235,7 @@ export const buildCapabilityLifecycleLedger = (input: {
   if (mutatingWithoutOperator) failureCodes.push("mutating_capability_without_operator_command");
   if (plan && !resultObserved) failureCodes.push("capability_result_missing");
   if (result && !validated) failureCodes.push("capability_result_unvalidated");
-  if (result && (result.receipt_refs.length > 0 || result.evidence_refs.length > 0) && !result.reentered_solver) {
+  if (reentryCandidateRefs.length > 0 && !reentered) {
     failureCodes.push("capability_result_not_reentered");
   }
   if (!terminalAllowed) failureCodes.push("capability_receipt_terminal_without_goal");
@@ -245,7 +256,7 @@ export const buildCapabilityLifecycleLedger = (input: {
     stage("adapter_acknowledged", dispatched ? receiptAcked(input.payload) ? "succeeded" : "failed" : "skipped", actionRefs, dispatched ? receiptAcked(input.payload) ? "adapter_acknowledgement_observed" : "adapter_acknowledgement_missing" : "no_action_dispatched"),
     stage("result_observed", resultObserved ? "succeeded" : plan ? "failed" : "skipped", resultRefs(result).length ? resultRefs(result) : derivedWorkstationRefs, result ? "capability_result_present" : satisfiedWorkstationEvaluation ? "workstation_tool_evaluation_observed" : admissibleExplicitNotRun ? "explicit_not_run_reason_present" : "capability_result_missing"),
     stage("result_validated", validated ? "succeeded" : result ? "failed" : "skipped", resultRefs(result).length ? resultRefs(result) : derivedWorkstationRefs, validated ? "capability_result_validated_or_workstation_goal_satisfied" : "capability_result_unvalidated"),
-    stage("reentered_solver", reentered ? "succeeded" : result ? "failed" : "skipped", resultRefs(result).length ? resultRefs(result) : derivedWorkstationRefs, reentered ? "capability_result_reentered_solver_or_workstation_goal_satisfied" : "capability_result_not_reentered"),
+    stage("reentered_solver", reentered ? "succeeded" : reentryCandidateRefs.length > 0 ? "failed" : "skipped", resultRefs(result).length ? resultRefs(result) : derivedWorkstationRefs, reentered ? "capability_result_reentered_solver_or_workstation_goal_satisfied" : "capability_result_not_reentered"),
     stage("terminal_considered", terminalAllowed ? "succeeded" : "failed", [readString(input.terminalArtifactKind ?? input.payload.terminal_artifact_kind)], terminalAllowed ? "terminal_receipt_matches_canonical_goal_or_not_receipt" : "terminal_receipt_without_required_goal_kind"),
   ];
 
@@ -254,6 +265,9 @@ export const buildCapabilityLifecycleLedger = (input: {
     turn_id: input.turnId,
     capability_plan_id: planId,
     capability_result_id: resultId,
+    reentry_authority: reentry.authority,
+    runtime_lifecycle_verified: reentry.runtime_lifecycle_verified,
+    matched_reentry_refs: reentry.matched_reentry_refs,
     stages,
     failure_codes: unique(failureCodes) as HelixCapabilityLifecycleFailureCode[],
     ok: failureCodes.length === 0,

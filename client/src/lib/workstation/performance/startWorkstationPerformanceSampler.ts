@@ -72,6 +72,7 @@ function startSamplerInstance(): () => void {
   let lastFrameAtMs: number | null = null;
   let lastFrameDurationMs: number | null = null;
   let lastInteractionSampleAtMs = 0;
+  let cancelDeferredPublish: (() => void) | null = null;
   let stopped = false;
 
   const readDomNodeCount = () => {
@@ -170,7 +171,8 @@ function startSamplerInstance(): () => void {
   window.addEventListener("pointermove", onPointerMove, { capture: true, passive: true });
   window.addEventListener("keydown", onKeyDown, { capture: true, passive: true });
 
-  const publish = () => {
+  const collectAndPublish = () => {
+    if (stopped) return;
     const nowMs = performance.now();
     pruneSamples(frameSamples, nowMs);
     pruneSamples(interactionSamples, nowMs);
@@ -241,15 +243,23 @@ function startSamplerInstance(): () => void {
         keepalive: true,
       }).catch(() => undefined);
     };
+    void postSample();
+  };
+
+  const publish = () => {
     if (isInteractionActive(500)) {
-      runWhenQuiet(postSample, {
+      if (cancelDeferredPublish) return;
+      cancelDeferredPublish = runWhenQuiet(() => {
+        cancelDeferredPublish = null;
+        collectAndPublish();
+      }, {
         key: "workstation.browser_performance.publish",
         priority: "background_diagnostics",
         quietMs: 800,
         timeoutMs: 3500,
       });
     } else {
-      void postSample();
+      collectAndPublish();
     }
   };
 
@@ -261,6 +271,8 @@ function startSamplerInstance(): () => void {
     if (rafId !== null) {
       window.cancelAnimationFrame(rafId);
     }
+    cancelDeferredPublish?.();
+    cancelDeferredPublish = null;
     window.clearInterval(intervalId);
     window.removeEventListener("click", onClick, { capture: true });
     window.removeEventListener("scroll", onScroll, { capture: true });

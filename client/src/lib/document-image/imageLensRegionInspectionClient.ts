@@ -67,6 +67,7 @@ export function applyImageLensRegionInspectionReceipt(
       regionId: receipt.region_id,
       scientificEvidenceSidecarId: receipt.scientific_evidence_sidecar?.sidecar_id ?? null,
       scholarlySourcePdfRef: receipt.scholarly_source_pdf_ref ?? null,
+      scholarlyPdfCachePath: receipt.scholarly_pdf_cache_path ?? null,
       sourceRefHash: receipt.scientific_evidence_packet?.source_ref_hash ?? receipt.scientific_evidence_sidecar?.source_ref_hash ?? null,
       mountedAt: capturedAt,
     });
@@ -110,6 +111,7 @@ export function applyImageLensRegionInspectionReceipt(
       captured_at: capturedAt,
       preview_data_url: sourceImageRef,
       preview_hash: hashString(sourceImageRef),
+      source_surface: "document",
       source_kind: "full_frame",
       crop_only: false,
       crop_bbox_px: null,
@@ -143,6 +145,7 @@ export function applyImageLensRegionInspectionReceipt(
     captured_at: capturedAt,
     preview_data_url: receipt.crop_image_ref,
     preview_hash: documentReceipt.crop.imageHash || hashString(receipt.crop_image_ref),
+    source_surface: "image_lens",
     source_kind: "image_lens_crop",
     crop_only: true,
     crop_bbox_px: receipt.bbox_px,

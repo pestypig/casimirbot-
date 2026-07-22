@@ -914,6 +914,7 @@ describe("Helix Ask Console recrown boundary", () => {
       "HelixAskComposer.tsx",
       "HelixAskComposerTextareaSurface.tsx",
       "HelixAskComposerTextareaState.ts",
+      "HelixAskComposerTextareaSizing.ts",
       "HelixAskPromptHistory.ts",
       "HelixAskSlashCommandCatalog.ts",
       "HelixAskSlashCommandInsertion.ts",
@@ -1752,7 +1753,7 @@ describe("Helix Ask Console recrown boundary", () => {
       bridgeReplacementReady: false,
       liveDayToDaySliceCount: 1,
       pureDisplayRecrownedSliceCount: 86,
-      behaviorSensitiveRecrownedWithParitySliceCount: 68,
+      behaviorSensitiveRecrownedWithParitySliceCount: 69,
       behaviorSensitiveQuarantinedSliceCount: 5,
       unknownTrapDoorSliceCount: 1,
     });
@@ -2263,7 +2264,9 @@ describe("Helix Ask Console recrown boundary", () => {
       "data-packet-schema=\"helix.ask.operator_surface.layout_parity.evidence_packet.v1\"",
     );
     expect(consoleSource).toContain("shouldRenderHelixAskOperatorSurfaceParityHarness(search)");
-    expect(consoleSource).toContain("return <HelixAskOperatorSurfaceParityHarness {...props} />");
+    expect(consoleSource).toContain("const HelixAskOperatorSurfaceParityHarness = React.lazy");
+    expect(consoleSource).toContain("<Suspense fallback={<HelixLoadingMark");
+    expect(consoleSource).toContain("<HelixAskOperatorSurfaceParityHarness {...props} />");
     expect(consoleSource).toContain("return <HelixAskConsoleRuntimeShell {...props} />");
     expect(runtimeShellSource).toContain("buildHelixAskConsoleRuntimeBridgeProps(props)");
     expect(runtimeShellSource).toContain("runtimeImplementation = \"legacy_bridge\"");
@@ -5298,7 +5301,9 @@ describe("Helix Ask Console recrown boundary", () => {
     expect(liveRuntimeControls).toContain("data-live-microphone-enabled");
     expect(liveRuntimeControls).toContain("runtime.setMicrophoneEnabled(!runtime.microphoneEnabled)");
     expect(liveRuntimeControls).toContain("data-live-visual-input-enabled");
-    expect(liveRuntimeControls).toContain("runtime.setVisualInputEnabled(!runtime.visualInputEnabled)");
+    expect(liveRuntimeControls).toContain("const nextEnabled = !runtime.visualInputEnabled");
+    expect(liveRuntimeControls).toContain("onVisualInputEnableRequested?.()");
+    expect(liveRuntimeControls).toContain("runtime.setVisualInputEnabled(nextEnabled)");
     expect(liveRuntimeSession).toContain("subscribeVisualFrameProducerFrames(routeFrame)");
     expect(liveRuntimeSession).toContain("!frame.liveRuntimeEligible");
     expect(liveRuntimeSession).toContain("controllerRef.current?.sendVisualFrame({");

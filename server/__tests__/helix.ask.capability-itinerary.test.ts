@@ -9,6 +9,7 @@ import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-
 import {
   attachHelixCapabilityItineraryExecutionState,
   buildHelixCapabilityItineraryExecutionState,
+  isHelixCapabilityItineraryFamilyObserved,
 } from "../services/helix-ask/capability-itinerary-execution";
 
 const scholarlyAdmission = (turnId: string): HelixToolCallAdmissionDecision => ({
@@ -51,6 +52,37 @@ const availableCapabilities = (keys: string[]) => ({
 });
 
 describe("Helix Ask capability itinerary", () => {
+  it("keeps natural lookup-then-full-text work as two required scholarly capabilities", () => {
+    const promptText = [
+      'Find one PDF-accessible primary paper for this workflow objective: "Magnetar".',
+      "Select exactly one paper, fetch or materialize its full text, and report its canonical identity, DOI or arXiv ID when available.",
+    ].join(" ");
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:itinerary-magnetar-full-text",
+      promptText,
+      toolCallAdmissionDecision: scholarlyAdmission("ask:itinerary-magnetar-full-text"),
+      availableCapabilities: availableCapabilities([
+        HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      ]),
+    });
+
+    expect(itinerary.planned_steps).toEqual([
+      expect.objectContaining({
+        tool_family: "scholarly_research",
+        capability_hint: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        required_observation_kinds: [
+          "scholarly_research_observation",
+          "scholarly_full_text_observation",
+        ],
+      }),
+    ]);
+    expect(itinerary.terminal_success_criteria.required_capabilities).toEqual([
+      HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+    ]);
+  });
+
   it("does not plan research or Image Lens execution for a capability behavior question", () => {
     const itinerary = buildHelixCapabilityItinerary({
       turnId: "ask:itinerary-capability-help",
@@ -131,6 +163,36 @@ describe("Helix Ask capability itinerary", () => {
     expect((payload.debug as Record<string, unknown>).capability_itinerary_execution_state).toBe(
       payload.capability_itinerary_execution_state,
     );
+  });
+
+  it("counts only successful docs.search gateway packets as Docs observations", () => {
+    const packet = (status: string) => ({
+      artifact_id: `ask:docs-search-status:workstation_gateway:docs.search:${status}`,
+      kind: "provider_gateway_observation_packet",
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        capability_key: "docs.search",
+        status,
+      },
+    });
+
+    expect(isHelixCapabilityItineraryFamilyObserved("docs_viewer", [packet("failed")])).toBe(false);
+    expect(isHelixCapabilityItineraryFamilyObserved("docs_viewer", [packet("succeeded")])).toBe(true);
+  });
+
+  it("counts only successful Image Lens gateway packets as visual capture observations", () => {
+    const packet = (status: string) => ({
+      artifact_id: `ask:image-lens-status:workstation_gateway:visual_analysis.inspect_image_region:${status}`,
+      kind: "provider_gateway_observation_packet",
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        capability_key: "visual_analysis.inspect_image_region",
+        status,
+      },
+    });
+
+    expect(isHelixCapabilityItineraryFamilyObserved("visual_capture", [packet("failed")])).toBe(false);
+    expect(isHelixCapabilityItineraryFamilyObserved("visual_capture", [packet("succeeded")])).toBe(true);
   });
 
   it("creates ordered compound subgoals for workspace status then calculator", () => {

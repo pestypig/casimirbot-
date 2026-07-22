@@ -82,6 +82,64 @@ const buildScholarlyNumericMissingResult = () => ({
   error: "missing_requested_numeric_variables",
 });
 
+const buildRuntimeSelectedScholarlyFullTextResult = () => ({
+  ok: true,
+  capability_id: "scholarly-research.fetch_full_text",
+  gateway_admission: {
+    requested_capability: "scholarly-research.fetch_full_text",
+    admission_reason: "scholarly_full_text_requested",
+  },
+  observation_packet: {
+    status: "succeeded",
+    observation_ref: "ask:scholarly:full-text:selected",
+    produced_artifact_refs: ["ask:scholarly:full-text:selected"],
+  },
+  observation: {
+    schema: "helix.scholarly_full_text_observation.v1",
+    artifact_id: "ask:scholarly:full-text:selected",
+    evidence_state: "full_text_usable",
+    selected_chunks: [{ page_number: 3, text: "The measured value was 4.0 mJy." }],
+    selected_for_answer: false,
+  },
+  artifact_refs: ["ask:scholarly:full-text:selected"],
+  terminal_eligible: false,
+  post_tool_model_step_required: true,
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
+const buildRuntimeSelectedScholarlyLookupResult = () => ({
+  ok: false,
+  capability_id: "scholarly-research.lookup_papers",
+  gateway_admission: {
+    requested_capability: "scholarly-research.lookup_papers",
+    admission_reason: "scholarly_lookup_requested",
+  },
+  observation_packet: {
+    status: "failed",
+    observation_ref: "ask:scholarly:lookup:partial",
+    produced_artifact_refs: ["ask:scholarly:lookup:partial"],
+  },
+  observation: {
+    schema: "helix.scholarly_research_observation.v1",
+    artifact_id: "ask:scholarly:lookup:partial",
+    evidence_state: "lookup_weak_match",
+    papers: [{
+      result_id: "arxiv:magnetar-review",
+      title: "Magnetars: neutron stars with huge magnetic storms",
+      evidence_refs: ["arxiv:1211.2086v1"],
+      identifiers: { arxiv_id: "1211.2086v1" },
+    }],
+    selected_for_answer: false,
+  },
+  artifact_refs: ["ask:scholarly:lookup:partial"],
+  terminal_eligible: false,
+  post_tool_model_step_required: true,
+  assistant_answer: false,
+  raw_content_included: false,
+  error: "semantic_scholar_http_429",
+});
+
 const buildCalculatorUnsupportedExpressionResult = () => ({
   ok: false,
   capability_id: "scientific-calculator.solve_expression",
@@ -127,13 +185,18 @@ const buildCalculatorUnsupportedExpressionResult = () => ({
 });
 
 describe("Codex provider terminal pass-through", () => {
-  it("does not overwrite Codex research explanation for scholarly numeric missing-variable observations", () => {
+  it("does not overwrite a narrative answer when selected full text supersedes an optional numeric helper", () => {
     const providerText =
       "I fetched the paper evidence and found density values, but the magnetic-field binding B_T was missing, so the calculator step cannot be completed from the retrieved text.";
 
     const guarded = applyGatewayFailureAuthorityGuard({
       text: providerText,
-      gatewayCallResults: [buildScholarlyNumericMissingResult() as never],
+      gatewayCallResults: [
+        buildRuntimeSelectedScholarlyFullTextResult() as never,
+        buildScholarlyNumericMissingResult() as never,
+      ],
+      selectedScholarlyResultIds: ["ask:scholarly:full-text:selected"],
+      structuredNumericEvidenceRequired: false,
     });
 
     expect(guarded).toBe(providerText);
@@ -147,11 +210,31 @@ describe("Codex provider terminal pass-through", () => {
 
     const guarded = applyGatewayFailureAuthorityGuard({
       text: providerText,
-      gatewayCallResults: [buildScholarlyNumericMissingResult() as never],
+      gatewayCallResults: [
+        buildRuntimeSelectedScholarlyFullTextResult() as never,
+        buildScholarlyNumericMissingResult() as never,
+      ],
+      selectedScholarlyResultIds: ["ask:scholarly:full-text:selected"],
+      structuredNumericEvidenceRequired: false,
     });
 
     expect(guarded).toBe(providerText);
     expect(guarded).not.toContain("I cannot claim the requested workstation tool or UI action ran");
+  });
+
+  it("keeps numeric extraction fail-closed when structured numeric evidence is required", () => {
+    const guarded = applyGatewayFailureAuthorityGuard({
+      text: "The structured extraction succeeded.",
+      gatewayCallResults: [
+        buildRuntimeSelectedScholarlyFullTextResult() as never,
+        buildScholarlyNumericMissingResult() as never,
+      ],
+      selectedScholarlyResultIds: ["ask:scholarly:full-text:selected"],
+      structuredNumericEvidenceRequired: true,
+    });
+
+    expect(guarded).toContain("could not extract the requested numeric parameters");
+    expect(guarded).toContain("Missing variables: B_T");
   });
 
   it("still blocks ordinary failed gateway requests from becoming final answer authority", () => {
@@ -183,6 +266,26 @@ describe("Codex provider terminal pass-through", () => {
 
     expect(guarded).toContain("I cannot claim the requested workstation tool or UI action ran");
     expect(guarded).toContain("scholarly-research.fetch_full_text: fetchable_paper_identity_required");
+  });
+
+  it("accepts exact runtime-selected lookup papers despite an unrelated provider failure", () => {
+    const gatewayCallResults = [buildRuntimeSelectedScholarlyLookupResult()] as never;
+
+    expect(providerGatewayEvidenceReadyForSolver({
+      gatewayCallResults,
+      scholarlyRecoveryObservationReentered: false,
+      selectedScholarlyResultIds: ["arxiv:magnetar-review"],
+    })).toBe(true);
+    expect(providerGatewayEvidenceReadyForSolver({
+      gatewayCallResults,
+      scholarlyRecoveryObservationReentered: false,
+      selectedScholarlyResultIds: ["arxiv:unknown"],
+    })).toBe(false);
+    expect(applyGatewayFailureAuthorityGuard({
+      text: "The observed search found a relevant magnetar review.",
+      gatewayCallResults,
+      selectedScholarlyResultIds: ["arxiv:magnetar-review"],
+    })).toBe("The observed search found a relevant magnetar review.");
   });
 
   it("preserves Moral Graph synthesis when adjacent external evidence is unavailable", () => {

@@ -1,13 +1,18 @@
 import crypto from "node:crypto";
 import {
+  HELIX_REALTIME_GROUNDED_FEEDBACK_BINDING_SCHEMA,
   HELIX_REALTIME_STAGE_PLAY_ASK_HANDOFF_SCHEMA,
+  type HelixRealtimeGroundedFeedbackBindingV1,
   type HelixRealtimeStagePlayAskHandoffV1,
 } from "@shared/contracts/helix-realtime-stage-play.v1";
 import type { HelixRealtimeTranscriptObservation } from "@shared/helix-realtime-observation";
 import { recordStagePlayLiveSourceConversationEvent } from "../../stage-play/stage-play-live-source-conversation-store";
 import { buildHelixRealtimeStagePlayContextPack } from "../realtime-session/context-pack";
 import { startRealtimeGroundedRelayForHandoff } from "../realtime-session/grounded-answer-relay";
-import { buildRealtimeTranscriptWorkerAdmission } from "../realtime-session/worker-admission";
+import {
+  buildRealtimeTranscriptWorkerAdmission,
+  resolveRealtimeTranscriptSourceTargetIntent,
+} from "../realtime-session/worker-admission";
 import type { HelixRuntimeGoalAccountScope } from "../runtime-goals/runtime-goal-account-binding";
 
 const handoffsById = new Map<string, HelixRealtimeStagePlayAskHandoffV1>();
@@ -107,12 +112,19 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     contextPack.context_pack_id,
     ...contextPack.evidence_refs,
   ]).slice(0, 40);
+  const sourceTargetIntent = resolveRealtimeTranscriptSourceTargetIntent({
+    handoffId,
+    threadId: input.threadId,
+    transcriptText,
+    sourceBinding: input.sourceBinding,
+  });
   const workerAdmission = buildRealtimeTranscriptWorkerAdmission({
     handoffId,
     realtimeSessionId: input.realtimeSessionId,
     threadId: input.threadId,
     transcriptText,
     sourceBinding: input.sourceBinding,
+    sourceTargetIntent,
     activeGoalBinding,
     selectedRuntimeAgentProvider: input.selectedRuntimeAgentProvider,
     evidenceRefs,
@@ -124,11 +136,42 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
   const mustEnterBackendAsk =
     workerAdmission.dispatch.kind === "ask_runtime" ||
     workerAdmission.dispatch.kind === "ask_runtime_read_only";
+  const semanticSourceRequiresObservation =
+    sourceTargetIntent.target_source !== "unknown" &&
+    sourceTargetIntent.target_source !== "model_only" &&
+    sourceTargetIntent.allow_no_tool_direct === false;
+  const groundedFeedbackRequiresObservation =
+    requiredGroundingCapabilityIds.length > 0 ||
+    (mustEnterBackendAsk && semanticSourceRequiresObservation);
+  const allowNoToolDirect = workerAdmission.dispatch.kind === "none"
+    ? true
+    : sourceTargetIntent.allow_no_tool_direct && !groundedFeedbackRequiresObservation;
+  const dispatchRequestedOutputs = mustEnterBackendAsk
+    ? ["grounded_runtime_agent_answer", "typed_failure"]
+    : workerAdmission.dispatch.kind === "goal_wake"
+      ? ["durable_goal_wake", "typed_failure"]
+      : ["realtime_conversation_local"];
+  const groundedFeedbackBinding: HelixRealtimeGroundedFeedbackBindingV1 = {
+    schema: HELIX_REALTIME_GROUNDED_FEEDBACK_BINDING_SCHEMA,
+    handoff_id: handoffId,
+    realtime_session_id: input.realtimeSessionId,
+    thread_id: input.threadId,
+    transcript_observation_ref: input.observation.observation_ref,
+    worker_admission_id: workerAdmission.admission_id,
+    issued_at_ms: nowMs,
+    answer_authority: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
   const routeMetadata: Record<string, unknown> = {
     schema: "helix.ask.route_metadata.v1",
     source: "realtime_stage_play",
     invocationKind: "stage_play_realtime_transcript_handoff",
-    sourceTarget: "operator_text",
+    sourceTarget: sourceTargetIntent.target_source,
+    transportSource: "operator_text",
+    transportKind: "realtime_transcript",
+    transportPrecedenceReason: "server_admitted_realtime_transcript_handoff",
     mailboxThreadId: input.threadId,
     handoffId,
     realtimeSessionId: input.realtimeSessionId,
@@ -139,6 +182,7 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     selected_runtime_agent_provider: workerAdmission.selected_runtime_agent_provider,
     requiredGroundingCapabilityIds,
     realtimeWorkerAdmission: workerAdmission,
+    realtime_grounded_feedback_binding: groundedFeedbackBinding,
     forbiddenCapabilities: [
       "workstation_mutation",
       "workstation_action_execution",
@@ -146,30 +190,37 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     ],
     evidenceRefs,
     source_target_intent: {
-      schema: "helix.ask_source_target_intent.v1",
-      source: "stage_play_realtime_handoff",
-      target_source: "operator_text",
-      target_kind: "realtime_transcript",
-      strength: "hard",
-      explicit_cues: ["server_admitted_realtime_transcript"],
-      reasons: ["realtime_transcript_observed", "stage_play_handoff_issued"],
-      requested_outputs: mustEnterBackendAsk
-        ? ["grounded_runtime_agent_answer", "typed_failure"]
-        : workerAdmission.dispatch.kind === "goal_wake"
-          ? ["durable_goal_wake", "typed_failure"]
-          : ["realtime_conversation_local"],
-      suppressed_routes: [
+      ...sourceTargetIntent,
+      source: "realtime_transcript_semantic_admission",
+      explicit_cues: unique([
+        ...sourceTargetIntent.explicit_cues,
+        "server_admitted_realtime_transcript",
+      ]),
+      reasons: unique([
+        ...sourceTargetIntent.reasons,
+        "realtime_transcript_observed",
+        "stage_play_handoff_issued",
+      ]),
+      requested_outputs: unique([
+        ...sourceTargetIntent.requested_outputs,
+        ...dispatchRequestedOutputs,
+      ]),
+      suppressed_routes: unique([
+        ...sourceTargetIntent.suppressed_routes,
         "client_projection",
         "workstation_action_execution",
         "realtime_provider_tool_execution",
-      ],
-      precedence_reason: "server_admitted_realtime_transcript_handoff",
+      ]),
       must_enter_backend_ask: mustEnterBackendAsk,
       allow_client_shortcut: false,
-      allow_no_tool_direct: requiredGroundingCapabilityIds.length === 0,
+      allow_no_tool_direct: allowNoToolDirect,
       admitted_readonly_handoff: true,
-      grounded_feedback_requires_observation: requiredGroundingCapabilityIds.length > 0,
+      grounded_feedback_requires_observation: groundedFeedbackRequiresObservation,
       required_grounding_capability_ids: requiredGroundingCapabilityIds,
+      semantic_source_authority: "ask_source_target_arbitrator",
+      transport_source: "operator_text",
+      transport_kind: "realtime_transcript",
+      transport_precedence_reason: "server_admitted_realtime_transcript_handoff",
       goal_id: activeGoalBinding?.goal_id ?? null,
       runtime_goal_session_ref: activeGoalBinding?.runtime_session_ref ?? null,
       runtime_agent_provider: workerAdmission.selected_runtime_agent_provider,

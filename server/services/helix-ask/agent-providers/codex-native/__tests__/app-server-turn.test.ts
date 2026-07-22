@@ -73,39 +73,45 @@ class FakeCodexAppServer implements CodexAppServerTransport {
       return;
     }
     if (message.id === 100 && message.result) {
-      if (this.mode === "tool_before_route") {
-        this.finish("The capability was correctly blocked before route admission.");
-      } else {
+      queueMicrotask(() => {
+        if (this.mode === "tool_before_route") {
+          this.finish("The capability was correctly blocked before route admission.");
+        } else {
+          this.emit({
+            id: 101,
+            method: "item/tool/call",
+            params: {
+              threadId: "thread:fake",
+              turnId: "turn:fake",
+              callId: "call:capability",
+              tool: this.capabilityToolNames[0],
+              arguments: {},
+            },
+          });
+        }
+      });
+      return;
+    }
+    if (message.id === 101 && message.result && this.mode === "compound") {
+      queueMicrotask(() => {
         this.emit({
-          id: 101,
+          id: 102,
           method: "item/tool/call",
           params: {
             threadId: "thread:fake",
             turnId: "turn:fake",
-            callId: "call:capability",
-            tool: this.capabilityToolNames[0],
-            arguments: {},
+            callId: "call:capability:2",
+            tool: this.capabilityToolNames[1],
+            arguments: { expression: "8*9" },
           },
         });
-      }
-      return;
-    }
-    if (message.id === 101 && message.result && this.mode === "compound") {
-      this.emit({
-        id: 102,
-        method: "item/tool/call",
-        params: {
-          threadId: "thread:fake",
-          turnId: "turn:fake",
-          callId: "call:capability:2",
-          tool: this.capabilityToolNames[1],
-          arguments: { expression: "8*9" },
-        },
       });
       return;
     }
     if ((message.id === 101 || message.id === 102) && message.result) {
-      this.finish("The workstation status observation was re-entered in this turn.");
+      queueMicrotask(() => {
+        this.finish("The workstation status observation was re-entered in this turn.");
+      });
     }
   }
 
@@ -365,6 +371,34 @@ describe("Codex native app-server turn", () => {
       arguments: {},
       iteration: 1,
     });
+    const lifecycle = result.debug.turn_lifecycle;
+    const lifecycleKinds = lifecycle.events.map((event) => event.kind);
+    expect(lifecycleKinds).toEqual([
+      "turn.started",
+      "route.proposed",
+      "capability.proposed",
+      "route.committed",
+      "capability.admitted",
+      "tool.call.started",
+      "tool.call.completed",
+      "observation.reentered",
+      "agent.message.completed",
+      "runtime.turn.completed",
+      "terminal.eligibility.checked",
+      "turn.completed",
+    ]);
+    expect(lifecycle).toMatchObject({
+      authority: "runtime_event_log",
+      reduction: {
+        complete: true,
+        post_observation_reasoning_completed: true,
+        terminal_outcome: "completed",
+        observation_reentry_refs: [
+          "ask:test:native:workspace_os.status:observation",
+        ],
+      },
+      integrity: { ok: true, violations: [] },
+    });
 
     const initialize = transport.received.find((message) => message.method === "initialize");
     expect(initialize?.params).toMatchObject({
@@ -476,7 +510,7 @@ describe("Codex native app-server turn", () => {
     expect(executeCapability).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects a native terminal candidate when one admitted compound observation failed", async () => {
+  it("keeps a native terminal candidate when an admitted failed tool result was observed", async () => {
     const transport = new FakeCodexAppServer("compound");
 
     const result = await runCodexNativeAppServerTurnWithTransport(
@@ -514,13 +548,13 @@ describe("Codex native app-server turn", () => {
     );
 
     expect(result).toMatchObject({
-      ok: false,
-      answer: "",
-      failReason: "native_route_observation_missing",
+      ok: true,
+      answer: "The workstation status observation was re-entered in this turn.",
+      failReason: null,
       debug: {
         successful_tools: ["workspace_os.status"],
         failed_tools: ["scientific-calculator.solve_expression"],
-        route_unobserved_tools: ["scientific-calculator.solve_expression"],
+        route_unobserved_tools: [],
         terminal_candidate_present: true,
       },
     });

@@ -284,11 +284,11 @@ describe("Helix Ask agent provider selection", () => {
       codeMutation: false,
     });
     expect(provider.permissionProfile).toMatchObject({
-      id: "read-observe",
+      id: "read-observe-act",
       allows: {
         observe: true,
         read: true,
-        act: false,
+        act: true,
         write: false,
         shell: false,
         codeMutation: false,
@@ -577,10 +577,10 @@ describe("Helix Ask agent provider selection", () => {
         enabled: true,
         experimental: true,
         permission_profile: expect.objectContaining({
-          id: "read-observe",
+          id: "read-observe-act",
           allows: expect.objectContaining({
             read: true,
-            act: false,
+            act: true,
             write: false,
             shell: false,
             codeMutation: false,
@@ -632,10 +632,10 @@ describe("Helix Ask agent provider selection", () => {
       selected_agent_provider: {
           id: "codex",
           permission_profile: {
-          id: "read-observe",
+          id: "read-observe-act",
           allows: {
             read: true,
-            act: false,
+            act: true,
             write: false,
             shell: false,
             codeMutation: false,
@@ -1159,11 +1159,11 @@ describe("Helix Ask agent provider selection", () => {
         capability_id: "scholarly-research.lookup_papers",
         mode: "read",
         arguments: expect.objectContaining({
-          query: "arXiv quantum inequalities warp constraints",
+          query: "arXiv quantum inequalities and warp constraints",
           mode: "paper_search",
           scholarly_intent: expect.objectContaining({
             schema: "helix.scholarly_intent.v1",
-            scholarly_query: "arXiv quantum inequalities warp constraints",
+            scholarly_query: "arXiv quantum inequalities and warp constraints",
             requested_workflow: "metadata_search",
           }),
           source_target_intent: expect.objectContaining({
@@ -1395,6 +1395,41 @@ describe("Helix Ask agent provider selection", () => {
     expect(buildCompoundCapabilityDependencyGatewayCallRequests(body)).toEqual([]);
   });
 
+  it("keeps this-document equation follow-ups on retained evidence instead of launching a new lookup", () => {
+    const body = {
+      turn_id: "ask:test:scholarly-retained-document-equation-followup",
+      question: "Ok can you find an equation we can use in this doc?",
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          schema: "helix.ask.chat_referent_context.v1",
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "reply-failed-inspection",
+            source_ref: "chat.final_answer.previous:reply-failed-inspection",
+            text: "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.",
+          },
+          recent_assistant_final_answers: [
+            {
+              role: "assistant",
+              reply_id: "reply-failed-inspection",
+              source_ref: "chat.final_answer.recent:reply-failed-inspection",
+              text: "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.",
+            },
+            {
+              role: "assistant",
+              reply_id: "reply-mounted-paper",
+              source_ref: "chat.final_answer.recent:reply-mounted-paper",
+              text: "Mounted artifact://magnetar.pdf and rendered page 2 as pdf-page-render:magnetar-page-2 in Image Lens.",
+            },
+          ],
+        },
+      },
+    };
+
+    expect(buildPromptDerivedScholarlyResearchGatewayCallRequests(body)).toEqual([]);
+    expect(buildCompoundCapabilityDependencyGatewayCallRequests(body)).toEqual([]);
+  });
+
   it("uses an explicit current-turn scholarly topic when retained answers do not contain the named claims", () => {
     const body = {
       turn_id: "ask:test:scholarly-explicit-topic-fallback",
@@ -1465,7 +1500,7 @@ describe("Helix Ask agent provider selection", () => {
     expect(extractScholarlyIntent(
       "Find a paper on Weyl curvature in general relativity, fetch full text if available, and summarize only from fetched text.",
     )).toMatchObject({
-      scholarly_query: "Weyl curvature general relativity",
+      scholarly_query: "Weyl curvature in general relativity",
       requested_workflow: "full_text_summary",
       requires_full_text: false,
       terminal_evidence_requirement: "metadata",
@@ -1517,7 +1552,7 @@ describe("Helix Ask agent provider selection", () => {
     expect(fullTextPlan.map((request) => (request as any).capability_id)).toEqual([
       "scholarly-research.lookup_papers",
     ]);
-    expect((fullTextPlan[0] as any).arguments.query).toBe("Weyl curvature general relativity");
+    expect((fullTextPlan[0] as any).arguments.query).toBe("Weyl curvature in general relativity");
     expect(fullTextPlan[0]).toMatchObject({
       dependent_capability_id: "scholarly-research.fetch_full_text",
       arguments: {
@@ -1561,22 +1596,66 @@ describe("Helix Ask agent provider selection", () => {
         'Use the paper titled "General Relativity and Weyl Frames" with arXiv id 1106.5543v1. Fetch the PDF, render page 1 into Image Lens, and extract the first displayed equation or equation-like row. Do not run a new broad lookup unless the arXiv fetch fails.',
     };
     const pdfPagePlan = buildCompoundCapabilityDependencyGatewayCallRequests(pdfPageBody);
-    expect(pdfPagePlan.map((request) => (request as any).capability_id)).toEqual([
-      "scholarly-research.lookup_papers",
+    expect(pdfPagePlan).toEqual([]);
+    expect(buildPromptNamedCapabilityGatewayCallRequests(pdfPageBody)).toEqual([
+      expect.objectContaining({
+        capability_id: "scholarly-research.fetch_full_text",
+        arguments: expect.objectContaining({
+          source_url: "https://arxiv.org/pdf/1106.5543v1.pdf",
+          source_target_intent: expect.objectContaining({
+            target_source: "scholarly_research",
+            target_kind: "research_paper_full_text",
+            arxiv_id: "1106.5543v1",
+          }),
+        }),
+      }),
     ]);
-    expect((pdfPagePlan[0] as any).arguments.query).toBe("General Relativity and Weyl Frames");
-    expect((pdfPagePlan[0] as any).arguments.scholarly_intent).toMatchObject({
-      requested_workflow: "full_text_summary",
-      requires_numeric_extraction: false,
-    });
-    expect((pdfPagePlan[0] as any).arguments.planned_scholarly_capability_chain).toMatchObject({
-      planned_capabilities: [
-        "scholarly-research.lookup_papers",
-        "scholarly-research.fetch_full_text",
-      ],
-      terminal_evidence_requirement: "full_text",
-    });
-    expect(JSON.stringify(pdfPagePlan)).not.toContain("scholarly-research.extract_numeric_parameters");
+    expect(JSON.stringify(buildPromptNamedCapabilityGatewayCallRequests(pdfPageBody))).not.toContain(
+      "scholarly-research.extract_numeric_parameters",
+    );
+
+    const quotedPdfAffordanceBody = {
+      turn_id: "ask:test:quoted-pdf-affordance-followup",
+      agent_runtime: "codex",
+      question:
+        'extract this "Full-text / PDF affordance - PDF: https://arxiv.org/pdf/astro-ph/0503030v1.pdf - Full-text URL: http://arxiv.org/abs/astro-ph/0503030v1" into research docs',
+    };
+    expect(buildPromptNamedCapabilityGatewayCallRequests(quotedPdfAffordanceBody)).toEqual([
+      expect.objectContaining({
+        capability_id: "scholarly-research.fetch_full_text",
+        arguments: expect.objectContaining({
+          source_url: "https://arxiv.org/pdf/astro-ph/0503030v1.pdf",
+          source_target_intent: expect.objectContaining({
+            arxiv_id: "astro-ph/0503030v1",
+          }),
+        }),
+      }),
+    ]);
+
+    const bareLegacyArxivBody = {
+      turn_id: "ask:test:bare-legacy-arxiv-followup",
+      agent_runtime: "codex",
+      question: "extract that magnetar paper, astro-ph/0503030v1",
+    };
+    expect(buildPromptNamedCapabilityGatewayCallRequests(bareLegacyArxivBody)).toEqual([
+      expect.objectContaining({
+        capability_id: "scholarly-research.fetch_full_text",
+        arguments: expect.objectContaining({
+          source_url: "https://arxiv.org/pdf/astro-ph/0503030v1.pdf",
+          source_target_intent: expect.objectContaining({
+            arxiv_id: "astro-ph/0503030v1",
+          }),
+        }),
+      }),
+    ]);
+    for (const question of [
+      "Do not extract that magnetar paper, astro-ph/0503030v1.",
+      'The screen says "extract that magnetar paper, astro-ph/0503030v1". Explain the text only.',
+      "Earlier I extracted that magnetar paper, astro-ph/0503030v1. Explain what happened.",
+      "Later we may extract that magnetar paper, astro-ph/0503030v1. Do not do it now.",
+    ]) {
+      expect(buildPromptNamedCapabilityGatewayCallRequests({ question })).toEqual([]);
+    }
 
     const numericBody = {
       turn_id: "ask:test:scholarly-numeric-workflow-plan",
@@ -4662,10 +4741,10 @@ describe("Helix Ask agent provider selection", () => {
     expect((result.debug as any)?.agent_runtime_adapter_contract).toMatchObject({
       selected_agent_provider: {
         permission_profile: {
-          id: "read-observe",
+          id: "read-observe-act",
           allows: {
             read: true,
-            act: false,
+            act: true,
             write: false,
             shell: false,
             codeMutation: false,

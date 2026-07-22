@@ -2,6 +2,10 @@ type RecordLike = Record<string, unknown>;
 
 const SOURCE_BINDING_KEYS = [
   "thread_id",
+  "room_id",
+  "room_runtime_id",
+  "participant_id",
+  "shared_context_mode",
   "source_id",
   "source_kind",
   "panel_id",
@@ -51,7 +55,15 @@ export const mergeRealtimeWorkstationSourceBinding = (input: {
   for (const key of WORKSTATION_CONTEXT_KEYS) {
     if (current[key] !== undefined) merged[key] = current[key];
   }
-  for (const key of ["thread_id", "source_id", "source_kind"] as const) {
+  for (const key of [
+    "thread_id",
+    "room_id",
+    "room_runtime_id",
+    "participant_id",
+    "shared_context_mode",
+    "source_id",
+    "source_kind",
+  ] as const) {
     if (merged[key] === undefined && current[key] !== undefined) merged[key] = current[key];
   }
   return Object.keys(merged).length > 0 ? merged : null;

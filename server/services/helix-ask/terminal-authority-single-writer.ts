@@ -50,6 +50,7 @@ import {
   buildHelixTerminalRejectionObservation,
 } from "./runtime/agent-continuation-state";
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
+import { readVerifiedHelixRuntimeLifecycleFromPayload } from "./runtime/turn-lifecycle";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -81,6 +82,23 @@ const readConcreteTerminalKind = (value: unknown): string | null => {
 };
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+
+const agentContinuationRequiresNonterminalDecision = (
+  payload: Record<string, unknown>,
+): boolean => {
+  const debug = readRecord(payload.debug);
+  const state =
+    readRecord(payload.agent_continuation_state) ??
+    readRecord(debug?.agent_continuation_state);
+  if (readString(state?.schema) !== "helix.agent_continuation_state.v1") return false;
+  const allowedDecisions = readArray(state?.allowed_decisions)
+    .map(readString)
+    .filter((decision): decision is string => Boolean(decision));
+  return (
+    !allowedDecisions.includes("answer") &&
+    (allowedDecisions.includes("act") || allowedDecisions.includes("retry"))
+  );
+};
 
 const appendRecoverableTerminalRejectionContinuation = (args: {
   input: SingleWriterInput;
@@ -355,9 +373,49 @@ const readBlockedTypedAffordanceRailFailure = (
   };
 };
 
+const readProfileSessionRequiredToolRailFailure = (
+  payload: Record<string, unknown>,
+): TerminalBlockingToolRailFailure | null => {
+  const debug = readRecord(payload.debug);
+  const gatewayResults = [
+    ...readArray(payload.workstation_gateway_call_results),
+    ...readArray(debug?.workstation_gateway_call_results),
+  ];
+  for (const result of gatewayResults) {
+    const record = readRecord(result);
+    if (!record) continue;
+    const admission = readRecord(record.gateway_admission);
+    const lifecycle = readRecord(record.tool_lifecycle_trace);
+    const followup = readRecord(record.tool_followup_decision);
+    const capability =
+      readString(record.capability_id) ??
+      readString(admission?.requested_capability) ??
+      readString(lifecycle?.requested_capability);
+    const failureReason =
+      readString(record.error) ??
+      readString(admission?.blocked_reason) ??
+      readString(lifecycle?.failure_reason) ??
+      readString(followup?.reason);
+    if (failureReason !== "profile_session_required" || !capability?.startsWith("research-library.")) {
+      continue;
+    }
+    return {
+      railStatus: "fail_closed",
+      railFailureCode: "profile_session_required",
+      firstBrokenRail: "tool_admission",
+      repairTarget: "account_session",
+      selectedCapability: capability,
+      executedCapability: null,
+    };
+  }
+  return null;
+};
+
 const readTerminalBlockingToolRailFailure = (
   payload: Record<string, unknown>,
 ): TerminalBlockingToolRailFailure | null => {
+  const profileSessionFailure = readProfileSessionRequiredToolRailFailure(payload);
+  if (profileSessionFailure) return profileSessionFailure;
   const blockedTypedAffordanceFailure = readBlockedTypedAffordanceRailFailure(payload);
   if (blockedTypedAffordanceFailure) return blockedTypedAffordanceFailure;
   const audit = readRecord(payload.tool_turn_chain_audit);
@@ -565,6 +623,9 @@ const toolRailFailureTerminalText = (
     )
   ) {
     return existingTypedFailureText;
+  }
+  if (failure.railFailureCode === "profile_session_required") {
+    return "Sign in to access the private Research Library, then retry this request.";
   }
   if (failure.firstBrokenRail === "typed_affordance_binding") {
     const capability = failure.selectedCapability ?? "a dependent workstation tool";
@@ -1628,6 +1689,7 @@ const terminalProcedureFailureRail = (
   const terminalErrorCode = readString(payload.terminal_error_code);
   const canonicalGoal = readRecord(payload.canonical_goal_frame);
   const admission = readRecord(payload.tool_call_admission_decision);
+  if (terminalErrorCode === "profile_session_required") return "tool_not_admitted";
   if (!readCommittedAskRoute(payload) && !readRecord(payload.route_product_contract)) return "route_not_selected";
   if (
     readString(admission?.requested_capability) &&
@@ -3338,6 +3400,123 @@ const supportRefCoversObservationRef = (supportRef: string, observationRef: stri
   supportRef.endsWith(`#${observationRef}`) ||
   supportRef.endsWith(`/${observationRef}`);
 
+type GroundedProviderObservationFailure = {
+  errorCode: string;
+  text: string;
+  candidateRef: string | null;
+  groundedObservationRefs: string[];
+  terminalAuthorityStatus: "blocked_by_observation_state";
+};
+
+const readGroundedProviderObservationFailure = (input: {
+  payload: Record<string, unknown>;
+  artifacts: ArtifactLike[];
+  turnId: string;
+}): GroundedProviderObservationFailure | null => {
+  const debug = readRecord(input.payload.debug);
+  const artifactBridgeRecords = input.artifacts
+    .filter((artifact) => artifactKind(artifact) === "provider_terminal_authority_bridge")
+    .map(artifactPayload)
+    .filter((record): record is Record<string, unknown> => Boolean(record))
+    .reverse();
+  const bridgeRecords = [
+    readRecord(input.payload.provider_terminal_authority_bridge),
+    readRecord(debug?.provider_terminal_authority_bridge),
+    ...artifactBridgeRecords,
+  ].filter((record): record is Record<string, unknown> => Boolean(record));
+  const artifactCandidateRecords = input.artifacts
+    .filter((artifact) => artifactKind(artifact) === "agent_provider_terminal_candidate")
+    .map(artifactPayload)
+    .filter((record): record is Record<string, unknown> => Boolean(record));
+  const baseCandidateRecords = [
+    readRecord(input.payload.provider_terminal_candidate),
+    readRecord(debug?.provider_terminal_candidate),
+    ...artifactCandidateRecords,
+  ].filter((record): record is Record<string, unknown> => Boolean(record));
+
+  for (const bridge of bridgeRecords) {
+    if (
+      readString(bridge.schema) !== "helix.provider_terminal_authority_bridge.v1" ||
+      readString(bridge.terminal_authority_status) !== "blocked_by_observation_state"
+    ) {
+      continue;
+    }
+    const bridgeCandidateRef = readString(bridge.provider_terminal_candidate_ref);
+    const candidates = [
+      readRecord(bridge.provider_terminal_candidate),
+      ...baseCandidateRecords,
+    ].filter((record): record is Record<string, unknown> => Boolean(record));
+    const candidate = candidates.find((record) => {
+      const candidateRef = readString(record.candidate_id);
+      return bridgeCandidateRef ? candidateRef === bridgeCandidateRef : true;
+    });
+    if (!candidate) continue;
+    const candidateTurnId = readString(candidate.turn_id);
+    if (candidateTurnId && candidateTurnId !== input.turnId) continue;
+    if (candidate.provider_reasoning_completed !== true || candidate.terminal_eligible !== false) continue;
+
+    const text =
+      readString(candidate.candidate_text) ??
+      readString(candidate.candidate_text_preview) ??
+      readString(candidate.answer_text) ??
+      readString(candidate.text);
+    if (
+      !text ||
+      isHelixGenericTypedFailureText(text) ||
+      isStaleWorkspaceFailureText(text) ||
+      !/\b(?:cannot|could\s+not|unable|blocked|unavailable|missing|failed|not\s+(?:available|present|materialized|exposed)|would\s+invent\s+evidence|no\s+(?:usable|materialized|available|extracted))\b/i.test(text)
+    ) {
+      continue;
+    }
+
+    const groundedObservationRefs = uniqueStrings([
+      ...readArray(candidate.grounded_in_observation_refs).map(readString),
+      ...readArray(candidate.grounded_observation_refs).map(readString),
+    ]);
+    const normalizedObservationRefs = uniqueStrings([
+      ...readArray(bridge.normalized_observation_refs).map(readString),
+      ...readArray(candidate.normalized_observation_refs).map(readString),
+    ]);
+    const normalizedGroundedRefs = groundedObservationRefs.filter((groundedRef) =>
+      normalizedObservationRefs.some((normalizedRef) =>
+        supportRefCoversObservationRef(groundedRef, normalizedRef) ||
+        supportRefCoversObservationRef(normalizedRef, groundedRef)
+      )
+    );
+    if (normalizedGroundedRefs.length === 0) continue;
+
+    const successfulObservationRefs = uniqueStrings([
+      ...readArray(bridge.successful_gateway_observation_refs).map(readString),
+      ...readArray(bridge.successful_capability_lane_observation_refs).map(readString),
+    ]);
+    const failedObservationRefs = uniqueStrings([
+      ...readArray(bridge.gateway_observation_refs).map(readString),
+      ...readArray(bridge.capability_lane_observation_refs).map(readString),
+    ]).filter((ref) => !successfulObservationRefs.includes(ref));
+    if (
+      failedObservationRefs.length > 0 &&
+      !normalizedGroundedRefs.some((groundedRef) =>
+        failedObservationRefs.some((failedRef) =>
+          supportRefCoversObservationRef(groundedRef, failedRef) ||
+          supportRefCoversObservationRef(failedRef, groundedRef)
+        )
+      )
+    ) {
+      continue;
+    }
+
+    const statusCode = text.match(/\b(?:extraction|inspection|observation|evidence)\s+status\s*:\s*`?([a-z][a-z0-9_:-]{2,})`?/i)?.[1];
+    return {
+      errorCode: statusCode?.toLowerCase() ?? "observation_state_blocked",
+      text,
+      candidateRef: readString(candidate.candidate_id) ?? bridgeCandidateRef,
+      groundedObservationRefs: normalizedGroundedRefs,
+      terminalAuthorityStatus: "blocked_by_observation_state",
+    };
+  }
+  return null;
+};
+
 const artifactRefMatches = (artifact: ArtifactLike, ref: string): boolean => {
   const payload = artifactPayload(artifact);
   return uniqueStrings([
@@ -4745,19 +4924,21 @@ export const shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal = (input: {
 export function applyHelixTerminalAuthoritySingleWriter(
   input: SingleWriterInput,
 ): HelixTerminalAuthoritySingleWriterResult {
+  const initialTypedFailure = readRecord(input.payload.typed_failure);
   const initialPayloadIsFailure =
     readString(input.payload.terminal_artifact_kind) === "typed_failure" ||
     input.payload.ok === false ||
     readString(input.payload.final_status) === "final_failure" ||
     Boolean(readString(input.payload.fail_reason));
+  const initialTypedFailureErrorCode = initialPayloadIsFailure
+    ? readString(initialTypedFailure?.error_code) ??
+      readString(input.payload.terminal_error_code)
+    : null;
   const initialTypedFailureText = initialPayloadIsFailure
-    ? readString(readRecord(input.payload.typed_failure)?.answer_text) ??
-      readString(readRecord(input.payload.typed_failure)?.text) ??
-      readString(readRecord(input.payload.typed_failure)?.message) ??
-      readString(input.payload.terminal_failure_text) ??
-      readString(input.payload.selected_final_answer) ??
-      readString(input.payload.answer) ??
-      readString(input.payload.text)
+    ? readString(initialTypedFailure?.answer_text) ??
+      readString(initialTypedFailure?.text) ??
+      readString(initialTypedFailure?.message) ??
+      readString(input.payload.terminal_failure_text)
     : null;
   const hydratedCommittedRoute = readCommittedAskRoute(input.payload);
   let terminalAuthorityRouteHydrationSource: string | null = null;
@@ -4821,9 +5002,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
   ].filter((entry): entry is typeof VISIBLE_ANSWER_FIELDS[number] => Boolean(entry));
 
   const rejectedCandidates: HelixTerminalAuthoritySingleWriterResult["rejected_candidates"] = [];
-  const rawSolverContinuationPending =
+  const legacySolverContinuationPending =
     readRecord(input.payload.solver_continuation_observation)?.schema === "helix.solver_continuation_observation.v1" &&
     readString(readRecord(input.payload.solver_continuation_observation)?.required_next_step) !== "typed_failure";
+  const agentContinuationDecisionPending =
+    agentContinuationRequiresNonterminalDecision(input.payload);
+  const rawSolverContinuationPending =
+    legacySolverContinuationPending || agentContinuationDecisionPending;
   const compoundCoverageGate = readRecord(input.payload.compound_prompt_coverage_gate);
   const compoundCoverageFailedClosed =
     readString(compoundCoverageGate?.decision) === "FAIL_CLOSED";
@@ -5058,6 +5243,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
     multiSubgoalCompoundTerminalSynthesisActive(input.payload);
   const selectedReceiptTerminal = compoundReceiptTerminalBlocked ? null : rawSelectedReceiptTerminal;
   const selectedProviderTerminalCandidate = authoritativeProviderTerminalCandidate(input.payload, input.artifactLedger);
+  const groundedProviderObservationFailure = readGroundedProviderObservationFailure({
+    payload: input.payload,
+    artifacts,
+    turnId: input.turnId,
+  });
   const selectedProviderRouteProduct = materializeAgentProviderRouteProductTerminal({
     payload: input.payload,
     artifacts,
@@ -5270,6 +5460,23 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const currentTerminalAuthority = readRecord(input.payload.terminal_answer_authority);
   const currentTerminalPresentation = readRecord(input.payload.terminal_presentation);
   const currentProviderReasoningReentry = readRecord(input.payload.provider_reasoning_reentry);
+  const currentProviderTerminalBridge =
+    readRecord(input.payload.provider_terminal_authority_bridge) ??
+    readRecord(readRecord(input.payload.debug)?.provider_terminal_authority_bridge);
+  const verifiedRuntimeLifecycle = readVerifiedHelixRuntimeLifecycleFromPayload({
+    payload: input.payload,
+    turnId: input.turnId,
+  });
+  const lifecycleProviderSolverCompletionObserved = Boolean(
+    verifiedRuntimeLifecycle?.reduction.runtime_turn_completed &&
+    verifiedRuntimeLifecycle.reduction.terminal_outcome === "completed" &&
+    verifiedRuntimeLifecycle.reduction.final_agent_message_event_id,
+  );
+  const providerSolverCompletionObserved = Boolean(
+    currentProviderReasoningReentry?.solver_completed === true ||
+    currentProviderTerminalBridge?.solver_completed === true ||
+    lifecycleProviderSolverCompletionObserved
+  );
   const currentScholarlyTerminalKind = readString(currentTerminalAuthority?.terminal_artifact_kind);
   const routeCheckedScholarlyTerminalKinds = new Set([
     "scholarly_research_answer",
@@ -5325,15 +5532,24 @@ export function applyHelixTerminalAuthoritySingleWriter(
     )
   );
   const currentScholarlyTerminalCanSurface = Boolean(
-    currentScholarlyTerminalReady || currentScholarlyMissingFollowupRecoveryReady
+    !agentContinuationDecisionPending &&
+    (
+      currentScholarlyMissingFollowupRecoveryReady ||
+      (
+        currentScholarlyTerminalReady &&
+        (!legacySolverContinuationPending || providerSolverCompletionObserved)
+      )
+    )
   );
   const currentScholarlyFollowupTerminalReady = Boolean(
     currentScholarlyTerminalCanSurface &&
     scholarlyFollowupEvidenceLookup?.followup_reference_detected === true
   );
   const solverContinuationPending =
-    rawSolverContinuationPending &&
-    !(
+    agentContinuationDecisionPending ||
+    (
+      legacySolverContinuationPending &&
+      !(
       (repoTerminalMaterialized && goalAllowsTerminal) ||
       (docsTerminalMaterialized && goalAllowsTerminal) ||
       docsTerminalMatchesRequiredGoal ||
@@ -5350,6 +5566,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       Boolean(selectedProviderTerminalCandidate) ||
       currentScholarlyTerminalCanSurface ||
       providerRouteProductCanSurface
+      )
     );
   if (solverContinuationPending) {
     const pendingText =
@@ -5361,10 +5578,31 @@ export function applyHelixTerminalAuthoritySingleWriter(
     input.payload.terminal_artifact_kind = "typed_failure";
     input.payload.final_answer_source = "typed_failure";
     input.payload.terminal_error_code = "solver_continuation_pending";
+    input.payload.terminal_failure_text = pendingText;
     input.payload.selected_final_answer = pendingText;
     input.payload.answer = pendingText;
     input.payload.text = pendingText;
     input.payload.assistant_answer = pendingText;
+    input.payload.typed_failure = {
+      schema: "helix.typed_failure.v1",
+      turn_id: input.turnId,
+      error_code: "solver_continuation_pending",
+      message: pendingText,
+      text: pendingText,
+      answer_text: pendingText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      concise_text: pendingText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
   } else if (rawSolverContinuationPending && repoTerminalMaterialized && goalAllowsTerminal) {
     rejectedCandidates.push({
       kind: "typed_failure",
@@ -6219,7 +6457,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
     !solverContinuationPending &&
     currentScholarlyFollowupTerminalReady &&
     !selectedImageLensObservationReport &&
-    !selectedImageLensNamedReceiptEvaluation
+    !selectedImageLensNamedReceiptEvaluation &&
+    !selectedProviderTerminalCandidate &&
+    !providerRouteProductCanSurface
   ) {
     materializeCurrentScholarlyTerminal();
   } else if (!solverContinuationPending && requiredNoteReceiptStepArtifact && requiredNoteReceiptStepText) {
@@ -7126,14 +7366,15 @@ export function applyHelixTerminalAuthoritySingleWriter(
         ? "internet_search_answer_synthesis_failed_after_observation"
         : moralGraphReflectionTerminalRoute
         ? "moral_graph_agent_provider_terminal_candidate_missing"
-        : "post_tool_model_step_missing";
+        : groundedProviderObservationFailure?.errorCode ?? "post_tool_model_step_missing";
       const terminalErrorText = scholarlyAnswerSynthesisMissing
         ? "I could not complete this scholarly research turn because PDF/full-text evidence was observed, but no valid model-authored scholarly answer passed terminal authority."
         : internetSearchAnswerSynthesisMissing
         ? "I could not complete this internet search turn because web evidence was observed, but no valid model-authored internet search answer passed terminal authority."
         : moralGraphReflectionTerminalRoute
         ? "I could not complete this Moral Graph reflection turn because the Moral Graph observation was produced, but no agent-authored terminal candidate grounded in that observation passed terminal authority."
-        : "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.";
+        : groundedProviderObservationFailure?.text ??
+          "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.";
       input.payload.terminal_artifact_kind = "typed_failure";
       input.payload.final_answer_source = "typed_failure";
       input.payload.terminal_error_code = terminalErrorCode;
@@ -7150,6 +7391,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
         answer_text: terminalErrorText,
         route_family: moralGraphReflectionTerminalRoute ? "moral_graph_reflection" : undefined,
         required_terminal_artifact_kind: moralGraphReflectionTerminalRoute ? "agent_provider_terminal_candidate" : undefined,
+        provider_terminal_candidate_ref: groundedProviderObservationFailure?.candidateRef ?? undefined,
+        grounded_observation_refs: groundedProviderObservationFailure?.groundedObservationRefs ?? undefined,
+        provider_terminal_authority_status: groundedProviderObservationFailure?.terminalAuthorityStatus ?? undefined,
         assistant_answer: false,
         raw_content_included: false,
       };
@@ -7492,9 +7736,14 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
   }
   let appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
+  const appliedTypedFailureErrorCode =
+    readString(readRecord(input.payload.typed_failure)?.error_code) ??
+    readString(input.payload.terminal_error_code);
   if (
     appliedEnvelope.terminal_artifact_kind === "typed_failure" &&
     initialTypedFailureText &&
+    initialTypedFailureErrorCode &&
+    appliedTypedFailureErrorCode === initialTypedFailureErrorCode &&
     !isHelixGenericTypedFailureText(initialTypedFailureText)
   ) {
     envelope = {
@@ -7793,6 +8042,15 @@ export function applyHelixTerminalAuthoritySingleWriter(
         ready: currentScholarlyTerminalReady,
         missing_followup_recovery_ready: currentScholarlyMissingFollowupRecoveryReady,
         can_surface: currentScholarlyTerminalCanSurface,
+        raw_solver_continuation_pending: rawSolverContinuationPending,
+        legacy_solver_continuation_pending: legacySolverContinuationPending,
+        agent_continuation_decision_pending: agentContinuationDecisionPending,
+        provider_solver_completion_observed: providerSolverCompletionObserved,
+        provider_solver_completion_source: lifecycleProviderSolverCompletionObserved
+          ? "verified_runtime_event_log"
+          : providerSolverCompletionObserved
+            ? "legacy_provider_projection"
+            : "not_observed",
         supersedes_tool_rail_failure: scholarlyResponseModeSupersedesToolRailFailure,
       },
       compound_terminal_policy: readCompoundTerminalPolicy(input.payload),

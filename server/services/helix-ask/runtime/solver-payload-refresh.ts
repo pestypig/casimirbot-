@@ -4,6 +4,7 @@ import { buildSolverArtifactReentryAudit } from "../solver-artifact-reentry-audi
 import { buildSolverRetryPolicies } from "../solver-retry-policy";
 import { buildSolverSubgoalLedger } from "../solver-subgoal-ledger";
 import { refreshToolLifecycleRecords } from "../tool-lifecycle-trace";
+import { readVerifiedHelixRuntimeLifecycleFromPayload } from "./turn-lifecycle";
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -17,6 +18,12 @@ export const readCapabilityPlanPayload = (payload: Record<string, unknown>): Rec
 };
 
 export const collectCapabilityReenteredRefs = (payload: Record<string, unknown>): string[] => {
+  const plan = readCapabilityPlanPayload(payload);
+  const turnId = readString(plan?.turn_id) ?? readString(payload.turn_id);
+  if (turnId) {
+    const lifecycle = readVerifiedHelixRuntimeLifecycleFromPayload({ payload, turnId });
+    if (lifecycle) return [...lifecycle.reduction.observation_reentry_refs];
+  }
   const refs = new Set<string>();
   const add = (value: unknown): void => {
     if (typeof value === "string" && value.trim()) refs.add(value.trim());

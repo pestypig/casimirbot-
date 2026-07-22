@@ -1,5 +1,7 @@
-import { getInterfaceCatalogReviewedCount } from "@/lib/i18n/messages/targetCatalogs";
-import { INTERFACE_MESSAGE_IDS } from "@/lib/i18n/messages/types";
+import {
+  INTERFACE_CATALOG_REVIEWED_COUNTS,
+  INTERFACE_MESSAGE_COUNT,
+} from "@/lib/i18n/messages/catalogMetadata";
 import {
   SHARED_INTERFACE_LANGUAGE_CODES,
   type SharedInterfaceLanguageCode,
@@ -179,5 +181,5 @@ export function getInterfaceLanguageOptionsForAccount(
 
 export function getInterfaceLanguageReadiness(option: InterfaceLanguageOption): string {
   if (option.translationMode === "source") return option.readiness;
-  return `${getInterfaceCatalogReviewedCount(option.code)}/${INTERFACE_MESSAGE_IDS.length} catalog strings`;
+  return `${INTERFACE_CATALOG_REVIEWED_COUNTS[option.code]}/${INTERFACE_MESSAGE_COUNT} catalog strings`;
 }

@@ -14,6 +14,10 @@ let lastDsn: string | undefined;
 const memPools = new Map<string, PgPool>();
 const localPersistenceTables = [
   "helix_accounts",
+  "helix_shared_realtime_rooms",
+  "helix_shared_realtime_room_members",
+  "helix_shared_realtime_room_invites",
+  "helix_shared_realtime_room_events",
   "helix_account_linked_providers",
   "helix_account_sessions",
   "helix_account_profile_storage",

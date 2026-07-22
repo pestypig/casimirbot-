@@ -61,6 +61,7 @@ describe("document image region store", () => {
       pageImageRef: "data:image/png;base64,page",
       pageNumber: 5,
       pageCount: 12,
+      scholarlyPdfCachePath: "C:/workspace/artifacts/helix/scholarly-pdfs/test.pdf",
     });
 
     useDocumentImageRegionStore.getState().setNaturalSize({ width: 1224, height: 1584 });
@@ -75,6 +76,7 @@ describe("document image region store", () => {
       cropDraft: { x: 73, y: 570, width: 1077, height: 87 },
       viewMode: "manual_crop",
       coordinateSpace: "natural_image_px",
+      scholarlyPdfCachePath: "C:/workspace/artifacts/helix/scholarly-pdfs/test.pdf",
     });
     expect(useDocumentImageRegionStore.getState().naturalSize).toEqual({ width: 1224, height: 1584 });
     expect(useDocumentImageRegionStore.getState().cropDraft).toEqual({ x: 73, y: 570, width: 1077, height: 87 });

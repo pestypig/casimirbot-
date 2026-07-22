@@ -314,6 +314,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     const { agentProvidersRouter } = await import("./routes/agi.agent-providers");
     const { runtimeParityRouter } = await import("./routes/agi.runtime-parity");
     const { workstationToolGatewayRouter } = await import("./routes/agi.workstation-tool-gateway");
+    const { sharedRealtimeRoomRouter } = await import("./routes/agi.realtime-room/index");
     const { realtimeSessionRouter } = await import("./routes/agi.realtime-session");
     const { runtimeGoalsRouter } = await import("./routes/agi.runtime-goals");
     const { discordRouter } = await import("./routes/discord");
@@ -343,6 +344,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi", agentProvidersRouter);
     app.use("/api/agi", runtimeParityRouter);
     app.use("/api/agi", workstationToolGatewayRouter);
+    // Must precede the personal Realtime router so room participants cannot
+    // start a second model call outside the room-owned session.
+    app.use("/api/agi", sharedRealtimeRoomRouter);
     app.use("/api/agi", realtimeSessionRouter);
     app.use("/api/agi", runtimeGoalsRouter);
     const enableTraceApi = flagEnabled(process.env.ENABLE_TRACE_API, false);

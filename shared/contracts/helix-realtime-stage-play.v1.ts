@@ -1,5 +1,6 @@
 import type {
   HelixRealtimeGroundedRelayV1,
+  HelixRealtimeGroundedRelayStatusV1,
 } from "./helix-realtime-worker-relay.v1";
 import type { HelixRealtimeWorkerAdmissionV2 } from "./helix-realtime-worker-dispatch.v2";
 
@@ -8,6 +9,12 @@ export const HELIX_REALTIME_STAGE_PLAY_CONTEXT_PACK_SCHEMA =
 
 export const HELIX_REALTIME_STAGE_PLAY_ASK_HANDOFF_SCHEMA =
   "helix.realtime_stage_play.ask_handoff.v1" as const;
+
+export const HELIX_REALTIME_GROUNDED_FEEDBACK_BINDING_SCHEMA =
+  "helix.realtime_grounded_feedback.binding.v1" as const;
+
+export const HELIX_REALTIME_GROUNDED_FEEDBACK_OBSERVER_AUDIT_SCHEMA =
+  "helix.realtime_grounded_feedback.observer_audit.v1" as const;
 
 export const HELIX_REALTIME_STAGE_PLAY_CONTEXT_SYNC_SCHEMA =
   "helix.realtime_stage_play.context_sync.v1" as const;
@@ -96,6 +103,46 @@ export type HelixRealtimeStagePlayContextPackV1 = {
   terminal_eligible: false;
 };
 
+export type HelixRealtimeGroundedFeedbackBindingV1 = {
+  schema: typeof HELIX_REALTIME_GROUNDED_FEEDBACK_BINDING_SCHEMA;
+  handoff_id: string;
+  realtime_session_id: string;
+  thread_id: string;
+  transcript_observation_ref: string;
+  worker_admission_id: string;
+  issued_at_ms: number;
+  answer_authority: false;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value && typeof value === "object" && !Array.isArray(value));
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
+export const isHelixRealtimeGroundedFeedbackBindingV1 = (
+  value: unknown,
+): value is HelixRealtimeGroundedFeedbackBindingV1 => {
+  if (!isRecord(value)) return false;
+  return (
+    value.schema === HELIX_REALTIME_GROUNDED_FEEDBACK_BINDING_SCHEMA &&
+    isNonEmptyString(value.handoff_id) &&
+    isNonEmptyString(value.realtime_session_id) &&
+    isNonEmptyString(value.thread_id) &&
+    isNonEmptyString(value.transcript_observation_ref) &&
+    isNonEmptyString(value.worker_admission_id) &&
+    typeof value.issued_at_ms === "number" &&
+    Number.isFinite(value.issued_at_ms) &&
+    value.answer_authority === false &&
+    value.assistant_answer === false &&
+    value.terminal_eligible === false &&
+    value.raw_content_included === false
+  );
+};
+
 export type HelixRealtimeStagePlayAskHandoffV1 = {
   schema: typeof HELIX_REALTIME_STAGE_PLAY_ASK_HANDOFF_SCHEMA;
   handoff_id: string;
@@ -182,6 +229,34 @@ export type HelixRealtimeStagePlayGroundedAnswerV1 = {
   raw_content_included: false;
 };
 
+export type HelixRealtimeGroundedFeedbackObserverAuditV1 = {
+  schema: typeof HELIX_REALTIME_GROUNDED_FEEDBACK_OBSERVER_AUDIT_SCHEMA;
+  handoff_id: string;
+  realtime_session_id: string;
+  binding_status: "not_observed" | "validated" | "rejected";
+  binding_source:
+    | "explicit_binding"
+    | "route_metadata_binding"
+    | "legacy_route_metadata"
+    | null;
+  turn_final_status: "not_observed" | "captured" | "rejected";
+  terminal_authority_status: "not_evaluated" | "validated" | "rejected";
+  grounding_evidence_status: "not_evaluated" | "not_required" | "validated" | "rejected";
+  feedback_status: "not_recorded" | "recorded" | "suppressed";
+  grounding_proof_source: "gateway_call_results" | "canonical_solver_trace" | null;
+  relay_status: HelixRealtimeGroundedRelayStatusV1 | null;
+  ask_turn_id: string | null;
+  failure_code: string | null;
+  observed_at_ms: number;
+  updated_at_ms: number;
+  completed_at_ms: number | null;
+  answer_authority: false;
+  assistant_answer: false;
+  terminal_eligible: false;
+  provider_payload_included: false;
+  raw_content_included: false;
+};
+
 export type HelixRealtimeStagePlayDebugV1 = {
   schema: typeof HELIX_REALTIME_STAGE_PLAY_DEBUG_SCHEMA;
   realtime_session_id: string;
@@ -197,12 +272,15 @@ export type HelixRealtimeStagePlayDebugV1 = {
     stage_play_event_ref: string;
     context_pack_id: string;
     context_hash: string;
+    transcript_text_hash: string;
+    transcript_text_char_count: number;
     goal_id: string | null;
     runtime_goal_session_ref: string | null;
     runtime_agent_provider: string | null;
     required_grounding_capability_ids: string[];
     worker_admission: HelixRealtimeWorkerAdmissionV2;
     created_at_ms: number;
+    feedback_observer_audit: HelixRealtimeGroundedFeedbackObserverAuditV1 | null;
     grounded_answer: HelixRealtimeStagePlayGroundedAnswerV1 | null;
     grounded_relay: HelixRealtimeGroundedRelayV1 | null;
   }>;
@@ -214,6 +292,8 @@ export type HelixRealtimeStagePlayDebugV1 = {
     terminal_answer_authority: false;
     grounded_answer_requires_completed_solver_path: true;
     grounded_answer_requires_route_evidence: true;
+    grounded_feedback_requires_issued_handoff_binding: true;
+    grounded_feedback_requires_current_turn_capability_evidence: true;
     spoken_relay_requires_server_authoritative_grounded_answer: true;
     realtime_relay_answer_authority: false;
   };

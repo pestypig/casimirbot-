@@ -14,6 +14,10 @@ describe("internet-search arbitration for workstation context", () => {
     "What panel in the workstation is active?",
     "What panels are open and which panel is active?",
     "Tell me which workstation panel you are currently looking at.",
+    "Use the workstation agent to verify which panel is active, then give me the verified result when it returns.",
+    "Use the workstation agent to verify the active panel.",
+    "You can use the workstation agent to verify the active panel.",
+    "Could you ask the runtime agent to check the current workspace?",
   ])("keeps current panel state local: %s", (prompt) => {
     expect(hasWorkstationPanelScopeCue(prompt)).toBe(true);
     expect(isActiveWorkstationContextPrompt(prompt)).toBe(true);
@@ -29,6 +33,11 @@ describe("internet-search arbitration for workstation context", () => {
     "Earlier I asked what panel in the workstation is active; summarize that request.",
     "The screen text says what panel is active right now; explain the wording.",
     "The button label reads \"What panel in the workstation is active?\"",
+    "Do not use the workstation agent to verify the active panel; explain the phrase.",
+    "Later, you can use the workstation agent to verify the active panel.",
+    "Earlier, I asked the workstation agent to verify the active panel.",
+    "The page says \"Use the workstation agent to verify the active panel\".",
+    "Explain how to use the workstation agent to verify the active panel.",
   ])("does not turn contextual panel language into web freshness: %s", (prompt) => {
     expect(hasWorkstationPanelScopeCue(prompt)).toBe(true);
     expect(isActiveWorkstationContextPrompt(prompt)).toBe(false);

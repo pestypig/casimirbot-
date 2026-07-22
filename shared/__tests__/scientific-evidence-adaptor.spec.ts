@@ -8,6 +8,53 @@ import {
 import type { ScientificBranchGateV1 } from "../scientific-evidence-adaptor";
 
 describe("scientific evidence adaptor", () => {
+  it("rejects page prose as an equation candidate when the requested region is equation-scoped", () => {
+    const packet = buildScientificEvidencePacket({
+      cropRegionId: "scholarly_pdf_page_2_equation_pass",
+      sourceRefHash: "sha256:page-two-prose",
+      sourceKind: "pdf_page_render",
+      pageNumber: 2,
+      bboxPx: { x: 0, y: 0, width: 1224, height: 1584 },
+      sourceDimensionsPx: { width: 1224, height: 1584 },
+      regionLabel: "scholarly_pdf_page_2_equation_pass",
+      textCandidate:
+        "The X-ray flares following short GRBs may indicate long activity of the central engine, but the mechanism remains unclear.",
+      latexCandidate: null,
+      uncertainty: [],
+      extractionStatus: "partial",
+    });
+
+    expect(packet).toMatchObject({
+      evidence_role: "context_only",
+      exact_equation_admissibility: "inadmissible_for_exact_equation",
+      admissibility: expect.objectContaining({ status: "inadmissible_for_exact_mapping" }),
+      quality_flags: expect.arrayContaining([
+        "no_ocr_or_latex_candidate",
+        "non_equation_text_candidate",
+      ]),
+    });
+  });
+
+  it("keeps symbolic OCR from an equation-scoped page as a usable partial candidate", () => {
+    const packet = buildScientificEvidencePacket({
+      cropRegionId: "scholarly_pdf_page_3_equation_pass",
+      sourceRefHash: "sha256:page-three-equation",
+      sourceKind: "pdf_page_render",
+      pageNumber: 3,
+      bboxPx: { x: 0, y: 0, width: 1224, height: 1584 },
+      sourceDimensionsPx: { width: 1224, height: 1584 },
+      regionLabel: "scholarly_pdf_page_3_equation_pass",
+      textCandidate: "L_0 = 10^49 B_{15}^2 P_{-3}^{-4} erg s^{-1}",
+      latexCandidate: null,
+      uncertainty: ["page-level OCR candidate"],
+      extractionStatus: "partial",
+    });
+
+    expect(packet.quality_flags).not.toContain("no_ocr_or_latex_candidate");
+    expect(packet.quality_flags).not.toContain("non_equation_text_candidate");
+    expect(packet.exact_equation_admissibility).toBe("partial_candidate");
+  });
+
   it("materializes a transient sidecar from Image Lens scientific packets", () => {
     const admissiblePacket = buildScientificEvidencePacket({
       cropRegionId: "image_lens_region:weyl",

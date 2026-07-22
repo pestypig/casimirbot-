@@ -268,6 +268,9 @@ export type HelixScholarlyResearchObservation = {
   evidence_state: HelixScholarlyEvidenceState;
   next_affordances: HelixScholarlyNextAffordance[];
   lookup_relevance_gate?: Record<string, unknown>;
+  semantic_relevance_authority?: "runtime_agent";
+  deterministic_lookup_relevance_role?: "advisory_only";
+  runtime_agent_semantic_selection_required?: true;
   scholarly_lookup_recovery_affordance?: HelixScholarlyRecoveryAffordance;
   recovery_query_basis?: Record<string, unknown>;
   recovery_affordances?: HelixScholarlyRecoveryAffordance[];

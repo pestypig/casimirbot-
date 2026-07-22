@@ -1203,6 +1203,44 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(receipt).not.toHaveProperty("scientific_evidence_sidecar");
   });
 
+  it("requests exact full-text recovery when PDF page inspection has no renderable cache", async () => {
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-pdf-page-inspection-cache-recovery",
+        capability_lane_call: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: "pdf-page-render:arxiv-1902.10712:page-2",
+          source_kind: "pdf_page_render",
+          page_image_ref: "artifact://scholarly-pdf/missing-paper.pdf/page/2",
+          scholarly_source_pdf_ref: "artifact://scholarly-pdf/missing-paper.pdf",
+          page_number: 2,
+          source_mount_only: false,
+          bbox_px: { x: 0, y: 0, width: 1600, height: 2200 },
+          question: "Inspect page 2 of the exact selected paper.",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]).toMatchObject({
+      ok: false,
+      error: "scholarly_pdf_cache_unavailable",
+      observation_packet: {
+        status: "missing_input",
+        missing_requirements: [{
+          code: "scholarly_pdf_cache_unavailable",
+          repair_action: "fetch_full_text_before_pdf_page_navigation",
+        }],
+      },
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+  });
+
   it("does not bypass an unconfigured visual backend for OCR or inspection", async () => {
     const sourceImageRef = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
     const result = await runHelixCapabilityLaneOneShotRequests({
@@ -2726,6 +2764,112 @@ describe("provider-neutral capability lane one-shot runner", () => {
       "text_to_speech.speak_text",
     ]);
     expect(result.debug_projection.capability_lane_reentry_status).toBe("observation_packet_required_for_provider_reentry");
+  });
+
+  it("bridges scholarly recovery lane requests through the governed gateway", async () => {
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-provider-neutral-scholarly-missing-query",
+        capability_lane_call: {
+          capability: "scholarly-research.lookup_papers",
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(result.requested).toBe(true);
+    expect(result.call_results).toHaveLength(1);
+    expect(result.call_results[0]).toMatchObject({
+      schema: "helix.workstation_tool_reference.gateway_bridge_result.v1",
+      ok: false,
+      lane_id: "workstation_tool_reference",
+      capability: "scholarly-research.lookup_papers",
+      delegated_capability_id: "scholarly-research.lookup_papers",
+      delegation_status: "gateway_executed",
+      selected_runtime_agent_provider: "codex",
+      arguments: {},
+      error: "missing_query",
+      reentry_required: true,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      delegated_gateway_call_result: {
+        schema: "helix.workstation_tool_gateway.call_result.v1",
+        ok: false,
+        capability_id: "scholarly-research.lookup_papers",
+        error: "missing_query",
+      },
+    });
+    expect(result.observation_packets[0]).toMatchObject({
+      capability_key: "scholarly-research.lookup_papers",
+      status: "blocked",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.resolve_traces[0]).toMatchObject({
+      requested_lane: "workstation_tool_reference",
+      execution_status: "executed_observation_only",
+      blocked_reason: "missing_query",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("bridges calculator lane requests through the governed gateway for provider re-entry", async () => {
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-provider-neutral-calculator",
+        capability_lane_call: {
+          capability: "scientific-calculator.solve_expression",
+          arguments: { expression: "8 * 9" },
+        },
+      },
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(result.requested).toBe(true);
+    expect(result.call_results).toHaveLength(1);
+    expect(result.call_results[0]).toMatchObject({
+      schema: "helix.workstation_tool_reference.gateway_bridge_result.v1",
+      ok: true,
+      lane_id: "workstation_tool_reference",
+      capability: "scientific-calculator.solve_expression",
+      delegated_capability_id: "scientific-calculator.solve_expression",
+      delegation_status: "gateway_executed",
+      selected_runtime_agent_provider: "codex",
+      arguments: { expression: "8 * 9" },
+      reentry_required: true,
+      answer_authority: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      delegated_gateway_call_result: {
+        ok: true,
+        capability_id: "scientific-calculator.solve_expression",
+        observation: {
+          schema: "helix.calculator_solve_observation.v1",
+          expression: "8 * 9",
+          result: "72",
+        },
+      },
+    });
+    expect(result.observation_packets[0]).toMatchObject({
+      capability_key: "scientific-calculator.solve_expression",
+      status: "succeeded",
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(result.resolve_traces[0]).toMatchObject({
+      requested_lane: "workstation_tool_reference",
+      execution_status: "executed_observation_only",
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
   });
 
   it("fails closed on unknown structured lane calls instead of dropping the request", async () => {

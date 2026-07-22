@@ -306,6 +306,59 @@ describe("Realtime grounded answer relay", () => {
     expect(sentEvents).toHaveLength(1);
   });
 
+  it("preserves pending grounded work across a newer conversation-local handoff", () => {
+    const workerAdmission = buildAdmission({ handoffId: "handoff:pending-worker", nowMs });
+    const workerHandoff = buildHandoff("pending-worker", workerAdmission, nowMs);
+    startRealtimeGroundedRelayForHandoff({
+      handoff: workerHandoff,
+      workerAdmission,
+      nowMs,
+    });
+
+    const localAdmission = buildAdmission({
+      handoffId: "handoff:conversation-while-worker-runs",
+      outcome: "conversation_local",
+      nowMs: nowMs + 1,
+    });
+    const localHandoff = buildHandoff(
+      "conversation-while-worker-runs",
+      localAdmission,
+      nowMs + 1,
+    );
+    const localRelay = startRealtimeGroundedRelayForHandoff({
+      handoff: localHandoff,
+      workerAdmission: localAdmission,
+      nowMs: nowMs + 1,
+    });
+
+    expect(localRelay).toMatchObject({
+      status: "suppressed",
+      status_reason: "conversation_local_no_delayed_relay",
+      response_created: false,
+    });
+    expect(readRealtimeGroundedAnswerRelay(workerHandoff.handoff_id)?.status).toBe(
+      "worker_running",
+    );
+
+    const requested = enqueueRealtimeGroundedAnswerRelay({
+      handoff: workerHandoff,
+      feedback: buildFeedback(workerHandoff, nowMs + 10),
+      workerAdmission: buildAdmission({
+        handoffId: workerHandoff.handoff_id,
+        phase: "solver_final",
+        nowMs: nowMs + 10,
+      }),
+      answerText: "The active panel is Account & Sessions.",
+      nowMs: nowMs + 10,
+    });
+
+    expect(requested).toMatchObject({
+      status: "response_requested",
+      response_created: true,
+    });
+    expect(sentEvents.map((event) => event.type)).toEqual(["response.create"]);
+  });
+
   it("supersedes older transcript work and marks expired results stale", () => {
     const firstAdmission = buildAdmission({ handoffId: "handoff:first", nowMs });
     const first = buildHandoff("first", firstAdmission, nowMs);

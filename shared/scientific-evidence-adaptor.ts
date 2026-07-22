@@ -504,6 +504,16 @@ const containsMultipleDisplayedEquationCandidates = (input: {
   return false;
 };
 
+const hasEquationLikeCandidateSyntax = (input: { text: string; latex: string }): boolean => {
+  if (input.latex.trim()) return true;
+  const text = input.text.trim();
+  if (!text) return false;
+  return /\\(?:frac|sum|int|sqrt|partial|nabla|begin|left|right|mathrm|mathbf|mathcal)\b/.test(text) ||
+    /[A-Za-z0-9)\]}]\s*(?:=|<=|>=|<|>|\+\-|~=)\s*[A-Za-z0-9([{\\]/.test(text) ||
+    /\b[A-Za-z][A-Za-z0-9]*\s*[_^]\s*(?:\{[^}]+\}|[A-Za-z0-9]+)/.test(text) ||
+    /(?:âˆ«|âˆ‘|âˆš|âˆ‚|âˆ‡|â‰¤|â‰¥|Î”|Î£)/.test(text);
+};
+
 const detectScientificQualityFlags = (input: {
   text: string;
   latex: string;
@@ -513,13 +523,23 @@ const detectScientificQualityFlags = (input: {
   labelMatchStatus: ScientificEquationLabelMatchStatusV1;
   extractionStatus: ScientificEvidencePacketV1["extraction_status"];
   hasCandidate: boolean;
+  equationCandidateRequested: boolean;
+  equationLikeCandidate: boolean;
 }): string[] => {
   const flags: string[] = [];
   const combined = `${input.text}\n${input.latex}`;
   const textLines = input.text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const latexLines = input.latex.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (!input.hasCandidate || input.extractionStatus === "failed" || input.extractionStatus === "not_run") {
+  if (
+    !input.hasCandidate ||
+    input.extractionStatus === "failed" ||
+    input.extractionStatus === "not_run" ||
+    (input.equationCandidateRequested && !input.equationLikeCandidate)
+  ) {
     flags.push("no_ocr_or_latex_candidate");
+  }
+  if (input.equationCandidateRequested && input.hasCandidate && !input.equationLikeCandidate) {
+    flags.push("non_equation_text_candidate");
   }
   if (input.extractionStatus === "partial") {
     flags.push("partial_extraction_status");
@@ -589,7 +609,8 @@ const detectSourceQualityFlags = (input: {
 
 const qualityFlagReason = (flag: string): string => {
   switch (flag) {
-    case "no_ocr_or_latex_candidate": return "No OCR text or LaTeX candidate was returned.";
+    case "no_ocr_or_latex_candidate": return "No OCR equation text or LaTeX candidate was returned.";
+    case "non_equation_text_candidate": return "The OCR candidate is prose rather than an equation-like expression.";
     case "missing_requested_equation_label": return "The requested equation label was not observed in the crop.";
     case "mismatched_equation_label": return "The observed equation label does not match the requested crop label.";
     case "ambiguous_equation_label": return "Multiple observed equation labels make this crop ambiguous for exact use.";
@@ -801,6 +822,14 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
   const evidenceRole = scientificEvidenceRole(input);
   const equationCaptureMode = input.equationCaptureMode ??
     (evidenceRole === "exact_equation_candidate" ? "exact_row" : "context");
+  const equationCandidateRequested =
+    equationCaptureMode === "exact_row" ||
+    equationCaptureMode === "exact_block" ||
+    /(?:^|[_\-\s])equation(?:$|[_\-\s])/i.test(input.regionLabel ?? "");
+  const equationLikeCandidate = hasEquationLikeCandidateSyntax({
+    text: textCandidate ?? "",
+    latex: latexCandidate ?? "",
+  });
   const isExactBlock = equationCaptureMode === "exact_block";
   const rawQualityFlags = detectScientificQualityFlags({
     text: textCandidate ?? "",
@@ -811,6 +840,8 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
     labelMatchStatus,
     extractionStatus: status,
     hasCandidate,
+    equationCandidateRequested,
+    equationLikeCandidate,
   });
   const sourceQualityFlags = detectSourceQualityFlags({
     bboxPx: input.bboxPx,
@@ -873,7 +904,9 @@ export function buildScientificEvidencePacket(input: CandidateInput): Scientific
   );
   const exactEquationAdmissibility: ScientificExactEquationAdmissibilityV1 =
     evidenceRole === "context_only"
-      ? "partial_candidate"
+      ? allQualityFlags.includes("non_equation_text_candidate")
+        ? "inadmissible_for_exact_equation"
+        : "partial_candidate"
       : isExactBlock
         ? hardBlockRejection
           ? "inadmissible_for_exact_equation"

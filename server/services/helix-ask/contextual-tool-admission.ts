@@ -49,9 +49,9 @@ const DOCS_VIEWER_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|
 const SCIENTIFIC_CALCULATOR_CUE_RE = /\b(?:scientific\s+calculator|calculator|calculate|compute|solve|evaluate|equation|expression)\b/i;
 const SCIENTIFIC_CALCULATOR_ACTION_RE = /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load|use|run|call|calculate|compute|solve|evaluate)\b[\s\S]{0,100}\b(?:scientific\s+calculator|calculator|equation|expression)\b|\b(?:calculate|compute|solve|evaluate)\b[\s\S]{0,120}(?:\d|[=+\-*/^()]|\\frac|\\sqrt)/i;
 const SCIENTIFIC_CALCULATOR_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|what\s+is|what\s+are|what(?:'s|\s+is)?|what\s+does|what\s+tool\s+would\s+you\s+use)\b[\s\S]{0,140}\b(?:scientific\s+calculator|calculator|calculate|compute|solve|evaluate)\b[\s\S]{0,100}\b(?:for|mean|do|does|is|are|used\s+for|purpose|would\s+use|should\s+use)\b/i;
-const SCHOLARLY_CUE_RE = /\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b|\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i;
-const SCHOLARLY_ACTION_RE = /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b/i;
-const SCHOLARLY_ACTION_WITH_CUE_RE = /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b[\s\S]{0,140}\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b|\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b[\s\S]{0,140}\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b/i;
+const SCHOLARLY_CUE_RE = /\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|papers?|articles?|studies|literature|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b|\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i;
+const SCHOLARLY_ACTION_RE = /\b(?:do\s+research|research|find|search|look\s+for|look\s*up|lookup|locate|retrieve|fetch|pull|query|get|give|show|recommend|suggest|identify|resolve|repair|collect|cite|cross-?check)\b/i;
+const SCHOLARLY_ACTION_WITH_CUE_RE = /\b(?:do\s+research|research|find|search|look\s+for|look\s*up|lookup|locate|retrieve|fetch|pull|query|get|give|show|recommend|suggest|identify|resolve|repair|collect|cite|cross-?check)\b[\s\S]{0,140}\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|papers?|articles?|studies|literature|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b|\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|papers?|articles?|studies|literature|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b[\s\S]{0,140}\b(?:do\s+research|research|find|search|look\s+for|look\s*up|lookup|locate|retrieve|fetch|pull|query|get|give|show|recommend|suggest|identify|resolve|repair|collect|cite|cross-?check)\b/i;
 const SCHOLARLY_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|what\s+is|what\s+are|what(?:'s|\s+is)?|what\s+does)\b[\s\S]{0,120}\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citation|reference|journal)\b[\s\S]{0,80}\b(?:for|mean|do|does|is|are|used\s+for|purpose)\b/i;
 const INTERNET_SEARCH_CUE_RE = /\b(?:browse|browsing|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online|latest|current|recent|today|breaking|ongoing\s+(?:conflict|war|crisis)|ceasefire|election|law|prices?|schedules?)\b/i;
 const INTERNET_SEARCH_ACTION_RE = /\b(?:browse|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online)\b/i;
@@ -101,10 +101,14 @@ const hasAffirmativeScholarlyActionClause = (promptText: string): boolean => {
     const clause = rawClause.trim();
     if (!clause || !SCHOLARLY_ACTION_WITH_CUE_RE.test(clause)) return false;
     const actionIndex = clause.search(SCHOLARLY_ACTION_RE);
-    const prefix = actionIndex >= 0 ? clause.slice(0, actionIndex) : clause;
+    const prefix = (actionIndex >= 0 ? clause.slice(0, actionIndex) : clause)
+      .replace(/^\s*(?:(?:ok|okay|please)\s*[,.]?\s*)+/i, "")
+      .replace(/^\s*(?:can|could|would|will)\s+you\s+/i, "");
     if (/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b/i.test(prefix)) return false;
     if (/\b(?:if|when|before|after|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future)\b/i.test(prefix)) return false;
     if (/\b(?:earlier|previously|last\s+turn|historically|already)\b/i.test(prefix)) return false;
+    if (/\b(?:screen|visible|label|button|phrase|text|debug)\b[^.!?;\n]{0,80}\b(?:says|said|shows|showed|reads|contains|mentions)\b/i.test(prefix)) return false;
+    if (/\b(?:later|tomorrow|next\s+time|in\s+the\s+future|eventually|not\s+now|not\s+yet)\b/i.test(clause)) return false;
     if (SCHOLARLY_EXPLANATION_RE.test(clause)) return false;
     return true;
   });
@@ -324,13 +328,24 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: quotedCalculator,
     };
   }
-  const quotedScholarly = prompt.match(/["'`][^"'`]*(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|query|cite|read)[^"'`]*(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)[^"'`]*["'`]/i)?.[0];
+  const quotedScholarly = prompt.match(/["'`][^"'`]*(?:do\s+research|research|find|search|look\s+for|look\s*up|lookup|locate|retrieve|fetch|query|recommend|suggest|identify|cite|read)[^"'`]*(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|papers?|articles?|studies|literature|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)[^"'`]*["'`]/i)?.[0];
   if (quotedScholarly) {
     return {
       tool_admission_suppressed: true,
       suppression_reason: "quoted_tool_command",
       verb_or_cue: scholarlyVerbOrCue(quotedScholarly),
       text: quotedScholarly,
+    };
+  }
+  const screenVisibleScholarly = prompt.match(
+    /\b(?:screen|visible\s+text|label|button|phrase|debug)\b[^.!?;\n]{0,100}\b(?:says|said|shows|showed|reads|contains|mentions)\b[^.!?;\n]{0,120}\b(?:find|search|look\s+for|look\s*up|lookup|locate|retrieve|recommend|suggest|identify)\b[^.!?;\n]{0,140}\b(?:papers?|articles?|studies|literature|doi|arxiv|pubmed|citations?|references?)\b/i,
+  )?.[0];
+  if (screenVisibleScholarly) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "screen_visible_tool_reference",
+      verb_or_cue: "scholarly-research.lookup_papers",
+      text: screenVisibleScholarly,
     };
   }
   const screenVisibleInternet = prompt.match(/\b(?:phrase|text|screen|page|button|label|headline)\b[\s\S]{0,160}(?:latest|current|recent|breaking|search|browse|web|internet)[\s\S]{0,120}\b(?:appears|says|shows|reads|contains)\b[\s\S]{0,80}\b(?:screen|page|label|headline)\b[\s\S]{0,120}\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no)\b[\s\S]{0,80}(?:search|browse|open|click|run)\b|\b(?:phrase|text|screen|page|button|label|headline)\b[\s\S]{0,80}(?:says|shows|appears|reads|contains)\b[\s\S]{0,120}(?:latest|current|recent|breaking|search|browse|web\s+search|internet\s+search)[\s\S]{0,120}\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no)\b[\s\S]{0,80}(?:search|browse|open|click|run)\b/i)?.[0];
@@ -506,11 +521,13 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
     };
   }
   const promptForExternalNegation = stripWriteOnlyNegationsForExternalToolMatching(prompt);
-  const negatedScholarly = promptForExternalNegation.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to)\b[\s\S]{0,120}(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|query|get|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?|10\.\d{4,9}\/[-._;()/:A-Z0-9]+)\b/i)?.[0];
+  const negatedScholarly = promptForExternalNegation.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to)\b[\s\S]{0,120}(?:do\s+research|research|find|search|look\s+for|look\s*up|lookup|locate|retrieve|fetch|query|get|recommend|suggest|identify|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|papers?|articles?|studies|literature|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?|10\.\d{4,9}\/[-._;()/:A-Z0-9]+)\b/i)?.[0];
   if (negatedScholarly) {
     const negatedCapability = scholarlyVerbOrCue(negatedScholarly);
+    const scopedLookupExclusion =
+      /\b(?:unrelated|other|additional|duplicate|separate)\b[^.!?;\n]{0,80}\b(?:papers?|articles?|records?|sources?)\b|\b(?:papers?|articles?|records?|sources?)\b[^.!?;\n]{0,80}\b(?:unrelated|other|additional|duplicate|separate)\b/i.test(negatedScholarly);
     const preservesAffirmativeMetadataLookup =
-      negatedCapability !== "scholarly-research.lookup_papers" &&
+      (negatedCapability !== "scholarly-research.lookup_papers" || scopedLookupExclusion) &&
       hasAffirmativeScholarlyActionClause(prompt);
     if (!preservesAffirmativeMetadataLookup) {
       return {
@@ -563,7 +580,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: hypotheticalCalculator,
     };
   }
-  const hypotheticalScholarly = prompt.match(/\b(?:in\s+the\s+future|later|next\s+time|if|when|before|after|would|could|might|hypothetically)\b[\s\S]{0,120}(?:do\s+research|research|find|search|searched|look\s*up|looked\s+up|lookup|retrieve|retrieved|fetch|fetched|query|queried|get|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b/i)?.[0];
+  const hypotheticalScholarly = prompt.match(/\b(?:in\s+the\s+future|later|next\s+time|tomorrow|if|when|before|after|would|could|might|hypothetically)\b[\s\S]{0,120}(?:do\s+research|research|find|search|searched|look\s+for|looked\s+for|look\s*up|looked\s+up|lookup|locate|retrieve|retrieved|fetch|fetched|query|queried|get|recommend|suggest|identify|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|papers?|articles?|studies|literature|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b/i)?.[0];
   if (hypotheticalScholarly && !hasAffirmativeScholarlyActionClause(prompt)) {
     return {
       tool_admission_suppressed: true,
@@ -600,7 +617,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: historicalCalculator,
     };
   }
-  const historicalScholarly = prompt.match(/\b(?:I|we|you)\s+(?:already\s+|previously\s+|earlier\s+)?(?:looked\s+up|searched|researched|queried|retrieved|fetched|read)\b[\s\S]{0,140}(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b|\b(?:earlier|previously|last\s+turn|before)\b[\s\S]{0,120}(?:looked\s+up|searched|researched|queried|retrieved|fetched|read)\b[\s\S]{0,140}(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b/i)?.[0];
+  const historicalScholarly = prompt.match(/\b(?:I|we|you)\s+(?:already\s+|previously\s+|earlier\s+)?(?:looked\s+for|looked\s+up|searched|researched|queried|retrieved|fetched|read)\b[\s\S]{0,140}(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|papers?|articles?|studies|literature|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b|\b(?:earlier|previously|last\s+turn|before)\b[\s\S]{0,120}(?:looked\s+for|looked\s+up|searched|researched|queried|retrieved|fetched|read)\b[\s\S]{0,140}(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|papers?|articles?|studies|literature|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b/i)?.[0];
   if (historicalScholarly) {
     return {
       tool_admission_suppressed: true,

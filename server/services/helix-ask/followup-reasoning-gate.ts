@@ -82,6 +82,7 @@ export function buildFollowupReasoningGate(input: {
   selectedEvidenceCount: number;
   conflictingHypotheses?: boolean;
   finalArbitrationRan: boolean;
+  postEvidenceReasoningCompleted?: boolean;
   routeFollowupReasoningRequired?: boolean;
 }): HelixFollowupReasoningGate {
   const reason = reasonFor({
@@ -105,7 +106,9 @@ export function buildFollowupReasoningGate(input: {
   }
   const maySkip = reason === "pure_control_receipt" || reason === "pure_status_receipt" || reason === "simple_no_source_turn";
   const required = !maySkip;
-  const completed = required ? input.finalArbitrationRan : true;
+  const completed = required
+    ? input.postEvidenceReasoningCompleted ?? input.finalArbitrationRan
+    : true;
 
   return {
     schema: "helix.followup_reasoning_gate.v1",

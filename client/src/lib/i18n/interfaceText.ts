@@ -5,8 +5,17 @@ import {
   type InterfaceLanguageCode,
 } from "@/lib/i18n/interfaceLanguage";
 import { pushWorkstationDebugEvent } from "@/lib/helix/workstation-debug";
-import { interfaceMessageCatalogs } from "@/lib/i18n/messages/targetCatalogs";
-import type { InterfaceMessageId, InterfaceMessageValues } from "@/lib/i18n/messages/types";
+import {
+  getEnglishInterfaceCatalog,
+  getLoadedInterfaceCatalog,
+  loadInterfaceCatalog,
+} from "@/lib/i18n/messages/runtimeCatalogs";
+import type {
+  InterfaceMessageCatalog,
+  InterfaceMessageId,
+  InterfaceMessageValues,
+  InterfaceTargetCatalog,
+} from "@/lib/i18n/messages/types";
 
 const interpolationPattern = /\{([a-zA-Z0-9_]+)\}/g;
 
@@ -23,10 +32,15 @@ function formatMessage(template: string, values?: InterfaceMessageValues): strin
   });
 }
 
-export function createInterfaceTextResolver(languageValue: unknown): InterfaceTextResolver {
+type RuntimeInterfaceCatalog = InterfaceMessageCatalog | InterfaceTargetCatalog;
+
+export function createInterfaceTextResolver(
+  languageValue: unknown,
+  catalogOverride?: RuntimeInterfaceCatalog,
+): InterfaceTextResolver {
   const language = normalizeInterfaceLanguageCode(languageValue);
-  const catalog = interfaceMessageCatalogs[language] ?? interfaceMessageCatalogs[DEFAULT_INTERFACE_LANGUAGE];
-  const fallbackCatalog = interfaceMessageCatalogs[DEFAULT_INTERFACE_LANGUAGE];
+  const fallbackCatalog = getEnglishInterfaceCatalog();
+  const catalog = catalogOverride ?? getLoadedInterfaceCatalog(language) ?? fallbackCatalog;
   return {
     language,
     t: (id, values) => {
@@ -52,5 +66,40 @@ export function createInterfaceTextResolver(languageValue: unknown): InterfaceTe
 }
 
 export function useInterfaceText(languageValue: unknown): InterfaceTextResolver {
-  return React.useMemo(() => createInterfaceTextResolver(languageValue), [languageValue]);
+  const language = normalizeInterfaceLanguageCode(languageValue);
+  const [catalogState, setCatalogState] = React.useState<{
+    language: InterfaceLanguageCode;
+    catalog: RuntimeInterfaceCatalog;
+  }>(() => ({
+    language,
+    catalog: getLoadedInterfaceCatalog(language) ?? getEnglishInterfaceCatalog(),
+  }));
+
+  React.useEffect(() => {
+    let active = true;
+    const loaded = getLoadedInterfaceCatalog(language);
+    if (loaded) {
+      setCatalogState({ language, catalog: loaded });
+      return () => {
+        active = false;
+      };
+    }
+
+    setCatalogState({ language, catalog: getEnglishInterfaceCatalog() });
+    void loadInterfaceCatalog(language).then((nextCatalog) => {
+      if (active) setCatalogState({ language, catalog: nextCatalog });
+    });
+    return () => {
+      active = false;
+    };
+  }, [language]);
+
+  const catalog = catalogState.language === language
+    ? catalogState.catalog
+    : getLoadedInterfaceCatalog(language) ?? getEnglishInterfaceCatalog();
+
+  return React.useMemo(
+    () => createInterfaceTextResolver(language, catalog),
+    [catalog, language],
+  );
 }

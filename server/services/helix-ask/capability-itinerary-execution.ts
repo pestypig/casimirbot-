@@ -700,13 +700,18 @@ export const isHelixCapabilityItineraryFamilyObserved = (
   artifacts: HelixCapabilityItineraryArtifactLike[],
 ): boolean => {
   if (family === "scholarly_research") {
-    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      /scholarly_research_observation|scholarly_full_text_observation|theory_frontier_literature_map/i.test([
+    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) => {
+      const status = readString(artifactPayload(artifact)?.status);
+      const successfulScholarlyGatewayObservation =
+        artifactCapability(artifact)?.startsWith("scholarly-research.") === true &&
+        /^(?:succeeded|completed|success|ok)$/i.test(status ?? "");
+      return successfulScholarlyGatewayObservation ||
+        /scholarly_research_observation|scholarly_full_text_observation|theory_frontier_literature_map/i.test([
         artifactKind(artifact),
         artifactSchema(artifact),
         artifactId(artifact),
-      ].join(" ")),
-    );
+      ].join(" "));
+    });
   }
   if (family === "internet_search") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
@@ -731,9 +736,14 @@ export const isHelixCapabilityItineraryFamilyObserved = (
     );
   }
   if (family === "docs_viewer") {
-    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      /doc_|docs_viewer/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" ")),
-    );
+    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) => {
+      const status = readString(artifactPayload(artifact)?.status);
+      const successfulDocsSearch =
+        artifactCapability(artifact) === "docs.search" &&
+        /^(?:succeeded|completed|success|ok)$/i.test(status ?? "");
+      return successfulDocsSearch ||
+        /doc_|docs_viewer/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
+    });
   }
   if (family === "calculator") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
@@ -763,13 +773,18 @@ export const isHelixCapabilityItineraryFamilyObserved = (
     );
   }
   if (family === "visual_capture" || family === "situation_run") {
-    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      /visual_frame_evidence|situation_context_pack|visual_capture_coverage/i.test([
-        artifactKind(artifact),
-        artifactSchema(artifact),
-        artifactId(artifact),
-      ].join(" ")),
-    );
+    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) => {
+      const status = readString(artifactPayload(artifact)?.status);
+      const successfulImageLensObservation =
+        artifactCapability(artifact) === "visual_analysis.inspect_image_region" &&
+        /^(?:succeeded|completed|success|ok)$/i.test(status ?? "");
+      return successfulImageLensObservation ||
+        /visual_frame_evidence|situation_context_pack|visual_capture_coverage/i.test([
+          artifactKind(artifact),
+          artifactSchema(artifact),
+          artifactId(artifact),
+        ].join(" "));
+    });
   }
   if (family === "live_source_mail") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
@@ -1168,9 +1183,32 @@ export const attachHelixCapabilityItineraryExecutionState = (
   payload: Record<string, unknown>,
   artifacts: HelixCapabilityItineraryArtifactLike[],
 ): string[] => {
+  const committedRoute = readRecord(payload.committed_ask_route);
+  const committedCapabilityPolicy = readRecord(committedRoute?.capability_policy);
+  const committedTerminalProduct = readRecord(committedRoute?.terminal_product);
+  const committedRequiredFamilies = readArray(
+    committedCapabilityPolicy?.required_capability_families,
+  ).map(readString).filter((entry): entry is string => Boolean(entry));
+  const committedRouteFallbackItinerary =
+    committedTerminalProduct?.evidence_reentry_required === true &&
+    committedRequiredFamilies.length > 0
+      ? {
+          schema: "helix.capability_itinerary.v1",
+          prompt_shape: "source_backed",
+          relevant_tool_families: committedRequiredFamilies,
+          terminal_success_criteria: {
+            required_observation_families: committedRequiredFamilies,
+            requires_post_observation_synthesis: true,
+          },
+          source: "committed_ask_route_terminal_fallback",
+          assistant_answer: false,
+          raw_content_included: false,
+        }
+      : null;
   const itinerary =
     readRecord(payload.capability_itinerary) ??
-    artifactPayloadByKind(artifacts, "capability_itinerary");
+    artifactPayloadByKind(artifacts, "capability_itinerary") ??
+    committedRouteFallbackItinerary;
   const executionState = buildHelixCapabilityItineraryExecutionState({
     capabilityItinerary: itinerary,
     artifacts,

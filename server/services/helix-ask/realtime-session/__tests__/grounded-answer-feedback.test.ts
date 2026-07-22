@@ -17,6 +17,8 @@ import {
   resetRealtimeGroundedAnswerFeedbackForTests,
 } from "../grounded-answer-feedback";
 import { readRealtimeGroundedAnswerRelay } from "../grounded-answer-relay";
+import { readRealtimeGroundedFeedbackObserverAudit } from "../grounded-answer-feedback-audit";
+import { resolveRealtimeGroundedFeedbackBinding } from "../grounded-answer-feedback-binding";
 import { buildRealtimeStagePlayDebugProvenance } from "../debug-provenance";
 import {
   admitRealtimeSession,
@@ -35,6 +37,75 @@ const terminalPayload = (answer: string) => ({
     server_authoritative: true,
     terminal_artifact_kind: "model_synthesized_answer",
     final_answer_source: "final_answer_draft",
+  },
+});
+
+const nativeCapabilityTerminalPayload = (input: {
+  answer: string;
+  turnId: string;
+  capabilityId: string;
+  observationRef: string;
+}) => ({
+  ...terminalPayload(input.answer),
+  turn_id: input.turnId,
+  selected_final_answer: input.answer,
+  terminal_answer_authority: {
+    server_authoritative: true,
+    turn_id: input.turnId,
+    terminal_artifact_kind: "agent_provider_terminal_candidate",
+    final_answer_source: "agent_provider_terminal_candidate",
+  },
+  terminal_artifact_kind: "agent_provider_terminal_candidate",
+  final_answer_source: "agent_provider_terminal_candidate",
+  terminal_presentation: {
+    schema: "helix.terminal_presentation.v1",
+    turn_id: input.turnId,
+    selected_observation_refs: [input.observationRef],
+    support_refs: [input.observationRef],
+  },
+  ask_turn_procedure_trace: {
+    schema: "helix.ask_turn_procedure_trace.v1",
+    turn_id: input.turnId,
+    evidence_reentry_status: "reentered",
+    observed_artifacts: [{
+      artifact_id: input.observationRef,
+      kind: "workstation_active_context_observation",
+      capability: input.capabilityId,
+      status: "succeeded",
+    }],
+    selected_terminal_product: {
+      kind: "agent_provider_terminal_candidate",
+      ref: `${input.turnId}:terminal`,
+      allowed_by_route: true,
+    },
+  },
+  ask_turn_solver_trace: {
+    schema: "helix.ask_turn_solver_trace.v1",
+    turn_id: input.turnId,
+    completed_solver_path: true,
+    evidence_reentry: { required: true, completed: true },
+    followup_reasoning: { required: true, completed: true },
+    evidence_reentry_gate: {
+      required: true,
+      completed: true,
+      selected_evidence_refs: [input.observationRef],
+    },
+    route_evidence_authority: {
+      current_turn_only: true,
+      admitted_tools: [{ capability_id: input.capabilityId }],
+      supporting_evidence_refs: [input.observationRef],
+    },
+    capability_result: {
+      capability_key: input.capabilityId,
+      requested_capability: input.capabilityId,
+      admitted_capability: input.capabilityId,
+      executed_capability: input.capabilityId,
+      status: "succeeded",
+      reentered_solver: true,
+      selected_for_answer: true,
+      observation_refs: [input.observationRef],
+      evidence_refs: [input.observationRef],
+    },
   },
 });
 
@@ -169,6 +240,45 @@ describe("Realtime grounded answer feedback", () => {
     expect(feedback?.evidence_refs).toContain(activeContextRef);
   });
 
+  it("accepts current-turn canonical solver evidence and rejects an unrelated capability artifact", () => {
+    const handoff = createDeicticHandoff("native-solver-proof");
+    const turnId = "ask:native-grounded:1";
+    const unrelatedRef = `${turnId}:observation:docs`;
+    expect(recordRealtimeGroundedAnswerFromPayload({
+      handoffId: handoff.handoff_id,
+      payload: nativeCapabilityTerminalPayload({
+        answer: "The active panel is Account & Sessions.",
+        turnId,
+        capabilityId: "docs.read",
+        observationRef: unrelatedRef,
+      }),
+    })).toBeNull();
+    expect(readRealtimeGroundedFeedbackObserverAudit(handoff.handoff_id)).toMatchObject({
+      grounding_evidence_status: "rejected",
+      feedback_status: "suppressed",
+      failure_code: "required_grounding_evidence_missing",
+    });
+
+    const activeContextRef = `${turnId}:workstation_gateway:workstation.active_context:1`;
+    const feedback = recordRealtimeGroundedAnswerFromPayload({
+      handoffId: handoff.handoff_id,
+      payload: nativeCapabilityTerminalPayload({
+        answer: "The active panel is Account & Sessions.",
+        turnId,
+        capabilityId: "workstation.active_context",
+        observationRef: activeContextRef,
+      }),
+    });
+    expect(feedback?.evidence_refs).toContain(activeContextRef);
+    expect(readRealtimeGroundedFeedbackObserverAudit(handoff.handoff_id)).toMatchObject({
+      terminal_authority_status: "validated",
+      grounding_evidence_status: "validated",
+      grounding_proof_source: "canonical_solver_trace",
+      feedback_status: "recorded",
+      failure_code: null,
+    });
+  });
+
   it("suppresses typed failures and exports the complete authority-safe relay chain", () => {
     const nowMs = Date.now();
     const session = admitRealtimeSession({
@@ -242,10 +352,20 @@ describe("Realtime grounded answer feedback", () => {
     const groundedDebug = debug.handoffs.find((entry) =>
       entry.handoff_id === groundedHandoff.handoff_id);
     expect(groundedDebug).toMatchObject({
+      transcript_text_hash: groundedHandoff.transcript_text_hash,
+      transcript_text_char_count: groundedHandoff.transcript_text_char_count,
       worker_admission: {
         decision_phase: "transcript_handoff",
         worker_turn_dispatched: false,
         workstation_action_execution_allowed: false,
+      },
+      feedback_observer_audit: {
+        turn_final_status: "captured",
+        terminal_authority_status: "validated",
+        grounding_evidence_status: "validated",
+        grounding_proof_source: "gateway_call_results",
+        feedback_status: "recorded",
+        raw_content_included: false,
       },
       grounded_answer: {
         completed_solver_path: true,
@@ -266,40 +386,151 @@ describe("Realtime grounded answer feedback", () => {
     });
     expect(debug.latest_grounded_relay?.handoff_id).toBe(groundedHandoff.handoff_id);
     expect(debug.authority).toMatchObject({
+      grounded_feedback_requires_issued_handoff_binding: true,
+      grounded_feedback_requires_current_turn_capability_evidence: true,
       spoken_relay_requires_server_authoritative_grounded_answer: true,
       realtime_relay_answer_authority: false,
     });
     expect(JSON.stringify(debug)).not.toContain(answerText);
   });
 
-  it("observes JSON and streaming turn-final responses without changing their payload", async () => {
+  it("observes JSON and streaming finals across the production-style router boundary", async () => {
     const jsonHandoff = createHandoff("json");
     const streamHandoff = createHandoff("stream");
+    const largeFinalHandoff = createHandoff("large-stream-final");
     const app = express();
+    const observerRouter = express.Router();
+    const askRouter = express.Router();
     app.use(express.json());
-    app.use(createRealtimeGroundedAnswerFeedbackMiddleware());
-    app.post("/ask/turn", (_req, res) => res.json(terminalPayload("JSON grounded answer.")));
-    app.post("/ask/turn/stream", (_req, res) => {
+    observerRouter.use(createRealtimeGroundedAnswerFeedbackMiddleware());
+    askRouter.post("/ask/turn", (_req, res) => res.json(terminalPayload("JSON grounded answer.")));
+    askRouter.post("/ask/turn/stream", (req, res) => {
       res.type("text/event-stream");
       res.write("event: turn_started\ndata: {\"ok\":true}\n\n");
-      res.write(`event: turn_delta\ndata: ${"x".repeat(1_300_000)}\n\n`);
-      res.end(`event: turn_final\ndata: ${JSON.stringify(terminalPayload("Stream grounded answer."))}\n\n`);
+      const largeFinal = req.body?.turnId === "ask:large-stream-final";
+      if (!largeFinal) {
+        res.write(`event: turn_delta\ndata: ${"x".repeat(1_300_000)}\n\n`);
+      }
+      const payload = largeFinal
+        ? {
+            ...terminalPayload("Large stream grounded answer."),
+            debug_padding: "x".repeat(1_350_000),
+          }
+        : terminalPayload("Stream grounded answer.");
+      res.end(`event: turn_final\ndata: ${JSON.stringify(payload)}\n\n`);
     });
+    app.use("/api/agi", observerRouter);
+    app.use("/api/agi", askRouter);
 
-    const jsonResponse = await request(app).post("/ask/turn").send({
+    const jsonResponse = await request(app).post("/api/agi/ask/turn").send({
       turnId: "ask:json",
       routeMetadata: jsonHandoff.route_metadata,
+      realtime_grounded_feedback_binding:
+        jsonHandoff.route_metadata.realtime_grounded_feedback_binding,
     }).expect(200);
     expect(jsonResponse.body.content).toBe("JSON grounded answer.");
     expect(readRealtimeGroundedAnswer(jsonHandoff.handoff_id)?.answer_text_char_count)
       .toBe("JSON grounded answer.".length);
 
-    const streamResponse = await request(app).post("/ask/turn/stream").send({
+    const streamResponse = await request(app).post("/api/agi/ask/turn/stream").send({
       turnId: "ask:stream",
       routeMetadata: streamHandoff.route_metadata,
+      realtime_grounded_feedback_binding:
+        streamHandoff.route_metadata.realtime_grounded_feedback_binding,
     }).expect(200);
     expect(streamResponse.text).toContain("event: turn_final");
     expect(streamResponse.text).toContain("Stream grounded answer.");
     expect(readRealtimeGroundedAnswer(streamHandoff.handoff_id)?.ask_turn_id).toBe("ask:stream");
+    expect(readRealtimeGroundedFeedbackObserverAudit(streamHandoff.handoff_id)).toMatchObject({
+      binding_status: "validated",
+      binding_source: "explicit_binding",
+      turn_final_status: "captured",
+      feedback_status: "recorded",
+    });
+
+    const largeStreamResponse = await request(app).post("/api/agi/ask/turn/stream").send({
+      turnId: "ask:large-stream-final",
+      routeMetadata: largeFinalHandoff.route_metadata,
+      realtime_grounded_feedback_binding:
+        largeFinalHandoff.route_metadata.realtime_grounded_feedback_binding,
+    }).expect(200);
+    expect(largeStreamResponse.text).toContain("Large stream grounded answer.");
+    expect(readRealtimeGroundedAnswer(largeFinalHandoff.handoff_id)?.ask_turn_id)
+      .toBe("ask:large-stream-final");
+    expect(readRealtimeGroundedFeedbackObserverAudit(largeFinalHandoff.handoff_id)).toMatchObject({
+      turn_final_status: "captured",
+      terminal_authority_status: "validated",
+      feedback_status: "recorded",
+      failure_code: null,
+    });
+  });
+
+  it("fails closed for forged and stale bindings while retaining legacy route compatibility", async () => {
+    const handoff = createHandoff("binding-validation");
+    const binding = handoff.route_metadata.realtime_grounded_feedback_binding as Record<string, unknown>;
+    const app = express();
+    app.use(express.json());
+    app.use(createRealtimeGroundedAnswerFeedbackMiddleware());
+    app.post("/ask/turn", (_req, res) => res.json(terminalPayload("Unchanged response.")));
+
+    await request(app).post("/ask/turn").send({
+      turnId: "ask:forged",
+      routeMetadata: handoff.route_metadata,
+      realtime_grounded_feedback_binding: {
+        ...binding,
+        realtime_session_id: "realtime:forged",
+      },
+    }).expect(200);
+    expect(readRealtimeGroundedAnswer(handoff.handoff_id)).toBeNull();
+    expect(readRealtimeGroundedFeedbackObserverAudit(handoff.handoff_id)).toMatchObject({
+      binding_status: "rejected",
+      failure_code: "realtime_feedback_binding_handoff_mismatch",
+    });
+
+    await request(app).post("/ask/turn").send({
+      turnId: "ask:valid-after-forged",
+      routeMetadata: handoff.route_metadata,
+      realtime_grounded_feedback_binding: binding,
+    }).expect(200);
+    expect(readRealtimeGroundedAnswer(handoff.handoff_id)).not.toBeNull();
+    expect(readRealtimeGroundedFeedbackObserverAudit(handoff.handoff_id)).toMatchObject({
+      binding_status: "validated",
+      feedback_status: "recorded",
+      failure_code: null,
+    });
+
+    await request(app).post("/ask/turn").send({
+      turnId: "ask:forged-after-valid",
+      routeMetadata: handoff.route_metadata,
+      realtime_grounded_feedback_binding: {
+        ...binding,
+        realtime_session_id: "realtime:forged",
+      },
+    }).expect(200);
+    expect(readRealtimeGroundedFeedbackObserverAudit(handoff.handoff_id)).toMatchObject({
+      binding_status: "validated",
+      feedback_status: "recorded",
+      failure_code: null,
+    });
+
+    const legacyRouteMetadata = { ...handoff.route_metadata };
+    delete legacyRouteMetadata.realtime_grounded_feedback_binding;
+    expect(resolveRealtimeGroundedFeedbackBinding({
+      route_metadata: legacyRouteMetadata,
+    })).toMatchObject({
+      handoff: { handoff_id: handoff.handoff_id },
+      bindingSource: "legacy_route_metadata",
+      failureCode: null,
+    });
+
+    resetRealtimeStagePlayAskHandoffsForTests();
+    expect(resolveRealtimeGroundedFeedbackBinding({
+      route_metadata: handoff.route_metadata,
+      realtime_grounded_feedback_binding: binding,
+    })).toMatchObject({
+      handoff: null,
+      candidateHandoffId: handoff.handoff_id,
+      failureCode: "realtime_feedback_handoff_unknown",
+    });
   });
 });

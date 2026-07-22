@@ -67,6 +67,39 @@ const buildPayload = (input: {
 };
 
 describe("agent provider response projection", () => {
+  it("redacts inline image bytes from the public response and debug mirrors", () => {
+    const provider = buildProvider("codex");
+    const inlineImage = `data:image/png;base64,${"a".repeat(40_000)}`;
+    const payload = buildPayload({
+      provider,
+      route: "/ask/turn",
+      turnId: "turn-public-image-redaction",
+      providerResult: {
+        ok: true,
+        runtime: "codex",
+        response_type: "final_answer",
+        final_status: "completed",
+        debug: {
+          capability_lane_observation_packets: [{
+            state_delta: { crop_image_ref: inlineImage },
+          }],
+          runtime_lane_request_loop: `candidate=${inlineImage}`,
+        },
+      },
+    });
+    const serialized = JSON.stringify(payload);
+    const sizeControl = payload.provider_response_size_control as Record<string, unknown>;
+
+    expect(serialized).not.toContain("data:image");
+    expect(serialized).not.toContain("a".repeat(1_000));
+    expect(serialized).toContain("helix-inline-image-ref:redacted");
+    expect(sizeControl).toMatchObject({
+      inline_image_references_redacted: 2,
+      unique_inline_images_redacted: 1,
+      raw_inline_images_included: false,
+    });
+  });
+
   it("projects bounded conversational referent diagnostics to payload and debug", () => {
     const provider = buildProvider("codex");
     const providerResult: HelixAgentRunResult = {

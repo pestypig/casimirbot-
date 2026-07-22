@@ -6,6 +6,7 @@ import {
   type HelixSolverArtifactReentryFailureCode,
 } from "@shared/helix-solver-artifact-reentry-audit";
 import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
+import { readVerifiedHelixRuntimeLifecycleFromPayload } from "./runtime/turn-lifecycle";
 
 type RecordLike = Record<string, unknown>;
 
@@ -161,7 +162,7 @@ const collectRejectedRefs = (payload: RecordLike): Set<string> => {
   return refs;
 };
 
-const collectReenteredRefs = (payload: RecordLike): Set<string> => {
+const collectCompatibilityReenteredRefs = (payload: RecordLike): Set<string> => {
   const refs = new Set<string>();
   const add = (value: unknown): void => {
     if (typeof value === "string" && value.trim()) refs.add(value.trim());
@@ -180,6 +181,32 @@ const collectReenteredRefs = (payload: RecordLike): Set<string> => {
     add(readString(capabilityResult.capability_plan_id));
   }
   return refs;
+};
+
+const collectReenteredRefs = (input: {
+  payload: RecordLike;
+  turnId: string;
+}): {
+  refs: Set<string>;
+  authority: "runtime_event_log" | "compatibility_projection";
+  runtimeLifecycleVerified: boolean;
+} => {
+  const lifecycle = readVerifiedHelixRuntimeLifecycleFromPayload({
+    payload: input.payload,
+    turnId: input.turnId,
+  });
+  if (lifecycle) {
+    return {
+      refs: new Set(lifecycle.reduction.observation_reentry_refs),
+      authority: "runtime_event_log",
+      runtimeLifecycleVerified: true,
+    };
+  }
+  return {
+    refs: collectCompatibilityReenteredRefs(input.payload),
+    authority: "compatibility_projection",
+    runtimeLifecycleVerified: false,
+  };
 };
 
 const artifactRefsOverlap = (artifact: {
@@ -253,7 +280,8 @@ export const buildSolverArtifactReentryAudit = (input: {
   const terminalSelectedRefs = collectTerminalSelectedRefs(input.payload);
   const supportSelectedRefs = collectSupportSelectedRefs(input.payload);
   const rejectedRefs = collectRejectedRefs(input.payload);
-  const reenteredRefs = collectReenteredRefs(input.payload);
+  const reentry = collectReenteredRefs({ payload: input.payload, turnId: input.turnId });
+  const reenteredRefs = reentry.refs;
   const requiredTerminal = requiredTerminalKind(input.payload);
   const allowedKinds = allowedTerminalKinds(input.payload);
   const forbiddenKinds = forbiddenTerminalKinds(input.payload);
@@ -313,7 +341,7 @@ export const buildSolverArtifactReentryAudit = (input: {
         (selectedForAnswer || selectedAsSupport) && !reenteredSolver && classification !== "terminal" ? "artifact_not_reentered" : "",
         selectedForAnswer && isReceiptKind(artifact.kind) && !allowedByCanonicalGoal ? "receipt_selected_without_goal_authority" : "",
         selectedForAnswer && isProjectionKind(artifact.kind) && !evidenceSelected ? "projection_selected_without_evidence" : "",
-        classification === "capability_result" && readRecord(input.payload.capability_result)?.selected_for_answer === true && !readBoolean(readRecord(input.payload.capability_result)?.reentered_solver)
+        classification === "capability_result" && readRecord(input.payload.capability_result)?.selected_for_answer === true && !reenteredSolver
           ? "capability_result_not_reentered"
           : "",
         classification === "retrieval_plan" && retrievalPlan && !retrievalResult ? "retrieval_plan_without_result" : "",
@@ -344,6 +372,8 @@ export const buildSolverArtifactReentryAudit = (input: {
     schema: HELIX_SOLVER_ARTIFACT_REENTRY_AUDIT_SCHEMA,
     audit_id: `solver-artifact-reentry:${hashShort([input.turnId, terminalArtifactKind, terminalArtifactId, failureCodes])}`,
     turn_id: input.turnId,
+    reentry_authority: reentry.authority,
+    runtime_lifecycle_verified: reentry.runtimeLifecycleVerified,
     terminal_artifact_kind: terminalArtifactKind,
     terminal_artifact_id: terminalArtifactId || null,
     final_answer_source: finalAnswerSource,

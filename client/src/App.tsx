@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -7,31 +7,32 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import LumaBackgroundPortal from "@/components/LumaBackgroundPortal";
 import { BackgroundLuma } from "@/components/BackgroundLuma";
 import { LumaOverlayHost } from "@/components/LumaOverlayHost";
-import Home from "@/pages/home";
-import Simulation from "@/pages/simulation";
-import Documentation from "@/pages/documentation";
-import NoiseGenAlias from "@/pages/noisegen";
-import Why from "@/pages/why";
-import StartPortal from "@/pages/start";
-import StationPage from "@/pages/station";
-import NotFound from "@/pages/not-found";
-import PotatoThresholdLab from "@/pages/potato-threshold-lab";
-import LumaPage from "@/pages/luma";
-import HelixObservablesPage from "@/pages/helix-observables";
-import IngestPage from "@/pages/ingest";
-import RagAdminPage from "@/pages/rag-admin";
-import CodeAdminPage from "@/pages/code-admin";
-import DesktopPage from "@/pages/desktop";
-import SignInPage from "@/pages/sign-in";
-import AccountResetPasswordPage from "@/pages/account-reset-password";
-import StarHydrostaticPanel from "@/pages/star-hydrostatic-panel";
-import IdeologyRenderPage from "@/pages/ideology-render";
-import EssenceRenderPage from "@/pages/essence-render";
-import AgiRefineryDashboard from "@/pages/agi-refinery";
 import { useQiStream } from "@/hooks/useQiStream";
 import { LumaWhispersProvider } from "@/lib/luma-whispers";
 import { useIsMobileViewport } from "@/hooks/useIsMobileViewport";
 import RouteBootSplash from "@/components/RouteBootSplash";
+
+const Home = lazy(() => import("@/pages/home"));
+const Simulation = lazy(() => import("@/pages/simulation"));
+const Documentation = lazy(() => import("@/pages/documentation"));
+const NoiseGenAlias = lazy(() => import("@/pages/noisegen"));
+const Why = lazy(() => import("@/pages/why"));
+const StartPortal = lazy(() => import("@/pages/start"));
+const StationPage = lazy(() => import("@/pages/station"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const PotatoThresholdLab = lazy(() => import("@/pages/potato-threshold-lab"));
+const LumaPage = lazy(() => import("@/pages/luma"));
+const HelixObservablesPage = lazy(() => import("@/pages/helix-observables"));
+const IngestPage = lazy(() => import("@/pages/ingest"));
+const RagAdminPage = lazy(() => import("@/pages/rag-admin"));
+const CodeAdminPage = lazy(() => import("@/pages/code-admin"));
+const DesktopPage = lazy(() => import("@/pages/desktop"));
+const SignInPage = lazy(() => import("@/pages/sign-in"));
+const AccountResetPasswordPage = lazy(() => import("@/pages/account-reset-password"));
+const StarHydrostaticPanel = lazy(() => import("@/pages/star-hydrostatic-panel"));
+const IdeologyRenderPage = lazy(() => import("@/pages/ideology-render"));
+const EssenceRenderPage = lazy(() => import("@/pages/essence-render"));
+const AgiRefineryDashboard = lazy(() => import("@/pages/agi-refinery"));
 
 const hasDesktopOverride = () => {
   if (typeof window === "undefined") return false;
@@ -155,38 +156,47 @@ function MobileRoute() {
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={DesktopRedirect} />
-      <Route path="/start" component={StartRoute} />
-      <Route path="/mobile" component={MobileRoute} />
-      <Route path="/bridge" component={Home} />
-      <Route path="/simulation" component={Simulation} />
-      <Route path="/documentation" component={Documentation} />
-      <Route path="/helix-core" component={HelixCoreRoute} />
-      <Route path="/helix-observables" component={HelixObservablesPage} />
-      <Route path="/helix/noise-gens" component={NoiseGenAlias} />
-      <Route path="/helix-noise-gens" component={NoiseGenAlias} />
-      <Route path="/noisegen" component={NoiseGenAlias} />
-      <Route path="/potato-threshold-lab" component={PotatoThresholdLab} />
-      <Route path="/luma" component={LumaPage} />
-      <Route path="/rag/ingest" component={IngestPage} />
-      <Route path="/rag/admin" component={RagAdminPage} />
-      <Route path="/code-admin" component={CodeAdminPage} />
-      <Route path="/desktop" component={DesktopRoute} />
-      <Route path="/sign-in" component={SignInPage} />
-      <Route path="/account/reset-password" component={AccountResetPasswordPage} />
-      <Route path="/ideology-render" component={IdeologyRenderPage} />
-      <Route path="/essence-render" component={EssenceRenderPage} />
-      <Route path="/agi-refinery" component={AgiRefineryDashboard} />
-      <Route path="/why" component={Why} />
-      <Route path="/star-hydrostatic" component={StarHydrostaticPanel} />
-      <Route path="/station/:role" component={StationPage} />
-      <Route path="/optimist-station" component={StationPage} />
-      <Route path="/engineer-station" component={StationPage} />
-      <Route path="/diplomat-station" component={StationPage} />
-      <Route path="/strategist-station" component={StationPage} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense
+      fallback={
+        <RouteBootSplash
+          message="Loading Helix..."
+          detail="Preparing the requested workspace"
+        />
+      }
+    >
+      <Switch>
+        <Route path="/" component={DesktopRedirect} />
+        <Route path="/start" component={StartRoute} />
+        <Route path="/mobile" component={MobileRoute} />
+        <Route path="/bridge" component={Home} />
+        <Route path="/simulation" component={Simulation} />
+        <Route path="/documentation" component={Documentation} />
+        <Route path="/helix-core" component={HelixCoreRoute} />
+        <Route path="/helix-observables" component={HelixObservablesPage} />
+        <Route path="/helix/noise-gens" component={NoiseGenAlias} />
+        <Route path="/helix-noise-gens" component={NoiseGenAlias} />
+        <Route path="/noisegen" component={NoiseGenAlias} />
+        <Route path="/potato-threshold-lab" component={PotatoThresholdLab} />
+        <Route path="/luma" component={LumaPage} />
+        <Route path="/rag/ingest" component={IngestPage} />
+        <Route path="/rag/admin" component={RagAdminPage} />
+        <Route path="/code-admin" component={CodeAdminPage} />
+        <Route path="/desktop" component={DesktopRoute} />
+        <Route path="/sign-in" component={SignInPage} />
+        <Route path="/account/reset-password" component={AccountResetPasswordPage} />
+        <Route path="/ideology-render" component={IdeologyRenderPage} />
+        <Route path="/essence-render" component={EssenceRenderPage} />
+        <Route path="/agi-refinery" component={AgiRefineryDashboard} />
+        <Route path="/why" component={Why} />
+        <Route path="/star-hydrostatic" component={StarHydrostaticPanel} />
+        <Route path="/station/:role" component={StationPage} />
+        <Route path="/optimist-station" component={StationPage} />
+        <Route path="/engineer-station" component={StationPage} />
+        <Route path="/diplomat-station" component={StationPage} />
+        <Route path="/strategist-station" component={StationPage} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 

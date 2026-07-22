@@ -217,6 +217,154 @@ const buildScholarlyNumericObservationResult = () => ({
   error: "missing_requested_numeric_variables",
 });
 
+const buildRuntimeSelectedScholarlyFullTextResult = () => ({
+  schema: "helix.workstation_tool_gateway.call_result.v1",
+  manifest_version: "test",
+  ok: true,
+  agent_runtime: "codex",
+  capability_id: "scholarly-research.fetch_full_text",
+  mode: "read",
+  gateway_admission: {
+    schema: "helix.workstation_tool_gateway.admission.v1",
+    requested_capability: "scholarly-research.fetch_full_text",
+    selected_agent_provider: "codex",
+    permission_profile: "read",
+    admission_status: "admitted",
+    admission_reason: "scholarly_full_text_requested",
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  observation_packet: {
+    schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
+    turn_id: "turn-scholar-authority",
+    iteration: 0,
+    call_id: "turn-scholar-authority:gateway:fetch_full_text",
+    decision_id: "turn-scholar-authority:decision:fetch_full_text",
+    capability_key: "scholarly-research.fetch_full_text",
+    panel_id: "scholarly-research",
+    action: "fetch_full_text",
+    status: "succeeded",
+    observation_ref: "ask:scholarly:full-text:selected",
+    produced_artifact_refs: ["ask:scholarly:full-text:selected"],
+    observation_summary: "Page-grounded full text is available.",
+    receipts: [],
+    missing_requirements: [],
+    state_delta: { evidence_state: "full_text_usable", selected_for_answer: false },
+    suggested_next_steps: ["continue_reasoning"],
+    produced_affordances: [],
+    consumed_affordances: [],
+    typed_handoff_contract: {
+      schema: "helix.workstation_typed_handoff_contract.v1",
+      producer_capability: "scholarly-research.fetch_full_text",
+      consumer_capability: null,
+      required_affordance_kinds: [],
+      produced_affordance_kinds: ["text_evidence", "citation_evidence"],
+      missing_affordance_kinds: [],
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  tool_lifecycle_trace: {},
+  tool_followup_decision: {},
+  observation: {
+    schema: "helix.scholarly_full_text_observation.v1",
+    artifact_id: "ask:scholarly:full-text:selected",
+    evidence_state: "full_text_usable",
+    selected_chunks: [{ page_number: 3, text: "The measured value was 4.0 mJy." }],
+    selected_for_answer: false,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  artifact_refs: ["ask:scholarly:full-text:selected"],
+  terminal_eligible: false,
+  post_tool_model_step_required: true,
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
+const buildRuntimeSelectedScholarlyLookupResult = () => ({
+  schema: "helix.workstation_tool_gateway.call_result.v1",
+  manifest_version: "test",
+  ok: false,
+  agent_runtime: "codex",
+  capability_id: "scholarly-research.lookup_papers",
+  mode: "read",
+  gateway_admission: {
+    schema: "helix.workstation_tool_gateway.admission.v1",
+    requested_capability: "scholarly-research.lookup_papers",
+    selected_agent_provider: "codex",
+    permission_profile: "read",
+    admission_status: "admitted",
+    admission_reason: "scholarly_lookup_requested",
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  observation_packet: {
+    schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
+    turn_id: "turn-scholar-lookup-authority",
+    iteration: 0,
+    call_id: "turn-scholar-lookup-authority:gateway:lookup_papers",
+    decision_id: "turn-scholar-lookup-authority:decision:lookup_papers",
+    capability_key: "scholarly-research.lookup_papers",
+    panel_id: "scholarly-research",
+    action: "lookup_papers",
+    status: "failed",
+    observation_ref: "ask:scholarly:lookup:partial",
+    produced_artifact_refs: ["ask:scholarly:lookup:partial"],
+    observation_summary: "Multiple providers returned paper candidates; one provider was rate limited.",
+    receipts: [],
+    missing_requirements: ["semantic_scholar_http_429", "lookup_weak_match"],
+    state_delta: { evidence_state: "lookup_weak_match", selected_for_answer: false },
+    suggested_next_steps: ["retry", "continue_reasoning"],
+    produced_affordances: [],
+    consumed_affordances: [],
+    typed_handoff_contract: {
+      schema: "helix.workstation_typed_handoff_contract.v1",
+      producer_capability: "scholarly-research.lookup_papers",
+      consumer_capability: null,
+      required_affordance_kinds: [],
+      produced_affordance_kinds: ["scholarly_paper_identity"],
+      missing_affordance_kinds: [],
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  tool_lifecycle_trace: {},
+  tool_followup_decision: {},
+  observation: {
+    schema: "helix.scholarly_research_observation.v1",
+    artifact_id: "ask:scholarly:lookup:partial",
+    evidence_state: "lookup_weak_match",
+    papers: [{
+      result_id: "arxiv:magnetar-review",
+      title: "Magnetars: neutron stars with huge magnetic storms",
+      evidence_refs: ["arxiv:1211.2086v1"],
+      identifiers: { arxiv_id: "1211.2086v1" },
+    }],
+    selected_for_answer: false,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  artifact_refs: ["ask:scholarly:lookup:partial"],
+  terminal_eligible: false,
+  post_tool_model_step_required: true,
+  assistant_answer: false,
+  raw_content_included: false,
+  error: "semantic_scholar_http_429",
+});
+
 const buildScholarlyFullTextRecoveryResult = () => ({
   schema: "helix.workstation_tool_gateway.call_result.v1",
   manifest_version: "test",
@@ -447,6 +595,58 @@ describe("provider terminal authority for capability lanes", () => {
     });
   });
 
+  it("authorizes an exact runtime-selected paper from a partially failed scholarly lookup", () => {
+    const gatewayResult = buildRuntimeSelectedScholarlyLookupResult();
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-scholar-lookup-authority",
+      threadId: "thread-scholar-lookup-authority",
+      route: "/ask/turn",
+      gatewayCallResults: [gatewayResult as never],
+      normalizedObservationPackets: [gatewayResult.observation_packet as never],
+      providerText: "The observed search found a relevant review by Nanda Rea (2012).",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+      selectedScholarlyResultIds: ["arxiv:magnetar-review"],
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "completed",
+      evidence_reentered: true,
+      runtime_selected_scholarly_result_ids: ["arxiv:magnetar-review"],
+      runtime_selected_usable_lookup_evidence: true,
+    });
+    expect(result.providerTerminalAuthorityBridge).toMatchObject({
+      all_gateway_calls_succeeded: true,
+      all_observations_succeeded: true,
+      normalized_observations_ready: true,
+      terminal_authority_granted: true,
+      final_visible_answer_authorized: true,
+    });
+    expect(result.terminalAnswerAuthority).not.toBeNull();
+
+    const unknownSelection = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-scholar-lookup-authority",
+      threadId: "thread-scholar-lookup-authority",
+      route: "/ask/turn",
+      gatewayCallResults: [gatewayResult as never],
+      normalizedObservationPackets: [gatewayResult.observation_packet as never],
+      providerText: "An unobserved paper was selected.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+      selectedScholarlyResultIds: ["arxiv:unknown"],
+    });
+    expect(unknownSelection.providerTerminalAuthorityBridge).toMatchObject({
+      all_gateway_calls_succeeded: false,
+      terminal_authority_granted: false,
+    });
+  });
+
   it("blocks no-observation provider text when no model-only direct answer contract permits it", () => {
     const result = buildHelixProviderReasoningReentry({
       runtime: "codex",
@@ -464,11 +664,11 @@ describe("provider terminal authority for capability lanes", () => {
     });
 
     expect(result.providerReasoningReentry).toMatchObject({
-      status: "pending_helix_solver_reentry",
+      status: "completed_not_terminal",
       evidence_reentry_required: false,
       evidence_reentered: false,
       model_only_direct_answer_allowed: false,
-      post_tool_model_step_required: true,
+      post_tool_model_step_required: false,
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
       terminal_authority_status: "blocked_by_missing_normalized_observations",
@@ -614,9 +814,9 @@ describe("provider terminal authority for capability lanes", () => {
     });
 
     expect(result.providerReasoningReentry).toMatchObject({
-      status: "pending_helix_solver_reentry",
-      evidence_reentered: false,
-      post_tool_model_step_required: true,
+      status: "completed_not_terminal",
+      evidence_reentered: true,
+      post_tool_model_step_required: false,
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
       terminal_authority_status: "blocked_by_voice_playback_overclaim",
@@ -649,9 +849,9 @@ describe("provider terminal authority for capability lanes", () => {
       assistant_answer: false,
     });
     expect(result.providerReasoningReentry).toMatchObject({
-      status: "pending_helix_solver_reentry",
+      status: "completed_not_terminal",
       evidence_reentered: false,
-      post_tool_model_step_required: true,
+      post_tool_model_step_required: false,
       terminal_eligible: false,
       assistant_answer: false,
     });
@@ -674,6 +874,70 @@ describe("provider terminal authority for capability lanes", () => {
     expect(result.terminalAnswerAuthority).toBeNull();
   });
 
+  it("allows a narrative answer when selected full text supersedes an optional numeric helper failure", () => {
+    const fullTextResult = buildRuntimeSelectedScholarlyFullTextResult();
+    const numericResult = buildScholarlyNumericObservationResult();
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-scholar-authority",
+      threadId: "thread-scholar-authority",
+      route: "/ask/turn",
+      gatewayCallResults: [fullTextResult as never, numericResult as never],
+      normalizedObservationPackets: [
+        fullTextResult.observation_packet as never,
+        numericResult.observation_packet as never,
+      ],
+      providerText: "The PDF reports a measured flux density of 4.0 mJy on page 3.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+      selectedScholarlyResultIds: ["ask:scholarly:full-text:selected"],
+      structuredNumericEvidenceRequired: false,
+    });
+
+    expect(result.providerTerminalAuthorityBridge).toMatchObject({
+      all_gateway_calls_succeeded: true,
+      normalized_observations_ready: true,
+      terminal_authority_granted: true,
+    });
+    expect(result.providerReasoningReentry).toMatchObject({
+      runtime_selected_usable_full_text_evidence: true,
+      evidence_reentered: true,
+      status: "completed",
+    });
+    expect(result.terminalAnswerAuthority).not.toBeNull();
+  });
+
+  it("still blocks when the user requires structured numeric evidence", () => {
+    const fullTextResult = buildRuntimeSelectedScholarlyFullTextResult();
+    const numericResult = buildScholarlyNumericObservationResult();
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-scholar-authority",
+      threadId: "thread-scholar-authority",
+      route: "/ask/turn",
+      gatewayCallResults: [fullTextResult as never, numericResult as never],
+      normalizedObservationPackets: [
+        fullTextResult.observation_packet as never,
+        numericResult.observation_packet as never,
+      ],
+      providerText: "The structured variables are complete.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+      selectedScholarlyResultIds: ["ask:scholarly:full-text:selected"],
+      structuredNumericEvidenceRequired: true,
+    });
+
+    expect(result.providerTerminalAuthorityBridge).toMatchObject({
+      all_gateway_calls_succeeded: false,
+      terminal_authority_granted: false,
+    });
+    expect(result.terminalAnswerAuthority).toBeNull();
+  });
+
   it("blocks Codex terminal candidates after scholarly full-text recovery observations", () => {
     const gatewayResult = buildScholarlyFullTextRecoveryResult();
     const result = buildHelixProviderReasoningReentry({
@@ -691,9 +955,9 @@ describe("provider terminal authority for capability lanes", () => {
     });
 
     expect(result.providerReasoningReentry).toMatchObject({
-      status: "pending_helix_solver_reentry",
+      status: "completed_not_terminal",
       evidence_reentered: false,
-      post_tool_model_step_required: true,
+      post_tool_model_step_required: false,
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
       terminal_authority_granted: false,

@@ -17,10 +17,13 @@ export type HelixEvidenceReentryGate = {
   turn_id: string;
   required: boolean;
   completed: boolean;
+  reentry_authority: "runtime_event_log" | "compatibility_projection";
+  runtime_lifecycle_verified: boolean;
   selected_evidence_refs: string[];
   rejected_evidence_refs: Array<{ ref: string; reason: string }>;
   receipts_reentered: string[];
   receipts_not_reentered: string[];
+  self_terminal_receipt_refs: string[];
   projections_reentered: string[];
   projections_not_reentered: string[];
   violation_codes: HelixEvidenceReentryViolationCode[];
@@ -834,6 +837,9 @@ export function buildEvidenceReentryGate(input: {
   terminalArtifactKind: string;
   finalAnswerSource: string;
   finalArbitrationRan: boolean;
+  runtimeLifecycleVerified?: boolean;
+  runtimeObservationReentryRefs?: string[];
+  postEvidenceReasoningCompleted?: boolean;
   sourceEvidenceRequired?: boolean;
   allowedTerminalProducts?: string[];
   toolUseRestatement?: ToolUseRestatementV1 | RecordLike | null;
@@ -914,6 +920,11 @@ export function buildEvidenceReentryGate(input: {
   const evidenceRefSet = new Set([...selectedEvidenceRefs, ...rejectedEvidenceRefs.map((entry) => entry.ref)]);
   const actualToolCalls = collectActualToolCalls(loopTrace);
   const observationRefs = collectObservationRefs(loopTrace);
+  const runtimeObservationReentryRefs = unique(input.runtimeObservationReentryRefs ?? []);
+  const runtimeObservationReentryRefSet = new Set(runtimeObservationReentryRefs);
+  const runtimeLifecycleVerified = input.runtimeLifecycleVerified === true;
+  const postEvidenceReasoningCompleted =
+    input.postEvidenceReasoningCompleted ?? input.finalArbitrationRan;
   const receiptRefs = collectReceiptRefs({
     payload: input.payload,
     loopTrace,
@@ -932,22 +943,26 @@ export function buildEvidenceReentryGate(input: {
     (input.allowedTerminalProducts ?? []).includes(input.terminalArtifactKind) &&
     selectedEvidenceRefs.length > 0;
   const receiptsReentered = receiptRefs.filter((ref) =>
-    evidenceRefSet.has(ref) ||
-    (allowedReceiptTerminal &&
-      (ref === input.terminalArtifactKind || ref === input.finalAnswerSource || isReceiptKind(ref)))
+    runtimeObservationReentryRefSet.has(ref) ||
+    (!runtimeLifecycleVerified && evidenceRefSet.has(ref))
   );
   const receiptsNotReentered = receiptRefs.filter((ref) => !receiptsReentered.includes(ref));
+  const selfTerminalReceiptRefs = allowedReceiptTerminal ? receiptRefs : [];
   const projectionRefs = unique([
     isProjectionKind(input.terminalArtifactKind) ? input.terminalArtifactKind : "",
     isProjectionKind(input.finalAnswerSource) ? input.finalAnswerSource : "",
   ].filter(Boolean));
-  const projectionsReentered = projectionRefs.filter((ref) => evidenceRefSet.has(ref) || rejectedRefSet.has(ref));
+  const projectionsReentered = projectionRefs.filter((ref) =>
+    runtimeObservationReentryRefSet.has(ref) ||
+    (!runtimeLifecycleVerified && (evidenceRefSet.has(ref) || rejectedRefSet.has(ref)))
+  );
   const projectionsNotReentered = projectionRefs.filter((ref) => !projectionsReentered.includes(ref));
   const hasTerminalReceipt = isReceiptKind(input.terminalArtifactKind) || isReceiptKind(input.finalAnswerSource);
   const hasTerminalProjection = isProjectionKind(input.terminalArtifactKind) || isProjectionKind(input.finalAnswerSource);
   const required =
     actualToolCalls.length > 0 ||
     observationRefs.length > 0 ||
+    runtimeObservationReentryRefs.length > 0 ||
     selectedEvidenceRefs.length > 0 ||
     input.sourceEvidenceRequired === true ||
     rejectedEvidenceRefs.length > 0 ||
@@ -956,13 +971,13 @@ export function buildEvidenceReentryGate(input: {
     hasTerminalReceipt ||
     hasTerminalProjection;
   const violationCodes = unique<HelixEvidenceReentryViolationCode>([
-    hasTerminalReceipt && (!allowedReceiptTerminal || receiptsNotReentered.length > 0)
+    hasTerminalReceipt && !allowedReceiptTerminal && receiptsNotReentered.length > 0
       ? "receipt_terminal_without_reentry"
       : "",
     hasTerminalProjection && projectionsNotReentered.length > 0
       ? "projection_terminal_without_reentry"
       : "",
-    actualToolCalls.length > 0 && hasTerminalReceipt && receiptsNotReentered.length > 0
+    actualToolCalls.length > 0 && hasTerminalReceipt && !allowedReceiptTerminal && receiptsNotReentered.length > 0
       ? "tool_result_terminal_without_reentry"
       : "",
     (observationRefs.length > 0 || input.sourceEvidenceRequired === true) &&
@@ -971,7 +986,7 @@ export function buildEvidenceReentryGate(input: {
       input.primaryIntent !== "status_question"
       ? "source_observation_terminal_without_selection"
       : "",
-    selectedEvidenceRefs.length > 0 && !input.finalArbitrationRan && !allowedObservationTerminal
+    selectedEvidenceRefs.length > 0 && !postEvidenceReasoningCompleted && !allowedObservationTerminal
       ? "evidence_selected_but_finalizer_missing"
       : "",
     internetSearchEvidencePlanIncomplete({
@@ -987,11 +1002,19 @@ export function buildEvidenceReentryGate(input: {
     schema: "helix.evidence_reentry_gate.v1",
     turn_id: input.turnId,
     required,
-    completed: violationCodes.length === 0 && (!required || input.finalArbitrationRan || allowedReceiptTerminal || allowedObservationTerminal),
+    completed: violationCodes.length === 0 && (
+      !required ||
+      postEvidenceReasoningCompleted ||
+      allowedReceiptTerminal ||
+      allowedObservationTerminal
+    ),
+    reentry_authority: runtimeLifecycleVerified ? "runtime_event_log" : "compatibility_projection",
+    runtime_lifecycle_verified: runtimeLifecycleVerified,
     selected_evidence_refs: selectedEvidenceRefs,
     rejected_evidence_refs: rejectedEvidenceRefs,
     receipts_reentered: receiptsReentered,
     receipts_not_reentered: receiptsNotReentered,
+    self_terminal_receipt_refs: selfTerminalReceiptRefs,
     projections_reentered: projectionsReentered,
     projections_not_reentered: projectionsNotReentered,
     violation_codes: violationCodes,

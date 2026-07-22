@@ -429,6 +429,28 @@ const readGoalDispatchReadinessTimelineStatus = (
       ? "blocked"
       : "ready";
 
+export const reconcileCapabilityLaneProviderTimelineReentry = (input: {
+  timeline: HelixCapabilityLaneProviderTimelineEvent[];
+  reenteredObservationRefs: string[];
+}): HelixCapabilityLaneProviderTimelineEvent[] => {
+  const reenteredRefs = new Set(
+    input.reenteredObservationRefs
+      .map((ref) => ref.trim())
+      .filter(Boolean),
+  );
+  return input.timeline.map((event) => {
+    if (event.stage !== "lane_reentered") return event;
+    const observationReentered = Boolean(
+      event.observation_ref && reenteredRefs.has(event.observation_ref),
+    );
+    return {
+      ...event,
+      status: observationReentered ? "completed" : "pending",
+      observation_reentered: observationReentered,
+    };
+  });
+};
+
 export const buildCapabilityLaneProviderTimeline = (input: {
   provider: HelixAgentProvider;
   manifest: HelixAgentModelVisibleCapabilityLaneManifest;
@@ -486,11 +508,11 @@ export const buildCapabilityLaneProviderTimeline = (input: {
       status: event.status,
       lane_visible: false,
       lane_requested: true,
-      lane_executed: event.stage === "lane_observation" && (
-        event.status === "completed" ||
-        event.status === "pending"
-      ),
-      observation_reentered: event.stage === "lane_reentered",
+      lane_executed:
+        event.stage === "lane_observation" &&
+        event.execution_status === "executed_observation_only",
+      observation_reentered:
+        event.stage === "lane_reentered" && event.status === "completed",
       requested_backend_provider: event.requested_backend_provider,
       requested_backend_provider_known: event.requested_backend_provider_known,
       selected_backend_provider: event.selected_backend_provider,

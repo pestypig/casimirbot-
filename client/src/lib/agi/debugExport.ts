@@ -8,6 +8,7 @@ import {
   normalizeHelixLiveTranslationSourceKind,
 } from "@shared/helix-live-translation-source-kind";
 import { normalizeScientificCalculatorReceiptV1 } from "@shared/contracts/scientific-calculator-receipt.v1";
+import { sanitizeHelixAskTurnAdmissionContinuationDebug } from "./helixAskTurnAdmissionContinuation";
 
 export type DebugExportUiResult = {
   attempted_payload_hash: string;
@@ -4060,6 +4061,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     voice_playback_receipt_barrier: voicePlaybackReceiptBarrier,
     voice_steering_debug: voiceSteeringDebug,
     narrator_debug: narratorDebug,
+    client_ask_turn_admission_continuation: sanitizeHelixAskTurnAdmissionContinuationDebug(
+      payload.client_ask_turn_admission_continuation ??
+        payload.ask_turn_admission_continuation ??
+        debug?.ask_turn_admission_continuation,
+    ),
     workflow_demo_debug:
       asRecord(payload.workflow_demo_debug) ??
       asRecord(asRecord(payload.channels)?.workflowDemo) ??

@@ -1,0 +1,591 @@
+{
+  "contractVersion": "doc_equation_action_source/v1",
+  "docPath": "docs/research/casimir-dp-quantum-foam-study.md",
+  "generatedAt": "2026-07-21T00:00:00.000Z",
+  "entries": [
+    {
+      "equationId": "cdp-casimir-energy-per-area",
+      "label": "Ideal Casimir energy per area",
+      "aliases": [
+        "E_A=-(pi^2 hbar c)/(720 a^3)"
+      ],
+      "actions": [
+        {
+          "actionId": "load-cdp-casimir-energy-reference",
+          "kind": "calculator_ingest",
+          "label": "Load ideal Casimir energy reference",
+          "calculatorPayloadRef": {
+            "badgeId": "casimir.cavity.parallel_plate_energy_density",
+            "payloadId": "casimir_energy_per_area_payload"
+          },
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.baseline",
+          "openPanels": ["scientific-calculator", "theory-badge-graph"],
+          "claimBoundaryNote": "The ideal scalar is a reference baseline, not a material, geometry, or metrology receipt."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Ideal perfect-conductor zero-temperature reference only.",
+        "It does not establish quantum foam or DP collapse."
+      ]
+    },
+    {
+      "equationId": "cdp-casimir-pressure",
+      "label": "Ideal Casimir pressure",
+      "aliases": [
+        "P_C=-(pi^2 hbar c)/(240 a^4)"
+      ],
+      "actions": [
+        {
+          "actionId": "load-cdp-casimir-pressure-reference",
+          "kind": "calculator_ingest",
+          "label": "Load ideal Casimir pressure reference",
+          "calculatorPayloadRef": {
+            "badgeId": "casimir.cavity.parallel_plate_pressure",
+            "payloadId": "casimir_pressure_payload"
+          },
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.baseline",
+          "openPanels": ["scientific-calculator", "theory-badge-graph"],
+          "claimBoundaryNote": "Pressure replay is not a unique ontology or a collapse observable."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The scalar pressure requires real-material and apparatus corrections before measurement comparison."
+      ]
+    },
+    {
+      "equationId": "cdp-casimir-force-residual",
+      "label": "Casimir force residual",
+      "aliases": [
+        "R_F=F_obs-F_standard"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-residual-evidence-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Casimir residual evidence path",
+          "badgeIds": [
+            "casimir.material.lifshitz_receipt",
+            "casimir.geometry.beyond_pfa_validity",
+            "study.casimir_dp.observable_separation_gate"
+          ],
+          "preferredBadgeId": "study.casimir_dp.observable_separation_gate",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.observable_gate",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "A force residual remains a measurement/model comparison and cannot be re-labeled as DP self-energy."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Residual authority requires metrology, response, nuisance, material, and geometry receipts."
+      ]
+    },
+    {
+      "equationId": "cdp-dp-self-energy",
+      "label": "DP gravitational self-energy difference",
+      "aliases": [
+        "Delta E_G from Delta rho"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-dp-self-energy-runtime-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open DP self-energy runtime path",
+          "badgeIds": [
+            "collapse.objective.mass_density_branch_difference",
+            "collapse.objective.dp_gravitational_self_energy",
+            "study.casimir_dp.protocol"
+          ],
+          "preferredBadgeId": "collapse.objective.dp_gravitational_self_energy",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.dp",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The field integral is runtime-owned and requires branch, grid, cutoff, and provenance evidence."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Casimir force does not supply the DP mass-density branch difference."
+      ]
+    },
+    {
+      "equationId": "cdp-dp-timescale",
+      "label": "DP collapse timescale",
+      "aliases": [
+        "tau_DP=hbar/deltaE_G_J"
+      ],
+      "actions": [
+        {
+          "actionId": "load-cdp-dp-timescale",
+          "kind": "calculator_ingest",
+          "label": "Load DP timescale",
+          "calculatorPayloadRef": {
+            "badgeId": "collapse.objective.dp_timescale",
+            "payloadId": "objective_dp_timescale_payload"
+          },
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.dp",
+          "openPanels": ["scientific-calculator", "theory-badge-graph"],
+          "claimBoundaryNote": "Scalar replay is meaningful only after a provenance-bearing DP self-energy calculation."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The DP timescale is an exploratory model diagnostic, not an observation of collapse."
+      ]
+    },
+    {
+      "equationId": "cdp-compton-dp-frequency-identities",
+      "label": "Compton and DP characteristic-frequency identities",
+      "aliases": [
+        "nu_C=mc^2/h and nu_DP=Delta E_G/h",
+        "omega_DP=Delta E_G/hbar=1/tau_DP"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-frequency-separation-gate",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Compton/DP frequency-separation gate",
+          "badgeIds": [
+            "study.casimir_dp.frequency_bridge_gate",
+            "collapse.objective.dp_timescale",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.frequency_bridge_gate",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.observable_gate",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Frequency notation preserves units but does not identify a physical oscillator, spectral line, collapse observation, or cavity coupling."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The Compton frequency uses total rest energy while the DP frequency uses branch-dependent gravitational self-energy.",
+        "The current DP rate model does not predict an oscillatory line at nu_DP or omega_DP."
+      ]
+    },
+    {
+      "equationId": "cdp-frequency-cavity-bridge-gate",
+      "label": "Compton/DP-to-cavity frequency bridge gate",
+      "aliases": [
+        "Bridge(nu_C,nu_DP,omega_cavity)=BLOCKED",
+        "K_cavity_to_branch_coherence not registered"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-frequency-cavity-bridge-gate",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open blocked frequency-to-cavity bridge",
+          "badgeIds": [
+            "study.casimir_dp.frequency_bridge_gate",
+            "study.casimir_dp.manifold_response_hypothesis",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.frequency_bridge_gate",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.observable_gate",
+          "openPanels": ["theory-badge-graph"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "A sourced, dimensionally complete, falsifiable transfer kernel is required before frequency bookkeeping can become a cavity-response prediction."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Shared frequency units do not create a dynamical coupling.",
+        "Beat-frequency, manifold-ringing, and quantum-foam-resonance language remains metaphorical while the gate is blocked."
+      ]
+    },
+    {
+      "equationId": "cdp-dp-boundary-null",
+      "label": "Baseline DP boundary-setting null",
+      "aliases": [
+        "Delta_b Gamma_DP=0 when Delta rho is fixed"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-dp-boundary-null",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open DP boundary-null path",
+          "badgeIds": [
+            "collapse.objective.mass_density_branch_difference",
+            "collapse.objective.dp_gravitational_self_energy",
+            "study.casimir_dp.manifold_response_hypothesis"
+          ],
+          "preferredBadgeId": "study.casimir_dp.manifold_response_hypothesis",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.manifold_response",
+          "openPanels": ["theory-badge-graph"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The null holds only for the repository's nonrelativistic DP model when branch inputs and regularization are fixed."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "A cavity setting is not a DP mass-density branch.",
+        "Boundary-induced motion, heating, strain, or polarization can invalidate the fixed-branch premise."
+      ]
+    },
+    {
+      "equationId": "cdp-semiclassical-curvature-baseline",
+      "label": "Simplified semiclassical curvature baseline",
+      "aliases": [
+        "G_munu+Lambda g_munu=(8 pi G/c^4)<T_munu>_ren"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-manifold-response-hypothesis",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open bounded manifold-response hypothesis",
+          "badgeIds": [
+            "study.casimir_dp.manifold_response_hypothesis",
+            "study.casimir_dp.decoherence_collapse_gate",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.manifold_response_hypothesis",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.manifold_response",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "This simplified mean-field tensor equation is a baseline, not a DP or objective-collapse equation."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "A complete renormalized treatment may require curvature counterterms.",
+        "The sign of one stress-tensor component does not uniquely fix curvature."
+      ]
+    },
+    {
+      "equationId": "cdp-boundary-stress-difference",
+      "label": "Boundary-conditioned renormalized stress difference",
+      "aliases": [
+        "Delta_b<T_munu>_ren=<T_munu>_b1-<T_munu>_b0"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-boundary-stress-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open boundary-stress evidence path",
+          "badgeIds": [
+            "casimir.material.lifshitz_receipt",
+            "study.casimir_dp.manifold_response_hypothesis",
+            "study.casimir_dp.observable_separation_gate"
+          ],
+          "preferredBadgeId": "study.casimir_dp.manifold_response_hypothesis",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.manifold_response",
+          "openPanels": ["theory-badge-graph"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Boundary-setting stress differences require a renormalized QFT/material calculation and are not DP branch differences."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Boundary labels and material-superposition branch labels must remain distinct."
+      ]
+    },
+    {
+      "equationId": "cdp-coherence-rate-residual",
+      "label": "Boundary-conditioned coherence-rate residual",
+      "aliases": [
+        "Delta Gamma_res=Delta Gamma_obs-standard decoherence budget"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-coherence-residual-gate",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open coherence residual and decoherence gate",
+          "badgeIds": [
+            "study.casimir_dp.manifold_response_hypothesis",
+            "study.casimir_dp.decoherence_collapse_gate",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.decoherence_collapse_gate",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.decoherence_gate",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "A residual coherence-decay rate is not objective collapse until standard decoherence alternatives and a dynamics-level discriminator close."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "All nuisance terms and the combined uncertainty must be pre-registered.",
+        "Visibility loss alone cannot distinguish decoherence from collapse."
+      ]
+    },
+    {
+      "equationId": "cdp-manifold-response-slot",
+      "label": "Unregistered tensor-to-coherence manifold response",
+      "aliases": [
+        "Delta Gamma_MR=F_MR[Delta_b<T>,N,Delta rho;theta_MR]"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-manifold-response-slot",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open manifold-response model slot",
+          "badgeIds": [
+            "study.casimir_dp.manifold_response_hypothesis",
+            "study.casimir_dp.observable_separation_gate",
+            "study.casimir_dp.decoherence_collapse_gate"
+          ],
+          "preferredBadgeId": "study.casimir_dp.manifold_response_hypothesis",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.manifold_response",
+          "openPanels": ["theory-badge-graph"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The functional is intentionally noncomputable until tensor-to-metric and metric-to-coherence dynamics are registered."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The model must distinguish mean stress, stress fluctuations, ordinary decoherence, and objective collapse.",
+        "It must recover standard QED/open-system and DP limits when the new coupling is zero."
+      ]
+    },
+    {
+      "equationId": "cdp-quantum-foam-response-slot",
+      "label": "Unregistered quantum-foam response slot",
+      "aliases": [
+        "R_F_foam=R_foam(theta_foam)"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-quantum-foam-hypothesis",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open bounded quantum-foam hypothesis",
+          "badgeIds": [
+            "study.casimir_dp.quantum_foam_hypothesis",
+            "study.casimir_dp.observable_separation_gate",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.quantum_foam_hypothesis",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.hypothesis",
+          "openPanels": ["theory-badge-graph"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The response function is intentionally noncomputable until a quantitative model and falsifier are registered."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Quantum foam is a candidate model family, not the accepted explanation of the Casimir effect."
+      ]
+    },
+    {
+      "equationId": "cdp-stage1-lifshitz-free-energy",
+      "label": "Stage-1 equilibrium Lifshitz free energy",
+      "aliases": [
+        "F/A=(kBT/2pi) sum Matsubara integral log reflection determinant"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage1-gated-computations",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-1 Lifshitz and inference gates",
+          "badgeIds": [
+            "study.casimir_dp.gated_computations_stage1",
+            "casimir.material.lifshitz_receipt",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.gated_computations_stage1",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.baseline",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The runtime integral is reduced-order equilibrium planar authority; material receipts and finite geometry remain open."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "PFA does not close the finite-geometry publication gate.",
+        "Gated 2D, superconducting, and nonequilibrium photoexcited boundaries require separate response operators."
+      ]
+    },
+    {
+      "equationId": "cdp-accessible-rate-ratio",
+      "label": "DP-to-environment accessible-rate ratio",
+      "aliases": [
+        "R_access=Gamma_DP/Gamma_env"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-experiment-design-campaign",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open experiment-design rate budget",
+          "badgeIds": [
+            "study.casimir_dp.experiment_design_campaign",
+            "study.casimir_dp.decoherence_collapse_gate",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.experiment_design_campaign",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.decoherence_gate",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The ratio compares a Gaussian DP proxy with assumed environmental rates; it is a design constraint, not evidence of collapse."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The numerator is not a measured manifold-response or objective-collapse rate.",
+        "The environmental budget is not yet fully receipt-backed."
+      ]
+    },
+    {
+      "equationId": "cdp-data-readiness-kramers-kronig",
+      "label": "Real-axis loss to imaginary-axis response",
+      "aliases": [
+        "epsilon(i xi)=1+(2/pi) integral omega epsilon''/(omega^2+xi^2) d omega"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-data-readiness-optical-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open measured optical-response readiness path",
+          "badgeIds": [
+            "study.casimir_dp.data_readiness_stage1",
+            "casimir.material.lifshitz_receipt",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.data_readiness_stage1",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.baseline",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The transform is numerically validated on a synthetic Lorentz fixture; a measured material requires an authenticated apparatus-specific loss table and calibration/covariance evidence."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Synthetic and literature-anchored inputs cannot close the measured-material gate.",
+        "Optical continuation does not establish objective collapse or a manifold mechanism."
+      ]
+    },
+    {
+      "equationId": "cdp-data-readiness-correlation-power",
+      "label": "Secondary-channel Fisher-z power",
+      "aliases": [
+        "N_pair=ceil(3+((z_alpha+z_power)/(atanh rho1-atanh rho0))^2)"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-data-readiness-discriminator-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open blinded secondary-observable power path",
+          "badgeIds": [
+            "study.casimir_dp.data_readiness_stage1",
+            "study.casimir_dp.decoherence_collapse_gate",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.data_readiness_stage1",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.decoherence_gate",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "This sizes switching-correlation and contamination checks; it does not identify objective collapse."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Independent approximately bivariate-normal paired windows are assumed.",
+        "A source-backed DP/Penrose secondary-observable signature remains missing."
+      ]
+    },
+    {
+      "equationId": "cdp-proposal-phase-force-bound",
+      "label": "Proposal phase-to-differential-force stability bound",
+      "aliases": [
+        "delta F max=hbar delta phi max/(Delta x t)"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-proposal-closure-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open proposal architecture and commissioning gates",
+          "badgeIds": [
+            "study.casimir_dp.proposal_closure",
+            "study.casimir_dp.data_readiness_stage1",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.proposal_closure",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.decoherence_gate",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The force-equivalent phase requirement is a commissioning bound, not a detected force or collapse signature."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Charge, patch, alignment, vibration, and optical phase noise must be measured rather than assumed absent.",
+        "Passing the proposal calculation does not close hardware or mechanism gates."
+      ]
+    },
+    {
+      "equationId": "cdp-observable-separation-gate",
+      "label": "Casimir-to-DP observable separation gate",
+      "aliases": [
+        "Bridge(R_F,DeltaE_G)=BLOCKED"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-full-study-protocol",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open full study protocol",
+          "badgeIds": [
+            "study.casimir_dp.protocol",
+            "study.casimir_dp.observable_separation_gate",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.observable_separation_gate",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.observable_gate",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Missing observable identity fails closed and blocks cross-lane inference."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Shared vocabulary or units cannot create a bridge.",
+        "No cross-lane mechanism claim is allowed while the gate is blocked."
+      ]
+    },
+    {
+      "equationId": "cdp-decoherence-collapse-gate",
+      "label": "Decoherence-to-collapse identification gate",
+      "aliases": [
+        "Identify(Delta Gamma_res,Gamma_collapse)=BLOCKED"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-decoherence-collapse-gate",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open decoherence/collapse separation gate",
+          "badgeIds": [
+            "study.casimir_dp.decoherence_collapse_gate",
+            "study.casimir_dp.manifold_response_hypothesis",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.decoherence_collapse_gate",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.decoherence_gate",
+          "openPanels": ["theory-badge-graph"],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Reduced visibility is not objective collapse while ordinary open-system explanations remain."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "A registered dynamics-level discriminator is required.",
+        "Correlation with a cavity setting does not establish gravitational causation."
+      ]
+    }
+  ]
+}

@@ -772,7 +772,14 @@ const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind
   if (resultStatus !== "succeeded" && resultStatus !== "not_run") return false;
   if (isCapabilityTerminalKind(terminalArtifactKind)) {
     if (readBoolean(result.selected_for_answer) !== true) return false;
-    if (readBoolean(result.reentered_solver) !== true) return false;
+    const reentryStage = readArray(ledger.stages)
+      .map(readRecord)
+      .find((stage) => readString(stage?.stage) === "reentered_solver");
+    if (ledger.runtime_lifecycle_verified === true) {
+      if (readString(reentryStage?.status) !== "succeeded") return false;
+    } else if (readBoolean(result.reentered_solver) !== true) {
+      return false;
+    }
   }
   return true;
 };

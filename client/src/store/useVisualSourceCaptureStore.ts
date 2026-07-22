@@ -1,5 +1,20 @@
 import { create } from "zustand";
 
+export type VisualSourceCaptureSurface =
+  | "screen"
+  | "window"
+  | "browser_tab"
+  | "camera"
+  | "document"
+  | "image_lens"
+  | "game"
+  | "app"
+  | "terminal"
+  | "file_manager"
+  | "calculator"
+  | "simulation"
+  | "unknown";
+
 export type VisualSourceCaptureFrameHistoryItem = {
   history_id: string;
   source_id: string;
@@ -8,6 +23,7 @@ export type VisualSourceCaptureFrameHistoryItem = {
   captured_at: string;
   preview_data_url: string;
   preview_hash: string | null;
+  source_surface?: VisualSourceCaptureSurface | null;
   source_kind?: "full_frame" | "image_lens_crop" | "action_replay" | null;
   crop_only?: boolean;
   crop_bbox_px?: {

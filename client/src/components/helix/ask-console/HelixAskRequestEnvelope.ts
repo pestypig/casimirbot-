@@ -2,6 +2,7 @@ import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
 import type { HelixLanguageModelProfileId } from "@shared/helix-language-model-policy";
 import type { HelixAskRouteMetadata } from "@/lib/helix/ask-prompt-launch";
 import type { HelixAskContextBridgeSnapshot } from "./HelixAskContextBridge";
+import { readHelixAskRealtimeGroundedFeedbackBinding } from "./HelixAskRealtimeGroundedFeedbackBinding";
 
 export type HelixAskConsoleRequestEnvelope = {
   question: string;
@@ -96,6 +97,8 @@ export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
   const activeDocPath =
     normalizeAskConsoleDocPath(args.docPath) ||
     normalizeAskConsoleDocPath(args.contextFiles?.[0]);
+  const realtimeGroundedFeedbackBinding =
+    readHelixAskRealtimeGroundedFeedbackBinding(args.routeMetadata);
   return {
     sessionId: args.sessionId ?? undefined,
     agentRuntime: args.agentRuntime,
@@ -119,6 +122,12 @@ export function buildHelixAskConsoleBackendTurnPayloadCore(args: {
       ? {
           routeMetadata: args.routeMetadata,
           route_metadata: args.routeMetadata,
+        }
+      : {}),
+    ...(realtimeGroundedFeedbackBinding
+      ? {
+          realtimeGroundedFeedbackBinding,
+          realtime_grounded_feedback_binding: realtimeGroundedFeedbackBinding,
         }
       : {}),
     ...(args.bypassWorkstationDispatch === true

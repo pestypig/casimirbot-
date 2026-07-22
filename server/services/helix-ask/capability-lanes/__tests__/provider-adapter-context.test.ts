@@ -7,6 +7,7 @@ import { createHelixCapabilityLaneGoalBindingStore } from "../goal-binding";
 import {
   buildHelixCapabilityLaneProviderAdapterContext,
   compactCapabilityLaneModelValue,
+  reconcileCapabilityLaneProviderTimelineReentry,
 } from "../provider-adapter-context";
 import { createHelixCapabilityLaneSessionStore } from "../session-manager";
 
@@ -52,6 +53,44 @@ it("omits inline image payloads from model-visible capability re-entry", () => {
   expect(serialized).toContain("inline_image_payload_omitted");
   expect(serialized).toContain("equation (47) extracted text");
   expect(serialized.length).toBeLessThan(1_000);
+});
+
+it("reconciles capability-lane re-entry only for the exact returned observation", () => {
+  const timeline = [
+    {
+      schema: "helix.capability_lane.provider_timeline_event.v1" as const,
+      stage: "lane_reentered" as const,
+      adapter_boundary: "helix_agent_provider_edge" as const,
+      selected_runtime_agent_provider: "codex",
+      lane_id: "visual_analysis",
+      capability_id: "visual_analysis.inspect_image_region",
+      status: "pending",
+      lane_visible: false,
+      lane_requested: true,
+      lane_executed: false,
+      observation_reentered: false,
+      observation_ref: "observation:image-region:expected",
+      terminal_authority_status: "pending_helix_terminal_authority" as const,
+      terminal_eligible: false,
+      assistant_answer: false as const,
+      raw_content_included: false as const,
+    },
+  ];
+
+  expect(reconcileCapabilityLaneProviderTimelineReentry({
+    timeline,
+    reenteredObservationRefs: ["observation:image-region:other"],
+  })[0]).toMatchObject({
+    status: "pending",
+    observation_reentered: false,
+  });
+  expect(reconcileCapabilityLaneProviderTimelineReentry({
+    timeline,
+    reenteredObservationRefs: ["observation:image-region:expected"],
+  })[0]).toMatchObject({
+    status: "completed",
+    observation_reentered: true,
+  });
 });
 
 const body = {
@@ -293,7 +332,8 @@ describe("capability lane provider adapter context", () => {
         lane_id: "utility_text",
         capability_id: "utility_text.normalize_text",
         observation_ref: expect.stringContaining("turn-provider-adapter-context:capability_lane:utility_text.normalize_text:"),
-        observation_reentered: true,
+        status: "pending",
+        observation_reentered: false,
         terminal_authority_status: "pending_helix_terminal_authority",
       }),
     ]));

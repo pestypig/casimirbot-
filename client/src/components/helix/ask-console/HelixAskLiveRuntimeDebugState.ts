@@ -6,10 +6,16 @@ import type {
   HelixRealtimeStagePlayAskHandoffV1,
   HelixRealtimeStagePlayContextSyncV1,
   HelixRealtimeStagePlayDebugV1,
+  HelixRealtimeStagePlayGroundedAnswerV1,
 } from "@shared/contracts/helix-realtime-stage-play.v1";
 import type { HelixAskLiveRuntimeVisualFrameReceipt } from "./HelixAskLiveRuntimeTransportController";
+import {
+  HELIX_ASK_REALTIME_COMPLETED_OUTPUT_TRANSCRIPT_SCHEMA,
+  type HelixAskRealtimeCompletedOutputTranscript,
+} from "./HelixAskRealtimeOutputTranscriptDebug";
 
 const MAX_EVENTS = 80;
+const MAX_COMPLETED_OUTPUT_TRANSCRIPTS = 16;
 
 export type HelixAskLiveRuntimeClientDebugEvent = {
   event_kind:
@@ -32,6 +38,7 @@ export type HelixAskLiveRuntimeClientDebugEvent = {
     | "initial_audio_probe_failed"
     | "audio_state_changed"
     | "provider_event_received"
+    | "provider_output_transcript_completed"
     | "remote_audio_track_attached"
     | "remote_audio_playback_started"
     | "remote_audio_playback_failed"
@@ -57,6 +64,9 @@ export type HelixAskLiveRuntimeClientDebugEvent = {
   context_pack_id?: string | null;
   context_hash?: string | null;
   context_sync_status?: string | null;
+  provider_response_ref?: string | null;
+  transcript_text_hash?: string | null;
+  transcript_text_char_count?: number | null;
 };
 
 export type HelixAskLiveRuntimeClientDebugSnapshot = {
@@ -100,6 +110,9 @@ export type HelixAskLiveRuntimeClientDebugSnapshot = {
     | "browser_play_rejected"
     | "provider_audio_and_browser_play_unmuted";
   hardware_audio_output_confirmed: false;
+  completed_output_transcript_count: number;
+  completed_output_transcripts: HelixAskRealtimeCompletedOutputTranscript[];
+  latest_completed_output_transcript: HelixAskRealtimeCompletedOutputTranscript | null;
   lifecycle_state: string;
   transport_state: string;
   started_at_ms: number;
@@ -188,6 +201,9 @@ export const beginHelixAskLiveRuntimeClientDebugAttempt = (input: {
     audio_focus_granted: null,
     speaker_trigger_evidence: "not_observed",
     hardware_audio_output_confirmed: false,
+    completed_output_transcript_count: 0,
+    completed_output_transcripts: [],
+    latest_completed_output_transcript: null,
     lifecycle_state: "requesting",
     transport_state: "awaiting_server_session",
     started_at_ms: observedAtMs,
@@ -412,6 +428,64 @@ export const recordHelixAskLiveRuntimeClientDebugEvent = (input: {
   snapshot = next;
 };
 
+export const recordHelixAskLiveRuntimeCompletedOutputTranscript = (
+  transcript: HelixAskRealtimeCompletedOutputTranscript,
+): void => {
+  if (
+    !snapshot ||
+    transcript.schema !== HELIX_ASK_REALTIME_COMPLETED_OUTPUT_TRANSCRIPT_SCHEMA ||
+    transcript.capture_source !== "browser_data_channel" ||
+    transcript.provider_payload_included !== false ||
+    transcript.output_audio_transcript_deltas_included !== false ||
+    transcript.answer_authority !== false ||
+    transcript.assistant_answer !== false ||
+    transcript.terminal_eligible !== false ||
+    transcript.raw_content_included !== false
+  ) return;
+  const identity = [
+    transcript.provider_response_ref ?? "response:unknown",
+    transcript.provider_item_ref ?? "item:unknown",
+    transcript.provider_content_index ?? "content:unknown",
+    transcript.completed_event_ref,
+  ].join("|");
+  const existing = snapshot.completed_output_transcripts.filter(
+    (candidate: HelixAskRealtimeCompletedOutputTranscript) => [
+      candidate.provider_response_ref ?? "response:unknown",
+      candidate.provider_item_ref ?? "item:unknown",
+      candidate.provider_content_index ?? "content:unknown",
+      candidate.completed_event_ref,
+    ].join("|") !== identity,
+  );
+  const completedOutputTranscripts = [...existing, { ...transcript }]
+    .slice(-MAX_COMPLETED_OUTPUT_TRANSCRIPTS);
+  const event: HelixAskLiveRuntimeClientDebugEvent = {
+    event_kind: "provider_output_transcript_completed",
+    observed_at_ms: transcript.observed_at_ms,
+    detail_code: transcript.capture_status,
+    provider_event_type: transcript.provider_event_type,
+    remote_track_source: null,
+    remote_audio_muted: null,
+    audio_focus_granted: null,
+    microphone_track_count: null,
+    microphone_live_track_count: null,
+    microphone_enabled_track_count: null,
+    microphone_muted_track_count: null,
+    microphone_device_label: null,
+    microphone_loopback_source: null,
+    provider_response_ref: transcript.provider_response_ref,
+    transcript_text_hash: transcript.transcript_text_hash,
+    transcript_text_char_count: transcript.transcript_text_char_count,
+  };
+  snapshot = {
+    ...snapshot,
+    completed_output_transcript_count: completedOutputTranscripts.length,
+    completed_output_transcripts: completedOutputTranscripts,
+    latest_completed_output_transcript: { ...transcript },
+    updated_at_ms: transcript.observed_at_ms,
+    events: [...snapshot.events, event].slice(-MAX_EVENTS),
+  };
+};
+
 export const recordHelixAskLiveRuntimeVisualFrameReceipt = (
   receipt: HelixAskLiveRuntimeVisualFrameReceipt,
 ): void => {
@@ -443,7 +517,16 @@ export const recordHelixAskLiveRuntimeVisualFrameReceipt = (
 export const readHelixAskLiveRuntimeClientDebugSnapshot = ():
   HelixAskLiveRuntimeClientDebugSnapshot | null =>
   snapshot
-    ? { ...snapshot, events: snapshot.events.map((event) => ({ ...event })) }
+    ? {
+        ...snapshot,
+        events: snapshot.events.map((event: HelixAskLiveRuntimeClientDebugEvent) => ({ ...event })),
+        completed_output_transcripts: snapshot.completed_output_transcripts.map(
+          (transcript: HelixAskRealtimeCompletedOutputTranscript) => ({ ...transcript }),
+        ),
+        latest_completed_output_transcript: snapshot.latest_completed_output_transcript
+          ? { ...snapshot.latest_completed_output_transcript }
+          : null,
+      }
     : null;
 
 export const resetHelixAskLiveRuntimeClientDebugStateForTests = (): void => {
@@ -458,22 +541,88 @@ export const mergeHelixAskLiveRuntimeClientDebugIntoExport = (payload: string): 
     const selectedAnswerTurnId =
       typeof parsed.active_turn_id === "string" ? parsed.active_turn_id : null;
     const groundedAnswers = liveRuntimeDebug.server_stage_play_provenance?.handoffs
-      .map((handoff) => handoff.grounded_answer)
-      .filter((answer): answer is NonNullable<typeof answer> => Boolean(answer)) ?? [];
+      .map((handoff: HelixRealtimeStagePlayDebugV1["handoffs"][number]) =>
+        handoff.grounded_answer)
+      .filter((answer: HelixRealtimeStagePlayGroundedAnswerV1 | null):
+        answer is HelixRealtimeStagePlayGroundedAnswerV1 => Boolean(answer)) ?? [];
+    const stagePlayHandoffs = liveRuntimeDebug.server_stage_play_provenance?.handoffs ?? [];
     const boundGroundedAnswer = selectedAnswerTurnId
-      ? groundedAnswers.find((answer) => answer.ask_turn_id === selectedAnswerTurnId) ?? null
+      ? groundedAnswers.find((answer: HelixRealtimeStagePlayGroundedAnswerV1) =>
+          answer.ask_turn_id === selectedAnswerTurnId) ?? null
       : null;
     const turnBinding = boundGroundedAnswer
       ? "server_stage_play_handoff_bound_to_selected_answer"
       : liveRuntimeDebug.latest_stage_play_handoff
         ? "server_stage_play_handoff_pending_or_bound_to_another_answer"
         : "ambient_live_runtime_session_not_bound_to_selected_answer";
+    const completedOutputTranscripts = liveRuntimeDebug.completed_output_transcripts.map(
+      (transcript: HelixAskRealtimeCompletedOutputTranscript) => {
+        const matchedHandoff = transcript.provider_response_ref
+          ? stagePlayHandoffs.find((handoff: HelixRealtimeStagePlayDebugV1["handoffs"][number]) =>
+              handoff.grounded_relay?.provider_response_ref === transcript.provider_response_ref) ?? null
+          : null;
+        const matchedRelay = matchedHandoff?.grounded_relay ?? null;
+        const matchedAskTurnId = matchedRelay?.ask_turn_id ??
+          matchedHandoff?.grounded_answer?.ask_turn_id ?? null;
+        const bindingStatus = !transcript.provider_response_ref
+          ? "provider_response_ref_missing"
+          : !matchedRelay
+            ? "no_grounded_relay_match"
+            : !matchedAskTurnId
+              ? "grounded_relay_pending_ask_turn"
+              : !selectedAnswerTurnId
+                ? "grounded_relay_matched_no_selected_answer"
+                : matchedAskTurnId === selectedAnswerTurnId
+                  ? "grounded_relay_bound_to_selected_answer"
+                  : "grounded_relay_bound_to_another_answer";
+        return {
+          ...transcript,
+          ask_turn_binding_status: bindingStatus,
+          ask_turn_id: matchedAskTurnId,
+          grounded_feedback_id: matchedRelay?.feedback_id ??
+            matchedHandoff?.grounded_answer?.feedback_id ?? null,
+          grounded_handoff_id: matchedHandoff?.handoff_id ?? null,
+          grounded_relay_id: matchedRelay?.relay_id ?? null,
+          grounded_relay_status: matchedRelay?.status ?? null,
+          grounded_relay_playback_receipt_ref: matchedRelay?.playback_receipt_ref ?? null,
+          grounded_relay_playback_confirmed:
+            matchedRelay?.status === "delivered" && Boolean(matchedRelay.playback_receipt_ref),
+          spoken_text_matches_answer_projection_hash:
+            transcript.transcript_text_hash && matchedRelay?.answer_projection_hash
+              ? transcript.transcript_text_hash === matchedRelay.answer_projection_hash
+              : null,
+          spoken_text_matches_canonical_answer_hash:
+            transcript.transcript_text_hash && matchedHandoff?.grounded_answer?.answer_text_hash
+              ? transcript.transcript_text_hash === matchedHandoff.grounded_answer.answer_text_hash
+              : null,
+          binding_source: matchedRelay ? "server_stage_play_grounded_relay" : "none",
+        };
+      },
+    );
+    const selectedAnswerSpokenOutput = [...completedOutputTranscripts]
+      .reverse()
+      .find((transcript) =>
+        transcript.ask_turn_binding_status === "grounded_relay_bound_to_selected_answer") ?? null;
+    const selectedAnswerSpokenOutputBinding = selectedAnswerSpokenOutput
+      ? "provider_response_bound_to_selected_answer"
+      : boundGroundedAnswer
+        ? "selected_answer_has_no_bound_completed_output_transcript"
+        : "selected_answer_not_bound_to_grounded_feedback";
     return JSON.stringify({
       ...parsed,
       realtime_live_client_debug: {
         ...liveRuntimeDebug,
+        completed_output_transcripts: completedOutputTranscripts,
+        latest_completed_output_transcript: completedOutputTranscripts.at(-1) ?? null,
         selected_answer_turn_id: selectedAnswerTurnId,
         selected_answer_grounded_feedback_id: boundGroundedAnswer?.feedback_id ?? null,
+        selected_answer_spoken_output_binding: selectedAnswerSpokenOutputBinding,
+        selected_answer_spoken_output_provider_response_ref:
+          selectedAnswerSpokenOutput?.provider_response_ref ?? null,
+        selected_answer_spoken_output_transcript_hash:
+          selectedAnswerSpokenOutput?.transcript_text_hash ?? null,
+        selected_answer_spoken_output_playback_confirmed:
+          selectedAnswerSpokenOutput?.grounded_relay_playback_confirmed ?? false,
         turn_binding: turnBinding,
       },
     }, null, 2);

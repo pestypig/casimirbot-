@@ -53,6 +53,7 @@ export const deriveDirectScholarlyPortfolioQueries = (
 const DOI_PATTERN = /\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i;
 const ARXIV_PATTERN = /\b(?:arxiv(?:\s*:\s*|\s+)|arxiv\.org\/(?:abs|pdf)\/)([A-Za-z-]+\/\d{7}(?:v\d+)?|\d{4}\.\d{4,5}(?:v\d+)?)\b/i;
 const BARE_ARXIV_PATTERN = /\b\d{4}\.\d{4,5}(?:v\d+)?\b/i;
+const BARE_LEGACY_ARXIV_PATTERN = /\b(?:astro-ph|cond-mat|gr-qc|hep-(?:ex|lat|ph|th)|math-ph|nlin|nucl-(?:ex|th)|physics|quant-ph|q-bio|cs|math|stat)\/\d{7}(?:v\d+)?\b/i;
 const SCHOLARLY_SOURCE_URL_PATTERN = /https?:\/\/[^\s"'`<>]+/gi;
 
 const trimIdentifier = (value: string): string =>
@@ -62,6 +63,14 @@ const trimIdentifier = (value: string): string =>
 // Intent cues must be read from the operator text, not from those literal examples.
 const stripQuotedPromptSegments = (promptText: string): string =>
   promptText.replace(/"[^"\n]*"|'[^'\n]*'|“[^”\n]*”|‘[^’\n]*’|`[^`\n]*`/g, " ");
+
+const stripNonCurrentScholarlyActionClauses = (promptText: string): string =>
+  stripQuotedPromptSegments(promptText)
+    .replace(/\b(?:earlier|previously|historically|last\s+(?:time|turn))\b[^.!?;\n]*/gi, " ")
+    .replace(/\b(?:later|in\s+the\s+future|eventually|next\s+time)\b[^.!?;\n]*/gi, " ")
+    .replace(/\b(?:the\s+(?:screen|ui)\s+(?:says|said|showed)|screen-visible)\b[^.!?;\n]*/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 export const extractScholarlyDoi = (promptText: string): string | null => {
   const match = promptText.match(DOI_PATTERN)?.[0];
@@ -73,7 +82,10 @@ export const extractScholarlyArxivId = (promptText: string): string | null => {
   if (explicit) return trimIdentifier(explicit);
   const hasArxivCue = /\barxiv\b/i.test(promptText);
   const bare = hasArxivCue ? promptText.match(BARE_ARXIV_PATTERN)?.[0] : null;
-  return bare ? trimIdentifier(bare) : null;
+  if (bare) return trimIdentifier(bare);
+  const hasPaperIdentityCue = /\b(?:paper|preprint|article|pdf|full[-\s]?text|scholarly|extract|fetch|retrieve|materialize|import)\b/i.test(promptText);
+  const legacyBare = hasPaperIdentityCue ? promptText.match(BARE_LEGACY_ARXIV_PATTERN)?.[0] : null;
+  return legacyBare ? trimIdentifier(legacyBare) : null;
 };
 
 export const extractScholarlyPmid = (promptText: string): string | null => {
@@ -246,15 +258,17 @@ export const normalizeScholarlyFullTextSourceUrl = (
 export const hasDirectScholarlyFullTextSourceIntent = (promptText: string): boolean => {
   const sourceUrl = extractScholarlySourceUrl(promptText);
   const hasIdentifier = Boolean(sourceUrl || extractScholarlyDoi(promptText) || extractScholarlyArxivId(promptText));
+  const operatorText = stripNonCurrentScholarlyActionClauses(promptText);
   const fullTextActionNegated =
-    /\b(?:do\s+not|don't|dont|without|avoid|not\s+asking\s+to)\b[\s\S]{0,100}\b(?:fetch|retrieve|read|open|parse|extract)\b[\s\S]{0,80}\b(?:pdf|full[-\s]?text|paper\s+text|article\s+text|paper|article)\b/i.test(promptText);
+    /\b(?:do\s+not|don't|dont|without|avoid|not\s+asking\s+to)\b[\s\S]{0,100}\b(?:fetch|retrieve|read|open|parse|extract)\b[\s\S]{0,80}\b(?:pdf|full[-\s]?text|paper\s+text|article\s+text|paper|article)\b/i.test(operatorText);
   if (!hasIdentifier || fullTextActionNegated) return false;
   const directFetch =
-    /\bscholarly-research\.fetch_full_text\b[^.!?;\n]{0,120}\b(?:directly|from|on)\b/i.test(promptText) ||
-    /\b(?:fetch|retrieve|get|pull|read|parse)\b[\s\S]{0,120}\b(?:pdf|full[-\s]?text|paper\s+text|article\s+text)\b/i.test(promptText) ||
-    /\b(?:pdf|full[-\s]?text|paper\s+text|article\s+text)\b[\s\S]{0,120}\b(?:fetch|retrieve|get|pull|read|parse)\b/i.test(promptText);
-  const lookupNegated = /\b(?:do\s+not|don't|dont|without|avoid)\b[^.!?;\n]{0,120}\bscholarly-research\.lookup_papers\b/i.test(promptText);
-  const lookupAbsent = !/\bscholarly-research\.lookup_papers\b/i.test(promptText);
+    /\bscholarly-research\.fetch_full_text\b[^.!?;\n]{0,120}\b(?:directly|from|on)\b/i.test(operatorText) ||
+    /\b(?:fetch|retrieve|get|pull|read|parse|extract|materialize|import|save)\b[\s\S]{0,120}\b(?:pdf|full[-\s]?text|paper(?:\s+text)?|article(?:\s+text)?|document)\b/i.test(operatorText) ||
+    /\b(?:pdf|full[-\s]?text|paper(?:\s+text)?|article(?:\s+text)?|document)\b[\s\S]{0,120}\b(?:fetch|retrieve|get|pull|read|parse|extract|materialize|import|save)\b/i.test(operatorText) ||
+    /\b(?:fetch|retrieve|get|pull|read|parse|extract|materialize|import|save)\s+(?:this|that|it)\b/i.test(operatorText);
+  const lookupNegated = /\b(?:do\s+not|don't|dont|without|avoid)\b[^.!?;\n]{0,120}\bscholarly-research\.lookup_papers\b/i.test(operatorText);
+  const lookupAbsent = !/\bscholarly-research\.lookup_papers\b/i.test(operatorText);
   return directFetch && (lookupNegated || lookupAbsent);
 };
 
@@ -266,14 +280,50 @@ const hasLocalRepoScopeCue = (promptText: string): boolean =>
   /\b(?:repo[-_. ]code\.(?:search_concept|search)|repo\.search|repo\/code\s+evidence|repository\s+evidence|cite\s+file\s+paths?)\b/i.test(promptText);
 
 const hasLookupActionCue = (promptText: string): boolean =>
-  /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|check|cross-?check)\b/i.test(promptText);
+  /\b(?:do\s+research|research|find|search|look\s+for|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect)\b/i.test(promptText) ||
+  /\b(?:check|cross-?check)\b[^.!?;\n]{0,100}\b(?:scholarly|academic|peer[-\s]?reviewed|literature|citations?|references?|bibliograph(?:y|ies)|research\s+papers?|journal\s+articles?)\b/i.test(promptText);
+
+const SCHOLARLY_PAPER_LOOKUP_ACTION_RE =
+  /\b(?:find|search|look\s+for|look\s*up|lookup|locate|retrieve|collect|get|give|show|recommend|suggest|identify)\b/i;
+
+const hasAffirmativeScholarlyPaperLookupCue = (promptText: string): boolean => {
+  const unquoted = stripQuotedPromptSegments(promptText);
+  return unquoted.split(/[.!?;\n]+/).some((rawClause) => {
+    const clause = rawClause.trim();
+    if (!clause) return false;
+    const topicBoundPaperLookup =
+      /\b(?:find|search|look\s+for|look\s*up|lookup|locate|retrieve|collect|get|give|show|recommend|suggest|identify)\b[^.!?;\n]{0,140}\b(?:papers?|articles?|studies|reviews?|literature)\b[^.!?;\n]{0,60}\b(?:about|on|for|supporting|that\s+support|related\s+to|concerning)\b/i.test(clause);
+    const qualifiedPaperLookup =
+      /\b(?:find|search|look\s+for|look\s*up|lookup|locate|retrieve|collect|get|give|show|recommend|suggest|identify)\b[^.!?;\n]{0,140}\b(?:primary|research|scholarly|academic|scientific|peer[-\s]?reviewed|journal)\b[^.!?;\n]{0,50}\b(?:papers?|articles?|studies|reviews?)\b/i.test(clause);
+    if (!topicBoundPaperLookup && !qualifiedPaperLookup) return false;
+
+    const actionIndex = clause.search(SCHOLARLY_PAPER_LOOKUP_ACTION_RE);
+    const rawPrefix = actionIndex >= 0 ? clause.slice(0, actionIndex) : clause;
+    const operatorPrefix = rawPrefix
+      .replace(/^\s*(?:(?:ok|okay|please)\s*[,.]?\s*)+/i, "")
+      .replace(/^\s*(?:can|could|would|will)\s+you\s+/i, "");
+    if (/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b/i.test(operatorPrefix)) {
+      return false;
+    }
+    if (/\b(?:if|when|before|after|would|could|might|hypothetically)\b/i.test(operatorPrefix)) {
+      return false;
+    }
+    if (/\b(?:earlier|previously|last\s+turn|historically|already)\b/i.test(operatorPrefix)) {
+      return false;
+    }
+    if (/\b(?:screen|visible|label|button|phrase|text|debug)\b[^.!?;\n]{0,80}\b(?:says|said|shows|showed|reads|contains|mentions)\b/i.test(operatorPrefix)) {
+      return false;
+    }
+    return !/\b(?:later|tomorrow|next\s+time|in\s+the\s+future|eventually|not\s+now|not\s+yet)\b/i.test(clause);
+  });
+};
 
 const hasExplicitInternetSearchScopeCue = (promptText: string): boolean =>
   /\b(?:search|browse|look\s*up|lookup|check|verify)\s+(?:(?:the|on)\s+)?(?:web|internet|online)\b|\b(?:google\s+(?:it|search)|web\s+search|internet\s+search)\b/i.test(promptText);
 
 const hasScholarlyExecutionActionAndTarget = (promptText: string): boolean =>
-  /\b(?:find|search|look\s*up|lookup|fetch|retrieve|read|open|inspect|query|resolve|collect|use)\b[^.!?;\n]{0,120}\b(?:scholarly|research\s+papers?|papers?|articles?|sources?|arxiv|doi|pubmed|pmc|citations?|references?|bibliograph(?:y|ies)|full[-\s]?text|pdfs?|abstracts?|metadata)\b/i.test(promptText) ||
-  /\b(?:scholarly|research\s+papers?|papers?|articles?|sources?|arxiv|doi|pubmed|pmc|citations?|references?|bibliograph(?:y|ies)|full[-\s]?text|pdfs?|abstracts?|metadata)\b[^.!?;\n]{0,120}\b(?:find|search|look\s*up|lookup|fetch|retrieve|read|open|inspect|query|resolve|collect|use)\b/i.test(promptText);
+  /\b(?:find|search|look\s+for|look\s*up|lookup|fetch|retrieve|read|open|inspect|query|resolve|collect|recommend|suggest|identify|use)\b[^.!?;\n]{0,120}\b(?:scholarly|research\s+papers?|papers?|articles?|sources?|arxiv|doi|pubmed|pmc|citations?|references?|bibliograph(?:y|ies)|full[-\s]?text|pdfs?|abstracts?|metadata)\b/i.test(promptText) ||
+  /\b(?:scholarly|research\s+papers?|papers?|articles?|sources?|arxiv|doi|pubmed|pmc|citations?|references?|bibliograph(?:y|ies)|full[-\s]?text|pdfs?|abstracts?|metadata)\b[^.!?;\n]{0,120}\b(?:find|search|look\s+for|look\s*up|lookup|fetch|retrieve|read|open|inspect|query|resolve|collect|recommend|suggest|identify|use)\b/i.test(promptText);
 
 export const hasFullyNegatedScholarlyResearchInstruction = (promptText: string): boolean => {
   const unquoted = stripQuotedPromptSegments(promptText);
@@ -369,7 +419,7 @@ const explicitLookupTopic = (promptText: string): string | null => {
 
 const explicitPrimaryPaperTopic = (promptText: string): string | null => {
   const match = promptText.match(
-    /\b(?:find|search|locate|retrieve|collect|get)\b[^.;\n]{0,120}\b(?:primary\s+)?(?:research\s+)?papers?\b\s+(?:supporting|that\s+support|about|on|for)\s+([^.;\n]{3,220})/i,
+    /\b(?:find|search|look\s+for|look\s*up|lookup|locate|retrieve|collect|get|give|show|recommend|suggest|identify)\b[^.;\n]{0,120}\b(?:primary\s+)?(?:research\s+)?papers?\b\s+(?:supporting|that\s+support|about|on|for)\s+([^.;\n]{3,220})/i,
   )?.[1];
   if (!match) return null;
   const cleaned = match
@@ -377,7 +427,12 @@ const explicitPrimaryPaperTopic = (promptText: string): string | null => {
       /(?:,\s*|\s+and\s+)(?=(?:then\s+)?(?:fetch|retrieve|get|open|read|parse|extract|summari[sz]e|show|report|return|provide|identify)\b)[\s\S]*$/i,
       " ",
     )
-    .replace(/\b(?:for|in|the)\b/gi, " ")
+    .replace(
+      /\s+that\s+(?:we|i)\s+(?:can|could|will|would|might|may|want\s+to|need\s+to)\s+(?:work\s+with|use|read|inspect|analy[sz]e|explore)\s*[?.!]*$/i,
+      " ",
+    )
+    .replace(/^\s*((?:arxiv|pubmed|semantic\s+scholar|openalex|crossref))\s+for\s+/i, "$1 ")
+    .replace(/^\s*(?:a|an|the)\s+/i, "")
     .replace(/\s+/g, " ")
     .replace(/^[\s:;,.!?-]+|[\s:;,.!?-]+$/g, "")
     .trim();
@@ -434,8 +489,8 @@ const stripInstructionText = (promptText: string): { query: string; reasons: str
     [/\bscholarly-research\.(?:lookup_papers|fetch_full_text|extract_numeric_parameters)\b/gi, " "],
     [/\s*[.;]\s*(?:fetch|open|read|parse)\s+(?:the\s+)?(?:(?:best|top)\s+)?(?:one|two|three|1|2|3|up\s+to\s+\d+)\s+(?:accessible\s+)?(?:sources?|papers?|articles?|pdfs?|full[-\s]?texts?)\b[^.;]*/gi, " "],
     [/\s*[.;]\s*(?:return|provide|identify|report|decompose|group|map)\b[^.;]*/gi, " "],
-    [/\b(?:search|find|look\s*up|lookup|retrieve|collect|get)\s+(?:a\s+)?(?:scholarly\s+)?(?:research\s+)?(?:papers?|articles?|sources?)\s+(?:for|on|about|with)?\b/gi, " "],
-    [/\b(?:search|find|look\s*up|lookup|retrieve|collect|get)\s+(?:a\s+)?(?:scholarly\s+)?(?:paper|article)\s+(?:for|on|about|with)?\b/gi, " "],
+    [/\b(?:search|find|look\s+for|look\s*up|lookup|retrieve|collect|get)\s+(?:a\s+)?(?:scholarly\s+)?(?:research\s+)?(?:papers?|articles?|sources?)\s+(?:for|on|about|with)?\b/gi, " "],
+    [/\b(?:search|find|look\s+for|look\s*up|lookup|retrieve|collect|get)\s+(?:a\s+)?(?:scholarly\s+)?(?:paper|article)\s+(?:for|on|about|with)?\b/gi, " "],
     [/\b(?:scholarly\s+research\s+papers?|research\s+papers?|paper\s+evidence|scholarly\s+papers?|paper\s+records?|paper\s+record|papers?|article)\b/gi, " "],
     [/\b(?:fetch|pull|read)\s+(?:the\s+)?(?:full[-\s]?text|pdf|paper\s+text|article\s+text)(?:\s+if\s+available)?\b/gi, " "],
     [/\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|scientific\s+evidence(?:\s+packet)?|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?)\b/gi, " "],
@@ -636,6 +691,7 @@ export const detectScholarlyResearchIntent = (promptText: string): HelixScholarl
     !hasNegatedScholarlyFullTextAction(admissionPrompt)
   );
   const lookupAction = hasLookupActionCue(admissionPrompt);
+  const explicitPaperLookup = hasAffirmativeScholarlyPaperLookupCue(prompt);
   const localDocsScope = hasLocalDocsScopeCue(admissionPrompt);
   const localRepoScope = hasLocalRepoScopeCue(admissionPrompt);
   const externalIdentifier = Boolean(doi || arxivId || pmid || pmcid || sourceTargets.length > 0);
@@ -663,6 +719,7 @@ export const detectScholarlyResearchIntent = (promptText: string): HelixScholarl
     (
       externalIdentifier ||
       sourceTargets.length > 0 ||
+      explicitPaperLookup ||
       (lookupAction && (providerCue || citationCue || corpusCue || fullTextCue)) ||
       (providerCue && (citationCue || corpusCue)) ||
       (citationCue && corpusCue) ||
@@ -680,6 +737,7 @@ export const detectScholarlyResearchIntent = (promptText: string): HelixScholarl
     corpusCue ? "scholarly_paper_corpus" : "",
     fullTextCue ? "scholarly_full_text_or_pdf" : "",
     lookupAction ? "research_lookup_action" : "",
+    explicitPaperLookup ? "scholarly_paper_lookup" : "",
   ].filter(Boolean);
   const mode: HelixScholarlyResearchIntentMode =
     citationCue && /\breferences?|bibliograph|bibtex/i.test(admissionPrompt)
@@ -699,7 +757,11 @@ export const detectScholarlyResearchIntent = (promptText: string): HelixScholarl
   return {
     researchRequested,
     mode,
-    strength: supportingSourceOnly ? "soft" : externalIdentifier || citationCue ? "hard" : "soft",
+    strength: supportingSourceOnly
+      ? "soft"
+      : externalIdentifier || citationCue || explicitPaperLookup
+        ? "hard"
+        : "soft",
     explicitCues,
     reasons: researchRequested
       ? ["external_scholarly_research_source_target", ...explicitCues]

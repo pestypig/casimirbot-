@@ -50,6 +50,10 @@ export type HelixToolLifecycleTrace = {
   receipt_refs: string[];
   evidence_refs: string[];
 
+  reentry_authority?: "runtime_event_log" | "compatibility_projection";
+  runtime_lifecycle_verified?: boolean;
+  matched_reentry_refs?: string[];
+
   failure_reason: string | null;
   retry_recommendation: HelixToolRetryRecommendation;
 

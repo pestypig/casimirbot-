@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildCommittedAskRoute } from "../committed-ask-route";
 import { readHardToolBackendEntrypointRouteMetadata } from "../hard-tool-route-metadata";
+import { interpretHelixAskPrompt } from "../prompt-interpretation";
 import {
   buildAskTurnScientificImageComparisonRouteMetadata,
   isAskTurnScientificImageTextComparisonPrompt,
@@ -86,6 +87,130 @@ describe("scientific Image Lens comparison route metadata", () => {
       ]),
     });
     expect(committed.terminal_product).toMatchObject({
+      required_terminal_product: "scholarly_research_answer",
+      evidence_reentry_required: true,
+      followup_reasoning_required: true,
+    });
+  });
+});
+
+describe("scholarly PDF Image Lens route repair", () => {
+  const scholarlyGatewayPayload = {
+    tool_call_admission_decision: {
+      requested_capability: "scholarly-research.fetch_full_text",
+      selected_capability: "scholarly-research.fetch_full_text",
+      admitted_capability: "scholarly-research.fetch_full_text",
+      admitted_tool_families: ["scholarly_research"],
+    },
+  };
+
+  it("admits both scholarly and visual families for an explicit DOI page inspection", () => {
+    const initial = buildCommittedAskRoute({
+      turnId: "ask:scholarly-image-lens",
+      promptText: "Fetch full text for DOI 10.1086/340586.",
+      selectedRoute: "/ask/turn/stream",
+      payload: scholarlyGatewayPayload,
+    });
+    const repaired = buildCommittedAskRoute({
+      turnId: "ask:scholarly-image-lens",
+      promptText:
+        "Open page 2 of DOI 10.1086/340586 in Image Lens and inspect it. Tell me what equations, tables, or measurements you can actually read.",
+      selectedRoute: "/ask/turn/stream",
+      payload: {
+        ...scholarlyGatewayPayload,
+        committed_ask_route: initial,
+      },
+    });
+
+    expect(repaired.route.source_target).toBe("scholarly_research");
+    expect(repaired.capability_policy.allowed_tool_families).toEqual(
+      expect.arrayContaining(["scholarly_research", "visual_analysis"]),
+    );
+    expect(repaired.capability_policy.required_capability_families).toEqual(
+      expect.arrayContaining(["scholarly_research", "visual_analysis"]),
+    );
+    expect(repaired.terminal_product).toMatchObject({
+      required_terminal_product: "scholarly_research_answer",
+      evidence_reentry_required: true,
+      followup_reasoning_required: true,
+    });
+  });
+
+  it("does not admit Image Lens from a negated page instruction", () => {
+    const initial = buildCommittedAskRoute({
+      turnId: "ask:scholarly-image-lens-negated",
+      promptText: "Fetch full text for DOI 10.1086/340586.",
+      selectedRoute: "/ask/turn/stream",
+      payload: scholarlyGatewayPayload,
+    });
+    const unchanged = buildCommittedAskRoute({
+      turnId: "ask:scholarly-image-lens-negated",
+      promptText:
+        "Do not open page 2 of DOI 10.1086/340586 in Image Lens; just report the full-text status.",
+      selectedRoute: "/ask/turn/stream",
+      payload: {
+        ...scholarlyGatewayPayload,
+        committed_ask_route: initial,
+      },
+    });
+
+    expect(unchanged.capability_policy.allowed_tool_families).not.toContain("visual_analysis");
+    expect(unchanged.capability_policy.required_capability_families).not.toContain("visual_analysis");
+  });
+
+  it("restores scholarly terminal authority when a retained paper page is inspected without a broad lookup", () => {
+    const visualPayload = {
+      tool_call_admission_decision: {
+        requested_capability: "visual_analysis.inspect_image_region",
+        selected_capability: "visual_analysis.inspect_image_region",
+        admitted_capability: "visual_analysis.inspect_image_region",
+        admitted_tool_families: ["visual_analysis"],
+      },
+    };
+    const staleVisualRoute = buildCommittedAskRoute({
+      turnId: "ask:retained-paper-page-2",
+      promptText: "Inspect the active Image Lens crop.",
+      selectedRoute: "/ask/turn/stream",
+      payload: visualPayload,
+    });
+    const prompt = [
+      "Using retained paper arXiv astro-ph/0512646v5 and its canonical PDF, inspect only page 2 in Image Lens.",
+      "Do this without a broad lookup and do not run docs-viewer.search_docs.",
+      "If page 2 has no displayed equation, report that bounded result and stop.",
+    ].join(" ");
+    const repaired = buildCommittedAskRoute({
+      turnId: "ask:retained-paper-page-2",
+      promptText: prompt,
+      selectedRoute: "/ask/turn/stream",
+      promptInterpretation: interpretHelixAskPrompt(prompt),
+      payload: {
+        ...visualPayload,
+        committed_ask_route: staleVisualRoute,
+        route_product_contract: {
+          source_target: "scholarly_research",
+          required_terminal_kind: "scholarly_research_answer",
+          allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+        },
+      },
+    });
+
+    expect(staleVisualRoute.route.source_target).toBe("visual_capture");
+    expect(repaired.route).toMatchObject({
+      source_target: "scholarly_research",
+      target_kind: "scholarly_research",
+      route_reason: "retained_scholarly_pdf_image_lens_workflow",
+    });
+    expect(repaired.canonical_goal).toMatchObject({
+      goal_kind: "scholarly_research_lookup",
+      required_terminal_kind: "scholarly_research_answer",
+    });
+    expect(repaired.capability_policy.allowed_tool_families).toEqual(
+      expect.arrayContaining(["scholarly_research", "visual_analysis"]),
+    );
+    expect(repaired.capability_policy.required_capability_families).toEqual(
+      expect.arrayContaining(["scholarly_research", "visual_analysis"]),
+    );
+    expect(repaired.terminal_product).toMatchObject({
       required_terminal_product: "scholarly_research_answer",
       evidence_reentry_required: true,
       followup_reasoning_required: true,

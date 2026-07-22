@@ -7,6 +7,7 @@ import {
   type HelixSolverSubgoalLedger,
   type HelixSolverSubgoalStatus,
 } from "@shared/helix-solver-subgoal";
+import { resolveHelixRuntimeObservationReentry } from "./runtime/turn-lifecycle";
 
 type RecordLike = Record<string, unknown>;
 
@@ -163,7 +164,7 @@ const evaluateRetrieveEvidence = (payload: RecordLike, prompt: string): HelixSol
   return makeEval(evidenceRefs.length > 0, evidenceRefs.length > 0 ? ["evidence_refs_available"] : ["evidence_missing"], evidenceRefs.length > 0 ? [] : ["evidence_refs"]);
 };
 
-const evaluateCapability = (payload: RecordLike, prompt: string): HelixSolverSubgoalEvaluation => {
+const evaluateCapability = (payload: RecordLike, prompt: string, turnId: string): HelixSolverSubgoalEvaluation => {
   const plan = readRecord(payload.capability_plan);
   const result = readRecord(payload.capability_result);
   const family = readString(plan?.capability_family);
@@ -188,7 +189,16 @@ const evaluateCapability = (payload: RecordLike, prompt: string): HelixSolverSub
     const ok = receiptRefs.length > 0 && /\b(?:accepted|completed|succeeded|success)\b/i.test(receiptText);
     return makeEval(ok, ok ? ["action_receipt_confirmed_accepted_or_completed"] : ["action_receipt_missing_acceptance"], ok ? [] : ["accepted_or_completed_action_receipt"]);
   }
-  const ok = readString(result?.status) === "succeeded" && result?.reentered_solver === true;
+  const reentry = resolveHelixRuntimeObservationReentry({
+    payload,
+    turnId,
+    candidateRefs: unique([
+      ...readStringArray(result?.receipt_refs),
+      ...readStringArray(result?.evidence_refs),
+    ]),
+    compatibilityProjected: result?.reentered_solver === true,
+  });
+  const ok = readString(result?.status) === "succeeded" && reentry.reentered;
   return makeEval(ok, ok ? ["capability_result_succeeded_and_reentered"] : ["capability_result_missing_or_not_reentered"], ok ? [] : ["capability_result_reentered_solver"]);
 };
 
@@ -275,7 +285,7 @@ export const buildSolverSubgoalLedger = (input: {
     add("retrieve_evidence", ["required evidence was retrieved or missing evidence was explicitly terminal"], evaluateRetrieveEvidence(input.payload, input.promptText));
   }
   if (readRecord(input.payload.capability_plan) || /\b(?:open|click|press|tap|show|pull up|bring up)\b/i.test(input.promptText)) {
-    add("execute_capability", ["capability result proves the requested action completed"], evaluateCapability(input.payload, input.promptText));
+    add("execute_capability", ["capability result proves the requested action completed"], evaluateCapability(input.payload, input.promptText, input.turnId));
   }
   if (isComparisonPrompt(input.promptText, input.payload)) {
     const retrievalEval = evaluateRetrieveEvidence(input.payload, input.promptText);

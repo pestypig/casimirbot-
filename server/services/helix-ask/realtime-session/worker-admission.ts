@@ -8,12 +8,14 @@ import {
   type HelixRealtimeWorkerDispatchStateV2,
 } from "@shared/contracts/helix-realtime-worker-dispatch.v2";
 import type { HelixRealtimeStagePlayGoalBindingV1 } from "@shared/contracts/helix-realtime-stage-play.v1";
+import type { HelixAskSourceTargetIntent } from "@shared/helix-ask-source-target-intent";
 import { readWorkstationGatewayCallRequestsForTurn } from "../agent-providers/explicit-workstation-gateway";
 import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
 import { buildHelixIntentHypotheses } from "../intent-hypothesis";
 import { arbitrateHelixIntent } from "../intent-arbitration";
 import { isHelixAskClarifyRescueGreetingOnlyQuestion } from "../policy/clarify-rescue";
 import { interpretHelixAskPrompt } from "../prompt-interpretation";
+import { isActiveWorkstationContextPrompt } from "../workstation-active-context-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -46,6 +48,24 @@ const workspaceSnapshotFromBinding = (
   openPanels: Array.isArray(sourceBinding?.open_panels) ? sourceBinding?.open_panels : [],
 });
 
+export const resolveRealtimeTranscriptSourceTargetIntent = (input: {
+  handoffId: string;
+  threadId: string;
+  transcriptText: string;
+  sourceBinding?: RecordLike | null;
+}): HelixAskSourceTargetIntent => {
+  const workspaceSnapshot = workspaceSnapshotFromBinding(input.sourceBinding);
+  return arbitrateAskSourceTarget({
+    turnId: input.handoffId,
+    threadId: input.threadId,
+    promptText: input.transcriptText,
+    activeWorkspaceSourceResolution: {
+      active_panel_id: workspaceSnapshot.activePanel,
+      active_doc_path: workspaceSnapshot.activeDocPath,
+    },
+  });
+};
+
 const capabilityIdsByMode = (
   requests: RecordLike[],
   modes: Set<string>,
@@ -54,6 +74,32 @@ const capabilityIdsByMode = (
   const capabilityId = readString(request.capability_id ?? request.capabilityId);
   return capabilityId && modes.has(mode) ? [capabilityId] : [];
 }));
+
+const unquoteWorkspacePrompt = (prompt: string): string =>
+  prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+
+const hasWorkspacePanelMention = (prompt: string): boolean =>
+  /\b(?:panel|workspace|workstation|tab|dock)\b/i.test(prompt);
+
+const hasAffirmativeWorkspacePanelWorkerDemand = (prompt: string): boolean => {
+  if (isActiveWorkstationContextPrompt(prompt)) return true;
+  const unquoted = unquoteWorkspacePrompt(prompt)
+    .replace(/^\s*(?:(?:ok|okay|please)\s*[,.]?\s*)+/i, "")
+    .trim();
+  if (!unquoted) return false;
+  const panelTarget = String.raw`\b(?:panel|workspace|workstation|tab|dock)\b`;
+  return (
+    new RegExp(
+      String.raw`^(?:(?:can|could|would|will)\s+you\s+|i\s+(?:need|want)\s+you\s+to\s+)?(?:check|inspect|read|show|list|identify|describe|review|open|focus|switch\s+to|go\s+to|look\s+at)\b[\s\S]{0,120}${panelTarget}`,
+      "i",
+    ).test(unquoted) ||
+    new RegExp(
+      String.raw`^(?:what|which|where|how\s+many)\b[\s\S]{0,120}${panelTarget}`,
+      "i",
+    ).test(unquoted) ||
+    new RegExp(String.raw`^tell\s+me\b[\s\S]{0,120}${panelTarget}`, "i").test(unquoted)
+  );
+};
 
 const buildAdmission = (input: {
   handoffId: string;
@@ -154,6 +200,7 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
   threadId: string;
   transcriptText: string;
   sourceBinding?: RecordLike | null;
+  sourceTargetIntent?: HelixAskSourceTargetIntent;
   activeGoalBinding?: HelixRealtimeStagePlayGoalBindingV1 | null;
   selectedRuntimeAgentProvider?: string | null;
   evidenceRefs?: string[];
@@ -169,14 +216,11 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
     promptInterpretation: interpretation,
     hypotheses,
   });
-  const sourceTargetIntent = arbitrateAskSourceTarget({
-    turnId: input.handoffId,
+  const sourceTargetIntent = input.sourceTargetIntent ?? resolveRealtimeTranscriptSourceTargetIntent({
+    handoffId: input.handoffId,
     threadId: input.threadId,
-    promptText: input.transcriptText,
-    activeWorkspaceSourceResolution: {
-      active_panel_id: workspaceSnapshot.activePanel,
-      active_doc_path: workspaceSnapshot.activeDocPath,
-    },
+    transcriptText: input.transcriptText,
+    sourceBinding: input.sourceBinding,
   });
   let requests: RecordLike[] = [];
   let plannerFailed = false;
@@ -200,15 +244,24 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
     sourceTargetIntent.target_source !== "unknown" &&
     sourceTargetIntent.target_source !== "model_only" &&
     sourceTargetIntent.allow_no_tool_direct === false;
+  const workspacePanelFragmentWithoutWorkerDemand =
+    hasWorkspacePanelMention(input.transcriptText) &&
+    readonlyCapabilityIds.length === 0 &&
+    actionCapabilityIds.length === 0 &&
+    !hasAffirmativeWorkspacePanelWorkerDemand(input.transcriptText);
+  const admittedSourceTargetRequiresEvidence =
+    sourceTargetRequiresEvidence && !workspacePanelFragmentWithoutWorkerDemand;
+  const admittedControlCommand =
+    primaryIntent === "control_command" && !workspacePanelFragmentWithoutWorkerDemand;
   const outcome: HelixRealtimeWorkerAdmissionOutcomeV2 = input.activeGoalBinding
     ? "durable_goal_bound"
-    : actionCapabilityIds.length > 0 || primaryIntent === "control_command"
+    : actionCapabilityIds.length > 0 || admittedControlCommand
       ? "action_candidate"
       : greetingOnly
         ? "conversation_local"
         : readonlyCapabilityIds.length > 0 ||
-            sourceTargetRequiresEvidence ||
-            primaryIntent !== "general_reasoning"
+            admittedSourceTargetRequiresEvidence ||
+            (primaryIntent !== "general_reasoning" && !workspacePanelFragmentWithoutWorkerDemand)
         ? "worker_grounded"
         : "conversation_local";
   const reasonCodes = [
@@ -218,8 +271,11 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
       : null,
     actionCapabilityIds.length > 0 ? "normal_ask_policy_found_action_candidate" : null,
     readonlyCapabilityIds.length > 0 ? "normal_ask_policy_found_readonly_capability" : null,
-    sourceTargetRequiresEvidence
+    admittedSourceTargetRequiresEvidence
       ? `source_target_${sourceTargetIntent.target_source}`
+      : null,
+    workspacePanelFragmentWithoutWorkerDemand
+      ? "realtime_workspace_panel_fragment_without_affirmative_request"
       : null,
     greetingOnly ? "ask_smalltalk_greeting_only_policy" : null,
     primaryIntent !== "general_reasoning" ? `intent_${primaryIntent}` : "intent_general_reasoning",

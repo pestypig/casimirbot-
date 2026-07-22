@@ -4,6 +4,7 @@ import {
   signInLocalAccountSession,
 } from "../../../../helix-account/account-session-store";
 import { resolveWorkstationGatewayAccountContext } from "../../../workstation-tool-gateway/account-policy";
+import { createHelixTurnLifecycleRecorder } from "../../../runtime/turn-lifecycle";
 import type {
   CodexNativeAppServerTurnResult,
   RunCodexNativeAppServerTurnInput,
@@ -21,12 +22,47 @@ const nativeResult = (input: {
   routeUnobserved?: string[];
   observationRefs?: string[];
   ok?: boolean;
-}): CodexNativeAppServerTurnResult => ({
-  ok: input.ok ?? true,
-  answer: input.ok === false ? "" : "Native answer from a re-entered observation.",
-  failReason: input.ok === false ? "native_tool_failed" : null,
-  stderr: "",
-  debug: {
+}): CodexNativeAppServerTurnResult => {
+  const lifecycle = createHelixTurnLifecycleRecorder({ turnId: input.turn.turnId });
+  const started = lifecycle.append({
+    kind: "turn.started",
+    producer: "helix_adapter",
+    status: "started",
+  });
+  const message = lifecycle.append({
+    kind: "agent.message.completed",
+    producer: "codex_runtime",
+    status: "succeeded",
+    causation_id: started.event_id,
+    native_item_id: "answer:test",
+  });
+  const runtime = lifecycle.append({
+    kind: "runtime.turn.completed",
+    producer: "codex_runtime",
+    status: "succeeded",
+    causation_id: message.event_id,
+    native_turn_id: "turn:test",
+  });
+  const eligibility = lifecycle.append({
+    kind: "terminal.eligibility.checked",
+    producer: "helix_policy",
+    status: input.ok === false ? "blocked" : "succeeded",
+    causation_id: runtime.event_id,
+    terminal_eligible: input.ok !== false,
+  });
+  lifecycle.append({
+    kind: input.ok === false ? "turn.failed" : "turn.completed",
+    producer: "helix_adapter",
+    status: input.ok === false ? "failed" : "succeeded",
+    causation_id: eligibility.event_id,
+    terminal_eligible: input.ok !== false,
+  });
+  return {
+    ok: input.ok ?? true,
+    answer: input.ok === false ? "" : "Native answer from a re-entered observation.",
+    failReason: input.ok === false ? "native_tool_failed" : null,
+    stderr: "",
+    debug: {
     schema: "helix.codex_native_app_server_debug.v1",
     transport: "app_server_stdio_jsonl",
     ephemeral_thread: true,
@@ -56,9 +92,11 @@ const nativeResult = (input: {
     native_turn_id: "turn:test",
     native_final_item_id: "answer:test",
     native_turn_status: "completed",
-    terminal_candidate_present: input.ok !== false,
-  },
-});
+      terminal_candidate_present: input.ok !== false,
+      turn_lifecycle: lifecycle.snapshot(),
+    },
+  };
+};
 
 const readBinding = (prompt: string) =>
   JSON.parse(prompt.split(/\r?\n/).at(-1) ?? "{}") as Record<string, unknown>;

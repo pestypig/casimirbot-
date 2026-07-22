@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   buildScholarlyCurrentPromptIdentifierRecoveryBody,
+  candidateHasInlineImageLensSource,
+  ensureCodexPreGatewayRouteAuthority,
+  isScholarlyFollowupReferencePrompt,
   scholarlyPdfSelectedAffordanceFromRuntimeLoop,
   shouldAttemptScholarlyPromptRecovery,
 } from "../codex-provider";
 import { readWorkstationGatewayCallRequestsForTurn } from "../explicit-workstation-gateway";
+import { arbitrateAskSourceTarget } from "../../ask-source-target-arbitrator";
+import {
+  buildPromptDerivedCalculatorSolveGatewayCallRequests,
+  buildPromptDerivedTheoryReflectionGatewayCallRequests,
+} from "../prompt-named-tool-requests";
 
 const recoveryFor = (question: string) => buildScholarlyCurrentPromptIdentifierRecoveryBody({
   body: {
@@ -96,6 +104,76 @@ describe("current-prompt exact scholarly recovery", () => {
     expect(scholarlyPdfSelectedAffordanceFromRuntimeLoop(
       "Audit provenance for the retained evidence chain and report which paper and page are in use.",
     )).toBe("audit_provenance");
+  });
+
+  it("requires actual inline image bytes before treating a PDF page candidate as materialized", () => {
+    expect(candidateHasInlineImageLensSource({
+      page_image_ref: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
+    })).toBe(true);
+    expect(candidateHasInlineImageLensSource({
+      page_image_ref: "pdf-page-render:magnetar-page-2",
+      source_image_ref: "artifact://magnetar.pdf#page=2",
+    })).toBe(false);
+  });
+
+  it("recognizes a natural this-document equation follow-up as retained scholarly work", () => {
+    expect(isScholarlyFollowupReferencePrompt(
+      "Ok can you find an equation we can use in this doc?",
+    )).toBe(true);
+  });
+
+  it.each([
+    {
+      question: "Can you use the calculator to check 8 times 9, then explain how that simple check differs from evaluating the paper's equation candidate?",
+      targetSource: "calculator_stream",
+      capability: "scientific-calculator.solve_expression",
+    },
+    {
+      question: "Now reflect what we learned from this paper, the equation search, and the calculator check into the Theory Badge Graph. Separate what the evidence supports from what remains unresolved.",
+      targetSource: "theory_locator",
+      capability: "helix_ask.reflect_theory_context",
+    },
+  ])("preserves the current explicit $targetSource operator over a prior-paper follow-up referent", ({
+    question,
+    targetSource,
+    capability,
+  }) => {
+    expect(isScholarlyFollowupReferencePrompt(question)).toBe(true);
+    const body: Record<string, unknown> = {
+      question,
+      source_target_intent: arbitrateAskSourceTarget({
+        turnId: `ask:test:${targetSource}`,
+        threadId: "thread:test",
+        promptText: question,
+      }),
+    };
+    const currentRequests = targetSource === "calculator_stream"
+      ? buildPromptDerivedCalculatorSolveGatewayCallRequests(body)
+      : buildPromptDerivedTheoryReflectionGatewayCallRequests(body);
+    expect(currentRequests).toHaveLength(1);
+    expect(body.source_target_intent).toMatchObject({ target_source: targetSource });
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: `ask:test:${targetSource}`,
+    });
+
+    expect(body.source_target_intent).toMatchObject({ target_source: targetSource });
+    expect(body.tool_call_admission_decision).toMatchObject({
+      required: true,
+      requested_capability: capability,
+      selected_capability: capability,
+      admitted_capability: capability,
+    });
+  });
+
+  it.each([
+    "Do not use this doc to find an equation.",
+    "Later, find an equation we can use in this document.",
+    "Earlier you tried to find an equation in this PDF.",
+    'The screen says "find an equation in this doc"; explain that message.',
+  ])("does not admit non-current document-followup wording: %s", (question) => {
+    expect(isScholarlyFollowupReferencePrompt(question)).toBe(false);
   });
 
   it.each([

@@ -2,8 +2,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
 import {
+  buildCodexContinuationAffordanceRetryInstruction,
+  buildCodexCapabilityLaneRetryInstruction,
   buildCodexCompoundSubgoalLedger,
+  buildCodexScholarlyEvidenceDecisionCorrectionInstruction,
+  buildCodexScholarlyEvidenceDecisionInstruction,
+  buildCodexRuntimeLaneCapabilityAdmissionCorrection,
   buildImageLensObservationFallbackAnswer,
   buildScholarlyCapabilityLaneReentryEvidenceLines,
   buildScholarlyResearchResponseModeProjection,
@@ -13,20 +19,31 @@ import {
   asksToBuildScientificEvidencePacketFromRetainedSidecar,
   augmentImageLensRegionCandidatesForQuestion,
   classifyCodexProcessFailureForUser,
+  codexProviderOutputHasPendingCapabilityLaneRequest,
   codexRouteAllowsTerminalKind,
   codexProvider,
+  continuationStateAdmitsPreparedRecoveryLaneRequest,
+  enrichCapabilityLaneCandidatesFromBody,
+  enrichScholarlyNumericCandidateFromGatewayResults,
   explicitlyExcludesScientificImageContext,
+  extractCodexScholarlyEvidenceDecision,
   extractCodexSemanticRouteProposalCandidate,
   forbiddenEvidenceFamiliesForLaneCapability,
   imageLensObservationReportCanSelfTerminal,
   asksForImageLensSidecarMetadataReport,
   isScholarlyFollowupReferencePrompt,
   resetScholarlyPdfWorkbenchVolatileMemoryForTest,
+  runtimeLaneRequestCandidateUsesAdmittedCapabilities,
+  selectScholarlyPdfRecoveryPageNumbers,
   scholarlyMemoryRecordFromGatewayResult,
   synthesizeScholarlyPageImageLaneCandidate,
   synthesizeScholarlyPageWindowLaneCandidates,
   scholarlyFollowupRequestedModes,
+  shouldRetryCodexCapabilityLaneRequest,
+  shouldRetryCodexContinuationAffordance,
   stripCodexSemanticRouteProposalMarkers,
+  stripCodexScholarlyEvidenceDecisionMarkers,
+  validateCodexScholarlyEvidenceDecision,
 } from "../codex-provider";
 
 describe("Codex provider capability lane adapter", () => {
@@ -97,6 +114,693 @@ describe("Codex provider capability lane adapter", () => {
     resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
 
     expect(fs.existsSync(isolatedMemoryDir)).toBe(false);
+  });
+
+  it("asks Codex to choose an exact admitted scholarly recovery lane request", () => {
+    const state: HelixAgentContinuationState = {
+      schema: "helix.agent_continuation_state.v1",
+      turn_id: "turn:scholarly-recovery",
+      state_id: "turn:scholarly-recovery:continuation:2",
+      sequence: 2,
+      trigger: "post_attempt",
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: false,
+      },
+      observation_refs: { all: [], existing: [], new: [] },
+      missing_requirement_ids: ["semantic_scholar_http_429"],
+      last_attempt: null,
+      next_admissible_affordances: [{
+        affordance_id: "affordance:magnetar-primary",
+        capability_id: "scholarly-research.lookup_papers",
+        action: null,
+        args: { query: "magnetar primary research observations" },
+        lane_request: {
+          capability: "scholarly-research.lookup_papers",
+          query: "magnetar primary research observations",
+        },
+        source_ref: "turn:scholarly-recovery:lookup-observation",
+        reason: "semantic_scholar_http_429",
+        admissible: true,
+        tried: false,
+        action_fingerprint: "scholarly-research.lookup_papers:magnetar-primary",
+      }],
+      tried_action_fingerprints: [],
+      progress: {
+        made_progress: false,
+        new_observation_count: 0,
+        resolved_requirement_ids: [],
+        added_requirement_ids: ["semantic_scholar_http_429"],
+        new_affordance_count: 1,
+        no_progress_repeat_count: 0,
+        reason_codes: ["requirements_added", "new_affordance"],
+      },
+      budget: {
+        soft: {
+          iterations: { max: 4, consumed: 1, remaining: 3 },
+          tool_calls: { max: 4, consumed: 1, remaining: 3 },
+          model_decisions: { max: 4, consumed: 1, remaining: 3 },
+          pressure: "none",
+          exhausted: false,
+        },
+        hard: {
+          iterations: { max: 12, consumed: 1, remaining: 11 },
+          tool_calls: { max: 12, consumed: 1, remaining: 11 },
+          model_decisions: { max: 12, consumed: 1, remaining: 11 },
+          exhausted: false,
+        },
+        extension_count: 0,
+        max_extensions: 2,
+      },
+      allowed_decisions: ["act", "retry"],
+      authority: "runtime_agent_decides_within_admitted_boundaries",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    const instruction = buildCodexContinuationAffordanceRetryInstruction(state);
+
+    expect(instruction).toContain("HELIX_CAPABILITY_LANE_REQUEST_JSON:");
+    expect(instruction).toContain("scholarly-research.lookup_papers");
+    expect(instruction).toContain("magnetar primary research observations");
+    expect(instruction).toContain("Copy its capability and arguments exactly");
+  });
+
+  it("keeps an admitted Image Lens continuation valid after additive Helix enrichment", () => {
+    const requestedCandidate = {
+      capability: "visual_analysis.inspect_image_region",
+      page_number: 3,
+      question: "Find the first displayed equation on the next untried page.",
+      region_kind: "equation",
+      detail: "high",
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+    const state = {
+      next_admissible_affordances: [{
+        admissible: true,
+        tried: false,
+        lane_request: requestedCandidate,
+      }],
+      allowed_decisions: ["act", "retry"],
+      last_attempt: { retryability: "not_applicable" },
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+    const preparedCandidate = {
+      ...requestedCandidate,
+      source_id: "pdf-page-render:page-3",
+      source_kind: "pdf_page_render",
+      source_image_data: "data:image/png;base64,AAAA",
+      scholarly_source_pdf_cache_path: "artifacts/helix/scholarly-pdfs/paper.pdf",
+    };
+
+    expect(continuationStateAdmitsPreparedRecoveryLaneRequest({
+      state,
+      requestedCandidate,
+      preparedCandidate,
+    })).toBe(true);
+    expect(continuationStateAdmitsPreparedRecoveryLaneRequest({
+      state,
+      requestedCandidate: { ...requestedCandidate, page_number: 4 },
+      preparedCandidate: { ...preparedCandidate, page_number: 4 },
+    })).toBe(false);
+    expect(continuationStateAdmitsPreparedRecoveryLaneRequest({
+      state,
+      requestedCandidate,
+      preparedCandidate: {
+        ...preparedCandidate,
+        capability: "docs-viewer.search_docs",
+      },
+    })).toBe(false);
+  });
+
+  it("keeps a provider lane request pending instead of treating it as terminal prose", () => {
+    expect(codexProviderOutputHasPendingCapabilityLaneRequest(
+      'HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"visual_analysis.inspect_image_region","page_number":3}',
+    )).toBe(true);
+    expect(codexProviderOutputHasPendingCapabilityLaneRequest(
+      "Page 3 contains a bounded equation candidate.",
+    )).toBe(false);
+  });
+
+  it("rejects invented capability ids before execution and gives Codex an executable correction", () => {
+    const admittedCapabilityIds = [
+      "visual_analysis.inspect_image_region",
+      "scholarly-research.fetch_full_text",
+    ];
+    const inventedCandidate = {
+      capability: "scholarly-research.parse_pdf_page_image",
+      page_number: 2,
+    };
+
+    expect(runtimeLaneRequestCandidateUsesAdmittedCapabilities({
+      candidate: inventedCandidate,
+      admittedCapabilityIds,
+    })).toBe(false);
+    expect(runtimeLaneRequestCandidateUsesAdmittedCapabilities({
+      candidate: {
+        capability: "visual_analysis.inspect_image_region",
+        page_number: 2,
+      },
+      admittedCapabilityIds,
+    })).toBe(true);
+
+    const correction = buildCodexRuntimeLaneCapabilityAdmissionCorrection({
+      rejectedCandidate: inventedCandidate,
+      admittedCapabilityIds,
+    });
+    expect(correction).toContain("rejected the prior capability request before execution");
+    expect(correction).toContain("scholarly-research.parse_pdf_page_image");
+    expect(correction).toContain("visual_analysis.inspect_image_region");
+    expect(correction).toContain("Do not invent, rename, or combine capability identifiers");
+  });
+
+  it("does not reopen continuation affordances after a validated runtime terminal decision", () => {
+    const continuationInstruction = "choose one admitted scholarly recovery affordance";
+
+    expect(shouldRetryCodexContinuationAffordance({
+      continuationInstruction,
+      scholarlyDecision: "answer",
+      scholarlyDecisionAuditStatus: "valid",
+    })).toBe(false);
+    expect(shouldRetryCodexContinuationAffordance({
+      continuationInstruction,
+      scholarlyDecision: "ask_user",
+      scholarlyDecisionAuditStatus: "valid",
+    })).toBe(false);
+    expect(shouldRetryCodexContinuationAffordance({
+      continuationInstruction,
+      scholarlyDecision: "fail",
+      scholarlyDecisionAuditStatus: "valid",
+    })).toBe(false);
+    expect(shouldRetryCodexContinuationAffordance({
+      continuationInstruction,
+      scholarlyDecision: "recover",
+      scholarlyDecisionAuditStatus: "valid",
+    })).toBe(true);
+    expect(shouldRetryCodexContinuationAffordance({
+      continuationInstruction,
+      scholarlyDecision: "answer",
+      scholarlyDecisionAuditStatus: "invalid",
+    })).toBe(true);
+  });
+
+  it("retries a natural selected-paper PDF and measurements follow-up through Codex", () => {
+    const question = "Can you get the PDF for that paper and tell me what measurements it reports?";
+
+    expect(shouldRetryCodexCapabilityLaneRequest({
+      question,
+      providerText: "I need fetched paper evidence before I can report measurements.",
+      existingObservationPacketCount: 0,
+      scholarlyEvidenceAvailable: true,
+    })).toBe(true);
+    expect(shouldRetryCodexCapabilityLaneRequest({
+      question,
+      providerText: "I need the paper identity first.",
+      existingObservationPacketCount: 0,
+      scholarlyEvidenceAvailable: false,
+    })).toBe(false);
+
+    const instruction = buildCodexCapabilityLaneRetryInstruction(question);
+    expect(instruction).toContain("exactly one next admitted scholarly capability");
+    expect(instruction).toContain("scholarly-research.fetch_full_text");
+    expect(instruction).toContain("scholarly-research.extract_numeric_parameters");
+    expect(instruction).toContain("exact observed paper identity");
+  });
+
+  it("does not retry a negated scholarly tool request", () => {
+    expect(shouldRetryCodexCapabilityLaneRequest({
+      question: "Do not get the PDF or extract measurements from that paper.",
+      providerText: "Understood.",
+      existingObservationPacketCount: 0,
+      scholarlyEvidenceAvailable: true,
+    })).toBe(false);
+  });
+
+  it("accepts a runtime-agent scholarly answer only for an exact observed result id", () => {
+    const providerText = [
+      'HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:{"decision":"answer","selected_result_ids":["arxiv:astro-ph/0503030v1"],"reason":"Directly studies magnetar giant flares."}',
+      "This primary paper studies the 2004 giant flare from SGR 1806-20.",
+    ].join("\n");
+    const gatewayCallResults = [{
+      capability_id: "scholarly-research.lookup_papers",
+      observation: {
+        papers: [{
+          result_id: "arxiv:astro-ph/0503030v1",
+          title: "The first giant flare from SGR 1806-20",
+        }],
+      },
+    }] as any;
+
+    expect(extractCodexScholarlyEvidenceDecision(providerText)).toMatchObject({
+      decision: "answer",
+      selected_result_ids: ["arxiv:astro-ph/0503030v1"],
+    });
+    expect(validateCodexScholarlyEvidenceDecision({
+      text: providerText,
+      phase: "test_answer",
+      gatewayCallResults,
+    }).audit).toMatchObject({
+      status: "valid",
+      semantic_relevance_authority: "runtime_agent",
+      deterministic_lookup_relevance_role: "advisory_only",
+      unknown_result_ids: [],
+    });
+    expect(stripCodexScholarlyEvidenceDecisionMarkers(providerText)).toBe(
+      "This primary paper studies the 2004 giant flare from SGR 1806-20.",
+    );
+  });
+
+  it("accepts a runtime-agent scholarly answer grounded in an exact full-text artifact id", () => {
+    const providerText = [
+      'HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:{"decision":"answer","selected_result_ids":["turn:test:fetch:3:scholarly_full_text_observation"],"reason":"The fetched pages contain the requested measurements."}',
+      "The fetched pages report mean flux densities of 4.0 +/- 0.8 mJy at 8.4 GHz and 1.7 +/- 0.3 mJy at 32 GHz.",
+    ].join("\n");
+    const validation = validateCodexScholarlyEvidenceDecision({
+      text: providerText,
+      phase: "test_full_text_answer",
+      gatewayCallResults: [{
+        capability_id: "scholarly-research.fetch_full_text",
+        observation: {
+          schema: "helix.scholarly_full_text_observation.v1",
+          artifact_id: "turn:test:fetch:3:scholarly_full_text_observation",
+          evidence_state: "full_text_usable",
+          selected_for_answer: true,
+          selected_chunks: [{
+            page_start: 7,
+            text_excerpt: "We measured mean flux densities of 4.0 +/- 0.8 mJy at 8.4 GHz.",
+          }],
+        },
+      }] as any,
+    });
+
+    expect(validation.audit).toMatchObject({
+      status: "valid",
+      available_result_ids: ["turn:test:fetch:3:scholarly_full_text_observation"],
+      unknown_result_ids: [],
+      validation_error: null,
+    });
+  });
+
+  it("binds one exact same-turn full-text observation into numeric extraction", () => {
+    const fullTextObservation = {
+      schema: "helix.scholarly_full_text_observation.v1",
+      artifact_id: "turn:test:fetch:3:scholarly_full_text_observation",
+      source_url: "https://arxiv.org/pdf/1902.10712v1.pdf",
+      source_pdf_ref: "artifact://scholarly-pdf/magnetar.pdf",
+      cache_integrity_hash: "sha256:magnetar",
+      evidence_state: "full_text_usable",
+      selected_for_answer: true,
+      selected_chunks: [{
+        page_start: 7,
+        page_end: 7,
+        citation_ref: "paper#page=7",
+        text_excerpt: "The mean flux density was 4.0 +/- 0.8 mJy at 8.4 GHz.",
+      }],
+    };
+    const candidate = enrichScholarlyNumericCandidateFromGatewayResults(
+      [{
+        capability_id: "scholarly-research.fetch_full_text",
+        ok: true,
+        observation: fullTextObservation,
+        observation_packet: { observation_ref: "observation:full-text:magnetar" },
+        artifact_refs: ["artifact://scholarly-pdf/magnetar.pdf"],
+      }] as any,
+      {
+        capability: "scholarly-research.extract_numeric_parameters",
+        variables: ["reported flux density"],
+      },
+    );
+
+    expect(candidate).toMatchObject({
+      capability: "scholarly-research.extract_numeric_parameters",
+      variables: ["reported flux density"],
+      source_ref: "turn:test:fetch:3:scholarly_full_text_observation",
+      full_text_observation: fullTextObservation,
+    });
+  });
+
+  it("does not guess a numeric evidence source when multiple papers are in the turn", () => {
+    const result = enrichScholarlyNumericCandidateFromGatewayResults(
+      [
+        {
+          capability_id: "scholarly-research.fetch_full_text",
+          ok: true,
+          observation: {
+            artifact_id: "full-text:a",
+            source_url: "https://example.test/a.pdf",
+            evidence_state: "full_text_usable",
+            selected_chunks: [{ text_excerpt: "A" }],
+          },
+          observation_packet: { observation_ref: "observation:a" },
+          artifact_refs: [],
+        },
+        {
+          capability_id: "scholarly-research.fetch_full_text",
+          ok: true,
+          observation: {
+            artifact_id: "full-text:b",
+            source_url: "https://example.test/b.pdf",
+            evidence_state: "full_text_usable",
+            selected_chunks: [{ text_excerpt: "B" }],
+          },
+          observation_packet: { observation_ref: "observation:b" },
+          artifact_refs: [],
+        },
+      ] as any,
+      {
+        capability: "scholarly-research.extract_numeric_parameters",
+        variables: ["reported value"],
+      },
+    );
+
+    expect(result).toEqual({
+      capability: "scholarly-research.extract_numeric_parameters",
+      variables: ["reported value"],
+    });
+  });
+
+  it("rejects a scholarly answer that selects a result id absent from the observation", () => {
+    const validation = validateCodexScholarlyEvidenceDecision({
+      text: [
+        'HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:{"decision":"answer","selected_result_ids":["invented:paper"],"reason":"Looks relevant."}',
+        "Use this paper.",
+      ].join("\n"),
+      phase: "test_unknown_result",
+      gatewayCallResults: [{
+        capability_id: "scholarly-research.lookup_papers",
+        observation: {
+          papers: [{ result_id: "arxiv:astro-ph/0503030v1" }],
+        },
+      }] as any,
+    });
+
+    expect(validation.audit).toMatchObject({
+      status: "invalid",
+      validation_error: "scholarly_answer_selected_unknown_result_id",
+      unknown_result_ids: ["invented:paper"],
+    });
+  });
+
+  it("accepts a model-chosen scholarly recovery for normal gateway admission", () => {
+    const validation = validateCodexScholarlyEvidenceDecision({
+      text: 'HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:{"decision":"recover","selected_result_ids":[],"reason":"The observed paper is about prescribing behavior, not magnetars.","lane_request":{"capability":"scholarly-research.lookup_papers","query":"SGR 1806-20 magnetar giant flare primary observations"}}',
+      phase: "test_recover",
+      gatewayCallResults: [{
+        capability_id: "scholarly-research.lookup_papers",
+        observation: {
+          papers: [{ result_id: "semantic_scholar:unrelated" }],
+        },
+      }] as any,
+    });
+
+    expect(validation).toMatchObject({
+      decision: {
+        decision: "recover",
+        selected_result_ids: [],
+        lane_request: {
+          capability: "scholarly-research.lookup_papers",
+          query: "SGR 1806-20 magnetar giant flare primary observations",
+        },
+      },
+      audit: {
+        status: "valid",
+        validation_error: null,
+      },
+    });
+  });
+
+  it("accepts a known lookup result ID as the binding target for full-text recovery", () => {
+    const resultId = "arxiv:cdf6eb1a77a68cf3";
+    const validation = validateCodexScholarlyEvidenceDecision({
+      text: [
+        "HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:",
+        JSON.stringify({
+          decision: "recover",
+          selected_result_ids: [resultId],
+          reason: "The primary magnetar paper is relevant and still needs an observed full-text artifact.",
+          lane_request: {
+            capability: "scholarly-research.fetch_full_text",
+            paper_result_id: resultId,
+            source_ref: "arxiv:astro-ph/0512646v5",
+            source_url: "https://arxiv.org/pdf/astro-ph/0512646v5.pdf",
+            max_pages: 20,
+            max_chunks: 12,
+          },
+        }),
+      ].join(""),
+      phase: "test_known_result_bound_recovery",
+      requiredEvidenceModes: ["full_text"],
+      gatewayCallResults: [{
+        capability_id: "scholarly-research.lookup_papers",
+        observation: {
+          papers: [{
+            result_id: resultId,
+            identifiers: {
+              arxiv_id: "astro-ph/0512646v5",
+              pdf_url: "https://arxiv.org/pdf/astro-ph/0512646v5.pdf",
+            },
+          }],
+        },
+      }] as any,
+    });
+
+    expect(validation).toMatchObject({
+      decision: {
+        decision: "recover",
+        selected_result_ids: [resultId],
+        lane_request: {
+          capability: "scholarly-research.fetch_full_text",
+          paper_result_id: resultId,
+        },
+      },
+      audit: {
+        status: "valid",
+        unknown_result_ids: [],
+        validation_error: null,
+      },
+    });
+  });
+
+  it("rejects an invented result ID used to bind scholarly recovery", () => {
+    const validation = validateCodexScholarlyEvidenceDecision({
+      text: 'HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:{"decision":"recover","selected_result_ids":["arxiv:invented"],"reason":"fetch it","lane_request":{"capability":"scholarly-research.fetch_full_text","paper_result_id":"arxiv:invented"}}',
+      phase: "test_unknown_result_bound_recovery",
+      gatewayCallResults: [{
+        capability_id: "scholarly-research.lookup_papers",
+        observation: { papers: [{ result_id: "arxiv:known" }] },
+      }] as any,
+    });
+
+    expect(validation.audit).toMatchObject({
+      status: "invalid",
+      unknown_result_ids: ["arxiv:invented"],
+      validation_error: "scholarly_recovery_selected_unknown_result_id",
+    });
+  });
+
+  it("limits an exact-page workbench recovery to the requested page", () => {
+    expect(selectScholarlyPdfRecoveryPageNumbers({
+      question: "Inspect only page 2 in Image Lens. If it has no equation, stop.",
+      currentPage: 6,
+      recommendedScanPages: [3, 4, 5],
+      inspectedPageNumbers: [],
+    })).toEqual([2]);
+
+    expect(selectScholarlyPdfRecoveryPageNumbers({
+      question: "Scan the next pages for the first displayed equation.",
+      currentPage: 2,
+      recommendedScanPages: [3, 4, 5],
+      inspectedPageNumbers: [2],
+    })).toEqual([3, 4, 5]);
+  });
+
+  it("normalizes Codex's standard lane marker into a scholarly recovery decision", () => {
+    const validation = validateCodexScholarlyEvidenceDecision({
+      text: 'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability_lane_call":{"capability":"scholarly-research.fetch_full_text","source_ref":"lookup:magnetar","query":"Magnetar","max_chunks":12}}',
+      phase: "test_standard_lane_recover",
+      requiredEvidenceModes: ["full_text"],
+      gatewayCallResults: [{
+        capability_id: "scholarly-research.lookup_papers",
+        gateway_admission: { requested_capability: "scholarly-research.lookup_papers" },
+        ok: true,
+        observation: {
+          papers: [{ result_id: "arxiv:astro-ph/0210382v2" }],
+        },
+      }] as any,
+    });
+
+    expect(validation).toMatchObject({
+      decision: {
+        decision: "recover",
+        lane_request: {
+          capability: "scholarly-research.fetch_full_text",
+          source_ref: "lookup:magnetar",
+        },
+      },
+      audit: {
+        status: "valid",
+        decision_source: "capability_lane_marker",
+        validation_error: null,
+      },
+    });
+  });
+
+  it("does not normalize an unrelated standard lane marker as a scholarly decision", () => {
+    const validation = validateCodexScholarlyEvidenceDecision({
+      text: 'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability_lane_call":{"capability":"translation.translate_text","text":"hello","target_language":"es"}}',
+      phase: "test_non_scholarly_standard_lane",
+      gatewayCallResults: [],
+    });
+
+    expect(validation).toMatchObject({
+      decision: null,
+      audit: {
+        status: "invalid",
+        decision_source: null,
+        validation_error: "scholarly_evidence_decision_missing_or_malformed",
+      },
+    });
+  });
+
+  it("rejects a lookup-only answer when the current goal requires full text", () => {
+    const validation = validateCodexScholarlyEvidenceDecision({
+      text: [
+        'HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:{"decision":"answer","selected_result_ids":["arxiv:astro-ph/0210382v2"],"reason":"The paper is relevant."}',
+        "This paper is relevant to magnetars.",
+      ].join("\n"),
+      phase: "test_required_full_text",
+      requiredEvidenceModes: ["full_text"],
+      gatewayCallResults: [{
+        capability_id: "scholarly-research.lookup_papers",
+        gateway_admission: { requested_capability: "scholarly-research.lookup_papers" },
+        ok: true,
+        observation: {
+          papers: [{ result_id: "arxiv:astro-ph/0210382v2" }],
+        },
+      }] as any,
+    });
+
+    expect(validation.audit).toMatchObject({
+      status: "invalid",
+      decision_source: "scholarly_evidence_marker",
+      validation_error: "scholarly_answer_requires_full_text_observation",
+    });
+  });
+
+  it("re-enters a typed full-text rejection so Codex can choose the fetch recovery", () => {
+    const gatewayCallResults = [{
+      capability_id: "scholarly-research.lookup_papers",
+      gateway_admission: { requested_capability: "scholarly-research.lookup_papers" },
+      ok: true,
+      observation: {
+        papers: [{
+          result_id: "arxiv:astro-ph/0210382v2",
+          identifiers: {
+            arxiv_id: "astro-ph/0210382v2",
+            pdf_url: "https://arxiv.org/pdf/astro-ph/0210382v2.pdf",
+          },
+        }],
+      },
+    }] as any;
+    const validation = validateCodexScholarlyEvidenceDecision({
+      text: "This paper is relevant to magnetars.",
+      phase: "test_missing_marker_with_full_text_goal",
+      requiredEvidenceModes: ["full_text"],
+      gatewayCallResults,
+    });
+
+    const instruction = buildCodexScholarlyEvidenceDecisionCorrectionInstruction({
+      audit: validation.audit,
+      requiredEvidenceModes: ["full_text"],
+      gatewayCallResults,
+    });
+
+    expect(instruction).toContain("helix.runtime_agent_scholarly_evidence_decision_rejection.v1");
+    expect(instruction).toContain("scholarly_evidence_decision_missing_or_malformed");
+    expect(instruction).toContain("arxiv:astro-ph/0210382v2");
+    expect(instruction).toContain('"full_text_observation_missing": true');
+    expect(instruction).toContain("Do not answer from lookup-only evidence");
+    expect(instruction).toContain("scholarly-research.fetch_full_text");
+    expect(instruction).toContain("Helix remains responsible for capability and argument admission");
+  });
+
+  it("admits a model-chosen Image Lens recovery only for an explicit scholarly page workflow", () => {
+    const text = 'HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:{"decision":"recover","selected_result_ids":[],"reason":"The PDF is available but page 2 still needs visual inspection.","lane_request":{"capability":"visual_analysis.inspect_image_region","doi":"10.1086/340586","page_number":2,"question":"Read equations, tables, and measurements on page 2."}}';
+    const gatewayCallResults = [{
+      capability_id: "scholarly-research.fetch_full_text",
+      observation: {
+        schema: "helix.scholarly_full_text_observation.v1",
+        artifact_id: "turn:test:fetch:magnetar",
+        evidence_state: "full_text_usable",
+        source_url: "https://example.test/magnetar.pdf",
+      },
+    }] as any;
+
+    expect(validateCodexScholarlyEvidenceDecision({
+      text,
+      phase: "test_visual_recovery_default_closed",
+      gatewayCallResults,
+    }).audit).toMatchObject({
+      status: "invalid",
+      image_lens_recovery_allowed: false,
+      validation_error: "scholarly_recovery_requires_scholarly_lane_request",
+    });
+
+    expect(validateCodexScholarlyEvidenceDecision({
+      text,
+      phase: "test_visual_recovery_explicit_page_workflow",
+      gatewayCallResults,
+      allowImageLensRecovery: true,
+    }).audit).toMatchObject({
+      status: "valid",
+      image_lens_recovery_allowed: true,
+      allowed_recovery_capability_ids: expect.arrayContaining([
+        "scholarly-research.fetch_full_text",
+        "visual_analysis.inspect_image_region",
+      ]),
+      validation_error: null,
+    });
+
+    expect(buildCodexScholarlyEvidenceDecisionInstruction({
+      allowImageLensRecovery: true,
+    })).toContain("visual_analysis.inspect_image_region");
+  });
+
+  it("rejects recovery after Helix closes the bounded scholarly recovery surface", () => {
+    const validation = validateCodexScholarlyEvidenceDecision({
+      text: 'HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:{"decision":"recover","selected_result_ids":[],"reason":"Try the same query again.","lane_request":{"capability":"scholarly-research.lookup_papers","query":"microtubule time crystal experimental pdf primary"}}',
+      phase: "test_recovery_boundary",
+      recoveryAllowed: false,
+      recoveryBoundaryReason: "runtime_agent_repeated_tried_affordance",
+      gatewayCallResults: [{
+        capability_id: "scholarly-research.lookup_papers",
+        observation: {
+          papers: [{ result_id: "doi:10.1063/5.0130618" }],
+        },
+      }] as any,
+    });
+
+    expect(validation.audit).toMatchObject({
+      status: "invalid",
+      decision: "recover",
+      validation_error: "scholarly_recovery_not_allowed_at_terminal_boundary",
+      recovery_allowed: false,
+      recovery_boundary_reason: "runtime_agent_repeated_tried_affordance",
+    });
+  });
+
+  it("removes recover from the final scholarly boundary instruction", () => {
+    const instruction = buildCodexScholarlyEvidenceDecisionInstruction({
+      allowRecovery: false,
+      recoveryBoundaryReason: "hard_step_boundary_reached_with_pending_affordance",
+    });
+
+    expect(instruction).toContain("Do not emit recover or any lane request");
+    expect(instruction).toContain("Choose exactly one of answer, ask_user, or fail");
+    expect(instruction).not.toContain('use {"decision":"recover"');
   });
 
   it("carries scholarly lookup and full-text evidence into stateless Image Lens re-entry", () => {
@@ -471,6 +1175,102 @@ describe("Codex provider capability lane adapter", () => {
     )).toEqual(["visual_evidence"]);
   });
 
+  it("persists the runtime-selected scholarly paper ahead of deterministic lookup order", () => {
+    const record = scholarlyMemoryRecordFromGatewayResult({
+      body: { session_id: "session-runtime-paper-selection" },
+      turnId: "ask:test:runtime-paper-selection",
+      selectedResultIds: ["openalex:rea-2013"],
+      result: {
+        ok: true,
+        capability_id: "scholarly-research.lookup_papers",
+        gateway_admission: { requested_capability: "scholarly-research.lookup_papers" },
+        artifact_refs: ["ask:test:runtime-paper-selection:observation"],
+        observation: {
+          evidence_state: "lookup_usable",
+          selected_for_answer: false,
+          papers: [
+            {
+              result_id: "openalex:unrelated-first",
+              title: "Does a gamma-ray binary harbor a magnetar?",
+              identifiers: { pdf_url: "https://example.test/unrelated.pdf" },
+            },
+            {
+              result_id: "openalex:rea-2013",
+              title: "The Outburst Decay of the Low Magnetic Field Magnetar SGR 0418+5729",
+              identifiers: {
+                doi: "10.1088/0004-637X/770/1/65",
+                pdf_url: "https://example.test/rea-2013.pdf",
+              },
+            },
+          ],
+        },
+        observation_packet: {
+          produced_artifact_refs: ["ask:test:runtime-paper-selection:observation"],
+          state_delta: {},
+        },
+      } as any,
+    });
+
+    expect(record).toMatchObject({
+      selected_for_answer: true,
+      evidence_grade: "answer_grade",
+      runtime_selected_result_ids: ["openalex:rea-2013"],
+      runtime_semantic_selection_status: "matched",
+    });
+    expect(record?.papers.map((paper) => paper.result_id)).toEqual([
+      "openalex:rea-2013",
+      "openalex:unrelated-first",
+    ]);
+  });
+
+  it("binds a deictic full-text lane call to the runtime-selected prior paper", () => {
+    const body: Record<string, unknown> = {
+      question: "Can you get the PDF for that paper and tell me what measurements it reports?",
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "rea-paper",
+            source_ref: "chat.final_answer.previous:rea-paper",
+            text: "Selected Rea et al. 2013, DOI 10.1088/0004-637X/770/1/65.",
+          },
+        },
+      },
+      current_turn_artifact_ledger: [{
+        kind: "scholarly_pdf_workbench_state",
+        payload_schema: "helix.scholarly_pdf_workbench_state.v1",
+        payload: {
+          schema: "helix.scholarly_pdf_workbench_state.v1",
+          paper: {
+            result_id: "openalex:rea-2013",
+            title: "The Outburst Decay of the Low Magnetic Field Magnetar SGR 0418+5729",
+            identifiers: {
+              doi: "10.1088/0004-637X/770/1/65",
+              pdf_url: "https://example.test/rea-2013.pdf",
+            },
+          },
+          runtime_selected_result_ids: ["openalex:rea-2013"],
+          runtime_semantic_selection_status: "matched",
+        },
+      }],
+    };
+    const enriched = enrichCapabilityLaneCandidatesFromBody(body, {
+      capability: "scholarly-research.fetch_full_text",
+      query: "get PDF that tell me what measurements it reports",
+      paper_result_id: "arxiv:unrelated-image-paper",
+      source_url: "https://arxiv.org/pdf/2312.10191v3.pdf",
+    }) as Record<string, unknown>;
+
+    expect(enriched).toMatchObject({
+      capability: "scholarly-research.fetch_full_text",
+      query: "The Outburst Decay of the Low Magnetic Field Magnetar SGR 0418+5729",
+      paper_result_id: "openalex:rea-2013",
+      selected_full_text_paper_ids: ["openalex:rea-2013"],
+      source_url: "https://example.test/rea-2013.pdf",
+      doi: "10.1088/0004-637X/770/1/65",
+    });
+  });
+
   it("bridges a private Research Library PDF observation into renderable scholarly workbench memory", () => {
     const integrityHash = "a".repeat(64);
     const cacheRoot = path.resolve(process.cwd(), "artifacts", "helix", "scholarly-pdfs");
@@ -622,6 +1422,16 @@ describe("Codex provider capability lane adapter", () => {
         page_number: 1,
         source_mount_only: true,
       });
+
+      expect(synthesizeScholarlyPageImageLaneCandidate({
+        question: [
+          "Can you use the calculator to check 8 times 9, then explain how that simple check",
+          "differs from evaluating the paper's equation candidate?",
+        ].join(" "),
+        record,
+        lookup: { status: "found" } as any,
+        source: "prior",
+      })).toBeNull();
 
       const conditionalPageScoutPrompt = [
         "Inspect page 2 of that same paper and extract the first displayed equation with page evidence.",
@@ -1058,6 +1868,68 @@ describe("Codex provider capability lane adapter", () => {
     expect(scholarlyFollowupRequestedModes(
       "Fetch the full text, then extract and transcribe its main equation exactly.",
     )).toEqual(["equation_extraction", "page_image_parse", "full_text"]);
+  });
+
+  it("keeps a natural PDF measurement follow-up on full text and model reasoning", () => {
+    expect(scholarlyFollowupRequestedModes(
+      "Can you get the PDF for that paper and tell me what measurements it reports?",
+    )).toEqual(["full_text", "metadata_context"]);
+  });
+
+  it("reserves numeric extraction for affirmative structured or calculator-bound requests", () => {
+    expect(scholarlyFollowupRequestedModes(
+      "Fetch that paper and extract the named numeric variables with cited units for calculator binding.",
+    )).toEqual(["full_text", "numeric_extraction"]);
+    expect(scholarlyFollowupRequestedModes(
+      "Return the paper's measurements as a structured table with values and units.",
+    )).toEqual(["numeric_extraction"]);
+    expect(scholarlyFollowupRequestedModes(
+      "Do not extract numeric parameters; summarize the measurements in prose.",
+    )).toEqual(["metadata_context"]);
+    expect(scholarlyFollowupRequestedModes(
+      "Later, extract the numeric parameters for calculator binding.",
+    )).toEqual([]);
+    expect(scholarlyFollowupRequestedModes(
+      "The UI says \"extract numeric parameters\", but summarize the paper instead.",
+    )).toEqual(["metadata_context"]);
+    expect(scholarlyFollowupRequestedModes(
+      "Previously we extracted numeric parameters; now explain the paper.",
+    )).toEqual(["metadata_context"]);
+  });
+
+  it("recognizes a natural selected-paper follow-up only when prior scholarly context exists", () => {
+    const question = "Let's use this one. Pull out the useful parts.";
+    const body = {
+      question,
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "magnetar-paper",
+            source_ref: "chat.final_answer.previous:magnetar-paper",
+            text: [
+              "Use Thompson and Duncan (1995), The soft gamma repeaters as very strongly magnetized neutron stars - I.",
+              "DOI: 10.1093/mnras/275.2.255.",
+            ].join(" "),
+          },
+        },
+      },
+    };
+
+    expect(isScholarlyFollowupReferencePrompt(question, body)).toBe(true);
+    expect(isScholarlyFollowupReferencePrompt(question)).toBe(false);
+    expect(isScholarlyFollowupReferencePrompt(
+      "Do not use this one. Pull out the useful parts.",
+      body,
+    )).toBe(false);
+    expect(isScholarlyFollowupReferencePrompt(
+      "Later, use this one and pull out the useful parts.",
+      body,
+    )).toBe(false);
+    expect(isScholarlyFollowupReferencePrompt(
+      'The screen says "Let\'s use this one. Pull out the useful parts." Explain it.',
+      body,
+    )).toBe(false);
   });
 
   it("keeps historical paper-search narration dormant while allowing prior-answer scholarly referents", () => {
@@ -2291,7 +3163,7 @@ describe("Codex provider capability lane adapter", () => {
         schema: "helix.runtime_agent_lane_request_contract.v1",
         legacy_schema: "helix.codex_runtime_lane_request_contract.v1",
         runtime_provider_adapter: "codex",
-        contract_version: "2026-07-02.p7.one_shot.v1",
+        contract_version: "2026-07-07.p8.bounded_pdf_exploration.v1",
         request_marker: "HELIX_CAPABILITY_LANE_REQUEST_JSON:",
         one_shot_lane_loop_enabled: true,
         initial_candidate_present: false,
@@ -2500,7 +3372,7 @@ describe("Codex provider capability lane adapter", () => {
         schema: "helix.runtime_agent_lane_request_contract.v1",
         legacy_schema: "helix.codex_runtime_lane_request_contract.v1",
         runtime_provider_adapter: "codex",
-        contract_version: "2026-07-02.p7.one_shot.v1",
+        contract_version: "2026-07-07.p8.bounded_pdf_exploration.v1",
         initial_candidate_present: false,
         retry_attempted: false,
         final_candidate_present: false,
@@ -2548,6 +3420,78 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
+  it("re-enters an invented capability id so Codex can choose an executable lane", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousCapturePromptPath = process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-provider-capability-correction-"));
+    const capturePromptPath = path.join(tempDir, "prompt.txt");
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"live_translation.translate_words","text":"hello","target_language":"es"}',
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"live_translation.translate_text","text":"hello","target_language":"es","requested_backend_provider":"live_translation.local_runtime"}',
+        "The translation is hola.",
+      ],
+    });
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = capturePromptPath;
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-capability-id-correction",
+          question: "Translate hello to Spanish.",
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const correctionPrompt = fs.readFileSync(path.join(tempDir, "prompt.2.txt"), "utf8");
+      expect(result).toMatchObject({
+        ok: true,
+        response_type: "final_answer",
+        final_status: "completed",
+        answer: "The translation is hola.",
+      });
+      expect(debug.runtime_lane_request_contract).toMatchObject({
+        retry_attempted: true,
+        continuation_lane_candidate_rejection: expect.objectContaining({
+          reason: "runtime_lane_request_capability_not_executable_or_admitted",
+          candidate: expect.objectContaining({
+            capability: "live_translation.translate_words",
+          }),
+        }),
+      });
+      expect(debug.capability_lane_call_results).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          ok: true,
+          capability: "live_translation.translate_text",
+        }),
+      ]));
+      expect(debug.capability_lane_call_results).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ capability: "live_translation.translate_words" }),
+      ]));
+      expect(correctionPrompt).toContain("rejected the prior capability request before execution");
+      expect(correctionPrompt).toContain("live_translation.translate_words");
+      expect(correctionPrompt).toContain("live_translation.translate_text");
+    } finally {
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined) delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined) delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousCapturePromptPath === undefined) delete process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+      else process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = previousCapturePromptPath;
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it("lets ordinary Codex turns request a one-shot lane and answer after observation re-entry", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
@@ -2590,7 +3534,7 @@ describe("Codex provider capability lane adapter", () => {
         schema: "helix.runtime_agent_lane_request_contract.v1",
         legacy_schema: "helix.codex_runtime_lane_request_contract.v1",
         runtime_provider_adapter: "codex",
-        contract_version: "2026-07-02.p7.one_shot.v1",
+        contract_version: "2026-07-07.p8.bounded_pdf_exploration.v1",
         request_marker: "HELIX_CAPABILITY_LANE_REQUEST_JSON:",
         one_shot_lane_loop_enabled: true,
         initial_candidate_present: true,
@@ -2714,7 +3658,8 @@ describe("Codex provider capability lane adapter", () => {
           lane_requested: true,
           lane_executed: true,
           observation_reentered: true,
-          terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+          terminal_authority_status: "authorized_by_terminal_authority_single_writer",
+          terminal_eligible: true,
         }),
       ]));
       expect(debug.provider_reasoning_reentry).toMatchObject({
@@ -2722,10 +3667,10 @@ describe("Codex provider capability lane adapter", () => {
         capability_lane_observation_packet_count: 1,
         evidence_reentered: true,
       });
-      expect(debug.terminal_authority_status).toBe("authorized_by_helix_provider_candidate_bridge");
-      expect(firstPrompt).toContain("Model-visible Helix capability lane manifest:");
-      expect(firstPrompt).toContain("request live_translation.translate_text");
-      expect(firstPrompt).toContain("direct translation answer before the lane observation is non-compliant");
+      expect(debug.terminal_authority_status).toBe("authorized_by_terminal_authority_single_writer");
+      expect(firstPrompt).toContain('"capability_proposal"');
+      expect(firstPrompt).toContain('"live_translation.translate_text"');
+      expect(firstPrompt).toContain("Helix independently validates the capability");
       expect(secondPrompt).toContain("Helix executed the runtime-requested capability lane call");
       expect(secondPrompt).toContain("translated_text");
       expect(secondPrompt).toContain("hola");
@@ -2918,7 +3863,8 @@ describe("Codex provider capability lane adapter", () => {
           lane_id: "helix_terminal_authority",
           status: "completed",
           observation_reentered: true,
-          terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+          terminal_authority_status: "authorized_by_terminal_authority_single_writer",
+          terminal_eligible: true,
         }),
       ]));
       expect(collectorPrompt).toContain("request one or more live_translation.translate_text lane calls");
@@ -3122,7 +4068,7 @@ describe("Codex provider capability lane adapter", () => {
           raw_content_included: false,
         },
       });
-      expect(debug.terminal_authority_status).toBe("authorized_by_helix_provider_candidate_bridge");
+      expect(debug.terminal_authority_status).toBe("authorized_by_terminal_authority_single_writer");
       expect(firstPrompt).toContain("workstation_tool_reference.collect_visible_translation_targets");
       expect(collectorReentryPrompt).toContain("visible target collection");
       expect(collectorReentryPrompt).toContain("live_translation.translate_text");
@@ -9321,7 +10267,7 @@ describe("Codex provider capability lane adapter", () => {
         schema: "helix.runtime_agent_lane_request_contract.v1",
         legacy_schema: "helix.codex_runtime_lane_request_contract.v1",
         runtime_provider_adapter: "codex",
-        contract_version: "2026-07-02.p7.one_shot.v1",
+        contract_version: "2026-07-07.p8.bounded_pdf_exploration.v1",
         request_marker: "HELIX_CAPABILITY_LANE_REQUEST_JSON:",
         one_shot_lane_loop_enabled: true,
         initial_candidate_present: false,
@@ -9535,7 +10481,8 @@ describe("Codex provider capability lane adapter", () => {
         stage: "lane_reentered",
         lane_id: "utility_text",
         capability_id: "utility_text.normalize_text",
-        observation_reentered: true,
+        status: "pending",
+        observation_reentered: false,
         observation_ref: expect.any(String),
         terminal_authority_status: "pending_helix_terminal_authority",
       }),

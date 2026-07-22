@@ -97,6 +97,23 @@ export const readCompoundTerminalPolicy = (
     ...readArray(contract?.subgoals),
     ...readArray(executionState?.compound_subgoal_ledger),
   ].map(readRecord).filter((entry): entry is RecordLike => Boolean(entry));
+  const declaredSubgoalRecords = readArray(contract?.subgoals)
+    .map(readRecord)
+    .filter((entry): entry is RecordLike => Boolean(entry));
+  const effectiveSubgoalRecords = declaredSubgoalRecords.length > 0
+    ? declaredSubgoalRecords
+    : readArray(executionState?.compound_subgoal_ledger)
+      .map(readRecord)
+      .filter((entry): entry is RecordLike => Boolean(entry));
+  const allSubgoalsAreScholarly =
+    effectiveSubgoalRecords.length > 1 &&
+    effectiveSubgoalRecords.every((subgoal) =>
+      readString(subgoal.capability_family) === "scholarly_research" ||
+      readString(subgoal.requested_capability).startsWith("scholarly-research.") ||
+      readString(subgoal.runtime_capability).startsWith("scholarly-research.") ||
+      readString(subgoal.selected_capability).startsWith("scholarly-research.") ||
+      readString(subgoal.executed_capability).startsWith("scholarly-research."),
+    );
   const hasDocsSubgoal = subgoalRecords.some((subgoal) =>
     readString(subgoal.capability_family) === "docs_viewer" ||
     readString(subgoal.requested_capability).startsWith("docs-viewer.") ||
@@ -145,14 +162,6 @@ export const readCompoundTerminalPolicy = (
     };
   }
 
-  const scholarlyResponseModeSelection =
-    readRecord(payload?.scholarly_response_mode_selection) ??
-    readRecord(debug?.scholarly_response_mode_selection);
-  const selectedScholarlyTerminalKind =
-    hasScholarlyResearchSubgoal && scholarlyResponseModeSelection?.terminal_eligible === true
-      ? readString(scholarlyResponseModeSelection.terminal_artifact_kind) ||
-        readString(scholarlyResponseModeSelection.selected_response_mode)
-      : "";
   const routeCheckedScholarlyTerminalKinds = new Set([
     "scholarly_research_answer",
     "scholarly_metadata_answer",
@@ -162,6 +171,22 @@ export const readCompoundTerminalPolicy = (
     "scholarly_exploratory_candidates",
     "scholarly_parse_required",
   ]);
+  const scholarlyResponseModeSelection =
+    readRecord(payload?.scholarly_response_mode_selection) ??
+    readRecord(debug?.scholarly_response_mode_selection);
+  const selectedScholarlyTerminalKind =
+    hasScholarlyResearchSubgoal && scholarlyResponseModeSelection?.terminal_eligible === true
+      ? readString(scholarlyResponseModeSelection.terminal_artifact_kind) ||
+        readString(scholarlyResponseModeSelection.selected_response_mode)
+      : "";
+  const canonicalScholarlyTerminalKind = readString(canonicalGoalFrame?.required_terminal_kind);
+  const sameFamilyScholarlyTerminalKind = allSubgoalsAreScholarly
+    ? routeCheckedScholarlyTerminalKinds.has(selectedScholarlyTerminalKind)
+      ? selectedScholarlyTerminalKind
+      : routeCheckedScholarlyTerminalKinds.has(canonicalScholarlyTerminalKind)
+        ? canonicalScholarlyTerminalKind
+        : ""
+    : "";
   const fallbackAllowed = unique([
     ...COMPOUND_SYNTHESIS_TERMINAL_KINDS,
     hasDocsSubgoal ? "doc_evidence_synthesis_answer" : "",
@@ -169,6 +194,7 @@ export const readCompoundTerminalPolicy = (
     routeCheckedScholarlyTerminalKinds.has(selectedScholarlyTerminalKind)
       ? selectedScholarlyTerminalKind
       : "",
+    sameFamilyScholarlyTerminalKind,
   ]);
   const shapeAllowedTerminalKindSet = new Set<string>(fallbackAllowed);
   const declaredAllowed = unique([
@@ -197,23 +223,25 @@ export const readCompoundTerminalPolicy = (
         ? "model_synthesized_answer"
         : allowed[0] ?? null);
   const requiredTerminalKind =
-    hasDocsSubgoal && allowed.includes("doc_evidence_synthesis_answer")
-      ? "doc_evidence_synthesis_answer"
-      : hasResearchLocatorSubgoal && allowed.includes("compound_research_locator_answer")
-        ? "compound_research_locator_answer"
-      : allowed.includes("compound_evidence_synthesis_answer")
-        ? "compound_evidence_synthesis_answer"
-      : rawRequiredTerminalKind &&
-          allowed.includes(rawRequiredTerminalKind) &&
-          !forbidden.includes(rawRequiredTerminalKind)
-        ? rawRequiredTerminalKind
-        : allowed.includes("doc_evidence_synthesis_answer")
-          ? "doc_evidence_synthesis_answer"
+    sameFamilyScholarlyTerminalKind && allowed.includes(sameFamilyScholarlyTerminalKind)
+      ? sameFamilyScholarlyTerminalKind
+      : hasDocsSubgoal && allowed.includes("doc_evidence_synthesis_answer")
+        ? "doc_evidence_synthesis_answer"
+        : hasResearchLocatorSubgoal && allowed.includes("compound_research_locator_answer")
+          ? "compound_research_locator_answer"
           : allowed.includes("compound_evidence_synthesis_answer")
             ? "compound_evidence_synthesis_answer"
-            : allowed.includes("model_synthesized_answer")
-              ? "model_synthesized_answer"
-              : allowed[0] ?? null;
+            : rawRequiredTerminalKind &&
+                allowed.includes(rawRequiredTerminalKind) &&
+                !forbidden.includes(rawRequiredTerminalKind)
+              ? rawRequiredTerminalKind
+              : allowed.includes("doc_evidence_synthesis_answer")
+                ? "doc_evidence_synthesis_answer"
+                : allowed.includes("compound_evidence_synthesis_answer")
+                  ? "compound_evidence_synthesis_answer"
+                  : allowed.includes("model_synthesized_answer")
+                    ? "model_synthesized_answer"
+                    : allowed[0] ?? null;
 
   return {
     active: true,

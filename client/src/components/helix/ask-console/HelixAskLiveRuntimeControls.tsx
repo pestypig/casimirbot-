@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Activity,
   CircleCheck,
@@ -28,6 +28,7 @@ import {
   type HelixAskLiveRuntimeTransportControllerState,
 } from "./HelixAskLiveRuntimeLifecycle";
 import { useHelixAskLiveRuntimeSession } from "./useHelixAskLiveRuntimeSession";
+import { HelixAskSharedLiveRoomControls } from "./shared-live-room";
 
 export type HelixAskLiveRuntimeControlsModel = {
   visible: boolean;
@@ -146,15 +147,18 @@ export function buildHelixAskLiveRuntimeControlsModel(args: {
 export function HelixAskLiveRuntimeControls({
   model,
   onToolbarBridgeChange,
+  onVisualInputEnableRequested,
 }: {
   model: HelixAskLiveRuntimeControlsModel;
   onToolbarBridgeChange?: (bridge: HelixAskLiveRuntimeToolbarBridge | null) => void;
+  onVisualInputEnableRequested?: () => void;
 }) {
   if (!model.visible) return null;
   return (
     <HelixAskVisibleLiveRuntimeControls
       model={model}
       onToolbarBridgeChange={onToolbarBridgeChange}
+      onVisualInputEnableRequested={onVisualInputEnableRequested}
     />
   );
 }
@@ -162,9 +166,11 @@ export function HelixAskLiveRuntimeControls({
 function HelixAskVisibleLiveRuntimeControls({
   model,
   onToolbarBridgeChange,
+  onVisualInputEnableRequested,
 }: {
   model: HelixAskLiveRuntimeControlsModel;
   onToolbarBridgeChange?: (bridge: HelixAskLiveRuntimeToolbarBridge | null) => void;
+  onVisualInputEnableRequested?: () => void;
 }) {
   const [mode, setMode] = useState<HelixLiveRuntimeAgentMode>(
     model.controlState.runtime_agent_mode,
@@ -172,11 +178,13 @@ function HelixAskVisibleLiveRuntimeControls({
   const [authority, setAuthority] = useState<HelixLiveRuntimeAgentAuthority>(
     model.controlState.runtime_agent_authority,
   );
+  const [sharedRoomTransportBound, setSharedRoomTransportBound] = useState(false);
   const runtime = useHelixAskLiveRuntimeSession({
     enabled: !model.locked,
     mode,
     authority,
     selectedRuntimeAgentProvider: model.selectedRuntimeAgentProvider,
+    directVisualInputSuppressed: sharedRoomTransportBound,
     initialLifecycleState: model.lifecycleState,
     initialTransportState: model.transportControllerState,
   });
@@ -196,6 +204,15 @@ function HelixAskVisibleLiveRuntimeControls({
     runtime.transportState === "connecting" ||
     runtime.transportState === "active";
   const workerRelayIndicator = describeHelixAskWorkerRelayStatus(runtime.workerRelayStatus);
+  const toggleVisualInput = useCallback(() => {
+    const nextEnabled = !runtime.visualInputEnabled;
+    if (nextEnabled) onVisualInputEnableRequested?.();
+    runtime.setVisualInputEnabled(nextEnabled);
+  }, [
+    onVisualInputEnableRequested,
+    runtime.setVisualInputEnabled,
+    runtime.visualInputEnabled,
+  ]);
   useEffect(() => {
     if (!onToolbarBridgeChange) return;
     onToolbarBridgeChange({
@@ -208,9 +225,7 @@ function HelixAskVisibleLiveRuntimeControls({
       },
       visualInputEnabled: runtime.visualInputEnabled,
       visualInputToggleDisabled: !runtime.active,
-      toggleVisualInput: () => {
-        runtime.setVisualInputEnabled(!runtime.visualInputEnabled);
-      },
+      toggleVisualInput,
     });
     return () => onToolbarBridgeChange(null);
   }, [
@@ -219,8 +234,8 @@ function HelixAskVisibleLiveRuntimeControls({
     runtime.active,
     runtime.microphoneEnabled,
     runtime.setMicrophoneEnabled,
-    runtime.setVisualInputEnabled,
     runtime.visualInputEnabled,
+    toggleVisualInput,
   ]);
   const cycleMode = () => {
     const index = modeOptions.indexOf(mode);
@@ -269,6 +284,19 @@ function HelixAskVisibleLiveRuntimeControls({
         <Activity className="h-4 w-4" />
         <span>{labelForHelixAskLiveRuntimeLifecycleState(runtime.lifecycleState)}</span>
       </button>
+      <HelixAskSharedLiveRoomControls
+        realtimeSessionId={runtime.realtimeSessionId}
+        runtimeActive={runtime.active}
+        realtimeModel={mode === "live_voice_mini" ? "gpt-realtime-2.1-mini" : "gpt-realtime-2.1"}
+        visualInputEnabled={runtime.visualInputEnabled}
+        onSharedTransportChange={setSharedRoomTransportBound}
+        onHostTransportConsentRevoked={() => {
+          void runtime.stop();
+        }}
+        onOwnerRoomClosed={() => {
+          void runtime.stop();
+        }}
+      />
       {runtime.active ? (
         <>
           <button
@@ -301,14 +329,16 @@ function HelixAskVisibleLiveRuntimeControls({
               : "Share visual frames with GPT Live"}
             aria-pressed={runtime.visualInputEnabled}
             title={runtime.visualInputError ?? (runtime.visualInputEnabled
-              ? `GPT Live receives frames from the active Screen or Camera source (${runtime.visualInputFrameCount} sent)`
-              : "Route the active Screen or Camera source to GPT Live")}
+              ? runtime.visualInputFrameCount > 0
+                ? `GPT Live receives automatic frames from the active Screen or Camera source (${runtime.visualInputFrameCount} sent)`
+                : "GPT Live Vision is enabled and waiting for the selected Screen or Camera source; captures run automatically every 10 seconds (0 sent)"
+              : "Enable GPT Live Vision and start the selected Screen or Camera source with automatic 10-second captures")}
             className={`inline-flex h-10 shrink-0 snap-center items-center gap-2 rounded-full border px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70 ${
               runtime.visualInputEnabled
                 ? "border-cyan-300/55 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/20"
                 : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
             }`}
-            onClick={() => runtime.setVisualInputEnabled(!runtime.visualInputEnabled)}
+            onClick={toggleVisualInput}
           >
             {runtime.visualInputEnabled ? (
               <Eye className="h-4 w-4 animate-pulse" />

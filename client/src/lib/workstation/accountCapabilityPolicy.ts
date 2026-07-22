@@ -14,6 +14,39 @@ let cachedPolicy: HelixAccountCapabilityPolicy | null = null;
 let cachedProfileId: string | null | undefined;
 let cachedProfileRevision = 0;
 
+const stringArraysEqual = (left: string[], right: string[]): boolean =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
+
+const accountPoliciesEqual = (
+  left: HelixAccountCapabilityPolicy | null,
+  right: HelixAccountCapabilityPolicy | null,
+): boolean => {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return (
+    left.schema === right.schema &&
+    left.account_type === right.account_type &&
+    left.max_workstation_permission === right.max_workstation_permission &&
+    stringArraysEqual(left.allowed_panels, right.allowed_panels) &&
+    stringArraysEqual(left.locked_panels, right.locked_panels) &&
+    stringArraysEqual(left.locked_features, right.locked_features) &&
+    stringArraysEqual(left.allowed_runtime_agents, right.allowed_runtime_agents) &&
+    stringArraysEqual(
+      left.allowed_workstation_capabilities,
+      right.allowed_workstation_capabilities,
+    ) &&
+    stringArraysEqual(
+      left.locked_workstation_capabilities,
+      right.locked_workstation_capabilities,
+    ) &&
+    stringArraysEqual(left.feature_flags, right.feature_flags) &&
+    left.quotas.profile_storage_bytes === right.quotas.profile_storage_bytes &&
+    left.quotas.model_tokens_per_turn === right.quotas.model_tokens_per_turn &&
+    left.quotas.model_tokens_per_day === right.quotas.model_tokens_per_day &&
+    left.quotas.runtime_minutes_per_day === right.quotas.runtime_minutes_per_day
+  );
+};
+
 const readStoredProfileId = (): string | null | undefined => {
   if (typeof window === "undefined") return undefined;
   try {
@@ -88,6 +121,7 @@ export function cacheAccountCapabilityPolicy(
   policy: HelixAccountCapabilityPolicy | null,
   profileId?: string | null,
 ): HelixAccountCapabilityPolicy | null {
+  const previousPolicy = cachedPolicy;
   const previousProfileId = cachedProfileId === undefined
     ? readStoredProfileId()
     : cachedProfileId;
@@ -100,18 +134,23 @@ export function cacheAccountCapabilityPolicy(
     profileId !== undefined &&
     previousProfileId !== undefined &&
     normalizedProfileId !== previousProfileId;
+  const profileIdentityChanged =
+    profileId !== undefined && normalizedProfileId !== previousProfileId;
+  const policyChanged = !accountPoliciesEqual(previousPolicy, policy);
   cachedPolicy = policy;
   cachedProfileId = normalizedProfileId;
   if (profileId !== undefined) storeProfileId(normalizedProfileId ?? null);
   if (profileChanged) cachedProfileRevision += 1;
-  dispatchAccountPolicyEvent({
-    account_policy: policy,
-    account_profile_id: normalizedProfileId ?? null,
-    account_profile_identity_known: normalizedProfileId !== undefined,
-    account_profile_changed: profileChanged,
-    account_profile_cross_tab: false,
-    account_profile_revision: cachedProfileRevision,
-  });
+  if (policyChanged || profileIdentityChanged) {
+    dispatchAccountPolicyEvent({
+      account_policy: policy,
+      account_profile_id: normalizedProfileId ?? null,
+      account_profile_identity_known: normalizedProfileId !== undefined,
+      account_profile_changed: profileChanged,
+      account_profile_cross_tab: false,
+      account_profile_revision: cachedProfileRevision,
+    });
+  }
   if (profileChanged) broadcastAccountProfileChange();
   return cachedPolicy;
 }

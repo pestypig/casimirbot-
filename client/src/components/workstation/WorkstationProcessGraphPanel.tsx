@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Download, Filter, Network, RotateCcw, Search, Trash2 } from "lucide-react";
+import { createWorkstationProcessGraphDisplaySelector } from "@/lib/workstation/processGraph/processGraphDisplayProjection";
 import { renderWorkstationProcessGraphSvg } from "@/lib/workstation/processGraph/renderProcessGraphSvg";
 import type {
   WorkstationProcessGraphTimelineEntry,
@@ -49,6 +50,11 @@ function matchesFilter(node: WorkstationProcessNode, filter: string): boolean {
 
 export default function WorkstationProcessGraphPanel() {
   const graph = useWorkstationProcessGraphStore((state) => state.graph);
+  const selectPanelDisplayGraph = React.useMemo(
+    () => createWorkstationProcessGraphDisplaySelector({ maxNodes: 120, maxEdges: 220 }),
+    [],
+  );
+  const panelDisplayGraph = useWorkstationProcessGraphStore(selectPanelDisplayGraph);
   const focusNode = useWorkstationProcessGraphStore((state) => state.focusNode);
   const filterView = useWorkstationProcessGraphStore((state) => state.filterView);
   const clearHistorical = useWorkstationProcessGraphStore((state) => state.clearHistorical);
@@ -86,7 +92,7 @@ export default function WorkstationProcessGraphPanel() {
   const panelSvg = React.useMemo(
     () =>
       renderWorkstationProcessGraphSvg({
-        graph,
+        graph: panelDisplayGraph,
         width: 1400,
         height: 760,
         density: "panel",
@@ -94,7 +100,7 @@ export default function WorkstationProcessGraphPanel() {
         maxNodes: 120,
         maxEdges: 220,
       }),
-    [graph],
+    [panelDisplayGraph],
   );
 
   const exportSvg = React.useCallback(() => {

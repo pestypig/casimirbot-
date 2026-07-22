@@ -141,6 +141,16 @@ describe("scholarly research lookup relevance", () => {
 
     expect(observation.evidence_state).toBe("lookup_weak_match");
     expect(observation.selected_for_answer).toBe(false);
+    expect(observation).toMatchObject({
+      semantic_relevance_authority: "runtime_agent",
+      deterministic_lookup_relevance_role: "advisory_only",
+      runtime_agent_semantic_selection_required: true,
+    });
+    expect(observation.lookup_relevance_gate).toMatchObject({
+      semantic_relevance_authority: "runtime_agent",
+      deterministic_lookup_relevance_role: "advisory_only",
+      runtime_agent_semantic_selection_required: true,
+    });
     expect(observation.scholarly_lookup_recovery_affordance).toMatchObject({
       reason: "lookup_weak_match",
       rejected_results: [
@@ -152,6 +162,75 @@ describe("scholarly research lookup relevance", () => {
         }),
       ],
     });
+  });
+
+  it("does not treat conversational request wording as scholarly topic evidence", async () => {
+    const fetchImpl: ScholarlyFetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: [
+          {
+            paperId: "unrelated-drugs-title",
+            title: "Don't Give Me Drugs",
+            abstract: "A discussion unrelated to compact stars or magnetic fields.",
+            authors: [{ name: "C. Author" }],
+            year: 2019,
+          },
+        ],
+      }),
+    });
+
+    const observation = await runScholarlyResearchLookup({
+      turnId: "ask:natural-magnetar-request-relevance",
+      callId: "call:natural-magnetar-request-relevance",
+      query: "give me a good primary about magnetars that we can work with",
+      providers: ["semantic_scholar"],
+      limit: 5,
+      fetchImpl,
+    });
+
+    expect(observation.evidence_state).toBe("lookup_weak_match");
+    expect(observation.selected_for_answer).toBe(false);
+    expect(observation.lookup_relevance_gate?.required_any).toContain("magnetar");
+    expect(observation.lookup_relevance_gate?.required_any).not.toEqual(
+      expect.arrayContaining(["give", "me", "good", "about", "we"]),
+    );
+    expect(observation.lookup_relevance_gate?.candidate_evaluations).toEqual([
+      expect.objectContaining({
+        supported: false,
+        matched_tokens: [],
+      }),
+    ]);
+    expect(observation.next_affordances.length).toBeGreaterThan(0);
+  });
+
+  it("keeps generic recovery queries bounded instead of compounding retry modifiers", async () => {
+    const fetchImpl: ScholarlyFetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [] }),
+    });
+
+    const observation = await runScholarlyResearchLookup({
+      turnId: "ask:bounded-magnetar-recovery",
+      callId: "call:bounded-magnetar-recovery",
+      query: "magnetar primary research review arxiv",
+      providers: ["semantic_scholar"],
+      limit: 5,
+      fetchImpl,
+    });
+
+    const recoveryQueries = observation.next_affordances
+      .map((affordance) => affordance.query)
+      .filter((query): query is string => Boolean(query));
+    expect(recoveryQueries.length).toBeLessThanOrEqual(3);
+    expect(recoveryQueries).toEqual(expect.arrayContaining([
+      "magnetar primary",
+      "magnetar primary review",
+      "magnetar primary arxiv",
+    ]));
+    expect(recoveryQueries.join(" ")).not.toMatch(/review\s+review|arxiv\s+arxiv|review\s+arxiv\s+(?:review|arxiv)/i);
   });
 
   it("rejects generic quantum-inequality constraint matches without the negative-energy anchor", async () => {

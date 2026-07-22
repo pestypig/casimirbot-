@@ -46,6 +46,7 @@ export type HelixPostulateRuntimeReviewTerminal = {
 };
 
 const PROVIDER_AUTHORED_ROUTE_PRODUCT_KINDS = new Set([
+  "direct_answer_text",
   "model_synthesized_answer",
   "doc_evidence_synthesis_answer",
   "repo_code_evidence_answer",
@@ -757,7 +758,9 @@ export const materializeAgentProviderRouteProductTerminal = (input: {
 
   const rejectedSupportRefs = requestedSupportRefs.filter((ref) => !currentTurnArtifactRefs.has(ref));
   const artifactRef = `${authorityRef}:route_product:${targetKind}`;
-  const targetSchema = targetKind === "compound_evidence_synthesis_answer"
+  const targetSchema = targetKind === "direct_answer_text"
+    ? "helix.direct_answer_text.v1"
+    : targetKind === "compound_evidence_synthesis_answer"
     ? "helix.compound_evidence_synthesis_answer.v1"
     : targetKind === "compound_research_locator_answer"
       ? "helix.compound_research_locator_answer.v1"

@@ -521,6 +521,7 @@ export async function runVisualFrameProducerOnce(input: {
     captured_at: frameAt,
     preview_data_url: imageBase64,
     preview_hash: frameHash,
+    source_surface: input.sourceSurface ?? "screen",
     summary,
     visual_observer_profile_id: readEvidenceString(evidence, "visual_observer_profile_id"),
     visual_observer_profile_title: readEvidenceString(evidence, "visual_observer_profile_title"),

@@ -131,6 +131,15 @@ client/public/originals/*
 /.cache/
 /tmp/
 /training-trace*.jsonl
+
+# Casimir Spec evaluator-custody material must never be tracked. Real blinded
+# calibration/held-out packs belong outside the checkout; these rules are only
+# a last-line guard against accidental staging.
+/datasets/benchmarks/casimir-spec/restricted/
+/datasets/benchmarks/casimir-spec/blinded-calibration/
+/datasets/benchmarks/casimir-spec/confirmatory-heldout/
+*.casimir-spec-hidden-bundle.json
+*.casimir-spec-hidden-salt
 # Replit/local caches
 /.pythonlibs/
 /.local/

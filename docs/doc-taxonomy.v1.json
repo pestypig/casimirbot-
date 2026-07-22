@@ -166,6 +166,22 @@
         "calculatorReady": true,
         "contentAuthority": "bounded_docs_observation_required"
       }
+    },
+    {
+      "path": "docs/research/casimir-dp-quantum-foam-study.md",
+      "docClass": "canonical-research",
+      "bundleKind": "equation-action-whitepaper",
+      "canonical": true,
+      "title": "Boundary-Condition Casimir Observables and Diósi–Penrose Collapse",
+      "sidecars": [
+        "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
+        "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json"
+      ],
+      "toolHints": {
+        "preferMarkdownOverSidecars": true,
+        "calculatorReady": true,
+        "contentAuthority": "bounded_docs_observation_required"
+      }
     }
   ]
 }

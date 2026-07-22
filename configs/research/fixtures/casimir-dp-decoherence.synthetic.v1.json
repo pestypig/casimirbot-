@@ -1,0 +1,40 @@
+{
+  "schema_version": "casimir_dp_acquisition_sidecar/1",
+  "sidecar_id": "decoherence-synthetic-fixture-v1",
+  "candidate_id": "separately-prepared-material-superposition",
+  "evidence_class": "synthetic_fixture",
+  "acquisition_window_s": 0.1,
+  "blinded_boundary_label": "boundary-A",
+  "calibration_refs": [
+    "synthetic-calibration://visibility-v1",
+    "synthetic-calibration://pressure-v1",
+    "synthetic-calibration://vibration-v1"
+  ],
+  "observable_order": [
+    "gas_rate_s",
+    "blackbody_rate_s",
+    "thermal_rate_s",
+    "vibration_rate_s",
+    "electromagnetic_rate_s",
+    "readout_rate_s",
+    "switching_rate_s"
+  ],
+  "observables": {
+    "gas_rate_s": { "value": 0.8, "standard_uncertainty": 0.08, "unit": "s^-1" },
+    "blackbody_rate_s": { "value": 0.4, "standard_uncertainty": 0.04, "unit": "s^-1" },
+    "thermal_rate_s": { "value": 0.3, "standard_uncertainty": 0.03, "unit": "s^-1" },
+    "vibration_rate_s": { "value": 0.25, "standard_uncertainty": 0.025, "unit": "s^-1" },
+    "electromagnetic_rate_s": { "value": 0.2, "standard_uncertainty": 0.02, "unit": "s^-1" },
+    "readout_rate_s": { "value": 0.15, "standard_uncertainty": 0.015, "unit": "s^-1" },
+    "switching_rate_s": { "value": 0.05, "standard_uncertainty": 0.005, "unit": "s^-1" }
+  },
+  "covariance": [
+    [0.0064, 0, 0, 0, 0, 0, 0],
+    [0, 0.0016, 0, 0, 0, 0, 0],
+    [0, 0, 0.0009, 0, 0, 0, 0],
+    [0, 0, 0, 0.000625, 0, 0, 0],
+    [0, 0, 0, 0, 0.0004, 0, 0],
+    [0, 0, 0, 0, 0, 0.000225, 0],
+    [0, 0, 0, 0, 0, 0, 0.000025]
+  ]
+}

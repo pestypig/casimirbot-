@@ -28,6 +28,7 @@ export type DocumentImageSourceState = {
   regionId?: string | null;
   scientificEvidenceSidecarId?: string | null;
   scholarlySourcePdfRef?: string | null;
+  scholarlyPdfCachePath?: string | null;
   sourceRefHash?: string | null;
   mountedAt?: string | null;
 };
@@ -105,6 +106,7 @@ const readPersistedSourceImage = (): DocumentImageSourceState | null => {
       regionId: typeof record.regionId === "string" ? record.regionId : null,
       scientificEvidenceSidecarId: typeof record.scientificEvidenceSidecarId === "string" ? record.scientificEvidenceSidecarId : null,
       scholarlySourcePdfRef: typeof record.scholarlySourcePdfRef === "string" ? record.scholarlySourcePdfRef : null,
+      scholarlyPdfCachePath: typeof record.scholarlyPdfCachePath === "string" ? record.scholarlyPdfCachePath : null,
       sourceRefHash: typeof record.sourceRefHash === "string" ? record.sourceRefHash : null,
       mountedAt: typeof record.mountedAt === "string" ? record.mountedAt : null,
     };

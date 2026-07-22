@@ -1,4 +1,7 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
 import sharp from "sharp";
 import {
   HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
@@ -103,6 +106,149 @@ const isDegenerateBbox = (bbox: DocumentImageBboxPxV1): boolean =>
 
 const nonEmpty = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
+
+const isInlineImageRef = (value: unknown): value is string =>
+  typeof value === "string" && /^data:image\//i.test(value.trim());
+
+type ScholarlyPdfPageMaterialization = {
+  request: ImageLensRegionInspectionRequestV1;
+  errorCode: string | null;
+  errorMessage: string | null;
+};
+
+const scholarlyPdfCacheRoot = (): string =>
+  path.resolve(process.cwd(), "artifacts", "helix", "scholarly-pdfs");
+
+const isPathInside = (candidate: string, root: string): boolean => {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+};
+
+const resolveScholarlyPdfCachePath = (request: ImageLensRegionInspectionRequestV1): string | null => {
+  const root = scholarlyPdfCacheRoot();
+  const requestedCachePath = nonEmpty(request.scholarly_pdf_cache_path);
+  if (requestedCachePath) {
+    const resolved = path.resolve(requestedCachePath);
+    if (isPathInside(resolved, root) && path.extname(resolved).toLowerCase() === ".pdf" && fs.existsSync(resolved)) {
+      return resolved;
+    }
+  }
+
+  const pdfRef = nonEmpty(request.scholarly_source_pdf_ref);
+  const match = pdfRef?.match(/^artifact:\/\/scholarly-pdf\/([^/?#]+\.pdf)$/i);
+  if (!match?.[1]) return null;
+  const resolved = path.resolve(root, path.basename(match[1]));
+  return isPathInside(resolved, root) && fs.existsSync(resolved) ? resolved : null;
+};
+
+const readPdfPageCount = (cachePath: string): number | null => {
+  try {
+    const output = execFileSync(nonEmpty(process.env.PDFINFO_BIN) ?? "pdfinfo", [cachePath], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const match = output.match(/^Pages:\s*(\d+)\s*$/im);
+    const parsed = Number.parseInt(match?.[1] ?? "", 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const materializeScholarlyPdfPage = (
+  request: ImageLensRegionInspectionRequestV1,
+): ScholarlyPdfPageMaterialization => {
+  const shouldMaterialize =
+    request.source_kind === "pdf_page_render" &&
+    typeof request.page_number === "number" &&
+    !isInlineImageRef(request.page_image_ref) &&
+    !isInlineImageRef(request.source_image_ref);
+  if (!shouldMaterialize) return { request, errorCode: null, errorMessage: null };
+
+  const pageNumber = Math.max(1, Math.floor(request.page_number ?? 1));
+  const cachePath = resolveScholarlyPdfCachePath(request);
+  if (!cachePath) {
+    return {
+      request,
+      errorCode: "scholarly_pdf_cache_unavailable",
+      errorMessage: "The mounted PDF cache is unavailable; fetch the paper full text again before changing pages.",
+    };
+  }
+
+  const pageCount = readPdfPageCount(cachePath) ?? request.page_count ?? null;
+  if (pageCount && pageNumber > pageCount) {
+    return {
+      request,
+      errorCode: "pdf_page_out_of_range",
+      errorMessage: `PDF page ${pageNumber} is outside the available range of 1-${pageCount}.`,
+    };
+  }
+
+  const outputRoot = path.resolve(process.cwd(), "artifacts", "helix", "scholarly-page-images");
+  fs.mkdirSync(outputRoot, { recursive: true });
+  const imageId = hashShort([cachePath, request.scholarly_source_pdf_ref ?? request.source_id, pageNumber]);
+  const outputPrefix = path.join(outputRoot, `${imageId}-page-${pageNumber}`);
+  const outputPath = `${outputPrefix}.png`;
+  if (!fs.existsSync(outputPath)) {
+    try {
+      execFileSync(nonEmpty(process.env.PDFTOPPM_BIN) ?? "pdftoppm", [
+        "-f",
+        String(pageNumber),
+        "-l",
+        String(pageNumber),
+        "-png",
+        "-singlefile",
+        "-r",
+        "144",
+        cachePath,
+        outputPrefix,
+      ], { stdio: "ignore" });
+    } catch {
+      return {
+        request,
+        errorCode: "pdf_page_render_failed",
+        errorMessage: `PDF page ${pageNumber} could not be rendered.`,
+      };
+    }
+  }
+  if (!fs.existsSync(outputPath)) {
+    return {
+      request,
+      errorCode: "pdf_page_render_failed",
+      errorMessage: `PDF page ${pageNumber} could not be rendered.`,
+    };
+  }
+
+  const imageBuffer = fs.readFileSync(outputPath);
+  const dimensions =
+    imageBuffer.length >= 24 && imageBuffer.subarray(1, 4).toString("ascii") === "PNG"
+      ? {
+          width: imageBuffer.readUInt32BE(16),
+          height: imageBuffer.readUInt32BE(20),
+        }
+      : null;
+  const boundedDimensions = dimensions && dimensions.width > 1 && dimensions.height > 1
+    ? dimensions
+    : request.source_dimensions_px ?? null;
+  const dataUrl = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+
+  return {
+    request: {
+      ...request,
+      page_number: pageNumber,
+      page_count: pageCount,
+      page_image_ref: dataUrl,
+      source_image_ref: dataUrl,
+      scholarly_pdf_cache_path: cachePath,
+      source_dimensions_px: boundedDimensions,
+      bbox_px: boundedDimensions
+        ? { x: 0, y: 0, width: boundedDimensions.width, height: boundedDimensions.height }
+        : request.bbox_px,
+    },
+    errorCode: null,
+    errorMessage: null,
+  };
+};
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => value?.trim() ?? "").filter(Boolean)));
@@ -1018,26 +1164,75 @@ export const runImageLensRegionInspection = async (input: {
   iteration?: number | null;
   env?: NodeJS.ProcessEnv;
 }): Promise<ImageLensRegionInspectionResultV1> => {
-  const turnId = input.turnId?.trim() || input.request.turn_id?.trim() || "ask:lane:image_lens";
+  const pageMaterialization = materializeScholarlyPdfPage(input.request);
+  const request = pageMaterialization.request;
+  const turnId = input.turnId?.trim() || request.turn_id?.trim() || "ask:lane:image_lens";
   const iteration = typeof input.iteration === "number" && Number.isFinite(input.iteration)
     ? Math.max(0, Math.trunc(input.iteration))
     : 0;
   const trace = admitLocalPdfPageMount({
-    request: input.request,
+    request,
     trace: resolveHelixCapabilityLaneRequest({
       provider: input.provider,
       requestedLane: LANE_ID,
-      requestedBackendProvider: input.request.requested_backend_provider ?? null,
+      requestedBackendProvider: request.requested_backend_provider ?? null,
       env: input.env,
     }),
   });
-  const normalizedSourceId = input.request.source_id.trim();
-  const bbox = await resolveEffectiveBbox(input.request);
+  const normalizedSourceId = request.source_id.trim();
+  const bbox = await resolveEffectiveBbox(request);
+
+  if (pageMaterialization.errorCode) {
+    const observationRef = `${turnId}:capability_lane:${IMAGE_LENS_REGION_INSPECTION_CAPABILITY}:${hashShort({
+      status: pageMaterialization.errorCode,
+      pageNumber: request.page_number ?? null,
+    })}`;
+    const packet = buildObservationPacket({
+      request,
+      turnId,
+      iteration,
+      status: "missing_input",
+      summary: pageMaterialization.errorMessage ?? "The requested PDF page could not be materialized.",
+      observationRef,
+      receipt: null,
+      backendSelectionDecision: trace.backend_selection_decision,
+      missingRequirements: [{
+        code: pageMaterialization.errorCode,
+        message: pageMaterialization.errorMessage ?? "The requested PDF page could not be materialized.",
+        repair_action: pageMaterialization.errorCode === "scholarly_pdf_cache_unavailable"
+          ? "fetch_full_text_before_pdf_page_navigation"
+          : "choose_an_available_pdf_page",
+      }],
+    });
+    return {
+      schema: IMAGE_LENS_REGION_INSPECTION_RESULT_SCHEMA,
+      ok: false,
+      lane_id: LANE_ID,
+      capability: IMAGE_LENS_REGION_INSPECTION_CAPABILITY,
+      selected_runtime_agent_provider: input.provider.id,
+      lane_resolve_trace: withExecutionTrace({
+        trace,
+        observationRef,
+        receiptRef: null,
+        status: "not_executed_shadow_only",
+        blockedReason: pageMaterialization.errorCode,
+      }),
+      observation: null,
+      observation_packet: packet,
+      receipt: null,
+      artifact_refs: packet.produced_artifact_refs,
+      error: pageMaterialization.errorCode,
+      reentry_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
 
   if (!normalizedSourceId) {
     const observationRef = `${turnId}:capability_lane:${IMAGE_LENS_REGION_INSPECTION_CAPABILITY}:${hashShort({ status: "missing_source_id", bbox })}`;
     const packet = buildObservationPacket({
-      request: input.request,
+      request,
       turnId,
       iteration,
       status: "missing_input",
@@ -1079,7 +1274,7 @@ export const runImageLensRegionInspection = async (input: {
   if (trace.admission_status !== "admitted_shadow_only") {
     const observationRef = `${turnId}:capability_lane:${IMAGE_LENS_REGION_INSPECTION_CAPABILITY}:${hashShort({ status: trace.admission_status, bbox })}`;
     const packet = buildObservationPacket({
-      request: input.request,
+      request,
       turnId,
       iteration,
       status: "blocked",
@@ -1113,16 +1308,16 @@ export const runImageLensRegionInspection = async (input: {
     };
   }
 
-  const cropImageRef = cropImageRefFor(input.request, bbox);
+  const cropImageRef = cropImageRefFor(request, bbox);
   const regionId = `image_lens_region:${hashShort({
     sourceId: normalizedSourceId,
-    frameId: input.request.frame_id ?? null,
+    frameId: request.frame_id ?? null,
     bbox,
     cropImageRef,
   })}`;
   const evidenceId = `${turnId}:image_lens_region_inspection:${hashShort({ regionId, cropImageRef })}`;
   const generatedAt = new Date().toISOString();
-  const normalizedRequest = { ...input.request, source_id: normalizedSourceId };
+  const normalizedRequest = { ...request, source_id: normalizedSourceId };
   const rawExtraction: ImageLensRegionExtractionResult = normalizedRequest.source_mount_only
     ? {
         extraction_status: "not_run",
@@ -1207,9 +1402,9 @@ export const runImageLensRegionInspection = async (input: {
     selection_reason: trace.selection_reason,
     backend_selection_decision: trace.backend_selection_decision,
     source_id: normalizedSourceId,
-    frame_id: input.request.frame_id ?? null,
-    source_attachment_id: sourceAttachmentIdFor(input.request),
-    page_number: input.request.page_number ?? null,
+    frame_id: request.frame_id ?? null,
+    source_attachment_id: sourceAttachmentIdFor(request),
+    page_number: request.page_number ?? null,
     bbox_px: bbox,
     crop_region_id: regionId,
     crop_image_ref: cropImageRef,

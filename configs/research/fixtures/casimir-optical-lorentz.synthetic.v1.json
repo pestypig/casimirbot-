@@ -1,0 +1,12 @@
+{
+  "schema_version": "casimir_optical_lorentz_fixture/1",
+  "material_id": "lorentz-analytic-validation",
+  "label": "Synthetic single-Lorentz dielectric",
+  "oscillator_strength_rad_s2": 4e32,
+  "resonance_rad_s": 1e16,
+  "damping_rad_s": 2e14,
+  "omega_min_rad_s": 1e10,
+  "omega_max_rad_s": 1e22,
+  "point_count": 12001,
+  "relative_loss_uncertainty": 0.01
+}

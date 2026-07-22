@@ -4395,6 +4395,89 @@ export const mathStageRegistry: MathStageEntry[] = [
     },
   },
   {
+    tag: "CASIMIR_DP_STAGE1",
+    module: "shared/casimir-lifshitz.ts",
+    stage: "reduced-order",
+    notes:
+      "Equilibrium planar Matsubara/reflection-coefficient solver with ideal-reference convergence and explicit material/finite-geometry claim gates.",
+    checks: [{ type: "test", path: "tests/casimir-lifshitz.spec.ts" }],
+    units: {
+      gap_m: "L",
+      temperature_K: "Theta",
+      free_energy_per_area_J_m2: "M T^-2",
+      pressure_Pa: "M L^-1 T^-2",
+      force_N: "M L T^-2",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_STAGE1",
+    module: "shared/casimir-dp-inference.ts",
+    stage: "reduced-order",
+    notes:
+      "Independent-binomial visibility power approximation and uncertainty-whitened dynamics-signature diagnostic; neither identifies collapse on its own.",
+    checks: [{ type: "test", path: "tests/casimir-dp-next-computations.spec.ts" }],
+    units: {
+      baseline_rate_s: "T^-1",
+      target_additional_rate_s: "T^-1",
+      observation_time_s: "T",
+      baseline_visibility: "1",
+      alternative_visibility: "1",
+      shots_per_setting: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_DATA_READINESS",
+    module: "shared/casimir-optical-response.ts",
+    stage: "reduced-order",
+    notes:
+      "Real-axis loss to imaginary-axis permittivity conversion with SHA-256, calibration, spectral-coverage, tail-registration, and uncertainty gates; synthetic validation cannot close measured-material authority.",
+    checks: [{ type: "test", path: "tests/casimir-optical-response.spec.ts" }],
+    units: {
+      omega_rad_s: "T^-1",
+      xi_rad_s: "T^-1",
+      epsilon_imag: "1",
+      epsilon_i_xi: "1",
+      standard_uncertainty: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_DATA_READINESS",
+    module: "shared/casimir-dp-data-readiness.ts",
+    stage: "diagnostic",
+    notes:
+      "Acquisition-sidecar hash/calibration/covariance validation and Fisher-z secondary-correlation power sizing; collapse identification remains source-gated.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-data-readiness.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-data-readiness.spec.ts" },
+    ],
+    units: {
+      acquisition_window_s: "T",
+      covariance: "varies",
+      null_correlation: "1",
+      alternative_correlation: "1",
+      paired_windows: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_PROPOSAL_CLOSURE",
+    module: "shared/casimir-dp-proposal-readiness.ts",
+    stage: "diagnostic",
+    notes:
+      "Proposal-readiness evaluator for the transverse-branch sample-and-hold architecture, literature Casimir-Polder scale, phase-to-force stability bound, systematics coverage, commissioning dependencies, power, blinding, model separation, and claim ceilings.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-proposal-closure.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-proposal-closure.spec.ts" },
+    ],
+    units: {
+      particle_mass_kg: "M",
+      c4_J_m4: "M L^6 T^-2",
+      casimir_polder_potential_J: "M L^2 T^-2",
+      casimir_polder_force_N: "M L T^-2",
+      maximum_differential_force_noise_N: "M L T^-2",
+      single_charge_electric_field_equivalent_V_m: "M L T^-3 I^-1",
+    },
+  },
+  {
     tag: "PROOF_MATH",
     module: "shared/curvature-proxy.ts",
     stage: "reduced-order",

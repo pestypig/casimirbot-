@@ -91,6 +91,7 @@ export const HELIX_DEVELOPER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "developer_workstation_panels",
     "experimental_panels",
     "runtime_agent_controls",
+    "shared_realtime_rooms",
     "workstation_gateway_act",
   ],
   quotas: {
@@ -113,6 +114,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "experimental_panels",
     "live_answer_visual_capture_controls",
     "runtime_agent_controls",
+    "shared_realtime_rooms",
     "workstation_gateway_act",
   ],
   allowed_runtime_agents: ["codex"],

@@ -283,6 +283,7 @@ const SCHOLARLY_LOOKUP_STOP_WORDS = new Set([
   "an",
   "and",
   "any",
+  "about",
   "arbitrarily",
   "are",
   "arxiv",
@@ -311,6 +312,8 @@ const SCHOLARLY_LOOKUP_STOP_WORDS = new Set([
   "from",
   "full",
   "generally",
+  "give",
+  "good",
   "has",
   "have",
   "how",
@@ -325,6 +328,7 @@ const SCHOLARLY_LOOKUP_STOP_WORDS = new Set([
   "map",
   "many",
   "may",
+  "me",
   "metadata",
   "might",
   "must",
@@ -337,6 +341,8 @@ const SCHOLARLY_LOOKUP_STOP_WORDS = new Set([
   "provider",
   "providers",
   "proposed",
+  "please",
+  "recommend",
   "reference",
   "references",
   "research",
@@ -349,6 +355,7 @@ const SCHOLARLY_LOOKUP_STOP_WORDS = new Set([
   "scholarly",
   "search",
   "separate",
+  "show",
   "shorter",
   "should",
   "source",
@@ -356,6 +363,7 @@ const SCHOLARLY_LOOKUP_STOP_WORDS = new Set([
   "study",
   "support",
   "supporting",
+  "suggest",
   "that",
   "the",
   "these",
@@ -368,6 +376,7 @@ const SCHOLARLY_LOOKUP_STOP_WORDS = new Set([
   "topic",
   "topics",
   "was",
+  "we",
   "were",
   "what",
   "when",
@@ -567,10 +576,8 @@ const buildLookupRecoveryQueries = (query: string, tokens: string[]): string[] =
       "Casimir Proc. Kon. Ned. Akad. Wet. 1948 conducting plates",
     );
   } else {
-    queries.push(
-      `${base} review`,
-      `${base} arxiv`,
-    );
+    if (!/\breviews?\b/i.test(base)) queries.push(`${base} review`);
+    if (!/\barxiv\b/i.test(base)) queries.push(`${base} arxiv`);
   }
   return unique(queries).slice(0, 5);
 };
@@ -1182,6 +1189,9 @@ export async function runScholarlyResearchLookup(
     schema: "helix.scholarly_lookup_relevance_gate.v1",
     status: evidenceState === "lookup_usable" ? "satisfied" : "blocked",
     code: evidenceState === "lookup_usable" ? "lookup_result_relevant" : evidenceState,
+    semantic_relevance_authority: "runtime_agent",
+    deterministic_lookup_relevance_role: "advisory_only",
+    runtime_agent_semantic_selection_required: true,
     required_any: queryTokens,
     candidate_evaluations: candidatePapers.map((paper) => ({
       result_id: paper.result_id,
@@ -1251,6 +1261,9 @@ export async function runScholarlyResearchLookup(
     evidence_state: evidenceState,
     next_affordances: nextAffordances,
     lookup_relevance_gate: lookupRelevanceGate,
+    semantic_relevance_authority: "runtime_agent",
+    deterministic_lookup_relevance_role: "advisory_only",
+    runtime_agent_semantic_selection_required: true,
     ...(scholarlyLookupRecoveryAffordance ? {
       scholarly_lookup_recovery_affordance: scholarlyLookupRecoveryAffordance,
       recovery_query_basis: recoveryQueryBasis,

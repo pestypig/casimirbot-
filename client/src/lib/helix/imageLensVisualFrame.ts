@@ -91,6 +91,7 @@ export async function submitImageLensCropFrame(input: SubmitImageLensCropFrameIn
     captured_at: frameAt,
     preview_data_url: input.imageDataUrl,
     preview_hash: input.receipt.crop.imageHash,
+    source_surface: "image_lens",
     source_kind: "image_lens_crop",
     crop_only: true,
     crop_bbox_px: input.receipt.crop.bboxPx,

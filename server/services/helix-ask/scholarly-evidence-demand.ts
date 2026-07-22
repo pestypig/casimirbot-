@@ -55,18 +55,23 @@ const fullTextRequested = (text: string, workflow?: HelixScholarlyRequestedWorkf
     ? workflow === "full_text_summary" ||
       workflow === "numeric_extraction" ||
       workflow === "numeric_calculation"
-    : /\b(?:full[-\s]?text|fetched\s+text|read\s+(?:the\s+)?(?:paper|pdf|article)|paper\s+content|parsed\s+page\s+count|page[-\s]?grounded|page[-\s]?numbered\s+(?:passage|excerpt))\b/i.test(text);
+    : /\b(?:full[-\s]?text|fetched\s+text|read\s+(?:the\s+)?(?:paper|pdf|article)|paper\s+content|parsed\s+page\s+count|page[-\s]?grounded|page[-\s]?numbered\s+(?:passage|excerpt))\b/i.test(text) ||
+      /\b(?:get|fetch|retrieve|open|download|access|obtain|load|parse)\b[^.!?;\n]{0,120}\b(?:the\s+|this\s+|that\s+|same\s+|selected\s+)?(?:pdf|full[-\s]?text|paper\s+text|article\s+text)\b/i.test(text) ||
+      /\b(?:fetch|retrieve|get|open|download|access|obtain|load|parse)\b[^.!?;\n]{0,80}\b(?:the\s+|this\s+|that\s+|same\s+|selected\s+)?(?:paper|article)\b/i.test(text) ||
+      /\b(?:pull\s+out|extract|summari[sz]e|identify|show|list|walk\s+(?:me\s+)?through)\b[\s\S]{0,100}\b(?:useful|important|key|relevant|main|substantive|scientific)\b[\s\S]{0,50}\b(?:parts?|points?|sections?|passages?|findings?|content|material)\b/i.test(text);
 
 const fullTextRequestedOnlyWhenAvailable = (text: string): boolean =>
-  /\b(?:fetch|retrieve|get|read|open|parse|use)\b[^.!?;\n]{0,160}\b(?:accessible\s+|available\s+|open[-\s]?access\s+)?(?:full[-\s]?text|pdf|paper\s+text|article\s+text)\b[^.!?;\n]{0,80}\b(?:if|when)\s+(?:it\s+is\s+)?(?:available|accessible|obtainable)\b/i.test(text) ||
+  /\b(?:fetch|retrieve|get|read|open|parse|use)\b[^.!?;\n]{0,160}\b(?:accessible\s+|available\s+|open[-\s]?access\s+)?(?:full[-\s]?text|pdf|paper\s+text|article\s+text)\b[^,;.!?\n]{0,32}\b(?:if|when)\s+(?:it\s+is\s+)?(?:available|accessible|obtainable)\b/i.test(text) ||
   /\b(?:if|when)\s+(?:it\s+is\s+)?(?:available|accessible|obtainable)\b[^.!?;\n]{0,120}\b(?:fetch|retrieve|get|read|open|parse|use)\b[^.!?;\n]{0,120}\b(?:full[-\s]?text|pdf|paper\s+text|article\s+text)\b/i.test(text);
 
 const explicitEquationRequested = (text: string): boolean =>
-  /\b(?:equations?|formulae?|formulas?|derive|derivation|variables?|parameter\s+binding)\b/i.test(text) ||
+  /\b(?:equations?|formulae?|formulas?|derive|derivation)\b/i.test(text) ||
+  /\bequation\s+(?:variables?|parameter\s+binding)\b/i.test(text) ||
   /\b(?:show\s+(?:me\s+)?(?:the\s+)?science|scientific\s+content|main\s+equations?|show\s+(?:me\s+)?(?:the\s+)?equations?)\b/i.test(text);
 
 const pageImageRequested = (text: string): boolean =>
-  /\b(?:page\s+images?|screenshots?|render(?:ed)?\s+pages?|pdf\s+pages?|image\s+lens|ocr|figures?|tables?|plots?)\b/i.test(text) ||
+  /\b(?:page\s+images?|screenshots?|render(?:ed)?\s+pages?|pdf\s+pages?|image\s+lens|ocr)\b/i.test(text) ||
+  /\b(?:inspect|read|extract|show|find|locate)\b[^.!?;\n]{0,100}\b(?:figures?|tables?|plots?)\b/i.test(text) ||
   /\b(?:render|inspect|ocr|crop|load|mount|open)\b[^.!?;\n]{0,160}\b(?:page\s*(?:number\s*)?\d{1,3}|next\s+pages?|following\s+pages?|subsequent\s+pages?)\b/i.test(text);
 
 const minimumDepth = (

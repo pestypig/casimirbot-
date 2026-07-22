@@ -245,8 +245,10 @@ Behavioral binding:
   answer authority. It presents the worker's result without adding claims or
   implying that it executed the worker's tools.
 - User speech, provider response activity, and browser playback hold the relay
-  queue busy. Newer transcripts supersede older pending results; qualified
-  barge-in cancels active relay speech; session closure cancels remaining work.
+  queue busy. Newer competing worker or action handoffs supersede older pending
+  results; conversation-local transcripts do not discard already-bound worker
+  results. Qualified barge-in cancels active relay speech; session closure
+  cancels remaining work.
 - Delivery is complete only after the correlated browser playback receipt.
   Debug records transcript/handoff, worker admission, provider/model,
   capabilities/evidence, relay lifecycle, provider response ID, and playback
