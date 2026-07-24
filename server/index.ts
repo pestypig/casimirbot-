@@ -26,6 +26,7 @@ import {
   renderStartupRetryHtml,
 } from "./startup-screen";
 import { resolveMobileDeviceSignals } from "@shared/mobile-device-detection";
+import { serveStaticAssets } from "./static";
 
 type LatticeWatcherHandle = {
   close(): Promise<void>;
@@ -591,6 +592,13 @@ for (const loadingAssetDir of loadingAssetDirs) {
   if (fs.existsSync(loadingAssetDir)) {
     app.use('/loading', express.static(loadingAssetDir));
   }
+}
+
+// Replit autoscale can route asset requests to a newly started instance before
+// its route bootstrap completes. Hashed client assets are safe to expose as
+// soon as the process starts and must not depend on appReady.
+if (runtimeEnv === "production" || process.env.SKIP_VITE_MIDDLEWARE === "1") {
+  serveStaticAssets(app);
 }
 
 // Cache headers for warp engine bundles

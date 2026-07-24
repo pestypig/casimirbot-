@@ -41,6 +41,18 @@ function resolveDistPath(): string {
   return distPath;
 }
 
+export function serveStaticAssets(app: Express) {
+  const assetPath = path.resolve(resolveDistPath(), "assets");
+
+  app.use(
+    "/assets",
+    express.static(assetPath, {
+      immutable: true,
+      maxAge: "1y",
+    }),
+  );
+}
+
 export function serveStatic(app: Express) {
   const distPath = resolveDistPath();
   const reasoningTheaterPath = resolveReasoningTheaterPath();
