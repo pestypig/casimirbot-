@@ -15,6 +15,13 @@ export type HelixAskRealtimeCompletedOutputTranscript = {
   provider_response_ref: string | null;
   provider_item_ref: string | null;
   provider_content_index: number | null;
+  helix_response_purpose: string | null;
+  helix_relay_id: string | null;
+  helix_provisional_response_id: string | null;
+  helix_handoff_id: string | null;
+  helix_worker_admission_id: string | null;
+  helix_utterance_code: string | null;
+  correlation_source: "provider_response_created_metadata" | null;
   transcript_text_hash: string | null;
   transcript_text_char_count: number;
   sanitized_transcript_text: string | null;
@@ -26,6 +33,7 @@ export type HelixAskRealtimeCompletedOutputTranscript = {
   transcript_accumulator_truncated: boolean;
   observed_at_ms: number;
   provider_payload_included: false;
+  raw_provider_metadata_included: false;
   output_audio_transcript_deltas_included: false;
   answer_authority: false;
   assistant_answer: false;
@@ -168,6 +176,13 @@ export const createHelixAskRealtimeOutputTranscriptTracker = () => {
           provider_response_ref: identity.providerResponseRef,
           provider_item_ref: identity.providerItemRef,
           provider_content_index: identity.providerContentIndex,
+          helix_response_purpose: null,
+          helix_relay_id: null,
+          helix_provisional_response_id: null,
+          helix_handoff_id: null,
+          helix_worker_admission_id: null,
+          helix_utterance_code: null,
+          correlation_source: null,
           transcript_text_hash: null,
           transcript_text_char_count: 0,
           sanitized_transcript_text: null,
@@ -179,6 +194,7 @@ export const createHelixAskRealtimeOutputTranscriptTracker = () => {
           transcript_accumulator_truncated: existing.truncated,
           observed_at_ms: input.observedAtMs,
           provider_payload_included: false,
+          raw_provider_metadata_included: false,
           output_audio_transcript_deltas_included: false,
           answer_authority: false,
           assistant_answer: false,
@@ -197,6 +213,13 @@ export const createHelixAskRealtimeOutputTranscriptTracker = () => {
         provider_response_ref: identity.providerResponseRef,
         provider_item_ref: identity.providerItemRef,
         provider_content_index: identity.providerContentIndex,
+        helix_response_purpose: null,
+        helix_relay_id: null,
+        helix_provisional_response_id: null,
+        helix_handoff_id: null,
+        helix_worker_admission_id: null,
+        helix_utterance_code: null,
+        correlation_source: null,
         transcript_text_hash: `sha256:${await sha256Hex(normalized)}`,
         transcript_text_char_count: normalized.length,
         sanitized_transcript_text: sanitized.text,
@@ -208,6 +231,7 @@ export const createHelixAskRealtimeOutputTranscriptTracker = () => {
         transcript_accumulator_truncated: existing.truncated,
         observed_at_ms: input.observedAtMs,
         provider_payload_included: false,
+        raw_provider_metadata_included: false,
         output_audio_transcript_deltas_included: false,
         answer_authority: false,
         assistant_answer: false,

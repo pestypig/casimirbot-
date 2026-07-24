@@ -250,10 +250,26 @@ export const resolveHelixRuntimeObservationReentry = (input: {
   const candidateRefs = Array.from(new Set(
     input.candidateRefs.map((ref) => ref.trim()).filter(Boolean),
   ));
-  const lifecycle = readVerifiedHelixRuntimeLifecycleFromPayload({
+  const preferredLifecycle = readVerifiedHelixRuntimeLifecycleFromPayload({
     payload: input.payload,
     turnId: input.turnId,
   });
+  const canonicalTurnLifecycle = readVerifiedHelixTurnLifecycleFromPayload({
+    payload: input.payload,
+    turnId: input.turnId,
+  });
+  const verifiedLifecycles = [preferredLifecycle, canonicalTurnLifecycle]
+    .filter((lifecycle): lifecycle is HelixTurnLifecycle => Boolean(lifecycle))
+    .filter((lifecycle, index, lifecycles) =>
+      lifecycles.findIndex((candidate) =>
+        candidate.scope === lifecycle.scope &&
+        candidate.events.length === lifecycle.events.length &&
+        candidate.events.every((event, eventIndex) =>
+          event.event_id === lifecycle.events[eventIndex]?.event_id)) === index);
+  const lifecycle = verifiedLifecycles.find((candidate) => {
+    const reentryRefs = new Set(candidate.reduction.observation_reentry_refs);
+    return candidateRefs.some((ref) => reentryRefs.has(ref));
+  }) ?? preferredLifecycle;
   if (lifecycle) {
     const runtimeObservationReentryRefs = lifecycle.reduction.observation_reentry_refs;
     const runtimeRefSet = new Set(runtimeObservationReentryRefs);

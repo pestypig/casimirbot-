@@ -152,6 +152,42 @@ describe("voice transcribe runtime memory admission", () => {
     expect(sttHttpHandlerMock).toHaveBeenCalledTimes(1);
   });
 
+  it("does not expose credential-bearing provider details in STT failures", async () => {
+    sttHttpHandlerMock.mockRejectedValue(
+      new Error(
+        "STT HTTP 401: Incorrect API key provided: sk-proj-********secret-suffix. Check your key.",
+      ),
+    );
+    const { app } = await buildApp();
+
+    const response = await request(app)
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-auth-redaction")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      })
+      .expect(502);
+
+    expect(response.body).toMatchObject({
+      error: "voice_backend_error",
+      traceId: "trace-auth-redaction",
+      details: {
+        attempts: [
+          {
+            backend: "openai",
+            engine: "openai_transcribe",
+            status: 401,
+            message: "STT HTTP 401",
+          },
+        ],
+      },
+    });
+    expect(JSON.stringify(response.body)).not.toContain("sk-proj-");
+    expect(JSON.stringify(response.body)).not.toContain("secret-suffix");
+    expect(JSON.stringify(response.body)).not.toContain("Incorrect API key");
+  });
+
   it("returns voice_memory_pressure on pre-STT recheck and does not call STT", async () => {
     let calls = 0;
     const reader: RuntimeMemoryReader = () => {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   HELIX_REALTIME_WORKER_ADMISSION_SCHEMA,
   type HelixRealtimeWorkerAdmissionOutcomeV1,
@@ -14,6 +14,7 @@ import {
   readRealtimeGroundedAnswerRelay,
   recordRealtimeGroundedRelayClientReceipt,
   resetRealtimeGroundedAnswerRelaysForTests,
+  resolveRealtimeGroundedRelayPlaybackCompletionTimeoutMs,
   startRealtimeGroundedRelayForHandoff,
   suppressRealtimeGroundedAnswerRelay,
 } from "../grounded-answer-relay";
@@ -119,8 +120,16 @@ const buildFeedback = (
   answer_text_char_count: 42,
   final_answer_source: "agent_provider",
   terminal_artifact_kind: "final_answer",
+  terminal_artifact_ref: `turn:${handoff.handoff_id}:final_answer`,
+  terminal_text_hash: "sha256:canonical-answer",
+  grounding_authority_ref: `terminal-grounding:${handoff.handoff_id}`,
+  relay_basis: "grounded_capability_terminal",
+  terminal_speech_authority_status: "validated",
   evidence_refs: [`gateway-call:${handoff.handoff_id}`],
+  grounding_evidence_refs: [`gateway-call:${handoff.handoff_id}`],
+  grounding_proof_source: "canonical_terminal_boundary",
   required_grounding_capability_ids: handoff.required_grounding_capability_ids,
+  grounding_required: true,
   grounding_evidence_satisfied: true,
   recorded_at_ms: nowMs,
   completed_solver_path: true,
@@ -221,7 +230,8 @@ describe("Realtime grounded answer relay", () => {
 
     expect(requested).toMatchObject({
       status: "response_requested",
-      response_created: true,
+      response_created: false,
+      delivery_attempt_count: 1,
       selected_runtime_agent_provider: "codex",
       selected_model: "gpt-5.4",
     });
@@ -234,11 +244,15 @@ describe("Realtime grounded answer relay", () => {
         tools: [],
         tool_choice: "none",
         metadata: {
-          helix_purpose: "grounded_worker_relay",
+          helix_purpose: "terminal_answer_relay",
           helix_relay_id: requested.relay_id,
         },
       },
     });
+    const response = sentEvents[0].response as Record<string, unknown>;
+    const metadata = response.metadata as Record<string, unknown>;
+    expect(metadata.helix_relay_attempt).toBe("1");
+    expect(Object.values(metadata).every((value) => typeof value === "string")).toBe(true);
 
     publishRealtimeSidebandProviderEvent({
       realtimeSessionId: SESSION_ID,
@@ -249,6 +263,10 @@ describe("Realtime grounded answer relay", () => {
           metadata: { helix_relay_id: requested.relay_id },
         },
       },
+    });
+    expect(readRealtimeGroundedAnswerRelay(handoff.handoff_id)).toMatchObject({
+      status: "provider_acknowledged",
+      response_created: true,
     });
     publishRealtimeSidebandProviderEvent({
       realtimeSessionId: SESSION_ID,
@@ -268,6 +286,285 @@ describe("Realtime grounded answer relay", () => {
       provider_response_ref: "response:delivery",
       playback_receipt_ref: "receipt:playback:delivery",
     });
+  });
+
+  it("does not correlate a provider response reference across Realtime sessions", () => {
+    const firstAdmission = buildAdmission({
+      handoffId: "handoff:first-session",
+      nowMs,
+    });
+    const firstHandoff = buildHandoff("first-session", firstAdmission, nowMs);
+    startRealtimeGroundedRelayForHandoff({
+      handoff: firstHandoff,
+      workerAdmission: firstAdmission,
+      nowMs,
+    });
+    enqueueRealtimeGroundedAnswerRelay({
+      handoff: firstHandoff,
+      feedback: buildFeedback(firstHandoff, nowMs + 10),
+      workerAdmission: buildAdmission({
+        handoffId: firstHandoff.handoff_id,
+        phase: "solver_final",
+        nowMs: nowMs + 10,
+      }),
+      answerText: "First session answer.",
+      nowMs: nowMs + 10,
+    });
+    publishRealtimeSidebandProviderEvent({
+      realtimeSessionId: SESSION_ID,
+      event: {
+        type: "response.created",
+        response: { id: "response:shared-reference" },
+      },
+    });
+
+    const secondSessionId = "realtime:relay-test:second";
+    admitRealtimeSession({
+      realtimeSessionId: secondSessionId,
+      requesterRef: "requester:test:second",
+      visibleUserConsentReceipt: "receipt:consent:test:second",
+      model: "gpt-realtime",
+      threadId: THREAD_ID,
+      nowMs,
+    });
+    updateAdmittedRealtimeSession({
+      realtimeSessionId: secondSessionId,
+      patch: { sidebandState: "open" },
+    });
+    const secondAdmission = {
+      ...buildAdmission({
+        handoffId: "handoff:second-session",
+        nowMs,
+      }),
+      realtime_session_id: secondSessionId,
+    };
+    const secondHandoff = {
+      ...buildHandoff("second-session", secondAdmission, nowMs),
+      realtime_session_id: secondSessionId,
+      worker_admission: secondAdmission,
+    };
+    startRealtimeGroundedRelayForHandoff({
+      handoff: secondHandoff,
+      workerAdmission: secondAdmission,
+      nowMs,
+    });
+    enqueueRealtimeGroundedAnswerRelay({
+      handoff: secondHandoff,
+      feedback: {
+        ...buildFeedback(secondHandoff, nowMs + 10),
+        realtime_session_id: secondSessionId,
+      },
+      workerAdmission: {
+        ...buildAdmission({
+          handoffId: secondHandoff.handoff_id,
+          phase: "solver_final",
+          nowMs: nowMs + 10,
+        }),
+        realtime_session_id: secondSessionId,
+      },
+      answerText: "Second session answer.",
+      nowMs: nowMs + 10,
+    });
+
+    publishRealtimeSidebandProviderEvent({
+      realtimeSessionId: secondSessionId,
+      event: {
+        type: "response.created",
+        response: { id: "response:shared-reference" },
+      },
+    });
+
+    expect(readRealtimeGroundedAnswerRelay(secondHandoff.handoff_id)).toMatchObject({
+      status: "provider_acknowledged",
+      provider_response_ref: "response:shared-reference",
+    });
+  });
+
+  it("accepts correlated browser lifecycle receipts when sideband provider events are absent", () => {
+    const preliminary = buildAdmission({
+      handoffId: "handoff:browser-ack",
+      nowMs,
+    });
+    const handoff = buildHandoff("browser-ack", preliminary, nowMs);
+    startRealtimeGroundedRelayForHandoff({
+      handoff,
+      workerAdmission: preliminary,
+      nowMs,
+    });
+    const requested = enqueueRealtimeGroundedAnswerRelay({
+      handoff,
+      feedback: buildFeedback(handoff, nowMs + 10),
+      workerAdmission: buildAdmission({
+        handoffId: handoff.handoff_id,
+        phase: "solver_final",
+        nowMs: nowMs + 10,
+      }),
+      answerText: "The browser received this terminal relay.",
+      nowMs: nowMs + 10,
+    });
+
+    const acknowledged = recordRealtimeGroundedRelayClientReceipt({
+      realtimeSessionId: SESSION_ID,
+      relayId: requested.relay_id,
+      receiptKind: "response_started",
+      clientReceiptRef: "receipt:response-started:browser-ack",
+      providerResponseRef: "response:browser-ack",
+      nowMs: nowMs + 20,
+    });
+    expect(acknowledged).toMatchObject({
+      status: "provider_acknowledged",
+      response_created: true,
+      provider_response_ref: "response:browser-ack",
+      answer_authority: false,
+    });
+
+    const speaking = recordRealtimeGroundedRelayClientReceipt({
+      realtimeSessionId: SESSION_ID,
+      relayId: requested.relay_id,
+      receiptKind: "playback_started",
+      clientReceiptRef: "receipt:playback-started:browser-ack",
+      providerResponseRef: "response:browser-ack",
+      nowMs: nowMs + 21,
+    });
+    expect(speaking?.status).toBe("speaking");
+
+    const delivered = recordRealtimeGroundedRelayClientReceipt({
+      realtimeSessionId: SESSION_ID,
+      relayId: requested.relay_id,
+      receiptKind: "playback_ended",
+      clientReceiptRef: "receipt:playback-ended:browser-ack",
+      providerResponseRef: "response:browser-ack",
+      nowMs: nowMs + 22,
+    });
+    expect(delivered).toMatchObject({
+      status: "delivered",
+      provider_response_ref: "response:browser-ack",
+      playback_receipt_ref: "receipt:playback-ended:browser-ack",
+      answer_authority: false,
+    });
+  });
+
+  it("uses a correlated browser response failure only to retry relay transport", () => {
+    const preliminary = buildAdmission({
+      handoffId: "handoff:browser-response-failed",
+      nowMs,
+    });
+    const handoff = buildHandoff("browser-response-failed", preliminary, nowMs);
+    startRealtimeGroundedRelayForHandoff({
+      handoff,
+      workerAdmission: preliminary,
+      nowMs,
+    });
+    const requested = enqueueRealtimeGroundedAnswerRelay({
+      handoff,
+      feedback: buildFeedback(handoff, nowMs + 10),
+      workerAdmission: buildAdmission({
+        handoffId: handoff.handoff_id,
+        phase: "solver_final",
+        nowMs: nowMs + 10,
+      }),
+      answerText: "This relay response fails before playback.",
+      nowMs: nowMs + 10,
+    });
+
+    const failed = recordRealtimeGroundedRelayClientReceipt({
+      realtimeSessionId: SESSION_ID,
+      relayId: requested.relay_id,
+      receiptKind: "response_failed",
+      clientReceiptRef: "receipt:response-failed",
+      providerResponseRef: "response:failed",
+      nowMs: nowMs + 20,
+    });
+
+    expect(failed).toMatchObject({
+      status: "relay_queued_busy",
+      status_reason: "terminal_relay_retry_queued",
+      last_delivery_failure: "realtime_terminal_response_failed",
+      answer_authority: false,
+    });
+  });
+
+  it("turns a correlated provider error into a typed transport retry", () => {
+    const preliminary = buildAdmission({
+      handoffId: "handoff:provider-error",
+      nowMs,
+    });
+    const handoff = buildHandoff("provider-error", preliminary, nowMs);
+    startRealtimeGroundedRelayForHandoff({
+      handoff,
+      workerAdmission: preliminary,
+      nowMs,
+    });
+    const requested = enqueueRealtimeGroundedAnswerRelay({
+      handoff,
+      feedback: buildFeedback(handoff, nowMs + 10),
+      workerAdmission: buildAdmission({
+        handoffId: handoff.handoff_id,
+        phase: "solver_final",
+        nowMs: nowMs + 10,
+      }),
+      answerText: "The provider rejects this transport request.",
+      nowMs: nowMs + 10,
+    });
+
+    publishRealtimeSidebandProviderEvent({
+      realtimeSessionId: SESSION_ID,
+      event: {
+        type: "error",
+        error: {
+          event_id: requested.provider_event_ref,
+          code: "invalid_request_error",
+        },
+      },
+    });
+
+    expect(readRealtimeGroundedAnswerRelay(handoff.handoff_id)).toMatchObject({
+      status: "relay_queued_busy",
+      status_reason: "terminal_relay_retry_queued",
+      last_delivery_failure: "openai_realtime_error_invalid_request_error",
+      answer_authority: false,
+    });
+  });
+
+  it("presents a model-direct terminal without inventing a workstation observation", () => {
+    const preliminary = buildAdmission({ handoffId: "handoff:model-direct", nowMs });
+    const handoff = buildHandoff("model-direct", preliminary, nowMs);
+    startRealtimeGroundedRelayForHandoff({ handoff, workerAdmission: preliminary, nowMs });
+    const groundedFeedback = buildFeedback(handoff, nowMs + 10);
+    const requested = enqueueRealtimeGroundedAnswerRelay({
+      handoff,
+      feedback: {
+        ...groundedFeedback,
+        relay_basis: "model_direct_terminal",
+        grounding_required: false,
+        grounding_evidence_refs: [],
+        required_grounding_capability_ids: [],
+      },
+      workerAdmission: buildAdmission({
+        handoffId: handoff.handoff_id,
+        phase: "solver_final",
+        nowMs: nowMs + 10,
+      }),
+      answerText: "This is the completed model-direct Codex answer.",
+      nowMs: nowMs + 10,
+    });
+
+    expect(requested).toMatchObject({
+      relay_basis: "model_direct_terminal",
+      grounding_required: false,
+      grounding_status: "not_required",
+      terminal_speech_authority_status: "validated",
+    });
+    const response = sentEvents[0]?.response as Record<string, unknown>;
+    expect(response.metadata).toMatchObject({
+      helix_purpose: "terminal_answer_relay",
+      helix_relay_basis: "model_direct_terminal",
+      helix_relay_idempotency_key: requested.relay_idempotency_key,
+    });
+    expect(String(response.instructions)).toContain(
+      "without claiming a workstation observation",
+    );
+    expect(String(response.instructions)).not.toContain("The workstation check found");
   });
 
   it("queues while speech is active and flushes only after the admitted session becomes idle", () => {
@@ -354,9 +651,132 @@ describe("Realtime grounded answer relay", () => {
 
     expect(requested).toMatchObject({
       status: "response_requested",
-      response_created: true,
+      response_created: false,
     });
     expect(sentEvents.map((event) => event.type)).toEqual(["response.create"]);
+  });
+
+  it("does not let an unqualified five-character parallel fragment supersede pending work", () => {
+    const workerAdmission = buildAdmission({
+      handoffId: "handoff:pending-before-fragment",
+      nowMs,
+    });
+    const workerHandoff = buildHandoff(
+      "pending-before-fragment",
+      workerAdmission,
+      nowMs,
+    );
+    startRealtimeGroundedRelayForHandoff({
+      handoff: workerHandoff,
+      workerAdmission,
+      nowMs,
+    });
+
+    const fragmentAdmission = {
+      ...buildAdmission({
+        handoffId: "handoff:short-fragment",
+        nowMs: nowMs + 1,
+      }),
+      reason_codes: [
+        "ask_ui_selected_runtime",
+        "realtime_parallel_conversation",
+        "selected_runtime_receives_substantive_utterance",
+      ],
+      selected_route: "unknown",
+      candidate_readonly_capability_ids: [],
+      action_candidate_capability_ids: [],
+    };
+    const fragmentHandoff = {
+      ...buildHandoff("short-fragment", fragmentAdmission, nowMs + 1),
+      transcript_text_char_count: 5,
+      required_grounding_capability_ids: [],
+      route_metadata: {
+        source_target_intent: {
+          qualified_user_interruption: false,
+        },
+      },
+    };
+    const fragmentRelay = startRealtimeGroundedRelayForHandoff({
+      handoff: fragmentHandoff,
+      workerAdmission: fragmentAdmission,
+      nowMs: nowMs + 1,
+    });
+
+    expect(fragmentRelay).toMatchObject({
+      status: "suppressed",
+      status_reason: "ambiguous_short_parallel_handoff_no_delayed_relay",
+      response_created: false,
+    });
+    expect(readRealtimeGroundedAnswerRelay(workerHandoff.handoff_id)?.status).toBe(
+      "worker_running",
+    );
+
+    const requested = enqueueRealtimeGroundedAnswerRelay({
+      handoff: workerHandoff,
+      feedback: buildFeedback(workerHandoff, nowMs + 10),
+      workerAdmission: buildAdmission({
+        handoffId: workerHandoff.handoff_id,
+        phase: "solver_final",
+        nowMs: nowMs + 10,
+      }),
+      answerText: "The pending answer remains eligible for speech.",
+      nowMs: nowMs + 10,
+    });
+
+    expect(requested.status).toBe("response_requested");
+    expect(sentEvents.map((event) => event.type)).toEqual(["response.create"]);
+  });
+
+  it("lets a qualified short interruption supersede pending work", () => {
+    const firstAdmission = buildAdmission({
+      handoffId: "handoff:before-qualified-interruption",
+      nowMs,
+    });
+    const firstHandoff = buildHandoff(
+      "before-qualified-interruption",
+      firstAdmission,
+      nowMs,
+    );
+    startRealtimeGroundedRelayForHandoff({
+      handoff: firstHandoff,
+      workerAdmission: firstAdmission,
+      nowMs,
+    });
+
+    const interruptionAdmission = {
+      ...buildAdmission({
+        handoffId: "handoff:qualified-short-interruption",
+        nowMs: nowMs + 1,
+      }),
+      reason_codes: ["realtime_parallel_conversation"],
+      selected_route: "unknown",
+      candidate_readonly_capability_ids: [],
+      action_candidate_capability_ids: [],
+    };
+    const interruptionHandoff = {
+      ...buildHandoff(
+        "qualified-short-interruption",
+        interruptionAdmission,
+        nowMs + 1,
+      ),
+      transcript_text_char_count: 5,
+      required_grounding_capability_ids: [],
+      route_metadata: {
+        source_target_intent: {
+          qualified_user_interruption: true,
+        },
+      },
+    };
+    const interruptionRelay = startRealtimeGroundedRelayForHandoff({
+      handoff: interruptionHandoff,
+      workerAdmission: interruptionAdmission,
+      nowMs: nowMs + 1,
+    });
+
+    expect(interruptionRelay.status).toBe("worker_running");
+    expect(readRealtimeGroundedAnswerRelay(firstHandoff.handoff_id)?.status).toBe(
+      "superseded",
+    );
   });
 
   it("supersedes older transcript work and marks expired results stale", () => {
@@ -420,7 +840,7 @@ describe("Realtime grounded answer relay", () => {
     expect(sentEvents.map((event) => event.type)).toEqual(["response.create", "response.cancel"]);
   });
 
-  it("preserves a synchronous sideband send failure instead of reopening it as queued", () => {
+  it("queues a bounded retry after a synchronous sideband send failure", () => {
     setRealtimeSidebandControlSenderForTests(({ onComplete }) => {
       onComplete?.("realtime_sideband_write_failed");
       return false;
@@ -442,10 +862,163 @@ describe("Realtime grounded answer relay", () => {
     });
 
     expect(artifact).toMatchObject({
-      status: "failed",
-      status_reason: "realtime_grounded_relay_send_failed",
-      failure_code: "realtime_sideband_write_failed",
+      status: "relay_queued_busy",
+      status_reason: "terminal_relay_retry_queued",
+      delivery_attempt_count: 1,
+      last_delivery_failure: "realtime_sideband_write_failed",
     });
+  });
+
+  it("retries a missing provider acknowledgement once, then fails closed", async () => {
+    vi.useFakeTimers();
+    try {
+      const preliminary = buildAdmission({ handoffId: "handoff:ack-timeout", nowMs });
+      const handoff = buildHandoff("ack-timeout", preliminary, nowMs);
+      startRealtimeGroundedRelayForHandoff({ handoff, workerAdmission: preliminary, nowMs });
+      enqueueRealtimeGroundedAnswerRelay({
+        handoff,
+        feedback: buildFeedback(handoff, nowMs + 10),
+        workerAdmission: buildAdmission({
+          handoffId: handoff.handoff_id,
+          phase: "solver_final",
+          nowMs: nowMs + 10,
+        }),
+        answerText: "This response requires provider acknowledgement.",
+        nowMs: nowMs + 10,
+      });
+
+      expect(sentEvents).toHaveLength(1);
+      expect(readRealtimeGroundedAnswerRelay(handoff.handoff_id)).toMatchObject({
+        status: "response_requested",
+        delivery_attempt_count: 1,
+      });
+
+      await vi.advanceTimersByTimeAsync(8_250);
+      expect(sentEvents).toHaveLength(2);
+      expect(readRealtimeGroundedAnswerRelay(handoff.handoff_id)).toMatchObject({
+        status: "response_requested",
+        delivery_attempt_count: 2,
+        last_delivery_failure: "realtime_terminal_response_ack_timeout",
+      });
+
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(readRealtimeGroundedAnswerRelay(handoff.handoff_id)).toMatchObject({
+        status: "failed",
+        status_reason: "terminal_relay_delivery_attempts_exhausted",
+        delivery_attempt_count: 2,
+        failure_code: "realtime_terminal_response_ack_timeout",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a long confirmed playback open beyond the playback-start deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      const preliminary = buildAdmission({ handoffId: "handoff:long-playback", nowMs });
+      const handoff = buildHandoff("long-playback", preliminary, nowMs);
+      startRealtimeGroundedRelayForHandoff({ handoff, workerAdmission: preliminary, nowMs });
+      const answerText = "A".repeat(1_200);
+      const requested = enqueueRealtimeGroundedAnswerRelay({
+        handoff,
+        feedback: buildFeedback(handoff, nowMs + 10),
+        workerAdmission: buildAdmission({
+          handoffId: handoff.handoff_id,
+          phase: "solver_final",
+          nowMs: nowMs + 10,
+        }),
+        answerText,
+        nowMs: nowMs + 10,
+      });
+      publishRealtimeSidebandProviderEvent({
+        realtimeSessionId: SESSION_ID,
+        event: {
+          type: "response.created",
+          response: {
+            id: "response:long-playback",
+            metadata: { helix_relay_id: requested.relay_id },
+          },
+        },
+      });
+      recordRealtimeGroundedRelayClientReceipt({
+        realtimeSessionId: SESSION_ID,
+        receiptKind: "playback_started",
+        clientReceiptRef: "receipt:long-playback-started",
+        providerResponseRef: "response:long-playback",
+        nowMs: nowMs + 20,
+      });
+
+      await vi.advanceTimersByTimeAsync(12_250);
+
+      expect(sentEvents).toHaveLength(1);
+      expect(readRealtimeGroundedAnswerRelay(handoff.handoff_id)).toMatchObject({
+        status: "speaking",
+        delivery_attempt_count: 1,
+        last_delivery_failure: null,
+      });
+
+      const delivered = recordRealtimeGroundedRelayClientReceipt({
+        realtimeSessionId: SESSION_ID,
+        receiptKind: "playback_ended",
+        clientReceiptRef: "receipt:long-playback-ended",
+        providerResponseRef: "response:long-playback",
+        nowMs: nowMs + 12_300,
+      });
+      expect(delivered?.status).toBe("delivered");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retries when browser playback starts but never confirms completion", async () => {
+    vi.useFakeTimers();
+    try {
+      const preliminary = buildAdmission({ handoffId: "handoff:playback-timeout", nowMs });
+      const handoff = buildHandoff("playback-timeout", preliminary, nowMs);
+      startRealtimeGroundedRelayForHandoff({ handoff, workerAdmission: preliminary, nowMs });
+      const answerText = "This response requires a browser playback receipt.";
+      const requested = enqueueRealtimeGroundedAnswerRelay({
+        handoff,
+        feedback: buildFeedback(handoff, nowMs + 10),
+        workerAdmission: buildAdmission({
+          handoffId: handoff.handoff_id,
+          phase: "solver_final",
+          nowMs: nowMs + 10,
+        }),
+        answerText,
+        nowMs: nowMs + 10,
+      });
+      publishRealtimeSidebandProviderEvent({
+        realtimeSessionId: SESSION_ID,
+        event: {
+          type: "response.created",
+          response: {
+            id: "response:playback-timeout",
+            metadata: { helix_relay_id: requested.relay_id },
+          },
+        },
+      });
+      recordRealtimeGroundedRelayClientReceipt({
+        realtimeSessionId: SESSION_ID,
+        receiptKind: "playback_started",
+        clientReceiptRef: "receipt:playback-started",
+        providerResponseRef: "response:playback-timeout",
+        nowMs: nowMs + 20,
+      });
+
+      await vi.advanceTimersByTimeAsync(
+        resolveRealtimeGroundedRelayPlaybackCompletionTimeoutMs(answerText.length) + 250,
+      );
+      expect(sentEvents).toHaveLength(2);
+      expect(readRealtimeGroundedAnswerRelay(handoff.handoff_id)).toMatchObject({
+        status: "response_requested",
+        delivery_attempt_count: 2,
+        last_delivery_failure: "realtime_terminal_playback_receipt_timeout",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("cancels active relay speech on barge-in and cancels queued work when the session closes", () => {

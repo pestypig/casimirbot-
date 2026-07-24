@@ -3,6 +3,7 @@ import type {
   HelixRealtimeGroundedRelayStatusV1,
 } from "./helix-realtime-worker-relay.v1";
 import type { HelixRealtimeWorkerAdmissionV2 } from "./helix-realtime-worker-dispatch.v2";
+import type { HelixRealtimeProvisionalResponseV1 } from "./helix-realtime-provisional-response.v1";
 
 export const HELIX_REALTIME_STAGE_PLAY_CONTEXT_PACK_SCHEMA =
   "helix.realtime_stage_play.context_pack.v1" as const;
@@ -219,8 +220,21 @@ export type HelixRealtimeStagePlayGroundedAnswerV1 = {
   answer_text_char_count: number;
   final_answer_source: string;
   terminal_artifact_kind: string;
+  terminal_artifact_ref: string;
+  terminal_text_hash: string;
+  grounding_authority_ref: string;
+  relay_basis: "model_direct_terminal" | "grounded_capability_terminal";
+  terminal_speech_authority_status: "validated";
   evidence_refs: string[];
+  grounding_evidence_refs: string[];
+  grounding_proof_source:
+    | "canonical_terminal_boundary"
+    | "canonical_terminal_boundary_compatibility"
+    | "gateway_call_results"
+    | "canonical_solver_trace"
+    | null;
   required_grounding_capability_ids: string[];
+  grounding_required: boolean;
   grounding_evidence_satisfied: true;
   recorded_at_ms: number;
   completed_solver_path: true;
@@ -241,11 +255,23 @@ export type HelixRealtimeGroundedFeedbackObserverAuditV1 = {
     | null;
   turn_final_status: "not_observed" | "captured" | "rejected";
   terminal_authority_status: "not_evaluated" | "validated" | "rejected";
+  terminal_speech_authority_status: "not_evaluated" | "validated" | "rejected";
+  relay_basis: "model_direct_terminal" | "grounded_capability_terminal" | null;
+  grounding_required: boolean | null;
   grounding_evidence_status: "not_evaluated" | "not_required" | "validated" | "rejected";
   feedback_status: "not_recorded" | "recorded" | "suppressed";
-  grounding_proof_source: "gateway_call_results" | "canonical_solver_trace" | null;
+  grounding_proof_source:
+    | "canonical_terminal_boundary"
+    | "canonical_terminal_boundary_compatibility"
+    | "gateway_call_results"
+    | "canonical_solver_trace"
+    | null;
   relay_status: HelixRealtimeGroundedRelayStatusV1 | null;
   ask_turn_id: string | null;
+  terminal_artifact_ref: string | null;
+  terminal_text_hash: string | null;
+  grounding_authority_ref: string | null;
+  grounding_evidence_refs: string[];
   failure_code: string | null;
   observed_at_ms: number;
   updated_at_ms: number;
@@ -283,9 +309,11 @@ export type HelixRealtimeStagePlayDebugV1 = {
     feedback_observer_audit: HelixRealtimeGroundedFeedbackObserverAuditV1 | null;
     grounded_answer: HelixRealtimeStagePlayGroundedAnswerV1 | null;
     grounded_relay: HelixRealtimeGroundedRelayV1 | null;
+    provisional_response: HelixRealtimeProvisionalResponseV1 | null;
   }>;
   latest_context_sync: HelixRealtimeStagePlayContextSyncV1 | null;
   latest_grounded_relay: HelixRealtimeGroundedRelayV1 | null;
+  latest_provisional_response: HelixRealtimeProvisionalResponseV1 | null;
   authority: {
     realtime_answer_authority: false;
     workstation_action_authority: false;
@@ -293,8 +321,12 @@ export type HelixRealtimeStagePlayDebugV1 = {
     grounded_answer_requires_completed_solver_path: true;
     grounded_answer_requires_route_evidence: true;
     grounded_feedback_requires_issued_handoff_binding: true;
-    grounded_feedback_requires_current_turn_capability_evidence: true;
+    grounded_feedback_requires_terminal_grounding_authority: true;
+    preliminary_capability_ids_are_non_authoritative: true;
     spoken_relay_requires_server_authoritative_grounded_answer: true;
+    terminal_speech_authority_is_independent_from_grounding_authority: true;
+    model_direct_terminal_relay_requires_no_capability_evidence: true;
+    grounded_terminal_relay_requires_current_turn_selected_evidence: true;
     realtime_relay_answer_authority: false;
   };
   provider_call_id_included: false;

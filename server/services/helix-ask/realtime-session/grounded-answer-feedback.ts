@@ -17,8 +17,14 @@ import {
   resetRealtimeGroundedFeedbackObserverAuditsForTests,
   updateRealtimeGroundedFeedbackObserverAudit,
 } from "./grounded-answer-feedback-audit";
-import { evaluateRealtimeGroundingEvidence } from "./grounded-answer-evidence";
+import {
+  evaluateRealtimeGroundingEvidence as evaluateLegacyRuntimeGoalGroundingEvidence,
+} from "./grounded-answer-evidence";
 import { createRealtimeGroundedFinalResponseCapture } from "./grounded-answer-final-response-capture";
+import {
+  evaluateRealtimeTerminalRelayAuthority,
+  type RealtimeTerminalRelayAuthorityEvaluation,
+} from "./terminal-relay-authority";
 import { resolveRealtimeFinalWorkerAdmission } from "./worker-admission";
 
 const groundedAnswersByHandoffId = new Map<string, HelixRealtimeStagePlayGroundedAnswerV1>();
@@ -69,12 +75,19 @@ const recordAcceptedRealtimeGroundedAnswer = (input: {
   finalAnswerSource: string;
   terminalArtifactKind: string;
   groundingEvidenceRefs: string[];
-  groundingProofSource: "gateway_call_results" | "canonical_solver_trace" | null;
+  groundingProofSource:
+    | "canonical_terminal_boundary"
+    | "canonical_terminal_boundary_compatibility"
+    | "gateway_call_results"
+    | "canonical_solver_trace"
+    | null;
+  terminalRelayAuthority: RealtimeTerminalRelayAuthorityEvaluation;
   askTurnId?: string | null;
   additionalEvidenceRefs?: string[];
   nowMs: number;
 }): HelixRealtimeStagePlayGroundedAnswerV1 => {
   const askTurnId =
+    input.terminalRelayAuthority.askTurnId ??
     readString(input.askTurnId) ??
     readString(input.payload.turn_id ?? input.payload.turnId) ??
     readString(input.terminalAuthority.turn_id);
@@ -86,6 +99,7 @@ const recordAcceptedRealtimeGroundedAnswer = (input: {
     input.handoff.context_pack_id,
     input.handoff.goal_id,
     input.handoff.runtime_goal_session_ref,
+    input.terminalRelayAuthority.terminalArtifactRef,
     ...input.groundingEvidenceRefs,
     ...(input.additionalEvidenceRefs ?? []),
     ...readStringArray(input.payload.runtime_goal_observation_refs),
@@ -119,8 +133,18 @@ const recordAcceptedRealtimeGroundedAnswer = (input: {
     answer_text_char_count: input.answerText.length,
     final_answer_source: input.finalAnswerSource,
     terminal_artifact_kind: input.terminalArtifactKind,
+    terminal_artifact_ref: input.terminalRelayAuthority.terminalArtifactRef as string,
+    terminal_text_hash: input.terminalRelayAuthority.terminalTextHash as string,
+    grounding_authority_ref:
+      input.terminalRelayAuthority.groundingAuthorityRef as string,
+    relay_basis: input.terminalRelayAuthority.relayBasis,
+    terminal_speech_authority_status: "validated",
     evidence_refs: evidenceRefs,
-    required_grounding_capability_ids: input.handoff.required_grounding_capability_ids,
+    grounding_evidence_refs: input.groundingEvidenceRefs,
+    grounding_proof_source: input.groundingProofSource,
+    required_grounding_capability_ids:
+      input.terminalRelayAuthority.requiredGroundingCapabilityIds,
+    grounding_required: input.terminalRelayAuthority.groundingRequired,
     grounding_evidence_satisfied: true,
     recorded_at_ms: input.nowMs,
     completed_solver_path: true,
@@ -149,13 +173,21 @@ const recordAcceptedRealtimeGroundedAnswer = (input: {
     patch: {
       turn_final_status: "captured",
       terminal_authority_status: "validated",
-      grounding_evidence_status: input.handoff.required_grounding_capability_ids.length > 0
+      terminal_speech_authority_status: "validated",
+      relay_basis: input.terminalRelayAuthority.relayBasis,
+      grounding_required: input.terminalRelayAuthority.groundingRequired,
+      grounding_evidence_status: input.terminalRelayAuthority.groundingRequired
         ? "validated"
         : "not_required",
       grounding_proof_source: input.groundingProofSource,
       feedback_status: "recorded",
       relay_status: relay.status,
       ask_turn_id: askTurnId,
+      terminal_artifact_ref: input.terminalRelayAuthority.terminalArtifactRef,
+      terminal_text_hash: input.terminalRelayAuthority.terminalTextHash,
+      grounding_authority_ref:
+        input.terminalRelayAuthority.groundingAuthorityRef,
+      grounding_evidence_refs: input.groundingEvidenceRefs,
       failure_code: null,
       completed_at_ms: input.nowMs,
     },
@@ -192,41 +224,28 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
     readString(input.payload.content) ??
     readString(input.payload.answer) ??
     readString(input.payload.text);
-  const evidenceReentry = readRecord(solverTrace?.evidence_reentry);
-  const followupReasoning = readRecord(solverTrace?.followup_reasoning);
-  const groundingTurnId =
-    input.askTurnId ??
-    readString(input.payload.turn_id) ??
-    readString(solverTrace?.turn_id) ??
-    "";
-  const grounding = evaluateRealtimeGroundingEvidence({
-    turnId: groundingTurnId,
-    requiredCapabilityIds: handoff.required_grounding_capability_ids,
+  const terminalRelayAuthority = evaluateRealtimeTerminalRelayAuthority({
+    handoff,
     payload: input.payload,
     debug,
     solverTrace,
-    evidenceContinuationCompleted:
-      evidenceReentry?.required === true &&
-      evidenceReentry.completed === true &&
-      followupReasoning?.required === true &&
-      followupReasoning.completed === true,
+    terminalAuthority,
+    answerText,
+    finalAnswerSource,
+    terminalArtifactKind,
+    askTurnId: input.askTurnId,
   });
   const nowMs = input.nowMs ?? Date.now();
-  const rejectionReason = !completedSolverPath
-    ? "solver_path_not_completed"
-    : !serverAuthoritative
-      ? "terminal_answer_not_server_authoritative"
-      : !answerText || !terminalArtifactKind || !finalAnswerSource
-        ? "terminal_answer_contract_incomplete"
-        : terminalArtifactKind === "typed_failure" || finalAnswerSource === "typed_failure"
-          ? "typed_failure_not_spoken"
-          : terminalArtifactKind === "request_user_input"
-            ? "request_user_input_not_spoken"
-            : terminalArtifactKind === "tool_receipt"
-              ? "tool_receipt_not_answer_authority"
-              : !grounding.satisfied
-                ? "required_grounding_evidence_missing"
-                : null;
+  const rejectionReason =
+    terminalArtifactKind === "typed_failure" || finalAnswerSource === "typed_failure"
+      ? "typed_failure_not_spoken"
+      : terminalArtifactKind === "request_user_input"
+        ? "request_user_input_not_spoken"
+        : terminalArtifactKind === "tool_receipt"
+          ? "tool_receipt_not_answer_authority"
+          : terminalRelayAuthority.failureCode
+            ? terminalRelayAuthority.failureCode
+            : null;
   if (rejectionReason) {
     const relay = suppressRealtimeGroundedAnswerRelay({
       handoffId: handoff.handoff_id,
@@ -235,28 +254,35 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
       nowMs,
     });
     const terminalAuthorityValidated = Boolean(
-      completedSolverPath &&
-      serverAuthoritative &&
-      answerText &&
-      terminalArtifactKind &&
-      finalAnswerSource,
+      completedSolverPath && serverAuthoritative && answerText &&
+      terminalArtifactKind && finalAnswerSource,
     );
     updateRealtimeGroundedFeedbackObserverAudit({
       handoff,
       patch: {
         turn_final_status: "captured",
         terminal_authority_status: terminalAuthorityValidated ? "validated" : "rejected",
-        grounding_evidence_status: handoff.required_grounding_capability_ids.length === 0
+        terminal_speech_authority_status:
+          terminalRelayAuthority.terminalSpeechAuthorityStatus,
+        relay_basis: terminalRelayAuthority.relayBasis,
+        grounding_required: terminalRelayAuthority.groundingRequired,
+        grounding_evidence_status: !terminalRelayAuthority.groundingRequired
           ? "not_required"
-          : grounding.satisfied
-            ? "validated"
-            : "rejected",
-        grounding_proof_source: grounding.proofSource,
+          : terminalRelayAuthority.failureCode
+            ? "rejected"
+            : "validated",
+        grounding_proof_source:
+          terminalRelayAuthority.groundingProofSource,
         feedback_status: "suppressed",
         relay_status: relay?.status ?? null,
         ask_turn_id:
-          readString(input.askTurnId) ??
-          readString(input.payload.turn_id ?? input.payload.turnId),
+          terminalRelayAuthority.askTurnId,
+        terminal_artifact_ref: terminalRelayAuthority.terminalArtifactRef,
+        terminal_text_hash: terminalRelayAuthority.terminalTextHash,
+        grounding_authority_ref:
+          terminalRelayAuthority.groundingAuthorityRef,
+        grounding_evidence_refs:
+          terminalRelayAuthority.groundingEvidenceRefs,
         failure_code: rejectionReason,
         completed_at_ms: nowMs,
       },
@@ -273,8 +299,9 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
     answerText: answerText as string,
     finalAnswerSource: finalAnswerSource as string,
     terminalArtifactKind: terminalArtifactKind as string,
-    groundingEvidenceRefs: grounding.evidenceRefs,
-    groundingProofSource: grounding.proofSource,
+    groundingEvidenceRefs: terminalRelayAuthority.groundingEvidenceRefs,
+    groundingProofSource: terminalRelayAuthority.groundingProofSource,
+    terminalRelayAuthority,
     askTurnId: input.askTurnId,
     nowMs,
   });
@@ -338,7 +365,9 @@ export const recordRealtimeGroundedAnswerFromRuntimeGoalPayload = (input: {
     evidenceReentered &&
     terminalAuthorityEvaluated &&
     providerTerminalAuthority?.server_authoritative === true;
-  const grounding = evaluateRealtimeGroundingEvidence({
+  // Runtime-goal commands have their own authority lifecycle and do not yet
+  // return the Ask terminal grounding certificate.
+  const grounding = evaluateLegacyRuntimeGoalGroundingEvidence({
     turnId:
       readString(input.payload.turn_id) ??
       readString(input.payload.ask_turn_id) ??
@@ -377,6 +406,14 @@ export const recordRealtimeGroundedAnswerFromRuntimeGoalPayload = (input: {
           completedGoalSolverPath && terminalAuthority?.server_authoritative === true
             ? "validated"
             : "rejected",
+        terminal_speech_authority_status:
+          completedGoalSolverPath && terminalAuthority?.server_authoritative === true
+            ? "validated"
+            : "rejected",
+        relay_basis: handoff.required_grounding_capability_ids.length > 0
+          ? "grounded_capability_terminal"
+          : "model_direct_terminal",
+        grounding_required: handoff.required_grounding_capability_ids.length > 0,
         grounding_evidence_status: handoff.required_grounding_capability_ids.length === 0
           ? "not_required"
           : grounding.satisfied
@@ -388,6 +425,10 @@ export const recordRealtimeGroundedAnswerFromRuntimeGoalPayload = (input: {
         ask_turn_id:
           readString(input.askTurnId) ??
           readString(input.payload.turn_id ?? input.payload.turnId),
+        terminal_artifact_ref: readString(terminalAuthority?.terminal_artifact_ref),
+        terminal_text_hash: readString(terminalAuthority?.terminal_text_hash),
+        grounding_authority_ref: null,
+        grounding_evidence_refs: grounding.evidenceRefs,
         failure_code: rejectionReason,
         completed_at_ms: nowMs,
       },
@@ -395,6 +436,17 @@ export const recordRealtimeGroundedAnswerFromRuntimeGoalPayload = (input: {
     });
     return null;
   }
+  const runtimeAskTurnId =
+    readString(input.askTurnId) ??
+    readString(input.payload.turn_id ?? input.payload.turnId) ??
+    readString(runtimeGoalSession?.turn_id) ??
+    "runtime-goal";
+  const runtimeTerminalArtifactRef =
+    readString(terminalAuthority?.terminal_artifact_ref) ??
+    `${runtimeAskTurnId}:runtime_goal_command_result`;
+  const runtimeTerminalTextHash =
+    readString(terminalAuthority?.terminal_text_hash) ??
+    hashText(answerText as string);
   return recordAcceptedRealtimeGroundedAnswer({
     handoff,
     payload: input.payload,
@@ -406,6 +458,26 @@ export const recordRealtimeGroundedAnswerFromRuntimeGoalPayload = (input: {
     terminalArtifactKind: terminalArtifactKind as string,
     groundingEvidenceRefs: grounding.evidenceRefs,
     groundingProofSource: grounding.proofSource,
+    terminalRelayAuthority: {
+      askTurnId: runtimeAskTurnId,
+      terminalArtifactRef: runtimeTerminalArtifactRef,
+      terminalTextHash: runtimeTerminalTextHash.startsWith("sha256:")
+        ? runtimeTerminalTextHash
+        : `sha256:${runtimeTerminalTextHash}`,
+      terminalSpeechAuthorityStatus: "validated",
+      relayBasis: handoff.required_grounding_capability_ids.length > 0
+        ? "grounded_capability_terminal"
+        : "model_direct_terminal",
+      groundingRequired: handoff.required_grounding_capability_ids.length > 0,
+      groundingEvidenceRefs: grounding.evidenceRefs,
+      groundingAuthorityRef:
+        `runtime-goal-grounding:${runtimeAskTurnId}`,
+      groundingProofSource: grounding.proofSource === "gateway_call_results"
+        ? "gateway_call_results"
+        : "canonical_solver_trace",
+      requiredGroundingCapabilityIds: handoff.required_grounding_capability_ids,
+      failureCode: null,
+    },
     additionalEvidenceRefs: wakeEventId ? [wakeEventId] : [],
     askTurnId: input.askTurnId,
     nowMs,

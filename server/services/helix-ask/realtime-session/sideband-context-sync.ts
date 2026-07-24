@@ -367,6 +367,10 @@ export const startRealtimeStagePlaySideband = (input: {
       realtimeSessionId: input.realtimeSessionId,
       patch: { sidebandState: "open" },
     });
+    publishRealtimeSidebandActivity({
+      realtimeSessionId: input.realtimeSessionId,
+      activity: "sideband_open",
+    });
     requestRealtimeStagePlayContextSync({
       realtimeSessionId: input.realtimeSessionId,
       reason: "session_start",

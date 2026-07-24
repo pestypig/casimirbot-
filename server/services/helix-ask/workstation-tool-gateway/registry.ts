@@ -39,7 +39,10 @@ import {
   type HelixScholarlyResearchIntentMode,
   type HelixScholarlyResearchProvider,
 } from "@shared/helix-scholarly-research-observation";
-import { runInternetSearch } from "../retrieval/internet-search";
+import {
+  listConfiguredInternetSearchProviders,
+  runInternetSearch,
+} from "../retrieval/internet-search";
 import { runScholarlyResearchLookup } from "../retrieval/scholarly-research-lookup";
 import { runScholarlyFullTextFetch } from "../retrieval/scholarly-full-text-fetch";
 import { runScholarlyNumericParameterExtraction } from "../retrieval/scholarly-numeric-parameters";
@@ -85,6 +88,11 @@ import {
   buildScientificCalculatorTheoryRunContextGatewayObservation,
   scientificCalculatorTheoryRunContextManifest,
 } from "./scientific-calculator-theory-run-context";
+import {
+  executeTheoryFormalVerifierGatewayCapability,
+  THEORY_FORMAL_VERIFIER_CAPABILITIES,
+  theoryFormalVerifierManifests,
+} from "./theory-formal-verifier";
 import {
   HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
   type HelixLiveEnvironmentToolName,
@@ -4419,6 +4427,10 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [civilizationBoundsReflectionManifest.capability_id, civilizationBoundsReflectionManifest],
   [theoryContextReflectionManifest.capability_id, theoryContextReflectionManifest],
   [theoryFrontierConjectureManifest.capability_id, theoryFrontierConjectureManifest],
+  ...theoryFormalVerifierManifests.map((manifest) => [
+    manifest.capability_id,
+    manifest,
+  ] as const),
   [moralGraphReflectionManifest.capability_id, moralGraphReflectionManifest],
   [moralLivingSubstrateReflectionManifest.capability_id, moralLivingSubstrateReflectionManifest],
   [textToSpeechSpeakTextManifest.capability_id, textToSpeechSpeakTextManifest],
@@ -4444,34 +4456,48 @@ const capabilities = new Map<string, HelixWorkstationCapabilityManifest>(
 
 export const listWorkstationGatewayCapabilities = (
   input: HelixWorkstationGatewayListInput = {},
-): HelixWorkstationGatewayListResult => ({
-  schema: WORKSTATION_GATEWAY_SCHEMA,
-  manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
-  agent_runtime: cleanString(input.agentRuntime, "codex"),
-  mode: normalizeMode(input.mode),
-  capabilities: Array.from(capabilities.values()).map((manifest) => {
-    if (
-      input.accountType === "user" &&
-      manifest.capability_id === ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY
-    ) {
-      return {
-        ...manifest,
-        input_schema: {
-          ...manifest.input_schema,
-          properties: {
-            ...readRecord(manifest.input_schema.properties),
-            language: { type: "string", enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES] },
-            interface_language: { type: "string", enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES] },
-            interfaceLanguage: { type: "string", enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES] },
-          },
-        },
-      };
-    }
-    return manifest;
-  }),
-  assistant_answer: false,
-  raw_content_included: false,
-});
+): HelixWorkstationGatewayListResult => {
+  const internetSearchConfigured = listConfiguredInternetSearchProviders().length > 0;
+  return {
+    schema: WORKSTATION_GATEWAY_SCHEMA,
+    manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+    agent_runtime: cleanString(input.agentRuntime, "codex"),
+    mode: normalizeMode(input.mode),
+    capabilities: Array.from(capabilities.values())
+      .filter((manifest) => manifest.capability_id !== INTERNET_SEARCH_CAPABILITY || internetSearchConfigured)
+      .map((manifest) => {
+        if (
+          input.accountType === "user" &&
+          manifest.capability_id === ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY
+        ) {
+          return {
+            ...manifest,
+            input_schema: {
+              ...manifest.input_schema,
+              properties: {
+                ...readRecord(manifest.input_schema.properties),
+                language: { type: "string", enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES] },
+                interface_language: { type: "string", enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES] },
+                interfaceLanguage: { type: "string", enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES] },
+              },
+            },
+          };
+        }
+        return manifest;
+      }),
+    ...(!internetSearchConfigured
+      ? {
+          unavailable_capabilities: [{
+            capability_id: INTERNET_SEARCH_CAPABILITY,
+            availability: "unavailable" as const,
+            reason: "provider_not_configured" as const,
+          }],
+        }
+      : {}),
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
 
 export const callWorkstationGatewayCapability = async (
   input: HelixWorkstationGatewayCallInput,
@@ -4606,6 +4632,69 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
       error: blockedReason,
+    };
+  }
+
+  if (
+    (THEORY_FORMAL_VERIFIER_CAPABILITIES as readonly string[]).includes(
+      manifest.capability_id,
+    )
+  ) {
+    const args = readArguments(input.arguments);
+    const gatewayResult = await executeTheoryFormalVerifierGatewayCapability({
+      capabilityId: manifest.capability_id,
+      args,
+      accountType: input.accountType ?? "user",
+      profileId: input.profileId,
+      approvalToken: input.approvalToken,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.admissionStatus,
+      reason: gatewayResult.admissionReason,
+      blockedReason: gatewayResult.blockedReason,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "theory-badge-graph",
+      action: manifest.action_id,
+      status: gatewayResult.status,
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      missingRequirements: gatewayResult.missingRequirements,
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: gatewayResult.error,
+      terminalEligible: false,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
     };
   }
 
@@ -4967,6 +5056,9 @@ export const callWorkstationGatewayCapability = async (
       status: "succeeded",
       summary: `Workspace OS status returned ${result.observation.capability_count} capability record(s).`,
       observation: result.observation,
+      stateDelta: {
+        workspace_os_status: result.observation,
+      },
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -6624,12 +6716,18 @@ export const callWorkstationGatewayCapability = async (
   if (manifest.capability_id === INTERNET_SEARCH_CAPABILITY) {
     const args = readArguments(input.arguments);
     const query = normalizeExternalSearchQuery(args.query ?? args.search_query ?? args.prompt);
-    const providers = readInternetSearchProviders(args.providers);
+    const requestedProviders = readInternetSearchProviders(args.providers);
+    const configuredProviders = listConfiguredInternetSearchProviders();
+    const providers = requestedProviders.length > 0
+      ? requestedProviders.filter((provider) => configuredProviders.includes(provider))
+      : configuredProviders;
     const domains = readInternetSearchDomains(args.domains);
     const recencyDays = readInternetSearchRecencyDays(args.recency_days ?? args.recencyDays);
     const limit = readExternalSearchLimit(args.limit ?? args.max_results ?? args.maxResults);
-    const blockedReason = !query
-      ? "missing_query"
+    const blockedReason = configuredProviders.length === 0 || (requestedProviders.length > 0 && providers.length === 0)
+      ? "provider_not_configured"
+      : !query
+        ? "missing_query"
       : query.length < 3 || !/[a-z0-9]/i.test(query)
         ? "query_too_broad"
         : null;
@@ -6675,8 +6773,10 @@ export const callWorkstationGatewayCapability = async (
         observation,
         missingRequirements: [{
           code: blockedReason,
-          message: "Provide a specific internet search query.",
-          repair_action: "ask_user",
+          message: blockedReason === "provider_not_configured"
+            ? "Configure Tavily, Exa, or Google Custom Search before using internet search."
+            : "Provide a specific internet search query.",
+          repair_action: blockedReason === "provider_not_configured" ? "configure_provider" : "ask_user",
         }],
       });
       const trace = buildGatewayTrace({

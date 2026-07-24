@@ -57,6 +57,26 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+export const listConfiguredInternetSearchProviders = (
+  env: NodeJS.ProcessEnv = process.env,
+): HelixInternetSearchProvider[] => {
+  const providers: HelixInternetSearchProvider[] = [];
+  if (readString(env.TAVILY_API_KEY)) providers.push("tavily");
+  if (readString(env.EXA_API_KEY)) providers.push("exa");
+  const googleApiKey =
+    readString(env.GOOGLE_CUSTOM_SEARCH_API_KEY) ??
+    readString(env.GOOGLE_CSE_API_KEY) ??
+    readString(env.GOOGLE_API_KEY);
+  const googleEngineId =
+    readString(env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID) ??
+    readString(env.GOOGLE_CUSTOM_SEARCH_CX) ??
+    readString(env.GOOGLE_CSE_CX) ??
+    readString(env.GOOGLE_CSE_ID) ??
+    readString(env.GOOGLE_SEARCH_ENGINE_ID);
+  if (googleApiKey && googleEngineId) providers.push("google_custom_search");
+  return providers;
+};
+
 const firstString = (...values: unknown[]): string | null => {
   for (const value of values) {
     const text = readString(value);

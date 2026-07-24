@@ -1357,6 +1357,176 @@ describe("Helix terminal authority single writer", () => {
       },
     });
     expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.terminal_answer_authority).toMatchObject({
+      terminal_kind: "answer",
+      terminal_artifact_kind: "scholarly_research_answer",
+      final_answer_source: "scholarly_research_answer",
+      server_authoritative: true,
+    });
+    expect(payload.terminal_presentation).toMatchObject({
+      terminal_artifact_kind: "scholarly_research_answer",
+      final_answer_source: "scholarly_research_answer",
+      concise_text: answerText,
+      selected_observation_refs: observationRefs,
+    });
+    expect(payload.typed_failure).toBeUndefined();
+  });
+
+  it("preserves a current scholarly terminal when no duplicate top-level answer artifact exists", () => {
+    const turnId = "ask:test:scholarly-current-terminal-envelope";
+    const observationRef = `${turnId}:workstation_gateway:scholarly-research.lookup_papers:1`;
+    const answerRef = `${turnId}:scholarly_research_answer`;
+    const answerText = "The lookup found current magnetar research and returned a grounded reading list.";
+    const artifacts = [{
+      artifact_id: observationRef,
+      kind: "provider_gateway_observation_packet",
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: turnId,
+        capability_key: "scholarly-research.lookup_papers",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    }];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Can you cite research about magnetars?",
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "model_only_concept",
+        answer_scope: "model_only",
+        required_terminal_kind: "direct_answer_text",
+      },
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        canonical_goal: {
+          goal_kind: "scholarly_research",
+          required_terminal_kind: "scholarly_research_answer",
+          allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+          forbidden_terminal_artifact_kinds: ["direct_answer_text"],
+        },
+        route: {
+          selected_route: "/ask/turn",
+          source_target: "scholarly_research",
+          target_kind: "scholarly_research",
+          strength: "hard",
+          route_reason: "explicit_capability_contract",
+        },
+        capability_policy: {
+          allowed_tool_families: ["scholarly_research"],
+          suppressed_tool_families: [],
+          required_capability_families: ["scholarly_research"],
+          mutating_families_allowed: false,
+        },
+        terminal_product: {
+          terminal_authority_required: true,
+          evidence_reentry_required: true,
+          followup_reasoning_required: false,
+          required_terminal_product: "scholarly_research_answer",
+        },
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "scholarly_research",
+        required_terminal_kind: "scholarly_research_answer",
+        allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+      },
+      route_evidence_authority: {
+        schema: "helix.route_evidence_authority.v1",
+        turn_id: turnId,
+        allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["direct_answer_text"],
+        required_terminal_kind: "scholarly_research_answer",
+        terminal_product_allowed: true,
+        current_turn_only: true,
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "source_backed",
+        relevant_tool_families: ["scholarly_research"],
+        terminal_success_criteria: {
+          required_observation_families: ["scholarly_research"],
+          requires_post_observation_synthesis: true,
+        },
+      },
+      current_turn_artifact_ledger: artifacts,
+      terminal_artifact_kind: "scholarly_research_answer",
+      final_answer_source: "scholarly_research_answer",
+      selected_final_answer: answerText,
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        thread_id: "thread:test",
+        turn_id: turnId,
+        route: "/ask/turn",
+        terminal_kind: "answer",
+        terminal_artifact_kind: "scholarly_research_answer",
+        final_answer_source: "scholarly_research_answer",
+        terminal_item_id: answerRef,
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "scholarly_research_answer",
+        final_answer_source: "scholarly_research_answer",
+        terminal_authority_ref: answerRef,
+        selected_observation_refs: [observationRef],
+        concise_text: answerText,
+      },
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        turn_id: turnId,
+        status: "completed",
+        normalized_observation_refs: [observationRef],
+        normalized_observation_packet_count: 1,
+        evidence_reentry_required: true,
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        normalized_observations_ready: true,
+        all_observations_succeeded: true,
+        all_gateway_calls_succeeded: true,
+        all_capability_lane_observations_succeeded: true,
+        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        successful_gateway_observation_refs: [observationRef],
+        normalized_observation_refs: [observationRef],
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("scholarly_research_answer");
+    expect(result.visible_text).toBe(answerText);
+    expect(payload.terminal_answer_envelope).toMatchObject({
+      terminal_artifact_kind: "scholarly_research_answer",
+      final_answer_source: "scholarly_research_answer",
+      terminal_text: answerText,
+      terminal_kind: "answer",
+    });
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.typed_failure).toBeUndefined();
   });
 
   it("preserves a current-turn authorized provider bridge when a later typed failure overwrites top-level terminal fields", () => {
@@ -1467,6 +1637,106 @@ describe("Helix terminal authority single writer", () => {
       provider_bridge_authorizes_candidate: true,
       authority_shape_valid: true,
       presentation_shape_valid: true,
+      current_turn_support_ref_count: 1,
+      rejection_reason: null,
+    });
+  });
+
+  it("materializes an authorized provider candidate as a route-required document summary", () => {
+    const turnId = "ask:test:provider-doc-summary-route-product";
+    const observationRef = `${turnId}:codex_normalized:retrieval_context:1`;
+    const providerCandidateRef = `${turnId}:agent_provider_terminal_candidate:codex:doc-summary`;
+    const answerText = "The document separates measured Casimir observables from speculative DP and quantum-foam bridges.";
+    const terminalAuthority = {
+      schema: "helix.turn_terminal_authority.v1",
+      thread_id: "thread:test",
+      turn_id: turnId,
+      route: "/ask/turn",
+      terminal_kind: "answer",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_item_id: providerCandidateRef,
+      server_authoritative: true,
+    };
+    const terminalPresentation = {
+      schema: "helix.terminal_presentation.v1",
+      turn_id: turnId,
+      concise_text: answerText,
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_authority_ref: providerCandidateRef,
+      selected_observation_refs: [observationRef],
+    };
+    const artifacts = [{
+      artifact_id: observationRef,
+      kind: "retrieval_context",
+      payload: {
+        schema: "helix.retrieval_context.v1",
+        turn_id: turnId,
+        path: "docs/research/casimir-dp-quantum-foam-study.md",
+        excerpt: "Measured Casimir and DP diagnostic lanes remain separate.",
+      },
+    }];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      canonical_goal_frame: {
+        goal_kind: "doc_summary",
+        required_terminal_kind: "doc_summary",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_kind: "doc_summary",
+        allowed_terminal_artifact_kinds: ["doc_summary", "typed_failure"],
+      },
+      terminal_answer_authority: terminalAuthority,
+      terminal_presentation: terminalPresentation,
+      provider_terminal_candidate: {
+        candidate_id: providerCandidateRef,
+        candidate_text: answerText,
+        grounded_in_observation_refs: [observationRef],
+        normalized_observation_refs: [observationRef],
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        evidence_reentry_required: true,
+        terminal_answer_authority: terminalAuthority,
+        terminal_presentation: terminalPresentation,
+      },
+    };
+
+    const materialized = materializeAgentProviderRouteProductTerminal({
+      payload,
+      artifacts,
+      turnId,
+      requiredTerminalKind: "doc_summary",
+      routeAllowsTerminalKind: (kind) => kind === "doc_summary",
+    });
+
+    expect(materialized).toMatchObject({
+      kind: "doc_summary",
+      text: answerText,
+      supportRefs: [observationRef],
+      artifact: {
+        kind: "doc_summary",
+        payload: {
+          schema: "helix.doc_summary.v1",
+          provider_terminal_candidate_ref: providerCandidateRef,
+        },
+      },
+    });
+    expect(inspectAgentProviderRouteProductEligibility({
+      payload,
+      artifacts,
+      turnId,
+      requiredTerminalKind: "doc_summary",
+      routeAllowsTerminalKind: (kind) => kind === "doc_summary",
+    })).toMatchObject({
+      target_kind: "doc_summary",
+      provider_authored_target_kind: true,
+      route_allows_target_kind: true,
       current_turn_support_ref_count: 1,
       rejection_reason: null,
     });
@@ -4907,7 +5177,22 @@ describe("Helix terminal authority single writer", () => {
 
   it("surfaces an authorized provider answer after a capability-lane observation product is re-entered", () => {
     const turnId = "ask:test:authorized-provider-bridge-after-capability-lane";
-    const observation = makePostToolObservation(turnId);
+    const observation = {
+      artifact_id: `${turnId}:capability_lane:visual_analysis.inspect_image_region:obs`,
+      kind: "capability_lane_observation_packet",
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: turnId,
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        action: "inspect_image_region",
+        panel_id: "image-lens",
+        capability_key: "visual_analysis.inspect_image_region",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
     const observationRef = String(observation.artifact_id);
     const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:visual`;
     const answerText = "The requested discussion is on page 3; the rendered page is ready in Image Lens.";
@@ -7279,5 +7564,112 @@ describe("Helix terminal authority single writer", () => {
       selected_capability: "scholarly-research.fetch_full_text",
       executed_capability: "scholarly-research.fetch_full_text",
     });
+  });
+
+  it("materializes a goal-supported visual artifact whose canonical text is top-level", () => {
+    const turnId = "ask:test:top-level-visual-context-text";
+    const visualRef = `${turnId}:situation_context_question:situation_evidence_selection`;
+    const answerText = "The current visual capture shows File Explorer open to a research folder.";
+    const visualArtifact = {
+      artifact_id: visualRef,
+      kind: "situation_context_pack",
+      text: answerText,
+      answer_text: answerText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        turn_id: turnId,
+        goal_kind: "situation_context_question",
+        required_terminal_kind: "visual_context_pack",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_kind: "visual_context_pack",
+        allowed_terminal_artifact_kinds: [
+          "visual_context_pack",
+          "situation_context_pack",
+          "visual_frame_evidence",
+          "typed_failure",
+        ],
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        turn_id: turnId,
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        observed_results: [{
+          ref: visualRef,
+          kind: "situation_context_pack",
+          status: "observed",
+          supports_goal: true,
+          reason: "satisfies_goal_terminal_contract",
+        }],
+      },
+      current_turn_artifact_ledger: [visualArtifact],
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            decision_id: `${turnId}:decision:visual`,
+            decision_authority: "llm",
+            decision_timing: "pre_tool",
+            next_step: "tool",
+            chosen_capability: "situation-room.describe_visual_capture",
+            observed_artifact_refs: [visualRef],
+            tool_observation: {
+              kind: "situation_context_pack",
+              artifact_id: visualRef,
+            },
+          },
+          {
+            iteration: 2,
+            decision_id: `${turnId}:decision:answer`,
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            observed_artifact_refs: [visualRef],
+          },
+        ],
+      },
+      agent_step_decision: {
+        schema: "helix.agent_step_decision.v1",
+        decision_id: `${turnId}:decision:answer`,
+        decision_authority: "llm",
+        decision_timing: "post_observation",
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "tool_receipt",
+        visible_text: "Visual capture completed.",
+      },
+    };
+
+    expect(shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal({
+      payload,
+      artifactLedger: [visualArtifact],
+    })).toBe(true);
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [visualArtifact],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("situation_context_pack");
+    expect(result.selected_terminal_artifact_ref).toBe(visualRef);
+    expect(result.visible_text).toBe(answerText);
+    expect(payload.terminal_artifact_kind).toBe("situation_context_pack");
+    expect(payload.final_answer_source).toBe("situation_context_pack");
+    expect(payload.selected_final_answer).toBe(answerText);
+    expect(payload.terminal_error_code).toBeUndefined();
   });
 });

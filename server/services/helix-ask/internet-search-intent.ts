@@ -4,11 +4,30 @@ import type {
 } from "@shared/helix-ask-source-target-intent";
 import type { ToolFamily } from "./tool-family-contract";
 import {
+  HELIX_LOCKED_WORKSTATION_PANEL_IDS,
+  HELIX_USER_WORKSTATION_PANEL_IDS,
+} from "@shared/helix-account-session";
+import {
   contextualToolSuppressionBlocksFamily,
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
 import { extractScholarlySourceTargets } from "./scholarly-research-intent";
 import { hasWorkstationPanelScopeCue } from "./workstation-active-context-intent";
+
+const KNOWN_WORKSTATION_PANEL_IDS = [
+  ...HELIX_USER_WORKSTATION_PANEL_IDS,
+  ...HELIX_LOCKED_WORKSTATION_PANEL_IDS,
+];
+
+const normalizeWorkstationSurfaceText = (value: string): string =>
+  value.toLowerCase().replace(/[_\s]+/g, "-");
+
+export const hasKnownWorkstationSurfaceScopeCue = (promptText: string): boolean => {
+  const normalizedPrompt = normalizeWorkstationSurfaceText(promptText);
+  return KNOWN_WORKSTATION_PANEL_IDS.some((panelId) =>
+    normalizedPrompt.includes(panelId)
+  );
+};
 
 export type HelixInternetSearchIntent = {
   searchRequested: boolean;
@@ -43,6 +62,7 @@ export type ToolUseRestatementV1 = {
 
 const hasLocalWorkspaceScopeCue = (promptText: string): boolean =>
   /\b(?:docs?\s+viewer|documents?\s+viewer|current\s+(?:doc|document)|active\s+(?:doc|document)|repo|repository|codebase|working\s+tree|workspace|local\s+files?|our\s+docs?|from\s+(?:our|local|the\s+)?docs?)\b/i.test(promptText) ||
+  hasKnownWorkstationSurfaceScopeCue(promptText) ||
   /\b(?:theory\s+badge\s+graph|current\s+badge\s+graph|selected\s+badges?|badge\s+(?:selection|combination|trace|branch))\b/i.test(promptText) ||
   /\b(?:current\s+)?(?:NHM[-\s]?2\s+)?(?:white\s*paper|whitepaper|doc(?:ument)?|paper)\b[\s\S]{0,120}\b(?:document\s+)?evidence\b/i.test(promptText) ||
   /\b(?:use|consult|check|read|inspect|apply|ground|base)\b[\s\S]{0,120}\b(?:NHM[-\s]?2\s+)?(?:white\s*paper|whitepaper|doc(?:ument)?|paper)\b/i.test(promptText) ||
@@ -55,6 +75,7 @@ const hasLocalObservationScopeCue = (promptText: string): boolean =>
 
 const hasScholarlyScopeCue = (promptText: string): boolean =>
   /\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|journal|peer[-\s]?reviewed|citations?|references?|bibliograph(?:y|ies)|research\s+papers?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText) ||
+  /\b(?:find|search|look\s+for|look\s*up|lookup|recommend|suggest|identify)\b[^.!?;\n]{0,140}\b(?:papers?|articles?|studies|reviews?|literature)\b/i.test(promptText) ||
   extractScholarlySourceTargets(promptText).length > 0;
 
 const hasSearchActionCue = (promptText: string): boolean =>
@@ -67,28 +88,45 @@ export const hasAffirmativeDocsViewerSearchCue = (promptText: string): boolean =
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
   if (contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer")) return false;
   if (
-    /\b(?:do\s+not|don't|dont|never|without|no)\b[\s\S]{0,120}\b(?:search|find|locate|look\s+for|look\s+at|use|consult|open|show|view)\b[\s\S]{0,120}\b(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)\b/i.test(prompt) ||
-    /\b(?:do\s+not|don't|dont|never|without|no)\b[\s\S]{0,120}\b(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)\b[\s\S]{0,120}\b(?:search|find|locate|look\s+for|look\s+at|use|consult|open|show|view)\b/i.test(prompt)
+    /\b(?:was|is)\s+my\s+(?:earlier|previous|last)\s+(?:prompt|question|message)\b/i.test(prompt) &&
+    /\b(?:do\s+not|don't|dont|without)\s+(?:search|find|open|read|use|consult)\b/i.test(prompt)
+  ) {
+    return false;
+  }
+  const priorDocumentDiscussionReference =
+    /\b(?:just|already|previously|earlier)\b[\s\S]{0,100}\b(?:explained|discussed|described|summari[sz]ed|talked\s+about)\b[\s\S]{0,100}\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?)\b/i.test(prompt) ||
+    /\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?)\b[\s\S]{0,100}\b(?:just|already|previously|earlier)\b[\s\S]{0,100}\b(?:explained|discussed|described|summari[sz]ed|talked\s+about)\b/i.test(prompt);
+  const freshDocumentAccessRequest =
+    /\b(?:search|find|locate|look\s+(?:for|in|at)|retrieve|check|use|consult|open|show|view|read|inspect|pull\s+from|quote|cite)\b/i.test(prompt) ||
+    /\b(?:exact\s+passage|page|section|line[-\s]?backed|citation|document\s+evidence)\b/i.test(prompt);
+  if (priorDocumentDiscussionReference && !freshDocumentAccessRequest) return false;
+  if (
+    /\b(?:do\s+not|don't|dont|never|without|no)\b[\s\S]{0,120}\b(?:search|find|locate|look\s+for|look\s+at|use|consult|open|show|view)\b[\s\S]{0,120}\b(?:docs?|documents?|white\s*papers?|papers?|docs?\s+viewer|documents?\s+viewer)\b/i.test(prompt) ||
+    /\b(?:do\s+not|don't|dont|never|without|no)\b[\s\S]{0,120}\b(?:docs?|documents?|white\s*papers?|papers?|docs?\s+viewer|documents?\s+viewer)\b[\s\S]{0,120}\b(?:search|find|locate|look\s+for|look\s+at|use|consult|open|show|view)\b/i.test(prompt)
   ) {
     return false;
   }
   if (
-    /\b(?:earlier|previously|last\s+turn|before|already)\b[\s\S]{0,120}\b(?:searched|found|located|looked\s+for|retrieved)\b[\s\S]{0,120}\b(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)\b/i.test(prompt) ||
-    /\b(?:searched|found|located|looked\s+for|retrieved)\b[\s\S]{0,120}\b(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)\b[\s\S]{0,120}\b(?:earlier|previously|last\s+turn|before|already)\b/i.test(prompt)
+    /\b(?:earlier|previously|last\s+turn|before|already)\b[\s\S]{0,120}\b(?:searched|found|located|looked\s+for|retrieved)\b[\s\S]{0,120}\b(?:docs?|documents?|white\s*papers?|papers?|docs?\s+viewer|documents?\s+viewer)\b/i.test(prompt) ||
+    /\b(?:searched|found|located|looked\s+for|retrieved)\b[\s\S]{0,120}\b(?:docs?|documents?|white\s*papers?|papers?|docs?\s+viewer|documents?\s+viewer)\b[\s\S]{0,120}\b(?:earlier|previously|last\s+turn|before|already)\b/i.test(prompt)
   ) {
     return false;
   }
-  const withoutQuotedDocsSearch = prompt.replace(/["'`][^"'`]*(?:search|find|locate|look\s+for)[^"'`]*(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)[^"'`]*["'`]/gi, " ");
   if (
-    /\b(?:search|find|locate|look\s+for|retrieve)\b[\s\S]{0,100}\b(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)\b/i.test(withoutQuotedDocsSearch) ||
-    /\b(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)\b[\s\S]{0,100}\b(?:search|find|locate|look\s+for|retrieve)\b/i.test(withoutQuotedDocsSearch)
+    /\b(?:later|next\s+time|in\s+the\s+future|not\s+now|not\s+yet|eventually|hypothetically)\b[\s\S]{0,160}\b(?:search|find|locate|look\s+for|retrieve)\b[\s\S]{0,120}\b(?:docs?|documents?|white\s*papers?|papers?|docs?\s+viewer|documents?\s+viewer)\b/i.test(prompt)
+  ) {
+    return false;
+  }
+  const withoutQuotedDocsSearch = prompt.replace(/["'`][^"'`]*(?:search|find|locate|look\s+for)[^"'`]*(?:docs?|documents?|white\s*papers?|papers?|docs?\s+viewer|documents?\s+viewer)[^"'`]*["'`]/gi, " ");
+  if (
+    /\b(?:search|find|locate|look\s+for|retrieve)\b[\s\S]{0,100}\b(?:docs?|documents?|white\s*papers?|papers?|docs?\s+viewer|documents?\s+viewer)\b/i.test(withoutQuotedDocsSearch) ||
+    /\b(?:docs?|documents?|white\s*papers?|papers?|docs?\s+viewer|documents?\s+viewer)\b[\s\S]{0,100}\b(?:search|find|locate|look\s+for|retrieve)\b/i.test(withoutQuotedDocsSearch)
   ) {
     return true;
   }
   if (
-    /\b(?:check|use|consult|look\s+(?:in|at)|read|inspect|pull\s+from)\b[\s\S]{0,120}\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?)\b/i.test(withoutQuotedDocsSearch) ||
-    /\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?)\b[\s\S]{0,120}\b(?:figure|figures|table|tables|value|values|newtons?|lbs?|pounds?|load[-\s]?bearing|capacity|reported|stated|specified)\b/i.test(withoutQuotedDocsSearch) ||
-    /\b(?:NHM[-\s]?2)\b[\s\S]{0,160}\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|figures?|newtons?|lbs?|pounds?|load[-\s]?bearing|capacity)\b/i.test(withoutQuotedDocsSearch)
+    /\b(?:check|use|consult|look\s+(?:in|at)|open|show|view|read|inspect|pull\s+from)\b[\s\S]{0,120}\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?)\b/i.test(withoutQuotedDocsSearch) ||
+    /\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?)\b[\s\S]{0,120}\b(?:figure|figures|table|tables|value|values|newtons?|lbs?|pounds?|load[-\s]?bearing|capacity|reported|stated|specified)\b/i.test(withoutQuotedDocsSearch)
   ) {
     return true;
   }
@@ -107,6 +145,9 @@ const hasCurrentAffairsDomainCue = (promptText: string): boolean =>
 
 const hasExplicitWebProviderCue = (promptText: string): boolean =>
   /\b(?:google\s+(?:custom\s+search|cse|search)|tavily|exa|web\s+api|internet\s+api)\b/i.test(promptText);
+
+const hasExplicitWebSearchCue = (promptText: string): boolean =>
+  /\b(?:search\s+(?:the\s+)?(?:web|internet)|look\s+up\s+online|check\s+online|google\s+it|google\s+search)\b/i.test(promptText);
 
 const domainPattern = /\b(?:site:)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+)\b/gi;
 
@@ -211,6 +252,7 @@ export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV
   const prompt = promptText.trim();
   const compactLiveSourceMailboxHandoff = isCompactLiveSourceMailboxHandoff(prompt);
   const explicitProviderCue = hasExplicitWebProviderCue(prompt);
+  const explicitWebRequest = explicitProviderCue || hasExplicitWebSearchCue(prompt);
   const searchAction = hasSearchActionCue(prompt);
   const currentWebCue = hasCurrentWebCue(prompt);
   const timeSensitiveCue = hasTimeSensitiveFactCue(prompt);
@@ -222,18 +264,22 @@ export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV
   const requiresDocsViewer = !suppressed && hasAffirmativeDocsViewerSearchCue(prompt);
   const requiresVoiceDelivery = !suppressed && hasAffirmativeVoiceReadAloudCue(prompt);
   const localSourceScope =
+    requiresDocsViewer ||
     hasWorkstationPanelScopeCue(prompt) ||
     hasLocalWorkspaceScopeCue(prompt) ||
     hasLocalObservationScopeCue(prompt);
-  const localSourceWithoutExplicitWeb = localSourceScope && !explicitProviderCue;
-  const freshnessRequired = !suppressed && !localSourceWithoutExplicitWeb && (explicitProviderCue || currentWebCue || timeSensitiveCue || currentAffairsCue);
+  const localSourceWithoutExplicitWeb = localSourceScope && !explicitWebRequest;
+  const freshnessRequired = !suppressed && !localSourceWithoutExplicitWeb && (explicitWebRequest || currentWebCue || timeSensitiveCue || currentAffairsCue);
   const currentAffairsRequired = !suppressed && !localSourceWithoutExplicitWeb && currentAffairsCue;
-  const requiresInternet = !suppressed && !localSourceScope && !hasScholarlyScopeCue(prompt) && (
-    explicitProviderCue ||
+  const requiresInternet = !suppressed &&
+    !localSourceWithoutExplicitWeb &&
+    (!hasScholarlyScopeCue(prompt) || explicitWebRequest) &&
+    (
+    explicitWebRequest ||
     (searchAction && (currentWebCue || timeSensitiveCue)) ||
     currentAffairsRequired ||
     (timeSensitiveCue && /\b(?:what|why|how|is|are|should|would|does|do|compare|assess|evaluate|true|prediction|status)\b/i.test(prompt))
-  );
+    );
   const complex = isComplexCurrentAffairsAnalysis(prompt);
   const minimumEvidencePlan = requiresInternet
     ? {
@@ -271,11 +317,14 @@ export const detectInternetSearchIntent = (promptText: string): HelixInternetSea
   const explicitProviderCue = hasExplicitWebProviderCue(prompt);
   const searchAction = hasSearchActionCue(prompt);
   const currentWebCue = hasCurrentWebCue(prompt);
-  const localScope = hasWorkstationPanelScopeCue(prompt) || hasLocalWorkspaceScopeCue(prompt);
+  const localScope =
+    restatement.requiredToolFamilies.includes("docs_viewer") ||
+    hasWorkstationPanelScopeCue(prompt) ||
+    hasLocalWorkspaceScopeCue(prompt);
   const scholarlyScope = hasScholarlyScopeCue(prompt);
   const domains = extractDomains(prompt);
   const recencyDays = extractRecencyDays(prompt);
-  const explicitWebSearchCue = /\b(?:search\s+(?:the\s+)?(?:web|internet)|look\s+up\s+online|check\s+online|google\s+it|google\s+search)\b/i.test(prompt);
+  const explicitWebSearchCue = hasExplicitWebSearchCue(prompt);
   const searchRequested =
     (
       !internetSearchSuppressed &&

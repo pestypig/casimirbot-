@@ -338,12 +338,15 @@ export const buildHelixProviderReasoningReentry = (input: {
   const candidateId = input.ok && input.providerText.trim()
     ? `${input.turnId}:agent_provider_terminal_candidate:${input.runtime}:${sha256(input.providerText).slice(0, 16)}`
     : null;
-  const providerReasoningCompleted = Boolean(candidateId && input.solverCompleted === true);
+  const providerReasoningCompleted = Boolean(candidateId);
   const evidenceReentered = Boolean(
     noEvidenceDirectAnswerReady ||
       (evidenceReentryRequired && normalizedObservationsReady && providerReasoningCompleted),
   );
-  const solverAuthoritySatisfied = providerReasoningCompleted && input.goalSatisfied !== false;
+  const solverAuthoritySatisfied =
+    providerReasoningCompleted &&
+    input.solverCompleted === true &&
+    input.goalSatisfied !== false;
   const pendingVoiceHandoffOverclaim = Boolean(
     candidateId &&
       capabilityLaneObservationPackets.some(isPendingTextToSpeechHandoffObservation) &&

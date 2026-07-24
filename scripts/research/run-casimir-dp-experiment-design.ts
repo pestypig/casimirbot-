@@ -86,7 +86,7 @@ function buildGaussianDpInput(candidate: CasimirDpExperimentCandidate): TDpColla
     grid: {
       dims,
       voxel_size_m: [voxel, voxel, voxel],
-      origin_m: [-halfSpan, -halfSpan, -halfSpan],
+      origin_m: [0, 0, 0],
     },
     branch_a: {
       kind: "analytic",
@@ -335,7 +335,10 @@ export async function runCasimirDpExperimentDesign(args: {
   );
   await mkdir(outDir, { recursive: true });
   const reportJson = stableJson(report);
-  const reportMarkdown = renderCasimirDpExperimentDesignMarkdown(report);
+  const reportMarkdown = renderCasimirDpExperimentDesignMarkdown(report).replace(
+    / {2}\n/g,
+    "<br>\n",
+  );
   const reportJsonPath = path.join(outDir, "experiment-design-report.json");
   const reportMarkdownPath = path.join(outDir, "experiment-design-report.md");
   await writeFile(reportJsonPath, reportJson, "utf8");

@@ -2243,6 +2243,9 @@ const routeContractAllowsTerminalKind = (
       return true;
     }
   }
+  if (currentTurnProviderBridgeAllowsCanonicalTerminalKind(payload, kind)) {
+    return true;
+  }
   const routeEvidenceAuthority = readRouteEvidenceAuthority(payload);
   if (routeEvidenceAuthority?.schema === "helix.route_evidence_authority.v1") {
     const routeProduct = readRecord(payload.route_product_contract);
@@ -2419,6 +2422,7 @@ const artifactId = (artifact: ArtifactLike): string | null =>
 
 const artifactText = (artifact: ArtifactLike): string | null => {
   const payload = artifactPayload(artifact);
+  const topLevel = artifact as Record<string, unknown>;
   return (
     readString(payload?.answer_text) ??
     readString(payload?.text) ??
@@ -2426,7 +2430,14 @@ const artifactText = (artifact: ArtifactLike): string | null => {
     readString(payload?.result_summary) ??
     readString(payload?.result_text) ??
     readString(payload?.visible_text) ??
-    readString(artifactPayload(artifact)?.message)
+    readString(payload?.message) ??
+    readString(topLevel.answer_text) ??
+    readString(topLevel.text) ??
+    readString(topLevel.summary) ??
+    readString(topLevel.result_summary) ??
+    readString(topLevel.result_text) ??
+    readString(topLevel.visible_text) ??
+    readString(topLevel.message)
   );
 };
 
@@ -5074,7 +5085,8 @@ export const shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal = (input: {
   artifactLedger?: ArtifactLike[] | null;
 }): boolean => {
   const writer = readRecord(input.payload.terminal_authority_single_writer);
-  if (readString(writer?.selected_terminal_artifact_kind) !== "typed_failure") return false;
+  const writerKind = readString(writer?.selected_terminal_artifact_kind);
+  if (writerKind !== "typed_failure" && writerKind !== "tool_receipt") return false;
 
   const canonicalGoal = readRecord(input.payload.canonical_goal_frame);
   const requiredTerminalKind = readString(canonicalGoal?.required_terminal_kind);
@@ -5088,20 +5100,34 @@ export const shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal = (input: {
     satisfactionReport?.satisfied === true;
   if (!goalSatisfied || !routeContractAllowsTerminalKind(input.payload, requiredTerminalKind)) return false;
 
-  const terminalFailureCode =
-    readString(input.payload.terminal_error_code) ??
-    readString(readRecord(input.payload.typed_failure)?.error_code);
-  if (
-    terminalFailureCode !== "terminal_not_materialized" &&
-    terminalFailureCode !== "terminal_authority_missing" &&
-    terminalFailureCode !== "terminal_projection_mismatch"
-  ) {
-    return false;
+  if (writerKind === "typed_failure") {
+    const terminalFailureCode =
+      readString(input.payload.terminal_error_code) ??
+      readString(readRecord(input.payload.typed_failure)?.error_code);
+    if (
+      terminalFailureCode !== "terminal_not_materialized" &&
+      terminalFailureCode !== "terminal_authority_missing" &&
+      terminalFailureCode !== "terminal_projection_mismatch"
+    ) {
+      return false;
+    }
   }
 
-  return (input.artifactLedger ?? []).some((artifact) =>
-    artifactKind(artifact) === requiredTerminalKind && Boolean(artifactText(artifact)),
+  const supportedGoalArtifacts = new Map(
+    readArray(goalEvaluation?.observed_results)
+      .map(readRecord)
+      .filter((entry): entry is Record<string, unknown> => entry?.supports_goal === true)
+      .map((entry) => [readString(entry.ref), readString(entry.kind)] as const)
+      .filter((entry): entry is [string, string] => Boolean(entry[0] && entry[1])),
   );
+
+  return (input.artifactLedger ?? []).some((artifact) => {
+    const kind = artifactKind(artifact);
+    if (!artifactText(artifact) || !routeContractAllowsTerminalKind(input.payload, kind)) return false;
+    if (kind === requiredTerminalKind) return true;
+    const ref = artifactId(artifact);
+    return Boolean(ref && supportedGoalArtifacts.get(ref) === kind);
+  });
 };
 
 export function applyHelixTerminalAuthoritySingleWriter(
@@ -5124,6 +5150,15 @@ export function applyHelixTerminalAuthoritySingleWriter(
       readString(initialTypedFailure?.message) ??
       readString(input.payload.terminal_failure_text)
     : null;
+  const initialTypedFailureAuthority = readRecord(input.payload.terminal_answer_authority);
+  const authoritativeInitialTypedFailureReady = Boolean(
+    initialTypedFailureErrorCode &&
+    initialTypedFailureText &&
+    typedFailureAuthorityApplies(initialTypedFailureAuthority) &&
+    initialTypedFailureAuthority?.server_authoritative === true &&
+    readString(initialTypedFailureAuthority?.terminal_kind) === "failure" &&
+    initialTypedFailureAuthority?.terminal_eligible !== false,
+  );
   const hydratedCommittedRoute = readCommittedAskRoute(input.payload);
   let terminalAuthorityRouteHydrationSource: string | null = null;
   if (hydratedCommittedRoute && !readRecord(input.payload.committed_ask_route)) {
@@ -6269,6 +6304,30 @@ export function applyHelixTerminalAuthoritySingleWriter(
     input.payload.text = currentScholarlyTerminalText;
     input.payload.assistant_answer = currentScholarlyTerminalText;
     input.payload.terminal_artifact_id = selectedArtifactRef;
+    input.payload.terminal_answer_authority = {
+      ...(currentTerminalAuthority ?? {}),
+      schema: "helix.turn_terminal_authority.v1",
+      turn_id: input.turnId,
+      terminal_kind: "answer",
+      terminal_artifact_kind: currentScholarlyTerminalKind,
+      final_answer_source: currentScholarlyTerminalKind,
+      terminal_text_preview: currentScholarlyTerminalText.slice(0, 240),
+      terminal_text_hash: hashHelixTerminalText(currentScholarlyTerminalText),
+      server_authoritative: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.terminal_presentation = {
+      ...(currentTerminalPresentation ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: currentScholarlyTerminalKind,
+      final_answer_source: currentScholarlyTerminalKind,
+      concise_text: currentScholarlyTerminalText,
+      selected_observation_refs: currentScholarlyObservationRefs,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
     delete input.payload.terminal_error_code;
     delete input.payload.terminal_failure_text;
     delete input.payload.typed_failure;
@@ -6932,6 +6991,35 @@ export function applyHelixTerminalAuthoritySingleWriter(
         reason: "later_authorized_provider_terminal_candidate",
       });
     }
+  } else if (!solverContinuationPending && authoritativeInitialTypedFailureReady) {
+    selectedArtifactRef =
+      readString(initialTypedFailureAuthority?.terminal_item_id) ??
+      `${input.turnId}:typed_failure:${initialTypedFailureErrorCode}`;
+    selectedArtifactKind = "typed_failure";
+    selectedSource = "typed_failure";
+    input.payload.ok = true;
+    input.payload.response_type = "final_answer";
+    input.payload.final_status = "completed";
+    input.payload.status = "completed";
+    input.payload.terminal_artifact_kind = "typed_failure";
+    input.payload.final_answer_source = "typed_failure";
+    input.payload.terminal_error_code = initialTypedFailureErrorCode;
+    input.payload.terminal_failure_text = initialTypedFailureText;
+    input.payload.selected_final_answer = initialTypedFailureText;
+    input.payload.answer = initialTypedFailureText;
+    input.payload.text = initialTypedFailureText;
+    input.payload.assistant_answer = initialTypedFailureText;
+    input.payload.terminal_artifact_id = selectedArtifactRef;
+    input.payload.typed_failure = {
+      ...(initialTypedFailure ?? {}),
+      schema: "helix.typed_failure.v1",
+      error_code: initialTypedFailureErrorCode,
+      message: initialTypedFailureText,
+      text: initialTypedFailureText,
+      answer_text: initialTypedFailureText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
   } else if (
     !solverContinuationPending &&
     !pendingControlPlaneTerminal &&
@@ -7268,7 +7356,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
     selectedGoalArtifact &&
     (
       !solverContinuationPending ||
-      (isDocumentTerminalArtifactKind(selectedGoalArtifact.kind) && goalAllowsTerminal)
+      (
+        (
+          isDocumentTerminalArtifactKind(selectedGoalArtifact.kind) ||
+          isVisualSituationTerminalKind(selectedGoalArtifact.kind)
+        ) &&
+        goalAllowsTerminal
+      )
     ) &&
     (
       !compoundSynthesisTerminalReady ||
@@ -7824,6 +7918,21 @@ export function applyHelixTerminalAuthoritySingleWriter(
       terminal_kind: "answer",
       authority_origin: "agent_provider_route_product_materializer",
     };
+  } else if (
+    currentScholarlyTerminalCanSurface &&
+    currentScholarlyTerminalKind &&
+    currentScholarlyTerminalText &&
+    selectedArtifactKind === currentScholarlyTerminalKind
+  ) {
+    envelope = {
+      ...envelope,
+      terminal_artifact_kind: currentScholarlyTerminalKind,
+      final_answer_source: currentScholarlyTerminalKind,
+      terminal_text: currentScholarlyTerminalText,
+      terminal_text_hash: hashHelixTerminalText(currentScholarlyTerminalText),
+      terminal_kind: "answer",
+      authority_origin: "terminal_presentation",
+    };
   } else if (selectedArtifactKind === "theory_context_reflection_answer" && materializedAuthorityEnvelopeText) {
     envelope = {
       ...envelope,
@@ -7857,13 +7966,16 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
   }
   if (
+    !goalArtifactTerminalMaterialized &&
     (
-      deterministicReceiptFallbackCanSurface &&
-      deterministicReceiptFallbackDraft
-    ) ||
-    (
-      readString(input.payload.terminal_artifact_kind) === "tool_receipt" &&
-      readString(input.payload.final_answer_source) === "deterministic_receipt_fallback"
+      (
+        deterministicReceiptFallbackCanSurface &&
+        deterministicReceiptFallbackDraft
+      ) ||
+      (
+        readString(input.payload.terminal_artifact_kind) === "tool_receipt" &&
+        readString(input.payload.final_answer_source) === "deterministic_receipt_fallback"
+      )
     )
   ) {
     const receiptText = deterministicReceiptFallbackDraft
@@ -8031,7 +8143,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
     appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
   }
-  if (deterministicReceiptFallbackCanSurface && deterministicReceiptFallbackDraft) {
+  if (
+    !goalArtifactTerminalMaterialized &&
+    deterministicReceiptFallbackCanSurface &&
+    deterministicReceiptFallbackDraft
+  ) {
     input.payload.final_answer_source = "deterministic_receipt_fallback";
     const terminalAuthority = readRecord(input.payload.terminal_answer_authority);
     if (terminalAuthority) {

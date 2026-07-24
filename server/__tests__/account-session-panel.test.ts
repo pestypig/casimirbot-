@@ -83,6 +83,110 @@ describe("account session panel API", () => {
     });
   });
 
+  it("creates a short-lived Xbox-style guest session for the public Rooms experiment", async () => {
+    vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
+    vi.stubEnv("HELIX_GUEST_ROOM_CREATION", "1");
+    const agent = request.agent(createApp());
+
+    const enabled = await agent
+      .post("/api/account/session/experimental-rooms")
+      .send({ enabled: true })
+      .expect(200);
+
+    expect(enabled.body).toMatchObject({
+      ok: true,
+      error: null,
+      session_cookie_action: "set",
+      status: {
+        session: {
+          profile: {
+            account_type: "user",
+            auth_mode: "guest",
+            provider: "guest",
+          },
+          memory_scope: "session_only",
+          account_policy: {
+            account_type: "user",
+            feature_flags: expect.arrayContaining(["shared_realtime_rooms"]),
+            locked_features: expect.not.arrayContaining(["shared_realtime_rooms"]),
+          },
+        },
+        experimental_features: {
+          shared_realtime_rooms: {
+            available: true,
+            enabled: true,
+            guest_session: true,
+            guest_hosting_allowed: true,
+          },
+        },
+      },
+    });
+    expect(enabled.body.status.session.profile.profile_id).toMatch(/^guest:[0-9a-f-]{36}$/);
+    expect(enabled.body.status.session.profile.display_name).toMatch(
+      /^[A-Z][a-z]+[A-Z][a-z]+\d{2}$/,
+    );
+    expect(enabled.body.status.account_policy.allowed_panels).not.toEqual(["*"]);
+    expect(enabled.body.status.account_policy.feature_flags).not.toContain(
+      "developer_workstation_panels",
+    );
+    expect(enabled.body.status.account_policy.max_workstation_permission).toBe("act");
+    expect(Date.parse(enabled.body.status.session.expires_at)).toBeGreaterThan(Date.now());
+
+    const stored = await getPool().query<{
+      provider: string;
+      expires_at: Date | string | null;
+    }>(
+      `
+        SELECT a.provider, s.expires_at
+        FROM helix_account_sessions s
+        JOIN helix_accounts a ON a.profile_id = s.profile_id
+        WHERE s.session_id = $1
+      `,
+      [enabled.body.status.session.session_id],
+    );
+    expect(stored.rows[0]?.provider).toBe("guest");
+    expect(stored.rows[0]?.expires_at).not.toBeNull();
+
+    const disabled = await agent
+      .post("/api/account/session/experimental-rooms")
+      .send({ enabled: false })
+      .expect(200);
+    expect(disabled.body).toMatchObject({
+      ok: true,
+      session_cookie_action: "clear",
+      status: {
+        session: null,
+        account_policy: {
+          account_type: "user",
+          locked_features: expect.arrayContaining(["shared_realtime_rooms"]),
+        },
+      },
+    });
+  });
+
+  it("keeps the public Rooms experiment unavailable unless the deployment enables it", async () => {
+    vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "0");
+    const response = await request(createApp())
+      .post("/api/account/session/experimental-rooms")
+      .send({ enabled: true })
+      .expect(403);
+
+    expect(response.body).toMatchObject({
+      ok: false,
+      error: "shared_realtime_rooms_experiment_unavailable",
+      session_cookie_action: "keep",
+      status: {
+        session: null,
+        experimental_features: {
+          shared_realtime_rooms: {
+            available: false,
+            enabled: false,
+          },
+        },
+      },
+    });
+  });
+
   it("returns developer and user account policy shape from session status", async () => {
     const app = createApp();
     const developerAgent = request.agent(app);
@@ -147,7 +251,8 @@ describe("account session panel API", () => {
           "situation-room-pipelines",
           "stage-play-badge-graph",
         ]),
-        locked_features: expect.arrayContaining(["runtime_agent_controls", "workstation_gateway_act"]),
+        feature_flags: expect.arrayContaining(["runtime_agent_controls"]),
+        locked_features: expect.not.arrayContaining(["runtime_agent_controls"]),
         allowed_runtime_agents: ["codex"],
       },
       session: {

@@ -4,6 +4,7 @@ import {
   purgeSharedRealtimeRoomVisualFrames,
   readSharedRealtimeRoomRuntime,
   reconcileSharedRealtimeRoomVisualFramesForConsent,
+  releaseSharedRealtimeRoomSpeakerFloor,
   stopSharedRealtimeRoomRuntime,
 } from "./runtime-registry";
 import {
@@ -88,6 +89,11 @@ export const reconcileSharedRealtimeRoomRuntimeAfterLeave = (input: {
     }
     return;
   }
+  releaseSharedRealtimeRoomSpeakerFloor({
+    roomId: input.roomId,
+    runtimeId: runtime.runtime_id,
+    participantId: input.participantId,
+  });
   if (runtime.state !== "closed") {
     markSharedRealtimeRoomRuntimeState({
       roomId: input.roomId,

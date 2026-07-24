@@ -11,6 +11,8 @@ import type {
 import { boundHelixDebugExportTextForUi } from "./HelixAskDebugExportSizeControl";
 import { mergeRenderedLanguageModelPolicySummaryIntoDebugExport } from "./HelixAskDebugExportModelPolicyProjection";
 import { mergeHelixAskLiveRuntimeClientDebugIntoExport } from "./HelixAskLiveRuntimeDebugState";
+import { mergeSharedLiveRoomDebugIntoExport } from
+  "./shared-live-room/SharedLiveRoomDebugArtifact";
 
 export type HelixAskWorkflowDemoDebugState = {
   session: HelixWorkflowDemoSessionV1 | null;
@@ -123,10 +125,12 @@ export function finalizeHelixAskWorkflowDebugCopyExport(args: {
   workflowDemoDebug: HelixWorkflowDemoDebugExportV1 | null | undefined;
 }): string {
   return boundHelixDebugExportTextForUi(
-    mergeHelixAskLiveRuntimeClientDebugIntoExport(
-      mergeRenderedLanguageModelPolicySummaryIntoDebugExport(
-        mergeHelixAskClientWorkflowDemoDebugIntoExport(args.payload, args.workflowDemoDebug),
-        args.clickedTurnScope,
+    mergeSharedLiveRoomDebugIntoExport(
+      mergeHelixAskLiveRuntimeClientDebugIntoExport(
+        mergeRenderedLanguageModelPolicySummaryIntoDebugExport(
+          mergeHelixAskClientWorkflowDemoDebugIntoExport(args.payload, args.workflowDemoDebug),
+          args.clickedTurnScope,
+        ),
       ),
     ),
   );

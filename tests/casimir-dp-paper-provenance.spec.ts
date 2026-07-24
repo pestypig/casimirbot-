@@ -30,7 +30,7 @@ describe("Casimir-DP paper provenance parity", () => {
     const sourceIds = source.entries.map((entry) => entry.equationId);
     const generatedIds = generated.entries.map((entry) => entry.equationId);
 
-    expect(markerIds).toHaveLength(20);
+    expect(markerIds).toHaveLength(23);
     expect(new Set(markerIds).size).toBe(markerIds.length);
     expect(new Set(sourceIds).size).toBe(sourceIds.length);
     expect(new Set(generatedIds).size).toBe(generatedIds.length);
@@ -55,6 +55,7 @@ describe("Casimir-DP paper provenance parity", () => {
       "run-casimir-dp-next-computations.ts",
       "run-casimir-dp-data-readiness.ts",
       "run-casimir-dp-proposal-closure.ts",
+      "run-casimir-dp-or-phase-stage2.ts",
     ]) {
       expect(paper).toContain(runner);
     }
@@ -70,6 +71,21 @@ describe("Casimir-DP paper provenance parity", () => {
     expect(paper).toContain("cdp-frequency-cavity-bridge-gate");
     expect(paper).toContain("\\mathcal K_{cavity\\rightarrow branch/coherence}\\ \\text{not registered}");
     expect(paper).toContain("A boundary-conditioned coherence residual proves objective collapse");
+    expect(paper).toContain("### 2.4 Penrose OR motivation, notation, and scope");
+    expect(paper).toContain("cdp-or-branch-geometry-context");
+    expect(paper).toContain("cdp-ambient-gravity-phase-control");
+    expect(paper).toContain("cdp-interferometric-phase-visibility-readout");
+    expect(paper).toContain("No numerical plausibility score");
+    expect(paper).toContain("### 8.2 Validation standing");
+    expect(paper).toContain("Math-stage registry | 193 entries; validation `pass`");
+    expect(paper).toContain("10 files, 67 tests `pass`");
+    expect(paper).toContain("18 files, 179 tests `pass`");
+    expect(paper).toContain(
+      "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    );
+    expect(paper).toContain(
+      "measured evidence `not_ready`; collapse identification `blocked`; manifold dynamics `blocked`",
+    );
   });
 
   it("prints the current byte hashes for every frozen runtime config", () => {
@@ -79,11 +95,13 @@ describe("Casimir-DP paper provenance parity", () => {
       "configs/research/casimir-dp-experiment-design.v1.json":
         "bd5528824d70de65e8b181dc18a78c3a287b2fd9c2cdd66bb5a9a79a3c97fe84",
       "configs/research/casimir-dp-next-computations.v1.json":
-        "9f19359ee6ab02930e1cba25045183ad8931fc3f62e88e1363028f8852fea420",
+        "5b12c758228dc68865f4a91d3ae1aa9ade698932546c686aab5cb9e5773b5e93",
       "configs/research/casimir-dp-data-readiness.v1.json":
         "a95e7a22c20e29ed9c34f45ece90916748a9264a32be8315663819171b406475",
       "configs/research/casimir-dp-proposal-closure.v1.json":
         "7b3b2673c95d4eebca060261385f3b0659365c1112c1d9d42bc1d8700686b8ba",
+      "configs/research/casimir-dp-or-phase-stage2.v1.json":
+        "b517e8fbf002303258a5269e7f37c6b16d4bc3c45c609072bdb2a9e5184e596d",
     } as const;
 
     for (const [relativePath, expectedHash] of Object.entries(expected)) {
@@ -115,9 +133,9 @@ describe("Casimir-DP paper provenance parity", () => {
     ]);
 
     const graph = buildCasimirDpStudyTheoryBadgesV1();
-    expect(graph.badges).toHaveLength(11);
-    expect(graph.edges).toHaveLength(28);
-    expect(paper).toContain("11 study badges connected by");
-    expect(paper).toContain("28 dependency, requirement, documentation, and blocking edges");
+    expect(graph.badges).toHaveLength(12);
+    expect(graph.edges).toHaveLength(34);
+    expect(paper).toContain("12 study badges connected by");
+    expect(paper).toContain("34 dependency, requirement, documentation, and blocking edges");
   });
 });

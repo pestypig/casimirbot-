@@ -175,24 +175,24 @@ describe("AGI Realtime session route boundary", () => {
     vi.restoreAllMocks();
   });
 
-  it("locks no-session and user accounts out of Realtime runtime controls", async () => {
+  it("admits no-session and signed-in user accounts to Realtime runtime controls", async () => {
     const noSession = await request(createApp())
       .post("/api/agi/realtime/session")
       .send({ runtime_agent_mode: "live_voice" })
-      .expect(403);
+      .expect(409);
     expect(noSession.body).toMatchObject({
       schema: "helix.realtime_session.response.v1",
       action: "start",
-      error: "realtime_runtime_agent_locked_by_account_policy",
-      blocked_reason: "developer_account_required",
+      error: "realtime_session_disabled",
+      blocked_reason: "capability_lane_disabled_by_policy",
       policy_gate: {
         account_type: "user",
-        runtime_agent_controls_available: false,
-        locked_reason: "developer_account_required",
+        runtime_agent_controls_available: true,
+        locked_reason: null,
       },
       account_policy: {
         account_type: "user",
-        locked_features: expect.arrayContaining(["runtime_agent_controls"]),
+        feature_flags: expect.arrayContaining(["runtime_agent_controls"]),
       },
     });
     expectNonTerminalRealtimeEnvelope(noSession.body);
@@ -201,11 +201,11 @@ describe("AGI Realtime session route boundary", () => {
     const user = await userAgent
       .post("/api/agi/realtime/session")
       .send({ runtime_agent_mode: "live_voice" })
-      .expect(403);
+      .expect(409);
     expect(user.body.policy_gate).toMatchObject({
       account_type: "user",
-      runtime_agent_controls_available: false,
-      locked_reason: "developer_account_required",
+      runtime_agent_controls_available: true,
+      locked_reason: null,
     });
     expectNonTerminalRealtimeEnvelope(user.body);
   });
@@ -473,7 +473,7 @@ describe("AGI Realtime session route boundary", () => {
     }
   });
 
-  it("keeps no-session locked before the OpenAI contract adapter can run", async () => {
+  it("admits no-session users to the OpenAI contract adapter without leaking credentials", async () => {
     const previousDescriptor = process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED;
     const previousAdapter = process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED;
     const previousTransport = process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED;
@@ -498,18 +498,24 @@ describe("AGI Realtime session route boundary", () => {
           runtime_agent_authority: "suggest_actions",
           transport: "webrtc",
         })
-        .expect(403);
+        .expect(200);
 
-      expect(transport).not.toHaveBeenCalled();
+      expect(transport).toHaveBeenCalledTimes(1);
       expect(response.body).toMatchObject({
-        error: "realtime_runtime_agent_locked_by_account_policy",
-        blocked_reason: "developer_account_required",
-        openai_network_call_attempted: false,
-        ephemeral_credential_minted: false,
+        ok: true,
+        error: null,
+        blocked_reason: null,
+        policy_gate: {
+          account_type: "user",
+          runtime_agent_controls_available: true,
+          locked_reason: null,
+        },
+        openai_network_call_attempted: true,
+        ephemeral_credential_minted: true,
         realtime_runtime_session_summary: expect.objectContaining({
-          live_session_admission_status: "locked_by_account_policy",
-          openai_network_call_attempted: false,
-          provider_session_ref: null,
+          live_session_admission_status: "openai_realtime_contract_ready",
+          openai_network_call_attempted: true,
+          provider_session_ref: "provider:session:locked",
         }),
       });
       const serialized = JSON.stringify(response.body);

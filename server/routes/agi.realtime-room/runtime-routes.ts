@@ -4,8 +4,13 @@ import { buildHelixSharedRealtimeRoomResponse } from
 import { bindOwnerRealtimeSessionToSharedRoom } from
   "../../services/helix-ask/realtime-room/runtime-session-binding";
 import {
+  sendSharedRealtimeRoomParticipantContext,
+  sendSharedRealtimeRoomParticipantContextIfBound,
+} from "../../services/helix-ask/realtime-room/participant-context";
+import {
   claimSharedRealtimeRoomSpeakerFloor,
   readSharedRealtimeRoomRuntime,
+  releaseSharedRealtimeRoomSpeakerFloor,
   reserveSharedRealtimeRoomRuntime,
 } from "../../services/helix-ask/realtime-room/runtime-registry";
 import { SharedRealtimeRoomDomainError } from
@@ -47,12 +52,52 @@ sharedRealtimeRoomRuntimeRouter.post(
       transportOwner: "host_browser",
     });
     if (!result.ok) throwRuntimeError(result.error);
+    const projectedRoom = await readAuthorizedRoom(req.params.roomId, account);
+    sendSharedRealtimeRoomParticipantContextIfBound({
+      room: projectedRoom,
+      reason: "participant_state_changed",
+    });
     res.json(buildHelixSharedRealtimeRoomResponse({
       ok: true,
       message: result.created
         ? "The room's single shared-model slot is reserved."
         : "The room's shared-model reservation is already active.",
-      room: await readAuthorizedRoom(req.params.roomId, account),
+      room: projectedRoom,
+    }));
+  }),
+);
+
+sharedRealtimeRoomRuntimeRouter.post(
+  "/realtime/rooms/:roomId/runtime/floor/release",
+  sharedRoomRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    const membership = await readMembership(req.params.roomId, account);
+    requirePresent(membership);
+    const runtime = readSharedRealtimeRoomRuntime({ roomId: req.params.roomId });
+    if (!runtime?.runtime_id) {
+      throw new SharedRealtimeRoomDomainError(
+        "shared_realtime_room_not_ready",
+        409,
+        "The room runtime has not been reserved.",
+      );
+    }
+    const result = releaseSharedRealtimeRoomSpeakerFloor({
+      roomId: req.params.roomId,
+      runtimeId: runtime.runtime_id,
+      participantId: membership.participantId,
+    });
+    if (!result.ok) throwRuntimeError(result.error);
+    const projectedRoom = await readAuthorizedRoom(req.params.roomId, account);
+    sendSharedRealtimeRoomParticipantContextIfBound({
+      room: projectedRoom,
+      reason: "participant_state_changed",
+    });
+    res.json(buildHelixSharedRealtimeRoomResponse({
+      ok: true,
+      message: result.released
+        ? "Speaking floor released."
+        : "This participant did not own the speaking floor.",
+      room: projectedRoom,
     }));
   }),
 );
@@ -89,10 +134,16 @@ sharedRealtimeRoomRuntimeRouter.post(
       participantId: membership.participantId,
     });
     if (binding.error) throwRuntimeError(binding.error);
+    const projectedRoom = await readAuthorizedRoom(req.params.roomId, account);
+    sendSharedRealtimeRoomParticipantContext({
+      room: projectedRoom,
+      realtimeSessionId,
+      reason: "runtime_bound",
+    });
     res.json(buildHelixSharedRealtimeRoomResponse({
       ok: true,
       message: "The owner's GPT Live transport is now the room's only shared model call.",
-      room: await readAuthorizedRoom(req.params.roomId, account),
+      room: projectedRoom,
     }));
   }),
 );
@@ -125,10 +176,15 @@ sharedRealtimeRoomRuntimeRouter.post(
       microphoneToModelAuthorized: membership.consent.microphone_to_model,
     });
     if (!result.ok) throwRuntimeError(result.error);
+    const projectedRoom = await readAuthorizedRoom(req.params.roomId, account);
+    sendSharedRealtimeRoomParticipantContextIfBound({
+      room: projectedRoom,
+      reason: "participant_state_changed",
+    });
     res.json(buildHelixSharedRealtimeRoomResponse({
       ok: true,
       message: "Speaking floor claimed for this participant.",
-      room: await readAuthorizedRoom(req.params.roomId, account),
+      room: projectedRoom,
     }));
   }),
 );

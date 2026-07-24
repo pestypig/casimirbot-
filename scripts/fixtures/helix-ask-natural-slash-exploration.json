@@ -1,0 +1,70 @@
+{
+  "schema": "helix.ask.user_prompt_corpus.v1",
+  "scenarios": [
+    {
+      "id": "natural_scholarly_research_lookup",
+      "category": "scholarly_research",
+      "prompt": "Find a primary paper about magnetar magnetic fields and give me the best candidate to read next.",
+      "notes": "Natural discovery request: Codex should select scholarly lookup, evaluate observed candidates, and return a useful source or a bounded provider limitation.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^scholarly-research\\.lookup_papers$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["magnetar|magnetic", "paper|candidate|source|DOI|arXiv|limitation"],
+      "expected_minimum_answer_chars": 100
+    },
+    {
+      "id": "natural_workstation_notes_lookup",
+      "category": "workstation_notes",
+      "prompt": "Check my workstation notes and tell me what topics are available.",
+      "notes": "Natural notes discovery request: retrieve the governed notes inventory before answering.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^workstation-notes\\.list_notes$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["note|topic|available|none"],
+      "expected_minimum_answer_chars": 40
+    },
+    {
+      "id": "natural_moral_graph_reflection",
+      "category": "moral_graph",
+      "prompt": "Use the moral graph to reflect on whether a research team should publish an exciting result before the main uncertainty is resolved.",
+      "notes": "Natural non-mutating graph reflection request with an explicit decision context.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^moral-graph\\.reflect_context$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["uncertain|evidence|publish|risk|responsib"],
+      "expected_minimum_answer_chars": 120
+    },
+    {
+      "id": "natural_postulate_review",
+      "category": "postulate_review",
+      "prompt": "Review this postulate: a Casimir cavity can modify local vacuum modes without proving a macroscopic negative-energy engineering mechanism.",
+      "notes": "A review request is not an affirmative mutation command. Codex should reason over it without submitting a proposal.",
+      "expected_tool_mode": "none",
+      "expected_maximum_observations": 0,
+      "expected_answer_patterns": ["postulate|review|permission|confirm|evidence|boundary"],
+      "expected_minimum_answer_chars": 80
+    },
+    {
+      "id": "natural_voice_callout",
+      "category": "voice",
+      "prompt": "Say this aloud: The evidence is diagnostic, not conclusive.",
+      "notes": "Natural explicit speech request. The spoken receipt or a precise permission/playback limitation must remain distinct from the text answer.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^(?:text_to_speech\\.speak_text|voice\\.speak)$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["evidence|diagnostic|conclusive|spoken|voice|audio|permission"],
+      "expected_minimum_answer_chars": 30
+    },
+    {
+      "id": "natural_workspace_status_inspection",
+      "category": "workspace_status",
+      "prompt": "Inspect the current workstation status and summarize what is available or blocked.",
+      "notes": "Public-account read-only status inspection using an actually advertised capability. Developer-only Situation Room acceptance belongs in an authenticated developer fixture.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^workspace_os\\.status$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["workspace|status|active|blocked|permission|available"],
+      "expected_minimum_answer_chars": 80
+    }
+  ]
+}

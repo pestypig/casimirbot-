@@ -51,13 +51,17 @@ describe("OpenAI Realtime SDP transport", () => {
           turn_detection: {
             type: "semantic_vad",
             eagerness: "low",
-            create_response: true,
+            create_response: false,
             interrupt_response: true,
           },
         },
         output: { voice: "marin" },
       },
     });
+    expect(session.instructions).toContain(
+      "Never say that Helix is checking unless a correlated Helix response event",
+    );
+    expect(session.instructions).toContain("state limitations and status factually");
     expect(result).toMatchObject({
       ok: true,
       answerSdp: "v=0\r\nanswer",
@@ -77,6 +81,32 @@ describe("OpenAI Realtime SDP transport", () => {
       failureReason: "realtime_sdp_offer_invalid",
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a stable authentication failure for an OpenAI 401", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 401,
+      text: async () => JSON.stringify({
+        error: {
+          code: "invalid_api_key",
+          message: "secret provider detail must not leak",
+        },
+      }),
+      headers: { get: () => null },
+    }));
+
+    const result = await createDefaultOpenAiRealtimeSdpTransport(fetchMock)({
+      apiKey: "rejected-key-must-not-leak",
+      offerSdp: "v=0\r\noffer",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      failureReason: "openai_realtime_authentication_failed_invalid_api_key",
+    });
+    expect(JSON.stringify(result)).not.toContain("rejected-key-must-not-leak");
+    expect(JSON.stringify(result)).not.toContain("secret provider detail");
   });
 
   it("admits server-SDP mode without minting an unused client secret", async () => {

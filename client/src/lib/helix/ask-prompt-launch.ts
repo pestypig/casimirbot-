@@ -142,31 +142,7 @@ const promptRequiresBackendAskEntrypoint = (
 const isDesktopRoute = () =>
   typeof window !== "undefined" && window.location.pathname.startsWith("/desktop");
 
-const ensureDesktopAskPromptConsumerMounted = (): void => {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem("helix:pending-panel", "account-session");
-  } catch {
-    // The in-page event below can still open the panel.
-  }
-  window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "account-session" } }));
-};
-
-const desktopAskConsumerUrl = (): string => {
-  if (typeof window === "undefined") return "/desktop?panels=account-session&focus=account-session";
-  const url = new URL(window.location.href);
-  const panels = new Set(
-    (url.searchParams.get("panels") ?? "")
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean),
-  );
-  panels.add("account-session");
-  url.pathname = "/desktop";
-  url.searchParams.set("panels", Array.from(panels).join(","));
-  url.searchParams.set("focus", "account-session");
-  return `${url.pathname}${url.search}${url.hash}`;
-};
+const desktopAskConsumerUrl = (): string => "/desktop";
 
 export function clearPendingHelixAskPrompt() {
   if (typeof window === "undefined") return;
@@ -304,10 +280,6 @@ export function launchHelixAskPrompt(args: {
   }
 
   window.dispatchEvent(new CustomEvent(HELIX_ASK_PROMPT_EVENT, { detail: payload }));
-
-  if (payload.autoSubmit) {
-    ensureDesktopAskPromptConsumerMounted();
-  }
 
   if (!isDesktopRoute()) {
     navigate(desktopAskConsumerUrl());

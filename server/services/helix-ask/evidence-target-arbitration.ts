@@ -34,6 +34,7 @@ import {
   isExplicitDocsPathLocateSynthesisPrompt,
   isExplicitDocsPathSummaryPrompt,
 } from "./docs-viewer-intent";
+import { isAskTurnDocsTopicSummaryPrompt } from "./doc-args";
 import { decideMoralGraphAgentInvocationPolicyV1 } from "@shared/moral-graph/moral-graph-agent-invocation-policy";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
@@ -108,17 +109,6 @@ const hasExplicitExternalResearchCommand = (prompt: string): boolean =>
 
 const hasExplicitLocalDocsPathSummary = (prompt: string): boolean =>
   isExplicitDocsPathSummaryPrompt(prompt);
-
-const hasLocalDocsTopicSummary = (prompt: string): boolean =>
-  /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b/i.test(prompt) &&
-  (
-    /\bdocs?\s+about\b/i.test(prompt) ||
-    /\bfrom\s+(?:our\s+|local\s+|the\s+)?docs?\b/i.test(prompt) ||
-    /\binclude\s+(?:the\s+)?paths?\b/i.test(prompt) ||
-    /\b(?:with|include)\s+(?:the\s+)?(?:document\s+)?paths?\b/i.test(prompt) ||
-    /\b(?:use|using|from)\s+(?:the\s+)?docs?\s+only\b/i.test(prompt) ||
-    /\bdocs?\s+only\b/i.test(prompt)
-  );
 
 const hasAffirmativeLocalDocumentEvidenceRequest = (prompt: string): boolean => {
   if (isExplicitDocsPathDocumentOperation(prompt) || isExplicitDocsPathComparePrompt(prompt) || isExplicitDocsPathLocateSynthesisPrompt(prompt)) {
@@ -356,7 +346,7 @@ export function buildAskEvidenceTargetArbitration(input: {
       terminalProductConstraints: ["doc_summary", "typed_failure", "request_user_input"],
     }));
   }
-  if (hasLocalDocsTopicSummary(prompt)) {
+  if (isAskTurnDocsTopicSummaryPrompt(prompt)) {
     promptIntentCandidates.push("local_docs_topic_summary");
     candidates.push(makeCandidate({
       candidateId: "docs_viewer.local_docs_topic_summary",

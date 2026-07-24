@@ -15,6 +15,7 @@ const ENV_KEYS = [
   "HELIX_REALTIME_SESSION_ADAPTER_ENABLED",
   "HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED",
   "HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED",
+  "OPENAI_REALTIME_API_KEY",
   "OPENAI_API_KEY",
 ] as const;
 
@@ -35,6 +36,7 @@ describe("Realtime SDP route", () => {
     resetStagePlayLiveSourceConversationStoreForTest();
     resetRealtimeStagePlayAskHandoffsForTests();
     for (const key of ENV_KEYS) priorEnv.set(key, process.env[key]);
+    delete process.env.OPENAI_REALTIME_API_KEY;
     process.env.OPENAI_API_KEY = "server-key-must-not-leak";
     setOpenAiRealtimeContractTransportForTests(async () => ({
       ok: true,
@@ -144,10 +146,13 @@ describe("Realtime SDP route", () => {
         route_metadata: {
           source: "realtime_stage_play",
           invocationKind: "stage_play_realtime_transcript_handoff",
-          sourceTarget: "operator_text",
+          sourceTarget: "workspace_panel",
+          transportSource: "operator_text",
           selectedRuntimeAgentProvider: "codex",
           selected_runtime_agent_provider: "codex",
           source_target_intent: expect.objectContaining({
+            target_source: "workspace_panel",
+            transport_source: "operator_text",
             must_enter_backend_ask: true,
             admitted_readonly_handoff: true,
           }),
@@ -155,6 +160,68 @@ describe("Realtime SDP route", () => {
       },
     });
     expect(JSON.stringify(transcript.body)).not.toContain("What is currently open");
+  });
+
+  it.each([
+    { label: "signed-out", signIn: false },
+    { label: "signed-in user", signIn: true },
+  ])("exchanges SDP and exposes status for $label access", async ({ signIn }) => {
+    const sdpTransport = vi.fn(async () => ({
+      ok: true,
+      answerSdp: "v=0\r\nuser-answer",
+      providerCallRef: "openai-realtime:call:user-access",
+    }));
+    setOpenAiRealtimeSdpTransportForTests(sdpTransport);
+    const agent = request.agent(createApp());
+    if (signIn) {
+      await agent.post("/api/account/session/sign-in")
+        .send({
+          profile_id: "profile:user-realtime-sdp",
+          display_name: "Realtime User",
+          account_type: "user",
+        })
+        .expect(200);
+    }
+    const consentReceipt = `receipt:visible-consent:${signIn ? "user" : "anonymous"}`;
+    const admission = await agent.post("/api/agi/realtime/session").send({
+      runtime_agent_mode: "live_voice",
+      runtime_agent_authority: "observe_only",
+      transport: "webrtc",
+      sdp_exchange_mode: "server",
+      selected_model_or_service: "gpt-realtime-2.1",
+      selected_runtime_agent_provider: "codex",
+      visible_user_consent_receipt: consentReceipt,
+    }).expect(200);
+
+    expect(admission.body.policy_gate).toMatchObject({
+      account_type: "user",
+      runtime_agent_controls_available: true,
+      locked_reason: null,
+    });
+
+    const response = await agent
+      .post(`/api/agi/realtime/session/${encodeURIComponent(admission.body.realtime_session_id)}/sdp`)
+      .send({
+        offer_sdp: "v=0\r\nuser-offer",
+        visible_user_consent_receipt: consentReceipt,
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      blocked_reason: null,
+      answer_sdp: "v=0\r\nuser-answer",
+      webrtc_started: true,
+    });
+    expect(sdpTransport).toHaveBeenCalledTimes(1);
+
+    const debug = await agent
+      .get(`/api/agi/realtime/session/${encodeURIComponent(admission.body.realtime_session_id)}/debug`)
+      .expect(200);
+    expect(debug.body).toMatchObject({
+      realtime_session_id: admission.body.realtime_session_id,
+      raw_content_included: false,
+    });
   });
 
   it("rejects an unknown selected Ask runtime before admitting a Realtime session", async () => {
@@ -178,13 +245,86 @@ describe("Realtime SDP route", () => {
     });
   });
 
+  it("honors the Realtime-specific key override for admission and SDP exchange", async () => {
+    process.env.OPENAI_REALTIME_API_KEY = "realtime-override-key-must-not-leak";
+    process.env.OPENAI_API_KEY = "generic-key-must-not-be-used";
+    const sdpTransport = vi.fn(async () => ({
+      ok: true,
+      answerSdp: "v=0\r\nanswer",
+      providerCallRef: "openai-realtime:call:key-resolution",
+    }));
+    setOpenAiRealtimeSdpTransportForTests(sdpTransport);
+    const agent = request.agent(createApp());
+    await agent.post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:developer-realtime-key-resolution" })
+      .expect(200);
+    const admission = await agent.post("/api/agi/realtime/session").send({
+      runtime_agent_mode: "live_voice",
+      runtime_agent_authority: "observe_only",
+      transport: "webrtc",
+      sdp_exchange_mode: "server",
+      selected_model_or_service: "gpt-realtime-2.1",
+      visible_user_consent_receipt: "receipt:visible-consent:key-resolution",
+    }).expect(200);
+
+    await agent
+      .post(`/api/agi/realtime/session/${encodeURIComponent(admission.body.realtime_session_id)}/sdp`)
+      .send({
+        offer_sdp: "v=0\r\noffer",
+        visible_user_consent_receipt: "receipt:visible-consent:key-resolution",
+      })
+      .expect(200);
+
+    expect(sdpTransport).toHaveBeenCalledWith(expect.objectContaining({
+      apiKey: "realtime-override-key-must-not-leak",
+    }));
+    expect(JSON.stringify(admission.body)).not.toContain("realtime-override-key-must-not-leak");
+    expect(JSON.stringify(admission.body)).not.toContain("generic-key-must-not-be-used");
+  });
+
+  it("uses the normal startup key when no Realtime-specific override is configured", async () => {
+    delete process.env.OPENAI_REALTIME_API_KEY;
+    process.env.OPENAI_API_KEY = "normal-startup-key-must-not-leak";
+    const sdpTransport = vi.fn(async () => ({
+      ok: true,
+      answerSdp: "v=0\r\nanswer",
+      providerCallRef: "openai-realtime:call:fallback-key-resolution",
+    }));
+    setOpenAiRealtimeSdpTransportForTests(sdpTransport);
+    const agent = request.agent(createApp());
+    await agent.post("/api/account/session/sign-in")
+      .send({ profile_id: "profile:developer-realtime-fallback-key-resolution" })
+      .expect(200);
+    const admission = await agent.post("/api/agi/realtime/session").send({
+      runtime_agent_mode: "live_voice",
+      runtime_agent_authority: "observe_only",
+      transport: "webrtc",
+      sdp_exchange_mode: "server",
+      selected_model_or_service: "gpt-realtime-2.1",
+      visible_user_consent_receipt: "receipt:visible-consent:fallback-key-resolution",
+    }).expect(200);
+
+    await agent
+      .post(`/api/agi/realtime/session/${encodeURIComponent(admission.body.realtime_session_id)}/sdp`)
+      .send({
+        offer_sdp: "v=0\r\noffer",
+        visible_user_consent_receipt: "receipt:visible-consent:fallback-key-resolution",
+      })
+      .expect(200);
+
+    expect(sdpTransport).toHaveBeenCalledWith(expect.objectContaining({
+      apiKey: "normal-startup-key-must-not-leak",
+    }));
+    expect(JSON.stringify(admission.body)).not.toContain("normal-startup-key-must-not-leak");
+  });
+
   it("fails closed before OpenAI for absent admission or mismatched consent", async () => {
     const sdpTransport = vi.fn();
     setOpenAiRealtimeSdpTransportForTests(sdpTransport);
     await request(createApp())
       .post("/api/agi/realtime/session/realtime%3Aunknown/sdp")
       .send({ offer_sdp: "v=0\r\noffer", visible_user_consent_receipt: "receipt:none" })
-      .expect(403);
+      .expect(404);
     expect(sdpTransport).not.toHaveBeenCalled();
   });
 });

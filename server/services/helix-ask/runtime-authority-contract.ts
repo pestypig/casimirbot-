@@ -32,6 +32,10 @@ export type HelixRuntimeAuthorityBoundaryReport = {
     supported_observation_refs: string[];
     authority_source: "verified_runtime_event_log" | "legacy_projection_only";
   };
+  provider_bridge_runtime_authority: {
+    eligible: boolean;
+    checks: Record<string, boolean | string | null>;
+  };
   eligible: boolean;
   severity: HelixRuntimeAuthoritySeverity;
   blocking_reasons: string[];
@@ -224,6 +228,9 @@ const artifactKindMatchesCapability = (
   }
   if (capability === "workspace_os.status") {
     return /workspace_os_status_observation|workspace_status|workspace[-_]os[-_.:]status|workstation_tool_evaluation/i.test(joined);
+  }
+  if (capability === "workstation.active_context") {
+    return /workstation_active_context_observation|helix\.workstation_active_context_observation\.v1|workstation\.active_context/i.test(joined);
   }
   if (capability === "workspace-directory.resolve") return /workspace_directory_resolution|helix\.workspace_directory_resolution\.v1/i.test(joined);
   if (capability === "helix_ask.reflect_theory_context") {
@@ -749,6 +756,14 @@ export function isSourceCapabilityDiagnosticTurn(payload: Record<string, unknown
   const sourceTargetIntent = readRecord(payload.source_target_intent);
   const targetSource = readString(sourceTargetIntent?.target_source);
   const targetKind = readString(sourceTargetIntent?.target_kind);
+  const committedSourceTarget = readCommittedAskRoute(payload)?.route.source_target;
+  if (
+    committedSourceTarget &&
+    !["unknown", "none", "model_only", "general_background"].includes(committedSourceTarget) &&
+    (targetSource === "model_only" || targetKind === "general_background")
+  ) {
+    return true;
+  }
   if (targetSource && !["unknown", "none", "model_only", "general_background"].includes(targetSource)) return true;
   if (targetKind && !["unknown", "none", "model_only", "general_background"].includes(targetKind)) return true;
   const route = `${readString(payload.route_reason_code) ?? ""} ${readString(payload.route) ?? ""}`;
@@ -760,6 +775,17 @@ export function isModelDirectAnswerTurn(payload: Record<string, unknown>): boole
   const terminalKind = readString(payload.terminal_artifact_kind);
   const finalAnswerSource = readString(payload.final_answer_source);
   const sourceTargetIntent = readRecord(payload.source_target_intent);
+  const committedRoute = readCommittedAskRoute(payload);
+  const committedSourceTarget = committedRoute?.route.source_target;
+  const committedGoalKind = committedRoute?.canonical_goal.goal_kind;
+  const committedTerminalKind = committedRoute?.canonical_goal.required_terminal_kind;
+  const committedSourceBackedRoute = Boolean(
+    committedSourceTarget &&
+      !["unknown", "none", "model_only", "general_background"].includes(committedSourceTarget) &&
+      committedGoalKind !== "model_only_concept" &&
+      committedTerminalKind !== "direct_answer_text",
+  );
+  if (committedSourceBackedRoute) return false;
   return Boolean(
     (goalKind && MODEL_DIRECT_ANSWER_GOAL_KINDS.has(goalKind)) ||
       terminalKind === "direct_answer_text" ||
@@ -1378,9 +1404,16 @@ const contractAuthorizedNoteReceiptTerminalAllowed = (payload: Record<string, un
   return goalSatisfactionAllowsTerminal(payload) && hasSelectedCapabilityObservation(payload);
 };
 
-const providerTerminalBridgeProvesRuntimeAuthority = (payload: Record<string, unknown>): boolean => {
+const providerTerminalBridgeProvesRuntimeAuthority = (
+  payload: Record<string, unknown>,
+  diagnostic?: Record<string, boolean | string | null>,
+): boolean => {
   const terminalKind = readString(payload.terminal_artifact_kind);
-  const turnId = readString(payload.turn_id);
+  const finalAnswerSource = readString(payload.final_answer_source);
+  const turnId =
+    readString(payload.turn_id) ??
+    readString(readRecord(payload.canonical_goal_frame)?.turn_id) ??
+    readString(readRecord(payload.terminal_answer_authority)?.turn_id);
   const singleWriterAuthority = readRecord(payload.provider_terminal_runtime_authority);
   const singleWriterCandidateRef = readString(singleWriterAuthority?.provider_terminal_candidate_ref);
   const singleWriterObservationRefs = readArray(singleWriterAuthority?.selected_observation_refs)
@@ -1398,6 +1431,11 @@ const providerTerminalBridgeProvesRuntimeAuthority = (payload: Record<string, un
     singleWriterAuthority?.server_authoritative === true &&
     singleWriterObservationRefs.length > 0
   ) {
+    if (diagnostic) {
+      diagnostic.authority_path = "single_writer_runtime_authority";
+      diagnostic.single_writer_authority = true;
+      diagnostic.eligible = true;
+    }
     return true;
   }
   const debug = readRecord(payload.debug);
@@ -1426,6 +1464,23 @@ const providerTerminalBridgeProvesRuntimeAuthority = (payload: Record<string, un
     ...readArray(bridge?.successful_gateway_observation_refs),
     ...readArray(bridge?.successful_capability_lane_observation_refs),
   ]
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const currentAuthority = readRecord(payload.terminal_answer_authority);
+  const currentPresentation = readRecord(payload.terminal_presentation);
+  const selectedObservationRefs = readArray(currentPresentation?.selected_observation_refs)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const normalizedObservationRefs = readArray(reentry?.normalized_observation_refs)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const providerSupportedObservationRefs = new Set([
+    ...successfulObservationRefs,
+    ...normalizedObservationRefs,
+  ]);
+  const committedRoute = readCommittedAskRoute(payload);
+  const committedGoal = readRecord(committedRoute?.canonical_goal);
+  const committedAllowedKinds = readArray(committedGoal?.allowed_terminal_artifact_kinds)
     .map(readString)
     .filter((entry): entry is string => Boolean(entry));
   const supportRefsSatisfyContract =
@@ -1461,7 +1516,39 @@ const providerTerminalBridgeProvesRuntimeAuthority = (payload: Record<string, un
     readString(bridgePresentation?.final_answer_source) === "agent_provider_terminal_candidate" &&
     bridgePresentationRef === candidateRef
   );
-  return Boolean(
+  const scholarlyProviderBridgeAuthority = Boolean(
+    turnId &&
+    terminalKind &&
+    terminalKind === finalAnswerSource &&
+    SCHOLARLY_ANSWER_TERMINAL_KINDS.has(terminalKind) &&
+    committedRoute?.schema === "helix.committed_ask_route.v1" &&
+    committedRoute.turn_id === turnId &&
+    committedRoute.route.source_target === "scholarly_research" &&
+    (
+      readString(committedGoal?.required_terminal_kind) === terminalKind ||
+      committedAllowedKinds.includes(terminalKind)
+    ) &&
+    readString(bridge?.turn_id) === turnId &&
+    readString(bridge?.terminal_authority_status) === "authorized_by_helix_provider_candidate_bridge" &&
+    bridge?.all_gateway_calls_succeeded === true &&
+    bridge?.all_capability_lane_observations_succeeded === true &&
+    readString(reentry?.schema) === "helix.provider_reasoning_reentry.v1" &&
+    readString(reentry?.turn_id) === turnId &&
+    readString(reentry?.status) === "completed" &&
+    reentry?.evidence_reentered === true &&
+    reentry?.solver_completed === true &&
+    reentry?.goal_satisfaction_compatible === true &&
+    selectedObservationRefs.length > 0 &&
+    selectedObservationRefs.every((ref) => providerSupportedObservationRefs.has(ref)) &&
+    readString(currentAuthority?.turn_id) === turnId &&
+    readString(currentAuthority?.terminal_kind) === "answer" &&
+    readString(currentAuthority?.terminal_artifact_kind) === terminalKind &&
+    readString(currentAuthority?.final_answer_source) === terminalKind &&
+    currentAuthority?.server_authoritative === true &&
+    readString(currentPresentation?.turn_id) === turnId &&
+    Boolean(readString(currentPresentation?.concise_text))
+  );
+  const commonBridgeContract = Boolean(
     bridge?.schema === "helix.provider_terminal_authority_bridge.v1" &&
     bridge?.solver_completed === true &&
     bridge?.goal_satisfaction_compatible === true &&
@@ -1469,17 +1556,88 @@ const providerTerminalBridgeProvesRuntimeAuthority = (payload: Record<string, un
     bridge?.final_visible_answer_authorized === true &&
     bridge?.normalized_observations_ready === true &&
     bridge?.all_observations_succeeded === true &&
-    supportRefsSatisfyContract &&
+    supportRefsSatisfyContract
+  );
+  const materializedProviderProductAuthority = Boolean(
+    materialization?.status === "materialized" &&
+    materializedKind &&
+    materializedKind === terminalKind &&
+    qualityGate?.ok === true
+  );
+  const eligible = Boolean(
+    commonBridgeContract &&
     (
       directProviderCandidateAuthority ||
-      (
-        materialization?.status === "materialized" &&
-        materializedKind &&
-        materializedKind === terminalKind &&
-        qualityGate?.ok === true
-      )
+      scholarlyProviderBridgeAuthority ||
+      materializedProviderProductAuthority
     )
   );
+  if (diagnostic) {
+    diagnostic.authority_path = eligible
+      ? scholarlyProviderBridgeAuthority
+        ? "scholarly_provider_bridge"
+        : directProviderCandidateAuthority
+          ? "direct_provider_candidate"
+          : "materialized_provider_product"
+      : null;
+    diagnostic.turn_id_present = Boolean(turnId);
+    diagnostic.scholarly_terminal_identity = Boolean(
+      terminalKind &&
+      terminalKind === finalAnswerSource &&
+      SCHOLARLY_ANSWER_TERMINAL_KINDS.has(terminalKind),
+    );
+    diagnostic.committed_scholarly_route = Boolean(
+      turnId &&
+      terminalKind &&
+      committedRoute?.schema === "helix.committed_ask_route.v1" &&
+      committedRoute.turn_id === turnId &&
+      committedRoute.route.source_target === "scholarly_research" &&
+      (
+        readString(committedGoal?.required_terminal_kind) === terminalKind ||
+        committedAllowedKinds.includes(terminalKind)
+      ),
+    );
+    diagnostic.bridge_execution_complete = Boolean(
+      turnId &&
+      readString(bridge?.turn_id) === turnId &&
+      readString(bridge?.terminal_authority_status) === "authorized_by_helix_provider_candidate_bridge" &&
+      bridge?.all_gateway_calls_succeeded === true &&
+      bridge?.all_capability_lane_observations_succeeded === true,
+    );
+    diagnostic.reasoning_reentry_complete = Boolean(
+      turnId &&
+      readString(reentry?.schema) === "helix.provider_reasoning_reentry.v1" &&
+      readString(reentry?.turn_id) === turnId &&
+      readString(reentry?.status) === "completed" &&
+      reentry?.evidence_reentered === true &&
+      reentry?.solver_completed === true &&
+      reentry?.goal_satisfaction_compatible === true,
+    );
+    diagnostic.observation_refs_aligned = Boolean(
+      selectedObservationRefs.length > 0 &&
+      selectedObservationRefs.every((ref) => providerSupportedObservationRefs.has(ref)),
+    );
+    diagnostic.current_answer_authority = Boolean(
+      turnId &&
+      terminalKind &&
+      readString(currentAuthority?.turn_id) === turnId &&
+      readString(currentAuthority?.terminal_kind) === "answer" &&
+      readString(currentAuthority?.terminal_artifact_kind) === terminalKind &&
+      readString(currentAuthority?.final_answer_source) === terminalKind &&
+      currentAuthority?.server_authoritative === true,
+    );
+    diagnostic.current_presentation = Boolean(
+      turnId &&
+      readString(currentPresentation?.turn_id) === turnId &&
+      readString(currentPresentation?.concise_text),
+    );
+    diagnostic.common_bridge_contract = commonBridgeContract;
+    diagnostic.direct_provider_candidate = directProviderCandidateAuthority;
+    diagnostic.scholarly_provider_bridge = scholarlyProviderBridgeAuthority;
+    diagnostic.materialized_provider_product = materializedProviderProductAuthority;
+    diagnostic.eligible = eligible;
+  }
+  return eligible;
 };
 
 type VerifiedRuntimeLifecycleAuthority = {
@@ -1579,6 +1737,66 @@ const verifiedRuntimeLifecycleAuthority = (
   };
 };
 
+const SCHOLARLY_ANSWER_TERMINAL_KINDS = new Set([
+  "scholarly_research_answer",
+  "scholarly_metadata_answer",
+  "scholarly_numeric_missing",
+  "scholarly_recovery_plan",
+  "scholarly_evidence_escalation_missing",
+  "scholarly_exploratory_candidates",
+  "scholarly_parse_required",
+]);
+
+const verifiedScholarlyAnswerAllowsTerminal = (
+  payload: Record<string, unknown>,
+  runtimeLifecycle: VerifiedRuntimeLifecycleAuthority,
+): boolean => {
+  const turnId = readString(payload.turn_id) ?? readString(readRecord(payload.canonical_goal_frame)?.turn_id);
+  const terminalKind = readString(payload.terminal_artifact_kind);
+  const finalAnswerSource = readString(payload.final_answer_source);
+  if (!turnId || !terminalKind || terminalKind !== finalAnswerSource) return false;
+  if (!SCHOLARLY_ANSWER_TERMINAL_KINDS.has(terminalKind)) return false;
+
+  const committedRoute = readCommittedAskRoute(payload);
+  const committedGoal = readRecord(committedRoute?.canonical_goal);
+  const committedAllowedKinds = readArray(committedGoal?.allowed_terminal_artifact_kinds)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  if (
+    committedRoute?.schema !== "helix.committed_ask_route.v1" ||
+    committedRoute.route.source_target !== "scholarly_research" ||
+    (
+      readString(committedGoal?.required_terminal_kind) !== terminalKind &&
+      !committedAllowedKinds.includes(terminalKind)
+    )
+  ) {
+    return false;
+  }
+
+  const authority = readRecord(payload.terminal_answer_authority);
+  const presentation = readRecord(payload.terminal_presentation);
+  const selectedObservationRefs = readArray(presentation?.selected_observation_refs)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const supportedObservationRefs = new Set(runtimeLifecycle.supportedObservationRefs);
+  return Boolean(
+    runtimeLifecycle.integrityVerified &&
+    runtimeLifecycle.providerCycleCompleted &&
+    runtimeLifecycle.postObservationModelDecision &&
+    selectedObservationRefs.length > 0 &&
+    selectedObservationRefs.some((ref) => supportedObservationRefs.has(ref)) &&
+    readString(authority?.turn_id) === turnId &&
+    readString(authority?.terminal_kind) === "answer" &&
+    readString(authority?.terminal_artifact_kind) === terminalKind &&
+    readString(authority?.final_answer_source) === terminalKind &&
+    authority?.server_authoritative === true &&
+    readString(presentation?.turn_id) === turnId &&
+    readString(presentation?.terminal_artifact_kind) === terminalKind &&
+    readString(presentation?.final_answer_source) === terminalKind &&
+    readString(presentation?.concise_text)
+  );
+};
+
 export function hasCleanTypedFailure(payload: Record<string, unknown>): boolean {
   if (readString(payload.terminal_artifact_kind) !== "typed_failure" && readString(payload.final_answer_source) !== "typed_failure") return false;
   return Boolean(
@@ -1621,8 +1839,16 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const microDeckCapability = selectedMicroDeckCapability(payload);
   const ledgerBackedPostObservationAnswerDraft = hasLedgerBackedPostObservationAnswerDraft(payload);
   const repoEvidenceAnswerTerminal = repoEvidenceAnswerTerminalAllowed(payload);
-  const providerBridgeRuntimeAuthority = providerTerminalBridgeProvesRuntimeAuthority(payload);
+  const providerBridgeRuntimeAuthorityChecks: Record<string, boolean | string | null> = {};
+  const providerBridgeRuntimeAuthority = providerTerminalBridgeProvesRuntimeAuthority(
+    payload,
+    providerBridgeRuntimeAuthorityChecks,
+  );
   const runtimeLifecycleAuthority = verifiedRuntimeLifecycleAuthority(payload);
+  const authorizedProviderTerminalCandidate =
+    terminalKind === "agent_provider_terminal_candidate" &&
+    finalAnswerSource === "agent_provider_terminal_candidate" &&
+    providerBridgeRuntimeAuthority;
   const checks = {
     agent_runtime_loop:
       hasAgentRuntimeLoopDecisionChain(payload) ||
@@ -1661,7 +1887,8 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
     goal_satisfaction_allows_terminal:
       goalSatisfactionAllowsTerminal(payload) ||
       ledgerBackedPostObservationAnswerDraft ||
-      providerBridgeRuntimeAuthority,
+      providerBridgeRuntimeAuthority ||
+      verifiedScholarlyAnswerAllowsTerminal(payload, runtimeLifecycleAuthority),
     typed_failure_clean: hasCleanTypedFailure(payload),
   };
   const requiresRuntimeLoop =
@@ -1678,7 +1905,11 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
     if (!checks.goal_satisfaction_allows_terminal && !livePipelineReceiptAllowed && !liveEnvironmentBindingDiagnosisAllowed && !workstationControlReceiptAllowed && !noteReceiptTerminalAllowed) blockingReasons.push("goal_satisfaction_not_terminal");
     if (terminalKind === "typed_failure") {
       if (!checks.typed_failure_clean) blockingReasons.push("typed_failure_missing_code");
-    } else if (modelDirectAnswerTurn) {
+    } else if (
+      modelDirectAnswerTurn &&
+      !authorizedProviderTerminalCandidate &&
+      !providerBridgeRuntimeAuthority
+    ) {
       if (!hasDirectAnswerDraft(payload)) blockingReasons.push("direct_answer_text_missing");
       if (!committedModelOnlyDirectAnswerTurn) {
         if (!checks.agent_step_decision) blockingReasons.push("agent_step_decision_missing");
@@ -1727,6 +1958,10 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
       authority_source: runtimeLifecycleAuthority.providerCycleCompleted
         ? "verified_runtime_event_log"
         : "legacy_projection_only",
+    },
+    provider_bridge_runtime_authority: {
+      eligible: providerBridgeRuntimeAuthority,
+      checks: providerBridgeRuntimeAuthorityChecks,
     },
     eligible,
     severity,

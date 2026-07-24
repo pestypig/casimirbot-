@@ -56,10 +56,50 @@ import {
   isExplicitDocsPathLocatePrompt,
   isExplicitDocsPathSummaryPrompt,
 } from "../docs-viewer-intent";
+import { resolveHelixAskConversationalReferent } from "../referent-resolution";
+import { materializeRealtimeConversationContext } from "./realtime-conversation-context";
 
 const HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY = "helix_ask.inspect_capability_catalog" as const;
 const SCIENTIFIC_CALCULATOR_THEORY_RUN_CONTEXT_CAPABILITY =
   "scientific-calculator.read_visible_theory_run_result" as const;
+
+const ACTIVE_DOC_EVIDENCE_QUERY_STOP_WORDS = new Set([
+  "about", "accepted", "answer", "asking", "because", "cannot", "claim", "context",
+  "current", "document", "does", "evidence", "explain", "first", "from", "here",
+  "means", "necessarily", "paper", "passage", "previous", "quote", "response", "saying",
+  "section", "sentence", "study", "that", "their", "there", "these", "they", "this",
+  "until", "what", "where", "which", "workflow", "would",
+]);
+
+const activeDocEvidenceQuotedTerms = (prompt: string): string[] =>
+  Array.from(prompt.matchAll(/["'`â€œâ€â€˜â€™]([^"'`â€œâ€â€˜â€™\r\n]{2,180})["'`â€œâ€â€˜â€™]/g))
+    .flatMap((match) => match[1]?.match(/[A-Za-z][A-Za-z0-9_-]{3,}/g) ?? []);
+
+const buildActiveDocEvidenceReferentTerms = (
+  prompt: string,
+  resolvedReferentText: string | null,
+): string[] => {
+  const literalTerms = activeDocEvidenceQuotedTerms(prompt);
+  const referentTokens = resolvedReferentText?.match(/[A-Za-z][A-Za-z0-9_-]{3,}/g) ?? [];
+  const literalKeys = new Set(literalTerms.map((term) => term.toLowerCase()));
+  const scored = new Map<string, { term: string; score: number }>();
+  for (const term of [...literalTerms, ...referentTokens]) {
+    const key = term.toLowerCase();
+    if (ACTIVE_DOC_EVIDENCE_QUERY_STOP_WORDS.has(key)) continue;
+    const prior = scored.get(key);
+    scored.set(key, {
+      term: prior?.term ?? term,
+      score: (prior?.score ?? 0) + 1 + (literalKeys.has(key) ? 20 : 0),
+    });
+  }
+  return Array.from(scored.entries())
+    .sort((left, right) =>
+      right[1].score - left[1].score ||
+      right[0].length - left[0].length ||
+      left[0].localeCompare(right[0]))
+    .slice(0, 8)
+    .map(([key]) => key);
+};
 
 const isCapabilityCatalogSelection = (selectedCapability: string): boolean =>
   /^(?:helix_ask\.inspect_capability_catalog|helix\.ask\.inspect_capability_catalog|inspect_capability_catalog|capability_catalog|runtime_capability_catalog|capability_catalog_runtime)$/i.test(
@@ -144,24 +184,69 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
 ): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
   if (!prompt) return [];
+  const routeMetadata = readRecord(body.route_metadata ?? body.routeMetadata);
+  const admittedSourceTarget =
+    readRecord(body.source_target_intent ?? body.sourceTargetIntent) ??
+    readRecord(routeMetadata?.source_target_intent ?? routeMetadata?.sourceTargetIntent);
+  const admittedTargetSource =
+    readString(admittedSourceTarget?.target_source ?? admittedSourceTarget?.targetSource);
+  const hardActiveDocObservationRequired =
+    admittedTargetSource === "active_doc" &&
+    (
+      admittedSourceTarget?.allow_no_tool_direct === false ||
+      admittedSourceTarget?.allowNoToolDirect === false ||
+      admittedSourceTarget?.must_enter_backend_ask === true ||
+      admittedSourceTarget?.mustEnterBackendAsk === true ||
+      readString(admittedSourceTarget?.strength) === "hard"
+    );
+  const activeDocEvidenceFollowup =
+    hardActiveDocObservationRequired &&
+    readString(admittedSourceTarget?.precedence_reason ?? admittedSourceTarget?.precedenceReason) ===
+      "active_doc_evidence_followup_source_target";
   const deicticPrompt = isActiveDocsViewerDeicticPrompt(prompt);
   const explicitPathSummaryPrompt = isImmediateExplicitDocsPathSummaryPrompt(prompt);
   const namedDocQuery = resolveAskTurnNamedDocSummaryQueryArg(prompt);
   const topicDocQuery = namedDocQuery ? null : resolveAskTurnTopicDocQueryArg(prompt);
   const standaloneDocQuery = namedDocQuery ?? topicDocQuery;
-  if (!deicticPrompt && !explicitPathSummaryPrompt && !standaloneDocQuery) return [];
+  if (
+    !deicticPrompt &&
+    !explicitPathSummaryPrompt &&
+    !standaloneDocQuery &&
+    !hardActiveDocObservationRequired
+  ) return [];
   const workspaceSnapshot = readWorkspaceSnapshot(body);
   const activePanel = readWorkspaceActivePanel(workspaceSnapshot);
   const explicitDocPath = explicitPathSummaryPrompt
     ? normalizeDocPath(extractUnquotedDocsMarkdownPaths(prompt)[0])
     : null;
-  const activeDocPath = explicitDocPath ?? readWorkspaceActiveDocPath(workspaceSnapshot);
+  const activeDocPath = explicitDocPath ??
+    readWorkspaceActiveDocPath(workspaceSnapshot) ??
+    normalizeDocPath(admittedSourceTarget?.active_doc_path ?? admittedSourceTarget?.activeDocPath);
   if (!activeDocPath && !standaloneDocQuery) return [];
   const fileName = activeDocPath?.split("/").pop()?.replace(/\.md$/i, "").replace(/[-_]+/g, " ").trim();
   const exactLocateTerms = explicitDocPath ? extractExplicitDocsLocateTerms(prompt) : [];
   const sectionRequest = explicitDocPath ? extractExplicitDocsSectionRequest(prompt) : null;
+  const conversationalReferent = hardActiveDocObservationRequired
+    ? resolveHelixAskConversationalReferent(body)
+    : null;
+  const realtimeConversationContext = hardActiveDocObservationRequired
+    ? materializeRealtimeConversationContext({ body, question: prompt })
+    : null;
+  const activeDocEvidenceReferentText = conversationalReferent?.resolvedText ??
+    realtimeConversationContext?.latestGroundedAnswer?.text ??
+    null;
+  const activeDocEvidenceReferentTerms = hardActiveDocObservationRequired
+    ? buildActiveDocEvidenceReferentTerms(prompt, activeDocEvidenceReferentText)
+    : [];
+  const activeDocEvidenceQuery = activeDocEvidenceReferentTerms.length > 0
+    ? `${prompt} ${activeDocEvidenceReferentTerms.join(" ")}`
+    : prompt;
   const query = standaloneDocQuery ?? sectionRequest?.headings.join(" ") ??
-    (exactLocateTerms.length > 0 ? exactLocateTerms.join(" ") : fileName || activeDocPath);
+    (exactLocateTerms.length > 0
+      ? exactLocateTerms.join(" ")
+      : hardActiveDocObservationRequired
+        ? activeDocEvidenceQuery
+        : fileName || activeDocPath);
   const derivationSource =
     standaloneDocQuery
       ? namedDocQuery
@@ -169,6 +254,10 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
         : "helix_topic_doc_lookup_query"
       : explicitDocPath
       ? "helix_explicit_doc_path_context"
+      : activeDocEvidenceFollowup
+      ? "helix_active_doc_evidence_followup"
+      : hardActiveDocObservationRequired
+      ? "helix_active_doc_required_observation"
       : activePanel === "docs-viewer"
       ? "helix_active_docs_viewer_context"
       : "helix_retained_active_doc_context";
@@ -181,6 +270,9 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
       query,
       paths: standaloneDocQuery ? ["docs"] : [activeDocPath],
       ...(exactLocateTerms.length > 0 ? { exact_terms: exactLocateTerms, max_hits: 40 } : {}),
+      ...(activeDocEvidenceFollowup && activeDocEvidenceReferentTerms.length > 0
+        ? { exact_terms: activeDocEvidenceReferentTerms, max_hits: 40 }
+        : {}),
       ...(sectionRequest
         ? {
             section_heading: sectionRequest.heading,
@@ -202,6 +294,32 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
         explicit_doc_path: explicitDocPath,
         named_doc_query: namedDocQuery,
         topic_doc_query: topicDocQuery,
+        active_doc_evidence_followup: activeDocEvidenceFollowup,
+        active_doc_required_observation: hardActiveDocObservationRequired,
+        ...(hardActiveDocObservationRequired
+          ? {
+              evidence_query_derivation: activeDocEvidenceReferentTerms.length > 0
+                ? "retained_assistant_answer_salient_terms"
+                : "current_prompt_only",
+              evidence_query_terms: activeDocEvidenceReferentTerms,
+              referent_resolution: conversationalReferent?.resolvedText
+                ? conversationalReferent.trace
+                : realtimeConversationContext?.latestGroundedAnswer
+                  ? {
+                      schema: "helix.active_doc_evidence_referent.v1",
+                      source_kind: "realtime_grounded_answer_context",
+                      resolved_source_ref: realtimeConversationContext.latestGroundedAnswer.ref,
+                      context_pack_id: realtimeConversationContext.audit.context_pack_id,
+                      context_hash: realtimeConversationContext.audit.context_hash,
+                      resolution_confidence: "high",
+                      context_role: "query_terms_only",
+                      assistant_answer: false,
+                      terminal_eligible: false,
+                      raw_content_included: false,
+                    }
+                  : conversationalReferent?.trace ?? null,
+            }
+          : {}),
       },
     },
   }];

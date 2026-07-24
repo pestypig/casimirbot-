@@ -786,6 +786,8 @@ export const createHelixAskLiveDebugSlimBuilder = (
         payload.provider_terminal_authority_bridge ?? debug.provider_terminal_authority_bridge ?? null,
       terminal_answer_authority:
         payload.terminal_answer_authority ?? debug.terminal_answer_authority ?? null,
+      terminal_grounding_authority:
+        payload.terminal_grounding_authority ?? debug.terminal_grounding_authority ?? null,
       terminal_presentation:
         payload.terminal_presentation ?? debug.terminal_presentation ?? null,
       terminal_authority_status:

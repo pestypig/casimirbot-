@@ -11,6 +11,8 @@ import {
 } from "../../services/helix-ask/realtime-room/room-store";
 import { reconcileSharedRealtimeRoomRuntimeAfterLeave } from
   "../../services/helix-ask/realtime-room/room-runtime-reconciliation";
+import { sendSharedRealtimeRoomParticipantContextIfBound } from
+  "../../services/helix-ask/realtime-room/participant-context";
 import {
   buildRealtimeRequesterRef,
   listAdmittedRealtimeSessions,
@@ -24,6 +26,7 @@ import {
   readMembership,
   readRecord,
   readString,
+  requireSharedRoomHostingAllowed,
   requireSharedRoomAccount,
   sharedRoomRoute,
   withRuntimeProjection,
@@ -44,11 +47,30 @@ sharedRealtimeRoomLifecycleRouter.get("/realtime/rooms", sharedRoomRoute(async (
 
 sharedRealtimeRoomLifecycleRouter.post("/realtime/rooms", sharedRoomRoute(async (req, res) => {
   const account = await requireSharedRoomAccount(req);
+  requireSharedRoomHostingAllowed(account);
   const body = readRecord(req.body);
-  const room = withRuntimeProjection(await createSharedRealtimeRoom({
-    ownerProfileId: account.profileId,
-    title: readString(body.title),
-  }));
+  const createRoom = async () => {
+    if (account.isGuest) {
+      const activeGuestRooms = await listSharedRealtimeRooms({
+        profileId: account.profileId,
+      });
+      if (activeGuestRooms.some((room) => room.status !== "closed")) {
+        throw new SharedRealtimeRoomDomainError(
+          "shared_realtime_room_runtime_conflict",
+          409,
+          "A temporary guest can host only one active Shared Live Room.",
+        );
+      }
+    }
+    return createSharedRealtimeRoom({
+      ownerProfileId: account.profileId,
+      title: readString(body.title),
+    });
+  };
+  const createdRoom = account.isGuest
+    ? await runWithSharedRealtimeProfileAdmissionLock(account.profileId, createRoom)
+    : await createRoom();
+  const room = withRuntimeProjection(createdRoom);
   res.status(201).json(buildHelixSharedRealtimeRoomResponse({
     ok: true,
     message: "Shared Realtime room created.",
@@ -145,13 +167,20 @@ sharedRealtimeRoomLifecycleRouter.post(
       participantId: membership.participantId,
       requesterSessionId: account.sessionId,
     });
+    const projectedRoom = result.room ? withRuntimeProjection(result.room) : null;
+    if (projectedRoom) {
+      sendSharedRealtimeRoomParticipantContextIfBound({
+        room: projectedRoom,
+        reason: "participant_state_changed",
+      });
+    }
 
     res.json(buildHelixSharedRealtimeRoomResponse({
       ok: true,
       message: result.action === "closed"
         ? "Shared Realtime room closed."
         : "Left Shared Realtime room.",
-      room: result.room ? withRuntimeProjection(result.room) : null,
+      room: projectedRoom,
     }));
   }),
 );

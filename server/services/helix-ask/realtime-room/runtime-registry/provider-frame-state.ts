@@ -8,7 +8,10 @@ export const detachSharedRealtimeRoomProviderFrameState = (
   record.frames = record.frames.map((entry) => ({
     ...entry,
     providerItemId: null,
-    frame: entry.frame.provider_delivery === "sent_to_shared_model"
+    frame: (
+      entry.frame.provider_delivery === "sent_to_shared_model" ||
+      entry.frame.provider_delivery === "transport_sent"
+    )
       ? { ...entry.frame, provider_delivery: "runtime_not_bound" }
       : entry.frame,
   }));

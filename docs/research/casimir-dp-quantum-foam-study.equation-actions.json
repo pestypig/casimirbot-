@@ -163,6 +163,78 @@
       ]
     },
     {
+      "equationId": "cdp-or-branch-geometry-context",
+      "label": "Penrose OR branch-geometry and timescale context",
+      "sectionAnchor": "24-penrose-or-motivation-notation-and-scope",
+      "latex": "|\\Psi\\rangle\\ \\sim\\ \\alpha|\\rho_A,g^{(A)}_{\\mu\\nu}\\rangle+ \\beta|\\rho_B,g^{(B)}_{\\mu\\nu}\\rangle, \\qquad \\tau_{\\mathrm{OR}}\\sim\\frac{\\hbar}{E_G}.",
+      "aliases": [
+        "|Psi>~alpha|rho_A,g_A>+beta|rho_B,g_B>",
+        "tau_OR~hbar/E_G"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-or-branch-geometry-context",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Penrose OR context and Stage-2 diagnostic",
+          "badgeIds": [
+            "study.casimir_dp.penrose_or_branch_geometry_context",
+            "collapse.objective.mass_density_branch_difference",
+            "collapse.objective.dp_gravitational_self_energy"
+          ],
+          "preferredBadgeId": "study.casimir_dp.penrose_or_branch_geometry_context",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.dp",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Penrose supplies branch-geometry motivation and an order-of-magnitude estimate, not a Casimir coupling or covariant runtime."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Branch-dependent metric configurations do not assert topologically distinct manifolds.",
+        "The repository Delta E_G is a regularized weak-field diagnostic rather than a complete OR dynamics.",
+        "This non-biological context does not validate Orch OR."
+      ]
+    },
+    {
+      "equationId": "cdp-ambient-gravity-phase-control",
+      "label": "Ordinary ambient-gravity phase control",
+      "sectionAnchor": "24-penrose-or-motivation-notation-and-scope",
+      "latex": "\\Delta\\phi_g= -\\frac{m}{\\hbar}\\int \\left[\\Phi_A(t)-\\Phi_B(t)\\right]dt.",
+      "aliases": [
+        "Delta phi_g=-(m/hbar) integral (Phi_A-Phi_B) dt"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-ambient-gravity-phase-control",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open ambient-gravity phase and tilt audit",
+          "badgeIds": [
+            "study.casimir_dp.decoherence_collapse_gate",
+            "study.casimir_dp.penrose_or_branch_geometry_context",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.decoherence_collapse_gate",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.decoherence_gate",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "This is an ordinary unitary phase and alignment control, not the DP branch self-energy or an OR rate."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "A shared ambient field magnitude does not set the DP collapse rate.",
+        "Boundary-correlated vertical projection, tilt, vibration, and phase reference require measured sidecars."
+      ]
+    },
+    {
       "equationId": "cdp-compton-dp-frequency-identities",
       "label": "Compton and DP characteristic-frequency identities",
       "sectionAnchor": "41-compton-frequency-non-bridge",
@@ -371,6 +443,43 @@
       ]
     },
     {
+      "equationId": "cdp-interferometric-phase-visibility-readout",
+      "label": "Boundary phase, visibility, and two-port interference readout",
+      "sectionAnchor": "53-registered-coherence-observable",
+      "latex": "\\Delta\\phi_b= -\\frac{1}{\\hbar}\\int \\left[U_{b,A}(t)-U_{b,B}(t)\\right]dt, \\qquad P_\\pm(b,t)=\\frac12\\left[ 1\\pm V_b(t)\\cos\\!\\left(\\Delta\\phi_b+\\chi\\right)\\right], \\qquad V_b(t)=V_{b,0}e^{-\\Gamma_b t}.",
+      "aliases": [
+        "Delta phi_b=-(1/hbar) integral (U_bA-U_bB) dt",
+        "P_plus_minus=(1/2)(1 plus_minus V cos(Delta phi+chi))"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-phase-visibility-readout",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open phase, visibility, and four-quadrature runtime",
+          "badgeIds": [
+            "study.casimir_dp.decoherence_collapse_gate",
+            "study.casimir_dp.manifold_response_hypothesis",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.decoherence_collapse_gate",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.decoherence_gate",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Constructive/destructive ports operationalize phase and visibility but do not identify objective collapse."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "A static boundary has a state, not a phase with which the particle becomes in phase.",
+        "Phase shift, visibility loss, and coherence-decay rate remain distinct observables.",
+        "Ordinary QED, electric, thermal, mechanical, readout, and gravity phase terms must be subtracted before a residual is reported."
+      ]
+    },
+    {
       "equationId": "cdp-manifold-response-slot",
       "label": "Unregistered tensor-to-coherence manifold response",
       "sectionAnchor": "54-candidate-manifold-response-bridge",
@@ -476,7 +585,7 @@
       "equationId": "cdp-accessible-rate-ratio",
       "label": "DP-to-environment accessible-rate ratio",
       "sectionAnchor": "57-role-separated-experiment-design-campaign",
-      "latex": "\\mathcal R_{access}=\\frac{\\Gamma_{DP}}{\\Gamma_{env}} =5.52\\times 10^{-8}.",
+      "latex": "\\mathcal R_{access}=\\frac{\\Gamma_{DP}}{\\Gamma_{env}} =4.47\\times 10^{-7}.",
       "aliases": [
         "R_access=Gamma_DP/Gamma_env"
       ],

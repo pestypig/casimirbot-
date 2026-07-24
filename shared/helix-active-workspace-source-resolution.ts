@@ -6,6 +6,7 @@ export const HELIX_ACTIVE_WORKSPACE_SOURCE_RESOLUTION_SCHEMA =
 export type HelixActiveWorkspaceSourceResolutionReason =
   | "active_docs_viewer_valid_doc"
   | "generic_deictic_bound_to_active_docs"
+  | "active_doc_evidence_followup"
   | "active_doc_location_prompt"
   | "explicit_visual_prompt_bypasses_workspace"
   | "ambiguous_without_active_workspace_source"

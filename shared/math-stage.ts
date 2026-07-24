@@ -4330,7 +4330,7 @@ export const mathStageRegistry: MathStageEntry[] = [
     module: "shared/dp-collapse.ts",
     stage: "exploratory",
     notes:
-      "Diosi-Penrose collapse estimator (DeltaE from mass-density difference).",
+      "Diosi-Penrose collapse estimator from mass-density difference, with symmetric self/cross bookkeeping, branch-grid origin/containment metadata, and a softened source-potential equivalence audit.",
     checks: [{ type: "test", path: "tests/dp-collapse.spec.ts" }],
     units: {
       ell_m: "L",
@@ -4341,6 +4341,11 @@ export const mathStageRegistry: MathStageEntry[] = [
       mass_a_kg: "M",
       mass_b_kg: "M",
       overlap_mass_kg: "M",
+      boundary_shell_mass_fraction_a: "1",
+      boundary_shell_mass_fraction_b: "1",
+      source_potential_deltaE_J: "M L^2 T^-2",
+      potential_min_m2_s2: "L^2 T^-2",
+      potential_max_m2_s2: "L^2 T^-2",
     },
   },
   {
@@ -4456,6 +4461,48 @@ export const mathStageRegistry: MathStageEntry[] = [
       null_correlation: "1",
       alternative_correlation: "1",
       paired_windows: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_OR_PHASE_STAGE2",
+    module: "shared/casimir-dp-phase-coherence.ts",
+    stage: "diagnostic",
+    notes:
+      "Ordinary branch-action phase integration, four-quadrature two-port interference, exponential visibility/rate conversion, projected-force phase, and ambient-gravity phase/tilt controls; none identifies objective collapse.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-phase-coherence.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-phase-coherence.spec.ts" },
+    ],
+    units: {
+      branch_energy_J: "M L^2 T^-2",
+      action_difference_J_s: "M L^2 T^-1",
+      boundary_phase_contrast_rad: "1",
+      visibility: "1",
+      coherence_rate_s: "T^-1",
+      projected_differential_force_N: "M L T^-2",
+      vertical_projection_m: "L",
+      tilt_rad: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_OR_PHASE_STAGE2",
+    module: "shared/casimir-dp-or-phase-stage2.ts",
+    stage: "diagnostic",
+    notes:
+      "Three-lane OR-motivated plausibility ledger combining DP pairwise/potential identities, fixed-branch boundary invariance, branch perturbation, ordinary phase/interference, ambient-gravity controls, upstream hashes, and a fail-closed unregistered bridge.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-or-phase-stage2.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-or-phase-stage2.spec.ts" },
+    ],
+    units: {
+      particle_mass_kg: "M",
+      compton_frequency_Hz: "T^-1",
+      dp_characteristic_frequency_Hz: "T^-1",
+      deltaE_G_J: "M L^2 T^-2",
+      tau_OR_s: "T",
+      boundary_phase_rad: "1",
+      ambient_gravity_phase_rad: "1",
+      branch_separation_m: "L",
     },
   },
   {

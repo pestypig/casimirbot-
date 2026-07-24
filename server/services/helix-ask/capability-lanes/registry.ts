@@ -80,6 +80,16 @@ const laneTemplates: HelixCapabilityLaneTemplate[] = [
   workstationToolReferenceLaneTemplate,
 ];
 
+const capabilityLaneCapabilityIds = new Set(
+  laneTemplates.flatMap((template) =>
+    template.capabilities.map((capability) => capability.capability_id),
+  ),
+);
+
+export const isHelixCapabilityLaneCapabilityId = (
+  capabilityId: string | null | undefined,
+): boolean => capabilityLaneCapabilityIds.has(String(capabilityId ?? "").trim());
+
 const laneSet = new Set<string>(HELIX_CAPABILITY_LANE_IDS);
 
 const laneEnabled = (

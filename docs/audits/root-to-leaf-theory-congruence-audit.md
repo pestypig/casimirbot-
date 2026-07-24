@@ -58,6 +58,26 @@ not only as retrieval metadata.
 - The first four paths are the evidence-bearing chain. The solar coherence lane
   is hypothesis-only and must remain quarantined beneath the measured chain.
 
+8. Casimir–DP/OR boundary-coherence bridge:
+- The study-specific bridge is a separate
+  `casimir-dp.or-boundary-coherence` bundle rooted at
+  `physics_quantum_semiclassical`; it is not a promotion of the NHM2
+  curvature-collapse bundle.
+- `path_quantum_semiclassical_to_casimir_dp_or_test` must terminate at
+  `leaf_casimir_dp_boundary_coherence_or_test` and remain capped at
+  `diagnostic`.
+- Its strict failure reason is
+  `ROOT_LEAF_CASIMIR_DP_OR_BRIDGE_FAIL`.
+- The path fails closed when any of these receipts or model components is
+  absent:
+  - authentic measured evidence
+  - ordinary-decoherence closure
+  - deterministic phase-residual replay
+  - a dynamics-level collapse discriminator
+  - a sourced boundary-to-coherence transfer kernel
+- Passing algebraic, synthetic, or fixed-branch replay checks does not close
+  any missing measured-evidence or bridge-dynamics gate.
+
 ## Implementation artifacts
 - Manifest: `configs/physics-root-leaf-manifest.v1.json`
 - Validator: `scripts/validate-physics-root-leaf-manifest.ts`
@@ -68,9 +88,12 @@ not only as retrieval metadata.
 1. Update root/leaf paths in the manifest for new theory lanes.
 2. If touching the curvature-collapse family, update the
    `nhm2.curvature-collapse` bundle and keep each sub-bridge falsifier explicit.
-3. Run `npm run validate:physics:root-leaf`.
-4. Run `npm run audit:toe:preflight`.
-5. Attach receipt evidence under `docs/audits/ticket-results/` when ticket-scoped.
+3. If touching the Casimir–DP/OR study, update its separate
+   `casimir-dp.or-boundary-coherence` bundle and preserve all five fail-closed
+   conditions.
+4. Run `npm run validate:physics:root-leaf`.
+5. Run `npm run audit:toe:preflight`.
+6. Attach receipt evidence under `docs/audits/ticket-results/` when ticket-scoped.
 
 ## Notes
 - This audit does not certify physical truth by itself.

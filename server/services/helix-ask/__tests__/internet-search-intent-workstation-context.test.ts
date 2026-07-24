@@ -2,15 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   buildToolUseRestatement,
   detectInternetSearchIntent,
+  hasKnownWorkstationSurfaceScopeCue,
 } from "../internet-search-intent";
 import {
   hasWorkstationPanelScopeCue,
   isActiveWorkstationContextPrompt,
 } from "../workstation-active-context-intent";
+import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
 
 describe("internet-search arbitration for workstation context", () => {
   it.each([
     "What panel is active right now?",
+    "What panel am I looking at right now?",
     "What panel in the workstation is active?",
     "What panels are open and which panel is active?",
     "Tell me which workstation panel you are currently looking at.",
@@ -23,6 +26,19 @@ describe("internet-search arbitration for workstation context", () => {
     expect(isActiveWorkstationContextPrompt(prompt)).toBe(true);
     expect(buildToolUseRestatement(prompt).requiredToolFamilies).not.toContain("internet_search");
     expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
+    expect(arbitrateAskSourceTarget({
+      turnId: "ask:test:workstation-context",
+      threadId: "thread:test",
+      promptText: prompt,
+    }).target_source).not.toBe("internet_search");
+  });
+
+  it("routes the reported first-person panel-view prompt to local workstation context", () => {
+    expect(arbitrateAskSourceTarget({
+      turnId: "ask:test:first-person-workstation-context",
+      threadId: "thread:test",
+      promptText: "What panel am I looking at right now?",
+    }).target_source).toBe("workspace_panel");
   });
 
   it.each([
@@ -46,6 +62,37 @@ describe("internet-search arbitration for workstation context", () => {
 
   it("still admits an explicit web request alongside local panel context", () => {
     const prompt = "What panel is active right now, and search the web for the current OpenAI API status.";
+
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(true);
+  });
+
+  it("keeps current Situation Room pipeline inspection in local workstation scope", () => {
+    const prompt =
+      "Inspect the current situation-room pipelines and summarize what is active or blocked.";
+
+    expect(hasKnownWorkstationSurfaceScopeCue(prompt)).toBe(true);
+    expect(buildToolUseRestatement(prompt).requiredToolFamilies).not.toContain("internet_search");
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
+    expect(arbitrateAskSourceTarget({
+      turnId: "ask:test:situation-room-context",
+      threadId: "thread:test",
+      promptText: prompt,
+    }).target_source).not.toBe("internet_search");
+  });
+
+  it.each([
+    "Inspect the current situation room pipelines.",
+    "What is active in Stage Play Badge Graph right now?",
+    "Summarize the current workstation task manager.",
+    "Check the live answer environment status.",
+  ])("recognizes registered workstation surfaces as local scope: %s", (prompt) => {
+    expect(hasKnownWorkstationSurfaceScopeCue(prompt)).toBe(true);
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
+  });
+
+  it("still admits an explicit web request alongside Situation Room context", () => {
+    const prompt =
+      "Inspect the current situation-room pipelines and search the web for the current OpenAI API status.";
 
     expect(detectInternetSearchIntent(prompt).searchRequested).toBe(true);
   });

@@ -1,0 +1,77 @@
+{
+  "schema": "helix.ask.user_prompt_corpus.v1",
+  "scenarios": [
+    {
+      "id": "nhm2_find",
+      "thread_group": "nhm2_document_conversation",
+      "category": "docs",
+      "prompt": "Can you find the NHM2 current status whitepaper?",
+      "notes": "Start a natural document conversation without naming an internal capability.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^(?:docs\\.search|docs-viewer\\.(?:search_docs|open_doc_by_path|identify_current_doc))$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["NHM2", "white\\s*paper|whitepaper|docs/research"],
+      "expected_minimum_answer_chars": 60
+    },
+    {
+      "id": "nhm2_explain_followup",
+      "thread_group": "nhm2_document_conversation",
+      "category": "docs",
+      "prompt": "What is the main idea?",
+      "notes": "Underspecified follow-up must resolve the document referent and re-enter current-turn evidence.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^(?:docs\\.search|docs-viewer\\.(?:identify_current_doc|open_doc_by_path|summarize_doc|locate_in_doc)|research-library\\.read_document)$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["NHM2|warp", "audit|diagnostic|bounded|evidence"],
+      "expected_minimum_answer_chars": 140
+    },
+    {
+      "id": "nhm2_casimir_followup",
+      "thread_group": "nhm2_document_conversation",
+      "category": "docs",
+      "prompt": "How does that connect to the Casimir effect?",
+      "notes": "Conceptual tangent must retain the source referent and distinguish evidence from speculation.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^(?:docs\\.search|docs-viewer\\.(?:identify_current_doc|open_doc_by_path|summarize_doc|locate_in_doc)|research-library\\.read_document)$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["Casimir", "negative|vacuum|boundary", "not|doesn.t|does not|bounded|speculat"],
+      "expected_minimum_answer_chars": 140
+    },
+    {
+      "id": "nhm2_corrective_followup",
+      "thread_group": "nhm2_document_conversation",
+      "category": "docs",
+      "prompt": "Does the paper actually prove a working warp drive? Correct the earlier explanation if it went too far.",
+      "notes": "Corrective follow-up must revisit evidence and avoid preserving an overclaim from conversation memory.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^(?:docs\\.search|docs-viewer\\.(?:identify_current_doc|open_doc_by_path|summarize_doc|locate_in_doc)|research-library\\.read_document)$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["no|not", "prove|demonstrat|validated", "warp"],
+      "expected_minimum_answer_chars": 120
+    },
+    {
+      "id": "workstation_status_natural",
+      "thread_group": "workstation_to_calculator",
+      "category": "workspace_status",
+      "prompt": "How is the workstation doing right now?",
+      "notes": "Start a cross-tool journey with a bounded workstation-state read.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^workspace_os\\.status$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["workstation|workspace", "status|available|healthy|blocked"],
+      "expected_minimum_answer_chars": 60
+    },
+    {
+      "id": "calculator_natural_followup",
+      "thread_group": "workstation_to_calculator",
+      "category": "calculator",
+      "prompt": "Good. Now calculate seventeen times nineteen and give me the checked result.",
+      "notes": "Cross-tool continuation must leave workstation status and admit calculator execution.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^scientific-calculator\\.(?:solve_expression|solve_scalar_expression)$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["323"],
+      "expected_minimum_answer_chars": 20
+    }
+  ]
+}

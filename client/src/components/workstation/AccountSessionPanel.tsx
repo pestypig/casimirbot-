@@ -1,5 +1,5 @@
 import React from "react";
-import { Archive, ChevronDown, Database, KeyRound, Languages, Link2, LogIn, LogOut, RefreshCw, ShieldCheck, UserCircle } from "lucide-react";
+import { Archive, ChevronDown, Database, FlaskConical, KeyRound, Languages, Link2, LogIn, LogOut, RefreshCw, ShieldCheck, UserCircle } from "lucide-react";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import {
@@ -273,6 +273,7 @@ export default function AccountSessionPanel() {
   const [categorizationJobs, setCategorizationJobs] = React.useState<CategorizationJobView[]>([]);
   const [postulateReceipts, setPostulateReceipts] = React.useState<ClaimablePostulateReceipt[]>([]);
   const [claimingPostulateId, setClaimingPostulateId] = React.useState<string | null>(null);
+  const [experimentalRoomsBusy, setExperimentalRoomsBusy] = React.useState(false);
   const { userSettings, updateSettings } = useHelixStartSettings();
   const memoryRegistrySnapshot = useWorkspaceMemoryRegistryStore((state) =>
     state.buildRegistrySnapshot(),
@@ -590,6 +591,42 @@ export default function AccountSessionPanel() {
 
   const session = status.session;
   const usage = status.usage;
+  const sharedRoomsExperiment = status.experimental_features?.shared_realtime_rooms;
+  const sharedRoomsEnabled = sharedRoomsExperiment?.enabled ??
+    Boolean(
+      status.account_policy?.feature_flags?.includes("shared_realtime_rooms") &&
+      !status.account_policy?.locked_features?.includes("shared_realtime_rooms"),
+    );
+  const sharedRoomsAvailable = sharedRoomsExperiment?.available ??
+    status.account_policy?.account_type === "developer";
+  const sharedRoomsDeveloperIncluded =
+    status.account_policy?.account_type === "developer";
+
+  const setSharedRoomsExperiment = React.useCallback(async (enabled: boolean) => {
+    setExperimentalRoomsBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/account/session/experimental-rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      const body = await response.json();
+      if (!response.ok || !body?.status) {
+        throw new Error(body?.message ?? `experimental rooms ${response.status}`);
+      }
+      const nextStatus = body.status as HelixAccountSessionStatus;
+      setStatus(nextStatus);
+      cacheAccountCapabilityPolicy(
+        nextStatus.account_policy ?? nextStatus.session?.account_policy ?? null,
+        nextStatus.session?.profile.profile_id ?? null,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update Shared Live Rooms.");
+    } finally {
+      setExperimentalRoomsBusy(false);
+    }
+  }, []);
 
   React.useEffect(() => {
     setProfileAttachConsentGranted(isProfileStorageAttachConsentGranted(session?.profile.profile_id));
@@ -712,11 +749,17 @@ export default function AccountSessionPanel() {
                     {t("account.session.memoryValue", { memory: displayMappedValue(t, session.memory_scope, memoryScopeMessages) })}
                   </span>
                   <span className="rounded bg-white/5 px-2 py-1">
-                    {t("account.session.authValue", { authMode: displayMappedValue(t, session.profile.auth_mode, authModeMessages) })}
+                    {t("account.session.authValue", {
+                      authMode: session.profile.auth_mode === "guest"
+                        ? "temporary guest"
+                        : displayMappedValue(t, session.profile.auth_mode, authModeMessages),
+                    })}
                   </span>
                   <span className="rounded bg-white/5 px-2 py-1">
                     {t("account.session.providerValue", {
-                      provider: displayMappedValue(t, session.profile.provider ?? "local", providerMessages),
+                      provider: session.profile.provider === "guest"
+                        ? "guest session"
+                        : displayMappedValue(t, session.profile.provider ?? "local", providerMessages),
                     })}
                   </span>
                   <span className="rounded bg-white/5 px-2 py-1">{t("account.session.agentPasswordsOff")}</span>
@@ -1335,6 +1378,82 @@ export default function AccountSessionPanel() {
             )}
           </div>
         </section>
+
+        <details className="mt-3 rounded-lg border border-fuchsia-300/15 bg-fuchsia-500/[0.04] p-3">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-fuchsia-100">
+            <span className="flex items-center gap-2">
+              <FlaskConical className="h-3.5 w-3.5" />
+              Experimental features
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 text-fuchsia-200/70" />
+          </summary>
+          <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-white">Shared Live Rooms</div>
+                <p className="mt-1 text-xs leading-5 text-slate-400">
+                  Join a two-person GPT Live room. Without a signed-in profile, this server creates
+                  a temporary Xbox-style guest name and session instead.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={sharedRoomsEnabled}
+                aria-label="Shared Live Rooms"
+                disabled={
+                  experimentalRoomsBusy ||
+                  sharedRoomsDeveloperIncluded ||
+                  !sharedRoomsAvailable
+                }
+                onClick={() => void setSharedRoomsExperiment(!sharedRoomsEnabled)}
+                className={`relative h-6 w-11 shrink-0 rounded-full border transition ${
+                  sharedRoomsEnabled
+                    ? "border-emerald-300/50 bg-emerald-400/30"
+                    : "border-white/20 bg-slate-800"
+                } disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                <span
+                  className={`absolute top-[3px] h-4 w-4 rounded-full bg-white transition ${
+                    sharedRoomsEnabled ? "left-[23px]" : "left-[3px]"
+                  }`}
+                />
+              </button>
+            </div>
+            <div className="mt-3 text-xs">
+              {!sharedRoomsAvailable ? (
+                <p className="text-amber-200">
+                  This deployment has not enabled public Shared Live Rooms testing.
+                </p>
+              ) : sharedRoomsDeveloperIncluded ? (
+                <p className="text-emerald-200">Included with developer access.</p>
+              ) : sharedRoomsEnabled && session?.profile.auth_mode === "guest" ? (
+                <div className="space-y-1">
+                  <p className="text-emerald-200">
+                    You appear as <span className="font-semibold">{session.profile.display_name}</span>.
+                  </p>
+                  <p className="text-slate-500">
+                    {sharedRoomsExperiment?.guest_hosting_allowed
+                      ? "This guest can create or join a room."
+                      : "This guest can join a one-time room invitation."}
+                    {sharedRoomsExperiment?.session_expires_at
+                      ? ` Session expires ${new Date(sharedRoomsExperiment.session_expires_at).toLocaleString()}.`
+                      : ""}
+                  </p>
+                </div>
+              ) : sharedRoomsEnabled ? (
+                <p className="text-emerald-200">Enabled for this account session.</p>
+              ) : (
+                <p className="text-slate-500">
+                  Off. Enabling this does not grant developer panels or permissions.
+                </p>
+              )}
+              {experimentalRoomsBusy ? (
+                <p className="mt-2 text-fuchsia-200">Updating Shared Live Rooms…</p>
+              ) : null}
+            </div>
+          </div>
+        </details>
 
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-slate-300">
           <div className="font-semibold uppercase tracking-[0.12em] text-slate-400">{t("account.boundary.title")}</div>

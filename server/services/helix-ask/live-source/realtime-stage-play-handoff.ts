@@ -14,6 +14,11 @@ import {
   resolveRealtimeTranscriptSourceTargetIntent,
 } from "../realtime-session/worker-admission";
 import type { HelixRuntimeGoalAccountScope } from "../runtime-goals/runtime-goal-account-binding";
+import {
+  deleteRealtimeStagePlayContextPack,
+  resetRealtimeStagePlayContextPacksForTests,
+  storeRealtimeStagePlayContextPack,
+} from "../realtime-session/context-pack-store";
 
 const handoffsById = new Map<string, HelixRealtimeStagePlayAskHandoffV1>();
 const handoffIdByProviderEventKey = new Map<string, string>();
@@ -44,6 +49,7 @@ const trimHandoffs = (): void => {
     .slice(0, handoffsById.size - MAX_HANDOFFS);
   for (const handoff of oldest) {
     handoffsById.delete(handoff.handoff_id);
+    deleteRealtimeStagePlayContextPack(handoff.handoff_id);
     handoffIdByProviderEventKey.delete(
       `${handoff.realtime_session_id}:${handoff.provider_event_ref}`,
     );
@@ -118,6 +124,18 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     transcriptText,
     sourceBinding: input.sourceBinding,
   });
+  const activeDocPath = readSafeString(
+    input.sourceBinding?.document_ref ??
+      input.sourceBinding?.active_doc_path ??
+      input.sourceBinding?.activeDocPath ??
+      input.sourceBinding?.doc_path,
+  );
+  const activePanel = readSafeString(
+    input.sourceBinding?.focus_panel_id ??
+      input.sourceBinding?.focused_panel_id ??
+      input.sourceBinding?.active_panel ??
+      input.sourceBinding?.activePanel,
+  );
   const workerAdmission = buildRealtimeTranscriptWorkerAdmission({
     handoffId,
     realtimeSessionId: input.realtimeSessionId,
@@ -175,6 +193,11 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     mailboxThreadId: input.threadId,
     handoffId,
     realtimeSessionId: input.realtimeSessionId,
+    stagePlayEventRef: stagePlayEvent.eventId,
+    contextPackId: contextPack.context_pack_id,
+    contextHash: contextPack.context_hash,
+    currentTranscriptTextHash: transcriptTextHash,
+    currentTranscriptTextCharCount: transcriptText.length,
     goalId: activeGoalBinding?.goal_id ?? null,
     runtimeGoalSessionRef: activeGoalBinding?.runtime_session_ref ?? null,
     boundRuntimeAgentProvider: activeGoalBinding?.runtime_agent_provider ?? null,
@@ -225,6 +248,8 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
       runtime_goal_session_ref: activeGoalBinding?.runtime_session_ref ?? null,
       runtime_agent_provider: workerAdmission.selected_runtime_agent_provider,
       realtime_worker_admission: workerAdmission,
+      active_doc_path: activeDocPath,
+      active_panel: activePanel,
       transcript_is_user_intent_after_admission: true,
       handoff_id: handoffId,
       realtime_session_id: input.realtimeSessionId,
@@ -276,6 +301,7 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     raw_content_included: false,
   };
   handoffsById.set(handoffId, handoff);
+  storeRealtimeStagePlayContextPack({ handoffId, contextPack });
   handoffIdByProviderEventKey.set(providerEventKey, handoffId);
   startRealtimeGroundedRelayForHandoff({
     handoff,
@@ -310,4 +336,5 @@ export const listRealtimeStagePlayAskHandoffs = (input: {
 export const resetRealtimeStagePlayAskHandoffsForTests = (): void => {
   handoffsById.clear();
   handoffIdByProviderEventKey.clear();
+  resetRealtimeStagePlayContextPacksForTests();
 };

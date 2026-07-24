@@ -312,16 +312,44 @@ const contextualForbiddenToolFamilies = (
 export const hasUnknownSourceArtifactDiscoveryIntent = (promptText: string): boolean => {
   const prompt = promptText.trim();
   if (!prompt) return false;
-  const retrievalAction =
-    /\b(?:find|locate|look\s+for|search\s+for|retrieve|get|pull\s+up|open|show|bring\s+up|read)\b/i.test(prompt);
+  if (
+    /\b(?:do\s+not|don't|dont|never|without|no\s+need\s+to)\b[\s\S]{0,80}\b(?:find|locate|look\s+for|search\s+for|retrieve|get|pull\s+up|open|show|bring\s+up|read)\b[\s\S]{0,120}\b(?:white\s*paper|whitepaper|paper|docs?|documents?|file|report|memo|artifact|source|note|path)\b/i.test(prompt)
+  ) {
+    return false;
+  }
+  if (
+    /\b(?:later|next\s+time|in\s+the\s+future|not\s+now|not\s+yet|eventually|hypothetically)\b[\s\S]{0,120}\b(?:find|locate|look\s+for|search\s+for|retrieve|get|pull\s+up|open|show|bring\s+up|read)\b/i.test(prompt)
+  ) {
+    return false;
+  }
+  if (
+    /^\s*(?:docs?\s+viewer|documents?\s+viewer|docs[-_. ]viewer)\s*:/i.test(prompt) &&
+    /\b(?:dynamic\s+actions?|capabilit(?:y|ies)|coverage|test\s+evidence|surface|well\s+represented|core\s+actions?)\b/i.test(prompt)
+  ) {
+    return false;
+  }
+  if (
+    /\b(?:screen|visible\s+text|label|button|debug|ui\s+text)\b[\s\S]{0,100}\b(?:says|shows|reads|contains|mentions)\b/i.test(prompt)
+  ) {
+    return false;
+  }
+  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  if (
+    contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer") ||
+    contextualToolSuppressionBlocksFamily(contextualSuppression, "repo_code")
+  ) {
+    return false;
+  }
   const artifactCue =
-    /\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|file|report|memo|artifact|source|note|path|where)\b/i.test(prompt);
+    /\b(?:white\s*paper|whitepaper|paper|docs?|documents?|file|report|memo|artifact|source|note|path|where)\b/i.test(prompt);
   const namedSubjectCue =
     /\b[A-Z][A-Z0-9-]{2,}\b/.test(prompt) ||
     /\b[A-Z][A-Za-z0-9-]{2,}\s+(?:theory|spec|design|paper|doc|report|memo|file)\b/.test(prompt);
+  const retrievalActionBeforeTarget =
+    /\b(?:find|locate|look\s+for|search\s+for|retrieve|get|pull\s+up|open|show|bring\s+up|read)\b[\s\S]{0,140}\b(?:white\s*paper|whitepaper|paper|docs?|documents?|file|report|memo|artifact|source|note|path|where|[A-Z][A-Z0-9-]{2,})\b/i.test(prompt);
   const explicitExternalScope =
     /\b(?:arxiv|doi|journal|peer[-\s]?reviewed|pubmed|openalex|semantic\s+scholar|crossref|citations?|bibliograph(?:y|ies)|published|web|internet|online|google|bing|scholarly\s+(?:paper|article|source)|research\s+papers?)\b/i.test(prompt);
-  return retrievalAction && (artifactCue || namedSubjectCue) && !explicitExternalScope;
+  return retrievalActionBeforeTarget && (artifactCue || namedSubjectCue) && !explicitExternalScope;
 };
 
 export function buildToolCallAdmissionDecision(input: {
@@ -487,6 +515,8 @@ export function buildToolCallAdmissionDecision(input: {
   const promptScholarlyResearchIntent = detectScholarlyResearchIntent(promptText);
   const promptInternetSearchIntent = detectInternetSearchIntent(promptText);
   const promptRepoCodeEvidenceIntent = detectRepoCodeEvidenceIntent(promptText);
+  const explicitRepoCodeScope =
+    /\b(?:repo(?:sitory)?|codebase|source\s+code|implementation|function|class|module|route|endpoint|file\s+path|line\s+number)\b/i.test(promptText);
   const promptScholarlyResearchRequested = promptScholarlyResearchIntent.researchRequested;
   const unresolvedSourceTarget =
     sourceTarget === "unknown" ||
@@ -874,6 +904,7 @@ export function buildToolCallAdmissionDecision(input: {
   if (
     promptRepoCodeEvidenceIntent.repoEvidenceRequested &&
     (!boundedLiveSourceTarget || promptRepoCodeEvidenceIntent.strength === "hard") &&
+    (effectiveSourceTarget !== "docs_viewer" || explicitRepoCodeScope) &&
     familyAllowed("repo_code")
   ) {
     compoundPromptFamilies.push("repo_code");

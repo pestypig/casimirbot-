@@ -51,6 +51,12 @@ const DISPATCH_KINDS = new Set([
   "ask_runtime_read_only",
 ]);
 
+const INTERACTION_MODES = new Set([
+  "conversation_local",
+  "parallel_conversation",
+  "worker_required",
+]);
+
 export const parseHelixRealtimeWorkerAdmissionV2 = (input: {
   value: unknown;
   handoffId: string;
@@ -59,11 +65,14 @@ export const parseHelixRealtimeWorkerAdmissionV2 = (input: {
   const admission = readRecord(input.value);
   const dispatch = readRecord(admission?.dispatch);
   const dispatchKind = readString(dispatch?.kind);
+  const interactionMode = readString(admission?.interaction_mode);
   if (
     admission?.schema !== "helix.realtime_worker_admission.v2" ||
     admission.handoff_id !== input.handoffId ||
     admission.realtime_session_id !== input.realtimeSessionId ||
     admission.decision_phase !== "transcript_handoff" ||
+    !interactionMode ||
+    !INTERACTION_MODES.has(interactionMode) ||
     admission.worker_turn_dispatched !== false ||
     admission.workstation_action_execution_allowed !== false ||
     admission.realtime_provider_tool_execution_allowed !== false ||
@@ -96,6 +105,9 @@ export const parseHelixRealtimeWorkerAdmissionV2 = (input: {
   if (
     (dispatchKind === "none" && (dispatch.requested !== false || dispatch.state !== "not_required")) ||
     (dispatchKind !== "none" && (dispatch.requested !== true || dispatch.state !== "requested")) ||
+    (interactionMode === "conversation_local" && dispatchKind !== "none") ||
+    (interactionMode === "parallel_conversation" && dispatchKind !== "ask_runtime") ||
+    (interactionMode === "worker_required" && dispatchKind === "none") ||
     (dispatchKind === "goal_wake" && !readString(dispatch.goal_id))
   ) {
     return null;

@@ -11,15 +11,21 @@ export function SharedLiveRoomVisualLanes({
   room,
   controller,
   sectionId,
+  onVisualSourceCaptureRequested,
 }: {
   room: HelixSharedRealtimeRoom;
   controller: HelixSharedLiveRoomController;
   sectionId: string;
+  onVisualSourceCaptureRequested?: () => void;
 }) {
   const lanes = useMemo(() => buildHelixSharedLiveRoomVisualLanes({
     room,
     frames: controller.frames,
   }), [controller.frames, room]);
+  const visualRouteAuthorized = Boolean(
+    controller.selfParticipant?.consent.screen_to_model ||
+    controller.selfParticipant?.consent.screen_thumbnail_to_room,
+  );
   return (
     <section aria-labelledby={sectionId} className="rounded-xl border border-cyan-300/15 bg-cyan-950/10 p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -33,6 +39,24 @@ export function SharedLiveRoomVisualLanes({
           {controller.frames.length} frames
         </span>
       </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={
+            !visualRouteAuthorized ||
+            !onVisualSourceCaptureRequested ||
+            controller.busyAction !== null
+          }
+          className="rounded-lg border border-cyan-300/30 px-3 py-2 text-[10px] font-semibold text-cyan-100 disabled:opacity-40"
+          onClick={onVisualSourceCaptureRequested}
+        >
+          Start selected Screen / Camera capture
+        </button>
+        <p className="text-[9px] leading-4 text-slate-500">
+          Choose Screen or Camera in the Ask toolbar first. Room capture uses this participant's
+          consent and does not start a second GPT Live call.
+        </p>
+      </div>
       <div className="mt-2 grid gap-3 sm:grid-cols-2">
         {lanes.map((lane) => (
           <article key={lane.participant.participant_id} className="min-w-0 rounded-lg border border-white/10 bg-black/25 p-2">
@@ -42,6 +66,14 @@ export function SharedLiveRoomVisualLanes({
               </p>
               <span className="text-[9px] text-slate-500">{lane.frames.length}</span>
             </div>
+            {lane.contextCard ? (
+              <p className="mt-1 text-[9px] text-cyan-100/70">
+                Context: {lane.contextCard.context_status}
+                {lane.contextCard.visual_sources[0]
+                  ? ` · ${lane.contextCard.visual_sources[0].source_label} · ${lane.contextCard.visual_sources[0].model_visibility}`
+                  : " · no frame observed"}
+              </p>
+            ) : null}
             {lane.latestFrame?.preview_data_url ? (
               <img
                 src={lane.latestFrame.preview_data_url}
@@ -79,6 +111,9 @@ export function SharedLiveRoomVisualLanes({
       </div>
       <p className="mt-2 text-[10px] text-slate-500">
         Local room ingress: {controller.frameUpload.status}
+        {controller.frameUpload.providerDelivery
+          ? ` · provider: ${controller.frameUpload.providerDelivery}`
+          : ""}
         {controller.frameUpload.sourceId ? ` · ${controller.frameUpload.sourceId}` : ""}
         {controller.frameUpload.error ? ` · ${controller.frameUpload.error}` : ""}
       </p>

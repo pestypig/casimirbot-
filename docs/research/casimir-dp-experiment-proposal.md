@@ -12,6 +12,7 @@
 **Manifold dynamics:** blocked pending a complete causal model  
 **Frozen config:** `configs/research/casimir-dp-proposal-closure.v1.json`  
 **Runnable closure report:** `docs/research/casimir-dp-proposal-closure-report.md`
+**OR/phase Stage-2 report:** `docs/research/casimir-dp-or-phase-stage2-report.md`
 
 ## Executive summary
 
@@ -68,6 +69,29 @@ Relevant levitation capabilities have been demonstrated separately:
 Together these results support a staged proposal, not an assertion that the
 integrated apparatus already exists.
 
+### OR motivation and the differential boundary test
+
+This proposal is motivated by Penrose objective reduction (OR), but it is not
+currently a direct differential test of the standard Penrose estimate. Penrose
+uses a branch-relative gravitational self-energy scale `E_G` and the
+order-of-magnitude relation `tau_OR~hbar/E_G`. The repository implements a
+Plummer-regularized weak-field counterpart from explicit material
+mass-density branches. At fixed branches, grid, and regularization, that
+registered estimator predicts no change when only the boundary label changes.
+
+The differential experiment therefore first tests ordinary boundary coupling
+and, separately, a possible future boundary-conditioned extension. It must not
+be described as a predicted modulation of the standard OR clock. An ambient
+gravitational field can create a large ordinary matter-wave phase when the two
+paths sample different potentials, but the shared field magnitude is not the
+DP self-energy. Similarly, classical gravitational-wave observations motivate
+precision phase instrumentation but do not establish quantum superposed
+geometries or objective reduction.
+
+Orch OR is outside the proposal scope. This apparatus has no microtubule,
+neuronal, anesthetic, or consciousness observable and cannot validate or
+falsify Orch OR as a complete biological theory.
+
 ## Central question and estimands
 
 The central experimental question is:
@@ -85,10 +109,45 @@ rate,
 -\Delta\Gamma_{surface}-\Delta\Gamma_{gas}-\Delta\Gamma_{opt/readout}.
 \]
 
+This seven-term form is the expanded version of the paper and Theory Badge
+four-bucket residual: `EM` aggregates electromagnetic, electrostatic, patch,
+and surface terms; `thermal` aggregates thermal, blackbody, and residual-gas
+terms; `mech` is unchanged; and `readout` includes optical readout and
+backaction. The frozen analysis must retain the expanded terms and their
+covariance even when a summary displays the four aggregate buckets.
+
 Secondary estimands are the interferometric phase, independently calibrated
 boundary-force contrast, coupled heat, and switching cross-correlation. The
 boundary coefficient is not called a collapse rate unless a registered model
 supplies the required observable map.
+
+The phase/visibility readout is
+
+\[
+P_\pm(b,t)=\frac12\left[
+1\pm V_b(t)\cos\!\left(\Delta\phi_b+\chi\right)\right],
+\qquad
+\Delta\phi_b=-\frac1\hbar\int
+\left[U_{b,A}(t)-U_{b,B}(t)\right]dt .
+\]
+
+The confirmatory phase residual is
+
+\[
+\Delta\phi_{res}
+=\Delta_b\phi_{obs}
+-\Delta\phi_{QED}
+-\Delta\phi_{electric}
+-\Delta\phi_{thermal}
+-\Delta\phi_{mechanical}
+-\Delta\phi_{readout}
+-\Delta\phi_{gravity}.
+\]
+
+A static boundary has a controlled state, not a phase with which the material
+superposition becomes "in phase." Four analysis phases reconstruct the
+quadratures, phase, and visibility. A phase shift and visibility decay are
+reported separately; neither is identified with collapse from readout alone.
 
 ## Frozen apparatus architecture
 
@@ -112,6 +171,17 @@ The normal Casimir-Polder interaction is common-mode to first order because the
 branches share the same surface distance. Lateral surface inhomogeneity,
 cross-axis trap coupling, charge, and state-dependent motion can still produce
 phase or decoherence and are measured rather than assumed absent.
+
+The same transverse geometry must be demonstrated relative to local gravity.
+For the nominal mass, separation, and observation time, a fully vertical branch
+separation would accumulate approximately `7.23e8 rad` of ordinary
+gravitational phase. Limiting a boundary-correlated contribution to `0.1 rad`
+requires about `2.77e-18 m` vertical-projection stability, equivalent in the
+small-angle limit to `1.38e-10 rad` of correlated tilt. Absolute common-mode
+phase may cancel, but boundary-correlated orientation, vibration, or
+state-expansion displacement must be measured with independent phase-reference
+and acceleration sidecars. The existing general alignment target does not by
+itself close this control.
 
 Using the literature silica/silicon retarded reference at 5 micrometres gives
 approximately
@@ -195,6 +265,13 @@ The phase-noise target of 0.1 rad corresponds to differential-force noise below
 reversal, and direct nuisance measurement hard gates rather than descriptive
 best practices.
 
+The pilot must also acquire a boundary-correlated branch-orientation time
+series, local acceleration/vibration transfer function, vertical
+state-expansion calibration, and paired phase-reference drift sidecar. The
+target is not merely a small average tilt: the on-minus-off vertical projection
+must be bounded at the Stage-2 phase-equivalent level. This is an ordinary
+gravity-phase requirement, not an OR prediction.
+
 ### Aim 4: conduct the blinded boundary pilot and powered main run
 
 The independent custodian randomizes boundary labels. A 400-paired-window pilot
@@ -260,7 +337,8 @@ Required robustness analyses include:
 - cold-start reproduction from raw artifacts.
 
 The rate-only DP estimate is not used to power the experiment because the
-current design estimate requires approximately `1e17` shots per boundary
+corrected centered-grid Stage-1 design estimate requires approximately
+`1.60e15` shots per boundary
 setting and cannot identify collapse. The powered cross-correlation lane is a
 systematics and dynamics discriminator, not a collapse detector.
 
@@ -273,6 +351,17 @@ Five model roles remain separate:
 - rigid-sphere DP rate-only diagnostic;
 - source-backed collapse dynamics, currently missing;
 - boundary-conditioned manifold dynamics, currently missing.
+
+For interpretation, these five roles reduce to three non-competing
+plausibility lanes: the computable QED/open-system baseline, the diagnostic
+OR/DP branch-instability model, and the blocked boundary-conditioned spacetime
+extension. No numerical plausibility score is assigned. The third lane remains
+blocked until a source-backed renormalized stress/noise prescription, causal
+metric-response kernel, gauge contract, metric-to-coherence dynamics,
+consistency/recovery proof, parameter manifest, and falsifiers are registered.
+The repository's generic ability to convert signed scalar stress or energy
+density into a DP input is not accepted as that bridge; it omits the required
+tensor dynamics and observable transfer.
 
 The registered outcomes are:
 
@@ -333,3 +422,13 @@ sensitivity. The Casimir verifier certifies repository constraint execution,
 not the physical hypothesis. Measured evidence, finite-geometry boundary
 contrast, collapse identification, and manifold dynamics remain open until the
 artifacts named by their respective gates actually exist.
+
+The OR/phase Stage-2 runtime passes its upstream-hash, DP algebra,
+pairwise/potential equivalence, branch-sampling, fixed-branch null, and
+phase/interference software checks. It also records that the Stage-1 sphere is
+not the frozen proposal sphere, runs a proposal-specific resolution sweep, and
+freezes the perturbation grid. Proposal convergence, branch provenance,
+experimental bounds, sub-voxel perturbation sensitivity, the phase uncertainty
+model, and measured phase/coherence are `not_ready`; collapse identification
+and manifold dynamics remain `blocked`. That combination is the current
+proposal standing.

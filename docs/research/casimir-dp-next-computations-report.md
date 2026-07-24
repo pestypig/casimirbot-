@@ -1,8 +1,8 @@
 # Casimir-DP Gated Computations Stage-1 Report
 
-**Campaign:** `casimir-dp-gated-computations-stage1-v1`  
-**Generated:** 2026-07-21T15:16:59.882Z  
-**Claim tier:** diagnostic  
+**Campaign:** `casimir-dp-gated-computations-stage1-v1`<br>
+**Generated:** 2026-07-23T21:44:42.166Z<br>
+**Claim tier:** diagnostic<br>
 **Promotion allowed:** false
 
 ## Lifshitz calculation
@@ -27,20 +27,24 @@
 
 ## Rigid-sphere DP convergence
 
-| Requested grid | Used grid | Delta E (J) | Rate (s^-1) | Change from prior | Provenance |
-|---:|---|---:|---:|---:|---|
-| 12 | 12x12x12 | 2.6549e-41 | 2.5175e-7 | n/a | inferred |
-| 14 | 14x14x14 | 1.7919e-41 | 1.6992e-7 | 0.481590 | inferred |
-| 16 | 16x16x16 | 1.5267e-41 | 1.4477e-7 | 0.173728 | inferred |
+| Requested grid | Used grid | Delta E (J) | Rate (s^-1) | Change from prior | Max mass error | Max boundary-shell fraction | Provenance |
+|---:|---|---:|---:|---:|---:|---:|---|
+| 12 | 12x12x12 | 2.2291e-40 | 2.1137e-6 | n/a | 0.035639 | 0.000000 | inferred |
+| 14 | 14x14x14 | 1.7473e-40 | 1.6568e-6 | 0.275773 | 0.037560 | 0.000000 | inferred |
+| 16 | 16x16x16 | 1.2511e-40 | 1.1864e-6 | 0.396578 | 0.012837 | 0.000000 | inferred |
 
-- Numerical convergence gate: `pass`
+- Mass-conservation gate: `pass`
+- Branch-symmetry gate: `pass`
+- Boundary-containment gate: `pass`
+- Branch-sampling gate: `pass`
+- Numerical convergence gate: `not_ready`
 - Branch provenance gate: `not_ready`
-- Selected tau: `6.9074e+6 s`
+- Selected tau: `8.4292e+5 s`
 
 ## Statistical power and dynamics discrimination
 
-- Rate-only shots per setting: `1.0774e+17`
-- Total shots: `2.1548e+17`
+- Rate-only shots per setting: `1.6044e+15`
+- Total shots: `3.2088e+15`
 - Rate-only accessibility: `not_ready`
 - Dynamics signature: `blocked`
 - Collapse-identifiability gate: `blocked`
@@ -62,7 +66,7 @@ Status: `blocked`. No manifold-response rate is computed.
 - `publication_grade_casimir_solver`: `not_ready`
 - `measured_switching_sidecar`: `not_ready`
 - `measured_decoherence_budget`: `not_ready`
-- `realistic_dp_numerical_convergence`: `pass`
+- `realistic_dp_numerical_convergence`: `not_ready`
 - `realistic_dp_branch_receipts`: `not_ready`
 - `statistical_accessibility`: `not_ready`
 - `collapse_identifiability`: `blocked`

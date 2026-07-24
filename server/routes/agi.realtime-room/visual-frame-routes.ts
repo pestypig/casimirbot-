@@ -6,6 +6,7 @@ import { listSharedRealtimeRoomVisualFrames } from
 import { ingestSharedRealtimeRoomVisualFrame } from
   "../../services/helix-ask/realtime-room/visual-frame-ingress";
 import {
+  readAuthorizedRoom,
   readMembership,
   requirePresent,
   requireSharedRoomAccount,
@@ -38,8 +39,10 @@ sharedRealtimeRoomVisualFrameRouter.post(
     const account = await requireSharedRoomAccount(req);
     const membership = await readMembership(req.params.roomId, account);
     requirePresent(membership);
+    const room = await readAuthorizedRoom(req.params.roomId, account);
     const ingress = ingestSharedRealtimeRoomVisualFrame({
       roomId: req.params.roomId,
+      room,
       membership,
       payload: req.body,
     });

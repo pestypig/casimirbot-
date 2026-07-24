@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import {
   HELIX_REALTIME_WORKER_ADMISSION_V2_SCHEMA,
   HELIX_REALTIME_WORKER_DISPATCH_V2_SCHEMA,
+  type HelixRealtimeInteractionModeV2,
   type HelixRealtimeWorkerAdmissionOutcomeV2,
   type HelixRealtimeWorkerAdmissionV2,
   type HelixRealtimeWorkerDispatchKindV2,
@@ -11,6 +12,7 @@ import type { HelixRealtimeStagePlayGoalBindingV1 } from "@shared/contracts/heli
 import type { HelixAskSourceTargetIntent } from "@shared/helix-ask-source-target-intent";
 import { readWorkstationGatewayCallRequestsForTurn } from "../agent-providers/explicit-workstation-gateway";
 import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
+import { buildActiveWorkspaceSourceResolution } from "../active-workspace-source-resolution";
 import { buildHelixIntentHypotheses } from "../intent-hypothesis";
 import { arbitrateHelixIntent } from "../intent-arbitration";
 import { isHelixAskClarifyRescueGreetingOnlyQuestion } from "../policy/clarify-rescue";
@@ -55,14 +57,16 @@ export const resolveRealtimeTranscriptSourceTargetIntent = (input: {
   sourceBinding?: RecordLike | null;
 }): HelixAskSourceTargetIntent => {
   const workspaceSnapshot = workspaceSnapshotFromBinding(input.sourceBinding);
+  const activeWorkspaceSourceResolution = buildActiveWorkspaceSourceResolution({
+    turnId: input.handoffId,
+    promptText: input.transcriptText,
+    workspaceSnapshot,
+  });
   return arbitrateAskSourceTarget({
     turnId: input.handoffId,
     threadId: input.threadId,
     promptText: input.transcriptText,
-    activeWorkspaceSourceResolution: {
-      active_panel_id: workspaceSnapshot.activePanel,
-      active_doc_path: workspaceSnapshot.activeDocPath,
-    },
+    activeWorkspaceSourceResolution,
   });
 };
 
@@ -75,16 +79,60 @@ const capabilityIdsByMode = (
   return capabilityId && modes.has(mode) ? [capabilityId] : [];
 }));
 
+const isDocsReadCapability = (capabilityId: string): boolean =>
+  capabilityId === "docs.search" || capabilityId.startsWith("docs-viewer.");
+
+const bindReadonlyCapabilitiesToSourceTarget = (input: {
+  sourceTargetIntent: HelixAskSourceTargetIntent;
+  capabilityIds: string[];
+}): string[] => {
+  if (
+    input.sourceTargetIntent.target_source !== "docs_viewer" &&
+    input.sourceTargetIntent.target_source !== "active_doc"
+  ) {
+    return input.capabilityIds;
+  }
+  const docsCapabilities = input.capabilityIds.filter(isDocsReadCapability);
+  if (docsCapabilities.length > 0) return unique(docsCapabilities);
+  if (
+    input.sourceTargetIntent.strength === "hard" &&
+    input.sourceTargetIntent.allow_no_tool_direct === false
+  ) {
+    return ["docs.search"];
+  }
+  return [];
+};
+
 const unquoteWorkspacePrompt = (prompt: string): string =>
   prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
 
 const hasWorkspacePanelMention = (prompt: string): boolean =>
   /\b(?:panel|workspace|workstation|tab|dock)\b/i.test(prompt);
 
+const isRealtimeConversationCheck = (prompt: string): boolean => {
+  const normalized = unquoteWorkspacePrompt(prompt)
+    .replace(/^\s*(?:(?:okay|ok|hey|hello|hi|please)\b\s*[,.!?]?\s*)+/i, "")
+    .trim();
+  if (!normalized) return true;
+  return /^(?:(?:can|could|do)\s+you\s+hear\s+me|you\s+(?:can|could)\s+hear\s+me|(?:are|can)\s+you\s+(?:hearing|listening\s+to)\s+me|is\s+(?:my\s+)?(?:mic|microphone|audio|voice)\s+(?:on|working|coming\s+through)|(?:my\s+)?(?:mic|microphone|audio|voice)\s+is\s+(?:now\s+)?(?:on|enabled|working|coming\s+through)|i(?:'ve|\s+have|\s+just)?\s+(?:turned|switched)\s+(?:my\s+)?(?:mic|microphone|audio|voice)\s+on|i(?:'ve|\s+have|\s+just)?\s+(?:enabled|unmuted)\s+(?:my\s+)?(?:mic|microphone|audio|voice)|can\s+you\s+see\s+me|is\s+this\s+(?:thing\s+)?working|test(?:ing)?(?:\s+(?:one|1)(?:\s+(?:two|2))?)?)[?.!\s]*$/i.test(normalized);
+};
+
+const isRealtimeConversationFragment = (prompt: string): boolean => {
+  const normalized = unquoteWorkspacePrompt(prompt)
+    .toLowerCase()
+    .replace(/[^a-z0-9'\s-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return false;
+  return /^(?:ok|okay|yes|yeah|yep|no|nope|right|sure|great|good|cool|fine|thanks|thank you|got it|understood|(?:that\s+)?makes sense|all right|alright|i see|mhm|mm hmm|uh huh|hmm)$/.test(
+    normalized,
+  );
+};
+
 const hasAffirmativeWorkspacePanelWorkerDemand = (prompt: string): boolean => {
   if (isActiveWorkstationContextPrompt(prompt)) return true;
   const unquoted = unquoteWorkspacePrompt(prompt)
-    .replace(/^\s*(?:(?:ok|okay|please)\s*[,.]?\s*)+/i, "")
+    .replace(/^\s*(?:(?:okay|ok|please)\b\s*[,.]?\s*)+/i, "")
     .trim();
   if (!unquoted) return false;
   const panelTarget = String.raw`\b(?:panel|workspace|workstation|tab|dock)\b`;
@@ -107,6 +155,7 @@ const buildAdmission = (input: {
   threadId: string;
   decisionPhase: HelixRealtimeWorkerAdmissionV2["decision_phase"];
   outcome: HelixRealtimeWorkerAdmissionOutcomeV2;
+  interactionMode: HelixRealtimeInteractionModeV2;
   reasonCodes: string[];
   primaryIntent?: string | null;
   selectedRoute?: string | null;
@@ -140,6 +189,7 @@ const buildAdmission = (input: {
       input.handoffId,
       input.decisionPhase,
       input.outcome,
+      input.interactionMode,
       input.candidateReadonlyCapabilityIds,
       input.observedReadonlyCapabilityIds,
     ]).slice(0, 20)}`,
@@ -148,6 +198,7 @@ const buildAdmission = (input: {
     thread_id: input.threadId,
     decision_phase: input.decisionPhase,
     outcome: input.outcome,
+    interaction_mode: input.interactionMode,
     reason_codes: unique(input.reasonCodes),
     selected_primary_intent: input.primaryIntent ?? null,
     selected_route: input.selectedRoute ?? null,
@@ -236,10 +287,15 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
   } catch {
     plannerFailed = true;
   }
-  const readonlyCapabilityIds = capabilityIdsByMode(requests, new Set(["read", "observe"]));
+  const readonlyCapabilityIds = bindReadonlyCapabilitiesToSourceTarget({
+    sourceTargetIntent,
+    capabilityIds: capabilityIdsByMode(requests, new Set(["read", "observe"])),
+  });
   const actionCapabilityIds = capabilityIdsByMode(requests, new Set(["act"]));
   const primaryIntent = arbitration.selected_primary_intent_kind;
   const greetingOnly = isHelixAskClarifyRescueGreetingOnlyQuestion(input.transcriptText);
+  const conversationCheck = isRealtimeConversationCheck(input.transcriptText);
+  const conversationFragment = isRealtimeConversationFragment(input.transcriptText);
   const sourceTargetRequiresEvidence =
     sourceTargetIntent.target_source !== "unknown" &&
     sourceTargetIntent.target_source !== "model_only" &&
@@ -253,15 +309,34 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
     sourceTargetRequiresEvidence && !workspacePanelFragmentWithoutWorkerDemand;
   const admittedControlCommand =
     primaryIntent === "control_command" && !workspacePanelFragmentWithoutWorkerDemand;
+  const conversationLocal =
+    greetingOnly ||
+    conversationCheck ||
+    conversationFragment ||
+    workspacePanelFragmentWithoutWorkerDemand;
+  const workerRequired = Boolean(input.activeGoalBinding) ||
+    actionCapabilityIds.length > 0 ||
+    admittedControlCommand ||
+    readonlyCapabilityIds.length > 0 ||
+    admittedSourceTargetRequiresEvidence ||
+    (primaryIntent !== "general_reasoning" && !conversationLocal);
+  const selectedRuntimeShouldReceiveTurn = Boolean(input.selectedRuntimeAgentProvider) &&
+    !conversationLocal;
+  const runtimeTurnRequired = workerRequired || selectedRuntimeShouldReceiveTurn;
+  const interactionMode: HelixRealtimeInteractionModeV2 = conversationLocal
+    ? "conversation_local"
+    : workerRequired
+      ? "worker_required"
+      : selectedRuntimeShouldReceiveTurn
+        ? "parallel_conversation"
+        : "conversation_local";
   const outcome: HelixRealtimeWorkerAdmissionOutcomeV2 = input.activeGoalBinding
     ? "durable_goal_bound"
     : actionCapabilityIds.length > 0 || admittedControlCommand
       ? "action_candidate"
-      : greetingOnly
+      : conversationLocal
         ? "conversation_local"
-        : readonlyCapabilityIds.length > 0 ||
-            admittedSourceTargetRequiresEvidence ||
-            (primaryIntent !== "general_reasoning" && !workspacePanelFragmentWithoutWorkerDemand)
+        : runtimeTurnRequired
         ? "worker_grounded"
         : "conversation_local";
   const reasonCodes = [
@@ -278,6 +353,11 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
       ? "realtime_workspace_panel_fragment_without_affirmative_request"
       : null,
     greetingOnly ? "ask_smalltalk_greeting_only_policy" : null,
+    conversationCheck ? "realtime_conversation_check_local" : null,
+    conversationFragment ? "realtime_conversation_fragment_local" : null,
+    interactionMode === "worker_required" ? "realtime_worker_result_required" : null,
+    interactionMode === "parallel_conversation" ? "realtime_parallel_conversation" : null,
+    selectedRuntimeShouldReceiveTurn ? "selected_runtime_receives_substantive_utterance" : null,
     primaryIntent !== "general_reasoning" ? `intent_${primaryIntent}` : "intent_general_reasoning",
     plannerFailed ? "normal_ask_gateway_policy_unavailable" : null,
   ].filter((entry): entry is string => Boolean(entry));
@@ -287,6 +367,7 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
     threadId: input.threadId,
     decisionPhase: "transcript_handoff",
     outcome,
+    interactionMode,
     reasonCodes,
     primaryIntent,
     selectedRoute: sourceTargetIntent.target_source,
@@ -363,28 +444,55 @@ export const resolveRealtimeFinalWorkerAdmission = (input: {
   const greetingOnlyPolicy = input.preliminary.reason_codes.includes(
     "ask_smalltalk_greeting_only_policy",
   );
+  const conversationLocalPolicy =
+    input.preliminary.outcome === "conversation_local" &&
+    input.preliminary.interaction_mode === "conversation_local" &&
+    input.preliminary.dispatch.requested === false;
+  const hasActionCandidate =
+    input.preliminary.outcome === "action_candidate" ||
+    input.preliminary.action_candidate_capability_ids.length > 0;
+  const hasGroundedReadonlyObservation = observedCapabilities.length > 0;
+  const selectedRuntimeSubstantiveTurn = input.preliminary.reason_codes.includes(
+    "selected_runtime_receives_substantive_utterance",
+  );
+  const readonlyObservationOverridesIntentLabel =
+    primaryIntent === "control_command" &&
+    !hasActionCandidate &&
+    hasGroundedReadonlyObservation;
   const outcome: HelixRealtimeWorkerAdmissionOutcomeV2 =
     input.preliminary.outcome === "durable_goal_bound"
       ? "durable_goal_bound"
-      : input.preliminary.outcome === "action_candidate" || primaryIntent === "control_command"
+      : hasActionCandidate
         ? "action_candidate"
-        : greetingOnlyPolicy
+        : conversationLocalPolicy
           ? "conversation_local"
-          : observedCapabilities.length > 0
+          : hasGroundedReadonlyObservation
             ? "worker_grounded"
-            : "conversation_local";
+            : selectedRuntimeSubstantiveTurn && input.preliminary.outcome === "worker_grounded"
+              ? "worker_grounded"
+              : primaryIntent === "control_command"
+                ? "action_candidate"
+                : "conversation_local";
   return buildAdmission({
     handoffId: input.preliminary.handoff_id,
     realtimeSessionId: input.preliminary.realtime_session_id,
     threadId: input.preliminary.thread_id,
     decisionPhase: "solver_final",
     outcome,
+    interactionMode: input.preliminary.interaction_mode,
     reasonCodes: [
       ...input.preliminary.reason_codes,
       observedCapabilities.length > 0
         ? "completed_solver_has_readonly_gateway_observation"
         : "completed_solver_has_no_readonly_gateway_observation",
       greetingOnlyPolicy ? "ask_smalltalk_greeting_only_policy_retained" : null,
+      conversationLocalPolicy ? "conversation_local_admission_retained" : null,
+      readonlyObservationOverridesIntentLabel
+        ? "control_command_label_overridden_by_readonly_observation"
+        : null,
+      selectedRuntimeSubstantiveTurn && observedCapabilities.length === 0
+        ? "selected_runtime_model_turn_completed_without_gateway_observation"
+        : null,
       outcome === "conversation_local" ? "delayed_spoken_relay_suppressed" : null,
       outcome === "action_candidate" ? "read_only_realtime_action_execution_forbidden" : null,
     ].filter((entry): entry is string => Boolean(entry)),

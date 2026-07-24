@@ -19,6 +19,7 @@ import type {
 
 type SimulatorMode =
   | "normal"
+  | "docs"
   | "compound"
   | "tool_before_route"
   | "forbidden_item"
@@ -85,7 +86,9 @@ class FakeCodexAppServer implements CodexAppServerTransport {
               turnId: "turn:fake",
               callId: "call:capability",
               tool: this.capabilityToolNames[0],
-              arguments: {},
+              arguments: this.mode === "docs"
+                ? { query: "NHM2", paths: ["docs"] }
+                : {},
             },
           });
         }
@@ -110,7 +113,9 @@ class FakeCodexAppServer implements CodexAppServerTransport {
     }
     if ((message.id === 101 || message.id === 102) && message.result) {
       queueMicrotask(() => {
-        this.finish("The workstation status observation was re-entered in this turn.");
+        this.finish(this.mode === "docs"
+          ? "The Docs observation was re-entered before this answer."
+          : "The workstation status observation was re-entered in this turn.");
       });
     }
   }
@@ -187,15 +192,19 @@ class FakeCodexAppServer implements CodexAppServerTransport {
           proposal_id: "ask:test:native:proposal",
           prompt_hash: "prompt:test",
           proposal_source: "agent_runtime",
-          proposed_route: "workspace_status",
-          proposed_tool_family: "workspace",
-          proposed_capability_id: "workspace_os.status",
+          proposed_route: this.mode === "docs" ? "docs_viewer" : "workspace_status",
+          proposed_tool_family: this.mode === "docs" ? "docs_viewer" : "workspace",
+          proposed_capability_id: this.mode === "docs" ? "docs.search" : "workspace_os.status",
           proposed_capability_ids: this.mode === "compound"
             ? ["workspace_os.status", "scientific-calculator.solve_expression"]
-            : ["workspace_os.status"],
+            : this.mode === "docs"
+              ? ["docs.search"]
+              : ["workspace_os.status"],
           confidence: "high",
           uncertainty: [],
-          reason_summary: "The prompt explicitly asks for current workstation status.",
+          reason_summary: this.mode === "docs"
+            ? "The prompt explicitly requires a current Docs observation."
+            : "The prompt explicitly asks for current workstation status.",
           supporting_hint_refs: [],
         },
       },
@@ -234,6 +243,14 @@ const calculatorManifest = () => {
   return manifest;
 };
 
+const docsSearchManifest = () => {
+  const manifest = listWorkstationGatewayCapabilities({ mode: "read" }).capabilities.find(
+    (capability) => capability.capability_id === "docs.search",
+  );
+  if (!manifest) throw new Error("docs.search manifest is required for this test");
+  return manifest;
+};
+
 const validateRoute = (value: unknown): CodexNativeRouteAdmission => {
   const proposal = normalizeHelixRuntimeSemanticRouteProposal({
     value,
@@ -250,6 +267,32 @@ const validateRoute = (value: unknown): CodexNativeRouteAdmission => {
         ok: true,
         proposal,
         admittedCapabilityIds: ["workspace_os.status"],
+        reason: "route_capability_admitted",
+      }
+    : {
+        ok: false,
+        proposal,
+        admittedCapabilityIds: [],
+        reason: "invalid_route_proposal",
+      };
+};
+
+const validateDocsRoute = (value: unknown): CodexNativeRouteAdmission => {
+  const proposal = normalizeHelixRuntimeSemanticRouteProposal({
+    value,
+    turnId: "ask:test:native",
+    promptHash: "prompt:test",
+    dependencies: {
+      readString: (entry) =>
+        typeof entry === "string" && entry.trim() ? entry.trim() : null,
+      hashPayloadShort: () => "test-hash",
+    },
+  });
+  return proposal?.proposed_capability_id === "docs.search"
+    ? {
+        ok: true,
+        proposal,
+        admittedCapabilityIds: ["docs.search"],
         reason: "route_capability_admitted",
       }
     : {
@@ -439,6 +482,74 @@ describe("Codex native app-server turn", () => {
         },
       ],
       sandboxPolicy: { type: "readOnly", networkAccess: false },
+    });
+  });
+
+  it("executes and re-enters docs.search before accepting the Docs terminal candidate", async () => {
+    const transport = new FakeCodexAppServer("docs");
+    const executeCapability = vi.fn(async () => ({
+      ok: true,
+      content: {
+        schema: "helix.docs_search_observation.v1",
+        query: "NHM2",
+        hit_count: 2,
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+      observationRef: "ask:test:native:docs.search:observation",
+    }));
+
+    const result = await runCodexNativeAppServerTurnWithTransport(
+      {
+        prompt:
+          "Search our docs for NHM2 and summarize its treatment of boundary conditions.",
+        turnId: "ask:test:native",
+        cwd: process.cwd(),
+        capabilities: [docsSearchManifest()],
+        validateRouteProposal: validateDocsRoute,
+        executeCapability,
+        timeoutMs: 2_000,
+      },
+      transport,
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      answer: "The Docs observation was re-entered before this answer.",
+      debug: {
+        model_visible_tools: ["docs.search"],
+        route_admitted_tools: ["docs.search"],
+        requested_tools: ["docs.search"],
+        executed_tools: ["docs.search"],
+        successful_tools: ["docs.search"],
+        route_unobserved_tools: [],
+        observation_reentry_refs: [
+          "ask:test:native:docs.search:observation",
+        ],
+        terminal_candidate_present: true,
+        turn_lifecycle: {
+          authority: "runtime_event_log",
+          reduction: {
+            complete: true,
+            post_observation_reasoning_completed: true,
+            observation_reentry_refs: [
+              "ask:test:native:docs.search:observation",
+            ],
+          },
+          integrity: {
+            ok: true,
+            violations: [],
+          },
+        },
+      },
+    });
+    expect(executeCapability).toHaveBeenCalledWith({
+      capabilityId: "docs.search",
+      arguments: {
+        query: "NHM2",
+        paths: ["docs"],
+      },
+      iteration: 1,
     });
   });
 

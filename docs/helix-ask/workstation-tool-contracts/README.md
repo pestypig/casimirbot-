@@ -256,6 +256,9 @@ Each capability contract should define:
 | `research-library.apply_evidence_enrichment` | [research-library.apply_evidence_enrichment.md](research-library.apply_evidence_enrichment.md) | `draft` |
 | `theory-badge-graph.reflect_discussion_context` | [theory-badge-graph.reflect_discussion_context.md](theory-badge-graph.reflect_discussion_context.md) | `candidate` |
 | `theory-badge-graph.propose_frontier_conjectures` | [theory-badge-graph.propose_frontier_conjectures.md](theory-badge-graph.propose_frontier_conjectures.md) | `draft` |
+| `theory-formal-verifier.plan` | [theory-formal-verifier.md](theory-formal-verifier.md) | `draft` |
+| `theory-formal-verifier.start` | [theory-formal-verifier.md](theory-formal-verifier.md) | `draft` |
+| `theory-formal-verifier.read_result` | [theory-formal-verifier.md](theory-formal-verifier.md) | `draft` |
 | `moral-graph.reflect_context` | [moral-graph.reflect_context.md](moral-graph.reflect_context.md) | `draft` |
 | `moral-graph.reflect_living_substrate_context` | [moral-graph.reflect_living_substrate_context.md](moral-graph.reflect_living_substrate_context.md) | `candidate` |
 | `civilization-bounds.reflect_system_bounds` | [civilization-bounds.reflect_system_bounds.md](civilization-bounds.reflect_system_bounds.md) | `candidate` |

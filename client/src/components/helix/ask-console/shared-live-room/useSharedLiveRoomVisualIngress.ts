@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  HelixSharedRealtimeRoomFrameDelivery,
   HelixSharedRealtimeRoomVisualFrame,
+  HelixSharedRealtimeRoomVisualFrameReceipt,
   HelixSharedRealtimeRoomVisualSourceSurface,
 } from "@shared/helix-shared-realtime-room";
 import {
@@ -15,10 +17,17 @@ const LOCAL_FRAME_MAX_UPLOAD_ATTEMPTS = 2;
 const LOCAL_FRAME_RETRY_DELAY_MS = 1_250;
 
 export type HelixSharedLiveRoomFrameUploadState = {
-  status: "idle" | "uploading" | "sent" | "error";
+  status:
+    | "idle"
+    | "uploading"
+    | "provider_ack_pending"
+    | "model_provider_acknowledged"
+    | "panel_only"
+    | "error";
   sourceId: string | null;
   historyId: string | null;
   observedAt: string | null;
+  providerDelivery: HelixSharedRealtimeRoomFrameDelivery | null;
   error: string | null;
 };
 
@@ -27,12 +36,41 @@ const initialFrameUploadState = (): HelixSharedLiveRoomFrameUploadState => ({
   sourceId: null,
   historyId: null,
   observedAt: null,
+  providerDelivery: null,
   error: null,
 });
 
 const safeErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message.trim()) return error.message.trim().slice(0, 360);
   return "Shared Live Room frame upload failed.";
+};
+
+export const projectSharedLiveRoomFrameDelivery = (input: {
+  receipt: HelixSharedRealtimeRoomVisualFrameReceipt | null;
+  frames: HelixSharedRealtimeRoomVisualFrame[];
+}): Pick<HelixSharedLiveRoomFrameUploadState, "status" | "providerDelivery" | "error"> => {
+  const listedFrame = input.receipt?.frame_ref
+    ? input.frames.find((candidate) => candidate.frame_ref === input.receipt?.frame_ref) ?? null
+    : null;
+  const providerDelivery = input.receipt?.provider_delivery === "duplicate"
+    ? listedFrame?.provider_delivery ?? "duplicate"
+    : input.receipt?.provider_delivery ?? "sideband_unavailable";
+  if (providerDelivery === "sent_to_shared_model") {
+    return { status: "model_provider_acknowledged", providerDelivery, error: null };
+  }
+  if (providerDelivery === "transport_sent") {
+    return { status: "provider_ack_pending", providerDelivery, error: null };
+  }
+  return {
+    status: "panel_only",
+    providerDelivery,
+    error:
+      providerDelivery === "sideband_unavailable"
+        ? "The room received the frame, but the GPT Live sideband was unavailable."
+        : providerDelivery === "provider_rejected"
+          ? "GPT Live rejected the room frame before acknowledging its input image."
+          : null,
+  };
 };
 
 const isRecentFrame = (frame: VisualSourceCaptureFrameHistoryItem): boolean => {
@@ -98,6 +136,7 @@ export function useSharedLiveRoomVisualIngress(input: {
   api: HelixSharedLiveRoomApi;
   roomId: string | null;
   enabled: boolean;
+  modelTransportBound: boolean;
   onFrames(frames: HelixSharedRealtimeRoomVisualFrame[]): void;
 }): {
   frameUpload: HelixSharedLiveRoomFrameUploadState;
@@ -105,6 +144,7 @@ export function useSharedLiveRoomVisualIngress(input: {
 } {
   const [frameUpload, setFrameUpload] = useState(initialFrameUploadState);
   const uploadedFrameKeysRef = useRef(new Set<string>());
+  const deferredUntilRuntimeBoundKeysRef = useRef(new Set<string>());
   const inFlightFrameKeysRef = useRef(new Set<string>());
   const frameUploadAttemptsRef = useRef(new Map<string, number>());
   const frameSequenceRef = useRef(0);
@@ -112,6 +152,7 @@ export function useSharedLiveRoomVisualIngress(input: {
   const resetVisualIngress = useCallback((): void => {
     setFrameUpload(initialFrameUploadState());
     uploadedFrameKeysRef.current.clear();
+    deferredUntilRuntimeBoundKeysRef.current.clear();
     inFlightFrameKeysRef.current.clear();
     frameUploadAttemptsRef.current.clear();
     frameSequenceRef.current = 0;
@@ -120,6 +161,12 @@ export function useSharedLiveRoomVisualIngress(input: {
   useEffect(() => {
     if (!input.roomId || !input.enabled) return;
     const roomId = input.roomId;
+    if (input.modelTransportBound && deferredUntilRuntimeBoundKeysRef.current.size > 0) {
+      for (const frameKey of deferredUntilRuntimeBoundKeysRef.current) {
+        frameUploadAttemptsRef.current.delete(frameKey);
+      }
+      deferredUntilRuntimeBoundKeysRef.current.clear();
+    }
     let disposed = false;
     const retryTimers = new Set<number>();
     const uploadCandidates = (
@@ -130,6 +177,7 @@ export function useSharedLiveRoomVisualIngress(input: {
         const priorAttempts = frameUploadAttemptsRef.current.get(frameKey) ?? 0;
         if (
           uploadedFrameKeysRef.current.has(frameKey) ||
+          deferredUntilRuntimeBoundKeysRef.current.has(frameKey) ||
           inFlightFrameKeysRef.current.has(frameKey) ||
           priorAttempts >= LOCAL_FRAME_MAX_UPLOAD_ATTEMPTS
         ) continue;
@@ -143,6 +191,7 @@ export function useSharedLiveRoomVisualIngress(input: {
           sourceId: producer.source_id,
           historyId: frame.history_id,
           observedAt: new Date().toISOString(),
+          providerDelivery: null,
           error: null,
         });
         void input.api.uploadVisualFrame(roomId, {
@@ -155,19 +204,42 @@ export function useSharedLiveRoomVisualIngress(input: {
           preview_hash: frame.preview_hash,
           preview_data_url: frame.preview_data_url,
         })
-          .then(async () => input.api.listVisualFrames(roomId))
-          .then((frames) => {
+          .then(async (response) => ({
+            receipt: response.frame_receipt ?? null,
+            frames: await input.api.listVisualFrames(roomId),
+          }))
+          .then(({ receipt, frames }) => {
             if (disposed) return;
-            uploadedFrameKeysRef.current.add(frameKey);
-            frameUploadAttemptsRef.current.delete(frameKey);
+            const deliveryProjection = projectSharedLiveRoomFrameDelivery({ receipt, frames });
+            const providerDelivery = deliveryProjection.providerDelivery;
+            const providerTransportAccepted =
+              providerDelivery === "transport_sent" ||
+              providerDelivery === "sent_to_shared_model";
+            if (providerTransportAccepted) {
+              uploadedFrameKeysRef.current.add(frameKey);
+              frameUploadAttemptsRef.current.delete(frameKey);
+            } else if (providerDelivery === "runtime_not_bound") {
+              deferredUntilRuntimeBoundKeysRef.current.add(frameKey);
+            }
             input.onFrames(frames);
             setFrameUpload({
-              status: "sent",
+              status: deliveryProjection.status,
               sourceId: producer.source_id,
               historyId: frame.history_id,
               observedAt: new Date().toISOString(),
-              error: null,
+              providerDelivery,
+              error: deliveryProjection.error,
             });
+            if (
+              providerDelivery === "sideband_unavailable" &&
+              (frameUploadAttemptsRef.current.get(frameKey) ?? 0) < LOCAL_FRAME_MAX_UPLOAD_ATTEMPTS
+            ) {
+              const retryTimer = window.setTimeout(() => {
+                retryTimers.delete(retryTimer);
+                if (!disposed) uploadCandidates(useVisualSourceCaptureStore.getState());
+              }, LOCAL_FRAME_RETRY_DELAY_MS);
+              retryTimers.add(retryTimer);
+            }
           })
           .catch((error) => {
             if (disposed) return;
@@ -176,6 +248,7 @@ export function useSharedLiveRoomVisualIngress(input: {
               sourceId: producer.source_id,
               historyId: frame.history_id,
               observedAt: new Date().toISOString(),
+              providerDelivery: null,
               error: safeErrorMessage(error),
             });
             if ((frameUploadAttemptsRef.current.get(frameKey) ?? 0) < LOCAL_FRAME_MAX_UPLOAD_ATTEMPTS) {
@@ -204,7 +277,7 @@ export function useSharedLiveRoomVisualIngress(input: {
       unsubscribe();
       retryTimers.forEach((timer) => window.clearTimeout(timer));
     };
-  }, [input.api, input.enabled, input.onFrames, input.roomId]);
+  }, [input.api, input.enabled, input.modelTransportBound, input.onFrames, input.roomId]);
 
   return { frameUpload, resetVisualIngress };
 }

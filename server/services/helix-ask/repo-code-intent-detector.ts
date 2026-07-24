@@ -10,6 +10,7 @@ import {
   detectModelOnlyConceptSourceSignal,
   hasExplicitModelOnlyConceptScope,
 } from "./model-only-concept-source-guard";
+import { isActiveWorkstationContextPrompt } from "./workstation-active-context-intent";
 import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
 import { isExplicitDocsPathDocumentOperation } from "./docs-viewer-intent";
 
@@ -210,6 +211,15 @@ export function detectRepoCodeEvidenceIntent(promptText: string): HelixRepoCodeE
       repoEvidenceRequested: false,
       strength: "none",
       reasons: ["active_docs_viewer_location_request_not_repo_code"],
+      requestedOutputs: [],
+      projectEntity: null,
+    };
+  }
+  if (isActiveWorkstationContextPrompt(prompt)) {
+    return {
+      repoEvidenceRequested: false,
+      strength: "none",
+      reasons: ["active_workstation_context_request_not_repo_code"],
       requestedOutputs: [],
       projectEntity: null,
     };

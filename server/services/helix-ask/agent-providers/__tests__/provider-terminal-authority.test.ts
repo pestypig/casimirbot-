@@ -762,6 +762,38 @@ describe("provider terminal authority for capability lanes", () => {
     });
   });
 
+  it("records lane evidence re-entry even when solver completion still blocks terminal authority", () => {
+    const packet = buildLanePacket();
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-lane-reentered-solver-pending",
+      threadId: "thread-lane-reentered-solver-pending",
+      route: "/ask/turn",
+      gatewayCallResults: [],
+      capabilityLaneObservationPackets: [packet],
+      normalizedObservationPackets: [packet],
+      providerText: "The page observation contains no readable equation, so another bounded step may be needed.",
+      ok: true,
+      solverCompleted: false,
+      goalSatisfied: false,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "completed_not_terminal",
+      evidence_reentered: true,
+      solver_completed: false,
+      goal_satisfaction_compatible: false,
+      post_tool_model_step_required: false,
+    });
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_status: "blocked_pending_helix_solver_completion",
+      terminal_authority_granted: false,
+      blockers: ["helix_solver_completion_required"],
+    });
+    expect(result.terminalAnswerAuthority).toBeNull();
+  });
+
   it("allows pending text-to-speech handoff terminal text that does not claim playback completion", () => {
     const packet = buildPendingTextToSpeechPacket();
     const result = buildHelixProviderReasoningReentry({

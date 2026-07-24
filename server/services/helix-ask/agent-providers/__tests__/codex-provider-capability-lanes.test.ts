@@ -7,6 +7,9 @@ import {
   buildCodexContinuationAffordanceRetryInstruction,
   buildCodexCapabilityLaneRetryInstruction,
   buildCodexCompoundSubgoalLedger,
+  buildCodexNormalizedObservationArtifacts,
+  buildCodexNormalizedObservationReentryEvidenceLines,
+  canonicalizeCodexCapabilityLaneCandidate,
   buildCodexScholarlyEvidenceDecisionCorrectionInstruction,
   buildCodexScholarlyEvidenceDecisionInstruction,
   buildCodexRuntimeLaneCapabilityAdmissionCorrection,
@@ -26,6 +29,7 @@ import {
   continuationStateAdmitsPreparedRecoveryLaneRequest,
   detectProviderPromptLeakMarkers,
   enrichCapabilityLaneCandidatesFromBody,
+  enrichScholarlyImageLensCandidateFromMemory,
   enrichScholarlyNumericCandidateFromGatewayResults,
   explicitlyExcludesScientificImageContext,
   extractCodexScholarlyEvidenceDecision,
@@ -53,6 +57,237 @@ describe("Codex provider capability lane adapter", () => {
   const previousLiveTranslationExternalBackends = process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
   const previousScholarlyWorkbenchMemoryDir = process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR;
   let scholarlyWorkbenchTestMemoryDir: string | null = null;
+
+  it("materializes normalized document content for model reasoning re-entry", () => {
+    const lines = buildCodexNormalizedObservationReentryEvidenceLines([{
+      schema: "helix.current_turn_artifact.v1",
+      artifact_id: "ask:test:codex_normalized:retrieval_context:1",
+      kind: "retrieval_context",
+      status: "succeeded",
+      capability_key: "docs.search",
+      provider_gateway_observation_ref: "ask:test:docs.search:observation",
+      payload: {
+        schema: "helix.retrieval_context.v1",
+        kind: "retrieval_context",
+        path: "docs/research/casimir-dp-quantum-foam-study.md",
+        excerpt: "This study separates Casimir observables from DP collapse diagnostics.",
+        observation_role: "evidence_not_assistant_answer",
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+    }]);
+
+    const promptBlock = lines.join("\n");
+    expect(promptBlock).toContain("Normalized workstation observations accumulated for this turn");
+    expect(promptBlock).toContain("docs/research/casimir-dp-quantum-foam-study.md");
+    expect(promptBlock).toContain("separates Casimir observables from DP collapse diagnostics");
+    expect(promptBlock).toContain("ask:test:docs.search:observation");
+    expect(promptBlock).toContain('"terminal_eligible": false');
+    expect(promptBlock).toContain('"assistant_answer": false');
+  });
+
+  it("normalizes workspace status fields for provider reasoning re-entry", () => {
+    const result = buildCodexNormalizedObservationArtifacts({
+      turnId: "ask:test:workspace-status-normalization",
+      gatewayCallResults: [{
+        capability_id: "workspace_os.status",
+        ok: true,
+        observation: {
+          schema: "helix.workspace_os_status_observation.v1",
+          capability_count: 34,
+          summary: {
+            available_count: 19,
+            degraded_count: 0,
+            blocked_count: 3,
+            error_count: 0,
+            unknown_count: 12,
+          },
+          runtime: {
+            memory_pressure: "normal",
+            active_task_count: 1,
+            queued_task_count: 0,
+          },
+          noteworthy_capabilities: [{
+            capability_id: "api.helix",
+            status: "available",
+          }],
+        },
+        observation_packet: {
+          call_id: "ask:test:workspace-status-normalization:call",
+          produced_artifact_refs: ["ask:test:workspace-status-normalization:observation"],
+        },
+      } as never],
+    });
+
+    expect(result.missingNormalizationFailures).toEqual([]);
+    expect(result.artifacts).toHaveLength(1);
+    expect(result.artifacts[0]).toMatchObject({
+      kind: "workspace_os_status_observation",
+      payload_schema: "helix.workspace_os_status_observation.v1",
+      status: "succeeded",
+      text_preview: expect.stringContaining("Available 19"),
+      payload: {
+        capability_count: 34,
+        summary: {
+          available_count: 19,
+          blocked_count: 3,
+        },
+        runtime: {
+          memory_pressure: "normal",
+        },
+      },
+    });
+  });
+
+  it("normalizes docs search candidates without requiring an already-open document", () => {
+    const result = buildCodexNormalizedObservationArtifacts({
+      turnId: "ask:test:docs-search-candidates",
+      gatewayCallResults: [{
+        capability_id: "docs.search",
+        ok: true,
+        observation: {
+          query: "Casimir Dp Quantum Foam Study",
+          paths: ["docs"],
+          hits: [{
+            filePath: "docs/research/casimir-dp-quantum-foam-study.md",
+            line: 1,
+            text: "Document title/path match: Casimir Dp Quantum Foam Study",
+          }],
+          document_candidates: [{
+            path: "docs/research/casimir-dp-quantum-foam-study.md",
+            title: "Casimir Dp Quantum Foam Study",
+            score: 13640,
+            canonical: true,
+          }],
+          active_document_observation: null,
+        },
+        observation_packet: {
+          call_id: "ask:test:docs-search-candidates:call",
+          produced_artifact_refs: ["ask:test:docs-search-candidates:observation"],
+        },
+      } as never],
+    });
+
+    expect(result.missingNormalizationFailures).toEqual([]);
+    expect(result.artifacts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "doc_search_results",
+        payload: expect.objectContaining({
+          query: "Casimir Dp Quantum Foam Study",
+          matches: [
+            expect.objectContaining({
+              path: "docs/research/casimir-dp-quantum-foam-study.md",
+              canonical: true,
+            }),
+          ],
+          document_candidates: [
+            expect.objectContaining({
+              path: "docs/research/casimir-dp-quantum-foam-study.md",
+            }),
+          ],
+        }),
+      }),
+      expect.objectContaining({
+        kind: "doc_candidate_validation",
+        payload: expect.objectContaining({
+          selected_path: "docs/research/casimir-dp-quantum-foam-study.md",
+          selected_status: "strong",
+          needs_clarification: false,
+        }),
+      }),
+    ]));
+    expect(result.artifacts.some((artifact) => artifact.kind === "retrieval_context")).toBe(false);
+  });
+
+  it("executes model-visible Docs aliases through their canonical gateway capability", () => {
+    expect(canonicalizeCodexCapabilityLaneCandidate({
+      capability: "docs-viewer.open_doc_by_path",
+      path: "docs/research/casimir-dp-quantum-foam-study.md",
+    })).toEqual({
+      capability: "docs-viewer.open_doc",
+      alias_capability: "docs-viewer.open_doc_by_path",
+      path: "docs/research/casimir-dp-quantum-foam-study.md",
+    });
+
+    expect(canonicalizeCodexCapabilityLaneCandidate({
+      capability: "docs.search",
+      query: "Casimir DP",
+    })).toEqual({
+      capability: "docs.search",
+      query: "Casimir DP",
+    });
+
+    expect(canonicalizeCodexCapabilityLaneCandidate({
+      capability: "docs-viewer.summarize_doc",
+      path: "docs/research/casimir-dp-quantum-foam-study.md",
+      query: "What is this about?",
+    })).toEqual({
+      capability: "docs.search",
+      alias_capability: "docs-viewer.summarize_doc",
+      path: "docs/research/casimir-dp-quantum-foam-study.md",
+      paths: ["docs/research/casimir-dp-quantum-foam-study.md"],
+      query: "What is this about?",
+    });
+  });
+
+  it("preserves governed capability-lane identities before lane dispatch", () => {
+    expect(canonicalizeCodexCapabilityLaneCandidate({
+      capability: "helix_ask.reflect_theory_context",
+      prompt: "Casimir cavities alter vacuum-mode boundary conditions.",
+      build_explanation_plan: true,
+    })).toEqual({
+      capability: "helix_ask.reflect_theory_context",
+      prompt: "Casimir cavities alter vacuum-mode boundary conditions.",
+      build_explanation_plan: true,
+    });
+  });
+
+  it("normalizes a successful Docs open action as both UI and Docs lifecycle receipts", () => {
+    const result = buildCodexNormalizedObservationArtifacts({
+      turnId: "ask:test:docs-open-receipt",
+      gatewayCallResults: [{
+        capability_id: "docs-viewer.open_doc",
+        ok: true,
+        terminal_eligible: false,
+        observation: {
+          schema: "helix.workstation_ui_action_receipt.v1",
+          capability_key: "docs-viewer.open_doc",
+          action_kind: "open_doc",
+          panel_id: "docs-viewer",
+          status: "succeeded",
+          path: "docs/research/casimir-dp-quantum-foam-study.md",
+          workstation_action: {
+            schema_version: "helix.workstation.action/v1",
+            action: "run_panel_action",
+            panel_id: "docs-viewer",
+            action_id: "open_doc",
+            args: {
+              path: "docs/research/casimir-dp-quantum-foam-study.md",
+            },
+          },
+        },
+        observation_packet: {
+          call_id: "ask:test:docs-open-receipt:call",
+          produced_artifact_refs: ["ask:test:docs-open-receipt:observation"],
+        },
+      } as never],
+    });
+
+    expect(result.missingNormalizationFailures).toEqual([]);
+    expect(result.artifacts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "workspace_action_receipt",
+      }),
+      expect.objectContaining({
+        kind: "doc_open_receipt",
+        payload: expect.objectContaining({
+          status: "opened",
+          path: "docs/research/casimir-dp-quantum-foam-study.md",
+          active_doc_path: "docs/research/casimir-dp-quantum-foam-study.md",
+        }),
+      }),
+    ]));
+  });
 
   const writeMinimalPdf = (filePath: string, pages: string[]): void => {
     const objects: string[] = [
@@ -248,6 +483,49 @@ describe("Codex provider capability lane adapter", () => {
     )).toBe(false);
   });
 
+  it("admits a continuation request when only its redundant capability_key mirror is omitted", () => {
+    const laneRequest = {
+      authority: "hint_only_agent_must_decide",
+      capability_key: "docs-viewer.open_doc_by_path",
+      capability: "docs-viewer.open_doc_by_path",
+      path: "/docs/research/casimir-dp-quantum-foam-study.md",
+      query: "Casimir Dp Quantum Foam Study",
+    };
+    const requestedCandidate = {
+      authority: "hint_only_agent_must_decide",
+      capability: "docs-viewer.open_doc_by_path",
+      path: "/docs/research/casimir-dp-quantum-foam-study.md",
+      query: "Casimir Dp Quantum Foam Study",
+    };
+    const state = {
+      next_admissible_affordances: [{
+        admissible: true,
+        tried: false,
+        lane_request: laneRequest,
+      }],
+      allowed_decisions: ["act"],
+      last_attempt: { retryability: "not_applicable" },
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+
+    expect(continuationStateAdmitsPreparedRecoveryLaneRequest({
+      state,
+      requestedCandidate,
+      preparedCandidate: requestedCandidate,
+    })).toBe(true);
+    expect(continuationStateAdmitsPreparedRecoveryLaneRequest({
+      state,
+      requestedCandidate: {
+        ...requestedCandidate,
+        path: "/docs/research/another-study.md",
+      },
+      preparedCandidate: {
+        ...requestedCandidate,
+        path: "/docs/research/another-study.md",
+      },
+    })).toBe(false);
+  });
+
   it("rejects invented capability ids before execution and gives Codex an executable correction", () => {
     const admittedCapabilityIds = [
       "visual_analysis.inspect_image_region",
@@ -268,6 +546,13 @@ describe("Codex provider capability lane adapter", () => {
         page_number: 2,
       },
       admittedCapabilityIds,
+    })).toBe(true);
+    expect(runtimeLaneRequestCandidateUsesAdmittedCapabilities({
+      candidate: {
+        capability: "docs-viewer.open_doc_by_path",
+        path: "docs/research/casimir-dp-quantum-foam-study.md",
+      },
+      admittedCapabilityIds: ["docs-viewer.open_doc"],
     })).toBe(true);
 
     const correction = buildCodexRuntimeLaneCapabilityAdmissionCorrection({
@@ -1457,6 +1742,50 @@ describe("Codex provider capability lane adapter", () => {
         bbox_px: { x: 0, y: 0, width: 1224, height: 1584 },
       });
 
+      const naturalOpenCandidate = synthesizeScholarlyPageImageLaneCandidate({
+        question: [
+          "Use the Magnetar paper you just fetched. Open page 2 in Image Lens, but do not analyze it yet.",
+          "Tell me whether that page is ready and still tied to the same paper.",
+        ].join(" "),
+        record,
+        lookup: { status: "found" } as any,
+        source: "prior",
+      });
+      expect(naturalOpenCandidate).toMatchObject({
+        capability: "visual_analysis.inspect_image_region",
+        source_kind: "pdf_page_render",
+        page_number: 2,
+        source_mount_only: true,
+        source_dimensions_px: { width: 1224, height: 1584 },
+      });
+      expect(naturalOpenCandidate?.source_image_ref).toMatch(/^data:image\/png;base64,/);
+      const naturalOpenImagePath = String(naturalOpenCandidate?.scholarly_page_image_path ?? "");
+      if (naturalOpenImagePath) renderedImagePaths.push(naturalOpenImagePath);
+
+      const enrichedNaturalOpenCandidate = enrichScholarlyImageLensCandidateFromMemory({
+        question: [
+          "Use the Magnetar paper you just fetched. Open page 2 in Image Lens, but do not analyze it yet.",
+          "Tell me whether that page is ready and still tied to the same paper.",
+        ].join(" "),
+        candidate: {
+          capability: "visual_analysis.inspect_image_region",
+          source_id: "openalex:selected-paper",
+          source_kind: "docs",
+          page_number: 2,
+          page_image_ref: "page_2",
+        },
+        record,
+        lookup: { status: "found" } as any,
+        source: "prior",
+      }) as Record<string, unknown>;
+      expect(enrichedNaturalOpenCandidate).toMatchObject({
+        source_id: expect.stringMatching(/^pdf-page-render:/),
+        source_kind: "pdf_page_render",
+        page_number: 2,
+        scholarly_source_pdf_ref: sourcePdfRef,
+      });
+      expect(enrichedNaturalOpenCandidate.source_image_ref).toMatch(/^data:image\/png;base64,/);
+
       const priorWorkflowMountPrompt = [
         "Use the selected paper from the prior step. Mount PDF page 1 in Image Lens as a source only.",
         "Do not inspect, crop, OCR, analyze, extract, or read it yet.",
@@ -1478,6 +1807,10 @@ describe("Codex provider capability lane adapter", () => {
         "Later I might mount the selected paper from the prior step as PDF page 1 in Image Lens.",
         "The UI says \"Mount PDF page 1 from the selected paper in Image Lens\"; explain that text only.",
         "Previously I mounted PDF page 1 from the selected paper in Image Lens; summarize what happened.",
+        "Do not open PDF page 2 from the selected paper in Image Lens; explain what that would do.",
+        "Later I might open PDF page 2 from the selected paper in Image Lens.",
+        "The UI says \"Open PDF page 2 in Image Lens\"; explain that text only.",
+        "Previously I opened PDF page 2 from the selected paper in Image Lens.",
       ]) {
         expect(synthesizeScholarlyPageImageLaneCandidate({
           question: nonExecutingPriorMountPrompt,

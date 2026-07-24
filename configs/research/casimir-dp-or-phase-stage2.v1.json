@@ -1,0 +1,105 @@
+{
+  "schema_version": "casimir_dp_or_phase_stage2/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-or-phase-stage2-v1",
+  "evidence_cutoff": "2026-07-23",
+  "claim_tier": "diagnostic",
+  "promotion_allowed": false,
+  "run_order": [
+    "freeze_stage2_claims_upstream_hashes_and_sign_conventions",
+    "validate_dp_grid_origin_branch_mass_and_containment",
+    "compute_pairwise_dp_self_energy",
+    "compute_softened_branch_difference_potential",
+    "apply_potential_self_energy_equivalence_gate",
+    "apply_dp_resolution_provenance_and_bounds_gates",
+    "compute_registered_qed_boundary_phase",
+    "compute_ambient_gravity_phase_and_tilt_control",
+    "compute_interference_quadratures_and_visibility",
+    "replay_fixed_branch_dp_boundary_null",
+    "run_branch_perturbation_sensitivity",
+    "evaluate_three_lane_plausibility_ledger",
+    "apply_bridge_and_claim_ceiling_gates",
+    "write_hashed_stage2_receipt_and_update_paper"
+  ],
+  "upstream_authorities": [
+    {
+      "role": "stage1_gated_computations",
+      "path": "configs/research/casimir-dp-next-computations.v1.json",
+      "sha256": "5b12c758228dc68865f4a91d3ae1aa9ade698932546c686aab5cb9e5773b5e93"
+    },
+    {
+      "role": "proposal_closure",
+      "path": "configs/research/casimir-dp-proposal-closure.v1.json",
+      "sha256": "7b3b2673c95d4eebca060261385f3b0659365c1112c1d9d42bc1d8700686b8ba"
+    }
+  ],
+  "dp_audit": {
+    "grid_dimension": 16,
+    "resolution_grid_dimensions": [12, 14, 16],
+    "resolution_relative_tolerance": 0.1,
+    "ell_m": 2e-9,
+    "padding_radii": 1,
+    "max_voxels": 4096,
+    "potential_relative_tolerance": 1e-12,
+    "potential_absolute_tolerance_J": 1e-50,
+    "component_identity_relative_tolerance": 1e-10,
+    "mass_conservation_relative_tolerance": 0.1,
+    "branch_symmetry_relative_tolerance": 1e-12,
+    "maximum_boundary_shell_mass_fraction": 0,
+    "perturbation_mass_drift_relative_tolerance": 0.001,
+    "branch_separation_offsets_m": [-1e-9, 0, 1e-9]
+  },
+  "ordinary_phase": {
+    "on_minus_off_branch_energy_difference_J": 0,
+    "energy_model_class": "qed_casimir_polder",
+    "evidence_class": "design_assumption",
+    "source_ref": "transverse-branch first-order common-mode design null; apparatus-specific finite-geometry boundary contrast not measured",
+    "raw_artifact_sha256": null,
+    "uncertainty_model": "not_registered",
+    "uncertainty_model_ref": null,
+    "uncertainty_artifact_sha256": null,
+    "initial_visibility": 1,
+    "baseline_decoherence_rate_s": 2.15
+  },
+  "ambient_gravity_control": {
+    "gravitational_acceleration_m_s2": 9.80665,
+    "maximum_boundary_correlated_phase_rad": 0.1,
+    "evidence_status": "design_target",
+    "required_receipts": [
+      "boundary-correlated branch-orientation and tilt time series",
+      "local acceleration and vibration transfer function",
+      "state-expansion vertical displacement calibration",
+      "paired phase-reference drift sidecar"
+    ]
+  },
+  "bridge_registration": {
+    "status": "blocked",
+    "model_id": null,
+    "source_ref": null,
+    "renormalized_stress_tensor_prescription": null,
+    "stress_noise_kernel_prescription": null,
+    "causal_metric_response_kernel": null,
+    "gauge_and_coordinate_contract": null,
+    "metric_to_coherence_dynamics": null,
+    "consistency_or_complete_positivity_proof": null,
+    "standard_qed_and_dp_recovery_limit": null,
+    "frozen_parameter_manifest": null,
+    "required_falsifiers": [
+      "matched-heating control removes the apparent boundary residual",
+      "sham switching or label permutation reproduces the apparent residual",
+      "registered gap, material, or branch-separation scaling fails on held-out data",
+      "ordinary QED, electrostatic, mechanical, thermal, readout, or gravity phase closes the residual",
+      "the secondary phase and correlation signature follows the calibrated switching transfer model"
+    ]
+  },
+  "orch_or_scope": {
+    "status": "out_of_scope",
+    "source_ref": "https://doi.org/10.1016/j.plrev.2013.08.002",
+    "excluded_claims": [
+      "microtubule coherence",
+      "neuronal orchestration",
+      "anesthetic response",
+      "conscious-event identification"
+    ]
+  }
+}

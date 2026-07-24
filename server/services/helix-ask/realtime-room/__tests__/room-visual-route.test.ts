@@ -109,7 +109,7 @@ describe("Shared Realtime room visual routes", () => {
       .expect(200);
     expect(uploaded.body.frame_receipt).toMatchObject({
       ok: true,
-      provider_delivery: "sent_to_shared_model",
+      provider_delivery: "transport_sent",
       carousel_visible: true,
       answer_authority: false,
       terminal_eligible: false,
@@ -118,8 +118,10 @@ describe("Shared Realtime room visual routes", () => {
     expect(uploaded.body.frame_receipt.participant_id).not.toBe("participant:spoofed");
     expect(uploaded.body.frame_receipt.image_hash).not.toBe("sha256:spoofed");
 
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
+    expect(events).toHaveLength(2);
+    const imageEvent = events.find((event) => JSON.stringify(event).includes('"input_image"'));
+    const contextEvent = events.find((event) => JSON.stringify(event).includes("participant_context"));
+    expect(imageEvent).toMatchObject({
       type: "conversation.item.create",
       item: {
         type: "message",
@@ -133,6 +135,8 @@ describe("Shared Realtime room visual routes", () => {
         ]),
       },
     });
+    expect(JSON.stringify(contextEvent)).toContain("Visual Guest");
+    expect(JSON.stringify(contextEvent)).toContain("model_transport_pending");
     expect(events.some((event) => event.type === "response.create")).toBe(false);
 
     const duplicate = await guest.agent
@@ -140,7 +144,7 @@ describe("Shared Realtime room visual routes", () => {
       .send(payload)
       .expect(200);
     expect(duplicate.body.frame_receipt.provider_delivery).toBe("duplicate");
-    expect(events).toHaveLength(1);
+    expect(events).toHaveLength(2);
 
     const carousel = await owner.agent
       .get(`/api/agi/realtime/rooms/${roomId}/visual-frames`)
@@ -152,6 +156,25 @@ describe("Shared Realtime room visual routes", () => {
       content_role: "observation_not_assistant_answer",
       answer_authority: false,
     });
+    const roomProjection = await owner.agent
+      .get(`/api/agi/realtime/rooms/${roomId}`)
+      .expect(200);
+    expect(roomProjection.body.room.participant_context_cards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          display_name: "Visual Guest",
+          context_status: "active",
+          visual_sources: expect.arrayContaining([
+            expect.objectContaining({
+              source_id: "screen:guest",
+              model_visibility: "model_transport_pending",
+            }),
+          ]),
+          answer_authority: false,
+          raw_content_included: false,
+        }),
+      ]),
+    );
 
     const debug = await owner.agent
       .get(`/api/agi/realtime/rooms/${roomId}/debug`)
@@ -319,8 +342,10 @@ describe("Shared Realtime room visual routes", () => {
       .post(`/api/agi/realtime/rooms/${roomId}/visual-frames`)
       .send(payload)
       .expect(200);
-    expect(retried.body.frame_receipt.provider_delivery).toBe("sent_to_shared_model");
-    expect(events.filter((event) => event.type === "conversation.item.create")).toHaveLength(1);
+    expect(retried.body.frame_receipt.provider_delivery).toBe("transport_sent");
+    expect(events.filter((event) => event.type === "conversation.item.create")).toHaveLength(2);
+    expect(JSON.stringify(events[0])).toContain("Retry Guest");
+    expect(JSON.stringify(events[0])).toContain("screen:retry");
 
     await guest.agent
       .patch(`/api/agi/realtime/rooms/${roomId}/consent`)

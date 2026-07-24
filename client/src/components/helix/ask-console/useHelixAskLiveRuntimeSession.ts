@@ -25,6 +25,7 @@ import {
 } from "@/lib/helix/visualFrameProducer";
 import {
   createHelixAskRealtimeProviderEventHandler,
+  type HelixAskRealtimeProviderEventHandler,
   type HelixAskRealtimeProviderEventProjection,
 } from "./HelixAskRealtimeProviderEventHandler";
 import { getAudioFocusSnapshot } from "@/lib/audio-focus";
@@ -33,13 +34,28 @@ import {
   recordHelixAskLiveRuntimeClientDebugEvent,
   recordHelixAskLiveRuntimeCompletedOutputTranscript,
   recordHelixAskLiveRuntimeServerStagePlayDebug,
+  recordHelixAskLiveRuntimeVisualFrameProviderAcknowledgement,
   recordHelixAskLiveRuntimeVisualFrameReceipt,
 } from "./HelixAskLiveRuntimeDebugState";
+import {
+  createHelixAskRealtimeVisualFrameAcknowledgementTracker,
+  type HelixAskRealtimeVisualFrameRouteKind,
+} from "./HelixAskRealtimeVisualFrameAcknowledgement";
 import { registerHelixAskVisualFrameLivePromotionHandler } from "./HelixAskVisualFramePromotion";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { buildHelixAskLiveRuntimeSourceBinding } from "./HelixAskMinimalRuntimeWorkspaceContext";
 import { stageSharedLiveRoomManualVisualFrame } from
   "./shared-live-room/SharedLiveRoomManualFrame";
+import {
+  registerHelixAskLiveMediaBoundary,
+  unregisterHelixAskLiveMediaBoundary,
+} from "./shared-live-room/media-bridge/HelixAskLiveMediaBoundary";
+import {
+  publishSharedLiveRoomInputSpeechStarted,
+  publishSharedLiveRoomInputTranscript,
+  publishSharedLiveRoomOutputTranscript,
+} from
+  "./shared-live-room/media-bridge/RoomTranscriptRelay";
 
 type LiveRuntimeSessionState = {
   lifecycleState: HelixAskLiveRuntimeLifecycleState;
@@ -51,6 +67,14 @@ type LiveRuntimeSessionState = {
   microphoneEnabled: boolean;
   visualInputEnabled: boolean;
   visualInputFrameCount: number;
+  visualInputProviderAcknowledgedFrameCount: number;
+  visualInputProviderImageConfirmedFrameCount: number;
+  visualInputLastDeliveryStatus:
+    | "none"
+    | "transport_sent"
+    | "provider_acknowledged"
+    | "transport_error"
+    | "provider_error";
   visualInputError: string | null;
 };
 
@@ -64,6 +88,9 @@ const INITIAL_STATE: LiveRuntimeSessionState = {
   microphoneEnabled: false,
   visualInputEnabled: false,
   visualInputFrameCount: 0,
+  visualInputProviderAcknowledgedFrameCount: 0,
+  visualInputProviderImageConfirmedFrameCount: 0,
+  visualInputLastDeliveryStatus: "none",
   visualInputError: null,
 };
 
@@ -78,6 +105,7 @@ const REALTIME_GROUNDED_RELAY_STATUSES = new Set<HelixRealtimeGroundedRelayStatu
   "result_ready",
   "relay_queued_busy",
   "response_requested",
+  "provider_acknowledged",
   "speaking",
   "delivered",
   "suppressed",
@@ -97,13 +125,17 @@ const readWorkerRelayStatus = (value: unknown): HelixRealtimeGroundedRelayStatus
 const postJson = async <T,>(path: string, body: Record<string, unknown>): Promise<T> => {
   const response = await fetch(path, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const payload = (await response.json()) as T & { blocked_reason?: string; error?: string };
+  const payload = await response.json().catch(() => null) as
+    | (T & { blocked_reason?: string; error?: string })
+    | null;
   if (!response.ok) {
-    throw new Error(payload.blocked_reason || payload.error || `realtime_http_${response.status}`);
+    throw new Error(payload?.blocked_reason || payload?.error || `realtime_http_${response.status}`);
   }
+  if (!payload) throw new Error("realtime_response_invalid");
   return payload;
 };
 
@@ -129,9 +161,13 @@ export const useHelixAskLiveRuntimeSession = (input: {
   }));
   const [visualTransportRevision, setVisualTransportRevision] = useState(0);
   const controllerRef = useRef<HelixAskLiveRuntimeBrowserTransportController | null>(null);
+  const providerEventHandlerRef = useRef<HelixAskRealtimeProviderEventHandler | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const microphoneEnabledRef = useRef(false);
   const visualInputEnabledRef = useRef(false);
+  const visualFrameAcknowledgementTrackerRef = useRef(
+    createHelixAskRealtimeVisualFrameAcknowledgementTracker(),
+  );
   const selectedRuntimeAgentProviderRef = useRef(input.selectedRuntimeAgentProvider);
   selectedRuntimeAgentProviderRef.current = input.selectedRuntimeAgentProvider;
   const runtimeContextRef = useRef<LiveRuntimeSafeContext>({
@@ -143,6 +179,7 @@ export const useHelixAskLiveRuntimeSession = (input: {
   const stop = useCallback(async () => {
     // Consent revocation must take effect before React can commit the next render.
     visualInputEnabledRef.current = false;
+    visualFrameAcknowledgementTrackerRef.current.reset();
     const sessionId = sessionIdRef.current ?? state.realtimeSessionId;
     recordHelixAskLiveRuntimeClientDebugEvent({
       eventKind: "session_stop_requested",
@@ -155,7 +192,11 @@ export const useHelixAskLiveRuntimeSession = (input: {
       lifecycleState: "stopping",
       transportState: "stopping",
     }));
-    await controllerRef.current?.stopTransport({ realtimeSessionId: sessionId }).catch(() => null);
+    const controller = controllerRef.current;
+    providerEventHandlerRef.current?.dispose();
+    providerEventHandlerRef.current = null;
+    unregisterHelixAskLiveMediaBoundary({ realtimeSessionId: sessionId, controller });
+    await controller?.stopTransport({ realtimeSessionId: sessionId }).catch(() => null);
     controllerRef.current = null;
     sessionIdRef.current = null;
     runtimeContextRef.current = {
@@ -179,6 +220,9 @@ export const useHelixAskLiveRuntimeSession = (input: {
       microphoneEnabled: false,
       visualInputEnabled: false,
       visualInputFrameCount: 0,
+      visualInputProviderAcknowledgedFrameCount: 0,
+      visualInputProviderImageConfirmedFrameCount: 0,
+      visualInputLastDeliveryStatus: "none",
       visualInputError: null,
     });
     microphoneEnabledRef.current = false;
@@ -193,6 +237,7 @@ export const useHelixAskLiveRuntimeSession = (input: {
   const start = useCallback(async () => {
     if (!input.enabled || state.active || state.lifecycleState === "requesting") return;
     visualInputEnabledRef.current = false;
+    visualFrameAcknowledgementTrackerRef.current.reset();
     const mode = input.mode === "off" ? "live_voice" : input.mode;
     const observedAtMs = Date.now();
     const consentReceipt = buildHelixAskLiveRuntimeClientReceiptPayload({
@@ -218,6 +263,9 @@ export const useHelixAskLiveRuntimeSession = (input: {
       microphoneEnabled: false,
       visualInputEnabled: false,
       visualInputFrameCount: 0,
+      visualInputProviderAcknowledgedFrameCount: 0,
+      visualInputProviderImageConfirmedFrameCount: 0,
+      visualInputLastDeliveryStatus: "none",
       visualInputError: null,
     });
     try {
@@ -246,6 +294,7 @@ export const useHelixAskLiveRuntimeSession = (input: {
       if (!response.ok || !response.realtime_session_id) {
         throw new Error(response.blocked_reason || response.error || "realtime_session_admission_failed");
       }
+      const realtimeSessionId = response.realtime_session_id;
       recordHelixAskLiveRuntimeClientDebugEvent({
         eventKind: "server_session_admitted",
         realtimeSessionId: response.realtime_session_id,
@@ -269,6 +318,10 @@ export const useHelixAskLiveRuntimeSession = (input: {
         onProjection: (projection: HelixAskRealtimeProviderEventProjection) => {
           if (projection.completed_output_transcript) {
             recordHelixAskLiveRuntimeCompletedOutputTranscript(
+              projection.completed_output_transcript,
+            );
+            publishSharedLiveRoomOutputTranscript(
+              realtimeSessionId,
               projection.completed_output_transcript,
             );
           }
@@ -299,6 +352,8 @@ export const useHelixAskLiveRuntimeSession = (input: {
           }
         },
       });
+      providerEventHandlerRef.current?.dispose();
+      providerEventHandlerRef.current = eventHandler;
       let remoteAudioPlaybackFailure: string | null = null;
       const controller = createHelixAskLiveRuntimeBrowserTransportController({
         onProviderEvent: (event) => {
@@ -318,12 +373,86 @@ export const useHelixAskLiveRuntimeSession = (input: {
             : typeof providerError?.type === "string"
               ? providerError.type
               : null;
+          if (
+            providerEventType === "input_audio_buffer.speech_started" &&
+            typeof providerEvent?.item_id === "string"
+          ) {
+            publishSharedLiveRoomInputSpeechStarted(
+              realtimeSessionId,
+              {
+                itemId: providerEvent.item_id,
+                observedAtMs: Date.now(),
+              },
+            );
+          }
+          if (
+            providerEventType === "conversation.item.input_audio_transcription.completed" &&
+            typeof providerEvent?.transcript === "string"
+          ) {
+            const transcript = providerEvent.transcript
+              .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
+              .trim()
+              .slice(0, 4_000);
+            const eventRef = [
+              typeof providerEvent.event_id === "string"
+                ? providerEvent.event_id
+                : "event:unknown",
+              typeof providerEvent.item_id === "string"
+                ? providerEvent.item_id
+                : "item:unknown",
+              typeof providerEvent.content_index === "number"
+                ? providerEvent.content_index
+                : "content:unknown",
+            ].join("|");
+            if (transcript) {
+              publishSharedLiveRoomInputTranscript(
+                realtimeSessionId,
+                {
+                  eventRef,
+                  itemId: typeof providerEvent.item_id === "string"
+                    ? providerEvent.item_id
+                    : null,
+                  transcript,
+                  observedAtMs: Date.now(),
+                },
+              );
+            }
+          }
           recordHelixAskLiveRuntimeClientDebugEvent({
             eventKind: "provider_event_received",
             realtimeSessionId: response.realtime_session_id,
             providerEventType,
             detailCode: providerErrorCode,
           });
+          const visualFrameAcknowledgement =
+            visualFrameAcknowledgementTrackerRef.current.observeProviderEvent(event);
+          if (visualFrameAcknowledgement) {
+            recordHelixAskLiveRuntimeVisualFrameProviderAcknowledgement(
+              visualFrameAcknowledgement,
+            );
+            setState((current) =>
+              current.realtimeSessionId !== response.realtime_session_id
+                ? current
+                : {
+                    ...current,
+                    visualInputProviderAcknowledgedFrameCount:
+                      current.visualInputProviderAcknowledgedFrameCount +
+                      (visualFrameAcknowledgement.first_provider_acknowledgement ? 1 : 0),
+                    visualInputProviderImageConfirmedFrameCount:
+                      current.visualInputProviderImageConfirmedFrameCount +
+                      (visualFrameAcknowledgement
+                        .first_provider_image_context_confirmation ? 1 : 0),
+                    visualInputLastDeliveryStatus:
+                      visualFrameAcknowledgement.status === "provider_error"
+                        ? "provider_error"
+                        : "provider_acknowledged",
+                    visualInputError:
+                      visualFrameAcknowledgement.status === "provider_error"
+                        ? visualFrameAcknowledgement.provider_error_code ??
+                          "visual_frame_provider_error"
+                        : null,
+                  });
+          }
           void eventHandler.handle(event);
         },
         onMicrophoneState: (outcome) => {
@@ -458,6 +587,10 @@ export const useHelixAskLiveRuntimeSession = (input: {
         },
       ).catch(() => null);
       if (!result.ok) throw new Error(result.blocked_reason);
+      registerHelixAskLiveMediaBoundary({
+        realtimeSessionId: response.realtime_session_id,
+        controller,
+      });
       recordHelixAskLiveRuntimeClientDebugEvent({
         eventKind: "transport_active",
         realtimeSessionId: response.realtime_session_id,
@@ -475,6 +608,9 @@ export const useHelixAskLiveRuntimeSession = (input: {
         microphoneEnabled: false,
         visualInputEnabled: false,
         visualInputFrameCount: 0,
+        visualInputProviderAcknowledgedFrameCount: 0,
+        visualInputProviderImageConfirmedFrameCount: 0,
+        visualInputLastDeliveryStatus: "none",
         visualInputError: null,
       });
     } catch (error) {
@@ -488,6 +624,10 @@ export const useHelixAskLiveRuntimeSession = (input: {
         detailCode: failureCode,
       });
       const failedSessionId = sessionIdRef.current;
+      unregisterHelixAskLiveMediaBoundary({
+        realtimeSessionId: failedSessionId,
+        controller: controllerRef.current,
+      });
       await controllerRef.current?.stopTransport({
         realtimeSessionId: failedSessionId,
       }).catch(() => null);
@@ -498,6 +638,8 @@ export const useHelixAskLiveRuntimeSession = (input: {
         }).catch(() => null);
       }
       controllerRef.current = null;
+      providerEventHandlerRef.current?.dispose();
+      providerEventHandlerRef.current = null;
       sessionIdRef.current = null;
       runtimeContextRef.current = {
         transportReceiptRef: null,
@@ -514,6 +656,9 @@ export const useHelixAskLiveRuntimeSession = (input: {
         microphoneEnabled: false,
         visualInputEnabled: false,
         visualInputFrameCount: 0,
+        visualInputProviderAcknowledgedFrameCount: 0,
+        visualInputProviderImageConfirmedFrameCount: 0,
+        visualInputLastDeliveryStatus: "none",
         visualInputError: null,
       });
       microphoneEnabledRef.current = false;
@@ -560,18 +705,22 @@ export const useHelixAskLiveRuntimeSession = (input: {
   const applyVisualFrameReceipt = useCallback((
     sessionId: string,
     receipt: ReturnType<HelixAskLiveRuntimeBrowserTransportController["sendVisualFrame"]>,
+    routeKind: HelixAskRealtimeVisualFrameRouteKind,
   ): void => {
-    recordHelixAskLiveRuntimeVisualFrameReceipt(receipt);
+    visualFrameAcknowledgementTrackerRef.current.registerReceipt(receipt, routeKind);
+    recordHelixAskLiveRuntimeVisualFrameReceipt(receipt, routeKind);
     setState((current) => current.realtimeSessionId !== sessionId
       ? current
       : receipt.ok
         ? {
             ...current,
             visualInputFrameCount: current.visualInputFrameCount + 1,
+            visualInputLastDeliveryStatus: "transport_sent",
             visualInputError: null,
           }
         : {
             ...current,
+            visualInputLastDeliveryStatus: "transport_error",
             visualInputError: receipt.code,
           });
   }, []);
@@ -616,7 +765,7 @@ export const useHelixAskLiveRuntimeSession = (input: {
       };
     }
     const receipt = controller.sendVisualFrame(frame);
-    applyVisualFrameReceipt(sessionId, receipt);
+    applyVisualFrameReceipt(sessionId, receipt, "manual_promotion");
     return {
       ok: receipt.ok,
       code: receipt.code,
@@ -668,7 +817,7 @@ export const useHelixAskLiveRuntimeSession = (input: {
       });
       if (!receipt) return;
       if (receipt.ok) lastClientFrameId = frame.clientFrameId;
-      applyVisualFrameReceipt(sessionId, receipt);
+      applyVisualFrameReceipt(sessionId, receipt, "automatic_capture");
     };
     const unsubscribe = subscribeVisualFrameProducerFrames(routeFrame);
     const latestFrame = getLatestVisualFrameProducerFrame();
@@ -726,10 +875,14 @@ export const useHelixAskLiveRuntimeSession = (input: {
 
   useEffect(() => () => {
     visualInputEnabledRef.current = false;
+    visualFrameAcknowledgementTrackerRef.current.reset();
     const controller = controllerRef.current;
     const sessionId = sessionIdRef.current;
+    providerEventHandlerRef.current?.dispose();
+    providerEventHandlerRef.current = null;
     controllerRef.current = null;
     sessionIdRef.current = null;
+    unregisterHelixAskLiveMediaBoundary({ realtimeSessionId: sessionId, controller });
     microphoneEnabledRef.current = false;
     runtimeContextRef.current = {
       transportReceiptRef: null,

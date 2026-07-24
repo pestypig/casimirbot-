@@ -249,6 +249,7 @@ export const projectRoom = async (
     max_participants: HELIX_SHARED_REALTIME_ROOM_MAX_PARTICIPANTS,
     self_participant_id: self.participant_id,
     participants,
+    participant_context_cards: [],
     readiness: {
       participant_count: participants.length,
       required_participant_count: HELIX_SHARED_REALTIME_ROOM_MAX_PARTICIPANTS,

@@ -149,6 +149,15 @@ describe("Helix Ask repo concept evidence", () => {
     });
   });
 
+  it("does not turn an active-workstation orientation question into repo code intent", () => {
+    expect(detectRepoConceptDefinition("What is currently open in the workstation?")).toBeNull();
+    expect(detectRepoCodeEvidenceIntent("What is currently open in the workstation?")).toMatchObject({
+      repoEvidenceRequested: false,
+      strength: "none",
+      reasons: ["active_workstation_context_request_not_repo_code"],
+    });
+  });
+
   it("defines the answer contract as repo evidence first, terminal answer second", () => {
     const contract = buildRepoCodeEvidenceAnswerContract({
       turnId: "turn:repo-concept",

@@ -21,6 +21,10 @@ import {
   isHelixAskRealtimeOutputTranscriptEvent,
   type HelixAskRealtimeCompletedOutputTranscript,
 } from "./HelixAskRealtimeOutputTranscriptDebug";
+import {
+  createHelixAskRealtimeParallelDispatchCoordinator,
+  type HelixAskRealtimeParallelDispatchSettlement,
+} from "./HelixAskRealtimeParallelDispatchCoordinator";
 
 export const HELIX_REALTIME_BARGE_MIN_SPEECH_MS = 700;
 
@@ -68,6 +72,7 @@ export type HelixAskRealtimeProviderEventProjection = {
 
 export type HelixAskRealtimeProviderEventHandler = {
   handle(event: unknown): Promise<HelixAskRealtimeProviderEventProjection>;
+  dispose(): void;
 };
 
 type RealtimeEventRecord = Record<string, unknown>;
@@ -79,6 +84,41 @@ const readRecord = (value: unknown): RealtimeEventRecord =>
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
+
+type HelixRealtimeResponseBinding = Pick<
+  HelixAskRealtimeCompletedOutputTranscript,
+  | "helix_response_purpose"
+  | "helix_relay_id"
+  | "helix_provisional_response_id"
+  | "helix_handoff_id"
+  | "helix_worker_admission_id"
+  | "helix_utterance_code"
+>;
+
+const readSafeCorrelationValue = (value: unknown): string | null => {
+  const text = readString(value);
+  return text && /^[A-Za-z0-9._:-]{1,260}$/.test(text) ? text : null;
+};
+
+const readHelixResponseBinding = (
+  response: RealtimeEventRecord,
+): HelixRealtimeResponseBinding | null => {
+  const metadata = readRecord(response.metadata);
+  const purpose = readSafeCorrelationValue(metadata.helix_purpose);
+  if (!purpose) return null;
+  return {
+    helix_response_purpose: purpose,
+    helix_relay_id: readSafeCorrelationValue(metadata.helix_relay_id),
+    helix_provisional_response_id: readSafeCorrelationValue(
+      metadata.helix_provisional_response_id,
+    ),
+    helix_handoff_id: readSafeCorrelationValue(metadata.helix_handoff_id),
+    helix_worker_admission_id: readSafeCorrelationValue(
+      metadata.helix_worker_admission_id,
+    ),
+    helix_utterance_code: readSafeCorrelationValue(metadata.helix_utterance_code),
+  };
+};
 
 const clipTranscript = (value: string): string => value.trim().slice(0, 16_000);
 
@@ -198,17 +238,20 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
   bargeMinSpeechMs?: number;
   readAudioFocus?: typeof getAudioFocusSnapshot;
   interruptTerminalVoice?: () => boolean;
+  parallelDispatchFallbackMs?: number;
 }): HelixAskRealtimeProviderEventHandler => {
   const consumedEventRefs = new Set<string>();
   const recordedPlaybackReceiptKeys = new Set<string>();
   const postEvent = input.postEvent ?? (async (path, body) => {
     const response = await fetch(path, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const payload = await response.json();
+    const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error(`realtime_event_http_${response.status}`);
+    if (!payload) throw new Error("realtime_event_response_invalid");
     return payload;
   });
   const launchPrompt = input.launchPrompt ?? launchHelixAskPrompt;
@@ -221,8 +264,66 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
     input.bargeMinSpeechMs ?? HELIX_REALTIME_BARGE_MIN_SPEECH_MS,
   );
   const outputTranscriptTracker = createHelixAskRealtimeOutputTranscriptTracker();
+  const parallelDispatchCoordinator =
+    createHelixAskRealtimeParallelDispatchCoordinator({
+      fallbackMs: input.parallelDispatchFallbackMs,
+    });
+  const responseBindings = new Map<string, HelixRealtimeResponseBinding>();
+  let activeProviderResponseRef: string | null = null;
   let activeSpeech: { startedAtMs: number; terminalVoiceOverlap: boolean } | null = null;
   let completedSpeech: { durationMs: number; terminalVoiceOverlap: boolean } | null = null;
+
+  const recordWorkerDispatchReceipt = (receipt: {
+    receiptKind:
+      | "worker_dispatch_deferred"
+      | "worker_dispatch_requested"
+      | "worker_dispatch_skipped";
+    handoffId: string;
+    workerAdmissionId: string;
+    workerDispatchKind: string;
+    workerDispatchState: string;
+    workerTurnDispatched: boolean;
+    runtimeGoalWakeRequested: boolean;
+    observedAtMs: number;
+    settlementReason?: string | null;
+    settlementSpeechEpoch?: number | null;
+    failureCode?: string | null;
+  }): void => {
+    const receiptRefKind = receipt.receiptKind === "worker_dispatch_deferred"
+      ? "worker-dispatch-deferred"
+      : "worker-dispatch";
+    void Promise.resolve(postEvent(
+      `/api/agi/realtime/session/${encodeURIComponent(input.realtimeSessionId)}/client-receipt`,
+      {
+        client_receipt_ref:
+          `receipt:realtime:${receiptRefKind}:${receipt.workerAdmissionId}`,
+        receipt_kind: receipt.receiptKind,
+        status: receipt.receiptKind === "worker_dispatch_requested"
+          ? "requested"
+          : receipt.receiptKind === "worker_dispatch_deferred"
+            ? "pending"
+            : "received",
+        observed_at_ms: receipt.observedAtMs,
+        lifecycle_state: "active",
+        handoff_id: receipt.handoffId,
+        worker_admission_id: receipt.workerAdmissionId,
+        worker_dispatch_kind: receipt.workerDispatchKind,
+        worker_dispatch_state: receipt.workerDispatchState,
+        worker_dispatch_settlement_reason: receipt.settlementReason ?? null,
+        worker_dispatch_speech_epoch: receipt.settlementSpeechEpoch ?? null,
+        worker_turn_dispatched: receipt.workerTurnDispatched,
+        runtime_goal_wake_requested: receipt.runtimeGoalWakeRequested,
+        failure_code: receipt.failureCode ?? null,
+        workstation_action_executed: false,
+        realtime_provider_tool_executed: false,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        reentry_required: receipt.workerTurnDispatched,
+      },
+    )).catch(() => null);
+  };
 
   return {
     handle: async (value) => {
@@ -234,16 +335,28 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
         readString(event.transcript ?? event.text ?? event.delta) ?? "",
       );
       if (kind === "output_transcript") {
-        const completedOutputTranscript = await outputTranscriptTracker.observe({
+        const trackedOutputTranscript = await outputTranscriptTracker.observe({
           event,
           type,
           eventRef,
           observedAtMs: nowMs(),
         });
         const response = readRecord(event.response);
-        const providerResponseRef = completedOutputTranscript?.provider_response_ref ?? readString(
+        const providerResponseRef = trackedOutputTranscript?.provider_response_ref ?? readString(
           event.response_id ?? event.responseId ?? response.id,
         );
+        const responseBinding = providerResponseRef
+          ? responseBindings.get(providerResponseRef) ?? null
+          : null;
+        const completedOutputTranscript = trackedOutputTranscript
+          ? {
+              ...trackedOutputTranscript,
+              ...(responseBinding ?? {}),
+              correlation_source: responseBinding
+                ? "provider_response_created_metadata" as const
+                : null,
+            }
+          : null;
         const projection = buildProjection({
           eventRef,
           type,
@@ -269,6 +382,7 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
         const observedAtMs = nowMs();
         const focus = readAudioFocus();
         if (vadState === "speech_started") {
+          parallelDispatchCoordinator.noteSpeechStarted();
           activeSpeech = {
             startedAtMs: observedAtMs,
             terminalVoiceOverlap: focus.active_kind === "helix_terminal_voice",
@@ -280,6 +394,24 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
             terminalVoiceOverlap: activeSpeech.terminalVoiceOverlap,
           };
           activeSpeech = null;
+        }
+        if (kind === "interruption" && type === "response.done") {
+          const response = readRecord(event.response);
+          const providerResponseRef = readString(
+            response.id ?? event.response_id ?? event.responseId,
+          );
+          const responseBinding = providerResponseRef
+            ? responseBindings.get(providerResponseRef) ?? null
+            : null;
+          if (
+            responseBinding?.helix_response_purpose === "parallel_conversation" &&
+            responseBinding.helix_handoff_id
+          ) {
+            parallelDispatchCoordinator.cancelHandoff({
+              handoffId: responseBinding.helix_handoff_id,
+              trigger: "provider_response_interrupted",
+            });
+          }
         }
         let blockedReason: string | null = null;
         try {
@@ -319,7 +451,11 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
         return projection;
       }
       if (kind === "playback") {
-        const responseRef = readString(event.response_id ?? event.responseId) ?? eventRef;
+        const responseRef =
+          readString(event.response_id ?? event.responseId) ??
+          activeProviderResponseRef ??
+          eventRef;
+        const responseBinding = responseBindings.get(responseRef) ?? null;
         const ended = type.endsWith(".done") || type === "output_audio_buffer.stopped";
         const receiptKind = ended ? "playback_ended" : "playback_started";
         const receiptKey = `${responseRef}:${receiptKind}`;
@@ -332,8 +468,9 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
               {
                 client_receipt_ref: `receipt:realtime:${receiptKind}:${responseRef}`,
                 receipt_kind: receiptKind,
+                relay_id: responseBinding?.helix_relay_id ?? null,
                 status: ended ? "received" : "requested",
-                observed_at_ms: Date.now(),
+                observed_at_ms: nowMs(),
                 lifecycle_state: ended ? "listening" : "active",
                 provider_event_type: type,
                 provider_response_ref: responseRef,
@@ -348,7 +485,20 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
             blockedReason = error instanceof Error ? error.message : "realtime_playback_receipt_failed";
           }
         }
+        if (
+          type === "output_audio_buffer.stopped" &&
+          responseBinding?.helix_response_purpose === "parallel_conversation" &&
+          responseBinding.helix_handoff_id
+        ) {
+          parallelDispatchCoordinator.settleHandoff({
+            handoffId: responseBinding.helix_handoff_id,
+            trigger: "live_response_playback_ended",
+          });
+        }
         const projection = buildProjection({ eventRef, type, kind, blockedReason });
+        if (ended && activeProviderResponseRef === responseRef) {
+          activeProviderResponseRef = null;
+        }
         input.onProjection?.(projection);
         return projection;
       }
@@ -359,6 +509,21 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
         const providerResponseRef = readString(
           response.id ?? event.response_id ?? event.responseId,
         );
+        if (type === "response.created") {
+          activeProviderResponseRef = providerResponseRef;
+        }
+        const responseBinding =
+          readHelixResponseBinding(response) ??
+          (providerResponseRef
+            ? responseBindings.get(providerResponseRef) ?? null
+            : null);
+        if (providerResponseRef && responseBinding) {
+          responseBindings.set(providerResponseRef, responseBinding);
+          if (responseBindings.size > 80) {
+            const oldest = responseBindings.keys().next().value;
+            if (typeof oldest === "string") responseBindings.delete(oldest);
+          }
+        }
         const receiptKind = type === "response.created"
           ? "response_started"
           : responseStatus === "failed"
@@ -371,6 +536,7 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
             {
               client_receipt_ref: `receipt:realtime:${receiptKind}:${providerResponseRef ?? eventRef}`,
               receipt_kind: receiptKind,
+              relay_id: responseBinding?.helix_relay_id ?? null,
               status: responseStatus === "failed" ? "error" : "received",
               observed_at_ms: nowMs(),
               lifecycle_state: type === "response.created" ? "active" : "listening",
@@ -386,6 +552,24 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
           );
         } catch (error) {
           blockedReason = error instanceof Error ? error.message : "realtime_response_receipt_failed";
+        }
+        if (
+          type === "response.done" &&
+          ["failed", "incomplete"].includes(responseStatus) &&
+          responseBinding?.helix_response_purpose === "parallel_conversation" &&
+          responseBinding.helix_handoff_id
+        ) {
+          parallelDispatchCoordinator.settleHandoff({
+            handoffId: responseBinding.helix_handoff_id,
+            trigger: "live_response_failed",
+          });
+        }
+        if (
+          type === "response.done" &&
+          ["failed", "cancelled", "incomplete"].includes(responseStatus) &&
+          activeProviderResponseRef === providerResponseRef
+        ) {
+          activeProviderResponseRef = null;
         }
         const projection = buildProjection({
           eventRef,
@@ -423,6 +607,7 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
 
       consumedEventRefs.add(eventRef);
       const observedAtMs = nowMs();
+      const transcriptSpeechEpoch = parallelDispatchCoordinator.readSpeechEpoch();
       const focus = readAudioFocus();
       const speechEvidence = activeSpeech
         ? {
@@ -594,7 +779,7 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
             : null,
           observedAtMs,
         });
-        const dispatchResult = executeHelixAskRealtimeWorkerDispatch({
+        const executeDispatch = () => executeHelixAskRealtimeWorkerDispatch({
           admission: workerAdmission,
           transcript,
           transcriptHash: readString(handoff.transcript_text_hash),
@@ -605,48 +790,93 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
           launchPrompt,
           requestGoalWake: input.requestGoalWake,
         });
-        void Promise.resolve(postEvent(
-          `/api/agi/realtime/session/${encodeURIComponent(input.realtimeSessionId)}/client-receipt`,
-          {
-            client_receipt_ref: `receipt:realtime:worker-dispatch:${workerAdmission.admission_id}`,
-            receipt_kind: dispatchResult.workerTurnDispatched
+        let workerDispatchState: string;
+        let workerTurnDispatched: boolean;
+        let runtimeGoalWakeRequested: boolean;
+        if (workerAdmission.interaction_mode === "parallel_conversation") {
+          const onSettlement = (
+            settlement: HelixAskRealtimeParallelDispatchSettlement,
+          ): void => {
+            recordWorkerDispatchReceipt({
+              receiptKind: settlement.result?.workerTurnDispatched
+                ? "worker_dispatch_requested"
+                : "worker_dispatch_skipped",
+              handoffId,
+              workerAdmissionId: workerAdmission.admission_id,
+              workerDispatchKind: workerAdmission.dispatch.kind,
+              workerDispatchState: settlement.state,
+              workerTurnDispatched:
+                settlement.result?.workerTurnDispatched === true,
+              runtimeGoalWakeRequested:
+                settlement.result?.runtimeGoalWakeRequested === true,
+              observedAtMs: nowMs(),
+              settlementReason: settlement.trigger,
+              settlementSpeechEpoch: settlement.speechEpoch,
+              failureCode: settlement.failureCode,
+            });
+          };
+          workerDispatchState = parallelDispatchCoordinator.defer({
+            handoffId,
+            workerAdmissionId: workerAdmission.admission_id,
+            speechEpoch: transcriptSpeechEpoch,
+            execute: executeDispatch,
+            onSettlement,
+          });
+          workerTurnDispatched = false;
+          runtimeGoalWakeRequested = false;
+          if (workerDispatchState === "awaiting_live_turn_settlement") {
+            recordWorkerDispatchReceipt({
+              receiptKind: "worker_dispatch_deferred",
+              handoffId,
+              workerAdmissionId: workerAdmission.admission_id,
+              workerDispatchKind: workerAdmission.dispatch.kind,
+              workerDispatchState,
+              workerTurnDispatched: false,
+              runtimeGoalWakeRequested: false,
+              observedAtMs,
+              settlementReason: "awaiting_correlated_live_response_playback",
+              settlementSpeechEpoch: transcriptSpeechEpoch,
+            });
+          }
+        } else {
+          const dispatchResult = executeDispatch();
+          workerDispatchState = dispatchResult.state;
+          workerTurnDispatched = dispatchResult.workerTurnDispatched;
+          runtimeGoalWakeRequested = dispatchResult.runtimeGoalWakeRequested;
+          recordWorkerDispatchReceipt({
+            receiptKind: dispatchResult.workerTurnDispatched
               ? "worker_dispatch_requested"
               : "worker_dispatch_skipped",
-            status: dispatchResult.workerTurnDispatched ? "requested" : "received",
-            observed_at_ms: observedAtMs,
-            lifecycle_state: "active",
-            handoff_id: handoffId,
-            worker_admission_id: workerAdmission.admission_id,
-            worker_dispatch_kind: dispatchResult.kind,
-            worker_dispatch_state: dispatchResult.state,
-            worker_turn_dispatched: dispatchResult.workerTurnDispatched,
-            runtime_goal_wake_requested: dispatchResult.runtimeGoalWakeRequested,
-            workstation_action_executed: false,
-            realtime_provider_tool_executed: false,
-            answer_authority: false,
-            assistant_answer: false,
-            terminal_eligible: false,
-            raw_content_included: false,
-            reentry_required: dispatchResult.workerTurnDispatched,
-          },
-        )).catch(() => null);
+            handoffId,
+            workerAdmissionId: workerAdmission.admission_id,
+            workerDispatchKind: dispatchResult.kind,
+            workerDispatchState: dispatchResult.state,
+            workerTurnDispatched: dispatchResult.workerTurnDispatched,
+            runtimeGoalWakeRequested: dispatchResult.runtimeGoalWakeRequested,
+            observedAtMs,
+          });
+        }
         consumedEventRefs.add(eventRef);
         const projection = buildProjection({
           eventRef,
           type,
           kind,
           transcriptCharCount: transcript.length,
-          reentryStatus: dispatchResult.workerTurnDispatched ? "reentered" : "not_required",
+          reentryStatus:
+            workerTurnDispatched ||
+            workerAdmission.interaction_mode === "parallel_conversation"
+              ? "reentered"
+              : "not_required",
           qualifiedUserInterruption,
           handoffId,
           stagePlayEventRef,
           contextPackId,
           contextSyncStatus: readString(contextSync.status),
           workerAdmissionSchema: workerAdmission.schema,
-          workerDispatchKind: dispatchResult.kind,
-          workerDispatchState: dispatchResult.state,
-          workerTurnDispatched: dispatchResult.workerTurnDispatched,
-          runtimeGoalWakeRequested: dispatchResult.runtimeGoalWakeRequested,
+          workerDispatchKind: workerAdmission.dispatch.kind,
+          workerDispatchState,
+          workerTurnDispatched,
+          runtimeGoalWakeRequested,
         });
         input.onProjection?.(projection);
         return projection;
@@ -664,5 +894,6 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
         return projection;
       }
     },
+    dispose: () => parallelDispatchCoordinator.dispose(),
   };
 };

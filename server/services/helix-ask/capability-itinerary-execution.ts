@@ -739,7 +739,7 @@ export const isHelixCapabilityItineraryFamilyObserved = (
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
       artifactMatchesObservationKind(
         artifact,
-        /helix_theory_context_reflection_tool_receipt|theory_context_reflection|theory_frontier_search|theory_frontier_candidate|theory_frontier_exact_contract_verification/i,
+        /helix_theory_context_reflection_tool_receipt|theory_context_reflection|theory_frontier_search|theory_frontier_candidate|theory_frontier_conjecture_observation|theory_frontier_exact_contract_verification/i,
       ),
     );
   }

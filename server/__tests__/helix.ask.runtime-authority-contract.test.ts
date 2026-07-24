@@ -9,10 +9,12 @@ import {
   hasPostObservationModelDecision,
   hasRuntimeToolCallForSelectedCapability,
   hasSelectedCapabilityObservation,
+  isModelDirectAnswerTurn,
   isSourceCapabilityDiagnosticTurn,
 } from "../services/helix-ask/runtime-authority-contract";
 import { buildPostToolAuthorityBridge } from "../services/helix-ask/post-tool-authority-bridge";
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
+import { createHelixTurnLifecycleRecorder } from "../services/helix-ask/runtime/turn-lifecycle";
 import { resolveToolFamilyContract } from "../services/helix-ask/tool-family-contract";
 
 describe("helix ask runtime authority contract", () => {
@@ -1964,7 +1966,141 @@ describe("helix ask runtime authority contract", () => {
     expect(report.eligible).toBe(true);
   });
 
-  it("accepts a directly authorized provider candidate after current-turn evidence re-entry", () => {
+  it.each(["user", "developer"] as const)(
+    "accepts a current-turn Docs provider product for %s accounts despite a stale Realtime model-only hint",
+    (accountType) => {
+      const turnId = `turn-realtime-docs-route-product-${accountType}`;
+      const observationRef = `${turnId}:workstation_gateway:docs.search:1`;
+      const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:nhm2`;
+      const routeProductRef = `${candidateRef}:route_product:model_synthesized_answer`;
+      const payload = {
+        turn_id: turnId,
+        account_policy: {
+          account_type: accountType,
+          allowed_workstation_capabilities: accountType === "developer" ? ["*"] : ["docs.search"],
+        },
+        source_target_intent: {
+          target_source: "model_only",
+          target_kind: "general_background",
+          strength: "soft",
+        },
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          turn_id: turnId,
+          route: {
+            selected_route: "/ask/turn/stream",
+            source_target: "docs_viewer",
+            target_kind: "docs_viewer",
+            strength: "hard",
+          },
+          capability_policy: {
+            allowed_tool_families: ["docs_viewer"],
+            required_capability_families: ["docs_viewer"],
+          },
+          canonical_goal: {
+            goal_kind: "docs",
+            required_terminal_kind: "model_synthesized_answer",
+            allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+            forbidden_terminal_artifact_kinds: [],
+          },
+        },
+        canonical_goal_frame: {
+          turn_id: turnId,
+          goal_kind: "agent_provider_gateway_turn",
+          requested_capability: "docs.search",
+          required_terminal_kind: "model_synthesized_answer",
+        },
+        route_product_contract: {
+          source_target: "docs_viewer",
+          required_terminal_kind: "model_synthesized_answer",
+          allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        },
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+        selected_final_answer: "I found the NHM2 research documents and summarized their current model.",
+        provider_terminal_authority_bridge: {
+          schema: "helix.provider_terminal_authority_bridge.v1",
+          turn_id: turnId,
+          provider_terminal_candidate_ref: candidateRef,
+          solver_completed: true,
+          goal_satisfaction_compatible: true,
+          terminal_authority_granted: true,
+          final_visible_answer_authorized: true,
+          normalized_observations_ready: true,
+          all_observations_succeeded: true,
+          successful_gateway_observation_refs: [observationRef],
+          successful_capability_lane_observation_refs: [],
+        },
+        provider_route_product_materialization: {
+          schema: "helix.provider_route_product_materialization.v1",
+          turn_id: turnId,
+          status: "materialized",
+          provider_terminal_candidate_ref: candidateRef,
+          materialized_terminal_artifact_kind: "model_synthesized_answer",
+          materialized_terminal_artifact_ref: routeProductRef,
+          selected_observation_refs: [observationRef],
+        },
+        provider_route_product_quality_gate: {
+          schema: "helix.final_answer_draft_quality_gate.v1",
+          turn_id: turnId,
+          ok: true,
+          violations: [],
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: observationRef,
+            kind: "provider_gateway_observation_packet",
+            payload: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: turnId,
+              capability_key: "docs.search",
+              status: "succeeded",
+            },
+          },
+          {
+            artifact_id: routeProductRef,
+            kind: "model_synthesized_answer",
+            payload: {
+              schema: "helix.provider_route_product.v1",
+              artifact_id: routeProductRef,
+              turn_id: turnId,
+              kind: "model_synthesized_answer",
+              provider_terminal_candidate_ref: candidateRef,
+              answer_text: "I found the NHM2 research documents and summarized their current model.",
+              support_refs: [observationRef],
+              terminal_eligible: true,
+            },
+          },
+        ],
+      };
+
+      expect(isModelDirectAnswerTurn(payload)).toBe(false);
+      expect(isSourceCapabilityDiagnosticTurn(payload)).toBe(true);
+      const missingProviderProof = structuredClone(payload) as Record<string, unknown>;
+      delete missingProviderProof.provider_terminal_authority_bridge;
+      delete missingProviderProof.provider_route_product_materialization;
+      delete missingProviderProof.provider_route_product_quality_gate;
+      const blockedReport = evaluateTerminalBoundaryEligibility(missingProviderProof);
+      expect(blockedReport.eligible).toBe(false);
+      expect(blockedReport.blocking_reasons).toEqual(expect.arrayContaining([
+        "agent_runtime_loop_missing",
+        "selected_capability_observation_missing",
+        "post_observation_model_decision_missing",
+      ]));
+      const report = evaluateTerminalBoundaryEligibility(payload);
+      expect(report.checks).toMatchObject({
+        agent_runtime_loop: true,
+        agent_step_decision: true,
+        selected_capability_observation: true,
+        post_observation_model_decision: true,
+        goal_satisfaction_allows_terminal: true,
+      });
+      expect(report.eligible).toBe(true);
+      expect(report.blocking_reasons).toEqual([]);
+    },
+  );
+
+  it("accepts a directly authorized provider candidate after current-turn evidence re-entry despite a stale model-only envelope", () => {
     const turnId = "turn-provider-candidate-authority";
     const observationRef = `${turnId}:workstation_gateway:repo.search:1`;
     const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:repo`;
@@ -1992,9 +2128,12 @@ describe("helix ask runtime authority contract", () => {
           allowed_tool_families: ["repo_code"],
         },
         canonical_goal: {
-          goal_kind: "unknown",
-          required_terminal_kind: "unknown",
-          allowed_terminal_artifact_kinds: [],
+          goal_kind: "model_only_concept",
+          required_terminal_kind: "direct_answer_text",
+          allowed_terminal_artifact_kinds: [
+            "direct_answer_text",
+            "agent_provider_terminal_candidate",
+          ],
           forbidden_terminal_artifact_kinds: [],
         },
       },
@@ -2117,5 +2256,305 @@ describe("helix ask runtime authority contract", () => {
     expect(report.severity).toBe("p1");
     expect(report.blocking_reasons).toContain("goal_satisfaction_not_terminal");
     expect(report.blocking_reasons).toContain("typed_failure_missing_code");
+  });
+
+  it("accepts a committed scholarly answer after verified observation re-entry despite a stale preflight goal frame", () => {
+    const turnId = "ask:runtime-authority:scholarly-answer";
+    const observationRef = `${turnId}:workstation_gateway:scholarly-research.lookup_papers:1`;
+    const recorder = createHelixTurnLifecycleRecorder({
+      turnId,
+      scope: "codex_native_provider_cycle",
+      now: () => 100,
+    });
+    const started = recorder.append({
+      kind: "turn.started",
+      producer: "helix_adapter",
+      status: "started",
+    });
+    const route = recorder.append({
+      kind: "route.committed",
+      producer: "helix_policy",
+      status: "succeeded",
+      causation_id: started.event_id,
+      route_commit_id: "route:scholarly",
+      capability_ids: ["scholarly-research.lookup_papers"],
+    });
+    const admitted = recorder.append({
+      kind: "capability.admitted",
+      producer: "helix_policy",
+      status: "succeeded",
+      causation_id: route.event_id,
+      route_commit_id: "route:scholarly",
+      capability_id: "scholarly-research.lookup_papers",
+    });
+    const call = recorder.append({
+      kind: "tool.call.started",
+      producer: "codex_runtime",
+      status: "started",
+      causation_id: admitted.event_id,
+      route_commit_id: "route:scholarly",
+      call_id: "call:scholarly",
+      capability_id: "scholarly-research.lookup_papers",
+    });
+    const completed = recorder.append({
+      kind: "tool.call.completed",
+      producer: "helix_adapter",
+      status: "succeeded",
+      causation_id: call.event_id,
+      route_commit_id: "route:scholarly",
+      call_id: "call:scholarly",
+      capability_id: "scholarly-research.lookup_papers",
+      observation_refs: [observationRef],
+    });
+    const reentered = recorder.append({
+      kind: "observation.reentered",
+      producer: "helix_adapter",
+      status: "succeeded",
+      causation_id: completed.event_id,
+      route_commit_id: "route:scholarly",
+      call_id: "call:scholarly",
+      capability_id: "scholarly-research.lookup_papers",
+      observation_refs: [observationRef],
+    });
+    const message = recorder.append({
+      kind: "agent.message.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: reentered.event_id,
+      native_item_id: "agent-message:scholarly",
+      message_sha256: "hash:scholarly",
+    });
+    const runtime = recorder.append({
+      kind: "runtime.turn.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: message.event_id,
+      native_turn_id: "native-turn:scholarly",
+    });
+    const eligibility = recorder.append({
+      kind: "terminal.eligibility.checked",
+      producer: "helix_policy",
+      status: "succeeded",
+      causation_id: runtime.event_id,
+      terminal_kind: "scholarly_research_answer",
+      terminal_eligible: true,
+    });
+    recorder.append({
+      kind: "turn.completed",
+      producer: "helix_adapter",
+      status: "succeeded",
+      causation_id: eligibility.event_id,
+      terminal_kind: "scholarly_research_answer",
+      terminal_eligible: true,
+    });
+
+    const payload = {
+      turn_id: turnId,
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+      ask_turn_solver_trace: {
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          turn_id: turnId,
+          route: {
+            selected_route: "/ask/turn/stream",
+            source_target: "scholarly_research",
+            target_kind: "scholarly_research",
+            strength: "hard",
+          },
+          canonical_goal: {
+            goal_kind: "scholarly_research",
+            required_terminal_kind: "scholarly_research_answer",
+            allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+            forbidden_terminal_artifact_kinds: ["direct_answer_text"],
+          },
+          capability_policy: {
+            allowed_tool_families: ["scholarly_research"],
+          },
+        },
+      },
+      native_provider_turn_lifecycle: recorder.snapshot(),
+      terminal_artifact_kind: "scholarly_research_answer",
+      final_answer_source: "scholarly_research_answer",
+      selected_final_answer: "Magnetar observations support ultra-strong magnetic-field models.",
+      terminal_answer_authority: {
+        turn_id: turnId,
+        terminal_kind: "answer",
+        terminal_artifact_kind: "scholarly_research_answer",
+        final_answer_source: "scholarly_research_answer",
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        turn_id: turnId,
+        terminal_artifact_kind: "scholarly_research_answer",
+        final_answer_source: "scholarly_research_answer",
+        concise_text: "Magnetar observations support ultra-strong magnetic-field models.",
+        selected_observation_refs: [observationRef],
+      },
+      current_turn_artifact_ledger: [{
+        artifact_id: observationRef,
+        kind: "scholarly_research_observation",
+        payload: {
+          schema: "helix.scholarly_research_observation.v1",
+          capability_key: "scholarly-research.lookup_papers",
+        },
+      }],
+    };
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.checks).toMatchObject({
+      agent_runtime_loop: true,
+      selected_capability_observation: true,
+      post_observation_model_decision: true,
+      goal_satisfaction_allows_terminal: true,
+    });
+    expect(report.blocking_reasons).toEqual([]);
+    expect(report.eligible).toBe(true);
+  });
+
+  it("accepts a current-turn scholarly provider bridge when the native lifecycle projection is unavailable", () => {
+    const turnId = "ask:runtime-authority:scholarly-provider-bridge";
+    const observationRef = `${turnId}:scholarly_research_observation:1`;
+    const candidateRef = `${turnId}:provider_terminal_candidate:1`;
+    const text = "A relevant magnetar citation was found and summarized from the scholarly observation.";
+    const payload = {
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+      ask_turn_solver_trace: {
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          turn_id: turnId,
+          route: {
+            selected_route: "/ask/turn/stream",
+            source_target: "scholarly_research",
+            target_kind: "scholarly_research",
+            strength: "hard",
+          },
+          canonical_goal: {
+            goal_kind: "scholarly_research",
+            required_terminal_kind: "scholarly_research_answer",
+            allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure"],
+            forbidden_terminal_artifact_kinds: ["direct_answer_text"],
+          },
+          capability_policy: {
+            allowed_tool_families: ["scholarly_research"],
+          },
+        },
+      },
+      terminal_artifact_kind: "scholarly_research_answer",
+      final_answer_source: "scholarly_research_answer",
+      selected_final_answer: text,
+      terminal_answer_authority: {
+        turn_id: turnId,
+        terminal_kind: "answer",
+        terminal_artifact_kind: "scholarly_research_answer",
+        final_answer_source: "scholarly_research_answer",
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        turn_id: turnId,
+        concise_text: text,
+        selected_observation_refs: [observationRef],
+      },
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        turn_id: turnId,
+        status: "completed",
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        normalized_observation_refs: [observationRef],
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+        provider_terminal_candidate_ref: candidateRef,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        normalized_observations_ready: true,
+        all_observations_succeeded: true,
+        all_gateway_calls_succeeded: true,
+        all_capability_lane_observations_succeeded: true,
+        successful_gateway_observation_refs: [observationRef],
+        successful_capability_lane_observation_refs: [],
+        terminal_answer_authority: {
+          turn_id: turnId,
+          terminal_kind: "answer",
+          terminal_artifact_kind: "agent_provider_terminal_candidate",
+          final_answer_source: "agent_provider_terminal_candidate",
+          terminal_item_id: candidateRef,
+          server_authoritative: true,
+        },
+        terminal_presentation: {
+          turn_id: turnId,
+          final_answer_source: "agent_provider_terminal_candidate",
+          terminal_authority_ref: candidateRef,
+        },
+      },
+    };
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.runtime_lifecycle.authority_source).toBe("legacy_projection_only");
+    expect(report.checks).toMatchObject({
+      agent_runtime_loop: true,
+      selected_capability_observation: true,
+      post_observation_model_decision: true,
+      goal_satisfaction_allows_terminal: true,
+    });
+    expect(report.blocking_reasons).toEqual([]);
+    expect(report.eligible).toBe(true);
+  });
+
+  it("does not demand a direct-answer draft after a verified provider route product supersedes stale model-only intent", () => {
+    const turnId = "ask:runtime-authority:provider-product-overrides-stale-model-only";
+    const observationRef = `${turnId}:scholarly_research_observation:1`;
+    const text = "The provider completed the scholarly lookup and returned a grounded magnetar citation.";
+    const payload = {
+      turn_id: turnId,
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+      terminal_artifact_kind: "scholarly_research_answer",
+      final_answer_source: "scholarly_research_answer",
+      selected_final_answer: text,
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        normalized_observations_ready: true,
+        all_observations_succeeded: true,
+        successful_gateway_observation_refs: [observationRef],
+      },
+      provider_route_product_materialization: {
+        schema: "helix.provider_route_product_materialization.v1",
+        turn_id: turnId,
+        materialized_terminal_artifact_kind: "scholarly_research_answer",
+        status: "materialized",
+      },
+      provider_route_product_quality_gate: {
+        schema: "helix.final_answer_draft_quality_gate.v1",
+        ok: true,
+      },
+    };
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.provider_bridge_runtime_authority.eligible).toBe(true);
+    expect(report.checks.goal_satisfaction_allows_terminal).toBe(true);
+    expect(report.blocking_reasons).toEqual([]);
+    expect(report.eligible).toBe(true);
   });
 });

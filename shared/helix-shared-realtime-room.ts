@@ -10,6 +10,8 @@ export const HELIX_SHARED_REALTIME_ROOM_VISUAL_FRAME_RECEIPT_SCHEMA =
   "helix.shared_realtime_room.visual_frame_receipt.v1" as const;
 export const HELIX_SHARED_REALTIME_ROOM_DEBUG_SCHEMA =
   "helix.shared_realtime_room.debug.v1" as const;
+export const HELIX_SHARED_REALTIME_ROOM_PARTICIPANT_CONTEXT_SCHEMA =
+  "helix.shared_realtime_room.participant_context.v1" as const;
 
 export const HELIX_SHARED_REALTIME_ROOM_MAX_PARTICIPANTS = 2 as const;
 
@@ -105,6 +107,7 @@ export type HelixSharedRealtimeRoom = {
   max_participants: typeof HELIX_SHARED_REALTIME_ROOM_MAX_PARTICIPANTS;
   self_participant_id: string;
   participants: HelixSharedRealtimeRoomParticipant[];
+  participant_context_cards: HelixSharedRealtimeRoomParticipantContextCard[];
   readiness: HelixSharedRealtimeRoomReadiness;
   runtime: HelixSharedRealtimeRoomRuntime;
   created_at: string;
@@ -124,11 +127,47 @@ export type HelixSharedRealtimeRoomVisualSourceSurface =
   | "manual_upload";
 
 export type HelixSharedRealtimeRoomFrameDelivery =
+  | "transport_sent"
   | "sent_to_shared_model"
+  | "provider_rejected"
   | "runtime_not_bound"
   | "sideband_unavailable"
   | "duplicate"
   | "blocked_by_consent";
+
+export type HelixSharedRealtimeRoomParticipantSourceContext = {
+  source_id: string;
+  source_label: string;
+  source_surface: HelixSharedRealtimeRoomVisualSourceSurface;
+  latest_frame_ref: string;
+  captured_at: string;
+  freshness: "fresh" | "stale";
+  provider_delivery: HelixSharedRealtimeRoomFrameDelivery;
+  model_visibility:
+    | "model_provider_acknowledged"
+    | "model_transport_pending"
+    | "panel_only"
+    | "blocked";
+  evidence_refs: string[];
+};
+
+/** Session-scoped observed room state. It must not be used as a personality profile. */
+export type HelixSharedRealtimeRoomParticipantContextCard = {
+  schema: typeof HELIX_SHARED_REALTIME_ROOM_PARTICIPANT_CONTEXT_SCHEMA;
+  participant_id: string;
+  display_name: string;
+  role: HelixSharedRealtimeRoomRole;
+  presence: HelixSharedRealtimeRoomPresence;
+  context_status: "active" | "awaiting_frame" | "away" | "visual_consent_revoked";
+  visual_sources: HelixSharedRealtimeRoomParticipantSourceContext[];
+  latest_observed_at: string | null;
+  transcript_status: "floor_attributed" | "room_media_bridge_required";
+  limitations: string[];
+  answer_authority: false;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+};
 
 /**
  * Authorized room members may request an ephemeral thumbnail projection for

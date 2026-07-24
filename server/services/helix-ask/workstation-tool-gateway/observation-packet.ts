@@ -18,6 +18,7 @@ export const buildWorkstationGatewayObservationPacket = (input: {
   status: HelixAgentStepObservationPacket["status"];
   summary: string;
   observation: unknown;
+  stateDelta?: HelixAgentStepObservationPacket["state_delta"];
   missingRequirements?: HelixAgentStepObservationPacket["missing_requirements"];
   producedAffordances?: HelixWorkstationTypedAffordance[];
   consumedAffordances?: HelixWorkstationTypedAffordance[];
@@ -48,7 +49,7 @@ export const buildWorkstationGatewayObservationPacket = (input: {
     observation_summary: input.summary,
     receipts: [],
     missing_requirements: input.missingRequirements ?? [],
-    state_delta: {},
+    state_delta: input.stateDelta ?? {},
     suggested_next_steps:
       input.status === "succeeded"
         ? ["answer", "use_another_tool"]

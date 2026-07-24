@@ -8,6 +8,11 @@ import type {
   HelixSharedRealtimeRoomVisualFrame,
   HelixSharedRealtimeRoomVisualSourceSurface,
 } from "@shared/helix-shared-realtime-room";
+import type {
+  HelixSharedRealtimeRoomMediaSignal,
+  HelixSharedRealtimeRoomMediaSignalKind,
+  HelixSharedRealtimeRoomMediaSignalResponse,
+} from "@shared/helix-shared-realtime-room-media";
 
 const SHARED_REALTIME_ROOMS_PATH = "/api/agi/realtime/rooms";
 
@@ -76,6 +81,36 @@ const requestSharedRoomJson = async (
   return payload;
 };
 
+const requestMediaSignalJson = async (
+  path: string,
+  init: RequestInit = {},
+): Promise<HelixSharedRealtimeRoomMediaSignalResponse> => {
+  const response = await fetch(path, {
+    ...init,
+    credentials: "include",
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...init.headers,
+    },
+  });
+  const payload = await response.json().catch(() => null) as
+    | HelixSharedRealtimeRoomMediaSignalResponse
+    | null;
+  if (
+    !response.ok ||
+    payload?.schema !== "helix.shared_realtime_room.media_signal.response.v1" ||
+    payload.ok !== true
+  ) {
+    throw new HelixSharedLiveRoomApiError({
+      message: payload?.message ?? payload?.error ?? null,
+      status: response.status,
+    });
+  }
+  return payload;
+};
+
 const requireRoom = (response: HelixSharedRealtimeRoomResponse): HelixSharedRealtimeRoom => {
   if (response.room) return response.room;
   throw new HelixSharedLiveRoomApiError({
@@ -120,6 +155,20 @@ export type HelixSharedLiveRoomApi = {
   reserveRuntime(roomId: string, model: string): Promise<HelixSharedRealtimeRoom>;
   bindRuntime(roomId: string, realtimeSessionId: string): Promise<HelixSharedRealtimeRoom>;
   takeFloor(roomId: string): Promise<HelixSharedRealtimeRoom>;
+  releaseFloor(roomId: string): Promise<HelixSharedRealtimeRoom>;
+  publishMediaSignal(roomId: string, input: {
+    targetParticipantId: string;
+    negotiationId: string;
+    kind: HelixSharedRealtimeRoomMediaSignalKind;
+    description?: RTCSessionDescriptionInit | null;
+    candidate?: RTCIceCandidateInit | null;
+  }): Promise<HelixSharedRealtimeRoomMediaSignal>;
+  listMediaSignals(
+    roomId: string,
+    afterSignalId?: string | null,
+  ): Promise<HelixSharedRealtimeRoomMediaSignal[]>;
+  activateMediaBridge(roomId: string): Promise<void>;
+  deactivateMediaBridge(roomId: string): Promise<void>;
   listVisualFrames(roomId: string): Promise<HelixSharedRealtimeRoomVisualFrame[]>;
   uploadVisualFrame(
     roomId: string,
@@ -198,6 +247,46 @@ export const helixSharedLiveRoomApi: HelixSharedLiveRoomApi = {
 
   async takeFloor(roomId) {
     return requireRoom(await postRoomMutation(roomId, "/runtime/floor"));
+  },
+
+  async releaseFloor(roomId) {
+    return requireRoom(await postRoomMutation(roomId, "/runtime/floor/release"));
+  },
+
+  async publishMediaSignal(roomId, input) {
+    const payload = await requestMediaSignalJson(roomPath(roomId, "/media/signals"), {
+      method: "POST",
+      body: JSON.stringify({
+        target_participant_id: input.targetParticipantId,
+        negotiation_id: input.negotiationId,
+        kind: input.kind,
+        description: input.description ?? null,
+        candidate: input.candidate ?? null,
+      }),
+    });
+    if (!payload.signal) throw new Error("shared_room_media_signal_missing");
+    return payload.signal;
+  },
+
+  async listMediaSignals(roomId, afterSignalId) {
+    const suffix = afterSignalId
+      ? `/media/signals?after=${encodeURIComponent(afterSignalId)}`
+      : "/media/signals";
+    return (await requestMediaSignalJson(roomPath(roomId, suffix))).signals;
+  },
+
+  async activateMediaBridge(roomId) {
+    await requestMediaSignalJson(roomPath(roomId, "/media/activate"), {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  },
+
+  async deactivateMediaBridge(roomId) {
+    await requestMediaSignalJson(roomPath(roomId, "/media/deactivate"), {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
   },
 
   async listVisualFrames(roomId) {

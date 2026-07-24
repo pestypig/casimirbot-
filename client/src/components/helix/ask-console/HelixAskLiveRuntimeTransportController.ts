@@ -25,6 +25,10 @@ export type HelixAskLiveRuntimeMediaStreamLike = {
   getTracks(): HelixAskLiveRuntimeTrackLike[];
 };
 
+export type HelixAskLiveRuntimeRtpSenderLike = {
+  replaceTrack?(track: HelixAskLiveRuntimeTrackLike | null): Promise<void>;
+};
+
 export type HelixAskLiveRuntimeDataChannelLike = {
   close(): void;
   send?(data: string): void;
@@ -42,7 +46,10 @@ export type HelixAskLiveRuntimeSessionDescriptionLike = {
 
 export type HelixAskLiveRuntimePeerConnectionLike = {
   createDataChannel?(label: string): HelixAskLiveRuntimeDataChannelLike;
-  addTrack?(track: HelixAskLiveRuntimeTrackLike, stream: HelixAskLiveRuntimeMediaStreamLike): unknown;
+  addTrack?(
+    track: HelixAskLiveRuntimeTrackLike,
+    stream: HelixAskLiveRuntimeMediaStreamLike,
+  ): HelixAskLiveRuntimeRtpSenderLike | unknown;
   createOffer?(): Promise<HelixAskLiveRuntimeSessionDescriptionLike>;
   setLocalDescription?(description: HelixAskLiveRuntimeSessionDescriptionLike): Promise<void>;
   setRemoteDescription?(description: HelixAskLiveRuntimeSessionDescriptionLike): Promise<void>;
@@ -166,6 +173,11 @@ export type HelixAskLiveRuntimeBrowserTransportDeps = {
 export type HelixAskLiveRuntimeBrowserTransportController =
   HelixAskLiveRuntimeTransportExecutionBoundary & {
     getResources(): HelixAskLiveRuntimeBrowserResources;
+    readProviderOutputStream(): HelixAskLiveRuntimeMediaStreamLike | null;
+    replaceProviderInputAudioTrack(
+      track: HelixAskLiveRuntimeTrackLike,
+    ): Promise<boolean>;
+    restoreProviderInputAudioTrack(): Promise<boolean>;
     setMicrophoneEnabled(enabled: boolean): boolean;
     getMicrophoneEnabled(): boolean;
     sendVisualFrame(
@@ -245,6 +257,7 @@ const defaultExchangeSdp: HelixAskLiveRuntimeSdpExchange = async (input) => {
     `/api/agi/realtime/session/${encodeURIComponent(input.realtimeSessionId)}/sdp`,
     {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         offer_sdp: input.offerSdp,
@@ -252,9 +265,11 @@ const defaultExchangeSdp: HelixAskLiveRuntimeSdpExchange = async (input) => {
       }),
     },
   );
-  const payload = (await response.json()) as HelixRealtimeSdpExchangeResponse;
-  if (!response.ok || payload.ok !== true || !payload.answer_sdp) {
-    throw new Error(payload.blocked_reason || payload.error || `realtime_sdp_http_${response.status}`);
+  const payload = await response.json().catch(() => null) as
+    | HelixRealtimeSdpExchangeResponse
+    | null;
+  if (!response.ok || payload?.ok !== true || !payload.answer_sdp) {
+    throw new Error(payload?.blocked_reason || payload?.error || `realtime_sdp_http_${response.status}`);
   }
   return {
     answerSdp: payload.answer_sdp,
@@ -419,6 +434,10 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
   let peerConnection: HelixAskLiveRuntimePeerConnectionLike | null = null;
   let dataChannel: HelixAskLiveRuntimeDataChannelLike | null = null;
   let remoteAudio: HelixAskLiveRuntimeRemoteAudioLike | null = null;
+  let providerAudioSender: HelixAskLiveRuntimeRtpSenderLike | null = null;
+  let providerInputAudioTrack: HelixAskLiveRuntimeTrackLike | null = null;
+  let originalProviderInputAudioTrack: HelixAskLiveRuntimeTrackLike | null = null;
+  let providerOutputStream: HelixAskLiveRuntimeMediaStreamLike | null = null;
   let audioFocusId: string | null = null;
   let microphoneEnabled = false;
   let transportActive = false;
@@ -446,7 +465,9 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
   };
 
   const setMicrophoneEnabled = (enabled: boolean): boolean => {
-    const tracks = mediaStream?.getTracks() ?? [];
+    const tracks = providerInputAudioTrack
+      ? [providerInputAudioTrack]
+      : mediaStream?.getTracks() ?? [];
     if (tracks.length === 0) return false;
     microphoneEnabled = enabled;
     tracks.forEach((track) => {
@@ -476,6 +497,9 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
   const closeResources = () => {
     const tracks = mediaStream?.getTracks() ?? [];
     tracks.forEach((track) => track.stop());
+    if (providerInputAudioTrack && !tracks.includes(providerInputAudioTrack)) {
+      providerInputAudioTrack.stop();
+    }
     if (audioFocusId) releaseAudioFocus(audioFocusId);
     remoteAudio?.pause();
     remoteAudio?.remove?.();
@@ -490,6 +514,10 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
     peerConnection = null;
     dataChannel = null;
     remoteAudio = null;
+    providerAudioSender = null;
+    providerInputAudioTrack = null;
+    originalProviderInputAudioTrack = null;
+    providerOutputStream = null;
     audioFocusId = null;
     microphoneEnabled = false;
     transportActive = false;
@@ -707,6 +735,33 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
 
   return {
     getResources: () => ({ mediaStream, peerConnection, dataChannel, remoteAudio }),
+    readProviderOutputStream: () => providerOutputStream,
+    replaceProviderInputAudioTrack: async (track) => {
+      if (
+        !transportActive ||
+        track.kind !== "audio" ||
+        !providerAudioSender?.replaceTrack
+      ) {
+        return false;
+      }
+      await providerAudioSender.replaceTrack(track);
+      providerInputAudioTrack = track;
+      track.enabled = microphoneEnabled;
+      return true;
+    },
+    restoreProviderInputAudioTrack: async () => {
+      if (
+        !transportActive ||
+        !originalProviderInputAudioTrack ||
+        !providerAudioSender?.replaceTrack
+      ) {
+        return false;
+      }
+      await providerAudioSender.replaceTrack(originalProviderInputAudioTrack);
+      providerInputAudioTrack = originalProviderInputAudioTrack;
+      originalProviderInputAudioTrack.enabled = microphoneEnabled;
+      return true;
+    },
     setMicrophoneEnabled,
     getMicrophoneEnabled: () => microphoneEnabled,
     sendVisualFrame,
@@ -738,9 +793,12 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
       }
 
       let openAiNetworkCallAttempted = false;
+      let transportStage = "microphone_request";
       try {
         mediaStream = await requestMicrophone();
+        transportStage = "microphone_configure";
         setMicrophoneEnabled(false);
+        transportStage = "peer_connection_create";
         peerConnection = createPeerConnection();
         if (
           !peerConnection.addTrack ||
@@ -750,12 +808,14 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
         ) {
           throw new Error("webrtc_offer_answer_api_unavailable");
         }
+        transportStage = "remote_audio_create";
         remoteAudio = createRemoteAudio();
         audioFocusId = `helix-realtime:${serverResponse.realtime_session_id}`;
         peerConnection.ontrack = (event) => {
           const streamFromEvent = event.streams?.[0] ?? null;
           const stream = streamFromEvent ?? createRemoteMediaStream(event.track);
           if (!remoteAudio || !stream || !audioFocusId) return;
+          providerOutputStream = stream;
           remoteAudio.srcObject = stream;
           const focusGranted = requestAudioFocus({
             id: audioFocusId,
@@ -782,9 +842,21 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
           deps.onAudioState?.(focusGranted ? "listening" : "muted");
           playRemoteAudio();
         };
+        transportStage = "local_tracks_add";
         for (const track of mediaStream.getTracks()) {
-          peerConnection.addTrack(track, mediaStream);
+          const sender = peerConnection.addTrack(track, mediaStream);
+          if (
+            track.kind === "audio" &&
+            sender &&
+            typeof sender === "object" &&
+            "replaceTrack" in sender
+          ) {
+            providerAudioSender = sender as HelixAskLiveRuntimeRtpSenderLike;
+            providerInputAudioTrack = track;
+            originalProviderInputAudioTrack = track;
+          }
         }
+        transportStage = "data_channel_create";
         dataChannel = peerConnection.createDataChannel?.("oai-events") ?? null;
         if (dataChannel) {
           dataChannel.onopen = () => {
@@ -837,15 +909,19 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
             }
           };
         }
+        transportStage = "offer_create";
         const offer = await peerConnection.createOffer();
         if (!offer.sdp) throw new Error("webrtc_offer_sdp_missing");
+        transportStage = "local_description_set";
         await peerConnection.setLocalDescription(offer);
         openAiNetworkCallAttempted = true;
+        transportStage = "sdp_exchange";
         const exchange = await exchangeSdp({
           realtimeSessionId: serverResponse.realtime_session_id,
           offerSdp: offer.sdp,
           visibleUserConsentReceipt: handoffPlan.visible_user_consent_receipt as string,
         });
+        transportStage = "remote_description_set";
         await peerConnection.setRemoteDescription({ type: "answer", sdp: exchange.answerSdp });
         transportActive = true;
         return buildResult({
@@ -866,6 +942,14 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
           dataChannelsCreated: Boolean(dataChannel),
         });
       } catch (error) {
+        const normalizedFailure = normalizeBrowserTransportFailure(error);
+        const failureCode = normalizedFailure === "realtime_browser_transport_failed"
+          ? `${normalizedFailure}:${transportStage}`
+          : normalizedFailure;
+        const mediaCaptureStarted = Boolean(mediaStream);
+        const browserTracksCreated = (mediaStream?.getTracks().length ?? 0) > 0;
+        const webrtcStarted = Boolean(peerConnection);
+        const dataChannelsCreated = Boolean(dataChannel);
         closeResources();
         return buildResult({
           ok: false,
@@ -874,9 +958,13 @@ export const createHelixAskLiveRuntimeBrowserTransportController = (
           handoffPlan,
           realtimeSessionId: serverResponse.realtime_session_id,
           observedAtMs: observedAtMs ?? nowMs(),
-          blockedReason: normalizeBrowserTransportFailure(error),
+          blockedReason: failureCode,
           controllerState: "error",
           transportExecutionAttempted: true,
+          mediaCaptureStarted,
+          browserTracksCreated,
+          webrtcStarted,
+          dataChannelsCreated,
           openAiNetworkCallAttempted,
           browserMediaApiReferenced: true,
         });

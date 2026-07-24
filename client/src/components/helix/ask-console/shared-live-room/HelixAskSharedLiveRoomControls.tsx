@@ -1,14 +1,13 @@
-import React, { useEffect, useId, useRef, useState } from "react";
-import { Users, X } from "lucide-react";
-import { SharedLiveRoomActivePanel } from "./SharedLiveRoomActivePanel";
-import { SharedLiveRoomSetupPanel } from "./SharedLiveRoomSetupPanel";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Users } from "lucide-react";
+import { SharedLiveRoomDialog } from "./SharedLiveRoomDialog";
 import { useHelixSharedLiveRoom } from "./useHelixSharedLiveRoom";
 
 export type HelixAskSharedLiveRoomControlsProps = {
   realtimeSessionId: string | null;
   runtimeActive: boolean;
   realtimeModel: string;
-  visualInputEnabled: boolean;
+  onVisualSourceCaptureRequested?: () => void;
   onSharedTransportChange?: (bound: boolean) => void;
   onHostTransportInvalidated?: () => void;
   onOwnerRoomClosed?: () => void;
@@ -18,7 +17,7 @@ export function HelixAskSharedLiveRoomControls({
   realtimeSessionId,
   runtimeActive,
   realtimeModel,
-  visualInputEnabled,
+  onVisualSourceCaptureRequested,
   onSharedTransportChange,
   onHostTransportInvalidated,
   onOwnerRoomClosed,
@@ -27,12 +26,11 @@ export function HelixAskSharedLiveRoomControls({
     realtimeSessionId,
     runtimeActive,
     realtimeModel,
-    visualInputEnabled,
   });
   const [dialogOpen, setDialogOpen] = useState(false);
   const titleId = useId();
   const descriptionId = useId();
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const hostInvalidationHandledRef = useRef(false);
   const hostTransportSeenRef = useRef(false);
   const room = controller.room;
@@ -41,7 +39,10 @@ export function HelixAskSharedLiveRoomControls({
     : "Room";
   const hostTransportReferencePresent = Boolean(
     controller.selfParticipant?.role === "owner" &&
-    room?.runtime.transport_owner === "host_browser" &&
+    (
+      room?.runtime.transport_owner === "host_browser" ||
+      room?.runtime.transport_owner === "room_media_bridge"
+    ) &&
     room.runtime.realtime_session_ref_hash,
   );
   const sharedTransportBound = hostTransportReferencePresent && room?.runtime.state !== "closed";
@@ -81,22 +82,15 @@ export function HelixAskSharedLiveRoomControls({
     sharedTransportBound,
   ]);
 
-  useEffect(() => {
-    if (!dialogOpen) return;
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setDialogOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 0);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.clearTimeout(focusTimer);
-    };
-  }, [dialogOpen]);
+  const closeDialog = useCallback((): void => {
+    setDialogOpen(false);
+    window.setTimeout(() => triggerButtonRef.current?.focus(), 0);
+  }, []);
 
   return (
     <>
       <button
+        ref={triggerButtonRef}
         type="button"
         data-helix-ask-action-item="true"
         data-shared-live-room-state={room?.status ?? "none"}
@@ -116,63 +110,16 @@ export function HelixAskSharedLiveRoomControls({
       </button>
 
       {dialogOpen ? (
-        <div className="fixed inset-0 z-[260] flex items-center justify-center p-3 sm:p-6">
-          <button
-            type="button"
-            aria-label="Close Shared GPT Live Room dialog"
-            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
-            onClick={() => setDialogOpen(false)}
-          />
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            aria-describedby={descriptionId}
-            className="relative z-10 flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-fuchsia-300/25 bg-slate-950 shadow-[0_24px_90px_rgba(0,0,0,0.65)]"
-          >
-            <header className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
-              <div>
-                <p id={titleId} className="text-sm font-semibold text-fuchsia-100">
-                  Shared GPT Live Room
-                </p>
-                <p id={descriptionId} className="mt-1 max-w-2xl text-[11px] leading-5 text-slate-400">
-                  Two signed-in developer accounts can contribute participant-labeled visual observations
-                  to one host-owned model call. Shared participant audio and transcript delivery are not connected yet.
-                </p>
-              </div>
-              <button
-                ref={closeButtonRef}
-                type="button"
-                aria-label="Close Shared GPT Live Room"
-                className="rounded-full border border-white/10 p-2 text-slate-300 hover:bg-white/10"
-                onClick={() => setDialogOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </header>
-
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {controller.error ? (
-                <div role="alert" className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">
-                  <span>{controller.error}</span>
-                  <button type="button" className="underline" onClick={controller.clearError}>Dismiss</button>
-                </div>
-              ) : null}
-
-              {room ? (
-                <SharedLiveRoomActivePanel
-                  room={room}
-                  controller={controller}
-                  idPrefix={titleId}
-                  onHostTransportInvalidated={onHostTransportInvalidated}
-                  onOwnerRoomClosed={onOwnerRoomClosed}
-                />
-              ) : (
-                <SharedLiveRoomSetupPanel controller={controller} fieldIdPrefix={titleId} />
-              )}
-            </div>
-          </section>
-        </div>
+        <SharedLiveRoomDialog
+          room={room}
+          controller={controller}
+          titleId={titleId}
+          descriptionId={descriptionId}
+          onClose={closeDialog}
+          onVisualSourceCaptureRequested={onVisualSourceCaptureRequested}
+          onHostTransportInvalidated={onHostTransportInvalidated}
+          onOwnerRoomClosed={onOwnerRoomClosed}
+        />
       ) : null}
     </>
   );

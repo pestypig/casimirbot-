@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import request from "supertest";
 import {
   admitRealtimeSession,
   buildRealtimeRequesterRef,
@@ -22,6 +23,68 @@ import {
 describe("Shared Realtime room runtime routes", () => {
   beforeEach(async () => {
     await resetSharedRealtimeRoomRouteTestState();
+  });
+
+  it("does not turn missing room authentication into a personal-session 401", async () => {
+    const response = await request(createSharedRealtimeRoomTestApp())
+      .post("/api/agi/realtime/session")
+      .send({ runtime_agent_mode: "live_voice" })
+      .expect(403);
+
+    expect(response.body).toMatchObject({
+      blocked_reason: "developer_account_required",
+    });
+    expect(response.body.error).not.toBe("shared_realtime_room_auth_required");
+  });
+
+  it("lets a signed-in developer without a room start a personal Realtime session", async () => {
+    const envKeys = [
+      "HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED",
+      "HELIX_REALTIME_SESSION_ADAPTER_ENABLED",
+      "HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED",
+      "HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED",
+      "OPENAI_REALTIME_API_KEY",
+      "OPENAI_API_KEY",
+    ] as const;
+    const priorEnv = new Map(envKeys.map((key) => [key, process.env[key]]));
+    try {
+      process.env.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = "1";
+      process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = "1";
+      process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = "1";
+      process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = "1";
+      delete process.env.OPENAI_REALTIME_API_KEY;
+      process.env.OPENAI_API_KEY = "personal-session-test-key-must-not-leak";
+      const developer = await signInSharedRealtimeRoomTestAgent({
+        app: createSharedRealtimeRoomTestApp(),
+        profileId: "profile:personal-realtime-no-room",
+        displayName: "Personal Realtime",
+      });
+
+      const response = await developer.agent
+        .post("/api/agi/realtime/session")
+        .send({
+          runtime_agent_mode: "live_voice",
+          runtime_agent_authority: "observe_only",
+          transport: "webrtc",
+          sdp_exchange_mode: "server",
+          selected_model_or_service: "gpt-realtime-2.1",
+          visible_user_consent_receipt: "receipt:personal-realtime-no-room",
+        })
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        ok: true,
+        error: null,
+        realtime_session_id: expect.stringMatching(/^realtime:admitted:/),
+      });
+      expect(JSON.stringify(response.body)).not.toContain("personal-session-test-key-must-not-leak");
+    } finally {
+      for (const key of envKeys) {
+        const value = priorEnv.get(key);
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 
   it("requires both members present and reserves the single model slot for the owner", async () => {

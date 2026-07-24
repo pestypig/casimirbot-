@@ -40,3 +40,28 @@ npm run formal:lean:check
 
 The project is pinned to Lean `v4.31.0`, the current stable release referenced
 by the Lean release notes on 2026-06-20.
+
+## Generic Casimir Spec replay
+
+The provider-neutral Casimir Spec lane is separate from the NHM2 theorem set:
+
+- `casimir_formal_verification_request/v1` binds the canonical scientific IR,
+  proposition, emitted Lean module, imports, graph/catalog snapshots, derivation
+  artifacts, and replay policy.
+- `casimir_formal_lean_replay_policy/v1` binds the exact Lean binary, allowed
+  imports, fixed direct invocation, source exclusions, and resource ceilings.
+- `server/services/theory/casimir-formal-lean-replay.ts` performs two fresh
+  outer-observed runs with `--trust=0`, one thread, a Lean memory ceiling, a
+  wall timeout, no shell, and no inherited process environment. A backend-owned
+  wrapper issues the exact `#check` and `#print axioms` commands after the sealed
+  source.
+- `casimir_formal_verification_certificate/v1` records transcript hashes and
+  axiom usage while keeping semantic, numerical, empirical, implementation, and
+  physical authority false.
+
+This backend does not generate proofs. The developer-only workstation tool rail
+exposes it as `theory-formal-verifier.plan`, `.start`, and `.read_result`; see
+`docs/helix-ask/workstation-tool-contracts/theory-formal-verifier.md`. Its
+policy explicitly does not assert operating-system network or filesystem
+hermeticity, and the tool rail preserves that boundary rather than implying a
+separate sandbox receipt.

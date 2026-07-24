@@ -213,7 +213,7 @@ export const openAiRealtimeSessionAdapterStub: HelixRealtimeSessionAdapter = {
   }),
 };
 
-const readOpenAiApiKey = (env?: NodeJS.ProcessEnv): string | null =>
+export const readOpenAiRealtimeApiKey = (env?: NodeJS.ProcessEnv): string | null =>
   readString(env?.OPENAI_REALTIME_API_KEY) ?? readString(env?.OPENAI_API_KEY);
 
 const isSafeOpenAiSafetyIdentifier = (value: string | null): value is string =>
@@ -413,7 +413,7 @@ export const createOpenAiRealtimeSessionAdapter = (
         blockedReason: "openai_realtime_adapter_stub_no_live_call",
       });
     }
-    const apiKey = readOpenAiApiKey(args.env);
+    const apiKey = readOpenAiRealtimeApiKey(args.env);
     if (!apiKey) {
       return buildAdapterResult({
         action: "start",

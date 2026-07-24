@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-21T18:39:58.393Z",
-  "registryCount": 191,
+  "generatedAt": "2026-07-23T23:03:52.525Z",
+  "registryCount": 193,
   "coverage": {
     "exploratory": {
       "count": 19,
@@ -73,7 +73,7 @@
       ]
     },
     "diagnostic": {
-      "count": 124,
+      "count": 126,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -192,6 +192,8 @@
         "shared/er-epr-tiny-syk-control-aggregate.ts",
         "shared/er-epr-tiny-syk-validation-safe-language.ts",
         "shared/casimir-dp-data-readiness.ts",
+        "shared/casimir-dp-phase-coherence.ts",
+        "shared/casimir-dp-or-phase-stage2.ts",
         "shared/casimir-dp-proposal-readiness.ts",
         "server/modules/halobank-solar/ephemeris-core.ts",
         "server/modules/halobank-solar/derived.ts",
@@ -287,7 +289,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 191,
+    "entriesWithUnits": 193,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -301,8 +303,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 124,
-        "withUnits": 124,
+        "total": 126,
+        "withUnits": 126,
         "missing": []
       },
       "certified": {
@@ -323,8 +325,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 2620,
-    "edgeCount": 6192
+    "nodeCount": 2682,
+    "edgeCount": 6416
   },
   "evidenceProfiles": [
     {

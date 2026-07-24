@@ -32,6 +32,25 @@ export const Float32VolumeB64 = z.object({
 });
 export type TFloat32VolumeB64 = z.infer<typeof Float32VolumeB64>;
 
+export const Float64VolumeB64 = z.object({
+  encoding: z.literal("base64"),
+  dtype: z.literal("float64"),
+  endian: z.literal("little"),
+  order: z.literal("row-major"),
+  data_b64: z.preprocess(stripDataUrlPrefix, z.string().min(1)),
+});
+export type TFloat64VolumeB64 = z.infer<typeof Float64VolumeB64>;
+
+export const DpDensityVolumeB64 = z.discriminatedUnion("dtype", [
+  Float32VolumeB64,
+  Float64VolumeB64,
+]);
+export type TDpDensityVolumeB64 = z.infer<typeof DpDensityVolumeB64>;
+
+const LowercaseSha256 = z
+  .string()
+  .regex(/^[0-9a-f]{64}$/, "must be a lowercase SHA-256 hex digest");
+
 export const DpGridSpec = z.object({
   dims: Vec3IntPositive,
   voxel_size_m: Vec3Positive,
@@ -72,9 +91,9 @@ export const DpMassDistribution = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal("density_grid"),
-    rho_kg_m3: Float32VolumeB64,
+    rho_kg_m3: DpDensityVolumeB64,
     grid: DpGridSpec.optional(),
-    lattice_generation_hash: z.string().optional(),
+    lattice_generation_hash: LowercaseSha256.optional(),
     label: z.string().optional(),
   }),
 ]);
@@ -149,6 +168,8 @@ export type DpCollapseResult = {
   mass_b_kg: number;
   overlap_mass_kg: number;
   overlap_fraction_min_mass: number;
+  boundary_shell_mass_fraction_a: number;
+  boundary_shell_mass_fraction_b: number;
   components: {
     self_a_J: number;
     self_b_J: number;
@@ -164,6 +185,25 @@ export type DpCollapseResult = {
   certifying: boolean;
   fail_reason?: "DP_COLLAPSE_PROVENANCE_NON_ADMISSIBLE" | "DP_COLLAPSE_PROVENANCE_UNKNOWN";
   notes?: string[];
+};
+
+export type DpPotentialEnergyAuditResult = {
+  schema_version: "dp_potential_energy_audit_result/1";
+  pairwise_deltaE_J: number;
+  source_potential_deltaE_J: number;
+  absolute_error_J: number;
+  relative_error: number;
+  relative_tolerance: number;
+  absolute_tolerance_J: number;
+  gate: "pass" | "not_ready";
+  kernel: "plummer";
+  method: "exact" | "downsampled";
+  grid: TDpGridSpec;
+  active_difference_voxels: number;
+  potential_min_m2_s2: number;
+  potential_max_m2_s2: number;
+  claim_tier: "diagnostic";
+  certifying: false;
 };
 
 export const DpCollapseResultSchema = z.object({
@@ -188,6 +228,8 @@ export const DpCollapseResultSchema = z.object({
   mass_b_kg: z.number().nonnegative(),
   overlap_mass_kg: z.number().nonnegative(),
   overlap_fraction_min_mass: z.number().nonnegative(),
+  boundary_shell_mass_fraction_a: z.number().nonnegative(),
+  boundary_shell_mass_fraction_b: z.number().nonnegative(),
   components: z.object({
     self_a_J: z.number().nonnegative(),
     self_b_J: z.number().nonnegative(),
@@ -225,7 +267,133 @@ const TWO_PI = 2 * PI;
 
 const isFiniteNumber = (value: number): boolean => Number.isFinite(value);
 
-const decodeFloat32 = (payload: TFloat32VolumeB64, expectedLength: number): Float32Array => {
+const SHA256_ROUND_CONSTANTS = new Uint32Array([
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
+  0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+  0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
+  0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
+  0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+  0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+  0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
+  0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+  0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+]);
+
+const rotateRight = (value: number, bits: number): number =>
+  (value >>> bits) | (value << (32 - bits));
+
+const sha256Bytes = (input: Uint8Array): string => {
+  const paddedLength = Math.ceil((input.byteLength + 9) / 64) * 64;
+  const padded = new Uint8Array(paddedLength);
+  padded.set(input);
+  padded[input.byteLength] = 0x80;
+  const bitLength = input.byteLength * 8;
+  const view = new DataView(padded.buffer);
+  view.setUint32(
+    paddedLength - 8,
+    Math.floor(bitLength / 0x1_0000_0000),
+    false,
+  );
+  view.setUint32(paddedLength - 4, bitLength >>> 0, false);
+
+  const state = new Uint32Array([
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c,
+    0x1f83d9ab, 0x5be0cd19,
+  ]);
+  const words = new Uint32Array(64);
+  for (let offset = 0; offset < paddedLength; offset += 64) {
+    for (let index = 0; index < 16; index += 1) {
+      words[index] = view.getUint32(offset + index * 4, false);
+    }
+    for (let index = 16; index < 64; index += 1) {
+      const word15 = words[index - 15];
+      const word2 = words[index - 2];
+      const sigma0 =
+        rotateRight(word15, 7) ^ rotateRight(word15, 18) ^ (word15 >>> 3);
+      const sigma1 =
+        rotateRight(word2, 17) ^ rotateRight(word2, 19) ^ (word2 >>> 10);
+      words[index] =
+        (words[index - 16] + sigma0 + words[index - 7] + sigma1) >>> 0;
+    }
+
+    let a = state[0];
+    let b = state[1];
+    let c = state[2];
+    let d = state[3];
+    let e = state[4];
+    let f = state[5];
+    let g = state[6];
+    let h = state[7];
+    for (let index = 0; index < 64; index += 1) {
+      const sum1 = rotateRight(e, 6) ^ rotateRight(e, 11) ^ rotateRight(e, 25);
+      const choice = (e & f) ^ (~e & g);
+      const temporary1 =
+        (h + sum1 + choice + SHA256_ROUND_CONSTANTS[index] + words[index]) >>>
+        0;
+      const sum0 = rotateRight(a, 2) ^ rotateRight(a, 13) ^ rotateRight(a, 22);
+      const majority = (a & b) ^ (a & c) ^ (b & c);
+      const temporary2 = (sum0 + majority) >>> 0;
+      h = g;
+      g = f;
+      f = e;
+      e = (d + temporary1) >>> 0;
+      d = c;
+      c = b;
+      b = a;
+      a = (temporary1 + temporary2) >>> 0;
+    }
+    state[0] = (state[0] + a) >>> 0;
+    state[1] = (state[1] + b) >>> 0;
+    state[2] = (state[2] + c) >>> 0;
+    state[3] = (state[3] + d) >>> 0;
+    state[4] = (state[4] + e) >>> 0;
+    state[5] = (state[5] + f) >>> 0;
+    state[6] = (state[6] + g) >>> 0;
+    state[7] = (state[7] + h) >>> 0;
+  }
+
+  return Array.from(state)
+    .map((word) => word.toString(16).padStart(8, "0"))
+    .join("");
+};
+
+const canonicalDpDensityFloat64Bytes = (
+  density: ArrayLike<number>,
+): Uint8Array => {
+  const bytes = new Uint8Array(density.length * Float64Array.BYTES_PER_ELEMENT);
+  if (bytes.byteLength !== density.length * 8) {
+    throw new Error("density_field_canonical_byte_length_mismatch");
+  }
+  const view = new DataView(bytes.buffer);
+  for (let index = 0; index < density.length; index += 1) {
+    const value = density[index];
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(
+        `density_field_invalid_value: index ${index} must be finite and nonnegative`,
+      );
+    }
+    view.setFloat64(index * 8, value === 0 ? 0 : value, true);
+  }
+  return bytes;
+};
+
+export const sha256DpCanonicalDensityValues = (
+  density: ArrayLike<number>,
+): string => sha256Bytes(canonicalDpDensityFloat64Bytes(density));
+
+type DecodedDpDensity = {
+  rho: Float64Array;
+  canonical_payload_sha256: string;
+};
+
+type DpDensityArray = Float32Array | Float64Array;
+
+const decodeDensityVolume = (
+  payload: TDpDensityVolumeB64,
+  expectedLength: number,
+): DecodedDpDensity => {
   const data = payload.data_b64.trim();
   const buffer: Uint8Array = (() => {
     if (typeof Buffer !== "undefined") {
@@ -242,13 +410,34 @@ const decodeFloat32 = (payload: TFloat32VolumeB64, expectedLength: number): Floa
     throw new Error("base64 decode unavailable in this runtime");
   })();
 
-  const byteLength = buffer.byteLength;
-  const floatCount = Math.floor(byteLength / 4);
-  if (floatCount < expectedLength) {
-    throw new Error(`density_field_length_mismatch: expected ${expectedLength}, got ${floatCount}`);
+  const bytesPerElement =
+    payload.dtype === "float64"
+      ? Float64Array.BYTES_PER_ELEMENT
+      : Float32Array.BYTES_PER_ELEMENT;
+  const expectedByteLength = expectedLength * bytesPerElement;
+  if (buffer.byteLength !== expectedByteLength) {
+    throw new Error(
+      `density_field_byte_length_mismatch: expected ${expectedByteLength}, got ${buffer.byteLength}`,
+    );
   }
-  const view = new Float32Array(buffer.buffer, buffer.byteOffset, expectedLength);
-  return new Float32Array(view);
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const rho = new Float64Array(expectedLength);
+  for (let index = 0; index < expectedLength; index += 1) {
+    rho[index] =
+      payload.dtype === "float64"
+        ? view.getFloat64(index * bytesPerElement, true)
+        : view.getFloat32(index * bytesPerElement, true);
+  }
+  const canonicalBytes = canonicalDpDensityFloat64Bytes(rho);
+  if (canonicalBytes.byteLength !== expectedLength * 8) {
+    throw new Error(
+      `density_field_canonical_byte_length_mismatch: expected ${expectedLength * 8}, got ${canonicalBytes.byteLength}`,
+    );
+  }
+  return {
+    rho,
+    canonical_payload_sha256: sha256Bytes(canonicalBytes),
+  };
 };
 
 const buildGridCenters = (grid: TDpGridSpec): { x: number[]; y: number[]; z: number[] } => {
@@ -332,7 +521,13 @@ const buildAnalyticDensity = (primitives: TDpMassPrimitive[], grid: TDpGridSpec)
 const resolveBranchDensity = (
   branch: TDpMassDistribution,
   grid: TDpGridSpec,
-): { rho: Float32Array; label?: string; lattice_generation_hash?: string } => {
+): {
+  rho: DpDensityArray;
+  label?: string;
+  lattice_generation_hash?: string;
+  canonical_payload_sha256?: string;
+  lattice_generation_hash_verified?: boolean;
+} => {
   if (branch.kind === "analytic") {
     validateAnalyticPrimitives(branch.primitives);
     return {
@@ -344,15 +539,28 @@ const resolveBranchDensity = (
   if (branch.grid) {
     const matchDims = branch.grid.dims.every((v, i) => v === grid.dims[i]);
     const matchVoxel = branch.grid.voxel_size_m.every((v, i) => v === grid.voxel_size_m[i]);
-    if (!matchDims || !matchVoxel) {
+    const matchOrigin = branch.grid.origin_m.every((v, i) => v === grid.origin_m[i]);
+    if (!matchDims || !matchVoxel || !matchOrigin) {
       throw new Error("density_grid_mismatch: branch grid does not match DP grid");
     }
   }
   const expectedLength = grid.dims[0] * grid.dims[1] * grid.dims[2];
+  const decoded = decodeDensityVolume(branch.rho_kg_m3, expectedLength);
+  if (
+    branch.lattice_generation_hash !== undefined &&
+    branch.lattice_generation_hash !== decoded.canonical_payload_sha256
+  ) {
+    throw new Error(
+      `density_grid_hash_mismatch: expected ${branch.lattice_generation_hash}, got ${decoded.canonical_payload_sha256}`,
+    );
+  }
   return {
-    rho: decodeFloat32(branch.rho_kg_m3, expectedLength),
+    rho: decoded.rho,
     label: branch.label,
     lattice_generation_hash: branch.lattice_generation_hash,
+    canonical_payload_sha256: decoded.canonical_payload_sha256,
+    lattice_generation_hash_verified:
+      branch.lattice_generation_hash !== undefined,
   };
 };
 
@@ -372,11 +580,11 @@ const chooseDownsampleDims = (dims: Vec3, maxVoxels: number): { dims: Vec3; scal
 };
 
 const downsampleDensity = (
-  rho: Float32Array,
+  rho: DpDensityArray,
   grid: TDpGridSpec,
   targetDims: Vec3,
   scale: Vec3,
-): { rho: Float32Array; grid: TDpGridSpec } => {
+): { rho: DpDensityArray; grid: TDpGridSpec } => {
   const [nx, ny, nz] = grid.dims;
   const [nx2, ny2, nz2] = targetDims;
   const [dx, dy, dz] = grid.voxel_size_m;
@@ -387,7 +595,10 @@ const downsampleDensity = (
     origin_m: grid.origin_m,
   };
 
-  const out = new Float32Array(nx2 * ny2 * nz2);
+  const out =
+    rho instanceof Float64Array
+      ? new Float64Array(nx2 * ny2 * nz2)
+      : new Float32Array(nx2 * ny2 * nz2);
   const dV = dx * dy * dz;
   const newDv = newGrid.voxel_size_m[0] * newGrid.voxel_size_m[1] * newGrid.voxel_size_m[2];
 
@@ -411,13 +622,13 @@ const downsampleDensity = (
   return { rho: out, grid: newGrid };
 };
 
-const computeMass = (rho: Float32Array, dV: number): number => {
+const computeMass = (rho: DpDensityArray, dV: number): number => {
   let sum = 0;
   for (let i = 0; i < rho.length; i += 1) sum += rho[i] * dV;
   return sum;
 };
 
-const computeOverlapMass = (rhoA: Float32Array, rhoB: Float32Array, dV: number): number => {
+const computeOverlapMass = (rhoA: DpDensityArray, rhoB: DpDensityArray, dV: number): number => {
   let sum = 0;
   for (let i = 0; i < rhoA.length; i += 1) {
     const a = rhoA[i];
@@ -428,9 +639,39 @@ const computeOverlapMass = (rhoA: Float32Array, rhoB: Float32Array, dV: number):
   return sum;
 };
 
+const computeBoundaryShellMassFraction = (
+  rho: DpDensityArray,
+  grid: TDpGridSpec,
+  dV: number,
+): number => {
+  const [nx, ny, nz] = grid.dims;
+  let boundaryMass = 0;
+  let totalMass = 0;
+  for (let iz = 0; iz < nz; iz += 1) {
+    for (let iy = 0; iy < ny; iy += 1) {
+      for (let ix = 0; ix < nx; ix += 1) {
+        const index = ix + nx * (iy + ny * iz);
+        const voxelMass = Math.abs(rho[index]) * dV;
+        totalMass += voxelMass;
+        if (
+          ix === 0 ||
+          iy === 0 ||
+          iz === 0 ||
+          ix === nx - 1 ||
+          iy === ny - 1 ||
+          iz === nz - 1
+        ) {
+          boundaryMass += voxelMass;
+        }
+      }
+    }
+  }
+  return boundaryMass / Math.max(totalMass, Number.MIN_VALUE);
+};
+
 const computePairwiseEnergy = (
-  rhoA: Float32Array,
-  rhoB: Float32Array,
+  rhoA: DpDensityArray,
+  rhoB: DpDensityArray,
   grid: TDpGridSpec,
   ell_m: number,
 ): { selfA: number; selfB: number; cross: number; delta: number } => {
@@ -478,7 +719,11 @@ const computePairwiseEnergy = (
               sumDelta += weight * deltaI * deltaJ * kernel;
               sumA += weight * rhoAi * rhoAj * kernel;
               sumB += weight * rhoBi * rhoBj * kernel;
-              sumCross += weight * rhoAi * rhoBj * kernel;
+              sumCross += (
+                jdx === idx
+                  ? rhoAi * rhoBi
+                  : rhoAi * rhoBj + rhoAj * rhoBi
+              ) * kernel;
             }
           }
         }
@@ -541,18 +786,22 @@ const evaluateConstraints = (
 };
 
 const resolveProvenanceContract = (
-  branchA: { lattice_generation_hash?: string },
-  branchB: { lattice_generation_hash?: string },
+  branchA: {
+    lattice_generation_hash?: string;
+    lattice_generation_hash_verified?: boolean;
+  },
+  branchB: {
+    lattice_generation_hash?: string;
+    lattice_generation_hash_verified?: boolean;
+  },
   input: TDpCollapseInput,
 ): Pick<DpCollapseResult, "provenance_class" | "claim_tier" | "certifying" | "fail_reason"> => {
   const isDensityGridPath = input.branch_a.kind === "density_grid" && input.branch_b.kind === "density_grid";
-  const hasHashes =
-    typeof branchA.lattice_generation_hash === "string" &&
-    branchA.lattice_generation_hash.trim().length > 0 &&
-    typeof branchB.lattice_generation_hash === "string" &&
-    branchB.lattice_generation_hash.trim().length > 0;
+  const hasVerifiedHashes =
+    branchA.lattice_generation_hash_verified === true &&
+    branchB.lattice_generation_hash_verified === true;
 
-  if (isDensityGridPath && hasHashes) {
+  if (isDensityGridPath && hasVerifiedHashes) {
     return {
       provenance_class: "measured",
       claim_tier: "certified",
@@ -577,23 +826,28 @@ const resolveProvenanceContract = (
   };
 };
 
-export const computeDpCollapse = (input: TDpCollapseInput): DpCollapseResult => {
-  const parsed = DpCollapseInput.parse(input);
+type PreparedDpBranches = {
+  branchA: ReturnType<typeof resolveBranchDensity>;
+  branchB: ReturnType<typeof resolveBranchDensity>;
+  rhoA: DpDensityArray;
+  rhoB: DpDensityArray;
+  workingGrid: TDpGridSpec;
+  downsampleMeta?: DpDownsampleMeta;
+};
+
+const prepareDpBranches = (parsed: TDpCollapseInput): PreparedDpBranches => {
   const grid = parsed.grid;
   const maxVoxels = parsed.method?.max_voxels ?? 4096;
-
   const downsample = chooseDownsampleDims(grid.dims, maxVoxels);
   let workingGrid = grid;
 
   const branchA = resolveBranchDensity(parsed.branch_a, grid);
   const branchB = resolveBranchDensity(parsed.branch_b, grid);
-
   let rhoA = branchA.rho;
   let rhoB = branchB.rho;
-
   let downsampleMeta: DpDownsampleMeta | undefined;
 
-  if (downsample.scale.some((v) => v > 1.001)) {
+  if (downsample.scale.some((value) => value > 1.001)) {
     const downA = downsampleDensity(rhoA, grid, downsample.dims, downsample.scale);
     const downB = downsampleDensity(rhoB, grid, downsample.dims, downsample.scale);
     rhoA = downA.rho;
@@ -608,11 +862,42 @@ export const computeDpCollapse = (input: TDpCollapseInput): DpCollapseResult => 
     };
   }
 
+  return {
+    branchA,
+    branchB,
+    rhoA,
+    rhoB,
+    workingGrid,
+    downsampleMeta,
+  };
+};
+
+export const computeDpCollapse = (input: TDpCollapseInput): DpCollapseResult => {
+  const parsed = DpCollapseInput.parse(input);
+  const {
+    branchA,
+    branchB,
+    rhoA,
+    rhoB,
+    workingGrid,
+    downsampleMeta,
+  } = prepareDpBranches(parsed);
+
   const dV = workingGrid.voxel_size_m[0] * workingGrid.voxel_size_m[1] * workingGrid.voxel_size_m[2];
   const massA = computeMass(rhoA, dV);
   const massB = computeMass(rhoB, dV);
   const overlapMass = computeOverlapMass(rhoA, rhoB, dV);
   const overlapFraction = overlapMass / Math.max(1e-30, Math.min(massA, massB));
+  const boundaryShellMassFractionA = computeBoundaryShellMassFraction(
+    rhoA,
+    workingGrid,
+    dV,
+  );
+  const boundaryShellMassFractionB = computeBoundaryShellMassFraction(
+    rhoB,
+    workingGrid,
+    dV,
+  );
 
   const energy = computePairwiseEnergy(rhoA, rhoB, workingGrid, parsed.ell_m);
   const deltaE_J = Math.max(0, energy.delta);
@@ -641,6 +926,8 @@ export const computeDpCollapse = (input: TDpCollapseInput): DpCollapseResult => 
     mass_b_kg: massB,
     overlap_mass_kg: overlapMass,
     overlap_fraction_min_mass: overlapFraction,
+    boundary_shell_mass_fraction_a: boundaryShellMassFractionA,
+    boundary_shell_mass_fraction_b: boundaryShellMassFractionB,
     components: {
       self_a_J: selfA,
       self_b_J: selfB,
@@ -656,11 +943,109 @@ export const computeDpCollapse = (input: TDpCollapseInput): DpCollapseResult => 
   };
 };
 
+export const computeDpPotentialEnergyAudit = (
+  input: TDpCollapseInput,
+  options: {
+    relative_tolerance?: number;
+    absolute_tolerance_J?: number;
+  } = {},
+): DpPotentialEnergyAuditResult => {
+  const parsed = DpCollapseInput.parse(input);
+  const relativeTolerance = options.relative_tolerance ?? 1e-12;
+  const absoluteTolerance = options.absolute_tolerance_J ?? 0;
+  if (!(relativeTolerance > 0) || !(absoluteTolerance >= 0)) {
+    throw new Error("dp_potential_audit_invalid_tolerance");
+  }
+
+  const {
+    rhoA,
+    rhoB,
+    workingGrid,
+    downsampleMeta,
+  } = prepareDpBranches(parsed);
+  const pairwise = computePairwiseEnergy(rhoA, rhoB, workingGrid, parsed.ell_m);
+  const dV =
+    workingGrid.voxel_size_m[0] *
+    workingGrid.voxel_size_m[1] *
+    workingGrid.voxel_size_m[2];
+  const [nx, ny, nz] = workingGrid.dims;
+  const centers = buildGridCenters(workingGrid);
+  const active: Array<{ rho: number; x: number; y: number; z: number }> = [];
+
+  for (let iz = 0; iz < nz; iz += 1) {
+    for (let iy = 0; iy < ny; iy += 1) {
+      for (let ix = 0; ix < nx; ix += 1) {
+        const index = ix + nx * (iy + ny * iz);
+        const difference = rhoA[index] - rhoB[index];
+        if (difference === 0) continue;
+        active.push({
+          rho: difference,
+          x: centers.x[ix],
+          y: centers.y[iy],
+          z: centers.z[iz],
+        });
+      }
+    }
+  }
+
+  let potentialEnergy = 0;
+  let potentialMinimum = Number.POSITIVE_INFINITY;
+  let potentialMaximum = Number.NEGATIVE_INFINITY;
+  for (const source of active) {
+    let differencePotential = 0;
+    for (const target of active) {
+      const dx = source.x - target.x;
+      const dy = source.y - target.y;
+      const dz = source.z - target.z;
+      const kernel = 1 / Math.sqrt(
+        dx * dx + dy * dy + dz * dz + parsed.ell_m * parsed.ell_m,
+      );
+      differencePotential -= G * target.rho * dV * kernel;
+    }
+    potentialMinimum = Math.min(potentialMinimum, differencePotential);
+    potentialMaximum = Math.max(potentialMaximum, differencePotential);
+    potentialEnergy += -0.5 * source.rho * differencePotential * dV;
+  }
+
+  const pairwiseEnergy = Math.max(0, pairwise.delta);
+  const sourcePotentialEnergy = Math.max(0, potentialEnergy);
+  const absoluteError = Math.abs(pairwiseEnergy - sourcePotentialEnergy);
+  const scale = Math.max(
+    Math.abs(pairwiseEnergy),
+    Math.abs(sourcePotentialEnergy),
+    Number.MIN_VALUE,
+  );
+  const relativeError = absoluteError / scale;
+  const gate =
+    absoluteError <= absoluteTolerance + relativeTolerance * scale
+      ? "pass"
+      : "not_ready";
+
+  return {
+    schema_version: "dp_potential_energy_audit_result/1",
+    pairwise_deltaE_J: pairwiseEnergy,
+    source_potential_deltaE_J: sourcePotentialEnergy,
+    absolute_error_J: absoluteError,
+    relative_error: relativeError,
+    relative_tolerance: relativeTolerance,
+    absolute_tolerance_J: absoluteTolerance,
+    gate,
+    kernel: "plummer",
+    method: downsampleMeta ? "downsampled" : "exact",
+    grid: workingGrid,
+    active_difference_voxels: active.length,
+    potential_min_m2_s2: active.length === 0 ? 0 : potentialMinimum,
+    potential_max_m2_s2: active.length === 0 ? 0 : potentialMaximum,
+    claim_tier: "diagnostic",
+    certifying: false,
+  };
+};
+
 export const dpDeltaEPointPairPlummer = (mass_kg: number, separation_m: number, ell_m: number): number => {
   if (!(mass_kg > 0 && separation_m >= 0 && ell_m > 0)) return Number.NaN;
   const self = 1 / ell_m;
   const cross = 1 / Math.sqrt(separation_m * separation_m + ell_m * ell_m);
-  return G * mass_kg * mass_kg * (2 * self - 2 * cross);
+  return G * mass_kg * mass_kg * (self - cross);
 };
 
 export const dpSelfEnergyUniformSphere = (mass_kg: number, radius_m: number): number => {

@@ -15,22 +15,22 @@ const consentControls: ReadonlyArray<{
   {
     key: "microphone_to_room",
     label: "Microphone to room",
-    description: "Permission record for a future room media bridge. It does not connect participant audio in the host-browser milestone.",
+    description: "Permit the other participant to hear your microphone after both browsers connect the room audio bridge.",
   },
   {
     key: "microphone_to_model",
     label: "Microphone to model",
-    description: "Permit your microphone to enter the shared model transport. The existing Live Mic button still starts or stops the actual host track.",
+    description: "Permit your microphone to enter the shared GPT input only while you hold the speaking floor.",
   },
   {
     key: "transcript_to_room",
     label: "Transcript to room",
-    description: "Permission record for future attributed transcript broadcast. Transcript sharing is not connected yet.",
+    description: "Share completed GPT transcripts and your floor-attributed input transcripts with both room members.",
   },
   {
     key: "screen_to_model",
     label: "Visual frames to model",
-    description: "Permit Live Vision and recent Image Lens carousel frames to enter the room's shared model context.",
+    description: "Permit this browser's Screen, Camera, and recent Image Lens carousel frames to enter the shared model context.",
   },
   {
     key: "screen_thumbnail_to_room",
@@ -40,7 +40,7 @@ const consentControls: ReadonlyArray<{
   {
     key: "model_audio_output",
     label: "Model audio playback",
-    description: "Permit model playback. Only the host browser receives it today; participant playback requires the future media bridge.",
+    description: "Permit shared GPT audio playback; the room bridge forwards the owner's GPT audio to the participant.",
   },
 ];
 

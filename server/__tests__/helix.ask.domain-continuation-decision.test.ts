@@ -151,6 +151,57 @@ describe("helix ask domain continuation decision", () => {
     });
   });
 
+  it("allows Codex synthesis after opened document content re-enters as bounded retrieval evidence", () => {
+    const path = "/docs/research/casimir-dp-quantum-foam-study.md";
+    const decision = buildDecision("Read the best result and explain what it is about.", {
+      goal_satisfaction_evaluation: {
+        terminal_contract: { goal_kind: "doc_summary" },
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:test:doc_search_results",
+          kind: "doc_search_results",
+          payload: {
+            query: "Casimir Dp Quantum Foam Study",
+            matches: [{ path }],
+          },
+        },
+        {
+          artifact_id: "ask:test:doc_candidate_validation",
+          kind: "doc_candidate_validation",
+          payload: {
+            selected_status: "strong",
+            selected_path: path,
+          },
+        },
+        {
+          artifact_id: "ask:test:doc_open_receipt",
+          kind: "doc_open_receipt",
+          payload: {
+            status: "opened",
+            path,
+          },
+        },
+        {
+          artifact_id: "ask:test:retrieval_context",
+          kind: "retrieval_context",
+          payload: {
+            path,
+            excerpt: "The study keeps Casimir, Diósi-Penrose, and manifold-response claims in separate evidence lanes.",
+          },
+        },
+      ],
+    });
+
+    expect(decision.decision).toBe("none");
+    expect(decision.reason).toBe("doc_summary_has_terminal_artifact");
+    expect(decision.docs_continuation_contract).toMatchObject({
+      current_docs_phase: "terminal_ready",
+      required_next_capability: null,
+      terminal_block_reason_if_missing: null,
+    });
+  });
+
   it("continues doc opening from strong validation to open_doc_by_path", () => {
     const decision = buildDecision("Open the NHM-2 white paper from the docs.", {
       goal_satisfaction_evaluation: {

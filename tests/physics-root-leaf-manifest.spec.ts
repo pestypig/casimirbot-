@@ -671,6 +671,88 @@ describe("validatePhysicsRootLeafManifest", () => {
     expect(policy.upstream_provenance_blocklist_for_certified).toEqual(["proxy", "inferred"]);
   });
 
+  it("declares the fail-closed Casimir-DP/OR boundary-coherence bridge", () => {
+    const manifestPath = path.join(process.cwd(), "configs", "physics-root-leaf-manifest.v1.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
+      leaves?: Array<{ id: string; statement?: string }>;
+      paths?: Array<{
+        id: string;
+        root_id?: string;
+        leaf_id?: string;
+        bundle_id?: string;
+        falsifier?: { reject_rule?: string; test_refs?: string[] };
+        maturity_gate?: {
+          max_claim_tier?: string;
+          required_evidence_types?: string[];
+          strict_fail_reason?: string;
+        };
+      }>;
+      bridge_bundles?: Array<{
+        id: string;
+        claim_scope?: string;
+        max_claim_tier?: string;
+        path_ids?: string[];
+      }>;
+    };
+
+    expect(
+      manifest.leaves?.find(
+        (entry) => entry.id === "leaf_casimir_dp_boundary_coherence_or_test",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        id: "leaf_casimir_dp_boundary_coherence_or_test",
+      }),
+    );
+
+    const pathEntry = manifest.paths?.find(
+      (entry) => entry.id === "path_quantum_semiclassical_to_casimir_dp_or_test",
+    );
+    expect(pathEntry).toEqual(
+      expect.objectContaining({
+        root_id: "physics_quantum_semiclassical",
+        leaf_id: "leaf_casimir_dp_boundary_coherence_or_test",
+        bundle_id: "casimir-dp.or-boundary-coherence",
+      }),
+    );
+    expect(pathEntry?.maturity_gate).toEqual(
+      expect.objectContaining({
+        max_claim_tier: "diagnostic",
+        strict_fail_reason: "ROOT_LEAF_CASIMIR_DP_OR_BRIDGE_FAIL",
+      }),
+    );
+    expect(pathEntry?.maturity_gate?.required_evidence_types).toEqual(
+      expect.arrayContaining(["measured", "proxy", "inferred"]),
+    );
+
+    const rejectRule = pathEntry?.falsifier?.reject_rule ?? "";
+    expect(rejectRule).toContain("measuredEvidenceReady != true");
+    expect(rejectRule).toContain("ordinaryDecoherenceClosure != true");
+    expect(rejectRule).toContain("phaseResidualReplayDeterministic != true");
+    expect(rejectRule).toContain("collapseDiscriminatorPresent != true");
+    expect(rejectRule).toContain("boundaryToCoherenceTransferKernelRegistered != true");
+    expect(pathEntry?.falsifier?.test_refs).toEqual(
+      expect.arrayContaining([
+        "tests/casimir-dp-data-readiness.spec.ts",
+        "tests/casimir-dp-phase-coherence.spec.ts",
+        "tests/casimir-dp-or-phase-stage2.spec.ts",
+        "tests/casimir-dp-proposal-closure.spec.ts",
+      ]),
+    );
+
+    expect(
+      manifest.bridge_bundles?.find(
+        (entry) => entry.id === "casimir-dp.or-boundary-coherence",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        claim_scope: "cross_domain",
+        max_claim_tier: "diagnostic",
+        path_ids: ["path_quantum_semiclassical_to_casimir_dp_or_test"],
+      }),
+    );
+  });
+
   it("declares the stellar radiation null-model lane in the repo manifest", () => {
     const manifestPath = path.join(process.cwd(), "configs", "physics-root-leaf-manifest.v1.json");
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {

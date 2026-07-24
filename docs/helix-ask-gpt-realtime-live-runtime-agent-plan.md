@@ -1,10 +1,12 @@
 # GPT Realtime Live Runtime Agent Plan
 
 Status: active implementation record. Phases 1 and 2 are complete; the Phase 3
-read-only live companion and worker-grounded spoken relay are implemented and
-awaiting keyed operator proof. Phases 4 and 5 remain governed future work.
+read-only live companion, post-admission operational speech, worker-grounded
+spoken relay, and automated proof harness are implemented. Phase 6 still needs
+one fully passing run with an OpenAI-accepted launcher credential. Phases 4 and
+5 remain governed future work.
 
-Implementation checkpoint (2026-07-17):
+Implementation checkpoint (2026-07-22):
 
 - Final Realtime transcripts enter the normal Helix Ask solver path through a
   server-issued, read-only Stage Play handoff.
@@ -17,6 +19,11 @@ Implementation checkpoint (2026-07-17):
   out-of-band audio. The full canonical answer remains in Helix Ask chat.
 - Conversation-local answers, typed failures, incomplete solver paths, missing
   required observations, stale results, and action candidates are not relayed.
+- Realtime automatic responses are disabled. Conversation-local speech is
+  requested only after Helix admission; operational interim speech is requested
+  only after a correlated worker-dispatch receipt.
+- Operational interim speech is factual and non-apologetic. It does not imply
+  that GPT Realtime ran a workstation tool.
 - Relay lifecycle covers worker running, result ready, busy queueing, provider
   response, playback receipt, supersession, interruption, closure, and failure.
 - Debug export correlates transcript handoff, admission reason, worker
@@ -26,6 +33,9 @@ Implementation checkpoint (2026-07-17):
   control and does not change the runtime-agent picker.
 - The README startup contract is unchanged: the existing `OPENAI_API_KEY`
   startup path enables the live transport without additional required flags.
+- `npm run helix:ask:gpt-live-codex-proof` drives deterministic WAV speech into
+  a browser `MediaStream`, runs six correlation/authority/audio scenarios, and
+  writes sanitized JSON and Markdown scorecards.
 - Implementation lives under extracted Realtime/Stage Play/recrowned Ask
   modules and does not depend on or add code to deprecated `agi.plan.ts` or
   `HelixAskPill.tsx`.
@@ -593,10 +603,60 @@ Acceptance:
 
 ### Phase 6: Keyed Live Proof And Rollout
 
-Implementation status: pending operator-owned keyed proof.
+Implementation status: automated harness complete; the model-only
+`parallel_conversation` keyed path has an accepted manual proof. The full
+source-backed six-scenario rollout proof remains pending.
 
-Run keyed operator-owned localhost proof only after the user starts the normal
-keyed server. Do not use a self-started unkeyed server as proof.
+Codex may start the keyed localhost server only through the configured opaque
+`start-myapp-for-codex` action. It must pass the active workspace to
+`C:\Users\dan\.local\bin\start-myapp-for-codex.cmd`, must not read that
+launcher or credential-bearing environment variables, and must not print
+provider secrets or secret-bearing process command lines. No other keyed server
+startup command is permitted.
+
+Wait for `[express] app ready`, then require HTTP 200 from:
+
+- `/api/account/session`
+- `/api/helix/pipeline`
+- `/api/agi/agent-providers`
+
+The provider response must also show Codex as visible, enabled, and launchable.
+Keep the server running after proof collection.
+
+Run:
+
+```bash
+npm run helix:ask:gpt-live-codex-proof
+```
+
+The harness scenarios are:
+
+1. Initial Account & Sessions orientation from bounded context.
+2. Conversation-local memory of the prior relayed result.
+3. Fresh orientation after changing to Scientific Calculator.
+4. Governed calculator execution and result `323`.
+5. Positive repository retrieval of `provisional-response.ts`.
+6. Negative repository evidence without GPT Live strengthening "not found" into
+   an existence claim.
+
+A pass requires exact handoff, worker-admission, provider-response, Ask-turn,
+terminal-answer hash, and playback-receipt correlation. Expected content must
+appear independently in the Codex terminal answer and the GPT Live spoken
+transcript. Combined text is not sufficient. Raw provider payloads, SDP,
+credentials, and provider audio are excluded from scorecards.
+
+Accepted keyed manual proof (2026-07-22): GPT Realtime produced and played its
+natural `parallel_conversation` response while Codex completed the same
+model-only turn with `gpt-5.5`. The Ask solver completed with route, poison, and
+terminal authority true. The grounded result was then relayed through the same
+Realtime call and ended with a correlated browser playback receipt. The proof
+identity and invariants are recorded in
+`docs/architecture/voice-service-contract.md`.
+
+An earlier 2026-07-22 harness attempt reached WebRTC but received HTTP 401 from
+the provider. That authentication result is superseded for the manually proven
+parallel path; it remains useful only as a negative harness fixture. The full
+six-scenario source/tool proof is still incomplete.
 
 API parity matrix is optional for this track and is not a required gate.
 
@@ -632,10 +692,14 @@ npx vitest run client/src/components/__tests__/helix-ask-console-recrown.spec.ts
 
 Keyed proof:
 
-- User starts the normal keyed server.
-- Operator tests live browser session, OpenAI Realtime auth, client receipts,
-  and action admission.
-- Report live proof separately from deterministic tests.
+- Codex invokes only the configured opaque keyed launcher, or the user starts
+  the same normal keyed server.
+- Run `npm run helix:ask:gpt-live-codex-proof` and require every scenario and
+  every global assertion to pass.
+- Treat mapped `openai_realtime_authentication_failed` receipts as auth
+  failures even when the local SDP proxy returns HTTP 502.
+- Report live proof separately from deterministic tests and retain only the
+  sanitized scorecard artifacts.
 
 ## Recommended Patch Order
 

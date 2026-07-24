@@ -3,6 +3,7 @@ import { createHelixAskRealtimeProviderEventHandler } from "@/components/helix/a
 
 type ServerHandoffOptions = {
   outcome?: "conversation_local" | "worker_grounded" | "durable_goal_bound" | "action_candidate";
+  interactionMode?: "conversation_local" | "parallel_conversation" | "worker_required";
   dispatchKind?: "none" | "ask_runtime" | "goal_wake" | "ask_runtime_read_only";
   goalId?: string | null;
   runtimeProvider?: string | null;
@@ -19,6 +20,8 @@ const buildServerHandoff = (
   const goalId = options.goalId ?? (dispatchKind === "goal_wake" ? `goal:${suffix}` : null);
   const runtimeProvider = options.runtimeProvider ?? (dispatchKind === "none" ? null : "codex");
   const dispatchRequested = dispatchKind !== "none";
+  const interactionMode = options.interactionMode ??
+    (outcome === "conversation_local" ? "conversation_local" : "worker_required");
   const candidateReadonlyCapabilityIds =
     outcome === "worker_grounded" || outcome === "action_candidate"
       ? ["workstation.active_context"]
@@ -31,6 +34,7 @@ const buildServerHandoff = (
     thread_id: "helix-ask:desktop",
     decision_phase: "transcript_handoff",
     outcome,
+    interaction_mode: interactionMode,
     reason_codes: ["intent_general_reasoning"],
     selected_primary_intent: "general_reasoning",
     selected_route: null,
@@ -99,7 +103,14 @@ const buildServerHandoff = (
     source: "realtime_stage_play",
     invocationKind: "stage_play_realtime_transcript_handoff",
     sourceTarget: "operator_text",
+    mailboxThreadId: "helix-ask:desktop",
     handoffId,
+    realtimeSessionId: "realtime:test",
+    stagePlayEventRef: `stage-play-event:${suffix}`,
+    contextPackId: `context-pack:${suffix}`,
+    contextHash: `sha256:${suffix}`,
+    currentTranscriptTextHash: `sha256:transcript-${suffix}`,
+    currentTranscriptTextCharCount: 37,
     forbiddenCapabilities: [
       "workstation_mutation",
       "workstation_action_execution",
@@ -194,6 +205,9 @@ describe("Helix Ask Realtime provider event handler", () => {
       routeMetadata: expect.objectContaining({
         source: "realtime_stage_play",
         invocationKind: "stage_play_realtime_transcript_handoff",
+        handoffId: "realtime-stage-play-handoff:test",
+        stagePlayEventRef: "stage-play-event:test",
+        contextPackId: "context-pack:test",
         evidenceRefs: expect.arrayContaining(["obs:realtime:transcript:test"]),
         source_target_intent: expect.objectContaining({
           server_fixture_marker: "test",
@@ -267,6 +281,257 @@ describe("Helix Ask Realtime provider event handler", () => {
         reentry_required: false,
       }),
     );
+  });
+
+  it("defers a parallel Ask turn until its correlated Live playback settles", async () => {
+    const observationRef = "obs:realtime:parallel-settlement";
+    const handoff = buildServerHandoff(
+      observationRef,
+      "parallel-settlement",
+      { interactionMode: "parallel_conversation" },
+    );
+    const postEvent = vi.fn(async (path: string) =>
+      path.endsWith("/event")
+        ? {
+            ok: true,
+            realtime_transcript_observations: [{ observation_ref: observationRef }],
+            realtime_stage_play_ask_handoff: handoff,
+          }
+        : { ok: true });
+    const launchPrompt = vi.fn();
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:test",
+      runtimeAgentAuthority: "observe_only",
+      postEvent,
+      launchPrompt,
+      parallelDispatchFallbackMs: 60_000,
+    });
+
+    const transcript = await handler.handle({
+      type: "conversation.item.input_audio_transcription.completed",
+      event_id: "event:transcript:parallel-settlement",
+      transcript: "Explain why this boundary condition matters.",
+    });
+
+    expect(transcript).toMatchObject({
+      reentry_status: "reentered",
+      worker_dispatch_kind: "ask_runtime",
+      worker_dispatch_state: "awaiting_live_turn_settlement",
+      worker_turn_dispatched: false,
+    });
+    expect(launchPrompt).not.toHaveBeenCalled();
+    expect(postEvent).toHaveBeenCalledWith(
+      "/api/agi/realtime/session/realtime%3Atest/client-receipt",
+      expect.objectContaining({
+        receipt_kind: "worker_dispatch_deferred",
+        worker_dispatch_state: "awaiting_live_turn_settlement",
+        worker_turn_dispatched: false,
+      }),
+    );
+
+    await handler.handle({
+      type: "response.created",
+      event_id: "event:response:parallel-settlement",
+      response: {
+        id: "response:parallel-settlement",
+        status: "in_progress",
+        metadata: {
+          helix_purpose: "parallel_conversation",
+          helix_handoff_id: handoff.handoff_id,
+          helix_worker_admission_id: handoff.worker_admission.admission_id,
+        },
+      },
+    });
+    await handler.handle({
+      type: "output_audio_buffer.stopped",
+      event_id: "event:playback:parallel-settlement",
+      response_id: "response:parallel-settlement",
+    });
+
+    expect(launchPrompt).toHaveBeenCalledOnce();
+    expect(launchPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      question: "Explain why this boundary condition matters.",
+      serverAdmittedRuntimeAgentProvider: "codex",
+    }));
+    expect(postEvent).toHaveBeenCalledWith(
+      "/api/agi/realtime/session/realtime%3Atest/client-receipt",
+      expect.objectContaining({
+        receipt_kind: "worker_dispatch_requested",
+        worker_dispatch_state: "ask_prompt_launched",
+        worker_dispatch_settlement_reason: "live_response_playback_ended",
+        worker_turn_dispatched: true,
+      }),
+    );
+    handler.dispose();
+  });
+
+  it("cancels a staged parallel Ask turn when the user resumes speaking", async () => {
+    const observationRef = "obs:realtime:parallel-continued";
+    const handoff = buildServerHandoff(
+      observationRef,
+      "parallel-continued",
+      { interactionMode: "parallel_conversation" },
+    );
+    const postEvent = vi.fn(async (path: string) =>
+      path.endsWith("/event")
+        ? {
+            ok: true,
+            realtime_transcript_observations: [{ observation_ref: observationRef }],
+            realtime_stage_play_ask_handoff: handoff,
+          }
+        : { ok: true });
+    const launchPrompt = vi.fn();
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:test",
+      runtimeAgentAuthority: "observe_only",
+      postEvent,
+      launchPrompt,
+      parallelDispatchFallbackMs: 60_000,
+    });
+
+    await handler.handle({
+      type: "conversation.item.input_audio_transcription.completed",
+      event_id: "event:transcript:parallel-continued",
+      transcript: "I was listening to a discussion of the Casimir operator.",
+    });
+    await handler.handle({
+      type: "input_audio_buffer.speech_started",
+      event_id: "event:speech:parallel-continued",
+    });
+    await handler.handle({
+      type: "response.created",
+      event_id: "event:response:parallel-continued",
+      response: {
+        id: "response:parallel-continued",
+        status: "in_progress",
+        metadata: {
+          helix_purpose: "parallel_conversation",
+          helix_handoff_id: handoff.handoff_id,
+          helix_worker_admission_id: handoff.worker_admission.admission_id,
+        },
+      },
+    });
+    await handler.handle({
+      type: "output_audio_buffer.stopped",
+      event_id: "event:playback:parallel-continued",
+      response_id: "response:parallel-continued",
+    });
+
+    expect(launchPrompt).not.toHaveBeenCalled();
+    expect(postEvent).toHaveBeenCalledWith(
+      "/api/agi/realtime/session/realtime%3Atest/client-receipt",
+      expect.objectContaining({
+        receipt_kind: "worker_dispatch_skipped",
+        worker_dispatch_state: "cancelled_user_continuation",
+        worker_dispatch_settlement_reason: "user_speech_resumed",
+        worker_turn_dispatched: false,
+      }),
+    );
+    handler.dispose();
+  });
+
+  it("rejects a parallel dispatch when speech resumes while its handoff is returning", async () => {
+    const observationRef = "obs:realtime:parallel-return-race";
+    const handoff = buildServerHandoff(
+      observationRef,
+      "parallel-return-race",
+      { interactionMode: "parallel_conversation" },
+    );
+    let resolveHandoff!: (value: Record<string, unknown>) => void;
+    const pendingHandoff = new Promise<Record<string, unknown>>((resolve) => {
+      resolveHandoff = resolve;
+    });
+    const postEvent = vi.fn((path: string) =>
+      path.endsWith("/event") ? pendingHandoff : Promise.resolve({ ok: true }));
+    const launchPrompt = vi.fn();
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:test",
+      runtimeAgentAuthority: "observe_only",
+      postEvent,
+      launchPrompt,
+      parallelDispatchFallbackMs: 60_000,
+    });
+
+    const transcriptProjection = handler.handle({
+      type: "conversation.item.input_audio_transcription.completed",
+      event_id: "event:transcript:parallel-return-race",
+      transcript: "This is the first part of a longer thought.",
+    });
+    await handler.handle({
+      type: "input_audio_buffer.speech_started",
+      event_id: "event:speech:parallel-return-race",
+    });
+    resolveHandoff({
+      ok: true,
+      realtime_transcript_observations: [{ observation_ref: observationRef }],
+      realtime_stage_play_ask_handoff: handoff,
+    });
+
+    const result = await transcriptProjection;
+
+    expect(result).toMatchObject({
+      worker_dispatch_state: "cancelled_user_continuation",
+      worker_turn_dispatched: false,
+    });
+    expect(launchPrompt).not.toHaveBeenCalled();
+    expect(postEvent).toHaveBeenCalledWith(
+      "/api/agi/realtime/session/realtime%3Atest/client-receipt",
+      expect.objectContaining({
+        receipt_kind: "worker_dispatch_skipped",
+        worker_dispatch_settlement_reason:
+          "speech_resumed_before_handoff_returned",
+      }),
+    );
+    handler.dispose();
+  });
+
+  it("uses a bounded fallback when no correlated Live playback event arrives", async () => {
+    vi.useFakeTimers();
+    try {
+      const observationRef = "obs:realtime:parallel-fallback";
+      const handoff = buildServerHandoff(
+        observationRef,
+        "parallel-fallback",
+        { interactionMode: "parallel_conversation" },
+      );
+      const postEvent = vi.fn(async (path: string) =>
+        path.endsWith("/event")
+          ? {
+              ok: true,
+              realtime_transcript_observations: [{ observation_ref: observationRef }],
+              realtime_stage_play_ask_handoff: handoff,
+            }
+          : { ok: true });
+      const launchPrompt = vi.fn();
+      const handler = createHelixAskRealtimeProviderEventHandler({
+        realtimeSessionId: "realtime:test",
+        runtimeAgentAuthority: "observe_only",
+        postEvent,
+        launchPrompt,
+        parallelDispatchFallbackMs: 1_000,
+      });
+
+      await handler.handle({
+        type: "conversation.item.input_audio_transcription.completed",
+        event_id: "event:transcript:parallel-fallback",
+        transcript: "Explain this concept.",
+      });
+      expect(launchPrompt).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(launchPrompt).toHaveBeenCalledOnce();
+      expect(postEvent).toHaveBeenCalledWith(
+        "/api/agi/realtime/session/realtime%3Atest/client-receipt",
+        expect.objectContaining({
+          receipt_kind: "worker_dispatch_requested",
+          worker_dispatch_settlement_reason: "settlement_fallback_elapsed",
+        }),
+      );
+      handler.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("wakes the bound durable goal without launching a parallel Ask answer", async () => {
@@ -434,6 +699,54 @@ describe("Helix Ask Realtime provider event handler", () => {
     });
     expect(postEvent).not.toHaveBeenCalled();
     expect(projections).toHaveBeenCalledTimes(2);
+  });
+
+  it("binds a spoken provisional status to server-issued response metadata", async () => {
+    const postEvent = vi.fn(async () => ({ ok: true }));
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:provisional-binding",
+      runtimeAgentAuthority: "observe_only",
+      postEvent,
+      launchPrompt: vi.fn(),
+      nowMs: () => 600,
+    });
+
+    await handler.handle({
+      type: "response.created",
+      event_id: "event:response:created",
+      response: {
+        id: "response:provisional-status",
+        status: "in_progress",
+        metadata: {
+          helix_purpose: "worker_dispatch_status",
+          helix_provisional_response_id: "realtime-provisional-response:test",
+          helix_handoff_id: "realtime-stage-play-handoff:test",
+          helix_worker_admission_id: "realtime-worker-admission:test",
+          helix_utterance_code: "workstation_context_check_in_progress",
+        },
+      },
+    });
+    const completed = await handler.handle({
+      type: "response.output_audio_transcript.done",
+      event_id: "event:output-transcript:bound",
+      response_id: "response:provisional-status",
+      item_id: "item:provisional-status",
+      content_index: 0,
+      transcript: "I'm checking the current workstation view.",
+    });
+
+    expect(completed.completed_output_transcript).toMatchObject({
+      provider_response_ref: "response:provisional-status",
+      helix_response_purpose: "worker_dispatch_status",
+      helix_provisional_response_id: "realtime-provisional-response:test",
+      helix_handoff_id: "realtime-stage-play-handoff:test",
+      helix_worker_admission_id: "realtime-worker-admission:test",
+      helix_utterance_code: "workstation_context_check_in_progress",
+      correlation_source: "provider_response_created_metadata",
+      raw_provider_metadata_included: false,
+      provider_payload_included: false,
+      raw_content_included: false,
+    });
   });
 
   it("deduplicates non-terminal client playback receipts", async () => {

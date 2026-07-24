@@ -734,6 +734,7 @@ import { selectSituationContextAuthority } from "../services/helix-ask/situation
 import { buildAskTurnPreflightContext } from "../services/helix-ask/ask-turn-preflight-context";
 import {
   arbitrateAskSourceTarget,
+  isHardDocsEvidenceSourceTargetIntent,
   isStagePlayCheckpointRequestPrompt,
   isStagePlayJobPlanningPrompt,
   isStagePlayReflectionPrompt,
@@ -913,6 +914,7 @@ import {
   buildCommittedAskRoute,
   buildRouteEvidenceAuthority,
   readCommittedAskRoute,
+  reconcileCanonicalGoalFrameToCommittedRoute,
 } from "../services/helix-ask/committed-ask-route";
 import { reconcileTerminalFailureWithToolRail } from "../services/helix-ask/terminal-rail-failure-reconciliation";
 import { applyHelixProjectionMismatchGate } from "../services/helix-ask/projection-mismatch-gate";
@@ -1447,6 +1449,7 @@ import {
   isAskTurnScientificImageTextComparisonPrompt,
 } from "../services/helix-ask/scientific-image-route-metadata";
 import { ScientificCalculatorRuntimeRouteMetadataSchema } from "../services/helix-ask/scientific-calculator-runtime-route-metadata";
+import { RealtimeStagePlayRouteMetadataSchema } from "../services/helix-ask/realtime-session/route-metadata";
 import {
   buildHelixAskTurnContractObligationCoverage as buildHelixAskTurnContractObligationCoverageBase,
 } from "../services/helix-ask/obligation-coverage";
@@ -28031,6 +28034,7 @@ const HelixAskRouteMetadataSchema = z.union([
   ConversationMemoryResumeRouteMetadataSchema,
   HardToolBackendEntrypointRouteMetadataSchema,
   ScientificCalculatorRuntimeRouteMetadataSchema,
+  RealtimeStagePlayRouteMetadataSchema,
 ]);
 
 const HelixLanguageModelSelectionRequestSchema = z.discriminatedUnion("mode", [
@@ -43857,36 +43861,55 @@ const isAskTurnUnderspecifiedCalculatorPrompt = (transcript: string): boolean =>
   return calculatorJudgment && missingConcreteValue;
 };
 
-const isAskTurnAffirmativeLocalDocumentEvidencePrompt = (transcript: string): boolean => {
-  const prompt = transcript.trim();
-  if (isExplicitDocsPathComparePrompt(prompt) || isExplicitDocsPathLocateSynthesisPrompt(prompt)) return true;
-  const documentCue = /\b(?:white\s*paper|whitepaper|paper|document|doc|docs|report|memo)\b/i.test(prompt);
-  if (!documentCue) return false;
-  const evidenceCue =
-    /\b(?:check|use|from|in|inside|look\s+in|look\s+at|consult|according\s+to|where|find|locate|reported|stated|specified|listed|table|row|source|cite|citation|evidence|white\s*paper)\b/i.test(prompt);
-  const valueCue =
-    /\b(?:load[-\s]?bearing|lbs?|pounds?|numeric|value|capacity|spec(?:ification)?s?|engineering|parameter|measurement|reported|stated)\b/i.test(prompt);
-  return evidenceCue && (valueCue || /\b(?:NHM[-\s]?2|casimir|tile)\b/i.test(prompt));
+const resolveAskTurnHardDocsEvidenceSourceTargetIntent = (args: {
+  transcript: string;
+  turnId: string;
+  threadId?: string | null;
+}): Record<string, unknown> | null => {
+  const sourceTargetIntent = arbitrateAskSourceTarget({
+    turnId: args.turnId,
+    threadId: args.threadId || "helix-ask:desktop",
+    promptText: args.transcript,
+  });
+  return isHardDocsEvidenceSourceTargetIntent(sourceTargetIntent)
+    ? sourceTargetIntent as unknown as Record<string, unknown>
+    : null;
 };
+
+const isAskTurnHardDocsEvidenceSourceTargetPrompt = (transcript: string): boolean =>
+  Boolean(resolveAskTurnHardDocsEvidenceSourceTargetIntent({
+    transcript,
+    turnId: "ask:docs-evidence-classification",
+    threadId: "helix-ask:desktop",
+  }));
 
 const buildAskTurnDocsEvidenceHardRouteMetadata = (args: {
   turnId: string;
   threadId?: string | null;
+  sourceTargetIntent?: Record<string, unknown> | null;
 }): { metadata: HardToolBackendEntrypointRouteMetadata; sourceTargetIntent: Record<string, unknown> } => {
   const sourceTargetIntent: Record<string, unknown> = {
+    ...(args.sourceTargetIntent ?? {}),
     schema: "helix.ask_source_target_intent.v1",
     turn_id: args.turnId,
     thread_id: args.threadId || "helix-ask:desktop",
     target_source: "docs_viewer",
-    target_kind: "local_document_evidence",
+    target_kind: args.sourceTargetIntent?.target_kind ?? "local_document_evidence",
     targetSource: "docs_viewer",
-    targetKind: "local_document_evidence",
+    targetKind: args.sourceTargetIntent?.target_kind ?? "local_document_evidence",
     strength: "hard",
-    explicit_cues: ["affirmative_local_document_evidence_prompt"],
-    reasons: ["prompt_requests_local_document_evidence_before_answer"],
-    requested_outputs: ["doc_search_results", "doc_evidence_synthesis_answer", "typed_failure"],
-    suppressed_routes: ["model_only", "internet_search", "repo_code"],
-    precedence_reason: "request_level_docs_evidence_hard_route_metadata",
+    explicit_cues: args.sourceTargetIntent?.explicit_cues ?? ["affirmative_local_document_evidence_prompt"],
+    reasons: args.sourceTargetIntent?.reasons ?? ["prompt_requests_local_document_evidence_before_answer"],
+    requested_outputs: Array.from(new Set([
+      ...(Array.isArray(args.sourceTargetIntent?.requested_outputs)
+        ? args.sourceTargetIntent.requested_outputs.filter((entry): entry is string => typeof entry === "string")
+        : []),
+      "doc_search_results",
+      "doc_evidence_synthesis_answer",
+      "typed_failure",
+    ])),
+    suppressed_routes: args.sourceTargetIntent?.suppressed_routes ?? ["model_only", "internet_search", "repo_code"],
+    precedence_reason: args.sourceTargetIntent?.precedence_reason ?? "request_level_docs_evidence_hard_route_metadata",
     mandatory_next_tool: {
       tool_name: "docs-viewer.search_docs",
       selected_capability: "docs-viewer.search_docs",
@@ -43909,7 +43932,7 @@ const buildAskTurnDocsEvidenceHardRouteMetadata = (args: {
     required_tool_family: "docs_viewer",
     source_target_intent: sourceTargetIntent,
     mandatory_next_tool: sourceTargetIntent.mandatory_next_tool as Record<string, unknown>,
-    route_reason: "request_level_docs_evidence_hard_route_metadata",
+    route_reason: String(sourceTargetIntent.precedence_reason),
     assistant_answer: false,
     raw_content_included: false,
   } satisfies HardToolBackendEntrypointRouteMetadata;
@@ -43974,6 +43997,11 @@ const buildAskTurnCanonicalGoalFrame = (args: {
   const repoCodeIntent = detectRepoCodeEvidenceIntent(transcript);
   const scholarlyResearchIntent = detectScholarlyResearchIntent(transcript);
   const internetSearchIntent = detectInternetSearchIntent(transcript);
+  const canonicalSourceTargetIntent = arbitrateAskSourceTarget({
+    turnId: args.turnId,
+    threadId: args.turnId,
+    promptText: transcript,
+  });
   const evidenceTargetArbitration = buildAskEvidenceTargetArbitration({
     turnId: args.turnId,
     threadId: args.turnId,
@@ -44382,7 +44410,7 @@ const buildAskTurnCanonicalGoalFrame = (args: {
       ]),
     };
   }
-  if (selectedEvidenceTarget?.target_source === "docs_viewer" && isAskTurnAffirmativeLocalDocumentEvidencePrompt(transcript)) {
+  if (isHardDocsEvidenceSourceTargetIntent(canonicalSourceTargetIntent)) {
     return {
       turn_id: args.turnId,
       goal_kind: "doc_evidence_synthesis",
@@ -44407,7 +44435,7 @@ const buildAskTurnCanonicalGoalFrame = (args: {
         "evidence_target_arbitration_selected_docs_viewer",
         "explicit_local_document_evidence_request",
         "local_document_source_precedes_repo_code",
-        ...selectedEvidenceTarget.reason_codes,
+        ...(selectedEvidenceTarget?.reason_codes ?? []),
         ...retrievalSignal.reasons,
       ]),
     };
@@ -97666,6 +97694,146 @@ const buildHelixDebugExportEnvelope = (args: {
   const payload = args.payload;
   const activeTurnId = readDebugExportString(payload.turn_id) ?? readDebugExportString(payload.turnId);
   if (!activeTurnId) return null;
+  const authoritativeTerminalEnvelope = asDebugExportRecord(payload.terminal_answer_envelope);
+  const authoritativeEnvelopeTurnId = readDebugExportString(authoritativeTerminalEnvelope?.turn_id);
+  const authoritativeEnvelopeKind = readDebugExportString(authoritativeTerminalEnvelope?.terminal_artifact_kind);
+  const authoritativeEnvelopeSource = readDebugExportString(authoritativeTerminalEnvelope?.final_answer_source);
+  const authoritativeEnvelopeText = readDebugExportString(authoritativeTerminalEnvelope?.terminal_text);
+  const authoritativeEnvelopeTerminalKind = readDebugExportString(authoritativeTerminalEnvelope?.terminal_kind);
+  const authoritativeEnvelopeHasAnswerRole =
+    authoritativeEnvelopeTerminalKind === "answer" ||
+    (
+      authoritativeEnvelopeTerminalKind === authoritativeEnvelopeKind &&
+      authoritativeEnvelopeTerminalKind !== "request_user_input" &&
+      authoritativeEnvelopeTerminalKind !== "status"
+    );
+  const authoritativeEnvelopeIsCurrentAnswer =
+    Boolean(
+      authoritativeTerminalEnvelope &&
+      (!authoritativeEnvelopeTurnId || authoritativeEnvelopeTurnId === activeTurnId) &&
+      authoritativeEnvelopeHasAnswerRole &&
+      authoritativeEnvelopeKind &&
+      authoritativeEnvelopeKind !== "typed_failure" &&
+      authoritativeEnvelopeKind !== "tool_receipt" &&
+      authoritativeEnvelopeSource &&
+      authoritativeEnvelopeText,
+    );
+  if (
+    authoritativeEnvelopeIsCurrentAnswer &&
+    authoritativeEnvelopeKind &&
+    authoritativeEnvelopeSource &&
+    authoritativeEnvelopeText
+  ) {
+    const previousWriter = asDebugExportRecord(payload.terminal_authority_single_writer);
+    const authoritativeEnvelopeRef =
+      readDebugExportString(authoritativeTerminalEnvelope?.terminal_artifact_ref) ??
+      readDebugExportString(authoritativeTerminalEnvelope?.terminal_artifact_id) ??
+      readDebugExportString(payload.terminal_artifact_id);
+    const previousWriterMatchesEnvelope =
+      readDebugExportString(previousWriter?.selected_terminal_artifact_kind) === authoritativeEnvelopeKind &&
+      readDebugExportString(previousWriter?.source) === authoritativeEnvelopeSource &&
+      readDebugExportString(previousWriter?.visible_text) === authoritativeEnvelopeText;
+    const preSynchronizationWriter = previousWriterMatchesEnvelope
+      ? asDebugExportRecord(previousWriter?.pre_synchronization_terminal_authority_single_writer) ?? null
+      : previousWriter ?? null;
+    const previousWriterAudit = asDebugExportRecord(previousWriter?.audit);
+    const previousWriterIntegrity = asDebugExportRecord(previousWriter?.integrity);
+    const synchronizedWriterAudit = {
+      ...(previousWriterAudit ?? {}),
+      artifactId: "terminal_authority_single_writer",
+      schemaVersion: "helix.terminal_authority_single_writer.v1",
+      selectedArtifactKind: authoritativeEnvelopeKind,
+      selectedArtifactRef: authoritativeEnvelopeRef ?? null,
+    };
+    const synchronizedWriterIntegrity = {
+      ...(previousWriterIntegrity ?? {}),
+      single_writer_applied: true,
+      visible_matches_selected_artifact: true,
+      stale_failure_visible: false,
+      receipt_visible_as_answer: false,
+      materialized_terminal_artifact_kind: authoritativeEnvelopeKind,
+      materialized_terminal_artifact_ref: authoritativeEnvelopeRef ?? null,
+      materialization_blocked_reason: null,
+      terminal_projection_kind_match: true,
+      terminal_projection_guard_applied: false,
+      terminal_projection_guard_action: null,
+      terminal_projection_failure_code: null,
+      terminal_authority_single_writer_audit: synchronizedWriterAudit,
+    };
+    const synchronizedWriter = {
+      ...(previousWriter ?? {}),
+      schema: "helix.terminal_authority_single_writer_result.v1",
+      turn_id: activeTurnId,
+      selectedArtifactKind: authoritativeEnvelopeKind,
+      selectedArtifactRef: authoritativeEnvelopeRef ?? null,
+      selected_terminal_artifact_kind: authoritativeEnvelopeKind,
+      selected_terminal_artifact_ref: authoritativeEnvelopeRef ?? null,
+      visible_text: authoritativeEnvelopeText,
+      source: authoritativeEnvelopeSource,
+      audit: synchronizedWriterAudit,
+      integrity: synchronizedWriterIntegrity,
+      debug_export_synchronized: true,
+      synchronized_from_terminal_answer_envelope: true,
+      pre_synchronization_terminal_authority_single_writer: preSynchronizationWriter,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.terminal_artifact_kind = authoritativeEnvelopeKind;
+    payload.final_answer_source = authoritativeEnvelopeSource;
+    payload.selected_final_answer = authoritativeEnvelopeText;
+    payload.answer = authoritativeEnvelopeText;
+    payload.text = authoritativeEnvelopeText;
+    payload.assistant_answer = authoritativeEnvelopeText;
+    payload.terminal_authority_single_writer = synchronizedWriter;
+    payload.terminal_answer_authority = {
+      ...(asDebugExportRecord(payload.terminal_answer_authority) ?? {}),
+      schema: "helix.turn_terminal_authority.v1",
+      turn_id: activeTurnId,
+      terminal_kind: "answer",
+      final_answer_source: authoritativeEnvelopeSource,
+      terminal_artifact_kind: authoritativeEnvelopeKind,
+      terminal_artifact_ref: authoritativeEnvelopeRef ?? null,
+      terminal_text_hash: hashHelixTerminalText(authoritativeEnvelopeText),
+      terminal_text_preview: authoritativeEnvelopeText.slice(0, 240),
+      authority_origin:
+        readDebugExportString(authoritativeTerminalEnvelope?.authority_origin) ??
+        authoritativeEnvelopeSource,
+      server_authoritative: true,
+      terminal_eligible: true,
+      debug_export_synchronized: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.terminal_presentation = {
+      ...(asDebugExportRecord(payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: activeTurnId,
+      terminal_artifact_kind: authoritativeEnvelopeKind,
+      final_answer_source: authoritativeEnvelopeSource,
+      terminal_authority_ref: authoritativeEnvelopeRef ?? null,
+      concise_text: authoritativeEnvelopeText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    delete payload.terminal_error_code;
+    delete payload.terminal_failure_text;
+    delete payload.typed_failure;
+    const debug = asDebugExportRecord(payload.debug);
+    if (debug) {
+      debug.terminal_artifact_kind = authoritativeEnvelopeKind;
+      debug.final_answer_source = authoritativeEnvelopeSource;
+      debug.selected_final_answer = authoritativeEnvelopeText;
+      debug.answer = authoritativeEnvelopeText;
+      debug.text = authoritativeEnvelopeText;
+      debug.assistant_answer = authoritativeEnvelopeText;
+      debug.terminal_authority_single_writer = synchronizedWriter;
+      debug.terminal_answer_authority = payload.terminal_answer_authority;
+      debug.terminal_presentation = payload.terminal_presentation;
+      delete debug.terminal_error_code;
+      delete debug.terminal_failure_text;
+      delete debug.typed_failure;
+    }
+  }
   const lifecycleProjectionSolverTraceAtBoundary = asDebugExportRecord(payload.ask_turn_solver_trace);
   const lifecycleProjectionEvidenceReentryAtBoundary = asDebugExportRecord(
     lifecycleProjectionSolverTraceAtBoundary?.evidence_reentry,
@@ -99401,7 +99569,9 @@ const buildHelixDebugExportEnvelope = (args: {
     codex_stderr_preview: payload.codex_stderr_preview,
     agent_runtime_selection_trace: payload.agent_runtime_selection_trace,
     selected_agent_provider: payload.selected_agent_provider,
-    provider_gateway_debug_summary: payload.provider_gateway_debug_summary,
+    provider_gateway_debug_summary:
+      payload.provider_gateway_debug_summary ??
+      lifecycleProjectionDebugAtBoundary?.provider_gateway_debug_summary,
     capability_lane_manifest: payload.capability_lane_manifest,
     capability_lane_ids: payload.capability_lane_ids,
     capability_lane_statuses: payload.capability_lane_statuses,
@@ -139013,6 +139183,41 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         payload.terminal_answer_authority = terminalAuthorityRecord;
         payload.terminal_authority_projection_invariant = terminalAuthorityProjectionInvariant;
         payload.poison_audit = poisonAudit;
+        const preSolverCommittedRoute = readCommittedAskRoute(payload);
+        const preSolverCanonicalGoalReconciliation =
+          reconcileCanonicalGoalFrameToCommittedRoute({
+            turnId: responseTurnId,
+            canonicalGoalFrame:
+              payload.canonical_goal_frame &&
+              typeof payload.canonical_goal_frame === "object" &&
+              !Array.isArray(payload.canonical_goal_frame)
+                ? (payload.canonical_goal_frame as Record<string, unknown>)
+                : null,
+            committedRoute: preSolverCommittedRoute,
+          });
+        if (
+          preSolverCanonicalGoalReconciliation.reconciled &&
+          preSolverCanonicalGoalReconciliation.frame
+        ) {
+          payload.canonical_goal_frame =
+            preSolverCanonicalGoalReconciliation.frame as HelixAskCanonicalGoalFrame;
+          payload.committed_route_canonical_goal_reconciliation = {
+            schema: "helix.committed_route_canonical_goal_reconciliation.v1",
+            turn_id: responseTurnId,
+            reconciled: true,
+            reason: preSolverCanonicalGoalReconciliation.reason,
+            committed_route_ref: preSolverCommittedRoute?.commit_id ?? null,
+            phase: "pre_solver_trace",
+            assistant_answer: false,
+            raw_content_included: false,
+          };
+          if (payload.debug && typeof payload.debug === "object" && !Array.isArray(payload.debug)) {
+            const debug = payload.debug as Record<string, unknown>;
+            debug.canonical_goal_frame = payload.canonical_goal_frame;
+            debug.committed_route_canonical_goal_reconciliation =
+              payload.committed_route_canonical_goal_reconciliation;
+          }
+        }
         const responseRouteForTrace =
           readAskTurnString(payload.route_reason_code) ??
           readAskTurnString(payload.route) ??
@@ -139346,6 +139551,40 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             hints: payload.runtime_continuation_hints as HelixRuntimeContinuationHint[],
             dependencies: buildHelixRuntimeContinuationHintDependencies(),
           });
+        }
+        const prePromotionCommittedRoute = readCommittedAskRoute(payload);
+        const prePromotionCanonicalGoalReconciliation =
+          reconcileCanonicalGoalFrameToCommittedRoute({
+            turnId: responseTurnId,
+            canonicalGoalFrame:
+              payload.canonical_goal_frame &&
+              typeof payload.canonical_goal_frame === "object" &&
+              !Array.isArray(payload.canonical_goal_frame)
+                ? (payload.canonical_goal_frame as Record<string, unknown>)
+                : null,
+            committedRoute: prePromotionCommittedRoute,
+          });
+        if (
+          prePromotionCanonicalGoalReconciliation.reconciled &&
+          prePromotionCanonicalGoalReconciliation.frame
+        ) {
+          payload.canonical_goal_frame =
+            prePromotionCanonicalGoalReconciliation.frame as HelixAskCanonicalGoalFrame;
+          payload.committed_route_canonical_goal_reconciliation = {
+            schema: "helix.committed_route_canonical_goal_reconciliation.v1",
+            turn_id: responseTurnId,
+            reconciled: true,
+            reason: prePromotionCanonicalGoalReconciliation.reason,
+            committed_route_ref: prePromotionCommittedRoute?.commit_id ?? null,
+            assistant_answer: false,
+            raw_content_included: false,
+          };
+          if (payload.debug && typeof payload.debug === "object" && !Array.isArray(payload.debug)) {
+            const debug = payload.debug as Record<string, unknown>;
+            debug.canonical_goal_frame = payload.canonical_goal_frame;
+            debug.committed_route_canonical_goal_reconciliation =
+              payload.committed_route_canonical_goal_reconciliation;
+          }
         }
         await promotePostObservationAgentStepForPayload({
           payload,
@@ -140142,15 +140381,23 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       const responseBoundaryAllowedTerminalKindsForRefresh = Array.isArray(responseBoundaryRouteEvidenceForTerminalRefresh?.allowed_terminal_artifact_kinds)
         ? responseBoundaryRouteEvidenceForTerminalRefresh.allowed_terminal_artifact_kinds.map((entry) => String(entry ?? "")).filter(Boolean)
         : [];
-      const responseBoundaryShouldRefreshGenericTypedFailureWriter =
-        responseBoundaryExistingTerminalWriterKindBeforeRefresh === "typed_failure" &&
+      const responseBoundaryShouldRefreshProvisionalTerminalWriter =
+        (
+          responseBoundaryExistingTerminalWriterKindBeforeRefresh === "typed_failure" ||
+          responseBoundaryExistingTerminalWriterKindBeforeRefresh === "tool_receipt"
+        ) &&
         Boolean(payload.committed_ask_route && typeof payload.committed_ask_route === "object" && !Array.isArray(payload.committed_ask_route)) &&
         responseBoundaryRouteEvidenceForTerminalRefresh?.terminal_product_allowed === true &&
         responseBoundaryAllowedTerminalKindsForRefresh.some((kind) => kind && kind !== "typed_failure") &&
         (
-          !responseBoundaryExistingTerminalWriterTextBeforeRefresh ||
-          /I could not (?:produce a terminal answer|complete this turn because a tool observation required a follow-up model answer step)/i.test(
-            responseBoundaryExistingTerminalWriterTextBeforeRefresh,
+          (
+            responseBoundaryExistingTerminalWriterKindBeforeRefresh === "typed_failure" &&
+            (
+              !responseBoundaryExistingTerminalWriterTextBeforeRefresh ||
+              /I could not (?:produce a terminal answer|complete this turn because a tool observation required a follow-up model answer step)/i.test(
+                responseBoundaryExistingTerminalWriterTextBeforeRefresh,
+              )
+            )
           ) ||
           shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal({
             payload,
@@ -140162,7 +140409,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         helixRuntimeFinalAnswerComposer.shouldApplyHelixTerminalSingleWriterForPayload(payload, responseBoundaryArtifacts) &&
         (
           !(payload.terminal_authority_single_writer && typeof payload.terminal_authority_single_writer === "object") ||
-          responseBoundaryShouldRefreshGenericTypedFailureWriter
+          responseBoundaryShouldRefreshProvisionalTerminalWriter
         ) &&
         !(
           readAskTurnString((payload.canonical_goal_frame as Record<string, unknown> | undefined)?.answer_scope) === "model_only" &&
@@ -145118,6 +145365,30 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           canonicalGoalFrame,
           stagePlayMailWakeRouteMetadata,
         );
+    const finalCommittedRouteForCanonicalGoal = readCommittedAskRoute(payload);
+    const finalCommittedRouteCanonicalGoalReconciliation =
+      reconcileCanonicalGoalFrameToCommittedRoute({
+        turnId: activeTurnId,
+        canonicalGoalFrame: canonicalGoalFrame as unknown as Record<string, unknown>,
+        committedRoute: finalCommittedRouteForCanonicalGoal,
+      });
+    if (
+      finalCommittedRouteCanonicalGoalReconciliation.reconciled &&
+      finalCommittedRouteCanonicalGoalReconciliation.frame
+    ) {
+      canonicalGoalFrame =
+        finalCommittedRouteCanonicalGoalReconciliation.frame as unknown as HelixAskCanonicalGoalFrame;
+      payload.committed_route_canonical_goal_reconciliation = {
+        schema: "helix.committed_route_canonical_goal_reconciliation.v1",
+        turn_id: activeTurnId,
+        reconciled: true,
+        reason: finalCommittedRouteCanonicalGoalReconciliation.reason,
+        committed_route_ref: finalCommittedRouteForCanonicalGoal?.commit_id ?? null,
+        phase: "final_response_composition",
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
     const reconcileCanonicalGoalToNoteMutation = (): void => {
       canonicalGoalFrame = {
         ...canonicalGoalFrame,
@@ -152355,14 +152626,23 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   });
   incoming.language_model_policy = activeLanguageModelPolicy;
   incoming.language_model_debug_summary = buildHelixLanguageModelDebugSummary(activeLanguageModelPolicy);
+  const requestDocsEvidenceSourceTargetIntent =
+    !stagePlayMailWakeRouteMetadata && !hardToolRouteMetadataForRequest
+      ? resolveAskTurnHardDocsEvidenceSourceTargetIntent({
+          transcript: transcriptSeed,
+          turnId,
+          threadId: sessionId || incomingThreadId || "helix-ask:desktop",
+        })
+      : null;
   if (
     !stagePlayMailWakeRouteMetadata &&
     !hardToolRouteMetadataForRequest &&
-    isAskTurnAffirmativeLocalDocumentEvidencePrompt(transcriptSeed)
+    requestDocsEvidenceSourceTargetIntent
   ) {
     const docsEvidenceRoute = buildAskTurnDocsEvidenceHardRouteMetadata({
       turnId,
       threadId: sessionId || incomingThreadId || "helix-ask:desktop",
+      sourceTargetIntent: requestDocsEvidenceSourceTargetIntent,
     });
     hardToolRouteMetadataForRequest = docsEvidenceRoute.metadata;
     canonicalRouteMetadataForRequest = hardToolRouteMetadataForRequest;
@@ -168804,13 +169084,25 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     streamBodyForRouteMetadata.sourceTargetIntent,
     streamBodyForRouteMetadata.mandatory_next_tool,
   );
-  if (!streamExistingHardToolRouteMetadata && isAskTurnAffirmativeLocalDocumentEvidencePrompt(question)) {
+  const streamDocsEvidenceSourceTargetIntent =
+    !streamExistingHardToolRouteMetadata
+      ? resolveAskTurnHardDocsEvidenceSourceTargetIntent({
+          transcript: question,
+          turnId: streamTurnId,
+          threadId:
+            readHelixAskRuntimeThreadId(streamBodyForRouteMetadata) ??
+            readHelixAskRuntimeSessionId(streamBodyForRouteMetadata) ??
+            "helix-ask:desktop",
+        })
+      : null;
+  if (!streamExistingHardToolRouteMetadata && streamDocsEvidenceSourceTargetIntent) {
     const streamDocsEvidenceRoute = buildAskTurnDocsEvidenceHardRouteMetadata({
       turnId: streamTurnId,
       threadId:
         readHelixAskRuntimeThreadId(streamBodyForRouteMetadata) ??
         readHelixAskRuntimeSessionId(streamBodyForRouteMetadata) ??
         "helix-ask:desktop",
+      sourceTargetIntent: streamDocsEvidenceSourceTargetIntent,
     });
     streamBodyForRouteMetadata.route_metadata = streamDocsEvidenceRoute.metadata;
     streamBodyForRouteMetadata.routeMetadata = streamDocsEvidenceRoute.metadata;
@@ -171840,7 +172132,7 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     }
     const docsRecoveryPrompt = recoveryPrompt || question;
     const docsRuntimeRecoveryDependencies: HelixDocsStreamRuntimeRecoveryDependencies = {
-      isDocsEvidencePrompt: isAskTurnAffirmativeLocalDocumentEvidencePrompt,
+      isDocsEvidencePrompt: isAskTurnHardDocsEvidenceSourceTargetPrompt,
       buildToolUseRestatement,
       buildDocsEvidenceHardRouteMetadata: buildAskTurnDocsEvidenceHardRouteMetadata,
       buildUniversalGoalFrame: (args) => buildAskTurnUniversalGoalFrame(args),
@@ -172101,13 +172393,17 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       raw_content_included: false,
     };
     const streamFailurePrompt = typeof body.question === "string" ? body.question : typeof body.prompt === "string" ? body.prompt : recoveryPrompt;
-    const streamFailureNeedsDocsPlan =
-      isAskTurnAffirmativeLocalDocumentEvidencePrompt(streamFailurePrompt) ||
-      buildToolUseRestatement(streamFailurePrompt).requiredToolFamilies.includes("docs_viewer");
+    const streamFailureDocsSourceTargetIntent = resolveAskTurnHardDocsEvidenceSourceTargetIntent({
+      transcript: streamFailurePrompt,
+      turnId,
+      threadId: sessionId ?? readHelixAskRuntimeThreadId(body) ?? "helix-ask:desktop",
+    });
+    const streamFailureNeedsDocsPlan = Boolean(streamFailureDocsSourceTargetIntent);
     if (streamFailureNeedsDocsPlan) {
       const docsEvidenceRoute = buildAskTurnDocsEvidenceHardRouteMetadata({
         turnId,
         threadId: sessionId ?? readHelixAskRuntimeThreadId(body) ?? "helix-ask:desktop",
+        sourceTargetIntent: streamFailureDocsSourceTargetIntent,
       });
       const docsRouteProductContract = buildRouteProductContract({
         turnId,

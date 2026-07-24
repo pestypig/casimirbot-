@@ -19,11 +19,16 @@ import { HelixSharedRoomVisualFramePayloadError } from
   "../../services/helix-ask/realtime-room/visual-frame-payload";
 import { buildHelixSharedRealtimeRoomResponse } from
   "../../services/helix-ask/realtime-room/room-response";
+import { projectSharedRealtimeRoomParticipantContext } from
+  "../../services/helix-ask/realtime-room/participant-context";
+import { isGuestSharedRealtimeRoomHostingEnabled } from
+  "../../services/helix-account/account-session-store";
 
 export type SharedRoomRequestAccount = {
   sessionId: string;
   profileId: string;
   displayName: string;
+  isGuest: boolean;
 };
 
 export const readRecord = (value: unknown): Record<string, unknown> =>
@@ -38,13 +43,12 @@ export const withRuntimeProjection = (
   room: HelixSharedRealtimeRoom,
 ): HelixSharedRealtimeRoom => {
   const runtime = readSharedRealtimeRoomRuntime({ roomId: room.room_id });
-  if (!runtime) return room;
-  const active = runtime.state === "host_transport_active" || runtime.state === "bridge_active";
-  return {
-    ...room,
-    status: room.status === "closed" ? "closed" : active ? "active" : room.status,
-    runtime,
-  };
+  const active = runtime?.state === "host_transport_active" || runtime?.state === "bridge_active";
+  return projectSharedRealtimeRoomParticipantContext(runtime ? {
+      ...room,
+      status: room.status === "closed" ? "closed" : active ? "active" : room.status,
+      runtime,
+    } : room);
 };
 
 export const requireSharedRoomAccount = async (
@@ -66,21 +70,32 @@ export const requireSharedRoomAccount = async (
   }
   const policy = context.account_policy;
   if (
-    policy.account_type !== "developer" ||
     !policy.feature_flags.includes("shared_realtime_rooms") ||
     policy.locked_features.includes("shared_realtime_rooms")
   ) {
     throw new SharedRealtimeRoomDomainError(
       "shared_realtime_room_locked_by_account_policy",
       403,
-      "Shared GPT Live Rooms are currently available to developer accounts only.",
+      "Enable Shared Live Rooms in Account & Sessions before creating or joining a room.",
     );
   }
   return {
     sessionId: context.session_id,
     profileId: context.profile_id,
     displayName: context.account_session.profile.display_name,
+    isGuest: context.account_session.profile.auth_mode === "guest",
   };
+};
+
+export const requireSharedRoomHostingAllowed = (
+  account: SharedRoomRequestAccount,
+): void => {
+  if (!account.isGuest || isGuestSharedRealtimeRoomHostingEnabled()) return;
+  throw new SharedRealtimeRoomDomainError(
+    "shared_realtime_room_forbidden",
+    403,
+    "Temporary guests can join invitations, but guest room creation is disabled on this server.",
+  );
 };
 
 const statusForRuntimeError = (

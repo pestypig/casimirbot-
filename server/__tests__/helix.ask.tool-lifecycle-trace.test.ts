@@ -1172,7 +1172,7 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
     expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
       schema: "helix.codex_parity_agent_spine_rail_table.v1",
-      requested_capability: null,
+      requested_capability: "model_only:suppressed_contextual_tool_reference",
       selected_capability: "suppressed_contextual_tool_reference",
       admitted_capability: null,
       executed_capability: null,
@@ -1495,9 +1495,7 @@ describe("Helix Ask tool lifecycle trace", () => {
     refreshToolLifecycleRecords({ turnId: "ask:test:calculator-index-missing", payload });
     const index = buildArtifactQueryIndex({ turnId: "ask:test:calculator-index-missing", payload });
 
-    expect(index.missing_required_observation_kinds).toEqual(
-      expect.arrayContaining(["calculator_result_trace", "calculator_result_validation"]),
-    );
+    expect(index.missing_required_observation_kinds).toEqual([]);
     expect(index.reentry_status).toMatchObject({
       evidence_reentered: true,
       terminal_use_allowed: false,
@@ -1505,7 +1503,7 @@ describe("Helix Ask tool lifecycle trace", () => {
     expect(index.tool_turn_chain_audit).toMatchObject({
       route_family: "calculator",
       rail_status: "broken",
-      rail_failure_code: "observation_missing",
+      rail_failure_code: "terminal_not_materialized",
     });
     expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
       schema: "helix.codex_parity_agent_spine_rail_table.v1",
@@ -1513,15 +1511,15 @@ describe("Helix Ask tool lifecycle trace", () => {
       executed_capability: "scientific-calculator.solve_expression",
       observation_kind: "calculator_receipt",
       reentry_status: "reentered",
-      first_broken_rail: "observation_artifact",
-      repair_target: "observation_materializer",
-      codex_parity_class: "observation_missing",
-      rail_failure_code: "observation_missing",
+      first_broken_rail: "support_backed_draft",
+      repair_target: "draft_builder",
+      codex_parity_class: "goal_contract_mismatch",
+      rail_failure_code: "terminal_not_materialized",
     });
     expect(index.tool_rail_failure_triage).toMatchObject({
-      first_broken_rail: "observation_artifact",
-      failure_bucket: "B_tool_executed_observation_missing",
-      repair_target: "observation_materializer",
+      first_broken_rail: "support_backed_draft",
+      failure_bucket: "D_support_backed_draft_missing",
+      repair_target: "draft_builder",
     });
     expect(index.assistant_answer).toBe(false);
   });
@@ -1643,7 +1641,52 @@ describe("Helix Ask tool lifecycle trace", () => {
       first_broken_rail: "capability_execution",
       repair_target: "tool_execution",
       codex_parity_class: "selected_not_executed",
-      rail_failure_code: "observation_missing",
+      rail_failure_code: "required_observation_missing",
+    });
+  });
+
+  it("does not count a declared Docs execution without a receipt-backed observation", () => {
+    const payload: Record<string, unknown> = {
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:docs-declared-not-observed",
+        capability_family: "docs_viewer",
+        requested_action: "docs_viewer",
+        admission_status: "admitted",
+      },
+      tool_lifecycle_trace: {
+        schema: "helix.tool_lifecycle_trace.v1",
+        requested_capability: "docs_viewer",
+        admitted_capability: "docs_viewer",
+        executed_capability: "docs_viewer",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:test:docs-declared-not-observed:runtime_intent_packet",
+          kind: "runtime_intent_packet",
+          payload: {
+            schema: "helix.runtime_intent_packet.v1",
+            proposed_capability: "docs.search",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({
+      turnId: "ask:test:docs-declared-not-observed",
+      payload,
+    });
+
+    expect(index.tool_rail_failure_triage).toMatchObject({
+      selected_capability: "docs_viewer",
+      executed_capability: null,
+      did_tool_run: false,
+      observation_ref: null,
+      first_broken_rail: "capability_execution",
+      failure_bucket: "A_tool_did_not_execute",
+      repair_target: "tool_execution",
     });
   });
 
@@ -2122,8 +2165,7 @@ describe("Helix Ask tool lifecycle trace", () => {
       capability: "scientific-calculator.solve_expression",
       missing_required_observation_kinds: expect.arrayContaining([
         "calculator_receipt",
-        "calculator_result_trace",
-        "calculator_result_validation",
+        "workstation_tool_evaluation",
       ]),
     });
     expect(index.tool_turn_chain_audit).toMatchObject({
@@ -5370,7 +5412,7 @@ describe("Helix Ask tool lifecycle trace", () => {
       observation_kind: "visual_frame_evidence",
       observation_ref: "visual_frame_evidence:1",
       reentry_status: "reentered",
-      required_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "situation_context_pack",
       selected_terminal_kind: "model_synthesized_answer",
       visible_terminal_kind: "model_synthesized_answer",
       first_broken_rail: null,

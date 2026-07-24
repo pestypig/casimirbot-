@@ -40,6 +40,15 @@ the final run. Revisions require a new policy version and an append-only link to
 the prior commitment. Freezing the design happens before tuning; executing the
 untouched held-out benchmark happens only after the candidate system is ready.
 
+`casimir_spec_benchmark_freeze_readiness/v1` is the machine-checkable
+development gate for this prerequisite. It requires the production public
+freeze, exact frozen policy and rubric artifacts, the 1,320-group design quotas,
+an independent custodian bundle-validation receipt, and an independently
+verified timestamp receipt bound to the public-freeze hash. Its output is an
+evidence-only readiness decision, not a benchmark result or preregistration
+authority. The currently tracked draft policy and rubric must produce
+`blocked`; synthetic conformance fixtures cannot unlock parser development.
+
 ## Evaluation gates
 
 The evaluation has two distinct gates:

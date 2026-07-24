@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
     visualInputEnabled: false,
     visualInputError: null as string | null,
     visualInputFrameCount: 0,
+    visualInputProviderAcknowledgedFrameCount: 0,
+    visualInputProviderImageConfirmedFrameCount: 0,
+    visualInputLastDeliveryStatus: "none" as const,
     workerRelayStatus: null,
   },
 }));
@@ -36,7 +39,7 @@ import {
 const model = buildHelixAskLiveRuntimeControlsModel({
   accountPolicy: {
     account_type: "developer",
-    feature_flags: [],
+    feature_flags: ["runtime_agent_controls", "shared_realtime_rooms"],
     locked_features: [],
   },
   lifecycleState: "active",
@@ -47,6 +50,8 @@ describe("Helix Ask GPT Live Vision source coordination", () => {
   beforeEach(() => {
     mocks.runtime.visualInputEnabled = false;
     mocks.runtime.visualInputFrameCount = 0;
+    mocks.runtime.visualInputProviderAcknowledgedFrameCount = 0;
+    mocks.runtime.visualInputProviderImageConfirmedFrameCount = 0;
     mocks.runtime.setVisualInputEnabled.mockClear();
   });
 
@@ -110,5 +115,70 @@ describe("Helix Ask GPT Live Vision source coordination", () => {
       "title",
       "GPT Live Vision is enabled and waiting for the selected Screen or Camera source; captures run automatically every 10 seconds (0 sent)",
     );
+  });
+
+  it("distinguishes transport-queued frames from provider acknowledgements", () => {
+    mocks.runtime.visualInputEnabled = true;
+    mocks.runtime.visualInputFrameCount = 3;
+    render(<HelixAskLiveRuntimeControls model={model} />);
+
+    const vision = screen.getByRole("button", {
+      name: "Stop sharing visual frames with GPT Live",
+    });
+    expect(vision).toHaveAttribute(
+      "title",
+      "GPT Live Vision queued 3 frames on the Realtime transport; awaiting provider acknowledgement",
+    );
+
+    cleanup();
+    mocks.runtime.visualInputProviderAcknowledgedFrameCount = 2;
+    render(<HelixAskLiveRuntimeControls model={model} />);
+    expect(screen.getByRole("button", {
+      name: "Stop sharing visual frames with GPT Live",
+    })).toHaveAttribute(
+      "title",
+      "GPT Live Vision provider acknowledged 2 of 3 items; awaiting input_image confirmation",
+    );
+
+    cleanup();
+    mocks.runtime.visualInputProviderImageConfirmedFrameCount = 2;
+    render(<HelixAskLiveRuntimeControls model={model} />);
+    expect(screen.getByRole("button", {
+      name: "Stop sharing visual frames with GPT Live",
+    })).toHaveAttribute(
+      "title",
+      "GPT Live Vision provider confirmed image context for 2 of 3 queued frames",
+    );
+  });
+
+  it("exposes GPT Live to users while withholding visual capture and shared rooms", () => {
+    const userModel = buildHelixAskLiveRuntimeControlsModel({
+      accountPolicy: {
+        account_type: "user",
+        feature_flags: ["runtime_agent_controls"],
+        locked_features: [
+          "live_answer_visual_capture_controls",
+          "shared_realtime_rooms",
+        ],
+      },
+      lifecycleState: "active",
+      transportControllerState: "active",
+      authority: "suggest_actions",
+    });
+
+    render(<HelixAskLiveRuntimeControls model={userModel} />);
+
+    expect(userModel.controlState.runtime_agent_authority).toBe("observe_only");
+    expect(screen.getByRole("button", { name: "Live runtime agent mode" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Enable Live Voice microphone" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Live runtime agent authority" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Share visual frames with GPT Live" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open Shared GPT Live Room" })).toBeNull();
+  });
+
+  it("keeps the Observe/Suggest authority selector available to developers", () => {
+    render(<HelixAskLiveRuntimeControls model={model} />);
+
+    expect(screen.getByRole("button", { name: "Live runtime agent authority" })).toBeVisible();
   });
 });

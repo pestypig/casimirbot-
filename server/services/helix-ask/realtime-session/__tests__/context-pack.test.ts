@@ -177,4 +177,50 @@ describe("Realtime Stage Play context pack", () => {
       unsubscribeGoalContext();
     }
   });
+
+  it("prioritizes active-session conversation evidence over older shared-thread history", () => {
+    const threadId = "helix-ask:desktop";
+    const currentSessionId = "realtime:current-session";
+    for (let index = 0; index < 40; index += 1) {
+      recordStagePlayLiveSourceConversationEvent({
+        threadId,
+        source: index % 2 === 0 ? "user_voice" : "assistant_answer",
+        text: `Older shared-thread event ${index}`,
+        evidenceRefs: [`realtime:older-session:${index}`, `evidence:older:${index}`],
+        now: `2026-07-16T12:${String(index).padStart(2, "0")}:00.000Z`,
+      });
+    }
+    const currentQuestion = recordStagePlayLiveSourceConversationEvent({
+      threadId,
+      source: "user_voice",
+      text: "What does the document mean by noncomputable?",
+      evidenceRefs: [currentSessionId, "handoff:current-question"],
+      now: "2026-07-16T12:40:00.000Z",
+    });
+    const currentAnswer = recordStagePlayLiveSourceConversationEvent({
+      threadId,
+      source: "assistant_answer",
+      text: "It means the response operator is not registered yet.",
+      evidenceRefs: ["handoff:current-answer", "ask:current-answer"],
+      now: "2026-07-16T12:40:01.000Z",
+    });
+
+    const context = buildHelixRealtimeStagePlayContextPack({
+      realtimeSessionId: currentSessionId,
+      threadId,
+      nowMs: Date.parse("2026-07-16T12:40:02.000Z"),
+    });
+
+    expect(context.recent_questions.map((entry) => entry.ref)).toContain(currentQuestion.eventId);
+    expect(context.grounded_answers.map((entry) => entry.ref)).toContain(currentAnswer.eventId);
+    expect(context.evidence_refs).toEqual(expect.arrayContaining([
+      currentQuestion.eventId,
+      currentAnswer.eventId,
+      currentSessionId,
+      "handoff:current-question",
+      "handoff:current-answer",
+      "ask:current-answer",
+    ]));
+    expect(context.evidence_refs.length).toBeLessThanOrEqual(context.limits.max_evidence_refs);
+  });
 });

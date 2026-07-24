@@ -7,7 +7,7 @@
 **Status:** proposal package complete; commissioning conditional; measured evidence not ready  
 **Current / maximum claim tier:** diagnostic / diagnostic  
 **Manifold-response math maturity:** Stage 0 exploratory / noncomputable  
-**Evidence cutoff:** 2026-07-21  
+**Evidence cutoff:** 2026-07-23<br>
 **Run config:** `configs/research/casimir-dp-quantum-foam-study.v1.json`  
 **Runner:** `scripts/research/run-casimir-dp-quantum-foam-study.ts`  
 **Experiment-design config:** `configs/research/casimir-dp-experiment-design.v1.json`  
@@ -23,6 +23,9 @@
 **Proposal-closure runner:** `scripts/research/run-casimir-dp-proposal-closure.ts`  
 **Experiment proposal:** `docs/research/casimir-dp-experiment-proposal.md`  
 **Proposal-closure report:** `docs/research/casimir-dp-proposal-closure-report.md`  
+**OR/phase Stage-2 config:** `configs/research/casimir-dp-or-phase-stage2.v1.json`<br>
+**OR/phase Stage-2 runner:** `scripts/research/run-casimir-dp-or-phase-stage2.ts`<br>
+**OR/phase Stage-2 report:** `docs/research/casimir-dp-or-phase-stage2-report.md`<br>
 **Equation-action sidecar:** `docs/research/casimir-dp-quantum-foam-study.equation-actions.json`  
 **Equation-action source:** `docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json`  
 **Theory-badge graph:** `shared/theory/casimir-dp-study-theory-badges.ts`
@@ -44,6 +47,24 @@ manifold-response and observable bridges. Promotion requires
 material/metrology receipts, a controlled coherence experiment, measured
 mass-density branch evidence, quantitative response dynamics, sensitivity and
 negative-control campaigns, and comparison with independent collapse bounds.
+
+### OR-motivated experimental thesis
+
+Penrose objective reduction (OR) supplies the conceptual motivation, not the
+current boundary-response prediction. In Penrose's argument, a coherent
+superposition of materially different mass distributions is associated,
+schematically and in a weak-field description, with branch-dependent spacetime
+geometries whose time-translation structures cannot be identified
+unambiguously. A gravitational self-energy scale `E_G` gives the
+order-of-magnitude instability estimate `tau_OR ~ hbar/E_G`.
+
+`CDP-QF-1` asks a narrower extension question: when the prepared material
+branches are held fixed, can changing a nearby QED boundary produce a phase or
+coherence differential beyond the complete ordinary-coupling prediction?
+Standard Penrose/DP reasoning alone does not predict that boundary dependence.
+The experiment is therefore OR-motivated, but it is not a direct confirmation
+experiment for OR unless a source-backed boundary-to-collapse dynamics and a
+dynamics-level discriminator are supplied.
 
 ## 1. Why this is separate from NHM2
 
@@ -119,6 +140,68 @@ prediction. Its value is that every link can be tested or blocked separately:
 5. test a blinded boundary-conditioned coherence differential;
 6. compare any surviving parameter region with independent collapse bounds.
 
+### 2.4 Penrose OR motivation, notation, and scope
+
+The paper uses the following notation crosswalk:
+
+| Layer | Notation | Meaning and authority |
+|---|---|---|
+| Penrose 1996 | `E_Delta` | Gravitational self-energy of the difference between alternative mass distributions; conceptual OR instability scale. |
+| Penrose 2014 | `E_G` | Later notation for the same weak-field order-of-magnitude idea. |
+| Repository | `Delta E_G^repo(ell)`; field `deltaE_J` | Plummer-regularized, grid-dependent numerical estimator from explicit material branches. |
+
+<!-- helix-doc-equation-action/v1 id=cdp-or-branch-geometry-context -->
+\[
+|\Psi\rangle\ \sim\
+\alpha|\rho_A,g^{(A)}_{\mu\nu}\rangle+
+\beta|\rho_B,g^{(B)}_{\mu\nu}\rangle,
+\qquad
+\tau_{\mathrm{OR}}\sim\frac{\hbar}{E_G}.
+\]
+
+The state notation labels correlated matter and branch-dependent metric
+configurations; it is not a completed covariant quantum-gravity state
+construction. "Branch-dependent metric configurations" is therefore preferred
+here to "two manifolds." Penrose's concern is that point identification and
+time translation between the alternative geometries are not canonically
+defined. The repository does not solve that geometric superposition. It
+computes the regulated Newtonian mass-density proxy in Lane B.
+
+The three quantities in the table correspond conceptually, but they are not
+assumed numerically identical across conventions. The repository value depends
+on the branch construction, grid, cutoff, Plummer length, and provenance. OR
+supplies motivation and a timescale conjecture; it does not supply a Casimir
+coupling, a cavity resonance, or a gravitational-wave signature.
+
+An ambient classical gravitational field must also remain separate from the OR
+branch-difference energy. A common background belongs to both branch
+descriptions. If the material paths sample different gravitational potentials,
+it produces an ordinary unitary matter-wave phase:
+
+<!-- helix-doc-equation-action/v1 id=cdp-ambient-gravity-phase-control -->
+\[
+\Delta\phi_g=
+-\frac{m}{\hbar}\int
+\left[\Phi_A(t)-\Phi_B(t)\right]dt.
+\]
+
+This phase, plus tidal, vibration, and alignment effects, is an experimental
+control. The mere presence of `Phi_ambient` or `|g|` is not
+`E_G[rho_A-rho_B]` and does not open the Casimir-to-OR bridge. For the frozen
+`75 nm` silica sphere, `20 nm` branch separation, and `0.1 s` window, a fully
+vertical branch separation would produce about `7.23e8 rad`. Keeping a
+boundary-correlated contribution below `0.1 rad` requires a vertical-projection
+stability of about `2.77e-18 m`, or a small-angle tilt stability of about
+`1.38e-10 rad`. These are high-risk measured controls, not collapse
+predictions.
+
+Penrose OR is the only part of the OR/Orch OR family placed in the causal
+motivation of this study. Orch OR adds a biological proposal involving
+microtubules, neuronal orchestration, anesthetic response, and conscious
+events. `CDP-QF-1` contains none of those preparations or endpoints. It can at
+most constrain the OR ingredient under a named mass-density and regularization
+model; it cannot validate or falsify Orch OR as a complete biological theory.
+
 ## 3. Lane A — Casimir reference and observation
 
 For ideal, perfectly conducting parallel plates at zero temperature, the
@@ -168,6 +251,13 @@ The DP lane begins with two explicit mass-density branches:
 \[
 \Delta\rho(\mathbf{x})=\rho_A(\mathbf{x})-\rho_B(\mathbf{x}).
 \]
+
+Positive and negative regions of `Delta rho` record where ordinary positive
+mass is present in one material branch relative to the other. They do not
+represent negative-mass matter, negative-frequency particles, or Casimir
+negative energy. The Casimir stress difference and the DP mass-density
+difference are distinct signed quantities with distinct operational
+definitions.
 
 The repository computes a regularized gravitational self-energy diagnostic
 from those branches. Its conceptual form is:
@@ -254,6 +344,9 @@ has been experimentally demonstrated.
 |---|---|---|---|
 | `E=mc^2=h\nu_C` supplies a collapse clock | The identity defines a Compton frequency but no collapse observable or cavity coupling by itself. | `blocked` by the Compton/DP/cavity frequency-separation gate. | Rest-energy bookkeeping and explicitly modeled phase differences only. |
 | DP reduction is a beat between two manifolds | Penrose motivates an incompatibility between alternative mass geometries; the repository implements a nonrelativistic mass-density self-energy proxy, not an acoustic mode. | DP rate-only diagnostic; covariant manifold dynamics `blocked`. | Metaphor only; no resonance or spectral-line claim. |
+| Collapse accelerates merely in a stronger ambient gravitational field | Standard OR/DP uses the branch-relative self-energy, not the shared field magnitude. Different path potentials can create a large ordinary unitary phase. | Ambient-gravity phase/tilt runtime `pass`; measured alignment receipts `not_ready`. | Treat as a phase and systematics control, not an OR rate. |
+| Constructive/destructive interference or gravitational-wave reality proves quantum manifolds | Interference measures phase and visibility; gravitational-wave observations establish classical metric dynamics. Neither result establishes superposed quantum geometries or objective reduction. | Four-quadrature readout runnable; measured evidence `not_ready`; collapse and manifold gates `blocked`. | Instrument/readout motivation only. |
+| A non-biological Casimir experiment validates Orch OR | Orch OR adds microtubule, neuronal, anesthetic, and consciousness claims absent from this protocol. | Explicit Orch OR scope boundary; no biological runtime. | At most constrain a named OR ingredient, never the complete Orch OR theory. |
 | Conducting plates literally filter long-wavelength virtual particles | Mode and Green-function language can be useful, but a virtual-particle population is not the measured observable and Casimir forces do not select a unique vacuum ontology. | Resolved as a QED claim boundary. | Use Lifshitz/material response and measured apparatus observables. |
 | A Casimir region has absolute negative energy | Ideal renormalized stress can be negative relative to a reference; real apparatus predictions require material, boundary, geometry, temperature, and renormalization receipts. | Ideal and reduced-order validation `pass`; apparatus-matched evidence `not_ready`. | Reference-subtracted stress/force statements with stated model domain. |
 | Negative energy density means negative spacetime curvature | Curvature follows a tensor field equation; the sign of one stress component does not determine the solved geometry. | Semiclassical baseline registered; causal manifold response `blocked`. | Tensor-source hypothesis only, with no geometry-control claim. |
@@ -268,6 +361,15 @@ compute a covariant superposition of manifolds. A virtual photon is also not a
 prepared, persistent mass-density branch accepted by that estimator. Applying
 `\tau_{DP}=\hbar/\Delta E_G` to an assigned virtual-particle "lifetime" would
 therefore mix two different formalisms without a registered derivation.
+
+The repository's generic DP adapters can, for exploratory diagnostics, convert
+signed `energy_density_J_m3` or `geom_stress` samples into a scalar
+`T00/c^2`-like density grid. That generic capability is not admitted as a
+Casimir-to-OR bridge in this study. A scalar conversion omits the pressure,
+momentum-flux, renormalization, gauge, causal metric-response, and
+metric-to-coherence dynamics required by the proposed mechanism. Feeding a
+Casimir stress sample through that adapter cannot close the observable,
+frequency, collapse-identification, or manifold-response gates.
 
 For the current DP implementation, a useful null prediction is:
 
@@ -349,6 +451,37 @@ decay rate `\Gamma`. The residual observable is:
 Every subtraction term must be fixed from calibration or control data before
 the blinded target comparison. The standard-null expectation is
 `\Delta\Gamma_{res}=0` within the combined uncertainty.
+This paper uses four aggregate nuisance buckets: `EM` includes the separately
+reported electrostatic, patch, and surface terms; `thermal` includes thermal,
+blackbody, and residual-gas collision terms; `mech` contains vibration and
+trap-motion terms; and `readout` includes optical readout and backaction. The
+experiment proposal expands those same buckets into seven explicit terms; it
+does not define a different residual.
+
+Phase and visibility are separate readout coordinates. A static boundary has a
+state, not an oscillation phase with which the particle becomes "in phase."
+The interferometric phase is the material-branch action difference under a
+specified boundary state, and the two-port probabilities make constructive and
+destructive interference operational:
+
+<!-- helix-doc-equation-action/v1 id=cdp-interferometric-phase-visibility-readout -->
+\[
+\Delta\phi_b=
+-\frac{1}{\hbar}\int
+\left[U_{b,A}(t)-U_{b,B}(t)\right]dt,
+\qquad
+P_\pm(b,t)=\frac12\left[
+1\pm V_b(t)\cos\!\left(\Delta\phi_b+\chi\right)\right],
+\qquad
+V_b(t)=V_{b,0}e^{-\Gamma_b t}.
+\]
+
+The phase residual is formed only after subtracting registered QED,
+electrostatic, thermal, mechanical, readout, and gravity phase terms. A phase
+shift can occur without visibility loss; visibility loss can occur without a
+resolved phase shift; and neither observation alone identifies nonunitary
+collapse. Four analysis phases `chi={0,pi/2,pi,3pi/2}` reconstruct the cosine
+and sine quadratures, visibility, and phase without assigning their cause.
 
 ### 5.4 Candidate manifold-response bridge
 
@@ -428,20 +561,20 @@ roles. It does not declare one apparatus to be the physics winner:
 | Role | Platform and actuator | Diagnostic result | Present use |
 |---|---|---|---|
 | Casimir calibration | Cryogenic nanomechanical resonator; superconducting transition | ideal-reference force SNR `1.30e6`; unmodeled phase `1.23e-7 rad`; DP branch unresolved | characterize boundary switching and force sidecars |
-| Integrated development | Cryogenic levitated nanoparticle; symmetric gated 2D boundaries | force SNR `163`; visibility `0.807`; Gaussian-proxy `tau_DP=8.43e6 s` | develop the joint switching/coherence protocol |
+| Integrated development | Cryogenic levitated nanoparticle; symmetric gated 2D boundaries | force SNR `163`; visibility `0.807`; corrected centered-grid Gaussian-proxy `tau_DP=1.04e6 s` | develop the joint switching/coherence protocol |
 | Spatial benchmark | Free-flight nanoparticle matter wave; photoexcited semiconductor | `133 nm` branch separation; visibility `0.242`; unmodeled phase `8.24e5 rad` | benchmark large separation while exposing the force-cancellation problem |
 
 For the integrated levitated design, the registered proxy gives
-`Gamma_DP=1.19e-7 s^-1` against an assumed ordinary-environment rate of
+`Gamma_DP=9.62e-7 s^-1` against an assumed ordinary-environment rate of
 `Gamma_env=2.15 s^-1`. The accessible-rate ratio is therefore:
 
 <!-- helix-doc-equation-action/v1 id=cdp-accessible-rate-ratio -->
 \[
 \mathcal R_{access}=\frac{\Gamma_{DP}}{\Gamma_{env}}
-=5.52\times 10^{-8}.
+=4.47\times 10^{-7}.
 \]
 
-This nearly eight-order rate gap is the central quantitative design constraint,
+This more-than-six-order rate gap is the central quantitative design constraint,
 not evidence of collapse. Closing it requires measured decoherence sidecars,
 realistic mass-density branches, a publication-grade finite-material Casimir
 calculation, and a dynamics-level discriminator. The nanomechanical candidate
@@ -493,20 +626,22 @@ following exact-grid diagnostic:
 
 | Grid | `Delta E_G` (J) | `Gamma_DP` (`s^-1`) | Change from prior |
 |---:|---:|---:|---:|
-| `12^3` | `2.6549e-41` | `2.5175e-7` | n/a |
-| `14^3` | `1.7919e-41` | `1.6992e-7` | `0.4816` |
-| `16^3` | `1.5267e-41` | `1.4477e-7` | `0.1737` |
+| `12^3` | `2.2291e-40` | `2.1137e-6` | n/a |
+| `14^3` | `1.7473e-40` | `1.6568e-6` | `0.2758` |
+| `16^3` | `1.2511e-40` | `1.1864e-6` | `0.3966` |
 
-The final change passes the registered coarse `25%` Stage-1 numerical gate,
-but density provenance remains `not_ready`: the sphere is a design model, not a
-measured internal mass-density map.
+The corrected centered grids pass mass conservation, branch symmetry, and
+boundary containment. The final change does not pass the registered coarse
+`25%` spatial-convergence gate, so numerical convergence is now `not_ready`.
+Density provenance also remains `not_ready`: the sphere is a design model, not
+a measured internal mass-density map.
 
 #### Power and identifiability
 
 Under an independent-binomial fringe approximation, two-sided `alpha=0.05`,
 `90%` power, and variance inflation 2, detecting only the rigid-sphere DP rate
 against the assumed `2.15 s^-1` background requires approximately
-`1.08e17` shots per setting (`2.15e17` total). This makes the rate-only protocol
+`1.60e15` shots per setting (`3.21e15` total). This makes the rate-only protocol
 inaccessible under the present assumptions.
 
 More importantly, rate-only visibility cannot identify collapse. The dynamics
@@ -648,6 +783,71 @@ completion, measured evidence, finite-geometry contrast, collapse
 identification, and manifold dynamics remain open for the exact artifacts that
 can close them.
 
+### 5.11 OR/phase Stage-2 plausibility runtime
+
+Campaign `casimir-dp-or-phase-stage2-v1` turns the revised hypothesis into
+three categorical lanes rather than a numerical plausibility score:
+
+No numerical plausibility score is produced; authority and evidence are
+categorical and fail closed.
+
+| Lane | Authority | Runnable output | Current evidence state |
+|---|---|---|---|
+| QED/open-system baseline | established reference plus apparatus model | branch-action phase, four-port quadratures, visibility, force/phase and ambient-gravity controls | computable; measured receipts `not_ready` |
+| OR/DP branch instability | sourced conjecture plus weak-field diagnostic | `Delta E_G`, `tau`, pairwise/potential identity, proposal-specific resolution sweep, branch sampling, fixed-branch boundary null | algebraic audit `pass`; proposal convergence, branch provenance, bounds, and Stage-1 authority transfer `not_ready` |
+| Boundary-conditioned spacetime bridge | unregistered extension | required inputs, falsifiers, and claim ceiling only | `blocked`; no rate computed |
+
+The audit first corrected two DP bookkeeping defects: the asymmetric
+cross-energy component now includes both branch orderings, and the analytic
+point-pair helper now obeys the registered one-half double-integral convention.
+It also corrects the Stage-1 grid builders to treat `origin_m` as the grid
+center rather than the minimum corner. With the corrected centered grids,
+mass conservation, branch symmetry, and boundary containment pass, but the
+`12/14/16` rigid-sphere sequence no longer meets the `0.25` spatial-convergence
+tolerance. The corrected Stage-1 gate is therefore `not_ready`, replacing the
+earlier false pass.
+
+For the frozen proposal sphere, the Stage-2 `16^3` diagnostic gives
+`Delta E_G=8.04731e-40 J`, `tau=1.31046e5 s`, and a pairwise-to-softened-
+potential relative error of `6.08e-16`. The independently accumulated
+self/cross component identity agrees to `1.74e-12`, inside its registered
+`1e-10` tolerance. These are software and algebraic checks, not evidence of
+physical reduction.
+
+Stage 2 now runs its own proposal-sphere `12/14/16` resolution sweep. Its final
+two relative energy changes are about `0.665` and `0.446`, so it does not meet
+the registered `0.10` convergence tolerance. The earlier Stage-1 convergence,
+provenance, and bound gates are explicitly non-transferable: Stage 1 used a
+`1e-18 kg`, `50 nm` sphere, whereas the frozen proposal uses a
+`3.88772e-18 kg`, `75 nm` sphere. Their separation and Plummer length match,
+but that does not make the mass/radius inputs identical.
+
+Replaying two boundary labels with identical `Delta rho`, grid, branch
+geometry, and Plummer length gives exactly
+`Delta_b Gamma_DP=0`. The `+/-1 nm` perturbation audit now freezes one
+`16^3` grid instead of changing voxel size with separation. The sampled masses
+remain fixed, but a `1 nm` separation change is below the `20 nm` voxel scale,
+so the raw rate remains unchanged and the physical-sensitivity gate is
+`not_ready`. No separation derivative is inferred from an unresolved grid.
+Switching-correlated motion, strain, heating, or polarization must still
+update the branch receipt before any comparison with the fixed-branch null.
+
+The ordinary phase runtime predicts the frozen first-order transverse
+common-mode null, reconstructs visibility `0.806541` from four quadratures, and
+keeps its measured-evidence gate `not_ready`; its uncertainty model is also
+`not_registered`, so a data hash alone cannot promote it. The ambient-gravity calculation
+produces the `7.23e8 rad` vertical phase and the `1.38e-10 rad` boundary-
+correlated tilt target above. This makes gravitational phase an explicit
+control without identifying it with collapse.
+
+The Stage-2 configuration hash is
+`b517e8fbf002303258a5269e7f37c6b16d4bc3c45c609072bdb2a9e5184e596d`;
+the maintained run receipt hash is
+`64f0e1c95307829540d3c01ad7cb7e10b15d510cb31cf8e73f88a8990d2c25ab`.
+Software/algebraic diagnostics pass. Measured QED phase/coherence remains
+`not_ready`; collapse identification and manifold dynamics remain `blocked`;
+the publication claim ceiling remains `diagnostic_protocol_only`.
+
 ## 6. Observable-separation gate
 
 The study currently fails closed at the cross-lane bridge:
@@ -699,7 +899,7 @@ stage cannot acquire authority before its prerequisites close.
 ### 7.1 Cross-runtime authority order
 
 The thirteen stages above govern the base study runner. The repository also
-contains five maintained campaign runtimes. Their paper-level authority order
+contains six maintained campaign runtimes. Their paper-level authority order
 is:
 
 1. **Base diagnostic scaffold** — freezes the separated observables, runs the
@@ -718,7 +918,11 @@ is:
 5. **Proposal closure** — freezes the transverse-branch sample-and-hold
    apparatus, preregistration contracts, commissioning ladder, model lanes,
    and decision table.
-6. **Document synchronization** — regenerates equation actions, validates the
+6. **OR/phase Stage 2** — replays corrected DP branch numerics through a
+   softened-potential identity, computes ordinary phase/interference and
+   ambient-gravity controls, evaluates the fixed-branch null, and emits the
+   three-lane plausibility ledger.
+7. **Document synchronization** — regenerates equation actions, validates the
    theory-badge graph and paper actions, and then updates this ledger.
 
 This is an **authority dependency rail**, not an assertion that every CLI
@@ -760,16 +964,23 @@ Run the proposal-closure audit with:
 npx tsx scripts/research/run-casimir-dp-proposal-closure.ts
 ```
 
+Run the OR/phase Stage-2 audit with:
+
+```text
+npx tsx scripts/research/run-casimir-dp-or-phase-stage2.ts --config configs/research/casimir-dp-or-phase-stage2.v1.json --report-doc docs/research/casimir-dp-or-phase-stage2-report.md
+```
+
 ### 8.1 Runtime-to-artifact contract
 
 | Runtime | Frozen input and SHA-256 | Outputs / sidecars | Current receipt or maintained evidence | Claim ceiling |
 |---|---|---|---|---|
 | Base diagnostic scaffold | `casimir-dp-quantum-foam-study.v1.json`; `56ab76ca85f4ef4da7ce1ac9da3e87d2eb4e898b02cbc09aca0ad301e0a3f2d2` | `casimir-reference-baseline.json`, `dp-collapse-diagnostic.json`, `study-run-receipt.json` in a timestamped run directory | receipt schema `casimir_dp_quantum_foam_study_receipt/1`; hashes both outputs and preserves every open gate | diagnostic smoke result only |
 | Experiment-design screen | `casimir-dp-experiment-design.v1.json`; `bd5528824d70de65e8b181dc18a78c3a287b2fd9c2cdd66bb5a9a79a3c97fe84` | timestamped JSON/Markdown reports and `experiment-design-receipt.json`; maintained design report | `casimir_dp_experiment_design_receipt/1`; input and both output hashes | engineering screen only; frozen proposal supersedes its symmetric-force candidate |
-| Stage-1 gated computations | `casimir-dp-next-computations.v1.json`; `9f19359ee6ab02930e1cba25045183ad8931fc3f62e88e1363028f8852fea420` | timestamped JSON/Markdown reports and `gated-computations-receipt.json`; maintained computations report | `casimir_dp_next_computations_receipt/1`; input and both output hashes | reduced-order diagnostic numerics only |
+| Stage-1 gated computations | `casimir-dp-next-computations.v1.json`; `5b12c758228dc68865f4a91d3ae1aa9ade698932546c686aab5cb9e5773b5e93` | timestamped JSON/Markdown reports and `gated-computations-receipt.json`; corrected maintained computations report | receipt `d9f42cb1e025bcfa56484b05919797dda8ed2cec383ea927d0972fd7e652c887`; branch sampling passes and spatial convergence is not ready | corrected reduced-order diagnostic numerics only |
 | Data readiness | `casimir-dp-data-readiness.v1.json`; `a95e7a22c20e29ed9c34f45ece90916748a9264a32be8315663819171b406475` | maintained data-readiness report plus authenticated optical, switching, and decoherence fixture checks | receipt `9e0f1e8aa01f8ff3e7faf0c070853e0cd4887a191115c51804fa5c71a7c2be5d` | synthetic-pipeline readiness; measured-evidence gate remains closed |
 | Proposal closure | `casimir-dp-proposal-closure.v1.json`; `7b3b2673c95d4eebca060261385f3b0659365c1112c1d9d42bc1d8700686b8ba` | maintained closure report and experiment proposal | receipt `aae5cf37e01df022509bc9f997287719eafd5670c6156fdd626d24ce94dbb4c0` | proposal completeness only; commissioning conditional |
-| Paper / workstation synchronization | paper plus `.equation-actions.source.json`; theory-badge module | generated `.equation-actions.json`, document-action tests, badge-graph tests | 20 equation markers = 20 source entries = 20 generated entries; 11 study badges and 28 edges | navigation and provenance only |
+| OR/phase Stage 2 | `casimir-dp-or-phase-stage2.v1.json`; `b517e8fbf002303258a5269e7f37c6b16d4bc3c45c609072bdb2a9e5184e596d` | JSON/Markdown OR/phase report, maintained report, and hashed receipt | receipt `64f0e1c95307829540d3c01ad7cb7e10b15d510cb31cf8e73f88a8990d2c25ab`; software/algebraic diagnostics pass; proposal convergence and sensitivity not ready | three-lane diagnostic only; measured, collapse, and manifold gates remain closed |
+| Paper / workstation synchronization | paper plus `.equation-actions.source.json`; theory-badge module | generated `.equation-actions.json`, document-action tests, badge-graph tests | 23 equation markers = 23 source entries = 23 generated entries; 12 study badges and 34 edges | navigation and provenance only |
 
 The input hashes identify the exact frozen configuration bytes in this
 checkout. Timestamped receipts identify a particular execution. A maintained
@@ -792,6 +1003,22 @@ The supplied config uses synthetic Gaussian DP branches solely to exercise the
 existing solver. Those values must never enter a results or abstract claim as
 apparatus measurements.
 
+### 8.2 Validation standing
+
+Validation is reported in separate software, algebraic, provenance, and
+scientific lanes so that repository health cannot be mistaken for experimental
+evidence.
+
+| Validation lane | Current result | What it establishes | What it does not establish |
+|---|---|---|---|
+| Optical-response analytic check | Kramers-Kronig relative error `7.0692e-7`; synthetic pipeline `pass` | the registered transform and synthetic acquisition path replay within their diagnostic contract | measured material response |
+| DP/phase focused contracts | 10 files, 67 tests `pass` | corrected DP normalization, density-payload integrity, branch sampling, proposal-specific resolution, potential/pairwise identity, phase/interference, paper provenance, badge graph, and root-leaf manifest agree | a physical collapse signal |
+| Equation and Theory Badge sidecars | `23/23/23` equation parity; 12 badges and 34 edges | paper navigation and claim-boundary provenance are synchronized | empirical support for any badge hypothesis |
+| Math-stage registry | 193 entries; validation `pass` | both new Stage-2 modules are registered at diagnostic maturity | certified manifold dynamics |
+| Required GR/warp regression battery | 18 files, 179 tests `pass` | this revision does not break the repository's required GR/constraint contracts | physical viability of the Casimir-DP extension |
+| Casimir adapter certificate | verdict `PASS`; first failure `null`; deltas empty; integrity `OK/GREEN`; SHA-256 `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45` | adapter and constraint-pack integrity at this revision | observation of collapse, quantum spacetime, or a Casimir-to-OR transfer law |
+| Scientific promotion gates | measured evidence `not_ready`; collapse identification `blocked`; manifold dynamics `blocked` | the proposal remains fail-closed while apparatus receipts and bridge dynamics are absent | permission to state the central hypothesis as a result |
+
 ## 9. Runtime plan
 
 | Stage | Class | Target | Current authority |
@@ -808,7 +1035,8 @@ apparatus measurements.
 | Cold-start reproduction | small/sweep | same campaign class | planned |
 | Data-readiness artifact validation | small diagnostic | <30 s for registered fixtures | structural pipeline pass; measured evidence not ready |
 | Proposal-closure audit | small diagnostic | <30 s | proposal package pass; commissioning conditional |
-| Equation-sidecar synchronization | small document build | <30 s | 18/18/18 marker/source/generated parity |
+| OR/phase Stage-2 audit | small diagnostic | <30 s | algebraic/runtime pass; Stage-1 transfer, proposal convergence/provenance/bounds, sub-voxel sensitivity, and measured evidence not ready; collapse/manifold gates closed |
+| Equation-sidecar synchronization | small document build | <30 s | 23/23/23 marker/source/generated parity |
 
 Long sweeps must use a request manifest, bounded output directory, timeout,
 freshness hashes, and explicit cancellation/failure state. A `latest` alias is
@@ -841,10 +1069,11 @@ not a single maintained measurement run.
 | Run id | Revision | Input hash | Stage | Status | Key result | Uncertainty | Artifact | Claim effect |
 |---|---|---|---|---|---|---|---|---|
 | `diagnostic-smoke-v1-<timestamp>` | local diagnostic | `56ab76ca85f4ef4da7ce1ac9da3e87d2eb4e898b02cbc09aca0ad301e0a3f2d2` | protocol scaffold | completed / downstream gates not ready or blocked | ideal Casimir reference plus synthetic DP solver smoke path | synthetic branches; material, metrology, and bridge absent | timestamped `study-run-receipt.json` and two hashed outputs | confirms runnable separation only |
-| boundary-coherence-platform-screen-v1 | local diagnostic | `bd5528824d70de65e8b181dc18a78c3a287b2fd9c2cdd66bb5a9a79a3c97fe84` | experiment design | completed / promotion blocked | integrated proxy `Gamma_DP/Gamma_env=5.52e-8`; no candidate promoted | design assumptions dominate | maintained design report + hashed receipt | defines rate gap and next computations only |
-| casimir-dp-gated-computations-stage1-v1 | local diagnostic | `9f19359ee6ab02930e1cba25045183ad8931fc3f62e88e1363028f8852fea420` | five gated computation lanes | completed / promotion blocked | Lifshitz ideal validation pass; exact-grid rigid-sphere DP coarse convergence pass; rate-only power not ready | material and sidecar receipts absent; manifold dynamics unregistered | gated-computations report + hashed receipt | advances numerical authority only; promotion remains blocked |
+| boundary-coherence-platform-screen-v1 | local diagnostic | `bd5528824d70de65e8b181dc18a78c3a287b2fd9c2cdd66bb5a9a79a3c97fe84` | experiment design | completed / promotion blocked | corrected centered-grid integrated proxy `Gamma_DP/Gamma_env=4.47e-7`; no candidate promoted | design assumptions dominate | maintained design report; receipt `002256c567e0897f2e0f93c29ec1d50652e1337b3c9175147f8928827c6667e0` | defines rate gap and next computations only |
+| casimir-dp-gated-computations-stage1-v1 | local diagnostic | `5b12c758228dc68865f4a91d3ae1aa9ade698932546c686aab5cb9e5773b5e93` | five gated computation lanes | completed / promotion blocked | Lifshitz ideal validation pass; DP mass/symmetry/containment pass; corrected spatial convergence not ready; rate-only power not ready | material and sidecar receipts absent; branch convergence and provenance open; manifold dynamics unregistered | corrected gated-computations report; receipt `d9f42cb1e025bcfa56484b05919797dda8ed2cec383ea927d0972fd7e652c887` | repairs false convergence pass and preserves promotion block |
 | casimir-dp-data-readiness-stage1-v1 | local diagnostic | `a95e7a22c20e29ed9c34f45ece90916748a9264a32be8315663819171b406475` | data and acquisition readiness | completed / measured gates not ready | Kramers–Kronig analytic error `7.0692e-7`; synthetic sidecar integrity and covariance checks pass | no apparatus-matched optical or acquisition sidecar | data-readiness report; receipt `9e0f1e8aa01f8ff3e7faf0c070853e0cd4887a191115c51804fa5c71a7c2be5d` | validates the data path, not measured physics |
 | casimir-dp-transverse-branch-pilot-v1 | local proposal closure | `7b3b2673c95d4eebca060261385f3b0659365c1112c1d9d42bc1d8700686b8ba` | proposal and preregistration closure | proposal package pass / commissioning conditional | frozen transverse architecture; nine machine contracts pass; five model roles separated | integrated hardware, finite-geometry contrast, and dynamics signatures remain absent | proposal, closure report; receipt `aae5cf37e01df022509bc9f997287719eafd5670c6156fdd626d24ce94dbb4c0` | authorizes commissioning planning only |
+| casimir-dp-or-phase-stage2-v1 | local diagnostic | `b517e8fbf002303258a5269e7f37c6b16d4bc3c45c609072bdb2a9e5184e596d` | OR notation, proposal-specific DP convergence, DP algebra, phase/interference, ambient gravity, three-lane bridge audit | software/algebraic diagnostics pass / promotion blocked | potential identity `6.08e-16`; fixed-branch `Delta_b Gamma_DP=0`; frozen-grid perturbation unresolved; vertical phase `7.23e8 rad`; bridge blocked | Stage-1 input mismatch; proposal convergence, provenance, bounds, perturbation sensitivity, and measured phase/coherence not ready; no bridge dynamics | Stage-2 report; receipt `64f0e1c95307829540d3c01ad7cb7e10b15d510cb31cf8e73f88a8990d2c25ab` | operationalizes the revised hypothesis without promoting OR or manifold claims |
 
 ## 12. Claim boundaries
 
@@ -862,9 +1091,15 @@ This paper does not claim:
 - that a negative renormalized energy-density component uniquely determines
   negative spacetime curvature;
 - that boundary-conditioned decoherence is objective collapse;
+- that an ambient gravitational field is the DP branch self-energy or that
+  ordinary gravitational phase is an OR rate;
 - that the existing nonrelativistic DP estimator accepts vacuum stress,
   pressure, or a noise kernel as a substitute for material `\Delta\rho`;
+- that observations of classical gravitational waves establish quantum
+  superposed geometries, Penrose reduction, or a cavity coupling;
 - that DP collapse has been observed;
+- that this non-biological experiment validates Orch OR, microtubule
+  coherence, neuronal orchestration, or consciousness claims;
 - that this study validates NHM2, propulsion, negative-energy engineering,
   gravity control, or physical viability.
 
@@ -883,6 +1118,22 @@ This paper does not claim:
 - R. Penrose, “On Gravity's Role in Quantum State Reduction,” *General
   Relativity and Gravitation* 28, 581–600 (1996), DOI
   `10.1007/BF02105068`.
+- R. Penrose, "On the Gravitization of Quantum Mechanics 1: Quantum State
+  Reduction," *Foundations of Physics* 44, 557-575 (2014), DOI
+  `10.1007/s10701-013-9770-0`; source for the `E_G` notation and
+  `tau~hbar/E_G` order-of-magnitude OR estimate, not for a Casimir coupling.
+- S. Hameroff and R. Penrose, "Consciousness in the universe: A review of the
+  'Orch OR' theory," *Physics of Life Reviews* 11, 39-78 (2014), DOI
+  `10.1016/j.plrev.2013.08.002`; used only to define the biological Orch OR
+  scope that this experiment does not test.
+- R. Colella, A. W. Overhauser, and S. A. Werner, "Observation of
+  Gravitationally Induced Quantum Interference," *Physical Review Letters* 34,
+  1472-1474 (1975), DOI `10.1103/PhysRevLett.34.1472`; experimental precedent
+  for ordinary unitary gravitational phase, not objective reduction.
+- B. P. Abbott et al., "Observation of Gravitational Waves from a Binary Black
+  Hole Merger," *Physical Review Letters* 116, 061102 (2016), DOI
+  `10.1103/PhysRevLett.116.061102`; evidence for classical dynamical spacetime
+  curvature, not quantum-geometry superposition or OR.
 - P. Wolf et al., “Does an atom interferometer test the gravitational redshift
   at the Compton frequency?,” *Classical and Quantum Gravity* 28, 145017
   (2011), DOI `10.1088/0264-9381/28/14/145017`; operational context for why
@@ -988,6 +1239,15 @@ This paper does not claim:
 - `docs/research/casimir-dp-experiment-proposal.md`
 - `docs/research/casimir-dp-proposal-closure-report.md`
 - `tests/casimir-dp-proposal-closure.spec.ts`
+- `shared/casimir-dp-phase-coherence.ts`
+- `shared/casimir-dp-or-phase-stage2.ts`
+- `shared/contracts/casimir-dp-or-phase-stage2.v1.ts`
+- `configs/research/casimir-dp-or-phase-stage2.v1.json`
+- `scripts/research/run-casimir-dp-or-phase-stage2.ts`
+- `docs/research/casimir-dp-or-phase-stage2-report.md`
+- `tests/casimir-dp-phase-coherence.spec.ts`
+- `tests/casimir-dp-or-phase-stage2.spec.ts`
+- `configs/physics-root-leaf-manifest.v1.json`
 
 ## Appendix A. Equation-to-artifact and equation-to-claim map
 
@@ -1004,12 +1264,15 @@ scalar calculator can reconstruct the required field, dataset, or provenance.
 | `cdp-casimir-force-residual` | artifact-backed path | Lifshitz/material receipt, beyond-PFA gate, observable-separation badge | observed-minus-standard force residual; no DP identification |
 | `cdp-dp-self-energy` | artifact-backed path | `shared/dp-collapse.ts`; mass-density branch and DP self-energy badges | branch-provenance-bounded DP diagnostic only |
 | `cdp-dp-timescale` | calculator ingest | DP self-energy payload and `tau=hbar/Delta E_G` calculator path | rate/timescale replay only |
+| `cdp-or-branch-geometry-context` | artifact-backed path | Penrose OR context, material-branch, and DP self-energy badges; Stage-2 notation crosswalk | conceptual branch-geometry and timescale context only; no covariant solution or Casimir coupling |
+| `cdp-ambient-gravity-phase-control` | artifact-backed path | Stage-2 ambient-gravity/tilt runtime and decoherence-collapse gate | ordinary unitary phase and alignment control; not an OR rate |
 | `cdp-compton-dp-frequency-identities` | artifact-backed path | Compton/DP/cavity frequency-separation badge and DP timescale badge | unit-safe frequency bookkeeping; no oscillator or resonance claim |
 | `cdp-frequency-cavity-bridge-gate` | artifact-backed path | Compton/DP/cavity frequency-separation, manifold-response, and claim-boundary badges | blocks frequency-to-cavity inference while the transfer kernel is absent |
 | `cdp-dp-boundary-null` | artifact-backed path | fixed-branch DP null and manifold-response hypothesis badge | conditional baseline null, not a Casimir-to-DP bridge |
 | `cdp-semiclassical-curvature-baseline` | artifact-backed path | manifold-response, decoherence gate, and claim-boundary badges | formal semiclassical baseline only |
 | `cdp-boundary-stress-difference` | artifact-backed path | measured Lifshitz/material receipt plus observable-separation gate | candidate QFT input; not curvature or collapse by itself |
 | `cdp-coherence-rate-residual` | artifact-backed path | data-readiness and decoherence-collapse gates | boundary-conditioned residual only |
+| `cdp-interferometric-phase-visibility-readout` | artifact-backed path | Stage-2 phase/coherence runtime and decoherence-collapse gate | phase, visibility, and constructive/destructive port prediction; no collapse attribution |
 | `cdp-manifold-response-slot` | artifact-backed path | manifold-response hypothesis and both bridge/identifiability gates | noncomputable placeholder while causal dynamics are missing |
 | `cdp-quantum-foam-response-slot` | artifact-backed path | quantum-foam hypothesis, observable gate, claim boundary | unregistered hypothesis family only |
 | `cdp-stage1-lifshitz-free-energy` | artifact-backed path | Stage-1 computations report and material receipt badge | reduced-order equilibrium planar diagnostic |
@@ -1020,7 +1283,7 @@ scalar calculator can reconstruct the required field, dataset, or provenance.
 | `cdp-observable-separation-gate` | artifact-backed path | protocol, observable-separation, and claim-boundary badges | blocks any Casimir-residual-to-DP promotion |
 | `cdp-decoherence-collapse-gate` | artifact-backed path | decoherence, manifold-response, and claim-boundary badges | blocks objective-collapse identification |
 
-Sidecar parity is exact for this revision: 20 paper markers, 20 source entries,
-and 20 generated entries. The graph layer exposes 11 study badges connected by
-28 dependency, requirement, documentation, and blocking edges. Those counts
+Sidecar parity is exact for this revision: 23 paper markers, 23 source entries,
+and 23 generated entries. The graph layer exposes 12 study badges connected by
+34 dependency, requirement, documentation, and blocking edges. Those counts
 are navigation-integrity evidence; they are not physical evidence.

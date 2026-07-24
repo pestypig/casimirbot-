@@ -89,6 +89,13 @@ describe("Helix workstation tool gateway", () => {
     PATH: process.env.PATH,
     Path: process.env.Path,
     TAVILY_API_KEY: process.env.TAVILY_API_KEY,
+    EXA_API_KEY: process.env.EXA_API_KEY,
+    GOOGLE_CUSTOM_SEARCH_API_KEY: process.env.GOOGLE_CUSTOM_SEARCH_API_KEY,
+    GOOGLE_CUSTOM_SEARCH_ENGINE_ID: process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID,
+    GOOGLE_CSE_API_KEY: process.env.GOOGLE_CSE_API_KEY,
+    GOOGLE_CSE_CX: process.env.GOOGLE_CSE_CX,
+    GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+    GOOGLE_SEARCH_ENGINE_ID: process.env.GOOGLE_SEARCH_ENGINE_ID,
   };
   const originalFetch = globalThis.fetch;
   const restoreEnvKey = (key: keyof typeof originalEnv): void => {
@@ -105,6 +112,13 @@ describe("Helix workstation tool gateway", () => {
     restoreEnvKey("PATH");
     restoreEnvKey("Path");
     restoreEnvKey("TAVILY_API_KEY");
+    restoreEnvKey("EXA_API_KEY");
+    restoreEnvKey("GOOGLE_CUSTOM_SEARCH_API_KEY");
+    restoreEnvKey("GOOGLE_CUSTOM_SEARCH_ENGINE_ID");
+    restoreEnvKey("GOOGLE_CSE_API_KEY");
+    restoreEnvKey("GOOGLE_CSE_CX");
+    restoreEnvKey("GOOGLE_API_KEY");
+    restoreEnvKey("GOOGLE_SEARCH_ENGINE_ID");
   });
 
   afterEach(() => {
@@ -112,6 +126,13 @@ describe("Helix workstation tool gateway", () => {
     restoreEnvKey("PATH");
     restoreEnvKey("Path");
     restoreEnvKey("TAVILY_API_KEY");
+    restoreEnvKey("EXA_API_KEY");
+    restoreEnvKey("GOOGLE_CUSTOM_SEARCH_API_KEY");
+    restoreEnvKey("GOOGLE_CUSTOM_SEARCH_ENGINE_ID");
+    restoreEnvKey("GOOGLE_CSE_API_KEY");
+    restoreEnvKey("GOOGLE_CSE_CX");
+    restoreEnvKey("GOOGLE_API_KEY");
+    restoreEnvKey("GOOGLE_SEARCH_ENGINE_ID");
     globalThis.fetch = originalFetch;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
     vi.restoreAllMocks();
@@ -135,6 +156,7 @@ describe("Helix workstation tool gateway", () => {
   };
 
   it("lists read-only non-terminal workstation capabilities", () => {
+    process.env.TAVILY_API_KEY = "test-tavily-key";
     const manifest = listWorkstationGatewayCapabilities({
       agentRuntime: "codex",
       mode: "observe",
@@ -725,6 +747,12 @@ describe("Helix workstation tool gateway", () => {
       panel_id: "workspace-os",
       action: "status",
       status: "succeeded",
+      state_delta: {
+        workspace_os_status: {
+          schema: "helix.workspace_os_status_observation.v1",
+          capability_key: HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
+        },
+      },
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,
@@ -2028,6 +2056,52 @@ describe("Helix workstation tool gateway", () => {
         }),
       ]),
     );
+  });
+
+  it("omits internet search and reports provider availability when no provider is configured", async () => {
+    delete process.env.TAVILY_API_KEY;
+    delete process.env.EXA_API_KEY;
+    delete process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
+    delete process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID;
+    delete process.env.GOOGLE_CSE_API_KEY;
+    delete process.env.GOOGLE_CSE_CX;
+    delete process.env.GOOGLE_API_KEY;
+    delete process.env.GOOGLE_SEARCH_ENGINE_ID;
+
+    const manifest = listWorkstationGatewayCapabilities({
+      agentRuntime: "codex",
+      mode: "observe",
+    });
+
+    expect(manifest.capabilities.map((capability) => capability.capability_id))
+      .not.toContain(INTERNET_SEARCH_CAPABILITY);
+    expect(manifest.unavailable_capabilities).toContainEqual({
+      capability_id: INTERNET_SEARCH_CAPABILITY,
+      availability: "unavailable",
+      reason: "provider_not_configured",
+    });
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "observe",
+      capabilityId: INTERNET_SEARCH_CAPABILITY,
+      turnId: "ask:test-internet-unconfigured",
+      iteration: 0,
+      arguments: { query: "current magnetar research" },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "provider_not_configured",
+      gateway_admission: {
+        blocked_reason: "provider_not_configured",
+      },
+      observation: {
+        status: "blocked",
+        blocked_reason: "provider_not_configured",
+        providers_called: [],
+      },
+    });
   });
 
   it("solves fully numeric bound scalar expressions as the result-producing calculator lane", async () => {

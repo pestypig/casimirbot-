@@ -10,7 +10,11 @@ import {
 } from "@/lib/agi/proposals";
 import { hawMessages } from "@/lib/i18n/messages/haw";
 import { INTERFACE_MESSAGE_IDS } from "@/lib/i18n/messages/types";
-import { HELIX_DEVELOPER_ACCOUNT_POLICY } from "@shared/helix-account-session";
+import {
+  buildHelixSharedRealtimeRoomsExperimentPolicy,
+  HELIX_DEVELOPER_ACCOUNT_POLICY,
+  HELIX_USER_ACCOUNT_POLICY,
+} from "@shared/helix-account-session";
 
 vi.mock("@/components/auth/GoogleSignInButton", () => ({
   GoogleSignInButton: () => <button type="button">Google sign-in mock</button>,
@@ -93,6 +97,58 @@ const statusBodyWithMappedStates = {
 const developerStatusBody = {
   ...statusBody,
   account_policy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+};
+
+const publicRoomsStatusBody = {
+  ...statusBody,
+  ok: true,
+  account_policy: HELIX_USER_ACCOUNT_POLICY,
+  experimental_features: {
+    shared_realtime_rooms: {
+      available: true,
+      enabled: false,
+      guest_session: false,
+      guest_hosting_allowed: true,
+      session_expires_at: null,
+    },
+  },
+};
+
+const guestRoomsStatusBody = {
+  ...publicRoomsStatusBody,
+  session: {
+    schema: "helix.account_session.v1",
+    session_id: "account_session:guest-test",
+    profile: {
+      profile_id: "guest:00000000-0000-4000-8000-000000000001",
+      display_name: "BriskBadger47",
+      email: null,
+      email_verified_at: null,
+      auth_mode: "guest",
+      account_type: "user",
+      provider: "guest",
+      provider_subject: "00000000-0000-4000-8000-000000000001",
+      picture_url: null,
+      created_at: "2026-07-23T12:00:00.000Z",
+      updated_at: "2026-07-23T12:00:00.000Z",
+    },
+    account_policy: buildHelixSharedRealtimeRoomsExperimentPolicy("user"),
+    status: "active",
+    memory_scope: "session_only",
+    created_at: "2026-07-23T12:00:00.000Z",
+    updated_at: "2026-07-23T12:00:00.000Z",
+    expires_at: "2026-07-24T12:00:00.000Z",
+  },
+  account_policy: buildHelixSharedRealtimeRoomsExperimentPolicy("user"),
+  experimental_features: {
+    shared_realtime_rooms: {
+      available: true,
+      enabled: true,
+      guest_session: true,
+      guest_hosting_allowed: true,
+      session_expires_at: "2026-07-24T12:00:00.000Z",
+    },
+  },
 };
 
 const archiveRows = [
@@ -214,6 +270,44 @@ describe("AccountSessionPanel interface language", () => {
     expect(screen.getByRole("option", { name: /Hawaiian/ })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /Spanish/ })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /Wolof/ })).toBeInTheDocument();
+  });
+
+  it("enables Shared Live Rooms immediately and shows the generated guest identity", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/account/session/experimental-rooms") {
+        return new Response(JSON.stringify({
+          ok: true,
+          error: null,
+          status: guestRoomsStatusBody,
+          session_cookie_action: "set",
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return mockFetch(publicRoomsStatusBody)(input);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AccountSessionPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Experimental features")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("Experimental features"));
+    const roomsSwitch = screen.getByRole("switch", { name: "Shared Live Rooms" });
+    expect(roomsSwitch).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(roomsSwitch);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/account/session/experimental-rooms",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ enabled: true }),
+        }),
+      );
+      expect(screen.getAllByText("BriskBadger47").length).toBeGreaterThanOrEqual(2);
+      expect(roomsSwitch).toHaveAttribute("aria-checked", "true");
+    });
   });
 
   it("renders known backend states through localized display labels instead of raw enum values", async () => {

@@ -4,6 +4,7 @@ import {
   repoConceptAliasTerms,
 } from "./repo-concept-alias-registry";
 import { detectModelOnlyConceptSourceSignal } from "./model-only-concept-source-guard";
+import { isActiveWorkstationContextPrompt } from "./workstation-active-context-intent";
 
 export type RepoConceptDetection = {
   applies: boolean;
@@ -140,6 +141,17 @@ export function detectRepoConcept(promptText: string): RepoConceptDetection {
       reason: "empty_prompt",
       require_repo_evidence: false,
       allow_model_direct_answer: true,
+    };
+  }
+  if (isActiveWorkstationContextPrompt(prompt)) {
+    return {
+      applies: false,
+      confidence: "high",
+      concept: null,
+      normalized_terms: [],
+      reason: "active_workstation_context_prompt",
+      require_repo_evidence: false,
+      allow_model_direct_answer: false,
     };
   }
   if (contextualSuppression) {

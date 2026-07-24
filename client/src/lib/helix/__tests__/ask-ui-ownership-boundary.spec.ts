@@ -339,6 +339,14 @@ describe("Helix Ask UI ownership boundaries", () => {
     expect(visualRuntime).toContain("postHelixAskAudioTranscriptChunk");
     expect(visualRuntime).toContain("requestVisualSourceMediaStream({");
     expect(visualRuntime).toContain("startVisualFrameProducerInterval({");
+    const permissionRequestIndex = visualRuntime.indexOf(
+      "pendingMediaRequest = requestVisualSourceMediaStream({",
+    );
+    const sourceRegistrationIndex = visualRuntime.indexOf(
+      "sourceId = await ensureHelixAskVisualSource",
+    );
+    expect(permissionRequestIndex).toBeGreaterThanOrEqual(0);
+    expect(sourceRegistrationIndex).toBeGreaterThan(permissionRequestIndex);
     expect(visualPreference).toContain("export function readHelixAskVisualCaptureAudioPreference");
     expect(visualPreference).toContain("export function syncHelixAskVisualCaptureRoutePreference");
     expect(visualPreference).toContain("HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY");

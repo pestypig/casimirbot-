@@ -10,6 +10,10 @@ import {
   listRealtimeGroundedAnswerRelays,
   readRealtimeGroundedAnswerRelay,
 } from "./grounded-answer-relay";
+import {
+  listRealtimeProvisionalResponses,
+  readRealtimeProvisionalResponse,
+} from "./provisional-response";
 import type { HelixRealtimeAdmittedSession } from "./session-registry";
 
 export const buildRealtimeStagePlayDebugProvenance = (
@@ -43,9 +47,14 @@ export const buildRealtimeStagePlayDebugProvenance = (
     feedback_observer_audit: readRealtimeGroundedFeedbackObserverAudit(handoff.handoff_id),
     grounded_answer: readRealtimeGroundedAnswer(handoff.handoff_id),
     grounded_relay: readRealtimeGroundedAnswerRelay(handoff.handoff_id),
+    provisional_response: readRealtimeProvisionalResponse(handoff.handoff_id),
   })),
   latest_context_sync: session.latestContextSync,
   latest_grounded_relay: listRealtimeGroundedAnswerRelays({
+    realtimeSessionId: session.realtimeSessionId,
+    limit: 1,
+  })[0] ?? null,
+  latest_provisional_response: listRealtimeProvisionalResponses({
     realtimeSessionId: session.realtimeSessionId,
     limit: 1,
   })[0] ?? null,
@@ -56,8 +65,12 @@ export const buildRealtimeStagePlayDebugProvenance = (
     grounded_answer_requires_completed_solver_path: true,
     grounded_answer_requires_route_evidence: true,
     grounded_feedback_requires_issued_handoff_binding: true,
-    grounded_feedback_requires_current_turn_capability_evidence: true,
+    grounded_feedback_requires_terminal_grounding_authority: true,
+    preliminary_capability_ids_are_non_authoritative: true,
     spoken_relay_requires_server_authoritative_grounded_answer: true,
+    terminal_speech_authority_is_independent_from_grounding_authority: true,
+    model_direct_terminal_relay_requires_no_capability_evidence: true,
+    grounded_terminal_relay_requires_current_turn_selected_evidence: true,
     realtime_relay_answer_authority: false,
   },
   provider_call_id_included: false,

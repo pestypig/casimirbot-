@@ -73,6 +73,138 @@ describe("Helix Ask docs-search admission", () => {
     expect(admission.admitted_tool_families).not.toContain("repo_code");
   });
 
+  it("routes a natural docs-topic explanation through Docs Viewer before model-only synthesis", () => {
+    const promptText = "Can you look for docs about NHM2 and explain what it is?";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "docs_viewer",
+      strength: "hard",
+      precedence_reason: "natural_docs_topic_summary_source_target",
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTargetIntent.explicit_cues).toEqual(
+      expect.arrayContaining(["natural_docs_topic_summary", "NHM2"]),
+    );
+    expect(admission.admitted_tool_families).toContain("docs_viewer");
+    expect(admission.admitted_tool_families).not.toContain("model_only");
+  });
+
+  it("routes a natural trailing document name through Docs Viewer before model-only synthesis", () => {
+    const promptText = "Okay, can you look at the NHM tube doc and explain what it's about?";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "docs_viewer",
+      strength: "hard",
+      precedence_reason: "natural_docs_topic_summary_source_target",
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTargetIntent.explicit_cues).toEqual(
+      expect.arrayContaining(["natural_docs_topic_summary", "NHM tube"]),
+    );
+    expect(admission.admitted_tool_families).toContain("docs_viewer");
+    expect(admission.admitted_tool_families).not.toContain("model_only");
+  });
+
+  it("routes a named status document main-idea request through Docs Viewer", () => {
+    const promptText = "Look at the NHM2 Status Document and give me the main idea.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "docs_viewer",
+      strength: "hard",
+      allow_no_tool_direct: false,
+    });
+    expect(admission.admitted_tool_families).toContain("docs_viewer");
+    expect(admission.admitted_tool_families).not.toContain("model_only");
+  });
+
+  it("routes a named document relation follow-up through Docs Viewer", () => {
+    const promptText = "And how does this relate to the Casimir DP quantum foam document?";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "docs_viewer",
+      strength: "hard",
+      precedence_reason: "named_doc_relation_source_target",
+      allow_no_tool_direct: false,
+      requested_outputs: expect.arrayContaining(["doc_summary", "line_backed_source"]),
+    });
+    expect(sourceTargetIntent.explicit_cues).toEqual(
+      expect.arrayContaining(["named_doc_relation", "Casimir DP quantum foam"]),
+    );
+    expect(admission.admitted_tool_families).toContain("docs_viewer");
+    expect(admission.admitted_tool_families).not.toContain("model_only");
+  });
+
+  it("keeps contextual natural docs-topic language out of Docs Viewer admission", () => {
+    const prompts = [
+      "Do not look for docs about NHM2; just explain NHM2 generally.",
+      "Later, look for docs about NHM2 and explain it.",
+      "Earlier you looked for docs about NHM2 and explained it.",
+      'The screen says "look for docs about NHM2 and explain it"; explain that UI text.',
+      "Do not compare this with the Casimir DP quantum foam document.",
+      "Later, compare this with the Casimir DP quantum foam document.",
+      'The screen says "how does this relate to the Casimir DP quantum foam document?"; explain that UI text.',
+    ];
+
+    for (const promptText of prompts) {
+      const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+      const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+      expect(sourceTargetIntent.precedence_reason, promptText).not.toBe("natural_docs_topic_summary_source_target");
+      expect(admission.admitted_tool_families, promptText).not.toContain("docs_viewer");
+    }
+  });
+
+  it("does not turn document mentions into hard Docs Viewer operations", () => {
+    const prompts = [
+      "NHM2 document",
+      "Tell me about the NHM2 document.",
+      "Tell me about the phrase NHM2 document.",
+      "We were discussing the NHM2 document.",
+      "The NHM2 document says the bridge is open.",
+      'The screen shows "NHM2 document" as a label.',
+    ];
+
+    for (const promptText of prompts) {
+      const restatement = buildToolUseRestatement(promptText);
+      const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+      const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+
+      expect(restatement.requiredToolFamilies, promptText).not.toContain("docs_viewer");
+      expect(sourceTargetIntent.strength, promptText).not.toBe("hard");
+      expect(admission.admitted_tool_families, promptText).not.toContain("docs_viewer");
+      expect(admission.admitted_tool_families, promptText).not.toContain("repo_code");
+    }
+  });
+
+  it("gives explicit Docs operations precedence over soft repo-code inference", () => {
+    const prompts = [
+      "Search for the NHM2 document and explain it.",
+      "Read the NHM2 Status document and summarize its main idea.",
+      "Open the NHM2 document and tell me what it says.",
+    ];
+
+    for (const promptText of prompts) {
+      const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+      const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+
+      expect(sourceTargetIntent, promptText).toMatchObject({
+        target_source: "docs_viewer",
+        strength: "hard",
+        allow_no_tool_direct: false,
+      });
+      expect(admission.admitted_tool_families, promptText).toContain("docs_viewer");
+      expect(admission.admitted_tool_families, promptText).not.toContain("repo_code");
+      expect(admission.admitted_tool_families, promptText).not.toContain("internet_search");
+    }
+  });
+
   it("keeps a named-document search-read-summary compound prompt on Docs Viewer", () => {
     const promptText =
       'Find the document called "Casimir Dp Quantum Foam Study", read the best matching result, and explain what it is about in a short paragraph.';
@@ -174,7 +306,11 @@ describe("Helix Ask docs-search admission", () => {
         expect.objectContaining({
           tool_family: "docs_viewer",
           capability_hint: "docs-viewer.search_docs",
-          required_observation_kinds: expect.arrayContaining(["doc_search_results", "doc_candidate_validation", "doc_open_receipt"]),
+          required_observation_kinds: expect.arrayContaining([
+            "doc_search_results",
+            "doc_candidate_validation",
+            "doc_evidence_location",
+          ]),
         }),
       ]),
     );

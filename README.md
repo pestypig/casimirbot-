@@ -39,6 +39,23 @@ Remember these rules:
 - A tool result must re-enter the runtime before it can support a final answer.
   Hard workflows with missing identity or evidence fail closed with a typed
   recovery path.
+- Voice presentation is downstream from terminal authority. A completed
+  model-direct answer may be spoken without tool evidence; an answer that
+  claims workstation or source grounding must carry current-turn observation
+  evidence. Preliminary tool guesses never decide that distinction.
+- Selecting Codex as the runtime means it receives substantive non-local turns;
+  it does not force GPT Realtime to wait. Model-answerable turns use parallel
+  conversation, while requests that require fresh workstation evidence,
+  explicit tool work, or a durable goal wait for the runtime result.
+- After canonical terminal selection, Helix emits one tool-neutral
+  `helix.terminal_grounding_authority.v1` audit bound to the Ask turn, terminal
+  artifact, answer hash, and selected evidence refs. GPT Realtime and other
+  presentation lanes validate that authority; they do not re-run tool-specific
+  grounding logic or become a second terminal boundary.
+- No model-authored "read aloud", relevance, or success tag grants speech
+  authority. Relay admission is deterministic server policy over the bound
+  terminal artifact, grounding authority, freshness, supersession, and
+  transport lifecycle.
 
 This ownership and lifecycle are frozen. Tool implementations may be repaired
 to conform, but must not introduce a competing planner, model loop, retry
@@ -84,6 +101,7 @@ sequence without contacting a server. Tool-specific contracts live under
 | Area | Why it matters | Entry points |
 | --- | --- | --- |
 | Helix Ask + Live Answer loop | Primary user and agent interface. Handles prompt interpretation, tool admission, evidence re-entry, terminal authority, streamed debug, and the visible answer. | `server/routes/agi.plan.ts`, `docs/helix-ask-agentic-loop-current-overview.md`, `docs/helix-ask-codex-loop-discipline.md`, `npm run helix:ask:regression:light` |
+| GPT Realtime + Codex handoff | Live voice can answer locally, converse while Codex reasons in parallel, or present a worker-grounded result without receiving workstation authority. Final relay grounding comes from the canonical terminal certificate, not a voice-owned tool evaluator. | `docs/architecture/voice-service-contract.md#gpt-realtime-grounded-worker-relay-additive`, `server/services/helix-ask/terminal-grounding-authority.ts`, `server/services/helix-ask/realtime-session/`, `shared/helix-terminal-grounding-authority.ts` |
 | Agent runtime adapter | Provider edge for Codex Workstation Mode. Future providers must conform to the same edge and are not user options by default. | `server/services/helix-ask/agent-providers/`, `server/services/helix-ask/workstation-tool-gateway/`, `shared/helix-agent-runtime.ts`, `docs/helix-ask-codex-loop-discipline.md` |
 | Terminal product authority | Contract for turning admitted artifacts into one visible Ask answer. Covers product materializers, explicit route-product allowance, preview-vs-full-answer projection, and sidecar admission boundaries. | `docs/helix-ask-terminal-authority-contract.md`, `server/services/helix-ask/terminal-product-materializers.ts`, `server/services/helix-ask/terminal-authority-single-writer.ts`, `client/src/components/helix/ask-console/HelixAskVisibleFinalAnswerSelection.ts` |
 | Account-based workstation access | Release boundary for profile sign-in. `developer` accounts see the full development workstation; no-sign-in and `user` accounts get the stable public subset enforced by server policy, with UI locks only as guidance. | `shared/helix-account-session.ts`, `server/services/helix-account/account-session-store.ts`, `server/routes/agi.workstation-tool-gateway.ts`, `AGENTS.md` |
@@ -117,6 +135,11 @@ The development server runs Express with Vite middleware. Open:
 Do not start a separate Vite server for normal development; the dev scripts
 already wire the API and UI together. Use `npm run dev` for the default port or
 `npm run dev:agi:5050` for the AGI-enabled 5050 workflow.
+
+The normal development commands also enable the Account-panel Shared Live Rooms
+experiment and guest room hosting for local two-browser testing. Production
+deployments remain opt-in through `HELIX_PUBLIC_ROOMS_EXPERIMENT=1` and
+`HELIX_GUEST_ROOM_CREATION=1`.
 
 The normal development commands keep the contract-only Helix Ask golden-path
 scaffold disabled so keyed model and tool routes can run. Use
@@ -185,11 +208,16 @@ npm run dev
 ```
 
 When `OPENAI_API_KEY` is configured, the same startup command also makes the
-developer-only GPT Realtime session path available. Realtime still requires a
-visible user start action and microphone consent, and user accounts remain
-blocked by server policy. The `HELIX_REALTIME_SESSION_*_ENABLED` variables are
-optional emergency overrides; set an individual flag to `0` only when that
-Realtime layer must be disabled.
+personal GPT Realtime session path available. Realtime still requires a visible
+user start action and microphone consent. Signed-out and `user` accounts receive
+the stable personal Live session; unfinished shared-room, visual-capture, and
+advanced controls remain policy-gated while `developer` stays the superset. The
+`HELIX_REALTIME_SESSION_*_ENABLED` variables are optional emergency overrides;
+set an individual flag to `0` only when that Realtime layer must be disabled.
+
+`OPENAI_REALTIME_API_KEY` is an optional explicit credential override. When it
+is absent, GPT Realtime uses the same `OPENAI_API_KEY` from the normal startup
+command.
 
 `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` should use the same Google OAuth
 Web application client ID. `VITE_GOOGLE_CLIENT_ID` is intentionally exposed to
@@ -391,6 +419,7 @@ Important paths:
 - `docs/helix-ask/workstation-tool-contracts/README.md`
 - `docs/helix-ask-turn-solver-spine.md`
 - `docs/helix-ask-codex-loop-discipline.md`
+- `docs/architecture/voice-service-contract.md`
 
 ### Workstation Launch Panels
 

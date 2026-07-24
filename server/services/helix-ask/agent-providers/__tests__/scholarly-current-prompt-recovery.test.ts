@@ -4,6 +4,7 @@ import {
   candidateHasInlineImageLensSource,
   ensureCodexPreGatewayRouteAuthority,
   isScholarlyFollowupReferencePrompt,
+  scoreScholarlyMemoryForQuestion,
   scholarlyPdfSelectedAffordanceFromRuntimeLoop,
   shouldAttemptScholarlyPromptRecovery,
 } from "../codex-provider";
@@ -120,6 +121,69 @@ describe("current-prompt exact scholarly recovery", () => {
     expect(isScholarlyFollowupReferencePrompt(
       "Ok can you find an equation we can use in this doc?",
     )).toBe(true);
+  });
+
+  it("prefers the selected paper's PDF memory for a natural numbered-page Image Lens follow-up", () => {
+    const common = {
+      schema: "helix.scholarly_followup_evidence_memory_record.v1",
+      memory_id: "memory:test",
+      turn_id: "turn:test",
+      thread_keys: ["thread:test"],
+      stored_at_ms: Date.now(),
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      selected_for_answer: true,
+      selected_for_exploration: false,
+      runtime_selected_result_ids: ["openalex:selected-paper"],
+      runtime_semantic_selection_status: "matched",
+      evidence_grade: "answer_grade",
+      paper_count: 1,
+      papers: [{
+        result_id: "openalex:selected-paper",
+        title: "SN 2015bn",
+        identifiers: { doi: "10.3847/example" },
+      }],
+      abstract_or_snippet_refs: [],
+      missing_requirements: [],
+      next_affordances: [],
+      observation_refs: [],
+      page_image_affordance_refs: [],
+      page_image_observation_refs: [],
+      equation_evidence_refs: [],
+      scientific_evidence_packet_refs: [],
+      theory_badge_graph_reflection_refs: [],
+      provider_gateway_packet_refs: [],
+      source_result_error: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const lookupRecord = {
+      ...common,
+      memory_id: "memory:lookup",
+      source_capability_id: "scholarly-research.lookup_papers",
+      query: "Magnetar that we can use for a multi-step analysis",
+      evidence_state: "lookup_usable",
+      source_pdf_ref: null,
+      cache_path: null,
+      page_text_refs: [],
+    } as any;
+    const fullTextRecord = {
+      ...common,
+      memory_id: "memory:full-text",
+      source_capability_id: "scholarly-research.fetch_full_text",
+      query: "SN 2015bn",
+      evidence_state: "full_text_usable",
+      source_pdf_ref: "artifact://scholarly-pdf/selected.pdf",
+      cache_path: "C:\\cache\\selected.pdf",
+      page_text_refs: ["artifact://scholarly-pdf/selected.pdf/page/2#text"],
+    } as any;
+    const question = [
+      "Use the Magnetar paper you just fetched.",
+      "Open page 2 in Image Lens, but do not analyze it yet.",
+    ].join(" ");
+
+    expect(scoreScholarlyMemoryForQuestion(fullTextRecord, question))
+      .toBeGreaterThan(scoreScholarlyMemoryForQuestion(lookupRecord, question));
   });
 
   it.each([

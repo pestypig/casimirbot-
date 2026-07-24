@@ -11,7 +11,10 @@ import {
   buildRealtimeTranscriptEventResponse,
   resolveRealtimeSessionPolicyGate,
 } from "../services/helix-ask/realtime-session/route-boundary";
-import { selectRealtimeSessionAdapter } from "../services/helix-ask/realtime-session/adapter";
+import {
+  readOpenAiRealtimeApiKey,
+  selectRealtimeSessionAdapter,
+} from "../services/helix-ask/realtime-session/adapter";
 import { readRealtimeSessionFeatureGate } from "../services/helix-ask/realtime-session/config";
 import {
   admitRealtimeSession,
@@ -24,14 +27,24 @@ import {
   exchangeOpenAiRealtimeSdp,
   isValidRealtimeOfferSdp,
 } from "../services/helix-ask/realtime-session/sdp-transport";
-import { bridgeRealtimeTranscriptToStagePlay } from "../services/helix-ask/live-source/realtime-stage-play-handoff";
+import {
+  bridgeRealtimeTranscriptToStagePlay,
+  readRealtimeStagePlayAskHandoff,
+} from "../services/helix-ask/live-source/realtime-stage-play-handoff";
 import {
   recordRealtimeStagePlayActivity,
   startRealtimeStagePlaySideband,
 } from "../services/helix-ask/realtime-session/sideband-context-sync";
 import { buildRealtimeStagePlayDebugProvenance } from "../services/helix-ask/realtime-session/debug-provenance";
 import { createRealtimeGroundedAnswerFeedbackMiddleware } from "../services/helix-ask/realtime-session/grounded-answer-feedback";
-import { recordRealtimeGroundedRelayClientReceipt } from "../services/helix-ask/realtime-session/grounded-answer-relay";
+import {
+  recordRealtimeGroundedRelayClientReceipt,
+  suppressRealtimeGroundedAnswerRelay,
+} from "../services/helix-ask/realtime-session/grounded-answer-relay";
+import {
+  recordRealtimeProvisionalResponseClientReceipt,
+  requestRealtimeProvisionalResponse,
+} from "../services/helix-ask/realtime-session/provisional-response";
 import { getHelixAgentProviderById } from "../services/helix-ask/agent-providers/registry";
 import {
   isHelixRealtimeToolSuggestionEventType,
@@ -217,14 +230,87 @@ const respondRealtimeBoundary = async (input: {
         })
       : null;
     const receiptKind = readString(body.receipt_kind ?? body.receiptKind);
+    let provisionalResponse: ReturnType<typeof requestRealtimeProvisionalResponse> | null = null;
     if (session && receiptKind) {
       recordRealtimeGroundedRelayClientReceipt({
+        realtimeSessionId: session.realtimeSessionId,
+        relayId: readString(body.relay_id ?? body.relayId),
+        receiptKind,
+        clientReceiptRef: readString(body.client_receipt_ref ?? body.clientReceiptRef),
+        providerResponseRef: readString(body.provider_response_ref ?? body.providerResponseRef),
+        nowMs: typeof body.observed_at_ms === "number" ? body.observed_at_ms : undefined,
+      });
+      provisionalResponse = recordRealtimeProvisionalResponseClientReceipt({
         realtimeSessionId: session.realtimeSessionId,
         receiptKind,
         clientReceiptRef: readString(body.client_receipt_ref ?? body.clientReceiptRef),
         providerResponseRef: readString(body.provider_response_ref ?? body.providerResponseRef),
         nowMs: typeof body.observed_at_ms === "number" ? body.observed_at_ms : undefined,
       });
+      if (
+        receiptKind === "worker_dispatch_requested" ||
+        receiptKind === "worker_dispatch_skipped"
+      ) {
+        const handoffId = readString(body.handoff_id ?? body.handoffId);
+        const workerAdmissionId = readString(
+          body.worker_admission_id ?? body.workerAdmissionId,
+        );
+        const handoff = readRealtimeStagePlayAskHandoff(handoffId);
+        const dispatchReceiptRef = readString(
+          body.client_receipt_ref ?? body.clientReceiptRef,
+        );
+        const validBinding = Boolean(
+          handoff &&
+          handoff.realtime_session_id === session.realtimeSessionId &&
+          handoff.worker_admission.admission_id === workerAdmissionId &&
+          handoff.worker_admission.dispatch.requested,
+        );
+        if (
+          handoff &&
+          validBinding &&
+          receiptKind === "worker_dispatch_skipped" &&
+          body.worker_turn_dispatched !== true
+        ) {
+          const rawDispatchState = readString(
+            body.worker_dispatch_state ?? body.workerDispatchState,
+          );
+          const dispatchState =
+            rawDispatchState && /^[a-z0-9_]{1,80}$/.test(rawDispatchState)
+              ? rawDispatchState
+              : "skipped";
+          suppressRealtimeGroundedAnswerRelay({
+            handoffId: handoff.handoff_id,
+            reason: `realtime_worker_dispatch_${dispatchState}`,
+            failureCode: dispatchState === "dispatch_failed"
+              ? readString(body.failure_code ?? body.failureCode) ??
+                "realtime_parallel_dispatch_failed"
+              : null,
+            nowMs: typeof body.observed_at_ms === "number"
+              ? body.observed_at_ms
+              : undefined,
+          });
+        }
+        if (
+          handoff &&
+          validBinding &&
+          dispatchReceiptRef &&
+          (
+            handoff.worker_admission.interaction_mode === "worker_required"
+          )
+        ) {
+          const workerDispatchStarted =
+            receiptKind === "worker_dispatch_requested" &&
+            body.worker_turn_dispatched === true;
+          provisionalResponse = requestRealtimeProvisionalResponse({
+            handoff,
+            kind: workerDispatchStarted
+              ? "worker_dispatch_status"
+              : "worker_dispatch_failure",
+            workerDispatchReceiptRef: dispatchReceiptRef,
+            nowMs: typeof body.observed_at_ms === "number" ? body.observed_at_ms : undefined,
+          });
+        }
+      }
       const activities = new Set([
         "vad_speech_started",
         "vad_speech_stopped",
@@ -261,6 +347,7 @@ const respondRealtimeBoundary = async (input: {
           server_sideband_requested: Boolean(refreshed.providerCallId),
           sideband_started: refreshed.sidebandState === "open",
           realtime_stage_play_context_sync: refreshed.latestContextSync,
+          realtime_provisional_response: provisionalResponse,
           realtime_runtime_session_summary: {
             ...response.realtime_runtime_session_summary,
             sideband_started: refreshed.sidebandState === "open",
@@ -339,6 +426,15 @@ const respondRealtimeBoundary = async (input: {
           terminalVoiceInterrupted: body.terminal_voice_interrupted === true,
         })
       : null;
+    const provisionalResponse =
+      handoff?.worker_admission.interaction_mode === "conversation_local" ||
+      handoff?.worker_admission.interaction_mode === "parallel_conversation"
+      ? requestRealtimeProvisionalResponse({
+          handoff,
+          kind: handoff.worker_admission.interaction_mode,
+          nowMs: handoff.created_at_ms,
+        })
+      : null;
     const refreshed = contextualSession
       ? readAdmittedRealtimeSession({
           realtimeSessionId: contextualSession.realtimeSessionId,
@@ -348,6 +444,9 @@ const respondRealtimeBoundary = async (input: {
     return input.res.status(200).json({
       ...response,
       ...(handoff ? { realtime_stage_play_ask_handoff: handoff } : {}),
+      ...(provisionalResponse
+        ? { realtime_provisional_response: provisionalResponse }
+        : {}),
       ...(refreshed
         ? {
             server_sideband_requested: Boolean(refreshed.providerCallId),
@@ -429,14 +528,15 @@ realtimeSessionRouter.post("/realtime/session/:id/event", async (req: Request, r
 
 realtimeSessionRouter.post("/realtime/session/:id/sdp", async (req: Request, res: Response) => {
   const accountPolicy = await accountPolicyForRequest(req);
-  if (
-    accountPolicy.account_type !== "developer" ||
-    accountPolicy.locked_features.includes("runtime_agent_controls")
-  ) {
+  const policyGate = resolveRealtimeSessionPolicyGate({
+    accountPolicy,
+    body: req.body,
+  });
+  if (!policyGate.runtime_agent_controls_available) {
     return res.status(403).json(buildSdpExchangeResponse({
       ok: false,
       error: "realtime_runtime_agent_locked_by_account_policy",
-      blocked_reason: "developer_runtime_agent_controls_required",
+      blocked_reason: policyGate.locked_reason ?? "runtime_agent_controls_locked_by_account_policy",
       realtime_session_id: req.params.id,
     }));
   }
@@ -486,7 +586,7 @@ realtimeSessionRouter.post("/realtime/session/:id/sdp", async (req: Request, res
     }));
   }
 
-  const apiKey = readString(process.env.OPENAI_API_KEY);
+  const apiKey = readOpenAiRealtimeApiKey(process.env);
   if (!apiKey) {
     return res.status(409).json(buildSdpExchangeResponse({
       ok: false,
@@ -552,13 +652,12 @@ realtimeSessionRouter.post("/realtime/session/:id/sdp", async (req: Request, res
 
 realtimeSessionRouter.get("/realtime/session/:id/debug", async (req: Request, res: Response) => {
   const accountPolicy = await accountPolicyForRequest(req);
-  if (
-    accountPolicy.account_type !== "developer" ||
-    accountPolicy.locked_features.includes("runtime_agent_controls")
-  ) {
+  const policyGate = resolveRealtimeSessionPolicyGate({ accountPolicy });
+  if (!policyGate.runtime_agent_controls_available) {
     return res.status(403).json({
       ok: false,
       error: "realtime_runtime_agent_locked_by_account_policy",
+      blocked_reason: policyGate.locked_reason,
       raw_content_included: false,
     });
   }

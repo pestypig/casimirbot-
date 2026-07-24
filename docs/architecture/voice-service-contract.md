@@ -231,12 +231,72 @@ Behavioral binding:
 
 ## GPT Realtime grounded worker relay (additive)
 
+Each finalized GPT Realtime utterance receives one server-owned interaction
+mode. The mode is admission policy, not answer authority:
+
+| Interaction mode | Live behavior | Runtime behavior |
+| --- | --- | --- |
+| `conversation_local` | Respond naturally and immediately. | Do not dispatch a runtime turn. Use for greetings, acknowledgements, microphone/connection checks, and fragments without affirmative worker demand. |
+| `parallel_conversation` | Respond naturally and immediately without announcing or waiting for a workstation check. | Stage the complete utterance for the selected runtime, then launch it after the correlated Live response finishes playback. If the user resumes speaking first, cancel that partial dispatch; the next handoff carries the prior segment in its bounded context pack. A later authorized result may be relayed into the ongoing Live conversation. |
+| `worker_required` | Give only the bounded operational status after dispatch is confirmed. | Use the selected runtime and admitted read-only capabilities for explicit docs, repository, research, calculator, workstation-state, or durable-goal requests. |
+
+Runtime selection and interaction mode are independent decisions. Selecting
+Codex means every substantive non-local utterance is offered to Codex; it does
+not promote an otherwise model-answerable turn to `worker_required`. Only a
+current request for fresh workstation/source evidence, an admitted tool or
+action, or a durable goal requires Live to wait.
+
+Contextual, negated, quoted, historical, future, and screen-visible control
+language must not become tool execution. A mixed utterance such as a microphone
+check followed by an affirmative docs request is `worker_required`, not
+`conversation_local`.
+
+- The complete current utterance is offered to Codex for both
+  `parallel_conversation` and `worker_required`; parsing must not reduce it to a
+  fragment such as "look at the docs".
+- A provider-finalized transcription segment is durable Stage Play context but
+  is not, by itself, proof that a conversational thought is finished. For
+  `parallel_conversation`, the browser records `worker_dispatch_deferred`, then
+  waits for the handoff-bound Live playback to settle. A later
+  `speech_started` cancels the pending launch with a typed
+  `worker_dispatch_skipped` receipt. A bounded fallback launches the staged
+  turn if provider playback lifecycle events are missing. Explicit
+  `worker_required` and durable-goal dispatches remain immediate.
+- Stage Play binds a bounded server-side conversation context pack to the
+  handoff. Codex receives prior user turns, grounded assistant answers, goal
+  summaries, and source identities only after the current transcript hash,
+  length, event, session, thread, context ID, and context hash match. The exact
+  current transcript remains the separate current user request.
+- The bounded context is conversational evidence, not operator authority. It
+  may resolve ordinary references and omitted subjects such as "it", "that",
+  or "look at the docs", but prior directives cannot authorize current tool use.
+  Helix still admits the current source, capability, arguments, and permissions;
+  Codex still owns reasoning, tool-result re-entry, and answer generation.
 - GPT Realtime conversation audio remains separate from `/api/voice/speak` and
-  the ElevenLabs/local read-aloud queue. A worker-grounded result is presented
-  through the existing OpenAI Realtime sideband call as a correlated
+  the ElevenLabs/local read-aloud queue. An eligible terminal result is
+  presented through the existing OpenAI Realtime sideband call as a correlated
   out-of-band `response.create` audio response.
-- Only a completed, server-authoritative Helix Ask terminal answer with required
-  read-only observations may enter this relay. Tool receipts, typed failures,
+- Terminal speech authority and grounding authority are independent gates. A
+  completed, server-authoritative model-direct terminal may be relayed without
+  selected evidence. A terminal that claims a document, panel, calculation,
+  repository, research, or other workstation observation must carry the
+  completed route's current-turn evidence.
+- The completed solver route determines whether grounding is required.
+  Preliminary interaction admission and candidate capability IDs are routing
+  hypotheses and must not suppress a canonical model-direct terminal.
+- The canonical terminal boundary emits
+  `helix.terminal_grounding_authority.v1` after terminal selection and final
+  evidence re-entry audit. It binds the Ask turn, selected terminal artifact,
+  terminal text hash, grounding mode, and selected evidence refs. The authority
+  is tool-neutral: GPT Realtime validates the certificate and exact terminal
+  binding instead of matching capabilities, gateway results, or tool-specific
+  observation schemas again.
+- Older response paths without the artifact may use the same canonical builder
+  as an explicitly labeled compatibility reconstruction. A malformed or
+  rejected artifact is never replaced silently, and no Realtime-side
+  capability guess can upgrade it.
+- Every relay binds the Realtime session, Stage Play handoff, Ask turn,
+  terminal artifact ref, and terminal text hash. Tool receipts, typed failures,
   requests for input, action candidates, and client projections are ineligible.
 - The projection is bounded and credential-redacted. Raw documents, tool
   output, debug exports, provider payloads, and the full answer are not sent;
@@ -244,15 +304,84 @@ Behavioral binding:
 - GPT Realtime receives no workstation tools and gains no mutation or terminal
   answer authority. It presents the worker's result without adding claims or
   implying that it executed the worker's tools.
+- Codex and GPT Realtime cannot grant relay eligibility by emitting a
+  "read aloud", relevance, success, or satisfaction tag. Relay admission is
+  deterministic server policy over the exact handoff and terminal binding,
+  terminal and grounding authority, freshness, supersession, and transport
+  state. Model prose is never its own speech-authority receipt.
 - User speech, provider response activity, and browser playback hold the relay
   queue busy. Newer competing worker or action handoffs supersede older pending
-  results; conversation-local transcripts do not discard already-bound worker
-  results. Qualified barge-in cancels active relay speech; session closure
-  cancels remaining work.
+  results; conversation-local transcripts and unqualified short
+  parallel-conversation fragments do not discard already-bound worker results.
+  Qualified barge-in cancels active relay speech; session closure cancels
+  remaining work.
+- Delivery follows `eligible -> queued -> response requested -> provider
+  acknowledged -> speaking -> playback confirmed`. A stable idempotency key and
+  bounded retry cover missing provider acknowledgement, explicit provider
+  failure, and missing or failed playback. Supersession, qualified barge-in,
+  expiry, and session closure stop retries.
+- Response acknowledgement and audio completion use separate watchdogs. Before
+  browser playback starts, a short fixed deadline detects a response that never
+  became audible. After `playback_started`, the completion deadline is derived
+  from the bounded answer projection length and capped, so a valid long answer
+  is not retried merely because it speaks for more than the playback-start
+  window.
 - Delivery is complete only after the correlated browser playback receipt.
-  Debug records transcript/handoff, worker admission, provider/model,
-  capabilities/evidence, relay lifecycle, provider response ID, and playback
-  receipt without raw answer content.
+  Debug records relay basis, speech authority, grounding requirement/status,
+  exact terminal binding, delivery attempts, last failure, provider response
+  ID, and playback receipt without raw answer content.
+
+### Contract-stable baseline
+
+The three interaction modes, Stage Play handoff identity, solver-authorized
+terminal feedback, sideband relay, and browser playback receipt are the
+contract-stable baseline. Changes to these paths must preserve:
+
+1. `conversation_local` never dispatches Codex or workstation tools.
+2. `parallel_conversation` does not force GPT Realtime to wait for Codex.
+3. `worker_required` does not claim a check started before the dispatch receipt.
+4. A relay requires a completed solver path plus route, poison, and terminal
+   authority; no receipt or client projection becomes an answer.
+5. Model-direct terminals do not require synthetic tool evidence. Grounded
+   terminals continue to fail closed without a validated terminal grounding
+   authority carrying current-turn selected observations.
+6. GPT Realtime remains presentation-only: no workstation execution or terminal
+   authority is transferred.
+7. Delivery requires a handoff-bound provider response and browser playback
+   receipt. Conversational rendering may paraphrase the canonical answer, so a
+   spoken transcript hash mismatch is not itself a failure when binding and
+   playback correlation succeed.
+
+Implementation files are not frozen. Source breadth, tool parity, speech style,
+and context economy may evolve behind these invariants.
+
+### Accepted keyed proof
+
+The 2026-07-22 manual parallel-conversation proof is accepted as the initial
+known-good baseline:
+
+- Ask turn: `ask:b96255c0-1f05-4419-a417-5d547dcb91d2`
+- Stage Play handoff: `realtime-stage-play-handoff:2952569c8a3ee66f6319`
+- admission: `parallel_conversation`, selected runtime `codex`, model `gpt-5.5`
+- provisional Live response: `delivered`
+- solver: completed with route, poison, and terminal authority all true
+- grounded answer hash:
+  `sha256:a9e1aae86598f29158e81ded0fd6a4a9471f081c09f196c40188bec9b8645a60`
+- grounded relay: `delivered` with correlated browser playback receipt
+- final binding: `provider_response_bound_to_selected_answer`, playback
+  confirmed
+
+This proves the model-only parallel path. A source-backed `worker_required`
+docs/tool run remains a separate rollout proof and must not be inferred from
+this baseline.
+
+Deterministic baseline checks:
+
+```bash
+npx vitest run server/services/helix-ask/realtime-session/__tests__/worker-admission.test.ts server/services/helix-ask/realtime-session/__tests__/provisional-response.test.ts server/services/helix-ask/realtime-session/__tests__/grounded-answer-feedback.test.ts server/services/helix-ask/realtime-session/__tests__/grounded-answer-relay.test.ts --pool=forks
+npx vitest run server/__tests__/helix.ask.turn-lifecycle-solver-authority.test.ts server/__tests__/helix.ask.turn-lifecycle-debug-export.test.ts client/src/lib/agi/__tests__/debug-export-capability-lanes.spec.ts --pool=forks
+npm run helix:ask:discipline:quick
+```
 
 ## Integration points
 - Input signals from Helix Ask live events and final envelopes.

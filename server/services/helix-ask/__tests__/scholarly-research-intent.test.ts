@@ -131,6 +131,18 @@ describe("scholarly research intent", () => {
     ]);
   });
 
+  it("reduces a polite citation request to its scholarly topic", () => {
+    const intent = detectScholarlyResearchIntent(
+      "Okay, can you cite research about magnetars?",
+    );
+
+    expect(intent.researchRequested).toBe(true);
+    expect(intent.normalizedQuery).toBe("magnetars");
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
+  });
+
   it.each([
     "Okay, can you look for papers about a magnetar?",
     "Could you look for papers about a magnetar?",

@@ -23,6 +23,8 @@ const hasAffirmativeCurrentPanelViewingCue = (prompt: string): boolean => {
 export const hasWorkstationPanelScopeCue = (prompt: string): boolean =>
   /\b(?:current|active|open|visible|focused)\s+(?:workstation\s+)?(?:panel|panels|workspace|layout)\b/i.test(prompt) ||
   /\b(?:panel|panels)\s+(?:is|are|currently|right\s+now|now)?\s*(?:active|open|visible|focused)\b/i.test(prompt) ||
+  /\b(?:what|which)\s+(?:workstation\s+)?panels?\b[\s\S]{0,80}\b(?:look(?:ing)?\s+at|view(?:ing)?|focus(?:ed)?\s+on)\b/i.test(prompt) ||
+  /\b(?:what|which)\s+(?:is|are)\s+(?:currently\s+|right\s+now\s+|now\s+)?(?:open|active|visible|focused)\s+in\s+(?:the\s+)?(?:workstation|workspace)\b/i.test(prompt) ||
   /\b(?:what|which)\s+panels?\s+(?:in|on)\s+(?:the\s+)?(?:workstation|workspace)\s+(?:is|are)\s+(?:active|open|visible|focused)\b/i.test(prompt) ||
   /\b(?:which|what)\s+workstation\s+panel\b/i.test(prompt) ||
   /\bworkstation\s+(?:panel|panels|workspace|layout)\b/i.test(prompt);
@@ -54,6 +56,7 @@ export const isActiveWorkstationContextPrompt = (prompt: string): boolean => {
     const mentionsPanelContext =
       /\b(?:current|active|open|visible)\s+(?:panel|panels|workspace|workstation|layout)\b/i.test(clause) ||
       /\b(?:panel|panels)\s+(?:(?:is|are|currently|right\s+now|now)\s+)?(?:open|active|visible|on\s+screen|in\s+(?:the\s+)?workspace)\b/i.test(clause) ||
+      /\b(?:what|which)\s+(?:is|are)\s+(?:currently\s+|right\s+now\s+|now\s+)?(?:open|active|visible|focused)\s+in\s+(?:the\s+)?(?:workstation|workspace)\b/i.test(clause) ||
       /\bwhat\s+(?:panel|panels)\s+(?:is|are)\s+(?:open|active|visible)\b/i.test(clause) ||
       /\b(?:what|which)\s+panels?\s+(?:in|on)\s+(?:the\s+)?(?:workstation|workspace)\s+(?:is|are)\s+(?:active|open|visible|focused)\b/i.test(clause) ||
       /\b(?:what|which)\s+(?:workstation\s+)?panels?\s+(?:do|can)\s+you\s+(?:see|view|observe)\b/i.test(clause) ||

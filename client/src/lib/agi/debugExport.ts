@@ -1794,6 +1794,7 @@ const copyRailCriticalDebugFields = (
     "terminal_boundary_eligibility",
     "terminal_projection_guard",
     "terminal_authority_single_writer",
+    "terminal_grounding_authority",
     "tool_turn_chain_audit",
     "tool_rail_failure_triage",
     "tool_turn_chain_family_matrix",
@@ -1898,6 +1899,14 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     payload.language_model_debug_summary ?? debug?.language_model_debug_summary ?? null;
   const modelPolicyDebugSummary =
     payload.model_policy_debug_summary ?? debug?.model_policy_debug_summary ?? languageModelDebugSummary;
+  const compactProviderGatewayDebugSummary = asRecord(
+    payload.provider_gateway_debug_summary ?? debug?.provider_gateway_debug_summary,
+  );
+  const realtimeConversationContextMaterialization = asRecord(
+    payload.realtime_conversation_context_materialization ??
+      debug?.realtime_conversation_context_materialization ??
+      compactProviderGatewayDebugSummary?.realtime_conversation_context_materialization,
+  );
   const minimal = {
     schema: payload.schema ?? "helix.ask.debug_export.v1",
     exported_at_ms: payload.exported_at_ms,
@@ -1951,6 +1960,7 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     language_model_policy: languageModelPolicy,
     language_model_debug_summary: languageModelDebugSummary,
     model_policy_debug_summary: modelPolicyDebugSummary,
+    realtime_conversation_context_materialization: realtimeConversationContextMaterialization,
     response_language: payload.response_language ?? debug?.response_language ?? null,
     source_language: payload.source_language ?? debug?.source_language ?? null,
     language_detected: payload.language_detected ?? debug?.language_detected ?? null,
@@ -1969,6 +1979,8 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     docs_synthesis_materializer_result:
       payload.docs_synthesis_materializer_result ?? debug?.docs_synthesis_materializer_result ?? null,
     terminal_answer_authority: payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? null,
+    terminal_grounding_authority:
+      payload.terminal_grounding_authority ?? debug?.terminal_grounding_authority ?? null,
     terminal_presentation: payload.terminal_presentation ?? debug?.terminal_presentation ?? null,
     runtime_goal_command: runtimeGoalCommand,
     runtime_goal_session: runtimeGoalSession,
@@ -3312,6 +3324,12 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       debug?.provider_gateway_debug_summary ??
       agentLoop?.provider_gateway_debug_summary,
   );
+  const realtimeConversationContextMaterialization = asRecord(
+    payload.realtime_conversation_context_materialization ??
+      debug?.realtime_conversation_context_materialization ??
+      agentLoop?.realtime_conversation_context_materialization ??
+      providerGatewayDebugSummary?.realtime_conversation_context_materialization,
+  );
   const workstationGatewayManifest = asRecord(
     payload.workstation_gateway_manifest ??
       debug?.workstation_gateway_manifest ??
@@ -3563,6 +3581,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     payload.terminal_answer_authority,
     debug?.terminal_answer_authority,
     agentLoop?.terminal_answer_authority,
+  );
+  const terminalGroundingAuthority = asRecord(
+    payload.terminal_grounding_authority ??
+      debug?.terminal_grounding_authority ??
+      agentLoop?.terminal_grounding_authority,
   );
   const calculatorPlannerResult =
     asRecord(payload.calculator_planner_result ?? debug?.calculator_planner_result ?? agentLoop?.calculator_planner_result) ??
@@ -4131,6 +4154,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     codex_native_provider_bridge: codexNativeProviderBridge,
     codex_native_compatibility_fallback: codexNativeCompatibilityFallback,
     provider_gateway_debug_summary: providerGatewayDebugSummary,
+    realtime_conversation_context_materialization: realtimeConversationContextMaterialization,
     workstation_gateway_manifest: workstationGatewayManifest,
     workstation_gateway_manifest_version:
       payload.workstation_gateway_manifest_version ??
@@ -4218,6 +4242,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     current_turn_artifact_ledger: ledger,
     current_turn_events: Array.isArray(agentLoop?.turn_events) ? agentLoop.turn_events : [],
     terminal_answer_authority: terminalAuthority,
+    terminal_grounding_authority: terminalGroundingAuthority,
     terminal_presentation: terminalPresentation,
     calculator_planner_result: calculatorPlannerResult,
     calculator_planner_repair_result: calculatorPlannerRepairResult,

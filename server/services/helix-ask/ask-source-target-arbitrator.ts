@@ -56,7 +56,12 @@ import {
   isExplicitDocsPathLocateSynthesisPrompt,
   isExplicitDocsPathSummaryPrompt as isExplicitDocsMarkdownPathSummaryPrompt,
 } from "./docs-viewer-intent";
-import { resolveAskTurnNamedDocSummaryQueryArg } from "./doc-args";
+import {
+  isAskTurnDocsTopicSummaryPrompt,
+  isAskTurnNamedDocRelationPrompt,
+  resolveAskTurnNamedDocSummaryQueryArg,
+  resolveAskTurnTopicDocQueryArg,
+} from "./doc-args";
 import {
   isAffirmativeTheoryBadgeGraphReflectionPrompt,
   isTheoryBadgeGraphCurrentContextPrompt,
@@ -161,8 +166,7 @@ const isDeicticDocsIdentityPrompt = (prompt: string): boolean => {
   if (explicitVisualCue) return false;
   return (
     /\b(?:what|which)\s+(?:docs?|documents?|papers?|white\s*papers?)\s+(?:am\s+i|are\s+we)\s+(?:looking\s+at|viewing|reading|on|open)(?:\s+(?:now|right\s+now|currently))?\b/i.test(prompt) ||
-    /\b(?:what|which)\s+(?:docs?|documents?|papers?|white\s*papers?)\s+(?:is|are)\s+(?:open|active|current|in\s+(?:the\s+)?viewer)(?:\s+(?:now|right\s+now|currently))?\b/i.test(prompt) ||
-    /\b(?:docs?|documents?|papers?|white\s*papers?)\b[\s\S]{0,80}\b(?:looking\s+at|viewing|reading|open|active|current|right\s+now|currently)\b/i.test(prompt)
+    /\b(?:what|which)\s+(?:docs?|documents?|papers?|white\s*papers?)\s+(?:is|are)\s+(?:open|active|current|in\s+(?:the\s+)?viewer)(?:\s+(?:now|right\s+now|currently))?\b/i.test(prompt)
   );
 };
 
@@ -193,20 +197,9 @@ const isDocsOpenAndSummarizePrompt = (prompt: string): boolean =>
 const isExplicitDocsPathSummaryPrompt = (prompt: string): boolean =>
   isExplicitDocsMarkdownPathSummaryPrompt(prompt);
 
-const isDocsTopicSummaryPrompt = (prompt: string): boolean =>
-  /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b/i.test(prompt) &&
-  (
-    /\bdocs?\s+about\b/i.test(prompt) ||
-    /\bfrom\s+(?:our\s+|local\s+|the\s+)?docs?\b/i.test(prompt) ||
-    /\binclude\s+(?:the\s+)?paths?\b/i.test(prompt) ||
-    /\b(?:with|include)\s+(?:the\s+)?(?:document\s+)?paths?\b/i.test(prompt) ||
-    /\b(?:use|using|from)\s+(?:the\s+)?docs?\s+only\b/i.test(prompt) ||
-    /\bdocs?\s+only\b/i.test(prompt)
-  );
-
 const isAffirmativeDocsSourceRequirementPrompt = (prompt: string): boolean =>
   isExplicitDocsPathSummaryPrompt(prompt) ||
-  isDocsTopicSummaryPrompt(prompt) ||
+  isAskTurnDocsTopicSummaryPrompt(prompt) ||
   isDocsOpenAndSummarizePrompt(prompt) ||
   Boolean(resolveAskTurnNamedDocSummaryQueryArg(prompt)) ||
   (
@@ -620,6 +613,35 @@ const toSourceTargetIntent = (input: {
   };
 };
 
+export const isHardDocsEvidenceSourceTargetIntent = (
+  value: HelixAskSourceTargetIntent | Record<string, unknown> | null | undefined,
+): boolean => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const requestedOutputs = Array.isArray(record.requested_outputs)
+    ? record.requested_outputs.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const reasons = Array.isArray(record.reasons)
+    ? record.reasons.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  return (
+    record.target_source === "docs_viewer" &&
+    record.strength === "hard" &&
+    (
+      requestedOutputs.some((output) =>
+        output === "line_backed_source" ||
+        output === "numeric_value_evidence" ||
+        output === "doc_evidence_synthesis_answer"
+      ) ||
+      reasons.some((reason) =>
+        reason === "explicit_local_document_evidence_source_target" ||
+        reason === "explicit_docs_path_compare_source_target" ||
+        reason === "explicit_docs_path_locate_synthesis_source_target"
+      )
+    )
+  );
+};
+
 const mapRepoRequestedOutputs = (
   outputs: ReturnType<typeof detectRepoCodeEvidenceIntent>["requestedOutputs"],
 ): HelixAskSourceTargetRequestedOutput[] =>
@@ -860,9 +882,14 @@ export function arbitrateAskSourceTarget(input: {
     isExplicitDocsPathLocateSynthesisPrompt(prompt) ||
     isExplicitDocsPathSummaryPrompt(prompt) ||
     isCurrentOpenDocsViewerSummaryPrompt(prompt) ||
-    isDocsTopicSummaryPrompt(prompt) ||
+    isAskTurnDocsTopicSummaryPrompt(prompt) ||
     isAffirmativeDocsSearchPrompt(prompt);
+  const nonOperationalDocumentReference =
+    /\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?|report|memo)\b/i.test(prompt) &&
+    !explicitDocsOperationSelected;
   const namedDocSummaryQuery = resolveAskTurnNamedDocSummaryQueryArg(prompt);
+  const topicDocSummaryQuery = namedDocSummaryQuery ? null : resolveAskTurnTopicDocQueryArg(prompt);
+  const namedDocRelationPrompt = isAskTurnNamedDocRelationPrompt(prompt);
   if (namedDocSummaryQuery) {
     return toSourceTargetIntent({
       turnId: input.turnId,
@@ -920,6 +947,73 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
+  if (topicDocSummaryQuery && isAskTurnDocsTopicSummaryPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: [
+        namedDocRelationPrompt ? "named_doc_relation" : "natural_docs_topic_summary",
+        topicDocSummaryQuery,
+      ],
+      reasons: [
+        namedDocRelationPrompt
+          ? "named_doc_relation_source_target"
+          : "natural_docs_topic_summary_source_target",
+        "explicit_docs_scope_suppresses_model_only_concept",
+      ],
+      requestedOutputs: [
+        "file_path",
+        "doc_summary",
+        ...(namedDocRelationPrompt ? ["line_backed_source"] as const : []),
+        "tool_call_eligibility",
+        "typed_failure",
+      ],
+      suppressedRoutes: [
+        "repo_code_evidence_question",
+        "internet_search_lookup",
+        "scholarly_research_lookup",
+        "situation_context_question",
+        "visual_deictic",
+        "visual_frame_evidence",
+        "active_doc_identity",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: namedDocRelationPrompt
+        ? "named_doc_relation_source_target"
+        : "natural_docs_topic_summary_source_target",
+      confidence: 0.98,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (
+    !isExplicitDocsPathComparePrompt(prompt) &&
+    !isExplicitDocsPathLocateSynthesisPrompt(prompt) &&
+    !isExplicitDocsPathSummaryPrompt(prompt) &&
+    !isCurrentOpenDocsViewerSummaryPrompt(prompt) &&
+    !isAskTurnDocsTopicSummaryPrompt(prompt) &&
+    isAffirmativeDocsSearchPrompt(prompt)
+  ) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: ["docs_search"],
+      reasons: ["explicit_docs_search_source_target", "local_docs_scope_suppresses_freshness_search"],
+      requestedOutputs: ["file_path", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: ["internet_search_lookup", "scholarly_research_lookup", "situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "explicit_docs_search_source_target",
+      confidence: 0.96,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (selectedEvidenceCandidate?.target_source === "docs_viewer" && !explicitDocsOperationSelected) {
     const localDocumentEvidence = isAffirmativeLocalDocumentEvidencePrompt(prompt);
     return toSourceTargetIntent({
@@ -958,7 +1052,10 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  if (selectedEvidenceCandidate?.target_source === "repo_code") {
+  if (
+    selectedEvidenceCandidate?.target_source === "repo_code" &&
+    !(selectedEvidenceCandidate.strength === "soft" && nonOperationalDocumentReference)
+  ) {
     const repoPrecedenceReason =
       selectedEvidenceCandidate.strength === "hard"
         ? "explicit_repo_code_source_target"
@@ -1234,6 +1331,37 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
+  const activeWorkspaceEvidenceFollowup =
+    input.activeWorkspaceSourceResolution?.schema === "helix.active_workspace_source_resolution.v1" &&
+    input.activeWorkspaceSourceResolution.resolved_source_target === "active_doc" &&
+    input.activeWorkspaceSourceResolution.reason === "active_doc_evidence_followup";
+  if (activeWorkspaceEvidenceFollowup && !isExplicitModelOnlyPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "active_doc",
+      targetKind: "active_doc",
+      strength: "hard",
+      explicitCues: ["active_doc_evidence_followup"],
+      reasons: ["active_workspace_source_resolution", "active_doc_evidence_followup"],
+      requestedOutputs: ["file_path", "line_backed_source", "doc_evidence_synthesis_answer", "typed_failure"],
+      suppressedRoutes: [
+        "internet_search_lookup",
+        "scholarly_research_lookup",
+        "repo_code_evidence_question",
+        "situation_context_question",
+        "visual_deictic",
+        "visual_frame_evidence",
+        "active_doc_identity",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "active_doc_evidence_followup_source_target",
+      confidence: input.activeWorkspaceSourceResolution.confidence,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   const modelOnlyConceptSourceSignal = detectModelOnlyConceptSourceSignal(prompt);
   const scholarlyResearchIntent = detectScholarlyResearchIntent(prompt);
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
@@ -1383,7 +1511,7 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  if (isDocsTopicSummaryPrompt(prompt)) {
+  if (isAskTurnDocsTopicSummaryPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
@@ -1426,23 +1554,6 @@ export function arbitrateAskSourceTarget(input: {
       ],
       precedenceReason: "explicit_local_document_evidence_source_target",
       confidence: 0.97,
-      allowClientShortcut: false,
-      allowNoToolDirect: false,
-    });
-  }
-  if (isAffirmativeDocsSearchPrompt(prompt)) {
-    return toSourceTargetIntent({
-      turnId: input.turnId,
-      threadId: input.threadId,
-      target: "docs_viewer",
-      targetKind: "docs_viewer",
-      strength: "hard",
-      explicitCues: ["docs_search"],
-      reasons: ["explicit_docs_search_source_target", "local_docs_scope_suppresses_freshness_search"],
-      requestedOutputs: ["file_path", "tool_call_eligibility", "typed_failure"],
-      suppressedRoutes: ["internet_search_lookup", "scholarly_research_lookup", "situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept", "no_tool_direct"],
-      precedenceReason: "explicit_docs_search_source_target",
-      confidence: 0.96,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });
@@ -1678,6 +1789,7 @@ export function arbitrateAskSourceTarget(input: {
     const reason = String((activeWorkspaceResolution as Record<string, unknown>).reason ?? "");
     if (resolvedSourceTarget === "active_doc" || resolvedSourceTarget === "docs_viewer") {
       const target = resolvedSourceTarget;
+      const evidenceFollowup = reason === "active_doc_evidence_followup";
       return toSourceTargetIntent({
         turnId: input.turnId,
         threadId: input.threadId,
@@ -1686,9 +1798,13 @@ export function arbitrateAskSourceTarget(input: {
         strength: "hard",
         explicitCues: [reason || "active_workspace_source_resolution"],
         reasons: ["active_workspace_source_resolution", reason || "active_workspace_source_resolution"],
-        requestedOutputs: ["file_path"],
+        requestedOutputs: evidenceFollowup
+          ? ["file_path", "line_backed_source", "doc_evidence_synthesis_answer", "typed_failure"]
+          : ["file_path"],
         suppressedRoutes: ["situation_context_question", "visual_deictic", "visual_frame_evidence", "model_only_concept"],
-        precedenceReason: "active_workspace_source_resolution",
+        precedenceReason: evidenceFollowup
+          ? "active_doc_evidence_followup_source_target"
+          : "active_workspace_source_resolution",
         confidence: typeof (activeWorkspaceResolution as Record<string, unknown>).confidence === "number"
           ? (activeWorkspaceResolution as Record<string, unknown>).confidence as number
           : 0.9,
@@ -1735,7 +1851,10 @@ export function arbitrateAskSourceTarget(input: {
     });
   }
   const repoIntent = detectRepoCodeEvidenceIntent(prompt);
-  if (repoIntent.repoEvidenceRequested) {
+  if (
+    repoIntent.repoEvidenceRequested &&
+    !(repoIntent.strength === "soft" && nonOperationalDocumentReference)
+  ) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,

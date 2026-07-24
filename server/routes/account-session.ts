@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import {
   deleteAccountProfile,
+  getAccountSessionById,
   getAccountSessionStatus,
   requestPasswordAccountEmailVerification,
   requestPasswordAccountPasswordReset,
@@ -10,6 +11,7 @@ import {
   signInLocalPasswordAccountSession,
   signUpPasswordAccountSession,
   signOutAccountSession,
+  setSharedRealtimeRoomsExperiment,
   verifyPasswordAccountEmail,
 } from "../services/helix-account/account-session-store";
 import {
@@ -26,11 +28,52 @@ import {
   readProfileStorageSnapshot,
   writeProfileStorageSnapshot,
 } from "../services/helix-account/profile-storage-store";
+import { leaveSharedRealtimeRoomsForExperimentDisable } from
+  "../services/helix-ask/realtime-room/experimental-access-cleanup";
 
 export const accountSessionRouter = Router();
 
 accountSessionRouter.get("/session", async (req: Request, res: Response) => {
   res.json(await getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie)));
+});
+
+accountSessionRouter.post("/session/experimental-rooms", async (req: Request, res: Response) => {
+  if (typeof req.body?.enabled !== "boolean") {
+    return res.status(400).json({
+      ok: false,
+      error: "invalid_experimental_rooms_setting",
+      message: "The Shared Live Rooms setting must be true or false.",
+    });
+  }
+  const sessionId = readHelixSessionCookie(req.headers.cookie);
+  const session = await getAccountSessionById(sessionId);
+  if (
+    req.body.enabled === false &&
+    session &&
+    session.account_policy.account_type !== "developer"
+  ) {
+    await leaveSharedRealtimeRoomsForExperimentDisable({
+      profileId: session.profile.profile_id,
+      sessionId: session.session_id,
+    });
+  }
+  const receipt = await setSharedRealtimeRoomsExperiment({
+    session_id: sessionId,
+    enabled: req.body.enabled,
+  });
+  if (receipt.session_cookie_action === "set" && receipt.status.session) {
+    const expiresAtMs = receipt.status.session.expires_at
+      ? Date.parse(receipt.status.session.expires_at)
+      : Number.NaN;
+    setHelixSessionCookie(res, receipt.status.session.session_id, {
+      maxAgeMs: Number.isFinite(expiresAtMs)
+        ? Math.max(1, expiresAtMs - Date.now())
+        : 1000 * 60 * 60 * 24,
+    });
+  } else if (receipt.session_cookie_action === "clear") {
+    clearHelixSessionCookie(res);
+  }
+  return res.status(receipt.ok ? 200 : 403).json(receipt);
 });
 
 accountSessionRouter.post("/session/sign-in", async (req: Request, res: Response) => {

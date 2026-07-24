@@ -548,6 +548,69 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("preserves calculator constants and common operator glyphs in natural prompts", () => {
+    const cases = [
+      ["Calculate 2*pi*3 and show the result in the scientific calculator.", "2*pi*3"],
+      ["Calculate 2π*3 and show the result in the scientific calculator.", "2pi*3"],
+      ["Use the scientific calculator to calculate sqrt(9) + 2.", "sqrt(9)+2"],
+      ["Calculate 6 ÷ 3 × 4 in the calculator.", "6/3*4"],
+    ] as const;
+
+    for (const [question, expression] of cases) {
+      const requests = readWorkstationGatewayCallRequestsForTurn({
+        includePlannerDerived: true,
+        body: { agent_runtime: "codex", question },
+      });
+      expect(capabilities(requests)).toContain("scientific-calculator.solve_expression");
+      expect(requests.find(
+        (request) => request.capability_id === "scientific-calculator.solve_expression",
+      )).toMatchObject({
+        arguments: { expression },
+      });
+    }
+  });
+
+  it("prefers the prompt-named calculator expression over a malformed structured duplicate", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question: "Calculate 2*pi*3 and show the result in the scientific calculator.",
+        source_target_intent: {
+          selected_capability: "scientific-calculator.solve_expression",
+          args: {
+            expression: "2*",
+          },
+        },
+      },
+    });
+
+    const calculatorRequests = requests.filter(
+      (request) => request.capability_id === "scientific-calculator.solve_expression",
+    );
+    expect(calculatorRequests).toHaveLength(1);
+    expect(calculatorRequests[0]).toMatchObject({
+      arguments: {
+        expression: "2*pi*3",
+      },
+    });
+  });
+
+  it("does not execute calculator text from contextual or negated prompts with constants", () => {
+    const prompts = [
+      'The screen says "Calculate 2*pi*3"; explain that label without running it.',
+      "Do not calculate 2*pi*3; just tell me what pi means.",
+      "Later we could calculate 2*pi*3, but do not run the calculator now.",
+    ];
+
+    for (const question of prompts) {
+      expect(readWorkstationGatewayCallRequestsForTurn({
+        includePlannerDerived: true,
+        body: { agent_runtime: "codex", question },
+      })).toEqual([]);
+    }
+  });
+
   it("does not execute generated capabilities outside the committed route", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -1089,6 +1152,52 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("materializes every hard active-document turn that requires an observation", () => {
+    const question =
+      "So can you tell me about the warp profile? Is it a relativistic profile? And how fast does that go, like in terms of saving time? I think we have some comparisons on days that it saves?";
+    const requests = buildActiveDocsContextWorkstationGatewayCallRequests({
+      question,
+      source_target_intent: {
+        target_source: "active_doc",
+        target_kind: "active_doc",
+        strength: "hard",
+        must_enter_backend_ask: true,
+        allow_no_tool_direct: false,
+        precedence_reason: "active_workspace_source_resolution",
+        active_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
+      },
+      workspace_context_snapshot: {
+        ...docSnapshot,
+        chat_referent_context: {
+          previous_assistant_final_answer: {
+            text:
+              "The NHM2 whitepaper audits the lapse, shift, clocking interpretation, and profile-scoped trip comparisons.",
+            source_ref: "chat.final_answer:nhm2-summary",
+          },
+        },
+      },
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        derivation_source: "helix_active_doc_required_observation",
+        capability_id: "docs.search",
+        mode: "read",
+        arguments: expect.objectContaining({
+          query: expect.stringContaining("comparisons on days"),
+          paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+          source_target_intent: expect.objectContaining({
+            target_source: "active_doc",
+            active_doc_required_observation: true,
+            active_doc_evidence_followup: false,
+            evidence_query_derivation: "current_prompt_only",
+          }),
+        }),
+      }),
+    ]);
+    expect((requests[0]?.arguments as Record<string, unknown>)?.exact_terms).toBeUndefined();
+  });
+
   it("materializes a named local document summary request without requiring active document context", () => {
     const requests = buildActiveDocsContextWorkstationGatewayCallRequests({
       question: 'Ok we have a doc called "Casimir Dp Quantum Foam Study" what this about?',
@@ -1130,6 +1239,55 @@ describe("explicit workstation gateway derived calls", () => {
         }),
       }),
     ]);
+  });
+
+  it("materializes a hard search of our docs as a bounded docs.search request", () => {
+    const requests = buildActiveDocsContextWorkstationGatewayCallRequests({
+      question:
+        "Search our docs for NHM2 and summarize its treatment of boundary conditions.",
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        derivation_source: "helix_topic_doc_lookup_query",
+        capability_id: "docs.search",
+        mode: "read",
+        arguments: expect.objectContaining({
+          query: "NHM2",
+          paths: ["docs"],
+          source_target_intent: expect.objectContaining({
+            target_source: "docs_viewer",
+            target_kind: "topic_doc",
+            topic_doc_query: "NHM2",
+          }),
+        }),
+      }),
+    ]);
+  });
+
+  it.each([
+    "Do not search our docs for NHM2; explain the wording only.",
+    "Later, search our docs for NHM2, but not now.",
+    "Earlier I searched our docs for NHM2 and summarized it.",
+    'The screen says "Search our docs for NHM2"; explain that visible text.',
+    '"Search our docs for NHM2" was my previous prompt; do not search now.',
+  ])("does not materialize contextual our-docs language: %s", (question) => {
+    expect(buildActiveDocsContextWorkstationGatewayCallRequests({
+      question,
+    })).toEqual([]);
+  });
+
+  it("keeps affirmative our-docs retrieval when an unrelated web route is negated", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Search our docs for NHM2 and summarize its treatment of boundary conditions; do not browse the web.",
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["docs.search"]);
   });
 
   it("keeps contextual named-document wording dormant", () => {

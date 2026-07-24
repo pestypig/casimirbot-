@@ -126,6 +126,26 @@ export const readTurnAdmittedWorkstationTools = (body: Record<string, unknown>):
   );
 };
 
+export const removeSatisfiedNativeWorkstationTools = (
+  allowedWorkstationTools: string[] | null,
+  gatewayCallResults: readonly HelixWorkstationGatewayCallResult[] = [],
+): string[] | null => {
+  if (allowedWorkstationTools === null || gatewayCallResults.length === 0) {
+    return allowedWorkstationTools;
+  }
+  const satisfiedCapabilities = new Set(
+    gatewayCallResults
+      .filter((result) =>
+        result.ok === true &&
+        result.observation_packet?.status === "succeeded"
+      )
+      .map((result) => result.capability_id),
+  );
+  return allowedWorkstationTools.filter(
+    (capabilityId) => !satisfiedCapabilities.has(capabilityId),
+  );
+};
+
 export type CodexNativeProviderBridgeAttempt = {
   attempted: boolean;
   eligible: boolean;
@@ -190,6 +210,7 @@ export const runCodexNativeProviderBridge = async (input: {
   body: Record<string, unknown>;
   headers?: IncomingHttpHeaders;
   accountContext?: HelixWorkstationGatewayAccountContext;
+  preexecutedGatewayCallResults?: readonly HelixWorkstationGatewayCallResult[];
   signal?: AbortSignal;
   onNativeEvent?: (method: string, params: unknown) => void;
 }): Promise<CodexNativeProviderBridgeAttempt> => {
@@ -198,7 +219,10 @@ export const runCodexNativeProviderBridge = async (input: {
   const modelPolicy = resolveCodexNativeModelPolicy(input.body);
   const runtimeGoal = readRecord(input.body.runtime_goal_session);
   const trustedGoalAccountBindingRequired = Boolean(runtimeGoal);
-  const allowedWorkstationTools = readTurnAdmittedWorkstationTools(input.body);
+  const allowedWorkstationTools = removeSatisfiedNativeWorkstationTools(
+    readTurnAdmittedWorkstationTools(input.body),
+    input.preexecutedGatewayCallResults,
+  );
   const baseDebug: CodexNativeProviderBridgeAttempt["debug"] = {
     schema: "helix.codex_native_provider_bridge.v1",
     enabled,

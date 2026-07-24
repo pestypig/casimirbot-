@@ -51,3 +51,27 @@ export const projectCodexRequestRouteAuthority = (body: RecordLike): RecordLike 
     const value = readRecord(body[key]);
     return value ? [[key, value]] : [];
   }));
+
+export const mergeCodexProviderRouteAuthorityProjection = (
+  body: RecordLike,
+  providerProjection: RecordLike,
+): RecordLike => {
+  const requestProjection = projectCodexRequestRouteAuthority(body);
+  const providerRouteProjection = Object.fromEntries(
+    ROUTE_AUTHORITY_KEYS.flatMap((key: typeof ROUTE_AUTHORITY_KEYS[number]) => {
+      const value = readRecord(providerProjection[key]);
+      return value ? [[key, value]] : [];
+    }),
+  );
+  return {
+    ...providerRouteProjection,
+    ...requestProjection,
+    provider_gateway_route_authority_projection: {
+      schema: "helix.provider_gateway_route_authority_projection.v1",
+      ...providerRouteProjection,
+      authority: "execution_evidence_only",
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+};

@@ -16,9 +16,11 @@ export {
   bindSharedRealtimeRoomAdmittedSession,
   bindSharedRealtimeRoomProviderCall,
   bindSharedRealtimeRoomTransport,
+  demoteSharedRealtimeRoomMediaBridge,
   findSharedRealtimeRoomRuntimeByRealtimeSessionId,
   markSharedRealtimeRoomRuntimeState,
   markSharedRealtimeRoomTransportActive,
+  promoteSharedRealtimeRoomMediaBridge,
   readSharedRealtimeRoomRuntime,
   readSharedRealtimeRoomRuntimeBinding,
   releaseSharedRealtimeRoomTransportBinding,
@@ -43,7 +45,10 @@ export {
   admitSharedRealtimeRoomVisualFrame,
   listSharedRealtimeRoomVisualFrames,
   purgeSharedRealtimeRoomVisualFrames,
+  rejectSharedRealtimeRoomVisualFrameByProviderEvent,
+  registerSharedRealtimeRoomVisualFrameProviderEvent,
   updateSharedRealtimeRoomVisualFrameProviderDelivery,
+  updateSharedRealtimeRoomVisualFrameByProviderItem,
 } from "./runtime-registry/visual-frames";
 export type {
   SharedRealtimeRoomVisualFrameAdmission,

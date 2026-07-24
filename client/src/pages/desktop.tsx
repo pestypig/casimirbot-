@@ -873,7 +873,10 @@ export default function DesktopPage({
         timeoutMs: 2500,
       });
     };
-    const unsubscribeLayout = useWorkstationLayoutStore.subscribe(scheduleSyncUrl);
+    // Panel focus is reload-critical state. Persist it synchronously so a Vite
+    // reload or a pressure-triggered remount cannot restore a stale `focus=`
+    // query while the quieter document/share-state sync is still pending.
+    const unsubscribeLayout = useWorkstationLayoutStore.subscribe(syncUrl);
     const unsubscribeDocs = useDocViewerStore.subscribe(scheduleSyncUrl);
     scheduleSyncUrl();
     return () => {

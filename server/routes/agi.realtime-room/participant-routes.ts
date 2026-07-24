@@ -13,6 +13,8 @@ import {
   reconcileSharedRealtimeRoomVisualConsent,
 } from
   "../../services/helix-ask/realtime-room/room-runtime-reconciliation";
+import { sendSharedRealtimeRoomParticipantContextIfBound } from
+  "../../services/helix-ask/realtime-room/participant-context";
 import {
   readRecord,
   readString,
@@ -40,10 +42,15 @@ sharedRealtimeRoomParticipantRouter.patch(
       room,
       participantId: room.self_participant_id,
     });
+    const projectedRoom = withRuntimeProjection(room);
+    sendSharedRealtimeRoomParticipantContextIfBound({
+      room: projectedRoom,
+      reason: "participant_state_changed",
+    });
     res.json(buildHelixSharedRealtimeRoomResponse({
       ok: true,
       message: "Your room consent was updated.",
-      room: withRuntimeProjection(room),
+      room: projectedRoom,
     }));
   }),
 );
@@ -66,10 +73,15 @@ sharedRealtimeRoomParticipantRouter.post(
       presence,
     });
     degradeSharedRealtimeRoomRuntimeForReadiness(room);
+    const projectedRoom = withRuntimeProjection(room);
+    sendSharedRealtimeRoomParticipantContextIfBound({
+      room: projectedRoom,
+      reason: "participant_state_changed",
+    });
     res.json(buildHelixSharedRealtimeRoomResponse({
       ok: true,
       message: "Room presence updated.",
-      room: withRuntimeProjection(room),
+      room: projectedRoom,
     }));
   }),
 );

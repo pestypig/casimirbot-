@@ -1,9 +1,13 @@
 # Casimir Spec Threat Model
 
-Status: milestone-2 design candidate. Claim-IR and synthetic benchmark-contract
-controls exist; restricted benchmark custody, external timestamping, formal and
-numerical backends, and agent-tool gates remain unimplemented. Described
-later-stage controls are not claims that those gates already exist.
+Status: milestone-2 design candidate. Claim-IR, synthetic benchmark-contract
+controls, provider-neutral formal request/certificate contracts, a generic
+fixed-policy Lean replay backend, and a fail-closed benchmark-freeze readiness
+assessment exist. The tracked benchmark policy and rubric remain explicitly
+unfrozen; restricted benchmark custody, real external timestamp receipts,
+operating-system-hermetic formal execution, numerical backends, and agent-tool
+gates remain unimplemented. Described later-stage controls are not claims that
+those gates already exist.
 
 ## Protected properties
 

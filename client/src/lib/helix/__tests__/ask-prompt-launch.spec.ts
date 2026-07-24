@@ -19,6 +19,7 @@ describe("helix ask prompt launch bridge", () => {
   beforeEach(() => {
     navigateMock.mockReset();
     clearPendingHelixAskPrompt();
+    window.localStorage.removeItem("helix:pending-panel");
     window.history.replaceState({}, "", "/helix-core");
   });
 
@@ -42,10 +43,10 @@ describe("helix ask prompt launch bridge", () => {
     expect(stored.blockId).toBe("nhm2.proof-guardrails");
     expect(stored.bypassWorkstationDispatch).toBe(false);
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(navigateMock).toHaveBeenCalledWith("/desktop?panels=account-session&focus=account-session");
+    expect(navigateMock).toHaveBeenCalledWith("/desktop");
   });
 
-  it("opens the Ask consumer panel for auto-submitted desktop prompts", () => {
+  it("preserves the active workstation panel for auto-submitted desktop prompts", () => {
     window.history.replaceState({}, "", "/desktop?panels=image-lens%2Cpostulate-board&focus=image-lens");
     const openPanelListener = vi.fn();
     window.addEventListener("open-helix-panel", openPanelListener as EventListener);
@@ -59,10 +60,8 @@ describe("helix ask prompt launch bridge", () => {
     }
 
     expect(navigateMock).not.toHaveBeenCalled();
-    expect(openPanelListener).toHaveBeenCalledWith(expect.objectContaining({
-      detail: { id: "account-session" },
-    }));
-    expect(window.localStorage.getItem("helix:pending-panel")).toBe("account-session");
+    expect(openPanelListener).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem("helix:pending-panel")).toBeNull();
     expect(consumePendingHelixAskPrompt()?.question).toBe(
       "Frame a candidate postulate from the current promoted equation evidence.",
     );

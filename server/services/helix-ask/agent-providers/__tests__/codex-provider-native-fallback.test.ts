@@ -13,7 +13,14 @@ vi.mock("../codex-native/provider-bridge", () => ({
   runCodexNativeProviderBridge: nativeBridgeMock.run,
 }));
 
-import { codexProvider, runCodexProcess } from "../codex-provider";
+import {
+  applyWorkstationContextAuthorityGuard,
+  buildCodexModelVisibleObservationArtifacts,
+  codexProvider,
+  hasBoundedScholarlyFollowupSourceEvidence,
+  isSuccessfulImageLensObservationPacket,
+  runCodexProcess,
+} from "../codex-provider";
 import { callWorkstationGatewayCapability } from "../../workstation-tool-gateway/registry";
 
 describe("Codex native compatibility fallback", () => {
@@ -69,6 +76,109 @@ describe("Codex native compatibility fallback", () => {
       failReason: "codex_process_disabled_in_test",
       bin: null,
     });
+  });
+
+  it("keeps workspace status fields visible while bounding the model prompt", () => {
+    const [artifact] = buildCodexModelVisibleObservationArtifacts([{
+      schema: "helix.current_turn_artifact.v1",
+      artifact_id: "ask:test:workspace-status",
+      kind: "workspace_os_status_observation",
+      status: "succeeded",
+      capability_key: "workspace_os.status",
+      text_preview: "Workspace OS status returned 34 capability records.",
+      payload: {
+        schema: "helix.workspace_os_status_observation.v1",
+        capability_count: 34,
+        summary: {
+          available_count: 19,
+          blocked_count: 3,
+        },
+        runtime: {
+          memory_pressure: "normal",
+          active_task_count: 1,
+        },
+        noteworthy_capabilities: Array.from({ length: 20 }, (_, index) => ({
+          capability_id: `capability.${index}`,
+          status: index === 0 ? "available" : "unknown",
+          authority: {
+            terminal_eligible: false,
+          },
+        })),
+        authority: {
+          terminal_eligible: false,
+        },
+      },
+    }]);
+
+    expect(artifact).toMatchObject({
+      kind: "workspace_os_status_observation",
+      status: "succeeded",
+      payload: {
+        capability_count: 34,
+        summary: {
+          available_count: 19,
+          blocked_count: 3,
+        },
+        runtime: {
+          memory_pressure: "normal",
+          active_task_count: 1,
+        },
+      },
+    });
+    expect((artifact.payload as Record<string, unknown>).noteworthy_capabilities).toHaveLength(12);
+    expect(JSON.stringify(artifact)).not.toContain("terminal_eligible");
+  });
+
+  it("distinguishes materialized Image Lens evidence from a missing-input packet", () => {
+    const missingInputPacket = {
+      capability_key: "visual_analysis.inspect_image_region",
+      status: "missing_input",
+      produced_artifact_refs: ["ask:test:image-lens:missing-input"],
+    } as any;
+    const succeededPacket = {
+      capability_key: "visual_analysis.inspect_image_region",
+      status: "succeeded",
+      produced_artifact_refs: ["ask:test:image-lens:page-2"],
+    } as any;
+
+    expect(isSuccessfulImageLensObservationPacket(missingInputPacket)).toBe(false);
+    expect(isSuccessfulImageLensObservationPacket(succeededPacket)).toBe(true);
+    expect(hasBoundedScholarlyFollowupSourceEvidence({
+      gatewayCallResults: [],
+      capabilityLaneObservationPackets: [missingInputPacket],
+    })).toBe(false);
+    expect(hasBoundedScholarlyFollowupSourceEvidence({
+      gatewayCallResults: [],
+      capabilityLaneObservationPackets: [succeededPacket],
+    })).toBe(true);
+    expect(hasBoundedScholarlyFollowupSourceEvidence({
+      gatewayCallResults: [],
+      priorEvidencePacket: {
+        capability_key: "scholarly-research.fetch_full_text",
+        status: "succeeded",
+        produced_artifact_refs: ["ask:test:paper"],
+      } as any,
+    })).toBe(true);
+  });
+
+  it("does not replace a grounded workspace status answer with a panel-context failure", () => {
+    const text = "The workstation has 19 available capabilities, 3 blocked, and normal memory pressure.";
+    expect(applyWorkstationContextAuthorityGuard({
+      question: "What is the current workstation status?",
+      text,
+      gatewayCallResults: [{
+        ok: true,
+        capability_id: "workspace_os.status",
+      } as never],
+    })).toBe(text);
+    expect(applyWorkstationContextAuthorityGuard({
+      question: "What panels are open in the workspace?",
+      text,
+      gatewayCallResults: [{
+        ok: true,
+        capability_id: "workspace_os.status",
+      } as never],
+    })).toContain("no workstation context observation packet");
   });
 
   it("restores governed gateway evidence before handing a failed native turn to codex exec", async () => {

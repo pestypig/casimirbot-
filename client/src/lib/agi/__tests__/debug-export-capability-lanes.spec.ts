@@ -2,6 +2,45 @@ import { describe, expect, it } from "vitest";
 import { buildHelixDebugExportEnvelopeFromMasterPayload } from "@/lib/agi/debugExport";
 
 describe("Helix Ask debug export capability lanes", () => {
+  it("retains sanitized Realtime context materialization metadata after size compaction", () => {
+    const audit = {
+      schema: "helix.realtime_conversation_context_materialization.v1",
+      handoff_id: "realtime-stage-play-handoff:compact-context",
+      context_pack_id: "context-pack:compact-context",
+      prior_turn_count: 3,
+      current_transcript_char_count: 24,
+      raw_content_included: false,
+      provider_payload_included: false,
+    };
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:compact-realtime-context",
+        question: "Explain the current conversation context.",
+        content: "Context retained.",
+      },
+      {
+        selected_final_answer: "Context retained.",
+        final_answer_source: "direct_answer_text",
+        terminal_artifact_kind: "direct_answer_text",
+        debug: {
+          provider_gateway_debug_summary: {
+            schema: "helix.provider_gateway_debug_summary.v1",
+            prompt: "x".repeat(800_000),
+            realtime_conversation_context_materialization: audit,
+          },
+        },
+      },
+    );
+    const exported = JSON.parse(text) as Record<string, any>;
+
+    expect(exported.debug_export_size_control).toMatchObject({
+      truncated: true,
+      compacted: true,
+    });
+    expect(exported.realtime_conversation_context_materialization).toEqual(audit);
+    expect(exported.provider_gateway_debug_summary).toBeUndefined();
+  });
+
   it("exports Realtime runtime session debug as non-terminal blocked evidence", () => {
     const poisonedTranscript = "open the postulate board now";
     const text = buildHelixDebugExportEnvelopeFromMasterPayload(
@@ -4418,5 +4457,52 @@ describe("Helix Ask debug export capability lanes", () => {
       raw_content_included: false,
     });
     expect(text).not.toContain("Sensitive prior answer text must not be exported.");
+  });
+
+  it("exports the tool-neutral terminal grounding authority", () => {
+    const authority = {
+      schema: "helix.terminal_grounding_authority.v1",
+      authority_id: "terminal-grounding:test",
+      authority_source: "canonical_terminal_boundary",
+      turn_id: "ask:grounding-debug",
+      terminal_artifact_ref: "ask:grounding-debug:terminal",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      terminal_text_hash: "sha256:test",
+      grounding_required: true,
+      status: "validated",
+      selected_evidence_refs: ["ask:grounding-debug:observation:docs"],
+      evidence_reentry_authority: "runtime_event_log",
+      runtime_lifecycle_verified: true,
+      current_turn_only: true,
+      completed_solver_path: true,
+      route_authority_ok: true,
+      poison_audit_ok: true,
+      terminal_authority_ok: true,
+      support_coverage_complete: true,
+      failure_code: null,
+      failure_codes: [],
+      assistant_answer: false,
+      terminal_eligible: false,
+      provider_payload_included: false,
+      raw_content_included: false,
+    };
+    const text = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:grounding-debug",
+        question: "Summarize the selected document.",
+        content: "Grounded answer.",
+      },
+      {
+        turn_id: "ask:grounding-debug",
+        selected_final_answer: "Grounded answer.",
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_kind: "model_synthesized_answer",
+        terminal_grounding_authority: authority,
+      },
+    );
+
+    const exported = JSON.parse(text) as Record<string, any>;
+    expect(exported.terminal_grounding_authority).toEqual(authority);
   });
 });

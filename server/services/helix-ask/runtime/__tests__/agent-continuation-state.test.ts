@@ -123,6 +123,51 @@ describe("agent continuation state", () => {
     );
   });
 
+  it("keeps a docs continuation in progress until its terminal artifact exists", () => {
+    const state = buildHelixAgentContinuationState({
+      payload: {
+        final_status: "final_answer",
+        docs_continuation_contract: {
+          schema: "helix.docs_continuation_contract.v1",
+          current_docs_phase: "candidate_validation_required",
+          required_next_capability: "docs-viewer.validate_doc_candidates",
+          terminal_block_reason: "doc_candidate_validation missing",
+        },
+        runtime_continuation_hints: [{
+          hint_id: "ask:continuation:provider_docs_continuation",
+          capability_id: "docs-viewer.validate_doc_candidates",
+          suggested_action: {
+            action: "run_panel_action",
+            panel_id: "docs-viewer",
+            action_id: "validate_doc_candidates",
+            args: { query: "Casimir Dp Quantum Foam Study" },
+          },
+        }],
+        current_turn_artifact_ledger: [],
+      },
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: {
+        capability_id: "docs.search",
+        status: "succeeded",
+      },
+    });
+
+    expect(state.goal).toEqual({
+      status: "in_progress",
+      satisfied: false,
+      terminal_product_allowed: null,
+    });
+    expect(state.missing_requirement_ids).toContain("doc_candidate_validation missing");
+    expect(state.next_admissible_affordances[0]).toMatchObject({
+      capability_id: "docs-viewer.validate_doc_candidates",
+      admissible: true,
+      tried: false,
+    });
+    expect(state.allowed_decisions).toContain("act");
+    expect(state.allowed_decisions).not.toContain("answer");
+  });
+
   it("marks new observations and resolved requirements as progress after an attempt", () => {
     const firstPayload: Record<string, unknown> = {
       goal_satisfaction_evaluation: {

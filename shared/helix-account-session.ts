@@ -113,7 +113,6 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "developer_workstation_panels",
     "experimental_panels",
     "live_answer_visual_capture_controls",
-    "runtime_agent_controls",
     "shared_realtime_rooms",
     "workstation_gateway_act",
   ],
@@ -161,7 +160,11 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "permission:write",
     "permission:danger",
   ],
-  feature_flags: ["stable_workstation_panels", "locked_dev_features_visible"],
+  feature_flags: [
+    "stable_workstation_panels",
+    "locked_dev_features_visible",
+    "runtime_agent_controls",
+  ],
   quotas: {
     profile_storage_bytes: 1024 * 1024,
     model_tokens_per_turn: 16_000,
@@ -207,6 +210,19 @@ export const buildHelixAccountCapabilityPolicy = (
   copyPolicy(accountType === "developer"
     ? HELIX_DEVELOPER_ACCOUNT_POLICY
     : HELIX_USER_ACCOUNT_POLICY);
+
+export const buildHelixSharedRealtimeRoomsExperimentPolicy = (
+  accountType: HelixAccountType,
+): HelixAccountCapabilityPolicy => {
+  const policy = buildHelixAccountCapabilityPolicy(accountType);
+  if (!policy.feature_flags.includes("shared_realtime_rooms")) {
+    policy.feature_flags.push("shared_realtime_rooms");
+  }
+  policy.locked_features = policy.locked_features.filter(
+    (feature) => feature !== "shared_realtime_rooms",
+  );
+  return policy;
+};
 
 export const helixPermissionRank = (
   permission: HelixWorkstationPermissionProfile | string | null | undefined,
@@ -311,9 +327,14 @@ export type HelixAccountSessionProfile = {
   display_name: string;
   email?: string | null;
   email_verified_at?: string | null;
-  auth_mode: "web_auth" | "local_dev_profile" | "local_password_profile" | "password_account";
+  auth_mode:
+    | "web_auth"
+    | "local_dev_profile"
+    | "local_password_profile"
+    | "password_account"
+    | "guest";
   account_type?: HelixAccountType;
-  provider?: "google" | "local" | null;
+  provider?: "google" | "local" | "guest" | null;
   provider_subject?: string | null;
   picture_url?: string | null;
   created_at: string;
@@ -321,7 +342,7 @@ export type HelixAccountSessionProfile = {
 };
 
 export type HelixAccountLinkedAccount = {
-  provider: "discord" | "minehut" | "browser" | "local" | "google";
+  provider: "discord" | "minehut" | "browser" | "local" | "google" | "guest";
   external_id: string;
   display_name?: string | null;
   status: "linked" | "pending" | "revoked";
@@ -349,6 +370,15 @@ export type HelixAccountSession = {
   memory_scope: "profile" | "session_only";
   created_at: string;
   updated_at: string;
+  expires_at?: string | null;
+};
+
+export type HelixSharedRealtimeRoomsExperimentStatus = {
+  available: boolean;
+  enabled: boolean;
+  guest_session: boolean;
+  guest_hosting_allowed: boolean;
+  session_expires_at: string | null;
 };
 
 export type HelixAccountSessionStatus = {
@@ -360,6 +390,9 @@ export type HelixAccountSessionStatus = {
   profile_ingress_tokens: HelixProfileIngressTokenSummary[];
   profile_ingress_usage: HelixProfileIngressUsageSummary;
   usage: HelixAccountUsageSummary;
+  experimental_features?: {
+    shared_realtime_rooms: HelixSharedRealtimeRoomsExperimentStatus;
+  };
   auth_boundary: {
     credential_collection_allowed_in_agents: false;
     raw_password_stored: false;
@@ -378,6 +411,12 @@ export type HelixAccountSessionReceipt = {
   error?: string | null;
   raw_password_stored: false;
   credential_collection_allowed_in_agents: false;
-  auth_method?: "web_auth" | "local_dev_profile" | "local_password_profile" | "password_account" | null;
+  auth_method?:
+    | "web_auth"
+    | "local_dev_profile"
+    | "local_password_profile"
+    | "password_account"
+    | "guest"
+    | null;
   show_password_reset_hint?: boolean;
 };

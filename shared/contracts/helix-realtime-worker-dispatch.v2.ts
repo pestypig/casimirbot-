@@ -10,6 +10,11 @@ export type HelixRealtimeWorkerAdmissionOutcomeV2 =
   | "durable_goal_bound"
   | "action_candidate";
 
+export type HelixRealtimeInteractionModeV2 =
+  | "conversation_local"
+  | "parallel_conversation"
+  | "worker_required";
+
 export type HelixRealtimeWorkerDispatchKindV2 =
   | "none"
   | "ask_runtime"
@@ -50,6 +55,7 @@ export type HelixRealtimeWorkerAdmissionV2 = {
   thread_id: string;
   decision_phase: "transcript_handoff" | "solver_final";
   outcome: HelixRealtimeWorkerAdmissionOutcomeV2;
+  interaction_mode: HelixRealtimeInteractionModeV2;
   reason_codes: string[];
   selected_primary_intent: string | null;
   selected_route: string | null;

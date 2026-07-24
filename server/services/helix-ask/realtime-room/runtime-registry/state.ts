@@ -25,6 +25,7 @@ export type StoredVisualFrame = {
 export type ProviderItemEntry = {
   itemId: string;
   frameRef: string;
+  eventId: string | null;
 };
 
 export type ActiveSpeakerFloor = {

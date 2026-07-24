@@ -259,7 +259,15 @@ const readOpenReceipt = (payload: Record<string, unknown>): Record<string, unkno
   findArtifactPayload(payload, ["doc_open_receipt"]);
 
 const hasDocSummary = (payload: Record<string, unknown>): boolean =>
-  Boolean(findArtifactPayload(payload, ["doc_summary", "focused_doc_answer"]));
+  Boolean(
+    findArtifactPayload(payload, ["doc_summary", "focused_doc_answer"]) ??
+    (() => {
+      const retrieval = findArtifactPayload(payload, ["retrieval_context"]);
+      return readString(retrieval?.path) && readString(retrieval?.excerpt)
+        ? retrieval
+        : null;
+    })(),
+  );
 
 const hasDocEvidenceSynthesisAnswer = (payload: Record<string, unknown>): boolean => {
   const answer = findArtifactPayload(payload, ["doc_evidence_synthesis_answer"]);

@@ -9,8 +9,10 @@ export {
   bindSharedRealtimeRoomAdmittedSession,
   bindSharedRealtimeRoomProviderCall,
   bindSharedRealtimeRoomTransport,
+  demoteSharedRealtimeRoomMediaBridge,
   findSharedRealtimeRoomRuntimeByRealtimeSessionId,
   markSharedRealtimeRoomTransportActive,
+  promoteSharedRealtimeRoomMediaBridge,
   readSharedRealtimeRoomRuntimeBinding,
 } from "./transport-binding";
 

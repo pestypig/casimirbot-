@@ -932,7 +932,12 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
 export const cleanCalculatorExpression = (value: string | null | undefined): string | null => {
   if (!value) return null;
   const expression = value
+    .replace(/π/gi, "pi")
+    .replace(/[×·]/g, "*")
+    .replace(/÷/g, "/")
     .trim()
+    .replace(/\b(?:with|in|using|through)\s+(?:the\s+)?(?:scientific[-\s]?)?calculator(?:\.[A-Za-z_][A-Za-z0-9_]*)?\b[\s\S]*$/i, "")
+    .replace(/,\s*(?:search|find|look\s*up|lookup|reflect|summari[sz]e|explain|report|tell|open|show|use|run|call)\b[\s\S]*$/i, "")
     .replace(/\b(?:then|and|wait|report|answer|give|explain|summari[sz]e|tell)\b[\s\S]*$/i, "")
     .trim()
     .replace(/[.,;:!?]+$/g, "")
@@ -975,7 +980,11 @@ export const readPromptNamedCalculatorSegment = (prompt: string): {
 
 export const extractCalculatorMathTokenSequence = (value: string | null | undefined): string | null => {
   if (!value) return null;
-  const source = value.trim();
+  const source = value
+    .replace(/π/gi, "pi")
+    .replace(/[×·]/g, "*")
+    .replace(/÷/g, "/")
+    .trim();
   let start = -1;
   for (let index = 0; index < source.length; index += 1) {
     if (/[A-Za-z0-9(]/.test(source[index] ?? "")) {
@@ -1043,12 +1052,15 @@ export const extractCalculatorExpressionFromPrompt = (prompt: string): string | 
     if (naturalArithmeticExpression) return naturalArithmeticExpression;
   }
   const explicitCapability =
-    unquoted.match(/\bscientific-calculator\.(?:solve_expression|solve_with_steps|solve)\b[\s\S]{0,80}\b(?:for|with|expression|calculate|evaluate|solve|compute)?\s*:?\s*([0-9(][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
-    unquoted.match(/\b(?:scientific\s+calculator|calculator|calc)\b[\s\S]{0,100}\b(?:calculate|evaluate|solve|compute|expression)\s*:?\s*([0-9(][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
+    unquoted.match(/\bscientific-calculator\.(?:solve_expression|solve_with_steps|solve)\b[\s\S]{0,80}\b(?:for|with|expression|calculate|evaluate|solve|compute)?\s*:?\s*([0-9A-Za-z_(π][0-9A-Za-z_π\s.,+\-*/^%()[\]×·÷]{1,120})/i)?.[1] ??
+    unquoted.match(/\b(?:scientific\s+calculator|calculator|calc)\b[\s\S]{0,100}\b(?:calculate|evaluate|solve|compute|expression)\s*:?\s*([0-9A-Za-z_(π][0-9A-Za-z_π\s.,+\-*/^%()[\]×·÷]{1,120})/i)?.[1] ??
     null;
-  if (explicitCapability) return extractCalculatorMathTokenSequence(explicitCapability);
+  if (explicitCapability) {
+    const expression = extractCalculatorMathTokenSequence(explicitCapability);
+    if (expression) return expression;
+  }
   const direct =
-    unquoted.match(/\b(?:calculate|evaluate|compute|solve)\s+([0-9(][0-9eE\s.+\-*/^%()[\]]{1,120})/i)?.[1] ??
+    unquoted.match(/\b(?:calculate|evaluate|compute|solve)\s+([0-9A-Za-z_(π][0-9A-Za-z_π\s.,+\-*/^%()[\]×·÷]{1,120})/i)?.[1] ??
     null;
   return extractCalculatorMathTokenSequence(direct);
 };

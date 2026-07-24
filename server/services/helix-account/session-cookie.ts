@@ -25,13 +25,17 @@ export function readHelixSessionCookie(cookieHeader: string | undefined): string
   return readCookie(cookieHeader, HELIX_SESSION_COOKIE);
 }
 
-export function setHelixSessionCookie(res: Response, sessionId: string): void {
+export function setHelixSessionCookie(
+  res: Response,
+  sessionId: string,
+  options?: { maxAgeMs?: number },
+): void {
   res.cookie(HELIX_SESSION_COOKIE, sessionId, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 1000 * 60 * 60 * 24 * 7,
+    maxAge: options?.maxAgeMs ?? 1000 * 60 * 60 * 24 * 7,
   });
 }
 

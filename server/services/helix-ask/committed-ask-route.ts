@@ -440,6 +440,108 @@ export function readCommittedAskRoute(payload: RecordLike | null | undefined): H
     : null;
 }
 
+export function reconcileCanonicalGoalFrameToCommittedRoute(input: {
+  turnId: string;
+  canonicalGoalFrame: RecordLike | null | undefined;
+  committedRoute: HelixCommittedAskRoute | null | undefined;
+}): {
+  reconciled: boolean;
+  frame: RecordLike | null;
+  reason: string | null;
+} {
+  const current = readRecord(input.canonicalGoalFrame);
+  const route = input.committedRoute ?? null;
+  if (!current || !route || route.turn_id !== input.turnId) {
+    return { reconciled: false, frame: current, reason: null };
+  }
+
+  const committedGoalKind = readString(route.canonical_goal.goal_kind);
+  const committedTerminalKind = normalizeCommittedRouteTerminalKind(
+    route.canonical_goal.required_terminal_kind,
+  );
+  const currentGoalKind = readString(current.goal_kind);
+  const currentTerminalKind = normalizeCommittedRouteTerminalKind(
+    readString(current.required_terminal_kind),
+  );
+  const committedSourceTarget = readString(route.route.source_target);
+  const repairableStaleModelOnlyViolations = new Set([
+    "source_target_goal_mismatch:model_only_concept_for_source_backed_route",
+    "required_terminal_product_forbidden",
+  ]);
+  const routeViolationsRepairableByCanonicalGoalReconciliation =
+    route.compatibility.violations.length > 0 &&
+    route.compatibility.violations.every((violation) =>
+      repairableStaleModelOnlyViolations.has(violation),
+    );
+  const committedRouteCompatible =
+    (
+      route.compatibility.source_goal_capability_terminal_compatible === true &&
+      route.compatibility.violations.length === 0
+    ) ||
+    routeViolationsRepairableByCanonicalGoalReconciliation;
+  const committedRouteIsSourceBacked =
+    committedRouteCompatible &&
+    Boolean(committedGoalKind) &&
+    committedGoalKind !== "model_only_concept" &&
+    committedSourceTarget !== "model_only" &&
+    committedTerminalKind !== "direct_answer_text" &&
+    committedTerminalKind !== "unknown";
+  const currentFrameIsStaleModelOnly =
+    currentGoalKind === "model_only_concept" ||
+    currentGoalKind === "unknown" ||
+    currentTerminalKind === "direct_answer_text" ||
+    currentTerminalKind === "unknown";
+  const classifierReasons = readStringArray(current.classifier_reasons);
+  const authoritativeModelOnlyDemotionReasons = new Set([
+    "conversational_referent_no_evidence",
+    "referent_cannot_supply_requested_evidence",
+    "conversational_referent_has_no_retrievable_claims",
+    "suppressed_contextual_reference",
+    "contextual_tool_reference_suppressed",
+    "contextual_tool_reference_demoted_route_metadata",
+  ]);
+  const currentFrameIsAuthoritativelyDemoted = classifierReasons.some((reason) =>
+    authoritativeModelOnlyDemotionReasons.has(reason),
+  );
+
+  if (
+    !committedRouteIsSourceBacked ||
+    !currentFrameIsStaleModelOnly ||
+    currentFrameIsAuthoritativelyDemoted
+  ) {
+    return { reconciled: false, frame: current, reason: null };
+  }
+
+  const answerScope =
+    committedSourceTarget === "scholarly_research"
+      ? "external_scholarly_research"
+      : committedSourceTarget === "internet_search"
+        ? "external_internet_search"
+        : committedSourceTarget || "source_backed";
+  const reconciledClassifierReasons = unique([
+    ...classifierReasons,
+    "committed_source_route_overrode_stale_model_only_goal",
+  ]);
+
+  return {
+    reconciled: true,
+    reason: "committed_source_route_overrode_stale_model_only_goal",
+    frame: {
+      ...current,
+      turn_id: input.turnId,
+      goal_kind: committedGoalKind,
+      answer_scope: answerScope,
+      required_terminal_kind: route.canonical_goal.required_terminal_kind,
+      allows_workspace_context:
+        committedSourceTarget !== "scholarly_research" &&
+        committedSourceTarget !== "internet_search",
+      allows_prior_artifacts: false,
+      confidence: readString(current.confidence) === "high" ? "high" : "medium",
+      classifier_reasons: reconciledClassifierReasons,
+    },
+  };
+}
+
 export function buildCommittedAskRoute(input: {
   turnId: string;
   promptText: string;

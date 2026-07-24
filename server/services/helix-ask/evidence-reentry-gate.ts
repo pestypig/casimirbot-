@@ -17,7 +17,10 @@ export type HelixEvidenceReentryGate = {
   turn_id: string;
   required: boolean;
   completed: boolean;
-  reentry_authority: "runtime_event_log" | "compatibility_projection";
+  reentry_authority:
+    | "runtime_event_log"
+    | "provider_terminal_authority_bridge"
+    | "compatibility_projection";
   runtime_lifecycle_verified: boolean;
   selected_evidence_refs: string[];
   rejected_evidence_refs: Array<{ ref: string; reason: string }>;
@@ -838,6 +841,10 @@ export function buildEvidenceReentryGate(input: {
   finalAnswerSource: string;
   finalArbitrationRan: boolean;
   runtimeLifecycleVerified?: boolean;
+  reentryAuthority?:
+    | "runtime_event_log"
+    | "provider_terminal_authority_bridge"
+    | "compatibility_projection";
   runtimeObservationReentryRefs?: string[];
   postEvidenceReasoningCompleted?: boolean;
   sourceEvidenceRequired?: boolean;
@@ -1008,7 +1015,9 @@ export function buildEvidenceReentryGate(input: {
       allowedReceiptTerminal ||
       allowedObservationTerminal
     ),
-    reentry_authority: runtimeLifecycleVerified ? "runtime_event_log" : "compatibility_projection",
+    reentry_authority:
+      input.reentryAuthority ??
+      (runtimeLifecycleVerified ? "runtime_event_log" : "compatibility_projection"),
     runtime_lifecycle_verified: runtimeLifecycleVerified,
     selected_evidence_refs: selectedEvidenceRefs,
     rejected_evidence_refs: rejectedEvidenceRefs,

@@ -655,13 +655,23 @@ const providerTerminalPathMaterialized = (input: {
   const committedCanonicalGoal = readRecord(committedAskRoute?.canonical_goal);
   const routeProductContract = readRecord(input.payload.route_product_contract);
   const sourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const committedRouteDescriptor = readRecord(committedAskRoute?.route);
+  const routeProductSourceTarget = readString(routeProductContract?.source_target);
+  const committedRouteSourceTarget = readString(committedRouteDescriptor?.source_target);
+  const directModelOnlyGoalKind =
+    readString(canonicalGoal?.goal_kind) || readString(committedCanonicalGoal?.goal_kind);
   const modelOnlySourceTarget = ["model_only", "general_background"].includes(
     readString(sourceTargetIntent?.target_source) || "",
   );
+  // Source strength is admission confidence, not an assertion that the turn has no observations.
   const modelOnlySourceContract =
-    modelOnlySourceTarget || readString(sourceTargetIntent?.strength) !== "hard";
-  const directModelOnlyGoalKind =
-    readString(canonicalGoal?.goal_kind) || readString(committedCanonicalGoal?.goal_kind);
+    modelOnlySourceTarget ||
+    ["model_only", "general_background"].includes(routeProductSourceTarget || "") ||
+    ["model_only", "general_background"].includes(committedRouteSourceTarget || "") ||
+    (
+      directModelOnlyGoalKind === "model_only_concept" &&
+      (!committedRouteSourceTarget || committedRouteSourceTarget === "unknown")
+    );
   const directModelOnlyTerminalAllowed =
     readString(canonicalGoal?.required_terminal_kind) === input.terminalArtifactKind ||
     readString(committedCanonicalGoal?.required_terminal_kind) === input.terminalArtifactKind ||
@@ -686,6 +696,50 @@ const providerTerminalPathMaterialized = (input: {
     readString(terminalPresentation?.final_answer_source) === input.finalAnswerSource &&
     directModelOnlyTerminalAllowed;
   if (directModelOnlyProviderProduct) return true;
+  const committedRoute = readCommittedAskRoute(input.payload);
+  const currentScholarlySupportRefs = presentationSupportRefs.filter((ref) =>
+    readStringArray(providerBridge?.successful_gateway_observation_refs).includes(ref) &&
+    readStringArray(providerReasoningReentry?.normalized_observation_refs).includes(ref)
+  );
+  const currentScholarlyProviderProduct =
+    input.terminalArtifactKind === "scholarly_research_answer" &&
+    input.finalAnswerSource === "scholarly_research_answer" &&
+    committedRoute?.route.source_target === "scholarly_research" &&
+    committedRoute.canonical_goal.allowed_terminal_artifact_kinds.includes(
+      "scholarly_research_answer",
+    ) &&
+    !committedRoute.canonical_goal.forbidden_terminal_artifact_kinds.includes(
+      "scholarly_research_answer",
+    ) &&
+    readString(providerBridge?.schema) === "helix.provider_terminal_authority_bridge.v1" &&
+    readString(providerBridge?.turn_id) === input.turnId &&
+    readBoolean(providerBridge?.all_observations_succeeded) === true &&
+    readBoolean(providerBridge?.normalized_observations_ready) === true &&
+    readBoolean(providerBridge?.terminal_authority_granted) === true &&
+    readBoolean(providerBridge?.final_visible_answer_authorized) === true &&
+    readString(providerReasoningReentry?.schema) === "helix.provider_reasoning_reentry.v1" &&
+    readString(providerReasoningReentry?.turn_id) === input.turnId &&
+    readString(providerReasoningReentry?.status) === "completed" &&
+    readBoolean(providerReasoningReentry?.evidence_reentered) === true &&
+    readBoolean(providerReasoningReentry?.solver_completed) === true &&
+    readBoolean(providerReasoningReentry?.goal_satisfaction_compatible) === true &&
+    readStringArray(providerReasoningReentry?.normalized_observation_refs).length > 0 &&
+    readBoolean(terminalAuthority?.server_authoritative) === true &&
+    readString(terminalAuthority?.turn_id) === input.turnId &&
+    readString(terminalAuthority?.terminal_kind) === "answer" &&
+    readString(terminalAuthority?.terminal_artifact_kind) === input.terminalArtifactKind &&
+    readString(terminalAuthority?.final_answer_source) === input.finalAnswerSource &&
+    readString(terminalPresentation?.turn_id) === input.turnId &&
+    readString(terminalPresentation?.terminal_artifact_kind) === input.terminalArtifactKind &&
+    readString(terminalPresentation?.final_answer_source) === input.finalAnswerSource &&
+    Boolean(readString(terminalPresentation?.concise_text)) &&
+    presentationSupportRefs.length > 0 &&
+    currentScholarlySupportRefs.length === presentationSupportRefs.length &&
+    (
+      readString(terminalWriter?.selected_terminal_artifact_kind) === input.terminalArtifactKind ||
+      readString(terminalWriter?.selectedArtifactKind) === input.terminalArtifactKind
+    );
+  if (currentScholarlyProviderProduct) return true;
   const terminalUsesMaterializedProviderRouteProduct =
     readString(providerRouteProductMaterialization?.status) === "materialized" &&
     materializedProviderRouteProductKind === input.terminalArtifactKind &&
@@ -1710,6 +1764,32 @@ export function buildAskTurnSolverTrace(input: {
     runtimeSolverCompletionObserved:
       runtimeLifecycleCycleCompleted && runtimePostObservationReasoningCompleted === true,
   });
+  const providerReasoningReentry = readRecord(input.payload.provider_reasoning_reentry);
+  const providerProjectionCompletesReasoning =
+    providerFinalArbitrationMaterialized &&
+    readString(providerReasoningReentry?.schema) === "helix.provider_reasoning_reentry.v1" &&
+    readString(providerReasoningReentry?.turn_id) === input.turnId &&
+    readString(providerReasoningReentry?.status) === "completed" &&
+    readBoolean(providerReasoningReentry?.evidence_reentered) === true &&
+    readBoolean(providerReasoningReentry?.solver_completed) === true &&
+    readBoolean(providerReasoningReentry?.goal_satisfaction_compatible) === true;
+  const providerObservationReentryRefs = providerProjectionCompletesReasoning
+    ? readStringArray(providerReasoningReentry?.normalized_observation_refs)
+    : [];
+  const effectiveObservationReentryRefs = runtimeObservationReentryRefs.length > 0
+    ? runtimeObservationReentryRefs
+    : providerObservationReentryRefs;
+  const effectivePostObservationReasoningCompleted =
+    runtimePostObservationReasoningCompleted === true ||
+    providerProjectionCompletesReasoning;
+  const effectiveReentryAuthority =
+    runtimePostObservationReasoningCompleted === true
+      ? "runtime_event_log" as const
+      : providerProjectionCompletesReasoning
+        ? "provider_terminal_authority_bridge" as const
+        : verifiedRuntimeLifecycle
+          ? "runtime_event_log" as const
+          : "compatibility_projection" as const;
   const effectiveFinalArbitrationRan =
     finalArbitrationRan ||
     routeApprovedSelfTerminalProduct ||
@@ -1725,8 +1805,9 @@ export function buildAskTurnSolverTrace(input: {
     finalAnswerSource,
     finalArbitrationRan: effectiveFinalArbitrationRan,
     runtimeLifecycleVerified: Boolean(verifiedRuntimeLifecycle),
-    runtimeObservationReentryRefs,
-    postEvidenceReasoningCompleted: runtimePostObservationReasoningCompleted,
+    reentryAuthority: effectiveReentryAuthority,
+    runtimeObservationReentryRefs: effectiveObservationReentryRefs,
+    postEvidenceReasoningCompleted: effectivePostObservationReasoningCompleted,
     sourceEvidenceRequired: evidenceRequired,
     allowedTerminalProducts: committedAskRoute.canonical_goal.allowed_terminal_artifact_kinds,
     toolUseRestatement,
@@ -1740,7 +1821,7 @@ export function buildAskTurnSolverTrace(input: {
     selectedEvidenceCount: evidenceReentryGate.selected_evidence_refs.length,
     conflictingHypotheses: intentHypotheses.length > 1 && secondary.length > 0,
     finalArbitrationRan: effectiveFinalArbitrationRan,
-    postEvidenceReasoningCompleted: runtimePostObservationReasoningCompleted,
+    postEvidenceReasoningCompleted: effectivePostObservationReasoningCompleted,
     routeFollowupReasoningRequired: routeApprovedSelfTerminalProduct
       ? false
       : undefined,

@@ -239,6 +239,85 @@ describe("Helix Ask solver runtime lifecycle authority", () => {
     })).toBe(true);
   });
 
+  it("completes a materialized model-only provider answer when source arbitration remains unknown", () => {
+    const turnId = "turn:lifecycle-model-only-unknown-source";
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:test`;
+    const routeProductRef = `${candidateRef}:route_product:direct_answer_text`;
+    const trace = buildAskTurnSolverTrace({
+      turnId,
+      promptText: "Explain why boundary conditions matter in the Casimir effect.",
+      selectedRoute: "/ask",
+      terminalArtifactKind: "direct_answer_text",
+      finalAnswerSource: "direct_answer_text",
+      payload: {
+        source_target_intent: {
+          target_source: "unknown",
+          target_kind: "unknown",
+          strength: "unknown",
+        },
+        canonical_goal_frame: {
+          schema: "helix.canonical_goal_frame.v1",
+          goal_kind: "model_only_concept",
+          required_terminal_kind: "direct_answer_text",
+        },
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          source_target: "unknown",
+          required_terminal_kind: "direct_answer_text",
+          allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+        },
+        provider_route_product_materialization: {
+          schema: "helix.provider_route_product_materialization.v1",
+          status: "materialized",
+          provider_terminal_candidate_ref: candidateRef,
+          materialized_terminal_artifact_kind: "direct_answer_text",
+          materialized_terminal_artifact_ref: routeProductRef,
+          selected_observation_refs: [],
+        },
+        provider_reasoning_reentry: {
+          status: "completed",
+          provider_terminal_candidate_ref: candidateRef,
+          evidence_reentry_required: false,
+          evidence_reentered: true,
+          solver_completed: true,
+          goal_satisfaction_compatible: true,
+        },
+        provider_terminal_authority_bridge: {
+          provider_terminal_candidate_ref: candidateRef,
+          terminal_authority_granted: true,
+          final_visible_answer_authorized: true,
+        },
+        terminal_authority_single_writer: {
+          selected_terminal_artifact_kind: "direct_answer_text",
+          selected_terminal_artifact_ref: routeProductRef,
+        },
+        terminal_answer_authority: {
+          terminal_artifact_kind: "direct_answer_text",
+          final_answer_source: "direct_answer_text",
+          server_authoritative: true,
+        },
+        terminal_presentation: {
+          terminal_artifact_kind: "direct_answer_text",
+          final_answer_source: "direct_answer_text",
+          selected_observation_refs: [],
+        },
+      },
+      loopParityTrace: {
+        actual_tool_calls: [],
+        observations_created: [],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace.committed_ask_route.canonical_goal.goal_kind).toBe("model_only_concept");
+    expect(trace.route_authority_ok).toBe(true);
+    expect(trace.completed_solver_path).toBe(true);
+    expect(trace.solver_risk_flags).toEqual([]);
+  });
+
   it("uses the committed route over a stale provider goal while retaining Helix terminal authority", () => {
     const turnId = "turn:lifecycle-provider-route-product";
     const observationRef = `${turnId}:research:observation:1`;
@@ -332,6 +411,285 @@ describe("Helix Ask solver runtime lifecycle authority", () => {
     expect(trace.route_authority_ok).toBe(true);
     expect(trace.terminal_authority_ok).toBe(true);
     expect(trace.solver_risk_flags).toEqual([]);
+  });
+
+  it("projects a verified scholarly provider re-entry when the native lifecycle trace is absent", () => {
+    const turnId = "turn:scholarly-provider-projection";
+    const observationRef = `${turnId}:workstation_gateway:scholarly-research.lookup_papers:1`;
+    const answerRef = `${turnId}:scholarly_research_answer`;
+    const trace = buildAskTurnSolverTrace({
+      turnId,
+      promptText: "Find a few citable research papers about magnetars.",
+      selectedRoute: "/ask/turn",
+      terminalArtifactKind: "scholarly_research_answer",
+      finalAnswerSource: "scholarly_research_answer",
+      payload: {
+        source_target_intent: {
+          target_source: "scholarly_research",
+          target_kind: "scholarly_research",
+          strength: "hard",
+        },
+        canonical_goal_frame: {
+          schema: "helix.canonical_goal_frame.v1",
+          goal_kind: "model_only_concept",
+          required_terminal_kind: "direct_answer_text",
+        },
+        tool_call_admission_decision: {
+          selected_capability: "scholarly-research.lookup_papers",
+          admitted_capability: "scholarly-research.lookup_papers",
+          admitted_tool_families: ["scholarly_research"],
+        },
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          turn_id: turnId,
+          status: "completed",
+          evidence_reentry_required: true,
+          evidence_reentered: true,
+          normalized_observation_refs: [observationRef],
+          normalized_observation_packet_count: 1,
+          solver_completed: true,
+          goal_satisfaction_compatible: true,
+        },
+        provider_terminal_authority_bridge: {
+          schema: "helix.provider_terminal_authority_bridge.v1",
+          turn_id: turnId,
+          successful_gateway_observation_refs: [observationRef],
+          normalized_observation_refs: [observationRef],
+          all_observations_succeeded: true,
+          normalized_observations_ready: true,
+          terminal_authority_granted: true,
+          final_visible_answer_authorized: true,
+        },
+        terminal_authority_single_writer: {
+          selected_terminal_artifact_kind: "scholarly_research_answer",
+          selected_terminal_artifact_ref: answerRef,
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          turn_id: turnId,
+          terminal_kind: "answer",
+          terminal_artifact_kind: "scholarly_research_answer",
+          final_answer_source: "scholarly_research_answer",
+          server_authoritative: true,
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          turn_id: turnId,
+          concise_text: "Here are several citable magnetar papers.",
+          terminal_artifact_kind: "scholarly_research_answer",
+          final_answer_source: "scholarly_research_answer",
+          selected_observation_refs: [observationRef],
+        },
+        goal_satisfaction_evaluation: {
+          satisfaction: "satisfied",
+          next_decision: "allow_terminal",
+        },
+        current_turn_artifact_ledger: [{
+          artifact_id: observationRef,
+          kind: "scholarly_research_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.scholarly_research_observation.v1",
+            artifact_id: observationRef,
+            selected_for_answer: true,
+          },
+        }],
+      },
+      loopParityTrace: {
+        actual_tool_calls: [{
+          tool_id: "scholarly-research.lookup_papers",
+          family: "scholarly_research",
+          admitted: true,
+          mutating: false,
+          result_ref: observationRef,
+        }],
+        observations_created: [{
+          observation_id: observationRef,
+          source_kind: "scholarly_research",
+        }],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace.evidence_reentry_gate).toMatchObject({
+      completed: true,
+      reentry_authority: "provider_terminal_authority_bridge",
+      selected_evidence_refs: [observationRef],
+      violation_codes: [],
+    });
+    expect(trace.followup_reasoning.completed).toBe(true);
+    expect(trace.route_authority_ok).toBe(true);
+    expect(trace.completed_solver_path).toBe(true);
+    expect(trace.solver_risk_flags).toEqual([]);
+    expect(trace.runtime_lifecycle_facts).toBeUndefined();
+  });
+
+  it("retains grounded provider route authority for a soft read-only workstation source", () => {
+    const turnId = "turn:lifecycle-soft-workstation-route-product";
+    const observationRef = `${turnId}:workstation:active-context:1`;
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:test`;
+    const routeProductRef = `${candidateRef}:route_product:direct_answer_text`;
+    const trace = buildAskTurnSolverTrace({
+      turnId,
+      promptText: "What panel in the workstation is active right now?",
+      selectedRoute: "/ask",
+      terminalArtifactKind: "direct_answer_text",
+      finalAnswerSource: "direct_answer_text",
+      payload: {
+        turn_lifecycle: buildProviderLifecycle(
+          turnId,
+          observationRef,
+          "workstation.active_context",
+        ),
+        source_target_intent: {
+          target_source: "workspace_panel",
+          target_kind: "workstation_state",
+          strength: "soft",
+          allow_no_tool_direct: false,
+        },
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          turn_id: turnId,
+          route: {
+            selected_route: "/ask/turn/stream",
+            source_target: "workspace_panel",
+            target_kind: "workstation_state",
+            strength: "soft",
+          },
+          canonical_goal: {
+            goal_kind: "model_only_concept",
+            required_terminal_kind: "direct_answer_text",
+            allowed_terminal_artifact_kinds: [
+              "direct_answer_text",
+              "agent_provider_terminal_candidate",
+            ],
+            forbidden_terminal_artifact_kinds: [],
+          },
+          capability_policy: {
+            allowed_tool_families: ["workstation_action"],
+            suppressed_tool_families: [],
+            required_capability_families: ["workstation_action"],
+            mutating_families_allowed: false,
+          },
+          suppression: {
+            contextual_tool_mentions: [],
+            negative_constraints: [],
+            suppressed_families: [],
+            firewall_required: true,
+          },
+          terminal_product: {
+            terminal_authority_required: true,
+            evidence_reentry_required: true,
+            followup_reasoning_required: true,
+            required_terminal_product: "direct_answer_text",
+          },
+          compatibility: {
+            source_goal_capability_terminal_compatible: true,
+            stale_metadata_ignored: false,
+            shortcut_firewall_applied: false,
+            violations: [],
+          },
+        },
+        canonical_goal_frame: {
+          schema: "helix.canonical_goal_frame.v1",
+          goal_kind: "agent_provider_gateway_turn",
+          requested_capability: "workstation.active_context",
+          required_terminal_kind: "agent_provider_terminal_candidate",
+        },
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          source_target: "workspace_panel",
+          required_terminal_kind: "direct_answer_text",
+          allowed_terminal_artifact_kinds: [
+            "direct_answer_text",
+            "agent_provider_terminal_candidate",
+          ],
+          forbidden_terminal_artifact_kinds: [],
+        },
+        provider_route_product_materialization: {
+          schema: "helix.provider_route_product_materialization.v1",
+          status: "materialized",
+          provider_terminal_candidate_ref: candidateRef,
+          materialized_terminal_artifact_kind: "direct_answer_text",
+          materialized_terminal_artifact_ref: routeProductRef,
+          selected_observation_refs: [observationRef],
+        },
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          turn_id: turnId,
+          status: "completed",
+          provider_terminal_candidate_ref: candidateRef,
+          evidence_reentered: true,
+          solver_completed: true,
+          goal_satisfaction_compatible: true,
+        },
+        provider_terminal_authority_bridge: {
+          schema: "helix.provider_terminal_authority_bridge.v1",
+          turn_id: turnId,
+          provider_terminal_candidate_ref: candidateRef,
+          terminal_authority_granted: true,
+          final_visible_answer_authorized: true,
+        },
+        terminal_authority_single_writer: {
+          selected_terminal_artifact_kind: "direct_answer_text",
+          selected_terminal_artifact_ref: routeProductRef,
+        },
+        terminal_answer_authority: {
+          turn_id: turnId,
+          terminal_artifact_kind: "direct_answer_text",
+          final_answer_source: "direct_answer_text",
+          terminal_artifact_ref: routeProductRef,
+          server_authoritative: true,
+        },
+        terminal_presentation: {
+          turn_id: turnId,
+          terminal_artifact_kind: "direct_answer_text",
+          final_answer_source: "direct_answer_text",
+          terminal_authority_ref: routeProductRef,
+          selected_observation_refs: [observationRef],
+        },
+        current_turn_artifact_ledger: [{
+          artifact_id: observationRef,
+          kind: "provider_gateway_observation_packet",
+          payload: {
+            turn_id: turnId,
+            artifact_id: observationRef,
+            capability_key: "workstation.active_context",
+            status: "succeeded",
+            selected_for_answer: true,
+          },
+        }],
+      },
+      loopParityTrace: {
+        actual_tool_calls: [{
+          tool_id: "workstation.active_context",
+          family: "workstation_action",
+          admitted: true,
+          mutating: false,
+          result_ref: observationRef,
+        }],
+        observations_created: [{
+          observation_id: observationRef,
+          source_kind: "workstation_active_context_observation",
+        }],
+        evidence_selected_for_answer: [observationRef],
+        evidence_rejected_for_answer: [],
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace).toMatchObject({
+      completed_solver_path: true,
+      route_authority_ok: true,
+      terminal_authority_ok: true,
+      evidence_reentry: { completed: true },
+      followup_reasoning: { completed: true },
+      solver_risk_flags: [],
+    });
   });
 
   it("repairs a stale legacy continuation only after verified provider completion and scholarly authority", () => {
@@ -531,5 +889,51 @@ describe("Helix Ask solver runtime lifecycle authority", () => {
     });
     expect(report.eligible).toBe(false);
     expect(report.blocking_reasons).toContain("selected_capability_observation_missing");
+  });
+
+  it("binds a verified active-context observation to the Codex-selected capability", () => {
+    const turnId = "turn:lifecycle-active-context";
+    const observationRef = `${turnId}:workstation:active-context:1`;
+    const report = evaluateTerminalBoundaryEligibility({
+      turn_id: turnId,
+      turn_lifecycle: buildProviderLifecycle(
+        turnId,
+        observationRef,
+        "workstation.active_context",
+      ),
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability: "workstation.active_context",
+        required_terminal_kind: "agent_provider_terminal_candidate",
+      },
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      current_turn_artifact_ledger: [{
+        artifact_id: observationRef,
+        kind: "provider_gateway_observation_packet",
+        source_scope: "current_turn",
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          capability_key: "workstation.active_context",
+          status: "succeeded",
+          observation: {
+            schema: "helix.workstation_active_context_observation.v1",
+          },
+        },
+      }],
+    });
+
+    expect(report.runtime_lifecycle).toMatchObject({
+      integrity_verified: true,
+      provider_cycle_completed: true,
+      supported_capability_ids: ["workstation.active_context"],
+      supported_observation_refs: [observationRef],
+    });
+    expect(report.checks.selected_capability_observation).toBe(true);
   });
 });

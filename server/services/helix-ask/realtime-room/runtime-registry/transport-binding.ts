@@ -138,6 +138,80 @@ export const markSharedRealtimeRoomTransportActive = (input: {
   return runtimeResult(record, null);
 };
 
+/**
+ * Promotes the already-bound owner browser transport after its two-person
+ * WebRTC relay is connected. This does not create or bind another model call.
+ */
+export const promoteSharedRealtimeRoomMediaBridge = (input: {
+  roomId: string;
+  runtimeId: string;
+  nowMs?: number;
+}) => {
+  const record = readRuntimeRecord(input.roomId, input.nowMs);
+  if (
+    record?.runtime.runtime_id === readRef(input.runtimeId) &&
+    record.runtime.transport_owner === "room_media_bridge" &&
+    record.runtime.state === "bridge_active" &&
+    record.admittedRealtimeSessionId
+  ) {
+    return runtimeResult(record, null);
+  }
+  if (
+    !record ||
+    record.runtime.runtime_id !== readRef(input.runtimeId) ||
+    record.runtime.transport_owner !== "host_browser" ||
+    record.runtime.state !== "host_transport_active" ||
+    !record.admittedRealtimeSessionId
+  ) {
+    return runtimeResult(record, "shared_realtime_room_runtime_conflict");
+  }
+  const nowMs = input.nowMs ?? Date.now();
+  record.runtime = {
+    ...record.runtime,
+    state: "bridge_active",
+    transport_owner: "room_media_bridge",
+    updated_at: iso(nowMs),
+    limitations: transportLimitations("room_media_bridge", true),
+  };
+  return runtimeResult(record, null);
+};
+
+export const demoteSharedRealtimeRoomMediaBridge = (input: {
+  roomId: string;
+  runtimeId: string;
+  nowMs?: number;
+}) => {
+  const record = readRuntimeRecord(input.roomId, input.nowMs);
+  if (
+    record?.runtime.runtime_id === readRef(input.runtimeId) &&
+    record.runtime.transport_owner === "host_browser" &&
+    record.runtime.state === "host_transport_active" &&
+    record.admittedRealtimeSessionId
+  ) {
+    return runtimeResult(record, null);
+  }
+  if (
+    !record ||
+    record.runtime.runtime_id !== readRef(input.runtimeId) ||
+    record.runtime.transport_owner !== "room_media_bridge" ||
+    record.runtime.state !== "bridge_active" ||
+    !record.admittedRealtimeSessionId
+  ) {
+    return runtimeResult(record, "shared_realtime_room_runtime_conflict");
+  }
+  const nowMs = input.nowMs ?? Date.now();
+  record.floor = null;
+  record.runtime = {
+    ...record.runtime,
+    state: "host_transport_active",
+    transport_owner: "host_browser",
+    active_speaker_participant_id: null,
+    updated_at: iso(nowMs),
+    limitations: transportLimitations("host_browser", true),
+  };
+  return runtimeResult(record, null);
+};
+
 /** Private binding material for trusted server transport code only. */
 export const readSharedRealtimeRoomRuntimeBinding = (input: {
   roomId: string;

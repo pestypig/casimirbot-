@@ -17,6 +17,7 @@ import {
   attachVisualSourceAudioWithCancellation,
   requestVisualSourceMediaStream,
   stopVisualSourceMediaStream,
+  type HelixVisualSourceRequestResult,
   type VisualSourceKind,
 } from "@/lib/helix/visualSourceMedia";
 import { sourceLabelForSituationSource } from "@/lib/helix/situation-room";
@@ -386,31 +387,40 @@ export function useHelixAskVisualSourceCaptureRuntime(
     signal?: AbortSignal;
   }): Promise<{ summary: string; visualEvidence: Record<string, unknown> | null }> => {
     let sourceId: string | null = null;
-    let stream: MediaStream | null = null;
+    const existingSourceId = visualSituationSourceIdRef.current;
+    let stream: MediaStream | null = existingSourceId
+      ? getActiveVisualFrameStream(existingSourceId)
+      : null;
     let ownsStream = false;
+    let pendingMediaRequest: Promise<HelixVisualSourceRequestResult> | null = null;
     let sourceSurface: "screen" | "window" | "browser_tab" | "camera" =
       input.kind === "camera" ? "camera" : "screen";
     let sourceOrigin: "browser_getDisplayMedia" | "browser_getUserMedia" =
       input.kind === "camera" ? "browser_getUserMedia" : "browser_getDisplayMedia";
+    const includeDisplayAudio = input.kind === "screen" && input.includeAudio === true;
+    const hasLiveDisplayAudio = Boolean(
+      stream?.getAudioTracks().some((track) => track.readyState !== "ended"),
+    );
+    const existingStreamNeedsAudioUpgrade = Boolean(
+      stream && includeDisplayAudio && !hasLiveDisplayAudio,
+    );
     try {
-      sourceId = await ensureHelixAskVisualSource(input.kind, input.signal);
-      if (input.signal?.aborted) throw new Error("visual_capture_cancelled");
-      stream = getActiveVisualFrameStream(sourceId);
-      const includeDisplayAudio = input.kind === "screen" && input.includeAudio === true;
-      const hasLiveDisplayAudio = Boolean(
-        stream?.getAudioTracks().some((track) => track.readyState !== "ended"),
-      );
-      const existingStreamNeedsAudioUpgrade = Boolean(
-        stream && includeDisplayAudio && !hasLiveDisplayAudio,
-      );
+      // Begin the browser permission request while the originating click still owns
+      // transient user activation. Awaiting source registration first makes
+      // getDisplayMedia/getUserMedia browser-dependent and intermittently blocked.
       if (!stream || existingStreamNeedsAudioUpgrade) {
-        const supersededStream = stream;
-        const visualSource = await requestVisualSourceMediaStream({
+        pendingMediaRequest = requestVisualSourceMediaStream({
           kind: input.kind,
           includeDisplayAudio,
           displayAudioConstraints: HELIX_ASK_DISPLAY_AUDIO_CONSTRAINTS,
           cameraFacingMode: "user",
         });
+      }
+      sourceId = await ensureHelixAskVisualSource(input.kind, input.signal);
+      if (input.signal?.aborted) throw new Error("visual_capture_cancelled");
+      if (pendingMediaRequest) {
+        const supersededStream = stream;
+        const visualSource = await pendingMediaRequest;
         if (!visualSource.ok) {
           throw new Error(`${visualSource.errorCode}: ${visualSource.message}`);
         }
@@ -559,6 +569,10 @@ export function useHelixAskVisualSourceCaptureRuntime(
           : null,
       };
     } catch (error) {
+      if (pendingMediaRequest && !ownsStream) {
+        const abandonedRequest = await pendingMediaRequest.catch(() => null);
+        if (abandonedRequest?.ok) stopVisualSourceMediaStream(abandonedRequest.stream);
+      }
       if (sourceId && input.signal?.aborted) {
         stopRegisteredHelixAskVisualSource(sourceId, input.kind);
       }

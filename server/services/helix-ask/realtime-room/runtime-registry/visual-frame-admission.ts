@@ -124,7 +124,8 @@ export const admitSharedRealtimeRoomVisualFrame = (input: {
     duplicate &&
     input.screenToModelAuthorized &&
     input.providerDeliveryAvailable === true &&
-    duplicate.frame.provider_delivery !== "sent_to_shared_model",
+    duplicate.frame.provider_delivery !== "sent_to_shared_model" &&
+    duplicate.frame.provider_delivery !== "transport_sent",
   );
   if (duplicate && !retryUndeliveredProviderFrame) {
     const frame = cloneSharedRealtimeRoomVisualFrame(
@@ -195,7 +196,9 @@ export const admitSharedRealtimeRoomVisualFrame = (input: {
     imageHash,
     String(capturedAtMs),
   ].join(":")).slice(0, 24)}`;
-  if (providerItemId) record.providerItems.push({ itemId: providerItemId, frameRef });
+  if (providerItemId) {
+    record.providerItems.push({ itemId: providerItemId, frameRef, eventId: null });
+  }
   const delivery: HelixSharedRealtimeRoomFrameDelivery = !input.screenToModelAuthorized
     ? "blocked_by_consent"
     : providerItemId

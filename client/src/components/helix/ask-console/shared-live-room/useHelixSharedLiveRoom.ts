@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   HelixSharedRealtimeRoom,
   HelixSharedRealtimeRoomConsentPatch,
@@ -10,6 +10,11 @@ import {
   helixSharedLiveRoomApi,
   type HelixSharedLiveRoomApi,
 } from "./SharedLiveRoomApi";
+import { shouldRenewSharedLiveRoomFloor } from "./SharedLiveRoomFloorLease";
+import {
+  buildSharedLiveRoomDebugArtifact,
+  recordSharedLiveRoomDebugArtifact,
+} from "./SharedLiveRoomDebugArtifact";
 import { readHelixSharedLiveRoomSelfParticipant } from "./SharedLiveRoomViewModel";
 import {
   sortHelixSharedLiveRooms,
@@ -19,6 +24,10 @@ import {
   useSharedLiveRoomVisualIngress,
   type HelixSharedLiveRoomFrameUploadState,
 } from "./useSharedLiveRoomVisualIngress";
+import { useSharedLiveRoomMediaBridge } from
+  "./media-bridge/useSharedLiveRoomMediaBridge";
+import type { SharedLiveRoomMediaBridgeProjection } from
+  "./media-bridge/RoomMediaBridgeContracts";
 
 export type { HelixSharedLiveRoomFrameUploadState } from "./useSharedLiveRoomVisualIngress";
 
@@ -29,6 +38,7 @@ export type HelixSharedLiveRoomAction =
   | "open"
   | "invite"
   | "consent"
+  | "connect"
   | "reserve"
   | "bind"
   | "floor"
@@ -48,15 +58,21 @@ export type HelixSharedLiveRoomController = {
   runtimeActive: boolean;
   realtimeSessionId: string | null;
   frameUpload: HelixSharedLiveRoomFrameUploadState;
+  mediaBridge: SharedLiveRoomMediaBridgeProjection;
   clearError(): void;
   createRoom(title?: string): Promise<boolean>;
   joinRoom(inviteCode: string): Promise<boolean>;
   openRoom(roomId: string): Promise<boolean>;
   createInvite(): Promise<boolean>;
   patchOwnConsent(consent: HelixSharedRealtimeRoomConsentPatch): Promise<boolean>;
+  connectRuntime(): Promise<boolean>;
   reserveRuntime(): Promise<boolean>;
   bindRuntime(): Promise<boolean>;
   takeFloor(): Promise<boolean>;
+  releaseFloor(): Promise<boolean>;
+  startMediaBridge(): Promise<void>;
+  stopMediaBridge(): Promise<void>;
+  resumeMediaPlayback(): Promise<boolean>;
   refreshDebug(): Promise<boolean>;
   leaveRoom(): Promise<boolean>;
 };
@@ -65,7 +81,6 @@ export type UseHelixSharedLiveRoomOptions = {
   realtimeSessionId: string | null;
   runtimeActive: boolean;
   realtimeModel: string;
-  visualInputEnabled: boolean;
   api?: HelixSharedLiveRoomApi;
 };
 
@@ -143,6 +158,28 @@ export function useHelixSharedLiveRoom(
     () => readHelixSharedLiveRoomSelfParticipant(room),
     [room],
   );
+  const mediaBridge = useSharedLiveRoomMediaBridge({
+    room,
+    self: selfParticipant,
+    realtimeSessionId: options.realtimeSessionId,
+    api,
+  });
+
+  useEffect(() => {
+    recordSharedLiveRoomDebugArtifact(
+      room
+        ? buildSharedLiveRoomDebugArtifact({
+            room,
+            frames,
+            mediaBridge: mediaBridge.projection,
+            debug,
+          })
+        : null,
+    );
+    return () => {
+      recordSharedLiveRoomDebugArtifact(null);
+    };
+  }, [debug, frames, mediaBridge.projection, room]);
   const visualRouteAuthorized = Boolean(
     selfParticipant?.consent.screen_to_model ||
     selfParticipant?.consent.screen_thumbnail_to_room,
@@ -150,7 +187,11 @@ export function useHelixSharedLiveRoom(
   const { frameUpload, resetVisualIngress } = useSharedLiveRoomVisualIngress({
     api,
     roomId: activeRoomId,
-    enabled: options.visualInputEnabled && visualRouteAuthorized,
+    enabled: visualRouteAuthorized,
+    modelTransportBound: Boolean(
+      room?.runtime.realtime_session_ref_hash &&
+      (room.runtime.state === "host_transport_active" || room.runtime.state === "bridge_active"),
+    ),
     onFrames: setFrames,
   });
 
@@ -218,6 +259,32 @@ export function useHelixSharedLiveRoom(
     return true;
   }, [activeRoomId, api, applyRoom, options.realtimeModel, runRoomAction]);
 
+  const connectRuntime = useCallback(async (): Promise<boolean> => {
+    if (!activeRoomId) return false;
+    if (!options.realtimeSessionId) {
+      setError("Start GPT Live before connecting this room to the current session.");
+      return false;
+    }
+    const connectedRoom = await runRoomAction("connect", async () => {
+      const reservedRoom = room?.runtime.runtime_id
+        ? room
+        : await api.reserveRuntime(activeRoomId, options.realtimeModel);
+      applyRoom(reservedRoom);
+      return api.bindRuntime(activeRoomId, options.realtimeSessionId as string);
+    });
+    if (!connectedRoom) return false;
+    applyRoom(connectedRoom);
+    return true;
+  }, [
+    activeRoomId,
+    api,
+    applyRoom,
+    options.realtimeModel,
+    options.realtimeSessionId,
+    room,
+    runRoomAction,
+  ]);
+
   const bindRuntime = useCallback(async (): Promise<boolean> => {
     if (!activeRoomId) return false;
     if (!options.realtimeSessionId) {
@@ -238,6 +305,44 @@ export function useHelixSharedLiveRoom(
     applyRoom(nextRoom);
     return true;
   }, [activeRoomId, api, applyRoom, runRoomAction]);
+
+  const releaseFloor = useCallback(async (): Promise<boolean> => {
+    if (!activeRoomId) return false;
+    const nextRoom = await runRoomAction("floor", () => api.releaseFloor(activeRoomId));
+    if (!nextRoom) return false;
+    applyRoom(nextRoom);
+    return true;
+  }, [activeRoomId, api, applyRoom, runRoomAction]);
+
+  useEffect(() => {
+    if (!shouldRenewSharedLiveRoomFloor({
+      activeRoomId,
+      runtimeState: room?.runtime.state ?? null,
+      transportOwner: room?.runtime.transport_owner ?? null,
+      activeSpeakerParticipantId:
+        room?.runtime.active_speaker_participant_id ?? null,
+      selfParticipantId: selfParticipant?.participant_id ?? null,
+      selfRole: selfParticipant?.role ?? null,
+      peerAudioConnected: mediaBridge.projection.peer_audio_connected,
+    })) return;
+    const renew = (): void => {
+      void api.takeFloor(activeRoomId)
+        .then(applyRoom)
+        .catch(() => undefined);
+    };
+    const interval = window.setInterval(renew, 3_000);
+    return () => window.clearInterval(interval);
+  }, [
+    activeRoomId,
+    api,
+    applyRoom,
+    mediaBridge.projection.peer_audio_connected,
+    room?.runtime.active_speaker_participant_id,
+    room?.runtime.state,
+    room?.runtime.transport_owner,
+    selfParticipant?.participant_id,
+    selfParticipant?.role,
+  ]);
 
   const refreshDebug = useCallback(async (): Promise<boolean> => {
     if (!activeRoomId) return false;
@@ -277,15 +382,21 @@ export function useHelixSharedLiveRoom(
     runtimeActive: options.runtimeActive,
     realtimeSessionId: options.realtimeSessionId,
     frameUpload,
+    mediaBridge: mediaBridge.projection,
     clearError,
     createRoom,
     joinRoom,
     openRoom,
     createInvite,
     patchOwnConsent,
+    connectRuntime,
     reserveRuntime,
     bindRuntime,
     takeFloor,
+    releaseFloor,
+    startMediaBridge: mediaBridge.start,
+    stopMediaBridge: mediaBridge.stop,
+    resumeMediaPlayback: mediaBridge.resumePlayback,
     refreshDebug,
     leaveRoom,
   };

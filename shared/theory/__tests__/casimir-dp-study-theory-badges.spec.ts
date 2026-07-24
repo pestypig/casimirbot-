@@ -24,6 +24,7 @@ describe("Casimir / DP quantum-foam study badges", () => {
         "study.casimir_dp.gated_computations_stage1",
         "study.casimir_dp.data_readiness_stage1",
         "study.casimir_dp.proposal_closure",
+        "study.casimir_dp.penrose_or_branch_geometry_context",
         "study.casimir_dp.claim_boundary",
       ]),
     );
@@ -111,9 +112,40 @@ describe("Casimir / DP quantum-foam study badges", () => {
     expect(gate?.status).toBe("blocked");
     expect(gate?.observables?.map((observable) => observable.canonicalObservableId)).toEqual([
       "observable.coherence.boundary_conditioned_decay_residual",
+      "observable.coherence.boundary_conditioned_phase_residual",
       "observable.collapse.objective_rate",
     ]);
+    expect(gate?.equations.map((equation) => equation.id)).toEqual(
+      expect.arrayContaining([
+        "interferometric_phase_visibility_readout",
+        "boundary_conditioned_phase_residual",
+        "ambient_gravity_phase_control",
+      ]),
+    );
     expect(branch.edges.some((edge) => edge.from === gate?.id && edge.relation === "blocks")).toBe(true);
+  });
+
+  it("records Penrose OR as context without importing Orch OR or phase-of-matter dynamics", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const context = branch.badges.find(
+      (badge) => badge.id === "study.casimir_dp.penrose_or_branch_geometry_context",
+    );
+
+    expect(context?.status).toBe("diagnostic");
+    expect(context?.equations.map((equation) => equation.id)).toEqual([
+      "penrose_or_branch_geometry_state",
+      "penrose_or_timescale_notation_context",
+    ]);
+    expect(context?.assumptions.join(" ")).toContain("does not validate Orch OR");
+    expect(branch.edges.filter((edge) => edge.from === context?.id || edge.to === context?.id)).toHaveLength(6);
+    expect(branch.edges.some((edge) =>
+      edge.from === context?.id &&
+      edge.to === "orch_or.claim_boundary.exploratory_only" &&
+      edge.relation === "documents"
+    )).toBe(true);
+    expect(branch.edges.some((edge) =>
+      edge.from.startsWith("matter.phase.") || edge.to.startsWith("matter.phase.")
+    )).toBe(false);
   });
 
   it("fails closed instead of inventing a Casimir-to-DP observable bridge", () => {

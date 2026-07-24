@@ -309,6 +309,15 @@ export const buildHelixRealtimeStagePlayContextPack = (input: {
     ...sourceHealth.map((entry) => entry.ref),
   ], 48);
 
+  const prioritizedConversationEvidenceRefs = [...conversation.events]
+    .sort((left, right) => {
+      const leftCurrentSession = left.evidenceRefs.includes(input.realtimeSessionId);
+      const rightCurrentSession = right.evidenceRefs.includes(input.realtimeSessionId);
+      if (leftCurrentSession !== rightCurrentSession) return leftCurrentSession ? -1 : 1;
+      return right.createdAt.localeCompare(left.createdAt);
+    })
+    .flatMap((event) => [event.eventId, ...event.evidenceRefs]);
+
   for (const source of workstationSources.slice(MAX_SOURCES)) {
     reject(rejectedRefs, source.source_ref, "limit_exceeded");
   }
@@ -317,13 +326,13 @@ export const buildHelixRealtimeStagePlayContextPack = (input: {
   }
 
   const evidenceRefs = unique([
-    ...conversation.evidenceRefs,
-    ...(situation?.evidence_refs ?? []),
-    ...recentQuestions.flatMap((entry) => entry.evidence_refs),
-    ...groundedAnswers.flatMap((entry) => entry.evidence_refs),
-    ...activeConstraints.flatMap((entry) => entry.evidence_refs),
+    ...[...recentQuestions].reverse().flatMap((entry) => [entry.ref, ...entry.evidence_refs]),
+    ...[...groundedAnswers].reverse().flatMap((entry) => [entry.ref, ...entry.evidence_refs]),
+    ...[...activeConstraints].reverse().flatMap((entry) => [entry.ref, ...entry.evidence_refs]),
+    ...prioritizedConversationEvidenceRefs,
     ...workstationGoalSummaries.flatMap((entry) => entry.evidence_refs),
     ...sourceHealth.flatMap((entry) => entry.evidence_refs),
+    ...(situation?.evidence_refs ?? []),
   ].map((entry) => safeRef(entry)), MAX_EVIDENCE_REFS);
 
   const objective = clip(

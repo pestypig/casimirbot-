@@ -139,6 +139,9 @@ scholarly-research.extract_numeric_parameters
 civilization-bounds.reflect_system_bounds
 theory-badge-graph.reflect_discussion_context
 theory-badge-graph.propose_frontier_conjectures
+theory-formal-verifier.plan
+theory-formal-verifier.start
+theory-formal-verifier.read_result
 moral-graph.reflect_context
 moral-graph.reflect_living_substrate_context
 text_to_speech.speak_text
@@ -311,6 +314,9 @@ capability uses:
 | `helix.moral_graph_reflection_observation.v1` | Moral Graph context reflection observations. |
 | `helix.moral_living_substrate_reflection_observation.v1` | Moral Graph living-substrate reflection observations. |
 | `helix.theory_frontier_conjecture_observation.v1` | Theory badge graph frontier conjecture workbench observations. |
+| `casimir.theory_formal_verifier.plan_observation.v1` | Developer-only sealed-input preflight observations; no Lean execution. |
+| `casimir.theory_formal_verifier.start_observation.v1` | Confirmation-gated formal replay job receipts. |
+| `casimir.theory_formal_verifier.result_observation.v1` | Developer-scoped replay status and evidence-only formal certificates. |
 | `helix.interim_voice_callout_tool_result.v1` | Voice/narrator request receipts and host playback projections. |
 | `helix.live_environment_tool_observation.v1` | Graduated live-environment read/dry-run observations. |
 
@@ -342,6 +348,9 @@ capabilities with non-empty `input_schema.required`:
 | `civilization-bounds.reflect_system_bounds` | `prompt` |
 | `theory-badge-graph.reflect_discussion_context` | `prompt` |
 | `theory-badge-graph.propose_frontier_conjectures` | `prompt` |
+| `theory-formal-verifier.plan` | `request`, `policy`, `theorem_source_path`, `import_source_paths` |
+| `theory-formal-verifier.start` | `request`, `policy`, `theorem_source_path`, `import_source_paths`, `plan_id` |
+| `theory-formal-verifier.read_result` | `job_id` |
 | `moral-graph.reflect_context` | `prompt` |
 | `text_to_speech.speak_text` | `text` |
 | `live_env.request_interim_voice_callout` | `text` |

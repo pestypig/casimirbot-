@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createHelixTurnLifecycleRecorder } from "../turn-lifecycle";
 import { readVerifiedHelixTurnLifecycle } from "../turn-lifecycle";
 import { readVerifiedHelixRuntimeLifecycleFromPayload } from "../turn-lifecycle";
+import { resolveHelixRuntimeObservationReentry } from "../turn-lifecycle";
 import { auditHelixTurnLifecycleProjection } from "../turn-lifecycle-projection-audit";
 
 const buildCompletedLifecycle = () => {
@@ -169,6 +170,67 @@ describe("Helix factual turn lifecycle", () => {
         observation_reentry_refs: ["paper:full-text:1"],
         post_observation_reasoning_completed: true,
       },
+    });
+  });
+
+  it("uses the verified canonical turn log when adapter gateway re-entry is outside the native cycle", () => {
+    const canonicalLifecycle = buildCompletedLifecycle();
+    const nativeRecorder = createHelixTurnLifecycleRecorder({
+      turnId: canonicalLifecycle.turn_id,
+      scope: "codex_native_provider_cycle",
+      now: () => 100,
+    });
+    const started = nativeRecorder.append({
+      kind: "turn.started",
+      producer: "codex_runtime",
+      status: "started",
+    });
+    const message = nativeRecorder.append({
+      kind: "agent.message.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: started.event_id,
+      message_sha256: "hash:native-no-gateway-observation",
+    });
+    const completed = nativeRecorder.append({
+      kind: "runtime.turn.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: message.event_id,
+    });
+    const eligibility = nativeRecorder.append({
+      kind: "terminal.eligibility.checked",
+      producer: "helix_terminal_authority",
+      status: "succeeded",
+      causation_id: completed.event_id,
+      terminal_kind: "model_synthesized_answer",
+      terminal_eligible: true,
+    });
+    nativeRecorder.append({
+      kind: "turn.completed",
+      producer: "helix_adapter",
+      status: "succeeded",
+      causation_id: eligibility.event_id,
+      terminal_kind: "model_synthesized_answer",
+      terminal_eligible: true,
+    });
+
+    const resolution = resolveHelixRuntimeObservationReentry({
+      payload: {
+        turn_lifecycle: canonicalLifecycle,
+        native_provider_turn_lifecycle: nativeRecorder.snapshot(),
+      },
+      turnId: canonicalLifecycle.turn_id,
+      candidateRefs: ["paper:full-text:1"],
+      compatibilityProjected: true,
+    });
+
+    expect(resolution).toMatchObject({
+      authority: "runtime_event_log",
+      runtime_lifecycle_verified: true,
+      reentered: true,
+      matched_reentry_refs: ["paper:full-text:1"],
+      runtime_observation_reentry_refs: ["paper:full-text:1"],
     });
   });
 

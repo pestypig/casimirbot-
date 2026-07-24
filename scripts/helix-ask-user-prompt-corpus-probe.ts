@@ -8,6 +8,7 @@ type Verdict = "PASS" | "WARN" | "FAIL" | "BLOCKED";
 export type UserPromptScenario = {
   id: string;
   prompt: string;
+  thread_group?: string;
   category:
     | "capability_catalog"
     | "calculator"
@@ -117,6 +118,9 @@ const readRecordArray = (value: unknown): RecordLike[] =>
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
+
+const readBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
 
 const getPath = (value: unknown, pathParts: string[]): unknown =>
   pathParts.reduce<unknown>((current, key) => {
@@ -258,6 +262,19 @@ const compoundSubgoals = (ask: RecordLike, debugExport: unknown): RecordLike[] =
   );
 };
 
+const gatewayCallResults = (ask: RecordLike, debugExport: unknown): RecordLike[] => {
+  const debug = readRecord(debugExport);
+  const payload = extractPayload(debugExport);
+  return firstNonEmptyRecords(
+    ask.workstation_gateway_call_results,
+    payload?.workstation_gateway_call_results,
+    getPath(payload, ["debug", "workstation_gateway_call_results"]),
+    debug?.workstation_gateway_call_results,
+    getPath(debug, ["payload", "workstation_gateway_call_results"]),
+    getPath(debug, ["payload", "debug", "workstation_gateway_call_results"]),
+  );
+};
+
 const selectedFinalText = (ask: RecordLike, debugExport: unknown): string => {
   const payload = extractPayload(debugExport);
   return (
@@ -334,6 +351,7 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
   const payload = extractPayload(debugExport);
   const rail = railTable(ask, debugExport);
   const subgoals = compoundSubgoals(ask, debugExport);
+  const gatewayResults = gatewayCallResults(ask, debugExport);
   const text = selectedFinalText(ask, debugExport);
   const terminalKind = readTerminalKind(ask, debugExport, rail);
   const visibleKind =
@@ -380,6 +398,36 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
   const expectedCapabilityPatterns = (scenario.expected_capability_patterns ?? []).map(
     (pattern) => new RegExp(pattern, "i"),
   );
+  const gatewayResultSummaries = gatewayResults.map((result) => {
+    const admission = readRecord(result.gateway_admission);
+    const packet = readRecord(result.observation_packet);
+    const capability =
+      readString(result.capability_id) ??
+      readString(admission?.requested_capability) ??
+      "unknown";
+    const packetStatus = readString(packet?.status) ?? "unknown";
+    const ok = readBoolean(result.ok);
+    return {
+      capability,
+      ok,
+      packet_status: packetStatus,
+      successful: ok === true && packetStatus === "succeeded",
+      failure_reason:
+        readString(result.error) ??
+        readString(result.failure_reason) ??
+        readString(getPath(result, ["tool_lifecycle_trace", "failure_reason"])) ??
+        readString(getPath(result, ["tool_followup_decision", "reason"])),
+    };
+  });
+  const expectedGatewayResults = expectedCapabilityPatterns.flatMap((pattern) =>
+    gatewayResultSummaries.filter((result) => pattern.test(result.capability)),
+  );
+  const expectedCapabilitiesSuccessful =
+    expectedCapabilityPatterns.length === 0 ||
+    expectedCapabilityPatterns.every((pattern) =>
+      gatewayResultSummaries.some((result) => pattern.test(result.capability) && result.successful),
+    );
+  const failedExpectedGatewayResults = expectedGatewayResults.filter((result) => !result.successful);
   const expectedCapabilityObserved =
     expectedCapabilityPatterns.length === 0 ||
     expectedCapabilityPatterns.every((pattern) => executedCapabilities.some((capability) => pattern.test(capability)));
@@ -394,6 +442,12 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
   const expectedMinimumAnswerChars = scenario.expected_minimum_answer_chars ?? 0;
   const proposalOnlyText =
     /\bcapability\s+proposal\s*:|\bI(?:'ll|\s+will)\s+(?:look\s*up|search|find|open|read|inspect|use|call)\b/i.test(text);
+  const observationVisibilityDenied =
+    scenario.expected_tool_mode === "required" &&
+    expectedCapabilitiesSuccessful &&
+    /\b(?:not available [^.]{0,80}this turn|actual observation fields? [^.]{0,80}(?:not re-entered|not included)|only have (?:the )?observation references?|(?:can't|cannot|couldn't|unable to) (?:access|see|retrieve|read|use) (?:the )?(?:tool )?(?:observation|result|data))\b/i.test(
+      text,
+    );
   const goalSatisfaction =
     readString(rail?.goal_satisfaction) ??
     readString(getPath(payload, ["goal_satisfaction", "status"])) ??
@@ -423,8 +477,12 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
       if (requestedCapability || proposalOnlyText) return "proposal_without_admission";
       return "capability_selection";
     }
+    if (!expectedCapabilitiesSuccessful || failedExpectedGatewayResults.length > 0) {
+      return "capability_execution";
+    }
     if (evaluatedObservationRefs.length === 0) return "observation_artifact";
     if (reentryStatus && reentryStatus !== "reentered") return "evidence_reentry";
+    if (observationVisibilityDenied) return "evidence_reentry";
     if (terminalError || terminalKind === "typed_failure" || finalAnswerSource === "typed_failure") {
       return "terminal_authority";
     }
@@ -451,6 +509,12 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
     scenario.expected_tool_mode === "required" && !expectedCapabilityObserved
       ? `expected_capability_not_executed:${scenario.expected_capability_patterns?.join("|") ?? "unspecified"}`
       : "",
+    scenario.expected_tool_mode === "required" && !expectedCapabilitiesSuccessful
+      ? `expected_capability_not_successful:${scenario.expected_capability_patterns?.join("|") ?? "unspecified"}`
+      : "",
+    ...failedExpectedGatewayResults.map((result) =>
+      `tool_observation_failed:${result.capability}:${result.packet_status}${result.failure_reason ? `:${result.failure_reason}` : ""}`
+    ),
     evaluatedObservationRefs.length < expectedMinimumObservations
       ? `required_tool_observation_missing:${evaluatedObservationRefs.length}/${expectedMinimumObservations}`
       : "",
@@ -467,10 +531,19 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
       .filter((pattern) => !pattern.test(text))
       .map((pattern) => `expected_answer_pattern_missing:${pattern.source}`),
     proposalOnlyText && executedCapabilities.length === 0 ? "proposal_only_without_execution" : "",
+    observationVisibilityDenied ? "answer_denies_successful_observation_reentry" : "",
   ].filter(Boolean);
 
+  const hardLifecycleFailure =
+    scenario.expected_tool_mode === "required" &&
+    (
+      !expectedCapabilitiesSuccessful ||
+      failedExpectedGatewayResults.length > 0 ||
+      observationVisibilityDenied
+    );
   const verdict: Verdict =
-    terminalError || terminalKind === "typed_failure" || finalAnswerSource === "typed_failure" || evaluatedFirstBrokenRail
+    terminalError || terminalKind === "typed_failure" || finalAnswerSource === "typed_failure" ||
+    evaluatedFirstBrokenRail || hardLifecycleFailure
       ? "FAIL"
       : !rail || qualityFlags.length > 0 || evaluatedRailStatus !== "complete" || evaluatedCodexParityClass !== "complete"
       ? "WARN"
@@ -494,6 +567,8 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
     admitted_capability: admittedCapability,
     executed_capability: executedCapability,
     executed_capabilities: executedCapabilities,
+    gateway_call_results: gatewayResultSummaries,
+    expected_capabilities_successful: expectedCapabilitiesSuccessful,
     observation_kind: observationKind,
     observation_ref: observationRef,
     observation_refs: observationRefs,
@@ -544,6 +619,7 @@ const loadScenarioFile = async (filePath: string): Promise<UserPromptScenario[]>
       id: readString(record.id) ?? `custom_${index + 1}`,
       category: (readString(record.category) as UserPromptScenario["category"] | null) ?? "compound",
       prompt,
+      thread_group: readString(record.thread_group) ?? undefined,
       notes: readString(record.notes) ?? undefined,
       expected_tool_mode: readString(record.expected_tool_mode) as UserPromptScenario["expected_tool_mode"] ?? undefined,
       expected_capability_patterns: readArray(record.expected_capability_patterns)
@@ -579,12 +655,20 @@ export const selectUserPromptCorpusScenarios = async (): Promise<UserPromptScena
   return scenarios.filter((scenario) => requested.has(scenario.id));
 };
 
+export const resolveUserPromptScenarioThreadId = (
+  scenario: UserPromptScenario,
+  runId: string,
+): string =>
+  scenario.thread_group
+    ? `helix-ask:user-prompt-corpus:${runId}:journey:${slug(scenario.thread_group)}`
+    : `helix-ask:user-prompt-corpus:${runId}:${scenario.id}`;
+
 const runScenario = async (
   scenario: UserPromptScenario,
   runId: string,
   outputDir: string,
 ): Promise<RecordLike> => {
-  const threadId = `helix-ask:user-prompt-corpus:${runId}:${scenario.id}`;
+  const threadId = resolveUserPromptScenarioThreadId(scenario, runId);
   const scenarioDir = path.join(outputDir, slug(scenario.id));
   await fs.mkdir(scenarioDir, { recursive: true });
 
@@ -613,6 +697,8 @@ const runScenario = async (
     ...result,
     elapsed_ms: Date.now() - startedAtMs,
     turn_id: turnId,
+    thread_id: threadId,
+    thread_group: scenario.thread_group ?? null,
     artifact_dir: scenarioDir,
   };
 };

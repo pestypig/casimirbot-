@@ -54,6 +54,11 @@ export type HelixWorkstationGatewayListResult = {
   agent_runtime: string;
   mode: HelixWorkstationGatewayMode;
   capabilities: HelixWorkstationCapabilityManifest[];
+  unavailable_capabilities?: Array<{
+    capability_id: string;
+    availability: "unavailable";
+    reason: "provider_not_configured";
+  }>;
   assistant_answer: false;
   raw_content_included: false;
 };

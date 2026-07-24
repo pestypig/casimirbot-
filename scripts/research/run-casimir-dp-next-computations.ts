@@ -119,7 +119,7 @@ function buildRigidSphereInput(
     grid: {
       dims: [dimension, dimension, dimension],
       voxel_size_m: [voxel, voxel, voxel],
-      origin_m: [-halfSpan, -halfSpan, -halfSpan],
+      origin_m: [0, 0, 0],
     },
     branch_a: {
       kind: "analytic",
@@ -157,6 +157,15 @@ function runDpConvergence(config: CasimirDpNextComputationsConfigType) {
       ? null
       : Math.abs(result.deltaE_J - previousDeltaE) / Math.max(result.deltaE_J, Number.MIN_VALUE);
     previousDeltaE = result.deltaE_J;
+    const massErrorA =
+      Math.abs(result.mass_a_kg - config.dp_campaign.mass_kg) /
+      config.dp_campaign.mass_kg;
+    const massErrorB =
+      Math.abs(result.mass_b_kg - config.dp_campaign.mass_kg) /
+      config.dp_campaign.mass_kg;
+    const branchSymmetryError =
+      Math.abs(result.mass_a_kg - result.mass_b_kg) /
+      Math.max(result.mass_a_kg, result.mass_b_kg, Number.MIN_VALUE);
     return {
       requested_grid_dimension: dimension,
       used_grid_dimensions: result.grid.dims,
@@ -169,6 +178,13 @@ function runDpConvergence(config: CasimirDpNextComputationsConfigType) {
       claim_tier: result.claim_tier,
       certifying: result.certifying,
       fail_reason: result.fail_reason ?? null,
+      sampled_mass_a_kg: result.mass_a_kg,
+      sampled_mass_b_kg: result.mass_b_kg,
+      mass_relative_error_a: massErrorA,
+      mass_relative_error_b: massErrorB,
+      branch_mass_symmetry_relative_error: branchSymmetryError,
+      boundary_shell_mass_fraction_a: result.boundary_shell_mass_fraction_a,
+      boundary_shell_mass_fraction_b: result.boundary_shell_mass_fraction_b,
     };
   });
   const final = rows[rows.length - 1];
@@ -177,8 +193,27 @@ function runDpConvergence(config: CasimirDpNextComputationsConfigType) {
       row.method === "exact" &&
       row.used_grid_dimensions.every((dimension) => dimension === row.requested_grid_dimension),
   );
+  const massConservation = rows.every(
+    (row) =>
+      row.mass_relative_error_a <= config.dp_campaign.mass_conservation_relative_tolerance &&
+      row.mass_relative_error_b <= config.dp_campaign.mass_conservation_relative_tolerance,
+  );
+  const branchSymmetry = rows.every(
+    (row) =>
+      row.branch_mass_symmetry_relative_error <=
+      config.dp_campaign.branch_symmetry_relative_tolerance,
+  );
+  const boundaryContainment = rows.every(
+    (row) =>
+      row.boundary_shell_mass_fraction_a <=
+        config.dp_campaign.maximum_boundary_shell_mass_fraction &&
+      row.boundary_shell_mass_fraction_b <=
+        config.dp_campaign.maximum_boundary_shell_mass_fraction,
+  );
+  const branchSamplingReady = massConservation && branchSymmetry && boundaryContainment;
   const numericalConvergence =
     exactDistinctResolutions &&
+    branchSamplingReady &&
     final.relative_change_from_prior != null &&
     final.relative_change_from_prior <= config.dp_campaign.convergence_relative_tolerance;
   return {
@@ -186,6 +221,10 @@ function runDpConvergence(config: CasimirDpNextComputationsConfigType) {
     selected_rate_s: final.rate_s,
     selected_tau_s: final.tau_s,
     exact_distinct_resolutions: exactDistinctResolutions,
+    mass_conservation_gate: massConservation ? "pass" as const : "not_ready" as const,
+    branch_symmetry_gate: branchSymmetry ? "pass" as const : "not_ready" as const,
+    boundary_containment_gate: boundaryContainment ? "pass" as const : "not_ready" as const,
+    branch_sampling_gate: branchSamplingReady ? "pass" as const : "not_ready" as const,
     numerical_convergence_gate: numericalConvergence ? "pass" as const : "not_ready" as const,
     provenance_gate: config.dp_campaign.density_evidence_class === "measured"
       ? "review" as const
@@ -295,9 +334,9 @@ export function renderCasimirDpNextComputationsMarkdown(
     `| ${entry.case_id} | ${format(entry.result.pressure_Pa)} | ${format(entry.result.ideal_zero_temperature_reference.pressure_ratio)} | ${entry.result.matsubara_terms_used} | ${entry.result.convergence.status} | ${entry.result.geometry.authority} |`,
   );
   const dpRows = report.dp.rows.map((row) =>
-    `| ${row.requested_grid_dimension} | ${row.used_grid_dimensions.join("x")} | ${format(row.deltaE_J)} | ${format(row.rate_s)} | ${row.relative_change_from_prior == null ? "n/a" : format(row.relative_change_from_prior)} | ${row.provenance_class} |`,
+    `| ${row.requested_grid_dimension} | ${row.used_grid_dimensions.join("x")} | ${format(row.deltaE_J)} | ${format(row.rate_s)} | ${row.relative_change_from_prior == null ? "n/a" : format(row.relative_change_from_prior)} | ${format(Math.max(row.mass_relative_error_a, row.mass_relative_error_b))} | ${format(Math.max(row.boundary_shell_mass_fraction_a, row.boundary_shell_mass_fraction_b))} | ${row.provenance_class} |`,
   );
-  return `# Casimir-DP Gated Computations Stage-1 Report\n\n**Campaign:** \`${report.campaign_id}\`  \n**Generated:** ${report.generated_at}  \n**Claim tier:** diagnostic  \n**Promotion allowed:** false\n\n## Lifshitz calculation\n\n| Case | Pressure (Pa) | Pressure / ideal T=0 | Matsubara terms | Convergence | Geometry authority |\n|---|---:|---:|---:|---|---|\n${lifshitzRows.join("\n")}\n\n- Ideal validation gate: \`${report.lifshitz.ideal_validation_gate}\`\n- Measured material gate: \`${report.lifshitz.measured_material_gate}\`\n- Finite-geometry gate: \`${report.lifshitz.finite_geometry_gate}\`\n- Publication-grade gate: \`${report.lifshitz.publication_grade_gate}\`\n\n## Switching and decoherence sidecars\n\n- Switching evidence gate: \`${report.switching.evidence_gate}\`\n- Decoherence evidence gate: \`${report.decoherence.evidence_gate}\`\n- Total assumed decoherence rate: \`${format(report.decoherence.rate_s)} s^-1\`\n- Combined standard uncertainty: \`${format(report.decoherence.standard_uncertainty_s)} s^-1\`\n- Visibility over the acquisition window: \`${format(report.decoherence.visibility)}\`\n\n## Rigid-sphere DP convergence\n\n| Requested grid | Used grid | Delta E (J) | Rate (s^-1) | Change from prior | Provenance |\n|---:|---|---:|---:|---:|---|\n${dpRows.join("\n")}\n\n- Numerical convergence gate: \`${report.dp.numerical_convergence_gate}\`\n- Branch provenance gate: \`${report.dp.provenance_gate}\`\n- Selected tau: \`${format(report.dp.selected_tau_s)} s\`\n\n## Statistical power and dynamics discrimination\n\n- Rate-only shots per setting: \`${format(report.inference.power.shots_per_setting)}\`\n- Total shots: \`${format(report.inference.power.total_shots)}\`\n- Rate-only accessibility: \`${report.inference.rate_only_accessibility_gate}\`\n- Dynamics signature: \`${report.inference.dynamics_signature.status}\`\n- Collapse-identifiability gate: \`${report.inference.collapse_identifiability_gate}\`\n\n## Manifold-response registration\n\nStatus: \`${report.manifold.status}\`. No manifold-response rate is computed.\n\n${report.manifold.blockers.map((blocker) => `- ${blocker}`).join("\n")}\n\n## Campaign gates\n\n${Object.entries(report.campaign_gates).map(([gate, status]) => `- \`${gate}\`: \`${status}\``).join("\n")}\n\n## Claim boundaries\n\n${report.claim_boundaries.map((boundary) => `- ${boundary}`).join("\n")}\n`;
+  return `# Casimir-DP Gated Computations Stage-1 Report\n\n**Campaign:** \`${report.campaign_id}\`  \n**Generated:** ${report.generated_at}  \n**Claim tier:** diagnostic  \n**Promotion allowed:** false\n\n## Lifshitz calculation\n\n| Case | Pressure (Pa) | Pressure / ideal T=0 | Matsubara terms | Convergence | Geometry authority |\n|---|---:|---:|---:|---|---|\n${lifshitzRows.join("\n")}\n\n- Ideal validation gate: \`${report.lifshitz.ideal_validation_gate}\`\n- Measured material gate: \`${report.lifshitz.measured_material_gate}\`\n- Finite-geometry gate: \`${report.lifshitz.finite_geometry_gate}\`\n- Publication-grade gate: \`${report.lifshitz.publication_grade_gate}\`\n\n## Switching and decoherence sidecars\n\n- Switching evidence gate: \`${report.switching.evidence_gate}\`\n- Decoherence evidence gate: \`${report.decoherence.evidence_gate}\`\n- Total assumed decoherence rate: \`${format(report.decoherence.rate_s)} s^-1\`\n- Combined standard uncertainty: \`${format(report.decoherence.standard_uncertainty_s)} s^-1\`\n- Visibility over the acquisition window: \`${format(report.decoherence.visibility)}\`\n\n## Rigid-sphere DP convergence\n\n| Requested grid | Used grid | Delta E (J) | Rate (s^-1) | Change from prior | Max mass error | Max boundary-shell fraction | Provenance |\n|---:|---|---:|---:|---:|---:|---:|---|\n${dpRows.join("\n")}\n\n- Mass-conservation gate: \`${report.dp.mass_conservation_gate}\`\n- Branch-symmetry gate: \`${report.dp.branch_symmetry_gate}\`\n- Boundary-containment gate: \`${report.dp.boundary_containment_gate}\`\n- Branch-sampling gate: \`${report.dp.branch_sampling_gate}\`\n- Numerical convergence gate: \`${report.dp.numerical_convergence_gate}\`\n- Branch provenance gate: \`${report.dp.provenance_gate}\`\n- Selected tau: \`${format(report.dp.selected_tau_s)} s\`\n\n## Statistical power and dynamics discrimination\n\n- Rate-only shots per setting: \`${format(report.inference.power.shots_per_setting)}\`\n- Total shots: \`${format(report.inference.power.total_shots)}\`\n- Rate-only accessibility: \`${report.inference.rate_only_accessibility_gate}\`\n- Dynamics signature: \`${report.inference.dynamics_signature.status}\`\n- Collapse-identifiability gate: \`${report.inference.collapse_identifiability_gate}\`\n\n## Manifold-response registration\n\nStatus: \`${report.manifold.status}\`. No manifold-response rate is computed.\n\n${report.manifold.blockers.map((blocker) => `- ${blocker}`).join("\n")}\n\n## Campaign gates\n\n${Object.entries(report.campaign_gates).map(([gate, status]) => `- \`${gate}\`: \`${status}\``).join("\n")}\n\n## Claim boundaries\n\n${report.claim_boundaries.map((boundary) => `- ${boundary}`).join("\n")}\n`;
 }
 
 type CliArgs = { configPath: string; outRoot: string | null; reportDoc: string | null };
@@ -334,7 +373,10 @@ export async function runCasimirDpNextComputations(args: {
   );
   await mkdir(outDir, { recursive: true });
   const json = stableJson(report);
-  const markdown = renderCasimirDpNextComputationsMarkdown(report);
+  const markdown = renderCasimirDpNextComputationsMarkdown(report).replace(
+    / {2}\n/g,
+    "<br>\n",
+  );
   await writeFile(path.join(outDir, "gated-computations-report.json"), json, "utf8");
   await writeFile(path.join(outDir, "gated-computations-report.md"), markdown, "utf8");
   const receipt = {

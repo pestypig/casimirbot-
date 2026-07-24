@@ -1,11 +1,13 @@
 import type {
   HelixSharedRealtimeRoom,
   HelixSharedRealtimeRoomParticipant,
+  HelixSharedRealtimeRoomParticipantContextCard,
   HelixSharedRealtimeRoomVisualFrame,
 } from "@shared/helix-shared-realtime-room";
 
 export type HelixSharedLiveRoomVisualLane = {
   participant: HelixSharedRealtimeRoomParticipant;
+  contextCard: HelixSharedRealtimeRoomParticipantContextCard | null;
   frames: HelixSharedRealtimeRoomVisualFrame[];
   latestFrame: HelixSharedRealtimeRoomVisualFrame | null;
 };
@@ -43,6 +45,8 @@ export const buildHelixSharedLiveRoomVisualLanes = (input: {
         .slice(-maxFramesPerParticipant);
       return {
         participant,
+        contextCard: input.room?.participant_context_cards.find((card) =>
+          card.participant_id === participant.participant_id) ?? null,
         frames,
         latestFrame: frames.at(-1) ?? null,
       };
@@ -69,4 +73,3 @@ export const describeHelixSharedLiveRoomReadiness = (
     ? `Waiting for ${missingConsentCount} consent grant${missingConsentCount === 1 ? "" : "s"}`
     : "Waiting for room readiness";
 };
-

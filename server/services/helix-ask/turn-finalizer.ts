@@ -2,6 +2,7 @@ import {
   hasCurrentTurnProviderTerminalPresentation,
   resolveCurrentTurnProviderTerminalIdentity,
 } from "./terminal-identity-precedence";
+import { attachHelixTerminalGroundingAuthority } from "./terminal-grounding-authority";
 export { resolveCurrentTurnProviderTerminalIdentity } from "./terminal-identity-precedence";
 
 type RecordLike = Record<string, unknown>;
@@ -1572,6 +1573,22 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
         debug.language_model_debug_summary = payload.language_model_debug_summary ?? debug.language_model_debug_summary;
         debug.model_policy_debug_summary = payload.model_policy_debug_summary ?? debug.model_policy_debug_summary;
       }
+    }
+    const groundingIdentity = resolveFinalizerTerminalIdentity();
+    refreshSolverArtifactReentryAuditForPayload({
+      payload,
+      turnId: args.turnId,
+      terminalArtifactKind: groundingIdentity.terminalArtifactKind,
+      finalAnswerSource: groundingIdentity.finalAnswerSource,
+    });
+    const terminalGroundingAuthority = attachHelixTerminalGroundingAuthority({
+      payload,
+      turnId: args.turnId,
+    });
+    if (payload.debug && typeof payload.debug === "object") {
+      const debug = payload.debug as Record<string, unknown>;
+      debug.solver_artifact_reentry_audit = payload.solver_artifact_reentry_audit;
+      debug.terminal_grounding_authority = terminalGroundingAuthority;
     }
     attachHelixAskReasoningTheaterStateToPayloadDebug(payload);
     const debugExport = rememberHelixDebugExportEnvelope({

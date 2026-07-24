@@ -177,6 +177,8 @@ describe("Realtime transcript Stage Play handoff", () => {
         semantic_source_authority: "ask_source_target_arbitrator",
         transport_source: "operator_text",
         transport_kind: "realtime_transcript",
+        active_doc_path: "docs/research/example.md",
+        active_panel: "docs-viewer",
       },
     });
     expect((handoff.route_metadata.source_target_intent as Record<string, unknown>).requested_outputs)
@@ -185,6 +187,85 @@ describe("Realtime transcript Stage Play handoff", () => {
         "grounded_runtime_agent_answer",
         "typed_failure",
       ]));
+  });
+
+  it("requires a document observation for a hard active-doc trip-comparison turn", () => {
+    const transcriptText =
+      "So can you tell me about the warp profile? Is it a relativistic profile? And how fast does that go, like in terms of saving time? I think we have some comparisons on days that it saves?";
+    const observation = buildRealtimeTranscriptObservation({
+      realtimeSessionId: "realtime:active-doc-trip-comparison",
+      nowMs: 340,
+      body: {
+        event_type: "transcript.final",
+        event_ref: "provider-event:active-doc-trip-comparison",
+        transcript_text: transcriptText,
+      },
+    })!;
+    const handoff = bridgeRealtimeTranscriptToStagePlay({
+      realtimeSessionId: "realtime:active-doc-trip-comparison",
+      threadId: "helix-ask:desktop",
+      providerEventRef: "provider-event:active-doc-trip-comparison",
+      transcriptText,
+      observation,
+      selectedRuntimeAgentProvider: "codex",
+      sourceBinding: {
+        focus_panel_id: "docs-viewer",
+        document_ref: "docs/research/nhm2-current-status-whitepaper.md",
+      },
+      nowMs: 340,
+    });
+
+    expect(handoff.worker_admission).toMatchObject({
+      interaction_mode: "worker_required",
+      selected_route: "active_doc",
+      candidate_readonly_capability_ids: ["docs.search"],
+    });
+    expect(handoff.required_grounding_capability_ids).toEqual(["docs.search"]);
+    expect(handoff.route_metadata).toMatchObject({
+      requiredGroundingCapabilityIds: ["docs.search"],
+      source_target_intent: {
+        target_source: "active_doc",
+        allow_no_tool_direct: false,
+        grounded_feedback_requires_observation: true,
+        required_grounding_capability_ids: ["docs.search"],
+      },
+    });
+  });
+
+  it("requires docs.search for a current-status whitepaper comparison", () => {
+    const transcriptText =
+      "Okay, and how does this relate to the NHM2 Current Status Whitepaper in the docs that we have?";
+    const observation = buildRealtimeTranscriptObservation({
+      realtimeSessionId: "realtime:current-status-whitepaper-comparison",
+      nowMs: 345,
+      body: {
+        event_type: "transcript.final",
+        event_ref: "provider-event:current-status-whitepaper-comparison",
+        transcript_text: transcriptText,
+      },
+    })!;
+    const handoff = bridgeRealtimeTranscriptToStagePlay({
+      realtimeSessionId: "realtime:current-status-whitepaper-comparison",
+      threadId: "helix-ask:desktop",
+      providerEventRef: "provider-event:current-status-whitepaper-comparison",
+      transcriptText,
+      observation,
+      selectedRuntimeAgentProvider: "codex",
+      sourceBinding: {
+        focus_panel_id: "docs-viewer",
+      },
+      nowMs: 345,
+    });
+
+    expect(handoff.worker_admission).toMatchObject({
+      interaction_mode: "worker_required",
+      selected_route: "docs_viewer",
+      candidate_readonly_capability_ids: ["docs.search"],
+    });
+    expect(handoff.required_grounding_capability_ids).toEqual(["docs.search"]);
+    expect(handoff.required_grounding_capability_ids).not.toContain(
+      "internet-search.search_web",
+    );
   });
 
   it("does not launch Ask for a bare panel transcript fragment", () => {

@@ -43,6 +43,37 @@ tool request must allow `direct_answer_text` or an allowed provider terminal
 candidate. It must not require retrieval, sidecars, or proof refs merely because
 those artifacts exist elsewhere in the workstation.
 
+## Terminal Grounding Authority
+
+After the single writer and final solver artifact re-entry audit are stable,
+the terminal boundary emits one
+`helix.terminal_grounding_authority.v1`. This audit does not select or rewrite
+the answer. It certifies the terminal decision already made.
+
+The authority binds:
+
+```text
+current Ask turn
++ selected terminal artifact ref and kind
++ final answer source
++ normalized terminal text hash
++ model-direct or grounded mode
++ current-turn selected evidence refs
++ evidence re-entry authority and coverage
+```
+
+The authority is tool-neutral. Docs, repository, calculator, panel-state,
+research, graph, and future observations use the same certificate once their
+evidence has passed the canonical solver path. Presentation consumers such as
+GPT Realtime may validate the certificate and its exact terminal binding; they
+must not recreate capability admission, tool-result matching, evidence
+selection, or terminal authority.
+
+Preliminary capability IDs remain routing diagnostics. They cannot make a
+model-direct terminal require synthetic evidence, and they cannot upgrade a
+rejected grounded terminal. A missing, stale, malformed, or rejected grounding
+authority fails closed at the presentation boundary.
+
 ## Ownership Boundary
 
 Codex owns generic runtime mechanics:

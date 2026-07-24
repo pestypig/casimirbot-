@@ -335,6 +335,7 @@ describe("shared Realtime room runtime registry", () => {
         joined_at: new Date(START_MS).toISOString(),
         last_seen_at: new Date(START_MS).toISOString(),
       }],
+      participant_context_cards: [],
       readiness: {
         participant_count: 1,
         required_participant_count: 2,

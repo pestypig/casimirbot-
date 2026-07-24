@@ -2,6 +2,10 @@ import { resolveHelixRuntimeObservationReentry } from "../runtime/turn-lifecycle
 
 type RecordLike = Record<string, unknown>;
 
+// Compatibility evaluator for runtime-goal command payloads that do not yet
+// emit helix.terminal_grounding_authority.v1. Normal Ask relays must consume
+// the terminal grounding authority instead of calling this evaluator.
+
 export type RealtimeGroundingEvidenceResult = {
   satisfied: boolean;
   evidenceRefs: string[];
@@ -100,11 +104,21 @@ const evaluateCanonicalSolverProof = (input: {
   const routeEvidenceAuthority = readRecord(input.solverTrace?.route_evidence_authority);
   const selectedTerminalProduct = readRecord(procedureTrace?.selected_terminal_product);
   const turnId = readString(procedureTrace?.turn_id);
+  const procedureReentryProjected =
+    procedureTrace?.evidence_reentry_status === "reentered";
+  const canonicalRuntimeReentryVerified = Boolean(
+    evidenceReentryGate?.schema === "helix.evidence_reentry_gate.v1" &&
+    readString(evidenceReentryGate.turn_id) === turnId &&
+    evidenceReentryGate.completed === true &&
+    evidenceReentryGate.reentry_authority === "runtime_event_log" &&
+    evidenceReentryGate.runtime_lifecycle_verified === true,
+  );
   if (
     !turnId ||
+    input.turnId !== turnId ||
     readString(input.solverTrace?.turn_id) !== turnId ||
     readString(terminalPresentation?.turn_id) !== turnId ||
-    procedureTrace?.evidence_reentry_status !== "reentered" ||
+    (!procedureReentryProjected && !canonicalRuntimeReentryVerified) ||
     selectedTerminalProduct?.allowed_by_route !== true ||
     evidenceReentryGate?.completed !== true ||
     routeEvidenceAuthority?.current_turn_only !== true
@@ -124,7 +138,11 @@ const evaluateCanonicalSolverProof = (input: {
     compatibilityProjected: evidenceReentryGate?.completed === true,
   });
   const reenteredRefs = new Set(
-    reentry.runtime_lifecycle_verified ? reentry.matched_reentry_refs : projectedReentryRefs,
+    reentry.runtime_lifecycle_verified
+      ? reentry.matched_reentry_refs
+      : canonicalRuntimeReentryVerified
+        ? projectedReentryRefs
+        : reentry.matched_reentry_refs,
   );
   const terminalSupportRefs = new Set(unique([
     ...readStringArray(terminalPresentation?.selected_observation_refs),
@@ -179,7 +197,9 @@ const evaluateCanonicalSolverProof = (input: {
     satisfied: true,
     evidenceRefs: unique(selectedEvidenceRefs),
     proofSource: "canonical_solver_trace",
-    reentryAuthority: reentry.authority,
+    reentryAuthority: canonicalRuntimeReentryVerified
+      ? "runtime_event_log"
+      : reentry.authority,
   };
 };
 

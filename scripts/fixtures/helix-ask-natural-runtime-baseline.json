@@ -49,7 +49,10 @@
       "prompt": "Find the document called \"Casimir Dp Quantum Foam Study\", read the best matching result, and explain what it is about in a short paragraph.",
       "notes": "Natural compound case: search, select/read, observation re-entry, then synthesis.",
       "expected_tool_mode": "required",
-      "expected_capability_patterns": ["^(?:docs\\.search|docs-viewer\\.(?:search_docs|open_doc_by_path|summarize_doc))$"],
+      "expected_capability_patterns": [
+        "^(?:docs\\.search|docs-viewer\\.search_docs)$",
+        "^(?:docs-viewer\\.(?:open_doc|open_doc_by_path|summarize_doc)|research-library\\.read_document)$"
+      ],
       "expected_minimum_observations": 2
     }
   ]

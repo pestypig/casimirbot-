@@ -227,6 +227,66 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(resolveAskTurnTopicDocQueryArg(
       "Later, find the local document about Helix Ask terminal authority, but not now.",
     )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Search our docs for NHM2 and summarize its treatment of boundary conditions.",
+    )).toBe("NHM2");
+    for (const contextualPrompt of [
+      "Do not search our docs for NHM2; explain the wording only.",
+      "Later, search our docs for NHM2, but not now.",
+      "Earlier I searched our docs for NHM2 and summarized it.",
+      'The screen says "Search our docs for NHM2"; explain that visible text.',
+      '"Search our docs for NHM2" was my previous prompt; do not search now.',
+    ]) {
+      expect(resolveAskTurnTopicDocQueryArg(contextualPrompt)).toBeNull();
+    }
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Can you look for docs about NHM2 and explain what it is?",
+    )).toBe("NHM2");
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Okay, can you look at the NHM tube doc and explain what it's about?",
+    )).toBe("NHM tube");
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Look at the NHM2 Status Document and give me the main idea.",
+    )).toBe("NHM2 Status");
+    expect(resolveAskTurnTopicDocQueryArg(
+      "And how does this relate to the Casimir DP quantum foam document?",
+    )).toBe("Casimir DP quantum foam");
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Do not look for docs about NHM2; just explain NHM2 generally.",
+    )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Later, look for docs about NHM2 and explain it.",
+    )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Earlier you looked for docs about NHM2 and explained it.",
+    )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      'The screen says "look for docs about NHM2 and explain it"; explain that UI text.',
+    )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Do not look at the NHM tube doc and explain it.",
+    )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Later, look at the NHM tube doc and explain it.",
+    )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Earlier you looked at the NHM tube doc and explained it.",
+    )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Do not look at the NHM2 Status Document and give me the main idea.",
+    )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Later, look at the NHM2 Status Document and give me the main idea.",
+    )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Do not compare this with the Casimir DP quantum foam document.",
+    )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      "Later, compare this with the Casimir DP quantum foam document.",
+    )).toBeNull();
+    expect(resolveAskTurnTopicDocQueryArg(
+      'The screen says "how does this relate to the Casimir DP quantum foam document?"; explain that text.',
+    )).toBeNull();
     expect(resolveAskTurnTitleLikeOpenDocQueryArg("open the NHM2 deeper reformulation decision memo")).toBe(
       "NHM2 deeper reformulation decision memo",
     );

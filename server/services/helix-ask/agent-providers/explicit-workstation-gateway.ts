@@ -742,15 +742,42 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   const requests: Record<string, unknown>[] = [];
   const seen = new Set<string>();
   const prompt = readPrompt(input.body) ?? "";
-  const finalizeRequests = (candidates: Record<string, unknown>[]): Record<string, unknown>[] =>
-    deferRuntimeOwnedReflection(
+  const promptCalculatorExpression = extractCalculatorExpressionFromPrompt(prompt);
+  const finalizeRequests = (candidates: Record<string, unknown>[]): Record<string, unknown>[] => {
+    const admitted = deferRuntimeOwnedReflection(
       filterRequestsAllowedByCommittedRoute(input.body, candidates),
     )
       .filter((request) => {
         const capability = readString(request.capability_id) ?? readString(request.capabilityId);
         return !gatewayCapabilityNegatedByPrompt(prompt, capability);
-      })
-      .slice(0, 10);
+      });
+    const canonicalized = promptCalculatorExpression
+      ? admitted.map((request) => {
+          const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+          if (capability !== CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) return request;
+          const args = readRecord(request.arguments ?? request.args) ?? {};
+          const sourceTargetIntent = readRecord(args.source_target_intent ?? args.sourceTargetIntent);
+          return {
+            ...request,
+            arguments: {
+              ...args,
+              expression: promptCalculatorExpression,
+              ...(sourceTargetIntent
+                ? {
+                    source_target_intent: {
+                      ...sourceTargetIntent,
+                      expression: promptCalculatorExpression,
+                    },
+                  }
+                : {}),
+            },
+          };
+        })
+      : admitted;
+    const deduplicated: Record<string, unknown>[] = [];
+    appendDedupe(deduplicated, new Set<string>(), canonicalized);
+    return deduplicated.slice(0, 10);
+  };
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
   const appendPromptDerivedDedupe = (candidates: Record<string, unknown>[]): void => {
     appendDedupe(
@@ -770,7 +797,31 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     /\b(?:research\s+papers?|papers?|arxiv|scholarly|internet|web|sources?|reflect|reflection|theory\s+badge\s+graph|theory\s+graph|civilization\s+bounds?|civilization)\b/i.test(
       unquotePrompt(prompt),
     );
-  const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(input.body);
+  const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(input.body).map(
+    (request) => {
+      const capability = readString(request.capability_id) ?? readString(request.capabilityId);
+      if (capability !== CALCULATOR_SOLVE_EXPRESSION_CAPABILITY || !promptCalculatorExpression) {
+        return request;
+      }
+      const args = readRecord(request.arguments ?? request.args) ?? {};
+      const sourceTargetIntent = readRecord(args.source_target_intent ?? args.sourceTargetIntent);
+      return {
+        ...request,
+        arguments: {
+          ...args,
+          expression: promptCalculatorExpression,
+          ...(sourceTargetIntent
+            ? {
+                source_target_intent: {
+                  ...sourceTargetIntent,
+                  expression: promptCalculatorExpression,
+                },
+              }
+            : {}),
+        },
+      };
+    },
+  );
   appendDedupe(requests, seen, structured);
   if (
     isAskTurnCapabilityHelpIntent(prompt) &&

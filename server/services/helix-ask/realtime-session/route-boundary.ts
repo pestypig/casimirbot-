@@ -90,15 +90,11 @@ export const resolveRealtimeSessionPolicyGate = (input: {
   const runtimeControlsLocked =
     input.accountPolicy.locked_features.includes("runtime_agent_controls") ||
     !input.accountPolicy.feature_flags.includes("runtime_agent_controls");
-  const available = input.accountPolicy.account_type === "developer" && !runtimeControlsLocked;
+  const available = !runtimeControlsLocked;
   return {
     account_type: input.accountPolicy.account_type,
     runtime_agent_controls_available: available,
-    locked_reason: available
-      ? null
-      : input.accountPolicy.account_type !== "developer"
-        ? "developer_account_required"
-        : "runtime_agent_controls_locked_by_account_policy",
+    locked_reason: available ? null : "runtime_agent_controls_locked_by_account_policy",
     requested_runtime_agent_mode: readString(body.runtime_agent_mode ?? body.runtimeAgentMode),
     requested_runtime_agent_authority: readString(body.runtime_agent_authority ?? body.runtimeAgentAuthority),
   };

@@ -10,6 +10,7 @@ import type {
 } from "@shared/helix-account-session";
 import {
   buildHelixAccountCapabilityPolicy,
+  buildHelixSharedRealtimeRoomsExperimentPolicy,
   HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
   HELIX_ACCOUNT_SESSION_SCHEMA,
   HELIX_ACCOUNT_SESSION_STATUS_SCHEMA,
@@ -38,6 +39,7 @@ import {
   enqueueAccountEmail,
   isLocalEmailDeliveryMode,
 } from "../email/email-outbox";
+import { generateGuestDisplayName } from "./guest-display-name";
 
 type AccountRow = {
   profile_id: string;
@@ -136,6 +138,59 @@ const isProductionRuntime = (): boolean => normalize(process.env.NODE_ENV).toLow
 const policyForAccountType = (accountType: HelixAccountType): HelixAccountCapabilityPolicy =>
   buildHelixAccountCapabilityPolicy(accountType);
 
+const envEnabled = (name: string): boolean =>
+  normalize(process.env[name]).toLowerCase() === "1" ||
+  normalize(process.env[name]).toLowerCase() === "true";
+
+export const isSharedRealtimeRoomsPublicExperimentEnabled = (): boolean =>
+  envEnabled("HELIX_PUBLIC_ROOMS_EXPERIMENT");
+
+export const isGuestSharedRealtimeRoomHostingEnabled = (): boolean =>
+  isSharedRealtimeRoomsPublicExperimentEnabled() &&
+  envEnabled("HELIX_GUEST_ROOM_CREATION");
+
+const GUEST_ROOM_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+
+const readStoredPolicy = (
+  value: HelixAccountCapabilityPolicy | string,
+): HelixAccountCapabilityPolicy | null => {
+  if (typeof value !== "string") return value;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object"
+      ? parsed as HelixAccountCapabilityPolicy
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const storedPolicyHasSharedRoomsExperiment = (
+  value: HelixAccountCapabilityPolicy | string,
+): boolean => {
+  const stored = readStoredPolicy(value);
+  return Boolean(
+    stored?.feature_flags?.includes("shared_realtime_rooms") &&
+    !stored?.locked_features?.includes("shared_realtime_rooms"),
+  );
+};
+
+const activePolicyFromRow = (
+  row: Pick<SessionRow, "account_type" | "account_policy">,
+): HelixAccountCapabilityPolicy => {
+  const accountType = normalizeAccountType(row.account_type) ?? "user";
+  if (
+    accountType === "developer" ||
+    (
+      isSharedRealtimeRoomsPublicExperimentEnabled() &&
+      storedPolicyHasSharedRoomsExperiment(row.account_policy)
+    )
+  ) {
+    return buildHelixSharedRealtimeRoomsExperimentPolicy(accountType);
+  }
+  return policyForAccountType(accountType);
+};
+
 const hashAccountActionToken = (token: string): string =>
   crypto.createHash("sha256").update(token).digest("base64url");
 
@@ -193,7 +248,9 @@ function sessionFromRow(row: SessionRow): HelixAccountSession {
       email: row.email,
       email_verified_at: row.email_verified_at ? iso(row.email_verified_at) : null,
       auth_mode:
-        row.provider === "google"
+        row.provider === "guest"
+          ? "guest"
+          : row.provider === "google"
           ? "web_auth"
           : row.provider === "password"
             ? "password_account"
@@ -201,19 +258,26 @@ function sessionFromRow(row: SessionRow): HelixAccountSession {
             ? "local_password_profile"
             : "local_dev_profile",
       account_type: accountType,
-      provider: row.provider === "google" ? "google" : "local",
+      provider:
+        row.provider === "guest"
+          ? "guest"
+          : row.provider === "google"
+            ? "google"
+            : "local",
       provider_subject: row.provider_subject,
       picture_url: row.picture_url,
       created_at: iso(row.account_created_at),
       updated_at: iso(row.account_updated_at),
     },
-    // Authorization follows the current account-type policy. The stored JSON is
-    // a session snapshot and must not preserve retired locks after deployment.
-    account_policy: policyForAccountType(accountType),
+    // Authorization follows the current base account policy. The stored JSON
+    // can opt a session into the one recognized public experiment, but cannot
+    // preserve retired locks or grant arbitrary capabilities after deployment.
+    account_policy: activePolicyFromRow(row),
     status: row.status === "signed_out" ? "signed_out" : "active",
     memory_scope: row.memory_scope === "session_only" ? "session_only" : "profile",
     created_at: iso(row.created_at),
     updated_at: iso(row.updated_at),
+    expires_at: row.expires_at ? iso(row.expires_at) : null,
   };
 }
 
@@ -233,7 +297,12 @@ function buildLinkedAccounts(session: HelixAccountSession | null): HelixAccountL
     }));
   const profileAccount: HelixAccountLinkedAccount | null = session
     ? {
-        provider: session.profile.provider === "google" ? "google" : "local",
+        provider:
+          session.profile.provider === "guest"
+            ? "guest"
+            : session.profile.provider === "google"
+              ? "google"
+              : "local",
         external_id: session.profile.provider_subject ?? session.profile.profile_id,
         display_name: session.profile.display_name,
         status: "linked",
@@ -286,7 +355,7 @@ async function upsertAccount(input: {
   display_name: string;
   email?: string | null;
   account_type: HelixAccountType;
-  provider: "local" | "google" | "password";
+  provider: "local" | "google" | "password" | "guest";
   provider_subject?: string | null;
   picture_url?: string | null;
 }): Promise<AccountRow> {
@@ -583,21 +652,23 @@ async function insertSession(input: {
   account: AccountRow;
   account_policy: HelixAccountCapabilityPolicy;
   memory_scope?: "profile" | "session_only";
+  expires_at?: string | null;
 }): Promise<HelixAccountSession> {
   const sessionId = `account_session:${crypto.randomUUID()}`;
   await ensureDatabase();
   await getPool().query(
     `
       INSERT INTO helix_account_sessions (
-        session_id, profile_id, status, memory_scope, account_policy, created_at, updated_at
+        session_id, profile_id, status, memory_scope, account_policy, created_at, updated_at, expires_at
       )
-      VALUES ($1, $2, 'active', $3, $4::jsonb, now(), now())
+      VALUES ($1, $2, 'active', $3, $4::jsonb, now(), now(), $5)
     `,
     [
       sessionId,
       input.account.profile_id,
       input.memory_scope ?? "profile",
       JSON.stringify(input.account_policy),
+      input.expires_at ?? null,
     ],
   );
   const joined = await getSessionRowById(sessionId);
@@ -644,6 +715,10 @@ export async function getAccountSessionStatus(sessionId?: string | null): Promis
   const session = sessionId ? await getAccountSessionById(sessionId) : null;
   const profileId = session?.profile.profile_id ?? null;
   const accountPolicy = session?.account_policy ?? getDefaultAccountCapabilityPolicy();
+  const developerAccess = accountPolicy.account_type === "developer";
+  const sharedRoomsEnabled =
+    accountPolicy.feature_flags.includes("shared_realtime_rooms") &&
+    !accountPolicy.locked_features.includes("shared_realtime_rooms");
   return {
     schema: HELIX_ACCOUNT_SESSION_STATUS_SCHEMA,
     ok: true,
@@ -653,6 +728,15 @@ export async function getAccountSessionStatus(sessionId?: string | null): Promis
     profile_ingress_tokens: listProfileIngressTokens(profileId),
     profile_ingress_usage: getProfileIngressUsage(profileId),
     usage: buildUsageSummary(),
+    experimental_features: {
+      shared_realtime_rooms: {
+        available: developerAccess || isSharedRealtimeRoomsPublicExperimentEnabled(),
+        enabled: sharedRoomsEnabled,
+        guest_session: session?.profile.auth_mode === "guest",
+        guest_hosting_allowed: developerAccess || isGuestSharedRealtimeRoomHostingEnabled(),
+        session_expires_at: session?.expires_at ?? null,
+      },
+    },
     auth_boundary: {
       credential_collection_allowed_in_agents: false,
       raw_password_stored: false,
@@ -661,6 +745,134 @@ export async function getAccountSessionStatus(sessionId?: string | null): Promis
       local_password_profile_available: resolveLocalPasswordProfileAuthConfig().enabled,
       local_password_profile_dev_default: resolveLocalPasswordProfileAuthConfig().dev_default,
     },
+  };
+}
+
+export type HelixSharedRealtimeRoomsExperimentReceipt = {
+  ok: boolean;
+  message: string;
+  error: string | null;
+  status: HelixAccountSessionStatus;
+  session_cookie_action: "set" | "clear" | "keep";
+};
+
+export async function setSharedRealtimeRoomsExperiment(input: {
+  session_id?: string | null;
+  enabled: boolean;
+}): Promise<HelixSharedRealtimeRoomsExperimentReceipt> {
+  const existingSession = input.session_id
+    ? await getAccountSessionById(input.session_id)
+    : null;
+  if (
+    input.enabled &&
+    existingSession?.account_policy.account_type !== "developer" &&
+    !isSharedRealtimeRoomsPublicExperimentEnabled()
+  ) {
+    return {
+      ok: false,
+      message: "Shared Live Rooms are not enabled on this server.",
+      error: "shared_realtime_rooms_experiment_unavailable",
+      status: await getAccountSessionStatus(input.session_id),
+      session_cookie_action: "keep",
+    };
+  }
+
+  if (existingSession?.account_policy.account_type === "developer") {
+    return {
+      ok: true,
+      message: "Shared Live Rooms are included with developer access.",
+      error: null,
+      status: await getAccountSessionStatus(existingSession.session_id),
+      session_cookie_action: "keep",
+    };
+  }
+
+  if (!input.enabled) {
+    if (!existingSession) {
+      return {
+        ok: true,
+        message: "Shared Live Rooms are off.",
+        error: null,
+        status: await getAccountSessionStatus(),
+        session_cookie_action: "clear",
+      };
+    }
+    await ensureDatabase();
+    if (existingSession.profile.auth_mode === "guest") {
+      await getPool().query(
+        `UPDATE helix_account_sessions SET status = 'signed_out', updated_at = now() WHERE session_id = $1`,
+        [existingSession.session_id],
+      );
+      return {
+        ok: true,
+        message: "Shared Live Rooms are off and the temporary guest session ended.",
+        error: null,
+        status: await getAccountSessionStatus(),
+        session_cookie_action: "clear",
+      };
+    }
+    const basePolicy = policyForAccountType(
+      existingSession.account_policy.account_type,
+    );
+    await getPool().query(
+      `
+        UPDATE helix_account_sessions
+        SET account_policy = $2::jsonb, updated_at = now()
+        WHERE session_id = $1
+      `,
+      [existingSession.session_id, JSON.stringify(basePolicy)],
+    );
+    return {
+      ok: true,
+      message: "Shared Live Rooms are off for this session.",
+      error: null,
+      status: await getAccountSessionStatus(existingSession.session_id),
+      session_cookie_action: "keep",
+    };
+  }
+
+  if (existingSession) {
+    const experimentalPolicy = buildHelixSharedRealtimeRoomsExperimentPolicy(
+      existingSession.account_policy.account_type,
+    );
+    await ensureDatabase();
+    await getPool().query(
+      `
+        UPDATE helix_account_sessions
+        SET account_policy = $2::jsonb, updated_at = now()
+        WHERE session_id = $1
+      `,
+      [existingSession.session_id, JSON.stringify(experimentalPolicy)],
+    );
+    return {
+      ok: true,
+      message: "Shared Live Rooms are on for this session.",
+      error: null,
+      status: await getAccountSessionStatus(existingSession.session_id),
+      session_cookie_action: "keep",
+    };
+  }
+
+  const guestSubject = crypto.randomUUID();
+  const guestAccount = await upsertAccount({
+    profile_id: `guest:${guestSubject}`,
+    display_name: generateGuestDisplayName(),
+    account_type: "user",
+    provider: "guest",
+    provider_subject: guestSubject,
+  });
+  const guestSession = await insertSession({
+    account: guestAccount,
+    account_policy: buildHelixSharedRealtimeRoomsExperimentPolicy("user"),
+    memory_scope: "session_only",
+    expires_at: new Date(Date.now() + GUEST_ROOM_SESSION_TTL_MS).toISOString(),
+  });
+  return {
+    ok: true,
+    message: `Shared Live Rooms are on. You will appear as ${guestSession.profile.display_name}.`,
+    error: null,
+    status: await getAccountSessionStatus(guestSession.session_id),
+    session_cookie_action: "set",
   };
 }
 

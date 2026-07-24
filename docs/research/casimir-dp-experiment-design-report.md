@@ -1,9 +1,9 @@
 # Casimir–DP Manifold-Response Experiment Design Report
 
-**Campaign:** `boundary-coherence-platform-screen-v1`  
-**Generated:** 2026-07-21T14:47:19.164Z  
-**Evidence cutoff:** 2026-07-21  
-**Claim tier:** diagnostic  
+**Campaign:** `boundary-coherence-platform-screen-v1`<br>
+**Generated:** 2026-07-23T21:44:42.154Z<br>
+**Evidence cutoff:** 2026-07-21<br>
+**Claim tier:** diagnostic<br>
 **Promotion allowed:** false
 
 This report compares engineering readiness only. It does not select a physically viable experiment or compute a manifold-induced collapse rate.
@@ -13,8 +13,8 @@ This report compares engineering readiness only. It does not select a physically
 | Candidate | Engineering index | Ideal force SNR | Unmodeled phase (rad) | Environmental visibility | DP tau (s) | Open blockers |
 |---|---:|---:|---:|---:|---:|---:|
 | Cryogenic nanomechanical resonator with superconducting-transition boundary | 0.580 | 1.300e+6 | 1.233e-7 | 0.900 | unresolved | 7 |
-| Cryogenic levitated nanoparticle with symmetric electrically gated 2D boundaries | 0.390 | 163.3786 | 0.3098 | 0.807 | 8.431e+6 | 8 |
-| Free-flight nanoparticle matter wave with photoexcited semiconductor boundary | 0.288 | 6.5351 | 8.242e+5 | 0.242 | 3.058e+11 | 8 |
+| Cryogenic levitated nanoparticle with symmetric electrically gated 2D boundaries | 0.390 | 163.3786 | 0.3098 | 0.807 | 1.040e+6 | 8 |
+| Free-flight nanoparticle matter wave with photoexcited semiconductor boundary | 0.288 | 6.5351 | 8.242e+5 | 0.242 | 3.642e+10 | 8 |
 
 ## Campaign gates
 
@@ -29,11 +29,11 @@ This report compares engineering readiness only. It does not select a physically
 - Study role: `integrated_development_candidate`
 - Platform: `levitated_nanoparticle`
 - Boundary actuator: `electrically_gated_2d_material`
-- Engineering screening index: `0.390332`
+- Engineering screening index: `0.390333`
 - Ideal-reference force: `-1.634e-16 N`
 - Residual force phase: `0.3098 rad`
 - Environmental visibility: `0.806541`
-- DP status / tau: `computed_gaussian_proxy` / `8.431e+6 s`
+- DP status / tau: `computed_gaussian_proxy` / `1.040e+6 s`
 - Promotion allowed: `false`
 
 ### Gates
@@ -91,7 +91,7 @@ This report compares engineering readiness only. It does not select a physically
 - Ideal-reference force: `-6.535e-20 N`
 - Residual force phase: `8.242e+5 rad`
 - Environmental visibility: `0.241714`
-- DP status / tau: `computed_gaussian_proxy` / `3.058e+11 s`
+- DP status / tau: `computed_gaussian_proxy` / `3.642e+10 s`
 - Promotion allowed: `false`
 
 ### Gates

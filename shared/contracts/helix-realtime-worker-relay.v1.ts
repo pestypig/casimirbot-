@@ -6,6 +6,24 @@ export const HELIX_REALTIME_WORKER_ADMISSION_SCHEMA =
 export const HELIX_REALTIME_GROUNDED_RELAY_SCHEMA =
   "helix.realtime_grounded_relay.v1" as const;
 
+export const HELIX_REALTIME_TERMINAL_RELAY_CONTRACT =
+  "helix.realtime_terminal_relay.v1" as const;
+
+export type HelixRealtimeTerminalRelayBasisV1 =
+  | "model_direct_terminal"
+  | "grounded_capability_terminal";
+
+export type HelixRealtimeTerminalSpeechAuthorityStatusV1 =
+  | "not_evaluated"
+  | "validated"
+  | "rejected";
+
+export type HelixRealtimeRelayGroundingStatusV1 =
+  | "not_evaluated"
+  | "not_required"
+  | "validated"
+  | "rejected";
+
 export type HelixRealtimeWorkerAdmissionOutcomeV1 =
   | "conversation_local"
   | "worker_grounded"
@@ -49,6 +67,7 @@ export type HelixRealtimeGroundedRelayStatusV1 =
   | "result_ready"
   | "relay_queued_busy"
   | "response_requested"
+  | "provider_acknowledged"
   | "speaking"
   | "delivered"
   | "suppressed"
@@ -60,6 +79,7 @@ export type HelixRealtimeGroundedRelayStatusV1 =
 
 export type HelixRealtimeGroundedRelayV1 = {
   schema: typeof HELIX_REALTIME_GROUNDED_RELAY_SCHEMA;
+  terminal_relay_contract: typeof HELIX_REALTIME_TERMINAL_RELAY_CONTRACT;
   relay_id: string;
   realtime_session_id: string;
   thread_id: string;
@@ -69,6 +89,14 @@ export type HelixRealtimeGroundedRelayV1 = {
   ask_turn_id: string | null;
   selected_runtime_agent_provider: string | null;
   selected_model: string | null;
+  relay_basis: HelixRealtimeTerminalRelayBasisV1 | null;
+  terminal_speech_authority_status: HelixRealtimeTerminalSpeechAuthorityStatusV1;
+  grounding_required: boolean;
+  grounding_status: HelixRealtimeRelayGroundingStatusV1;
+  terminal_artifact_ref: string | null;
+  terminal_text_hash: string | null;
+  grounding_authority_ref: string | null;
+  relay_idempotency_key: string | null;
   status: HelixRealtimeGroundedRelayStatusV1;
   status_reason: string | null;
   answer_projection_hash: string | null;
@@ -80,6 +108,8 @@ export type HelixRealtimeGroundedRelayV1 = {
   provider_response_ref: string | null;
   playback_receipt_ref: string | null;
   response_created: boolean;
+  delivery_attempt_count: number;
+  last_delivery_failure: string | null;
   provider_payload_included: false;
   created_at_ms: number;
   updated_at_ms: number;

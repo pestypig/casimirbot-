@@ -25,6 +25,7 @@ import {
 } from "./contextual-tool-admission";
 import { buildHelixCompoundCapabilityContract } from "./compound-capability-contract";
 import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "./workstation-context-feed-query-tool-contracts";
+import { resolveHelixRuntimeObservationReentry } from "./runtime/turn-lifecycle";
 
 type RecordLike = Record<string, unknown>;
 
@@ -1290,6 +1291,7 @@ const compoundSubgoalRailStatusesFromContract = (payload: RecordLike): RecordLik
 };
 
 const buildToolTurnChainAudit = (input: {
+  turnId: string;
   payload: RecordLike;
   artifacts: RecordLike[];
   lifecycleTrace: RecordLike | null;
@@ -1349,6 +1351,25 @@ const buildToolTurnChainAudit = (input: {
     selectedCapability ?? requestedCapability ?? input.capability,
     requestedObservationKinds,
   );
+  const selectedCapabilityObservationProvesExecution = Boolean(
+    selectedCapabilityObservationArtifact &&
+      (
+        artifactSupportsCapabilityObservation(
+          selectedCapabilityObservationArtifact,
+          selectedCapability ?? requestedCapability ?? input.capability,
+        ) ||
+        requestedObservationKinds.some((kind) =>
+          observationKindMatches(selectedCapabilityObservationArtifact, kind)
+        )
+      ),
+  );
+  const hasCompatibleCapabilityObservation = input.artifacts.some((artifact) =>
+    artifactSupportsCapabilityObservation(
+      artifact,
+      selectedCapability ?? requestedCapability ?? input.capability,
+    ) ||
+    requestedObservationKinds.some((kind) => observationKindMatches(artifact, kind))
+  );
   if (
     !selectedCapability &&
     !contextualSuppression &&
@@ -1368,7 +1389,10 @@ const buildToolTurnChainAudit = (input: {
     selectedCapabilityIsCatalog && capabilityCatalogArtifact && selectedCapability
       ? selectedCapability
       : null,
-    !contextualSuppression && selectedCapability && selectedCapabilityObservationArtifact && nonModelToolCapability(selectedCapability)
+    !contextualSuppression &&
+      selectedCapability &&
+      selectedCapabilityObservationProvesExecution &&
+      nonModelToolCapability(selectedCapability)
       ? selectedCapability
       : null,
     runtimeLoopExecutedCapability(input.payload),
@@ -1376,7 +1400,15 @@ const buildToolTurnChainAudit = (input: {
     nonModelToolCapability(operationalTrace?.executed_capability),
     nonModelToolCapability(runtimeToolCall?.capability_key),
   );
-  const executedCapability = toolExecutionRejected ? null : rawExecutedCapability;
+  const executedCapability =
+    toolExecutionRejected ||
+    (
+      rawExecutedCapability &&
+      nonModelToolCapability(rawExecutedCapability) &&
+      !hasCompatibleCapabilityObservation
+    )
+      ? null
+      : rawExecutedCapability;
   const requestedSelectedDirectMatch =
     requestedCapability && selectedCapability
       ? explicitCapabilityMatches(requestedCapability, selectedCapability)
@@ -1457,9 +1489,13 @@ const buildToolTurnChainAudit = (input: {
   const observationArtifactKind =
     toolExecutionRejected
       ? null
+      : !contextualSuppression &&
+          (requestedCapability || selectedCapability) &&
+          !hasCompatibleCapabilityObservation
+        ? null
       : selectedCapabilityIsCatalog && capabilityCatalogArtifact
         ? "capability_registry"
-      : selectedCapabilityObservationArtifact
+      : selectedCapabilityObservationProvesExecution && selectedCapabilityObservationArtifact
         ? artifactDisplayKind(selectedCapabilityObservationArtifact)
       : readString(observationCoverage?.kind) ||
         input.artifacts
@@ -1469,16 +1505,24 @@ const buildToolTurnChainAudit = (input: {
   const observationRef =
     toolExecutionRejected
       ? null
+      : !contextualSuppression &&
+          (requestedCapability || selectedCapability) &&
+          !hasCompatibleCapabilityObservation
+        ? null
       : selectedCapabilityIsCatalog && capabilityCatalogArtifact
         ? artifactRef(capabilityCatalogArtifact)
-      : selectedCapabilityObservationArtifact
+      : selectedCapabilityObservationProvesExecution && selectedCapabilityObservationArtifact
         ? artifactRef(selectedCapabilityObservationArtifact)
       : readStringArray(observationCoverage?.artifact_refs)[0] ||
         (observationArtifactKind ? artifactRef(artifactForKind(input.artifacts, observationArtifactKind) ?? {}) : null);
   const observationArtifact =
     selectedCapabilityIsCatalog && capabilityCatalogArtifact
       ? capabilityCatalogArtifact
-      : selectedCapabilityObservationArtifact ??
+      : !contextualSuppression &&
+          (requestedCapability || selectedCapability) &&
+          !hasCompatibleCapabilityObservation
+        ? null
+      : (selectedCapabilityObservationProvesExecution ? selectedCapabilityObservationArtifact : null) ??
         (observationRef
           ? input.artifacts.find((artifact) => artifactRef(artifact) === observationRef) ?? null
           : null);
@@ -1578,8 +1622,23 @@ const buildToolTurnChainAudit = (input: {
       normalizedEqual(authorityTerminal, materializedTerminal) &&
       normalizedEqual(visibleTerminal, materializedTerminal),
   );
+  const observationPayload = artifactPayload(observationArtifact ?? {});
+  const runtimeObservationReentry = observationRef
+    ? resolveHelixRuntimeObservationReentry({
+        payload: input.payload,
+        turnId: input.turnId,
+        candidateRefs: unique([
+          observationRef,
+          readString(observationPayload?.provider_gateway_observation_ref),
+          readString(observationPayload?.observation_ref),
+        ]),
+      })
+    : null;
   const reentryProofSource =
-    readString(input.lifecycleTrace?.lifecycle_stage) === "reentered_solver"
+    runtimeObservationReentry?.runtime_lifecycle_verified === true &&
+      runtimeObservationReentry.reentered
+      ? "runtime_event_log.observation_reentered"
+      : readString(input.lifecycleTrace?.lifecycle_stage) === "reentered_solver"
       ? "tool_lifecycle_trace.lifecycle_stage"
       : readBoolean(input.followupDecision?.evidence_reentered)
         ? "tool_followup_decision.evidence_reentered"
@@ -1611,6 +1670,7 @@ const buildToolTurnChainAudit = (input: {
   const terminalProductMismatch = Boolean(
     requiredTerminal &&
       materializedTerminal &&
+      !observationTerminalAllowed &&
       materializedTerminal !== "typed_failure" &&
       !normalizedEqual(requiredTerminal, materializedTerminal) &&
       !(input.contract?.allowedTerminalKinds ?? []).some((kind) => normalizedEqual(kind, materializedTerminal)),
@@ -2548,6 +2608,7 @@ const codexParityClassFromAudit = (input: {
   const railStatus = readString(input.audit.rail_status);
   const failureCode = readString(input.audit.rail_failure_code);
   const requestedCapability = readString(input.audit.requested_capability);
+  const requestedCapabilitySource = readString(input.audit.requested_capability_source);
   const selectedCapability = readString(input.audit.selected_capability);
   const executedCapability = readString(input.audit.executed_capability);
   const firstBrokenRail = readString(input.triage.first_broken_rail);
@@ -2574,8 +2635,15 @@ const codexParityClassFromAudit = (input: {
   if (failureCode === "terminal_projection_mismatch" || firstBrokenRail === "visible_projection") {
     return "visible_projection_mismatch";
   }
-  if (requestedCapability && input.visibleSurface.length === 0) return "tool_surface_missing";
+  if (
+    requestedCapability &&
+    requestedCapabilitySource === "explicit_user_command" &&
+    input.visibleSurface.length === 0
+  ) {
+    return "tool_surface_missing";
+  }
   if (selectedCapability && !executedCapability) return "selected_not_executed";
+  if (requestedCapability && input.visibleSurface.length === 0) return "tool_surface_missing";
   if (failureCode === "observation_missing" || failureCode === "required_observation_missing") return "observation_missing";
   if (
     failureCode === "observation_not_reentered" ||
@@ -3185,6 +3253,7 @@ export const buildArtifactQueryIndex = (input: {
   const lifecycleReceiptRefs = readStringArray(lifecycleTrace?.receipt_refs);
   const lifecycleEvidenceRefs = readStringArray(lifecycleTrace?.evidence_refs);
   const toolTurnChainAudit = buildToolTurnChainAudit({
+    turnId: input.turnId,
     payload: input.payload,
     artifacts,
     lifecycleTrace,
@@ -3271,7 +3340,16 @@ export const buildArtifactQueryIndex = (input: {
       terminal_use_allowed:
         readBoolean(lifecycleTrace?.terminal_eligible) &&
         readString(followupDecision?.next_action) === "terminal_answer" &&
-        requiredObservationsSatisfied,
+        requiredObservationsSatisfied &&
+        Boolean(readString(toolTurnChainAudit.materialized_terminal_artifact_kind)) &&
+        normalizedEqual(
+          toolTurnChainAudit.materialized_terminal_artifact_kind,
+          toolTurnChainAudit.terminal_authority_kind,
+        ) &&
+        normalizedEqual(
+          toolTurnChainAudit.materialized_terminal_artifact_kind,
+          toolTurnChainAudit.visible_terminal_kind,
+        ),
     },
     codex_parity_agent_spine_rail_table: codexParityAgentSpineRailTable,
     tool_turn_chain_audit: toolTurnChainAudit,

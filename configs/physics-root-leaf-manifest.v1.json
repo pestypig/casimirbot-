@@ -182,6 +182,11 @@
       "statement": "Collapse benchmark claims must remain diagnostic until preregistered null-competed evidence clears the contract."
     },
     {
+      "id": "leaf_casimir_dp_boundary_coherence_or_test",
+      "prompt_family": "Casimir boundary coherence test of Penrose OR and Diósi-Penrose diagnostics",
+      "statement": "Casimir-boundary coherence claims must fail closed unless measured evidence, ordinary-decoherence closure, replayable phase residuals, a collapse discriminator, and a sourced boundary-to-coherence transfer kernel are all present."
+    },
+    {
       "id": "leaf_solar_collapse_hypothesis",
       "prompt_family": "solar coherence to collapse hypothesis",
       "statement": "Solar coherence narratives stay hypothesis-scoped and subordinate to the measured Casimir to collapse benchmark family."
@@ -633,6 +638,45 @@
       }
     },
     {
+      "id": "path_quantum_semiclassical_to_casimir_dp_or_test",
+      "bundle_id": "casimir-dp.or-boundary-coherence",
+      "root_id": "physics_quantum_semiclassical",
+      "leaf_id": "leaf_casimir_dp_boundary_coherence_or_test",
+      "nodes": [
+        "physics_quantum_semiclassical",
+        "physics_information_dynamics",
+        "physics_collapse_benchmark",
+        "leaf_casimir_dp_boundary_coherence_or_test"
+      ],
+      "dag_bridges": [
+        "bridge-casimir-boundary-to-material-phase-residual",
+        "bridge-branch-relative-self-energy-to-or-rate-diagnostic",
+        "bridge-boundary-coherence-residual-to-collapse-discriminator",
+        "bridge-casimir-stress-to-branch-geometry-coherence-kernel"
+      ],
+      "falsifier": {
+        "observable": "preregistered boundary-conditioned coherence residual with measured evidence, ordinary-decoherence closure, deterministic phase-residual replay, collapse discrimination, and a sourced boundary-to-coherence transfer kernel",
+        "reject_rule": "measuredEvidenceReady != true OR ordinaryDecoherenceClosure != true OR phaseResidualReplayDeterministic != true OR collapseDiscriminatorPresent != true OR boundaryToCoherenceTransferKernelRegistered != true",
+        "uncertainty_model": "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true,replay_window=session)",
+        "test_refs": [
+          "tests/casimir-dp-data-readiness.spec.ts",
+          "tests/casimir-dp-phase-coherence.spec.ts",
+          "tests/casimir-dp-or-phase-stage2.spec.ts",
+          "tests/casimir-dp-proposal-closure.spec.ts",
+          "tests/physics-root-leaf-manifest.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_CASIMIR_DP_OR_BRIDGE_FAIL"
+      }
+    },
+    {
       "id": "path_stellar_structure_to_spectral_viability",
       "bundle_id": "stellar.radiation.audit",
       "root_id": "physics_stellar_structure_nucleosynthesis",
@@ -745,6 +789,15 @@
         "path_curvature_proxy_to_collapse_benchmark",
         "path_collapse_benchmark_entrypoint",
         "path_solar_coherence_to_collapse_hypothesis"
+      ]
+    },
+    {
+      "id": "casimir-dp.or-boundary-coherence",
+      "summary": "Diagnostic Casimir-boundary coherence test that keeps ordinary QED phase and decoherence, Penrose/Diósi-Penrose branch-instability diagnostics, and the unregistered boundary-to-coherence bridge as separately gated lanes.",
+      "claim_scope": "cross_domain",
+      "max_claim_tier": "diagnostic",
+      "path_ids": [
+        "path_quantum_semiclassical_to_casimir_dp_or_test"
       ]
     },
     {

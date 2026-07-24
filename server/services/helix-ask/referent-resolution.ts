@@ -372,6 +372,12 @@ const conversationalReferentPhrase = (prompt: string): string | null => {
   ) {
     return "deictic_previous_assistant_answer";
   }
+  if (
+    /\b(?:quote|show|find|give|provide)\b[\s\S]{0,80}\b(?:exact|verbatim|source)?\s*(?:passage|sentence|lines?|paragraph|section|wording)\b[\s\S]{0,100}\b(?:where|that|which)\b[\s\S]{0,80}\b(?:it|this|that)\b/i.test(unquoted) ||
+    /\b(?:where|what)\b[\s\S]{0,80}\b(?:does|did)\b[\s\S]{0,40}\b(?:it|this|that)\b[\s\S]{0,40}\b(?:say|state|claim|appear)\b/i.test(unquoted)
+  ) {
+    return "deictic_previous_assistant_answer";
+  }
   return null;
 };
 

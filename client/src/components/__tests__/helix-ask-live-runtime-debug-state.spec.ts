@@ -7,6 +7,7 @@ import {
   recordHelixAskLiveRuntimeCompletedOutputTranscript,
   recordHelixAskLiveRuntimeServerStagePlayDebug,
   recordHelixAskLiveRuntimeStagePlayHandoff,
+  recordHelixAskLiveRuntimeVisualFrameProviderAcknowledgement,
   recordHelixAskLiveRuntimeVisualFrameReceipt,
   resetHelixAskLiveRuntimeClientDebugStateForTests,
 } from "@/components/helix/ask-console/HelixAskLiveRuntimeDebugState";
@@ -173,6 +174,25 @@ describe("Helix Ask live runtime client debug state", () => {
       terminal_eligible: false,
       raw_content_included: false,
       reentry_required: true,
+    }, "manual_promotion");
+    recordHelixAskLiveRuntimeVisualFrameProviderAcknowledgement({
+      schema: "helix.ask.realtime.visual_frame_provider_ack.v1",
+      status: "provider_item_added",
+      item_id: "visual-frame-item:test",
+      client_event_id: "visual-frame-event:test",
+      provider_event_id: "provider-event:visual-added",
+      provider_event_type: "conversation.item.added",
+      route_kind: "manual_promotion",
+      provider_error_code: null,
+      observed_at_ms: 115,
+      first_provider_acknowledgement: true,
+      provider_image_content_observed: true,
+      first_provider_image_context_confirmation: true,
+      model_context_evidence: "provider_conversation_item_with_input_image",
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
     });
 
     const exportedText = mergeHelixAskLiveRuntimeClientDebugIntoExport(JSON.stringify({
@@ -183,6 +203,14 @@ describe("Helix Ask live runtime client debug state", () => {
       visual_input_enabled: true,
       visual_frame_attempt_count: 1,
       visual_frame_sent_count: 1,
+      visual_frame_provider_acknowledged_count: 1,
+      visual_frame_provider_image_confirmed_count: 1,
+      visual_frame_automatic_sent_count: 0,
+      visual_frame_manual_sent_count: 1,
+      visual_frame_automatic_provider_acknowledged_count: 0,
+      visual_frame_manual_provider_acknowledged_count: 1,
+      visual_frame_automatic_provider_image_confirmed_count: 0,
+      visual_frame_manual_provider_image_confirmed_count: 1,
       visual_frame_blocked_count: 0,
       visual_frame_error_count: 0,
       latest_visual_frame_receipt: {
@@ -192,6 +220,33 @@ describe("Helix Ask live runtime client debug state", () => {
         raw_content_included: false,
         answer_authority: false,
         terminal_eligible: false,
+      },
+      latest_visual_frame_provider_acknowledgement: {
+        status: "provider_item_added",
+        route_kind: "manual_promotion",
+        item_id: "visual-frame-item:test",
+        provider_event_id: "provider-event:visual-added",
+        model_context_evidence: "provider_conversation_item_with_input_image",
+        answer_authority: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      visual_input_proof: {
+        schema: "helix.ask.live_vision.proof.v1",
+        status: "provider_image_context_confirmed",
+        automatic_capture: {
+          status: "not_observed",
+        },
+        manual_promotion: {
+          status: "provider_image_context_confirmed",
+        },
+        automatic_capture_transport_ready: false,
+        manual_promotion_transport_ready: true,
+        semantic_marker_test_required: true,
+        semantic_model_use_confirmed: false,
+        answer_authority: false,
+        terminal_eligible: false,
+        raw_content_included: false,
       },
     });
     expect(exportedText).not.toContain("data:image/");
@@ -234,6 +289,7 @@ describe("Helix Ask live runtime client debug state", () => {
           thread_id: "helix-ask:desktop",
           decision_phase: "transcript_handoff",
           outcome: "conversation_local",
+          interaction_mode: "conversation_local",
           reason_codes: ["intent_conversation_local"],
           selected_primary_intent: "conversation_local",
           selected_route: null,
@@ -293,6 +349,12 @@ describe("Helix Ask live runtime client debug state", () => {
       provider_response_ref: "response:conversation-local",
       provider_item_ref: "item:conversation-local",
       provider_content_index: 0,
+      helix_response_purpose: null,
+      helix_provisional_response_id: null,
+      helix_handoff_id: null,
+      helix_worker_admission_id: null,
+      helix_utterance_code: null,
+      correlation_source: null,
       transcript_text_hash: "sha256:conversation-local",
       transcript_text_char_count: 24,
       sanitized_transcript_text: "A conversational response.",
@@ -304,6 +366,7 @@ describe("Helix Ask live runtime client debug state", () => {
       transcript_accumulator_truncated: false,
       observed_at_ms: 125,
       provider_payload_included: false,
+      raw_provider_metadata_included: false,
       output_audio_transcript_deltas_included: false,
       answer_authority: false,
       assistant_answer: false,
@@ -319,6 +382,12 @@ describe("Helix Ask live runtime client debug state", () => {
       provider_response_ref: "response:grounded:selected-answer",
       provider_item_ref: "item:grounded",
       provider_content_index: 0,
+      helix_response_purpose: null,
+      helix_provisional_response_id: null,
+      helix_handoff_id: null,
+      helix_worker_admission_id: null,
+      helix_utterance_code: null,
+      correlation_source: null,
       transcript_text_hash: "sha256:spoken-grounded-answer",
       transcript_text_char_count: 38,
       sanitized_transcript_text: "Account & Sessions is the active panel.",
@@ -330,6 +399,7 @@ describe("Helix Ask live runtime client debug state", () => {
       transcript_accumulator_truncated: false,
       observed_at_ms: 126,
       provider_payload_included: false,
+      raw_provider_metadata_included: false,
       output_audio_transcript_deltas_included: false,
       answer_authority: false,
       assistant_answer: false,
@@ -388,6 +458,22 @@ describe("Helix Ask live runtime client debug state", () => {
           provider_response_ref: "response:grounded:selected-answer",
           playback_receipt_ref: "receipt:playback:binding",
         },
+      }, {
+        handoff_id: "handoff:in-progress",
+        grounded_answer: {
+          feedback_id: "feedback:in-progress",
+          ask_turn_id: "ask:in-progress",
+        },
+        grounded_relay: {
+          schema: "helix.realtime_grounded_relay.v1",
+          relay_id: "relay:in-progress",
+          handoff_id: "handoff:in-progress",
+          feedback_id: "feedback:in-progress",
+          ask_turn_id: "ask:in-progress",
+          status: "speaking",
+          provider_response_ref: "response:grounded:in-progress",
+          playback_receipt_ref: "receipt:playback-started:in-progress",
+        },
       }],
       latest_context_sync: null,
       authority: {
@@ -432,6 +518,21 @@ describe("Helix Ask live runtime client debug state", () => {
       provider_response_ref: "response:conversation-local",
       ask_turn_binding_status: "no_grounded_relay_match",
       binding_source: "none",
+    });
+
+    const inProgressExport = JSON.parse(
+      mergeHelixAskLiveRuntimeClientDebugIntoExport(JSON.stringify({
+        active_turn_id: "ask:in-progress",
+      })),
+    );
+    expect(inProgressExport.realtime_live_client_debug).toMatchObject({
+      selected_answer_grounded_feedback_id: "feedback:in-progress",
+      selected_answer_spoken_output_binding:
+        "provider_response_in_progress_for_selected_answer",
+      selected_answer_spoken_output_provider_response_ref:
+        "response:grounded:in-progress",
+      selected_answer_spoken_output_relay_status: "speaking",
+      selected_answer_spoken_output_playback_confirmed: false,
     });
   });
 });

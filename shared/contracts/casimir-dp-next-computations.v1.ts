@@ -82,6 +82,19 @@ const RigidSphereDpCampaign = z.object({
   density_evidence_class: EvidenceClass,
   density_source_ref: z.string().min(1),
   convergence_relative_tolerance: z.number().positive().max(1),
+  mass_conservation_relative_tolerance: z.number().positive().max(1),
+  branch_symmetry_relative_tolerance: z.number().positive().max(1),
+  maximum_boundary_shell_mass_fraction: z.number().nonnegative().max(1),
+}).superRefine((campaign, context) => {
+  for (let index = 1; index < campaign.grid_dimensions.length; index += 1) {
+    if (campaign.grid_dimensions[index] <= campaign.grid_dimensions[index - 1]) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["grid_dimensions", index],
+        message: "grid_dimensions must be strictly increasing and unique",
+      });
+    }
+  }
 });
 
 const PowerPlan = z.object({

@@ -328,6 +328,17 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: quotedCalculator,
     };
   }
+  const quotedCalculatorExpression = prompt.match(
+    /["'`][^"'`]*(?:calculate|compute|solve|evaluate)\b[^"'`]{0,120}(?:\d|π|[=+\-*/^()]|\\frac|\\sqrt)[^"'`]*["'`]/i,
+  )?.[0];
+  if (quotedCalculatorExpression) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "quoted_tool_command",
+      verb_or_cue: "scientific_calculator.solve_expression",
+      text: quotedCalculatorExpression,
+    };
+  }
   const quotedScholarly = prompt.match(/["'`][^"'`]*(?:do\s+research|research|find|search|look\s+for|look\s*up|lookup|locate|retrieve|fetch|query|recommend|suggest|identify|cite|read)[^"'`]*(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|citations?|references?|journals?|papers?|articles?|studies|literature|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)[^"'`]*["'`]/i)?.[0];
   if (quotedScholarly) {
     return {

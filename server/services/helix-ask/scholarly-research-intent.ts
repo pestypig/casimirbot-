@@ -486,6 +486,11 @@ const stripInstructionText = (promptText: string): { query: string; reasons: str
     return { query: historicalTopic.query, reasons: [historicalTopic.reason] };
   }
   const replacements: Array<[RegExp, string]> = [
+    [/^\s*(?:(?:ok(?:ay)?|please)\s*[,.!?-]*\s*)+/i, " "],
+    [
+      /^\s*(?:(?:can|could|would|will)\s+you\s+)?(?:cite|give|provide|show|list|recommend)\s+(?:me\s+)?(?:(?:scholarly|academic|peer[-\s]?reviewed|research)\s+)?(?:(?:papers?|studies|articles?|sources?|citations?|references?)\s+)?(?:about|on|for|concerning)?\s*/i,
+      " ",
+    ],
     [/\bscholarly-research\.(?:lookup_papers|fetch_full_text|extract_numeric_parameters)\b/gi, " "],
     [/\s*[.;]\s*(?:fetch|open|read|parse)\s+(?:the\s+)?(?:(?:best|top)\s+)?(?:one|two|three|1|2|3|up\s+to\s+\d+)\s+(?:accessible\s+)?(?:sources?|papers?|articles?|pdfs?|full[-\s]?texts?)\b[^.;]*/gi, " "],
     [/\s*[.;]\s*(?:return|provide|identify|report|decompose|group|map)\b[^.;]*/gi, " "],

@@ -34,6 +34,9 @@ export type HelixAskLiveRuntimeControlsModel = {
   visible: boolean;
   locked: boolean;
   lockReason: string | null;
+  visualInputAllowed: boolean;
+  sharedRealtimeRoomsAllowed: boolean;
+  authoritySelectorVisible: boolean;
   modeLabel: string;
   authorityLabel: string;
   lifecycleState: HelixAskLiveRuntimeLifecycleState;
@@ -93,7 +96,8 @@ export const describeHelixAskWorkerRelayStatus = (
   if (
     status === "result_ready" ||
     status === "relay_queued_busy" ||
-    status === "response_requested"
+    status === "response_requested" ||
+    status === "provider_acknowledged"
   ) {
     return { label: "Result ready", icon: "ready" };
   }
@@ -116,18 +120,27 @@ export function buildHelixAskLiveRuntimeControlsModel(args: {
   selectedRuntimeAgentProvider?: HelixAgentRuntimeId;
 }): HelixAskLiveRuntimeControlsModel {
   const accountPolicy = args.accountPolicy ?? null;
-  const developerUnlocked =
-    accountPolicy?.account_type === "developer" &&
+  const runtimeControlsUnlocked =
+    accountPolicy?.feature_flags?.includes("runtime_agent_controls") === true &&
     accountPolicy.locked_features?.includes("runtime_agent_controls") !== true;
-  const visible = developerUnlocked;
+  const visible = runtimeControlsUnlocked;
   const mode = resolveHelixLiveRuntimeMode(args.mode);
-  const authority = resolveHelixLiveRuntimeAuthority(args.authority);
+  const authoritySelectorVisible = accountPolicy?.account_type === "developer";
+  const authority = authoritySelectorVisible
+    ? resolveHelixLiveRuntimeAuthority(args.authority)
+    : "observe_only";
   const lifecycleState = args.lifecycleState ?? "off";
   const transportControllerState = args.transportControllerState ?? "idle";
   return {
     visible,
-    locked: !developerUnlocked,
-    lockReason: developerUnlocked ? null : "developer_runtime_agent_controls_required",
+    locked: !runtimeControlsUnlocked,
+    lockReason: runtimeControlsUnlocked ? null : "runtime_agent_controls_required",
+    visualInputAllowed:
+      accountPolicy?.locked_features?.includes("live_answer_visual_capture_controls") !== true,
+    sharedRealtimeRoomsAllowed:
+      accountPolicy?.feature_flags?.includes("shared_realtime_rooms") === true &&
+      accountPolicy.locked_features?.includes("shared_realtime_rooms") !== true,
+    authoritySelectorVisible,
     modeLabel: labelForMode(mode),
     authorityLabel: labelForAuthority(authority),
     lifecycleState,
@@ -259,7 +272,7 @@ function HelixAskVisibleLiveRuntimeControls({
         <Radio className="h-4 w-4" />
         <span>{labelForMode(mode)}</span>
       </button>
-      <button
+      {model.authoritySelectorVisible ? <button
         type="button"
         data-helix-ask-action-item="true"
         aria-label="Live runtime agent authority"
@@ -270,7 +283,7 @@ function HelixAskVisibleLiveRuntimeControls({
       >
         <ShieldCheck className="h-4 w-4" />
         <span>{labelForAuthority(authority)}</span>
-      </button>
+      </button> : null}
       <button
         type="button"
         data-helix-ask-action-item="true"
@@ -284,19 +297,21 @@ function HelixAskVisibleLiveRuntimeControls({
         <Activity className="h-4 w-4" />
         <span>{labelForHelixAskLiveRuntimeLifecycleState(runtime.lifecycleState)}</span>
       </button>
-      <HelixAskSharedLiveRoomControls
-        realtimeSessionId={runtime.realtimeSessionId}
-        runtimeActive={runtime.active}
-        realtimeModel={mode === "live_voice_mini" ? "gpt-realtime-2.1-mini" : "gpt-realtime-2.1"}
-        visualInputEnabled={runtime.visualInputEnabled}
-        onSharedTransportChange={setSharedRoomTransportBound}
-        onHostTransportInvalidated={() => {
-          void runtime.stop();
-        }}
-        onOwnerRoomClosed={() => {
-          void runtime.stop();
-        }}
-      />
+      {model.sharedRealtimeRoomsAllowed ? (
+        <HelixAskSharedLiveRoomControls
+          realtimeSessionId={runtime.realtimeSessionId}
+          runtimeActive={runtime.active}
+          realtimeModel={mode === "live_voice_mini" ? "gpt-realtime-2.1-mini" : "gpt-realtime-2.1"}
+          onVisualSourceCaptureRequested={onVisualInputEnableRequested}
+          onSharedTransportChange={setSharedRoomTransportBound}
+          onHostTransportInvalidated={() => {
+            void runtime.stop();
+          }}
+          onOwnerRoomClosed={() => {
+            void runtime.stop();
+          }}
+        />
+      ) : null}
       {runtime.active ? (
         <>
           <button
@@ -320,7 +335,7 @@ function HelixAskVisibleLiveRuntimeControls({
             <Mic className={`h-4 w-4 ${runtime.microphoneEnabled ? "animate-pulse" : ""}`} />
             <span>{runtime.microphoneEnabled ? "Mic On" : "Mic Off"}</span>
           </button>
-          <button
+          {model.visualInputAllowed ? <button
             type="button"
             data-helix-ask-action-item="true"
             data-live-visual-input-enabled={runtime.visualInputEnabled ? "true" : "false"}
@@ -329,8 +344,12 @@ function HelixAskVisibleLiveRuntimeControls({
               : "Share visual frames with GPT Live"}
             aria-pressed={runtime.visualInputEnabled}
             title={runtime.visualInputError ?? (runtime.visualInputEnabled
-              ? runtime.visualInputFrameCount > 0
-                ? `GPT Live receives automatic frames from the active Screen or Camera source (${runtime.visualInputFrameCount} sent)`
+              ? runtime.visualInputProviderImageConfirmedFrameCount > 0
+                ? `GPT Live Vision provider confirmed image context for ${runtime.visualInputProviderImageConfirmedFrameCount} of ${runtime.visualInputFrameCount} queued frames`
+                : runtime.visualInputProviderAcknowledgedFrameCount > 0
+                  ? `GPT Live Vision provider acknowledged ${runtime.visualInputProviderAcknowledgedFrameCount} of ${runtime.visualInputFrameCount} items; awaiting input_image confirmation`
+                : runtime.visualInputFrameCount > 0
+                  ? `GPT Live Vision queued ${runtime.visualInputFrameCount} frames on the Realtime transport; awaiting provider acknowledgement`
                 : "GPT Live Vision is enabled and waiting for the selected Screen or Camera source; captures run automatically every 10 seconds (0 sent)"
               : "Enable GPT Live Vision and start the selected Screen or Camera source with automatic 10-second captures")}
             className={`inline-flex h-10 shrink-0 snap-center items-center gap-2 rounded-full border px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70 ${
@@ -346,7 +365,7 @@ function HelixAskVisibleLiveRuntimeControls({
               <EyeOff className="h-4 w-4" />
             )}
             <span>{runtime.visualInputEnabled ? "Vision On" : "Vision Off"}</span>
-          </button>
+          </button> : null}
         </>
       ) : null}
       {workerRelayIndicator ? (

@@ -128,6 +128,10 @@ const collectSupportSelectedRefs = (payload: RecordLike): Set<string> => {
   };
   const loopTrace = readRecord(payload.loop_parity_trace);
   addArray(loopTrace?.evidence_selected_for_answer);
+  addArray(payload.selected_terminal_support_refs);
+  addArray(payload.terminal_synthesis_support_refs);
+  addArray(payload.selected_terminal_subgoal_observation_refs);
+  addArray(payload.terminal_synthesis_subgoal_observation_refs);
   const solverTrace = readRecord(payload.ask_turn_solver_trace);
   const evidenceReentry = readRecord(solverTrace?.evidence_reentry_gate);
   addArray(evidenceReentry?.selected_evidence_refs);
@@ -139,8 +143,11 @@ const collectSupportSelectedRefs = (payload: RecordLike): Set<string> => {
   }
   const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
   const answerAuthority = readRecord(payload.terminal_answer_authority);
+  const terminalPresentation = readRecord(payload.terminal_presentation);
   addArray(terminalAuthority?.support_refs);
   addArray(answerAuthority?.support_refs);
+  addArray(terminalPresentation?.selected_observation_refs);
+  addArray(terminalPresentation?.support_refs);
   return refs;
 };
 

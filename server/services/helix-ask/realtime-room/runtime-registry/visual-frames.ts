@@ -9,5 +9,8 @@ export type {
 export {
   listSharedRealtimeRoomVisualFrames,
   purgeSharedRealtimeRoomVisualFrames,
+  rejectSharedRealtimeRoomVisualFrameByProviderEvent,
+  registerSharedRealtimeRoomVisualFrameProviderEvent,
   updateSharedRealtimeRoomVisualFrameProviderDelivery,
+  updateSharedRealtimeRoomVisualFrameByProviderItem,
 } from "./visual-frame-retention";

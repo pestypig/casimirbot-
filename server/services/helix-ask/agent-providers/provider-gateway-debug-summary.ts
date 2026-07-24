@@ -5,6 +5,7 @@ import type {
   HelixWorkstationGatewayCallResult,
   HelixWorkstationGatewayListResult,
 } from "../workstation-tool-gateway/types";
+import { materializeRealtimeConversationContext } from "./realtime-conversation-context";
 
 const sha256 = (value: string): string =>
   crypto.createHash("sha256").update(value).digest("hex");
@@ -72,6 +73,9 @@ export const buildProviderGatewayDebugSummary = (input: {
   const actionReceiptResults = input.gatewayCallResults.filter(isWorkstationActionReceipt);
   const evidenceObservationResults = input.gatewayCallResults.filter((result) => !isWorkstationActionReceipt(result));
   const observationRefs = unique(input.gatewayCallResults.flatMap((result) => result.artifact_refs));
+  const realtimeConversationContext = prompt
+    ? materializeRealtimeConversationContext({ body: input.body, question: prompt })
+    : null;
 
   return {
     schema: "helix.provider_gateway_debug_summary.v1",
@@ -98,6 +102,8 @@ export const buildProviderGatewayDebugSummary = (input: {
     gateway_observation_count: evidenceObservationResults.length,
     observation_refs: observationRefs,
     observation_packet_refs: observationRefs,
+    realtime_conversation_context_materialization:
+      realtimeConversationContext?.audit ?? null,
     observation_packet_invariants: input.gatewayCallResults.map((result) => ({
       capability_id: result.capability_id,
       assistant_answer: result.observation_packet.assistant_answer,

@@ -1448,6 +1448,39 @@ type SttFailure = {
   rateLimitSource?: SttRateLimitSource;
 };
 
+const sanitizeSttFailureMessage = (failure: SttFailure): string => {
+  if (typeof failure.status === "number") {
+    const metadata = failure.status === 429
+      ? [
+          typeof failure.retryAfterMs === "number"
+            ? `retry_after_ms=${failure.retryAfterMs}`
+            : "",
+          failure.rateLimitSource
+            ? `rate_limit_source=${failure.rateLimitSource}`
+            : "",
+        ].filter(Boolean)
+      : [];
+    return [`STT HTTP ${failure.status}`, ...metadata].join(" ");
+  }
+  return failure.message
+    .replace(/\b(?:sk|sess|key)-[A-Za-z0-9_*.-]{8,}\b/gi, "[redacted credential]")
+    .replace(/\bBearer\s+[A-Za-z0-9._*+-]{8,}\b/gi, "Bearer [redacted credential]");
+};
+
+const serializeSttFailure = (failure: SttFailure): Record<string, unknown> => ({
+  backend: failure.backend,
+  engine: failure.engine,
+  stage: failure.stage ?? "primary",
+  status: failure.status ?? null,
+  retryable: failure.retryable,
+  retryAfterMs:
+    typeof failure.retryAfterMs === "number" && Number.isFinite(failure.retryAfterMs)
+      ? failure.retryAfterMs
+      : null,
+  rateLimitSource: failure.rateLimitSource ?? null,
+  message: sanitizeSttFailureMessage(failure),
+});
+
 const backendEngine = (backend: ResolvedSttBackend): TranscriptionEngine => {
   if (backend.kind === "openai") return "openai_transcribe";
   if (backend.kind === "local") return "faster_whisper_local";
@@ -2381,11 +2414,12 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       outputMode,
     });
     if (!result) {
+      const safeFailureAttempts = failures.map(serializeSttFailure);
       writeVoiceLaneBreadcrumb("voice.transcribe.failed", {
         breadcrumbId,
         traceId: parsed.data.traceId ?? traceId,
         failureCount: failures.length,
-        failures,
+        failures: safeFailureAttempts,
       });
       const rateLimitedFailures = failures.filter((entry) => entry.status === 429);
       const allFailuresRateLimited =
@@ -2414,19 +2448,7 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
             outputMode,
             retryAfterMs: retryAfterMs > 0 ? retryAfterMs : null,
             rateLimitSource,
-            attempts: failures.map((entry) => ({
-              backend: entry.backend,
-              engine: entry.engine,
-              stage: entry.stage ?? "primary",
-              status: entry.status ?? null,
-              retryable: entry.retryable,
-              retryAfterMs:
-                typeof entry.retryAfterMs === "number" && Number.isFinite(entry.retryAfterMs)
-                  ? entry.retryAfterMs
-                  : null,
-              rateLimitSource: entry.rateLimitSource ?? null,
-              message: entry.message,
-            })),
+            attempts: safeFailureAttempts,
             formatRecovery,
           },
           parsed.data.traceId,
@@ -2440,19 +2462,7 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
         {
           policyMode,
           outputMode,
-          attempts: failures.map((entry) => ({
-            backend: entry.backend,
-            engine: entry.engine,
-            stage: entry.stage ?? "primary",
-            status: entry.status ?? null,
-            retryable: entry.retryable,
-            retryAfterMs:
-              typeof entry.retryAfterMs === "number" && Number.isFinite(entry.retryAfterMs)
-                ? entry.retryAfterMs
-                : null,
-            rateLimitSource: entry.rateLimitSource ?? null,
-            message: entry.message,
-          })),
+          attempts: safeFailureAttempts,
           formatRecovery,
         },
         parsed.data.traceId,

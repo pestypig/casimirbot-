@@ -66,6 +66,44 @@ const completedRuntimeLifecycle = (turnId: string) => {
 };
 
 describe("Helix Ask runtime lifecycle debug export", () => {
+  it("projects provider context materialization retained under provider debug", () => {
+    const turnId = "ask:test:realtime-context-debug-export";
+    const contextAudit = {
+      schema: "helix.realtime_conversation_context_materialization.v1",
+      status: "materialized",
+      handoff_id: "realtime-stage-play-handoff:test-context",
+      context_pack_id: "realtime-stage-play-context:test-context",
+      model_context_included: true,
+      raw_content_included: false,
+    };
+    const envelope = __testHelixAskOutputContract.buildHelixDebugExportEnvelope({
+      payload: {
+        turn_id: turnId,
+        selected_final_answer: "Context retained.",
+        final_answer_source: "direct_answer_text",
+        terminal_artifact_kind: "direct_answer_text",
+        debug: {
+          provider_gateway_debug_summary: {
+            schema: "helix.provider_gateway_debug_summary.v1",
+            turn_id: turnId,
+            realtime_conversation_context_materialization: contextAudit,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+      },
+      prompt: "Explain why boundary conditions matter.",
+      sessionId: "test-session",
+    }) as Record<string, any>;
+
+    expect(envelope.provider_gateway_debug_summary).toMatchObject({
+      turn_id: turnId,
+      realtime_conversation_context_materialization: contextAudit,
+      raw_content_included: false,
+    });
+  });
+
   it("surfaces legacy projection contradictions without rewriting runtime facts", () => {
     const turnId = "ask:test:lifecycle-debug-export";
     const lifecycle = completedRuntimeLifecycle(turnId);

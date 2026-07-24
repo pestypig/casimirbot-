@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractCodexCapabilityLaneRequestCandidate,
   extractCodexCapabilityLaneRequestCandidates,
+  stripCodexCapabilityLaneRequestMarkers,
 } from "../codex-provider";
 
 describe("Codex capability-lane request parsing", () => {
@@ -35,6 +36,21 @@ describe("Codex capability-lane request parsing", () => {
     expect(extractCodexCapabilityLaneRequestCandidate(request)).toMatchObject({
       capability: "visual_analysis.inspect_image_region",
     });
+  });
+
+  it("translates the legacy workstation marker without exposing it as answer text", () => {
+    const request =
+      "HELIX_WORKSTATION_TOOL_REQUEST_JSON: " +
+      JSON.stringify({
+        capability_id: "docs.search",
+        arguments: { query: "NHM tube", max_hits: 5 },
+      });
+
+    expect(extractCodexCapabilityLaneRequestCandidate(request)).toMatchObject({
+      capability_id: "docs.search",
+      arguments: { query: "NHM tube", max_hits: 5 },
+    });
+    expect(stripCodexCapabilityLaneRequestMarkers(request)).toBe("");
   });
 
   it("rejects an explicitly wrapped lane object that omits its capability", () => {

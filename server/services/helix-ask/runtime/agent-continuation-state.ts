@@ -193,6 +193,7 @@ const collectObservationRefs = (payload: RecordLike, turnId: string): string[] =
 };
 
 const collectMissingRequirementIds = (payload: RecordLike): string[] => {
+  const docsContinuationContract = readRecord(payload.docs_continuation_contract);
   const records = [
     payload,
     readRecord(payload.goal_satisfaction_evaluation),
@@ -220,6 +221,16 @@ const collectMissingRequirementIds = (payload: RecordLike): string[] => {
     const review = readRecord(reviewValue);
     values.push(review?.missing_requirement_ids, review?.missing_requirements);
   }
+  if (
+    docsContinuationContract &&
+    readString(docsContinuationContract.current_docs_phase) !== "terminal_ready"
+  ) {
+    values.push(
+      readString(docsContinuationContract.terminal_block_reason) ??
+        readString(docsContinuationContract.required_next_capability) ??
+        "docs_continuation_pending",
+    );
+  }
   return uniqueStrings(values);
 };
 
@@ -229,6 +240,11 @@ const normalizeGoalStatus = (payload: RecordLike): {
   terminalProductAllowed: boolean | null;
 } => {
   const evaluation = readRecord(payload.goal_satisfaction_evaluation);
+  const docsContinuationContract = readRecord(payload.docs_continuation_contract);
+  const docsContinuationPending = Boolean(
+    docsContinuationContract &&
+    readString(docsContinuationContract.current_docs_phase) !== "terminal_ready",
+  );
   const report = readRecord(payload.satisfaction_report);
   const authority = readRecord(payload.route_evidence_authority);
   const providerBridge = readRecord(payload.provider_terminal_authority_bridge);
@@ -245,7 +261,9 @@ const normalizeGoalStatus = (payload: RecordLike): {
   const raw = ["satisfied", "terminal_satisfied", "answered", "final_answer", "complete", "completed"].includes(terminalStatus)
     ? terminalStatus
     : evaluationStatus || terminalStatus;
-  const satisfied = ["satisfied", "terminal_satisfied", "answered", "final_answer", "complete", "completed"].includes(raw);
+  const satisfied =
+    !docsContinuationPending &&
+    ["satisfied", "terminal_satisfied", "answered", "final_answer", "complete", "completed"].includes(raw);
   let status: HelixAgentContinuationGoalStatus = satisfied ? "satisfied" : "unknown";
   if (/needs_user_input|pending_input|ask_user|clarif/.test(raw)) status = "needs_user_input";
   else if (/blocked|failed|failure|non_retryable/.test(raw)) status = "blocked";

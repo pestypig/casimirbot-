@@ -35,7 +35,10 @@ describe("Casimir-DP gated computations Stage-1 campaign", () => {
     expect(report.lifshitz.ideal_validation_gate).toBe("pass");
     expect(report.lifshitz.publication_grade_gate).toBe("not_ready");
     expect(report.dp.exact_distinct_resolutions).toBe(true);
-    expect(report.dp.numerical_convergence_gate).toBe("pass");
+    expect(report.dp.mass_conservation_gate).toBe("pass");
+    expect(report.dp.branch_symmetry_gate).toBe("pass");
+    expect(report.dp.boundary_containment_gate).toBe("pass");
+    expect(report.dp.numerical_convergence_gate).toBe("not_ready");
     expect(report.dp.provenance_gate).toBe("not_ready");
     expect(report.inference.rate_only_accessibility_gate).toBe("not_ready");
     expect(report.inference.collapse_identifiability_gate).toBe("blocked");

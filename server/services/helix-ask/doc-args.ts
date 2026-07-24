@@ -364,19 +364,44 @@ export const resolveAskTurnCreateThenOpenDocTopicArg = (transcript: string): str
   return topic || null;
 };
 
+const hasContextualTopicDocLookupSuppression = (transcript: string): boolean => {
+  const unquoted = transcript.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  const quotedOperationMention =
+    /(?:"[^"]*"|'[^']*'|`[^`]*`)/.test(transcript) &&
+    /(?:"[^"]*|'[^']*|`[^`]*)\b(?:find|search|look\s+(?:for|up|at)|read|check|inspect|open|view|show)\b[\s\S]{0,140}\b(?:doc|docs|document|paper)\b/i.test(
+      transcript,
+    ) &&
+    /\b(?:command|prompt|question|text|phrase|wording|said|typed|wrote|earlier|previously|explain\s+whether)\b/i.test(
+      unquoted,
+    );
+  return (
+    quotedOperationMention ||
+    /\b(?:do\s+not|don't|dont|never|no\s+need\s+to)\s+(?:find|search|look\s+(?:for|up|at)|read|check|inspect|pick|select|get|open|view|show)\b[\s\S]{0,140}\b(?:doc|docs|document|paper)\b/i.test(unquoted) ||
+    /\b(?:do\s+not|don't|dont|never|no\s+need\s+to)\b[\s\S]{0,120}\b(?:relate|connect|compare|have\s+to\s+do)\b[\s\S]{0,140}\b(?:doc|docs|document|paper)\b/i.test(unquoted) ||
+    /\b(?:later|next\s+time|in\s+the\s+future|not\s+now|not\s+yet)\b[\s\S]{0,160}\b(?:find|search|look\s+(?:for|up|at)|read|check|inspect|pick|select|get|open|view|show)\b[\s\S]{0,120}\b(?:doc|docs|document|paper)\b/i.test(unquoted) ||
+    /\b(?:later|next\s+time|in\s+the\s+future|not\s+now|not\s+yet)\b[\s\S]{0,160}\b(?:relate|connect|compare|have\s+to\s+do)\b[\s\S]{0,140}\b(?:doc|docs|document|paper)\b/i.test(unquoted) ||
+    /\b(?:earlier|previously|last\s+turn|historically)\b[\s\S]{0,180}\b(?:find|search|look\s+(?:for|up|at)|read|check|inspect|pick|select|get|open|view|show)\b[\s\S]{0,120}\b(?:doc|docs|document|paper)\b/i.test(unquoted) ||
+    /\b(?:screen|visible\s+text|label|button|debug)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions)\b/i.test(unquoted)
+  );
+};
+
+export const isAskTurnNamedDocRelationPrompt = (transcript: string): boolean => {
+  const normalized = transcript.trim();
+  if (!normalized || hasContextualTopicDocLookupSuppression(normalized)) return false;
+  return /\b(?:how\s+(?:does|do)\s+(?:this|that|it|the\s+(?:current|previous|prior)\s+(?:doc|document|paper|idea|claim|result))\s+(?:relate|connect|compare)|what\s+does\s+(?:this|that|it)\s+have\s+to\s+do)\s+(?:to|with)\s+(?:the\s+)?[\s\S]{2,180}?\s+(?:doc|document|paper)\b/i.test(
+    normalized,
+  );
+};
+
 export const resolveAskTurnTopicDocQueryArg = (transcript: string): string | null => {
   const normalized = transcript.trim();
   if (!normalized || /\b(?:latest|newest|most\s+recent|recent)\b/i.test(normalized)) return null;
-  const unquoted = normalized.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
-  if (
-    /\b(?:do\s+not|don't|dont|never|no\s+need\s+to)\s+(?:find|search|pick|select|get|open|view|show)\b[\s\S]{0,140}\b(?:doc|docs|document|paper)\b/i.test(unquoted) ||
-    /\b(?:later|next\s+time|in\s+the\s+future|not\s+now|not\s+yet)\b[\s\S]{0,160}\b(?:find|search|pick|select|get|open|view|show)\b[\s\S]{0,120}\b(?:doc|docs|document|paper)\b/i.test(unquoted) ||
-    /\b(?:earlier|previously|last\s+turn|historically)\b[\s\S]{0,180}\b(?:find|search|pick|select|get|open|view|show)\b[\s\S]{0,120}\b(?:doc|docs|document|paper)\b/i.test(unquoted) ||
-    /\b(?:screen|visible\s+text|label|button|debug)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions)\b/i.test(unquoted)
-  ) return null;
+  if (hasContextualTopicDocLookupSuppression(normalized)) return null;
   const patterns = [
+    /\b(?:how\s+(?:does|do)\s+(?:this|that|it|the\s+(?:current|previous|prior)\s+(?:doc|document|paper|idea|claim|result))\s+(?:relate|connect|compare)|what\s+does\s+(?:this|that|it)\s+have\s+to\s+do)\s+(?:to|with)\s+(?:the\s+)?(.{2,180}?)\s+(?:doc|document|paper)\b/i,
     /\b(?:find\s+and\s+open|search\s+for\s+and\s+open|pull\s+up|open|view|show|pick|grab|go\s+to|navigate\s+to|take\s+me\s+to|bring\s+me\s+to)\s+(?:a|an|the)?\s*(?:(?:local|workspace)\s+)?(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
-    /\b(?:find|search|pick|select|get)\s+(?:me\s+)?(?:(?:a|an|the)\s+)?(?:best|right|top|closest|most\s+relevant)?\s*(?:(?:local|workspace)\s+)?(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
+    /\b(?:find|search|look\s+(?:for|up)|pick|select|get)\s+(?:me\s+)?(?:(?:a|an|the)\s+)?(?:best|right|top|closest|most\s+relevant)?\s*(?:(?:our|local|workspace|project)\s+)?(?:doc|docs|document|paper)\s+(?:about|on|regarding|for)\s+(.+)$/i,
+    /\b(?:look\s+at|read|check|inspect)\s+(?:the\s+)?(.{2,160}?)\s+(?:doc|document|paper)\b(?=[\s,;:.!?]*(?:(?:and|then)\s+)?(?:explain|summari[sz]e|describe|tell\s+me|give\s+me\s+(?:(?:the|an?)\s+)?(?:main\s+idea|overview|summary|gist|takeaways?)|what(?:'s|\s+is)?\s+(?:it|this|that))\b)/i,
   ];
   for (const pattern of patterns) {
     const match = normalized.match(pattern);
@@ -387,9 +412,29 @@ export const resolveAskTurnTopicDocQueryArg = (transcript: string): string | nul
       .replace(/[?!.;,:"'`]+$/g, "")
       .trim();
     const topic = cleanupAskTurnOpenDocSearchTopic(rawTopic);
-    if (topic) return topic;
+    if (topic && !/^(?:this|that|the|current|active|open|it)$/i.test(topic)) return topic;
   }
   return null;
+};
+
+export const isAskTurnDocsTopicSummaryPrompt = (transcript: string): boolean => {
+  const normalized = transcript.trim();
+  if (!normalized || hasContextualTopicDocLookupSuppression(normalized)) return false;
+  return (
+    (
+      /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist|main\s+idea)\b/i.test(normalized) ||
+      isAskTurnNamedDocRelationPrompt(normalized)
+    ) &&
+    (
+      Boolean(resolveAskTurnTopicDocQueryArg(normalized)) ||
+      /\bdocs?\s+about\b/i.test(normalized) ||
+      /\bfrom\s+(?:our\s+|local\s+|the\s+)?docs?\b/i.test(normalized) ||
+      /\binclude\s+(?:the\s+)?paths?\b/i.test(normalized) ||
+      /\b(?:with|include)\s+(?:the\s+)?(?:document\s+)?paths?\b/i.test(normalized) ||
+      /\b(?:use|using|from)\s+(?:the\s+)?docs?\s+only\b/i.test(normalized) ||
+      /\bdocs?\s+only\b/i.test(normalized)
+    )
+  );
 };
 
 export const isAskTurnDocsPanelOpenIntent = (transcript: string): boolean => {

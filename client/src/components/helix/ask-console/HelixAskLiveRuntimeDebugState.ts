@@ -13,6 +13,14 @@ import {
   HELIX_ASK_REALTIME_COMPLETED_OUTPUT_TRANSCRIPT_SCHEMA,
   type HelixAskRealtimeCompletedOutputTranscript,
 } from "./HelixAskRealtimeOutputTranscriptDebug";
+import type {
+  HelixAskRealtimeVisualFrameRouteKind,
+  HelixAskRealtimeVisualFrameProviderAcknowledgement,
+} from "./HelixAskRealtimeVisualFrameAcknowledgement";
+import {
+  buildHelixAskLiveVisionProof,
+  type HelixAskLiveVisionProof,
+} from "./HelixAskLiveVisionProof";
 
 const MAX_EVENTS = 80;
 const MAX_COMPLETED_OUTPUT_TRANSCRIPTS = 16;
@@ -31,6 +39,8 @@ export type HelixAskLiveRuntimeClientDebugEvent = {
     | "visual_frame_sent"
     | "visual_frame_blocked"
     | "visual_frame_error"
+    | "visual_frame_provider_acknowledged"
+    | "visual_frame_provider_error"
     | "data_channel_opened"
     | "data_channel_closed"
     | "data_channel_error"
@@ -67,6 +77,9 @@ export type HelixAskLiveRuntimeClientDebugEvent = {
   provider_response_ref?: string | null;
   transcript_text_hash?: string | null;
   transcript_text_char_count?: number | null;
+  visual_frame_item_id?: string | null;
+  visual_frame_client_event_id?: string | null;
+  provider_event_ref?: string | null;
 };
 
 export type HelixAskLiveRuntimeClientDebugSnapshot = {
@@ -88,11 +101,22 @@ export type HelixAskLiveRuntimeClientDebugSnapshot = {
   visual_input_enabled: boolean;
   visual_frame_attempt_count: number;
   visual_frame_sent_count: number;
+  visual_frame_provider_acknowledged_count: number;
+  visual_frame_provider_image_confirmed_count: number;
+  visual_frame_automatic_sent_count: number;
+  visual_frame_manual_sent_count: number;
+  visual_frame_automatic_provider_acknowledged_count: number;
+  visual_frame_manual_provider_acknowledged_count: number;
+  visual_frame_automatic_provider_image_confirmed_count: number;
+  visual_frame_manual_provider_image_confirmed_count: number;
   visual_frame_blocked_count: number;
   visual_frame_error_count: number;
   latest_visual_frame_receipt: Omit<HelixAskLiveRuntimeVisualFrameReceipt, "raw_content_included"> & {
     raw_content_included: false;
   } | null;
+  latest_visual_frame_provider_acknowledgement:
+    HelixAskRealtimeVisualFrameProviderAcknowledgement | null;
+  visual_input_proof: HelixAskLiveVisionProof;
   data_channel_state: "not_created" | "connecting" | "open" | "closed" | "error";
   initial_audio_probe_requested: boolean;
   initial_audio_probe_error: string | null;
@@ -186,9 +210,30 @@ export const beginHelixAskLiveRuntimeClientDebugAttempt = (input: {
     visual_input_enabled: false,
     visual_frame_attempt_count: 0,
     visual_frame_sent_count: 0,
+    visual_frame_provider_acknowledged_count: 0,
+    visual_frame_provider_image_confirmed_count: 0,
+    visual_frame_automatic_sent_count: 0,
+    visual_frame_manual_sent_count: 0,
+    visual_frame_automatic_provider_acknowledged_count: 0,
+    visual_frame_manual_provider_acknowledged_count: 0,
+    visual_frame_automatic_provider_image_confirmed_count: 0,
+    visual_frame_manual_provider_image_confirmed_count: 0,
     visual_frame_blocked_count: 0,
     visual_frame_error_count: 0,
     latest_visual_frame_receipt: null,
+    latest_visual_frame_provider_acknowledgement: null,
+    visual_input_proof: buildHelixAskLiveVisionProof({
+      visual_frame_sent_count: 0,
+      visual_frame_provider_acknowledged_count: 0,
+      visual_frame_provider_image_confirmed_count: 0,
+      visual_frame_automatic_sent_count: 0,
+      visual_frame_manual_sent_count: 0,
+      visual_frame_automatic_provider_acknowledged_count: 0,
+      visual_frame_manual_provider_acknowledged_count: 0,
+      visual_frame_automatic_provider_image_confirmed_count: 0,
+      visual_frame_manual_provider_image_confirmed_count: 0,
+      latest_visual_frame_provider_acknowledgement: null,
+    }),
     data_channel_state: "not_created",
     initial_audio_probe_requested: false,
     initial_audio_probe_error: null,
@@ -488,6 +533,7 @@ export const recordHelixAskLiveRuntimeCompletedOutputTranscript = (
 
 export const recordHelixAskLiveRuntimeVisualFrameReceipt = (
   receipt: HelixAskLiveRuntimeVisualFrameReceipt,
+  routeKind: HelixAskRealtimeVisualFrameRouteKind = "unspecified",
 ): void => {
   if (!snapshot) return;
   recordHelixAskLiveRuntimeClientDebugEvent({
@@ -504,6 +550,12 @@ export const recordHelixAskLiveRuntimeVisualFrameReceipt = (
     ...snapshot,
     visual_frame_attempt_count: snapshot.visual_frame_attempt_count + 1,
     visual_frame_sent_count: snapshot.visual_frame_sent_count + (receipt.ok ? 1 : 0),
+    visual_frame_automatic_sent_count:
+      snapshot.visual_frame_automatic_sent_count +
+      (receipt.ok && routeKind === "automatic_capture" ? 1 : 0),
+    visual_frame_manual_sent_count:
+      snapshot.visual_frame_manual_sent_count +
+      (receipt.ok && routeKind === "manual_promotion" ? 1 : 0),
     visual_frame_blocked_count: snapshot.visual_frame_blocked_count + (receipt.status === "blocked" ? 1 : 0),
     visual_frame_error_count: snapshot.visual_frame_error_count + (receipt.status === "error" ? 1 : 0),
     latest_visual_frame_receipt: {
@@ -511,6 +563,60 @@ export const recordHelixAskLiveRuntimeVisualFrameReceipt = (
       raw_content_included: false,
     },
     updated_at_ms: receipt.observed_at_ms,
+  };
+};
+
+export const recordHelixAskLiveRuntimeVisualFrameProviderAcknowledgement = (
+  acknowledgement: HelixAskRealtimeVisualFrameProviderAcknowledgement,
+): void => {
+  if (!snapshot) return;
+  const event: HelixAskLiveRuntimeClientDebugEvent = {
+    event_kind: acknowledgement.status === "provider_error"
+      ? "visual_frame_provider_error"
+      : "visual_frame_provider_acknowledged",
+    observed_at_ms: acknowledgement.observed_at_ms,
+    detail_code: acknowledgement.provider_error_code ?? acknowledgement.status,
+    provider_event_type: acknowledgement.provider_event_type,
+    remote_track_source: null,
+    remote_audio_muted: null,
+    audio_focus_granted: null,
+    microphone_track_count: null,
+    microphone_live_track_count: null,
+    microphone_enabled_track_count: null,
+    microphone_muted_track_count: null,
+    microphone_device_label: null,
+    microphone_loopback_source: null,
+    visual_frame_item_id: safeCode(acknowledgement.item_id),
+    visual_frame_client_event_id: safeCode(acknowledgement.client_event_id),
+    provider_event_ref: safeCode(acknowledgement.provider_event_id),
+  };
+  snapshot = {
+    ...snapshot,
+    visual_frame_provider_acknowledged_count:
+      snapshot.visual_frame_provider_acknowledged_count +
+      (acknowledgement.first_provider_acknowledgement ? 1 : 0),
+    visual_frame_automatic_provider_acknowledged_count:
+      snapshot.visual_frame_automatic_provider_acknowledged_count +
+      (acknowledgement.first_provider_acknowledgement &&
+      acknowledgement.route_kind === "automatic_capture" ? 1 : 0),
+    visual_frame_manual_provider_acknowledged_count:
+      snapshot.visual_frame_manual_provider_acknowledged_count +
+      (acknowledgement.first_provider_acknowledgement &&
+      acknowledgement.route_kind === "manual_promotion" ? 1 : 0),
+    visual_frame_provider_image_confirmed_count:
+      snapshot.visual_frame_provider_image_confirmed_count +
+      (acknowledgement.first_provider_image_context_confirmation ? 1 : 0),
+    visual_frame_automatic_provider_image_confirmed_count:
+      snapshot.visual_frame_automatic_provider_image_confirmed_count +
+      (acknowledgement.first_provider_image_context_confirmation &&
+      acknowledgement.route_kind === "automatic_capture" ? 1 : 0),
+    visual_frame_manual_provider_image_confirmed_count:
+      snapshot.visual_frame_manual_provider_image_confirmed_count +
+      (acknowledgement.first_provider_image_context_confirmation &&
+      acknowledgement.route_kind === "manual_promotion" ? 1 : 0),
+    latest_visual_frame_provider_acknowledgement: { ...acknowledgement },
+    updated_at_ms: acknowledgement.observed_at_ms,
+    events: [...snapshot.events, event].slice(-MAX_EVENTS),
   };
 };
 
@@ -526,6 +632,11 @@ export const readHelixAskLiveRuntimeClientDebugSnapshot = ():
         latest_completed_output_transcript: snapshot.latest_completed_output_transcript
           ? { ...snapshot.latest_completed_output_transcript }
           : null,
+        latest_visual_frame_provider_acknowledgement:
+          snapshot.latest_visual_frame_provider_acknowledgement
+            ? { ...snapshot.latest_visual_frame_provider_acknowledgement }
+            : null,
+        visual_input_proof: buildHelixAskLiveVisionProof(snapshot),
       }
     : null;
 
@@ -550,6 +661,11 @@ export const mergeHelixAskLiveRuntimeClientDebugIntoExport = (payload: string): 
       ? groundedAnswers.find((answer: HelixRealtimeStagePlayGroundedAnswerV1) =>
           answer.ask_turn_id === selectedAnswerTurnId) ?? null
       : null;
+    const boundGroundedHandoff = boundGroundedAnswer
+      ? stagePlayHandoffs.find((handoff: HelixRealtimeStagePlayDebugV1["handoffs"][number]) =>
+          handoff.grounded_answer?.feedback_id === boundGroundedAnswer.feedback_id) ?? null
+      : null;
+    const boundGroundedRelay = boundGroundedHandoff?.grounded_relay ?? null;
     const turnBinding = boundGroundedAnswer
       ? "server_stage_play_handoff_bound_to_selected_answer"
       : liveRuntimeDebug.latest_stage_play_handoff
@@ -605,6 +721,9 @@ export const mergeHelixAskLiveRuntimeClientDebugIntoExport = (payload: string): 
         transcript.ask_turn_binding_status === "grounded_relay_bound_to_selected_answer") ?? null;
     const selectedAnswerSpokenOutputBinding = selectedAnswerSpokenOutput
       ? "provider_response_bound_to_selected_answer"
+      : boundGroundedRelay?.status === "response_requested" ||
+          boundGroundedRelay?.status === "speaking"
+        ? "provider_response_in_progress_for_selected_answer"
       : boundGroundedAnswer
         ? "selected_answer_has_no_bound_completed_output_transcript"
         : "selected_answer_not_bound_to_grounded_feedback";
@@ -618,7 +737,10 @@ export const mergeHelixAskLiveRuntimeClientDebugIntoExport = (payload: string): 
         selected_answer_grounded_feedback_id: boundGroundedAnswer?.feedback_id ?? null,
         selected_answer_spoken_output_binding: selectedAnswerSpokenOutputBinding,
         selected_answer_spoken_output_provider_response_ref:
-          selectedAnswerSpokenOutput?.provider_response_ref ?? null,
+          selectedAnswerSpokenOutput?.provider_response_ref ??
+          boundGroundedRelay?.provider_response_ref ??
+          null,
+        selected_answer_spoken_output_relay_status: boundGroundedRelay?.status ?? null,
         selected_answer_spoken_output_transcript_hash:
           selectedAnswerSpokenOutput?.transcript_text_hash ?? null,
         selected_answer_spoken_output_playback_confirmed:

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   readTurnAdmittedWorkstationTools,
+  removeSatisfiedNativeWorkstationTools,
   resolveCodexNativeProviderBridgeAvailability,
 } from "../provider-bridge";
 
@@ -80,6 +81,19 @@ describe("Codex native provider bridge availability", () => {
     expect(readTurnAdmittedWorkstationTools({
       runtime_goal_session: { allowed_workstation_tools: [] },
     })).toEqual([]);
+  });
+
+  it("does not re-expose a capability whose successful observation is already in the prompt", () => {
+    expect(removeSatisfiedNativeWorkstationTools(
+      ["workspace_os.status", "repo.search"],
+      [{
+        ok: true,
+        capability_id: "workspace_os.status",
+        observation_packet: {
+          status: "succeeded",
+        },
+      } as never],
+    )).toEqual(["repo.search"]);
   });
 
   it("does not turn deterministic test suites into live API calls", () => {
