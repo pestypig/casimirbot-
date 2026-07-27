@@ -425,9 +425,15 @@ export function buildToolCallAdmissionDecision(input: {
     promptExplicitCapabilityMatches.map((match) => match.contract),
   );
   const promptExplicitCapabilityContract = extractExplicitCapabilityContract(promptText);
+  const policySelectedCapabilityContract =
+    unknownSourceArtifactDiscoveryRequested &&
+    (sourceTarget === "docs_viewer" || sourceTarget === "active_doc")
+      ? explicitCapabilityContractForCapability("docs.search")
+      : null;
   const candidateExplicitCapabilityContract =
     promptExplicitCapabilityContract ??
-    explicitCapabilityContractForCapability(mandatoryToolName);
+    explicitCapabilityContractForCapability(mandatoryToolName) ??
+    policySelectedCapabilityContract;
   const contextualModelOnlySuppression =
     Boolean(contextualSuppression) &&
     (sourceTarget === "model_only" || sourceTarget === "general_background") &&
@@ -455,11 +461,17 @@ export function buildToolCallAdmissionDecision(input: {
   );
   const requestedCapabilitySource = promptExplicitCapabilityContract
     ? "explicit_user_command"
+    : policySelectedCapabilityContract &&
+        candidateExplicitCapabilityContract?.capability === policySelectedCapabilityContract.capability
+      ? "hard_source_target_policy"
     : explicitCapabilityContract
       ? "mandatory_next_tool"
       : null;
   const requestedCapabilityConfidence = promptExplicitCapabilityContract
     ? 0.99
+    : policySelectedCapabilityContract &&
+        candidateExplicitCapabilityContract?.capability === policySelectedCapabilityContract.capability
+      ? 0.96
     : explicitCapabilityContract
       ? 0.95
       : null;

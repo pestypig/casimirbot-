@@ -1,8 +1,11 @@
 import type { HelixWorldEvent } from "./helix-world-event";
 
-export const HELIX_EVENT_JOURNAL_RECORD_SCHEMA = "helix.event_journal_record.v1" as const;
-export const HELIX_EVENT_JOURNAL_QUERY_SCHEMA = "helix.event_journal_query.v1" as const;
-export const HELIX_EVENT_JOURNAL_QUERY_RESULT_SCHEMA = "helix.event_journal_query_result.v1" as const;
+export const HELIX_EVENT_JOURNAL_RECORD_SCHEMA =
+  "helix.event_journal_record.v1" as const;
+export const HELIX_EVENT_JOURNAL_QUERY_SCHEMA =
+  "helix.event_journal_query.v1" as const;
+export const HELIX_EVENT_JOURNAL_QUERY_RESULT_SCHEMA =
+  "helix.event_journal_query_result.v1" as const;
 
 export type HelixEventJournalSourceFamily =
   | "minecraft"
@@ -10,7 +13,8 @@ export type HelixEventJournalSourceFamily =
   | "calculator_stream"
   | "physics_simulation"
   | "browser_audio"
-  | "unknown";
+  | "unknown"
+  | (string & {});
 
 export type HelixEventJournalRecord = {
   schema: typeof HELIX_EVENT_JOURNAL_RECORD_SCHEMA;

@@ -7,6 +7,10 @@ import {
   type HelixVisualProducerCadenceStatus,
 } from "@shared/helix-visual-producer-cadence";
 import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
+import {
   getLiveSourceProducer,
   listLiveSourceChunks,
   setLiveSourceRatePolicy,
@@ -36,6 +40,12 @@ const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
 
 const nowIso = (): string => new Date().toISOString();
+
+const assertGenericProducerSourceId = (sourceId: string): void => {
+  if (isHelixRoomSourceIngressSourceId(sourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
+};
 
 const clampCadenceMs = (value: unknown): number | null => {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
@@ -72,6 +82,13 @@ export function bindLiveSourceProducer(input: {
   pipelineId?: string | null;
   participantId?: string | null;
 }): HelixLiveSourceProducerBinding {
+  assertGenericProducerSourceId(input.sourceId);
+  if (input.producer) {
+    assertGenericProducerSourceId(input.producer.source_id);
+    if (input.producer.source_id !== input.sourceId) {
+      throw new Error("live_source_producer_binding_identity_mismatch");
+    }
+  }
   const producer = input.producer ?? upsertLiveSourceProducer({
     sourceId: input.sourceId,
     threadId: input.threadId,
@@ -110,11 +127,19 @@ export function bindLiveSourceProducer(input: {
 }
 
 export function getLiveSourceProducerBinding(sourceId: string): HelixLiveSourceProducerBinding | null {
-  return bindingsBySourceId.get(sourceId) ?? null;
+  if (isHelixRoomSourceIngressSourceId(sourceId)) return null;
+  const binding = bindingsBySourceId.get(sourceId) ?? null;
+  return binding && !isHelixRoomSourceIngressSourceId(binding.source_id)
+    ? binding
+    : null;
 }
 
 export function listLiveSourceProducerBindings(input: { threadId?: string | null } = {}): HelixLiveSourceProducerBinding[] {
   return Array.from(bindingsBySourceId.values())
+    .filter(
+      (binding: HelixLiveSourceProducerBinding) =>
+        !isHelixRoomSourceIngressSourceId(binding.source_id),
+    )
     .filter((binding: HelixLiveSourceProducerBinding) => !input.threadId || binding.thread_id === input.threadId);
 }
 
@@ -128,6 +153,7 @@ export function setVisualProducerCadence(input: {
   clientStreamConfirmed?: boolean;
   status?: HelixVisualProducerCadenceStatus | null;
 }): { producer: HelixLiveSourceProducer; binding: HelixLiveSourceProducerBinding; receipt: HelixVisualProducerCadenceReceipt } {
+  assertGenericProducerSourceId(input.sourceId);
   const cadenceMs = clampCadenceMs(input.cadenceMs) ?? 15_000;
   const captureMode = input.captureMode ?? "interval";
   const status: HelixVisualProducerCadenceStatus =
@@ -217,6 +243,7 @@ export function markVisualProducerHeartbeat(input: {
   status?: HelixVisualProducerCadenceStatus | null;
   ts?: string | null;
 }): { producer: HelixLiveSourceProducer; binding: HelixLiveSourceProducerBinding; receipt: HelixVisualProducerCadenceReceipt } {
+  assertGenericProducerSourceId(input.sourceId);
   const existing = getLiveSourceProducerBinding(input.sourceId);
   const ts = input.ts ?? nowIso();
   const currentProducer = getLiveSourceProducer(input.sourceId);
@@ -300,6 +327,16 @@ export function readVisualProducerTickDue(input: {
   assistant_answer: false;
   raw_content_included: false;
 } {
+  if (isHelixRoomSourceIngressSourceId(input.sourceId)) {
+    return {
+      due: false,
+      producer: null,
+      binding: null,
+      next_required_action: "use_bound_room_source_ingress",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
   const binding = getLiveSourceProducerBinding(input.sourceId);
   const producer = getLiveSourceProducer(input.sourceId);
   const nowMs = Date.parse(input.now ?? nowIso());
@@ -334,6 +371,12 @@ export function readVisualProducerTickDue(input: {
     assistant_answer: false,
     raw_content_included: false,
   };
+}
+
+export function removeLiveSourceProducerBinding(input: {
+  sourceId: string;
+}): number {
+  return bindingsBySourceId.delete(input.sourceId) ? 1 : 0;
 }
 
 export function resetLiveSourceProducerBindingsForTest(): void {

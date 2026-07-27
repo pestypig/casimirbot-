@@ -9,6 +9,9 @@ import type {
   HelixWorkstationTypedAffordance,
   HelixWorkstationTypedAffordanceKind,
 } from "@shared/helix-agent-step-observation-packet";
+import type {
+  HelixWorkstationGatewayAccountContext,
+} from "./account-policy";
 
 export type HelixWorkstationGatewayMode = "read" | "observe" | "act" | "verify";
 
@@ -68,11 +71,20 @@ export type HelixWorkstationGatewayCallInput = {
   mode?: HelixWorkstationGatewayMode | string | null;
   capabilityId: string;
   arguments?: Record<string, unknown>;
+  approvalReceipt?: unknown;
   approvalToken?: string | null;
+  sessionId?: string | null;
   turnId?: string | null;
   iteration?: number | null;
   accountType?: HelixAccountType | null;
   profileId?: string | null;
+  /**
+   * Server-derived account context for capabilities whose authorization
+   * depends on more than a caller-supplied profile identifier. This is never
+   * populated from tool arguments.
+   */
+  accountContext?: HelixWorkstationGatewayAccountContext | null;
+  authoritativeEvidenceArtifacts?: unknown[];
 };
 
 export type HelixWorkstationGatewayAdmissionRecord = {

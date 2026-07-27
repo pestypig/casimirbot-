@@ -43,6 +43,9 @@ describe("Helix capability contract arbitration", () => {
       ["scholarly-research.lookup_papers", "scholarly_research_lookup", "external_scholarly_research"],
       ["scholarly-research.fetch_full_text", "scholarly_full_text_lookup", "external_scholarly_research"],
       ["helix_ask.reflect_theory_context", "theory_context_reflection", "theory_context"],
+      ["theory-experiment-procedure.prepare", "theory_context_reflection", "theory_context"],
+      ["theory-experiment-procedure.readmit", "theory_context_reflection", "theory_context"],
+      ["theory-experiment-procedure.evaluate_closure", "theory_context_reflection", "theory_context"],
       ["helix.theory.frontierVectorFieldTrace", "theory_frontier_vector_field", "theory_context"],
       ["helix_ask.reflect_live_synthetic_data", "context_attachment_reflection", "context_reflection"],
       ["helix_ask.reflect_context_attachments", "context_attachment_reflection", "context_reflection"],
@@ -86,6 +89,8 @@ describe("Helix capability contract arbitration", () => {
       ["live_env.project_live_source_narrative", "live_environment_review", "live_environment_state"],
       ["live_env.record_live_source_mail_decision", "processed_mail_voice_decision", "live_source_mail"],
       ["live_env.request_interim_voice_callout", "processed_mail_voice_decision", "live_environment_state"],
+      ["text_to_speech.speak_text", "voice_delivery", "live_environment_state"],
+      ["workstation-notes.list_notes", "workstation_note_list", "workspace_state"],
       ["workstation-notes.append_to_note", "workstation_note_edit", "workspace_state"],
       ["workstation-notes.create_note", "workstation_note_edit", "workspace_state"],
       ["workstation-notes.open", "workstation_note_open", "workspace_state"],
@@ -147,6 +152,9 @@ describe("Helix capability contract arbitration", () => {
       ["internet_search", "Use internet_search.web_research to find a cited paper source.", "internet_search.web_research"],
       ["scholarly_research", "Call scholarly-research.lookup_papers for Alcubierre metric papers.", "scholarly-research.lookup_papers"],
       ["theory_locator", "Use helix_ask.reflect_theory_context to map this claim on the theory graph.", "helix_ask.reflect_theory_context"],
+      ["theory_locator", "Prepare a seven-stage theory experiment procedure for badge study.casimir_dp.evidence_map_stage3.", "theory-experiment-procedure.prepare"],
+      ["theory_locator", "Call theory-experiment-procedure.readmit for the exact retained procedure.", "theory-experiment-procedure.readmit"],
+      ["theory_locator", "Continue the execution-closure workflow for the admitted procedure.", "theory-experiment-procedure.evaluate_closure"],
       ["live_source_mail", "Run live_env.read_processed_live_source_mail to inspect processed mailbox evidence.", "live_env.read_processed_live_source_mail"],
       ["live_environment", "Call live_env.query_workstation_goal_context to inspect goal context.", "live_env.query_workstation_goal_context"],
       ["visual_capture", "Use situation-room.describe_visual_capture to inspect the current visual frame.", "image_lens.inspect"],
@@ -161,6 +169,205 @@ describe("Helix capability contract arbitration", () => {
       expect(match?.contract.capability_family, family).toBe(family);
       expect(match?.source, family).toBe("command_mention");
     }
+  });
+
+  it("maps natural read-only notes and literal voice commands onto explicit capability contracts", () => {
+    const cases = [
+      [
+        "Check my workstation notes and tell me what topics are available.",
+        "workstation-notes.list_notes",
+      ],
+      [
+        "Say this aloud: The evidence is diagnostic, not conclusive.",
+        "text_to_speech.speak_text",
+      ],
+    ] as const;
+
+    for (const [promptText, expectedCapability] of cases) {
+      expect(
+        extractExplicitCapabilityContracts(promptText).map((entry) => ({
+          capability: entry.contract.capability,
+          source: entry.source,
+        })),
+        promptText,
+      ).toContainEqual({
+        capability: expectedCapability,
+        source: "natural_capability_intent",
+      });
+    }
+  });
+
+  it("does not execute natural notes or voice capabilities from contextual mentions", () => {
+    const cases = [
+      ["Do not check my workstation notes; just explain what notes are.", "workstation-notes.list_notes"],
+      ["Later, check my workstation notes and tell me what is available.", "workstation-notes.list_notes"],
+      ['The screen says "check my workstation notes"; explain that label only.', "workstation-notes.list_notes"],
+      ["Do not say this aloud: The evidence is diagnostic.", "text_to_speech.speak_text"],
+      ["Later, say this aloud: The evidence is diagnostic.", "text_to_speech.speak_text"],
+      ['The prompt says "Say this aloud: hello"; explain the quote only.', "text_to_speech.speak_text"],
+    ] as const;
+
+    for (const [promptText, forbiddenCapability] of cases) {
+      expect(
+        extractExplicitCapabilityContracts(promptText).map(
+          (entry) => entry.contract.capability,
+        ),
+        promptText,
+      ).not.toContain(forbiddenCapability);
+    }
+  });
+
+  it("readmits an exact retained procedure only for affirmative commands", () => {
+    const capability = "theory-experiment-procedure.readmit";
+    expect(explicitCapabilityContractForCapability(capability)).toMatchObject({
+      capability_family: "theory_locator",
+      required_args: [
+        "procedure_artifact_ref",
+        "procedure_id",
+        "procedure_sha256",
+      ],
+      required_observation_kinds: [
+        "theory_experiment_procedure_observation",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+    });
+
+    for (const promptText of [
+      "Call theory-experiment-procedure.readmit for the exact retained procedure.",
+      "Use theory_experiment_procedure_readmit now with its original artifact binding.",
+    ]) {
+      expect(
+        extractExplicitCapabilityContracts(promptText).map(
+          (entry) => entry.contract.capability,
+        ),
+        promptText,
+      ).toContain(capability);
+    }
+
+    for (const promptText of [
+      "Do not call theory-experiment-procedure.readmit; explain retention only.",
+      "Later we may call theory-experiment-procedure.readmit.",
+      "Earlier I asked you to call theory-experiment-procedure.readmit.",
+      'The notes say "call theory-experiment-procedure.readmit"; explain that quote.',
+      "The screen shows theory-experiment-procedure.readmit, but only explain the label.",
+      "What does theory-experiment-procedure.readmit do?",
+    ]) {
+      expect(
+        extractExplicitCapabilityContracts(promptText).map(
+          (entry) => entry.contract.capability,
+        ),
+        promptText,
+      ).not.toContain(capability);
+    }
+  });
+
+  it("requires closure evidence for affirmative execution-closure commands without admitting contextual mentions", () => {
+    const closureCapability =
+      "theory-experiment-procedure.evaluate_closure";
+    const contract =
+      explicitCapabilityContractForCapability(closureCapability);
+    expect(contract).toMatchObject({
+      capability_family: "theory_locator",
+      source_target: "theory_locator",
+      required_args: ["prompt", "procedure_id", "procedure_sha256"],
+      required_observation_kinds: [
+        "theory_experiment_execution_closure",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+    });
+    expect(contract?.required_observation_kinds).not.toContain(
+      "theory_experiment_procedure_observation",
+    );
+
+    for (const promptText of [
+      "Continue the execution-closure workflow for the admitted procedure.",
+      "Evaluate the theory execution closure now.",
+      "Run theory-experiment-procedure.evaluate_closure with the exact admitted procedure binding.",
+    ]) {
+      expect(
+        extractExplicitCapabilityContracts(promptText).map(
+          (entry) => entry.contract.capability,
+        ),
+        promptText,
+      ).toContain(closureCapability);
+    }
+
+    for (const promptText of [
+      "Do not run the execution closure; explain the prepared procedure only.",
+      "In the future, run the execution closure after the evidence arrives.",
+      "Earlier I asked you to run the execution closure.",
+      'The notes say "run the execution closure"; explain that quote.',
+      "The screen says run theory-experiment-procedure.evaluate_closure, but only explain the label.",
+      "What does the execution-closure workflow do?",
+    ]) {
+      expect(
+        extractExplicitCapabilityContracts(promptText).map(
+          (entry) => entry.contract.capability,
+        ),
+        promptText,
+      ).not.toContain(closureCapability);
+    }
+  });
+
+  it("registers each execution-closure evidence rail as nonterminal theory-locator work", () => {
+    const cases = [
+      ["theory-semantic-admitter.normalize", "semantic_admission"],
+      [
+        "theory-artifact-producer.prepare_lanyon_request",
+        "theory_artifact_producer_lanyon_request_observation",
+      ],
+      ["theory-artifact-producer.admit_lanyon_snapshot", "artifact_generation_receipt"],
+      ["theory-formal-verifier.prepare_request", "theory_formal_verifier_preparation_observation"],
+      ["theory-formal-verifier.plan", "theory_formal_verifier_plan_observation"],
+      ["theory-formal-verifier.start", "theory_formal_verifier_start_observation"],
+      ["theory-formal-verifier.read_result", "formal_certificate"],
+      ["theory-independent-numerical-verifier.prepare_request", "theory_independent_numerical_verifier_prepared_request_observation"],
+      ["theory-independent-numerical-verifier.plan", "theory_independent_numerical_verifier_plan_observation"],
+      ["theory-independent-numerical-verifier.start", "theory_independent_numerical_verifier_start_observation"],
+      ["theory-independent-numerical-verifier.read_result", "numerical_certificate"],
+    ] as const;
+
+    for (const [capability, observationKind] of cases) {
+      const contract =
+        explicitCapabilityContractForCapability(capability);
+      expect(contract, capability).toMatchObject({
+        capability_family: "theory_locator",
+        plan_family: "theory_locator",
+        source_target: "theory_locator",
+        required_observation_kinds: [observationKind],
+        required_terminal_kind: "model_synthesized_answer",
+        forbidden_nearby_capabilities: ["model.direct_answer"],
+      });
+      expect(
+        canonicalGoalKindForExplicitCapability(capability),
+        capability,
+      ).toBe("theory_context_reflection");
+      expect(
+        answerScopeForExplicitCapability(capability),
+        capability,
+      ).toBe("theory_context");
+    }
+
+    const lanyonContract = explicitCapabilityContractForCapability(
+      "theory-artifact-producer.admit_lanyon_snapshot",
+    );
+    expect(lanyonContract?.required_args).toEqual([
+      "request_artifact_ref",
+      "case_id",
+    ]);
+    expect(lanyonContract?.optional_args).not.toContain("source_root");
+    expect(lanyonContract?.optional_args).not.toContain("sourceRoot");
+
+    const preparerContract = explicitCapabilityContractForCapability(
+      "theory-artifact-producer.prepare_lanyon_request",
+    );
+    expect(preparerContract?.required_args).toEqual([
+      "procedure_artifact_ref",
+      "procedure_id",
+      "procedure_sha256",
+      "semantic_admission_artifact_ref",
+      "case_id",
+    ]);
   });
 
   it("keeps research-paper and Image Lens workflow questions explanatory", () => {

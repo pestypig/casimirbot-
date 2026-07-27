@@ -8,8 +8,39 @@ import {
   HELIX_PAPER_EVIDENCE_ENRICHMENT_PROPOSAL_SCHEMA,
   HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
 } from "@shared/helix-paper-evidence-enrichment";
+import {
+  THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+  buildTheoryExperimentProcedurePromptArguments,
+} from "./theory-experiment-procedure-intent";
 
 type RecordLike = Record<string, unknown>;
+
+const THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY =
+  "theory-experiment-procedure.evaluate_closure" as const;
+const THEORY_EXPERIMENT_PROCEDURE_READMIT_CAPABILITY =
+  "theory-experiment-procedure.readmit" as const;
+const THEORY_SEMANTIC_ADMITTER_NORMALIZE_CAPABILITY =
+  "theory-semantic-admitter.normalize" as const;
+const THEORY_ARTIFACT_PRODUCER_PREPARE_LANYON_REQUEST_CAPABILITY =
+  "theory-artifact-producer.prepare_lanyon_request" as const;
+const THEORY_ARTIFACT_PRODUCER_ADMIT_LANYON_CAPABILITY =
+  "theory-artifact-producer.admit_lanyon_snapshot" as const;
+const THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY =
+  "theory-formal-verifier.prepare_request" as const;
+const THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY =
+  "theory-formal-verifier.plan" as const;
+const THEORY_FORMAL_VERIFIER_START_CAPABILITY =
+  "theory-formal-verifier.start" as const;
+const THEORY_FORMAL_VERIFIER_READ_RESULT_CAPABILITY =
+  "theory-formal-verifier.read_result" as const;
+const THEORY_INDEPENDENT_NUMERICAL_PREPARE_REQUEST_CAPABILITY =
+  "theory-independent-numerical-verifier.prepare_request" as const;
+const THEORY_INDEPENDENT_NUMERICAL_PLAN_CAPABILITY =
+  "theory-independent-numerical-verifier.plan" as const;
+const THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY =
+  "theory-independent-numerical-verifier.start" as const;
+const THEORY_INDEPENDENT_NUMERICAL_READ_RESULT_CAPABILITY =
+  "theory-independent-numerical-verifier.read_result" as const;
 
 export const HELIX_COMPOUND_CAPABILITY_CONTRACT_SCHEMA =
   "helix.compound_capability_contract.v1" as const;
@@ -359,6 +390,16 @@ const boundedPromptArgForSubgoal = (
   return stripLeadingArgLabel(segment) || normalizeSpace(promptText);
 };
 
+const theoryEvidenceBindingHint = (source: string): string =>
+  `<bind from ${source}>`;
+
+const theoryStructuredEvidenceBindingHint = (
+  source: string,
+): RecordLike => ({
+  binding_required_from: source,
+  authority: "current_turn_evidence_only",
+});
+
 const argsHintForSubgoal = (input: {
   turnId: string;
   promptText: string;
@@ -440,6 +481,184 @@ const argsHintForSubgoal = (input: {
       sync_panel: true,
       panel_overlay_mode: "live_answer_context",
       open_panel: false,
+    };
+  }
+  if (capability === THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY) {
+    const procedureArgs = buildTheoryExperimentProcedurePromptArguments({
+      promptText: input.promptText,
+    });
+    return procedureArgs.selected_badge_ids.length > 0
+      ? procedureArgs
+      : {
+          ...procedureArgs,
+          selected_badge_ids: [
+            theoryEvidenceBindingHint(
+              "current-turn registered Theory Badge selection",
+            ),
+          ],
+        };
+  }
+  if (capability === THEORY_EXPERIMENT_PROCEDURE_READMIT_CAPABILITY) {
+    return {
+      procedure_artifact_ref: theoryEvidenceBindingHint(
+        "original retained theory experiment procedure observation",
+      ),
+      procedure_id: theoryEvidenceBindingHint(
+        "exact retained theory experiment procedure identity",
+      ),
+      procedure_sha256: theoryEvidenceBindingHint(
+        "exact retained theory experiment procedure content hash",
+      ),
+    };
+  }
+  if (
+    capability ===
+    THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY
+  ) {
+    return {
+      prompt: boundedPromptArg(),
+      procedure_id: theoryEvidenceBindingHint(
+        "current-turn or explicitly readmitted theory experiment procedure",
+      ),
+      procedure_sha256: theoryEvidenceBindingHint(
+        "exact theory experiment procedure content hash",
+      ),
+      procedure_artifact_ref: theoryEvidenceBindingHint(
+        "theory experiment procedure observation",
+      ),
+    };
+  }
+  if (capability === THEORY_SEMANTIC_ADMITTER_NORMALIZE_CAPABILITY) {
+    return {
+      source_evidence_ref: theoryEvidenceBindingHint(
+        "exact current-turn authoritative source packet artifact",
+      ),
+      source_packet: theoryStructuredEvidenceBindingHint(
+        "current-turn Casimir Spec source packet",
+      ),
+      source_path: theoryEvidenceBindingHint(
+        "source packet provenance path",
+      ),
+      receipt_id: theoryEvidenceBindingHint(
+        "current-turn source provenance receipt",
+      ),
+    };
+  }
+  if (
+    capability ===
+    THEORY_ARTIFACT_PRODUCER_PREPARE_LANYON_REQUEST_CAPABILITY
+  ) {
+    return {
+      procedure_artifact_ref: theoryEvidenceBindingHint(
+        "current-turn Theory Experiment Procedure artifact",
+      ),
+      procedure_id: theoryEvidenceBindingHint(
+        "exact Theory Experiment Procedure ID",
+      ),
+      procedure_sha256: theoryEvidenceBindingHint(
+        "exact Theory Experiment Procedure SHA-256",
+      ),
+      semantic_admission_artifact_ref: theoryEvidenceBindingHint(
+        "current-turn semantic-admission artifact",
+      ),
+      case_id: theoryEvidenceBindingHint(
+        "registered Lanyon case selection",
+      ),
+    };
+  }
+  if (capability === THEORY_ARTIFACT_PRODUCER_ADMIT_LANYON_CAPABILITY) {
+    return {
+      request_artifact_ref: theoryEvidenceBindingHint(
+        "current-turn prepared Lanyon request artifact",
+      ),
+      case_id: theoryEvidenceBindingHint(
+        "registered Lanyon case selection",
+      ),
+    };
+  }
+  if (
+    capability === THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY
+  ) {
+    return {
+      procedure_artifact_ref: theoryEvidenceBindingHint(
+        "current-turn theory experiment procedure observation",
+      ),
+      procedure_id: theoryEvidenceBindingHint(
+        "exact theory experiment procedure identity",
+      ),
+      procedure_sha256: theoryEvidenceBindingHint(
+        "exact theory experiment procedure hash",
+      ),
+      semantic_admission_artifact_ref: theoryEvidenceBindingHint(
+        "current-turn semantic-admission observation",
+      ),
+      artifact_generation_artifact_ref: theoryEvidenceBindingHint(
+        "current-turn formal-artifact producer observation",
+      ),
+    };
+  }
+  if (
+    capability === THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY ||
+    capability === THEORY_FORMAL_VERIFIER_START_CAPABILITY
+  ) {
+    return {
+      prepared_request_id: theoryEvidenceBindingHint(
+        "ready server-owned formal prepared-request observation",
+      ),
+      ...(capability === THEORY_FORMAL_VERIFIER_START_CAPABILITY
+        ? {
+            plan_id: theoryEvidenceBindingHint(
+              "formal verifier plan observation",
+            ),
+          }
+        : {}),
+    };
+  }
+  if (capability === THEORY_FORMAL_VERIFIER_READ_RESULT_CAPABILITY) {
+    return {
+      job_id: theoryEvidenceBindingHint(
+        "formal verifier start observation",
+      ),
+    };
+  }
+  if (
+    capability ===
+    THEORY_INDEPENDENT_NUMERICAL_PREPARE_REQUEST_CAPABILITY
+  ) {
+    return {
+      catalog_entry_id: theoryEvidenceBindingHint(
+        "server-owned independent numerical execution catalog entry",
+      ),
+      procedure_id: theoryEvidenceBindingHint(
+        "exact theory experiment procedure identifier",
+      ),
+      procedure_sha256: theoryEvidenceBindingHint(
+        "exact theory experiment procedure hash",
+      ),
+    };
+  }
+  if (capability === THEORY_INDEPENDENT_NUMERICAL_PLAN_CAPABILITY) {
+    return {
+      prepared_request_id: theoryEvidenceBindingHint(
+        "independent numerical prepared-request observation",
+      ),
+    };
+  }
+  if (capability === THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY) {
+    return {
+      plan_id: theoryEvidenceBindingHint(
+        "independent numerical verifier plan observation",
+      ),
+    };
+  }
+  if (
+    capability ===
+    THEORY_INDEPENDENT_NUMERICAL_READ_RESULT_CAPABILITY
+  ) {
+    return {
+      job_id: theoryEvidenceBindingHint(
+        "independent numerical verifier start observation",
+      ),
     };
   }
   if (capability === "helix.theory.frontierVectorFieldTrace") {
@@ -830,6 +1049,73 @@ export const buildHelixCompoundCapabilityContract = (input: {
     subgoals,
     required_capabilities: unique(subgoals.map((subgoal: HelixCompoundCapabilitySubgoal) => subgoal.requested_capability)),
     requires_all_subgoals: subgoals.length > 1,
+    terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+export const buildHelixSingleCapabilityContractFromAdmission = (input: {
+  turnId: string;
+  promptText: string;
+  contract: ExplicitCapabilityContract;
+  argsHint?: RecordLike | null;
+}): HelixCompoundCapabilityContract => {
+  const match: ExtractedExplicitCapabilityContract = {
+    contract: input.contract,
+    capability: input.contract.capability,
+    matched_name: input.contract.capability,
+    match_index: 0,
+    match_end_index: 0,
+    source: "command_mention",
+  };
+  const ordered = [match];
+  const requestedCapability = input.contract.capability;
+  const subgoal: HelixCompoundCapabilitySubgoal = {
+    subgoal_id: subgoalIdFor(input.turnId, 1, requestedCapability),
+    order: 1,
+    requested_capability: requestedCapability,
+    runtime_capability: runtimeCapabilityForContract(input.contract),
+    capability_family: input.contract.capability_family,
+    plan_family: input.contract.plan_family,
+    source_target: input.contract.source_target,
+    admission_families: [...input.contract.admission_families],
+    required_args: [...input.contract.required_args],
+    optional_args: [...input.contract.optional_args],
+    args_hint:
+      input.argsHint ??
+      argsHintForSubgoal({
+        turnId: input.turnId,
+        promptText: input.promptText,
+        match,
+        ordered,
+      }),
+    required_observation_kinds: requiredObservationKindsForCompoundSubgoal(
+      input.contract,
+      1,
+    ),
+    produced_affordance_kinds: producedAffordancesForContract(input.contract),
+    consumed_affordance_kinds: consumedAffordancesForContract(input.contract),
+    missing_affordance_kinds: [],
+    required_terminal_kind: input.contract.required_terminal_kind,
+    contribution_role: contributionRoleForContract(input.contract),
+    terminal_contribution_kind: input.contract.required_terminal_kind,
+    allowed_substitutions: [...input.contract.allowed_substitutions],
+    forbidden_nearby_capabilities: [
+      ...input.contract.forbidden_nearby_capabilities,
+    ],
+    depends_on_subgoal_ids: [],
+    input_bindings: [],
+    status: "pending",
+    mandatory: true,
+  };
+  return {
+    schema: HELIX_COMPOUND_CAPABILITY_CONTRACT_SCHEMA,
+    turn_id: input.turnId,
+    prompt_shape: "single_capability",
+    subgoals: [subgoal],
+    required_capabilities: [requestedCapability],
+    requires_all_subgoals: false,
     terminal_policy: "synthesize_from_satisfied_subgoal_observations",
     assistant_answer: false,
     raw_content_included: false,

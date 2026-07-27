@@ -5,6 +5,7 @@ import type {
 import type { HelixWorldEvent } from "@shared/helix-world-event";
 import type { HelixMinecraftRouteRehearsal } from "@shared/helix-minecraft-route-rehearsal";
 import type { HelixMinecraftRouteDriftEvent } from "@shared/helix-minecraft-evidence";
+import type { HelixRoomSourceAdmission } from "@shared/helix-room-source-ingress";
 import type {
   SituationEventSignal,
   SituationGoalHypothesis,
@@ -41,18 +42,22 @@ export function reduceLiveAnswerEnvironmentFromWorldEvent(input: {
   goalHypotheses?: SituationGoalHypothesis[];
   routeRehearsal?: HelixMinecraftRouteRehearsal | null;
   routeDriftEvent?: HelixMinecraftRouteDriftEvent | null;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
   now?: string;
 }): { environment: LiveAnswerEnvironment; delta: LiveAnswerEnvironmentDelta } | null {
   const environment = input.environment;
   if (!environment || environment.status !== "active") return null;
   const environmentSnapshot = extractEnvironmentStateSnapshotFromWorldEvent(input.event);
   if (environmentSnapshot) {
-    ingestEnvironmentStateSnapshot(environmentSnapshot);
+    ingestEnvironmentStateSnapshot(environmentSnapshot, {
+      sourceAdmission: input.sourceAdmission,
+    });
     const environmentUpdate = reduceLiveAnswerEnvironmentFromEnvironmentStateSnapshot({
       environment,
       snapshot: environmentSnapshot,
       threadId: environment.thread_id,
       objective: environment.objective,
+      sourceAdmission: input.sourceAdmission,
       now: input.now ?? input.signal.ts,
     });
     return environmentUpdate

@@ -23,6 +23,10 @@ import {
 } from "@shared/helix-visual-frame-evidence";
 import type { HelixVisualEventAlignment } from "@shared/helix-visual-event-alignment";
 import { HELIX_VISUAL_EVENT_ALIGNMENT_SCHEMA } from "@shared/helix-visual-event-alignment";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 import { enqueueStagePlayLiveSourceMailItem } from "../stage-play/stage-play-live-source-mailbox-store";
 import { getLiveSourceProducer } from "./live-source-chunk-buffer";
 
@@ -47,6 +51,46 @@ const uniqueStrings = (value: unknown): string[] =>
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+
+const assertGenericVisualSourceId = (sourceId: unknown): void => {
+  if (isHelixRoomSourceIngressSourceId(sourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
+};
+
+const assertGenericVisualSourceAliases = (
+  input: Record<string, unknown>,
+): void => {
+  assertGenericVisualSourceId(input.source_id);
+  assertGenericVisualSourceId(input.sourceId);
+};
+
+const storedFrameForId = (
+  threadId: string,
+  frameId: string,
+): HelixVisualFrameRecord | null =>
+  (framesByThread.get(threadId) ?? []).find(
+    (frame) => frame.frame_id === frameId,
+  ) ?? null;
+
+const storedFrameForIdAcrossThreads = (
+  frameId: string,
+): HelixVisualFrameRecord | null => {
+  for (const frames of framesByThread.values()) {
+    const frame = frames.find((entry) => entry.frame_id === frameId);
+    if (frame) return frame;
+  }
+  return null;
+};
+
+const alignmentHasProtectedSource = (
+  alignment: HelixVisualEventAlignment,
+): boolean =>
+  alignment.frame_ids.some((frameId) =>
+    isHelixRoomSourceIngressSourceId(
+      storedFrameForIdAcrossThreads(frameId)?.source_id,
+    ),
+  );
 
 const parseStructuredVisualObserverOutput = (value: unknown): Record<string, unknown> | null => {
   const direct = readRecord(value);
@@ -110,6 +154,7 @@ const playerPositionFromInput = (value: unknown): HelixVisualPlayerPosition | nu
 };
 
 export function startVisualSnapshotSource(input: Record<string, unknown>): HelixVisualSnapshotSourceReceipt {
+  assertGenericVisualSourceAliases(input);
   const threadId = readString(input.thread_id) ?? "helix-ask:desktop";
   const sourceSurface = normalizeSourceSurface(input.source_surface);
   const sourceId =
@@ -157,7 +202,9 @@ export function setVisualSnapshotSourceStatus(input: {
   sourceId: string;
   status: HelixVisualSnapshotSourceStatus;
 }): HelixVisualSnapshotSourceReceipt {
+  assertGenericVisualSourceId(input.sourceId);
   const source = sourcesById.get(input.sourceId);
+  assertGenericVisualSourceId(source?.source_id);
   if (!source) {
     return {
       schema: "helix.visual_snapshot_source_receipt.v1",
@@ -191,7 +238,9 @@ export function touchVisualSnapshotSource(input: {
   status?: HelixVisualSnapshotSourceStatus | null;
   ts?: string | null;
 }): HelixVisualSnapshotSource | null {
+  assertGenericVisualSourceId(input.sourceId);
   const source = sourcesById.get(input.sourceId);
+  assertGenericVisualSourceId(source?.source_id);
   if (!source) return null;
   const updated: HelixVisualSnapshotSource = {
     ...source,
@@ -203,6 +252,7 @@ export function touchVisualSnapshotSource(input: {
 }
 
 export function updateVisualSnapshotSource(input: Record<string, unknown>): HelixVisualSnapshotSourceReceipt {
+  assertGenericVisualSourceAliases(input);
   const sourceId = readString(input.source_id);
   if (!sourceId) {
     return {
@@ -216,6 +266,7 @@ export function updateVisualSnapshotSource(input: Record<string, unknown>): Heli
     };
   }
   const existing = sourcesById.get(sourceId);
+  assertGenericVisualSourceId(existing?.source_id);
   if (!existing) return setVisualSnapshotSourceStatus({ sourceId, status: "error" });
   const status = normalizeStatus(input.status) ?? existing.status;
   const updated: HelixVisualSnapshotSource = {
@@ -238,8 +289,11 @@ export function updateVisualSnapshotSource(input: Record<string, unknown>): Heli
 }
 
 export function recordVisualFrame(input: Record<string, unknown>): HelixVisualFrameRecord {
+  assertGenericVisualSourceAliases(input);
   const sourceId = readString(input.source_id) ?? "source:visual-snapshot";
+  assertGenericVisualSourceId(sourceId);
   const source = sourcesById.get(sourceId);
+  assertGenericVisualSourceId(source?.source_id);
   const threadId = readString(input.thread_id) ?? source?.thread_id ?? "helix-ask:desktop";
   const ts = readString(input.ts) ?? nowIso();
   const imageSha = readString(input.image_sha256) ?? (
@@ -273,12 +327,16 @@ export function recordVisualFrame(input: Record<string, unknown>): HelixVisualFr
 }
 
 export function analyzeVisualFrame(input: Record<string, unknown>): HelixVisualFrameEvidence {
+  assertGenericVisualSourceAliases(input);
   const threadId = readString(input.thread_id) ?? "helix-ask:desktop";
   const frameId = readString(input.frame_id);
-  const frame = frameId ? getVisualFrame({ threadId, frameId }) : getLatestVisualFrame({ threadId });
+  const frame = frameId
+    ? storedFrameForId(threadId, frameId)
+    : (framesByThread.get(threadId) ?? []).at(-1) ?? null;
   if (!frame) {
     throw new Error("visual_frame_not_found");
   }
+  assertGenericVisualSourceId(frame.source_id);
   const supportClaims = Array.isArray(input.supports_claims)
     ? input.supports_claims.map((entry): HelixVisualFrameSupportClaim | null => {
         if (!entry || typeof entry !== "object") return null;
@@ -363,10 +421,16 @@ export function analyzeVisualFrame(input: Record<string, unknown>): HelixVisualF
 }
 
 export function alignVisualFrameWithEvents(input: Record<string, unknown>): HelixVisualEventAlignment {
+  assertGenericVisualSourceAliases(input);
   const threadId = readString(input.thread_id) ?? "helix-ask:desktop";
   const frameIds = uniqueStrings(input.frame_ids);
-  const latestFrame = getLatestVisualFrame({ threadId });
+  const latestFrame = (framesByThread.get(threadId) ?? []).at(-1) ?? null;
   const selectedFrameIds = frameIds.length > 0 ? frameIds : latestFrame ? [latestFrame.frame_id] : [];
+  for (const selectedFrameId of selectedFrameIds) {
+    assertGenericVisualSourceId(
+      storedFrameForIdAcrossThreads(selectedFrameId)?.source_id,
+    );
+  }
   const alignment: HelixVisualEventAlignment = {
     schema: HELIX_VISUAL_EVENT_ALIGNMENT_SCHEMA,
     alignment_id: readString(input.alignment_id) ?? `visual_alignment:${compactHash([threadId, selectedFrameIds, input.event_refs ?? [], Date.now()])}`,
@@ -387,11 +451,16 @@ export function alignVisualFrameWithEvents(input: Record<string, unknown>): Heli
 }
 
 export function getVisualSnapshotSource(sourceId: string): HelixVisualSnapshotSource | null {
-  return sourcesById.get(sourceId) ?? null;
+  if (isHelixRoomSourceIngressSourceId(sourceId)) return null;
+  const source = sourcesById.get(sourceId) ?? null;
+  return source && !isHelixRoomSourceIngressSourceId(source.source_id)
+    ? source
+    : null;
 }
 
 export function listVisualSnapshotSources(input: { threadId?: string | null; status?: string | null } = {}): HelixVisualSnapshotSource[] {
   return Array.from(sourcesById.values()).filter((source) => {
+    if (isHelixRoomSourceIngressSourceId(source.source_id)) return false;
     if (input.threadId && source.thread_id !== input.threadId) return false;
     if (input.status && source.status !== input.status) return false;
     return true;
@@ -399,32 +468,94 @@ export function listVisualSnapshotSources(input: { threadId?: string | null; sta
 }
 
 export function getVisualFrame(input: { threadId: string; frameId: string }): HelixVisualFrameRecord | null {
-  return (framesByThread.get(input.threadId) ?? []).find((frame) => frame.frame_id === input.frameId) ?? null;
+  const frame = storedFrameForId(input.threadId, input.frameId);
+  return frame && !isHelixRoomSourceIngressSourceId(frame.source_id)
+    ? frame
+    : null;
 }
 
 export function getLatestVisualFrame(input: { threadId: string }): HelixVisualFrameRecord | null {
-  return (framesByThread.get(input.threadId) ?? []).at(-1) ?? null;
+  return (framesByThread.get(input.threadId) ?? [])
+    .filter((frame) => !isHelixRoomSourceIngressSourceId(frame.source_id))
+    .at(-1) ?? null;
 }
 
 export function listVisualFrames(input: { threadId?: string | null; limit?: number } = {}): HelixVisualFrameRecord[] {
   const entries = input.threadId
     ? [...(framesByThread.get(input.threadId) ?? [])]
     : Array.from(framesByThread.values()).flat();
-  return entries.slice(-(input.limit ?? 100));
+  return entries
+    .filter((frame) => !isHelixRoomSourceIngressSourceId(frame.source_id))
+    .slice(-(input.limit ?? 100));
 }
 
 export function listVisualFrameEvidence(input: { threadId?: string | null; limit?: number } = {}): HelixVisualFrameEvidence[] {
   const entries = input.threadId
     ? [...(evidenceByThread.get(input.threadId) ?? [])]
     : Array.from(evidenceByThread.values()).flat();
-  return entries.slice(-(input.limit ?? 100));
+  return entries
+    .filter((evidence) => !isHelixRoomSourceIngressSourceId(evidence.source_id))
+    .slice(-(input.limit ?? 100));
 }
 
 export function listVisualEventAlignments(input: { threadId?: string | null; limit?: number } = {}): HelixVisualEventAlignment[] {
   const entries = input.threadId
     ? [...(alignmentsByThread.get(input.threadId) ?? [])]
     : Array.from(alignmentsByThread.values()).flat();
-  return entries.slice(-(input.limit ?? 100));
+  return entries
+    .filter((alignment) => !alignmentHasProtectedSource(alignment))
+    .slice(-(input.limit ?? 100));
+}
+
+export function removeVisualSnapshotState(input: {
+  sourceId: string;
+}): {
+  sources: number;
+  frames: number;
+  evidence: number;
+  alignments: number;
+} {
+  const sourceRemoved = sourcesById.delete(input.sourceId) ? 1 : 0;
+  const removedFrameIds = new Set<string>();
+  let framesRemoved = 0;
+  for (const [threadId, frames] of framesByThread.entries()) {
+    const retained = frames.filter((frame) => {
+      if (frame.source_id !== input.sourceId) return true;
+      removedFrameIds.add(frame.frame_id);
+      framesRemoved += 1;
+      return false;
+    });
+    if (retained.length > 0) framesByThread.set(threadId, retained);
+    else framesByThread.delete(threadId);
+  }
+  let evidenceRemoved = 0;
+  for (const [threadId, evidenceEntries] of evidenceByThread.entries()) {
+    const retained = evidenceEntries.filter((evidence) => {
+      if (evidence.source_id !== input.sourceId) return true;
+      evidenceRemoved += 1;
+      return false;
+    });
+    if (retained.length > 0) evidenceByThread.set(threadId, retained);
+    else evidenceByThread.delete(threadId);
+  }
+  let alignmentsRemoved = 0;
+  for (const [threadId, alignmentEntries] of alignmentsByThread.entries()) {
+    const retained = alignmentEntries.filter((alignment) => {
+      if (!alignment.frame_ids.some((frameId) => removedFrameIds.has(frameId))) {
+        return true;
+      }
+      alignmentsRemoved += 1;
+      return false;
+    });
+    if (retained.length > 0) alignmentsByThread.set(threadId, retained);
+    else alignmentsByThread.delete(threadId);
+  }
+  return {
+    sources: sourceRemoved,
+    frames: framesRemoved,
+    evidence: evidenceRemoved,
+    alignments: alignmentsRemoved,
+  };
 }
 
 export function resetVisualSnapshotStoreForTest(): void {

@@ -26,6 +26,13 @@ const workstationToolContractReadmePath = path.join(
   "workstation-tool-contracts",
   "README.md",
 );
+const theoryExperimentProcedureReadmitContractPath = path.join(
+  repoRoot,
+  "docs",
+  "helix-ask",
+  "workstation-tool-contracts",
+  "theory-experiment-procedure.readmit.md",
+);
 const sideEffectEvidenceProjectionContractPath = path.join(
   repoRoot,
   "docs",
@@ -111,6 +118,7 @@ const reviewedSharedProviderGatewayCapabilityIds = [
   "docs-viewer.read_visible_surface",
   "docs-viewer.read_active_translation",
   "scientific-calculator.read_visible_result",
+  "scientific-calculator.read_visible_theory_run_result",
   "scientific-calculator.open_panel",
   "scientific-calculator.focus_panel",
   "scientific-calculator.show_gateway_solve",
@@ -121,18 +129,32 @@ const reviewedSharedProviderGatewayCapabilityIds = [
   "docs-viewer.open_doc",
   "repo.search",
   "docs.search",
-  "internet-search.search_web",
   "research-library.read_document",
   "research-library.apply_evidence_enrichment",
   "scholarly-research.lookup_papers",
   "scholarly-research.fetch_full_text",
   "scholarly-research.extract_numeric_parameters",
   "civilization-bounds.reflect_system_bounds",
-  "theory-badge-graph.reflect_discussion_context",
+  "helix_ask.reflect_theory_context",
   "theory-badge-graph.propose_frontier_conjectures",
+  "theory-formal-verifier.prepare_request",
   "theory-formal-verifier.plan",
   "theory-formal-verifier.start",
   "theory-formal-verifier.read_result",
+  "theory-runtime-canary.inspect",
+  "theory-runtime-canary.plan",
+  "theory-runtime-canary.start",
+  "theory-runtime-canary.read_result",
+  "theory-artifact-producer.prepare_lanyon_request",
+  "theory-artifact-producer.admit_lanyon_snapshot",
+  "theory-semantic-admitter.normalize",
+  "theory-independent-numerical-verifier.prepare_request",
+  "theory-independent-numerical-verifier.plan",
+  "theory-independent-numerical-verifier.start",
+  "theory-independent-numerical-verifier.read_result",
+  "theory-experiment-procedure.prepare",
+  "theory-experiment-procedure.readmit",
+  "theory-experiment-procedure.evaluate_closure",
   "moral-graph.reflect_context",
   "moral-graph.reflect_living_substrate_context",
   "text_to_speech.speak_text",
@@ -176,6 +198,13 @@ const reviewedSharedProviderGatewayCapabilityIds = [
   "live_env.query_visual_observer_profiles",
   "live_env.test_visual_observer_profile",
   "live_env.compare_visual_observer_profiles",
+  "room.evidence.read_bound",
+  "situation-room.describe_visual_capture",
+  "room.list",
+  "room.inspect",
+  "room.create",
+  "room.source.list",
+  "room.source.create",
 ] as const;
 
 const reviewedSharedCapabilityLaneClassifications = [
@@ -197,7 +226,6 @@ const reviewedNonSharedProviderCapabilityClassifications = [
   "helix_ask.reflect_ideology_context|safe_to_graduate_next|read_observe|explicit_contract",
   "helix_ask.reflect_live_synthetic_data|safe_to_graduate_next|read_observe|explicit_contract",
   "helix_ask.reflect_workstation_tool_alignment|safe_to_graduate_next|read_observe|explicit_contract",
-  "image_lens.inspect|safe_to_graduate_next|read_observe|explicit_contract",
   "live_env.apply_micro_reasoner_preset|helix_native_only|ui_projection|live_environment",
   "live_env.apply_visual_observer_profile|helix_native_only|ui_projection|live_environment",
   "live_env.bind_workstation_source|blocked_pending_contract|mutating_control|live_environment",
@@ -244,7 +272,6 @@ const reviewedNonSharedProviderCapabilityClassifications = [
   "runtime_evidence|safe_to_graduate_next|read_observe|explicit_contract",
   "scientific-calculator.open|blocked_pending_contract|user_confirmed_side_effect|explicit_contract",
   "scientific-calculator.start_equation_live_source|blocked_pending_contract|user_confirmed_side_effect|explicit_contract",
-  "situation-room.describe_visual_capture|safe_to_graduate_next|read_observe|explicit_contract",
   "workspace-directory.resolve|safe_to_graduate_next|read_observe|explicit_contract",
   "workstation-notes.append_to_note|blocked_pending_contract|user_confirmed_side_effect|explicit_contract",
   "workstation-notes.create_note|candidate_host_receipt_bridge|user_confirmed_side_effect|explicit_contract",
@@ -329,12 +356,81 @@ describe("provider-agent capability contract catalog", () => {
     }
   });
 
+  it("pins theory procedure readmission as an exact owner-scoped read-only continuation", () => {
+    const manifests = [
+      listWorkstationGatewayCapabilities({ agentRuntime: "helix", mode: "act" }),
+      listWorkstationGatewayCapabilities({ agentRuntime: "codex", mode: "act" }),
+      listWorkstationGatewayCapabilities({ agentRuntime: "future", mode: "act" }),
+    ];
+    for (const manifest of manifests) {
+      const capability = manifest.capabilities.find(
+        (candidate) =>
+          candidate.capability_id === "theory-experiment-procedure.readmit",
+      );
+      expect(capability).toMatchObject({
+        mode: "read",
+        mutating: false,
+        requires_confirmation: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        input_schema: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "procedure_artifact_ref",
+            "procedure_id",
+            "procedure_sha256",
+          ],
+        },
+        output_observation_schema:
+          "casimir.theory_experiment_procedure.observation.v1",
+      });
+      expect(capability?.safety_tags).toEqual(
+        expect.arrayContaining([
+          "developer_only",
+          "read_only_procedure_readmission",
+          "server_retained_artifact",
+          "session_scoped",
+          "exact_procedure_hash_binding",
+          "non_terminal",
+        ]),
+      );
+    }
+
+    const providerContract = fs.readFileSync(
+      providerCapabilityContractDocPath,
+      "utf8",
+    );
+    const contractIndex = fs.readFileSync(
+      workstationToolContractReadmePath,
+      "utf8",
+    );
+    const readmitContract = fs.readFileSync(
+      theoryExperimentProcedureReadmitContractPath,
+      "utf8",
+    );
+    expect(providerContract).toContain(
+      "`procedure_artifact_ref`/`procedure_id`/`procedure_sha256`",
+    );
+    expect(providerContract).toContain("process-local for 24 hours");
+    expect(contractIndex).toContain(
+      "[theory-experiment-procedure.readmit.md](theory-experiment-procedure.readmit.md)",
+    );
+    expect(readmitContract).toContain(
+      "scope: exact account type, profile id, and session id",
+    );
+    expect(readmitContract).toContain("terminal_eligible=false");
+  });
+
   it("keeps explicitly classified non-manifest capabilities out of the shared gateway manifest", () => {
+    const gatewayManifest = listWorkstationGatewayCapabilities({
+      agentRuntime: "codex",
+      mode: "act",
+    });
     const gatewayIds = new Set(
-      listWorkstationGatewayCapabilities({
-        agentRuntime: "codex",
-        mode: "act",
-      }).capabilities.map((capability) => capability.capability_id),
+      gatewayManifest.capabilities.map((capability) => capability.capability_id),
     );
     const overlappingClassifications = PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS
       .map((classification) => classification.capability_id)
@@ -686,16 +782,22 @@ describe("provider-agent capability contract catalog", () => {
   it("documents explicit route alias candidates without exposing them through the provider gateway", () => {
     const contractIndex = fs.readFileSync(workstationToolContractReadmePath, "utf8");
     const explicitRouteAliasContract = fs.readFileSync(explicitRouteAliasBoundariesContractPath, "utf8");
+    const gatewayManifest = listWorkstationGatewayCapabilities({
+      agentRuntime: "codex",
+      mode: "act",
+    });
     const gatewayIds = new Set(
-      listWorkstationGatewayCapabilities({
-        agentRuntime: "codex",
-        mode: "act",
-      }).capabilities.map((capability) => capability.capability_id),
+      gatewayManifest.capabilities.map((capability) => capability.capability_id),
     );
+    const knownGatewayIds = new Set([
+      ...gatewayIds,
+      ...(gatewayManifest.unavailable_capabilities ?? [])
+        .map((capability) => capability.capability_id),
+    ]);
     const sharedExplicitRouteAliases = [
       "repo-code.search_concept",
       "internet_search.web_research",
-      "helix_ask.reflect_theory_context",
+      "theory-badge-graph.reflect_discussion_context",
       "helix_ask.reflect_civilization_bounds",
       "scientific-calculator.solve_with_steps",
       "scientific-calculator.solve",
@@ -705,6 +807,7 @@ describe("provider-agent capability contract catalog", () => {
       "docs-viewer.locate_in_doc",
       "docs-viewer.summarize_doc",
       "docs-viewer.doc_equation_context",
+      "image_lens.inspect",
     ];
     const heldBackExplicitRouteAliasCandidates = [
       "helix_ask.inspect_capability_catalog",
@@ -716,8 +819,6 @@ describe("provider-agent capability contract catalog", () => {
       "helix_ask.reflect_ideology_context",
       "helix_ask.bridge_theory_ideology_context",
       "helix_ask.build_civilization_scenario_frame",
-      "image_lens.inspect",
-      "situation-room.describe_visual_capture",
       "docs-viewer.identify_current_doc",
       "docs-viewer.validate_doc_candidates",
     ];
@@ -736,7 +837,7 @@ describe("provider-agent capability contract catalog", () => {
       });
       expect(classification?.provider_gateway_alias_target, capabilityId).toEqual(expect.any(String));
       expect(classification?.provider_gateway_alias_target, capabilityId).not.toBe(capabilityId);
-      expect(gatewayIds.has(classification?.provider_gateway_alias_target ?? ""), capabilityId).toBe(true);
+      expect(knownGatewayIds.has(classification?.provider_gateway_alias_target ?? ""), capabilityId).toBe(true);
       expect(explicitRouteAliasContract).toContain(classification?.provider_gateway_alias_target ?? "");
     }
     for (const capabilityId of heldBackExplicitRouteAliasCandidates) {

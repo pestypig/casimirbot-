@@ -1,5 +1,9 @@
 import type { PoolClient } from "pg";
-import { ensureDatabase, getPool } from "../../../../db/client";
+import {
+  ensureDatabase,
+  getPool,
+  persistLocalDatabaseSnapshotIfEnabled,
+} from "../../../../db/client";
 import type { Queryable } from "./types";
 
 export const readSharedRealtimeRoomDatabase = async (): Promise<Queryable> => {
@@ -16,6 +20,7 @@ export const withSharedRealtimeRoomTransaction = async <T>(
     await client.query("BEGIN");
     const result = await run(client);
     await client.query("COMMIT");
+    await persistLocalDatabaseSnapshotIfEnabled();
     return result;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);

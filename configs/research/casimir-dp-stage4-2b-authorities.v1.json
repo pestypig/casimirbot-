@@ -1,0 +1,219 @@
+{
+  "schema_version": "casimir_dp_stage4_2b_authorities/1",
+  "manifest_id": "casimir-dp-apparatus-coherence-residual-stage4-2b-authorities-v1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-apparatus-coherence-residual-stage4-2b-v1",
+  "generated_at": "2026-07-26T00:00:00.000Z",
+  "evidence_cutoff": "2026-07-26",
+  "evidence_class": "synthetic_fixture",
+  "claim_ceiling": "apparatus_coupled_residual_and_dp_scaling_sensitivity_forecast_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "authority_mode": "immutable_role_path_and_full_sha256_tuple",
+  "mutable_aliases_are_authority": false,
+  "upstream_authorities": [
+    {
+      "role": "stage3_config",
+      "path": "configs/research/casimir-dp-evidence-map-stage3.v1.json",
+      "sha256": "231cb26e9c9bb523e2dda40a6178d8a484ec099f1868a74b995d8153337d29c2",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_authority_manifest",
+      "path": "configs/research/casimir-dp-stage3-authorities.v1.json",
+      "sha256": "6f5a0a903a161bf98cd82e69b48a03288a7a436f737c07b83366efba1dbbcf13",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-report.json",
+      "sha256": "feb799bcf93f1497673d58eac1a98a773ac1e1b0767082104af7b7d6c8e3508b",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-report.md",
+      "sha256": "41aae6d542a19b6564f88ae7c8e7f2531abf90b08a7d02c11b043e5c691cc23a",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-receipt.json",
+      "sha256": "5bcd2400bfeaa57a85c4b726224ac25dc8ab4c56bd59dad1b6e54f7f11ff0346",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-evidence-map-stage3-verification-receipt.json",
+      "sha256": "2cf09b5c5f6d0a584a0c3fd56d8e53834b78f938814ac2ff5500651349930082",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_config",
+      "path": "configs/research/casimir-dp-polarization-congruence-stage4.v1.json",
+      "sha256": "ade06cd7b95e27fe414614ad36512d5764d439c4fa6623f8499ad218ba07c3d7",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-authorities.v1.json",
+      "sha256": "3f26ef115533ef78756fad70f3880f8ea1d1ace43cbc9a0e66d6d0b5e9c2918d",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-report.json",
+      "sha256": "2c56cd9b61928ee750cf0714435674cc923b4c81f02e325b8ee9e9e5a9816d0b",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-report.md",
+      "sha256": "1221cf1e6b6c247c3253240c44ed78446318b2cdb2966610a63d08c7ec4f00a8",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-receipt.json",
+      "sha256": "185a09ceb61b4f158afe16022783c8b184c1035f456cb341b5c90920b69b774a",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-polarization-congruence-stage4-verification-receipt.json",
+      "sha256": "721b9f6aeab4b181ccc5ac21b4bc81c984d3b1fb72cdf76e55abedba11e38440",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_config",
+      "path": "configs/research/casimir-dp-qed-scale-hierarchy-stage4-1.v1.json",
+      "sha256": "e2625c86a5366258677c58cbe78e73b8fcc1893ecd417b48765d74488f953478",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-1-authorities.v1.json",
+      "sha256": "cd681b977d47de6715322249c1026ecf5e963ac81735d6c29aa5100942824f4f",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-qed-scale-hierarchy-stage4-1/casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z/qed-scale-hierarchy-stage4-1-report.json",
+      "sha256": "8f06bf394e64d40d24530e9e93b5d61edece3752318ece2095f27d61f55042c5",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-qed-scale-hierarchy-stage4-1/casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z/qed-scale-hierarchy-stage4-1-report.md",
+      "sha256": "6ae9530701fc35aa544b438709e789929b45eaf53ae950ec93ed976bb9703ba6",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-qed-scale-hierarchy-stage4-1/casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z/qed-scale-hierarchy-stage4-1-receipt.json",
+      "sha256": "d835b56a87ed6f6d78edfb8e627bceecb931575348232ca0fd77795f5ffe24af",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-qed-scale-hierarchy-stage4-1-verification-receipt.json",
+      "sha256": "a7f60aa9b12b7c1c143a7a1681048a61275495aaed33e1dfa6caa11e9e44b8db",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2a_config",
+      "path": "configs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a.v1.json",
+      "sha256": "1459d48bbd1630e372b7b936b4931b48713afcb7c64e5df527e50f04edd087b2",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2a_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-2a-authorities.v1.json",
+      "sha256": "1e4dde8f5a162b5368376b7ccaf07e19e725e6edb24b447aa6b1292732ce3b5f",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2a_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a/casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1-20260725T211750900Z/electron-mass-higgs-anchor-stage4-2a-report.json",
+      "sha256": "a53a2f1cdc7e4b2d1c9957aaa0a73316d77037371002b7ced4a2978a630fe35d",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2a_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a/casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1-20260725T211750900Z/electron-mass-higgs-anchor-stage4-2a-report.md",
+      "sha256": "d7dbf59d6e284ef60ccae58f0f01076b453de1a81fcb2b6863bf44d969f7357a",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2a_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a/casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1-20260725T211750900Z/electron-mass-higgs-anchor-stage4-2a-receipt.json",
+      "sha256": "592a6245993411801672c6fa6ffa4cea4484e4fcf9164ad03f586a55333b17c3",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2a_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a-verification-receipt.json",
+      "sha256": "debd651e7e500ee9b7011e7fa1c7a16ddcdcf56a6957ca0d2d91b28fe756b66a",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "proposal_closure_config_at_stage4_2b_freeze",
+      "path": "configs/research/casimir-dp-proposal-closure.v1.json",
+      "sha256": "7b3b2673c95d4eebca060261385f3b0659365c1112c1d9d42bc1d8700686b8ba",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "proposal_closure_report_at_stage4_2b_freeze",
+      "path": "docs/research/casimir-dp-proposal-closure-report.md",
+      "sha256": "5385a47b09877dbecd0fca2f508b1533b3a1a0aacd366d3231d361c746c159b1",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "data_readiness_config_at_stage4_2b_freeze",
+      "path": "configs/research/casimir-dp-data-readiness.v1.json",
+      "sha256": "a95e7a22c20e29ed9c34f45ece90916748a9264a32be8315663819171b406475",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "data_readiness_report_at_stage4_2b_freeze",
+      "path": "docs/research/casimir-dp-data-readiness-report.md",
+      "sha256": "3939b2b773c5227046c964325abd54ca21bb164b0f0cf0c6aca84dfbc0235b90",
+      "tracked": true,
+      "required_at_runtime": true
+    }
+  ],
+  "scientific_boundaries": [
+    "Upstream calibration and shared constants transport parameters and units; they do not transport evidence into DP.",
+    "The conditional boundary identity applies only to the registered nonrelativistic Markovian mass-density DP generator under complete joint-system equivalence.",
+    "The XENONnT R0 bound remains contextual until kernel, width, normalization, constituent, temporal-noise, radiation, and master-equation conventions map exactly.",
+    "Synthetic recovery validates software, falsifiers, and design power only; measured evidence remains not_ready.",
+    "No Stage-4.2B v1 observable bridge edge is permitted."
+  ]
+}

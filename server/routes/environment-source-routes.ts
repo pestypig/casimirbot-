@@ -1,6 +1,18 @@
 import express, { type Request, type Response, type NextFunction } from "express";
-import type { HelixEnvironmentSourceHeartbeat, HelixEnvironmentSourceManifest } from "@shared/helix-environment-source-manifest";
-import type { HelixEnvironmentProbeResult } from "@shared/helix-environment-probe";
+import {
+  helixEnvironmentSourceHeartbeatSchema,
+  helixEnvironmentSourceManifestSchema,
+  type HelixEnvironmentSourceHeartbeat,
+  type HelixEnvironmentSourceManifest,
+} from "@shared/helix-environment-source-manifest";
+import {
+  helixEnvironmentProbeResultSchema,
+  type HelixEnvironmentProbeResult,
+} from "@shared/helix-environment-probe";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 import { auditEnvironmentSourceContract } from "../services/situation-room/environment-source-contract-validator";
 import { registerEnvironmentSourceManifest, getEnvironmentSourceManifest } from "../services/situation-room/environment-source-registry";
 import { recordEnvironmentSourceHeartbeat } from "../services/situation-room/environment-source-heartbeat-store";
@@ -36,12 +48,43 @@ const rejectOversizedPayload = (req: Request, res: Response, next: NextFunction)
   return next();
 };
 
+const rejectReservedRoomSourceNamespace = (
+  res: Response,
+  sourceId: unknown,
+): boolean => {
+  if (!isHelixRoomSourceIngressSourceId(sourceId)) return false;
+  res.status(403).json({
+    ok: false,
+    error: HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+    message:
+      "Room-ingress source identities are accepted only through their bound first-party room ingress route.",
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  return true;
+};
+
 environmentSourceRouter.use(express.json({ limit: "64kb" }));
 environmentSourceRouter.use(requireSensorBearer);
 environmentSourceRouter.use(rejectOversizedPayload);
 
 environmentSourceRouter.post("/sources/manifest", (req, res) => {
-  const manifest = req.body as HelixEnvironmentSourceManifest;
+  if (
+    rejectReservedRoomSourceNamespace(
+      res,
+      (req.body as { source_id?: unknown } | null)?.source_id,
+    )
+  ) {
+    return;
+  }
+  const parsed = helixEnvironmentSourceManifestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      ok: false,
+      error: "environment_manifest_schema_invalid",
+    });
+  }
+  const manifest = parsed.data as HelixEnvironmentSourceManifest;
   const audit = auditEnvironmentSourceContract({ subject: manifest });
   if (!audit.ok) return res.status(400).json({ ok: false, audit });
   try {
@@ -53,7 +96,22 @@ environmentSourceRouter.post("/sources/manifest", (req, res) => {
 });
 
 environmentSourceRouter.post("/sources/heartbeat", (req, res) => {
-  const heartbeat = req.body as HelixEnvironmentSourceHeartbeat;
+  if (
+    rejectReservedRoomSourceNamespace(
+      res,
+      (req.body as { source_id?: unknown } | null)?.source_id,
+    )
+  ) {
+    return;
+  }
+  const parsed = helixEnvironmentSourceHeartbeatSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      ok: false,
+      error: "environment_heartbeat_schema_invalid",
+    });
+  }
+  const heartbeat = parsed.data as HelixEnvironmentSourceHeartbeat;
   if (!getEnvironmentSourceManifest(heartbeat.source_id)) {
     return res.status(404).json({ ok: false, error: "unknown_environment_source" });
   }
@@ -65,6 +123,7 @@ environmentSourceRouter.post("/sources/heartbeat", (req, res) => {
 
 environmentSourceRouter.get("/sources/:source_id/probes/pending", (req, res) => {
   const sourceId = req.params.source_id;
+  if (rejectReservedRoomSourceNamespace(res, sourceId)) return;
   if (!getEnvironmentSourceManifest(sourceId)) {
     return res.status(404).json({ ok: false, error: "unknown_environment_source" });
   }
@@ -75,10 +134,26 @@ environmentSourceRouter.get("/sources/:source_id/probes/pending", (req, res) => 
 
 environmentSourceRouter.post("/sources/:source_id/probes/result", (req, res) => {
   const sourceId = req.params.source_id;
+  if (
+    rejectReservedRoomSourceNamespace(res, sourceId) ||
+    rejectReservedRoomSourceNamespace(
+      res,
+      (req.body as { source_id?: unknown } | null)?.source_id,
+    )
+  ) {
+    return;
+  }
   if (!getEnvironmentSourceManifest(sourceId)) {
     return res.status(404).json({ ok: false, error: "unknown_environment_source" });
   }
-  const result = req.body as HelixEnvironmentProbeResult;
+  const parsed = helixEnvironmentProbeResultSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      ok: false,
+      error: "environment_probe_result_schema_invalid",
+    });
+  }
+  const result = parsed.data as HelixEnvironmentProbeResult;
   if (result.source_id !== sourceId) {
     return res.status(400).json({ ok: false, error: "source_id_mismatch" });
   }
@@ -89,6 +164,7 @@ environmentSourceRouter.post("/sources/:source_id/probes/result", (req, res) => 
 
 environmentSourceRouter.get("/sources/:source_id/status", (req, res) => {
   const sourceId = req.params.source_id;
+  if (rejectReservedRoomSourceNamespace(res, sourceId)) return;
   const status = projectEnvironmentSourceAvailability({
     sourceId,
     requiredModalities: ["environment_state"],

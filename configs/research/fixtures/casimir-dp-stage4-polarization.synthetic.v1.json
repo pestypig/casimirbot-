@@ -1,0 +1,428 @@
+{
+  "schema_version": "casimir_dp_polarization_qed_control/1",
+  "evidence_class": "synthetic_fixture",
+  "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "model_maturity": "exploratory_reduced_order_diagnostic",
+  "polarization_convention": {
+    "phasor_convention": "Re[E exp(-i omega t)]",
+    "propagation_direction_lab": [0, 0, 1],
+    "te_direction_lab": [1, 0, 0],
+    "tm_direction_lab": [0, 1, 0],
+    "observation_direction": "looking_along_propagation",
+    "circular_basis_order": ["RCP", "LCP"],
+    "rcp_definition": "(TE-i*TM)/sqrt(2)",
+    "lcp_definition": "(TE+i*TM)/sqrt(2)",
+    "stokes_s3_definition": "I_RCP-I_LCP=2*Im(C_TE,TM)"
+  },
+  "receipts": [
+    {
+      "receipt_id": "forward-model",
+      "source_ref": "synthetic://stage4/polarization-forward-model/v1",
+      "expected_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "actual_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "integrity_verified": true,
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_class": "synthetic_fixture"
+    },
+    {
+      "receipt_id": "achiral-response",
+      "source_ref": "synthetic://stage4/achiral-response/v1",
+      "expected_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "actual_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "integrity_verified": true,
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_class": "synthetic_fixture"
+    },
+    {
+      "receipt_id": "chiral-plus-response",
+      "source_ref": "synthetic://stage4/chiral-plus-response/v1",
+      "expected_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "actual_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "integrity_verified": true,
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_class": "synthetic_fixture"
+    },
+    {
+      "receipt_id": "chiral-minus-response",
+      "source_ref": "synthetic://stage4/chiral-minus-response/v1",
+      "expected_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "actual_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "integrity_verified": true,
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_class": "synthetic_fixture"
+    },
+    {
+      "receipt_id": "no-boundary-response",
+      "source_ref": "synthetic://stage4/no-boundary-response/v1",
+      "expected_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "actual_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "integrity_verified": true,
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_class": "synthetic_fixture"
+    },
+    {
+      "receipt_id": "polarization-state",
+      "source_ref": "synthetic://stage4/polarization-state/v1",
+      "expected_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "actual_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "integrity_verified": true,
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_class": "synthetic_fixture"
+    },
+    {
+      "receipt_id": "matched-controls",
+      "source_ref": "synthetic://stage4/matched-controls/v1",
+      "expected_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "actual_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "integrity_verified": true,
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_class": "synthetic_fixture"
+    }
+  ],
+  "forward_model": {
+    "receipt_id": "forward-model",
+    "green_reference_m_inv": 2000000,
+    "polarizability_reference_SI": 1e-30,
+    "incident_power_reference_W": 0.000001,
+    "phase_coefficient_rad": 0.4,
+    "ramsey_chi_coefficient": 0.02,
+    "axial_force_coefficient_N": 2e-18,
+    "heating_coefficient_W": 4e-19,
+    "axial_torque_coefficient_N_m": 1e-24,
+    "trap_shift_coefficient_rad_s": 5,
+    "formula_ref": "casimir_dp_stage4_polarization_reduced_order_transfer/1"
+  },
+  "responses": [
+    {
+      "response_id": "reciprocal-achiral",
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "receipt_id": "achiral-response",
+      "matrix_basis": "circular_rcp_lcp",
+      "reflection_jones": [
+        [{"re": 0.95, "im": 0}, {"re": 0, "im": 0}],
+        [{"re": 0, "im": 0}, {"re": 0.95, "im": 0}]
+      ],
+      "boundary_kind": "opaque_reflector",
+      "symmetry_class": "reciprocal_achiral",
+      "reciprocal_confirmed": true,
+      "mirror_pair_id": null,
+      "mirror_handedness": 0
+    },
+    {
+      "response_id": "reciprocal-chiral-plus",
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "receipt_id": "chiral-plus-response",
+      "matrix_basis": "circular_rcp_lcp",
+      "reflection_jones": [
+        [{"re": 0.9310632489491795, "im": 0.18873586425530814}, {"re": 0, "im": 0}],
+        [{"re": 0, "im": 0}, {"re": 0.9310632489491795, "im": -0.18873586425530814}]
+      ],
+      "boundary_kind": "opaque_reflector",
+      "symmetry_class": "reciprocal_chiral",
+      "reciprocal_confirmed": true,
+      "mirror_pair_id": "synthetic-chiral-mirror-pair",
+      "mirror_handedness": 1
+    },
+    {
+      "response_id": "reciprocal-chiral-minus",
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "receipt_id": "chiral-minus-response",
+      "matrix_basis": "circular_rcp_lcp",
+      "reflection_jones": [
+        [{"re": 0.9310632489491795, "im": -0.18873586425530814}, {"re": 0, "im": 0}],
+        [{"re": 0, "im": 0}, {"re": 0.9310632489491795, "im": 0.18873586425530814}]
+      ],
+      "boundary_kind": "opaque_reflector",
+      "symmetry_class": "reciprocal_chiral",
+      "reciprocal_confirmed": true,
+      "mirror_pair_id": "synthetic-chiral-mirror-pair",
+      "mirror_handedness": -1
+    },
+    {
+      "response_id": "no-boundary",
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "receipt_id": "no-boundary-response",
+      "matrix_basis": "te_tm",
+      "reflection_jones": [
+        [{"re": 0, "im": 0}, {"re": 0, "im": 0}],
+        [{"re": 0, "im": 0}, {"re": 0, "im": 0}]
+      ],
+      "boundary_kind": "no_boundary",
+      "symmetry_class": "no_boundary",
+      "reciprocal_confirmed": true,
+      "mirror_pair_id": null,
+      "mirror_handedness": 0
+    }
+  ],
+  "cells": [
+    {
+      "cell_id": "achiral-rcp",
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "response_id": "reciprocal-achiral",
+      "state_receipt_id": "polarization-state",
+      "controls_receipt_id": "matched-controls",
+      "polarization_label": "RCP",
+      "polarization_state": {
+        "kind": "stokes",
+        "basis": "te_tm",
+        "stokes": [1, 0, 0, 1]
+      },
+      "green_projection_m_inv": 2000000,
+      "polarizability_projection_SI": 1e-30,
+      "coupling_multiplier": 1,
+      "incident_power_W": 0.000001,
+      "hold_time_s": 0.1,
+      "controls": {
+        "reported_absorbed_power_W": 9.75e-8,
+        "reported_heating_rate_s": 0.001,
+        "reported_axial_force_N": 2e-18,
+        "reported_axial_torque_magnitude_N_m": 9.75e-26,
+        "reported_trap_omega_rad_s": 6283.185307179586,
+        "branch_state_ref": "synthetic://stage4/branch-state/shared-v1",
+        "branch_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    },
+    {
+      "cell_id": "achiral-lcp",
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "response_id": "reciprocal-achiral",
+      "state_receipt_id": "polarization-state",
+      "controls_receipt_id": "matched-controls",
+      "polarization_label": "LCP",
+      "polarization_state": {
+        "kind": "coherency_matrix",
+        "basis": "circular_rcp_lcp",
+        "matrix": [
+          [{"re": 0, "im": 0}, {"re": 0, "im": 0}],
+          [{"re": 0, "im": 0}, {"re": 1, "im": 0}]
+        ]
+      },
+      "green_projection_m_inv": 2000000,
+      "polarizability_projection_SI": 1e-30,
+      "coupling_multiplier": 1,
+      "incident_power_W": 0.000001,
+      "hold_time_s": 0.1,
+      "controls": {
+        "reported_absorbed_power_W": 9.75e-8,
+        "reported_heating_rate_s": 0.001,
+        "reported_axial_force_N": 2e-18,
+        "reported_axial_torque_magnitude_N_m": 9.75e-26,
+        "reported_trap_omega_rad_s": 6283.185307179586,
+        "branch_state_ref": "synthetic://stage4/branch-state/shared-v1",
+        "branch_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    },
+    {
+      "cell_id": "chiral-plus-rcp",
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "response_id": "reciprocal-chiral-plus",
+      "state_receipt_id": "polarization-state",
+      "controls_receipt_id": "matched-controls",
+      "polarization_label": "RCP",
+      "polarization_state": {
+        "kind": "stokes",
+        "basis": "te_tm",
+        "stokes": [1, 0, 0, 1]
+      },
+      "green_projection_m_inv": 2000000,
+      "polarizability_projection_SI": 1e-30,
+      "coupling_multiplier": 1,
+      "incident_power_W": 0.000001,
+      "hold_time_s": 0.1,
+      "controls": {
+        "reported_absorbed_power_W": 9.75e-8,
+        "reported_heating_rate_s": 0.001,
+        "reported_axial_force_N": 2e-18,
+        "reported_axial_torque_magnitude_N_m": 9.75e-26,
+        "reported_trap_omega_rad_s": 6283.185307179586,
+        "branch_state_ref": "synthetic://stage4/branch-state/shared-v1",
+        "branch_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    },
+    {
+      "cell_id": "chiral-plus-lcp",
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "response_id": "reciprocal-chiral-plus",
+      "state_receipt_id": "polarization-state",
+      "controls_receipt_id": "matched-controls",
+      "polarization_label": "LCP",
+      "polarization_state": {
+        "kind": "coherency_matrix",
+        "basis": "circular_rcp_lcp",
+        "matrix": [
+          [{"re": 0, "im": 0}, {"re": 0, "im": 0}],
+          [{"re": 0, "im": 0}, {"re": 1, "im": 0}]
+        ]
+      },
+      "green_projection_m_inv": 2000000,
+      "polarizability_projection_SI": 1e-30,
+      "coupling_multiplier": 1,
+      "incident_power_W": 0.000001,
+      "hold_time_s": 0.1,
+      "controls": {
+        "reported_absorbed_power_W": 9.75e-8,
+        "reported_heating_rate_s": 0.001,
+        "reported_axial_force_N": 2e-18,
+        "reported_axial_torque_magnitude_N_m": 9.75e-26,
+        "reported_trap_omega_rad_s": 6283.185307179586,
+        "branch_state_ref": "synthetic://stage4/branch-state/shared-v1",
+        "branch_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    },
+    {
+      "cell_id": "chiral-minus-rcp",
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "response_id": "reciprocal-chiral-minus",
+      "state_receipt_id": "polarization-state",
+      "controls_receipt_id": "matched-controls",
+      "polarization_label": "RCP",
+      "polarization_state": {
+        "kind": "stokes",
+        "basis": "te_tm",
+        "stokes": [1, 0, 0, 1]
+      },
+      "green_projection_m_inv": 2000000,
+      "polarizability_projection_SI": 1e-30,
+      "coupling_multiplier": 1,
+      "incident_power_W": 0.000001,
+      "hold_time_s": 0.1,
+      "controls": {
+        "reported_absorbed_power_W": 9.75e-8,
+        "reported_heating_rate_s": 0.001,
+        "reported_axial_force_N": 2e-18,
+        "reported_axial_torque_magnitude_N_m": 9.75e-26,
+        "reported_trap_omega_rad_s": 6283.185307179586,
+        "branch_state_ref": "synthetic://stage4/branch-state/shared-v1",
+        "branch_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    },
+    {
+      "cell_id": "chiral-minus-lcp",
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "response_id": "reciprocal-chiral-minus",
+      "state_receipt_id": "polarization-state",
+      "controls_receipt_id": "matched-controls",
+      "polarization_label": "LCP",
+      "polarization_state": {
+        "kind": "coherency_matrix",
+        "basis": "circular_rcp_lcp",
+        "matrix": [
+          [{"re": 0, "im": 0}, {"re": 0, "im": 0}],
+          [{"re": 0, "im": 0}, {"re": 1, "im": 0}]
+        ]
+      },
+      "green_projection_m_inv": 2000000,
+      "polarizability_projection_SI": 1e-30,
+      "coupling_multiplier": 1,
+      "incident_power_W": 0.000001,
+      "hold_time_s": 0.1,
+      "controls": {
+        "reported_absorbed_power_W": 9.75e-8,
+        "reported_heating_rate_s": 0.001,
+        "reported_axial_force_N": 2e-18,
+        "reported_axial_torque_magnitude_N_m": 9.75e-26,
+        "reported_trap_omega_rad_s": 6283.185307179586,
+        "branch_state_ref": "synthetic://stage4/branch-state/shared-v1",
+        "branch_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    },
+    {
+      "cell_id": "zero-coupling-rcp",
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "response_id": "reciprocal-chiral-plus",
+      "state_receipt_id": "polarization-state",
+      "controls_receipt_id": "matched-controls",
+      "polarization_label": "RCP",
+      "polarization_state": {
+        "kind": "stokes",
+        "basis": "te_tm",
+        "stokes": [1, 0, 0, 1]
+      },
+      "green_projection_m_inv": 2000000,
+      "polarizability_projection_SI": 1e-30,
+      "coupling_multiplier": 0,
+      "incident_power_W": 0.000001,
+      "hold_time_s": 0.1,
+      "controls": {
+        "reported_absorbed_power_W": 9.75e-8,
+        "reported_heating_rate_s": 0,
+        "reported_axial_force_N": 0,
+        "reported_axial_torque_magnitude_N_m": 0,
+        "reported_trap_omega_rad_s": 6283.185307179586,
+        "branch_state_ref": "synthetic://stage4/branch-state/zero-coupling-v1",
+        "branch_state_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    {
+      "cell_id": "no-boundary-rcp",
+      "model_binding_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "response_id": "no-boundary",
+      "state_receipt_id": "polarization-state",
+      "controls_receipt_id": "matched-controls",
+      "polarization_label": "RCP",
+      "polarization_state": {
+        "kind": "stokes",
+        "basis": "te_tm",
+        "stokes": [1, 0, 0, 1]
+      },
+      "green_projection_m_inv": 2000000,
+      "polarizability_projection_SI": 1e-30,
+      "coupling_multiplier": 1,
+      "incident_power_W": 0.000001,
+      "hold_time_s": 0.1,
+      "controls": {
+        "reported_absorbed_power_W": 0,
+        "reported_heating_rate_s": 0,
+        "reported_axial_force_N": 0,
+        "reported_axial_torque_magnitude_N_m": 0,
+        "reported_trap_omega_rad_s": 6283.185307179586,
+        "branch_state_ref": "synthetic://stage4/branch-state/no-boundary-v1",
+        "branch_state_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  ],
+  "matched_pairs": [
+    {
+      "pair_id": "achiral-rcp-lcp",
+      "rcp_cell_id": "achiral-rcp",
+      "lcp_cell_id": "achiral-lcp"
+    },
+    {
+      "pair_id": "chiral-plus-rcp-lcp",
+      "rcp_cell_id": "chiral-plus-rcp",
+      "lcp_cell_id": "chiral-plus-lcp"
+    },
+    {
+      "pair_id": "chiral-minus-rcp-lcp",
+      "rcp_cell_id": "chiral-minus-rcp",
+      "lcp_cell_id": "chiral-minus-lcp"
+    }
+  ],
+  "double_contrasts": [
+    {
+      "contrast_id": "chiral-helicity-mirror-odd",
+      "chiral_plus_rcp_cell_id": "chiral-plus-rcp",
+      "chiral_plus_lcp_cell_id": "chiral-plus-lcp",
+      "mirror_rcp_cell_id": "chiral-minus-rcp",
+      "mirror_lcp_cell_id": "chiral-minus-lcp"
+    }
+  ],
+  "tolerances": {
+    "frame_orthonormal_absolute": 1e-12,
+    "state_hermitian_absolute": 1e-12,
+    "state_psd_absolute": 1e-12,
+    "helicity_label_absolute": 1e-12,
+    "passivity_absolute": 1e-12,
+    "symmetry_absolute": 1e-12,
+    "basis_invariance_relative": 1e-12,
+    "matched_relative": 1e-12,
+    "matched_force_absolute_N": 1e-30,
+    "matched_torque_absolute_N_m": 1e-36,
+    "zero_limit_absolute": 1e-30
+  },
+  "sensitivity": {
+    "anchor_cell_id": "chiral-plus-rcp",
+    "fractional_perturbation": 0.1,
+    "minimum_fractional_output_change": 0.05
+  }
+}

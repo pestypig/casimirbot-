@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 type RecordLike = Record<string, unknown>;
 
@@ -29,6 +30,8 @@ type TurnResult = {
   relay_status: string | null;
   relay_reason: string | null;
   relay_failure_code: string | null;
+  relay_terminal_speech_authority_status: string | null;
+  relay_grounding_status: string | null;
   grounding_authority_status: string | null;
   grounding_authority_failure_codes: string[];
   provisional_kind: string | null;
@@ -37,11 +40,34 @@ type TurnResult = {
   continuity_evidence_refs: string[];
 };
 
+export type RealtimeDocProbeTurn = {
+  id: string;
+  prompt: string;
+  documentRef?: string;
+  focusPanelId?: string;
+  expectedText: RegExp[];
+  requireDocsSearch?: boolean;
+  expectedCapabilities?: string[];
+  requireGroundedVoiceRelay?: boolean;
+};
+
+export type RealtimeDocProbeScenario = {
+  id: string;
+  requiresDeveloper: boolean;
+  focusPanelId: string;
+  turns: RealtimeDocProbeTurn[];
+};
+
 const BASE_URL = (process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:1522")
   .replace(/\/+$/, "");
 const TEST_MODEL = process.env.HELIX_ASK_TEST_MODEL?.trim() || "gpt-4o-mini";
 const TEST_SCENARIO = process.env.HELIX_ASK_REALTIME_DOC_SCENARIO?.trim() || "conversation";
 const CAPTURE_DEBUG = process.env.HELIX_ASK_REALTIME_DOC_CAPTURE_DEBUG === "1";
+const DRY_RUN =
+  process.argv.includes("--dry-run") ||
+  process.env.HELIX_ASK_REALTIME_DOC_DRY_RUN === "1";
+const LOCAL_DEVELOPER_SIGN_IN =
+  process.env.HELIX_ASK_REALTIME_DOC_LOCAL_DEVELOPER === "1";
 const TIMEOUT_MS = Math.max(
   30_000,
   Number(process.env.HELIX_ASK_REALTIME_DOC_TIMEOUT_MS ?? 180_000),
@@ -51,6 +77,46 @@ const OUTPUT_PATH = path.resolve(
   process.env.HELIX_ASK_REALTIME_DOC_PROBE_OUT ??
     path.join("artifacts", "helix-ask-live-validation", "realtime-doc-conversation", `${RUN_ID}.json`),
 );
+let requestCookie: string | null = null;
+
+export const THEORY_EXPERIMENT_PROCEDURE_REALTIME_SCENARIO: RealtimeDocProbeScenario = {
+  id: "theory-experiment-procedure",
+  requiresDeveloper: true,
+  focusPanelId: "workflow-demo-lab",
+  turns: [
+    {
+      id: "theory-procedure-prepare",
+      prompt:
+        "Prepare a seven-stage theory experiment procedure comparing badge study.casimir_dp.evidence_map_stage3 with physics.energy.energy_density, using the pinned Lanyon case advection_diffusion_full_1d. Keep dependency order separate from scale checkpoints. Prepare only; do not start formal, numerical, or shell work.",
+      focusPanelId: "workflow-demo-lab",
+      expectedText: [
+        /seven|7/i,
+        /procedure|prepared/i,
+        /dependency|DAG|order/i,
+        /scale|checkpoint|biome/i,
+        /Lanyon|advection.?diffusion/i,
+      ],
+      expectedCapabilities: ["theory-experiment-procedure.prepare"],
+      requireGroundedVoiceRelay: true,
+    },
+    {
+      id: "theory-procedure-missing-requirements",
+      prompt:
+        "Continue that same comparison. Re-prepare the procedure so its evidence is current for this turn, then identify the missing semantic admission, bridge or boundary-condition, formal-certificate, independent numerical, and observable or empirical requirements. Keep the interpretation bounded: preparation is not proof or physical validation, and do not start downstream jobs.",
+      focusPanelId: "workflow-demo-lab",
+      expectedText: [
+        /semantic|admission/i,
+        /bridge|boundary|initial condition/i,
+        /formal|Lean|certificate/i,
+        /numerical/i,
+        /observable|empirical/i,
+        /not proof|not.*validat|missing|requires/i,
+      ],
+      expectedCapabilities: ["theory-experiment-procedure.prepare"],
+      requireGroundedVoiceRelay: true,
+    },
+  ],
+};
 
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as RecordLike : null;
@@ -78,8 +144,15 @@ const requestJson = async (
     const response = await fetch(`${BASE_URL}${route}`, {
       method: init?.method ?? "GET",
       headers: init?.body
-        ? { Accept: "application/json", "Content-Type": "application/json" }
-        : { Accept: "application/json" },
+        ? {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            ...(requestCookie ? { Cookie: requestCookie } : {}),
+          }
+        : {
+            Accept: "application/json",
+            ...(requestCookie ? { Cookie: requestCookie } : {}),
+          },
       body: init?.body ? JSON.stringify(init.body) : undefined,
       signal: controller.signal,
     });
@@ -98,15 +171,82 @@ const assert = (id: string, ok: boolean, detail: string): void => {
   assertions.push({ id, ok, detail });
 };
 
-const sourceBinding = (documentRef?: string): RecordLike => ({
+export const isLoopbackRealtimeDocBaseUrl = (baseUrl: string): boolean => {
+  try {
+    const hostname = new URL(baseUrl).hostname.toLowerCase();
+    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]";
+  } catch {
+    return false;
+  }
+};
+
+export const resolveRealtimeDocProbeScenario = (
+  scenarioId: string,
+): RealtimeDocProbeScenario | null =>
+  scenarioId === THEORY_EXPERIMENT_PROCEDURE_REALTIME_SCENARIO.id
+    ? THEORY_EXPERIMENT_PROCEDURE_REALTIME_SCENARIO
+    : null;
+
+const establishLocalDeveloperSession = async (): Promise<void> => {
+  if (!isLoopbackRealtimeDocBaseUrl(BASE_URL)) {
+    throw new Error("local_developer_sign_in_requires_loopback_base_url");
+  }
+  const receipt = await requestJson("/api/account/session/sign-in", {
+    method: "POST",
+    body: {
+      profile_id: `helix-ask-realtime-doc-probe:${RUN_ID}`,
+      display_name: "Helix Ask Realtime Theory Probe",
+      account_type: "developer",
+    },
+  });
+  const sessionId = readString(readRecord(receipt.body.session)?.session_id);
+  if (receipt.status !== 200 || receipt.body.ok !== true || !sessionId) {
+    throw new Error(
+      `local_developer_sign_in_failed:${receipt.status}:${readString(receipt.body.error) ?? "session_missing"}`,
+    );
+  }
+  requestCookie = `helix_session=${sessionId}`;
+  const status = await requestJson("/api/account/session");
+  const accountPolicy = readRecord(status.body.account_policy);
+  const accountType = readString(accountPolicy?.account_type);
+  if (status.status !== 200 || accountType !== "developer") {
+    try {
+      await requestJson("/api/account/session/sign-out", {
+        method: "POST",
+        body: {},
+      });
+    } finally {
+      requestCookie = null;
+    }
+    throw new Error(`local_developer_policy_missing:${accountType ?? "unknown"}`);
+  }
+};
+
+const releaseLocalDeveloperSession = async (): Promise<void> => {
+  if (!requestCookie) return;
+  try {
+    await requestJson("/api/account/session/sign-out", {
+      method: "POST",
+      body: {},
+    });
+  } finally {
+    requestCookie = null;
+  }
+};
+
+const sourceBinding = (
+  documentRef?: string,
+  focusPanelId = "docs-viewer",
+): RecordLike => ({
   thread_id: "helix-ask:desktop",
   source_id: "helix-ask:desktop",
   source_kind: "helix_ask_workstation",
-  focus_panel_id: "docs-viewer",
+  focus_panel_id: focusPanelId,
   ...(documentRef ? { document_ref: documentRef } : {}),
 });
 
-const main = async (): Promise<void> => {
+const runLiveProbe = async (): Promise<void> => {
+  const selectedScenario = resolveRealtimeDocProbeScenario(TEST_SCENARIO);
   const account = await requestJson("/api/account/session");
   const pipeline = await requestJson("/api/helix/pipeline");
   const providers = await requestJson("/api/agi/agent-providers");
@@ -114,6 +254,13 @@ const main = async (): Promise<void> => {
     .find((provider) => readString(provider.id) === "codex") ?? null;
   const runtimeStatus = readRecord(codex?.runtime_status);
   assert("preflight_account", account.status === 200, `HTTP ${account.status}`);
+  if (selectedScenario?.requiresDeveloper) {
+    assert(
+      "preflight_developer_account",
+      readString(readRecord(account.body.account_policy)?.account_type) === "developer",
+      `account_type=${String(readRecord(account.body.account_policy)?.account_type)}`,
+    );
+  }
   assert("preflight_pipeline", pipeline.status === 200, `HTTP ${pipeline.status}`);
   assert(
     "preflight_codex_launchable",
@@ -134,7 +281,7 @@ const main = async (): Promise<void> => {
       requested_backend_provider: "realtime_session.openai_realtime",
       selected_model_or_service: "gpt-realtime-2.1-mini",
       selected_realtime_voice: "marin",
-      source_binding: sourceBinding(),
+      source_binding: sourceBinding(undefined, selectedScenario?.focusPanelId),
       visible_user_consent_receipt: consentReceipt,
     },
   });
@@ -144,14 +291,7 @@ const main = async (): Promise<void> => {
   }
 
   const turns: TurnResult[] = [];
-  const runTurn = async (input: {
-    id: string;
-    prompt: string;
-    documentRef?: string;
-    expectedText: RegExp[];
-    requireDocsSearch?: boolean;
-    expectedCapabilities?: string[];
-  }): Promise<void> => {
+  const runTurn = async (input: RealtimeDocProbeTurn): Promise<void> => {
     const observedAtMs = Date.now();
     const event = await requestJson(
       `/api/agi/realtime/session/${encodeURIComponent(realtimeSessionId)}/event`,
@@ -165,7 +305,10 @@ const main = async (): Promise<void> => {
           transcript_text: input.prompt,
           observed_at_ms: observedAtMs,
           client_receipt_ref: consentReceipt,
-          workstation_source_binding: sourceBinding(input.documentRef),
+          workstation_source_binding: sourceBinding(
+            input.documentRef,
+            input.focusPanelId ?? selectedScenario?.focusPanelId,
+          ),
         },
       },
     );
@@ -180,11 +323,26 @@ const main = async (): Promise<void> => {
     const workerAdmissionId = readString(workerAdmission?.admission_id);
     const dispatch = readRecord(workerAdmission?.dispatch);
     const dispatchRequested = dispatch?.requested === true;
+    const interactionMode = readString(workerAdmission?.interaction_mode);
     const immediateProvisional = readRecord(event.body.realtime_provisional_response);
+    const immediateParallelConversationIsSafe =
+      interactionMode === "parallel_conversation" &&
+      readString(immediateProvisional?.kind) === "parallel_conversation" &&
+      readString(immediateProvisional?.handoff_id) === handoffId &&
+      readString(immediateProvisional?.worker_admission_id) === workerAdmissionId &&
+      immediateProvisional?.requested_after_worker_dispatch_receipt === false &&
+      immediateProvisional?.answer_authority === false &&
+      immediateProvisional?.assistant_answer === false &&
+      immediateProvisional?.terminal_eligible === false;
     assert(
       `${input.id}_no_pre_dispatch_worker_answer`,
-      !dispatchRequested || immediateProvisional === null,
-      `dispatch_requested=${String(dispatchRequested)} provisional_kind=${String(immediateProvisional?.kind)}`,
+      !dispatchRequested ||
+        (
+          interactionMode === "parallel_conversation"
+            ? immediateParallelConversationIsSafe
+            : immediateProvisional === null
+        ),
+      `dispatch_requested=${String(dispatchRequested)} interaction_mode=${String(interactionMode)} provisional_kind=${String(immediateProvisional?.kind)} authority=${String(immediateProvisional?.answer_authority)}`,
     );
     const dispatchReceipt = dispatchRequested && workerAdmissionId
       ? await requestJson(
@@ -216,17 +374,33 @@ const main = async (): Promise<void> => {
     const dispatchProvisional = readRecord(
       dispatchReceipt?.body.realtime_provisional_response,
     );
+    const postReceiptParallelConversationIsSafe =
+      dispatchProvisional === null ||
+      (
+        readString(dispatchProvisional.kind) === "parallel_conversation" &&
+        readString(dispatchProvisional.handoff_id) === handoffId &&
+        readString(dispatchProvisional.worker_admission_id) === workerAdmissionId &&
+        dispatchProvisional.answer_authority === false &&
+        dispatchProvisional.assistant_answer === false &&
+        dispatchProvisional.terminal_eligible === false
+      );
     assert(
       `${input.id}_status_only_after_dispatch_receipt`,
       !dispatchRequested ||
         (
           dispatchReceipt?.status === 200 &&
-          readString(dispatchProvisional?.kind) === "worker_dispatch_status" &&
-          dispatchProvisional?.answer_authority === false &&
-          dispatchProvisional?.assistant_answer === false &&
-          dispatchProvisional?.terminal_eligible === false
+          (
+            interactionMode === "parallel_conversation"
+              ? postReceiptParallelConversationIsSafe
+              : (
+                  readString(dispatchProvisional?.kind) === "worker_dispatch_status" &&
+                  dispatchProvisional?.answer_authority === false &&
+                  dispatchProvisional?.assistant_answer === false &&
+                  dispatchProvisional?.terminal_eligible === false
+                )
+          )
         ),
-      `dispatch_requested=${String(dispatchRequested)} status=${String(dispatchReceipt?.status)} kind=${String(dispatchProvisional?.kind)} authority=${String(dispatchProvisional?.answer_authority)}`,
+      `dispatch_requested=${String(dispatchRequested)} interaction_mode=${String(interactionMode)} status=${String(dispatchReceipt?.status)} kind=${String(dispatchProvisional?.kind)} authority=${String(dispatchProvisional?.answer_authority)}`,
     );
     const turnId = `ask:${RUN_ID}:${input.id}`;
     const ask = await requestJson("/api/agi/ask/turn", {
@@ -304,6 +478,10 @@ const main = async (): Promise<void> => {
       relay_status: readString(relay?.status),
       relay_reason: readString(relay?.status_reason),
       relay_failure_code: readString(relay?.failure_code),
+      relay_terminal_speech_authority_status: readString(
+        relay?.terminal_speech_authority_status,
+      ),
+      relay_grounding_status: readString(relay?.grounding_status),
       grounding_authority_status: readString(groundingAuthority?.status),
       grounding_authority_failure_codes: readStrings(groundingAuthority?.failure_codes),
       provisional_kind: readString(dispatchProvisional?.kind),
@@ -359,6 +537,27 @@ const main = async (): Promise<void> => {
         `required=${requiredCapabilities.join(",")} executed=${executedCapabilities.join(",")}`,
       );
     }
+    if (input.requireGroundedVoiceRelay) {
+      const relayStatus = readString(relay?.status);
+      const admittedRelayStatuses = new Set([
+        "result_ready",
+        "relay_queued_busy",
+        "response_requested",
+        "provider_acknowledged",
+        "speaking",
+        "delivered",
+      ]);
+      assert(
+        `${input.id}_grounded_voice_relay`,
+        Boolean(groundedAnswer) &&
+          audit?.feedback_status === "recorded" &&
+          audit?.grounding_evidence_status === "validated" &&
+          relay?.terminal_speech_authority_status === "validated" &&
+          relay?.grounding_status === "validated" &&
+          admittedRelayStatuses.has(relayStatus ?? ""),
+        `feedback=${String(audit?.feedback_status)} evidence=${String(audit?.grounding_evidence_status)} relay=${String(relayStatus)} speech_authority=${String(relay?.terminal_speech_authority_status)} relay_grounding=${String(relay?.grounding_status)}`,
+      );
+    }
     const previous = turns.at(-2);
     if (previous) {
       assert(
@@ -370,7 +569,11 @@ const main = async (): Promise<void> => {
   };
 
   try {
-    if (TEST_SCENARIO === "magnetar-scholarly-voice") {
+    if (selectedScenario) {
+      for (const turn of selectedScenario.turns) {
+        await runTurn(turn);
+      }
+    } else if (TEST_SCENARIO === "magnetar-scholarly-voice") {
       await runTurn({
         id: "magnetar-citations",
         prompt: "Okay, can you cite research about magnetars?",
@@ -518,7 +721,75 @@ const main = async (): Promise<void> => {
   }
 };
 
-main().catch((error) => {
-  process.stderr.write(`[realtime-doc-probe] ${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
-});
+const writeDryRunReport = async (): Promise<void> => {
+  const selectedScenario = resolveRealtimeDocProbeScenario(TEST_SCENARIO);
+  if (!selectedScenario) {
+    throw new Error(
+      `dry_run_not_available_for_legacy_scenario:${TEST_SCENARIO}`,
+    );
+  }
+  const report = {
+    schema: "helix.ask.realtime_doc_conversation_probe_dry_run.v1",
+    run_id: RUN_ID,
+    base_url: BASE_URL,
+    requested_model: TEST_MODEL,
+    scenario: selectedScenario.id,
+    dry_run: true,
+    requires_developer: selectedScenario.requiresDeveloper,
+    local_developer_sign_in_requested: LOCAL_DEVELOPER_SIGN_IN,
+    focus_panel_id: selectedScenario.focusPanelId,
+    turns: selectedScenario.turns.map((turn) => ({
+      id: turn.id,
+      prompt: turn.prompt,
+      focus_panel_id: turn.focusPanelId ?? selectedScenario.focusPanelId,
+      expected_capabilities: turn.expectedCapabilities ?? [],
+      expected_text_patterns: turn.expectedText.map((pattern) => pattern.source),
+      require_grounded_voice_relay: turn.requireGroundedVoiceRelay === true,
+    })),
+    summary: {
+      passed: selectedScenario.turns.length,
+      failed: 0,
+      ok: true,
+    },
+  };
+  await fs.mkdir(path.dirname(OUTPUT_PATH), { recursive: true });
+  await fs.writeFile(OUTPUT_PATH, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  process.stdout.write(`${JSON.stringify({ ...report.summary, output: OUTPUT_PATH })}\n`);
+};
+
+const main = async (): Promise<void> => {
+  const selectedScenario = resolveRealtimeDocProbeScenario(TEST_SCENARIO);
+  if (DRY_RUN) {
+    await writeDryRunReport();
+    return;
+  }
+  if (selectedScenario?.requiresDeveloper && !LOCAL_DEVELOPER_SIGN_IN) {
+    throw new Error(
+      "theory_experiment_procedure_scenario_requires_explicit_local_developer_sign_in",
+    );
+  }
+
+  try {
+    if (LOCAL_DEVELOPER_SIGN_IN) {
+      await establishLocalDeveloperSession();
+    }
+    await runLiveProbe();
+  } finally {
+    if (LOCAL_DEVELOPER_SIGN_IN) {
+      await releaseLocalDeveloperSession();
+    }
+  }
+};
+
+const isEntrypoint =
+  Boolean(process.argv[1]) &&
+  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+
+if (isEntrypoint) {
+  void main().catch((error) => {
+    process.stderr.write(
+      `[realtime-doc-probe] ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exitCode = 1;
+  });
+}

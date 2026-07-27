@@ -6,6 +6,11 @@ import {
   type HelixSituationSourceBindingPolicy,
   type HelixSituationSourceReplayPolicy,
 } from "@shared/helix-situation-source-binding";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 
 const bindings = new Map<string, HelixSituationSourceBinding>();
 
@@ -33,11 +38,15 @@ export function upsertSituationSourceBinding(input: {
   modality: HelixSituationSourceBindingModality;
   binding_policy?: HelixSituationSourceBindingPolicy;
   replay_policy?: HelixSituationSourceReplayPolicy;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
   now?: string;
 }): HelixSituationSourceBinding {
   const threadId = normalize(input.thread_id) ?? "helix-ask:desktop";
   const situationRunId = normalize(input.situation_run_id) ?? "unknown_situation_run";
   const sourceId = normalize(input.source_id) ?? "unknown_source";
+  if (isHelixRoomSourceIngressSourceId(sourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
   const now = input.now ?? new Date().toISOString();
   const bindingId = bindingIdFor({
     thread_id: threadId,
@@ -75,6 +84,10 @@ export function listSituationSourceBindings(input: {
 } = {}): HelixSituationSourceBinding[] {
   const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
   return Array.from(bindings.values())
+    .filter(
+      (binding: HelixSituationSourceBinding) =>
+        !isHelixRoomSourceIngressSourceId(binding.source_id),
+    )
     .filter((binding: HelixSituationSourceBinding) => !input.threadId || binding.thread_id === input.threadId)
     .filter((binding: HelixSituationSourceBinding) => !input.situationRunId || binding.situation_run_id === input.situationRunId)
     .filter((binding: HelixSituationSourceBinding) => !input.sourceId || binding.source_id === input.sourceId)
@@ -86,7 +99,10 @@ export function listSituationSourceBindings(input: {
 export function getSituationSourceBinding(
   bindingId: string,
 ): HelixSituationSourceBinding | null {
-  return bindings.get(bindingId) ?? null;
+  const binding = bindings.get(bindingId) ?? null;
+  return binding && !isHelixRoomSourceIngressSourceId(binding.source_id)
+    ? binding
+    : null;
 }
 
 export function getSituationSourceBindingForSource(input: {

@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import {
+  HELIX_ROOM_SOURCE_ADMISSION_SCHEMA,
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
 import type { WorldEventIngestResult } from "../services/situation-room/world-event-ingest";
 import {
@@ -28,6 +33,25 @@ const minecraftEvent = (overrides: Partial<HelixWorldEvent> = {}): HelixWorldEve
   ...overrides,
 });
 
+const sourceAdmission = (event: HelixWorldEvent): HelixRoomSourceAdmission => ({
+  schema: HELIX_ROOM_SOURCE_ADMISSION_SCHEMA,
+  transport: "room_source_ingress",
+  binding_id: "binding:minecraft-paper",
+  request_id: "request:world-event",
+  room_id: event.room_id,
+  source_id: event.source_id ?? "source:paper",
+  world_id: event.world_id,
+  domain_adapter: "minecraft.paper_plugin.v1",
+  evidence_refs: event.evidence_refs ?? [],
+  content_role: "source_admission_not_assistant_answer",
+  reentry_required: true,
+  model_invoked: false,
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
 const ingestResult = (event: HelixWorldEvent, overrides: Partial<WorldEventIngestResult> = {}): WorldEventIngestResult => ({
   ok: true,
   schema: "helix.world_event_ingest_response.v1",
@@ -39,6 +63,7 @@ const ingestResult = (event: HelixWorldEvent, overrides: Partial<WorldEventInges
   thread_id: "thread:minecraft",
   message: "World event ingested.",
   event_type: event.event_type,
+  source_admission: sourceAdmission(event),
   append_candidate: {
     event,
     eventId: "event:damage",
@@ -67,6 +92,63 @@ describe("live continuation runner", () => {
   beforeEach(() => {
     resetLiveContinuationJobsForTest();
     resetLiveContinuationRunnerForTest();
+  });
+
+  it("rejects a protected event source hidden behind a normal append-candidate alias", async () => {
+    const job = upsertLiveContinuationJob({
+      thread_id: "thread:minecraft",
+      room_id: "room:overworld",
+      source_ids: ["source:normal"],
+      objective: "Observe the current world state.",
+    });
+    const baseline = ingestResult(minecraftEvent());
+    const protectedEvent = minecraftEvent({
+      source_id: "source:room-ingress:binding-1",
+    });
+    const aliasedResult = {
+      ...baseline,
+      source_admission: null,
+      append_candidate: {
+        ...baseline.append_candidate!,
+        sourceId: "source:normal",
+        event: protectedEvent,
+      },
+    } as WorldEventIngestResult;
+
+    await expect(
+      runLiveContinuationTick({
+        job,
+        trigger: "world_event",
+        worldEventResult: aliasedResult,
+      }),
+    ).rejects.toThrow(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  });
+
+  it("rejects conflicting non-room append-candidate and event source identities", async () => {
+    const job = upsertLiveContinuationJob({
+      thread_id: "thread:minecraft",
+      room_id: "room:overworld",
+      source_ids: ["source:normal"],
+      objective: "Observe the current world state.",
+    });
+    const baseline = ingestResult(minecraftEvent());
+    const aliasedResult = {
+      ...baseline,
+      source_admission: null,
+      append_candidate: {
+        ...baseline.append_candidate!,
+        sourceId: "source:normal",
+        event: minecraftEvent({ source_id: "source:other" }),
+      },
+    } as WorldEventIngestResult;
+
+    await expect(
+      runLiveContinuationTick({
+        job,
+        trigger: "world_event",
+        worldEventResult: aliasedResult,
+      }),
+    ).rejects.toThrow("live_continuation_source_identity_mismatch");
   });
 
   it("runs deterministic single-agent lanes for a salient Minecraft world event", async () => {
@@ -111,7 +193,7 @@ describe("live continuation runner", () => {
     });
     expect(debug?.admission).toMatchObject({
       source_kind: "minecraft_world_events",
-      transport: "cloudflarelink",
+      transport: "room_source_ingress",
       trust_level: "admitted_live_source",
       assistant_answer: false,
       terminal_eligible: false,
@@ -435,5 +517,37 @@ describe("live continuation runner", () => {
     expect(tick.next_step).toBe("fail_closed");
     expect(debug?.admission.trust_level).toBe("blocked");
     expect(debug?.goal.status).toBe("fail_closed");
+  });
+
+  it("does not project source-controlled profile aliases without server-owned admission", async () => {
+    const job = upsertLiveContinuationJob({
+      thread_id: "thread:minecraft",
+      room_id: "room:overworld",
+      source_ids: ["source:paper"],
+      objective: "Watch my Minecraft run.",
+    });
+    const event = minecraftEvent({
+      meta: {
+        server_id: "server:paper",
+        profile_id: "profile:spoofed",
+        linked_profile_id: "profile:linked-spoofed",
+        commander_profile_id: "profile:commander-spoofed",
+      },
+    });
+    const tick = await runLiveContinuationTick({
+      job,
+      trigger: "world_event",
+      worldEventResult: ingestResult(event, { source_admission: null }),
+      now: "2026-06-02T02:20:01.000Z",
+    });
+    const admission = getLiveContinuationRunDebugForTest(tick.tick_id)?.admission;
+
+    expect(admission).toMatchObject({
+      transport: "unknown",
+      trust_level: "unverified",
+      source_identity: {
+        profile_id: null,
+      },
+    });
   });
 });

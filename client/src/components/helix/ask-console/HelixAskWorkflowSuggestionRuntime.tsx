@@ -3,6 +3,7 @@ import { ArrowRight, Sparkles, X } from "lucide-react";
 import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 import { projectResearchPaperToProposalSession } from "@/lib/helix/workflow-demos/research-paper-to-proposal";
 import { useHelixWorkflowDemoStore, type HelixWorkflowDemoState } from "@/store/useHelixWorkflowDemoStore";
+import { useTheoryExperimentWorkflowStore } from "@/store/useTheoryExperimentWorkflowStore";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
 import { recordWorkstationTimelineEntry } from "@/store/useWorkstationWorkflowTimelineStore";
 
@@ -17,6 +18,9 @@ export function HelixAskWorkflowSuggestionRuntime({
 }: HelixAskWorkflowSuggestionRuntimeProps) {
   const session = useHelixWorkflowDemoStore((state: HelixWorkflowDemoState) => state.session);
   const observePayload = useHelixWorkflowDemoStore((state: HelixWorkflowDemoState) => state.observePayload);
+  const observeTheoryExperimentPayload = useTheoryExperimentWorkflowStore(
+    (state) => state.observePayload,
+  );
   const dismissSuggestion = useHelixWorkflowDemoStore((state: HelixWorkflowDemoState) => state.dismissSuggestion);
   const recordSuggestionShown = useHelixWorkflowDemoStore((state: HelixWorkflowDemoState) => state.recordSuggestionShown);
   const recordPromptInserted = useHelixWorkflowDemoStore((state: HelixWorkflowDemoState) => state.recordPromptInserted);
@@ -31,8 +35,9 @@ export function HelixAskWorkflowSuggestionRuntime({
   useEffect(() => {
     if (latestPayload !== undefined && latestPayload !== null && activeChatId) {
       observePayload(latestPayload, activeChatId);
+      void observeTheoryExperimentPayload(latestPayload, activeChatId);
     }
-  }, [activeChatId, latestPayload, observePayload]);
+  }, [activeChatId, latestPayload, observePayload, observeTheoryExperimentPayload]);
 
   useEffect(() => {
     setDraft(qte?.prompt ?? "");

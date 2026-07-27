@@ -50,6 +50,7 @@ export type HelixAgentRunResult = {
   terminal_failure_text?: string | null;
   typed_failure?: Record<string, unknown> | null;
   current_turn_artifact_ledger?: Record<string, unknown> | null;
+  capability_itinerary?: Record<string, unknown>;
   compound_evidence_synthesis_answer?: Record<string, unknown>;
   compound_capability_contract?: Record<string, unknown>;
   debug?: Record<string, unknown>;

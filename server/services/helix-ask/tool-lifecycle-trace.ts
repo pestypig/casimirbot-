@@ -353,6 +353,8 @@ export const buildToolLifecycleTrace = (input: {
     modelCapability(decision) ||
     capabilityFromPlan(plan);
   const admittedCapability =
+    readString(admission?.admitted_capability) ||
+    readString(admission?.selected_capability) ||
     readString(operationalTrace?.policy_admitted_capability) ||
     readStringArray(admission?.admitted_tool_families)[0] ||
     (readString(plan?.admission_status) === "admitted" || readString(plan?.admission_status) === "needs_evidence"

@@ -1,0 +1,164 @@
+{
+  "schema_version": "casimir_dp_stage4_2b_synthetic_campaign/1",
+  "campaign_id": "casimir-dp-apparatus-coherence-residual-stage4-2b-v1",
+  "evidence_class": "synthetic_fixture",
+  "generated_at": "2026-07-26T00:00:00.000Z",
+  "measured_evidence": "not_ready",
+  "collapse_identification": "blocked",
+  "manifold_dynamics": "blocked",
+  "physical_viability": "not_evaluated",
+  "cases": [
+    {
+      "case_id": "ordinary_closure_only",
+      "target_runtime": "E",
+      "mutation": "baseline_ordinary_only",
+      "expected_gate": "pass",
+      "expected_status": "synthetic_recovery",
+      "does_not_support": "Measured ordinary-decoherence closure or objective collapse."
+    },
+    {
+      "case_id": "isolated_thermal_injection",
+      "target_runtime": "B",
+      "mutation": "increase_particle_spectral_temperature",
+      "expected_gate": "pass",
+      "expected_status": "synthetic_recovery",
+      "does_not_support": "Measured nanoparticle thermometry."
+    },
+    {
+      "case_id": "em_patch_injection",
+      "target_runtime": "C",
+      "mutation": "registered_electromagnetic_injection",
+      "expected_gate": "pass",
+      "expected_status": "synthetic_recovery",
+      "does_not_support": "A measured patch-noise subtraction."
+    },
+    {
+      "case_id": "vibration_and_correlated_tilt_injection",
+      "target_runtime": "C",
+      "mutation": "registered_correlated_vibration_injection",
+      "expected_gate": "pass",
+      "expected_status": "synthetic_recovery",
+      "does_not_support": "Measured vibration closure."
+    },
+    {
+      "case_id": "residual_gas_injection",
+      "target_runtime": "C",
+      "mutation": "registered_non_gaussian_gas_contribution",
+      "expected_gate": "pass",
+      "expected_status": "synthetic_recovery",
+      "does_not_support": "Measured vacuum closure."
+    },
+    {
+      "case_id": "optical_readout_injection",
+      "target_runtime": "C",
+      "mutation": "registered_readout_injection",
+      "expected_gate": "pass",
+      "expected_status": "synthetic_recovery",
+      "does_not_support": "Measured optical-readout closure."
+    },
+    {
+      "case_id": "correlated_covariance_false_residual",
+      "target_runtime": "E",
+      "mutation": "omit_cross_covariance",
+      "expected_gate": "blocked",
+      "expected_status": "false_residual_prevented",
+      "does_not_support": "A physical residual."
+    },
+    {
+      "case_id": "strict_frozen_dp_injection",
+      "target_runtime": "E",
+      "mutation": "inject_exact_frozen_dp_signature",
+      "expected_gate": "pass",
+      "expected_status": "synthetic_recovery",
+      "does_not_support": "Measured DP evidence."
+    },
+    {
+      "case_id": "generic_irreversible_non_dp_loss",
+      "target_runtime": "F",
+      "mutation": "replace_dp_scaling_with_generic_loss",
+      "expected_gate": "blocked",
+      "expected_status": "signature_not_identifiable",
+      "does_not_support": "Objective-collapse identification."
+    },
+    {
+      "case_id": "boundary_only_residual",
+      "target_runtime": "E",
+      "mutation": "inject_boundary_residual_with_zero_registered_dp_contrast",
+      "expected_gate": "pass",
+      "expected_status": "boundary_correlated_anomaly_only",
+      "does_not_support": "Unmodified DP or a Casimir-DP bridge."
+    },
+    {
+      "case_id": "joint_system_branch_mismatch",
+      "target_runtime": "A",
+      "mutation": "change_registered_joint_branch_density",
+      "expected_gate": "blocked",
+      "expected_status": "conditional_boundary_identity_not_applicable",
+      "does_not_support": "A standard-DP boundary effect."
+    },
+    {
+      "case_id": "echo_recoverable_quasistatic_dephasing",
+      "target_runtime": "C",
+      "mutation": "registered_echo_filter_recovery",
+      "expected_gate": "pass",
+      "expected_status": "synthetic_recovery",
+      "does_not_support": "Irreversible collapse."
+    },
+    {
+      "case_id": "blind_label_leakage",
+      "target_runtime": "E",
+      "mutation": "confirmatory_timestamp_before_freeze",
+      "expected_gate": "blocked",
+      "expected_status": "leakage_prevented",
+      "does_not_support": "A confirmatory comparison."
+    },
+    {
+      "case_id": "post_hoc_parameter_retuning_attempt",
+      "target_runtime": "D",
+      "mutation": "unfreeze_r0_after_held_out",
+      "expected_gate": "blocked",
+      "expected_status": "retuning_prevented",
+      "does_not_support": "A fitted DP result."
+    },
+    {
+      "case_id": "signature_collinearity_failure",
+      "target_runtime": "F",
+      "mutation": "duplicate_whitened_signature",
+      "expected_gate": "blocked",
+      "expected_status": "signature_not_identifiable",
+      "does_not_support": "Mechanism identification."
+    },
+    {
+      "case_id": "underpowered_null",
+      "target_runtime": "F",
+      "mutation": "use_frozen_nominal_apparatus",
+      "expected_gate": "pass",
+      "expected_status": "apparatus_not_powered_for_dp",
+      "does_not_support": "DP exclusion."
+    },
+    {
+      "case_id": "sensor_self_noise_false_decoherence",
+      "target_runtime": "C",
+      "mutation": "omit_sensor_self_noise_subtraction",
+      "expected_gate": "blocked",
+      "expected_status": "sensor_noise_confound_prevented",
+      "does_not_support": "Physical apparatus decoherence."
+    },
+    {
+      "case_id": "singular_covariance_jitter_rescue_attempt",
+      "target_runtime": "E",
+      "mutation": "singular_confirmatory_covariance",
+      "expected_gate": "blocked",
+      "expected_status": "not_identifiable",
+      "does_not_support": "A regularized positive claim."
+    },
+    {
+      "case_id": "low_visibility_gaussian_coverage_failure",
+      "target_runtime": "E",
+      "mutation": "visibility_below_validated_log_domain",
+      "expected_gate": "blocked",
+      "expected_status": "likelihood_not_covered",
+      "does_not_support": "A Gaussian residual significance."
+    }
+  ]
+}

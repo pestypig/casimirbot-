@@ -17,6 +17,7 @@ type LeafEntry = {
 
 type PathFalsifier = {
   observable?: string;
+  readiness_block_rule?: string;
   reject_rule?: string;
   uncertainty_model?: string;
   test_refs?: string[];

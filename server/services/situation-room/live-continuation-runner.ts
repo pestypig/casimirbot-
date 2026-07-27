@@ -17,6 +17,11 @@ import {
   type HelixWorkerLaneReceipt,
 } from "@shared/helix-live-continuation";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 import type { WorldEventIngestResult } from "./world-event-ingest";
 import type {
   LiveContinuationJob,
@@ -125,36 +130,72 @@ const isRouteEvent = (event: HelixWorldEvent | null, result?: WorldEventIngestRe
 function buildAdmission(input: {
   job: LiveContinuationJob;
   event: HelixWorldEvent | null;
+  sourceAdmission: HelixRoomSourceAdmission | null;
   sourceId: string | null;
   now: string;
   evidenceRefs: string[];
 }): HelixLiveSourceAdmissionReceipt {
   const missingSource = input.job.source_ids.length === 0 || !input.sourceId;
-  const sourceBlocked = Boolean(input.sourceId && input.job.source_ids.length > 0 && !input.job.source_ids.includes(input.sourceId));
+  const admissionIdentityMismatch = Boolean(
+    input.sourceAdmission &&
+      (
+        input.sourceAdmission.room_id !== input.job.room_id ||
+        input.sourceAdmission.source_id !== input.sourceId ||
+        input.sourceAdmission.room_id !== input.event?.room_id ||
+        input.sourceAdmission.world_id !== input.event?.world_id
+      ),
+  );
+  const sourceBlocked = admissionIdentityMismatch || Boolean(
+    input.sourceId &&
+      input.job.source_ids.length > 0 &&
+      !input.job.source_ids.includes(input.sourceId),
+  );
   const sourceStale = input.event?.event_type === "source_disconnected";
+  const verifiedAdmission = Boolean(input.sourceAdmission && !admissionIdentityMismatch);
   return {
     schema: HELIX_LIVE_SOURCE_ADMISSION_RECEIPT_SCHEMA,
-    receipt_id: `live_source_admission:${hashShort([input.job.job_id, input.sourceId, input.now])}`,
+    receipt_id: `live_source_admission:${hashShort([
+      input.job.job_id,
+      input.sourceId,
+      input.sourceAdmission?.binding_id ?? null,
+      input.sourceAdmission?.request_id ?? null,
+      input.now,
+    ])}`,
     thread_id: input.job.thread_id,
     room_id: input.job.room_id,
     environment_id: input.job.environment_id ?? null,
     contract_id: input.job.contract_id ?? null,
     source_id: input.sourceId ?? input.job.source_ids[0] ?? "unknown",
     source_kind: "minecraft_world_events",
-    transport: "cloudflarelink",
+    transport: verifiedAdmission ? "room_source_ingress" : "unknown",
     source_identity: {
-      world_id: input.event?.world_id ?? null,
-      server_id: typeof input.event?.meta?.server_id === "string" ? input.event.meta.server_id : null,
+      world_id: input.sourceAdmission?.world_id ?? input.event?.world_id ?? null,
+      server_id: null,
       player_id: input.event?.actor_id ?? null,
-      profile_id: typeof input.event?.meta?.profile_id === "string" ? input.event.meta.profile_id : null,
+      profile_id: null,
     },
     freshness: {
-      status: sourceBlocked ? "blocked" : missingSource ? "missing" : sourceStale ? "stale" : "connected",
+      status: sourceBlocked
+        ? "blocked"
+        : missingSource
+          ? "missing"
+          : sourceStale
+            ? "stale"
+            : verifiedAdmission
+              ? "connected"
+              : "unknown",
       last_seen_at: input.event?.ts ?? null,
       stale_after_ms: input.job.cooldowns.min_tick_interval_ms * 3,
     },
-    trust_level: sourceBlocked ? "blocked" : missingSource || sourceStale ? "unverified" : "admitted_live_source",
-    evidence_refs: input.evidenceRefs,
+    trust_level: sourceBlocked
+      ? "blocked"
+      : verifiedAdmission && !sourceStale
+        ? "admitted_live_source"
+        : "unverified",
+    evidence_refs: uniqueStrings([
+      ...input.evidenceRefs,
+      ...(input.sourceAdmission?.evidence_refs ?? []),
+    ]),
     ...helixReceiptNotAnswerFlags,
   };
 }
@@ -436,15 +477,40 @@ export async function runLiveContinuationTick(input: {
   const now = input.now ?? new Date().toISOString();
   const event = eventFromResult(input.worldEventResult);
   const eventId = eventIdFromResult(input.worldEventResult);
+  const appendCandidateSourceId =
+    input.worldEventResult?.append_candidate?.sourceId ?? null;
+  const eventSourceId = event?.source_id ?? null;
   const sourceId = sourceIdFromResult(input.worldEventResult, event);
+  const sourceAdmission =
+    input.worldEventResult?.source_admission ??
+    input.worldEventResult?.append_candidate?.sourceAdmission ??
+    null;
+  if (
+    input.job.source_ids.some(isHelixRoomSourceIngressSourceId) ||
+    isHelixRoomSourceIngressSourceId(appendCandidateSourceId) ||
+    isHelixRoomSourceIngressSourceId(eventSourceId) ||
+    isHelixRoomSourceIngressSourceId(sourceId) ||
+    isHelixRoomSourceIngressSourceId(sourceAdmission?.source_id)
+  ) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
+  if (
+    appendCandidateSourceId &&
+    eventSourceId &&
+    appendCandidateSourceId !== eventSourceId
+  ) {
+    throw new Error("live_continuation_source_identity_mismatch");
+  }
   const evidenceRefs = uniqueStrings([
     `live_continuation_job:${input.job.job_id}`,
     ...(input.job.last_observation_refs ?? []),
     ...evidenceRefsFromResult(input.worldEventResult, event),
+    ...(sourceAdmission?.evidence_refs ?? []),
   ]);
   const admission = buildAdmission({
     job: input.job,
     event,
+    sourceAdmission,
     sourceId,
     now,
     evidenceRefs,
@@ -535,10 +601,26 @@ export async function runLiveContinuationTick(input: {
 }
 
 export function getLiveContinuationRunDebug(tickId: string): LiveContinuationRunDebug | null {
-  return latestDebugByTickId.get(tickId) ?? null;
+  const debug = latestDebugByTickId.get(tickId) ?? null;
+  return debug &&
+    !isHelixRoomSourceIngressSourceId(debug.admission.source_id)
+    ? debug
+    : null;
 }
 
 export const getLiveContinuationRunDebugForTest = getLiveContinuationRunDebug;
+
+export function removeLiveContinuationRunDebug(input: {
+  sourceId: string;
+}): number {
+  let removed = 0;
+  for (const [tickId, debug] of latestDebugByTickId.entries()) {
+    if (debug.admission.source_id !== input.sourceId) continue;
+    latestDebugByTickId.delete(tickId);
+    removed += 1;
+  }
+  return removed;
+}
 
 export function resetLiveContinuationRunnerForTest(): void {
   latestDebugByTickId = new Map<string, LiveContinuationRunDebug>();

@@ -629,11 +629,13 @@ export const isHardDocsEvidenceSourceTargetIntent = (
     record.strength === "hard" &&
     (
       requestedOutputs.some((output) =>
+        output === "file_path" ||
         output === "line_backed_source" ||
         output === "numeric_value_evidence" ||
         output === "doc_evidence_synthesis_answer"
       ) ||
       reasons.some((reason) =>
+        reason === "explicit_docs_search_source_target" ||
         reason === "explicit_local_document_evidence_source_target" ||
         reason === "explicit_docs_path_compare_source_target" ||
         reason === "explicit_docs_path_locate_synthesis_source_target"

@@ -7,6 +7,10 @@ import {
   type LiveWorkstationPipelinePlan,
   type LiveWorkstationPipelineReceipt,
 } from "@shared/helix-live-workstation-pipeline";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 
 const pipelines = new Map<string, LiveWorkstationPipeline>();
 
@@ -43,6 +47,9 @@ export function createLiveWorkstationPipeline(input: {
   const objective = clean(input.objective) ?? input.plan.objective;
   const createdTurnId = clean(input.created_turn_id) ?? `turn:live_pipeline:${hashShort([threadId, objective], 12)}`;
   const sourceIds = unique(input.source_ids ?? []);
+  if (sourceIds.some(isHelixRoomSourceIngressSourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
   const pipelineId = `live_pipeline:${hashShort([threadId, createdTurnId, objective, sourceIds, input.plan.pipeline_recipe_id], 18)}`;
   const existing = pipelines.get(pipelineId);
   const pipeline: LiveWorkstationPipeline = {
@@ -93,17 +100,23 @@ export function createLiveWorkstationPipeline(input: {
 }
 
 export function listLiveWorkstationPipelines(): LiveWorkstationPipeline[] {
-  return Array.from(pipelines.values()).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  return Array.from(pipelines.values())
+    .filter((pipeline) => !pipeline.source_ids.some(isHelixRoomSourceIngressSourceId))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 }
 
 export function listLiveWorkstationPipelinesForSource(sourceId: string): LiveWorkstationPipeline[] {
+  if (isHelixRoomSourceIngressSourceId(sourceId)) return [];
   return listLiveWorkstationPipelines().filter((pipeline) =>
     pipeline.status === "active" && pipeline.source_ids.includes(sourceId),
   );
 }
 
 export function getLiveWorkstationPipeline(pipelineId: string): LiveWorkstationPipeline | null {
-  return pipelines.get(pipelineId) ?? null;
+  const pipeline = pipelines.get(pipelineId) ?? null;
+  return pipeline && !pipeline.source_ids.some(isHelixRoomSourceIngressSourceId)
+    ? pipeline
+    : null;
 }
 
 export function setLiveWorkstationPipelineStatus(input: {
@@ -113,9 +126,24 @@ export function setLiveWorkstationPipelineStatus(input: {
 }): LiveWorkstationPipeline | null {
   const existing = pipelines.get(input.pipeline_id);
   if (!existing) return null;
+  if (existing.source_ids.some(isHelixRoomSourceIngressSourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
   const next = { ...existing, status: input.status, updated_at: input.now ?? new Date().toISOString() };
   pipelines.set(next.pipeline_id, next);
   return next;
+}
+
+export function removeLiveWorkstationPipelines(input: {
+  sourceId: string;
+}): number {
+  let removed = 0;
+  for (const [pipelineId, pipeline] of pipelines.entries()) {
+    if (!pipeline.source_ids.includes(input.sourceId)) continue;
+    pipelines.delete(pipelineId);
+    removed += 1;
+  }
+  return removed;
 }
 
 export function resetLiveWorkstationPipelines(): void {

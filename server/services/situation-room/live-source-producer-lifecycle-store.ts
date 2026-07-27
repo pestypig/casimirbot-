@@ -5,6 +5,10 @@ import {
   type HelixLiveSourceProducerLifecycleKind,
   type HelixLiveSourceProducerLifecycleStatus,
 } from "@shared/helix-live-source-producer-lifecycle";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 
 const eventsByProducerId = new Map<string, HelixLiveSourceProducerLifecycleEvent[]>();
 
@@ -25,6 +29,9 @@ export function recordLiveSourceProducerLifecycleEvent(input: {
   relatedIds?: string[];
   createdAt?: string | null;
 }): HelixLiveSourceProducerLifecycleEvent {
+  if (isHelixRoomSourceIngressSourceId(input.sourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
   const createdAt = input.createdAt ?? nowIso();
   const event: HelixLiveSourceProducerLifecycleEvent = {
     schema: HELIX_LIVE_SOURCE_PRODUCER_LIFECYCLE_EVENT_SCHEMA,
@@ -52,8 +59,24 @@ export function listLiveSourceProducerLifecycleEvents(input: {
   limit?: number;
 }): HelixLiveSourceProducerLifecycleEvent[] {
   return [...(eventsByProducerId.get(input.producerId) ?? [])]
+    .filter(
+      (event) => !isHelixRoomSourceIngressSourceId(event.source_id),
+    )
     .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
     .slice(-(input.limit ?? 120));
+}
+
+export function removeLiveSourceProducerLifecycleEvents(input: {
+  sourceId: string;
+}): number {
+  let removed = 0;
+  for (const [producerId, events] of eventsByProducerId.entries()) {
+    const retained = events.filter((event) => event.source_id !== input.sourceId);
+    removed += events.length - retained.length;
+    if (retained.length > 0) eventsByProducerId.set(producerId, retained);
+    else eventsByProducerId.delete(producerId);
+  }
+  return removed;
 }
 
 export function resetLiveSourceProducerLifecycleForTest(): void {

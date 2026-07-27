@@ -7,6 +7,7 @@ import com.casimirbot.helixsensor.manifest.ManifestPublisher;
 import com.casimirbot.helixsensor.probe.ProbePoller;
 import com.casimirbot.helixsensor.snapshot.SnapshotBurstController;
 import com.casimirbot.helixsensor.snapshot.SnapshotScheduler;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -21,6 +22,7 @@ public final class HelixPaperSensorPlugin extends JavaPlugin {
     private ProbePoller probePoller;
     private SnapshotBurstController burstController;
     private HelixSensorRuntimeStatus runtimeStatus;
+    private final AtomicBoolean sensorLoopsStarted = new AtomicBoolean(false);
     private final AtomicInteger pendingProbeCount = new AtomicInteger(0);
     private final AtomicInteger skippedSnapshotCount = new AtomicInteger(0);
 
@@ -37,9 +39,21 @@ public final class HelixPaperSensorPlugin extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
+        if (!sensorConfig.sensorUploadsAllowed()) {
+            getLogger().severe(
+                "HelixPaperSensor refuses to start: use HTTPS (or loopback HTTP) and paste a generated room-source credential."
+            );
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
 
         this.runtimeStatus = new HelixSensorRuntimeStatus(sensorConfig);
-        this.httpClient = new HelixHttpClient(sensorConfig, getLogger(), runtimeStatus);
+        this.httpClient = new HelixHttpClient(
+            sensorConfig,
+            getLogger(),
+            runtimeStatus,
+            () -> getServer().getScheduler().runTask(this, this::stopSensorLoops)
+        );
         this.burstController = new SnapshotBurstController(sensorConfig);
         this.manifestPublisher = new ManifestPublisher(this, sensorConfig, httpClient, runtimeStatus);
         this.heartbeatScheduler = new HeartbeatScheduler(this, sensorConfig, httpClient, runtimeStatus, pendingProbeCount, skippedSnapshotCount);
@@ -48,19 +62,16 @@ public final class HelixPaperSensorPlugin extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new SnapshotEventListener(burstController), this);
 
-        manifestPublisher.publishAsync();
-        heartbeatScheduler.start();
-        snapshotScheduler.start();
-        probePoller.start();
+        manifestPublisher.start(this::startSensorLoops);
 
-        getLogger().info("HelixPaperSensor enabled in read-only mode.");
+        getLogger().info(
+            "HelixPaperSensor enabled in read-only mode; waiting for manifest admission."
+        );
     }
 
     @Override
     public void onDisable() {
-        if (heartbeatScheduler != null) heartbeatScheduler.stop();
-        if (snapshotScheduler != null) snapshotScheduler.stop();
-        if (probePoller != null) probePoller.stop();
+        stopSensorLoops();
         if (httpClient != null) httpClient.close();
         getLogger().info("HelixPaperSensor disabled.");
     }
@@ -77,12 +88,20 @@ public final class HelixPaperSensorPlugin extends JavaPlugin {
         if ("probes".equals(subcommand)) return sendLines(sender, CommandStatusFormatter.probes(runtimeStatus));
         if ("debug-payload".equals(subcommand) || "debug_payload".equals(subcommand)) return sendLines(sender, CommandStatusFormatter.debugPayload(runtimeStatus));
         if ("heartbeat".equals(subcommand)) {
-            if (heartbeatScheduler != null) heartbeatScheduler.forceHeartbeat();
+            if (!sensorLoopsStarted.get()) {
+                sender.sendMessage("Helix heartbeat is waiting for manifest admission.");
+                return true;
+            }
+            heartbeatScheduler.forceHeartbeat();
             sender.sendMessage("Helix heartbeat queued.");
             return true;
         }
         if ("snapshot".equals(subcommand)) {
-            if (snapshotScheduler != null) snapshotScheduler.forceSnapshot();
+            if (!sensorLoopsStarted.get()) {
+                sender.sendMessage("Helix snapshot is waiting for manifest admission.");
+                return true;
+            }
+            snapshotScheduler.forceSnapshot();
             sender.sendMessage("Helix snapshot queued.");
             return true;
         }
@@ -98,5 +117,29 @@ public final class HelixPaperSensorPlugin extends JavaPlugin {
     private boolean sendLines(CommandSender sender, Iterable<String> lines) {
         for (String line : lines) sender.sendMessage(line);
         return true;
+    }
+
+    private void startSensorLoops() {
+        if (
+            httpClient == null ||
+            httpClient.terminallyPaused() ||
+            !sensorLoopsStarted.compareAndSet(false, true)
+        ) {
+            return;
+        }
+        heartbeatScheduler.start();
+        snapshotScheduler.start();
+        probePoller.start();
+        getLogger().info(
+            "Helix manifest admitted; heartbeat, snapshot, and probe loops started."
+        );
+    }
+
+    private void stopSensorLoops() {
+        if (manifestPublisher != null) manifestPublisher.stop();
+        if (heartbeatScheduler != null) heartbeatScheduler.stop();
+        if (snapshotScheduler != null) snapshotScheduler.stop();
+        if (probePoller != null) probePoller.stop();
+        sensorLoopsStarted.set(false);
     }
 }

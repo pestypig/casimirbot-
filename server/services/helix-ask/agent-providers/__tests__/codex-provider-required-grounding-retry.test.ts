@@ -20,6 +20,22 @@ describe("Codex required-grounding correction", () => {
     })).toEqual(["docs.search"]);
   });
 
+  it("reads mandatory runtime capabilities from the projected provider itinerary", () => {
+    expect(runtimeProviderRequiredGroundingCapabilityIdsFromBody({
+      capability_itinerary: {
+        compound_capability_contract: {
+          subgoals: [
+            {
+              requested_capability: "docs-viewer.search_docs",
+              runtime_capability: "docs.search",
+              mandatory: true,
+            },
+          ],
+        },
+      },
+    })).toEqual(["docs.search"]);
+  });
+
   it("retries a direct locator answer when the required Docs observation is absent", () => {
     expect(shouldRetryCodexCapabilityLaneRequest({
       question: "Find the NHM2 current status whitepaper.",

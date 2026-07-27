@@ -32,6 +32,22 @@ export type CasimirFormalVerificationCertificateV1 = {
     requestId: string;
     artifactSha256: string;
     propositionSha256: string;
+    casimirSpec: {
+      semanticSha256: string;
+      artifactSha256: string;
+    };
+    masterProblem: {
+      planId: string;
+      artifactSha256: string;
+    };
+    derivationProgram: {
+      programId: string;
+      artifactSha256: string;
+    };
+    theoryGraph: {
+      graphId: string;
+      snapshotSha256: string;
+    };
   };
   status: CasimirFormalVerificationStatusV1;
   theorem: {
@@ -215,7 +231,16 @@ export function validateCasimirFormalVerificationCertificateV1(
   if (
     addExactShapeIssue(
       value.request,
-      ["schemaVersion", "requestId", "artifactSha256", "propositionSha256"],
+      [
+        "schemaVersion",
+        "requestId",
+        "artifactSha256",
+        "propositionSha256",
+        "casimirSpec",
+        "masterProblem",
+        "derivationProgram",
+        "theoryGraph",
+      ],
       "request",
       issues,
     )
@@ -236,6 +261,76 @@ export function validateCasimirFormalVerificationCertificateV1(
       "request.propositionSha256",
       issues,
     );
+    if (
+      addExactShapeIssue(
+        value.request.casimirSpec,
+        ["semanticSha256", "artifactSha256"],
+        "request.casimirSpec",
+        issues,
+      )
+    ) {
+      validateSha(
+        value.request.casimirSpec.semanticSha256,
+        "request.casimirSpec.semanticSha256",
+        issues,
+      );
+      validateSha(
+        value.request.casimirSpec.artifactSha256,
+        "request.casimirSpec.artifactSha256",
+        issues,
+      );
+    }
+    if (
+      addExactShapeIssue(
+        value.request.masterProblem,
+        ["planId", "artifactSha256"],
+        "request.masterProblem",
+        issues,
+      )
+    ) {
+      if (!isNonEmptyString(value.request.masterProblem.planId)) {
+        issues.push("request.masterProblem.planId must be non-empty");
+      }
+      validateSha(
+        value.request.masterProblem.artifactSha256,
+        "request.masterProblem.artifactSha256",
+        issues,
+      );
+    }
+    if (
+      addExactShapeIssue(
+        value.request.derivationProgram,
+        ["programId", "artifactSha256"],
+        "request.derivationProgram",
+        issues,
+      )
+    ) {
+      if (!isNonEmptyString(value.request.derivationProgram.programId)) {
+        issues.push("request.derivationProgram.programId must be non-empty");
+      }
+      validateSha(
+        value.request.derivationProgram.artifactSha256,
+        "request.derivationProgram.artifactSha256",
+        issues,
+      );
+    }
+    if (
+      addExactShapeIssue(
+        value.request.theoryGraph,
+        ["graphId", "snapshotSha256"],
+        "request.theoryGraph",
+        issues,
+      )
+    ) {
+      if (!isNonEmptyString(value.request.theoryGraph.graphId)) {
+        issues.push("request.theoryGraph.graphId must be non-empty");
+      }
+      validateSha(
+        value.request.theoryGraph.snapshotSha256,
+        "request.theoryGraph.snapshotSha256",
+        issues,
+      );
+    }
   }
 
   if (
@@ -649,6 +744,60 @@ export function validateCasimirFormalVerificationCertificateAgainstRequestV1(
     certificate.request.propositionSha256 !== request.claim.propositionSha256
   ) {
     issues.push("certificate propositionSha256 does not match request");
+  }
+  if (
+    certificate.request.casimirSpec.semanticSha256 !==
+    request.casimirSpec.semanticSha256
+  ) {
+    issues.push(
+      "certificate Casimir Spec semantic hash does not match request",
+    );
+  }
+  if (
+    certificate.request.casimirSpec.artifactSha256 !==
+    request.casimirSpec.artifactSha256
+  ) {
+    issues.push(
+      "certificate Casimir Spec artifact hash does not match request",
+    );
+  }
+  if (
+    certificate.request.masterProblem.planId !== request.masterProblem.planId
+  ) {
+    issues.push("certificate Master Problem planId does not match request");
+  }
+  if (
+    certificate.request.masterProblem.artifactSha256 !==
+    request.masterProblem.artifactSha256
+  ) {
+    issues.push(
+      "certificate Master Problem artifact hash does not match request",
+    );
+  }
+  if (
+    certificate.request.derivationProgram.programId !==
+    request.derivationProgram.programId
+  ) {
+    issues.push("certificate derivation programId does not match request");
+  }
+  if (
+    certificate.request.derivationProgram.artifactSha256 !==
+    request.derivationProgram.artifactSha256
+  ) {
+    issues.push(
+      "certificate derivation program artifact hash does not match request",
+    );
+  }
+  if (certificate.request.theoryGraph.graphId !== request.theoryGraph.graphId) {
+    issues.push("certificate Theory Graph graphId does not match request");
+  }
+  if (
+    certificate.request.theoryGraph.snapshotSha256 !==
+    request.theoryGraph.snapshotSha256
+  ) {
+    issues.push(
+      "certificate Theory Graph snapshot hash does not match request",
+    );
   }
   if (certificate.theorem.claimId !== request.claim.claimId)
     issues.push("certificate claimId does not match request");

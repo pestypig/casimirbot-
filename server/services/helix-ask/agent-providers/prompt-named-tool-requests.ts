@@ -51,6 +51,7 @@ import {
   TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
   THEORY_CONTEXT_REFLECTION_ALIAS_CAPABILITIES,
   THEORY_CONTEXT_REFLECTION_CAPABILITY,
+  THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
   THEORY_FRONTIER_CONJECTURE_ALIAS_CAPABILITIES,
   THEORY_FRONTIER_CONJECTURE_CAPABILITY,
   VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY,
@@ -71,6 +72,10 @@ import {
 } from "./explicit-tool-requests";
 import { appendDedupe } from "./gateway-request-dedupe";
 import {
+  buildTheoryExperimentProcedurePromptArguments,
+  isAffirmativeTheoryExperimentProcedurePrompt,
+} from "../theory-experiment-procedure-intent";
+import {
   HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
   isSavedResearchLibraryEvidencePrompt,
 } from "@shared/helix-research-library";
@@ -78,6 +83,7 @@ import {
   conversationalReferentTextCannotSupplyRequestedEvidence,
   resolveHelixAskConversationalReferent,
 } from "../referent-resolution";
+import { materializeRealtimeConversationContext } from "./realtime-conversation-context";
 import { extractExplicitTheoryDerivationRequestAssignments } from "../theory-congruence/derivation-request";
 import { isAffirmativeTheoryBadgeGraphReflectionPrompt } from "../theory-badge-graph-current-context-intent";
 
@@ -1152,6 +1158,91 @@ export const buildPromptDerivedTheoryReflectionGatewayCallRequests = (
         source: "helix_prompt_derived_theory_reflection",
         target_source: "theory_badge_graph",
         target_kind: "theory_context_reflection",
+      },
+    },
+  }];
+};
+
+export const buildPromptDerivedTheoryExperimentProcedureGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt || !isAffirmativeTheoryExperimentProcedurePrompt(prompt)) {
+    return [];
+  }
+  const conversationalReferent =
+    resolveHelixAskConversationalReferent(body);
+  const realtimeConversationContext =
+    conversationalReferent.resolvedText
+      ? null
+      : materializeRealtimeConversationContext({
+          body,
+          question: prompt,
+        });
+  const realtimeRetainedContext =
+    realtimeConversationContext?.latestGroundedAnswer
+      ? {
+          ...realtimeConversationContext.latestGroundedAnswer,
+          sourceKind: "realtime_grounded_answer_context",
+        }
+      : realtimeConversationContext?.latestPriorUserTurn
+        ? {
+            ...realtimeConversationContext.latestPriorUserTurn,
+            sourceKind: "realtime_prior_user_turn_context",
+          }
+        : null;
+  const retainedContextText =
+    conversationalReferent.resolvedText ??
+    realtimeRetainedContext?.text ??
+    null;
+  const retainedContextRef =
+    conversationalReferent.trace.resolved_source_ref ??
+    realtimeRetainedContext?.ref ??
+    null;
+  const argumentsForProcedure =
+    buildTheoryExperimentProcedurePromptArguments({
+      promptText: prompt,
+      retainedContextText,
+    });
+  if (argumentsForProcedure.selected_badge_ids.length === 0) {
+    // Keep semantic binding with Codex when the user named a human-facing
+    // badge description rather than a canonical badge id.
+    return [];
+  }
+  return [{
+    schema:
+      "helix.workstation_gateway.prompt_derived_theory_experiment_procedure_call_request.v1",
+    derivation_source:
+      "helix_prompt_derived_theory_experiment_procedure",
+    capability_id: THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+    mode: "read",
+    arguments: {
+      ...argumentsForProcedure,
+      source_target_intent: {
+        source: "helix_prompt_derived_theory_experiment_procedure",
+        target_source: "theory_experiment_procedure",
+        target_kind: "theory_experiment_procedure_observation",
+        strength: "hard",
+        explicit_cues: ["affirmative_theory_experiment_procedure_command"],
+        retained_context_ref: retainedContextRef,
+        retained_context_source_kind:
+          conversationalReferent.resolvedText
+            ? "chat_history"
+            : realtimeRetainedContext?.sourceKind ?? null,
+        retained_context_text_hash:
+          realtimeRetainedContext?.textHash ?? null,
+        realtime_context_pack_id:
+          realtimeRetainedContext
+            ? realtimeConversationContext?.audit.context_pack_id ?? null
+            : null,
+        realtime_context_hash:
+          realtimeRetainedContext
+            ? realtimeConversationContext?.audit.context_hash ?? null
+            : null,
+        context_authority: "non_authoritative_argument_context",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
       },
     },
   }];

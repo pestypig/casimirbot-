@@ -124,6 +124,24 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     transcriptText,
     sourceBinding: input.sourceBinding,
   });
+  const contextBoundRouteMetadata: Record<string, unknown> = {
+    schema: "helix.ask.route_metadata.v1",
+    source: "realtime_stage_play",
+    invocationKind: "stage_play_realtime_transcript_handoff",
+    sourceTarget: sourceTargetIntent.target_source,
+    mailboxThreadId: input.threadId,
+    handoffId,
+    realtimeSessionId: input.realtimeSessionId,
+    stagePlayEventRef: stagePlayEvent.eventId,
+    contextPackId: contextPack.context_pack_id,
+    contextHash: contextPack.context_hash,
+    currentTranscriptTextHash: transcriptTextHash,
+    currentTranscriptTextCharCount: transcriptText.length,
+    source_target_intent: sourceTargetIntent,
+  };
+  // Store before preliminary admission so its normal planner can use the same
+  // hash-bound Realtime context materialization as the provider turn.
+  storeRealtimeStagePlayContextPack({ handoffId, contextPack });
   const activeDocPath = readSafeString(
     input.sourceBinding?.document_ref ??
       input.sourceBinding?.active_doc_path ??
@@ -143,6 +161,7 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     transcriptText,
     sourceBinding: input.sourceBinding,
     sourceTargetIntent,
+    routeMetadata: contextBoundRouteMetadata,
     activeGoalBinding,
     selectedRuntimeAgentProvider: input.selectedRuntimeAgentProvider,
     evidenceRefs,
@@ -183,21 +202,10 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     raw_content_included: false,
   };
   const routeMetadata: Record<string, unknown> = {
-    schema: "helix.ask.route_metadata.v1",
-    source: "realtime_stage_play",
-    invocationKind: "stage_play_realtime_transcript_handoff",
-    sourceTarget: sourceTargetIntent.target_source,
+    ...contextBoundRouteMetadata,
     transportSource: "operator_text",
     transportKind: "realtime_transcript",
     transportPrecedenceReason: "server_admitted_realtime_transcript_handoff",
-    mailboxThreadId: input.threadId,
-    handoffId,
-    realtimeSessionId: input.realtimeSessionId,
-    stagePlayEventRef: stagePlayEvent.eventId,
-    contextPackId: contextPack.context_pack_id,
-    contextHash: contextPack.context_hash,
-    currentTranscriptTextHash: transcriptTextHash,
-    currentTranscriptTextCharCount: transcriptText.length,
     goalId: activeGoalBinding?.goal_id ?? null,
     runtimeGoalSessionRef: activeGoalBinding?.runtime_session_ref ?? null,
     boundRuntimeAgentProvider: activeGoalBinding?.runtime_agent_provider ?? null,
@@ -301,7 +309,6 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     raw_content_included: false,
   };
   handoffsById.set(handoffId, handoff);
-  storeRealtimeStagePlayContextPack({ handoffId, contextPack });
   handoffIdByProviderEventKey.set(providerEventKey, handoffId);
   startRealtimeGroundedRelayForHandoff({
     handoff,

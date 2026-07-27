@@ -3283,6 +3283,419 @@ describe("final_answer_draft terminal selection", () => {
     expect(gate.violations).toContain("fallback_like_answer");
   });
 
+  it("accepts a bounded missing-requirements synthesis from a typed theory procedure observation", () => {
+    const turnId = "ask:test:theory-procedure-bounded-limitation";
+    const observationRef = `${turnId}:theory_experiment_procedure_observation`;
+    const routeProductContract = {
+      schema: "helix.route_product_contract.v1",
+      turn_id: turnId,
+      source_target: "theory_locator",
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const artifactLedger = [{
+      artifact_id: observationRef,
+      turn_id: turnId,
+      kind: "theory_experiment_procedure_observation",
+      status: "succeeded",
+      payload: {
+        schema: "casimir.theory_experiment_procedure.observation.v1",
+        turn_id: turnId,
+        status: "succeeded",
+        output_role: "evidence_for_synthesis",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        procedure: {
+          lanyonEligibility: {
+            requested: true,
+            status: "ineligible",
+            requestedCaseId: "unregistered_2d_adaptive_mesh_advection_diffusion",
+            blockers: [
+              "unsupported_lanyon_case",
+              "target_observable_required",
+              "coordinate_frame_required",
+              "initial_boundary_conditions_required",
+            ],
+          },
+          readiness: {
+            status: "conditional",
+            terminalSynthesisAllowed: false,
+          },
+          authority: {
+            preparesProcedureOnly: true,
+            executesTools: false,
+            proofAuthority: false,
+            numericalAuthority: false,
+            empiricalAuthority: false,
+            physicalTruthAuthority: false,
+            terminalEligible: false,
+            postToolModelStepRequired: true,
+          },
+        },
+      },
+    }];
+    const draftText = [
+      "The requested Lanyon case is ineligible; I cannot improvise support or treat it as eligible, and no code was run.",
+      "Exact typed limitation and missing requirements:",
+      "- unsupported_lanyon_case",
+      "- target_observable_required",
+      "- coordinate_frame_required",
+      "- initial_boundary_conditions_required",
+    ].join("\n");
+    const gate = evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:draft`,
+      draftText,
+      draftPayload: {
+        schema: "helix.final_answer_draft.v1",
+        grounded_in_observation_refs: [observationRef],
+      },
+      promptText:
+        "Do not improvise support or run code; give the exact typed limitation and missing requirements.",
+      routeProductContract,
+      payload: {
+        active_prompt:
+          "Do not improvise support or run code; give the exact typed limitation and missing requirements.",
+        route_product_contract: routeProductContract,
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          route: {
+            source_target: "theory_locator",
+          },
+          canonical_goal: {
+            goal_kind: "theory_locator",
+            required_terminal_kind: "model_synthesized_answer",
+          },
+        },
+      },
+      artifactLedger,
+    });
+
+    expect(gate).toMatchObject({
+      ok: true,
+      route_family: "theory_locator",
+      violations: [],
+    });
+  });
+
+  it("accepts grounded missing-requirement reporting for an admitted procedure while retaining generic fallback rejection", () => {
+    const turnId = "ask:test:theory-procedure-grounded-requirements";
+    const observationRef = `${turnId}:theory_experiment_procedure_observation`;
+    const routeProductContract = {
+      schema: "helix.route_product_contract.v1",
+      turn_id: turnId,
+      source_target: "theory_locator",
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const artifactLedger = [{
+      artifact_id: observationRef,
+      turn_id: turnId,
+      kind: "theory_experiment_procedure_observation",
+      status: "succeeded",
+      payload: {
+        schema: "casimir.theory_experiment_procedure.observation.v1",
+        turn_id: turnId,
+        status: "succeeded",
+        output_role: "evidence_for_synthesis",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        procedure: {
+          lanyonEligibility: {
+            requested: true,
+            status: "eligible",
+            requestedCaseId: "advection_diffusion_full_1d",
+            blockers: [],
+          },
+          authority: {
+            preparesProcedureOnly: true,
+            executesTools: false,
+            proofAuthority: false,
+            numericalAuthority: false,
+            empiricalAuthority: false,
+            physicalTruthAuthority: false,
+            terminalEligible: false,
+            postToolModelStepRequired: true,
+          },
+        },
+      },
+    }];
+    const commonInput = {
+      turnId,
+      finalAnswerDraftRef: `${turnId}:draft`,
+      draftPayload: {
+        schema: "helix.final_answer_draft.v1",
+        grounded_in_observation_refs: [observationRef],
+      },
+      promptText:
+        "Re-prepare the procedure and identify the missing semantic, formal, numerical, and observable requirements.",
+      routeProductContract,
+      payload: {
+        active_prompt:
+          "Re-prepare the procedure and identify the missing semantic, formal, numerical, and observable requirements.",
+        route_product_contract: routeProductContract,
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          route: { source_target: "theory_locator" },
+          canonical_goal: {
+            goal_kind: "theory_locator",
+            required_terminal_kind: "model_synthesized_answer",
+          },
+        },
+      },
+      artifactLedger,
+    };
+
+    const groundedGate = evaluateFinalAnswerDraftQualityGate({
+      ...commonInput,
+      draftText: [
+        "The current procedure remains bounded preparation, not proof or physical validation.",
+        "Missing requirements identified from current procedure evidence:",
+        "- semantic_admission_required",
+        "- registered_bridge_or_derivation_repair_required",
+        "- independent_numerical_certificate_required",
+        "- target_observable_required",
+      ].join("\n"),
+    });
+    expect(groundedGate).toMatchObject({
+      ok: true,
+      route_family: "theory_locator",
+      violations: [],
+    });
+
+    const genericFallbackGate = evaluateFinalAnswerDraftQualityGate({
+      ...commonInput,
+      draftText:
+        "I could not produce a terminal answer because required artifacts were missing. Missing requirements remain. Please retry once.",
+    });
+    expect(genericFallbackGate.ok).toBe(false);
+    expect(genericFallbackGate.violations).toContain("fallback_like_answer");
+  });
+
+  it("does not exempt bounded-looking limitation text without the exact current-turn procedure observation", () => {
+    const turnId = "ask:test:theory-procedure-ungrounded-limitation";
+    const gate = evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:draft`,
+      draftText: [
+        "The requested Lanyon case is ineligible; no code was run and no support was improvised.",
+        "Exact typed limitation and missing requirements:",
+        "- unsupported_lanyon_case",
+      ].join("\n"),
+      draftPayload: {
+        schema: "helix.final_answer_draft.v1",
+        grounded_in_observation_refs: [`${turnId}:missing_observation`],
+      },
+      routeProductContract: {
+        schema: "helix.route_product_contract.v1",
+        turn_id: turnId,
+        source_target: "theory_locator",
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+      },
+      artifactLedger: [],
+    });
+
+    expect(gate.ok).toBe(false);
+    expect(gate.violations).toContain("fallback_like_answer");
+  });
+
+  it("still rejects terminal-unavailable boilerplate beside typed theory procedure evidence", () => {
+    const turnId = "ask:test:theory-procedure-generic-fallback";
+    const gate = evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:draft`,
+      draftText:
+        "I could not produce a terminal answer because required artifacts were missing. Please retry once.",
+      routeProductContract: {
+        schema: "helix.route_product_contract.v1",
+        turn_id: turnId,
+        source_target: "theory_locator",
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+      },
+      artifactLedger: [{
+        artifact_id: `${turnId}:theory_experiment_procedure_observation`,
+        kind: "theory_experiment_procedure_observation",
+        payload: {
+          schema: "casimir.theory_experiment_procedure.observation.v1",
+          status: "succeeded",
+          output_role: "evidence_for_synthesis",
+          terminal_eligible: false,
+          assistant_answer: false,
+        },
+      }],
+    });
+
+    expect(gate.ok).toBe(false);
+    expect(gate.violations).toContain("fallback_like_answer");
+  });
+
+  it("preserves theory-locator quality semantics for a grounded same-family compound procedure", () => {
+    const turnId = "ask:test:theory-procedure-compound-lanyon-limitation";
+    const observationRef = `${turnId}:theory_experiment_procedure_observation`;
+    const routeProductContract = {
+      schema: "helix.route_product_contract.v1",
+      turn_id: turnId,
+      source_target: "agent_provider_gateway_turn",
+      required_terminal_kind: "compound_evidence_synthesis_answer",
+      allowed_terminal_artifact_kinds: [
+        "compound_evidence_synthesis_answer",
+        "typed_failure",
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const subgoals = [
+      {
+        subgoal_id: "prepare",
+        capability_family: "theory_locator",
+        requested_capability: "theory-experiment-procedure.prepare",
+      },
+      {
+        subgoal_id: "evaluate",
+        capability_family: "theory_locator",
+        requested_capability:
+          "theory-experiment-procedure.evaluate_closure",
+      },
+      {
+        subgoal_id: "reflect",
+        capability_family: "theory_locator",
+        requested_capability: "helix_ask.reflect_theory_context",
+      },
+    ];
+    const artifactLedger = [
+      {
+        artifact_id: observationRef,
+        turn_id: turnId,
+        kind: "theory_experiment_procedure_observation",
+        status: "succeeded",
+        payload: {
+          schema: "casimir.theory_experiment_procedure.observation.v1",
+          turn_id: turnId,
+          status: "succeeded",
+          output_role: "evidence_for_synthesis",
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+          procedure: {
+            lanyonEligibility: {
+              requested: true,
+              status: "ineligible",
+              requestedCaseId: "unregistered_2d_adaptive_mesh",
+              blockers: [
+                "unsupported_lanyon_case",
+                "target_observable_required",
+                "coordinate_frame_required",
+              ],
+            },
+            authority: {
+              preparesProcedureOnly: true,
+              executesTools: false,
+              proofAuthority: false,
+              numericalAuthority: false,
+              empiricalAuthority: false,
+              physicalTruthAuthority: false,
+              terminalEligible: false,
+              postToolModelStepRequired: true,
+            },
+          },
+        },
+      },
+    ];
+    const payload = {
+      active_prompt:
+        "Use the current theory procedure, closure, and reflection evidence to report the exact Lanyon limitation and missing requirements.",
+      route_product_contract: routeProductContract,
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        route: { source_target: "theory_locator" },
+        canonical_goal: {
+          goal_kind: "theory_locator",
+          required_terminal_kind: "compound_evidence_synthesis_answer",
+        },
+      },
+      compound_capability_contract: {
+        schema: "helix.compound_capability_contract.v1",
+        subgoals,
+        required_observation_families: ["theory_locator"],
+      },
+      capability_itinerary_execution_state: {
+        schema: "helix.capability_itinerary_execution_state.v1",
+        complete: false,
+        required_observation_families: ["theory_locator"],
+        compound_subgoal_ledger: [
+          {
+            ...subgoals[0],
+            satisfaction: "failed",
+            rail_status: "failed",
+          },
+        ],
+      },
+      compound_subgoal_rail_statuses: subgoals.map((subgoal) => ({
+        ...subgoal,
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        observation_ref: `${turnId}:${subgoal.subgoal_id}:observation`,
+      })),
+      compound_capability_synthesis_readiness: {
+        schema: "helix.compound_capability_synthesis_readiness.v1",
+        applies: true,
+        complete: false,
+        has_failed_subgoal: true,
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+    };
+    const commonInput = {
+      turnId,
+      finalAnswerDraftRef: `${turnId}:provider-route-product`,
+      draftPayload: {
+        schema: "helix.provider_route_product.v1",
+        support_refs: [observationRef],
+        selected_observation_refs: [observationRef],
+      },
+      promptText: payload.active_prompt,
+      routeProductContract,
+      payload,
+      artifactLedger,
+    };
+
+    const boundedGate = evaluateFinalAnswerDraftQualityGate({
+      ...commonInput,
+      draftText: [
+        "The current theory procedure and closure evidence do not admit the requested Lanyon case.",
+        "Exact typed limitation and missing requirements:",
+        "- unsupported_lanyon_case",
+        "- target_observable_required",
+        "- coordinate_frame_required",
+        "This is a bounded preparation result, not a proof, numerical certificate, or claim about physical truth.",
+      ].join("\n"),
+    });
+    expect(boundedGate).toMatchObject({
+      ok: true,
+      route_family: "theory_locator",
+      violations: [],
+    });
+
+    const fallbackGate = evaluateFinalAnswerDraftQualityGate({
+      ...commonInput,
+      draftText:
+        "I could not produce a terminal answer because required artifacts were missing. Missing requirements remain. Please retry once.",
+    });
+    expect(fallbackGate.route_family).toBe("theory_locator");
+    expect(fallbackGate.ok).toBe(false);
+    expect(fallbackGate.violations).toContain("fallback_like_answer");
+  });
+
   it("projection gate repairs visible stale direct answer when a later valid draft exists", () => {
     const turnId = "ask:test:projection-direct-to-draft";
     const draftText = [

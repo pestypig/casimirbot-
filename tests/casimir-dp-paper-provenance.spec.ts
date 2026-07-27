@@ -30,7 +30,7 @@ describe("Casimir-DP paper provenance parity", () => {
     const sourceIds = source.entries.map((entry) => entry.equationId);
     const generatedIds = generated.entries.map((entry) => entry.equationId);
 
-    expect(markerIds).toHaveLength(23);
+    expect(markerIds).toHaveLength(41);
     expect(new Set(markerIds).size).toBe(markerIds.length);
     expect(new Set(sourceIds).size).toBe(sourceIds.length);
     expect(new Set(generatedIds).size).toBe(generatedIds.length);
@@ -47,7 +47,7 @@ describe("Casimir-DP paper provenance parity", () => {
   });
 
   it("documents the cross-runtime rail, frozen inputs, receipts, and current ledgers", () => {
-    expect(paper).toContain("### 7.1 Cross-runtime authority order");
+    expect(paper).toContain("### 7.4 Cross-runtime authority order");
     expect(paper).toContain("### 8.1 Runtime-to-artifact contract");
     for (const runner of [
       "run-casimir-dp-quantum-foam-study.ts",
@@ -56,11 +56,36 @@ describe("Casimir-DP paper provenance parity", () => {
       "run-casimir-dp-data-readiness.ts",
       "run-casimir-dp-proposal-closure.ts",
       "run-casimir-dp-or-phase-stage2.ts",
+      "run-casimir-dp-evidence-map-stage3.ts",
+      "run-casimir-dp-polarization-congruence-stage4.ts",
+      "run-casimir-dp-qed-scale-hierarchy-stage4-1.ts",
+      "run-casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
     ]) {
       expect(paper).toContain(runner);
     }
     expect(paper).toContain("9e0f1e8aa01f8ff3e7faf0c070853e0cd4887a191115c51804fa5c71a7c2be5d");
     expect(paper).toContain("aae5cf37e01df022509bc9f997287719eafd5670c6156fdd626d24ce94dbb4c0");
+    expect(paper).toContain("casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z");
+    expect(paper).toContain("signature_not_identifiable");
+    expect(paper).toContain("0.9999771044199663");
+    expect(paper).toContain("179103.91134865975");
+    expect(paper).toContain("50632b32c4133fe3f0f5eee3cbbb157a983d0a9da69de6239d58563ca88f569c");
+    expect(paper).toContain("2ebd9971bacc393842dc71bfd80063d7b244231947074bc70b3be25bd7ad5b67");
+    expect(paper).toContain("e29564c6cedcace388233f6006b98683fab54f9326b96ab9bbaf3334f33adcbe");
+    expect(paper).toContain("727d78249462f0b4171532af37db97be5500a3a7a870cc56b2e533cae0ae0df7");
+    expect(paper).toContain(
+      "docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-verification-receipt.json",
+    );
+    expect(paper).toContain(
+      "casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T130100867Z-final",
+    );
+    expect(paper).toContain("run `2325`");
+    expect(paper).toContain(
+      "3894af959e1f3de8d28ede457727a97688c2fd64031c3512f941f5b89a889ffd",
+    );
+    expect(paper).toContain(
+      "194a58bcfa4cc855c8a50a8a862fac391a01ee55c4dc9feeb1d6e98526b8bf3d",
+    );
     expect(paper).not.toContain("| pending | pending | pending |");
   });
 
@@ -77,11 +102,14 @@ describe("Casimir-DP paper provenance parity", () => {
     expect(paper).toContain("cdp-interferometric-phase-visibility-readout");
     expect(paper).toContain("No numerical plausibility score");
     expect(paper).toContain("### 8.2 Validation standing");
-    expect(paper).toContain("Math-stage registry | 193 entries; validation `pass`");
+    expect(paper).toContain("Math-stage registry | 213 entries; validation `pass`");
     expect(paper).toContain("10 files, 67 tests `pass`");
     expect(paper).toContain("18 files, 179 tests `pass`");
     expect(paper).toContain(
       "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    );
+    expect(paper).toContain(
+      "38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34",
     );
     expect(paper).toContain(
       "measured evidence `not_ready`; collapse identification `blocked`; manifold dynamics `blocked`",
@@ -102,6 +130,10 @@ describe("Casimir-DP paper provenance parity", () => {
         "7b3b2673c95d4eebca060261385f3b0659365c1112c1d9d42bc1d8700686b8ba",
       "configs/research/casimir-dp-or-phase-stage2.v1.json":
         "b517e8fbf002303258a5269e7f37c6b16d4bc3c45c609072bdb2a9e5184e596d",
+      "configs/research/casimir-dp-polarization-congruence-stage4.v1.json":
+        "ade06cd7b95e27fe414614ad36512d5764d439c4fa6623f8499ad218ba07c3d7",
+      "configs/research/casimir-dp-apparatus-coherence-residual-stage4-2b.v1.json":
+        "2abf8808fe73f6099d3e9e93e1bed2c8ca33d1094b6a93e9ad926f5fd900fa3e",
     } as const;
 
     for (const [relativePath, expectedHash] of Object.entries(expected)) {
@@ -133,9 +165,9 @@ describe("Casimir-DP paper provenance parity", () => {
     ]);
 
     const graph = buildCasimirDpStudyTheoryBadgesV1();
-    expect(graph.badges).toHaveLength(12);
-    expect(graph.edges).toHaveLength(34);
-    expect(paper).toContain("12 study badges connected by");
-    expect(paper).toContain("34 dependency, requirement, documentation, and blocking edges");
+    expect(graph.badges).toHaveLength(27);
+    expect(graph.edges).toHaveLength(79);
+    expect(paper).toContain("27 study badges connected by");
+    expect(paper).toContain("79 dependency, requirement, documentation, and blocking edges");
   });
 });

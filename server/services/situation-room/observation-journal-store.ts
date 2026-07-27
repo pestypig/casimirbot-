@@ -4,6 +4,10 @@ import {
   type HelixObservationJournalEntry,
   type HelixObservationJournalRole,
 } from "@shared/helix-observation-journal";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 import { observeSourceBindingState, upsertSourceBindingStatus, listSourceBindingStatuses } from "./source-binding-status-store";
 
 const observationsByThread = new Map<string, HelixObservationJournalEntry[]>();
@@ -13,6 +17,15 @@ const hashShort = (value: unknown, size = 18): string =>
 
 const cleanString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
+
+const isReservedObservationSourceId = (sourceId: unknown): boolean =>
+  isHelixRoomSourceIngressSourceId(cleanString(sourceId));
+
+const assertGenericObservationSourceId = (sourceId: unknown): void => {
+  if (isReservedObservationSourceId(sourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
+};
 
 const cleanStrings = (values: unknown): string[] =>
   Array.isArray(values) ? Array.from(new Set(values.map(cleanString).filter(Boolean) as string[])) : [];
@@ -79,6 +92,7 @@ export function appendObservationJournalEntry(input: Record<string, unknown>): H
   const ingestedAt = normalizeTimestamp(input.ingested_at ?? input.ingestedAt, now);
   const availableAt = normalizeTimestamp(input.available_at ?? input.availableAt ?? input.finalized_at ?? input.finalizedAt, ingestedAt);
   const sourceId = cleanString(input.source_id ?? input.sourceId);
+  assertGenericObservationSourceId(sourceId);
   const environmentId = cleanString(input.environment_id ?? input.environmentId);
   const sourceBindingId =
     cleanString(input.source_binding_id ?? input.sourceBindingId) ??
@@ -166,6 +180,7 @@ export function listObservationJournalEntries(input: {
 }): HelixObservationJournalEntry[] {
   const limit = Number.isFinite(input.limit) ? Math.max(0, Math.min(300, Math.trunc(input.limit ?? 100))) : 100;
   return [...(observationsByThread.get(input.threadId) ?? [])]
+    .filter((entry) => !isReservedObservationSourceId(entry.source_id))
     .filter((entry) => !input.roomId || entry.room_id === input.roomId)
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
     .slice(-limit);

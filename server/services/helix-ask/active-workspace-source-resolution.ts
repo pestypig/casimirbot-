@@ -32,18 +32,22 @@ const activeDocLocationRe =
 const unquotePrompt = (prompt: string): string =>
   prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ").replace(/\s+/g, " ").trim();
 
+const naturalActiveDocContinuationRe =
+  /(?:\bwhat(?:'s|\s+is)\s+(?:the\s+)?(?:main|central|core)\s+(?:idea|claim|argument|point|thesis)\b|\bwhat(?:'s|\s+is)\s+(?:it|this|that|the\s+(?:doc(?:ument)?|paper|whitepaper|source))\s+(?:mainly\s+)?about\b|\b(?:explain|summarize|describe|outline)\s+(?:it|this|that|the\s+(?:doc(?:ument)?|paper|whitepaper|source))\b|\bhow\s+(?:does|do|is|are)\s+(?:it|this|that|the\s+(?:doc(?:ument)?|paper|whitepaper|source|idea|claim|argument))\s+(?:connect(?:ed)?|relate(?:d)?|compare(?:d)?|apply|fit|matter)\b|\b(?:does|do|can|could|would)\s+(?:it|this|that|the\s+(?:doc(?:ument)?|paper|whitepaper|source|author))\s+(?:actually\s+)?(?:prove|show|support|establish|demonstrate|imply|claim|argue|mean)\b)/i;
+
 const isActiveDocEvidenceFollowup = (prompt: string): boolean => {
   const unquoted = unquotePrompt(prompt);
   if (!unquoted) return false;
   if (
-    /\b(?:do\s+not|don'?t|without|avoid|ignore|disregard|no\s+need\s+to)\b[\s\S]{0,120}\b(?:quote|cite|extract|explain|interpret|check|verify|read|use)\b/i.test(unquoted) ||
-    /^(?:if|when)\b[\s\S]{0,180}\b(?:later|eventually|next\s+time|in\s+the\s+future)\b/i.test(unquoted) ||
-    /\b(?:later|eventually|next\s+time|in\s+the\s+future|previously|earlier|historically)\b[\s\S]{0,140}\b(?:quot(?:e|ed|ing)|cit(?:e|ed|ing)|extract(?:ed|ing)?|explain(?:ed|ing)?|interpret(?:ed|ing)?|check(?:ed|ing)?|verif(?:y|ied|ying)|read)\b/i.test(unquoted) ||
+    /\b(?:do\s+not|don'?t|without|avoid|ignore|disregard|no\s+need\s+to)\b[\s\S]{0,120}\b(?:quote|cite|extract|explain|summarize|describe|interpret|check|verify|read|use|connect|relate|compare|prove|show|support)\b/i.test(unquoted) ||
+    /^(?:if|when|once|after)\b[\s\S]{0,180}\b(?:later|eventually|next\s+time|in\s+the\s+future|tomorrow)\b/i.test(unquoted) ||
+    /\b(?:later|eventually|next\s+time|in\s+the\s+future|tomorrow|previously|earlier|historically)\b[\s\S]{0,140}\b(?:quot(?:e|ed|ing)|cit(?:e|ed|ing)|extract(?:ed|ing)?|explain(?:ed|ing)?|summar(?:y|ize|ized|izing)|describ(?:e|ed|ing)|interpret(?:ed|ing)?|check(?:ed|ing)?|verif(?:y|ied|ying)|read|connect(?:ed|ing)?|relat(?:e|ed|ing)|compar(?:e|ed|ing)|prov(?:e|ed|ing)|show(?:n|ed|ing)?|support(?:ed|ing)?)\b/i.test(unquoted) ||
     /\b(?:screen|page|button|label|ui|text|sentence|phrase)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|mentions)\b/i.test(unquoted)
   ) {
     return false;
   }
   return (
+    naturalActiveDocContinuationRe.test(unquoted) ||
     /\b(?:quote|cite|extract|show|give)\b[\s\S]{0,100}\b(?:exact|relevant|surrounding)?\s*(?:passage|paragraph|section|excerpt|sentence|lines?|wording)\b/i.test(unquoted) ||
     /\bwhat\s+does\s+(?:it|this|that)\s+mean\s+by\s+(?:saying|claiming|stating|arguing|calling)\b/i.test(unquoted) ||
     /\bwhere\s+(?:it|this|that|the\s+(?:doc(?:ument)?|paper|passage|section))\s+(?:says?|states?|claims?|argues?)\b/i.test(unquoted) ||

@@ -4,6 +4,10 @@ import {
   resolveSituationThreadBinding,
 } from "./thread-binding-store";
 import { listWorldSourcesSeen } from "./world-source-registry";
+import {
+  isHelixRoomSourceIngressSourceId,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 
 export type SituationBindingResolveReason =
   | "matched"
@@ -55,7 +59,22 @@ export function resolveWorldEventThreadBinding(input: {
   source_id?: string | null;
   graph_id?: string | null;
   world_id?: string | null;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): SituationBindingResolveResult {
+  if (isHelixRoomSourceIngressSourceId(normalize(input.source_id))) {
+    return {
+      binding: null,
+      reason: "binding_mismatch",
+      mismatched_bindings: [],
+      diagnostic: {
+        room_id: normalize(input.room_id),
+        source_id: normalize(input.source_id),
+        world_id: normalize(input.world_id),
+        detected_source_count: 0,
+        active_binding_count: 0,
+      },
+    };
+  }
   const binding = resolveSituationThreadBinding(input);
   if (binding && bindingMatchesKnownIds(binding, input)) {
     return {
@@ -88,10 +107,14 @@ export function resolveWorldEventThreadBinding(input: {
     };
   }
 
-  const sameRoom = listSituationThreadBindings().filter(
+  const sameRoom = listSituationThreadBindings({
+    sourceAdmission: input.sourceAdmission,
+  }).filter(
     (candidate: HelixSituationThreadBinding) => candidate.room_id === roomId,
   );
-  const sameRoomSources = listWorldSourcesSeen().filter((source: { room_id: string }) => source.room_id === roomId);
+  const sameRoomSources = listWorldSourcesSeen({
+    sourceAdmission: input.sourceAdmission,
+  }).filter((source: { room_id: string }) => source.room_id === roomId);
   const mismatched = sameRoom.filter((candidate: HelixSituationThreadBinding) => !bindingMatchesKnownIds(candidate, input));
   if (mismatched.length > 0) {
     return {

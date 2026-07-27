@@ -1,0 +1,756 @@
+{
+  "schema_version": "casimir_dp_apparatus_coherence_residual_stage4_2b_campaign/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-apparatus-coherence-residual-stage4-2b-v1",
+  "implementation_version": "1.0.0",
+  "evidence_cutoff": "2026-07-26",
+  "evidence_class": "synthetic_fixture",
+  "claim_ceiling": "apparatus_coupled_residual_and_dp_scaling_sensitivity_forecast_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "authority_manifest": {
+    "role": "stage4_2b_authority_manifest",
+    "path": "configs/research/casimir-dp-stage4-2b-authorities.v1.json",
+    "sha256": "dd3e423c02fdb16481c91c7ff3ee8583aa740efc71e5a04902ce32cf10754d35",
+    "tracked": false,
+    "required_at_runtime": true
+  },
+  "upstream_authorities": [
+    {
+      "role": "stage3_config",
+      "path": "configs/research/casimir-dp-evidence-map-stage3.v1.json",
+      "sha256": "231cb26e9c9bb523e2dda40a6178d8a484ec099f1868a74b995d8153337d29c2",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_authority_manifest",
+      "path": "configs/research/casimir-dp-stage3-authorities.v1.json",
+      "sha256": "6f5a0a903a161bf98cd82e69b48a03288a7a436f737c07b83366efba1dbbcf13",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-report.json",
+      "sha256": "feb799bcf93f1497673d58eac1a98a773ac1e1b0767082104af7b7d6c8e3508b",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-report.md",
+      "sha256": "41aae6d542a19b6564f88ae7c8e7f2531abf90b08a7d02c11b043e5c691cc23a",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-receipt.json",
+      "sha256": "5bcd2400bfeaa57a85c4b726224ac25dc8ab4c56bd59dad1b6e54f7f11ff0346",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-evidence-map-stage3-verification-receipt.json",
+      "sha256": "2cf09b5c5f6d0a584a0c3fd56d8e53834b78f938814ac2ff5500651349930082",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_config",
+      "path": "configs/research/casimir-dp-polarization-congruence-stage4.v1.json",
+      "sha256": "ade06cd7b95e27fe414614ad36512d5764d439c4fa6623f8499ad218ba07c3d7",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-authorities.v1.json",
+      "sha256": "3f26ef115533ef78756fad70f3880f8ea1d1ace43cbc9a0e66d6d0b5e9c2918d",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-report.json",
+      "sha256": "2c56cd9b61928ee750cf0714435674cc923b4c81f02e325b8ee9e9e5a9816d0b",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-report.md",
+      "sha256": "1221cf1e6b6c247c3253240c44ed78446318b2cdb2966610a63d08c7ec4f00a8",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-receipt.json",
+      "sha256": "185a09ceb61b4f158afe16022783c8b184c1035f456cb341b5c90920b69b774a",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-polarization-congruence-stage4-verification-receipt.json",
+      "sha256": "721b9f6aeab4b181ccc5ac21b4bc81c984d3b1fb72cdf76e55abedba11e38440",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_config",
+      "path": "configs/research/casimir-dp-qed-scale-hierarchy-stage4-1.v1.json",
+      "sha256": "e2625c86a5366258677c58cbe78e73b8fcc1893ecd417b48765d74488f953478",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-1-authorities.v1.json",
+      "sha256": "cd681b977d47de6715322249c1026ecf5e963ac81735d6c29aa5100942824f4f",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-qed-scale-hierarchy-stage4-1/casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z/qed-scale-hierarchy-stage4-1-report.json",
+      "sha256": "8f06bf394e64d40d24530e9e93b5d61edece3752318ece2095f27d61f55042c5",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-qed-scale-hierarchy-stage4-1/casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z/qed-scale-hierarchy-stage4-1-report.md",
+      "sha256": "6ae9530701fc35aa544b438709e789929b45eaf53ae950ec93ed976bb9703ba6",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-qed-scale-hierarchy-stage4-1/casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z/qed-scale-hierarchy-stage4-1-receipt.json",
+      "sha256": "d835b56a87ed6f6d78edfb8e627bceecb931575348232ca0fd77795f5ffe24af",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-qed-scale-hierarchy-stage4-1-verification-receipt.json",
+      "sha256": "a7f60aa9b12b7c1c143a7a1681048a61275495aaed33e1dfa6caa11e9e44b8db",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2a_config",
+      "path": "configs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a.v1.json",
+      "sha256": "1459d48bbd1630e372b7b936b4931b48713afcb7c64e5df527e50f04edd087b2",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2a_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-2a-authorities.v1.json",
+      "sha256": "1e4dde8f5a162b5368376b7ccaf07e19e725e6edb24b447aa6b1292732ce3b5f",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2a_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a/casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1-20260725T211750900Z/electron-mass-higgs-anchor-stage4-2a-report.json",
+      "sha256": "a53a2f1cdc7e4b2d1c9957aaa0a73316d77037371002b7ced4a2978a630fe35d",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2a_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a/casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1-20260725T211750900Z/electron-mass-higgs-anchor-stage4-2a-report.md",
+      "sha256": "d7dbf59d6e284ef60ccae58f0f01076b453de1a81fcb2b6863bf44d969f7357a",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2a_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a/casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1-20260725T211750900Z/electron-mass-higgs-anchor-stage4-2a-receipt.json",
+      "sha256": "592a6245993411801672c6fa6ffa4cea4484e4fcf9164ad03f586a55333b17c3",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2a_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a-verification-receipt.json",
+      "sha256": "debd651e7e500ee9b7011e7fa1c7a16ddcdcf56a6957ca0d2d91b28fe756b66a",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "proposal_closure_config_at_stage4_2b_freeze",
+      "path": "configs/research/casimir-dp-proposal-closure.v1.json",
+      "sha256": "7b3b2673c95d4eebca060261385f3b0659365c1112c1d9d42bc1d8700686b8ba",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "proposal_closure_report_at_stage4_2b_freeze",
+      "path": "docs/research/casimir-dp-proposal-closure-report.md",
+      "sha256": "5385a47b09877dbecd0fca2f508b1533b3a1a0aacd366d3231d361c746c159b1",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "data_readiness_config_at_stage4_2b_freeze",
+      "path": "configs/research/casimir-dp-data-readiness.v1.json",
+      "sha256": "a95e7a22c20e29ed9c34f45ece90916748a9264a32be8315663819171b406475",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "data_readiness_report_at_stage4_2b_freeze",
+      "path": "docs/research/casimir-dp-data-readiness-report.md",
+      "sha256": "3939b2b773c5227046c964325abd54ca21bb164b0f0cf0c6aca84dfbc0235b90",
+      "tracked": true,
+      "required_at_runtime": true
+    }
+  ],
+  "source_registry": [
+    {
+      "source_id": "diosi-1987-master-equation",
+      "citation": "L. Diosi, Phys. Lett. A 120, 377-381 (1987).",
+      "url": "https://doi.org/10.1016/0375-9601(87)90681-5",
+      "supports": "A named gravity-related master-equation lineage.",
+      "does_not_support": "A Casimir boundary modifier or an unregularized universal prediction.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "diosi-1989-mass-density-generator",
+      "citation": "L. Diosi, Phys. Rev. A 40, 1165-1174 (1989).",
+      "url": "https://doi.org/10.1103/PhysRevA.40.1165",
+      "supports": "The mass-density generator imported by the named DP manifest.",
+      "does_not_support": "A theorem about Casimir cavities.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "penrose-1996-or",
+      "citation": "R. Penrose, Gen. Relativ. Gravit. 28, 581-600 (1996).",
+      "url": "https://doi.org/10.1007/BF02105068",
+      "supports": "A branch-geometry gravitational self-energy lifetime heuristic.",
+      "does_not_support": "A unique stochastic dynamics or cavity kernel.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "xenonnt-2026-dp-radiation",
+      "citation": "XENON Collaboration, Phys. Rev. Lett. 136, 120201 (2026).",
+      "url": "https://doi.org/10.1103/2jm3-4976",
+      "supports": "A lower R0 bound for the tested Markovian white-noise spontaneous-radiation implementation with no significant excess.",
+      "does_not_support": "Generic Penrose OR or every colored, dissipative, or non-Markovian DP model.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "donadi-2021-collapse-radiation",
+      "citation": "S. Donadi et al., Nat. Phys. 17, 74-78 (2021).",
+      "url": "https://doi.org/10.1038/s41567-020-1008-4",
+      "supports": "Radiative constraints on a named gravity-related collapse parameterization.",
+      "does_not_support": "Penrose OR generally or a cavity-conditioned mechanism.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "pedalino-2026-nanoparticle-interference",
+      "citation": "S. Pedalino et al., Nature 649, 866-870 (2026).",
+      "url": "https://doi.org/10.1038/s41586-025-09917-9",
+      "supports": "A high-mass matter-wave interference readiness benchmark.",
+      "does_not_support": "A DP or Casimir-DP result or a universal preparation limit.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "hornberger-2003-gas-decoherence",
+      "citation": "K. Hornberger et al., Phys. Rev. Lett. 90, 160401 (2003).",
+      "url": "https://doi.org/10.1103/PhysRevLett.90.160401",
+      "supports": "Pressure- and collision-dependent matter-wave decoherence.",
+      "does_not_support": "Objective collapse.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "hackermuller-2004-thermal-decoherence",
+      "citation": "L. Hackermuller et al., Nature 427, 711-714 (2004).",
+      "url": "https://doi.org/10.1038/nature02276",
+      "supports": "Thermal-emission decoherence in heated molecular interferometry.",
+      "does_not_support": "Silica nanoparticle thermometry or boundary-modified emission.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "schafer-2024-dielectric-emission",
+      "citation": "J. Schafer, B. A. Stickler, and K. Hornberger, Phys. Rev. Research 6, 043307 (2024).",
+      "url": "https://doi.org/10.1103/PhysRevResearch.6.043307",
+      "supports": "A free-space emission master equation for quasi-equilibrated dielectric rigid bodies.",
+      "does_not_support": "A measured thermometer or cavity-modified emission model.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "garrett-2020-patch-force",
+      "citation": "J. L. Garrett, J. Kim, and J. N. Munday, Phys. Rev. Research 2, 023355 (2020).",
+      "url": "https://doi.org/10.1103/PhysRevResearch.2.023355",
+      "supports": "Kelvin-probe-informed patch-force estimation in a sphere-plate Casimir apparatus.",
+      "does_not_support": "A stochastic patch-noise coherence kernel.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "yang-2018-proton-mass",
+      "citation": "Y.-B. Yang et al., Phys. Rev. Lett. 121, 212001 (2018).",
+      "url": "https://doi.org/10.1103/PhysRevLett.121.212001",
+      "supports": "A scheme- and scale-specified lattice-QCD proton energy-momentum decomposition.",
+      "does_not_support": "Using individual QCD terms as DP sources or deriving silica density.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "rembold-2017-vibration",
+      "citation": "C. Rembold et al., New J. Phys. 19, 033009 (2017).",
+      "url": "https://doi.org/10.1088/1367-2630/aa60a1",
+      "supports": "Vibration-noise transfer and recovery methods for matter-wave interferometry.",
+      "does_not_support": "DP or a Casimir bridge.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "cowan-2011-profile-likelihood",
+      "citation": "G. Cowan et al., Eur. Phys. J. C 71, 1554 (2011).",
+      "url": "https://doi.org/10.1140/epjc/s10052-011-1554-0",
+      "supports": "Profile-likelihood, power, and asymptotic method definitions.",
+      "does_not_support": "The validity of asymptotics without simulation coverage or a physical DP model.",
+      "numeric_values_admitted": false
+    },
+    {
+      "source_id": "psi-nedm-2021-blinding",
+      "citation": "PSI nEDM Collaboration, Eur. Phys. J. A 57, 152 (2021).",
+      "url": "https://doi.org/10.1140/epja/s10050-021-00456-1",
+      "supports": "An implemented physics-analysis blinding precedent.",
+      "does_not_support": "The sufficiency of this campaign custody protocol or a DP claim.",
+      "numeric_values_admitted": false
+    }
+  ],
+  "conventions": {
+    "units": "SI",
+    "phase_sign": "phase_a_minus_b",
+    "boundary_contrast": "on_minus_off",
+    "angular_frequency_relation": "omega=2*pi*f",
+    "psd_sidedness": "two_sided",
+    "psd_normalization": "integral d omega over 2 pi of S(omega) gives equal-time variance",
+    "residual_definition": "minus_log_visibility_ratio_minus_ordinary_chi",
+    "dp_rate_definition": "Gamma_DP=E_G/hbar"
+  },
+  "evidence_policy": {
+    "parameter_transport_is_evidential_transport": false,
+    "synthetic_can_validate_software_only": true,
+    "synthetic_can_satisfy_measured_gate": false,
+    "unexplained_residual_is_collapse": false,
+    "boundary_residual_confirms_unmodified_dp": false,
+    "conditional_boundary_null_scope": "registered_nonrelativistic_markovian_mass_density_dp_with_complete_joint_system_equivalence_only",
+    "shared_constants_open_observable_bridge": false,
+    "automatic_unblinding_allowed": false,
+    "null_excludes_only_powered_preregistered_region": true
+  },
+  "apparatus": {
+    "object_material": "silica",
+    "nominal_radius_m": 7.5e-8,
+    "nominal_mass_kg": 3.8877e-18,
+    "nominal_branch_separation_m": 2e-8,
+    "nominal_hold_time_s": 0.1,
+    "nominal_surface_distance_m": 5e-6,
+    "nominal_environment_temperature_K": 4,
+    "planned_paired_windows": 1600,
+    "state_preparation_evidence_class": "design_assumption"
+  },
+  "confirmatory_design_grid": {
+    "schema_version": "casimir_dp_stage4_2b_confirmatory_design_grid/1",
+    "evidence_class": "design_assumption",
+    "forecast_evidence_class": "synthetic_fixture",
+    "measured_evidence": "not_ready",
+    "claim_ceiling": "confirmatory_design_grid_contract_only",
+    "promotion_allowed": false,
+    "object_configurations": [
+      {
+        "object_configuration_id": "silica_r50",
+        "material": "silica",
+        "nominal_mass_kg": 1.1519e-18,
+        "nominal_radius_m": 5e-8,
+        "nominal_bulk_density_kg_m3": 2200,
+        "independent_metrology_plan_id": "metrology_plan_silica_r50",
+        "independent_metrology_required": true,
+        "metrology_evidence_class": "design_assumption",
+        "metrology_receipt_status": "not_ready"
+      },
+      {
+        "object_configuration_id": "silica_r75",
+        "material": "silica",
+        "nominal_mass_kg": 3.8877e-18,
+        "nominal_radius_m": 7.5e-8,
+        "nominal_bulk_density_kg_m3": 2200,
+        "independent_metrology_plan_id": "metrology_plan_silica_r75",
+        "independent_metrology_required": true,
+        "metrology_evidence_class": "design_assumption",
+        "metrology_receipt_status": "not_ready"
+      },
+      {
+        "object_configuration_id": "silica_r100",
+        "material": "silica",
+        "nominal_mass_kg": 9.2153e-18,
+        "nominal_radius_m": 1e-7,
+        "nominal_bulk_density_kg_m3": 2200,
+        "independent_metrology_plan_id": "metrology_plan_silica_r100",
+        "independent_metrology_required": true,
+        "metrology_evidence_class": "design_assumption",
+        "metrology_receipt_status": "not_ready"
+      }
+    ],
+    "branch_separations": [
+      {
+        "branch_separation_id": "dx_10nm",
+        "separation_m": 1e-8
+      },
+      {
+        "branch_separation_id": "dx_20nm",
+        "separation_m": 2e-8
+      },
+      {
+        "branch_separation_id": "dx_40nm",
+        "separation_m": 4e-8
+      }
+    ],
+    "hold_times": [
+      {
+        "hold_time_id": "t_0",
+        "hold_time_s": 0
+      },
+      {
+        "hold_time_id": "t_25ms",
+        "hold_time_s": 0.025
+      },
+      {
+        "hold_time_id": "t_50ms",
+        "hold_time_s": 0.05
+      },
+      {
+        "hold_time_id": "t_100ms",
+        "hold_time_s": 0.1
+      }
+    ],
+    "sequence_kinds": [
+      "ramsey",
+      "path_swap",
+      "echo"
+    ],
+    "boundary_pair": {
+      "states": [
+        {
+          "boundary_state_id": "boundary_active",
+          "state_role": "active"
+        },
+        {
+          "boundary_state_id": "boundary_reference",
+          "state_role": "reference"
+        }
+      ],
+      "paired_within_window": true,
+      "randomized_order": true,
+      "blinded_to_analysis": true,
+      "blind_mapping_custody": "synthetic_contract_only",
+      "automatic_unblinding_allowed": false
+    },
+    "boundary_controls": {
+      "sham_switch": {
+        "control_state_id": "sham_switch",
+        "required": true,
+        "switching_waveform_matched": true,
+        "matched_heating_required": true
+      },
+      "detuned_boundary": {
+        "control_state_id": "detuned_boundary",
+        "required": true,
+        "detuned_from_casimir_sensitive_configuration": true
+      }
+    },
+    "nuisance_control_axes": [
+      {
+        "axis_id": "temperature",
+        "level_ids": [
+          "temperature_low",
+          "temperature_high"
+        ],
+        "minimum_levels": 2,
+        "varied_independently_of_boundary_state": true,
+        "other_nuisance_axes_held_nominal": true,
+        "evidence_class": "design_assumption"
+      },
+      {
+        "axis_id": "pressure",
+        "level_ids": [
+          "pressure_low",
+          "pressure_high"
+        ],
+        "minimum_levels": 2,
+        "varied_independently_of_boundary_state": true,
+        "other_nuisance_axes_held_nominal": true,
+        "evidence_class": "design_assumption"
+      },
+      {
+        "axis_id": "vibration",
+        "level_ids": [
+          "vibration_low",
+          "vibration_high"
+        ],
+        "minimum_levels": 2,
+        "varied_independently_of_boundary_state": true,
+        "other_nuisance_axes_held_nominal": true,
+        "evidence_class": "design_assumption"
+      },
+      {
+        "axis_id": "charge",
+        "level_ids": [
+          "charge_low",
+          "charge_high"
+        ],
+        "minimum_levels": 2,
+        "varied_independently_of_boundary_state": true,
+        "other_nuisance_axes_held_nominal": true,
+        "evidence_class": "design_assumption"
+      },
+      {
+        "axis_id": "distance",
+        "level_ids": [
+          "distance_near",
+          "distance_far"
+        ],
+        "minimum_levels": 2,
+        "varied_independently_of_boundary_state": true,
+        "other_nuisance_axes_held_nominal": true,
+        "evidence_class": "design_assumption"
+      },
+      {
+        "axis_id": "polarization",
+        "level_ids": [
+          "polarization_te",
+          "polarization_tm"
+        ],
+        "minimum_levels": 2,
+        "varied_independently_of_boundary_state": true,
+        "other_nuisance_axes_held_nominal": true,
+        "evidence_class": "design_assumption"
+      },
+      {
+        "axis_id": "readout_power",
+        "level_ids": [
+          "readout_power_low",
+          "readout_power_high"
+        ],
+        "minimum_levels": 2,
+        "varied_independently_of_boundary_state": true,
+        "other_nuisance_axes_held_nominal": true,
+        "evidence_class": "design_assumption"
+      }
+    ],
+    "partitions": [
+      {
+        "partition_id": "pilot_training",
+        "replication_id": "pilot",
+        "role": "pilot_training",
+        "confirmatory_scoring_allowed": false,
+        "nuisance_fit_allowed": true,
+        "acquired_after_analysis_freeze": false,
+        "independent_replication": false,
+        "artifact_separation_from_primary": "disjoint_rows_and_artifacts"
+      },
+      {
+        "partition_id": "confirmatory_primary",
+        "replication_id": "primary",
+        "role": "confirmatory_primary",
+        "confirmatory_scoring_allowed": true,
+        "nuisance_fit_allowed": false,
+        "acquired_after_analysis_freeze": true,
+        "independent_replication": false,
+        "scored_separately": true
+      },
+      {
+        "partition_id": "confirmatory_replication",
+        "replication_id": "independent_replication",
+        "role": "confirmatory_replication",
+        "confirmatory_scoring_allowed": true,
+        "nuisance_fit_allowed": false,
+        "acquired_after_analysis_freeze": true,
+        "independent_replication": true,
+        "shares_experimental_units_with_primary": false,
+        "independent_apparatus_run_and_operators_required": true,
+        "scored_separately": true
+      }
+    ],
+    "cell_generation": {
+      "physics_grid_policy": "full_factorial_object_separation_hold_sequence_paired_boundary",
+      "control_cell_policy": "independent_one_axis_at_a_time_with_sham_and_detuned_boundary",
+      "partition_coverage": "same_frozen_axis_definition_primary_and_independent_replication",
+      "baseline_nuisance_control_axis_id": "nominal",
+      "baseline_nuisance_control_level_id": "nominal",
+      "axis_order": [
+        "partition_id",
+        "replication_id",
+        "object_configuration_id",
+        "branch_separation_id",
+        "hold_time_id",
+        "sequence_kind",
+        "boundary_or_control_state_id",
+        "nuisance_control_axis_id",
+        "nuisance_control_level_id"
+      ],
+      "required_cell_record_fields": [
+        "cell_id",
+        "cell_index",
+        "partition_id",
+        "replication_id",
+        "object_configuration_id",
+        "nominal_mass_kg",
+        "nominal_radius_m",
+        "branch_separation_id",
+        "branch_separation_m",
+        "hold_time_id",
+        "hold_time_s",
+        "sequence_kind",
+        "boundary_or_control_state_id",
+        "nuisance_control_axis_id",
+        "nuisance_control_level_id"
+      ],
+      "cell_id_template": "{partition_id}__{replication_id}__{object_configuration_id}__{branch_separation_id}__{hold_time_id}__{sequence_kind}__{boundary_or_control_state_id}__{nuisance_control_axis_id}__{nuisance_control_level_id}",
+      "numeric_values_resolved_from_frozen_axis_ids": true,
+      "duplicate_cell_ids_allowed": false,
+      "order": "lexicographic_declared_axis_order"
+    },
+    "alternative_design_sweep": {
+      "allowed": true,
+      "separate_from_frozen_proposal": true,
+      "may_retroactively_change_feasibility_verdict": false
+    }
+  },
+  "apparatus_density_transport": {
+    "transport_prescription": "continuum_uniform_sphere_bulk_mass_geometry_transport_only",
+    "transport_role": "apparatus_scale_and_complete_branch_density_design_input",
+    "dp_dynamics_implication": "none_stage3_single_effective_gaussian_particle_remains_named_dp_model",
+    "model_limitation": "uniform_sphere_transport_is_not_uniform_sphere_dp_dynamics",
+    "evidence_class": "design_assumption",
+    "measured_density_receipts": "not_ready"
+  },
+  "dp_applicability_manifest": {
+    "model_id": "M_dp_regularized_synthetic_v1",
+    "generator": "nonrelativistic_markovian_mass_density_dp",
+    "density_prescription": "single_effective_gaussian_particle",
+    "smearing_kernel": "gaussian_mass_density_smearing",
+    "r0_m": 1e-7,
+    "r0_frozen_before_held_out": true,
+    "fitted_amplitude_allowed": false,
+    "boundary_variable_in_unmodified_generator": false,
+    "complete_joint_system_equivalence_required_for_boundary_identity": true,
+    "stage3_manifest_sha256": "4868b598b05e76f43f9814858f81c27cf8d8a783d360deb56e26793aad7047c6",
+    "xenon_r0_parameter_map_status": "contextual_not_admitted",
+    "xenon_bound_used_to_truncate_parameter_space": false
+  },
+  "thresholds": {
+    "mass_conservation_relative_error_max": 1e-9,
+    "numerical_null_absolute_error_max_s": 1e-18,
+    "numerical_null_relative_error_max": 0.001,
+    "branch_systematic_fraction_max": 0.1,
+    "spectral_covariance_symmetry_tolerance": 1e-12,
+    "residual_covariance_condition_max": 100000000,
+    "minimum_temperature_fisher_information": 0.000001,
+    "minimum_signature_rank": 4,
+    "maximum_abs_whitened_signature_cosine": 0.97,
+    "augmented_design_condition_number_max": 100,
+    "minimum_power": 0.8,
+    "maximum_false_positive_rate": 0.05,
+    "minimum_companion_snr": 5
+  },
+  "runtime_fixture": {
+    "role": "stage4_2b_synthetic_campaign_matrix",
+    "path": "configs/research/fixtures/casimir-dp-stage4-2b-campaign.synthetic.v1.json",
+    "sha256": "ca89c5385bd55290b1cda8084b3d067cbd76420c810164fc958f310de11d1b8c",
+    "schema_version": "casimir_dp_stage4_2b_synthetic_campaign/1",
+    "evidence_class": "synthetic_fixture",
+    "required_case_ids": [
+      "ordinary_closure_only",
+      "isolated_thermal_injection",
+      "em_patch_injection",
+      "vibration_and_correlated_tilt_injection",
+      "residual_gas_injection",
+      "optical_readout_injection",
+      "correlated_covariance_false_residual",
+      "strict_frozen_dp_injection",
+      "generic_irreversible_non_dp_loss",
+      "boundary_only_residual",
+      "joint_system_branch_mismatch",
+      "echo_recoverable_quasistatic_dephasing",
+      "blind_label_leakage",
+      "post_hoc_parameter_retuning_attempt",
+      "signature_collinearity_failure",
+      "underpowered_null",
+      "sensor_self_noise_false_decoherence",
+      "singular_covariance_jitter_rescue_attempt",
+      "low_visibility_gaussian_coverage_failure"
+    ]
+  },
+  "software": {
+    "runtime": "typescript",
+    "runner": "scripts/research/run-casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+    "module_ids": [
+      "shared/casimir-dp-apparatus-scale-transport-stage4-2b.ts",
+      "shared/casimir-dp-apparatus-spectral-thermometry-stage4-2b.ts",
+      "shared/casimir-dp-apparatus-response-covariance-stage4-2b.ts",
+      "shared/casimir-dp-dp-scaling-forecast-stage4-2b.ts",
+      "shared/casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+      "shared/casimir-dp-apparatus-identifiability-stage4-2b.ts",
+      "shared/contracts/casimir-dp-apparatus-coherence-residual-stage4-2b.v1.ts"
+    ],
+    "reused_module_ids": [
+      "shared/casimir-optical-response.ts",
+      "shared/casimir-lifshitz.ts",
+      "shared/dp-collapse.ts",
+      "shared/casimir-dp-inference.ts",
+      "shared/casimir-dp-phase-coherence.ts",
+      "shared/casimir-dp-complex-coherence.ts",
+      "shared/casimir-dp-data-readiness.ts",
+      "shared/casimir-dp-proposal-readiness.ts",
+      "shared/contracts/casimir-dp-next-computations.v1.ts",
+      "scripts/research/run-casimir-dp-next-computations.ts",
+      "shared/contracts/casimir-dp-proposal-closure.v1.ts",
+      "shared/casimir-dp-qed-green-noise.ts",
+      "shared/casimir-dp-radiative-thermal-closure.ts",
+      "shared/casimir-dp-dp-companion.ts"
+    ]
+  },
+  "run_order": [
+    "freeze_claim_policy_conventions_sources_and_upstream_authorities",
+    "freeze_dp_manifest_external_bounds_ordinary_registry_and_bridge_policy",
+    "validate_blind_generation_and_synthetic_custody_mode",
+    "ingest_calibration_and_pilot_artifacts_only",
+    "validate_object_mass_composition_density_geometry_and_hierarchy",
+    "validate_complete_joint_system_branches_and_equivalence",
+    "validate_material_response_kk_geometry_surfaces_and_solver_receipts",
+    "fit_response_corrected_spectral_thermometry_from_pilot",
+    "fit_sensor_noise_and_cross_spectral_response_from_pilot",
+    "predict_all_registered_ordinary_phase_and_decoherence_lanes",
+    "compute_frozen_dp_density_functional_scaling_and_companion",
+    "reconcile_dp_manifests_and_conditional_boundary_identity",
+    "construct_pilot_likelihood_residual_covariance_and_coverage",
+    "forecast_signature_identifiability_power_and_coverage",
+    "run_synthetic_recovery_and_fail_closed_fixtures",
+    "freeze_code_exclusions_covariance_predictions_cells_and_scoring",
+    "ingest_synthetic_held_out_artifacts_after_freeze",
+    "estimate_held_out_complex_coherence_without_refitting",
+    "retain_custodian_authority_and_prohibit_automatic_unblinding",
+    "score_blinded_synthetic_held_out_comparison",
+    "populate_outcome_claim_nonclaim_and_blocker_ledger",
+    "write_content_addressed_report_receipt_and_downstream_evidence_state"
+  ],
+  "final_status_policy": {
+    "software_and_synthetic_diagnostics": "pass",
+    "measured_evidence": "not_ready",
+    "ordinary_decoherence_closure": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "publication_claim": "apparatus_power_and_identifiability_forecast_only"
+  }
+}

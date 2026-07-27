@@ -8,6 +8,10 @@ import {
 } from "@shared/helix-situation-source-capability";
 import type { WorkstationLiveSource, WorkstationLiveSourceKind } from "@shared/helix-workstation-live-source";
 import type { HelixVisualSnapshotSource } from "@shared/helix-visual-snapshot-source";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 import { listWorkstationLiveSources } from "./workstation-live-source-ingest";
 import { listVisualFrames, listVisualSnapshotSources } from "./visual-snapshot-store";
 import { isVisualHeartbeatExempt, resolveHeartbeatStatus } from "./source-heartbeat-monitor";
@@ -22,6 +26,12 @@ const cleanString = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed || null;
+};
+
+const assertGenericCapabilitySourceId = (sourceId: string): void => {
+  if (isHelixRoomSourceIngressSourceId(sourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
 };
 
 const normalizeModality = (value: unknown): HelixSituationSourceModality => {
@@ -211,6 +221,7 @@ export function registerSituationSourceCapability(input: Record<string, unknown>
   const modality = normalizeModality(input.modality);
   const status = normalizeStatus(input.status);
   const sourceId = cleanString(input.source_id) ?? `${modality}:${threadId}`;
+  assertGenericCapabilitySourceId(sourceId);
   const entry = capability({
     source_id: sourceId,
     thread_id: threadId,
@@ -231,7 +242,9 @@ export function registerSituationSourceCapability(input: Record<string, unknown>
 export function updateSituationSourceCapability(input: Record<string, unknown>): HelixSituationSourceCapability | null {
   const sourceId = cleanString(input.source_id);
   if (!sourceId) return null;
+  assertGenericCapabilitySourceId(sourceId);
   const existing = explicitCapabilities.get(sourceId);
+  if (existing) assertGenericCapabilitySourceId(existing.source_id);
   if (!existing) return registerSituationSourceCapability(input);
   const status = input.status ? normalizeStatus(input.status) : existing.status;
   const updated = capability({
@@ -257,7 +270,9 @@ export function recordSituationSourceHeartbeat(input: {
   status?: string | null;
   ts?: string | null;
 }): HelixSituationSourceCapability {
+  assertGenericCapabilitySourceId(input.source_id);
   const existing = explicitCapabilities.get(input.source_id);
+  if (existing) assertGenericCapabilitySourceId(existing.source_id);
   const status = input.status ? normalizeStatus(input.status) : "active";
   const next = capability({
     source_id: input.source_id,
@@ -311,6 +326,7 @@ export function buildSituationSourceCapabilities(input: {
   ];
   const deduped = new Map<string, HelixSituationSourceCapability>();
   for (const entry of inferred) {
+    if (isHelixRoomSourceIngressSourceId(entry.source_id)) continue;
     if (input.roomId && entry.room_id && entry.room_id !== input.roomId) continue;
     const existing = deduped.get(entry.source_id);
     if (existing?.modality === "visual_frame" && entry.modality === "visual_frame") continue;
@@ -351,6 +367,12 @@ export function buildSituationSourceCapabilities(input: {
     const statusRank = (status: HelixSituationSourceStatus) => status === "active" ? 0 : status === "stale" ? 1 : status === "waiting_for_client" ? 2 : status === "permission_required" ? 3 : 4;
     return statusRank(a.status) - statusRank(b.status) || a.modality.localeCompare(b.modality) || a.source_id.localeCompare(b.source_id);
   });
+}
+
+export function removeSituationSourceCapabilities(input: {
+  sourceId: string;
+}): number {
+  return explicitCapabilities.delete(input.sourceId) ? 1 : 0;
 }
 
 export function readSituationSourceCapabilities(input: {

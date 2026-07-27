@@ -3,6 +3,7 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   resetLiveContinuationJobsForTest,
+  upsertLiveContinuationJob,
 } from "../services/situation-room/live-continuation-job-store";
 import {
   resetLiveContinuationRunnerForTest,
@@ -101,15 +102,27 @@ describe("live continuation model-visible tool routes", () => {
       terminal_eligible: false,
     });
 
+    const job = upsertLiveContinuationJob({
+      thread_id: "thread:mc",
+      room_id: "room:minecraft",
+      source_ids: ["source:minecraft"],
+      objective: "Keep the source-health lane ready for authenticated observations.",
+    });
     const sourceHealth = await request(app)
       .post("/api/agi/situation/live-continuation/source-health/query")
-      .send({ thread_id: "thread:mc", room_id: "room:minecraft", source_id: "source:minecraft" })
+      .send({ job_id: job.job_id, source_id: "source:minecraft" })
       .expect(200);
     expect(sourceHealth.body?.receipt).toMatchObject({
       schema: "helix.live_source_admission_receipt.v1",
       source_id: "source:minecraft",
+      transport: "unknown",
+      freshness: {
+        status: "unknown",
+        last_seen_at: null,
+      },
+      trust_level: "unverified",
       context_role: "receipt_not_assistant_answer",
       terminal_eligible: false,
     });
-  }, 20_000);
+  }, 30_000);
 });

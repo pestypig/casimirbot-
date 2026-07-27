@@ -6,6 +6,7 @@ import type {
 } from "@shared/helix-environment-source-manifest";
 import { getEnvironmentSourceHeartbeat, projectEnvironmentSourceHeartbeatStatus } from "./environment-source-heartbeat-store";
 import { getEnvironmentSourceManifest, listEnvironmentSourceManifests } from "./environment-source-registry";
+import type { HelixRoomSourceAdmission } from "@shared/helix-room-source-ingress";
 
 export type EnvironmentSourceAvailabilityLabel =
   | "available"
@@ -50,8 +51,11 @@ export function projectEnvironmentSourceAvailability(input: {
   requiredModalities?: HelixEnvironmentSourceModality[];
   requiredSnapshotSections?: HelixEnvironmentSnapshotSection[];
   requiredProbeTypes?: HelixEnvironmentManifestProbeType[];
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): EnvironmentSourceAvailability {
-  const manifest = getEnvironmentSourceManifest(input.sourceId);
+  const manifest = getEnvironmentSourceManifest(input.sourceId, {
+    sourceAdmission: input.sourceAdmission,
+  });
   if (!manifest) {
     return {
       source_id: input.sourceId,
@@ -84,6 +88,7 @@ export function projectEnvironmentSourceAvailability(input: {
     requiredModalities: input.requiredModalities,
     requiredSnapshotSections: input.requiredSnapshotSections,
     requiredProbeTypes: input.requiredProbeTypes,
+    sourceAdmission: input.sourceAdmission,
   });
 }
 
@@ -93,12 +98,15 @@ export function projectManifestAvailability(input: {
   requiredModalities?: HelixEnvironmentSourceModality[];
   requiredSnapshotSections?: HelixEnvironmentSnapshotSection[];
   requiredProbeTypes?: HelixEnvironmentManifestProbeType[];
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): EnvironmentSourceAvailability {
   const manifest = input.manifest;
   const requiredModalities = input.requiredModalities ?? ["environment_state"];
   const requiredSnapshotSections = input.requiredSnapshotSections ?? ["actor_state", "inventory_state"];
   const requiredProbeTypes = input.requiredProbeTypes ?? [];
-  const heartbeat = getEnvironmentSourceHeartbeat(manifest.source_id);
+  const heartbeat = getEnvironmentSourceHeartbeat(manifest.source_id, {
+    sourceAdmission: input.sourceAdmission,
+  });
   const heartbeatStatus = projectEnvironmentSourceHeartbeatStatus({ heartbeat, now: input.now });
   const missingModalities = requiredModalities.filter((entry) => !manifest.modalities.includes(entry));
   const missingSections = requiredSnapshotSections.filter((entry) => !manifest.supported_snapshot_sections.includes(entry));
@@ -187,14 +195,19 @@ export function projectManifestAvailability(input: {
 export function listEnvironmentSourceAvailabilities(input?: {
   roomId?: string | null;
   now?: string;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): EnvironmentSourceAvailability[] {
-  return listEnvironmentSourceManifests({ roomId: input?.roomId ?? null }).map((manifest) =>
+  return listEnvironmentSourceManifests({
+    roomId: input?.roomId ?? null,
+    sourceAdmission: input?.sourceAdmission,
+  }).map((manifest) =>
     projectManifestAvailability({
       manifest,
       now: input?.now,
       requiredModalities: ["environment_state"],
       requiredSnapshotSections: ["actor_state", "inventory_state"],
       requiredProbeTypes: ["route_feasibility", "reachability", "inventory_check"],
+      sourceAdmission: input?.sourceAdmission,
     })
   );
 }

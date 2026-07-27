@@ -1,6 +1,12 @@
 import crypto from "node:crypto";
 import { z } from "zod";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
+import {
+  assertHelixRoomSourceNamespaceAdmission,
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 import type {
   EnvironmentCellSummary,
   EnvironmentPosition,
@@ -199,7 +205,6 @@ export const helixWorldEventSchema = z.object({
   evidence_refs: z.array(z.string()).default([]),
   meta: recordSchema.optional(),
 });
-
 export const worldEventBatchRequestSchema = z.object({
   events: z.array(helixWorldEventSchema),
   thread_id: z.string().trim().min(1).nullable().optional(),
@@ -226,6 +231,8 @@ export type WorldEventIngestOptions = {
   sessionId?: string | null;
   traceId?: string | null;
   graphId?: string | null;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
+  sourceOwnerProfileId?: string | null;
   now?: () => Date;
 };
 
@@ -270,6 +277,7 @@ export type WorldEventIngestResult = {
   live_continuation_worker_receipts?: HelixWorkerLaneReceipt[];
   live_continuation_goal_evaluation?: HelixGoalEvaluationReceipt | null;
   live_continuation_callout_candidate?: HelixCalloutCandidate | null;
+  source_admission?: HelixRoomSourceAdmission | null;
   minecraft_spatial_event?: HelixMinecraftSpatialEvent | null;
   minecraft_spatial_episode?: HelixMinecraftSpatialEpisode | null;
   minecraft_seed_map_result?: HelixMinecraftSeedMapResult | null;
@@ -327,6 +335,7 @@ export type WorldEventIngestDebug = {
 
 export type WorldEventAppendCandidate = {
   event: HelixWorldEvent;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
   eventId: string;
   threadId: string;
   sessionId?: string | null;
@@ -939,17 +948,47 @@ const shouldPublishSpatialEpisode = (
   return true;
 };
 
+const assertWorldEventSourceNamespaceAdmission = (
+  event: HelixWorldEvent,
+  admission?: HelixRoomSourceAdmission | null,
+): void => {
+  if (!event.source_id) return;
+  assertHelixRoomSourceNamespaceAdmission(
+    {
+      source_id: event.source_id,
+      room_id: event.room_id,
+      world_id: event.world_id,
+      domain_adapter: readString(event.meta, "domain_adapter"),
+    },
+    admission,
+  );
+};
+
 export const ingestWorldEvent = async (
   event: HelixWorldEvent,
   options: WorldEventIngestOptions = {},
 ): Promise<WorldEventIngestResult> => {
+  if (isHelixRoomSourceIngressSourceId(event.source_id)) {
+    assertWorldEventSourceNamespaceAdmission(event, options.sourceAdmission);
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
+  assertWorldEventSourceNamespaceAdmission(event, options.sourceAdmission);
   const graphId = options.graphId ?? null;
   const salienceClass = classifyMinecraftEventSalience(event);
-  const seenSource = recordWorldSourceSeen(event);
+  const seenSource = recordWorldSourceSeen(event, {
+    sourceAdmission: options.sourceAdmission,
+  });
+  const sourceOwnerProfileId =
+    typeof options.sourceOwnerProfileId === "string" && options.sourceOwnerProfileId.trim()
+      ? options.sourceOwnerProfileId.trim()
+      : null;
   const profileId =
-    readString(event.meta, "profile_id") ??
-    readString(event.meta, "linked_profile_id") ??
-    readString(event.meta, "commander_profile_id");
+    sourceOwnerProfileId ??
+    (options.sourceAdmission
+      ? null
+      : readString(event.meta, "profile_id") ??
+        readString(event.meta, "linked_profile_id") ??
+        readString(event.meta, "commander_profile_id"));
   if (profileId) {
     recordProfileLiveSource({
       profile_id: profileId,
@@ -965,7 +1004,9 @@ export const ingestWorldEvent = async (
   const state = getOrCreateState(event, graphId);
   const signalId = buildSignalId(event);
   const signal = normalizeMinecraftWorldEventToSignal({ event, signalId, graphId });
-  const spatialResult = ingestMinecraftSpatialWorldEvent(event);
+  const spatialResult = ingestMinecraftSpatialWorldEvent(event, {
+    sourceAdmission: options.sourceAdmission,
+  });
   const worldSenseResult = ingestMinecraftWorldSenseEvent(event);
   let environmentRiskResourceLedger = updateEnvironmentRiskResourceLedgerFromWorldEvent(event);
   const minecraftWorldDeltaOverlay = persistMinecraftWorldDeltaOverlay(
@@ -1153,6 +1194,7 @@ export const ingestWorldEvent = async (
           trace_id: options.traceId ?? null,
           mode: "standby_receipts",
           append_policy: "salient_only",
+          sourceAdmission: options.sourceAdmission,
         }).binding ?? null
       : null;
   const bindingResolution =
@@ -1174,12 +1216,14 @@ export const ingestWorldEvent = async (
           source_id: event.source_id ?? null,
           graph_id: graphId,
           world_id: event.world_id,
+          sourceAdmission: options.sourceAdmission,
         });
   const resolvedBinding = bindingResolution.binding;
   recordEventJournalEvent({
     event,
     threadId: resolvedBinding?.thread_id ?? explicitThreadId ?? null,
     sourceFamily: "minecraft",
+    sourceAdmission: options.sourceAdmission,
   });
   const appendBlockedReason =
     bindingResolution.reason === "binding_mismatch" || bindingResolution.reason === "source_id_mismatch"
@@ -1241,6 +1285,7 @@ export const ingestWorldEvent = async (
           observationRef: buildStandbyObservationRef({
             binding: resolvedBinding,
             world_event: event,
+            source_admission: options.sourceAdmission ?? null,
             signal,
             state_projection: projection,
             goal_hypotheses: goalHypotheses,
@@ -1256,6 +1301,7 @@ export const ingestWorldEvent = async (
             episode_predictions: episodePredictions,
             interjection_decision: interjectionDecision,
           }),
+          sourceAdmission: options.sourceAdmission ?? null,
           salienceReason: salienceReceipt?.reason ?? null,
           saliencePriority: salienceReceipt?.priority ?? null,
           dedupeKey: salienceReceipt?.dedupe_key ?? null,
@@ -1302,7 +1348,9 @@ export const ingestWorldEvent = async (
         }
       : environmentStateSnapshot;
     const enrichedSnapshot = enrichChunkSummaryForRouteCorridor(routeStateSnapshot, navigationQuery);
-    ingestEnvironmentStateSnapshot(enrichedSnapshot);
+    ingestEnvironmentStateSnapshot(enrichedSnapshot, {
+      sourceAdmission: options.sourceAdmission,
+    });
     environmentRiskResourceLedger = updateEnvironmentRiskResourceLedgerFromSnapshot(enrichedSnapshot);
   }
   const liveArtifactUpdate =
@@ -1329,6 +1377,7 @@ export const ingestWorldEvent = async (
           goalHypotheses,
           routeRehearsal: minecraftRouteRehearsal,
           routeDriftEvent: minecraftRouteDriftEvent,
+          sourceAdmission: options.sourceAdmission,
           now: signal.ts,
         })
       : null;
@@ -1366,6 +1415,7 @@ export const ingestWorldEvent = async (
           queue_items: queueItems,
           interjection_decision: interjectionDecision,
           append_candidate: appendCandidate,
+          source_admission: options.sourceAdmission ?? null,
           callout_proposal: calloutProposal,
           callout_delivery_receipt: calloutDeliveryReceipt,
           live_situation_artifact: liveArtifactBeforeUpdate,
@@ -1834,6 +1884,8 @@ export const ingestWorldEvent = async (
     item_id: batchDecision?.observation_item_id ?? null,
     batch_id: batchReceipt?.batch_id ?? null,
     turn_id: batchReceipt?.turn_id ?? null,
+  }, {
+    sourceAdmission: options.sourceAdmission,
   });
   const appendDecision: HelixStandbyObservationAppendDecision = batchDecision ?? {
     event_id: signal.signal_id,
@@ -1890,6 +1942,7 @@ export const ingestWorldEvent = async (
     append_decision: appendDecision,
     batch_receipt: batchReceipt,
     append_candidate: appendCandidate,
+    source_admission: options.sourceAdmission ?? null,
     callout_proposal: calloutProposal,
     callout_delivery_receipt: calloutDeliveryReceipt,
     live_situation_artifact: spatialArtifactUpdate?.artifact ?? liveArtifactUpdate?.artifact ?? liveArtifactBeforeUpdate ?? null,
@@ -1924,6 +1977,24 @@ export const ingestWorldEventBatch = async (
   events: HelixWorldEvent[],
   options: WorldEventIngestOptions = {},
 ): Promise<WorldEventIngestBatchResult> => {
+  const protectedEvents = events.filter((event) =>
+    isHelixRoomSourceIngressSourceId(event.source_id),
+  );
+  if (protectedEvents.length > 0) {
+    if (protectedEvents.length !== events.length || !options.sourceAdmission) {
+      throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+    }
+    for (const event of protectedEvents) {
+      assertWorldEventSourceNamespaceAdmission(event, options.sourceAdmission);
+    }
+    return ingestProtectedRoomSourceWorldEventBatch(
+      protectedEvents,
+      options.sourceAdmission,
+    );
+  }
+  for (const event of events) {
+    assertWorldEventSourceNamespaceAdmission(event, options.sourceAdmission);
+  }
   const ordered = events
     .slice()
     .sort((a: HelixWorldEvent, b: HelixWorldEvent) => a.ts.localeCompare(b.ts) || a.event_type.localeCompare(b.event_type));
@@ -2005,6 +2076,8 @@ export const ingestWorldEventBatch = async (
         item_id: appendedDecision.decision.observation_item_id ?? null,
         batch_id: appendedDecision.receipt.batch_id,
         turn_id: appendedDecision.receipt.turn_id ?? null,
+      }, {
+        sourceAdmission: candidate.sourceAdmission,
       });
     }
   }
@@ -2016,6 +2089,72 @@ export const ingestWorldEventBatch = async (
     appended_count: appendedCount,
     suppressed_count: results.length - appendedCount,
     batch_receipts: batchReceipts,
+    results,
+  };
+};
+
+/**
+ * Public room-source ingress is deliberately observation-only. It may retain
+ * admitted source identity, compact journal evidence, and an explicitly
+ * protected environment snapshot, but it must not enter the generic world
+ * reducer fan-out until an authenticated room-aware re-entry path exists for
+ * every derived store.
+ */
+export const ingestProtectedRoomSourceWorldEventBatch = (
+  events: HelixWorldEvent[],
+  sourceAdmission: HelixRoomSourceAdmission,
+): WorldEventIngestBatchResult => {
+  const ordered = events
+    .slice()
+    .sort(
+      (a: HelixWorldEvent, b: HelixWorldEvent) =>
+        a.ts.localeCompare(b.ts) || a.event_type.localeCompare(b.event_type),
+    );
+  const results: WorldEventIngestResult[] = ordered.map(
+    (event: HelixWorldEvent): WorldEventIngestResult => {
+      assertWorldEventSourceNamespaceAdmission(event, sourceAdmission);
+      const admittedEvent: HelixWorldEvent = {
+        ...event,
+        evidence_refs: Array.from(new Set([
+          ...(event.evidence_refs ?? []),
+          ...sourceAdmission.evidence_refs,
+        ])),
+      };
+      const signalId = buildSignalId(admittedEvent);
+      recordWorldSourceSeen(admittedEvent, { sourceAdmission });
+      recordEventJournalEvent({
+        event: admittedEvent,
+        threadId: null,
+        sourceAdmission,
+      });
+      const snapshot =
+        extractEnvironmentStateSnapshotFromWorldEvent(admittedEvent);
+      if (snapshot) {
+        ingestEnvironmentStateSnapshot(snapshot, { sourceAdmission });
+      }
+      return {
+        ok: true,
+        schema: "helix.world_event_ingest_response.v1",
+        appended: false,
+        signal_id: signalId,
+        thread_id: null,
+        turn_id: null,
+        item_id: null,
+        reason: "protected_observation_only",
+        message:
+          "Protected room-source event recorded as nonterminal observation evidence.",
+        event_type: admittedEvent.event_type,
+        source_admission: sourceAdmission,
+      };
+    },
+  );
+  return {
+    ok: true,
+    schema: "helix.world_event_batch_ingest_response.v1",
+    event_count: results.length,
+    appended_count: 0,
+    suppressed_count: results.length,
+    batch_receipts: [],
     results,
   };
 };

@@ -1,0 +1,200 @@
+{
+  "schema_version": "casimir_dp_qed_scale_hierarchy_calibration/1",
+  "calibration_id": "casimir-dp-qed-scale-hierarchy-stage4-1-v1",
+  "evidence_class": "source_backed_calculation",
+  "claim_ceiling": "qed_scale_identity_calibration",
+  "promotion_allowed": false,
+  "authority_receipt": {
+    "authority_id": "nist-codata-2022-v9.0",
+    "path": "configs/constants/codata-2022.v1.json",
+    "expected_sha256": "5a7e10ed709577c224cf45f78199dd143a7f9cf10d6f8fe8c018e168454b7a61",
+    "actual_sha256": "5a7e10ed709577c224cf45f78199dd143a7f9cf10d6f8fe8c018e168454b7a61",
+    "integrity_verified": true,
+    "citation": "NIST/CODATA recommended values of the fundamental physical constants: 2022",
+    "url": "https://physics.nist.gov/constants",
+    "retrieved_at": "2026-07-25T18:05:19.309Z"
+  },
+  "constants_set": {
+    "id": "CODATA-2022-v9.0",
+    "h_J_s": {
+      "value": 6.62607015e-34,
+      "literal_text": "6.62607015e-34",
+      "standard_uncertainty": 0,
+      "exact_si": true
+    },
+    "c_m_s": {
+      "value": 299792458,
+      "literal_text": "299792458",
+      "standard_uncertainty": 0,
+      "exact_si": true
+    },
+    "fine_structure_alpha": {
+      "value": 0.0072973525643,
+      "literal_text": "7.2973525643e-3",
+      "standard_uncertainty": 1.1e-12,
+      "standard_uncertainty_literal_text": "1.1e-12",
+      "relative_uncertainty": 1.5073959909534913e-10,
+      "regime": "zero_momentum_low_energy_codata"
+    },
+    "electron_rest_mass_kg": {
+      "value": 9.1093837139e-31,
+      "literal_text": "9.1093837139e-31",
+      "standard_uncertainty": 2.8e-40,
+      "standard_uncertainty_literal_text": "2.8e-40",
+      "relative_uncertainty": 3.0737534919376406e-10,
+      "mass_scheme": "on_shell_rest_mass"
+    },
+    "references": {
+      "electron_compton_wavelength_m": {
+        "value": 2.42631023538e-12,
+        "literal_text": "2.42631023538e-12",
+        "standard_uncertainty": 7.6e-22,
+        "standard_uncertainty_literal_text": "7.6e-22",
+        "relative_uncertainty": 3.132328211445605e-10,
+        "rounding_resolution": 1e-23
+      },
+      "electron_reduced_compton_wavelength_m": {
+        "value": 3.8615926744e-13,
+        "literal_text": "3.8615926744e-13",
+        "standard_uncertainty": 1.2e-22,
+        "standard_uncertainty_literal_text": "1.2e-22",
+        "relative_uncertainty": 3.1075260939748173e-10,
+        "rounding_resolution": 1e-23
+      },
+      "bohr_radius_m": {
+        "value": 5.29177210544e-11,
+        "literal_text": "5.29177210544e-11",
+        "standard_uncertainty": 8.2e-21,
+        "standard_uncertainty_literal_text": "8.2e-21",
+        "relative_uncertainty": 1.5495754232443817e-10,
+        "rounding_resolution": 1e-22
+      },
+      "classical_electron_radius_m": {
+        "value": 2.8179403205e-15,
+        "literal_text": "2.8179403205e-15",
+        "standard_uncertainty": 1.3e-24,
+        "standard_uncertainty_literal_text": "1.3e-24",
+        "relative_uncertainty": 4.613298551934326e-10,
+        "rounding_resolution": 1e-25
+      },
+      "rydberg_constant_m_inv": {
+        "value": 10973731.568157,
+        "literal_text": "10973731.568157",
+        "standard_uncertainty": 0.000012,
+        "standard_uncertainty_literal_text": "0.000012",
+        "relative_uncertainty": 1.0935204606991638e-12,
+        "rounding_resolution": 0.000001
+      },
+      "rydberg_frequency_Hz": {
+        "value": 3.28984196025e15,
+        "literal_text": "3.2898419602500e15",
+        "standard_uncertainty": 3600,
+        "standard_uncertainty_literal_text": "3.6e3",
+        "relative_uncertainty": 1.0942774891613428e-12,
+        "rounding_resolution": 100
+      },
+      "rydberg_energy_J": {
+        "value": 2.179872361103e-18,
+        "literal_text": "2.1798723611030e-18",
+        "standard_uncertainty": 2.4e-30,
+        "standard_uncertainty_literal_text": "2.4e-30",
+        "relative_uncertainty": 1.1009818936305137e-12,
+        "rounding_resolution": 1e-30
+      },
+      "hartree_energy_J": {
+        "value": 4.359744722206e-18,
+        "literal_text": "4.3597447222060e-18",
+        "standard_uncertainty": 4.8e-30,
+        "standard_uncertainty_literal_text": "4.8e-30",
+        "relative_uncertainty": 1.1009818936305137e-12,
+        "rounding_resolution": 1e-30
+      }
+    }
+  },
+  "uncertainty_model": {
+    "status": "not_supplied",
+    "quantity_order": [
+      "fine_structure_alpha",
+      "electron_rest_mass_kg",
+      "nucleus_to_electron_mass_ratio"
+    ],
+    "relative_covariance": null,
+    "derived_reference_cross_covariance": "not_supplied",
+    "significance_policy": "not_computable_without_cross_covariance",
+    "fallback_uncertainty_policy": "conservative_l1_relative_uncertainty_bound"
+  },
+  "reduced_mass_case": {
+    "case_id": "hydrogen_proton_electron_leading_order",
+    "atomic_number_Z": 1,
+    "nucleus_to_electron_mass_ratio": 1836.152673426,
+    "ratio_literal_text": "1836.152673426",
+    "ratio_standard_uncertainty": 3.2e-8,
+    "ratio_standard_uncertainty_literal_text": "3.2e-8",
+    "mass_semantics": "bare_nucleus_over_electron",
+    "initial_n": 1,
+    "final_n": 2
+  },
+  "symbol_registry": {
+    "fine_structure_constant": "alpha_fs",
+    "electric_polarizability_tensor": "alpha_pol_ij",
+    "statistical_significance": "alpha_stat",
+    "branch_amplitudes": [
+      "c_A",
+      "c_B"
+    ],
+    "bare_alpha_allowed": false
+  },
+  "conventions": {
+    "units": "SI",
+    "ordinary_compton_wavelength": "lambda_C=h/(m_e*c)",
+    "reduced_compton_wavelength": "lambda_bar_C=hbar/(m_e*c)",
+    "cyclic_compton_frequency": "nu_C=m_e*c^2/h",
+    "angular_compton_frequency": "omega_C=m_e*c^2/hbar=2*pi*nu_C",
+    "rydberg_constant_semantics": "R_infinity_is_infinite_nuclear_mass_wavenumber",
+    "rydberg_frequency_semantics": "nu_R=c*R_infinity",
+    "alpha_semantics": "dimensionless_low_energy_electromagnetic_coupling_not_probability"
+  },
+  "precision_scope": {
+    "calculation_level": "leading_nonrelativistic_reduced_mass",
+    "applied_terms": [
+      "si_exact_constants",
+      "codata_low_energy_constants",
+      "leading_nonrelativistic_reduced_mass"
+    ],
+    "omitted_terms": [
+      "dirac_bound_state",
+      "relativistic_recoil",
+      "radiative_recoil",
+      "electron_self_energy",
+      "vacuum_polarization",
+      "higher_order_radiative",
+      "finite_nuclear_size",
+      "nuclear_polarizability",
+      "hyperfine_structure",
+      "stark_shift",
+      "zeeman_shift",
+      "doppler_shift",
+      "pressure_shift",
+      "blackbody_shift"
+    ],
+    "precision_spectroscopy_claimed": false,
+    "independent_empirical_validation_claimed": false
+  },
+  "domain_exclusions": {
+    "polarization_or_helicity_model_included": false,
+    "cavity_input_allowed": false,
+    "casimir_input_allowed": false,
+    "dp_input_allowed": false,
+    "collapse_input_allowed": false,
+    "manifold_input_allowed": false,
+    "resonance_input_allowed": false,
+    "transfer_kernel_input_allowed": false
+  },
+  "tolerances": {
+    "identity_relative_tolerance": 1e-13,
+    "maximum_identity_relative_tolerance": 1e-12,
+    "covariance_symmetry_tolerance": 1e-30,
+    "covariance_psd_tolerance": 1e-12,
+    "reference_uncertainty_multiplier": 5
+  }
+}

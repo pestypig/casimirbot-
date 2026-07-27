@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -21,6 +22,7 @@ public final class HeartbeatScheduler {
     private final HelixSensorRuntimeStatus runtimeStatus;
     private final AtomicInteger pendingProbeCount;
     private final AtomicInteger skippedSnapshotCount;
+    private final AtomicBoolean heartbeatInFlight = new AtomicBoolean(false);
     private BukkitTask task;
     private volatile String latestSnapshotId;
     private volatile String latestSnapshotTs;
@@ -67,6 +69,7 @@ public final class HeartbeatScheduler {
     }
 
     private void collectAndPostOnMainThread() {
+        if (!heartbeatInFlight.compareAndSet(false, true)) return;
         String now = Instant.now().toString();
         List<Map<String, Object>> players = new ArrayList<>();
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -106,6 +109,15 @@ public final class HeartbeatScheduler {
         heartbeat.put("assistant_answer", false);
         heartbeat.put("raw_content_included", false);
         heartbeat.put("created_at", now);
-        httpClient.postHeartbeatAsync(HelixJson.stringify(heartbeat));
+        httpClient
+            .postHeartbeatAsync(HelixJson.stringify(heartbeat))
+            .whenComplete((response, error) -> {
+                heartbeatInFlight.set(false);
+                if (error != null) {
+                    plugin.getLogger().warning(
+                        "Helix heartbeat transport failed: " + error.getMessage()
+                    );
+                }
+            });
     }
 }

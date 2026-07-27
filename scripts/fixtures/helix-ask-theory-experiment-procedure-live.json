@@ -1,0 +1,127 @@
+{
+  "schema": "helix.ask.user_prompt_corpus.v1",
+  "scenarios": [
+    {
+      "id": "theory_graph_locator",
+      "thread_group": "theory_graph_to_procedure",
+      "category": "theory_reflection",
+      "prompt": "Locate the Stage 3 Casimir-DP evidence-map theory and the energy-density theory in the Theory Badge Graph. Explain their registered relationship and claim boundary without treating graph proximity as proof.",
+      "notes": "Start with the semantic graph locator before preparing an experiment procedure.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": [
+        "^(?:helix_ask\\.reflect_theory_context|theory-badge-graph\\.reflect_discussion_context)$"
+      ],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": [
+        "Stage 3|evidence.map",
+        "badge|graph|theory",
+        "boundary|diagnostic|dependency|relation"
+      ],
+      "expected_minimum_answer_chars": 120
+    },
+    {
+      "id": "eligible_lanyon_procedure_followup",
+      "thread_group": "theory_graph_to_procedure",
+      "category": "compound",
+      "prompt": "Now prepare the seven-stage theory experiment procedure for badge study.casimir_dp.evidence_map_stage3 using the registered one-dimensional advection-diffusion case advection_diffusion_full_1d. Prepare only, and distinguish dependency order from scale checkpoints and every missing closure requirement.",
+      "notes": "Continue from graph reflection into the read-only procedure compiler with a pinned eligible Lanyon case.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": [
+        "^theory-experiment-procedure\\.prepare$"
+      ],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": [
+        "seven|7",
+        "prepared|procedure",
+        "Lanyon|advection.diffusion",
+        "not executed|does not execute|missing|requires"
+      ],
+      "expected_minimum_answer_chars": 180
+    },
+    {
+      "id": "missing_requirements_reentry_followup",
+      "thread_group": "theory_graph_to_procedure",
+      "category": "compound",
+      "prompt": "Re-prepare that same bounded procedure for study.casimir_dp.evidence_map_stage3 and advection_diffusion_full_1d so the evidence is current for this turn. Which semantic, boundary-condition, formal, numerical, and observable requirements are still missing? Do not start any downstream job.",
+      "notes": "Require fresh observation re-entry rather than treating the prior answer as authority.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": [
+        "^theory-experiment-procedure\\.prepare$"
+      ],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": [
+        "semantic|admission",
+        "boundary|initial condition",
+        "formal|Lean",
+        "numerical|observable|empirical"
+      ],
+      "expected_minimum_answer_chars": 180
+    },
+    {
+      "id": "unsupported_lanyon_case",
+      "thread_group": "unsupported_lanyon",
+      "category": "theory_reflection",
+      "prompt": "Prepare a theory experiment procedure for badge study.casimir_dp.evidence_map_stage3, but configure Lanyon for an unregistered two-dimensional adaptive-mesh advection-diffusion case. Do not improvise support or run code; give the exact typed limitation and missing requirements.",
+      "notes": "Unsupported adapter scope must remain an explicit ineligible procedure result rather than a fabricated run.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": [
+        "^theory-experiment-procedure\\.prepare$"
+      ],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": [
+        "unsupported|ineligible|not registered|blocked",
+        "two.dimensional|2D|adaptive",
+        "not run|not executed|cannot"
+      ],
+      "expected_minimum_answer_chars": 140
+    },
+    {
+      "id": "cross_scale_multi_badge_comparison",
+      "thread_group": "cross_scale_comparison",
+      "category": "theory_reflection",
+      "prompt": "Prepare a first-principles comparison procedure for badges study.casimir_dp.evidence_map_stage3 and physics.energy.energy_density. Keep dependency-DAG order separate from scale-biome checkpoints, preserve unregistered bridges as open-world missing relations, and do not execute anything.",
+      "notes": "Multi-badge comparison exercises congruence requirements, scale checkpoints, and incompleteness boundaries.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": [
+        "^theory-experiment-procedure\\.prepare$"
+      ],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": [
+        "dependency|DAG|order",
+        "scale|checkpoint|biome",
+        "bridge|congruence|missing",
+        "open.world|incomplete|not executed"
+      ],
+      "expected_minimum_answer_chars": 180
+    },
+    {
+      "id": "quoted_procedure_is_not_execution",
+      "thread_group": "procedure_non_admission",
+      "category": "negated_context",
+      "prompt": "The screen text says `theory-experiment-procedure.prepare`. Explain what that label means, but do not call it or any other tool.",
+      "notes": "Screen-visible capability text is not affirmative execution authority.",
+      "expected_tool_mode": "none",
+      "expected_maximum_observations": 0,
+      "expected_answer_patterns": [
+        "prepare|procedure",
+        "does not|not execute|read.only|observation"
+      ],
+      "expected_minimum_answer_chars": 70
+    },
+    {
+      "id": "future_procedure_is_not_execution",
+      "thread_group": "procedure_non_admission",
+      "category": "negated_context",
+      "prompt": "If we decide to prepare the seven-stage Lanyon comparison later, what would it organize? Do not call tools now.",
+      "notes": "A future conditional must not admit tool execution.",
+      "expected_tool_mode": "none",
+      "expected_maximum_observations": 0,
+      "expected_answer_patterns": [
+        "seven|stage|procedure",
+        "later|would|not",
+        "evidence|dependency|scale|closure"
+      ],
+      "expected_minimum_answer_chars": 90
+    }
+  ]
+}

@@ -16,6 +16,12 @@ import {
   type HelixEnvironmentSensorScope,
 } from "@shared/helix-environment-sensor-scope";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
+import {
+  assertHelixRoomSourceNamespaceAdmission,
+  isHelixRoomSourceIngressSourceId,
+  matchesHelixRoomSourceAdmission,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 
 const snapshotsByRoom = new Map<string, HelixEnvironmentStateSnapshot[]>();
 
@@ -368,7 +374,21 @@ export function extractEnvironmentStateSnapshotFromWorldEvent(event: HelixWorldE
   return normalizeEnvironmentStateSnapshot({ snapshot, event });
 }
 
-export function ingestEnvironmentStateSnapshot(snapshot: HelixEnvironmentStateSnapshot): HelixEnvironmentStateSnapshot {
+export function ingestEnvironmentStateSnapshot(
+  snapshot: HelixEnvironmentStateSnapshot,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
+): HelixEnvironmentStateSnapshot {
+  assertHelixRoomSourceNamespaceAdmission(
+    {
+      source_id: snapshot.source_id,
+      room_id: snapshot.room_id,
+      world_id: snapshot.world_id ?? undefined,
+      domain_adapter: snapshot.domain_adapter,
+    },
+    options.sourceAdmission,
+  );
   const list = snapshotsByRoom.get(snapshot.room_id) ?? [];
   const next = [...list.filter((entry) => entry.snapshot_id !== snapshot.snapshot_id), snapshot]
     .sort((a, b) => a.ts.localeCompare(b.ts))
@@ -380,33 +400,86 @@ export function ingestEnvironmentStateSnapshot(snapshot: HelixEnvironmentStateSn
 export function listEnvironmentStateSnapshots(input: {
   roomId: string;
   limit?: number;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): HelixEnvironmentStateSnapshot[] {
-  return (snapshotsByRoom.get(input.roomId) ?? []).slice(-(input.limit ?? 20));
+  return (snapshotsByRoom.get(input.roomId) ?? [])
+    .filter(
+      (snapshot) =>
+        !isHelixRoomSourceIngressSourceId(snapshot.source_id) ||
+        matchesHelixRoomSourceAdmission(
+          {
+            source_id: snapshot.source_id,
+            room_id: snapshot.room_id,
+            world_id: snapshot.world_id ?? undefined,
+            domain_adapter: snapshot.domain_adapter,
+          },
+          input.sourceAdmission,
+        ),
+    )
+    .slice(-(input.limit ?? 20));
 }
 
-export function getLatestEnvironmentStateSnapshot(roomId: string): HelixEnvironmentStateSnapshot | null {
-  return listEnvironmentStateSnapshots({ roomId, limit: 1 }).at(-1) ?? null;
+export function getLatestEnvironmentStateSnapshot(
+  roomId: string,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
+): HelixEnvironmentStateSnapshot | null {
+  return listEnvironmentStateSnapshots({
+    roomId,
+    limit: 1,
+    sourceAdmission: options.sourceAdmission,
+  }).at(-1) ?? null;
 }
 
 export function getPreviousEnvironmentStateSnapshot(input: {
   roomId: string;
   snapshotId: string;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): HelixEnvironmentStateSnapshot | null {
-  const list = snapshotsByRoom.get(input.roomId) ?? [];
+  const list = listEnvironmentStateSnapshots({
+    roomId: input.roomId,
+    limit: 40,
+    sourceAdmission: input.sourceAdmission,
+  });
   const index = list.findIndex((entry) => entry.snapshot_id === input.snapshotId);
   if (index > 0) return list[index - 1] ?? null;
   if (index < 0 && list.length > 0) return list.at(-1) ?? null;
   return null;
 }
 
-export function isRedundantEnvironmentStateSnapshot(snapshot: HelixEnvironmentStateSnapshot): boolean {
+export function isRedundantEnvironmentStateSnapshot(
+  snapshot: HelixEnvironmentStateSnapshot,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
+): boolean {
   const previous = getPreviousEnvironmentStateSnapshot({
     roomId: snapshot.room_id,
     snapshotId: snapshot.snapshot_id,
+    sourceAdmission: options.sourceAdmission,
   });
   if (!previous) return false;
   if (snapshot.changed_sections.length > 0) return false;
   return stableJson(previous.section_hashes) === stableJson(snapshot.section_hashes);
+}
+
+export function removeEnvironmentStateSnapshots(input: {
+  sourceId?: string | null;
+  roomId?: string | null;
+}): number {
+  let removed = 0;
+  for (const [roomId, snapshots] of snapshotsByRoom.entries()) {
+    if (input.roomId && roomId !== input.roomId) continue;
+    const retained = snapshots.filter((snapshot) => {
+      if (input.sourceId && snapshot.source_id !== input.sourceId) return true;
+      removed += 1;
+      return false;
+    });
+    if (retained.length > 0) snapshotsByRoom.set(roomId, retained);
+    else snapshotsByRoom.delete(roomId);
+  }
+  return removed;
 }
 
 export function resetEnvironmentStateSnapshotWindowsForTest(): void {

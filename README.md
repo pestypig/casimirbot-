@@ -103,6 +103,7 @@ sequence without contacting a server. Tool-specific contracts live under
 | Helix Ask + Live Answer loop | Primary user and agent interface. Handles prompt interpretation, tool admission, evidence re-entry, terminal authority, streamed debug, and the visible answer. | `server/routes/agi.plan.ts`, `docs/helix-ask-agentic-loop-current-overview.md`, `docs/helix-ask-codex-loop-discipline.md`, `npm run helix:ask:regression:light` |
 | GPT Realtime + Codex handoff | Live voice can answer locally, converse while Codex reasons in parallel, or present a worker-grounded result without receiving workstation authority. Final relay grounding comes from the canonical terminal certificate, not a voice-owned tool evaluator. | `docs/architecture/voice-service-contract.md#gpt-realtime-grounded-worker-relay-additive`, `server/services/helix-ask/terminal-grounding-authority.ts`, `server/services/helix-ask/realtime-session/`, `shared/helix-terminal-grounding-authority.ts` |
 | Agent runtime adapter | Provider edge for Codex Workstation Mode. Future providers must conform to the same edge and are not user options by default. | `server/services/helix-ask/agent-providers/`, `server/services/helix-ask/workstation-tool-gateway/`, `shared/helix-agent-runtime.ts`, `docs/helix-ask-codex-loop-discipline.md` |
+| External agent API and MCP | Provider-neutral, tenant-owned durable runs for outside agents. REST and Streamable HTTP MCP share the same bounded completion, evidence, account-binding, and terminal-authority contract. | `docs/architecture/helix-agent-api-v1.md`, `server/services/helix-agent-api/`, `server/routes/helix-agent-api.ts`, `server/mcp/helix-mcp-server.ts` |
 | Terminal product authority | Contract for turning admitted artifacts into one visible Ask answer. Covers product materializers, explicit route-product allowance, preview-vs-full-answer projection, and sidecar admission boundaries. | `docs/helix-ask-terminal-authority-contract.md`, `server/services/helix-ask/terminal-product-materializers.ts`, `server/services/helix-ask/terminal-authority-single-writer.ts`, `client/src/components/helix/ask-console/HelixAskVisibleFinalAnswerSelection.ts` |
 | Account-based workstation access | Release boundary for profile sign-in. `developer` accounts see the full development workstation; no-sign-in and `user` accounts get the stable public subset enforced by server policy, with UI locks only as guidance. | `shared/helix-account-session.ts`, `server/services/helix-account/account-session-store.ts`, `server/routes/agi.workstation-tool-gateway.ts`, `AGENTS.md` |
 | Workstation launch panels | User-facing capability surfaces. Launch panels expose docs, calculators, theory maps, stellar/solar simulators, NHM2 panels, notes, process graphs, and runtime diagnostics. | `client/src/pages/desktop.tsx`, `client/src/pages/helix-core.panels.ts`, `docs/helix-desktop-panels.md` |
@@ -141,9 +142,100 @@ experiment and guest room hosting for local two-browser testing. Production
 deployments remain opt-in through `HELIX_PUBLIC_ROOMS_EXPERIMENT=1` and
 `HELIX_GUEST_ROOM_CREATION=1`.
 
+Developer room owners can generate a separate, read-only Minecraft source link
+from a Shared Live Room. On a published full-stack deployment this gives the
+Paper plugin a stable `https://casimirbot.com/api/room-ingress/v1/...` endpoint
+and replaces a Cloudflare tunnel. Human invitations and source credentials are
+deliberately separate. Source identity is server-generated, and the plugin
+gates its sensor loops on admitted manifest evidence while retaining typed
+retry/replay diagnostics. See
+`docs/minecraft-room-source-ingress.md`.
+
 The normal development commands keep the contract-only Helix Ask golden-path
 scaffold disabled so keyed model and tool routes can run. Use
 `npm run dev:golden-path` only when deliberately testing that scaffold.
+
+### External Agent API and MCP
+
+CasimirBot exposes one provider-neutral durable agent-run service through:
+
+- REST at `/api/v1/agent-runs`;
+- a stateless Streamable HTTP MCP endpoint at `/mcp`.
+
+The MCP server's core durable-run tools are:
+
+- `helix_run_start`;
+- `helix_run_continue`;
+- `helix_run_inspect`;
+- `helix_run_fetch_evidence`;
+- `helix_run_list_events`;
+- `helix_run_cancel`.
+
+The authenticated MCP `tools/list` response is the source of truth for the
+complete catalog, including any Shared Live Room tools. Each tool declares its
+required OAuth scope, which is enforced again when the tool is called.
+
+Starting a run creates durable state and returns an opaque `run_id`;
+`helix_run_continue` advances that same run through bounded, versioned turns.
+External results re-enter Helix as evidence and cannot bypass source admission,
+proof gates, or canonical terminal-answer authority.
+
+The Streamable HTTP catalog supplies input/output schemas, safety annotations,
+and per-tool OAuth security schemes. Missing-scope calls return a typed MCP
+reauthorization challenge instead of silently hiding the tool.
+
+Both transports require a verified bearer principal, an exact Helix account
+binding, and admitted OAuth and logical data scopes. The protected resource
+fails closed when that configuration is incomplete. CasimirBot verifies tokens
+as the OAuth protected resource; production still needs a compatible
+authorization server with authorization code + PKCE, resource/audience
+propagation, and an OpenAI-supported client-registration path.
+
+An already signed-in CasimirBot user can inspect binding readiness with
+`GET /api/account/session/agent-bindings` and revoke one of that profile's
+opaque binding references with
+`DELETE /api/account/session/agent-bindings/{binding_ref}`. These
+cookie-authenticated management routes return sanitized projections: provider
+subjects and bearer credentials are never included. Here `oauth_ready` means
+only that the current Helix profile has an active CasimirBot binding; it does
+not prove that the authorization server, client registration, token scopes, or
+an outside provider connection are operational.
+
+There is deliberately no public generic create-link or completion callback.
+Binding creation requires a trusted authorization-server adapter that verifies
+the external identity and then commits the provider link and exact
+issuer/tenant binding through the internal account-link service. Selecting and
+configuring that adapter remains a production deployment responsibility.
+
+The canonical public connection target is
+`https://casimirbot.com/mcp`. Its human-readable discovery URL is
+[`https://casimirbot.com/agent-access`](https://casimirbot.com/agent-access),
+and its OAuth protected-resource metadata URL is
+[`https://casimirbot.com/.well-known/oauth-protected-resource/mcp`](https://casimirbot.com/.well-known/oauth-protected-resource/mcp).
+Finding the website through normal internet retrieval only lets a model read
+public pages. It does not install, authorize, or invoke the MCP tools. A user,
+application developer, ChatGPT plugin, Codex configuration, Gemini
+configuration, or surrounding agent harness must explicitly add the endpoint
+and complete OAuth before tool use.
+
+For ChatGPT development testing, enable Developer mode and add the public
+`/mcp` URL under Settings → Plugins. Broad ChatGPT distribution still requires
+a reviewed, published plugin; the local Codex MCP configuration is not shared
+with ChatGPT.
+
+Those URLs are the intended public configuration contract; this README is not
+evidence that the production endpoint is deployed or has passed provider
+conformance. See
+[`docs/architecture/helix-agent-api-v1.md`](docs/architecture/helix-agent-api-v1.md)
+for safe OpenAI and Gemini configuration shapes, request schemas,
+authentication, idempotency, completion states, cancellation limits, and
+deployment configuration.
+
+Run `npm run mcp:provider-conformance` for a secret-redacted report. With no
+credentials it checks public discovery and the unauthenticated OAuth challenge.
+With `CASIMIRBOT_MCP_ACCESS_TOKEN`, and optionally `OPENAI_API_KEY` and
+`GEMINI_API_KEY`, it also checks authenticated MCP metadata and one bounded
+provider invocation per configured provider.
 
 ### Runtime Commands
 

@@ -1,5 +1,6 @@
 import { extractCalculatorExpression } from "./workstation-tool-planner";
 import { appendAskToolTraceDisclosureNote, buildAskToolTraceDisclosure } from "./tool-trace-disclosure";
+import { requestedTheoryContextIdentityLine } from "./requested-theory-context-identity";
 import type { HelixWorkstationToolPlan, HelixWorkstationToolPlanStep } from "../../../shared/helix-workstation-tool-plan";
 import type { HelixWorkstationToolEvaluation } from "../../../shared/helix-workstation-tool-evaluation";
 import type { HelixCalculatorSetupContext, HelixCalculatorSetupVariable } from "../../../shared/helix-calculator-setup-context";
@@ -399,6 +400,7 @@ function isTheoryReflectionStep(step: HelixWorkstationToolPlanStep): boolean {
 function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAnswerInput): string {
   const summary = input.evaluation?.summary ?? "The graph reflection returned a non-terminal context observation.";
   const evaluationResult = (input.evaluation as { result?: string } | null | undefined)?.result ?? null;
+  const requestedIdentityLine = requestedTheoryContextIdentityLine(input.prompt);
   const hasExplanationPlan = input.plan.steps.some(
     (step: HelixWorkstationToolPlanStep) =>
       (step.panel_id === "theory-badge-graph" && step.action_id === "explain_reflected_context") ||
@@ -429,6 +431,7 @@ function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAns
   if (evaluationResult === "insufficient") {
     return [
       "The theory reflection receipt was not accepted as final-answer evidence.",
+      ...(requestedIdentityLine ? [requestedIdentityLine] : []),
       cleanSummary || "The receipt failed route-authority checks.",
       "I should answer from the prompt directly or rerun the reflection with a valid non-terminal receipt before using it as context.",
     ].join("\n");
@@ -436,6 +439,7 @@ function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAns
   if (shouldLeadWithConcept && promptMentionsPhotonEnergyRelation) {
     return [
       "E = hf means a photon's energy is proportional to its frequency.",
+      ...(requestedIdentityLine ? [requestedIdentityLine] : []),
       "Here, E is the photon energy, h is Planck's constant, and f is the light frequency. It is the scalar bridge between wave behavior and quantum energy packets; higher-frequency light carries more energy per photon.",
       "In the Theory Badge Graph, this belongs near the quantum/constants/radiation roots, then branches into photon-energy rows, spectrum rows such as solar lines, and cavity-mode photon-energy cuts. The related wavelength form is E = hc/lambda when frequency is expressed as c/lambda.",
       `The graph reflection observed: ${cleanSummary || "this prompt overlaps mapped photon-energy and radiation badges."}`,
@@ -445,6 +449,7 @@ function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAns
   if (asksForMainComponents && mentionsNeedleHull) {
     return [
       "The Theory Badge Graph reflection supports reading Needle Hull Mark 2 as a multi-part solve frame, not as one finished proof.",
+      ...(requestedIdentityLine ? [requestedIdentityLine] : []),
       "Main components:",
       "- Hull geometry and boundary setup: the shape, scale, and coordinate assumptions that define what is being solved.",
       "- Casimir cavity coupling: the negative-energy/source-side model that has to be connected to the hull instead of asserted globally.",
@@ -458,12 +463,14 @@ function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAns
   if (hasExplanationPlan) {
     return [
       "I located this discussion in the Theory Badge Graph, then built a first-principles explanation route from that reflection.",
+      ...(requestedIdentityLine ? [requestedIdentityLine] : []),
       `The graph route suggests: ${cleanSummary || "start from shared first-principle badges, follow the relevant theory branch, then keep runtime/evidence and claim-boundary rows visible."}`,
       "Read that route as evidence, not as a solve: roots and branch badges explain where the concept lives, scalar cuts can go to the calculator, and tensor/runtime rows need receipts before they can support stronger interpretation.",
     ].join("\n");
   }
   return [
     "I located this discussion in the Theory Badge Graph as context evidence.",
+    ...(requestedIdentityLine ? [requestedIdentityLine] : []),
     `The graph reflection suggests: ${cleanSummary || "the prompt overlaps mapped theory badges and claim-boundary context."}`,
     "This is a context locator, not a solve. Any numeric result still has to come from calculator traces, runtime receipts, or another completed solver path.",
   ].join("\n");

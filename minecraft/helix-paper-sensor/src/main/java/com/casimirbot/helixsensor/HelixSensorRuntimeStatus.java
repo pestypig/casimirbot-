@@ -56,13 +56,27 @@ public final class HelixSensorRuntimeStatus {
     }
 
     public synchronized void recordHttpResult(String path, int status, long elapsedMillis) {
+        recordHttpResult(
+            path,
+            status,
+            elapsedMillis,
+            status >= 200 && status < 300
+        );
+    }
+
+    public synchronized void recordHttpResult(
+        String path,
+        int status,
+        long elapsedMillis,
+        boolean applicationSuccess
+    ) {
         lastHttpMillis = elapsedMillis;
-        if (status >= 200 && status < 300) {
+        if (status >= 200 && status < 300 && applicationSuccess) {
             backoffState = "idle";
             lastError = null;
             if (path.contains("/manifest")) lastManifestSuccessAt = Instant.now();
             if (path.contains("/heartbeat")) lastHeartbeatSuccessAt = Instant.now();
-            if (path.contains("/world-event/batch")) lastSnapshotSuccessAt = Instant.now();
+            if (path.contains("/world-event")) lastSnapshotSuccessAt = Instant.now();
             if (path.contains("/probes/pending")) lastProbePollSuccessAt = Instant.now();
             if (path.contains("/probes/result")) lastProbeResultSuccessAt = Instant.now();
             return;
@@ -80,6 +94,21 @@ public final class HelixSensorRuntimeStatus {
         } else {
             lastError = "http_" + status;
         }
+    }
+
+    public synchronized void recordIngressReceipt(
+        String errorCode,
+        String message,
+        String requestId,
+        long sequence
+    ) {
+        String code = errorCode == null || errorCode.isBlank()
+            ? "ingress_rejected"
+            : errorCode;
+        String detail = message == null || message.isBlank()
+            ? code
+            : code + ": " + message;
+        lastError = detail + " [request=" + requestId + ", sequence=" + sequence + "]";
     }
 
     public synchronized void recordBackoff(String state, String error) {

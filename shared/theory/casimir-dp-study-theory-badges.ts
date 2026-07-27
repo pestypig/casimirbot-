@@ -29,6 +29,295 @@ const studyBadge = (badge: Omit<TheoryBadgeV1, "claimBoundary">): TheoryBadgeV1 
   claimBoundary: STUDY_BOUNDARY,
 });
 
+const stage3StudyBadge = (args: {
+  id: string;
+  title: string;
+  plainMeaning: string;
+  whyItMatters: string;
+  status: TheoryBadgeV1["status"];
+  maturityTag: string;
+  modulePath: string;
+  testPath: string;
+  equationId: string;
+  displayLatex: string;
+  primaryObservableId: string;
+  primaryObservableSymbol: string;
+  primaryObservableQuantity: string;
+  primaryObservableUnit: string | null;
+  primaryObservableDimension: string | null;
+  falsifier: string;
+  blockedReason: string;
+  maximumClaim: string;
+}): TheoryBadgeV1 =>
+  studyBadge({
+    id: args.id,
+    title: args.title,
+    plainMeaning: args.plainMeaning,
+    whyItMatters: args.whyItMatters,
+    subjects: [
+      "casimir_dp_study",
+      "casimir_dp_stage3",
+      args.primaryObservableId,
+    ],
+    level: "diagnostic_gate",
+    status: args.status,
+    simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"],
+    equationFamilies: ["casimir_dp_stage3_evidence_map"],
+    tags: [
+      "stage_3",
+      args.maturityTag,
+      "synthetic_validation",
+      "measured_not_ready",
+      `maximum_claim:${args.maximumClaim}`,
+    ],
+    equations: [
+      {
+        id: args.equationId,
+        role: "gate",
+        displayLatex: args.displayLatex,
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["stage3_config", "runtime_receipt", "evidence_class"],
+        outputSymbols: [args.primaryObservableSymbol, "stage3_gate_status"],
+      },
+    ],
+    units: [
+      {
+        symbol: args.primaryObservableSymbol,
+        unit: args.primaryObservableUnit,
+        quantity: args.primaryObservableQuantity,
+        dimensionSignature: args.primaryObservableDimension,
+      },
+    ],
+    assumptions: [
+      `Primary observable: ${args.primaryObservableQuantity}.`,
+      `Preregistered falsifier: ${args.falsifier}`,
+      `Current blocked/not-ready reason: ${args.blockedReason}`,
+      `Maximum permitted claim: ${args.maximumClaim}.`,
+      "Synthetic recovery validates software behavior only and cannot satisfy a measured-evidence gate.",
+      "This badge cannot promote collapse identification, manifold dynamics, NHM2, or physical viability.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      sourceRef(
+        "repo_module",
+        args.modulePath,
+        args.equationId,
+        "Stage-3 diagnostic runtime.",
+      ),
+      sourceRef(
+        "test",
+        args.testPath,
+        args.equationId,
+        "Focused synthetic recovery and fail-closed tests.",
+      ),
+      sourceRef(
+        "artifact",
+        "configs/research/casimir-dp-evidence-map-stage3.v1.json",
+        "casimir-dp-evidence-map-stage3-v1",
+        "Frozen Stage-3 authorities, preregistration, and fixture hashes.",
+      ),
+      sourceRef(
+        "doc",
+        "docs/research/casimir-dp-evidence-map-stage3-report.md",
+        "casimir-dp-evidence-map-stage3-v1",
+        "Maintained Stage-3 evidence-map report.",
+      ),
+    ],
+    observables: [
+      {
+        id: `${args.id}.primary_observable`,
+        canonicalObservableId: args.primaryObservableId,
+        symbol: args.primaryObservableSymbol,
+        quantity: args.primaryObservableQuantity,
+        mathematicalType: "scalar",
+        unit: args.primaryObservableUnit,
+        dimensionSignature: args.primaryObservableDimension,
+        coordinateFrame: "apparatus_frame",
+        operationalDefinitionRef:
+          "docs/research/casimir-dp-evidence-map-stage3-report.md",
+        responseModelRef: args.modulePath,
+      },
+    ],
+    hintKeys: {
+      subjects: [
+        "Casimir DP Stage 3",
+        args.title,
+        args.primaryObservableQuantity,
+      ],
+      symbols: [args.primaryObservableSymbol],
+      unitSignatures:
+        args.primaryObservableDimension == null
+          ? []
+          : [args.primaryObservableDimension],
+      repoPaths: [
+        args.modulePath,
+        args.testPath,
+        "configs/research/casimir-dp-evidence-map-stage3.v1.json",
+        "docs/research/casimir-dp-evidence-map-stage3-report.md",
+      ],
+      equationFamilies: ["casimir_dp_stage3_evidence_map"],
+      simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"],
+    },
+  });
+
+const stage4StudyBadge = (args: {
+  id: string;
+  title: string;
+  plainMeaning: string;
+  whyItMatters: string;
+  status: TheoryBadgeV1["status"];
+  maturityTag: string;
+  modulePath: string;
+  testPath: string;
+  equationId: string;
+  displayLatex: string;
+  primaryObservableId: string;
+  primaryObservableSymbol: string;
+  primaryObservableQuantity: string;
+  primaryObservableUnit: string | null;
+  primaryObservableDimension: string | null;
+  falsifier: string;
+  blockedReason: string;
+  maximumClaim: string;
+  extraSourceRefs?: TheoryBadgeV1["sourceRefs"];
+}): TheoryBadgeV1 =>
+  studyBadge({
+    id: args.id,
+    title: args.title,
+    plainMeaning: args.plainMeaning,
+    whyItMatters: args.whyItMatters,
+    subjects: [
+      "casimir_dp_study",
+      "casimir_dp_stage4",
+      "polarization",
+      "thermal_radiation",
+      "dimensional_congruence",
+      args.primaryObservableId,
+    ],
+    level: "diagnostic_gate",
+    status: args.status,
+    simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"],
+    equationFamilies: [
+      "casimir_dp_stage4_polarization_congruence",
+      "macroscopic_qed",
+      "thermal_radiation",
+    ],
+    tags: [
+      "stage_4",
+      args.maturityTag,
+      "synthetic_validation",
+      "synthetic_blinding_contract_only",
+      "measured_not_ready",
+      `maximum_claim:${args.maximumClaim}`,
+    ],
+    equations: [
+      {
+        id: args.equationId,
+        role: "gate",
+        displayLatex: args.displayLatex,
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "stage4_config",
+          "stage3_immutable_receipt",
+          "runtime_receipt",
+          "evidence_class",
+          "blinding_lane_state",
+        ],
+        outputSymbols: [
+          args.primaryObservableSymbol,
+          "stage4_gate_status",
+        ],
+      },
+    ],
+    units: [
+      {
+        symbol: args.primaryObservableSymbol,
+        unit: args.primaryObservableUnit,
+        quantity: args.primaryObservableQuantity,
+        dimensionSignature: args.primaryObservableDimension,
+      },
+    ],
+    assumptions: [
+      `Primary observable: ${args.primaryObservableQuantity}.`,
+      `Preregistered falsifier: ${args.falsifier}`,
+      `Current blocked/not-ready reason: ${args.blockedReason}`,
+      `Maximum permitted claim: ${args.maximumClaim}.`,
+      "Stage 3 is immutable upstream evidence and the named DP parameter manifest is reused without mutation.",
+      "Synthetic prediction recovery validates software behavior only and cannot satisfy measured evidence, collapse identification, manifold dynamics, or physical viability.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      sourceRef(
+        "repo_module",
+        args.modulePath,
+        args.equationId,
+        "Stage-4 diagnostic runtime.",
+      ),
+      sourceRef(
+        "test",
+        args.testPath,
+        args.equationId,
+        "Focused synthetic recovery and fail-closed tests.",
+      ),
+      sourceRef(
+        "artifact",
+        "configs/research/casimir-dp-polarization-congruence-stage4.v1.json",
+        "casimir-dp-polarization-congruence-stage4-v1",
+        "Frozen Stage-4 authorities, conventions, model policy, and fixture hashes.",
+      ),
+      sourceRef(
+        "doc",
+        "docs/research/casimir-dp-polarization-congruence-stage4-report.md",
+        "casimir-dp-polarization-congruence-stage4-v1",
+        "Maintained Stage-4 synthetic prediction report.",
+      ),
+      ...(args.extraSourceRefs ?? []),
+    ],
+    observables: [
+      {
+        id: `${args.id}.primary_observable`,
+        canonicalObservableId: args.primaryObservableId,
+        symbol: args.primaryObservableSymbol,
+        quantity: args.primaryObservableQuantity,
+        mathematicalType: "scalar",
+        unit: args.primaryObservableUnit,
+        dimensionSignature: args.primaryObservableDimension,
+        coordinateFrame: "right_handed_apparatus_frame",
+        operationalDefinitionRef:
+          "docs/research/casimir-dp-polarization-congruence-stage4-report.md",
+        responseModelRef: args.modulePath,
+      },
+    ],
+    hintKeys: {
+      subjects: [
+        "Casimir DP Stage 4",
+        args.title,
+        args.primaryObservableQuantity,
+        "circular polarization",
+        "blackbody thermal closure",
+      ],
+      symbols: [args.primaryObservableSymbol],
+      unitSignatures:
+        args.primaryObservableDimension == null
+          ? []
+          : [args.primaryObservableDimension],
+      repoPaths: [
+        args.modulePath,
+        args.testPath,
+        "configs/research/casimir-dp-polarization-congruence-stage4.v1.json",
+        "docs/research/casimir-dp-polarization-congruence-stage4-report.md",
+      ],
+      equationFamilies: [
+        "casimir_dp_stage4_polarization_congruence",
+        "macroscopic_qed",
+        "thermal_radiation",
+      ],
+      simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"],
+    },
+  });
+
 export const CASIMIR_DP_STUDY_THEORY_BADGES: TheoryBadgeV1[] = [
   studyBadge({
     id: "study.casimir_dp.protocol",
@@ -926,6 +1215,1111 @@ export const CASIMIR_DP_STUDY_THEORY_BADGES: TheoryBadgeV1[] = [
       simulationOwners: ["casimir_dp_study", "curvature_collapse"],
     },
   }),
+  stage3StudyBadge({
+    id: "study.casimir_dp.complex_coherence_discriminator",
+    title: "Stage-3 Complex-Coherence Discriminator",
+    plainMeaning:
+      "Reconstructs complex coherence, phase-conditioned visibility, path-swap sign, echo recovery, and decay-shape identifiability without relabeling unrecovered loss as collapse.",
+    whyItMatters:
+      "Complex coherence separates a reversible Hamiltonian phase and conditionable dephasing from an unresolved loss channel before any intrinsic model is compared.",
+    status: "diagnostic",
+    maturityTag: "stage_2_diagnostic",
+    modulePath: "shared/casimir-dp-complex-coherence.ts",
+    testPath: "tests/casimir-dp-complex-coherence.spec.ts",
+    equationId: "casimir_dp_stage3_complex_coherence",
+    displayLatex: "C_b(t)=V_b(t)e^{i\\phi_b(t)}",
+    primaryObservableId: "observable.coherence.complex_boundary_cell",
+    primaryObservableSymbol: "C_b",
+    primaryObservableQuantity: "complex boundary-conditioned coherence",
+    primaryObservableUnit: "1",
+    primaryObservableDimension: "1",
+    falsifier:
+      "A purported irreducible loss that reverses under path swap or recovers under independent conditioning/echo is not intrinsic collapse.",
+    blockedReason:
+      "Only synthetic quadrature, echo, and hold-time fixtures are present; measured coherence sidecars are absent.",
+    maximumClaim: "computational_phase_dephasing_echo_discrimination",
+  }),
+  stage3StudyBadge({
+    id: "study.casimir_dp.qed_green_noise_budget",
+    title: "Stage-3 Measurement-Constrained QED Green/Noise Budget",
+    plainMeaning:
+      "Propagates one material, geometry, Green-response, and PSD receipt into mean phase, force noise, heating, and ordinary decoherence.",
+    whyItMatters:
+      "The same apparatus model must explain both mean and fluctuation observables before a boundary-correlated residual can be assigned to an anomalous channel.",
+    status: "diagnostic",
+    maturityTag: "stage_1_reduced_order",
+    modulePath: "shared/casimir-dp-qed-green-noise.ts",
+    testPath: "tests/casimir-dp-qed-green-noise.spec.ts",
+    equationId: "casimir_dp_stage3_qed_noise_exponent",
+    displayLatex:
+      "\\chi_b(t)=\\frac{1}{2\\hbar^2}\\int\\frac{d\\omega}{2\\pi}S_{\\Delta U,b}(\\omega)|Y_b(\\omega,t)|^2",
+    primaryObservableId: "observable.qed.green_noise_budget",
+    primaryObservableSymbol: "\\chi_{QED}",
+    primaryObservableQuantity: "QED/open-system coherence exponent",
+    primaryObservableUnit: "1",
+    primaryObservableDimension: "1",
+    falsifier:
+      "A QED explanation fails its registered region when held-out phase/noise/heating cells exceed the propagated material and covariance envelope.",
+    blockedReason:
+      "The reduced-order fixture is synthetic; apparatus-matched material, Green-tensor, calibration, and noise receipts are absent.",
+    maximumClaim: "conditional_qed_open_system_budget",
+  }),
+  stage3StudyBadge({
+    id: "study.casimir_dp.dp_companion_signature",
+    title: "Stage-3 Named DP Companion Signature",
+    plainMeaning:
+      "Keeps Penrose's lifetime envelope separate from one named regularized dynamical-DP implementation whose coherence and applicable companion channels share one parameter manifest.",
+    whyItMatters:
+      "A companion observable can disfavor a named dynamics even when a coherence timescale remains numerically compatible with the Penrose heuristic.",
+    status: "diagnostic",
+    maturityTag: "stage_0_dependency_ceiling",
+    modulePath: "shared/casimir-dp-dp-companion.ts",
+    testPath: "tests/casimir-dp-dp-companion.spec.ts",
+    equationId: "casimir_dp_stage3_dp_companion",
+    displayLatex: "\\Gamma_{OR}=E_G/\\hbar",
+    primaryObservableId: "observable.dp.named_companion_signature",
+    primaryObservableSymbol: "\\Gamma_{DP}",
+    primaryObservableQuantity: "named DP coherence and companion signature",
+    primaryObservableUnit: "s^-1",
+    primaryObservableDimension: "T^-1",
+    falsifier:
+      "A powered missing heating, diffusion, or radiation companion disfavors only the frozen named variant and parameter set.",
+    blockedReason:
+      "The DP dependency remains exploratory and no measured coherence or companion-observable sidecar is present.",
+    maximumClaim: "named_model_constraint_or_rejection",
+  }),
+  stage3StudyBadge({
+    id: "study.casimir_dp.casimir_gravity_upper_bound",
+    title: "Stage-3 Complete-Apparatus Casimir Gravity Bound",
+    plainMeaning:
+      "Converts a signed complete-apparatus state-energy ledger into mass, weight, and ordinary weak-field phase bounds without substituting plate pressure for gravitational weight.",
+    whyItMatters:
+      "It separates ordinary mass-energy coupling from objective reduction and exposes when a tensor or conservation claim lacks a complete source.",
+    status: "diagnostic",
+    maturityTag: "stage_1_reduced_order",
+    modulePath: "shared/casimir-dp-gravity-upper-bound.ts",
+    testPath: "tests/casimir-dp-gravity-upper-bound.spec.ts",
+    equationId: "casimir_dp_stage3_gravity_upper_bound",
+    displayLatex: "\\Delta m_{app}=\\Delta E_{app}/c^2",
+    primaryObservableId:
+      "observable.gravity.complete_apparatus_energy_difference",
+    primaryObservableSymbol: "\\Delta E_{app}",
+    primaryObservableQuantity: "complete-apparatus state-energy difference",
+    primaryObservableUnit: "J",
+    primaryObservableDimension: "M L^2 T^-2",
+    falsifier:
+      "A claimed tensor response fails closed when the source ledger is incomplete or its stress-energy conservation residual exceeds tolerance.",
+    blockedReason:
+      "Only a synthetic scalar ledger is closed; a measured complete tensor source and gravitational response are absent.",
+    maximumClaim: "scalar_gravitational_upper_bound",
+  }),
+  stage3StudyBadge({
+    id: "study.casimir_dp.blinded_model_comparison",
+    title: "Stage-3 Blinded Joint Model Comparison",
+    plainMeaning:
+      "Compares a composite ordinary-physics null with named nested DP and only preregistered bridge extensions over held-out coherence and companion cells.",
+    whyItMatters:
+      "Joint prediction, power, identifiability, and a custodian boundary keep one residual from becoming an automatic collapse or ontology verdict.",
+    status: "diagnostic",
+    maturityTag: "stage_2_diagnostic",
+    modulePath: "shared/casimir-dp-model-comparison.ts",
+    testPath: "tests/casimir-dp-model-comparison.spec.ts",
+    equationId: "casimir_dp_stage3_composite_null",
+    displayLatex:
+      "M_0=M_{QED\\ phase}+M_{technical}+M_{environment}+M_{ordinary\\ GR}",
+    primaryObservableId: "observable.inference.blinded_joint_model_state",
+    primaryObservableSymbol: "M_0",
+    primaryObservableQuantity: "blinded held-out joint model state",
+    primaryObservableUnit: null,
+    primaryObservableDimension: null,
+    falsifier:
+      "A model is disfavored only by its frozen held-out criterion within a demonstrated powered and identifiable parameter region.",
+    blockedReason:
+      "Synthetic cells validate the comparison contract; measured confirmatory cells and a custodian unblinding receipt are absent.",
+    maximumClaim: "specified_model_comparison",
+  }),
+  stage3StudyBadge({
+    id: "study.casimir_dp.manifold_kernel_registry",
+    title: "Stage-3 Manifold-Kernel Registry Gate",
+    plainMeaning:
+      "Validates whether a proposed tensor/noise-to-metric-to-coherence bridge has every causal, gauge, dimensional, conservation, positivity, recovery, provenance, and falsifier field.",
+    whyItMatters:
+      "The registry prevents scalar negative energy, plate pressure, or a frequency coincidence from masquerading as an executable manifold dynamics.",
+    status: "blocked",
+    maturityTag: "stage_2_validator_stage_0_candidate",
+    modulePath: "shared/casimir-dp-manifold-kernel-registry.ts",
+    testPath: "tests/casimir-dp-manifold-kernel-registry.spec.ts",
+    equationId: "casimir_dp_stage3_manifold_registry_gate",
+    displayLatex:
+      "registered\\iff T_{\\mu\\nu}^{ren}\\land N_{\\mu\\nu\\alpha\\beta}\\land G^{ret}\\land \\mathcal{D}_{coh}\\land falsifiers",
+    primaryObservableId: "observable.manifold.kernel_registry_status",
+    primaryObservableSymbol: "R_{kernel}",
+    primaryObservableQuantity: "manifold-kernel registry status",
+    primaryObservableUnit: null,
+    primaryObservableDimension: null,
+    falsifier:
+      "The deterministic first missing or invalid field blocks every bridge phase or rate; a rejected version remains immutable.",
+    blockedReason:
+      "No complete preregistered Casimir-to-coherence kernel exists.",
+    maximumClaim: "schema_and_consistency_completeness_only",
+  }),
+  stage3StudyBadge({
+    id: "study.casimir_dp.evidence_map_stage3",
+    title: "Casimir-DP Stage-3 Evidence Map",
+    plainMeaning:
+      "Runs the six Stage-3 diagnostics in immutable authority order and maps every outcome to what it establishes, disfavors, and cannot establish.",
+    whyItMatters:
+      "It makes model-specific falsification runnable while retaining measured-evidence, collapse, manifold, and physical-viability gates.",
+    status: "diagnostic",
+    maturityTag: "stage_2_diagnostic_per_lane_ceiling",
+    modulePath: "shared/casimir-dp-evidence-map-stage3.ts",
+    testPath: "tests/casimir-dp-evidence-map-stage3.spec.ts",
+    equationId: "casimir_dp_stage3_claim_ceiling",
+    displayLatex: "claim_{Stage3}\\leq diagnostic",
+    primaryObservableId: "observable.study.stage3_evidence_map",
+    primaryObservableSymbol: "claim_{Stage3}",
+    primaryObservableQuantity: "Stage-3 outcome-to-claim state",
+    primaryObservableUnit: null,
+    primaryObservableDimension: null,
+    falsifier:
+      "Any hash, blind, power, identifiability, model-registration, or evidence-class failure forces the affected lane to not_ready or blocked.",
+    blockedReason:
+      "The synthetic campaign cannot close measured, collapse, or manifold gates.",
+    maximumClaim: "diagnostic_evidence_map",
+  }),
+  stage4StudyBadge({
+    id: "study.casimir_dp.polarization_resolved_qed_control",
+    title: "Stage-4 Polarization-Resolved Macroscopic-QED Control",
+    plainMeaning:
+      "Represents the two transverse photon polarizations with Jones/Stokes states, propagates reciprocal or nonreciprocal reflection response, and evaluates basis invariance, mirror parity, matched controls, and helicity double contrasts.",
+    whyItMatters:
+      "Circular polarization is an ordinary electromagnetic control axis whose material and geometry response must close before any polarization-correlated coherence residual is called anomalous.",
+    status: "diagnostic",
+    maturityTag: "stage_1_reduced_order",
+    modulePath: "shared/casimir-dp-polarization-qed-control.ts",
+    testPath: "tests/casimir-dp-polarization-qed-control.spec.ts",
+    equationId: "casimir_dp_stage4_polarization_double_contrast",
+    displayLatex:
+      "\\Delta_{h,m}X=\\frac12[(X_{+,R}-X_{+,L})-(X_{-,R}-X_{-,L})]",
+    primaryObservableId:
+      "observable.qed.polarization_mirror_double_contrast",
+    primaryObservableSymbol: "\\Delta_{h,m}X",
+    primaryObservableQuantity:
+      "polarization and mirror double contrast",
+    primaryObservableUnit: "varies",
+    primaryObservableDimension: null,
+    falsifier:
+      "Basis dependence, unmatched branch state, wrong mirror parity, or failure to follow the calibrated material response rejects an intrinsic interpretation.",
+    blockedReason:
+      "The current fixture is synthetic and the reduced-order transfer coefficients are not apparatus-matched finite-geometry Green-tensor receipts.",
+    maximumClaim: "synthetic_polarization_qed_control",
+    extraSourceRefs: [
+      sourceRef(
+        "literature_ref",
+        "https://arxiv.org/abs/0908.2649",
+        "Rahi-et-al-2009",
+        "Scattering formulation for material and geometry dependent Casimir interactions.",
+      ),
+      sourceRef(
+        "literature_ref",
+        "https://arxiv.org/abs/1707.04577",
+        "Fuchs-et-al-2017",
+        "Polarization-mixing reflection matrices in macroscopic QED.",
+      ),
+    ],
+  }),
+  stage4StudyBadge({
+    id: "study.casimir_dp.thermal_radiative_closure",
+    title: "Stage-4 Planck/FDT Thermal-Radiative Closure",
+    plainMeaning:
+      "Checks omega/nu normalization, Planck occupation, Stefan-Boltzmann recovery, near- versus far-field routing, detailed balance, thermal recoil, heating, noise, decoherence, and their covariance.",
+    whyItMatters:
+      "Blackbody and near-field thermal channels are ordinary decoherence controls and must not be double counted with zero-point or parent-QED terms.",
+    status: "diagnostic",
+    maturityTag: "stage_0_exploratory_reduced_order",
+    modulePath: "shared/casimir-dp-radiative-thermal-closure.ts",
+    testPath: "tests/casimir-dp-radiative-thermal-closure.spec.ts",
+    equationId: "casimir_dp_stage4_planck_stefan_boltzmann_closure",
+    displayLatex:
+      "\\sigma=\\frac{\\pi^2k_B^4}{60\\hbar^3c^2},\\quad P_{net}=\\epsilon_{eff}AF\\sigma(T_s^4-T_e^4)",
+    primaryObservableId:
+      "observable.thermal.net_radiative_power_and_covariance",
+    primaryObservableSymbol: "P_{net}",
+    primaryObservableQuantity:
+      "net radiative power with thermal covariance",
+    primaryObservableUnit: "W",
+    primaryObservableDimension: "M L^2 T^-3",
+    falsifier:
+      "Failure of Planck-to-Stefan-Boltzmann recovery, detailed balance, entropy sign, receipt integrity, or exclusive near/far-field routing blocks the thermal prediction.",
+    blockedReason:
+      "The synthetic greybody lane is not apparatus thermometry, emissivity, or Green/FDT evidence.",
+    maximumClaim: "synthetic_thermal_radiative_control",
+    extraSourceRefs: [
+      sourceRef(
+        "literature_ref",
+        "https://physics.nist.gov/cuu/pdf/RevModPhys.93.025010.pdf",
+        "CODATA-2018",
+        "Exact SI radiation constants and Stefan-Boltzmann relation.",
+      ),
+      sourceRef(
+        "literature_ref",
+        "https://arxiv.org/abs/0902.3586",
+        "Scheel-Buhmann-2008",
+        "Macroscopic-QED Green and fluctuation-dissipation framework.",
+      ),
+    ],
+  }),
+  stage4StudyBadge({
+    id: "study.casimir_dp.tensor_dimensional_congruence",
+    title: "Stage-4 Tensor, Dimensional, and Semantic Congruence Gate",
+    plainMeaning:
+      "Validates units, semantic quantity identity, tensor rank and symmetry, frame/basis/gauge maps, spectral Jacobians, receipts, conservation, FDT, covariance, and recovery limits.",
+    whyItMatters:
+      "It allows variables to remain consistently represented without treating equal dimensions as a physical coupling or replacing a tensor source with a scalar.",
+    status: "diagnostic",
+    maturityTag: "stage_2_diagnostic_validator",
+    modulePath: "shared/casimir-dp-tensor-dimensional-congruence.ts",
+    testPath: "tests/casimir-dp-tensor-dimensional-congruence.spec.ts",
+    equationId: "casimir_dp_stage4_frequency_semantic_nonbridge",
+    displayLatex:
+      "[\\omega_C]=[E_G/\\hbar]=[\\omega_{cav}]=T^{-1}\\;\\not\\Rightarrow\\;K_{transfer}",
+    primaryObservableId:
+      "observable.study.tensor_dimensional_semantic_congruence",
+    primaryObservableSymbol: "G_{congruence}",
+    primaryObservableQuantity:
+      "tensor, dimensional, and semantic congruence gate",
+    primaryObservableUnit: null,
+    primaryObservableDimension: null,
+    falsifier:
+      "The deterministic first unit, semantic, tensor, frame, spectral, conservation, positivity, receipt, or recovery error blocks the affected chain.",
+    blockedReason:
+      "The QED chain is congruent, but the manifold bridge remains schema-level and has no registered numerical output.",
+    maximumClaim: "synthetic_congruence_validation",
+  }),
+  stage4StudyBadge({
+    id: "study.casimir_dp.polarization_congruence_stage4",
+    title: "Casimir-DP Polarization and Congruence Stage-4 Campaign",
+    plainMeaning:
+      "Hash-links immutable Stage 3, expands the ordinary-physics null with polarization-QED and thermal/FDT controls, reuses the named DP manifest unchanged, and admits only registered numerical bridge kernels.",
+    whyItMatters:
+      "It creates a runnable prediction playground and model-specific falsifier map while preserving measured, collapse, manifold, and viability gates.",
+    status: "diagnostic",
+    maturityTag: "stage_2_diagnostic_per_lane_ceiling",
+    modulePath: "shared/casimir-dp-polarization-congruence-stage4.ts",
+    testPath: "tests/casimir-dp-polarization-congruence-stage4.spec.ts",
+    equationId: "casimir_dp_stage4_expanded_ordinary_null",
+    displayLatex:
+      "M'_0=M_0+M_{polarization\\ QED}+M_{thermal/FDT}",
+    primaryObservableId:
+      "observable.study.stage4_polarization_congruence_state",
+    primaryObservableSymbol: "M'_0",
+    primaryObservableQuantity:
+      "Stage-4 expanded-null prediction and claim state",
+    primaryObservableUnit: null,
+    primaryObservableDimension: null,
+    falsifier:
+      "Any upstream hash, convention, runtime, blinding, fixed-branch, model-version, or evidence-class failure forces the affected lane to not_ready or blocked.",
+    blockedReason:
+      "All current inputs are synthetic. Reserved blind labels are contract-test labels only: no custodian receipt or mapping has been created, measured comparison and unblinding are unauthorized, ordinary-physics measured closure is absent, and no numerical bridge is registered.",
+    maximumClaim: "diagnostic_prediction_campaign",
+  }),
+  studyBadge({
+    id: "study.casimir_dp.qed_scale_hierarchy_stage4_1",
+    title: "Stage-4.1 QED Scale-Hierarchy Calibration",
+    plainMeaning:
+      "Replays the CODATA 2022 electron Compton, Rydberg, Bohr-radius, and classical-electron-radius identities with explicit uncertainty, covariance, reduced-mass, and rounding conventions.",
+    whyItMatters:
+      "It calibrates the ordinary QED hierarchy without treating a shared frequency or length scale as a Casimir, Diósi-Penrose, collapse, manifold, resonance, or polarization transfer law.",
+    subjects: [
+      "casimir_dp_study",
+      "casimir_dp_stage4_1",
+      "qed_scale_hierarchy",
+      "codata_2022",
+      "compton_frequency",
+      "rydberg_scale",
+      "semantic_nonbridge",
+    ],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"],
+    equationFamilies: [
+      "qed_scale_hierarchy",
+      "compton_frequency",
+      "rydberg_energy",
+      "atomic_length_scales",
+    ],
+    tags: [
+      "stage_4_1",
+      "stage_1_reduced_order",
+      "source_backed_calculation",
+      "codata_2022",
+      "same_dimension_not_connected",
+      "promotion_blocked",
+      "maximum_claim:qed_scale_identity_calibration",
+    ],
+    equations: [
+      {
+        id: "casimir_dp_qed_scale_hierarchy_stage4_1",
+        role: "gate",
+        displayLatex:
+          "\\nu_C=\\frac{m_ec^2}{h},\\quad \\nu_R^{(\\infty)}=\\frac{\\alpha_{fs}^2}{2}\\nu_C,\\quad \\bar\\lambda_C=\\alpha_{fs}a_0,\\quad r_e=\\alpha_{fs}^2a_0",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "h",
+          "c",
+          "m_e",
+          "alpha_fs",
+          "codata_covariance",
+          "reduced_mass_ledger",
+        ],
+        outputSymbols: ["G_QED_4_1", "qed_scale_identity_status"],
+      },
+    ],
+    units: [
+      {
+        symbol: "G_QED_4_1",
+        unit: null,
+        quantity: "source_backed_qed_scale_identity_calibration_gate",
+        dimensionSignature: null,
+      },
+    ],
+    assumptions: [
+      "Maximum permitted claim: qed_scale_identity_calibration.",
+      "The identities are a source-backed reduced-order calibration wrapped in a diagnostic gate; they are not independent confirmations because the CODATA quantities share inputs and covariance.",
+      "The fine-structure constant is namespaced as alpha_fs and cannot be substituted for a polarizability tensor, a fit coefficient, or any unrelated alpha.",
+      "The hydrogen reduced-mass result is a leading-order scale with an explicit correction ledger, not a precision spectroscopy prediction.",
+      "Stage 4 remains immutable upstream evidence and retains same_dimension_not_connected for Compton, DP, and cavity frequencies.",
+      "No cavity-mode, Casimir, DP, collapse, manifold, resonance, polarization, or transfer-kernel variable is admitted by this calibration.",
+      "Measured evidence, apparatus closure, collapse identification, manifold dynamics, and physical viability remain not ready, blocked, or not evaluated.",
+      "This badge is non-promotable and has no calculator payload or observable bridge.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      sourceRef(
+        "repo_module",
+        "shared/casimir-dp-qed-scale-hierarchy-calibration.ts",
+        "casimir_dp_qed_scale_hierarchy_stage4_1",
+        "Strict source-backed Stage-4.1 calibration runtime.",
+      ),
+      sourceRef(
+        "test",
+        "tests/casimir-dp-qed-scale-hierarchy-calibration.spec.ts",
+        "casimir_dp_qed_scale_hierarchy_stage4_1",
+        "Focused identity, uncertainty, namespace, and fail-closed tests.",
+      ),
+      sourceRef(
+        "artifact",
+        "configs/research/casimir-dp-qed-scale-hierarchy-stage4-1.v1.json",
+        "casimir-dp-qed-scale-hierarchy-stage4-1-v1",
+        "Frozen Stage-4.1 authorities, CODATA fixture, run order, and claim policy.",
+      ),
+      sourceRef(
+        "doc",
+        "docs/research/casimir-dp-qed-scale-hierarchy-stage4-1-report.md",
+        "casimir-dp-qed-scale-hierarchy-stage4-1-v1",
+        "Maintained source-backed calibration report and nonclaim ledger.",
+      ),
+      sourceRef(
+        "artifact",
+        "configs/constants/codata-2022.v1.json",
+        "codata-2022",
+        "Namespaced constant values, standard uncertainties, provenance, and dependency metadata.",
+      ),
+    ],
+    observables: [
+      {
+        id: "study.casimir_dp.qed_scale_hierarchy_stage4_1.calibration_gate",
+        canonicalObservableId:
+          "observable.study.qed_scale_identity_calibration_gate",
+        symbol: "G_QED_4_1",
+        quantity: "source_backed_qed_scale_identity_calibration_gate",
+        mathematicalType: "scalar",
+        unit: null,
+        dimensionSignature: null,
+        coordinateFrame: "not_applicable_scalar_identity_space",
+        operationalDefinitionRef:
+          "docs/research/casimir-dp-qed-scale-hierarchy-stage4-1-report.md",
+        responseModelRef:
+          "shared/casimir-dp-qed-scale-hierarchy-calibration.ts",
+      },
+    ],
+    hintKeys: {
+      subjects: [
+        "Casimir DP Stage 4.1",
+        "QED scale hierarchy",
+        "Compton Rydberg congruence",
+        "CODATA 2022 calibration",
+        "semantic nonbridge",
+      ],
+      symbols: [
+        "G_QED_4_1",
+        "nu_C",
+        "nu_R",
+        "alpha_fs",
+        "lambda_bar_C",
+        "a_0",
+        "r_e",
+      ],
+      unitSignatures: ["1", "T^-1", "L"],
+      repoPaths: [
+        "shared/casimir-dp-qed-scale-hierarchy-calibration.ts",
+        "tests/casimir-dp-qed-scale-hierarchy-calibration.spec.ts",
+        "configs/research/casimir-dp-qed-scale-hierarchy-stage4-1.v1.json",
+        "configs/constants/codata-2022.v1.json",
+        "docs/research/casimir-dp-qed-scale-hierarchy-stage4-1-report.md",
+      ],
+      equationFamilies: [
+        "qed_scale_hierarchy",
+        "compton_frequency",
+        "rydberg_energy",
+        "atomic_length_scales",
+      ],
+      simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"],
+    },
+  }),
+  studyBadge({
+    id: "study.casimir_dp.electron_mass_higgs_anchor_stage4_2a",
+    title: "Stage-4.2A Electron-Mass and Higgs-Yukawa Anchor",
+    plainMeaning:
+      "Replays a theory-assisted Penning-trap electron-mass determination, keeps CODATA conversions correlated, and maps the same rest-energy parameter into the conditional Standard Model tree-level Yukawa convention.",
+    whyItMatters:
+      "It gives the downstream DP experiment a traceable mass parameter and unit contract while explicitly preventing mass, Higgs, Compton, or shared-energy notation from becoming evidence for collapse.",
+    subjects: [
+      "casimir_dp_study",
+      "casimir_dp_stage4_2a",
+      "electron_mass_metrology",
+      "higgs_yukawa_tree_anchor",
+      "cross_scale_calibration",
+      "semantic_nonbridge",
+    ],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["casimir_dp_study", "curvature_collapse"],
+    equationFamilies: [
+      "electron_mass_metrology",
+      "standard_model_yukawa_tree_relation",
+      "compton_frequency",
+      "cross_scale_dependency_ladder",
+    ],
+    tags: [
+      "stage_4_2a",
+      "diagnostic",
+      "source_backed_replay",
+      "correlated_calibration",
+      "same_dimension_not_connected",
+      "promotion_blocked",
+      "maximum_claim:electron_mass_metrology_replay_and_conditional_sm_tree_mapping_only",
+    ],
+    equations: [
+      {
+        id: "casimir_dp_electron_mass_higgs_anchor_stage4_2a",
+        role: "gate",
+        displayLatex:
+          "m_ec^2=\\frac{y_e^{\\mathrm{tree}}v_F}{\\sqrt2},\\quad v_F=(\\sqrt2G_F)^{-1/2},\\quad g_{hee}^{\\mathrm{tree}}=\\frac{y_e^{\\mathrm{tree}}}{\\sqrt2}",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "A_r_e",
+          "m_e_OS_kg",
+          "E_e_OS_J",
+          "v_F_tree_GeV",
+          "penning_covariance",
+          "source_dependency_dag",
+        ],
+        outputSymbols: [
+          "G_MH_4_2A",
+          "y_e_lagrangian_tree",
+          "g_h_e_e_tree",
+        ],
+      },
+    ],
+    units: [
+      {
+        symbol: "G_MH_4_2A",
+        unit: null,
+        quantity:
+          "electron_mass_metrology_and_conditional_tree_mapping_gate",
+        dimensionSignature: null,
+      },
+    ],
+    assumptions: [
+      "Maximum permitted claim: electron_mass_metrology_replay_and_conditional_sm_tree_mapping_only.",
+      "The Penning result is a bound-electron frequency-ratio and QED-assisted inference, not static weighing.",
+      "The kg, joule, MeV, Compton-frequency, and Rydberg forms reuse one electron-mass ancestor and are not independent confirmations.",
+      "The inferred tree-level electron Yukawa is reconstructed from the mass and v_F; it is not a direct electron-Higgs observation and does not explain the Yukawa hierarchy.",
+      "The CMS H to electron-pair result remains an upper limit, and precision running-Yukawa matching remains blocked until a scheme, scale, tadpole convention, and matching kernel are supplied.",
+      "The formal v_F to zero limit is a domain-exit recovery test, not an apparatus control.",
+      "The cross-scale ladder calibrates parameters and dimensions only; it supplies no Casimir, DP, collapse, manifold, cosmological, or quantum-foam transfer law.",
+      "Measured coherence evidence, collapse identification, manifold dynamics, cosmological lift, and physical viability remain not ready, blocked, or not evaluated.",
+      "This badge is non-promotable and has no calculator payload or observable bridge.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      sourceRef(
+        "repo_module",
+        "shared/casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts",
+        "casimir_dp_electron_mass_higgs_anchor_stage4_2a",
+        "Strict source-backed metrology, unit, covariance, Yukawa, collider, and nonbridge runtime.",
+      ),
+      sourceRef(
+        "test",
+        "tests/casimir-dp-electron-mass-higgs-anchor-stage4-2a.spec.ts",
+        "casimir_dp_electron_mass_higgs_anchor_stage4_2a",
+        "Focused replay, covariance, unit, tree-mapping, upper-bound, and fail-closed tests.",
+      ),
+      sourceRef(
+        "artifact",
+        "configs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a.v1.json",
+        "casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1",
+        "Frozen Stage-4.2A authorities, fixtures, run order, and claim policy.",
+      ),
+      sourceRef(
+        "doc",
+        "docs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a-report.md",
+        "casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1",
+        "Maintained cross-scale calibration report and nonclaim ledger.",
+      ),
+    ],
+    observables: [
+      {
+        id:
+          "study.casimir_dp.electron_mass_higgs_anchor_stage4_2a.calibration_gate",
+        canonicalObservableId:
+          "observable.study.electron_mass_higgs_anchor_calibration_gate",
+        symbol: "G_MH_4_2A",
+        quantity:
+          "electron_mass_metrology_and_conditional_tree_mapping_gate",
+        mathematicalType: "scalar",
+        unit: null,
+        dimensionSignature: null,
+        coordinateFrame: "not_applicable_parameter_calibration_space",
+        operationalDefinitionRef:
+          "docs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a-report.md",
+        responseModelRef:
+          "shared/casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts",
+      },
+    ],
+    hintKeys: {
+      subjects: [
+        "Casimir DP Stage 4.2A",
+        "electron mass metrology",
+        "Higgs Yukawa anchor",
+        "Penning trap replay",
+        "mass energy frequency ladder",
+      ],
+      symbols: [
+        "G_MH_4_2A",
+        "A_r_e",
+        "m_e_OS_kg",
+        "E_e_OS_J",
+        "v_F_tree_GeV",
+        "y_e_lagrangian_tree",
+        "g_h_e_e_tree",
+      ],
+      unitSignatures: ["1", "M", "M L^2 T^-2", "T^-1"],
+      repoPaths: [
+        "shared/casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts",
+        "tests/casimir-dp-electron-mass-higgs-anchor-stage4-2a.spec.ts",
+        "configs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a.v1.json",
+        "docs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a-report.md",
+      ],
+      equationFamilies: [
+        "electron_mass_metrology",
+        "standard_model_yukawa_tree_relation",
+        "compton_frequency",
+        "cross_scale_dependency_ladder",
+      ],
+      simulationOwners: ["casimir_dp_study", "curvature_collapse"],
+    },
+  }),
+  studyBadge({
+    id: "study.casimir_dp.planck_solar_calibration_stage4_2a",
+    title: "Stage-4.2A Planck and Solar Radiometric Calibration",
+    plainMeaning:
+      "Closes the Planck spectral-density Jacobians and Stefan-Boltzmann integral, then keeps a TSIS spectrum-derived solar color temperature separate from the IAU luminosity-radius bolometric effective temperature.",
+    whyItMatters:
+      "It demonstrates cross-scale energy-frequency bookkeeping on a macroscopic radiometric benchmark without treating a solar-temperature match or shared Planck constant as collapse evidence.",
+    subjects: [
+      "casimir_dp_study",
+      "casimir_dp_stage4_2a",
+      "planck_spectrum",
+      "stefan_boltzmann",
+      "solar_color_temperature",
+      "solar_effective_temperature",
+      "semantic_nonbridge",
+    ],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["casimir_dp_study", "solar"],
+    equationFamilies: [
+      "planck_spectral_radiance",
+      "stefan_boltzmann_integral",
+      "wien_color_temperature",
+      "solar_effective_temperature",
+    ],
+    tags: [
+      "stage_4_2a",
+      "diagnostic",
+      "source_backed_radiometric_calibration",
+      "coarse_wien_peak_not_full_fit",
+      "temperature_semantics_separated",
+      "same_dimension_not_connected",
+      "promotion_blocked",
+      "maximum_claim:source_backed_radiometric_calibration_only",
+    ],
+    equations: [
+      {
+        id: "casimir_dp_planck_solar_calibration_stage4_2a",
+        role: "gate",
+        displayLatex:
+          "B_\\lambda(T)=\\frac{2hc^2}{\\lambda^5}\\frac{1}{e^{hc/(\\lambda k_BT)}-1},\\quad T_{\\mathrm{color}}=\\frac{b}{\\lambda_{\\max}},\\quad T_{\\mathrm{eff}}=\\left(\\frac{L}{4\\pi R^2\\sigma}\\right)^{1/4}",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "h",
+          "c",
+          "k_B",
+          "TSIS_HSRS_lambda",
+          "TSIS_HSRS_E_lambda",
+          "L_sun_nominal",
+          "R_sun_nominal",
+        ],
+        outputSymbols: [
+          "G_PS_4_2A",
+          "T_color_TSIS",
+          "T_eff_IAU",
+        ],
+      },
+    ],
+    units: [
+      {
+        symbol: "G_PS_4_2A",
+        unit: null,
+        quantity: "planck_solar_radiometric_calibration_gate",
+        dimensionSignature: null,
+      },
+      {
+        symbol: "T_color_TSIS",
+        unit: "K",
+        quantity: "band_and_model_dependent_solar_color_temperature",
+        dimensionSignature: "Theta",
+      },
+      {
+        symbol: "T_eff_IAU",
+        unit: "K",
+        quantity: "flux_equivalent_solar_effective_temperature",
+        dimensionSignature: "Theta",
+      },
+      {
+        symbol: "B_lambda",
+        unit: "W m^-2 sr^-1 m^-1",
+        quantity: "spectral_radiance_per_wavelength",
+        dimensionSignature: "M L^-1 T^-3",
+      },
+      {
+        symbol: "B_nu",
+        unit: "W m^-2 sr^-1 Hz^-1",
+        quantity: "spectral_radiance_per_cyclic_frequency",
+        dimensionSignature: "M T^-2",
+      },
+      {
+        symbol: "B_omega",
+        unit: "W m^-2 sr^-1 per_rad_s",
+        quantity: "spectral_radiance_per_angular_frequency",
+        dimensionSignature: "M T^-2",
+      },
+      {
+        symbol: "sigma_SB",
+        unit: "W m^-2 K^-4",
+        quantity: "stefan_boltzmann_constant",
+        dimensionSignature: "M T^-3 Theta^-4",
+      },
+    ],
+    assumptions: [
+      "Maximum permitted claim: source_backed_radiometric_calibration_only.",
+      "Planck integration and the Stefan-Boltzmann constant belong to one analytic identity family and are not independent theories.",
+      "The TSIS spectrum-derived result is a coarse frozen-grid Wien-peak color diagnostic, not a full spectral fit or a unique temperature of the solar photosphere.",
+      "The IAU nominal effective temperature is a flux-equivalent luminosity-radius conversion and is distinct from color and wavelength-dependent brightness temperatures.",
+      "The source-backed spectral snapshot lacks the complete cross-wavelength covariance required for an independent measured-fit significance claim.",
+      "Shared h, c, k_B, energy, frequency, or inverse-time dimensions calibrate notation only and do not connect thermal radiation to DP.",
+      "No near-field, Casimir, cavity, collapse, manifold, cosmological, or transfer-kernel output is admitted.",
+      "This badge is non-promotable and has no calculator payload or observable bridge.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      sourceRef(
+        "repo_module",
+        "shared/casimir-dp-planck-solar-calibration-stage4-2a.ts",
+        "casimir_dp_planck_solar_calibration_stage4_2a",
+        "Strict spectral-density, Planck-integral, solar-temperature-semantics, and nonbridge runtime.",
+      ),
+      sourceRef(
+        "test",
+        "tests/casimir-dp-planck-solar-calibration-stage4-2a.spec.ts",
+        "casimir_dp_planck_solar_calibration_stage4_2a",
+        "Focused Jacobian, integral, temperature-semantics, geometry, provenance, and fail-closed tests.",
+      ),
+      sourceRef(
+        "artifact",
+        "configs/research/fixtures/casimir-dp-planck-solar-calibration.source-backed.v1.json",
+        "casimir-dp-planck-solar-calibration-stage4-2a-v1",
+        "Frozen IAU and TSIS source-backed radiometric fixture.",
+      ),
+      sourceRef(
+        "artifact",
+        "configs/research/source-snapshots/tsis1-hsrs-20260725-480-800nm.csv",
+        "casimir-dp-planck-solar-calibration-stage4-2a-v1",
+        "Content-addressed TSIS-1 HSRS rows used by the coarse frozen-window Wien diagnostic.",
+      ),
+      sourceRef(
+        "doc",
+        "docs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a-report.md",
+        "casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1",
+        "Combined Stage-4.2A cross-scale calibration report.",
+      ),
+    ],
+    observables: [
+      {
+        id:
+          "study.casimir_dp.planck_solar_calibration_stage4_2a.calibration_gate",
+        canonicalObservableId:
+          "observable.study.planck_solar_radiometric_calibration_gate",
+        symbol: "G_PS_4_2A",
+        quantity: "planck_solar_radiometric_calibration_gate",
+        mathematicalType: "scalar",
+        unit: null,
+        dimensionSignature: null,
+        coordinateFrame: "not_applicable_radiometric_calibration_space",
+        operationalDefinitionRef:
+          "docs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a-report.md",
+        responseModelRef:
+          "shared/casimir-dp-planck-solar-calibration-stage4-2a.ts",
+      },
+    ],
+    hintKeys: {
+      subjects: [
+        "Casimir DP Stage 4.2A radiometry",
+        "Planck spectrum",
+        "Stefan Boltzmann",
+        "solar color temperature",
+        "solar effective temperature",
+      ],
+      symbols: [
+        "G_PS_4_2A",
+        "B_lambda",
+        "T_color_TSIS",
+        "T_eff_IAU",
+        "sigma",
+      ],
+      unitSignatures: ["1", "Theta", "M T^-3", "M T^-3 Theta^-4"],
+      repoPaths: [
+        "shared/casimir-dp-planck-solar-calibration-stage4-2a.ts",
+        "tests/casimir-dp-planck-solar-calibration-stage4-2a.spec.ts",
+        "configs/research/fixtures/casimir-dp-planck-solar-calibration.source-backed.v1.json",
+        "docs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a-report.md",
+      ],
+      equationFamilies: [
+        "planck_spectral_radiance",
+        "stefan_boltzmann_integral",
+        "wien_color_temperature",
+        "solar_effective_temperature",
+      ],
+      simulationOwners: ["casimir_dp_study", "solar"],
+    },
+  }),
+  studyBadge({
+    id: "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
+    title: "Stage-4.2B Apparatus Coherence Residual Forecast",
+    plainMeaning:
+      "Transports the frozen apparatus and complete branch-density ledger into response-corrected ordinary-decoherence, named Diósi-Penrose, complex-residual, covariance, identifiability, power, and acquisition forecasts; the coupled v1 run reaches a signature-identifiability no-go.",
+    whyItMatters:
+      "It requires the proposed experiment to fail closed in one observable space. The current runtime does not estimate DP power or exclusion because the frozen intercept and thermal signatures remain too collinear.",
+    subjects: [
+      "casimir_dp_study",
+      "casimir_dp_stage4_2b",
+      "apparatus_coherence_residual",
+      "response_corrected_spectral_thermometry",
+      "sensor_self_noise",
+      "full_cross_spectral_covariance",
+      "dp_scaling_forecast",
+      "identifiability_and_power",
+    ],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"],
+    equationFamilies: [
+      "apparatus_scale_transport",
+      "response_corrected_spectral_thermometry",
+      "sensor_forward_noise_covariance",
+      "regularized_dp_self_energy_scaling",
+      "complex_coherence_residual",
+      "signature_identifiability_power",
+    ],
+    tags: [
+      "stage_4_2b",
+      "diagnostic",
+      "synthetic_only_v1",
+      "synthetic_validation",
+      "measured_not_ready",
+      "collapse_identification_blocked",
+      "manifold_dynamics_blocked",
+      "physical_viability_not_evaluated",
+      "promotion_blocked",
+      "zero_observable_bridge",
+      "runtime_g_campaign_pass",
+      "runtime_f_signature_not_identifiable",
+      "fresh_adapter_verifier_pass_integrity_ok",
+      "current_no_go_not_dp_exclusion",
+      "maximum_synthetic_claim:apparatus_residual_and_frozen_dp_signature_software_recovery_only",
+      "maximum_source_backed_claim:apparatus_power_and_identifiability_forecast_only",
+    ],
+    equations: [
+      {
+        id: "casimir_dp_apparatus_coherence_residual_stage4_2b",
+        role: "gate",
+        displayLatex:
+          "\\Gamma_{\\mathrm{DP}}=\\frac{E_G[\\Delta\\rho;r_0]}{\\hbar},\\quad \\mathbf r=\\mathbf y-\\boldsymbol\\mu_0,\\quad \\Sigma_r=\\Sigma_{yy}+J\\Sigma_{xx}J^{\\mathsf T}-\\Sigma_{yx}J^{\\mathsf T}-J\\Sigma_{xy}",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "object_and_joint_branch_density_receipts",
+          "apparatus_spectral_response",
+          "sensor_forward_model",
+          "ordinary_prediction_vector",
+          "frozen_dp_prediction_vector",
+          "full_residual_covariance",
+          "pilot_freeze_receipt",
+          "held_out_cell_order",
+        ],
+        outputSymbols: [
+          "G_ACR_4_2B",
+          "apparatus_go_no_go",
+          "powered_parameter_regions",
+          "required_paired_windows",
+        ],
+      },
+    ],
+    units: [
+      {
+        symbol: "G_ACR_4_2B",
+        unit: null,
+        quantity: "apparatus_coherence_residual_forecast_gate",
+        dimensionSignature: null,
+      },
+    ],
+    assumptions: [
+      "Maximum synthetic claim: apparatus_residual_and_frozen_dp_signature_software_recovery_only.",
+      "Maximum source-backed claim: apparatus_power_and_identifiability_forecast_only.",
+      "Stage-4.2B v1 accepts synthetic_fixture evidence only; measured ingestion requires a new versioned campaign and evidence class.",
+      "Parameter transport is not evidence transport: complete object mass and branch density are design-class inputs until measured-preparation receipts exist.",
+      "Ordinary, frozen-DP, and separately registered bridge hypotheses remain separate and are scored in one pilot-frozen complex-coherence and full-covariance space.",
+      "The conditional boundary null applies only to the registered nonrelativistic Markovian mass-density DP generator under complete joint-system equivalence of branch densities, smearing, trajectories, and parameters.",
+      "The analytic DP identity, numerical null-recovery error, and experimental equivalence uncertainty are separate outputs.",
+      "The boundary identity is not a theorem about Penrose OR, relativistic collapse, colored, dissipative, or non-Markovian DP, or a branch-dependent cavity modifier.",
+      "No confirmatory label, nuisance parameter, covariance regularization, DP amplitude, r0 value, row order, or exclusion rule may be learned after the pilot freeze.",
+      "The authoritative coupled campaign may return powered_parameter_region_available, apparatus_not_powered_for_dp, or signature_not_identifiable; neither no-go outcome falsifies DP.",
+      "The immutable v1 coupled run passes Runtimes A-E and blocks Runtime F as signature_not_identifiable: rank 7, maximum absolute whitened cosine 0.9999771044199663 for intercept versus thermal, and normalized Gram condition number 179103.91134865975.",
+      "The 30 frozen control rows currently identify axes and levels but do not admit source-backed numeric control-response vectors and a block-bound covariance, so acquisition power and a DP exclusion are not estimable from this run.",
+      "Fresh adapter run 2325 passes the repo-convergence software gate with no first failure, no deltas, certificate integrity OK, and scientific scope none.",
+      "Measured evidence remains not_ready; collapse identification and manifold dynamics remain blocked; physical viability remains not_evaluated.",
+      "This badge is non-promotable, has no calculator payload, and creates no observable bridge.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      sourceRef(
+        "repo_module",
+        "shared/casimir-dp-apparatus-scale-transport-stage4-2b.ts",
+        "casimir_dp_apparatus_scale_transport_stage4_2b",
+        "Object, composition, complete-joint-system branch-density, hierarchy, and equivalence ledger.",
+      ),
+      sourceRef(
+        "repo_module",
+        "shared/casimir-dp-apparatus-spectral-thermometry-stage4-2b.ts",
+        "casimir_dp_apparatus_spectral_thermometry_stage4_2b",
+        "Response-corrected detector and nonblackbody spectral-thermometry runtime.",
+      ),
+      sourceRef(
+        "repo_module",
+        "shared/casimir-dp-apparatus-response-covariance-stage4-2b.ts",
+        "casimir_dp_apparatus_response_covariance_stage4_2b",
+        "Sensor-self-noise separation and full cross-spectral/shared-calibration covariance runtime.",
+      ),
+      sourceRef(
+        "repo_module",
+        "shared/casimir-dp-dp-scaling-forecast-stage4-2b.ts",
+        "casimir_dp_dp_scaling_forecast_stage4_2b",
+        "Frozen named regularized DP scaling, convergence, companion, and conditional-null runtime.",
+      ),
+      sourceRef(
+        "repo_module",
+        "shared/casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+        "casimir_dp_apparatus_coherence_residual_stage4_2b",
+        "Pilot-frozen raw-complex or coverage-qualified log-visibility residual comparator.",
+      ),
+      sourceRef(
+        "repo_module",
+        "shared/casimir-dp-apparatus-identifiability-stage4-2b.ts",
+        "casimir_dp_apparatus_identifiability_stage4_2b",
+        "Nuisance-profiled identifiability, coverage, power, bounded-region, and go/no-go runtime.",
+      ),
+      sourceRef(
+        "repo_module",
+        "scripts/research/run-casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+        "casimir_dp_apparatus_coherence_residual_stage4_2b_runtime_g",
+        "Runtime-G authority, coupling adapters, immutable artifact writer, fixture executor, and claim ledger.",
+      ),
+      sourceRef(
+        "repo_module",
+        "shared/contracts/casimir-dp-apparatus-coherence-residual-stage4-2b.v1.ts",
+        "casimir_dp_apparatus_coherence_residual_stage4_2b_contract",
+        "Strict 22-stage, 28-authority, 19-fixture campaign contract.",
+      ),
+      sourceRef(
+        "artifact",
+        "configs/research/casimir-dp-apparatus-coherence-residual-stage4-2b.v1.json",
+        "casimir-dp-apparatus-coherence-residual-stage4-2b-v1",
+        "Frozen evidence policy, named DP manifest, thresholds, software, and run order.",
+      ),
+      sourceRef(
+        "artifact",
+        "configs/research/casimir-dp-stage4-2b-authorities.v1.json",
+        "dd3e423c02fdb16481c91c7ff3ee8583aa740efc71e5a04902ce32cf10754d35",
+        "Stage-4.2B immutable upstream authority-role and hash manifest.",
+      ),
+      sourceRef(
+        "artifact",
+        "configs/research/fixtures/casimir-dp-stage4-2b-campaign.synthetic.v1.json",
+        "ca89c5385bd55290b1cda8084b3d067cbd76420c810164fc958f310de11d1b8c",
+        "Frozen 19-case synthetic recovery and fail-closed fixture matrix.",
+      ),
+      sourceRef(
+        "artifact",
+        "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-report.json",
+        "2ebd9971bacc393842dc71bfd80063d7b244231947074bc70b3be25bd7ad5b67",
+        "Immutable coupled Runtime-G JSON report; campaign PASS with Runtime-F signature-identifiability no-go.",
+      ),
+      sourceRef(
+        "artifact",
+        "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-report.md",
+        "e29564c6cedcace388233f6006b98683fab54f9326b96ab9bbaf3334f33adcbe",
+        "Immutable human-readable coupled Runtime-G report.",
+      ),
+      sourceRef(
+        "artifact",
+        "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-trace.jsonl",
+        "727d78249462f0b4171532af37db97be5500a3a7a870cc56b2e533cae0ae0df7",
+        "Immutable 42-record Runtime-G execution trace with no measured-evidence promotion.",
+      ),
+      sourceRef(
+        "artifact",
+        "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-receipt.json",
+        "50632b32c4133fe3f0f5eee3cbbb157a983d0a9da69de6239d58563ca88f569c",
+        "Immutable campaign receipt binding inputs, authorities, coupling adapters, outputs, fixtures, and the pending external-verification state.",
+      ),
+      sourceRef(
+        "artifact",
+        "artifacts/training-trace-stage4-2b-20260726T130100867Z-bound-validated.jsonl",
+        "3894af959e1f3de8d28ede457727a97688c2fd64031c3512f941f5b89a889ffd",
+        "Fresh fail-closed one-record adapter trace for run 2325; PASS, no first failure, no deltas, certificate integrity OK.",
+      ),
+      sourceRef(
+        "doc",
+        "docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-verification-receipt.json",
+        "194a58bcfa4cc855c8a50a8a862fac391a01ee55c4dc9feeb1d6e98526b8bf3d",
+        "Downstream verification receipt binding the campaign, 509-test replay, build, math, root, WARP, explicit adapter request, validated trace, and certificate scope.",
+      ),
+      sourceRef(
+        "doc",
+        "docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-plan.md",
+        "casimir_dp_apparatus_coherence_residual_stage4_2b_plan",
+        "Implementation plan and claim-boundary contract; it is not runtime evidence.",
+      ),
+      sourceRef(
+        "test",
+        "tests/casimir-dp-stage4-2b-contract.spec.ts",
+        "casimir_dp_apparatus_coherence_residual_stage4_2b_contract_test",
+        "Strict schema, exact run-order, authority, fixture-order, and fail-closed contract tests.",
+      ),
+      sourceRef(
+        "test",
+        "tests/casimir-dp-stage4-2b-campaign.spec.ts",
+        "casimir_dp_apparatus_coherence_residual_stage4_2b_campaign_test",
+        "Coupled value/hash lineage, partition-template, 19-fixture, no-go, and immutable-output tests.",
+      ),
+    ],
+    observables: [
+      {
+        id:
+          "study.casimir_dp.apparatus_coherence_residual_stage4_2b.forecast_gate",
+        canonicalObservableId:
+          "observable.study.apparatus_coherence_residual_forecast_gate",
+        symbol: "G_ACR_4_2B",
+        quantity: "apparatus_coherence_residual_forecast_gate",
+        mathematicalType: "scalar",
+        unit: null,
+        dimensionSignature: null,
+        coordinateFrame: "not_applicable_forecast_decision_space",
+        operationalDefinitionRef:
+          "shared/contracts/casimir-dp-apparatus-coherence-residual-stage4-2b.v1.ts",
+        responseModelRef:
+          "shared/casimir-dp-apparatus-identifiability-stage4-2b.ts",
+      },
+    ],
+    hintKeys: {
+      subjects: [
+        "Casimir DP Stage 4.2B",
+        "apparatus coherence residual",
+        "DP scaling forecast",
+        "sensor self noise",
+        "full covariance",
+        "identifiability power",
+        "apparatus no go",
+      ],
+      symbols: [
+        "G_ACR_4_2B",
+        "E_G",
+        "Gamma_DP",
+        "Delta_rho",
+        "Sigma_r",
+        "Q_M",
+      ],
+      unitSignatures: ["1", "M", "L", "T", "T^-1", "M L^2 T^-2"],
+      repoPaths: [
+        "shared/casimir-dp-apparatus-scale-transport-stage4-2b.ts",
+        "shared/casimir-dp-apparatus-spectral-thermometry-stage4-2b.ts",
+        "shared/casimir-dp-apparatus-response-covariance-stage4-2b.ts",
+        "shared/casimir-dp-dp-scaling-forecast-stage4-2b.ts",
+        "shared/casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+        "shared/casimir-dp-apparatus-identifiability-stage4-2b.ts",
+        "scripts/research/run-casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+        "shared/contracts/casimir-dp-apparatus-coherence-residual-stage4-2b.v1.ts",
+        "configs/research/casimir-dp-apparatus-coherence-residual-stage4-2b.v1.json",
+        "configs/research/casimir-dp-stage4-2b-authorities.v1.json",
+        "configs/research/fixtures/casimir-dp-stage4-2b-campaign.synthetic.v1.json",
+        "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-report.json",
+        "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-report.md",
+        "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-trace.jsonl",
+        "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-receipt.json",
+        "artifacts/training-trace-stage4-2b-20260726T130100867Z-bound-validated.jsonl",
+        "docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-verification-receipt.json",
+        "docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-plan.md",
+        "tests/casimir-dp-stage4-2b-contract.spec.ts",
+        "tests/casimir-dp-stage4-2b-campaign.spec.ts",
+      ],
+      equationFamilies: [
+        "apparatus_scale_transport",
+        "spectral_thermometry_forward_model",
+        "sensor_self_noise_forward_model",
+        "ordinary_coherence_exponent",
+        "residual_covariance",
+        "joint_complex_residual",
+        "frozen_dp_scaling",
+        "identifiability_power_gate",
+      ],
+      simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"],
+    },
+  }),
   studyBadge({
     id: "study.casimir_dp.claim_boundary",
     title: "Casimir / DP Quantum-Foam Study Claim Boundary",
@@ -968,7 +2362,12 @@ export const CASIMIR_DP_STUDY_THEORY_BADGES: TheoryBadgeV1[] = [
     sourceRefs: [
       sourceRef("doc", "docs/research/casimir-dp-quantum-foam-study.md", "claim-boundaries", "Canonical study non-claims."),
       sourceRef("literature_ref", "https://doi.org/10.1038/s41567-020-1008-4", "Donadi-et-al-2021", "Experimental exclusion context for the natural parameter-free DP version."),
-      sourceRef("literature_ref", "https://doi.org/10.1103/2jm3-4976", "XENONnT-2026", "Current independent DP parameter constraints."),
+      sourceRef(
+        "literature_ref",
+        "https://doi.org/10.1103/2jm3-4976",
+        "XENONnT-2026",
+        "Current lower bound on R_0 for the tested Markovian spontaneous-radiation DP implementation; no significant excess; not generic Penrose OR or colored, dissipative, or non-Markovian DP.",
+      ),
     ],
     hintKeys: {
       subjects: ["casimir dp claim boundary", "quantum foam non claim", "objective collapse bounds"],
@@ -1245,6 +2644,432 @@ export const CASIMIR_DP_STUDY_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "blocks",
     label: "An unregistered quantum-foam response remains a bounded hypothesis slot.",
     claimBoundaryNote: "Noncomputable hypothesis language is not evidence.",
+  },
+  {
+    id: "casimir_dp_proposal_feeds_stage3_evidence_map",
+    from: "study.casimir_dp.proposal_closure",
+    to: "study.casimir_dp.evidence_map_stage3",
+    relation: "diagnostic_checks",
+    label: "The frozen proposal architecture and commissioning contracts feed the Stage-3 evidence map.",
+    claimBoundaryNote: "Proposal completeness cannot satisfy measured Stage-3 gates.",
+  },
+  {
+    id: "casimir_dp_stage2_context_feeds_stage3_evidence_map",
+    from: "study.casimir_dp.penrose_or_branch_geometry_context",
+    to: "study.casimir_dp.evidence_map_stage3",
+    relation: "diagnostic_checks",
+    label: "The immutable Stage-2 OR/phase and fixed-branch-null context feeds Stage 3.",
+    claimBoundaryNote: "Stage-2's prior certificate and blocked evidence states are not promoted or reused.",
+  },
+  {
+    id: "casimir_dp_complex_coherence_feeds_model_comparison",
+    from: "study.casimir_dp.complex_coherence_discriminator",
+    to: "study.casimir_dp.blinded_model_comparison",
+    relation: "requires",
+    label: "Joint inference requires complex coherence, path-swap, conditioning, echo, and decay-shape diagnostics.",
+    claimBoundaryNote: "Visibility alone cannot identify collapse.",
+  },
+  {
+    id: "casimir_dp_qed_noise_feeds_model_comparison",
+    from: "study.casimir_dp.qed_green_noise_budget",
+    to: "study.casimir_dp.blinded_model_comparison",
+    relation: "requires",
+    label: "The composite ordinary-physics null requires a shared material/Green mean-and-noise budget.",
+    claimBoundaryNote: "Mean pressure cannot be substituted for a fluctuation spectrum.",
+  },
+  {
+    id: "casimir_dp_dp_companion_feeds_model_comparison",
+    from: "study.casimir_dp.dp_companion_signature",
+    to: "study.casimir_dp.blinded_model_comparison",
+    relation: "requires",
+    label: "A named DP comparison requires one frozen parameter manifest across coherence and companions.",
+    claimBoundaryNote: "Penrose's lifetime heuristic is not a generative master equation.",
+  },
+  {
+    id: "casimir_dp_gravity_bound_feeds_model_comparison",
+    from: "study.casimir_dp.casimir_gravity_upper_bound",
+    to: "study.casimir_dp.blinded_model_comparison",
+    relation: "requires",
+    label: "The ordinary-physics null includes the complete-apparatus gravitational upper-bound lane.",
+    claimBoundaryNote: "A plate force or partial energy source cannot enter as gravitational weight.",
+  },
+  {
+    id: "casimir_dp_registry_gates_bridge_comparison",
+    from: "study.casimir_dp.manifold_kernel_registry",
+    to: "study.casimir_dp.blinded_model_comparison",
+    relation: "requires",
+    label: "Only a bridge passing the fail-closed registry may enter the held-out comparison.",
+    claimBoundaryNote: "A blocked registry excludes only the bridge lane; it does not block ordinary or named-DP diagnostics.",
+  },
+  {
+    id: "casimir_dp_model_comparison_feeds_stage3_evidence_map",
+    from: "study.casimir_dp.blinded_model_comparison",
+    to: "study.casimir_dp.evidence_map_stage3",
+    relation: "diagnostic_checks",
+    label: "Held-out model states populate the machine-readable outcome-to-claim ledger.",
+    claimBoundaryNote: "Not-disfavored within a powered region is not confirmation.",
+  },
+  {
+    id: "casimir_dp_registry_feeds_stage3_evidence_map",
+    from: "study.casimir_dp.manifold_kernel_registry",
+    to: "study.casimir_dp.evidence_map_stage3",
+    relation: "diagnostic_checks",
+    label: "The registry contributes its deterministic first failure and bridge-admission state.",
+    claimBoundaryNote: "Schema completeness is not empirical validation.",
+  },
+  {
+    id: "casimir_dp_radiation_modes_feed_stage4_polarization",
+    from: "physics.radiation.mode_context",
+    to: "study.casimir_dp.polarization_resolved_qed_control",
+    relation: "requires",
+    label:
+      "The Stage-4 polarization lane starts from the two-dimensional transverse radiation-mode space.",
+    claimBoundaryNote:
+      "TE/TM and RCP/LCP are bases of the same photon field space, not extra gravitational degrees of freedom.",
+  },
+  {
+    id: "casimir_dp_quantum_field_state_feeds_stage4_polarization",
+    from: "physics.radiation.quantum_field_state_context",
+    to: "study.casimir_dp.polarization_resolved_qed_control",
+    relation: "requires",
+    label:
+      "Jones coherency and Stokes state physicality feed the polarization-resolved QED control.",
+    claimBoundaryNote:
+      "A polarization state does not define a DP mass-density branch.",
+  },
+  {
+    id: "casimir_dp_stage3_qed_feeds_stage4_polarization",
+    from: "study.casimir_dp.qed_green_noise_budget",
+    to: "study.casimir_dp.polarization_resolved_qed_control",
+    relation: "requires",
+    label:
+      "Stage 4 resolves the Stage-3 QED material/Green response by polarization and mirror parity.",
+    claimBoundaryNote:
+      "The current reduced-order fixture remains synthetic and is not apparatus closure.",
+  },
+  {
+    id: "casimir_dp_blackbody_reference_feeds_stage4_thermal",
+    from: "solar.spectrum.blackbody_curve_reference",
+    to: "study.casimir_dp.thermal_radiative_closure",
+    relation: "diagnostic_checks",
+    label:
+      "The Planck spectrum provides a normalization benchmark for the Stage-4 thermal lane.",
+    claimBoundaryNote:
+      "The blackbody reference is a thermal benchmark, not a collapse bridge.",
+  },
+  {
+    id: "casimir_dp_stefan_boltzmann_feeds_stage4_thermal",
+    from: "solar.spectrum.stefan_boltzmann_luminosity",
+    to: "study.casimir_dp.thermal_radiative_closure",
+    relation: "diagnostic_checks",
+    label:
+      "Planck integration must recover the Stefan-Boltzmann flux normalization.",
+    claimBoundaryNote:
+      "Flux closure does not derive stellar structure or gravitational reduction.",
+  },
+  {
+    id: "casimir_dp_thermal_population_feeds_stage4_thermal",
+    from: "low_temp.radiation.thermal_population_floor",
+    to: "study.casimir_dp.thermal_radiative_closure",
+    relation: "requires",
+    label:
+      "Thermal occupation and zero-point separation feed the ordinary radiative-noise budget.",
+    claimBoundaryNote:
+      "Zero-point mode energy is not added to net thermal power.",
+  },
+  {
+    id: "casimir_dp_energy_frequency_feeds_stage4_congruence",
+    from: "physics.quantum.energy_frequency",
+    to: "study.casimir_dp.tensor_dimensional_congruence",
+    relation: "requires",
+    label:
+      "The congruence gate enforces h versus hbar and nu versus omega representations.",
+    claimBoundaryNote:
+      "A shared inverse-time dimension is not a transfer kernel.",
+  },
+  {
+    id: "casimir_dp_frequency_gate_feeds_stage4_congruence",
+    from: "study.casimir_dp.frequency_bridge_gate",
+    to: "study.casimir_dp.tensor_dimensional_congruence",
+    relation: "requires",
+    label:
+      "The Compton/DP/cavity non-bridge is made machine-checkable by semantic quantity identities.",
+    claimBoundaryNote:
+      "The synthetic result is same_dimension_not_connected.",
+  },
+  {
+    id: "casimir_dp_manifold_registry_feeds_stage4_congruence",
+    from: "study.casimir_dp.manifold_kernel_registry",
+    to: "study.casimir_dp.tensor_dimensional_congruence",
+    relation: "requires",
+    label:
+      "Tensor, gauge, conservation, covariance, and causal-chain fields are checked before any bridge comparison.",
+    claimBoundaryNote:
+      "Registered congruence emits no numerical bridge rate and is not empirical validation.",
+  },
+  {
+    id: "casimir_dp_stage3_evidence_map_feeds_stage4",
+    from: "study.casimir_dp.evidence_map_stage3",
+    to: "study.casimir_dp.polarization_congruence_stage4",
+    relation: "requires",
+    label:
+      "Stage 4 hash-links the immutable Stage-3 report, receipt, config, and verification receipt.",
+    claimBoundaryNote:
+      "Stage 4 cannot rewrite or promote Stage-3 scientific gates.",
+  },
+  {
+    id: "casimir_dp_stage4_polarization_feeds_campaign",
+    from: "study.casimir_dp.polarization_resolved_qed_control",
+    to: "study.casimir_dp.polarization_congruence_stage4",
+    relation: "requires",
+    label:
+      "Polarization-resolved ordinary-QED predictions enter the expanded null.",
+    claimBoundaryNote:
+      "A nonzero ordinary optical double contrast is not collapse.",
+  },
+  {
+    id: "casimir_dp_stage4_thermal_feeds_campaign",
+    from: "study.casimir_dp.thermal_radiative_closure",
+    to: "study.casimir_dp.polarization_congruence_stage4",
+    relation: "requires",
+    label:
+      "Thermal/FDT power, recoil, heating, noise, decoherence, and covariance enter the expanded null.",
+    claimBoundaryNote:
+      "Near- and far-field lanes are mutually exclusive in one prediction cell.",
+  },
+  {
+    id: "casimir_dp_stage4_congruence_gates_campaign",
+    from: "study.casimir_dp.tensor_dimensional_congruence",
+    to: "study.casimir_dp.polarization_congruence_stage4",
+    relation: "requires",
+    label:
+      "The model comparator runs only after unit, semantic, tensor, and representation congruence passes.",
+    claimBoundaryNote:
+      "Congruence is necessary for comparison but does not validate a mechanism.",
+  },
+  {
+    id: "casimir_dp_stage4_campaign_documents_claim_boundary",
+    from: "study.casimir_dp.polarization_congruence_stage4",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "documents",
+    label:
+      "The Stage-4 outcome map preserves the least-mature claim ceiling of every lane.",
+    claimBoundaryNote:
+      "The graph-wide maximum remains diagnostic: the synthetic blinding contract passes only by proving that no custodian receipt, mapping, measured comparison, or unblinding exists or is authorized.",
+  },
+  {
+    id: "casimir_dp_stage4_campaign_requires_stage4_1_qed_scale_calibration",
+    from: "study.casimir_dp.polarization_congruence_stage4",
+    to: "study.casimir_dp.qed_scale_hierarchy_stage4_1",
+    relation: "requires",
+    label:
+      "Stage 4.1 consumes the immutable Stage-4 authority and preserves its Compton/DP/cavity semantic non-bridge.",
+    claimBoundaryNote:
+      "A successful identity calibration cannot rewrite or promote any Stage-4 scientific gate.",
+  },
+  {
+    id: "casimir_dp_stage4_congruence_requires_stage4_1_qed_scale_calibration",
+    from: "study.casimir_dp.tensor_dimensional_congruence",
+    to: "study.casimir_dp.qed_scale_hierarchy_stage4_1",
+    relation: "requires",
+    label:
+      "The Stage-4.1 QED hierarchy inherits explicit h versus hbar, nu versus omega, dimensional, semantic, and namespace conventions.",
+    claimBoundaryNote:
+      "Algebraic congruence is not a sourced transfer kernel or mechanism.",
+  },
+  {
+    id: "casimir_dp_atomic_electronic_context_requires_stage4_1_qed_scale_calibration",
+    from: "physics.atomic.electronic_level_structure_context",
+    to: "study.casimir_dp.qed_scale_hierarchy_stage4_1",
+    relation: "requires",
+    label:
+      "Atomic electronic-level context bounds the Rydberg identity and the leading-order reduced-mass hydrogen scale.",
+    claimBoundaryNote:
+      "The leading-order identity does not replace precision spectroscopy or its correction ledger.",
+  },
+  {
+    id: "casimir_dp_stage4_1_qed_scale_calibration_documents_claim_boundary",
+    from: "study.casimir_dp.qed_scale_hierarchy_stage4_1",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "documents",
+    label:
+      "The source-backed QED identity calibration records its reduced-order maximum claim and every semantic nonclaim.",
+    claimBoundaryNote:
+      "The maximum claim is qed_scale_identity_calibration; measured, collapse, manifold, and viability claims remain unavailable.",
+  },
+  {
+    id: "casimir_dp_stage4_2a_mass_anchor_requires_stage4_1_qed_calibration",
+    from: "study.casimir_dp.electron_mass_higgs_anchor_stage4_2a",
+    to: "study.casimir_dp.qed_scale_hierarchy_stage4_1",
+    relation: "requires",
+    label:
+      "Stage 4.2A consumes the immutable Stage-4.1 mass, h/hbar, nu/omega, alpha_fs, Compton, and Rydberg semantics without rewriting them.",
+    claimBoundaryNote:
+      "A downstream mass-provenance and Yukawa replay cannot promote the upstream QED identity calibration.",
+  },
+  {
+    id: "casimir_dp_stage4_2a_mass_anchor_requires_planck_solar_calibration",
+    from: "study.casimir_dp.electron_mass_higgs_anchor_stage4_2a",
+    to: "study.casimir_dp.planck_solar_calibration_stage4_2a",
+    relation: "diagnostic_checks",
+    label:
+      "The composite campaign co-reports independent mass and radiometric sibling lanes under one claim ledger.",
+    claimBoundaryNote:
+      "Neither sibling requires the other's physics output; shared constants and reporting do not make them independent votes for a mechanism.",
+  },
+  {
+    id: "casimir_dp_frequency_gate_requires_stage4_2a_mass_semantics",
+    from: "study.casimir_dp.frequency_bridge_gate",
+    to: "study.casimir_dp.electron_mass_higgs_anchor_stage4_2a",
+    relation: "requires",
+    label:
+      "The blocked frequency bridge uses the traceable rest-mass and tree-anchor semantics before evaluating any future sourced kernel.",
+    claimBoundaryNote:
+      "Compton rest-energy bookkeeping remains distinct from a physical oscillator, cavity mode, or collapse clock.",
+  },
+  {
+    id: "casimir_dp_stage4_2a_mass_anchor_documents_claim_boundary",
+    from: "study.casimir_dp.electron_mass_higgs_anchor_stage4_2a",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "documents",
+    label:
+      "The mass/Higgs runtime records correlated provenance, upper-bound-only collider evidence, and a zero-bridge claim ceiling.",
+    claimBoundaryNote:
+      "The maximum claim is a diagnostic metrology replay and conditional Standard Model tree mapping.",
+  },
+  {
+    id: "casimir_dp_stage4_2a_planck_solar_requires_stage4_thermal_conventions",
+    from: "study.casimir_dp.planck_solar_calibration_stage4_2a",
+    to: "study.casimir_dp.thermal_radiative_closure",
+    relation: "diagnostic_checks",
+    label:
+      "The independently frozen radiometric lane is compared against the Stage-4 Planck, h/hbar, nu/omega, and far-field conventions.",
+    claimBoundaryNote:
+      "This is a convention cross-check, not a hash-linked Stage-4 authority dependency, and it imports no apparatus heat-transfer or decoherence output.",
+  },
+  {
+    id: "casimir_dp_solar_reference_checks_stage4_2a_planck_solar_calibration",
+    from: "solar.spectrum.stefan_boltzmann_luminosity",
+    to: "study.casimir_dp.planck_solar_calibration_stage4_2a",
+    relation: "diagnostic_checks",
+    label:
+      "The IAU luminosity-radius effective-temperature identity checks the bolometric lane while TSIS supplies a distinct spectrum-shape lane.",
+    claimBoundaryNote:
+      "Color and bolometric effective temperatures are operationally different and their agreement is not a DP observable.",
+  },
+  {
+    id: "casimir_dp_stage4_2a_planck_solar_documents_claim_boundary",
+    from: "study.casimir_dp.planck_solar_calibration_stage4_2a",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "documents",
+    label:
+      "The radiometric runtime preserves source overlap, temperature vocabulary, and every thermal-to-collapse nonclaim.",
+    claimBoundaryNote:
+      "Shared h, energy, frequency, or inverse-time dimensions do not register a thermal-to-DP bridge.",
+  },
+  {
+    id: "casimir_dp_stage4_2a_mass_anchor_feeds_stage4_2b_apparatus_forecast",
+    from: "study.casimir_dp.electron_mass_higgs_anchor_stage4_2a",
+    to: "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
+    relation: "requires",
+    label:
+      "Stage 4.2B inherits traceable mass, unit, and energy-frequency semantics while transporting complete object density rather than reconstructing bulk mass from the electron scale.",
+    claimBoundaryNote:
+      "Parameter provenance is not a Higgs, Compton, Casimir, DP, collapse, or manifold transfer mechanism.",
+  },
+  {
+    id: "casimir_dp_stage4_thermal_feeds_stage4_2b_apparatus_forecast",
+    from: "study.casimir_dp.thermal_radiative_closure",
+    to: "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
+    relation: "requires",
+    label:
+      "Response-corrected apparatus thermometry and ordinary radiative decoherence inherit the frozen Planck/FDT and zero-point-separation conventions.",
+    claimBoundaryNote:
+      "The Stage-4.2B thermometry lane is synthetic and cannot satisfy measured apparatus thermal closure.",
+  },
+  {
+    id: "casimir_dp_mass_density_branch_difference_feeds_stage4_2b_dp_forecast",
+    from: "collapse.objective.mass_density_branch_difference",
+    to: "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
+    relation: "requires",
+    label:
+      "The named DP forecast requires complete object and joint-system branch-density receipts before evaluating E_G over a frozen mass, geometry, separation, and hold-time grid.",
+    claimBoundaryNote:
+      "Design-class branch preparation cannot satisfy the experimental-equivalence or measured-evidence gate.",
+  },
+  {
+    id: "casimir_dp_named_companion_checks_stage4_2b_dp_forecast",
+    from: "study.casimir_dp.dp_companion_signature",
+    to: "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
+    relation: "diagnostic_checks",
+    label:
+      "The Stage-4.2B frozen DP rate is reconciled with the separately powered applicable companion and the immutable Stage-3 parameter manifest.",
+    claimBoundaryNote:
+      "An unpowered companion permits compatibility or exclusion language only and cannot support a named-DP identification.",
+  },
+  {
+    id: "casimir_dp_qed_green_noise_feeds_stage4_2b_apparatus_forecast",
+    from: "study.casimir_dp.qed_green_noise_budget",
+    to: "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
+    relation: "requires",
+    label:
+      "The residual forecast extends the ordinary QED mean/noise budget with sensor-forward response, self-noise separation, and full cross-spectral/shared-calibration covariance.",
+    claimBoundaryNote:
+      "Mean Casimir pressure or a raw sensor PSD cannot substitute for a measured disturbance-to-coherence noise kernel.",
+  },
+  {
+    id: "casimir_dp_stage3_model_comparison_feeds_stage4_2b_power_gate",
+    from: "study.casimir_dp.blinded_model_comparison",
+    to: "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
+    relation: "requires",
+    label:
+      "Stage 4.2B freezes the ordinary, named-DP, and separately registered bridge prediction vectors before forecasting held-out identifiability and power.",
+    claimBoundaryNote:
+      "Synthetic recovery and a software power forecast are not a physical blind, measured residual, or model preference from nature.",
+  },
+  {
+    id: "casimir_dp_stage4_2b_missing_bridge_blocks_claim_boundary",
+    from: "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "blocks",
+    label:
+      "Synthetic-only evidence, an underpowered frozen apparatus, absent measured preparation and covariance, and a missing numerical boundary-to-coherence kernel block physical promotion.",
+    claimBoundaryNote:
+      "The maximum current claim is an apparatus power and identifiability forecast; measured evidence is not ready, collapse and manifold dynamics are blocked, and physical viability is not evaluated.",
+  },
+  {
+    id: "casimir_dp_stage4_missing_numeric_bridge_blocks_claims",
+    from: "study.casimir_dp.tensor_dimensional_congruence",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "blocks",
+    label:
+      "A schema-congruent but non-numerical bridge blocks collapse and manifold-mechanism claims.",
+    claimBoundaryNote:
+      "same_dimension_not_connected is a successful non-bridge result.",
+  },
+  {
+    id: "casimir_dp_stage3_comparison_blocks_claims",
+    from: "study.casimir_dp.blinded_model_comparison",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "blocks",
+    label: "Missing measured held-out data, power, or identifiability blocks confirmatory physical claims.",
+    claimBoundaryNote: "Synthetic model recovery is a software result only.",
+  },
+  {
+    id: "casimir_dp_stage3_registry_blocks_manifold_claims",
+    from: "study.casimir_dp.manifold_kernel_registry",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "blocks",
+    label: "An incomplete tensor/noise-to-coherence registry blocks every manifold-mechanism claim.",
+    claimBoundaryNote: "No numerical bridge rate is emitted while blocked.",
+  },
+  {
+    id: "casimir_dp_stage3_evidence_map_documents_claim_boundary",
+    from: "study.casimir_dp.evidence_map_stage3",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "documents",
+    label: "The Stage-3 outcome map carries each lane's least-mature maximum claim.",
+    claimBoundaryNote: "The graph-wide maximum remains diagnostic.",
   },
   {
     id: "casimir_dp_protocol_documents_claim_boundary",

@@ -1,4 +1,8 @@
-import type { HelixEnvironmentSensorScope } from "./helix-environment-sensor-scope";
+import {
+  isHelixEnvironmentSensorScope,
+  type HelixEnvironmentSensorScope,
+} from "./helix-environment-sensor-scope";
+import { z } from "zod";
 
 export const HELIX_ENVIRONMENT_PROBE_REQUEST_SCHEMA =
   "helix.environment_probe_request.v1" as const;
@@ -82,3 +86,65 @@ export type HelixEnvironmentProbeResult = {
   context_policy: "compact_context_pack_only";
   created_at: string;
 };
+
+const probeWireIdSchema = z.string().trim().min(1).max(256);
+const probeWireTimestampSchema = z.string().trim().min(1).max(64).refine(
+  (value) => Number.isFinite(Date.parse(value)),
+  "Expected an ISO-compatible timestamp.",
+);
+const probeTypeSchema = z.enum([
+  "route_feasibility",
+  "reachability",
+  "line_of_sight",
+  "container_freshness",
+  "crop_state",
+  "hazard_check",
+  "inventory_check",
+  "local_map_summary",
+]);
+
+export const helixEnvironmentProbeResultSchema = z.object({
+  schema: z.literal(HELIX_ENVIRONMENT_PROBE_RESULT_SCHEMA),
+  probe_result_id: probeWireIdSchema,
+  probe_request_id: probeWireIdSchema,
+  source_id: probeWireIdSchema,
+  room_id: probeWireIdSchema,
+  domain: z.string().trim().min(1).max(80),
+  probe_type: probeTypeSchema,
+  status: z.enum([
+    "succeeded",
+    "failed",
+    "partial",
+    "expired",
+    "unsupported",
+    "blocked_by_policy",
+  ]),
+  result_summary: z.string().trim().min(1).max(2000),
+  result: z.object({
+    feasible: z.boolean().nullable().optional(),
+    reachable: z.boolean().nullable().optional(),
+    line_of_sight: z.boolean().nullable().optional(),
+    path_cost_blocks: z.number().finite().nonnegative().nullable().optional(),
+    distance_blocks: z.number().finite().nonnegative().nullable().optional(),
+    contents_fresh: z.boolean().nullable().optional(),
+    crop_mature: z.boolean().nullable().optional(),
+    hazard_present: z.boolean().nullable().optional(),
+    confidence: z.number().finite().min(0).max(1).nullable().optional(),
+    details: z.record(z.string(), z.unknown()).optional(),
+  }).strict(),
+  sensor_scope: z.custom<HelixEnvironmentSensorScope>(
+    isHelixEnvironmentSensorScope,
+    { message: "Expected a supported environment sensor scope." },
+  ),
+  requires_caveat: z.boolean(),
+  side_effects_performed: z.literal(false),
+  commands_executed: z.array(z.unknown()).length(0),
+  world_mutation_performed: z.literal(false),
+  evidence_refs: z.array(z.string().trim().min(1).max(512)).max(128),
+  deterministic: z.literal(true),
+  model_invoked: z.literal(false),
+  assistant_answer: z.literal(false),
+  raw_content_included: z.literal(false),
+  context_policy: z.literal("compact_context_pack_only"),
+  created_at: probeWireTimestampSchema,
+}).strict();

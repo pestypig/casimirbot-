@@ -8,6 +8,13 @@ import {
   type HelixEventJournalSourceFamily,
 } from "@shared/helix-event-journal-query";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
+import {
+  assertHelixRoomSourceNamespaceAdmission,
+  isHelixRoomSourceIngressSourceId,
+  matchesHelixRoomSourceAdmission,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
+import { redactProtectedRoomSourceSecrets } from "./room-source-ingress-security";
 
 const records: HelixEventJournalRecord[] = [];
 const recordsById = new Map<string, HelixEventJournalRecord>();
@@ -39,8 +46,30 @@ export function recordEventJournalEvent(input: {
   event: HelixWorldEvent;
   threadId?: string | null;
   sourceFamily?: HelixEventJournalSourceFamily;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): HelixEventJournalRecord {
-  const event = input.event;
+  const protectedRoomSource = isHelixRoomSourceIngressSourceId(
+    input.event.source_id,
+  );
+  if (input.event.source_id) {
+    assertHelixRoomSourceNamespaceAdmission(
+      {
+        source_id: input.event.source_id,
+        room_id: input.event.room_id,
+        world_id: input.event.world_id,
+      },
+      input.sourceAdmission,
+    );
+  }
+  const event = protectedRoomSource
+    ? redactProtectedRoomSourceSecrets(input.event)
+    : input.event;
+  const sourceAdmission = protectedRoomSource
+    ? redactProtectedRoomSourceSecrets(input.sourceAdmission)
+    : input.sourceAdmission;
+  const threadId = protectedRoomSource
+    ? redactProtectedRoomSourceSecrets(input.threadId ?? null)
+    : input.threadId ?? null;
   const journalEventId = `event_journal:${hashShort([
     event.world_id,
     event.room_id,
@@ -54,7 +83,7 @@ export function recordEventJournalEvent(input: {
   if (existing) {
     const next: HelixEventJournalRecord = {
       ...existing,
-      thread_id: existing.thread_id ?? input.threadId ?? null,
+      thread_id: existing.thread_id ?? threadId,
     };
     recordsById.set(journalEventId, next);
     const index = records.findIndex((record: HelixEventJournalRecord) => record.journal_event_id === journalEventId);
@@ -68,12 +97,15 @@ export function recordEventJournalEvent(input: {
     room_id: event.room_id,
     source_id: event.source_id ?? null,
     world_id: event.world_id,
-    thread_id: input.threadId ?? null,
+    thread_id: threadId,
     event_type: event.event_type,
     actor_id: event.actor_id ?? null,
     actor_label: event.actor_label ?? null,
     ts: event.ts,
-    evidence_refs: uniqueStrings(event.evidence_refs ?? []),
+    evidence_refs: uniqueStrings([
+      ...(event.evidence_refs ?? []),
+      ...(sourceAdmission?.evidence_refs ?? []),
+    ]),
     compact_summary: compactSummary(event),
     raw_event: event,
     raw_content_included: true,
@@ -88,20 +120,42 @@ export function recordEventJournalEvent(input: {
   return record;
 }
 
-const toPublicRecord = (record: HelixEventJournalRecord, includeRaw: boolean): HelixEventJournalRecord => ({
-  ...record,
-  raw_event: includeRaw ? record.raw_event : undefined,
-  raw_content_included: includeRaw,
-});
+const toPublicRecord = (
+  record: HelixEventJournalRecord,
+  includeRaw: boolean,
+): HelixEventJournalRecord => {
+  const projected = {
+    ...record,
+    raw_event: includeRaw ? record.raw_event : undefined,
+    raw_content_included: includeRaw,
+  };
+  return isHelixRoomSourceIngressSourceId(record.source_id)
+    ? redactProtectedRoomSourceSecrets(projected)
+    : projected;
+};
 
 export function queryEventJournal(input: Partial<HelixEventJournalQuery> & {
   query_id?: string;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): HelixEventJournalQueryResult {
   const includeRaw = input.include_raw_events === true;
   const eventTypeSet = new Set(input.event_types ?? []);
   const fromMs = input.from_ts ? Date.parse(input.from_ts) : null;
   const toMs = input.to_ts ? Date.parse(input.to_ts) : null;
   const matches = records.filter((record: HelixEventJournalRecord) => {
+    if (
+      isHelixRoomSourceIngressSourceId(record.source_id) &&
+      !matchesHelixRoomSourceAdmission(
+        {
+          source_id: record.source_id,
+          room_id: record.room_id,
+          world_id: record.world_id,
+        },
+        input.sourceAdmission,
+      )
+    ) {
+      return false;
+    }
     if (input.source_family && record.source_family !== input.source_family) return false;
     if (input.thread_id && record.thread_id !== input.thread_id) return false;
     if (input.room_id && record.room_id !== input.room_id) return false;
@@ -132,4 +186,24 @@ export function queryEventJournal(input: Partial<HelixEventJournalQuery> & {
 export function clearEventJournalForTest(): void {
   records.splice(0, records.length);
   recordsById.clear();
+}
+
+export function removeEventJournalRecords(input: {
+  sourceId?: string | null;
+  roomId?: string | null;
+}): number {
+  const removedIds = records
+    .filter((record: HelixEventJournalRecord) => {
+      if (input.sourceId && record.source_id !== input.sourceId) return false;
+      if (input.roomId && record.room_id !== input.roomId) return false;
+      return true;
+    })
+    .map((record: HelixEventJournalRecord) => record.journal_event_id);
+  if (removedIds.length === 0) return 0;
+  const removed = new Set(removedIds);
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    if (removed.has(records[index].journal_event_id)) records.splice(index, 1);
+  }
+  for (const id of removed) recordsById.delete(id);
+  return removed.size;
 }

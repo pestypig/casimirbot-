@@ -15,6 +15,7 @@ import RouteBootSplash from "@/components/RouteBootSplash";
 const Home = lazy(() => import("@/pages/home"));
 const Simulation = lazy(() => import("@/pages/simulation"));
 const Documentation = lazy(() => import("@/pages/documentation"));
+const AgentAccessPage = lazy(() => import("@/pages/agent-access"));
 const NoiseGenAlias = lazy(() => import("@/pages/noisegen"));
 const Why = lazy(() => import("@/pages/why"));
 const StartPortal = lazy(() => import("@/pages/start"));
@@ -171,6 +172,7 @@ function Router() {
         <Route path="/bridge" component={Home} />
         <Route path="/simulation" component={Simulation} />
         <Route path="/documentation" component={Documentation} />
+        <Route path="/agent-access" component={AgentAccessPage} />
         <Route path="/helix-core" component={HelixCoreRoute} />
         <Route path="/helix-observables" component={HelixObservablesPage} />
         <Route path="/helix/noise-gens" component={NoiseGenAlias} />

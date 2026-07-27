@@ -6,6 +6,7 @@ import type { HelixActionRehearsalResult } from "@shared/helix-action-rehearsal"
 import type { HelixPossibilityGraph } from "@shared/helix-environment-possibility-graph";
 import type { HelixEnvironmentStateSnapshot } from "@shared/helix-environment-state-snapshot";
 import type { HelixRecommendationGate } from "@shared/helix-recommendation-gate";
+import type { HelixRoomSourceAdmission } from "@shared/helix-room-source-ingress";
 import { updateLiveAnswerEnvironment } from "./live-answer-environment-store";
 import { reduceEnvironmentAffordances } from "./environment-affordance-reducer";
 import { updateEnvironmentMemoryLedger } from "./environment-memory-ledger";
@@ -32,6 +33,7 @@ export function reduceLiveAnswerEnvironmentFromEnvironmentStateSnapshot(input: {
   threadId: string;
   objective?: string | null;
   autoRehearse?: boolean;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
   now?: string;
 }): {
   environment: LiveAnswerEnvironment;
@@ -45,7 +47,14 @@ export function reduceLiveAnswerEnvironmentFromEnvironmentStateSnapshot(input: {
   if (!environment || environment.status !== "active") return null;
   const now = input.now ?? input.snapshot.ts;
   const snapshotAudit = auditEnvironmentSourceContract({ subject: input.snapshot, now });
-  if (!snapshotAudit.ok || isRedundantEnvironmentStateSnapshot(input.snapshot)) return null;
+  if (
+    !snapshotAudit.ok ||
+    isRedundantEnvironmentStateSnapshot(input.snapshot, {
+      sourceAdmission: input.sourceAdmission,
+    })
+  ) {
+    return null;
+  }
   const reduction = reduceEnvironmentStateSnapshot(input.snapshot);
   const affordances = reduceEnvironmentAffordances(input.snapshot);
   const affordanceAudit = auditEnvironmentSourceContract({ subject: affordances, now });
@@ -66,7 +75,12 @@ export function reduceLiveAnswerEnvironmentFromEnvironmentStateSnapshot(input: {
     : null;
   const graph = graphAudit?.ok ? graphCandidate : null;
   const rehearsalPack = graph && input.autoRehearse !== false
-    ? rehearsePossibilityGraph({ graph, environmentState: input.snapshot, now })
+    ? rehearsePossibilityGraph({
+        graph,
+        environmentState: input.snapshot,
+        sourceAdmission: input.sourceAdmission,
+        now,
+      })
     : null;
   const requestAudit = rehearsalPack
     ? auditEnvironmentSourceContract({ subject: rehearsalPack.request, now })

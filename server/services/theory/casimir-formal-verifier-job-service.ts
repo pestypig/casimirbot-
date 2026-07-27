@@ -18,6 +18,11 @@ import {
   replayCasimirFormalLeanRequestV1,
   type CasimirFormalLeanProcessRunnerV1,
 } from "./casimir-formal-lean-replay";
+import {
+  createRuntimeToolConfirmationReceiptVerifierV1,
+  type TrustedRuntimeToolConfirmationReplayLedgerV1,
+  type TrustedRuntimeToolConfirmationVerifierV1,
+} from "./runtime-tool-confirmation-receipt-verifier";
 
 export const CASIMIR_FORMAL_VERIFIER_PLAN_SCHEMA =
   "casimir.theory_formal_verifier.plan.v1" as const;
@@ -25,6 +30,10 @@ export const CASIMIR_FORMAL_VERIFIER_JOB_RECEIPT_SCHEMA =
   "casimir.theory_formal_verifier.job_receipt.v1" as const;
 export const CASIMIR_FORMAL_VERIFIER_RESULT_SCHEMA =
   "casimir.theory_formal_verifier.result.v1" as const;
+export const CASIMIR_FORMAL_VERIFIER_START_CAPABILITY_ID =
+  "theory-formal-verifier.start" as const;
+export const CASIMIR_FORMAL_VERIFIER_READ_RESULT_CAPABILITY_ID =
+  "theory-formal-verifier.read_result" as const;
 
 export type CasimirFormalVerifierSealedInputV1 = {
   request: CasimirFormalVerificationRequestV1;
@@ -41,10 +50,12 @@ export type CasimirFormalVerifierPlanV1 = {
   requestId: string | null;
   requestArtifactSha256: string | null;
   policyArtifactSha256: string | null;
+  sealedInputSha256: string | null;
   issues: string[];
   confirmationRequired: true;
   nextCapability:
-    "theory-formal-verifier.start" | "repair_formal_verification_inputs";
+    | string
+    | "repair_formal_verification_inputs";
   authority: CasimirFormalVerifierEvidenceAuthorityV1;
 };
 
@@ -53,11 +64,12 @@ export type CasimirFormalVerifierJobReceiptV1 = {
   ok: boolean;
   status: "running" | "needs_confirmation" | "blocked";
   planId: string | null;
+  sealedInputSha256: string | null;
   jobId: string | null;
   requestId: string | null;
   issues: string[];
   nextCapability:
-    | "theory-formal-verifier.read_result"
+    | string
     | "request_user_confirmation"
     | "repair_formal_verification_inputs";
   authority: CasimirFormalVerifierEvidenceAuthorityV1;
@@ -69,6 +81,7 @@ export type CasimirFormalVerifierResultV1 = {
   status: "running" | "completed" | "failed" | "blocked";
   jobId: string | null;
   planId: string | null;
+  sealedInputSha256: string | null;
   requestId: string | null;
   certificate: CasimirFormalVerificationCertificateV1 | null;
   issues: string[];
@@ -92,6 +105,7 @@ type CasimirFormalVerifierEvidenceAuthorityV1 = {
 type JobRecord = {
   jobId: string;
   planId: string;
+  sealedInputSha256: string;
   ownerKey: string;
   requestId: string;
   status: "running" | "completed" | "failed";
@@ -99,9 +113,14 @@ type JobRecord = {
   issues: string[];
 };
 
-type ServiceDependencies = {
+export type CasimirFormalVerifierJobServiceDependenciesV1 = {
   resolveLeanExecutablePath?: () => string | null;
   runner?: CasimirFormalLeanProcessRunnerV1;
+  verifyTrustedRuntimeReceipt?: TrustedRuntimeToolConfirmationVerifierV1;
+  confirmationReplayLedger?: TrustedRuntimeToolConfirmationReplayLedgerV1;
+  runtimeApprovalCapabilityId?: string;
+  readResultCapabilityId?: string;
+  now?: () => number;
 };
 
 const evidenceAuthority = (): CasimirFormalVerifierEvidenceAuthorityV1 => ({
@@ -184,9 +203,26 @@ async function safelyRemoveReplayTempRoot(root: string): Promise<void> {
 }
 
 export function createCasimirFormalVerifierJobService(
-  dependencies: ServiceDependencies = {},
+  dependencies: CasimirFormalVerifierJobServiceDependenciesV1 = {},
 ) {
+  if (dependencies.runner && process.env.NODE_ENV !== "test") {
+    throw new Error("formal_verifier_test_runner_forbidden");
+  }
   const jobs = new Map<string, JobRecord>();
+  const runtimeApprovalCapabilityId =
+    dependencies.runtimeApprovalCapabilityId?.trim() ||
+    CASIMIR_FORMAL_VERIFIER_START_CAPABILITY_ID;
+  const readResultCapabilityId =
+    dependencies.readResultCapabilityId?.trim() ||
+    CASIMIR_FORMAL_VERIFIER_READ_RESULT_CAPABILITY_ID;
+  const confirmationReceipts = createRuntimeToolConfirmationReceiptVerifierV1({
+    verifyTrustedRuntimeReceipt: dependencies.verifyTrustedRuntimeReceipt,
+    replayLedger: dependencies.confirmationReplayLedger,
+    requireDurableReplayProtection: Boolean(
+      dependencies.verifyTrustedRuntimeReceipt,
+    ),
+    now: dependencies.now,
+  });
 
   const resolveLeanExecutablePath = (): string | null =>
     dependencies.resolveLeanExecutablePath?.() ??
@@ -206,10 +242,9 @@ export function createCasimirFormalVerifierJobService(
       await validateCasimirFormalVerificationRequestIntegrityV1(
         input.sealedInput.request,
       );
-    const policyIssues =
-      await validateCasimirFormalLeanReplayPolicyIntegrityV1(
-        input.sealedInput.policy,
-      );
+    const policyIssues = await validateCasimirFormalLeanReplayPolicyIntegrityV1(
+      input.sealedInput.policy,
+    );
     issues.push(
       ...requestIssues.map((issue) => `request:${issue}`),
       ...policyIssues.map((issue) => `policy:${issue}`),
@@ -223,10 +258,9 @@ export function createCasimirFormalVerifierJobService(
         status: "blocked",
         planId: null,
         requestId: readOptionalString(requestRecord.requestId),
-        requestArtifactSha256: readOptionalString(
-          requestRecord.artifactSha256,
-        ),
+        requestArtifactSha256: readOptionalString(requestRecord.artifactSha256),
         policyArtifactSha256: readOptionalString(policyRecord.artifactSha256),
+        sealedInputSha256: null,
         issues: [...new Set(issues)].sort(),
         confirmationRequired: true,
         nextCapability: "repair_formal_verification_inputs",
@@ -271,6 +305,14 @@ export function createCasimirFormalVerifierJobService(
         entry.sourceSha256,
       ]),
     );
+    const policyAllowedImports = new Set(
+      input.sealedInput.policy.allowedImportModules,
+    );
+    for (const moduleName of expectedImports.keys()) {
+      if (!policyAllowedImports.has(moduleName)) {
+        issues.push(`import_module_not_allowed:${moduleName}`);
+      }
+    }
     if (
       JSON.stringify(Object.keys(importSourcePaths)) !==
       JSON.stringify([...expectedImports.keys()].sort())
@@ -303,6 +345,23 @@ export function createCasimirFormalVerifierJobService(
     }
 
     const uniqueIssues = [...new Set(issues)].sort();
+    const sealedInputSha256 =
+      uniqueIssues.length === 0
+        ? await computeCasimirSpecValueSha256V1({
+            domain: "casimir-theory-formal-verifier-sealed-input/v1",
+            request: input.sealedInput.request,
+            policy: input.sealedInput.policy,
+            theoremSourcePath:
+              "absolutePath" in sourceInspection
+                ? sourceInspection.absolutePath
+                : path.resolve(input.sealedInput.theoremSourcePath),
+            importSourcePaths,
+            leanExecutablePath:
+              executableInspection && !("issue" in executableInspection)
+                ? executableInspection.absolutePath
+                : null,
+          })
+        : null;
     const planId =
       uniqueIssues.length === 0
         ? await computeCasimirSpecValueSha256V1({
@@ -328,11 +387,12 @@ export function createCasimirFormalVerifierJobService(
       requestId: input.sealedInput.request?.requestId ?? null,
       requestArtifactSha256: input.sealedInput.request?.artifactSha256 ?? null,
       policyArtifactSha256: input.sealedInput.policy?.artifactSha256 ?? null,
+      sealedInputSha256,
       issues: uniqueIssues,
       confirmationRequired: true,
       nextCapability:
         uniqueIssues.length === 0
-          ? "theory-formal-verifier.start"
+          ? runtimeApprovalCapabilityId
           : "repair_formal_verification_inputs",
       authority: evidenceAuthority(),
     };
@@ -343,6 +403,9 @@ export function createCasimirFormalVerifierJobService(
     profileId?: string | null;
     sealedInput: CasimirFormalVerifierSealedInputV1;
     planId?: string | null;
+    sessionId?: string | null;
+    turnId?: string | null;
+    approvalReceipt?: unknown;
     approvalToken?: string | null;
   }): Promise<CasimirFormalVerifierJobReceiptV1> => {
     const planned = await plan(input);
@@ -352,6 +415,7 @@ export function createCasimirFormalVerifierJobService(
         ok: false,
         status: "blocked",
         planId: planned.planId,
+        sealedInputSha256: planned.sealedInputSha256,
         jobId: null,
         requestId: planned.requestId,
         issues: planned.issues,
@@ -365,6 +429,7 @@ export function createCasimirFormalVerifierJobService(
         ok: false,
         status: "blocked",
         planId: planned.planId,
+        sealedInputSha256: planned.sealedInputSha256,
         jobId: null,
         requestId: planned.requestId,
         issues: ["formal_verifier_plan_id_mismatch"],
@@ -372,16 +437,56 @@ export function createCasimirFormalVerifierJobService(
         authority: evidenceAuthority(),
       };
     }
-    if (!input.approvalToken?.trim()) {
+    const profileId = input.profileId?.trim() ?? "";
+    const sessionId = input.sessionId?.trim() ?? "";
+    const turnId = input.turnId?.trim() ?? "";
+    if (
+      input.approvalReceipt &&
+      (!profileId || !sessionId || !turnId || !planned.sealedInputSha256)
+    ) {
       return {
         schema: CASIMIR_FORMAL_VERIFIER_JOB_RECEIPT_SCHEMA,
         ok: false,
-        status: "needs_confirmation",
+        status: "blocked",
         planId: planned.planId,
+        sealedInputSha256: planned.sealedInputSha256,
         jobId: null,
         requestId: planned.requestId,
-        issues: ["runtime_approval_token_required"],
-        nextCapability: "request_user_confirmation",
+        issues: ["runtime_approval_receipt_binding_context_missing"],
+        nextCapability: "repair_formal_verification_inputs",
+        authority: evidenceAuthority(),
+      };
+    }
+    const confirmation = await confirmationReceipts.consume({
+      receipt: input.approvalReceipt,
+      legacyApprovalToken: input.approvalToken,
+      expectedBinding: {
+        capabilityId: runtimeApprovalCapabilityId,
+        planId: planned.planId,
+        accountType: input.accountType,
+        profileId,
+        sessionId,
+        turnId,
+        sealedInputSha256: planned.sealedInputSha256 ?? "",
+      },
+    });
+    if (!confirmation.ok) {
+      return {
+        schema: CASIMIR_FORMAL_VERIFIER_JOB_RECEIPT_SCHEMA,
+        ok: false,
+        status:
+          confirmation.status === "needs_confirmation"
+            ? "needs_confirmation"
+            : "blocked",
+        planId: planned.planId,
+        sealedInputSha256: planned.sealedInputSha256,
+        jobId: null,
+        requestId: planned.requestId,
+        issues: confirmation.issues,
+        nextCapability:
+          confirmation.status === "needs_confirmation"
+            ? "request_user_confirmation"
+            : "repair_formal_verification_inputs",
         authority: evidenceAuthority(),
       };
     }
@@ -397,10 +502,11 @@ export function createCasimirFormalVerifierJobService(
         ok: true,
         status: "running",
         planId: existing.planId,
+        sealedInputSha256: existing.sealedInputSha256,
         jobId: existing.jobId,
         requestId: existing.requestId,
         issues: [],
-        nextCapability: "theory-formal-verifier.read_result",
+        nextCapability: readResultCapabilityId,
         authority: evidenceAuthority(),
       };
     }
@@ -408,6 +514,7 @@ export function createCasimirFormalVerifierJobService(
     const job: JobRecord = {
       jobId: `casimir-formal-verifier:${randomUUID()}`,
       planId: planned.planId,
+      sealedInputSha256: planned.sealedInputSha256 as string,
       ownerKey: ownerKey(input.accountType, input.profileId),
       requestId: input.sealedInput.request.requestId,
       status: "running",
@@ -457,10 +564,11 @@ export function createCasimirFormalVerifierJobService(
       ok: true,
       status: "running",
       planId: planned.planId,
+      sealedInputSha256: job.sealedInputSha256,
       jobId: job.jobId,
       requestId: job.requestId,
       issues: [],
-      nextCapability: "theory-formal-verifier.read_result",
+      nextCapability: readResultCapabilityId,
       authority: evidenceAuthority(),
     };
   };
@@ -477,6 +585,7 @@ export function createCasimirFormalVerifierJobService(
         status: "blocked",
         jobId: input.jobId?.trim() || null,
         planId: null,
+        sealedInputSha256: null,
         requestId: null,
         certificate: null,
         issues: ["developer_account_required"],
@@ -492,6 +601,7 @@ export function createCasimirFormalVerifierJobService(
         status: "blocked",
         jobId: jobId || null,
         planId: null,
+        sealedInputSha256: null,
         requestId: null,
         certificate: null,
         issues: ["formal_verifier_job_not_found"],
@@ -504,6 +614,7 @@ export function createCasimirFormalVerifierJobService(
       status: job.status,
       jobId: job.jobId,
       planId: job.planId,
+      sealedInputSha256: job.sealedInputSha256,
       requestId: job.requestId,
       certificate: job.certificate,
       issues: [...job.issues],
@@ -513,18 +624,34 @@ export function createCasimirFormalVerifierJobService(
 
   const reset = (): void => {
     jobs.clear();
+    confirmationReceipts.reset();
   };
 
   return { plan, start, readResult, reset };
 }
 
-const defaultFormalVerifierJobService = createCasimirFormalVerifierJobService();
+let defaultFormalVerifierJobService = createCasimirFormalVerifierJobService();
 
-export const planCasimirFormalVerifierJobV1 =
-  defaultFormalVerifierJobService.plan;
-export const startCasimirFormalVerifierJobV1 =
-  defaultFormalVerifierJobService.start;
-export const readCasimirFormalVerifierJobResultV1 =
-  defaultFormalVerifierJobService.readResult;
-export const resetCasimirFormalVerifierJobsForTests =
-  defaultFormalVerifierJobService.reset;
+/**
+ * Trusted server-bootstrap installation point. This is intentionally not
+ * exposed through any route or tool argument: only server composition may
+ * supply the Lean resolver, process runner, or confirmation-receipt verifier.
+ */
+export const installCasimirFormalVerifierDependenciesForServerV1 = (
+  dependencies: CasimirFormalVerifierJobServiceDependenciesV1,
+): void => {
+  defaultFormalVerifierJobService =
+    createCasimirFormalVerifierJobService(dependencies);
+};
+
+export const planCasimirFormalVerifierJobV1 = (
+  input: Parameters<typeof defaultFormalVerifierJobService.plan>[0],
+) => defaultFormalVerifierJobService.plan(input);
+export const startCasimirFormalVerifierJobV1 = (
+  input: Parameters<typeof defaultFormalVerifierJobService.start>[0],
+) => defaultFormalVerifierJobService.start(input);
+export const readCasimirFormalVerifierJobResultV1 = (
+  input: Parameters<typeof defaultFormalVerifierJobService.readResult>[0],
+) => defaultFormalVerifierJobService.readResult(input);
+export const resetCasimirFormalVerifierJobsForTests = (): void =>
+  defaultFormalVerifierJobService.reset();

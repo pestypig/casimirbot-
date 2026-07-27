@@ -7,6 +7,26 @@ import {
 } from "../registry";
 import { runtimeMemoryGovernor } from "../../../runtime/runtime-memory-governor";
 import {
+  createLiveAnswerEnvironment,
+  resetLiveAnswerEnvironments,
+} from "../../../situation-room/live-answer-environment-store";
+import {
+  recordLiveFieldEvaluation,
+  resetLiveFieldEvaluationsForTest,
+} from "../../../situation-room/live-field-evaluation-store";
+import {
+  ensureLiveSituationRunForEnvironment,
+  resetLiveSituationRunsForTest,
+} from "../../../situation-room/live-situation-run-store";
+import {
+  appendObservationJournalEntry,
+  resetObservationJournalForTest,
+} from "../../../situation-room/observation-journal-store";
+import {
+  appendInterpretationCard,
+  resetInterpretationCardsForTest,
+} from "../../../situation-room/interpretation-card-store";
+import {
   buildScientificEvidencePacket,
   buildScientificImageEvidenceSidecar,
 } from "@shared/scientific-evidence-adaptor";
@@ -34,6 +54,8 @@ const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc";
 const REPO_SEARCH_CAPABILITY = "repo.search";
 const DOCS_SEARCH_CAPABILITY = "docs.search";
 const INTERNET_SEARCH_CAPABILITY = "internet-search.search_web";
+const VISUAL_SITUATION_OBSERVATION_CAPABILITY =
+  "situation-room.describe_visual_capture";
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers";
 const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text";
 const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters";
@@ -135,6 +157,11 @@ describe("Helix workstation tool gateway", () => {
     restoreEnvKey("GOOGLE_SEARCH_ENGINE_ID");
     globalThis.fetch = originalFetch;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
+    resetLiveAnswerEnvironments();
+    resetLiveSituationRunsForTest();
+    resetObservationJournalForTest();
+    resetLiveFieldEvaluationsForTest();
+    resetInterpretationCardsForTest();
     vi.restoreAllMocks();
   });
 
@@ -1169,6 +1196,39 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(JSON.stringify(result.observation)).not.toContain("secret body");
     expect(JSON.stringify(result.observation)).not.toContain("secret content");
+  });
+
+  it("reads bounded notes context from the canonical capability input envelope", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: WORKSTATION_NOTES_LIST_NOTES_CAPABILITY,
+      arguments: {
+        input: {
+          workspace_context: {
+            activePanel: "workstation-notes",
+            notes_context: {
+              notes: [],
+            },
+          },
+        },
+      },
+      turnId: "ask:test:gateway-notes-list-envelope",
+      iteration: 1,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: WORKSTATION_NOTES_LIST_NOTES_CAPABILITY,
+      observation: {
+        schema: "helix.workstation_notes_list_observation.v1",
+        status: "succeeded",
+        note_count: 0,
+      },
+      observation_packet: {
+        status: "succeeded",
+      },
+    });
   });
 
   it("blocks workstation-notes.list_notes when no bounded notes context was supplied", async () => {
@@ -3637,6 +3697,82 @@ describe("Helix workstation tool gateway", () => {
       },
     });
     expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
+  });
+
+  it("searches an adapter-admitted mechanics collection without requiring its document title", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query:
+          "what current evidence is needed before saying an actor can use an inventory item",
+        mechanics_collection_ids: ["mechanics.minecraft.java.v1"],
+        adapter_profile_id: "game.minecraft.readonly.v1",
+        max_hits: 4,
+      },
+      turnId: "ask:test:gateway-docs-mechanics-search",
+      iteration: 4,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation: {
+        mechanics_scope: {
+          adapter_profile_id: "game.minecraft.readonly.v1",
+          document_paths: [
+            "docs/game-mechanics/minecraft-java-v1.md",
+          ],
+          content_role: "mechanics_reference_not_live_observation",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+        paths: ["docs/game-mechanics/minecraft-java-v1.md"],
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+    });
+    const hits = (result.observation as {
+      hits?: Array<{ filePath?: string }>;
+    }).hits ?? [];
+    expect(hits.length).toBeGreaterThan(0);
+    expect(
+      hits.every(
+        (hit) =>
+          hit.filePath ===
+          "docs/game-mechanics/minecraft-java-v1.md",
+      ),
+    ).toBe(true);
+  });
+
+  it("fails closed when a mechanics collection does not match the named adapter profile", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "how does reachability work",
+        mechanics_collection_ids: [
+          "mechanics.synthetic_game.fixture.v1",
+        ],
+        adapter_profile_id: "game.minecraft.readonly.v1",
+      },
+      turnId: "ask:test:gateway-docs-mechanics-cross-profile",
+      iteration: 4,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "environment_mechanics_collection_unknown",
+      gateway_admission: {
+        admission_status: "blocked",
+      },
+      observation: {
+        status: "blocked",
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+    });
   });
 
   it("finds the NHM2 current status whitepaper from a multi-word docs query", async () => {
@@ -7809,6 +7945,180 @@ describe("Helix workstation tool gateway", () => {
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("keeps missing visual evidence as an admitted failed observation", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: VISUAL_SITUATION_OBSERVATION_CAPABILITY,
+      arguments: {
+        thread_id: "helix-ask:test:no-visual-evidence",
+        prompt: "What is happening right now in the visual screen capture?",
+        source_target_intent: {
+          target_source: "visual_capture",
+          target_kind: "visual_capture",
+          strength: "hard",
+        },
+      },
+      turnId: "ask:test:gateway-visual-evidence-unavailable",
+      iteration: 1,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: VISUAL_SITUATION_OBSERVATION_CAPABILITY,
+      error: "active_visual_situation_evidence_unavailable",
+      gateway_admission: {
+        admission_status: "admitted",
+      },
+      observation_packet: {
+        status: "failed",
+        missing_requirements: [
+          expect.objectContaining({
+            code: "active_visual_situation_evidence_unavailable",
+            repair_action: "retry",
+          }),
+        ],
+      },
+      tool_lifecycle_trace: {
+        requested_capability: VISUAL_SITUATION_OBSERVATION_CAPABILITY,
+        admitted_capability: VISUAL_SITUATION_OBSERVATION_CAPABILITY,
+        executed_capability: VISUAL_SITUATION_OBSERVATION_CAPABILITY,
+        lifecycle_stage: "failed",
+        failure_reason: "active_visual_situation_evidence_unavailable",
+      },
+      observation: {
+        status: "unavailable",
+        reentry_required: true,
+        answer_authority: false,
+        terminal_eligible: false,
+      },
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+  });
+
+  it("returns bounded active SituationRun evidence for runtime re-entry", async () => {
+    const threadId = "helix-ask:test:visual-evidence";
+    const sourceId = "visual_source:test:visual-evidence";
+    const now = new Date().toISOString();
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "seed:test:visual-evidence",
+      objective: "Describe the current visual scene.",
+      preset: "custom",
+      source_ids: [sourceId],
+    });
+    const initialRun = ensureLiveSituationRunForEnvironment({
+      environment,
+      advanceEpoch: false,
+    });
+    const observation = appendObservationJournalEntry({
+      thread_id: threadId,
+      observation_id: "observation:test:visual-evidence",
+      role: "model_perception_observation",
+      modality: "visual_frame",
+      source_id: sourceId,
+      source_binding_id: initialRun.source_binding_id,
+      text: "A workstation panel shows a visible Start button and status controls.",
+      evidence_refs: ["visual_evidence:test:visual-evidence"],
+      model_invoked: true,
+      confidence: 0.88,
+      created_at: now,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    const run = ensureLiveSituationRunForEnvironment({
+      environment,
+      observation,
+      sourceBindingId: initialRun.source_binding_id,
+      advanceEpoch: true,
+    });
+    recordLiveFieldEvaluation({
+      schema: "helix.live_field_evaluation.v1",
+      evaluation_id: "field_eval:test:visual-evidence:activity",
+      worker_run_id: "field_worker_run:test:visual-evidence:activity",
+      worker_id: "field_worker:test:visual-evidence",
+      situation_run_id: run.situation_run_id,
+      thread_id: threadId,
+      environment_id: environment.environment_id,
+      field_key: "activity",
+      value: "Reviewing a workstation panel with a Start button.",
+      status: "supported",
+      confidence: 0.86,
+      evidence_refs: [observation.observation_id],
+      missing_evidence: [],
+      corroboration_state: { visual: "present" },
+      next_check: "Observe the next frame for state changes.",
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+      created_at: now,
+      role: "ui_projection",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    appendInterpretationCard({
+      thread_id: threadId,
+      title: "Current visual scene",
+      summary: "The current frame shows a workstation panel with a Start button.",
+      evidence_refs: [observation.observation_id],
+      confidence: 0.86,
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    });
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: VISUAL_SITUATION_OBSERVATION_CAPABILITY,
+      arguments: {
+        thread_id: threadId,
+        prompt: "What is happening right now in the visual screen capture?",
+        source_target_intent: {
+          target_source: "visual_capture",
+          target_kind: "visual_capture",
+          strength: "hard",
+        },
+      },
+      turnId: "ask:test:gateway-visual-evidence",
+      iteration: 1,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: VISUAL_SITUATION_OBSERVATION_CAPABILITY,
+      gateway_admission: {
+        admission_status: "admitted",
+      },
+      observation_packet: {
+        status: "succeeded",
+      },
+      observation: {
+        schema: "helix.visual_situation_observation.v1",
+        status: "completed",
+        thread_id: threadId,
+        situation_run_id: run.situation_run_id,
+        visual_frame_evidence: {
+          answerable: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        situation_context_pack: {
+          schema: "helix.situation_context_pack.v1",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        observation_role: "evidence_not_assistant_answer",
+        reentry_required: true,
+        answer_authority: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+      },
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
     });
   });
 

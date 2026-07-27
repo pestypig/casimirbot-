@@ -6,6 +6,11 @@ import {
   type HelixSituationThreadBinding,
   type HelixSituationThreadBindingReceipt,
 } from "@shared/helix-situation-thread-binding";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 
 const bindings = new Map<string, HelixSituationThreadBinding>();
 
@@ -84,6 +89,7 @@ export function createSituationThreadBinding(input: {
   trace_id?: string | null;
   mode?: "observe_only" | "standby_receipts";
   append_policy?: "salient_only" | "all_receipts_debug";
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): HelixSituationThreadBindingReceipt {
   pruneBindings();
   const roomId = normalize(input.room_id);
@@ -94,6 +100,17 @@ export function createSituationThreadBinding(input: {
       ok: false,
       error: "missing_thread_context",
       message: "Situation thread binding requires room_id and thread_id.",
+    };
+  }
+  const sourceId = normalize(input.source_id);
+  const worldId = normalize(input.world_id);
+  if (isHelixRoomSourceIngressSourceId(sourceId)) {
+    return {
+      schema: HELIX_SITUATION_THREAD_BINDING_RECEIPT_SCHEMA,
+      ok: false,
+      error: HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+      message:
+        "Room-source transport admission does not grant Helix thread authority.",
     };
   }
   const now = new Date().toISOString();
@@ -111,9 +128,9 @@ export function createSituationThreadBinding(input: {
     binding_id: bindingId,
     binding_kind: inferBindingKind(input),
     room_id: roomId,
-    source_id: normalize(input.source_id),
+    source_id: sourceId,
     graph_id: normalize(input.graph_id),
-    world_id: normalize(input.world_id),
+    world_id: worldId,
     thread_id: threadId,
     turn_id: normalize(input.turn_id),
     session_id: normalize(input.session_id),
@@ -142,16 +159,22 @@ export function resolveSituationThreadBinding(input: {
   source_id?: string | null;
   graph_id?: string | null;
   world_id?: string | null;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): HelixSituationThreadBinding | null {
   pruneBindings();
   const roomId = normalize(input.room_id);
   if (!roomId) return null;
   const sourceId = normalize(input.source_id);
+  if (isHelixRoomSourceIngressSourceId(sourceId)) return null;
   const graphId = normalize(input.graph_id);
   const worldId = normalize(input.world_id);
-  const matches = Array.from(bindings.values()).filter(
-    (binding: HelixSituationThreadBinding) => binding.room_id === roomId,
-  );
+  const matches = Array.from(bindings.values())
+    .filter(
+      (binding: HelixSituationThreadBinding) => binding.room_id === roomId,
+    )
+    .filter(
+      (binding) => !isHelixRoomSourceIngressSourceId(binding.source_id),
+    );
   const graph = graphId ? matches.find((binding: HelixSituationThreadBinding) => binding.graph_id === graphId) : null;
   if (graph) return graph;
   const source = sourceId ? matches.find((binding: HelixSituationThreadBinding) => binding.source_id === sourceId) : null;
@@ -161,11 +184,31 @@ export function resolveSituationThreadBinding(input: {
   return matches.find((binding: HelixSituationThreadBinding) => binding.binding_kind === "room") ?? null;
 }
 
-export function listSituationThreadBindings(): HelixSituationThreadBinding[] {
+export function listSituationThreadBindings(_options: {
+  sourceAdmission?: HelixRoomSourceAdmission | null;
+} = {}): HelixSituationThreadBinding[] {
   pruneBindings();
-  return Array.from(bindings.values()).sort((a: HelixSituationThreadBinding, b: HelixSituationThreadBinding) =>
-    b.updated_at.localeCompare(a.updated_at),
-  );
+  return Array.from(bindings.values())
+    .filter(
+      (binding) => !isHelixRoomSourceIngressSourceId(binding.source_id),
+    )
+    .sort((a: HelixSituationThreadBinding, b: HelixSituationThreadBinding) =>
+      b.updated_at.localeCompare(a.updated_at),
+    );
+}
+
+export function removeSituationThreadBindings(input: {
+  sourceId?: string | null;
+  roomId?: string | null;
+}): number {
+  let removed = 0;
+  for (const [bindingId, binding] of bindings.entries()) {
+    if (input.sourceId && binding.source_id !== input.sourceId) continue;
+    if (input.roomId && binding.room_id !== input.roomId) continue;
+    bindings.delete(bindingId);
+    removed += 1;
+  }
+  return removed;
 }
 
 export function deleteSituationThreadBinding(bindingId: string): HelixSituationThreadBindingReceipt {

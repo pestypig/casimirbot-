@@ -3,6 +3,8 @@ import { HelixLoadingMark } from "@/components/common/HelixLoadingMark";
 import type { HelixAskMinimalRuntimeShellProps } from "./HelixAskMinimalRuntimeShell";
 import type { HelixAskConsoleProps } from "./HelixAskConsoleState";
 import { buildHelixAskConsoleRuntimeBridgeProps } from "./HelixAskConsoleRuntimeShellProps";
+import { AgentRunObserverBindingSurface } from
+  "./agent-run-observer/AgentRunObserverBindingSurface";
 
 const HelixAskLegacyRuntimeBridge = React.lazy(async () => {
   const module = await import("./HelixAskLegacyRuntimeBridge");
@@ -29,17 +31,29 @@ export function HelixAskConsoleRuntimeShell({
   minimalRuntime,
   ...props
 }: HelixAskConsoleRuntimeShellProps) {
+  const observer = (
+    <AgentRunObserverBindingSurface
+      className="mt-3"
+      contextId={props.contextId}
+    />
+  );
   if (runtimeImplementation === "minimal_runtime_shell") {
     return (
-      <Suspense fallback={<HelixLoadingMark title="Loading Helix Ask" compact />}>
-        <HelixAskMinimalRuntimeShell {...props} {...minimalRuntime} />
-      </Suspense>
+      <>
+        <Suspense fallback={<HelixLoadingMark title="Loading Helix Ask" compact />}>
+          <HelixAskMinimalRuntimeShell {...props} {...minimalRuntime} />
+        </Suspense>
+        {observer}
+      </>
     );
   }
 
   return (
-    <Suspense fallback={<HelixLoadingMark title="Loading Helix Ask" compact />}>
-      <HelixAskLegacyRuntimeBridge {...buildHelixAskConsoleRuntimeBridgeProps(props)} />
-    </Suspense>
+    <>
+      <Suspense fallback={<HelixLoadingMark title="Loading Helix Ask" compact />}>
+        <HelixAskLegacyRuntimeBridge {...buildHelixAskConsoleRuntimeBridgeProps(props)} />
+      </Suspense>
+      {observer}
+    </>
   );
 }

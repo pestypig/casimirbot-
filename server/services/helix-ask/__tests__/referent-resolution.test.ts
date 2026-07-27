@@ -64,6 +64,22 @@ const bodyWithRecentAnswers = (
 };
 
 describe("Helix Ask read-aloud referent resolution", () => {
+  it("resolves colon-delimited literal speech without treating this as an ambiguous referent", () => {
+    const resolution = resolveHelixAskReadAloudReferent({
+      turn_id: "ask:test:literal-voice",
+      question: "Say this aloud: The evidence is diagnostic, not conclusive.",
+    });
+
+    expect(resolution.resolvedText).toBe("The evidence is diagnostic, not conclusive.");
+    expect(resolution.trace).toMatchObject({
+      requested_action: "text_to_speech.speak_text",
+      referent_phrase: "explicit_colon_text",
+      source_kind: "user_prompt_literal",
+      resolution_confidence: "high",
+      tool_argument_source: "referent_resolution:user_prompt_literal",
+    });
+  });
+
   it("resolves last statement aloud to the previous assistant final answer", () => {
     const resolution = resolveHelixAskReadAloudReferent(
       bodyWithPreviousAnswer("ok can you read the last statement outload?"),

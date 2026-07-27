@@ -22,6 +22,7 @@ Surface-specific aliases use the same observation schema:
 - `docs-viewer.read_visible_surface`
 - `docs-viewer.read_active_translation`
 - `scientific-calculator.read_visible_result`
+- `scientific-calculator.read_visible_theory_run_result`
 
 ## Authority
 
@@ -56,6 +57,13 @@ Blocked inputs:
 - hidden UI state or secrets
 - missing translation text for `docs-viewer.read_active_translation`
 - missing visible result for `scientific-calculator.read_visible_result`
+- request/receipt mismatch or missing selected runtime result for
+  `scientific-calculator.read_visible_theory_run_result`
+
+The theory-run read requires `request_id` and `receipt_id` and returns
+`helix.theory_run_context_observation.v1`. That observation is bounded,
+non-terminal evidence for a current-turn model re-entry; it cannot promote the
+runtime output into a verified scientific claim.
 - quoted, negated, future, historical, or screen-visible mentions that are not
   affirmative operator requests
 

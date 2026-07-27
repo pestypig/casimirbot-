@@ -5,6 +5,11 @@ import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegis
 
 export type { ChatMessage, ChatRole, ChatSession };
 
+export type AppendAgiChatMessageOnceResult = {
+  inserted: boolean;
+  message: ChatMessage | null;
+};
+
 interface AgiChatStore {
   sessions: Record<string, ChatSession>;
   activeId?: string;
@@ -14,14 +19,18 @@ interface AgiChatStore {
   setActive: (id: string) => void;
   addMessage: (
     sessionId: string,
-    msg: Omit<ChatMessage, "id" | "at" | "tokens"> & { tokens?: number }
+    msg: Omit<ChatMessage, "id" | "at" | "tokens"> & { tokens?: number },
   ) => ChatMessage;
+  appendMessageOnce: (
+    sessionId: string,
+    completeMessage: ChatMessage,
+  ) => AppendAgiChatMessageOnceResult;
   ensureContextSession: (contextId: string, title?: string) => string;
   getThreadForContext: (contextId: string | null) => ChatSession | undefined;
   addContextMessage: (
     contextId: string,
     msg: Omit<ChatMessage, "id" | "at" | "tokens"> & { tokens?: number },
-    title?: string
+    title?: string,
   ) => ChatMessage | null;
   setPersona: (sessionId: string, personaId: string) => void;
   clearSession: (sessionId: string) => void;
@@ -31,12 +40,16 @@ interface AgiChatStore {
   totals: (sessionId: string) => { tokens: number; messages: number };
 }
 
+type PersistedAgiChatState = Pick<AgiChatStore, "sessions" | "activeId">;
+
 export const estimateTokens = (text: string) => {
   const rough = Math.ceil(text.trim().length / 4);
   return Math.max(1, rough);
 };
 
-const rawBudget = Number(import.meta.env?.VITE_CHAT_CONTEXT_BUDGET_TOKENS ?? 8192);
+const rawBudget = Number(
+  import.meta.env?.VITE_CHAT_CONTEXT_BUDGET_TOKENS ?? 8192,
+);
 
 export const CHAT_CONTEXT_BUDGET =
   Number.isFinite(rawBudget) && rawBudget > 0 ? Math.floor(rawBudget) : 8192;
@@ -49,6 +62,10 @@ const AGI_CHAT_MAX_PERSISTED_CONTENT_CHARS = 12_000;
 const AGI_CHAT_MAX_PERSISTED_HELIX_ASK_CHARS = 6_000;
 const AGI_CHAT_MAX_STORAGE_CHARS = 1_500_000;
 const AGI_CHAT_MIN_STORAGE_CHARS = 220_000;
+const AGENT_RUN_OBSERVER_TERMINAL_PROJECTION_SCHEMA =
+  "helix.agent_run_observer.terminal_projection.v1";
+const PERSISTED_CHAT_TRUNCATION_SUFFIX =
+  /\n\.\.\.\[truncated (\d+) chars for saved chat copy\]$/;
 
 function titleFromFirstMessage(content: string): string {
   const normalized = content.trim().replace(/\s+/g, " ");
@@ -81,6 +98,69 @@ function truncatePersistedText(value: string, limit: number): string {
   return `${value.slice(0, Math.max(0, limit - 48))}\n...[truncated ${value.length - limit} chars for saved chat copy]`;
 }
 
+function isPersistedChatTruncationOf(
+  persistedContent: string,
+  completeContent: string,
+): boolean {
+  const match = PERSISTED_CHAT_TRUNCATION_SUFFIX.exec(persistedContent);
+  if (!match || match.index < 0) return false;
+  const omittedCount = Number(match[1]);
+  if (!Number.isSafeInteger(omittedCount) || omittedCount <= 0) return false;
+  const originalLimit = completeContent.length - omittedCount;
+  const persistedPrefix = persistedContent.slice(0, match.index);
+  return (
+    originalLimit >= 48 &&
+    persistedPrefix.length === originalLimit - 48 &&
+    completeContent.startsWith(persistedPrefix)
+  );
+}
+
+function terminalProjectionIdentity(message: ChatMessage): {
+  bindingRef: string;
+  authorityRef: string;
+  terminalTextHash: string;
+} | null {
+  const metadata = message.helixAsk;
+  if (
+    message.role !== "assistant" ||
+    !metadata ||
+    metadata.schema !== AGENT_RUN_OBSERVER_TERMINAL_PROJECTION_SCHEMA ||
+    typeof metadata.binding_ref !== "string" ||
+    !metadata.binding_ref.trim() ||
+    typeof metadata.authority_ref !== "string" ||
+    !metadata.authority_ref.trim() ||
+    typeof metadata.terminal_text_hash !== "string" ||
+    !metadata.terminal_text_hash.trim()
+  ) {
+    return null;
+  }
+  return {
+    bindingRef: metadata.binding_ref,
+    authorityRef: metadata.authority_ref,
+    terminalTextHash: metadata.terminal_text_hash,
+  };
+}
+
+function isRestorablePersistedTerminalCopy(
+  persisted: ChatMessage,
+  complete: ChatMessage,
+): boolean {
+  const persistedIdentity = terminalProjectionIdentity(persisted);
+  const completeIdentity = terminalProjectionIdentity(complete);
+  return Boolean(
+    persistedIdentity &&
+    completeIdentity &&
+    persisted.id === complete.id &&
+    persisted.at === complete.at &&
+    persisted.traceId === complete.traceId &&
+    persisted.tool === complete.tool &&
+    persistedIdentity.bindingRef === completeIdentity.bindingRef &&
+    persistedIdentity.authorityRef === completeIdentity.authorityRef &&
+    persistedIdentity.terminalTextHash === completeIdentity.terminalTextHash &&
+    isPersistedChatTruncationOf(persisted.content, complete.content),
+  );
+}
+
 function clampUnknownForStorage(value: unknown, limit: number): unknown {
   if (!value || typeof value !== "object") return value;
   try {
@@ -88,24 +168,32 @@ function clampUnknownForStorage(value: unknown, limit: number): unknown {
     if (serialized.length <= limit) return value;
     return {
       truncated: true,
-      storage_note: "large Helix Ask metadata omitted from browser-saved chat copy",
+      storage_note:
+        "large Helix Ask metadata omitted from browser-saved chat copy",
       original_char_length: serialized.length,
       preview: serialized.slice(0, limit),
     };
   } catch {
     return {
       truncated: true,
-      storage_note: "unserializable Helix Ask metadata omitted from browser-saved chat copy",
+      storage_note:
+        "unserializable Helix Ask metadata omitted from browser-saved chat copy",
     };
   }
 }
 
-function normalizeMessageForStorage(message: ChatMessage, contentLimit = AGI_CHAT_MAX_PERSISTED_CONTENT_CHARS): ChatMessage {
+function normalizeMessageForStorage(
+  message: ChatMessage,
+  contentLimit = AGI_CHAT_MAX_PERSISTED_CONTENT_CHARS,
+): ChatMessage {
   return {
     ...message,
     content: truncatePersistedText(message.content ?? "", contentLimit),
     tokens: message.tokens ?? estimateTokens(message.content ?? ""),
-    helixAsk: clampUnknownForStorage(message.helixAsk, AGI_CHAT_MAX_PERSISTED_HELIX_ASK_CHARS) as ChatMessage["helixAsk"],
+    helixAsk: clampUnknownForStorage(
+      message.helixAsk,
+      AGI_CHAT_MAX_PERSISTED_HELIX_ASK_CHARS,
+    ) as ChatMessage["helixAsk"],
   };
 }
 
@@ -125,25 +213,38 @@ function normalizeSessionForStorage(
   };
 }
 
-function buildPersistedChatState(state: Pick<AgiChatStore, "sessions" | "activeId">) {
+function buildPersistedChatState(
+  state: PersistedAgiChatState,
+): PersistedAgiChatState {
   const sessions = Object.values(state.sessions ?? {})
     .sort((left, right) => {
       if (left.id === state.activeId) return -1;
       if (right.id === state.activeId) return 1;
-      return scoreTimestamp(right.updatedAt ?? right.createdAt) - scoreTimestamp(left.updatedAt ?? left.createdAt);
+      return (
+        scoreTimestamp(right.updatedAt ?? right.createdAt) -
+        scoreTimestamp(left.updatedAt ?? left.createdAt)
+      );
     })
     .slice(0, AGI_CHAT_MAX_PERSISTED_SESSIONS)
     .map((session) => normalizeSessionForStorage(session));
   return {
-    sessions: Object.fromEntries(sessions.map((session) => [session.id, session])),
+    sessions: Object.fromEntries(
+      sessions.map((session) => [session.id, session]),
+    ),
     activeId: state.activeId,
   };
 }
 
-function clampPersistedChatEnvelope(envelope: unknown, targetChars = AGI_CHAT_MAX_STORAGE_CHARS): unknown {
-  const record = envelope && typeof envelope === "object"
-    ? envelope as { state?: { sessions?: Record<string, ChatSession>; activeId?: string } }
-    : null;
+function clampPersistedChatEnvelope(
+  envelope: unknown,
+  targetChars = AGI_CHAT_MAX_STORAGE_CHARS,
+): unknown {
+  const record =
+    envelope && typeof envelope === "object"
+      ? (envelope as {
+          state?: { sessions?: Record<string, ChatSession>; activeId?: string };
+        })
+      : null;
   const sourceState = {
     sessions: record?.state?.sessions ?? {},
     activeId: record?.state?.activeId,
@@ -157,19 +258,29 @@ function clampPersistedChatEnvelope(envelope: unknown, targetChars = AGI_CHAT_MA
       ...buildPersistedChatState(sourceState),
     },
   };
-  while (JSON.stringify(next).length > targetChars && targetChars >= AGI_CHAT_MIN_STORAGE_CHARS) {
+  while (
+    JSON.stringify(next).length > targetChars &&
+    targetChars >= AGI_CHAT_MIN_STORAGE_CHARS
+  ) {
     const sessions = Object.values(sourceState.sessions)
       .sort((left, right) => {
         if (left.id === sourceState.activeId) return -1;
         if (right.id === sourceState.activeId) return 1;
-        return scoreTimestamp(right.updatedAt ?? right.createdAt) - scoreTimestamp(left.updatedAt ?? left.createdAt);
+        return (
+          scoreTimestamp(right.updatedAt ?? right.createdAt) -
+          scoreTimestamp(left.updatedAt ?? left.createdAt)
+        );
       })
       .slice(0, sessionLimit)
-      .map((session) => normalizeSessionForStorage(session, messageLimit, contentLimit));
+      .map((session) =>
+        normalizeSessionForStorage(session, messageLimit, contentLimit),
+      );
     next = {
       ...(record ?? {}),
       state: {
-        sessions: Object.fromEntries(sessions.map((session) => [session.id, session])),
+        sessions: Object.fromEntries(
+          sessions.map((session) => [session.id, session]),
+        ),
         activeId: sourceState.activeId,
       },
     };
@@ -191,7 +302,7 @@ function clampPersistedChatEnvelope(envelope: unknown, targetChars = AGI_CHAT_MA
   return next;
 }
 
-const safeAgiChatStorage = createJSONStorage<Pick<AgiChatStore, "sessions" | "activeId">>(() => ({
+const safeAgiChatStorage = createJSONStorage<PersistedAgiChatState>(() => ({
   getItem: (name) => {
     try {
       if (typeof window === "undefined") return null;
@@ -211,14 +322,28 @@ const safeAgiChatStorage = createJSONStorage<Pick<AgiChatStore, "sessions" | "ac
         const parsed = JSON.parse(value);
         const clamped = JSON.stringify(clampPersistedChatEnvelope(parsed));
         window.localStorage.setItem(name, clamped);
-        console.warn("[agi-chat] saved chat copy was truncated after storage quota pressure", error);
+        console.warn(
+          "[agi-chat] saved chat copy was truncated after storage quota pressure",
+          error,
+        );
       } catch (secondError) {
         try {
           if (typeof window !== "undefined") {
-            window.localStorage.setItem(name, JSON.stringify(clampPersistedChatEnvelope(JSON.parse(value), AGI_CHAT_MIN_STORAGE_CHARS)));
+            window.localStorage.setItem(
+              name,
+              JSON.stringify(
+                clampPersistedChatEnvelope(
+                  JSON.parse(value),
+                  AGI_CHAT_MIN_STORAGE_CHARS,
+                ),
+              ),
+            );
           }
         } catch {
-          console.warn("[agi-chat] localStorage write skipped after quota pressure", secondError);
+          console.warn(
+            "[agi-chat] localStorage write skipped after quota pressure",
+            secondError,
+          );
         }
       }
     }
@@ -234,7 +359,7 @@ const safeAgiChatStorage = createJSONStorage<Pick<AgiChatStore, "sessions" | "ac
 }));
 
 export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
-  persist(
+  persist<AgiChatStore, [], [], PersistedAgiChatState>(
     (set, get) => ({
       sessions: {},
       activeId: undefined,
@@ -250,11 +375,11 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           updatedAt: now,
           personaId: "default",
           contextId,
-          messages: []
+          messages: [],
         };
         set((state) => ({
           sessions: { ...state.sessions, [id]: session },
-          activeId: id
+          activeId: id,
         }));
         registerChatMemoryArtifact(session);
         return id;
@@ -265,7 +390,7 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           id: crypto.randomUUID(),
           at: new Date().toISOString(),
           tokens: partial.tokens ?? estimateTokens(partial.content),
-          ...partial
+          ...partial,
         };
         set((state) => {
           const target = state.sessions[sessionId];
@@ -275,28 +400,100 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
             title:
               partial.role === "user" &&
               target.messages.length === 0 &&
-              (DEFAULT_CHAT_TITLES.has(target.title) || target.title === target.contextId)
+              (DEFAULT_CHAT_TITLES.has(target.title) ||
+                target.title === target.contextId)
                 ? titleFromFirstMessage(partial.content)
                 : target.title,
             messages: [...target.messages, complete],
-            updatedAt: complete.at
+            updatedAt: complete.at,
           };
           registerChatMemoryArtifact(updatedSession);
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: updatedSession
-            }
+              [sessionId]: updatedSession,
+            },
           };
         });
         return complete;
+      },
+      appendMessageOnce: (sessionId, completeMessage) => {
+        let result: AppendAgiChatMessageOnceResult = {
+          inserted: false,
+          message: null,
+        };
+        if (!sessionId.trim() || !completeMessage.id.trim()) {
+          return result;
+        }
+        set((state) => {
+          const target = state.sessions[sessionId];
+          if (!target) return state;
+          const existing = target.messages.find(
+            (message) => message.id === completeMessage.id,
+          );
+          if (existing) {
+            if (isRestorablePersistedTerminalCopy(existing, completeMessage)) {
+              const restoredMessage: ChatMessage = {
+                ...completeMessage,
+                tokens:
+                  completeMessage.tokens ??
+                  estimateTokens(completeMessage.content),
+              };
+              const updatedSession: ChatSession = {
+                ...target,
+                messages: target.messages.map((message) =>
+                  message.id === restoredMessage.id ? restoredMessage : message,
+                ),
+                updatedAt:
+                  scoreTimestamp(restoredMessage.at) >=
+                  scoreTimestamp(target.updatedAt)
+                    ? restoredMessage.at
+                    : target.updatedAt,
+              };
+              result = { inserted: false, message: restoredMessage };
+              registerChatMemoryArtifact(updatedSession);
+              return {
+                sessions: {
+                  ...state.sessions,
+                  [sessionId]: updatedSession,
+                },
+              };
+            }
+            result = { inserted: false, message: existing };
+            return state;
+          }
+          const message: ChatMessage = {
+            ...completeMessage,
+            tokens:
+              completeMessage.tokens ?? estimateTokens(completeMessage.content),
+          };
+          const updatedSession: ChatSession = {
+            ...target,
+            messages: [...target.messages, message],
+            updatedAt:
+              scoreTimestamp(message.at) >= scoreTimestamp(target.updatedAt)
+                ? message.at
+                : target.updatedAt,
+          };
+          result = { inserted: true, message };
+          registerChatMemoryArtifact(updatedSession);
+          return {
+            sessions: {
+              ...state.sessions,
+              [sessionId]: updatedSession,
+            },
+          };
+        });
+        return result;
       },
       ensureContextSession: (contextId, title) => {
         const key = contextId?.trim();
         if (!key) {
           return "";
         }
-        const existing = Object.values(get().sessions).find((session) => session.contextId === key);
+        const existing = Object.values(get().sessions).find(
+          (session) => session.contextId === key,
+        );
         if (existing) {
           return existing.id;
         }
@@ -309,10 +506,10 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           updatedAt: now,
           personaId: "default",
           contextId: key,
-          messages: []
+          messages: [],
         };
         set((state) => ({
-          sessions: { ...state.sessions, [id]: session }
+          sessions: { ...state.sessions, [id]: session },
         }));
         registerChatMemoryArtifact(session);
         return id;
@@ -321,7 +518,9 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
         if (!contextId) return undefined;
         const key = contextId.trim();
         if (!key) return undefined;
-        return Object.values(get().sessions).find((session) => session.contextId === key);
+        return Object.values(get().sessions).find(
+          (session) => session.contextId === key,
+        );
       },
       addContextMessage: (contextId, partial, title) => {
         if (!contextId?.trim()) {
@@ -343,8 +542,8 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: updatedSession
-            }
+              [sessionId]: updatedSession,
+            },
           };
         }),
       clearSession: (sessionId) =>
@@ -357,8 +556,8 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: updatedSession
-            }
+              [sessionId]: updatedSession,
+            },
           };
         }),
       deleteSession: (sessionId) =>
@@ -366,13 +565,19 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           if (!state.sessions[sessionId]) return state;
           const nextSessions = { ...state.sessions };
           delete nextSessions[sessionId];
-          useWorkspaceMemoryRegistryStore.getState().removeArtifact(`helix-chat-session:${sessionId}`);
-          useWorkspaceMemoryRegistryStore.getState().removeArtifact(`helix-chat-layout:${sessionId}`);
+          useWorkspaceMemoryRegistryStore
+            .getState()
+            .removeArtifact(`helix-chat-session:${sessionId}`);
+          useWorkspaceMemoryRegistryStore
+            .getState()
+            .removeArtifact(`helix-chat-layout:${sessionId}`);
           const nextActive =
-            state.activeId === sessionId ? Object.keys(nextSessions)[0] : state.activeId;
+            state.activeId === sessionId
+              ? Object.keys(nextSessions)[0]
+              : state.activeId;
           return {
             sessions: nextSessions,
-            activeId: nextActive
+            activeId: nextActive,
           };
         }),
       renameSession: (sessionId, title) =>
@@ -385,8 +590,8 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: updatedSession
-            }
+              [sessionId]: updatedSession,
+            },
           };
         }),
       mergeSessions: (incoming) =>
@@ -409,8 +614,12 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
               activeId = activeId ?? session.id;
               continue;
             }
-            const existingStamp = scoreTimestamp(existing.updatedAt ?? existing.createdAt);
-            const incomingStamp = scoreTimestamp(session.updatedAt ?? session.createdAt);
+            const existingStamp = scoreTimestamp(
+              existing.updatedAt ?? existing.createdAt,
+            );
+            const incomingStamp = scoreTimestamp(
+              session.updatedAt ?? session.createdAt,
+            );
             if (incomingStamp >= existingStamp) {
               const incomingMessages = session.messages ?? [];
               const hasIncomingMessages = incomingMessages.length > 0;
@@ -423,7 +632,7 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
                 messages:
                   hasIncomingMessages || hasZeroCount
                     ? incomingMessages
-                    : existing.messages
+                    : existing.messages,
               };
               registerChatMemoryArtifact(sessions[session.id]);
             }
@@ -438,16 +647,18 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           0,
         );
         return { tokens, messages: sess.messages.length };
-      }
+      },
     }),
     {
       name: AGI_CHAT_STORAGE_KEY,
       storage: safeAgiChatStorage,
       partialize: buildPersistedChatState,
       onRehydrateStorage: () => (state) => {
-        Object.values(state?.sessions ?? {}).forEach(registerChatMemoryArtifact);
+        Object.values(state?.sessions ?? {}).forEach(
+          registerChatMemoryArtifact,
+        );
         state?.setHydrated(true);
       },
-    }
-  )
+    },
+  ),
 );

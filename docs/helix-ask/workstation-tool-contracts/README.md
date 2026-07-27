@@ -16,11 +16,11 @@ Codex/provider gateway classification, also read:
 
 ## Maturity Labels
 
-| Label | Meaning |
-| --- | --- |
-| `draft` | Matches the current intended gateway lifecycle, but still needs broader UI/API validation. |
-| `candidate` | Covered by deterministic API tests and at least one live UI smoke for the named capability. |
-| `stable` | Covered by API matrix, UI projection validation, negative admission tests, debug export parity, and panel projection tests where applicable. |
+| Label       | Meaning                                                                                                                                      |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `draft`     | Matches the current intended gateway lifecycle, but still needs broader UI/API validation.                                                   |
+| `candidate` | Covered by deterministic API tests and at least one live UI smoke for the named capability.                                                  |
+| `stable`    | Covered by API matrix, UI projection validation, negative admission tests, debug export parity, and panel projection tests where applicable. |
 
 Do not promote a contract because the final prose looked good. Promotion
 requires structured evidence: request, admission, execution, observation packet,
@@ -116,13 +116,13 @@ through typed payloads and typed non-payload rows. Compatibility does not mean
 that every badge is numerically solvable. It means every badge can be projected
 into one of these lanes without ambiguity:
 
-| Lane | Badge requirement | Calculator behavior |
-| --- | --- | --- |
-| Scalar payload | `calculatorPayloads[]` with an expression, units, assumptions, source refs, and setup context when available | May prefill, bind variables, and solve only after required numeric values are present |
-| Runtime context | Runtime, artifact, tensor, gate, or simulation-specific evidence refs | May show context or load a compound run; scalar calculator must not claim the runtime result |
-| Reference context | Laws, definitions, tensor equations, worldline integrals, or noncomputable references | May display or explain the expression; no numeric receipt is allowed |
-| Diagnostic gate | Gate-status equations, pass/fail semantics, or verification requirements | May report gate context; cannot convert gate status into proof without the required verifier receipt |
-| Claim boundary | Explicit limits on validation, physical mechanism, promotion, or proof maturity | Must travel with any loadout, answer, or recommended action |
+| Lane              | Badge requirement                                                                                            | Calculator behavior                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Scalar payload    | `calculatorPayloads[]` with an expression, units, assumptions, source refs, and setup context when available | May prefill, bind variables, and solve only after required numeric values are present                |
+| Runtime context   | Runtime, artifact, tensor, gate, or simulation-specific evidence refs                                        | May show context or load a compound run; scalar calculator must not claim the runtime result         |
+| Reference context | Laws, definitions, tensor equations, worldline integrals, or noncomputable references                        | May display or explain the expression; no numeric receipt is allowed                                 |
+| Diagnostic gate   | Gate-status equations, pass/fail semantics, or verification requirements                                     | May report gate context; cannot convert gate status into proof without the required verifier receipt |
+| Claim boundary    | Explicit limits on validation, physical mechanism, promotion, or proof maturity                              | Must travel with any loadout, answer, or recommended action                                          |
 
 Adding a researched paper, function, equation, or badge to the Theory Badge
 Graph is acceptable only when the patch declares which lane it occupies. A
@@ -227,86 +227,109 @@ Each capability contract should define:
 
 ## Current Draft Contracts
 
-| Capability | Contract | Maturity |
-| --- | --- | --- |
-| `workspace_os.status` | [workspace_os.status.md](workspace_os.status.md) | `draft` |
-| `workstation.active_context` | [workstation.active_context.md](workstation.active_context.md) | `draft` |
-| `theory-badge-graph.current_context` | [theory-badge-graph.current_context.md](theory-badge-graph.current_context.md) | `draft` |
-| `workstation-notes.list_notes` | [workstation-notes.list_notes.md](workstation-notes.list_notes.md) | `draft` |
-| `scientific-calculator.solve_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
-| `scientific-calculator.solve_scalar_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
-| `scientific-calculator.classify_expression` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
-| `scientific-calculator.bind_variables` | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md) | `candidate` |
-| `scientific-calculator.active_context` | [scientific-calculator.active_context.md](scientific-calculator.active_context.md) | `draft` |
-| `workstation.readable_surface.observe` | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md) | `draft` |
-| `docs-viewer.read_visible_surface` | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md) | `draft` |
-| `docs-viewer.read_active_translation` | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md) | `draft` |
-| `scientific-calculator.read_visible_result` | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md) | `draft` |
-| `scientific-calculator.open_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
-| `scientific-calculator.focus_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
-| `scientific-calculator.show_gateway_solve` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
-| `scientific-calculator.prefill_expression` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
-| `account_session.set_interface_language` | [workstation.dynamic_panel_action_boundaries.md](workstation.dynamic_panel_action_boundaries.md) | `draft` |
-| `workstation.open_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
-| `workstation.focus_panel` | [workstation.panel_actions.md](workstation.panel_actions.md) | `draft` |
-| `docs-viewer.open_doc` | [docs-viewer.open_doc.md](docs-viewer.open_doc.md) | `draft` |
-| `docs.search` | [docs.search.md](docs.search.md) | `draft` |
-| `repo.search` | [repo.search.md](repo.search.md) | `draft` |
-| `research-library.read_document` | [research-library.read_document.md](research-library.read_document.md) | `draft` |
-| `research-library.apply_evidence_enrichment` | [research-library.apply_evidence_enrichment.md](research-library.apply_evidence_enrichment.md) | `draft` |
-| `theory-badge-graph.reflect_discussion_context` | [theory-badge-graph.reflect_discussion_context.md](theory-badge-graph.reflect_discussion_context.md) | `candidate` |
-| `theory-badge-graph.propose_frontier_conjectures` | [theory-badge-graph.propose_frontier_conjectures.md](theory-badge-graph.propose_frontier_conjectures.md) | `draft` |
-| `theory-formal-verifier.plan` | [theory-formal-verifier.md](theory-formal-verifier.md) | `draft` |
-| `theory-formal-verifier.start` | [theory-formal-verifier.md](theory-formal-verifier.md) | `draft` |
-| `theory-formal-verifier.read_result` | [theory-formal-verifier.md](theory-formal-verifier.md) | `draft` |
-| `moral-graph.reflect_context` | [moral-graph.reflect_context.md](moral-graph.reflect_context.md) | `draft` |
-| `moral-graph.reflect_living_substrate_context` | [moral-graph.reflect_living_substrate_context.md](moral-graph.reflect_living_substrate_context.md) | `candidate` |
-| `civilization-bounds.reflect_system_bounds` | [civilization-bounds.reflect_system_bounds.md](civilization-bounds.reflect_system_bounds.md) | `candidate` |
-| `scholarly-research.lookup_papers` | [scholarly-research.lookup_papers.md](scholarly-research.lookup_papers.md) | `draft` |
-| `scholarly-research.fetch_full_text` | [scholarly-research.fetch_full_text.md](scholarly-research.fetch_full_text.md) | `draft` |
-| `scholarly-research.extract_numeric_parameters` | [scholarly-research.extract_numeric_parameters.md](scholarly-research.extract_numeric_parameters.md) | `draft` |
-| `internet-search.search_web` | [internet-search.search_web.md](internet-search.search_web.md) | `draft` |
-| `text_to_speech.speak_text` | [live_env.request_interim_voice_callout.md](live_env.request_interim_voice_callout.md) | `draft` |
-| `live_env.request_interim_voice_callout` | [live_env.request_interim_voice_callout.md](live_env.request_interim_voice_callout.md) | `draft` |
-| `live_env.narrator_say` | [live_env.narrator_say.md](live_env.narrator_say.md) | `draft` |
-| `live_env.query_trace_memory` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
-| `live_env.query_narrator_events` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
-| `live_env.query_audio_transcripts` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
-| `live_env.query_visual_summaries` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
-| `live_env.query_translation_segments` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
-| `live_env.query_microdeck_outputs` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
-| `live_env.query_live_answer_state` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
-| `live_env.query_packet_traces` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
-| `live_env.query_route_evidence` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
-| `live_env.query_automation_policies` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
-| `live_env.query_source_health` | [live_env.context_feed_queries.md](live_env.context_feed_queries.md) | `draft` |
-| `live_env.query_live_source_loop_health` | [live_env.query_live_source_loop_health.md](live_env.query_live_source_loop_health.md) | `draft` |
-| `live_env.query_live_source_quality` | [live_env.live_source_state_reads.md](live_env.live_source_state_reads.md) | `draft` |
-| `live_env.query_workstation_goal_context` | [live_env.live_source_state_reads.md](live_env.live_source_state_reads.md) | `draft` |
-| `live_env.summarize_live_source_current_state` | [live_env.live_source_state_reads.md](live_env.live_source_state_reads.md) | `draft` |
-| `live_env.query_event_log` | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md) | `draft` |
-| `live_env.query_world_events` | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md) | `draft` |
-| `live_env.query_navigation_state` | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md) | `draft` |
-| `live_env.query_stage_sources` | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md) | `draft` |
-| `live_env.query_constructs` | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md) | `draft` |
-| `live_env.query_job_evidence` | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md) | `draft` |
-| `live_env.check_live_source_mail` | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md) | `draft` |
-| `live_env.read_live_source_mail` | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md) | `draft` |
-| `live_env.read_processed_live_source_mail` | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md) | `draft` |
-| `live_env.reflect_live_source_mail_loop` | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md) | `draft` |
-| `live_env.compare_mail_to_interpreter_profile` | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md) | `draft` |
-| `live_env.validate_live_source_prediction` | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md) | `draft` |
-| `live_env.predict_live_source_immediate` | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md) | `draft` |
-| `live_env.compare_live_source_prediction` | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md) | `draft` |
-| `live_env.describe_stage_builder` | [live_env.stage_play_builder_reads.md](live_env.stage_play_builder_reads.md) | `draft` |
-| `live_env.validate_stage_play_graph` | [live_env.stage_play_builder_reads.md](live_env.stage_play_builder_reads.md) | `draft` |
-| `live_env.plan_stage_play_job` | [live_env.stage_play_builder_reads.md](live_env.stage_play_builder_reads.md) | `draft` |
-| `live_env.query_micro_reasoner_presets` | [live_env.micro_reasoner_read_tools.md](live_env.micro_reasoner_read_tools.md) | `draft` |
-| `live_env.query_micro_reasoner_prompts` | [live_env.micro_reasoner_read_tools.md](live_env.micro_reasoner_read_tools.md) | `draft` |
-| `live_env.test_micro_reasoner_prompt` | [live_env.micro_reasoner_read_tools.md](live_env.micro_reasoner_read_tools.md) | `draft` |
-| `live_env.query_visual_observer_profiles` | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md) | `draft` |
-| `live_env.test_visual_observer_profile` | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md) | `draft` |
-| `live_env.compare_visual_observer_profiles` | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md) | `draft` |
+| Capability                                              | Contract                                                                                                 | Maturity    |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------- |
+| `workspace_os.status`                                   | [workspace_os.status.md](workspace_os.status.md)                                                         | `draft`     |
+| `workstation.active_context`                            | [workstation.active_context.md](workstation.active_context.md)                                           | `draft`     |
+| `theory-badge-graph.current_context`                    | [theory-badge-graph.current_context.md](theory-badge-graph.current_context.md)                           | `draft`     |
+| `workstation-notes.list_notes`                          | [workstation-notes.list_notes.md](workstation-notes.list_notes.md)                                       | `draft`     |
+| `scientific-calculator.solve_expression`                | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md)                   | `candidate` |
+| `scientific-calculator.solve_scalar_expression`         | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md)                   | `candidate` |
+| `scientific-calculator.classify_expression`             | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md)                   | `candidate` |
+| `scientific-calculator.bind_variables`                  | [scientific-calculator.solve_expression.md](scientific-calculator.solve_expression.md)                   | `candidate` |
+| `scientific-calculator.active_context`                  | [scientific-calculator.active_context.md](scientific-calculator.active_context.md)                       | `draft`     |
+| `workstation.readable_surface.observe`                  | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md)                       | `draft`     |
+| `docs-viewer.read_visible_surface`                      | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md)                       | `draft`     |
+| `docs-viewer.read_active_translation`                   | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md)                       | `draft`     |
+| `scientific-calculator.read_visible_result`             | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md)                       | `draft`     |
+| `scientific-calculator.read_visible_theory_run_result`  | [workstation.readable_surface.observe.md](workstation.readable_surface.observe.md)                       | `candidate` |
+| `scientific-calculator.open_panel`                      | [workstation.panel_actions.md](workstation.panel_actions.md)                                             | `draft`     |
+| `scientific-calculator.focus_panel`                     | [workstation.panel_actions.md](workstation.panel_actions.md)                                             | `draft`     |
+| `scientific-calculator.show_gateway_solve`              | [workstation.panel_actions.md](workstation.panel_actions.md)                                             | `draft`     |
+| `scientific-calculator.prefill_expression`              | [workstation.panel_actions.md](workstation.panel_actions.md)                                             | `draft`     |
+| `account_session.set_interface_language`                | [workstation.dynamic_panel_action_boundaries.md](workstation.dynamic_panel_action_boundaries.md)         | `draft`     |
+| `workstation.open_panel`                                | [workstation.panel_actions.md](workstation.panel_actions.md)                                             | `draft`     |
+| `workstation.focus_panel`                               | [workstation.panel_actions.md](workstation.panel_actions.md)                                             | `draft`     |
+| `docs-viewer.open_doc`                                  | [docs-viewer.open_doc.md](docs-viewer.open_doc.md)                                                       | `draft`     |
+| `docs.search`                                           | [docs.search.md](docs.search.md)                                                                         | `draft`     |
+| `repo.search`                                           | [repo.search.md](repo.search.md)                                                                         | `draft`     |
+| `research-library.read_document`                        | [research-library.read_document.md](research-library.read_document.md)                                   | `draft`     |
+| `research-library.apply_evidence_enrichment`            | [research-library.apply_evidence_enrichment.md](research-library.apply_evidence_enrichment.md)           | `draft`     |
+| `helix_ask.reflect_theory_context`                      | [theory-badge-graph.reflect_discussion_context.md](theory-badge-graph.reflect_discussion_context.md)     | `candidate` |
+| `theory-experiment-procedure.prepare`                   | [theory-experiment-procedure.prepare.md](theory-experiment-procedure.prepare.md)                         | `draft`     |
+| `theory-experiment-procedure.readmit`                   | [theory-experiment-procedure.readmit.md](theory-experiment-procedure.readmit.md)                         | `draft`     |
+| `theory-experiment-procedure.evaluate_closure`          | [theory-experiment-procedure.prepare.md](theory-experiment-procedure.prepare.md)                         | `draft`     |
+| `theory-badge-graph.propose_frontier_conjectures`       | [theory-badge-graph.propose_frontier_conjectures.md](theory-badge-graph.propose_frontier_conjectures.md) | `draft`     |
+| `theory-formal-verifier.prepare_request`                | [theory-formal-verifier.md](theory-formal-verifier.md)                                                   | `draft`     |
+| `theory-formal-verifier.plan`                           | [theory-formal-verifier.md](theory-formal-verifier.md)                                                   | `draft`     |
+| `theory-formal-verifier.start`                          | [theory-formal-verifier.md](theory-formal-verifier.md)                                                   | `draft`     |
+| `theory-formal-verifier.read_result`                    | [theory-formal-verifier.md](theory-formal-verifier.md)                                                   | `draft`     |
+| `theory-runtime-canary.inspect`                         | [theory-runtime-canary.md](theory-runtime-canary.md)                                                     | `draft`     |
+| `theory-runtime-canary.plan`                            | [theory-runtime-canary.md](theory-runtime-canary.md)                                                     | `draft`     |
+| `theory-runtime-canary.start`                           | [theory-runtime-canary.md](theory-runtime-canary.md)                                                     | `draft`     |
+| `theory-runtime-canary.read_result`                     | [theory-runtime-canary.md](theory-runtime-canary.md)                                                     | `draft`     |
+| `theory-artifact-producer.prepare_lanyon_request`       | [theory-artifact-producer.md](theory-artifact-producer.md)                                               | `draft`     |
+| `theory-artifact-producer.admit_lanyon_snapshot`        | [theory-artifact-producer.md](theory-artifact-producer.md)                                               | `draft`     |
+| `theory-semantic-admitter.normalize`                    | [theory-semantic-admitter.md](theory-semantic-admitter.md)                                               | `draft`     |
+| `theory-independent-numerical-verifier.prepare_request` | [theory-independent-numerical-verifier.md](theory-independent-numerical-verifier.md)                     | `draft`     |
+| `theory-independent-numerical-verifier.plan`            | [theory-independent-numerical-verifier.md](theory-independent-numerical-verifier.md)                     | `draft`     |
+| `theory-independent-numerical-verifier.start`           | [theory-independent-numerical-verifier.md](theory-independent-numerical-verifier.md)                     | `draft`     |
+| `theory-independent-numerical-verifier.read_result`     | [theory-independent-numerical-verifier.md](theory-independent-numerical-verifier.md)                     | `draft`     |
+| `moral-graph.reflect_context`                           | [moral-graph.reflect_context.md](moral-graph.reflect_context.md)                                         | `draft`     |
+| `moral-graph.reflect_living_substrate_context`          | [moral-graph.reflect_living_substrate_context.md](moral-graph.reflect_living_substrate_context.md)       | `candidate` |
+| `civilization-bounds.reflect_system_bounds`             | [civilization-bounds.reflect_system_bounds.md](civilization-bounds.reflect_system_bounds.md)             | `candidate` |
+| `scholarly-research.lookup_papers`                      | [scholarly-research.lookup_papers.md](scholarly-research.lookup_papers.md)                               | `draft`     |
+| `scholarly-research.fetch_full_text`                    | [scholarly-research.fetch_full_text.md](scholarly-research.fetch_full_text.md)                           | `draft`     |
+| `scholarly-research.extract_numeric_parameters`         | [scholarly-research.extract_numeric_parameters.md](scholarly-research.extract_numeric_parameters.md)     | `draft`     |
+| `internet-search.search_web`                            | [internet-search.search_web.md](internet-search.search_web.md)                                           | `draft`     |
+| `text_to_speech.speak_text`                             | [live_env.request_interim_voice_callout.md](live_env.request_interim_voice_callout.md)                   | `draft`     |
+| `live_env.request_interim_voice_callout`                | [live_env.request_interim_voice_callout.md](live_env.request_interim_voice_callout.md)                   | `draft`     |
+| `live_env.narrator_say`                                 | [live_env.narrator_say.md](live_env.narrator_say.md)                                                     | `draft`     |
+| `live_env.query_trace_memory`                           | [live_env.context_feed_queries.md](live_env.context_feed_queries.md)                                     | `draft`     |
+| `live_env.query_narrator_events`                        | [live_env.context_feed_queries.md](live_env.context_feed_queries.md)                                     | `draft`     |
+| `live_env.query_audio_transcripts`                      | [live_env.context_feed_queries.md](live_env.context_feed_queries.md)                                     | `draft`     |
+| `live_env.query_visual_summaries`                       | [live_env.context_feed_queries.md](live_env.context_feed_queries.md)                                     | `draft`     |
+| `live_env.query_translation_segments`                   | [live_env.context_feed_queries.md](live_env.context_feed_queries.md)                                     | `draft`     |
+| `live_env.query_microdeck_outputs`                      | [live_env.context_feed_queries.md](live_env.context_feed_queries.md)                                     | `draft`     |
+| `live_env.query_live_answer_state`                      | [live_env.context_feed_queries.md](live_env.context_feed_queries.md)                                     | `draft`     |
+| `live_env.query_packet_traces`                          | [live_env.context_feed_queries.md](live_env.context_feed_queries.md)                                     | `draft`     |
+| `live_env.query_route_evidence`                         | [live_env.context_feed_queries.md](live_env.context_feed_queries.md)                                     | `draft`     |
+| `live_env.query_automation_policies`                    | [live_env.context_feed_queries.md](live_env.context_feed_queries.md)                                     | `draft`     |
+| `live_env.query_source_health`                          | [live_env.context_feed_queries.md](live_env.context_feed_queries.md)                                     | `draft`     |
+| `live_env.query_live_source_loop_health`                | [live_env.query_live_source_loop_health.md](live_env.query_live_source_loop_health.md)                   | `draft`     |
+| `live_env.query_live_source_quality`                    | [live_env.live_source_state_reads.md](live_env.live_source_state_reads.md)                               | `draft`     |
+| `live_env.query_workstation_goal_context`               | [live_env.live_source_state_reads.md](live_env.live_source_state_reads.md)                               | `draft`     |
+| `live_env.summarize_live_source_current_state`          | [live_env.live_source_state_reads.md](live_env.live_source_state_reads.md)                               | `draft`     |
+| `live_env.query_event_log`                              | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md)                       | `draft`     |
+| `live_env.query_world_events`                           | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md)                       | `draft`     |
+| `live_env.query_navigation_state`                       | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md)                       | `draft`     |
+| `live_env.query_stage_sources`                          | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md)                       | `draft`     |
+| `live_env.query_constructs`                             | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md)                       | `draft`     |
+| `live_env.query_job_evidence`                           | [live_env.situation_stage_state_reads.md](live_env.situation_stage_state_reads.md)                       | `draft`     |
+| `live_env.check_live_source_mail`                       | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md)                           | `draft`     |
+| `live_env.read_live_source_mail`                        | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md)                           | `draft`     |
+| `live_env.read_processed_live_source_mail`              | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md)                           | `draft`     |
+| `live_env.reflect_live_source_mail_loop`                | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md)                           | `draft`     |
+| `live_env.compare_mail_to_interpreter_profile`          | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md)                     | `draft`     |
+| `live_env.validate_live_source_prediction`              | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md)                     | `draft`     |
+| `live_env.predict_live_source_immediate`                | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md)                     | `draft`     |
+| `live_env.compare_live_source_prediction`               | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md)                     | `draft`     |
+| `live_env.describe_stage_builder`                       | [live_env.stage_play_builder_reads.md](live_env.stage_play_builder_reads.md)                             | `draft`     |
+| `live_env.validate_stage_play_graph`                    | [live_env.stage_play_builder_reads.md](live_env.stage_play_builder_reads.md)                             | `draft`     |
+| `live_env.plan_stage_play_job`                          | [live_env.stage_play_builder_reads.md](live_env.stage_play_builder_reads.md)                             | `draft`     |
+| `live_env.query_micro_reasoner_presets`                 | [live_env.micro_reasoner_read_tools.md](live_env.micro_reasoner_read_tools.md)                           | `draft`     |
+| `live_env.query_micro_reasoner_prompts`                 | [live_env.micro_reasoner_read_tools.md](live_env.micro_reasoner_read_tools.md)                           | `draft`     |
+| `live_env.test_micro_reasoner_prompt`                   | [live_env.micro_reasoner_read_tools.md](live_env.micro_reasoner_read_tools.md)                           | `draft`     |
+| `live_env.query_visual_observer_profiles`               | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md)                         | `draft`     |
+| `live_env.test_visual_observer_profile`                 | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md)                         | `draft`     |
+| `live_env.compare_visual_observer_profiles`             | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md)                         | `draft`     |
+| `room.evidence.read_bound`                              | [shared-live-room-control.md](shared-live-room-control.md)                                               | `draft`     |
+| `situation-room.describe_visual_capture`                | [situation-room.describe_visual_capture.md](situation-room.describe_visual_capture.md)                   | `draft`     |
+| `room.list`                                             | [shared-live-room-control.md](shared-live-room-control.md)                                               | `draft`     |
+| `room.inspect`                                          | [shared-live-room-control.md](shared-live-room-control.md)                                               | `draft`     |
+| `room.create`                                           | [shared-live-room-control.md](shared-live-room-control.md)                                               | `draft`     |
+| `room.source.list`                                      | [shared-live-room-control.md](shared-live-room-control.md)                                               | `draft`     |
+| `room.source.create`                                    | [shared-live-room-control.md](shared-live-room-control.md)                                               | `draft`     |
 
 ## Held-Back Contract Boundaries
 
@@ -315,40 +338,40 @@ gateway tools yet. They stay absent from the Codex/provider gateway until a
 permission, receipt, re-entry, and projection contract is implemented and
 tested.
 
-| Capability | Contract | Status |
-| --- | --- | --- |
-| `live_env.read_card` | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md) | `requires_confirmation_contract` |
-| `live_env.reflect_stage_play_context` | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md) | `requires_confirmation_contract` |
-| `live_env.request_probe` | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md) | `requires_confirmation_contract` |
-| `live_env.record_commentary` | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md) | `requires_confirmation_contract` |
-| `live_env.evaluate_goal_satisfaction` | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md) | `requires_confirmation_contract` |
-| `live_env.start_agent_goal_session` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.change_workstation_preset` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.set_visual_preset` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.set_audio_preset` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.bind_workstation_source` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.unbind_workstation_source` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.pause_workstation_loop` | [live_env.workstation_loop_controls.md](live_env.workstation_loop_controls.md) | `blocked_pending_contract` |
-| `live_env.resume_workstation_loop` | [live_env.workstation_loop_controls.md](live_env.workstation_loop_controls.md) | `blocked_pending_contract` |
-| `live_env.set_workstation_loop_state` | [live_env.workstation_loop_controls.md](live_env.workstation_loop_controls.md) | `blocked_pending_contract` |
-| `live_env.repair_loop` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.repair_workstation_source` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.update_live_answer_projection` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.focus_process_graph` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.configure_route_watch` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.configure_live_source_watch_job` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.configure_interpreter_profile` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `live_env.spawn_field_worker` | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md) | `blocked_pending_contract` |
-| `scientific-calculator.open` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
-| `scientific-calculator.start_equation_live_source` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract` |
-| `workstation-notes.append_to_note` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `blocked_pending_contract` |
-| `workstation-notes.create_note` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `candidate_host_receipt_bridge` |
-| `workstation-notes.create` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `blocked_pending_contract` |
-| `workstation-notes.open` | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md) | `blocked_pending_contract` |
-| `client.read_aloud` | [client.read_aloud.md](client.read_aloud.md) | `client_projection_only` |
-| `workstation.dynamic_panel_actions` | [workstation.dynamic_panel_action_boundaries.md](workstation.dynamic_panel_action_boundaries.md) | `panel_owned_boundary` |
-| `workstation.explicit_route_aliases` | [workstation.explicit_route_alias_boundaries.md](workstation.explicit_route_alias_boundaries.md) | mixed: `shared_gateway_now` with `provider_gateway_alias_target`, or `safe_to_graduate_next` |
-| `live_env.helix_native_procedures` | [live_env.helix_native_procedure_boundaries.md](live_env.helix_native_procedure_boundaries.md) | `helix_owned_boundary` |
+| Capability                                         | Contract                                                                                         | Status                                                                                       |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `live_env.read_card`                               | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md)       | `requires_confirmation_contract`                                                             |
+| `live_env.reflect_stage_play_context`              | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md)       | `requires_confirmation_contract`                                                             |
+| `live_env.request_probe`                           | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md)       | `requires_confirmation_contract`                                                             |
+| `live_env.record_commentary`                       | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md)       | `requires_confirmation_contract`                                                             |
+| `live_env.evaluate_goal_satisfaction`              | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md)       | `requires_confirmation_contract`                                                             |
+| `live_env.start_agent_goal_session`                | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.change_workstation_preset`               | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.set_visual_preset`                       | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.set_audio_preset`                        | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.bind_workstation_source`                 | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.unbind_workstation_source`               | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.pause_workstation_loop`                  | [live_env.workstation_loop_controls.md](live_env.workstation_loop_controls.md)                   | `blocked_pending_contract`                                                                   |
+| `live_env.resume_workstation_loop`                 | [live_env.workstation_loop_controls.md](live_env.workstation_loop_controls.md)                   | `blocked_pending_contract`                                                                   |
+| `live_env.set_workstation_loop_state`              | [live_env.workstation_loop_controls.md](live_env.workstation_loop_controls.md)                   | `blocked_pending_contract`                                                                   |
+| `live_env.repair_loop`                             | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.repair_workstation_source`               | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.update_live_answer_projection`           | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.focus_process_graph`                     | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.configure_route_watch`                   | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.configure_live_source_watch_job`         | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.configure_interpreter_profile`           | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `live_env.spawn_field_worker`                      | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
+| `scientific-calculator.open`                       | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract`                                                                   |
+| `scientific-calculator.start_equation_live_source` | [workstation.explicit_side_effect_boundaries.md](workstation.explicit_side_effect_boundaries.md) | `blocked_pending_contract`                                                                   |
+| `workstation-notes.append_to_note`                 | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md)             | `blocked_pending_contract`                                                                   |
+| `workstation-notes.create_note`                    | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md)             | `candidate_host_receipt_bridge`                                                              |
+| `workstation-notes.create`                         | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md)             | `blocked_pending_contract`                                                                   |
+| `workstation-notes.open`                           | [workstation-notes.side_effect_actions.md](workstation-notes.side_effect_actions.md)             | `blocked_pending_contract`                                                                   |
+| `client.read_aloud`                                | [client.read_aloud.md](client.read_aloud.md)                                                     | `client_projection_only`                                                                     |
+| `workstation.dynamic_panel_actions`                | [workstation.dynamic_panel_action_boundaries.md](workstation.dynamic_panel_action_boundaries.md) | `panel_owned_boundary`                                                                       |
+| `workstation.explicit_route_aliases`               | [workstation.explicit_route_alias_boundaries.md](workstation.explicit_route_alias_boundaries.md) | mixed: `shared_gateway_now` with `provider_gateway_alias_target`, or `safe_to_graduate_next` |
+| `live_env.helix_native_procedures`                 | [live_env.helix_native_procedure_boundaries.md](live_env.helix_native_procedure_boundaries.md)   | `helix_owned_boundary`                                                                       |
 
 ## Implementation Anchors
 

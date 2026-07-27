@@ -213,6 +213,15 @@ describe("Codex native compatibility fallback", () => {
       terminal_eligible: false,
       assistant_answer: false,
     });
+    expect(
+      (result as Record<string, any>).provider_prompt_diagnostics,
+    ).toMatchObject({
+      protected_marker_ids: [],
+      raw_prompt_included: false,
+    });
+    expect(
+      (result as Record<string, any>).provider_prompt_diagnostics.char_count,
+    ).toBeLessThan(50_000);
   });
 
   it("recovers admitted observations missing from a partially completed native compound route", async () => {

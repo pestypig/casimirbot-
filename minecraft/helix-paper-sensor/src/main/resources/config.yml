@@ -1,8 +1,10 @@
 helix:
-  enabled: true
-  endpoint: "https://example.trycloudflare.com"
+  enabled: false
+  # Paste public_ingress_base_url from the room owner's source-binding receipt.
+  endpoint: "https://casimirbot.com/api/room-ingress/v1/bindings/replace-with-generated-id"
   bearer_token: "replace-me"
-  source_id: "source:minecraft-paper-plugin"
+  # Paste the server-generated source:room-ingress:... value.
+  source_id: "source:room-ingress:replace-with-generated-id"
   room_id: "room:minecraft"
   world_id: "minecraft:paper-server"
   domain_adapter: "minecraft.paper_plugin.v1"

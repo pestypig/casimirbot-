@@ -62,6 +62,14 @@ const sanitizeEnvironment = (port) => {
     LLM_LOCAL_STOP_FLAG: "1",
     NOISEGEN_STORAGE_BACKEND: "memory",
     HELIX_BUILD_META_PATH: "dist/build-meta.json",
+    CASIMIR_PUBLIC_BASE_URL: "https://casimirbot.com",
+    HELIX_AGENT_OAUTH_ISSUER: "https://auth.example.invalid",
+    HELIX_AGENT_OAUTH_AUDIENCE: "https://casimirbot.com/mcp",
+    HELIX_AGENT_OAUTH_PROVIDER: "production-smoke",
+    HELIX_AGENT_OAUTH_JWKS_URL:
+      "https://auth.example.invalid/.well-known/jwks.json",
+    HELIX_AGENT_ALLOWED_HOSTS: `127.0.0.1:${port}`,
+    TRUST_PROXY: "loopback",
   };
 };
 
@@ -75,9 +83,13 @@ const fetchWithTimeout = async (url, init = {}, requestTimeoutMs = 15_000) => {
   }
 };
 
-const readJson = async (baseUrl, pathname) => {
+const readJson = async (baseUrl, pathname, init = {}) => {
   const response = await fetchWithTimeout(`${baseUrl}${pathname}`, {
-    headers: { Accept: "application/json" },
+    ...init,
+    headers: {
+      Accept: "application/json",
+      ...(init.headers ?? {}),
+    },
   });
   const text = await response.text();
   if (!response.ok) throw new Error(`${pathname} returned HTTP ${response.status}: ${text.slice(0, 800)}`);
@@ -143,6 +155,9 @@ const main = async () => {
   child.stdout.on("data", appendLog);
   child.stderr.on("data", appendLog);
   const baseUrl = `http://127.0.0.1:${port}`;
+  const forwardedHttpsHeaders = {
+    "X-Forwarded-Proto": "https",
+  };
 
   try {
     const fingerprint = await waitForFingerprint({ baseUrl, child, logs });
@@ -158,6 +173,120 @@ const main = async () => {
     const documentText = await documentResponse.text();
     assert(documentResponse.ok, `/docs/helix-ask-flow.md returned HTTP ${documentResponse.status}`);
     assert(documentText.includes("# Helix Ask Flow"), "production Markdown route returned unexpected content");
+
+    const agentAccessResponse = await fetchWithTimeout(`${baseUrl}/agent-access`);
+    const agentAccessHtml = await agentAccessResponse.text();
+    assert(agentAccessResponse.ok, `/agent-access returned HTTP ${agentAccessResponse.status}`);
+    assert(
+      agentAccessResponse.headers.get("content-type")?.includes("text/html"),
+      "/agent-access did not return HTML",
+    );
+    assert(
+      agentAccessHtml.includes("https://casimirbot.com/mcp"),
+      "/agent-access did not advertise the canonical MCP endpoint",
+    );
+    assert(
+      agentAccessHtml.includes("retrieval") && agentAccessHtml.includes("connection"),
+      "/agent-access did not distinguish retrieval from an MCP connection",
+    );
+
+    const agentAccessManifest = await readJson(baseUrl, "/agent-access.json");
+    assert(
+      agentAccessManifest.metadata_kind === "casimirbot.agent_access" &&
+        agentAccessManifest.metadata_version === "1",
+      "/agent-access.json returned an unexpected metadata contract",
+    );
+    assert(
+      agentAccessManifest.mcp?.url === "https://casimirbot.com/mcp",
+      "/agent-access.json returned an unexpected MCP URL",
+    );
+    assert(
+      agentAccessManifest.connection?.explicit_configuration_required === true,
+      "/agent-access.json did not declare the explicit connection requirement",
+    );
+
+    const robotsResponse = await fetchWithTimeout(`${baseUrl}/robots.txt`);
+    const robotsText = await robotsResponse.text();
+    assert(robotsResponse.ok, `/robots.txt returned HTTP ${robotsResponse.status}`);
+    assert(
+      robotsResponse.headers.get("content-type")?.includes("text/plain"),
+      "/robots.txt did not return text/plain",
+    );
+    assert(robotsText.includes("Sitemap: https://casimirbot.com/sitemap.xml"), "/robots.txt omitted the sitemap");
+
+    const sitemapResponse = await fetchWithTimeout(`${baseUrl}/sitemap.xml`);
+    const sitemapText = await sitemapResponse.text();
+    assert(sitemapResponse.ok, `/sitemap.xml returned HTTP ${sitemapResponse.status}`);
+    assert(
+      sitemapResponse.headers.get("content-type")?.includes("xml"),
+      "/sitemap.xml did not return XML",
+    );
+    assert(
+      sitemapText.includes("<loc>https://casimirbot.com/agent-access</loc>"),
+      "/sitemap.xml omitted /agent-access",
+    );
+
+    const protectedResource = await readJson(
+      baseUrl,
+      "/.well-known/oauth-protected-resource/mcp",
+      { headers: forwardedHttpsHeaders },
+    );
+    assert(
+      protectedResource.resource === "https://casimirbot.com/mcp",
+      "OAuth protected-resource metadata returned an unexpected resource",
+    );
+    assert(
+      protectedResource.authorization_servers?.[0] === "https://auth.example.invalid",
+      "OAuth protected-resource metadata returned an unexpected authorization server",
+    );
+
+    const initializeResponse = await fetchWithTimeout(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        ...forwardedHttpsHeaders,
+        Accept: "application/json, text/event-stream",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "production-smoke-initialize",
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-03-26",
+          capabilities: {},
+          clientInfo: {
+            name: "casimir-replit-production-smoke",
+            version: "1.0.0",
+          },
+        },
+      }),
+    });
+    const initializeText = await initializeResponse.text();
+    assert(
+      initializeResponse.status === 401,
+      `/mcp unauthenticated initialize returned HTTP ${initializeResponse.status}: ${initializeText.slice(0, 800)}`,
+    );
+    assert(
+      initializeResponse.headers.get("www-authenticate")?.includes("resource_metadata="),
+      "/mcp unauthenticated initialize omitted the OAuth resource-metadata challenge",
+    );
+    assert(
+      !initializeResponse.headers.get("content-type")?.includes("text/html"),
+      "/mcp unauthenticated initialize fell through to the compiled client shell",
+    );
+
+    const restResponse = await fetchWithTimeout(`${baseUrl}/api/v1/agent-runs`, {
+      headers: forwardedHttpsHeaders,
+    });
+    const restText = await restResponse.text();
+    assert(
+      restResponse.status === 401,
+      `/api/v1/agent-runs unauthenticated request returned HTTP ${restResponse.status}: ${restText.slice(0, 800)}`,
+    );
+    assert(
+      restResponse.headers.get("www-authenticate")?.includes("resource_metadata="),
+      "/api/v1/agent-runs omitted the OAuth resource-metadata challenge",
+    );
 
     const session = await readJson(baseUrl, "/api/account/session");
     const pipeline = await readJson(baseUrl, "/api/helix/pipeline");
@@ -194,6 +323,13 @@ const main = async () => {
       endpoints: {
         desktop: desktopResponse.status,
         documentation_markdown: documentResponse.status,
+        agent_access: agentAccessResponse.status,
+        agent_access_manifest: 200,
+        robots: robotsResponse.status,
+        sitemap: sitemapResponse.status,
+        oauth_protected_resource: 200,
+        mcp_unauthenticated: initializeResponse.status,
+        agent_runs_unauthenticated: restResponse.status,
         account_session: session.ok === false ? "response_error" : 200,
         helix_pipeline: pipeline.ok === false ? "response_error" : 200,
         runtime_parity_fingerprint: 200,

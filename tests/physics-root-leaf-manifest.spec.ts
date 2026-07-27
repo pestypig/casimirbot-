@@ -680,6 +680,7 @@ describe("validatePhysicsRootLeafManifest", () => {
         root_id?: string;
         leaf_id?: string;
         bundle_id?: string;
+        dag_bridges?: string[];
         falsifier?: { reject_rule?: string; test_refs?: string[] };
         maturity_gate?: {
           max_claim_tier?: string;
@@ -704,6 +705,17 @@ describe("validatePhysicsRootLeafManifest", () => {
         id: "leaf_casimir_dp_boundary_coherence_or_test",
       }),
     );
+    expect(
+      manifest.leaves?.find(
+        (entry) =>
+          entry.id === "leaf_casimir_dp_complete_apparatus_gravity_control",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        id: "leaf_casimir_dp_complete_apparatus_gravity_control",
+        statement: expect.stringContaining("never plate pressure"),
+      }),
+    );
 
     const pathEntry = manifest.paths?.find(
       (entry) => entry.id === "path_quantum_semiclassical_to_casimir_dp_or_test",
@@ -725,19 +737,182 @@ describe("validatePhysicsRootLeafManifest", () => {
       expect.arrayContaining(["measured", "proxy", "inferred"]),
     );
 
+    const readinessBlockRule = (
+      pathEntry?.falsifier as {
+        readiness_block_rule?: string;
+      } | undefined
+    )?.readiness_block_rule ?? "";
+    expect(readinessBlockRule).toContain(
+      "upstreamAuthorityIntegrity != true",
+    );
+    expect(readinessBlockRule).toContain("preregistrationFrozen != true");
+    expect(readinessBlockRule).toContain("measuredEvidenceReady != true");
+    expect(readinessBlockRule).toContain("fixedDeltaRhoMatched != true");
+    expect(readinessBlockRule).toContain(
+      "complexCoherenceIdentifiable != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "ordinaryDecoherenceClosure != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "polarizationQEDControlReady != true",
+    );
+    expect(readinessBlockRule).toContain("thermalFdtControlReady != true");
+    expect(readinessBlockRule).toContain(
+      "tensorDimensionalCongruence != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "qedScaleHierarchyCalibration != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "electronMassHiggsAnchorCalibration != true",
+    );
+    expect(readinessBlockRule).toContain("planckSolarCalibration != true");
+    expect(readinessBlockRule).toContain(
+      "crossScaleDpNonbridgePreserved != true",
+    );
+    expect(readinessBlockRule).toContain("namedDpManifestUnchanged != true");
+    expect(readinessBlockRule).toContain(
+      "phaseResidualReplayDeterministic != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "collapseDiscriminatorPresent != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "heldOutModelComparisonReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "boundaryToCoherenceTransferKernelRegistered != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2bForecastContractReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "responseCorrectedSpectralThermometryReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "physicalSensorNoiseSeparated != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "fullCrossSpectralCovarianceReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "completeJointSystemEquivalenceReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "apparatusDpPowerReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2bMeasuredEvidenceCampaignVersioned != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "bridgeCompared == true AND registeredNumericBridgeKernel != true",
+    );
     const rejectRule = pathEntry?.falsifier?.reject_rule ?? "";
-    expect(rejectRule).toContain("measuredEvidenceReady != true");
-    expect(rejectRule).toContain("ordinaryDecoherenceClosure != true");
-    expect(rejectRule).toContain("phaseResidualReplayDeterministic != true");
-    expect(rejectRule).toContain("collapseDiscriminatorPresent != true");
-    expect(rejectRule).toContain("boundaryToCoherenceTransferKernelRegistered != true");
+    expect(rejectRule).toContain("heldOutReplicationReady == true");
+    expect(rejectRule).toContain("apparatusDpPowerReady == true");
+    expect(rejectRule).toContain(
+      "registeredNonunitarySignatureMatch != true",
+    );
+    expect(rejectRule).toContain("frozenDpScalingMatch != true");
+    expect(rejectRule).not.toContain(
+      "electronMassHiggsAnchorCalibration",
+    );
+    expect(pathEntry?.dag_bridges).toEqual(
+      expect.arrayContaining([
+        "bridge-stage3-complex-coherence-to-model-discrimination",
+        "bridge-stage3-ordinary-physics-null-to-residual",
+        "bridge-stage3-named-dp-to-companion-falsifier",
+        "bridge-stage3-manifold-registry-to-bridge-admission",
+        "bridge-stage4-transverse-polarization-to-qed-null",
+        "bridge-stage4-planck-fdt-to-thermal-null",
+        "bridge-stage4-congruence-to-model-admission",
+        "bridge-stage4-expanded-null-to-prediction-residual",
+        "bridge-stage4-same-dimension-to-nonbridge",
+        "bridge-stage4-1-qed-scale-hierarchy-to-semantic-nonbridge",
+        "bridge-stage4-2a-electron-mass-higgs-anchor-to-semantic-nonbridge",
+        "bridge-stage4-2a-planck-solar-calibration-to-semantic-nonbridge",
+        "bridge-stage4-2b-scale-transport-to-frozen-dp-signature",
+        "bridge-stage4-2b-spectral-thermometry-to-ordinary-null",
+        "bridge-stage4-2b-sensor-forward-model-to-nuisance-covariance",
+        "bridge-stage4-2b-full-covariance-to-complex-residual",
+        "bridge-stage4-2b-dp-scaling-to-identifiability-power",
+        "bridge-stage4-2b-complete-equivalence-to-conditional-dp-null",
+        "bridge-stage4-2b-missing-kernel-to-manifold-nonclaim",
+      ]),
+    );
     expect(pathEntry?.falsifier?.test_refs).toEqual(
       expect.arrayContaining([
         "tests/casimir-dp-data-readiness.spec.ts",
         "tests/casimir-dp-phase-coherence.spec.ts",
         "tests/casimir-dp-or-phase-stage2.spec.ts",
         "tests/casimir-dp-proposal-closure.spec.ts",
+        "tests/casimir-dp-complex-coherence.spec.ts",
+        "tests/casimir-dp-qed-green-noise.spec.ts",
+        "tests/casimir-dp-dp-companion.spec.ts",
+        "tests/casimir-dp-gravity-upper-bound.spec.ts",
+        "tests/casimir-dp-model-comparison.spec.ts",
+        "tests/casimir-dp-manifold-kernel-registry.spec.ts",
+        "tests/casimir-dp-evidence-map-stage3.spec.ts",
+        "tests/casimir-dp-polarization-qed-control.spec.ts",
+        "tests/casimir-dp-radiative-thermal-closure.spec.ts",
+        "tests/casimir-dp-tensor-dimensional-congruence.spec.ts",
+        "tests/casimir-dp-polarization-congruence-stage4.spec.ts",
+        "tests/casimir-dp-qed-scale-hierarchy-calibration.spec.ts",
+        "tests/casimir-dp-electron-mass-higgs-anchor-stage4-2a.spec.ts",
+        "tests/casimir-dp-planck-solar-calibration-stage4-2a.spec.ts",
+        "tests/casimir-dp-stage4-2a-campaign.spec.ts",
+        "tests/casimir-dp-apparatus-scale-transport-stage4-2b.spec.ts",
+        "tests/casimir-dp-apparatus-spectral-thermometry-stage4-2b.spec.ts",
+        "tests/casimir-dp-apparatus-response-covariance-stage4-2b.spec.ts",
+        "tests/casimir-dp-dp-scaling-forecast-stage4-2b.spec.ts",
+        "tests/casimir-dp-apparatus-coherence-residual-stage4-2b.spec.ts",
+        "tests/casimir-dp-apparatus-identifiability-stage4-2b.spec.ts",
+        "tests/casimir-dp-stage4-2b-contract.spec.ts",
+        "tests/casimir-dp-stage4-2b-campaign.spec.ts",
       ]),
+    );
+
+    const gravityPath = manifest.paths?.find(
+      (entry) =>
+        entry.id ===
+        "path_complete_casimir_apparatus_to_ordinary_gravity_control",
+    );
+    expect(gravityPath).toEqual(
+      expect.objectContaining({
+        root_id: "physics_quantum_semiclassical",
+        leaf_id: "leaf_casimir_dp_complete_apparatus_gravity_control",
+        bundle_id: "casimir-dp.or-boundary-coherence",
+      }),
+    );
+    expect(gravityPath?.falsifier?.reject_rule).toContain(
+      "completeApparatusLedger != true",
+    );
+    expect(gravityPath?.falsifier?.reject_rule).toContain(
+      "pressureUsedAsWeight == true",
+    );
+    expect(gravityPath?.falsifier?.reject_rule).toContain(
+      "tensorSourceConserved != true",
+    );
+    expect(gravityPath?.falsifier?.reject_rule).toContain(
+      "independentGravityResponseMeasured != true",
+    );
+    expect(gravityPath?.dag_bridges).toEqual([
+      "bridge-complete-casimir-ledger-to-mass-energy-bound",
+      "bridge-complete-source-to-weak-field-gr-control",
+    ]);
+    expect(gravityPath?.falsifier?.test_refs).toEqual(
+      expect.arrayContaining([
+        "tests/casimir-dp-gravity-upper-bound.spec.ts",
+        "tests/casimir-dp-evidence-map-stage3.spec.ts",
+        "tests/physics-root-leaf-manifest.spec.ts",
+      ]),
+    );
+    expect(gravityPath?.maturity_gate?.required_evidence_types).toEqual(
+      expect.arrayContaining(["measured", "proxy", "inferred"]),
+    );
+    expect(gravityPath?.maturity_gate?.strict_fail_reason).toBe(
+      "ROOT_LEAF_CASIMIR_DP_ORDINARY_GRAVITY_FAIL",
     );
 
     expect(
@@ -748,7 +923,10 @@ describe("validatePhysicsRootLeafManifest", () => {
       expect.objectContaining({
         claim_scope: "cross_domain",
         max_claim_tier: "diagnostic",
-        path_ids: ["path_quantum_semiclassical_to_casimir_dp_or_test"],
+        path_ids: [
+          "path_quantum_semiclassical_to_casimir_dp_or_test",
+          "path_complete_casimir_apparatus_to_ordinary_gravity_control",
+        ],
       }),
     );
   });

@@ -50,18 +50,22 @@
       "equation_id": "curvature_unit_proxy_contract",
       "binding": {
         "operator": "equals",
-        "lhs": "curvature_unit_proxy_contract",
-        "rhs": "curvature_unit_proxy_contract"
+        "lhs": "map_units(curvature_signal, scale_assumptions)",
+        "rhs": "kappa_ref"
       },
       "residual": {
-        "metric": "curvature_unit_proxy_contract_residual",
+        "metric": "curvature_unit_proxy_residual",
         "comparator": "<=",
-        "threshold": "1.0"
+        "threshold": "0.05"
       },
       "falsifier": {
-        "condition": "curvature_unit_proxy_contract_residual > 1.0",
-        "evidence": "manual_review"
-      }
+        "condition": "curvature_unit_proxy_residual > 0.05",
+        "evidence": "curvature_unit_proxy_diagnostic_trace",
+        "uncertainty_model": "declared_mapping_scale_with_traceable_calibration_window"
+      },
+      "provenance_class": "proxy",
+      "claim_tier": "diagnostic",
+      "uncertainty_model_id": "curvature_unit_proxy_uq_v1"
     },
     {
       "id": "physics_collapse_benchmark__uncertainty_propagation",
@@ -88,18 +92,22 @@
       "equation_id": "curvature_unit_proxy_contract",
       "binding": {
         "operator": "equals",
-        "lhs": "curvature_unit_proxy_contract",
-        "rhs": "curvature_unit_proxy_contract"
+        "lhs": "map_units(curvature_signal, scale_assumptions)",
+        "rhs": "kappa_ref"
       },
       "residual": {
-        "metric": "curvature_unit_proxy_contract_residual",
+        "metric": "curvature_unit_proxy_residual",
         "comparator": "<=",
-        "threshold": "1.0"
+        "threshold": "0.05"
       },
       "falsifier": {
-        "condition": "curvature_unit_proxy_contract_residual > 1.0",
-        "evidence": "manual_review"
-      }
+        "condition": "curvature_unit_proxy_residual > 0.05",
+        "evidence": "curvature_unit_proxy_diagnostic_trace",
+        "uncertainty_model": "declared_mapping_scale_with_traceable_calibration_window"
+      },
+      "provenance_class": "proxy",
+      "claim_tier": "diagnostic",
+      "uncertainty_model_id": "curvature_unit_proxy_uq_v1"
     },
     {
       "id": "physics_curvature_proxy__uncertainty_propagation",
@@ -176,7 +184,12 @@
         "condition": "runtime_gate_false_negative_rate > 0.01 OR qi_bound_ok = false",
         "evidence": "runtime_guardrail_regression",
         "uncertainty_model": "runtime_gate_thresholds(determinism_min=0.98,citation_min=0.96,non_200_max=0.02,latency_p95_max_ms=1200)"
-      }
+      },
+      "runtime_safety_eligible": true,
+      "cross_lane_bridge": true,
+      "provenance_class": "proxy",
+      "claim_tier": "diagnostic",
+      "uncertainty_model_id": "runtime_gate_thresholds_v1"
     },
     {
       "id": "physics_information_dynamics__uncertainty_propagation",
@@ -236,6 +249,29 @@
       }
     },
     {
+      "id": "physics_quantum_semiclassical__atomic_energy_to_energy_density_proxy",
+      "root_id": "physics_quantum_semiclassical",
+      "equation_id": "atomic_energy_to_energy_density_proxy",
+      "binding": {
+        "operator": "equals",
+        "lhs": "rho_atomic_proxy",
+        "rhs": "E_atomic / V_proxy"
+      },
+      "residual": {
+        "metric": "atomic_energy_density_proxy_residual",
+        "comparator": "<=",
+        "threshold": "0.15"
+      },
+      "falsifier": {
+        "condition": "atomic_energy_density_proxy_residual > 0.15",
+        "evidence": "atomic_energy_density_proxy_trace",
+        "uncertainty_model": "traceable_atomic_energy_and_declared_proxy_volume"
+      },
+      "provenance_class": "proxy",
+      "claim_tier": "diagnostic",
+      "uncertainty_model_id": "atomic_energy_density_proxy_uq_v1"
+    },
+    {
       "id": "physics_quantum_semiclassical__semiclassical_coupling",
       "root_id": "physics_quantum_semiclassical",
       "equation_id": "semiclassical_coupling",
@@ -272,7 +308,12 @@
         "condition": "runtime_gate_false_negative_rate > 0.01 OR qi_bound_ok = false",
         "evidence": "runtime_guardrail_regression",
         "uncertainty_model": "runtime_gate_thresholds(determinism_min=0.98,citation_min=0.96,non_200_max=0.02,latency_p95_max_ms=1200)"
-      }
+      },
+      "runtime_safety_eligible": true,
+      "cross_lane_bridge": true,
+      "provenance_class": "proxy",
+      "claim_tier": "diagnostic",
+      "uncertainty_model_id": "runtime_gate_thresholds_v1"
     },
     {
       "id": "physics_solar_coherence_hypothesis__uncertainty_propagation",
@@ -294,6 +335,29 @@
       }
     },
     {
+      "id": "physics_spacetime_gr__curvature_unit_proxy_contract",
+      "root_id": "physics_spacetime_gr",
+      "equation_id": "curvature_unit_proxy_contract",
+      "binding": {
+        "operator": "equals",
+        "lhs": "map_units(curvature_signal, scale_assumptions)",
+        "rhs": "kappa_ref"
+      },
+      "residual": {
+        "metric": "curvature_unit_proxy_residual",
+        "comparator": "<=",
+        "threshold": "0.05"
+      },
+      "falsifier": {
+        "condition": "curvature_unit_proxy_residual > 0.05",
+        "evidence": "curvature_unit_proxy_diagnostic_trace",
+        "uncertainty_model": "declared_mapping_scale_with_traceable_calibration_window"
+      },
+      "provenance_class": "proxy",
+      "claim_tier": "diagnostic",
+      "uncertainty_model_id": "curvature_unit_proxy_uq_v1"
+    },
+    {
       "id": "physics_spacetime_gr__efe_baseline",
       "root_id": "physics_spacetime_gr",
       "equation_id": "efe_baseline",
@@ -310,6 +374,215 @@
       "falsifier": {
         "condition": "einstein_tensor_residual_rms > 1.0e-3",
         "evidence": "gr_constraint_gate_report"
+      }
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis__planck_radiance_lambda",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "equation_id": "planck_radiance_lambda",
+      "binding": {
+        "operator": "equals",
+        "lhs": "planck_radiance_lambda",
+        "rhs": "planck_radiance_lambda"
+      },
+      "residual": {
+        "metric": "planck_radiance_lambda_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "planck_radiance_lambda_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis__solar_teff_from_LR",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "equation_id": "solar_teff_from_LR",
+      "binding": {
+        "operator": "equals",
+        "lhs": "solar_teff_from_LR",
+        "rhs": "solar_teff_from_LR"
+      },
+      "residual": {
+        "metric": "solar_teff_from_LR_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "solar_teff_from_LR_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis__stefan_boltzmann_flux",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "equation_id": "stefan_boltzmann_flux",
+      "binding": {
+        "operator": "equals",
+        "lhs": "stefan_boltzmann_flux",
+        "rhs": "stefan_boltzmann_flux"
+      },
+      "residual": {
+        "metric": "stefan_boltzmann_flux_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "stefan_boltzmann_flux_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis__stellar_continuum_opacity_sum",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "equation_id": "stellar_continuum_opacity_sum",
+      "binding": {
+        "operator": "equals",
+        "lhs": "stellar_continuum_opacity_sum",
+        "rhs": "stellar_continuum_opacity_sum"
+      },
+      "residual": {
+        "metric": "stellar_continuum_opacity_sum_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "stellar_continuum_opacity_sum_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis__stellar_hydrostatic_balance",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "equation_id": "stellar_hydrostatic_balance",
+      "binding": {
+        "operator": "equals",
+        "lhs": "stellar_hydrostatic_balance",
+        "rhs": "stellar_hydrostatic_balance"
+      },
+      "residual": {
+        "metric": "stellar_hydrostatic_balance_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "stellar_hydrostatic_balance_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis__stellar_lte_source_function",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "equation_id": "stellar_lte_source_function",
+      "binding": {
+        "operator": "equals",
+        "lhs": "stellar_lte_source_function",
+        "rhs": "stellar_lte_source_function"
+      },
+      "residual": {
+        "metric": "stellar_lte_source_function_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "stellar_lte_source_function_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis__stellar_nlte_source_function",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "equation_id": "stellar_nlte_source_function",
+      "binding": {
+        "operator": "equals",
+        "lhs": "stellar_nlte_source_function",
+        "rhs": "stellar_nlte_source_function"
+      },
+      "residual": {
+        "metric": "stellar_nlte_source_function_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "stellar_nlte_source_function_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis__stellar_population_ionization_balance_diagnostic",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "equation_id": "stellar_population_ionization_balance_diagnostic",
+      "binding": {
+        "operator": "equals",
+        "lhs": "stellar_population_ionization_balance_diagnostic",
+        "rhs": "stellar_population_ionization_balance_diagnostic"
+      },
+      "residual": {
+        "metric": "stellar_population_ionization_balance_diagnostic_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "stellar_population_ionization_balance_diagnostic_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis__stellar_radiative_transfer_equation",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "equation_id": "stellar_radiative_transfer_equation",
+      "binding": {
+        "operator": "equals",
+        "lhs": "stellar_radiative_transfer_equation",
+        "rhs": "stellar_radiative_transfer_equation"
+      },
+      "residual": {
+        "metric": "stellar_radiative_transfer_equation_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "stellar_radiative_transfer_equation_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis__stellar_spectral_viability",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "equation_id": "stellar_spectral_viability",
+      "binding": {
+        "operator": "equals",
+        "lhs": "stellar_spectral_viability",
+        "rhs": "stellar_spectral_viability"
+      },
+      "residual": {
+        "metric": "stellar_spectral_viability_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "stellar_spectral_viability_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis__stellar_thermal_balance",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "equation_id": "stellar_thermal_balance",
+      "binding": {
+        "operator": "equals",
+        "lhs": "stellar_thermal_balance",
+        "rhs": "stellar_thermal_balance"
+      },
+      "residual": {
+        "metric": "stellar_thermal_balance_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "stellar_thermal_balance_residual > 1.0",
+        "evidence": "manual_review"
       }
     },
     {

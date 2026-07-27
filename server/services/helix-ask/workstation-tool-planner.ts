@@ -1193,7 +1193,7 @@ function buildMinecraftLiveContinuationPlan(
     mode: "standby_receipts",
     source_config: {
       source_kind: "minecraft_world_events",
-      transport: "cloudflarelink",
+      transport: "room_source_ingress",
     },
   };
   const attachArgs = {
@@ -1279,7 +1279,7 @@ function buildMinecraftLiveContinuationPlan(
       panel_id: "situation-room-pipelines",
       action_id: "attach_live_source",
       score: 0.95,
-      reason: "Minecraft CloudflareLink source must be admitted before continuation",
+      reason: "Minecraft room-source ingress must be admitted before continuation",
       required_args_missing: [],
     },
     {

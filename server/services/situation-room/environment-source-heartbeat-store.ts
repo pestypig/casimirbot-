@@ -1,4 +1,10 @@
 import type { HelixEnvironmentSourceHeartbeat } from "@shared/helix-environment-source-manifest";
+import {
+  assertHelixRoomSourceNamespaceAdmission,
+  isHelixRoomSourceIngressSourceId,
+  matchesHelixRoomSourceAdmission,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 
 const heartbeatsBySource = new Map<string, HelixEnvironmentSourceHeartbeat>();
 
@@ -7,23 +13,82 @@ export const ENVIRONMENT_SOURCE_HEARTBEAT_STOPPED_MS = 120_000;
 
 export function recordEnvironmentSourceHeartbeat(
   heartbeat: HelixEnvironmentSourceHeartbeat,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
 ): HelixEnvironmentSourceHeartbeat {
+  assertHelixRoomSourceNamespaceAdmission(
+    {
+      source_id: heartbeat.source_id,
+      room_id: heartbeat.room_id,
+      domain_adapter: heartbeat.domain_adapter,
+    },
+    options.sourceAdmission,
+  );
   if (heartbeat.assistant_answer !== false) throw new Error("environment heartbeat cannot be an assistant answer");
   if (heartbeat.raw_content_included !== false) throw new Error("environment heartbeat cannot include raw content");
   heartbeatsBySource.set(heartbeat.source_id, heartbeat);
   return heartbeat;
 }
 
-export function getEnvironmentSourceHeartbeat(sourceId: string): HelixEnvironmentSourceHeartbeat | null {
-  return heartbeatsBySource.get(sourceId) ?? null;
+export function getEnvironmentSourceHeartbeat(
+  sourceId: string,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
+): HelixEnvironmentSourceHeartbeat | null {
+  const heartbeat = heartbeatsBySource.get(sourceId) ?? null;
+  if (
+    heartbeat &&
+    isHelixRoomSourceIngressSourceId(heartbeat.source_id) &&
+    !matchesHelixRoomSourceAdmission(
+      {
+        source_id: heartbeat.source_id,
+        room_id: heartbeat.room_id,
+        domain_adapter: heartbeat.domain_adapter,
+      },
+      options.sourceAdmission,
+    )
+  ) {
+    return null;
+  }
+  return heartbeat;
 }
 
 export function listEnvironmentSourceHeartbeats(input?: {
   roomId?: string | null;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): HelixEnvironmentSourceHeartbeat[] {
-  return Array.from(heartbeatsBySource.values()).filter((heartbeat) =>
-    input?.roomId ? heartbeat.room_id === input.roomId : true
-  );
+  return Array.from(heartbeatsBySource.values()).filter((heartbeat) => {
+    if (
+      isHelixRoomSourceIngressSourceId(heartbeat.source_id) &&
+      !matchesHelixRoomSourceAdmission(
+        {
+          source_id: heartbeat.source_id,
+          room_id: heartbeat.room_id,
+          domain_adapter: heartbeat.domain_adapter,
+        },
+        input?.sourceAdmission,
+      )
+    ) {
+      return false;
+    }
+    return input?.roomId ? heartbeat.room_id === input.roomId : true;
+  });
+}
+
+export function removeEnvironmentSourceHeartbeats(input: {
+  sourceId?: string | null;
+  roomId?: string | null;
+}): number {
+  let removed = 0;
+  for (const [sourceId, heartbeat] of heartbeatsBySource.entries()) {
+    if (input.sourceId && sourceId !== input.sourceId) continue;
+    if (input.roomId && heartbeat.room_id !== input.roomId) continue;
+    heartbeatsBySource.delete(sourceId);
+    removed += 1;
+  }
+  return removed;
 }
 
 export function projectEnvironmentSourceHeartbeatStatus(input: {

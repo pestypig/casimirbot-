@@ -1,4 +1,4 @@
-# theory-badge-graph.reflect_discussion_context
+# helix_ask.reflect_theory_context
 
 Maturity: `candidate`
 
@@ -10,7 +10,7 @@ diagnostic context; it is not proof of the final claim.
 
 ## Owner
 
-- Capability id: `theory-badge-graph.reflect_discussion_context`
+- Capability id: `helix_ask.reflect_theory_context`
 - Panel: `theory-badge-graph`
 - Action id: `reflect_discussion_context`
 - Permission profile: `read`
@@ -31,21 +31,21 @@ Optional:
 - `build_explanation_plan`
 - `limit`
 
-Explicit route alias:
+Legacy route alias:
 
-- `helix_ask.reflect_theory_context`
+- `theory-badge-graph.reflect_discussion_context`
 
-This alias is not a separate provider gateway tool. It may be admitted only as
-an alias that executes the canonical
-`theory-badge-graph.reflect_discussion_context` gateway capability, with the
-requested alias recorded as `source_target_intent.alias_capability`.
+The Ask-owned identity is canonical for admission, execution, observations, and
+provider catalogs. The legacy graph-shaped name may still be normalized at the
+gateway boundary, with the requested alias recorded as
+`source_target_intent.alias_capability`.
 
 Blocked:
 
 - missing prompt
 - prompts that only quote or discuss the capability name
 - quoted, negated, future, or UI-label mentions of
-  `helix_ask.reflect_theory_context`
+  either reflection capability name
 - claims that ask the reflection itself to validate physical viability
 
 ## Observation
@@ -53,7 +53,7 @@ Blocked:
 Required observation fields:
 
 - `schema`: theory context reflection observation schema
-- `capability_key`: `theory-badge-graph.reflect_discussion_context`
+- `capability_key`: `helix_ask.reflect_theory_context`
 - `panel_id`: `theory-badge-graph`
 - `action_id`: `reflect_discussion_context`
 - `reflection_id`
@@ -85,7 +85,7 @@ from structured badge ids in the observation.
 ## Visible Trace
 
 ```txt
-Tool request: theory-badge-graph.reflect_discussion_context
+Tool request: helix_ask.reflect_theory_context
 Tool observation: theory reflection returned badge and claim-boundary evidence
 Model re-entry
 Final answer

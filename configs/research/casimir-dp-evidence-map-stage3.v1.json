@@ -1,0 +1,636 @@
+{
+  "schema_version": "casimir_dp_evidence_map_stage3/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-evidence-map-stage3-v1",
+  "implementation_version": "1.0.0",
+  "evidence_cutoff": "2026-07-25",
+  "claim_ceiling": "diagnostic",
+  "promotion_allowed": false,
+  "authority_manifest": {
+    "role": "stage3_authority_manifest",
+    "path": "configs/research/casimir-dp-stage3-authorities.v1.json",
+    "sha256": "6f5a0a903a161bf98cd82e69b48a03288a7a436f737c07b83366efba1dbbcf13",
+    "tracked": true,
+    "required_at_runtime": true
+  },
+  "upstream_authorities": [
+    {
+      "role": "stage2_config",
+      "path": "configs/research/casimir-dp-or-phase-stage2.v1.json",
+      "sha256": "b517e8fbf002303258a5269e7f37c6b16d4bc3c45c609072bdb2a9e5184e596d",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage2_maintained_report",
+      "path": "docs/research/casimir-dp-or-phase-stage2-report.md",
+      "sha256": "179e2e1674ca611e6977259c7b154b6e0d8450ef6d969c1ca3b4482e19cc2746",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage2_immutable_report",
+      "path": "artifacts/research/casimir-dp-or-phase-stage2/casimir-dp-or-phase-stage2-v1-20260723T220236Z/or-phase-stage2-report.json",
+      "sha256": "6e1772306598ca37f3407f170d28c5252955747b82ef0610b71ff4c0f9ee7c0c",
+      "tracked": false,
+      "required_at_runtime": false
+    },
+    {
+      "role": "stage2_immutable_receipt",
+      "path": "artifacts/research/casimir-dp-or-phase-stage2/casimir-dp-or-phase-stage2-v1-20260723T220236Z/or-phase-stage2-receipt.json",
+      "sha256": "64f0e1c95307829540d3c01ad7cb7e10b15d510cb31cf8e73f88a8990d2c25ab",
+      "tracked": false,
+      "required_at_runtime": false
+    },
+    {
+      "role": "experiment_proposal_prefreeze_baseline",
+      "path": "docs/research/casimir-dp-experiment-proposal.md",
+      "sha256": "712f0b58b7e2862e1ce2c103c0cbc45d8a9a2a4fee6889e179c5e4d22c63083b",
+      "tracked": true,
+      "required_at_runtime": false
+    },
+    {
+      "role": "proposal_closure_config",
+      "path": "configs/research/casimir-dp-proposal-closure.v1.json",
+      "sha256": "7b3b2673c95d4eebca060261385f3b0659365c1112c1d9d42bc1d8700686b8ba",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "proposal_closure_report",
+      "path": "docs/research/casimir-dp-proposal-closure-report.md",
+      "sha256": "5385a47b09877dbecd0fca2f508b1533b3a1a0aacd366d3231d361c746c159b1",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "data_readiness_config",
+      "path": "configs/research/casimir-dp-data-readiness.v1.json",
+      "sha256": "a95e7a22c20e29ed9c34f45ece90916748a9264a32be8315663819171b406475",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "data_readiness_report",
+      "path": "docs/research/casimir-dp-data-readiness-report.md",
+      "sha256": "3939b2b773c5227046c964325abd54ca21bb164b0f0cf0c6aca84dfbc0235b90",
+      "tracked": true,
+      "required_at_runtime": true
+    }
+  ],
+  "source_registry": [
+    {
+      "source_id": "jaffe-2005-casimir-observable",
+      "url": "https://doi.org/10.1103/PhysRevD.72.021301",
+      "supports": "Casimir observables do not require treating zero-point modes as a uniquely measured ontology.",
+      "does_not_support": "A Casimir-to-collapse or Casimir-to-manifold transfer law."
+    },
+    {
+      "source_id": "klimchitskaya-2009-material-casimir",
+      "url": "https://doi.org/10.1103/RevModPhys.81.1827",
+      "supports": "Finite material response, temperature, geometry, and metrology are required for apparatus-level Casimir predictions.",
+      "does_not_support": "Objective collapse or a gravitational interpretation of a force residual."
+    },
+    {
+      "source_id": "diosi-1987-master-equation",
+      "url": "https://doi.org/10.1016/0375-9601(87)90681-5",
+      "supports": "A named gravity-related stochastic master-equation lineage with model-dependent predictions.",
+      "does_not_support": "An unregularized universal numerical prediction or a Casimir boundary coupling."
+    },
+    {
+      "source_id": "penrose-1996-or",
+      "url": "https://doi.org/10.1007/BF02105068",
+      "supports": "The gravitational self-energy mismatch motivates an objective-reduction lifetime estimate.",
+      "does_not_support": "A generative noise law, a cavity resonance, or a Casimir boundary term."
+    },
+    {
+      "source_id": "penrose-2014-eg",
+      "url": "https://doi.org/10.1007/s10701-013-9770-0",
+      "supports": "The E_G notation and the order-of-magnitude relation tau approximately hbar over E_G.",
+      "does_not_support": "Equating E_G over h with a Compton or cavity-mode transfer frequency."
+    },
+    {
+      "source_id": "hu-verdaguer-2008-stochastic-gravity",
+      "url": "https://doi.org/10.12942/lrr-2008-3",
+      "supports": "Separation of mean semiclassical stress, stress-tensor noise, and induced metric fluctuations.",
+      "does_not_support": "Objective reduction or a scalar-stress-to-coherence bridge."
+    },
+    {
+      "source_id": "bahrami-2014-dp-heating",
+      "url": "https://doi.org/10.1103/PhysRevA.90.062105",
+      "supports": "Model-dependent heating provides a companion observable for a specified Diósi-Penrose implementation.",
+      "does_not_support": "Every DP variant or a boundary-dependent collapse rate."
+    },
+    {
+      "source_id": "lindblad-1976-generators",
+      "url": "https://doi.org/10.1007/BF01608499",
+      "supports": "A completely positive Markovian dynamics requires an explicit generator rather than a lifetime slogan.",
+      "does_not_support": "A specific gravitational or Casimir collapse kernel."
+    },
+    {
+      "source_id": "donadi-2021-collapse-radiation",
+      "url": "https://doi.org/10.1038/s41567-020-1008-4",
+      "supports": "Independent radiation channels can constrain named gravity-related collapse parameterizations.",
+      "does_not_support": "Penrose OR generally or a Casimir-conditioned manifold mechanism."
+    },
+    {
+      "source_id": "colella-1975-gravity-phase",
+      "url": "https://doi.org/10.1103/PhysRevLett.34.1472",
+      "supports": "Ordinary gravity can produce a unitary interferometric phase and therefore belongs in the composite null.",
+      "does_not_support": "Gravity-induced objective wave-function reduction."
+    }
+  ],
+  "conventions": {
+    "units": "SI",
+    "coordinate_frame": "apparatus-fixed Cartesian frame with branch A minus branch B phase",
+    "metric_signature": "-+++",
+    "phase_sign": "phase_a_minus_b",
+    "boundary_contrast": "on_minus_off",
+    "fourier_transform": "F(omega)=integral dt exp(+i omega t) f(t)",
+    "angular_frequency_relation": "omega=2*pi*f",
+    "psd_sidedness": "two_sided",
+    "psd_normalization": "integral d omega over 2 pi of S(omega) gives the equal-time variance"
+  },
+  "evidence_policy": {
+    "synthetic_can_validate_software_only": true,
+    "synthetic_can_satisfy_measured_gate": false,
+    "unexplained_residual_is_collapse": false,
+    "unexplained_residual_is_manifold_evidence": false,
+    "null_excludes_only_powered_region": true,
+    "compatibility_label": "not_disfavored_within_powered_region"
+  },
+  "blinding": {
+    "blind_labels": [
+      "blind-A",
+      "blind-B"
+    ],
+    "mapping_stored_in_repository": false,
+    "custodian_receipt_status": "sealed",
+    "custodian_mapping_sha256": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    "preregistration_timestamp": "2026-07-20T08:00:00.000Z",
+    "unblinding_timestamp": null,
+    "automatic_unblinding_allowed": false
+  },
+  "preregistration": {
+    "composite_null_model_id": "M0_ordinary_physics",
+    "composite_null_components": [
+      "M_qed_phase",
+      "M_technical_dephasing",
+      "M_qed_environmental_decoherence",
+      "M_ordinary_gravity"
+    ],
+    "frozen_models": [
+      {
+        "model_id": "M_qed_phase",
+        "lane": "qed_hamiltonian",
+        "role": "baseline_component",
+        "source_ids": [
+          "klimchitskaya-2009-material-casimir"
+        ],
+        "equation_ids": [
+          "cdp-stage3-complex-coherence"
+        ],
+        "parameter_domain": {
+          "material_response": "measured_and_causal",
+          "geometry": "apparatus_matched",
+          "temperature_K_min": 0
+        },
+        "prediction_axes": [
+          "complex_phase",
+          "path_swap",
+          "echo",
+          "boundary_material",
+          "distance"
+        ],
+        "companion_observable": "mean_force_or_force_gradient",
+        "maximum_claim": "controlled_qed_phase",
+        "requires_registered_bridge": false
+      },
+      {
+        "model_id": "M_technical_dephasing",
+        "lane": "technical_dephasing",
+        "role": "baseline_component",
+        "source_ids": [
+          "klimchitskaya-2009-material-casimir"
+        ],
+        "equation_ids": [
+          "cdp-stage3-complex-coherence"
+        ],
+        "parameter_domain": {
+          "nuisance_covariance": "sidecar_measured",
+          "conditioning": "pilot_fit_only"
+        },
+        "prediction_axes": [
+          "phase_conditioning",
+          "path_swap",
+          "echo",
+          "charge",
+          "vibration"
+        ],
+        "companion_observable": "independent_technical_psd",
+        "maximum_claim": "conditionable_dephasing",
+        "requires_registered_bridge": false
+      },
+      {
+        "model_id": "M_qed_environmental_decoherence",
+        "lane": "qed_environmental_decoherence",
+        "role": "baseline_component",
+        "source_ids": [
+          "klimchitskaya-2009-material-casimir",
+          "hu-verdaguer-2008-stochastic-gravity"
+        ],
+        "equation_ids": [
+          "cdp-stage3-composite-null"
+        ],
+        "parameter_domain": {
+          "green_tensor": "causal_material_model",
+          "temperature_K_min": 0,
+          "psd": "two_sided"
+        },
+        "prediction_axes": [
+          "visibility",
+          "heating",
+          "temperature",
+          "material_loss",
+          "distance",
+          "echo"
+        ],
+        "companion_observable": "force_noise_or_heating",
+        "maximum_claim": "ordinary_open_system_decoherence",
+        "requires_registered_bridge": false
+      },
+      {
+        "model_id": "M_ordinary_gravity",
+        "lane": "ordinary_gravity",
+        "role": "baseline_component",
+        "source_ids": [
+          "colella-1975-gravity-phase",
+          "hu-verdaguer-2008-stochastic-gravity"
+        ],
+        "equation_ids": [
+          "cdp-stage3-complete-apparatus-mass"
+        ],
+        "parameter_domain": {
+          "source": "complete_delta_T_munu",
+          "weak_field": true,
+          "closed_apparatus": true
+        },
+        "prediction_axes": [
+          "mass_difference",
+          "weight_difference",
+          "unitary_phase",
+          "independent_gravity_probe"
+        ],
+        "companion_observable": "vacuum_weight_or_metric_probe",
+        "maximum_claim": "ordinary_gravitational_response",
+        "requires_registered_bridge": false
+      },
+      {
+        "model_id": "M_penrose_or_envelope",
+        "lane": "penrose_or_heuristic",
+        "role": "diagnostic_envelope",
+        "source_ids": [
+          "penrose-1996-or",
+          "penrose-2014-eg"
+        ],
+        "equation_ids": [
+          "cdp-dp-self-energy"
+        ],
+        "parameter_domain": {
+          "timescale": "tau_approximately_hbar_over_E_G",
+          "generative_dynamics": false,
+          "boundary_term": false
+        },
+        "prediction_axes": [
+          "mass_density_geometry",
+          "branch_separation",
+          "hold_time"
+        ],
+        "companion_observable": null,
+        "maximum_claim": "heuristic_compatibility_or_powered_exclusion",
+        "requires_registered_bridge": false
+      },
+      {
+        "model_id": "M_dp_regularized_synthetic_v1",
+        "lane": "named_dynamical_dp",
+        "role": "nested_extension",
+        "source_ids": [
+          "diosi-1987-master-equation",
+          "bahrami-2014-dp-heating",
+          "donadi-2021-collapse-radiation"
+        ],
+        "equation_ids": [
+          "cdp-dp-self-energy",
+          "cdp-stage3-composite-null"
+        ],
+        "parameter_domain": {
+          "regularization": "gaussian_mass_density_smearing",
+          "R0_m": 0.0000001,
+          "composition": "single_effective_particle",
+          "dissipation": "none"
+        },
+        "prediction_axes": [
+          "coherence",
+          "mass",
+          "branch_separation",
+          "hold_time",
+          "heating"
+        ],
+        "companion_observable": "center_of_mass_heating",
+        "maximum_claim": "named_dp_implementation_compatibility_or_exclusion",
+        "requires_registered_bridge": false
+      },
+      {
+        "model_id": "M_bridge_tensor_noise_v1",
+        "lane": "registered_bridge",
+        "role": "nested_extension",
+        "source_ids": [
+          "hu-verdaguer-2008-stochastic-gravity",
+          "lindblad-1976-generators"
+        ],
+        "equation_ids": [
+          "cdp-stage3-manifold-kernel-preflight"
+        ],
+        "parameter_domain": {
+          "registry_version": "1.0.0",
+          "maturity": "stage0_exploratory",
+          "numerical_prediction_allowed": false
+        },
+        "prediction_axes": [
+          "boundary",
+          "material_loss",
+          "temperature",
+          "distance",
+          "path_swap",
+          "echo",
+          "independent_companion"
+        ],
+        "companion_observable": "registered_independent_metric_or_stress_noise_channel",
+        "maximum_claim": "registered_schema_only_until_empirically_validated",
+        "requires_registered_bridge": true
+      }
+    ],
+    "proper_priors": [
+      {
+        "prior_id": "prior_dp_R0_log_normal_v1",
+        "model_id": "M_dp_regularized_synthetic_v1",
+        "proper": true,
+        "distribution": "log_normal",
+        "parameters": {
+          "median_R0_m": 0.0000001,
+          "log_standard_deviation": 1
+        },
+        "frozen_before_unblinding": true
+      }
+    ],
+    "nuisance_registry": [
+      {
+        "nuisance_id": "surface_distance",
+        "measured_channel": "surface_distance_m",
+        "allowed_range": [
+          0.0000001,
+          0.00001
+        ],
+        "covariance_source": "geometry_and_alignment_sidecar"
+      },
+      {
+        "nuisance_id": "temperature",
+        "measured_channel": "temperature_K",
+        "allowed_range": [
+          0.01,
+          300
+        ],
+        "covariance_source": "thermometry_sidecar"
+      },
+      {
+        "nuisance_id": "net_charge",
+        "measured_channel": "net_charge_C",
+        "allowed_range": [
+          -1e-16,
+          1e-16
+        ],
+        "covariance_source": "charge_metrology_sidecar"
+      },
+      {
+        "nuisance_id": "vibration",
+        "measured_channel": "vibration_rms_m",
+        "allowed_range": [
+          0,
+          0.000001
+        ],
+        "covariance_source": "accelerometer_and_reference_interferometer_sidecar"
+      },
+      {
+        "nuisance_id": "material_loss",
+        "measured_channel": "imaginary_permittivity",
+        "allowed_range": [
+          0,
+          1000000
+        ],
+        "covariance_source": "optical_response_sidecar"
+      },
+      {
+        "nuisance_id": "gas_pressure",
+        "measured_channel": "pressure_Pa",
+        "allowed_range": [
+          0,
+          0.001
+        ],
+        "covariance_source": "vacuum_gauge_sidecar"
+      }
+    ],
+    "decision_rules": [
+      {
+        "rule_id": "reject_composite_null_only_in_powered_region",
+        "metric": "heldout_joint_chi_square",
+        "operator": "gt",
+        "threshold": 20,
+        "interpretation": "Disfavor M0 only when achieved power and identifiability gates both pass."
+      },
+      {
+        "rule_id": "signature_independence",
+        "metric": "maximum_abs_whitened_signature_cosine",
+        "operator": "lte",
+        "threshold": 0.98,
+        "interpretation": "Do not identify a mechanism when frozen signatures are too collinear."
+      },
+      {
+        "rule_id": "minimum_power",
+        "metric": "achieved_power",
+        "operator": "gte",
+        "threshold": 0.8,
+        "interpretation": "A null can exclude only a parameter region covered at or above this power."
+      },
+      {
+        "rule_id": "companion_observable",
+        "metric": "companion_signal_to_noise",
+        "operator": "gte",
+        "threshold": 5,
+        "interpretation": "Named-model support requires its applicable independent companion channel."
+      }
+    ],
+    "falsifiers": [
+      {
+        "falsifier_id": "qed_phase_path_swap",
+        "model_id": "M_qed_phase",
+        "observable": "complex_coherence_phase",
+        "criterion": "The Hamiltonian phase must reverse with the registered path orientation and remain compatible with the material Green model.",
+        "requires_power": true,
+        "independent": false
+      },
+      {
+        "falsifier_id": "technical_recovery",
+        "model_id": "M_technical_dephasing",
+        "observable": "conditioned_visibility",
+        "criterion": "A component assigned to conditionable dephasing must recover under independent phase conditioning or the applicable echo filter.",
+        "requires_power": true,
+        "independent": true
+      },
+      {
+        "falsifier_id": "qed_environmental_companion",
+        "model_id": "M_qed_environmental_decoherence",
+        "observable": "force_noise_and_heating",
+        "criterion": "The same causal material response must jointly predict phase noise, heating, and coherence loss within uncertainty.",
+        "requires_power": true,
+        "independent": true
+      },
+      {
+        "falsifier_id": "penrose_boundary_null",
+        "model_id": "M_penrose_or_envelope",
+        "observable": "fixed_delta_rho_boundary_contrast",
+        "criterion": "Unextended Penrose OR predicts no boundary dependence when delta_rho and branch trajectories are demonstrably equivalent.",
+        "requires_power": true,
+        "independent": true
+      },
+      {
+        "falsifier_id": "dp_joint_companion",
+        "model_id": "M_dp_regularized_synthetic_v1",
+        "observable": "coherence_and_center_of_mass_heating",
+        "criterion": "Reject the named DP manifest when its joint held-out coherence and powered heating signature fails.",
+        "requires_power": true,
+        "independent": true
+      },
+      {
+        "falsifier_id": "ordinary_gravity_complete_source",
+        "model_id": "M_ordinary_gravity",
+        "observable": "mass_weight_and_unitary_phase",
+        "criterion": "No ordinary-gravity claim is allowed without a conserved complete-apparatus energy or stress ledger.",
+        "requires_power": true,
+        "independent": true
+      },
+      {
+        "falsifier_id": "bridge_joint_signature",
+        "model_id": "M_bridge_tensor_noise_v1",
+        "observable": "heldout_boundary_conditioned_coherence_and_companion",
+        "criterion": "The bridge is excluded from numerical comparison unless its registered kernel, causal mapping, uncertainties, companion observable, and falsifiers pass preflight before unblinding.",
+        "requires_power": true,
+        "independent": true
+      }
+    ],
+    "thresholds": {
+      "minimum_power": 0.8,
+      "maximum_false_positive_rate": 0.05,
+      "maximum_signature_correlation": 0.98,
+      "minimum_signature_rank": 4,
+      "minimum_distinct_hold_times": 4,
+      "minimum_hold_time_span_ratio": 4,
+      "fixed_delta_rho_relative_tolerance": 0.01,
+      "minimum_companion_signal_to_noise": 5,
+      "maximum_green_interpolation_relative_error": 0.001,
+      "maximum_green_convergence_relative_error": 0.001,
+      "maximum_kramers_kronig_relative_error": 0.00001
+    },
+    "fixed_delta_rho_equivalence": {
+      "required": true,
+      "wavepacket_receipt_required": true,
+      "branch_trajectory_receipt_required": true,
+      "tolerance_source": "frozen preregistration plus independent branch tomography",
+      "boundary_induced_state_change_is_confound": true
+    },
+    "confirmatory_support_requires": {
+      "independent_replication": true,
+      "applicable_powered_companion_observable": true,
+      "held_out_prediction": true
+    }
+  },
+  "runtime_fixtures": {
+    "complex_coherence": {
+      "path": "configs/research/fixtures/casimir-dp-stage3-complex-coherence.synthetic.v1.json",
+      "sha256": "6ca955e993f94be6d4ddda409d3ff523e68ffee1b01558a0ae3ab4b601b114fa",
+      "schema_version": "casimir_dp_complex_coherence/1",
+      "evidence_class": "synthetic"
+    },
+    "qed_green_noise": {
+      "path": "configs/research/fixtures/casimir-dp-stage3-qed-green-noise.synthetic.v1.json",
+      "sha256": "49bb2d48b8281ca94dbefc20e336cfb0c3a5835f1a230a7effadc8020c981371",
+      "schema_version": "casimir_dp_qed_green_noise/1",
+      "evidence_class": "synthetic"
+    },
+    "dp_companion": {
+      "path": "configs/research/fixtures/casimir-dp-stage3-dp-companion.synthetic.v1.json",
+      "sha256": "14b32063294220471b65fba5312577cf5da077fe24b4633b41be590a0be72ceb",
+      "schema_version": "casimir_dp_dp_companion/1",
+      "evidence_class": "synthetic"
+    },
+    "gravity_upper_bound": {
+      "path": "configs/research/fixtures/casimir-dp-stage3-gravity-upper-bound.synthetic.v1.json",
+      "sha256": "90ee6a91cc5f1924c341ca5120babb1609a94d22189d074b777c16e2ce026bdd",
+      "schema_version": "casimir_dp_gravity_upper_bound/1",
+      "evidence_class": "synthetic"
+    },
+    "model_comparison": {
+      "path": "configs/research/fixtures/casimir-dp-stage3-model-comparison.synthetic.v1.json",
+      "sha256": "f7243d6b71a61dfc2940b5949229e464b7e18e2e7af4a3e0a78891e3286294ff",
+      "schema_version": "casimir_dp_blinded_model_comparison/1",
+      "evidence_class": "synthetic"
+    },
+    "manifold_kernel_registry": {
+      "path": "configs/research/fixtures/casimir-dp-stage3-manifold-registry.synthetic.v1.json",
+      "sha256": "6211ef6f27fc72f8a2d377ca007a5504540cba2dc1e8d4eb8953e12cbf954f2c",
+      "schema_version": "casimir_dp_manifold_kernel_registry/1",
+      "evidence_class": "synthetic"
+    }
+  },
+  "deterministic_seeds": {
+    "synthetic": 310031,
+    "bootstrap": 310032,
+    "resampling": 310033
+  },
+  "software": {
+    "runtime": "typescript",
+    "runner": "scripts/research/run-casimir-dp-evidence-map-stage3.ts",
+    "module_ids": [
+      "shared/casimir-dp-complex-coherence.ts",
+      "shared/casimir-dp-qed-green-noise.ts",
+      "shared/casimir-dp-dp-companion.ts",
+      "shared/casimir-dp-gravity-upper-bound.ts",
+      "shared/casimir-dp-manifold-kernel-registry.ts",
+      "shared/casimir-dp-model-comparison.ts",
+      "shared/casimir-dp-evidence-map-stage3.ts"
+    ]
+  },
+  "run_order": [
+    "freeze_sources_conventions_models_and_upstream_hashes",
+    "validate_blind_provenance_randomization_and_control_coverage",
+    "estimate_complex_coherence",
+    "evaluate_phase_conditioning_path_swap_and_echo",
+    "evaluate_decay_shape_and_time_grid_identifiability",
+    "validate_material_green_noise_and_technical_sidecars",
+    "predict_qed_phase_noise_heating_and_decoherence",
+    "validate_named_or_dp_models_and_parameter_manifest",
+    "predict_dp_coherence_and_applicable_companions",
+    "validate_complete_apparatus_energy_and_stress_ledger",
+    "compute_mass_weight_weak_field_and_ordinary_gravity_phase_bounds",
+    "preflight_manifold_kernel_registry",
+    "freeze_signatures_likelihoods_priors_criteria_and_falsifiers",
+    "run_blinded_held_out_joint_model_comparison",
+    "populate_outcome_to_claim_ledger",
+    "write_hash_backed_receipt_report_and_evidence_state"
+  ],
+  "final_status_policy": {
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "registry_may_complete_blocked": true
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "generatedAt": "2026-07-25T21:29:37.9736438Z",
+  "source": "explicit_stage4_2a_receipt_grade_replay",
+  "repo": {
+    "build": {
+      "status": "pass",
+      "ok": true,
+      "exitCode": 0,
+      "command": "npm run build",
+      "warningsPresent": true
+    },
+    "tests": {
+      "total": 260,
+      "failed": 0,
+      "passed": 260,
+      "status": "pass",
+      "files": 25,
+      "suites": 58,
+      "reportPath": "reports/vitest-stage4-2a-final.json",
+      "reportSha256": "31cd4ee50582c30859f5b542cbf041c7f41f1fb9d4476d1e001ff7110d31cb95"
+    },
+    "schema": {
+      "contracts": "pass",
+      "ok": true,
+      "scope": "stage4_2a_runtime_contract_adversarial_fixture_theory_badge_equation_sidecar_math_root_leaf_and_required_gr_warp"
+    },
+    "deps": {
+      "coherence": "pass",
+      "exitCode": 0,
+      "command": "npm ls --depth=0",
+      "packageLockSha256": "1833546cf15db039c1895a05e29e80338c271aff935d488034e7e9e6ab025cba"
+    }
+  }
+}

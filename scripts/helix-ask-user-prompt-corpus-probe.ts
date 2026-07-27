@@ -16,9 +16,13 @@ export type UserPromptScenario = {
     | "docs"
     | "repo_code"
     | "theory_reflection"
+    | "workstation_notes"
+    | "moral_graph"
+    | "voice_delivery"
     | "compound"
     | "negated_context";
   notes?: string;
+  workspace_context_snapshot?: RecordLike;
   expected_tool_mode?: "none" | "required";
   expected_capability_patterns?: string[];
   expected_minimum_observations?: number;
@@ -36,12 +40,21 @@ type ProbePreflight = {
   hint?: string;
 };
 
+export type UserPromptConversationContext = {
+  turn_id: string;
+  assistant_text: string;
+  user_prompt: string;
+  active_doc_path?: string | null;
+};
+
 const BASE_URL = (process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:1498").replace(/\/+$/, "");
 const OUT_DIR = process.env.HELIX_ASK_USER_PROMPT_OUT ?? "artifacts/helix-ask-user-prompt-corpus";
 const TIMEOUT_MS = Math.max(1000, Number(process.env.HELIX_ASK_USER_PROMPT_TIMEOUT_MS ?? 240_000));
 const DELAY_MS = Math.max(0, Number(process.env.HELIX_ASK_USER_PROMPT_DELAY_MS ?? 1000));
 const DRY_RUN = process.argv.includes("--dry-run") || process.env.HELIX_ASK_USER_PROMPT_DRY_RUN === "1";
 const FAIL_ON_WARN = process.env.HELIX_ASK_USER_PROMPT_FAIL_ON_WARN === "1";
+const LOCAL_DEVELOPER_SIGN_IN =
+  process.env.HELIX_ASK_USER_PROMPT_LOCAL_DEVELOPER === "1";
 const TEST_MODEL = process.env.HELIX_ASK_TEST_MODEL?.trim() || "gpt-5.4-mini";
 const TEST_MODEL_SELECTION = TEST_MODEL.toLowerCase() === "auto"
   ? { mode: "auto" as const }
@@ -50,6 +63,7 @@ const SCENARIO_FILTER = (process.env.HELIX_ASK_USER_PROMPT_SCENARIOS ?? "")
   .split(",")
   .map((entry) => entry.trim())
   .filter(Boolean);
+let requestCookie: string | null = null;
 
 export const USER_PROMPT_CORPUS_SCENARIOS: UserPromptScenario[] = [
   {
@@ -156,6 +170,7 @@ const fetchJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        ...(requestCookie ? { Cookie: requestCookie } : {}),
         ...(init?.headers ?? {}),
       },
     });
@@ -164,6 +179,65 @@ const fetchJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
     return JSON.parse(text) as T;
   } finally {
     clearTimeout(timeout);
+  }
+};
+
+export const isLoopbackUserPromptBaseUrl = (baseUrl: string): boolean => {
+  try {
+    const hostname = new URL(baseUrl).hostname.toLowerCase();
+    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]";
+  } catch {
+    return false;
+  }
+};
+
+const establishLocalDeveloperSession = async (
+  runId: string,
+): Promise<{ profile_id: string; account_type: "developer" }> => {
+  if (!isLoopbackUserPromptBaseUrl(BASE_URL)) {
+    throw new Error("local_developer_sign_in_requires_loopback_base_url");
+  }
+  const profileId = `helix-ask-user-prompt-probe:${runId}`;
+  const receipt = await fetchJson<RecordLike>(`${BASE_URL}/api/account/session/sign-in`, {
+    method: "POST",
+    body: JSON.stringify({
+      profile_id: profileId,
+      display_name: "Helix Ask User Prompt Probe",
+      account_type: "developer",
+    }),
+  });
+  const sessionId = readString(readRecord(receipt.session)?.session_id);
+  if (receipt.ok !== true || !sessionId) {
+    throw new Error(
+      `local_developer_sign_in_failed:${readString(receipt.error) ?? "session_missing"}`,
+    );
+  }
+  requestCookie = `helix_session=${sessionId}`;
+  const status = await fetchJson<RecordLike>(`${BASE_URL}/api/account/session`);
+  const accountType = readString(getPath(status, ["account_policy", "account_type"]));
+  if (accountType !== "developer") {
+    try {
+      await fetchJson<RecordLike>(`${BASE_URL}/api/account/session/sign-out`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+    } finally {
+      requestCookie = null;
+    }
+    throw new Error(`local_developer_policy_missing:${accountType ?? "unknown"}`);
+  }
+  return { profile_id: profileId, account_type: "developer" };
+};
+
+const releaseLocalDeveloperSession = async (): Promise<void> => {
+  if (!requestCookie) return;
+  try {
+    await fetchJson<RecordLike>(`${BASE_URL}/api/account/session/sign-out`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  } finally {
+    requestCookie = null;
   }
 };
 
@@ -422,10 +496,19 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
   const expectedGatewayResults = expectedCapabilityPatterns.flatMap((pattern) =>
     gatewayResultSummaries.filter((result) => pattern.test(result.capability)),
   );
+  const successfulSubgoalCapabilities = subgoals.flatMap((subgoal) => {
+    if (!["satisfied", "completed", "complete"].includes(readString(subgoal.satisfaction) ?? "")) return [];
+    return [
+      readString(subgoal.executed_capability),
+      readString(subgoal.selected_capability),
+      readString(subgoal.requested_capability),
+    ].filter((capability): capability is string => Boolean(capability));
+  });
   const expectedCapabilitiesSuccessful =
     expectedCapabilityPatterns.length === 0 ||
     expectedCapabilityPatterns.every((pattern) =>
-      gatewayResultSummaries.some((result) => pattern.test(result.capability) && result.successful),
+      gatewayResultSummaries.some((result) => pattern.test(result.capability) && result.successful) ||
+      successfulSubgoalCapabilities.some((capability) => pattern.test(capability)),
     );
   const failedExpectedGatewayResults = expectedGatewayResults.filter((result) => !result.successful);
   const expectedCapabilityObserved =
@@ -481,7 +564,9 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
       return "capability_execution";
     }
     if (evaluatedObservationRefs.length === 0) return "observation_artifact";
-    if (reentryStatus && reentryStatus !== "reentered") return "evidence_reentry";
+    if (reentryStatus && !["reentered", "handoff_terminal_allowed"].includes(reentryStatus)) {
+      return "evidence_reentry";
+    }
     if (observationVisibilityDenied) return "evidence_reentry";
     if (terminalError || terminalKind === "typed_failure" || finalAnswerSource === "typed_failure") {
       return "terminal_authority";
@@ -495,7 +580,12 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
     terminalError ? `terminal_error:${terminalError}` : "",
     terminalKind === "typed_failure" || finalAnswerSource === "typed_failure" ? "typed_failure" : "",
     text.trim().length === 0 ? "empty_answer" : "",
-    text.trim().length > 0 && text.trim().length < 80 && terminalKind !== "typed_failure" ? "short_answer" : "",
+    scenario.expected_minimum_answer_chars == null &&
+      text.trim().length > 0 &&
+      text.trim().length < 80 &&
+      terminalKind !== "typed_failure"
+      ? "short_answer"
+      : "",
     terminalKind && visibleKind && terminalKind !== visibleKind ? `terminal_projection_mismatch:${terminalKind}!=${visibleKind}` : "",
     compoundTerminalNotSynthesis ? `compound_terminal_not_synthesis:${terminalKind}` : "",
     evaluatedRailStatus && !["complete", "satisfied"].includes(evaluatedRailStatus) ? `rail_status:${evaluatedRailStatus}` : "",
@@ -621,6 +711,7 @@ const loadScenarioFile = async (filePath: string): Promise<UserPromptScenario[]>
       prompt,
       thread_group: readString(record.thread_group) ?? undefined,
       notes: readString(record.notes) ?? undefined,
+      workspace_context_snapshot: readRecord(record.workspace_context_snapshot) ?? undefined,
       expected_tool_mode: readString(record.expected_tool_mode) as UserPromptScenario["expected_tool_mode"] ?? undefined,
       expected_capability_patterns: readArray(record.expected_capability_patterns)
         .map((value) => readString(value))
@@ -663,14 +754,69 @@ export const resolveUserPromptScenarioThreadId = (
     ? `helix-ask:user-prompt-corpus:${runId}:journey:${slug(scenario.thread_group)}`
     : `helix-ask:user-prompt-corpus:${runId}:${scenario.id}`;
 
+export const buildUserPromptConversationWorkspaceSnapshot = (
+  context: UserPromptConversationContext | null | undefined,
+): RecordLike | undefined => {
+  if (!context?.assistant_text.trim()) return undefined;
+  const sourceRef = `chat.final_answer.previous:${context.turn_id}`;
+  const activeDocPath =
+    readString(context.active_doc_path) ??
+    context.assistant_text.match(/\bdocs[\\/][^\s)\]]+\.md\b/i)?.[0]?.replace(/\\/g, "/") ??
+    null;
+  const previousAnswer = {
+    role: "assistant",
+    reply_id: context.turn_id,
+    source_ref: sourceRef,
+    text: context.assistant_text,
+  };
+  return {
+    ...(activeDocPath
+      ? {
+          activeDocPath,
+          active_doc_path: activeDocPath,
+          activePanel: "docs-viewer",
+          hasDocContext: true,
+          source: "user_prompt_corpus_prior_answer",
+        }
+      : {}),
+    chat_referent_context: {
+      schema: "helix.ask.chat_referent_context.v1",
+      previous_assistant_final_answer: previousAnswer,
+      previous_chat_message: previousAnswer,
+      recent_assistant_final_answers: [previousAnswer],
+      previous_user_message: {
+        role: "user",
+        source_ref: `chat.user.previous:${context.turn_id}`,
+        text: context.user_prompt,
+      },
+    },
+  };
+};
+
+export const mergeUserPromptWorkspaceSnapshots = (
+  configured: RecordLike | null | undefined,
+  conversation: RecordLike | null | undefined,
+): RecordLike | undefined => {
+  if (!configured && !conversation) return undefined;
+  return {
+    ...(configured ?? {}),
+    ...(conversation ?? {}),
+  };
+};
+
 const runScenario = async (
   scenario: UserPromptScenario,
   runId: string,
   outputDir: string,
+  conversationContexts: Map<string, UserPromptConversationContext>,
 ): Promise<RecordLike> => {
   const threadId = resolveUserPromptScenarioThreadId(scenario, runId);
   const scenarioDir = path.join(outputDir, slug(scenario.id));
   await fs.mkdir(scenarioDir, { recursive: true });
+  const workspaceContextSnapshot = mergeUserPromptWorkspaceSnapshots(
+    scenario.workspace_context_snapshot,
+    buildUserPromptConversationWorkspaceSnapshot(conversationContexts.get(threadId)),
+  );
 
   const startedAtMs = Date.now();
   const ask = await fetchJson<RecordLike>(`${BASE_URL}/api/agi/ask/turn`, {
@@ -680,6 +826,12 @@ const runScenario = async (
       question: scenario.prompt,
       mode: "read",
       debug: true,
+      ...(workspaceContextSnapshot
+        ? {
+            workspace_context_snapshot: workspaceContextSnapshot,
+            workspaceContextSnapshot: workspaceContextSnapshot,
+          }
+        : {}),
       language_model_selection: TEST_MODEL_SELECTION,
       languageModelSelection: TEST_MODEL_SELECTION,
     }),
@@ -689,6 +841,18 @@ const runScenario = async (
     ? await fetchJson<RecordLike>(`${BASE_URL}/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`)
     : null;
   const result = summarizeTurn(scenario, ask, debug);
+  const finalText = selectedFinalText(ask, debug);
+  if (turnId && finalText.trim()) {
+    const activeDocPath =
+      finalText.match(/\bdocs[\\/][^\s)\]]+\.md\b/i)?.[0]?.replace(/\\/g, "/") ??
+      readString(workspaceContextSnapshot?.activeDocPath);
+    conversationContexts.set(threadId, {
+      turn_id: turnId,
+      assistant_text: finalText,
+      user_prompt: scenario.prompt,
+      active_doc_path: activeDocPath,
+    });
+  }
 
   await fs.writeFile(path.join(scenarioDir, "ask-response.json"), `${JSON.stringify(ask, null, 2)}\n`);
   await fs.writeFile(path.join(scenarioDir, "debug-export.json"), `${JSON.stringify(debug, null, 2)}\n`);
@@ -794,6 +958,7 @@ const main = async (): Promise<void> => {
       ok: true,
       scenario_count: scenarios.length,
       model_selection: TEST_MODEL_SELECTION,
+      account_mode: LOCAL_DEVELOPER_SIGN_IN ? "local_developer" : "default",
       scenario_ids: scenarios.map((scenario) => scenario.id),
       scenarios,
     };
@@ -812,30 +977,65 @@ const main = async (): Promise<void> => {
     return;
   }
 
+  let accountIdentity: { profile_id: string; account_type: "developer" } | null = null;
+  if (LOCAL_DEVELOPER_SIGN_IN) {
+    try {
+      accountIdentity = await establishLocalDeveloperSession(runId);
+    } catch (error) {
+      const identityPreflight: ProbePreflight = {
+        ok: false,
+        status: 0,
+        reason: "developer_session_unavailable",
+        message: error instanceof Error ? error.message : String(error),
+        hint:
+          "Use the operator-started loopback keyed server; local developer sign-in is intentionally unavailable for remote base URLs.",
+      };
+      const summary = await writeBlockedSummary(
+        outputDir,
+        runId,
+        scenarios,
+        identityPreflight,
+      );
+      console.log(JSON.stringify(summary, null, 2));
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   await fs.mkdir(outputDir, { recursive: true });
   const results: RecordLike[] = [];
-  for (const [index, scenario] of scenarios.entries()) {
-    if (index > 0 && DELAY_MS > 0) await sleep(DELAY_MS);
-    console.log(`[helix-user-prompt-corpus] ${scenario.id}: ${scenario.prompt}`);
-    try {
-      results.push(await runScenario(scenario, runId, outputDir));
-    } catch (error) {
-      const scenarioDir = path.join(outputDir, slug(scenario.id));
-      await fs.mkdir(scenarioDir, { recursive: true });
-      const result = {
-        schema: "helix.ask_user_prompt_corpus_probe_result.v1",
-        id: scenario.id,
-        category: scenario.category,
-        prompt: scenario.prompt,
-        verdict: "FAIL" as Verdict,
-        answer_quality_status: "failed",
-        answer_quality_flags: ["probe_exception"],
-        error: error instanceof Error ? error.message : String(error),
-        artifact_dir: scenarioDir,
-      };
-      await fs.writeFile(path.join(scenarioDir, "probe-result.json"), `${JSON.stringify(result, null, 2)}\n`);
-      results.push(result);
+  const conversationContexts = new Map<string, UserPromptConversationContext>();
+  try {
+    for (const [index, scenario] of scenarios.entries()) {
+      if (index > 0 && DELAY_MS > 0) await sleep(DELAY_MS);
+      console.log(`[helix-user-prompt-corpus] ${scenario.id}: ${scenario.prompt}`);
+      try {
+        results.push(await runScenario(
+          scenario,
+          runId,
+          outputDir,
+          conversationContexts,
+        ));
+      } catch (error) {
+        const scenarioDir = path.join(outputDir, slug(scenario.id));
+        await fs.mkdir(scenarioDir, { recursive: true });
+        const result = {
+          schema: "helix.ask_user_prompt_corpus_probe_result.v1",
+          id: scenario.id,
+          category: scenario.category,
+          prompt: scenario.prompt,
+          verdict: "FAIL" as Verdict,
+          answer_quality_status: "failed",
+          answer_quality_flags: ["probe_exception"],
+          error: error instanceof Error ? error.message : String(error),
+          artifact_dir: scenarioDir,
+        };
+        await fs.writeFile(path.join(scenarioDir, "probe-result.json"), `${JSON.stringify(result, null, 2)}\n`);
+        results.push(result);
+      }
     }
+  } finally {
+    if (LOCAL_DEVELOPER_SIGN_IN) await releaseLocalDeveloperSession();
   }
 
   const counts = results.reduce<Record<string, number>>((acc, result) => {
@@ -860,6 +1060,8 @@ const main = async (): Promise<void> => {
     preflight,
     scenario_count: scenarios.length,
     model_selection: TEST_MODEL_SELECTION,
+    account_mode: accountIdentity?.account_type ?? "default",
+    account_profile_id: accountIdentity?.profile_id ?? null,
     verdict_counts: counts,
     lifecycle_stage_counts: lifecycleStageCounts,
     results,

@@ -1,0 +1,48 @@
+{
+  "schema": "casimir_numerical_build_manifest/v1",
+  "manifest_id": "casimir-advection-diffusion-lanyon-adapter-msvc-19.41.34123",
+  "lineage_id": "lanyon-generated-kernel-with-casimir-driver",
+  "implementation_id": "casimir-lanyon-advection-diffusion-full-1d",
+  "upstream": {
+    "repository": "https://github.com/lanyonai/AdvectionDiffusion",
+    "commit": "3d19be11e101121d8187230977f5a5aeba0daefe",
+    "logical_path": "implementations/advection_diffusion_full_1d.c",
+    "sha256": "ea3f4f7534475c719fa94cd96c380faa90c6eedd2f587b513b9b9658cb1beb75",
+    "vendored": false,
+    "license_file_observed": false
+  },
+  "driver": {
+    "logical_path": "tools/casimir-numerical/advection-diffusion-lanyon-adapter.c",
+    "sha256": "a0b420bbc3a56144145008e81ec06e8fc9cbe8f2606e4771b9c1038a7aee1533"
+  },
+  "toolchain": {
+    "compiler": "Microsoft C/C++ Optimizing Compiler 19.41.34123.0 x64",
+    "compiler_sha256": "5a85e24e8545c3cc58f8961020a546838acf8f78ed7a3342472836130016f77b",
+    "flags": [
+      "/nologo",
+      "/O2",
+      "/fp:strict",
+      "/std:c11",
+      "/Brepro"
+    ]
+  },
+  "runtime_environment": {
+    "ucrtbase_version": "10.0.26100.8875",
+    "ucrtbase_sha256": "5e7709a6b71bb818260b6f05c5bb3b6ca0c3ca9bc2f58c6242c1cd9d826d0079",
+    "platform_sha256": "1ba89b0966e71bd6eeee30053a657fd2f8e279ad39c490f0b87cd4b0711c1426"
+  },
+  "output": {
+    "logical_name": "lanyon-adapter.exe",
+    "sha256": "17f1891190c6071b075e19b35a33a870fff150d1ebb32679080c57922d2baf5b",
+    "reproducible_builds_observed": 2,
+    "reproducible_builds_byte_identical": true
+  },
+  "claim_boundary": {
+    "upstream_is_complete_simulation_driver": false,
+    "casimir_driver_is_upstream_generated": false,
+    "validates_generated_code": false,
+    "validates_numerical_implementation": false,
+    "validates_theory": false,
+    "terminal_eligible": false
+  }
+}

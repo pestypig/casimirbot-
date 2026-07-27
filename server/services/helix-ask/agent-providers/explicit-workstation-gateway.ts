@@ -31,6 +31,7 @@ import {
   VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY,
   THEORY_CONTEXT_REFLECTION_CAPABILITY,
   THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
+  THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
   VOICE_INTERIM_CALLOUT_CAPABILITY,
   VOICE_NARRATOR_SAY_CAPABILITY,
   WORKSTATION_ACTIVE_CONTEXT_CAPABILITY,
@@ -74,6 +75,7 @@ import {
   buildPromptDerivedRepoSearchGatewayCallRequests,
   buildPromptDerivedResearchLibraryGatewayCallRequests,
   buildPromptDerivedScholarlyResearchGatewayCallRequests,
+  buildPromptDerivedTheoryExperimentProcedureGatewayCallRequests,
   buildPromptDerivedTheoryReflectionGatewayCallRequests,
   buildPromptDerivedVoiceGatewayCallRequests,
   buildPromptDerivedWorkspaceStatusGatewayCallRequests,
@@ -274,7 +276,8 @@ const contextualSuppressionFamilyForCapability = (
   ) return "calculator";
   if (
     capability === THEORY_CONTEXT_REFLECTION_CAPABILITY ||
-    capability === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY
+    capability === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY ||
+    capability === THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY
   ) return "theory_locator";
   if (
     capability === MORAL_GRAPH_REFLECTION_CAPABILITY ||
@@ -547,6 +550,7 @@ export {
   buildPromptDerivedRepoSearchGatewayCallRequests,
   buildPromptDerivedResearchLibraryGatewayCallRequests,
   buildPromptDerivedScholarlyResearchGatewayCallRequests,
+  buildPromptDerivedTheoryExperimentProcedureGatewayCallRequests,
   buildPromptDerivedTheoryReflectionGatewayCallRequests,
   buildPromptDerivedVoiceGatewayCallRequests,
   buildPromptDerivedWorkspaceStatusGatewayCallRequests,
@@ -839,6 +843,14 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
       .map((request) => readString(request.capability_id) ?? readString(request.capabilityId))
       .filter((capability): capability is string => Boolean(capability)),
   );
+  // This read-only preparation rail has its own contextual guard: "prepare
+  // only; do not execute downstream work" is an affirmative request for the
+  // bounded procedure, not a negation of the preparation observation.
+  appendDedupe(
+    requests,
+    seen,
+    buildPromptDerivedTheoryExperimentProcedureGatewayCallRequests(input.body),
+  );
   // A structured source-target admission is the authoritative route decision for
   // the turn. Keep independently admitted compound dependencies, but do not let
   // lexical capability names or active-panel context append a competing source.
@@ -975,11 +987,45 @@ export const hasWorkstationGatewayCallsForTurn = (input: {
   includePlannerDerived?: boolean;
 }): boolean => readWorkstationGatewayCallRequestsForTurn(input).length > 0;
 
+export const buildExplicitProviderGatewayCallInput = (input: {
+  request: Record<string, unknown>;
+  accountContext: HelixWorkstationGatewayAccountContext;
+  agentRuntime: HelixAgentRuntimeId;
+  turnId: string;
+  iteration: number;
+  authoritativeEvidenceArtifacts?: unknown[];
+}): Parameters<
+  typeof callAccountAuthorizedWorkstationGatewayCapabilityForProvider
+>[0] => ({
+  accountContext: input.accountContext,
+  requestedRuntime: input.agentRuntime,
+  requestedMode: readString(input.request.mode),
+  capabilityId:
+    readString(input.request.capability_id) ??
+    readString(input.request.capabilityId) ??
+    "",
+  arguments:
+    readRecord(input.request.arguments ?? input.request.args) ?? {},
+  // Approval is a control-envelope field. Keep the exact opaque receipt
+  // object outside tool arguments so only the trusted runtime can issue it.
+  approvalReceipt:
+    input.request.approval_receipt ?? input.request.approvalReceipt,
+  // Legacy forwarding remains solely so the verifier can return the typed
+  // runtime_approval_legacy_token_rejected failure.
+  approvalToken:
+    readString(input.request.approval_token) ??
+    readString(input.request.approvalToken),
+  turnId: input.turnId,
+  iteration: input.iteration,
+  authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
+});
+
 export const runExplicitWorkstationGatewayCalls = async (input: {
   body: Record<string, unknown>;
   agentRuntime: HelixAgentRuntimeId;
   turnId?: string | null;
   accountContext?: HelixWorkstationGatewayAccountContext;
+  authoritativeEvidenceArtifacts?: unknown[];
 }): Promise<HelixWorkstationGatewayCallResult[]> => {
   const requests = readWorkstationGatewayCallRequestsForTurn({
     body: input.body,
@@ -1023,15 +1069,18 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
     let dependentDepth = 0;
     while (nextDependentRequest && dependentDepth < 4) {
       dependentDepth += 1;
-      const dependentResult = await callAccountAuthorizedWorkstationGatewayCapabilityForProvider({
-        accountContext,
-        requestedRuntime: input.agentRuntime,
-        requestedMode: readString(nextDependentRequest.mode),
-        capabilityId: readString(nextDependentRequest.capability_id) ?? "",
-        arguments: readRecord(nextDependentRequest.arguments) ?? {},
-        turnId,
-        iteration: results.length + 1,
-      });
+      const dependentResult =
+        await callAccountAuthorizedWorkstationGatewayCapabilityForProvider(
+          buildExplicitProviderGatewayCallInput({
+            request: nextDependentRequest,
+            accountContext,
+            agentRuntime: input.agentRuntime,
+            turnId,
+            iteration: results.length + 1,
+            authoritativeEvidenceArtifacts:
+              input.authoritativeEvidenceArtifacts,
+          }),
+        );
       results.push(dependentResult);
       const followupDependentRequest = buildDependentCompoundCapabilityGatewayCallRequest({
         request: nextDependentRequest,
@@ -1068,16 +1117,20 @@ export const runExplicitWorkstationGatewayCalls = async (input: {
     result: HelixWorkstationGatewayCallResult;
   } | null = null;
   for (const [index, request] of requests.entries()) {
-    const result = await callAccountAuthorizedWorkstationGatewayCapabilityForProvider({
-      accountContext,
-      requestedRuntime: input.agentRuntime,
-      requestedMode: readString(request.mode),
-      capabilityId: readString(request.capability_id) ?? readString(request.capabilityId) ?? "",
-      arguments: readRecord(request.arguments ?? request.args) ?? {},
-      approvalToken: readString(request.approval_token) ?? readString(request.approvalToken),
-      turnId,
-      iteration: typeof request.iteration === "number" ? request.iteration : index + 1,
-    });
+    const result =
+      await callAccountAuthorizedWorkstationGatewayCapabilityForProvider(
+        buildExplicitProviderGatewayCallInput({
+          request,
+          accountContext,
+          agentRuntime: input.agentRuntime,
+          turnId,
+          iteration:
+            typeof request.iteration === "number"
+              ? request.iteration
+              : index + 1,
+          authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
+        }),
+      );
     results.push(result);
     if (isScholarlyLookupPortfolioCloser(request)) {
       scholarlyPortfolioCloser = { request, result };

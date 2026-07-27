@@ -8,7 +8,7 @@ avoid raw NBT or side effects.
 
 1. Build the plugin:
    `gradle -p minecraft/helix-paper-sensor build`
-2. Configure `plugins/HelixPaperSensor/config.yml` with the Helix endpoint and bearer token.
+2. Configure `plugins/HelixPaperSensor/config.yml` with the generated room-source endpoint and show-once bearer token, then set `helix.enabled: true`. The bundled configuration is deliberately disabled.
 3. Copy `minecraft/helix-paper-sensor/build/libs/HelixPaperSensor-0.1.0.jar` to the Paper server `plugins/` directory.
 4. Start the Paper server.
 5. Run `/helixsensor status`.
@@ -36,7 +36,8 @@ non-passing certificate that explains the missing runtime prerequisite.
 | --- | --- | --- |
 | 401/403 | Wrong bearer token | Set `helix.bearer_token` to the Helix source token. |
 | 413 | Payload too large | Reduce `local_map_radius`, `max_local_blocks`, crop radius, or entity caps. |
-| No heartbeat | Endpoint unreachable or plugin disabled | Check `helix.enabled`, endpoint URL, tunnel, and firewall. |
+| No heartbeat | Endpoint unreachable or plugin disabled | Check `helix.enabled`, the generated endpoint URL, published `/api` routing, and firewall. A tunnel is only a local-development fallback. |
+| Plugin disables itself during startup | Unsafe or incomplete endpoint configuration | Use the exact generated room-ingress URL and show-once credential. Remote endpoints must use HTTPS; placeholder credentials are rejected. |
 | Snapshots skipped | Upload in flight or backoff active | Check `/helixsensor status` and reduce payload size. |
 | Minecraft space limited | Manifest registered but probes unsupported | Verify supported probe types in the manifest. |
 | Privileged language appears | Sensor scope bug | Check snapshot sections for `sensor_scope` and caveats. |

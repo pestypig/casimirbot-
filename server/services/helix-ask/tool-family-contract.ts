@@ -377,6 +377,20 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
       "theory_frontier_conjecture_observation",
       "theory_frontier_search",
       "theory_frontier_candidate",
+      "theory_experiment_procedure_observation",
+      "theory_experiment_execution_closure",
+      "theory_formal_verifier_preparation_observation",
+      "theory_formal_verifier_plan_observation",
+      "theory_formal_verifier_start_observation",
+      "theory_formal_verifier_result_observation",
+      "theory_independent_numerical_verifier_prepared_request_observation",
+      "theory_independent_numerical_verifier_plan_observation",
+      "theory_independent_numerical_verifier_start_observation",
+      "theory_independent_numerical_verifier_result_observation",
+      "semantic_admission",
+      "artifact_generation_receipt",
+      "formal_certificate",
+      "numerical_certificate",
     ],
     allowedTerminalKinds: ["theory_context_reflection_answer", ...evidenceOnlyTerminalKinds],
     requiredReentry: true,
@@ -394,6 +408,20 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
       "theory-badge-graph.propose_frontier_conjectures",
       "theory-badge-graph.reflect_discussion_context",
       "theory-badge-graph.current_context",
+      "theory-experiment-procedure.prepare",
+      "theory-experiment-procedure.readmit",
+      "theory-experiment-procedure.evaluate_closure",
+      "theory-semantic-admitter.normalize",
+      "theory-artifact-producer.prepare_lanyon_request",
+      "theory-artifact-producer.admit_lanyon_snapshot",
+      "theory-formal-verifier.prepare_request",
+      "theory-formal-verifier.plan",
+      "theory-formal-verifier.start",
+      "theory-formal-verifier.read_result",
+      "theory-independent-numerical-verifier.prepare_request",
+      "theory-independent-numerical-verifier.plan",
+      "theory-independent-numerical-verifier.start",
+      "theory-independent-numerical-verifier.read_result",
       "propose_frontier_conjectures",
       "frontier_conjecture_workbench",
     ],
@@ -1734,7 +1762,7 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
   if (/record-live-source-mail-decision|live[-.:]?source[-.:]?decision/.test(normalized)) return "live_source_decision";
   if (/voice[-.:]?delivery|voice[-.:]?output|request-interim-voice-callout|callout/.test(normalized)) return "voice_delivery";
   if (/moral[-.:]?graph|moralgraph|reflect[-.:]?ideology[-.:]?context|procedural[-.:]?moral[-.:]?classification/.test(normalized)) return "moral_graph_reflection";
-  if (/theory[-.:]?locator|theory[-.:]?context|reflect[-.:]?theory[-.:]?context|frontiervectorfieldtrace|frontier[-.:]?vector[-.:]?field/.test(normalized)) return "theory_locator";
+  if (/theory[-.:]?locator|theory[-.:]?context|theory[-.:]?experiment[-.:]?procedure|theory[-.:]?semantic[-.:]?admitter|theory[-.:]?artifact[-.:]?producer|theory[-.:]?formal[-.:]?verifier|theory[-.:]?independent[-.:]?numerical[-.:]?verifier|reflect[-.:]?theory[-.:]?context|frontiervectorfieldtrace|frontier[-.:]?vector[-.:]?field/.test(normalized)) return "theory_locator";
   if (
     /context[-.:]?reflection|context[-.:]?binding|bounded[-.:]?context|context[-.:]?attachment|dragged[-.:]?cutout|selected[-.:]?ui[-.:]?region|reflect[-.:]?context[-.:]?attachments|live[-.:]?synthetic[-.:]?data|live[-.:]?answer[-.:]?synthetic|microdeck[-.:]?reflection|macro[-.:]?reasoner[-.:]?deck|mail[-.:]?loop[-.:]?synthetic|prediction[-.:]?review/.test(
       normalized,

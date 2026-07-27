@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildActiveDocsContextWorkstationGatewayCallRequests,
+  buildExplicitProviderGatewayCallInput,
   buildPlannerDerivedWorkstationGatewayCallRequests,
   buildPromptNamedCapabilityGatewayCallRequests,
   buildStructuredAdmissionWorkstationGatewayCallRequests,
@@ -67,6 +68,92 @@ const buildTestProvider = (id: "helix" | "codex"): HelixAgentProvider => ({
 });
 
 describe("explicit workstation gateway derived calls", () => {
+  it("forwards an exact runtime receipt in the provider control envelope", () => {
+    const accountContext = {
+      session_id: "session:runtime-receipt",
+      profile_id: "profile:runtime-receipt",
+      account_policy: {
+        account_type: "developer",
+      },
+    } as any;
+    const snakeReceipt = {
+      schema: "helix.runtime_tool_confirmation_receipt/v1",
+      receiptId: "receipt:formal",
+    };
+    const camelReceipt = {
+      schema: "helix.runtime_tool_confirmation_receipt/v1",
+      receiptId: "receipt:numerical",
+    };
+
+    const formal = buildExplicitProviderGatewayCallInput({
+      request: {
+        capability_id: "theory-formal-verifier.start",
+        mode: "act",
+        arguments: {
+          prepared_request_id: "prepared:formal",
+          plan_id: "plan:formal",
+        },
+        approval_receipt: snakeReceipt,
+      },
+      accountContext,
+      agentRuntime: "codex",
+      turnId: "turn:formal",
+      iteration: 1,
+    });
+    const numerical = buildExplicitProviderGatewayCallInput({
+      request: {
+        capabilityId: "theory-independent-numerical-verifier.start",
+        mode: "act",
+        args: {
+          plan_id: "plan:numerical",
+        },
+        approvalReceipt: camelReceipt,
+      },
+      accountContext,
+      agentRuntime: "codex",
+      turnId: "turn:numerical",
+      iteration: 2,
+    });
+    const legacy = buildExplicitProviderGatewayCallInput({
+      request: {
+        capability_id: "theory-formal-verifier.start",
+        mode: "act",
+        arguments: {
+          prepared_request_id: "prepared:legacy",
+          plan_id: "plan:legacy",
+        },
+        approval_token: "legacy-confirmation",
+      },
+      accountContext,
+      agentRuntime: "codex",
+      turnId: "turn:legacy",
+      iteration: 3,
+    });
+
+    expect(formal).toMatchObject({
+      accountContext,
+      capabilityId: "theory-formal-verifier.start",
+      approvalReceipt: snakeReceipt,
+      turnId: "turn:formal",
+    });
+    expect(formal.approvalToken).toBeNull();
+    expect(formal.approvalReceipt).toBe(snakeReceipt);
+    expect(numerical).toMatchObject({
+      accountContext,
+      capabilityId: "theory-independent-numerical-verifier.start",
+      approvalReceipt: camelReceipt,
+      turnId: "turn:numerical",
+    });
+    expect(numerical.approvalToken).toBeNull();
+    expect(numerical.approvalReceipt).toBe(camelReceipt);
+    expect(legacy).toMatchObject({
+      approvalReceipt: undefined,
+      approvalToken: "legacy-confirmation",
+    });
+    expect(formal.arguments).not.toHaveProperty("approval_receipt");
+    expect(numerical.arguments).not.toHaveProperty("approvalReceipt");
+  });
+
   it("deduplicates repeated explicit scholarly lookup requests before dispatch", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -3351,6 +3438,38 @@ describe("explicit workstation gateway derived calls", () => {
         arguments: {
           source_target_intent: expect.objectContaining({
             selected_capability: "workspace_diagnostic",
+          }),
+        },
+      }),
+    ]);
+  });
+
+  it("maps admitted visual source context to the bounded SituationRun gateway", () => {
+    const requests = buildStructuredAdmissionWorkstationGatewayCallRequests({
+      agent_runtime: "codex",
+      question: "What is happening right now in the visual screen capture?",
+      sessionId: "helix-ask:test:visual-source",
+      source_target_intent: {
+        target_source: "visual_capture",
+        target_kind: "visual_capture",
+        strength: "hard",
+        selected_capability: "image_lens.inspect",
+      },
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: "situation-room.describe_visual_capture",
+        mode: "read",
+        arguments: {
+          thread_id: "helix-ask:test:visual-source",
+          prompt: "What is happening right now in the visual screen capture?",
+          source_target_intent: expect.objectContaining({
+            target_source: "visual_capture",
+            target_kind: "visual_capture",
+            selected_capability: "situation-room.describe_visual_capture",
+            alias_capability: "image_lens.inspect",
           }),
         },
       }),

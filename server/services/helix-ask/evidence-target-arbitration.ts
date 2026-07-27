@@ -14,7 +14,10 @@ import {
   contextualToolSuppressionBlocksFamily,
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
-import { detectInternetSearchIntent } from "./internet-search-intent";
+import {
+  detectInternetSearchIntent,
+  hasAffirmativeDocsViewerSearchCue,
+} from "./internet-search-intent";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import { isAskTurnCapabilityHelpIntent } from "./capability-catalog-intent";
@@ -273,6 +276,32 @@ export function buildAskEvidenceTargetArbitration(input: {
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
   const suppressesScholarlyResearch = contextualToolSuppressionBlocksFamily(contextualSuppression, "scholarly_research");
   const suppressesInternetSearch = contextualToolSuppressionBlocksFamily(contextualSuppression, "internet_search");
+  const affirmativeDocsSearch = hasAffirmativeDocsViewerSearchCue(prompt);
+
+  if (
+    affirmativeDocsSearch &&
+    !contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer")
+  ) {
+    promptIntentCandidates.push("docs_search");
+    candidates.push(makeCandidate({
+      candidateId: "docs_viewer.affirmative_document_search",
+      targetSource: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      score: 0.97,
+      reasonCodes: [
+        "explicit_docs_search_source_target",
+        "local_docs_scope_suppresses_freshness_search",
+      ],
+      requestedOutputs: ["file_path", "tool_call_eligibility", "typed_failure"],
+      capabilityKeys: ["docs.search"],
+      terminalProductConstraints: [
+        "doc_location_result",
+        "model_synthesized_answer",
+        "typed_failure",
+      ],
+    }));
+  }
   const suppressesWorkstationAction = contextualToolSuppressionBlocksFamily(contextualSuppression, "workstation_action");
   const suppressesRepoCode = contextualToolSuppressionBlocksFamily(contextualSuppression, "repo_code");
   const suppressesLiveEnvironment = contextualToolSuppressionBlocksFamily(contextualSuppression, "live_environment");

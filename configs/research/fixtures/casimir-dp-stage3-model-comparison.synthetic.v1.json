@@ -1,0 +1,375 @@
+{
+  "schema_version": "casimir_dp_blinded_model_comparison/1",
+  "campaign_id": "casimir-dp-stage3-synthetic-nested-comparison",
+  "evidence_class": "synthetic",
+  "freeze_receipt": {
+    "frozen_at": "2026-07-20T09:00:00.000Z",
+    "model_registry_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "likelihood_registry_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "nuisance_registry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "prior_registry_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "falsifier_registry_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "confirmatory_cells_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "blinding": {
+    "state": "unblinded_by_custodian",
+    "mapping_available_during_feature_construction": false,
+    "mapping_available_during_nuisance_fit": false,
+    "custodian_receipt_sha256": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    "unblinded_at": "2026-07-23T12:00:00.000Z"
+  },
+  "nuisance_fit": {
+    "training_cell_ids": [
+      "pilot-light-a",
+      "pilot-heavy-b"
+    ],
+    "heldout_cell_ids": [
+      "heldout-light-a",
+      "heldout-light-b",
+      "heldout-heavy-a",
+      "heldout-heavy-b"
+    ],
+    "fit_frozen_at": "2026-07-21T12:00:00.000Z",
+    "sensitivity_passed": true,
+    "sensitivity_receipt_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "inference": {
+    "scoring_rule": "heldout_gaussian_log_score",
+    "bayes_factor_proper_prior_receipt_sha256": null,
+    "bayes_factor_prior_sensitivity_sha256": null,
+    "maximum_abs_signature_cosine": 0.98,
+    "minimum_whitened_signal_norm": 1,
+    "minimum_confirmatory_rows": 8,
+    "required_design_rank": 4,
+    "observed_design_rank": 4,
+    "simulation_calibration_passed": true,
+    "multiple_testing_control": "Benjamini-Hochberg is frozen for exploratory cells; confirmatory rows use the single preregistered joint score.",
+    "baseline_rejection_threshold_chi_square": 20,
+    "baseline_minimum_power": 0.8,
+    "baseline_achieved_power": 0.95,
+    "baseline_covered_region_id": "ordinary-physics-residual-covered-region"
+  },
+  "design_cells": [
+    {
+      "cell_id": "pilot-light-a",
+      "partition": "pilot",
+      "blind_boundary_label": "blind-A",
+      "object_id": "object-light-au",
+      "mass_kg": 1e-17,
+      "density_profile_id": "sphere-light-v1",
+      "branch_separation_m": 1e-7,
+      "hold_time_s": 0.02,
+      "probe_to_boundary_distance_m": 5e-7,
+      "cavity_gap_m": 1e-6,
+      "boundary_material_id": "gold-v1",
+      "boundary_loss_response_id": "gold-loss-v1",
+      "boundary_temperature_K": 4,
+      "environment_temperature_K": 4,
+      "path_orientation": 1,
+      "path_swap": false,
+      "echo_sequence_id": "echo-off"
+    },
+    {
+      "cell_id": "pilot-heavy-b",
+      "partition": "pilot",
+      "blind_boundary_label": "blind-B",
+      "object_id": "object-heavy-si",
+      "mass_kg": 2e-17,
+      "density_profile_id": "sphere-heavy-v1",
+      "branch_separation_m": 2e-7,
+      "hold_time_s": 0.04,
+      "probe_to_boundary_distance_m": 8e-7,
+      "cavity_gap_m": 1.6e-6,
+      "boundary_material_id": "silicon-v1",
+      "boundary_loss_response_id": "silicon-loss-v1",
+      "boundary_temperature_K": 6,
+      "environment_temperature_K": 6,
+      "path_orientation": -1,
+      "path_swap": true,
+      "echo_sequence_id": "echo-on"
+    },
+    {
+      "cell_id": "heldout-light-a",
+      "partition": "confirmatory",
+      "blind_boundary_label": "blind-A",
+      "object_id": "object-light-au",
+      "mass_kg": 1e-17,
+      "density_profile_id": "sphere-light-v1",
+      "branch_separation_m": 1e-7,
+      "hold_time_s": 0.05,
+      "probe_to_boundary_distance_m": 5e-7,
+      "cavity_gap_m": 1e-6,
+      "boundary_material_id": "gold-v1",
+      "boundary_loss_response_id": "gold-loss-v1",
+      "boundary_temperature_K": 4,
+      "environment_temperature_K": 4,
+      "path_orientation": 1,
+      "path_swap": false,
+      "echo_sequence_id": "echo-off"
+    },
+    {
+      "cell_id": "heldout-light-b",
+      "partition": "confirmatory",
+      "blind_boundary_label": "blind-B",
+      "object_id": "object-light-au",
+      "mass_kg": 1e-17,
+      "density_profile_id": "sphere-light-v1",
+      "branch_separation_m": 1e-7,
+      "hold_time_s": 0.1,
+      "probe_to_boundary_distance_m": 6e-7,
+      "cavity_gap_m": 1e-6,
+      "boundary_material_id": "gold-v1",
+      "boundary_loss_response_id": "gold-loss-v1",
+      "boundary_temperature_K": 4,
+      "environment_temperature_K": 4,
+      "path_orientation": -1,
+      "path_swap": true,
+      "echo_sequence_id": "echo-on"
+    },
+    {
+      "cell_id": "heldout-heavy-a",
+      "partition": "confirmatory",
+      "blind_boundary_label": "blind-A",
+      "object_id": "object-heavy-si",
+      "mass_kg": 2e-17,
+      "density_profile_id": "sphere-heavy-v1",
+      "branch_separation_m": 2e-7,
+      "hold_time_s": 0.05,
+      "probe_to_boundary_distance_m": 8e-7,
+      "cavity_gap_m": 1.6e-6,
+      "boundary_material_id": "silicon-v1",
+      "boundary_loss_response_id": "silicon-loss-v1",
+      "boundary_temperature_K": 6,
+      "environment_temperature_K": 6,
+      "path_orientation": 1,
+      "path_swap": false,
+      "echo_sequence_id": "echo-off"
+    },
+    {
+      "cell_id": "heldout-heavy-b",
+      "partition": "confirmatory",
+      "blind_boundary_label": "blind-B",
+      "object_id": "object-heavy-si",
+      "mass_kg": 2e-17,
+      "density_profile_id": "sphere-heavy-v1",
+      "branch_separation_m": 2e-7,
+      "hold_time_s": 0.1,
+      "probe_to_boundary_distance_m": 9e-7,
+      "cavity_gap_m": 1.6e-6,
+      "boundary_material_id": "silicon-v1",
+      "boundary_loss_response_id": "silicon-loss-v1",
+      "boundary_temperature_K": 6,
+      "environment_temperature_K": 6,
+      "path_orientation": -1,
+      "path_swap": true,
+      "echo_sequence_id": "echo-on"
+    }
+  ],
+  "observations": [
+    {
+      "row_id": "pilot-light-phase",
+      "cell_id": "pilot-light-a",
+      "observable_id": "qed_phase",
+      "channel": "qed_phase",
+      "value": 0.1,
+      "sigma": 0.03
+    },
+    {
+      "row_id": "pilot-heavy-phase",
+      "cell_id": "pilot-heavy-b",
+      "observable_id": "qed_phase",
+      "channel": "qed_phase",
+      "value": 0.2,
+      "sigma": 0.03
+    },
+    {
+      "row_id": "h1-coherence",
+      "cell_id": "heldout-light-a",
+      "observable_id": "complex_coherence_re",
+      "channel": "coherence_re",
+      "value": 0.601,
+      "sigma": 0.03
+    },
+    {
+      "row_id": "h1-companion",
+      "cell_id": "heldout-light-a",
+      "observable_id": "dp_heating_rate",
+      "channel": "dp_companion",
+      "value": 0.13,
+      "sigma": 0.02
+    },
+    {
+      "row_id": "h2-coherence",
+      "cell_id": "heldout-light-b",
+      "observable_id": "complex_coherence_re",
+      "channel": "coherence_re",
+      "value": 0.521,
+      "sigma": 0.03
+    },
+    {
+      "row_id": "h2-companion",
+      "cell_id": "heldout-light-b",
+      "observable_id": "dp_heating_rate",
+      "channel": "dp_companion",
+      "value": 0.15,
+      "sigma": 0.02
+    },
+    {
+      "row_id": "h3-coherence",
+      "cell_id": "heldout-heavy-a",
+      "observable_id": "complex_coherence_re",
+      "channel": "coherence_re",
+      "value": 0.432,
+      "sigma": 0.03
+    },
+    {
+      "row_id": "h3-companion",
+      "cell_id": "heldout-heavy-a",
+      "observable_id": "dp_heating_rate",
+      "channel": "dp_companion",
+      "value": 0.19,
+      "sigma": 0.02
+    },
+    {
+      "row_id": "h4-coherence",
+      "cell_id": "heldout-heavy-b",
+      "observable_id": "complex_coherence_re",
+      "channel": "coherence_re",
+      "value": 0.342,
+      "sigma": 0.03
+    },
+    {
+      "row_id": "h4-companion",
+      "cell_id": "heldout-heavy-b",
+      "observable_id": "dp_heating_rate",
+      "channel": "dp_companion",
+      "value": 0.22,
+      "sigma": 0.02
+    }
+  ],
+  "ordinary_baseline_components": [
+    {
+      "component_id": "qed_hamiltonian",
+      "source_ref": "synthetic-qed-green-receipt",
+      "equation_ids": [
+        "synthetic-qed-heldout-vector"
+      ],
+      "frozen_signature_sha256": "1010101010101010101010101010101010101010101010101010101010101010",
+      "predictions": [
+        { "row_id": "h1-coherence", "value": 0.8 },
+        { "row_id": "h1-companion", "value": 0 },
+        { "row_id": "h2-coherence", "value": 0.78 },
+        { "row_id": "h2-companion", "value": 0 },
+        { "row_id": "h3-coherence", "value": 0.75 },
+        { "row_id": "h3-companion", "value": 0 },
+        { "row_id": "h4-coherence", "value": 0.72 },
+        { "row_id": "h4-companion", "value": 0 }
+      ]
+    },
+    {
+      "component_id": "technical_dephasing",
+      "source_ref": "synthetic-technical-noise-receipt",
+      "equation_ids": [
+        "synthetic-conditioned-dephasing-vector"
+      ],
+      "frozen_signature_sha256": "2020202020202020202020202020202020202020202020202020202020202020",
+      "predictions": [
+        { "row_id": "h1-coherence", "value": -0.02 },
+        { "row_id": "h1-companion", "value": 0.01 },
+        { "row_id": "h2-coherence", "value": -0.02 },
+        { "row_id": "h2-companion", "value": 0.01 },
+        { "row_id": "h3-coherence", "value": -0.02 },
+        { "row_id": "h3-companion", "value": 0.01 },
+        { "row_id": "h4-coherence", "value": -0.02 },
+        { "row_id": "h4-companion", "value": 0.01 }
+      ]
+    },
+    {
+      "component_id": "qed_environmental_decoherence",
+      "source_ref": "synthetic-qed-noise-receipt",
+      "equation_ids": [
+        "synthetic-environmental-heldout-vector"
+      ],
+      "frozen_signature_sha256": "3030303030303030303030303030303030303030303030303030303030303030",
+      "predictions": [
+        { "row_id": "h1-coherence", "value": -0.03 },
+        { "row_id": "h1-companion", "value": 0.02 },
+        { "row_id": "h2-coherence", "value": -0.04 },
+        { "row_id": "h2-companion", "value": 0.02 },
+        { "row_id": "h3-coherence", "value": -0.05 },
+        { "row_id": "h3-companion", "value": 0.03 },
+        { "row_id": "h4-coherence", "value": -0.06 },
+        { "row_id": "h4-companion", "value": 0.03 }
+      ]
+    },
+    {
+      "component_id": "ordinary_gravity",
+      "source_ref": "synthetic-complete-apparatus-gravity-receipt",
+      "equation_ids": [
+        "synthetic-ordinary-gravity-heldout-vector"
+      ],
+      "frozen_signature_sha256": "4040404040404040404040404040404040404040404040404040404040404040",
+      "predictions": [
+        { "row_id": "h1-coherence", "value": 0.001 },
+        { "row_id": "h1-companion", "value": 0 },
+        { "row_id": "h2-coherence", "value": 0.001 },
+        { "row_id": "h2-companion", "value": 0 },
+        { "row_id": "h3-coherence", "value": 0.002 },
+        { "row_id": "h3-companion", "value": 0 },
+        { "row_id": "h4-coherence", "value": 0.002 },
+        { "row_id": "h4-companion", "value": 0 }
+      ]
+    }
+  ],
+  "alternative_models": [
+    {
+      "model_id": "M_dp_regularized_synthetic_v1",
+      "model_kind": "named_dynamical_dp",
+      "model_version": "1.0.0",
+      "source_refs": [
+        "https://doi.org/10.1103/PhysRevA.90.062105"
+      ],
+      "equation_ids": [
+        "synthetic-frozen-regularized-dp-coherence-and-heating"
+      ],
+      "nested_baseline_id": "M0_ordinary_physics",
+      "parameter_manifest_sha256": "5050505050505050505050505050505050505050505050505050505050505050",
+      "frozen_signature_sha256": "6060606060606060606060606060606060606060606060606060606060606060",
+      "incremental_predictions": [
+        { "row_id": "h1-coherence", "value": -0.15 },
+        { "row_id": "h1-companion", "value": 0.1 },
+        { "row_id": "h2-coherence", "value": -0.2 },
+        { "row_id": "h2-companion", "value": 0.12 },
+        { "row_id": "h3-coherence", "value": -0.25 },
+        { "row_id": "h3-companion", "value": 0.15 },
+        { "row_id": "h4-coherence", "value": -0.3 },
+        { "row_id": "h4-companion", "value": 0.18 }
+      ],
+      "companion_observable_ids": [
+        "dp_heating_rate"
+      ],
+      "proper_prior": {
+        "required": false,
+        "is_proper": false,
+        "receipt_sha256": null,
+        "sensitivity_report_sha256": null
+      },
+      "falsifier": {
+        "criterion": "maximum_weighted_residual_chi_square",
+        "rejection_threshold_chi_square": 20
+      },
+      "power": {
+        "minimum_power": 0.8,
+        "achieved_power": 0.92,
+        "parameter_region_ids": [
+          "regularized-dp-region-covered",
+          "regularized-dp-region-uncovered"
+        ],
+        "covered_parameter_region_ids": [
+          "regularized-dp-region-covered"
+        ]
+      },
+      "maximum_claim": "named_dp_implementation_compatibility_or_exclusion"
+    }
+  ]
+}

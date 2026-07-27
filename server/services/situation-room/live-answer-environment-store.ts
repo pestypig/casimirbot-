@@ -13,6 +13,10 @@ import {
   type LiveAnswerLineDefinition,
   type LiveAnswerLineState,
 } from "@shared/helix-live-answer-environment";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 
 const environments = new Map<string, LiveAnswerEnvironment>();
 const deltasByEnvironment = new Map<string, LiveAnswerEnvironmentDelta[]>();
@@ -62,6 +66,17 @@ const normalizeString = (value?: string | null): string | null => {
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value: string | null | undefined) => normalizeString(value)).filter((value: string | null): value is string => Boolean(value))));
+
+const assertNoProtectedRoomSourceIds = (sourceIds: string[]): void => {
+  if (sourceIds.some(isHelixRoomSourceIngressSourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
+};
+
+const hasProtectedRoomSourceId = (
+  environment: LiveAnswerEnvironment,
+): boolean =>
+  environment.source_ids.some(isHelixRoomSourceIngressSourceId);
 
 const normalizeMode = (value?: string | null): LiveAnswerEnvironmentMode => {
   if (value === "voice_on_confirm" || value === "critical_voice" || value === "direct_address_only") return value;
@@ -238,6 +253,7 @@ export function createLiveAnswerEnvironment(input: {
   }
   const roomId = normalizeString(input.room_id);
   const sourceIds = uniqueStrings(input.source_ids ?? []);
+  assertNoProtectedRoomSourceIds(sourceIds);
   const environmentId = buildEnvironmentId({
     thread_id: threadId,
     created_turn_id: turnId,
@@ -303,12 +319,19 @@ export function createLiveAnswerEnvironment(input: {
 }
 
 export function getLiveAnswerEnvironment(environmentId: string): LiveAnswerEnvironment | null {
-  return environments.get(environmentId) ?? null;
+  const environment = environments.get(environmentId) ?? null;
+  return environment && !hasProtectedRoomSourceId(environment)
+    ? environment
+    : null;
 }
 
 export function getActiveLiveAnswerEnvironmentForThread(threadId: string): LiveAnswerEnvironment | null {
   return Array.from(environments.values())
-    .filter((environment: LiveAnswerEnvironment) => environment.thread_id === threadId && environment.status === "active")
+    .filter((environment: LiveAnswerEnvironment) =>
+      !hasProtectedRoomSourceId(environment) &&
+      environment.thread_id === threadId &&
+      environment.status === "active",
+    )
     .sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) =>
       b.updated_at.localeCompare(a.updated_at) ||
       b.created_at.localeCompare(a.created_at) ||
@@ -319,7 +342,11 @@ export function getActiveLiveAnswerEnvironmentForThread(threadId: string): LiveA
 
 export function getActiveLiveAnswerEnvironmentForRoom(roomId: string): LiveAnswerEnvironment | null {
   return Array.from(environments.values())
-    .filter((environment: LiveAnswerEnvironment) => environment.room_id === roomId && environment.status === "active")
+    .filter((environment: LiveAnswerEnvironment) =>
+      !hasProtectedRoomSourceId(environment) &&
+      environment.room_id === roomId &&
+      environment.status === "active",
+    )
     .sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) =>
       b.updated_at.localeCompare(a.updated_at) ||
       b.created_at.localeCompare(a.created_at) ||
@@ -329,8 +356,13 @@ export function getActiveLiveAnswerEnvironmentForRoom(roomId: string): LiveAnswe
 }
 
 export function getActiveLiveAnswerEnvironmentForSource(sourceId: string): LiveAnswerEnvironment | null {
+  if (isHelixRoomSourceIngressSourceId(sourceId)) return null;
   return Array.from(environments.values())
-    .filter((environment: LiveAnswerEnvironment) => environment.source_ids.includes(sourceId) && environment.status === "active")
+    .filter((environment: LiveAnswerEnvironment) =>
+      !hasProtectedRoomSourceId(environment) &&
+      environment.source_ids.includes(sourceId) &&
+      environment.status === "active",
+    )
     .sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) =>
       b.updated_at.localeCompare(a.updated_at) ||
       b.created_at.localeCompare(a.created_at) ||
@@ -344,8 +376,10 @@ export function addLiveAnswerEnvironmentSourceIds(input: {
   source_ids: string[];
   now?: string;
 }): { environment: LiveAnswerEnvironment; delta: LiveAnswerEnvironmentDelta } | null {
+  assertNoProtectedRoomSourceIds(input.source_ids);
   const existing = environments.get(input.environment_id);
   if (!existing) return null;
+  if (hasProtectedRoomSourceId(existing)) return null;
   const now = input.now ?? new Date().toISOString();
   const nextSourceIds = uniqueStrings([...(existing.source_ids ?? []), ...input.source_ids]);
   if (nextSourceIds.length === existing.source_ids.length) {
@@ -407,11 +441,13 @@ export function addLiveAnswerEnvironmentSourceIds(input: {
 }
 
 export function listLiveAnswerEnvironments(): LiveAnswerEnvironment[] {
-  return Array.from(environments.values()).sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) =>
-    b.updated_at.localeCompare(a.updated_at) ||
-    b.created_at.localeCompare(a.created_at) ||
-    b.environment_id.localeCompare(a.environment_id)
-  );
+  return Array.from(environments.values())
+    .filter((environment) => !hasProtectedRoomSourceId(environment))
+    .sort((a: LiveAnswerEnvironment, b: LiveAnswerEnvironment) =>
+      b.updated_at.localeCompare(a.updated_at) ||
+      b.created_at.localeCompare(a.created_at) ||
+      b.environment_id.localeCompare(a.environment_id)
+    );
 }
 
 export function updateLiveAnswerEnvironment(input: {

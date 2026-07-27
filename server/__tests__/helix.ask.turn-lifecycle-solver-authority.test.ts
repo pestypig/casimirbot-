@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildAskTurnSolverTrace } from "../services/helix-ask/ask-turn-solver";
+import { buildLoopParityTrace } from "../services/helix-ask/loop-parity-trace";
 import { providerPostObservationCompletionMaterialized } from "../services/helix-ask/provider-terminal-completion";
 import { evaluateTerminalBoundaryEligibility } from "../services/helix-ask/runtime-authority-contract";
 import { createHelixTurnLifecycleRecorder } from "../services/helix-ask/runtime/turn-lifecycle";
@@ -237,6 +238,214 @@ describe("Helix Ask solver runtime lifecycle authority", () => {
       terminalArtifactKind: "agent_provider_terminal_candidate",
       finalAnswerSource: "agent_provider_terminal_candidate",
     })).toBe(true);
+  });
+
+  it("lets a committed theory route override a stale Realtime model-only hint after exact evidence re-entry", () => {
+    const turnId = "turn:lifecycle-realtime-theory-procedure";
+    const observationRef = `${turnId}:theory_experiment_procedure_observation:1`;
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:test`;
+    const routeProductRef = `${candidateRef}:route_product:model_synthesized_answer`;
+    const promptText =
+      "Prepare the seven-stage Theory Experiment Procedure comparing the Casimir and Dynamic Casimir Effect badges.";
+    const payload = {
+      source_target_intent: {
+        target_source: "model_only",
+        target_kind: "general_background",
+        strength: "soft",
+      },
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        route: {
+          selected_route: "/ask/turn",
+          source_target: "theory_locator",
+          target_kind: "theory_badge_graph",
+          strength: "hard",
+        },
+        canonical_goal: {
+          goal_kind: "agent_provider_gateway_turn",
+          requested_capability: "theory-experiment-procedure.prepare",
+          required_terminal_kind: "model_synthesized_answer",
+          allowed_terminal_artifact_kinds: [
+            "model_synthesized_answer",
+            "agent_provider_terminal_candidate",
+            "typed_failure",
+          ],
+          forbidden_terminal_artifact_kinds: [],
+        },
+        capability_policy: {
+          allowed_tool_families: ["theory_locator"],
+          suppressed_tool_families: [],
+          required_capability_families: ["theory_locator"],
+          mutating_families_allowed: false,
+        },
+        suppression: {
+          contextual_tool_mentions: [],
+          negative_constraints: [],
+          suppressed_families: [],
+          firewall_required: true,
+        },
+        terminal_product: {
+          terminal_authority_required: true,
+          evidence_reentry_required: true,
+          followup_reasoning_required: true,
+          required_terminal_product: "model_synthesized_answer",
+        },
+        compatibility: {
+          source_goal_capability_terminal_compatible: true,
+          stale_metadata_ignored: true,
+          shortcut_firewall_applied: true,
+          violations: [],
+        },
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability: "theory-experiment-procedure.prepare",
+        required_terminal_kind: "agent_provider_terminal_candidate",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "agent_provider_gateway_turn",
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: [
+          "model_synthesized_answer",
+          "typed_failure",
+        ],
+      },
+      provider_route_product_materialization: {
+        schema: "helix.provider_route_product_materialization.v1",
+        turn_id: turnId,
+        status: "materialized",
+        provider_terminal_candidate_ref: candidateRef,
+        materialized_terminal_artifact_kind: "model_synthesized_answer",
+        materialized_terminal_artifact_ref: routeProductRef,
+        selected_observation_refs: [observationRef],
+      },
+      provider_reasoning_reentry: {
+        schema: "helix.provider_reasoning_reentry.v1",
+        turn_id: turnId,
+        status: "completed",
+        provider_terminal_candidate_ref: candidateRef,
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        provider_terminal_candidate_ref: candidateRef,
+        all_observations_succeeded: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        turn_id: turnId,
+        selected_terminal_artifact_kind: "model_synthesized_answer",
+        selected_terminal_artifact_ref: routeProductRef,
+        selected_terminal_support_refs: [observationRef],
+        integrity: {
+          single_writer_applied: true,
+          post_tool_model_step_satisfied: true,
+        },
+      },
+      terminal_answer_authority: {
+        turn_id: turnId,
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_ref: routeProductRef,
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        turn_id: turnId,
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+        terminal_authority_ref: routeProductRef,
+        selected_observation_refs: [observationRef],
+      },
+      poison_audit: {
+        ok: true,
+        violations: [],
+      },
+      current_turn_artifact_ledger: [{
+        artifact_id: observationRef,
+        kind: "theory_experiment_procedure_observation",
+        source_scope: "current_turn",
+        payload: {
+          turn_id: turnId,
+          artifact_id: observationRef,
+          selected_for_answer: true,
+        },
+      }],
+    };
+    const loopParityTrace = buildLoopParityTrace({
+      turnId,
+      promptText,
+      selectedRoute: "/ask/turn",
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+      payload,
+    });
+    const trace = buildAskTurnSolverTrace({
+      turnId,
+      promptText,
+      selectedRoute: "/ask/turn",
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+      payload,
+      loopParityTrace,
+    });
+
+    expect(providerPostObservationCompletionMaterialized({
+      payload,
+      turnId,
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+    })).toBe(true);
+    expect(loopParityTrace).toMatchObject({
+      terminal_selection_ran_after_observations: true,
+      route_authority_ok: true,
+      short_circuit_risk_flags: [],
+    });
+    expect(trace).toMatchObject({
+      completed_solver_path: true,
+      route_authority_ok: true,
+      terminal_authority_ok: true,
+      evidence_reentry: { completed: true },
+      followup_reasoning: { completed: true },
+      solver_risk_flags: [],
+    });
+
+    const mismatchedWriterPayload = {
+      ...payload,
+      terminal_authority_single_writer: {
+        ...payload.terminal_authority_single_writer,
+        selected_terminal_artifact_ref: `${routeProductRef}:mismatch`,
+      },
+    };
+    expect(providerPostObservationCompletionMaterialized({
+      payload: mismatchedWriterPayload,
+      turnId,
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+    })).toBe(false);
+
+    const staleSupportPayload = {
+      ...payload,
+      provider_route_product_materialization: {
+        ...payload.provider_route_product_materialization,
+        selected_observation_refs: ["turn:prior:theory_experiment_procedure_observation:1"],
+      },
+    };
+    expect(providerPostObservationCompletionMaterialized({
+      payload: staleSupportPayload,
+      turnId,
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+    })).toBe(false);
   });
 
   it("completes a materialized model-only provider answer when source arbitration remains unknown", () => {

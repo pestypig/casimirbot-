@@ -1,0 +1,238 @@
+{
+  "schema_version": "casimir_dp_gravity_upper_bound/1",
+  "evidence_class": "synthetic",
+  "contrast": {
+    "state_a_id": "boundary-on",
+    "state_b_id": "boundary-off",
+    "convention": "state_a_minus_state_b"
+  },
+  "states": [
+    {
+      "state_id": "boundary-on",
+      "components": [
+        {
+          "component_id": "on-field",
+          "category": "field_interaction_energy",
+          "signed_energy_J": -1e-12,
+          "source_ref": "synthetic://field-energy/on",
+          "provenance_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "on-plates",
+          "category": "plates_and_coatings",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://plates/on",
+          "provenance_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "on-supports",
+          "category": "supports_and_stresses",
+          "signed_energy_J": 5e-13,
+          "source_ref": "synthetic://supports/on",
+          "provenance_sha256": "1313131313131313131313131313131313131313131313131313131313131313",
+          "internal_transfer_id": "closed-transfer-1"
+        },
+        {
+          "component_id": "on-actuator",
+          "category": "actuators_and_modulation_work",
+          "signed_energy_J": -5e-13,
+          "source_ref": "synthetic://actuator/on",
+          "provenance_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+          "internal_transfer_id": "closed-transfer-1"
+        },
+        {
+          "component_id": "on-patch",
+          "category": "electrostatic_and_patch",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://patch/on",
+          "provenance_sha256": "1515151515151515151515151515151515151515151515151515151515151515",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "on-elastic",
+          "category": "elastic_strain",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://elastic/on",
+          "provenance_sha256": "1616161616161616161616161616161616161616161616161616161616161616",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "on-thermal",
+          "category": "thermal_state_and_heat_flow",
+          "signed_energy_J": 2e-13,
+          "source_ref": "synthetic://thermal/on",
+          "provenance_sha256": "1717171717171717171717171717171717171717171717171717171717171717",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "on-probe",
+          "category": "trapped_probe_state",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://probe/on",
+          "provenance_sha256": "1818181818181818181818181818181818181818181818181818181818181818",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "on-controls",
+          "category": "control_electronics_nearby",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://controls/on",
+          "provenance_sha256": "1919191919191919191919191919191919191919191919191919191919191919",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "on-boundary",
+          "category": "boundary_and_surface_terms",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://boundary/on",
+          "provenance_sha256": "2020202020202020202020202020202020202020202020202020202020202020",
+          "internal_transfer_id": null
+        }
+      ],
+      "covariance_J2": [
+        [1e-30, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1e-30, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1e-30, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1e-30, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1e-30, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1e-30, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 1e-30, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 1e-30, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 1e-30, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1e-30]
+      ],
+      "covariance_receipt_sha256": "2121212121212121212121212121212121212121212121212121212121212121",
+      "conservation": {
+        "closed_apparatus": true,
+        "signed_energy_balance_residual_J": 0,
+        "tolerance_J": 1e-18,
+        "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "geometry_receipt_sha256": "2323232323232323232323232323232323232323232323232323232323232323"
+    },
+    {
+      "state_id": "boundary-off",
+      "components": [
+        {
+          "component_id": "off-field",
+          "category": "field_interaction_energy",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://field-energy/off",
+          "provenance_sha256": "3131313131313131313131313131313131313131313131313131313131313131",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "off-plates",
+          "category": "plates_and_coatings",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://plates/off",
+          "provenance_sha256": "3232323232323232323232323232323232323232323232323232323232323232",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "off-supports",
+          "category": "supports_and_stresses",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://supports/off",
+          "provenance_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "off-actuator",
+          "category": "actuators_and_modulation_work",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://actuator/off",
+          "provenance_sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "off-patch",
+          "category": "electrostatic_and_patch",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://patch/off",
+          "provenance_sha256": "3535353535353535353535353535353535353535353535353535353535353535",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "off-elastic",
+          "category": "elastic_strain",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://elastic/off",
+          "provenance_sha256": "3636363636363636363636363636363636363636363636363636363636363636",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "off-thermal",
+          "category": "thermal_state_and_heat_flow",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://thermal/off",
+          "provenance_sha256": "3737373737373737373737373737373737373737373737373737373737373737",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "off-probe",
+          "category": "trapped_probe_state",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://probe/off",
+          "provenance_sha256": "3838383838383838383838383838383838383838383838383838383838383838",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "off-controls",
+          "category": "control_electronics_nearby",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://controls/off",
+          "provenance_sha256": "3939393939393939393939393939393939393939393939393939393939393939",
+          "internal_transfer_id": null
+        },
+        {
+          "component_id": "off-boundary",
+          "category": "boundary_and_surface_terms",
+          "signed_energy_J": 0,
+          "source_ref": "synthetic://boundary/off",
+          "provenance_sha256": "4040404040404040404040404040404040404040404040404040404040404040",
+          "internal_transfer_id": null
+        }
+      ],
+      "covariance_J2": [
+        [1e-30, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1e-30, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1e-30, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1e-30, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1e-30, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1e-30, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 1e-30, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 1e-30, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 1e-30, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1e-30]
+      ],
+      "covariance_receipt_sha256": "4141414141414141414141414141414141414141414141414141414141414141",
+      "conservation": {
+        "closed_apparatus": true,
+        "signed_energy_balance_residual_J": 0,
+        "tolerance_J": 1e-18,
+        "receipt_sha256": "4242424242424242424242424242424242424242424242424242424242424242"
+      },
+      "geometry_receipt_sha256": "4343434343434343434343434343434343434343434343434343434343434343"
+    }
+  ],
+  "contrast_covariance_model": "independent_state_ledgers",
+  "local_gravitational_acceleration_m_s2": 9.80665,
+  "upper_bound_sigma": 3,
+  "far_field_detector_distance_m": 0.01,
+  "probe": {
+    "mass_kg": 1e-17,
+    "coherent_hold_time_s": 0.1,
+    "detector_phase_sensitivity_rad": 0.000001
+  },
+  "tensor_source": {
+    "status": "absent",
+    "missing_fields": [
+      "complete_delta_T_munu",
+      "tensor_conservation_receipt",
+      "weak_field_solver_receipt"
+    ]
+  }
+}

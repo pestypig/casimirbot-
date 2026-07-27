@@ -1023,6 +1023,7 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
   authorizedGatewayCapabilities?: HelixWorkstationCapabilityManifest[];
   accountType?: HelixAccountType | null;
   profileId?: string | null;
+  authoritativeEvidenceArtifacts?: unknown[];
 }): Promise<HelixCapabilityLaneProviderAdapterContext> => {
   const turnId = readString(input.turnId) || readString(input.body.turn_id ?? input.body.turnId) || "ask:capability-lane";
   const oneShot = await runHelixCapabilityLaneOneShotRequests({
@@ -1034,6 +1035,7 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
     authorizedGatewayCapabilities: input.authorizedGatewayCapabilities,
     accountType: input.accountType,
     profileId: input.profileId,
+    authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
   });
   const sessions = runHelixCapabilityLaneSessionRequests({
     provider: input.provider,

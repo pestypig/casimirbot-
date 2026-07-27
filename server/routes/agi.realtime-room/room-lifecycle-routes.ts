@@ -1,14 +1,18 @@
+import crypto from "node:crypto";
 import { Router } from "express";
 import { buildHelixSharedRealtimeRoomResponse } from
   "../../services/helix-ask/realtime-room/room-response";
 import {
-  createSharedRealtimeRoom,
   createSharedRealtimeRoomInvite,
   joinSharedRealtimeRoom,
   leaveOrCloseSharedRealtimeRoom,
-  listSharedRealtimeRooms,
   SharedRealtimeRoomDomainError,
 } from "../../services/helix-ask/realtime-room/room-store";
+import {
+  buildSharedLiveRoomControlActorFromAccountContext,
+} from "../../services/shared-live-room-control/service";
+import { getSharedLiveRoomControlService } from
+  "../../services/shared-live-room-control/default-service";
 import { reconcileSharedRealtimeRoomRuntimeAfterLeave } from
   "../../services/helix-ask/realtime-room/room-runtime-reconciliation";
 import { sendSharedRealtimeRoomParticipantContextIfBound } from
@@ -26,55 +30,47 @@ import {
   readMembership,
   readRecord,
   readString,
-  requireSharedRoomHostingAllowed,
   requireSharedRoomAccount,
+  requireSharedRoomAccountContext,
   sharedRoomRoute,
   withRuntimeProjection,
 } from "./http-context";
 
 export const sharedRealtimeRoomLifecycleRouter = Router();
+const sharedLiveRoomControlService = getSharedLiveRoomControlService();
 
 sharedRealtimeRoomLifecycleRouter.get("/realtime/rooms", sharedRoomRoute(async (req, res) => {
-  const account = await requireSharedRoomAccount(req);
-  const rooms = (await listSharedRealtimeRooms({ profileId: account.profileId }))
-    .map(withRuntimeProjection);
+  const actor = buildSharedLiveRoomControlActorFromAccountContext(
+    await requireSharedRoomAccountContext(req),
+  );
+  const receipt = await sharedLiveRoomControlService.listRooms({ actor });
   res.json(buildHelixSharedRealtimeRoomResponse({
     ok: true,
     message: "Shared Realtime rooms listed.",
-    rooms,
+    rooms: receipt.rooms,
   }));
 }));
 
 sharedRealtimeRoomLifecycleRouter.post("/realtime/rooms", sharedRoomRoute(async (req, res) => {
-  const account = await requireSharedRoomAccount(req);
-  requireSharedRoomHostingAllowed(account);
+  const context = await requireSharedRoomAccountContext(req);
+  const actor = buildSharedLiveRoomControlActorFromAccountContext(context);
   const body = readRecord(req.body);
-  const createRoom = async () => {
-    if (account.isGuest) {
-      const activeGuestRooms = await listSharedRealtimeRooms({
-        profileId: account.profileId,
-      });
-      if (activeGuestRooms.some((room) => room.status !== "closed")) {
-        throw new SharedRealtimeRoomDomainError(
-          "shared_realtime_room_runtime_conflict",
-          409,
-          "A temporary guest can host only one active Shared Live Room.",
-        );
-      }
-    }
-    return createSharedRealtimeRoom({
-      ownerProfileId: account.profileId,
-      title: readString(body.title),
-    });
-  };
-  const createdRoom = account.isGuest
-    ? await runWithSharedRealtimeProfileAdmissionLock(account.profileId, createRoom)
-    : await createRoom();
-  const room = withRuntimeProjection(createdRoom);
+  const suppliedIdempotencyKey =
+    req.get("idempotency-key")?.trim() ||
+    req.get("x-idempotency-key")?.trim() ||
+    "";
+  const created = await sharedLiveRoomControlService.createRoom({
+    actor,
+    idempotencyKey:
+      suppliedIdempotencyKey || `legacy-room-create:${crypto.randomUUID()}`,
+    request: {
+      ...(readString(body.title) ? { title: readString(body.title) } : {}),
+    },
+  });
   res.status(201).json(buildHelixSharedRealtimeRoomResponse({
     ok: true,
     message: "Shared Realtime room created.",
-    room,
+    room: created.body.room,
   }));
 }));
 

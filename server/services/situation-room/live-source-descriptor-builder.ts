@@ -7,6 +7,10 @@ import {
   type HelixLiveSourceOrigin,
   type HelixLiveSourceSurface,
 } from "@shared/helix-live-source-descriptor";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 
 const descriptorsById = new Map<string, HelixLiveSourceDescriptor>();
 const latestDescriptorBySource = new Map<string, string>();
@@ -126,7 +130,18 @@ export function inferLiveSourceSurface(input: {
 }
 
 export function upsertLiveSourceDescriptor(input: Record<string, unknown>): HelixLiveSourceDescriptor {
-  const sourceId = normalizeString(input.source_id) ?? normalizeString(input.sourceId) ?? `source:unknown:${hashShort(input, 12)}`;
+  const snakeSourceId = normalizeString(input.source_id);
+  const camelSourceId = normalizeString(input.sourceId);
+  if (
+    isHelixRoomSourceIngressSourceId(snakeSourceId) ||
+    isHelixRoomSourceIngressSourceId(camelSourceId)
+  ) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
+  if (snakeSourceId && camelSourceId && snakeSourceId !== camelSourceId) {
+    throw new Error("live_source_descriptor_identity_mismatch");
+  }
+  const sourceId = snakeSourceId ?? camelSourceId ?? `source:unknown:${hashShort(input, 12)}`;
   const threadId = normalizeString(input.thread_id) ?? normalizeString(input.threadId) ?? "helix-ask:desktop";
   const serving = input.serving_context && typeof input.serving_context === "object"
     ? input.serving_context as Record<string, unknown>
@@ -191,6 +206,7 @@ export function listLiveSourceDescriptors(input: {
 } = {}): HelixLiveSourceDescriptor[] {
   const limit = Math.max(0, Math.min(200, Math.trunc(input.limit ?? 80)));
   return Array.from(descriptorsById.values())
+    .filter((descriptor) => !isHelixRoomSourceIngressSourceId(descriptor.source_id))
     .filter((descriptor) => !input.threadId || descriptor.thread_id === input.threadId)
     .filter((descriptor) => !input.sourceId || descriptor.source_id === input.sourceId)
     .filter((descriptor) => !input.environmentId || descriptor.environment_id === input.environmentId)
@@ -199,8 +215,23 @@ export function listLiveSourceDescriptors(input: {
 }
 
 export function getLatestLiveSourceDescriptorForSource(sourceId: string): HelixLiveSourceDescriptor | null {
+  if (isHelixRoomSourceIngressSourceId(sourceId)) return null;
   const descriptorId = latestDescriptorBySource.get(sourceId);
-  return descriptorId ? descriptorsById.get(descriptorId) ?? null : null;
+  const descriptor = descriptorId ? descriptorsById.get(descriptorId) ?? null : null;
+  return descriptor && !isHelixRoomSourceIngressSourceId(descriptor.source_id)
+    ? descriptor
+    : null;
+}
+
+export function removeLiveSourceDescriptors(input: { sourceId: string }): number {
+  let removed = 0;
+  for (const [descriptorId, descriptor] of descriptorsById.entries()) {
+    if (descriptor.source_id !== input.sourceId) continue;
+    descriptorsById.delete(descriptorId);
+    removed += 1;
+  }
+  latestDescriptorBySource.delete(input.sourceId);
+  return removed;
 }
 
 export function resetLiveSourceDescriptorsForTest(): void {

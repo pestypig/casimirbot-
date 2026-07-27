@@ -29,6 +29,14 @@ import { migration027 } from "./migrations/027_helix_account_credentials";
 import { migration028 } from "./migrations/028_helix_account_recovery";
 import { migration029 } from "./migrations/029_helix_research_library";
 import { migration030 } from "./migrations/030_shared_realtime_rooms";
+import { migration031 } from "./migrations/031_room_source_ingress";
+import { migration032 } from "./migrations/032_helix_agent_api";
+import { migration033 } from "./migrations/033_runtime_tool_confirmation_replay";
+import { migration034 } from "./migrations/034_shared_live_room_agent_bindings";
+import { migration035 } from "./migrations/035_helix_agent_account_links";
+import { migration036 } from "./migrations/036_shared_live_room_binding_consent";
+import { migration037 } from "./migrations/037_shared_live_room_binding_consent_enforcement";
+import { migration038 } from "./migrations/038_environment_adapter_registry";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -62,6 +70,14 @@ const MIGRATIONS = [
   migration028,
   migration029,
   migration030,
+  migration031,
+  migration032,
+  migration033,
+  migration034,
+  migration035,
+  migration036,
+  migration037,
+  migration038,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {
@@ -79,7 +95,9 @@ export async function runMigrations(pool: Pool): Promise<void> {
     `);
 
     const applied = new Set<string>();
-    const { rows } = await client.query<{ id: string }>(`SELECT id FROM schema_migrations;`);
+    const { rows } = await client.query<{ id: string }>(
+      `SELECT id FROM schema_migrations;`,
+    );
     for (const row of rows) {
       applied.add(row.id);
     }
@@ -92,7 +110,9 @@ export async function runMigrations(pool: Pool): Promise<void> {
       await client.query("BEGIN");
       try {
         await migration.run(client, ctx);
-        await client.query(`INSERT INTO schema_migrations(id) VALUES ($1)`, [migration.id]);
+        await client.query(`INSERT INTO schema_migrations(id) VALUES ($1)`, [
+          migration.id,
+        ]);
         await client.query("COMMIT");
       } catch (err) {
         await client.query("ROLLBACK");

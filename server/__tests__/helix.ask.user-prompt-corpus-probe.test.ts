@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildUserPromptConversationWorkspaceSnapshot,
+  isLoopbackUserPromptBaseUrl,
+  mergeUserPromptWorkspaceSnapshots,
   resolveUserPromptScenarioThreadId,
   summarizeTurn,
   type UserPromptScenario,
@@ -18,6 +21,14 @@ const modelOnlyScenario: UserPromptScenario = {
 };
 
 describe("Helix Ask natural prompt corpus scoring", () => {
+  it("permits automatic developer probe sessions only on loopback URLs", () => {
+    expect(isLoopbackUserPromptBaseUrl("http://127.0.0.1:1498")).toBe(true);
+    expect(isLoopbackUserPromptBaseUrl("http://localhost:1522")).toBe(true);
+    expect(isLoopbackUserPromptBaseUrl("http://[::1]:1498")).toBe(true);
+    expect(isLoopbackUserPromptBaseUrl("https://casimirbot.example")).toBe(false);
+    expect(isLoopbackUserPromptBaseUrl("not-a-url")).toBe(false);
+  });
+
   it("keeps journey scenarios on one thread while isolating unrelated scenarios", () => {
     const first = { ...modelOnlyScenario, id: "journey-first", thread_group: "docs journey" };
     const second = { ...modelOnlyScenario, id: "journey-second", thread_group: "docs journey" };
@@ -27,6 +38,58 @@ describe("Helix Ask natural prompt corpus scoring", () => {
       .toBe(resolveUserPromptScenarioThreadId(second, "run-1"));
     expect(resolveUserPromptScenarioThreadId(isolated, "run-1"))
       .not.toBe(resolveUserPromptScenarioThreadId(first, "run-1"));
+  });
+
+  it("carries the prior visible answer as bounded referent context for journey follow-ups", () => {
+    expect(buildUserPromptConversationWorkspaceSnapshot({
+      turn_id: "ask:prior",
+      user_prompt: "Find the NHM2 whitepaper.",
+      assistant_text:
+        "The canonical file is docs/research/nhm2-current-status-whitepaper.md.",
+    })).toMatchObject({
+      activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
+      active_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
+      activePanel: "docs-viewer",
+      hasDocContext: true,
+      source: "user_prompt_corpus_prior_answer",
+      chat_referent_context: {
+        previous_assistant_final_answer: {
+          source_ref: "chat.final_answer.previous:ask:prior",
+          text: expect.stringContaining("nhm2-current-status-whitepaper.md"),
+        },
+        previous_user_message: {
+          text: "Find the NHM2 whitepaper.",
+        },
+      },
+    });
+  });
+
+  it("retains the active document when a later answer does not repeat its path", () => {
+    expect(buildUserPromptConversationWorkspaceSnapshot({
+      turn_id: "ask:followup",
+      user_prompt: "What is the main idea?",
+      assistant_text: "The main idea is disciplined evidence boundaries.",
+      active_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
+    })).toMatchObject({
+      activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
+      activePanel: "docs-viewer",
+      hasDocContext: true,
+    });
+  });
+
+  it("preserves configured bounded panel context when conversation context is added", () => {
+    expect(mergeUserPromptWorkspaceSnapshots({
+      activePanel: "workstation-notes",
+      notes_context: { notes: [] },
+    }, {
+      chat_referent_context: { previous_user_message: { text: "Check my notes." } },
+    })).toMatchObject({
+      activePanel: "workstation-notes",
+      notes_context: { notes: [] },
+      chat_referent_context: {
+        previous_user_message: { text: "Check my notes." },
+      },
+    });
   });
 
   it("does not treat model-only policy refs as executed tool observations", () => {
@@ -154,6 +217,46 @@ describe("Helix Ask natural prompt corpus scoring", () => {
       verdict: "PASS",
       lifecycle_failure_stage: "complete",
       expected_capabilities_successful: true,
+    });
+  });
+
+  it("accepts a completed governed client lane without inventing a gateway call", () => {
+    const result = summarizeTurn({
+      id: "voice-client-lane-success",
+      category: "voice_delivery",
+      prompt: "Say this aloud: The evidence is diagnostic, not conclusive.",
+      expected_tool_mode: "required",
+      expected_capability_patterns: ["^text_to_speech\\.speak_text$"],
+      expected_minimum_observations: 1,
+      expected_answer_patterns: ["diagnostic"],
+      expected_minimum_answer_chars: 20,
+    }, {
+      selected_final_answer: "The evidence is diagnostic, not conclusive.",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      compound_subgoal_rail_statuses: [{
+        requested_capability: "text_to_speech.speak_text",
+        selected_capability: "text_to_speech.speak_text",
+        executed_capability: "text_to_speech.speak_text",
+        observation_kind: "capability_lane_observation_packet",
+        observation_ref: "artifact:voice:1",
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      }],
+      codex_parity_agent_spine_rail_table: {
+        rail_status: "complete",
+        codex_parity_class: "complete",
+        executed_capability: "text_to_speech.speak_text",
+        observation_ref: "artifact:voice:1",
+        reentry_status: "handoff_terminal_allowed",
+      },
+    }, {});
+
+    expect(result).toMatchObject({
+      verdict: "PASS",
+      lifecycle_failure_stage: "complete",
+      expected_capabilities_successful: true,
+      gateway_call_results: [],
     });
   });
 });

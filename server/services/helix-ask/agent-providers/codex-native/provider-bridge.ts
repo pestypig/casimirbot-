@@ -16,12 +16,17 @@ import {
   runCodexNativeWorkstationTurn,
   type CodexNativeWorkstationTurnResult,
 } from "./workstation-turn";
+import type { CodexNativeRuntimeApprovalContextV1 } from "./runtime-approval-host";
 
-const readBooleanEnv = (value: string | undefined, defaultValue: boolean): boolean => {
+const readBooleanEnv = (
+  value: string | undefined,
+  defaultValue: boolean,
+): boolean => {
   if (value === undefined) return defaultValue;
   const normalized = value.trim().toLowerCase();
   if (!normalized) return defaultValue;
-  if (["0", "false", "no", "off", "disabled"].includes(normalized)) return false;
+  if (["0", "false", "no", "off", "disabled"].includes(normalized))
+    return false;
   if (["1", "true", "yes", "on", "enabled"].includes(normalized)) return true;
   return defaultValue;
 };
@@ -38,9 +43,7 @@ const readStringArray = (value: unknown): string[] | null => {
   if (!Array.isArray(value)) return null;
   return Array.from(
     new Set(
-      value
-        .map(readString)
-        .filter((entry): entry is string => Boolean(entry)),
+      value.map(readString).filter((entry): entry is string => Boolean(entry)),
     ),
   );
 };
@@ -50,7 +53,9 @@ const cookieHeader = (headers?: IncomingHttpHeaders): string | undefined => {
   return Array.isArray(cookie) ? cookie.join("; ") : cookie;
 };
 
-const readGoalAllowedWorkstationTools = (body: Record<string, unknown>): string[] | null => {
+const readGoalAllowedWorkstationTools = (
+  body: Record<string, unknown>,
+): string[] | null => {
   const runtimeGoal = readRecord(body.runtime_goal_session);
   const jobBrief = readRecord(runtimeGoal?.job_brief);
   return (
@@ -67,29 +72,43 @@ const normalizeGatewayCapabilityId = (capabilityId: string): string =>
 const normalizeGatewayCapabilityIds = (capabilityIds: string[]): string[] =>
   Array.from(new Set(capabilityIds.map(normalizeGatewayCapabilityId)));
 
-export const readTurnAdmittedWorkstationTools = (body: Record<string, unknown>): string[] | null => {
+export const readTurnAdmittedWorkstationTools = (
+  body: Record<string, unknown>,
+): string[] | null => {
   const rawGoalTools = readGoalAllowedWorkstationTools(body);
-  const goalTools = rawGoalTools === null ? null : normalizeGatewayCapabilityIds(rawGoalTools);
-  const admission = readRecord(body.tool_call_admission_decision ?? body.toolCallAdmissionDecision);
+  const goalTools =
+    rawGoalTools === null ? null : normalizeGatewayCapabilityIds(rawGoalTools);
+  const admission = readRecord(
+    body.tool_call_admission_decision ?? body.toolCallAdmissionDecision,
+  );
   const routeArbitration = readRecord(admission?.route_arbitration);
-  const admissionStatus = readString(admission?.admission_status)?.toLowerCase() ?? null;
+  const admissionStatus =
+    readString(admission?.admission_status)?.toLowerCase() ?? null;
   const admissionRejected = Boolean(
     admission?.tool_admission_suppressed === true ||
-      readString(admission?.runtime_capability_rejection_reason) ||
-      admissionStatus === "rejected" ||
-      admissionStatus === "blocked" ||
-      admissionStatus === "suppressed",
+    readString(admission?.runtime_capability_rejection_reason) ||
+    admissionStatus === "rejected" ||
+    admissionStatus === "blocked" ||
+    admissionStatus === "suppressed",
   );
   const routeTools = admission
     ? admissionRejected
       ? []
-      : normalizeGatewayCapabilityIds(Array.from(new Set([
-          ...(readStringArray(admission.compound_requested_capabilities) ?? []),
-          readString(admission.admitted_capability),
-          readString(admission.selected_capability),
-          readString(routeArbitration?.selected_capability),
-          readString(admission.requested_capability),
-        ].filter((entry): entry is string => Boolean(entry)))))
+      : normalizeGatewayCapabilityIds(
+          Array.from(
+            new Set(
+              [
+                ...(readStringArray(
+                  admission.compound_requested_capabilities,
+                ) ?? []),
+                readString(admission.admitted_capability),
+                readString(admission.selected_capability),
+                readString(routeArbitration?.selected_capability),
+                readString(admission.requested_capability),
+              ].filter((entry): entry is string => Boolean(entry)),
+            ),
+          ),
+        )
     : null;
   const plannedTools = admissionRejected
     ? []
@@ -99,30 +118,38 @@ export const readTurnAdmittedWorkstationTools = (body: Record<string, unknown>):
           includePlannerDerived: true,
           deferRuntimeTheoryReflection: false,
         })
-          .map((request) => readString(request.capability_id ?? request.capabilityId))
+          .map((request) =>
+            readString(request.capability_id ?? request.capabilityId),
+          )
           .filter((entry): entry is string => Boolean(entry)),
       );
-  const turnTools = routeTools === null && plannedTools.length === 0
-    ? null
-    : Array.from(new Set([...(routeTools ?? []), ...plannedTools]));
+  const turnTools =
+    routeTools === null && plannedTools.length === 0
+      ? null
+      : Array.from(new Set([...(routeTools ?? []), ...plannedTools]));
 
-  const goalIntersectedTools = goalTools === null
-    ? turnTools
-    : turnTools === null
-      ? goalTools
-      : goalTools.includes("*")
-        ? turnTools
-        : turnTools.includes("*")
-          ? goalTools
-          : turnTools.filter((capabilityId) => new Set(goalTools).has(capabilityId));
+  const goalIntersectedTools =
+    goalTools === null
+      ? turnTools
+      : turnTools === null
+        ? goalTools
+        : goalTools.includes("*")
+          ? turnTools
+          : turnTools.includes("*")
+            ? goalTools
+            : turnTools.filter((capabilityId) =>
+                new Set(goalTools).has(capabilityId),
+              );
   const committedRoute = readCommittedAskRoute(body);
-  if (!committedRoute || goalIntersectedTools === null) return goalIntersectedTools;
-  return goalIntersectedTools.filter((capabilityId) =>
-    capabilityId !== "*" &&
-    assertCapabilityAllowedByCommittedRoute({
-      committedRoute,
-      capabilityId,
-    }).allowed
+  if (!committedRoute || goalIntersectedTools === null)
+    return goalIntersectedTools;
+  return goalIntersectedTools.filter(
+    (capabilityId) =>
+      capabilityId !== "*" &&
+      assertCapabilityAllowedByCommittedRoute({
+        committedRoute,
+        capabilityId,
+      }).allowed,
   );
 };
 
@@ -135,9 +162,10 @@ export const removeSatisfiedNativeWorkstationTools = (
   }
   const satisfiedCapabilities = new Set(
     gatewayCallResults
-      .filter((result) =>
-        result.ok === true &&
-        result.observation_packet?.status === "succeeded"
+      .filter(
+        (result) =>
+          result.ok === true &&
+          result.observation_packet?.status === "succeeded",
       )
       .map((result) => result.capability_id),
   );
@@ -158,7 +186,12 @@ export type CodexNativeProviderBridgeAttempt = {
     enabled: boolean;
     eligible: boolean;
     attempted: boolean;
-    status: "not_eligible" | "disabled" | "unavailable" | "completed" | "fallback_required";
+    status:
+      | "not_eligible"
+      | "disabled"
+      | "unavailable"
+      | "completed"
+      | "fallback_required";
     native_transport: "codex_app_server";
     compatibility_transport: "codex_exec";
     fallback_required: boolean;
@@ -180,8 +213,12 @@ export const resolveCodexNativeProviderBridgeAvailability = (): {
   available: boolean;
   unavailableReason: string | null;
 } => {
-  const enabled = readBooleanEnv(process.env.HELIX_CODEX_NATIVE_APP_SERVER_ENABLED, true);
-  const runningUnderTest = process.env.VITEST !== undefined || process.env.NODE_ENV === "test";
+  const enabled = readBooleanEnv(
+    process.env.HELIX_CODEX_NATIVE_APP_SERVER_ENABLED,
+    true,
+  );
+  const runningUnderTest =
+    process.env.VITEST !== undefined || process.env.NODE_ENV === "test";
   const nativeTestOptIn = readBooleanEnv(
     process.env.HELIX_CODEX_NATIVE_APP_SERVER_TEST_ENABLED,
     false,
@@ -193,9 +230,9 @@ export const resolveCodexNativeProviderBridgeAvailability = (): {
       ? "legacy_fake_runtime_configured"
       : runningUnderTest && !nativeTestOptIn
         ? "native_app_server_disabled_in_test"
-      : !readString(process.env.OPENAI_API_KEY)
-        ? "openai_api_key_missing"
-        : null;
+        : !readString(process.env.OPENAI_API_KEY)
+          ? "openai_api_key_missing"
+          : null;
   return {
     enabled,
     available: unavailableReason === null,
@@ -211,6 +248,8 @@ export const runCodexNativeProviderBridge = async (input: {
   headers?: IncomingHttpHeaders;
   accountContext?: HelixWorkstationGatewayAccountContext;
   preexecutedGatewayCallResults?: readonly HelixWorkstationGatewayCallResult[];
+  authoritativeEvidenceArtifacts?: unknown[];
+  runtimeApproval?: CodexNativeRuntimeApprovalContextV1;
   signal?: AbortSignal;
   onNativeEvent?: (method: string, params: unknown) => void;
 }): Promise<CodexNativeProviderBridgeAttempt> => {
@@ -276,9 +315,9 @@ export const runCodexNativeProviderBridge = async (input: {
 
   const accountContext =
     input.accountContext ??
-    await resolveWorkstationGatewayAccountContext(
+    (await resolveWorkstationGatewayAccountContext(
       readHelixSessionCookie(cookieHeader(input.headers)),
-    );
+    ));
   const result = await runCodexNativeWorkstationTurn({
     prompt: input.prompt,
     turnId: input.turnId,
@@ -288,6 +327,9 @@ export const runCodexNativeProviderBridge = async (input: {
     model: modelPolicy.model,
     reasoningEffort: modelPolicy.reasoningEffort,
     allowedWorkstationTools,
+    authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
+    trustedCurrentTurnGatewayCallResults: input.preexecutedGatewayCallResults,
+    runtimeApproval: input.runtimeApproval,
     requireTrustedAccountBinding: trustedGoalAccountBindingRequired,
     signal: input.signal,
     onNativeEvent: input.onNativeEvent,

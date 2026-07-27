@@ -138,6 +138,193 @@
       "to": "tools/warpViabilityCertificate.ts",
       "reason": "Warp viability tool issues certificates.",
       "waiver": "Certified -> certified dependency for viability tool."
+    },
+    {
+      "from": "shared/casimir-dp-complex-coherence.ts",
+      "to": "shared/casimir-dp-phase-coherence.ts",
+      "reason": "Stage-3 complex-coherence diagnostics extend the immutable Stage-2 phase and quadrature convention."
+    },
+    {
+      "from": "shared/casimir-dp-qed-green-noise.ts",
+      "to": "shared/casimir-optical-response.ts",
+      "reason": "The reduced-order Green/noise budget consumes the registered material-response and Kramers-Kronig conventions."
+    },
+    {
+      "from": "shared/casimir-dp-qed-green-noise.ts",
+      "to": "shared/casimir-lifshitz.ts",
+      "reason": "The Stage-3 QED lane retains the established reduced-order equilibrium mean-interaction boundary."
+    },
+    {
+      "from": "shared/casimir-dp-dp-companion.ts",
+      "to": "shared/dp-collapse.ts",
+      "reason": "The named companion lane inherits the exploratory branch-density self-energy authority and keeps physical regularization separate from numerical softening."
+    },
+    {
+      "from": "shared/casimir-dp-manifold-kernel-registry.ts",
+      "to": "shared/casimir-dp-or-phase-stage2.ts",
+      "reason": "The fail-closed registry versions, but does not loosen, the null Stage-2 bridge requirements."
+    },
+    {
+      "from": "shared/casimir-dp-model-comparison.ts",
+      "to": "shared/casimir-dp-complex-coherence.ts",
+      "reason": "Held-out comparison consumes complex-coherence, conditioning, path-swap, and echo signatures."
+    },
+    {
+      "from": "shared/casimir-dp-model-comparison.ts",
+      "to": "shared/casimir-dp-qed-green-noise.ts",
+      "reason": "The composite ordinary-physics null consumes the reduced-order QED mean/noise budget.",
+      "waiver": "The diagnostic comparator preserves the QED lane's reduced-order maturity and cannot promote it."
+    },
+    {
+      "from": "shared/casimir-dp-model-comparison.ts",
+      "to": "shared/casimir-dp-dp-companion.ts",
+      "reason": "Named-DP comparison consumes the frozen exploratory companion signature.",
+      "waiver": "The diagnostic comparator preserves the DP lane's exploratory claim ceiling and cannot promote it."
+    },
+    {
+      "from": "shared/casimir-dp-model-comparison.ts",
+      "to": "shared/casimir-dp-gravity-upper-bound.ts",
+      "reason": "The composite ordinary-physics null includes the reduced-order complete-apparatus gravitational upper bound.",
+      "waiver": "The diagnostic comparator preserves the ordinary-GR lane's reduced-order maturity and cannot promote it."
+    },
+    {
+      "from": "shared/casimir-dp-model-comparison.ts",
+      "to": "shared/casimir-dp-manifold-kernel-registry.ts",
+      "reason": "A bridge model is excluded unless the registry preflight passes before comparison."
+    },
+    {
+      "from": "shared/casimir-dp-evidence-map-stage3.ts",
+      "to": "shared/casimir-dp-complex-coherence.ts",
+      "reason": "The Stage-3 outcome map consumes the complex-coherence discriminator."
+    },
+    {
+      "from": "shared/casimir-dp-evidence-map-stage3.ts",
+      "to": "shared/casimir-dp-qed-green-noise.ts",
+      "reason": "The Stage-3 outcome map consumes the QED mean/noise budget.",
+      "waiver": "Per-lane maturity is retained; diagnostic orchestration does not promote reduced-order QED outputs."
+    },
+    {
+      "from": "shared/casimir-dp-evidence-map-stage3.ts",
+      "to": "shared/casimir-dp-dp-companion.ts",
+      "reason": "The Stage-3 outcome map consumes the named exploratory DP companion lane.",
+      "waiver": "Per-lane maturity is retained; diagnostic orchestration does not promote the exploratory DP dependency."
+    },
+    {
+      "from": "shared/casimir-dp-evidence-map-stage3.ts",
+      "to": "shared/casimir-dp-gravity-upper-bound.ts",
+      "reason": "The Stage-3 outcome map consumes the complete-apparatus scalar gravity bound.",
+      "waiver": "Per-lane maturity is retained; diagnostic orchestration does not promote a scalar bound to a tensor result."
+    },
+    {
+      "from": "shared/casimir-dp-evidence-map-stage3.ts",
+      "to": "shared/casimir-dp-model-comparison.ts",
+      "reason": "The human and machine outcome ledger consumes the blinded held-out comparison states."
+    },
+    {
+      "from": "shared/casimir-dp-evidence-map-stage3.ts",
+      "to": "shared/casimir-dp-manifold-kernel-registry.ts",
+      "reason": "The outcome ledger carries the deterministic registry first failure and bridge-admission state."
+    },
+    {
+      "from": "shared/casimir-dp-evidence-map-stage3.ts",
+      "to": "shared/casimir-dp-or-phase-stage2.ts",
+      "reason": "Stage 3 consumes the immutable Stage-2 authority and preserves its blocked scientific gates."
+    },
+    {
+      "from": "shared/casimir-dp-qed-scale-hierarchy-calibration.ts",
+      "to": "shared/casimir-dp-polarization-congruence-stage4.ts",
+      "reason": "Stage 4.1 consumes the immutable Stage-4 campaign authority and preserves every upstream scientific gate and nonclaim."
+    },
+    {
+      "from": "shared/casimir-dp-qed-scale-hierarchy-calibration.ts",
+      "to": "shared/casimir-dp-tensor-dimensional-congruence.ts",
+      "reason": "The source-backed QED hierarchy inherits Stage-4 h/hbar, nu/omega, dimensional, semantic, and namespace conventions without registering a physical transfer kernel."
+    },
+    {
+      "from": "shared/casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts",
+      "to": "shared/casimir-dp-qed-scale-hierarchy-calibration.ts",
+      "reason": "Stage 4.2A hash-links the immutable Stage-4.1 mass, Compton, Rydberg, h/hbar, nu/omega, alpha_fs, unit, and semantic-nonbridge authority."
+    },
+    {
+      "from": "shared/casimir-dp-planck-solar-calibration-stage4-2a.ts",
+      "to": "shared/casimir-dp-qed-scale-hierarchy-calibration.ts",
+      "reason": "The cross-scale calibration shares explicit h, energy-frequency, and unit semantics with Stage 4.1 but registers no physical or observable bridge."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-scale-transport-stage4-2b.ts",
+      "to": "shared/casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts",
+      "reason": "Stage 4.2B reuses traceable mass, unit, and energy-frequency semantics while transporting the complete object density rather than reconstructing bulk mass from electron or Compton scales."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-scale-transport-stage4-2b.ts",
+      "to": "shared/dp-collapse.ts",
+      "reason": "The branch-density ledger supplies the mass, geometry, separation, and smearing inputs consumed by the named exploratory DP density functional.",
+      "waiver": "The diagnostic transport ledger preserves the exploratory DP dependency's model limitations and cannot promote it."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-spectral-thermometry-stage4-2b.ts",
+      "to": "shared/casimir-dp-radiative-thermal-closure.ts",
+      "reason": "Response-corrected apparatus thermometry reuses the explicit Planck, h/hbar, nu/omega, zero-point, and thermal-radiative conventions.",
+      "waiver": "The diagnostic thermometry runtime preserves the exploratory thermal model's claim ceiling and is synthetic rather than measured."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-response-covariance-stage4-2b.ts",
+      "to": "shared/casimir-dp-apparatus-spectral-thermometry-stage4-2b.ts",
+      "reason": "The nuisance-response model consumes the frozen response-corrected thermometry prediction and covariance."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-response-covariance-stage4-2b.ts",
+      "to": "shared/casimir-dp-qed-green-noise.ts",
+      "reason": "The full apparatus covariance reconciles the earlier reduced-order QED mean/noise budget with sensor-forward and cross-spectral calibration.",
+      "waiver": "The diagnostic covariance runtime does not promote the reduced-order QED dependency or turn design-class inputs into measured closure."
+    },
+    {
+      "from": "shared/casimir-dp-dp-scaling-forecast-stage4-2b.ts",
+      "to": "shared/casimir-dp-apparatus-scale-transport-stage4-2b.ts",
+      "reason": "The frozen DP signature consumes the complete object and branch-density provenance, equivalence, and scale ledger."
+    },
+    {
+      "from": "shared/casimir-dp-dp-scaling-forecast-stage4-2b.ts",
+      "to": "shared/dp-collapse.ts",
+      "reason": "The convergence and mass/separation/time forecast executes the registered exploratory DP density functional without inserting a boundary modifier.",
+      "waiver": "The diagnostic forecast preserves the exploratory model prescription and explicitly reports its radius and regularization sensitivity."
+    },
+    {
+      "from": "shared/casimir-dp-dp-scaling-forecast-stage4-2b.ts",
+      "to": "shared/casimir-dp-dp-companion.ts",
+      "reason": "The apparatus forecast reconciles the named DP rate with its separately powered companion signature.",
+      "waiver": "The diagnostic forecast cannot promote the exploratory companion or treat an unpowered companion as support."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+      "to": "shared/casimir-dp-complex-coherence.ts",
+      "reason": "The held-out comparator reuses the Stage-3 complex-coherence estimator and keeps raw Re/Im scoring distinct from coverage-qualified log visibility."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+      "to": "shared/casimir-dp-apparatus-response-covariance-stage4-2b.ts",
+      "reason": "The residual likelihood consumes the pilot-frozen full covariance, sensor-noise separation, shared-calibration cross terms, and immutable row order."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+      "to": "shared/casimir-dp-dp-scaling-forecast-stage4-2b.ts",
+      "reason": "The comparator scores a frozen no-amplitude DP prediction separately from ordinary and registered bridge hypotheses."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+      "to": "shared/casimir-dp-manifold-kernel-registry.ts",
+      "reason": "A boundary-conditioned bridge can enter the comparator only after the fail-closed numerical kernel registry admits a separately versioned model."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-identifiability-stage4-2b.ts",
+      "to": "shared/casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+      "reason": "The go/no-go forecast consumes the same frozen complex-residual space, covariance, cell order, and ordinary/DP/bridge prediction vectors."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-identifiability-stage4-2b.ts",
+      "to": "shared/casimir-dp-inference.ts",
+      "reason": "The Stage-4.2B forecast reconciles legacy rate-only power and independent dynamics-signature diagnostics while adding full nuisance profiling and bounded parameter regions.",
+      "waiver": "The diagnostic go/no-go preserves the reduced-order inference dependency and cannot identify collapse from a rate-only comparison."
     }
   ]
 }

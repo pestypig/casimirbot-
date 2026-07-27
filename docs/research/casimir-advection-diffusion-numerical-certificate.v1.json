@@ -1,0 +1,146 @@
+{
+  "schema": "casimir_advection_diffusion_numerical_certificate_record/v1",
+  "generatedAt": "2026-07-25T16:14:52.553Z",
+  "canonicalCasimirSpec": {
+    "specId": "casimir-spec:advection-diffusion:open-world-fixture",
+    "schemaVersion": "casimir_spec_scientific_claim_ir/v1",
+    "semanticSha256": "3a06872d33bc65ef6eee4cc5d742754ad1476191a5f960a5008915d29eab357d",
+    "artifactSha256": "a62e2ed18995fad5824547ad23ea21fbd24a87c231d0fd82e97aa7418991f7c3",
+    "claimId": "claim:advection-diffusion-equation",
+    "propositionSha256": "35368b46e58130d83cf5f09f682f799efe48f8ee5780ca81970889fddd20c09f"
+  },
+  "upstreamLanyon": {
+    "repository": "https://github.com/lanyonai/AdvectionDiffusion",
+    "commit": "3d19be11e101121d8187230977f5a5aeba0daefe",
+    "sourcePath": "implementations/advection_diffusion_full_1d.c",
+    "sourceSha256": "ea3f4f7534475c719fa94cd96c380faa90c6eedd2f587b513b9b9658cb1beb75",
+    "vendored": false,
+    "licenseFileObserved": false,
+    "completeSimulationDriver": false
+  },
+  "sourceSnapshot": {
+    "commitSha": "048b43df2cd7a0140e174519d241d4ece1e519f9",
+    "treeSha": "595a88b0734e07b861cd68e40c6264a42d72c9f8",
+    "selectedSourceManifestSha256": "d32cc0a891b63cf1691d5a8f1dfa35ab511d1239b43cb10e273dc55cc33e4b45"
+  },
+  "builds": {
+    "primaryManifestSha256": "6fe780a1a2556caf0eebc44a73295fb08e205f3c021208a8c51a51261911a2b9",
+    "primaryExecutableSha256": "17f1891190c6071b075e19b35a33a870fff150d1ebb32679080c57922d2baf5b",
+    "independentManifestSha256": "9a508e87ecab5b81229d374910a8cddb1a6c231a508983ec7c374e1ae41d9a24",
+    "independentExecutableSha256": "77ce1a11b7f88d72f27483a951e6f94e8b0f7c60333e6a58d3706ddf02dadf86",
+    "harnessManifestSha256": "b4bdd31fe055c9986ab873505de1b16baebe7835ead4dcc92a932b1e104012a5",
+    "reproducibleBuildsObserved": 2,
+    "reproducibleBuildsByteIdentical": true
+  },
+  "generationEvidence": {
+    "primaryGenerationRequestSha256": "6fc240482b32ff1254232d90a5560649ce1db4a7d2021ff790c01bee25e5d21e",
+    "primaryReceiptId": "casimir-advection-diffusion-generation-receipt:primary",
+    "primaryReceiptSha256": "a525d8f8119a5fbdb1aebec920aa10062c31539a528bdcc142c277b5690f6cf7",
+    "independentGenerationRequestSha256": "2527b0acb097d0f15abfe19cb3f3fe67fab378b63285d034d308f563280e28bc",
+    "independentReceiptId": "casimir-advection-diffusion-generation-receipt:independent",
+    "independentReceiptSha256": "b92f66e203b10abc2e9c1366210ec1f8ad6cbe7fb9378dd83b7290fecb8dce3e"
+  },
+  "numericalRequest": {
+    "requestId": "casimir-advection-diffusion-periodic-1d-numerical/v1",
+    "artifactSha256": "ad6bcae84a82f4ed1cb048b5cd629ac4041a57d70f98d20c820996b7cf0fb96a",
+    "replayPolicyId": "casimir-advection-diffusion-numerical-replay/v1",
+    "replayPolicySha256": "a31a89edd5a9e69119d7b6a761448d9eaa5cde95767be3ed01f7c3dfdabb2858"
+  },
+  "certificate": {
+    "artifactId": "casimir_independent_numerical_verification_certificate",
+    "schemaVersion": "casimir_independent_numerical_verification_certificate/v1",
+    "generatedAt": "2026-07-25T16:14:52.551Z",
+    "certificateId": "casimir-independent-numerical:casimir-advection-diffusion-periodic-1d-numerical/v1",
+    "request": {
+      "schemaVersion": "casimir_independent_numerical_verification_request/v1",
+      "requestId": "casimir-advection-diffusion-periodic-1d-numerical/v1",
+      "artifactSha256": "ad6bcae84a82f4ed1cb048b5cd629ac4041a57d70f98d20c820996b7cf0fb96a",
+      "casimirSpec": {
+        "semanticSha256": "3a06872d33bc65ef6eee4cc5d742754ad1476191a5f960a5008915d29eab357d",
+        "artifactSha256": "a62e2ed18995fad5824547ad23ea21fbd24a87c231d0fd82e97aa7418991f7c3"
+      },
+      "claimId": "claim:advection-diffusion-equation",
+      "propositionSha256": "35368b46e58130d83cf5f09f682f799efe48f8ee5780ca81970889fddd20c09f",
+      "frozenCase": {
+        "caseId": "casimir-advection-diffusion-periodic-1d/v1",
+        "inputsSha256": "5311652c41e5054728d1681b592eaaed450a92e6c9d144bffdf362d357a210e4",
+        "meshSha256": "6afdf6fa1fce1858ff9b38d6946b0d7b4c025a720478a18427b45540c8294346",
+        "initialConditionsSha256": "1edded09030399f70cd90a8b714f70cbd68f1596cc0d58158d0d2e158befff23",
+        "boundaryConditionsSha256": "1e0da5e1e75de50abfa1acde45ede260fda647c14c0bbbbca395d6ef4502d471",
+        "observableIds": [
+          "solution_l2_error"
+        ]
+      }
+    },
+    "status": "passed",
+    "lineageAudit": {
+      "primaryLineageId": "lanyon-generated-kernel-with-casimir-driver",
+      "independentLineageId": "casimir-analytic-periodic-solution",
+      "sourceDistinct": true,
+      "buildManifestDistinct": true,
+      "independenceEstablished": true
+    },
+    "runs": {
+      "primary": {
+        "implementationId": "casimir-lanyon-advection-diffusion-full-1d",
+        "completedReplayCount": 2,
+        "byteIdentical": true,
+        "aggregateOutputManifestSha256": "60ebdf41bf6d9d284734b199b452767487d2d882f237846601d8590061526d82",
+        "aggregateTranscriptSha256": "5a2cab5ac184068658843cdd67e4a78e619eaf57686257ec71eedf1f5a39151f",
+        "refinementLevels": 3
+      },
+      "independent": {
+        "implementationId": "casimir-advection-diffusion-analytic-reference",
+        "completedReplayCount": 2,
+        "byteIdentical": true,
+        "aggregateOutputManifestSha256": "057592f2c8b87a379e9dcde71dc03c453395a06fa1e65f9548c8c7c70b374af8",
+        "aggregateTranscriptSha256": "6ec91291153eddcd387b3ef3844c82057b1416088e4fe9b1324c84aeb074e7d3",
+        "refinementLevels": 3
+      }
+    },
+    "comparisons": [
+      {
+        "observableId": "solution_l2_error",
+        "unit": "1",
+        "maximumAbsoluteError": 0.0006153141461445303,
+        "maximumRelativeError": 0.0006062751728316276,
+        "observedConvergenceOrder": 0.7661416833841534,
+        "absoluteTolerance": 0.001,
+        "relativeTolerance": 0.001,
+        "withinTolerance": true,
+        "convergenceSatisfied": true
+      }
+    ],
+    "blockers": [],
+    "authority": {
+      "outputRole": "evidence_for_bounded_synthesis",
+      "frozenNumericalComparisonChecked": true,
+      "independentImplementationCompared": true,
+      "validatesSemanticIntent": false,
+      "validatesTheory": false,
+      "validatesGeneratedCode": false,
+      "validatesNumericalImplementation": false,
+      "validatesEmpiricalClaim": false,
+      "validatesPhysicalMechanism": false,
+      "formalPropositionChecked": false,
+      "assistantAnswer": false,
+      "terminalEligible": false,
+      "promotionAllowed": false,
+      "postToolModelStepRequired": true
+    },
+    "artifactSha256": "1a3a6fd62f9684cf0c9beeed8f1361588cd9bda6a1d27f9ece0d6083588ffb65"
+  },
+  "recordAuthority": {
+    "portableSummaryOnly": true,
+    "fullReplayBundleGenerated": true,
+    "validatesSemanticIntent": false,
+    "validatesTheory": false,
+    "validatesGeneratedCode": false,
+    "validatesNumericalImplementation": false,
+    "validatesEmpiricalClaim": false,
+    "validatesPhysicalMechanism": false,
+    "assistantAnswer": false,
+    "terminalEligible": false,
+    "promotionAllowed": false
+  }
+}

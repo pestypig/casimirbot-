@@ -1474,7 +1474,7 @@ describe("panelActionAdapters", () => {
     );
   });
 
-  it("treats Situation Room live-source attach as source admission", () => {
+  it("keeps a synthetic Situation Room live-source attach unverified until authenticated ingress", () => {
     const fetchMock = vi.fn(() =>
       Promise.resolve(
         new Response(JSON.stringify({ ok: true }), {
@@ -1514,8 +1514,12 @@ describe("panelActionAdapters", () => {
       environment_id: "live-env:minecraft",
       source_id: "source:minecraft-server",
       source_kind: "minecraft_world_events",
-      transport: "cloudflarelink",
-      trust_level: "admitted_live_source",
+      transport: "unknown",
+      freshness: {
+        status: "unknown",
+        last_seen_at: null,
+      },
+      trust_level: "unverified",
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,

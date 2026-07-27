@@ -1,0 +1,249 @@
+{
+  "schema_version": "casimir_dp_electron_mass_higgs_anchor_stage4_2a/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1",
+  "implementation_version": "1.0.0",
+  "evidence_cutoff": "2026-07-25",
+  "evidence_class": "source_backed_diagnostic_replay",
+  "claim_ceiling": "mass_energy_frequency_and_radiometric_calibration_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "authority_manifest": {
+    "role": "stage4_2a_authority_manifest",
+    "path": "configs/research/casimir-dp-stage4-2a-authorities.v1.json",
+    "sha256": "1e4dde8f5a162b5368376b7ccaf07e19e725e6edb24b447aa6b1292732ce3b5f",
+    "tracked": false,
+    "required_at_runtime": true
+  },
+  "upstream_authorities": [
+    {
+      "role": "stage4_1_config",
+      "path": "configs/research/casimir-dp-qed-scale-hierarchy-stage4-1.v1.json",
+      "sha256": "e2625c86a5366258677c58cbe78e73b8fcc1893ecd417b48765d74488f953478",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-1-authorities.v1.json",
+      "sha256": "cd681b977d47de6715322249c1026ecf5e963ac81735d6c29aa5100942824f4f",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-qed-scale-hierarchy-stage4-1/casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z/qed-scale-hierarchy-stage4-1-report.json",
+      "sha256": "8f06bf394e64d40d24530e9e93b5d61edece3752318ece2095f27d61f55042c5",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-qed-scale-hierarchy-stage4-1/casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z/qed-scale-hierarchy-stage4-1-report.md",
+      "sha256": "6ae9530701fc35aa544b438709e789929b45eaf53ae950ec93ed976bb9703ba6",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_immutable_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-qed-scale-hierarchy-stage4-1/casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z/qed-scale-hierarchy-stage4-1-receipt.json",
+      "sha256": "d835b56a87ed6f6d78edfb8e627bceecb931575348232ca0fd77795f5ffe24af",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-qed-scale-hierarchy-stage4-1-verification-receipt.json",
+      "sha256": "a7f60aa9b12b7c1c143a7a1681048a61275495aaed33e1dfa6caa11e9e44b8db",
+      "tracked": false,
+      "required_at_runtime": true
+    }
+  ],
+  "source_registry": [
+    {
+      "source_id": "sturm-2014-electron-mass",
+      "citation": "S. Sturm et al., High-precision measurement of the atomic mass of the electron, Nature 506, 467-470 (2014).",
+      "url": "https://doi.org/10.1038/nature13026",
+      "supports": "The Penning-trap bound-electron frequency-ratio method and published electron relative atomic-mass inference.",
+      "does_not_support": "Static weighing, an adjustment-independent CODATA confirmation, Higgs identification, or a collapse mechanism."
+    },
+    {
+      "source_id": "koehler-2016-corrected-penning-analysis",
+      "citation": "F. Koehler et al., The electron mass from g-factor measurements on hydrogen-like carbon 12C5+.",
+      "url": "https://arxiv.org/abs/1604.04380",
+      "supports": "The detailed correction, line-shape, bound-g, and supersession history required for a diagnostic metrology replay.",
+      "does_not_support": "A source-independent electron-mass measurement or any Casimir, DP, manifold, or quantum-foam connection."
+    },
+    {
+      "source_id": "codata-2022-adjustment",
+      "citation": "P. J. Mohr et al., CODATA recommended values of the fundamental physical constants: 2022.",
+      "url": "https://physics.nist.gov/cuu/pdf/JPCRD2022CODATA.pdf",
+      "supports": "Adjusted electron-mass, Fermi-constant, uncertainty, correlation, and SI conversion context.",
+      "does_not_support": "Independent confirmation between quantities sharing the same least-squares adjustment."
+    },
+    {
+      "source_id": "bipm-si-defining-constants",
+      "citation": "BIPM SI Brochure and defining constants.",
+      "url": "https://www.bipm.org/en/measurement-units/si-defining-constants",
+      "supports": "Exact SI values and unit semantics for h, c, e, and k_B.",
+      "does_not_support": "A physical bridge between rest energy, blackbody radiation, and collapse."
+    },
+    {
+      "source_id": "pdg-higgs-review-2025",
+      "citation": "Particle Data Group, Status of Higgs Boson Physics, Review of Particle Physics (2025).",
+      "url": "https://pdg.lbl.gov/2025/reviews/rpp2025-rev-higgs-boson.pdf",
+      "supports": "The Standard Model tree-level Yukawa convention and the distinction between inferred and directly measured couplings.",
+      "does_not_support": "Why the electron Yukawa has its value or a Higgs-to-Casimir/DP transfer."
+    },
+    {
+      "source_id": "cms-hig-21-015",
+      "citation": "CMS Collaboration, Search for the Higgs boson decay to a pair of electrons, Phys. Lett. B 846, 137783 (2023).",
+      "url": "https://cms-results.web.cern.ch/cms-results/public-results/publications/HIG-21-015/index.html",
+      "supports": "The direct H to e+e- branching-fraction upper limit at 95 percent confidence.",
+      "does_not_support": "An observation of the Standard Model electron Yukawa coupling."
+    },
+    {
+      "source_id": "iau-2015-resolution-b3",
+      "citation": "IAU 2015 Resolution B3 on recommended nominal conversion constants for selected solar and planetary properties.",
+      "url": "https://www.iau.org/common/Uploaded%20files/IAUGA2015-Resolution-B3-recommended-nominal-conversion.pdf",
+      "supports": "Nominal solar radius, luminosity, and flux-equivalent effective-temperature conversion constants.",
+      "does_not_support": "A spectrum-only solar temperature, a true time-invariant solar property, or stellar-structure validation."
+    },
+    {
+      "source_id": "tsis1-hsrs",
+      "citation": "TSIS-1 Hybrid Solar Reference Spectrum, LASP Interactive Solar Irradiance Datacenter.",
+      "url": "https://lasp.colorado.edu/lisird/data/tsis1_hsrs/",
+      "supports": "A source-backed solar spectral-irradiance snapshot for a band-dependent diagnostic color-temperature recovery.",
+      "does_not_support": "A perfect-blackbody Sun, equality of color and bolometric effective temperature, or an independent DP test."
+    }
+  ],
+  "evidence_policy": {
+    "penning_replay_is_static_weighing": false,
+    "codata_conversions_are_independent_confirmations": false,
+    "inferred_tree_yukawa_is_direct_higgs_measurement": false,
+    "collider_upper_limit_is_electron_yukawa_observation": false,
+    "planck_integral_and_sigma_are_independent_theories": false,
+    "solar_color_temperature_equals_bolometric_effective_temperature": false,
+    "common_h_or_dimensions_imply_dp_connection": false,
+    "cross_covariance_required_for_independence_significance": true,
+    "measured_casimir_or_coherence_gate_can_be_satisfied": false,
+    "observable_bridge_edges_allowed": false
+  },
+  "runtime_fixtures": [
+    {
+      "role": "mass_higgs_fixture",
+      "path": "configs/research/fixtures/casimir-dp-electron-mass-higgs-anchor.source-backed.v1.json",
+      "sha256": "63cf7ec526aaf3161600cbc90e08a372d28267a6c0607a395e18ea6f8621ad41",
+      "schema_version": "casimir_dp_electron_mass_higgs_anchor_stage4_2a_input/1",
+      "evidence_class": "source_backed_calculation"
+    },
+    {
+      "role": "planck_solar_fixture",
+      "path": "configs/research/fixtures/casimir-dp-planck-solar-calibration.source-backed.v1.json",
+      "sha256": "fcae03d2161774a93de3aae6770ad465f4ad07fbc77084ce3f59fe78d6bdc303",
+      "schema_version": "casimir_dp_planck_solar_calibration_stage4_2a_input/1",
+      "evidence_class": "source_backed_radiometric_calibration"
+    }
+  ],
+  "deterministic_seed": 4202022,
+  "software": {
+    "runtime": "typescript",
+    "runner": "scripts/research/run-casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts",
+    "module_ids": [
+      "shared/casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts",
+      "shared/casimir-dp-planck-solar-calibration-stage4-2a.ts",
+      "shared/contracts/casimir-dp-electron-mass-higgs-anchor-stage4-2a.v1.ts",
+      "shared/theory/casimir-dp-study-theory-badges.ts"
+    ],
+    "source_authorities": [
+      {
+        "role": "electron_mass_higgs_anchor_runtime",
+        "path": "shared/casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts",
+        "sha256": "17ef9a21417a9da1a4c0500747108bc9a787c09c2a159b9464927e55b952d610",
+        "tracked": false,
+        "required_at_runtime": true
+      },
+      {
+        "role": "planck_solar_calibration_runtime",
+        "path": "shared/casimir-dp-planck-solar-calibration-stage4-2a.ts",
+        "sha256": "cbc89e378d3dd590e110d9c75bd7f12024e7348cfb3dcfdaf25c25f34c011261",
+        "tracked": false,
+        "required_at_runtime": true
+      },
+      {
+        "role": "stage4_2a_contract",
+        "path": "shared/contracts/casimir-dp-electron-mass-higgs-anchor-stage4-2a.v1.ts",
+        "sha256": "799ecc7ef6fc51322c72d47e2525187c411ae7ab0f22cf7b167c845963a236c1",
+        "tracked": false,
+        "required_at_runtime": true
+      },
+      {
+        "role": "stage4_2a_runner",
+        "path": "scripts/research/run-casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts",
+        "sha256": "a174ffa055a0e34d387d4e1ea593f7ef401ef4edabd3f48bdc9a5aba4268d5d8",
+        "tracked": false,
+        "required_at_runtime": true
+      },
+      {
+        "role": "stage4_2a_theory_badge_graph",
+        "path": "shared/theory/casimir-dp-study-theory-badges.ts",
+        "sha256": "fc2efdcb804679b19f249e965663c974d59a88f96554a878f644cfb3f17e351c",
+        "tracked": false,
+        "required_at_runtime": true
+      }
+    ],
+    "source_snapshot": {
+      "git_head": "705759a201ee77313919de906c53dc8565de75bc",
+      "worktree_state": "dirty_uncommitted_source_hashes_authoritative",
+      "authority_mode": "content_hashes"
+    }
+  },
+  "run_order": [
+    "hash_link_immutable_stage4_1_authorities",
+    "freeze_source_snapshots_roles_paths_and_hashes",
+    "freeze_si_natural_mass_frequency_higgs_and_temperature_conventions",
+    "validate_dependency_dag_source_overlap_and_covariance_semantics",
+    "run_penning_bound_electron_mass_replay",
+    "reproduce_correlated_codata_mass_energy_conversions",
+    "derive_fermi_scale_and_conditional_tree_yukawa_anchor",
+    "replay_stage4_1_compton_and_rydberg_identities",
+    "close_planck_spectral_jacobians_and_stefan_boltzmann_integral",
+    "recover_tsis_color_and_iau_bolometric_temperatures_separately",
+    "enforce_precision_matching_and_collider_upper_bound_nonclaims",
+    "run_formal_zero_vf_domain_exit_recovery",
+    "enforce_cross_scale_dependency_and_dp_nonbridge_semantics",
+    "populate_outcome_nonclaim_falsifier_and_final_gate_ledgers",
+    "project_nonpromotable_theory_badges_with_zero_observable_bridges",
+    "write_content_addressed_stage4_2a_report_and_receipt"
+  ],
+  "final_status_policy": {
+    "source_authority_integrity": "pass",
+    "penning_observational_replay": "pass",
+    "codata_correlated_reproduction": "pass",
+    "unit_dimension_closure": "pass",
+    "conditional_sm_tree_mapping": "pass",
+    "planck_spectral_density_closure": "pass",
+    "stefan_boltzmann_closure": "pass",
+    "solar_color_temperature_recovery": "pass",
+    "solar_bolometric_temperature_recovery": "pass",
+    "temperature_semantics": "pass",
+    "cross_scale_dependency_semantics": "pass",
+    "independent_electron_mass_validation": "not_ready",
+    "running_yukawa_at_higgs_scale": "blocked",
+    "direct_electron_yukawa_observation": "not_ready",
+    "electron_mass_from_higgs_identification": "blocked",
+    "higgs_origin_identification": "blocked",
+    "independent_solar_validation": "not_ready",
+    "measured_spectral_fit_significance": "not_ready",
+    "stellar_structure_inference": "not_evaluated",
+    "measured_casimir_coherence_evidence": "not_ready",
+    "casimir_higgs_dp_transfer": "blocked",
+    "compton_to_collapse_clock": "blocked",
+    "thermal_to_dp_transfer": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "cosmological_lift": "blocked",
+    "physical_viability": "not_evaluated",
+    "publication_claim": "diagnostic_cross_scale_calibration_only"
+  }
+}

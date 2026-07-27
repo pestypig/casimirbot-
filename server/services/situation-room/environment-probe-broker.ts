@@ -10,6 +10,12 @@ import { policyForEnvironmentSensorScope } from "@shared/helix-environment-senso
 import type { EnvironmentSourceContractAudit } from "./environment-source-contract-validator";
 import { auditEnvironmentProbeContract } from "./environment-probe-contract-validator";
 import { getEnvironmentSourceManifest } from "./environment-source-registry";
+import {
+  assertHelixRoomSourceNamespaceAdmission,
+  isHelixRoomSourceIngressSourceId,
+  matchesHelixRoomSourceAdmission,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 
 const pendingBySource = new Map<string, HelixEnvironmentProbeRequest[]>();
 const resultsByRequest = new Map<string, HelixEnvironmentProbeResult>();
@@ -49,11 +55,22 @@ export function createEnvironmentProbeRequest(input: {
   objective?: string | null;
   evidenceRefs: string[];
   ttlMs?: number;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): HelixEnvironmentProbeRequest {
   if (FORBIDDEN_PROBE_TYPES.has(String(input.probeType))) {
     throw new Error(`forbidden environment probe type: ${String(input.probeType)}`);
   }
-  const manifest = getEnvironmentSourceManifest(input.sourceId);
+  const manifest = getEnvironmentSourceManifest(input.sourceId, {
+    sourceAdmission: input.sourceAdmission,
+  });
+  assertHelixRoomSourceNamespaceAdmission(
+    {
+      source_id: input.sourceId,
+      room_id: input.roomId,
+      domain_adapter: manifest?.domain_adapter ?? null,
+    },
+    input.sourceAdmission,
+  );
   if (manifest && !manifest.supported_probe_types.includes(input.probeType)) {
     throw new Error(`unsupported environment probe type for source ${input.sourceId}: ${input.probeType}`);
   }
@@ -109,17 +126,53 @@ export function listPendingEnvironmentProbeRequests(input: {
   sourceId: string;
   limit?: number;
   now?: string;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): HelixEnvironmentProbeRequest[] {
-  expireEnvironmentProbeRequests({ sourceId: input.sourceId, now: input.now });
+  const manifest = getEnvironmentSourceManifest(input.sourceId, {
+    sourceAdmission: input.sourceAdmission,
+  });
+  assertHelixRoomSourceNamespaceAdmission(
+    {
+      source_id: input.sourceId,
+      room_id:
+        manifest?.room_id ??
+        input.sourceAdmission?.room_id ??
+        "",
+      domain_adapter:
+        manifest?.domain_adapter ??
+        input.sourceAdmission?.domain_adapter ??
+        null,
+    },
+    input.sourceAdmission,
+  );
+  expireEnvironmentProbeRequests({
+    sourceId: input.sourceId,
+    now: input.now,
+    sourceAdmission: input.sourceAdmission,
+  });
   return (pendingBySource.get(input.sourceId) ?? []).slice(0, input.limit ?? 8);
 }
 
 export function recordEnvironmentProbeResult(
   result: HelixEnvironmentProbeResult,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
 ): {
   result: HelixEnvironmentProbeResult;
   audit: EnvironmentSourceContractAudit;
 } {
+  const manifest = getEnvironmentSourceManifest(result.source_id, {
+    sourceAdmission: options.sourceAdmission,
+  });
+  assertHelixRoomSourceNamespaceAdmission(
+    {
+      source_id: result.source_id,
+      room_id: result.room_id,
+      domain_adapter: manifest?.domain_adapter ?? null,
+    },
+    options.sourceAdmission,
+  );
   const policy = policyForEnvironmentSensorScope(result.sensor_scope);
   const normalized: HelixEnvironmentProbeResult = {
     ...result,
@@ -143,11 +196,27 @@ export function recordEnvironmentProbeResult(
 export function expireEnvironmentProbeRequests(input: {
   sourceId?: string | null;
   now?: string;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): HelixEnvironmentProbeResult[] {
   const nowMs = Date.parse(input.now ?? new Date().toISOString());
   const expired: HelixEnvironmentProbeResult[] = [];
   for (const [sourceId, pending] of pendingBySource.entries()) {
     if (input.sourceId && sourceId !== input.sourceId) continue;
+    if (
+      isHelixRoomSourceIngressSourceId(sourceId) &&
+      !pending.every((request) =>
+        matchesHelixRoomSourceAdmission(
+          {
+            source_id: request.source_id,
+            room_id: request.room_id,
+            domain_adapter: request.domain_adapter ?? undefined,
+          },
+          input.sourceAdmission,
+        ),
+      )
+    ) {
+      continue;
+    }
     const stillPending: HelixEnvironmentProbeRequest[] = [];
     for (const request of pending) {
       if (Date.parse(request.expires_at) <= nowMs) {
@@ -186,8 +255,53 @@ export function expireEnvironmentProbeRequests(input: {
   return expired;
 }
 
-export function getEnvironmentProbeResult(requestId: string): HelixEnvironmentProbeResult | null {
-  return resultsByRequest.get(requestId) ?? null;
+export function getEnvironmentProbeResult(
+  requestId: string,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
+): HelixEnvironmentProbeResult | null {
+  const result = resultsByRequest.get(requestId) ?? null;
+  if (
+    result &&
+    isHelixRoomSourceIngressSourceId(result.source_id) &&
+    !matchesHelixRoomSourceAdmission(
+      {
+        source_id: result.source_id,
+        room_id: result.room_id,
+      },
+      options.sourceAdmission,
+    )
+  ) {
+    return null;
+  }
+  return result;
+}
+
+export function removeEnvironmentProbeState(input: {
+  sourceId?: string | null;
+  roomId?: string | null;
+}): { pending: number; results: number } {
+  let pendingRemoved = 0;
+  let resultsRemoved = 0;
+  for (const [sourceId, pending] of pendingBySource.entries()) {
+    if (input.sourceId && sourceId !== input.sourceId) continue;
+    if (
+      input.roomId &&
+      !pending.some((request) => request.room_id === input.roomId)
+    ) {
+      continue;
+    }
+    pendingRemoved += pending.length;
+    pendingBySource.delete(sourceId);
+  }
+  for (const [requestId, result] of resultsByRequest.entries()) {
+    if (input.sourceId && result.source_id !== input.sourceId) continue;
+    if (input.roomId && result.room_id !== input.roomId) continue;
+    resultsByRequest.delete(requestId);
+    resultsRemoved += 1;
+  }
+  return { pending: pendingRemoved, results: resultsRemoved };
 }
 
 export function resetEnvironmentProbeBrokerForTest(): void {

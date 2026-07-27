@@ -4824,7 +4824,7 @@ export function executeHelixPanelAction(
                 receipt_id: `live_source_admission:${Date.now()}`,
                 source_id: asNonEmptyString(args.source_id ?? args.sourceId) ?? "source:manual-feed",
                 source_kind: "minecraft_world_events",
-                transport: "cloudflarelink",
+                transport: "unknown",
                 source_identity: {
                   world_id: asNonEmptyString(args.world_id ?? args.worldId) ?? null,
                   server_id: asNonEmptyString(args.server_id ?? args.serverId) ?? null,
@@ -4832,11 +4832,11 @@ export function executeHelixPanelAction(
                   profile_id: asNonEmptyString(args.profile_id ?? args.profileId) ?? null,
                 },
                 freshness: {
-                  status: "connected",
-                  last_seen_at: new Date().toISOString(),
+                  status: "unknown",
+                  last_seen_at: null,
                   stale_after_ms: null,
                 },
-                trust_level: "admitted_live_source",
+                trust_level: "unverified",
                 ...helixReceiptNotAnswerFlags,
                 evidence_refs: [`live_answer_environment:${environmentId}:source_attached`],
               }

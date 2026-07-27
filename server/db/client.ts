@@ -18,6 +18,19 @@ const localPersistenceTables = [
   "helix_shared_realtime_room_members",
   "helix_shared_realtime_room_invites",
   "helix_shared_realtime_room_events",
+  "helix_room_source_bindings",
+  "helix_room_source_credentials",
+  "helix_room_source_ingress_requests",
+  "helix_agent_runs",
+  "helix_agent_api_events",
+  "helix_agent_api_requests",
+  "helix_agent_account_bindings",
+  "helix_agent_account_link_intents",
+  "helix_agent_run_room_bindings",
+  "helix_agent_run_chat_bindings",
+  "helix_agent_chat_terminal_projections",
+  "helix_room_source_credential_deliveries",
+  "helix_runtime_tool_confirmation_replay_claims",
   "helix_account_linked_providers",
   "helix_account_sessions",
   "helix_account_profile_storage",
@@ -27,6 +40,27 @@ const localPersistenceTables = [
   "helix_email_outbox",
   "helix_research_library_documents",
 ] as const;
+const localPersistenceJsonColumns = new Set([
+  "helix_shared_realtime_room_members.consent",
+  "helix_shared_realtime_room_events.metadata",
+  "helix_room_source_bindings.scopes",
+  "helix_room_source_ingress_requests.response_receipt",
+  "helix_agent_runs.configuration",
+  "helix_agent_runs.evidence_bundle",
+  "helix_agent_runs.runtime_snapshot",
+  "helix_agent_runs.latest_result",
+  "helix_agent_runs.unresolved_requirements",
+  "helix_agent_runs.contradictions",
+  "helix_agent_runs.pending_questions",
+  "helix_agent_api_events.payload",
+  "helix_agent_api_requests.response_receipt",
+  "helix_agent_run_chat_bindings.context_snapshot",
+  "helix_agent_chat_terminal_projections.supporting_evidence_refs",
+  "helix_account_sessions.account_policy",
+  "helix_account_profile_storage.snapshot",
+  "helix_account_events.payload",
+  "helix_research_library_documents.metadata",
+]);
 
 type LocalSnapshot = {
   schema: "helix.local_pg_mem_snapshot.v1";
@@ -149,6 +183,24 @@ async function persistLocalSnapshot(activePool: PgPool): Promise<void> {
   await fs.promises.rename(tempPath, localPersistencePath);
 }
 
+export async function persistLocalDatabaseSnapshotIfEnabled(): Promise<void> {
+  if (
+    !pool ||
+    !localPersistencePath ||
+    !localPersistenceReady ||
+    localPersistenceSuppress
+  ) {
+    return;
+  }
+  const activePool = pool;
+  localPersistenceWrite = localPersistenceWrite
+    .then(() => persistLocalSnapshot(activePool))
+    .catch((err) => {
+      console.warn("[db] failed to persist local pg-mem snapshot", err);
+    });
+  await localPersistenceWrite;
+}
+
 async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
   if (!localPersistencePath || localPersistenceRestored || !fs.existsSync(localPersistencePath)) {
     localPersistenceRestored = true;
@@ -168,7 +220,14 @@ async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
         const columnList = columns.map((column) => `"${column}"`).join(", ");
         await activePool.query(
           `INSERT INTO ${table} (${columnList}) VALUES (${placeholders}) ON CONFLICT DO NOTHING;`,
-          columns.map((column) => row[column]),
+          columns.map((column) => {
+            const value = row[column];
+            return value !== null &&
+              typeof value === "object" &&
+              localPersistenceJsonColumns.has(`${table}.${column}`)
+              ? JSON.stringify(value)
+              : value;
+          }),
         );
       }
     }

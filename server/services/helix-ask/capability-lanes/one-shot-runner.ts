@@ -474,6 +474,7 @@ export const runHelixCapabilityLaneOneShotRequests = async (input: {
   authorizedGatewayCapabilities?: HelixWorkstationCapabilityManifest[];
   accountType?: HelixAccountType | null;
   profileId?: string | null;
+  authoritativeEvidenceArtifacts?: unknown[];
 }): Promise<HelixCapabilityLaneOneShotRunnerResult> => {
   const turnId = readString(input.turnId) || readString(input.body.turn_id ?? input.body.turnId) || null;
   const calls = readStructuredLaneCalls(input.body);
@@ -522,6 +523,7 @@ export const runHelixCapabilityLaneOneShotRequests = async (input: {
       authorizedGatewayCapability,
       accountType: input.accountType,
       profileId: input.profileId,
+      authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
     }));
   }
 

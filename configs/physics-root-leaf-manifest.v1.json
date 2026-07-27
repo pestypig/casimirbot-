@@ -7,7 +7,8 @@
       "id": "physics_spacetime_gr",
       "name": "Spacetime and general relativity baseline",
       "equation_refs": [
-        "efe_baseline"
+        "efe_baseline",
+        "curvature_unit_proxy_contract"
       ],
       "tree_lane": "physics_spacetime_gr",
       "tree_path": "docs/knowledge/physics/physics-spacetime-gr-tree.json"
@@ -16,7 +17,8 @@
       "id": "physics_quantum_semiclassical",
       "name": "Semiclassical quantum coupling baseline",
       "equation_refs": [
-        "semiclassical_coupling"
+        "semiclassical_coupling",
+        "atomic_energy_to_energy_density_proxy"
       ],
       "tree_lane": "physics_quantum_semiclassical",
       "tree_path": "docs/knowledge/physics/physics-quantum-semiclassical-tree.json"
@@ -185,6 +187,11 @@
       "id": "leaf_casimir_dp_boundary_coherence_or_test",
       "prompt_family": "Casimir boundary coherence test of Penrose OR and Diósi-Penrose diagnostics",
       "statement": "Casimir-boundary coherence claims must fail closed unless measured evidence, ordinary-decoherence closure, replayable phase residuals, a collapse discriminator, and a sourced boundary-to-coherence transfer kernel are all present."
+    },
+    {
+      "id": "leaf_casimir_dp_complete_apparatus_gravity_control",
+      "prompt_family": "complete Casimir apparatus energy to ordinary weak-field gravity control",
+      "statement": "Ordinary Casimir-gravity claims must begin with a signed complete-apparatus energy or conserved tensor difference, never plate pressure, and remain upper bounds until an independent gravitational response is measured."
     },
     {
       "id": "leaf_solar_collapse_hypothesis",
@@ -644,6 +651,7 @@
       "leaf_id": "leaf_casimir_dp_boundary_coherence_or_test",
       "nodes": [
         "physics_quantum_semiclassical",
+        "physics_thermodynamics_entropy",
         "physics_information_dynamics",
         "physics_collapse_benchmark",
         "leaf_casimir_dp_boundary_coherence_or_test"
@@ -652,17 +660,60 @@
         "bridge-casimir-boundary-to-material-phase-residual",
         "bridge-branch-relative-self-energy-to-or-rate-diagnostic",
         "bridge-boundary-coherence-residual-to-collapse-discriminator",
-        "bridge-casimir-stress-to-branch-geometry-coherence-kernel"
+        "bridge-casimir-stress-to-branch-geometry-coherence-kernel",
+        "bridge-stage3-complex-coherence-to-model-discrimination",
+        "bridge-stage3-ordinary-physics-null-to-residual",
+        "bridge-stage3-named-dp-to-companion-falsifier",
+        "bridge-stage3-manifold-registry-to-bridge-admission",
+        "bridge-stage4-transverse-polarization-to-qed-null",
+        "bridge-stage4-planck-fdt-to-thermal-null",
+        "bridge-stage4-congruence-to-model-admission",
+        "bridge-stage4-expanded-null-to-prediction-residual",
+        "bridge-stage4-same-dimension-to-nonbridge",
+        "bridge-stage4-1-qed-scale-hierarchy-to-semantic-nonbridge",
+        "bridge-stage4-2a-electron-mass-higgs-anchor-to-semantic-nonbridge",
+        "bridge-stage4-2a-planck-solar-calibration-to-semantic-nonbridge",
+        "bridge-stage4-2b-scale-transport-to-frozen-dp-signature",
+        "bridge-stage4-2b-spectral-thermometry-to-ordinary-null",
+        "bridge-stage4-2b-sensor-forward-model-to-nuisance-covariance",
+        "bridge-stage4-2b-full-covariance-to-complex-residual",
+        "bridge-stage4-2b-dp-scaling-to-identifiability-power",
+        "bridge-stage4-2b-complete-equivalence-to-conditional-dp-null",
+        "bridge-stage4-2b-missing-kernel-to-manifold-nonclaim"
       ],
       "falsifier": {
-        "observable": "preregistered boundary-conditioned coherence residual with measured evidence, ordinary-decoherence closure, deterministic phase-residual replay, collapse discrimination, and a sourced boundary-to-coherence transfer kernel",
-        "reject_rule": "measuredEvidenceReady != true OR ordinaryDecoherenceClosure != true OR phaseResidualReplayDeterministic != true OR collapseDiscriminatorPresent != true OR boundaryToCoherenceTransferKernelRegistered != true",
+        "observable": "preregistered complex boundary-conditioned coherence and companion-observable signature with immutable authority, measured-preparation-class complete joint-system branch equivalence, response-corrected apparatus spectral thermometry, sensor-self-noise-separated ordinary-physics covariance, a pilot-frozen likelihood and prediction vector, Stage-4 polarization and thermal/FDT closure, tensor/dimensional/semantic congruence, source-backed electron-mass/Higgs-tree and solar-radiometric calibration with explicit dependency nonbridges, a verified custodian receipt and authorized powered measured comparison for the confirmatory lane, held-out model discrimination, and a separately registered numerical boundary-to-coherence kernel for any bridge claim",
+        "readiness_block_rule": "upstreamAuthorityIntegrity != true OR preregistrationFrozen != true OR syntheticBlindingContractPass != true OR stage4_2bForecastContractReady != true OR apparatusScaleTransportReady != true OR responseCorrectedSpectralThermometryReady != true OR physicalSensorNoiseSeparated != true OR fullCrossSpectralCovarianceReady != true OR frozenDpSignatureReady != true OR completeJointSystemEquivalenceReady != true OR residualLikelihoodFrozen != true OR signatureIdentifiabilityReady != true OR apparatusDpPowerReady != true OR stage4_2bMeasuredEvidenceCampaignVersioned != true OR measuredEvidenceReady != true OR measuredComparisonAuthorized != true OR custodianReceiptVerified != true OR unblindingAuthorized != true OR fixedDeltaRhoMatched != true OR complexCoherenceIdentifiable != true OR ordinaryDecoherenceClosure != true OR polarizationQEDControlReady != true OR thermalFdtControlReady != true OR tensorDimensionalCongruence != true OR qedScaleHierarchyCalibration != true OR electronMassHiggsAnchorCalibration != true OR planckSolarCalibration != true OR crossScaleDpNonbridgePreserved != true OR namedDpManifestUnchanged != true OR phaseResidualReplayDeterministic != true OR collapseDiscriminatorPresent != true OR heldOutModelComparisonReady != true OR boundaryToCoherenceTransferKernelRegistered != true OR (bridgeCompared == true AND registeredNumericBridgeKernel != true)",
+        "reject_rule": "measuredComparisonAuthorized == true AND heldOutReplicationReady == true AND apparatusDpPowerReady == true AND ordinaryDecoherenceClosure == true AND (registeredNonunitarySignatureMatch != true OR frozenDpScalingMatch != true OR (boundaryExtensionClaimed == true AND registeredNumericBridgeKernelMatch != true))",
         "uncertainty_model": "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true,replay_window=session)",
         "test_refs": [
           "tests/casimir-dp-data-readiness.spec.ts",
           "tests/casimir-dp-phase-coherence.spec.ts",
           "tests/casimir-dp-or-phase-stage2.spec.ts",
           "tests/casimir-dp-proposal-closure.spec.ts",
+          "tests/casimir-dp-complex-coherence.spec.ts",
+          "tests/casimir-dp-qed-green-noise.spec.ts",
+          "tests/casimir-dp-dp-companion.spec.ts",
+          "tests/casimir-dp-gravity-upper-bound.spec.ts",
+          "tests/casimir-dp-model-comparison.spec.ts",
+          "tests/casimir-dp-manifold-kernel-registry.spec.ts",
+          "tests/casimir-dp-evidence-map-stage3.spec.ts",
+          "tests/casimir-dp-polarization-qed-control.spec.ts",
+          "tests/casimir-dp-radiative-thermal-closure.spec.ts",
+          "tests/casimir-dp-tensor-dimensional-congruence.spec.ts",
+          "tests/casimir-dp-polarization-congruence-stage4.spec.ts",
+          "tests/casimir-dp-qed-scale-hierarchy-calibration.spec.ts",
+          "tests/casimir-dp-electron-mass-higgs-anchor-stage4-2a.spec.ts",
+          "tests/casimir-dp-planck-solar-calibration-stage4-2a.spec.ts",
+          "tests/casimir-dp-stage4-2a-campaign.spec.ts",
+          "tests/casimir-dp-apparatus-scale-transport-stage4-2b.spec.ts",
+          "tests/casimir-dp-apparatus-spectral-thermometry-stage4-2b.spec.ts",
+          "tests/casimir-dp-apparatus-response-covariance-stage4-2b.spec.ts",
+          "tests/casimir-dp-dp-scaling-forecast-stage4-2b.spec.ts",
+          "tests/casimir-dp-apparatus-coherence-residual-stage4-2b.spec.ts",
+          "tests/casimir-dp-apparatus-identifiability-stage4-2b.spec.ts",
+          "tests/casimir-dp-stage4-2b-contract.spec.ts",
+          "tests/casimir-dp-stage4-2b-campaign.spec.ts",
           "tests/physics-root-leaf-manifest.spec.ts"
         ]
       },
@@ -674,6 +725,40 @@
           "inferred"
         ],
         "strict_fail_reason": "ROOT_LEAF_CASIMIR_DP_OR_BRIDGE_FAIL"
+      }
+    },
+    {
+      "id": "path_complete_casimir_apparatus_to_ordinary_gravity_control",
+      "bundle_id": "casimir-dp.or-boundary-coherence",
+      "root_id": "physics_quantum_semiclassical",
+      "leaf_id": "leaf_casimir_dp_complete_apparatus_gravity_control",
+      "nodes": [
+        "physics_quantum_semiclassical",
+        "physics_casimir_force_measurement",
+        "leaf_casimir_dp_complete_apparatus_gravity_control"
+      ],
+      "dag_bridges": [
+        "bridge-complete-casimir-ledger-to-mass-energy-bound",
+        "bridge-complete-source-to-weak-field-gr-control"
+      ],
+      "falsifier": {
+        "observable": "signed complete-apparatus state-energy difference with scalar mass/weight bound and an independently calibrated gravitational phase or weight control",
+        "reject_rule": "completeApparatusLedger != true OR pressureUsedAsWeight == true OR (tensorClaimAttempted == true AND tensorSourceConserved != true) OR independentGravityResponseMeasured != true",
+        "uncertainty_model": "signed_component_covariance_with_conservation_gate",
+        "test_refs": [
+          "tests/casimir-dp-gravity-upper-bound.spec.ts",
+          "tests/casimir-dp-evidence-map-stage3.spec.ts",
+          "tests/physics-root-leaf-manifest.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_CASIMIR_DP_ORDINARY_GRAVITY_FAIL"
       }
     },
     {
@@ -793,11 +878,12 @@
     },
     {
       "id": "casimir-dp.or-boundary-coherence",
-      "summary": "Diagnostic Casimir-boundary coherence test that keeps ordinary QED phase and decoherence, Penrose/Diósi-Penrose branch-instability diagnostics, and the unregistered boundary-to-coherence bridge as separately gated lanes.",
+      "summary": "Diagnostic Casimir-boundary coherence test that keeps ordinary QED phase and decoherence, Stage-4 polarization and thermal/FDT controls, Stage-4.2B apparatus scale transport, response-corrected thermometry, sensor-noise-separated covariance, frozen Diósi-Penrose scale forecasts, complex-residual identifiability and power, tensor/dimensional/semantic congruence, Penrose/Diósi-Penrose branch-instability diagnostics, and the unregistered numerical boundary-to-coherence bridge as separately gated lanes.",
       "claim_scope": "cross_domain",
       "max_claim_tier": "diagnostic",
       "path_ids": [
-        "path_quantum_semiclassical_to_casimir_dp_or_test"
+        "path_quantum_semiclassical_to_casimir_dp_or_test",
+        "path_complete_casimir_apparatus_to_ordinary_gravity_control"
       ]
     },
     {

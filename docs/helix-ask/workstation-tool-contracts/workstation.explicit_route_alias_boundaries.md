@@ -78,7 +78,7 @@ Shared explicit aliases:
 | --- | --- |
 | `repo-code.search_concept` | `repo.search` |
 | `internet_search.web_research` | `internet-search.search_web` |
-| `helix_ask.reflect_theory_context` | `theory-badge-graph.reflect_discussion_context` |
+| `theory-badge-graph.reflect_discussion_context` | `helix_ask.reflect_theory_context` |
 | `helix_ask.reflect_civilization_bounds` | `civilization-bounds.reflect_system_bounds` |
 | `scientific-calculator.solve_with_steps` | `scientific-calculator.solve_expression` |
 | `scientific-calculator.solve` | `scientific-calculator.solve_expression` |
@@ -109,7 +109,7 @@ repo-code.search_concept
 workspace-directory.resolve
 internet_search.web_research
 scholarly-research.fetch_full_text
-helix_ask.reflect_theory_context
+theory-badge-graph.reflect_discussion_context
 helix.theory.frontierVectorFieldTrace
 helix_ask.reflect_live_synthetic_data
 helix_ask.reflect_context_attachments
@@ -117,9 +117,13 @@ helix_ask.reflect_ideology_context
 helix_ask.bridge_theory_ideology_context
 helix_ask.build_civilization_scenario_frame
 helix_ask.reflect_civilization_bounds
-image_lens.inspect
-situation-room.describe_visual_capture
 ```
+
+`image_lens.inspect` has graduated as a provider-shared alias to the canonical
+read-only `situation-room.describe_visual_capture` gateway. This alias is
+available only after authoritative visual-source admission. It does not execute
+from lexical mention, and its observation is nonterminal until it re-enters the
+runtime for follow-up reasoning.
 
 Explicit UI/projection candidates:
 

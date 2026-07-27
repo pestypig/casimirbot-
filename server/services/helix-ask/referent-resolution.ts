@@ -334,6 +334,12 @@ const conversationalReferentPhrase = (prompt: string): string | null => {
   ) {
     return "deictic_previous_evidence_source";
   }
+  if (
+    /\b(?:continue|resume|re[-\s]?prepare|prepare\s+again)\b[\s\S]{0,100}\b(?:that\s+same|the\s+same|same|that|the)\s+(?:comparison|bounded\s+procedure|procedure)\b/i.test(unquoted) ||
+    /\b(?:that\s+same|the\s+same|same)\s+(?:comparison|bounded\s+procedure|procedure)\b[\s\S]{0,100}\b(?:continue|resume|re[-\s]?prepare|prepare\s+again)\b/i.test(unquoted)
+  ) {
+    return "deictic_previous_assistant_answer";
+  }
   if (isAffirmativeTheoryBadgeGraphReferentPrompt(prompt)) {
     return "deictic_previous_assistant_answer";
   }
@@ -523,6 +529,25 @@ export const resolveHelixAskReadAloudReferent = (
 
   const unquoted = unquotePrompt(prompt);
   const requestedAction = TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY;
+  const colonLiteralText =
+    prompt.match(
+      /\b(?:say|speak|read|play)\s+(?:this\s+)?(?:aloud|out\s*loud|outload|to\s+me)\s*:\s*([\s\S]{1,4000})$/i,
+    )?.[1];
+  if (colonLiteralText?.trim()) {
+    const text = colonLiteralText.trim();
+    return {
+      resolvedText: text,
+      trace: blankTrace({
+        requested_action: requestedAction,
+        referent_phrase: "explicit_colon_text",
+        source_kind: "user_prompt_literal",
+        resolved_source_ref: `prompt.literal:${sha256Short(text)}`,
+        resolved_text_hash: sha256Short(text),
+        resolution_confidence: "high",
+        tool_argument_source: "referent_resolution:user_prompt_literal",
+      }),
+    };
+  }
   const exactQuotedText =
     prompt.match(/\b(?:say|speak|read|play)\s+(?:exactly\s+)?["“]([^"”]{1,4000})["”]\s+(?:aloud|out\s*loud|outload|to\s+me)\b/i)?.[1] ??
     prompt.match(/\b(?:say|speak|read|play)\s+(?:exactly\s+)?'([^']{1,4000})'\s+(?:aloud|out\s*loud|outload|to\s+me)\b/i)?.[1];

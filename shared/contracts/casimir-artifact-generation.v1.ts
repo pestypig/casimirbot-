@@ -116,10 +116,20 @@ export type CasimirArtifactGenerationReceiptV1 = {
     schemaVersion: typeof CASIMIR_ARTIFACT_GENERATION_REQUEST_SCHEMA_VERSION;
     requestId: string;
     artifactSha256: string;
-    casimirSpecSemanticSha256: string;
-    casimirSpecArtifactSha256: string;
+    casimirSpec: {
+      semanticSha256: string;
+      artifactSha256: string;
+    };
     claimId: string;
     propositionSha256: string;
+    masterProblem: {
+      planId: string;
+      artifactSha256: string;
+    };
+    derivationProgram: {
+      programId: string;
+      artifactSha256: string;
+    };
   };
   producer: {
     producerId: string;
@@ -157,12 +167,20 @@ export type CasimirArtifactGenerationReceiptV1 = {
 
 export type BuildCasimirArtifactGenerationRequestV1Input = Omit<
   CasimirArtifactGenerationRequestV1,
-  "artifactId" | "schemaVersion" | "generatedAt" | "artifactSha256" | "authority"
+  | "artifactId"
+  | "schemaVersion"
+  | "generatedAt"
+  | "artifactSha256"
+  | "authority"
 > & { generatedAt?: string };
 
 export type BuildCasimirArtifactGenerationReceiptV1Input = Omit<
   CasimirArtifactGenerationReceiptV1,
-  "artifactId" | "schemaVersion" | "generatedAt" | "artifactSha256" | "authority"
+  | "artifactId"
+  | "schemaVersion"
+  | "generatedAt"
+  | "artifactSha256"
+  | "authority"
 > & { generatedAt?: string };
 
 const REQUEST_KEYS = [
@@ -339,9 +357,7 @@ function validateCasimirSpecBinding(
   }
   if (!isNonEmptyString(value.specId))
     issues.push(`${path}.specId must be non-empty`);
-  if (
-    value.schemaVersion !== CASIMIR_SPEC_SCIENTIFIC_CLAIM_IR_SCHEMA_VERSION
-  ) {
+  if (value.schemaVersion !== CASIMIR_SPEC_SCIENTIFIC_CLAIM_IR_SCHEMA_VERSION) {
     issues.push(
       `${path}.schemaVersion must be ${CASIMIR_SPEC_SCIENTIFIC_CLAIM_IR_SCHEMA_VERSION}`,
     );
@@ -538,9 +554,7 @@ export function validateCasimirArtifactGenerationRequestV1(
     if (producerIds.length === 0)
       issues.push("producerPolicy.allowedProducerIds must be non-empty");
     if (value.producerPolicy.immutableRepositoryPinRequired !== true) {
-      issues.push(
-        "producerPolicy.immutableRepositoryPinRequired must be true",
-      );
+      issues.push("producerPolicy.immutableRepositoryPinRequired must be true");
     }
     if (value.producerPolicy.outputHashRequired !== true)
       issues.push("producerPolicy.outputHashRequired must be true");
@@ -615,11 +629,7 @@ function validateReceiptArtifacts(
       `${itemPath}.derivedFromSha256s`,
       issues,
     ).forEach((item, sourceIndex) =>
-      sha(
-        item,
-        `${itemPath}.derivedFromSha256s[${sourceIndex}]`,
-        issues,
-      ),
+      sha(item, `${itemPath}.derivedFromSha256s[${sourceIndex}]`, issues),
     );
   });
   if (!isSortedUnique(ids)) {
@@ -640,12 +650,7 @@ function validateBlockers(
   value.forEach((entry, index) => {
     const itemPath = `${path}[${index}]`;
     if (
-      !exactObject(
-        entry,
-        ["code", "message", "evidenceRefs"],
-        itemPath,
-        issues,
-      )
+      !exactObject(entry, ["code", "message", "evidenceRefs"], itemPath, issues)
     )
       return;
     if (!isNonEmptyString(entry.code))
@@ -689,10 +694,11 @@ export function validateCasimirArtifactGenerationReceiptV1(
         "schemaVersion",
         "requestId",
         "artifactSha256",
-        "casimirSpecSemanticSha256",
-        "casimirSpecArtifactSha256",
+        "casimirSpec",
         "claimId",
         "propositionSha256",
+        "masterProblem",
+        "derivationProgram",
       ],
       "request",
       issues,
@@ -710,13 +716,61 @@ export function validateCasimirArtifactGenerationReceiptV1(
       if (!isNonEmptyString(value.request[field]))
         issues.push(`request.${field} must be non-empty`);
     }
-    for (const field of [
-      "artifactSha256",
-      "casimirSpecSemanticSha256",
-      "casimirSpecArtifactSha256",
-      "propositionSha256",
-    ] as const) {
+    for (const field of ["artifactSha256", "propositionSha256"] as const) {
       sha(value.request[field], `request.${field}`, issues);
+    }
+    if (
+      exactObject(
+        value.request.casimirSpec,
+        ["semanticSha256", "artifactSha256"],
+        "request.casimirSpec",
+        issues,
+      )
+    ) {
+      sha(
+        value.request.casimirSpec.semanticSha256,
+        "request.casimirSpec.semanticSha256",
+        issues,
+      );
+      sha(
+        value.request.casimirSpec.artifactSha256,
+        "request.casimirSpec.artifactSha256",
+        issues,
+      );
+    }
+    if (
+      exactObject(
+        value.request.masterProblem,
+        ["planId", "artifactSha256"],
+        "request.masterProblem",
+        issues,
+      )
+    ) {
+      if (!isNonEmptyString(value.request.masterProblem.planId)) {
+        issues.push("request.masterProblem.planId must be non-empty");
+      }
+      sha(
+        value.request.masterProblem.artifactSha256,
+        "request.masterProblem.artifactSha256",
+        issues,
+      );
+    }
+    if (
+      exactObject(
+        value.request.derivationProgram,
+        ["programId", "artifactSha256"],
+        "request.derivationProgram",
+        issues,
+      )
+    ) {
+      if (!isNonEmptyString(value.request.derivationProgram.programId)) {
+        issues.push("request.derivationProgram.programId must be non-empty");
+      }
+      sha(
+        value.request.derivationProgram.artifactSha256,
+        "request.derivationProgram.artifactSha256",
+        issues,
+      );
     }
   }
 
@@ -833,9 +887,11 @@ export async function computeCasimirArtifactGenerationReceiptSha256V1(
   });
 }
 
-const authority = (
-  artifactBytesProduced: boolean,
-): CasimirArtifactGenerationAuthorityV1 => ({
+const authority = <Produced extends boolean>(
+  artifactBytesProduced: Produced,
+): Omit<CasimirArtifactGenerationAuthorityV1, "artifactBytesProduced"> & {
+  artifactBytesProduced: Produced;
+} => ({
   outputRole: "evidence_for_bounded_synthesis",
   artifactBytesProduced,
   providerOutputTrusted: false,
@@ -944,13 +1000,13 @@ export function validateCasimirArtifactGenerationReceiptAgainstRequestV1(
   if (receipt.request.artifactSha256 !== request.artifactSha256)
     issues.push("receipt request artifactSha256 does not match request");
   if (
-    receipt.request.casimirSpecSemanticSha256 !==
+    receipt.request.casimirSpec.semanticSha256 !==
     request.casimirSpec.semanticSha256
   ) {
     issues.push("receipt Casimir Spec semantic hash does not match request");
   }
   if (
-    receipt.request.casimirSpecArtifactSha256 !==
+    receipt.request.casimirSpec.artifactSha256 !==
     request.casimirSpec.artifactSha256
   ) {
     issues.push("receipt Casimir Spec artifact hash does not match request");
@@ -959,6 +1015,29 @@ export function validateCasimirArtifactGenerationReceiptAgainstRequestV1(
     issues.push("receipt claimId does not match request");
   if (receipt.request.propositionSha256 !== request.claim.propositionSha256)
     issues.push("receipt proposition hash does not match request");
+  if (receipt.request.masterProblem.planId !== request.masterProblem.planId) {
+    issues.push("receipt Master Problem planId does not match request");
+  }
+  if (
+    receipt.request.masterProblem.artifactSha256 !==
+    request.masterProblem.artifactSha256
+  ) {
+    issues.push("receipt Master Problem artifact hash does not match request");
+  }
+  if (
+    receipt.request.derivationProgram.programId !==
+    request.derivationProgram.programId
+  ) {
+    issues.push("receipt derivation programId does not match request");
+  }
+  if (
+    receipt.request.derivationProgram.artifactSha256 !==
+    request.derivationProgram.artifactSha256
+  ) {
+    issues.push(
+      "receipt derivation program artifact hash does not match request",
+    );
+  }
   if (
     !request.producerPolicy.allowedProducerIds.includes(
       receipt.producer.producerId,
@@ -968,6 +1047,14 @@ export function validateCasimirArtifactGenerationReceiptAgainstRequestV1(
   }
   if (receipt.producer.adapterId !== request.producerPolicy.adapterContractId)
     issues.push("receipt adapterId does not match request adapter contract");
+  if (
+    receipt.producer.adapterRevisionSha256 !==
+    request.producerPolicy.adapterContractSha256
+  ) {
+    issues.push(
+      "receipt adapter revision hash does not match request adapter contract",
+    );
+  }
 
   if (receipt.run.status === "succeeded") {
     const requested = new Map(
@@ -990,9 +1077,7 @@ export function validateCasimirArtifactGenerationReceiptAgainstRequestV1(
       if (actual.mediaType !== expected.mediaType)
         issues.push(`artifact mediaType mismatch: ${artifactId}`);
       if (
-        !actual.derivedFromSha256s.includes(
-          request.sourcePacket.artifactSha256,
-        )
+        !actual.derivedFromSha256s.includes(request.sourcePacket.artifactSha256)
       ) {
         issues.push(
           `artifact is not bound to source packet hash: ${artifactId}`,

@@ -109,6 +109,68 @@ const hasCompleteMultiSubgoalExecutionLedger = (
   return ledger.every(compoundLedgerEntryHasSatisfiedObservation);
 };
 
+const isTheoryProcedureCapability = (value: string): boolean =>
+  /^(?:theory-(?:experiment-procedure|semantic-admitter|artifact-producer|formal-verifier|independent-numerical-verifier)\.|helix_ask\.reflect_theory_context$)/i.test(
+    value,
+  );
+
+const isGroundedSameFamilyTheoryProcedureCompound = (input: {
+  payload?: Record<string, unknown> | null;
+  artifactLedger?: ArtifactLike[] | null;
+}): boolean => {
+  if (!compoundTerminalPolicyActive(input.payload)) return false;
+  const itinerary =
+    readRecord(input.payload?.capability_itinerary) ??
+    artifactPayloadByKind(input.artifactLedger, "capability_itinerary");
+  const contract =
+    readRecord(input.payload?.compound_capability_contract) ??
+    readRecord(itinerary?.compound_capability_contract) ??
+    artifactPayloadByKind(input.artifactLedger, "compound_capability_contract");
+  const executionState =
+    readRecord(input.payload?.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state) ??
+    artifactPayloadByKind(input.artifactLedger, "capability_itinerary_execution_state");
+  const artifactQueryIndex = readRecord(input.payload?.artifact_query_index);
+  const rows = [
+    ...readArray(contract?.subgoals),
+    ...readArray(executionState?.compound_subgoal_ledger),
+    ...readArray(input.payload?.compound_subgoal_rail_statuses),
+    ...readArray(artifactQueryIndex?.compound_subgoal_rail_statuses),
+  ]
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const capabilities = unique(
+    rows.flatMap((entry) => [
+      readString(entry.requested_capability),
+      readString(entry.runtime_capability),
+      readString(entry.selected_capability),
+      readString(entry.executed_capability),
+    ]).filter((entry): entry is string => Boolean(entry)),
+  );
+  const requiredFamilies = unique([
+    ...readArray(executionState?.required_observation_families).map(readString),
+    ...readArray(contract?.required_observation_families).map(readString),
+    ...rows.flatMap((entry) => [
+      readString(entry.capability_family),
+      readString(entry.plan_family),
+    ]),
+  ].filter((entry): entry is string => Boolean(entry)));
+  const hasGroundedProcedureObservation = (input.artifactLedger ?? []).some((artifact) => {
+    const payload = readRecord(artifact.payload);
+    return (
+      artifactKind(artifact) === "theory_experiment_procedure_observation" &&
+      readString(payload?.schema) === "casimir.theory_experiment_procedure.observation.v1"
+    );
+  });
+  return (
+    rows.length >= 2 &&
+    capabilities.length >= 2 &&
+    capabilities.every(isTheoryProcedureCapability) &&
+    requiredFamilies.every((family) => family === "theory_locator") &&
+    hasGroundedProcedureObservation
+  );
+};
+
 export const inferFinalAnswerDraftRouteFamily = (input: {
   routeProductContract?: Record<string, unknown> | null;
   payload?: Record<string, unknown> | null;
@@ -119,6 +181,12 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   const committedGoal = readRecord(committedRoute?.canonical_goal);
   const committedSourceTarget = readString(committedRouteSource?.source_target);
   const committedGoalKind = readString(committedGoal?.goal_kind);
+  if (
+    (committedSourceTarget === "theory_locator" || committedGoalKind === "theory_locator") &&
+    isGroundedSameFamilyTheoryProcedureCompound(input)
+  ) {
+    return "theory_locator";
+  }
   if (
     compoundTerminalPolicyActive(input.payload) &&
     (
@@ -421,6 +489,77 @@ const hasMoralGraphSupportRef = (input: {
 const isFallbackLike = (text: string): boolean =>
   /\b(?:I could not produce a terminal answer|I couldn['’]?t produce a final answer|could not produce a final answer|No final answer returned|terminal answer unavailable|Please retry once|missing_allowed_terminal_artifact|missing required artifacts|missing requirements|was not satisfied|not satisfied due to missing|required artifacts were missing)\b/i.test(text);
 
+const fallbackLikeAfterRemovingBoundedRequirementLabel = (text: string): boolean =>
+  isFallbackLike(text.replace(/\bmissing requirements\b/gi, "typed limitations"));
+
+const isGroundedTheoryProcedureObservation = (input: {
+  turnId: string;
+  routeFamily: FinalAnswerDraftRouteFamily;
+  draftPayload?: Record<string, unknown> | null;
+  artifactLedger?: ArtifactLike[] | null;
+}): boolean => {
+  if (input.routeFamily !== "theory_locator") return false;
+  const explicitSupportRefs = new Set(collectExplicitDraftSupportRefs(input.draftPayload));
+  if (explicitSupportRefs.size === 0) return false;
+
+  return (input.artifactLedger ?? []).some((artifact) => {
+    const artifactRecord = artifact as Record<string, unknown>;
+    const payload = readRecord(artifact.payload);
+    const procedure = readRecord(payload?.procedure);
+    const authority = readRecord(procedure?.authority);
+    const ref = readString(artifact.artifact_id) ?? readString(payload?.artifact_id);
+    const artifactTurnId = readString(artifactRecord.turn_id) ?? readString(payload?.turn_id);
+    const topLevelStatus = readString(artifactRecord.status);
+    const payloadStatus = readString(payload?.status);
+    const statuses = [topLevelStatus, payloadStatus].filter(
+      (status): status is string => Boolean(status),
+    );
+    return (
+      Boolean(ref && explicitSupportRefs.has(ref)) &&
+      artifactTurnId === input.turnId &&
+      artifactKind(artifact) === "theory_experiment_procedure_observation" &&
+      readString(payload?.schema) === "casimir.theory_experiment_procedure.observation.v1" &&
+      statuses.length > 0 &&
+      statuses.every((status) => status === "succeeded") &&
+      readString(payload?.output_role) === "evidence_for_synthesis" &&
+      payload?.terminal_eligible === false &&
+      payload?.post_tool_model_step_required === true &&
+      payload?.assistant_answer === false &&
+      authority?.preparesProcedureOnly === true &&
+      authority?.executesTools === false &&
+      authority?.proofAuthority === false &&
+      authority?.numericalAuthority === false &&
+      authority?.empiricalAuthority === false &&
+      authority?.physicalTruthAuthority === false &&
+      authority?.terminalEligible === false &&
+      authority?.postToolModelStepRequired === true
+    );
+  });
+};
+
+const isGroundedUnsupportedLanyonProcedureLimitation = (input: {
+  turnId: string;
+  routeFamily: FinalAnswerDraftRouteFamily;
+  draftPayload?: Record<string, unknown> | null;
+  artifactLedger?: ArtifactLike[] | null;
+}): boolean => {
+  if (!isGroundedTheoryProcedureObservation(input)) return false;
+  const explicitSupportRefs = new Set(collectExplicitDraftSupportRefs(input.draftPayload));
+  return (input.artifactLedger ?? []).some((artifact) => {
+    const payload = readRecord(artifact.payload);
+    const procedure = readRecord(payload?.procedure);
+    const lanyonEligibility = readRecord(procedure?.lanyonEligibility);
+    const ref = readString(artifact.artifact_id) ?? readString(payload?.artifact_id);
+    return (
+      Boolean(ref && explicitSupportRefs.has(ref)) &&
+      readString(lanyonEligibility?.status) === "ineligible" &&
+      readArray(lanyonEligibility?.blockers)
+        .map(readString)
+        .includes("unsupported_lanyon_case")
+    );
+  });
+};
+
 const isReceiptLike = (text: string): boolean =>
   /^(?:Opening panel|Opened panel|Workspace action|Action receipt|Receipt:|Successfully executed)\b/i.test(text.trim()) ||
   /\b(?:workspace_action_receipt|runtime_tool_observation|client_projection|panel receipt)\b/i.test(text);
@@ -675,12 +814,41 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
     text,
     input.artifactLedger,
   );
+  const groundedTheoryProcedureObservation = isGroundedTheoryProcedureObservation({
+    turnId: input.turnId,
+    routeFamily,
+    draftPayload: input.draftPayload,
+    artifactLedger: input.artifactLedger,
+  });
+  const groundedTheoryProcedureLimitation =
+    isGroundedUnsupportedLanyonProcedureLimitation({
+      turnId: input.turnId,
+      routeFamily,
+      draftPayload: input.draftPayload,
+      artifactLedger: input.artifactLedger,
+    });
+  const groundedBoundedTheoryProcedureLimitation =
+    groundedTheoryProcedureLimitation &&
+    /\bunsupported_lanyon_case\b/i.test(text) &&
+    /\b(?:ineligible|unsupported|not registered|blocked)\b/i.test(text);
+  const groundedBoundedTheoryProcedureOperationRefusal =
+    groundedBoundedTheoryProcedureLimitation &&
+    /\b(?:I (?:can(?:not|'t)|am unable)|I['’]m unable|unable to)\b.{0,120}\b(?:improvise|run|execute|treat(?: it| the case)? as eligible|claim support)\b/i.test(text);
   if (!text) violations.push("empty_draft");
-  if (isFallbackLike(text)) violations.push("fallback_like_answer");
+  if (
+    isFallbackLike(text) &&
+    !(
+      groundedTheoryProcedureObservation &&
+      !fallbackLikeAfterRemovingBoundedRequirementLabel(text)
+    )
+  ) {
+    violations.push("fallback_like_answer");
+  }
   if (isReceiptLike(text)) violations.push("receipt_like_answer");
   if (
     isRefusalLike(text) &&
     !readString(input.payload?.terminal_error_code) &&
+    !groundedBoundedTheoryProcedureOperationRefusal &&
     !(isConditionalVisualEvidencePrompt(prompt) && conditionalVisualEvidenceSatisfied)
   ) {
     violations.push("refusal_without_error");

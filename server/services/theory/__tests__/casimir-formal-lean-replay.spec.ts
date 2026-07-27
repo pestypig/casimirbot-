@@ -214,6 +214,24 @@ describe("generic Casimir formal Lean replay", () => {
     expect(certificate.replay.completedReplayCount).toBe(2);
     expect(certificate.replay.byteIdentical).toBe(true);
     expect(certificate.axiomAudit.usedAxiomIds).toEqual([]);
+    expect(certificate.request).toMatchObject({
+      casimirSpec: {
+        semanticSha256: fixture.request.casimirSpec.semanticSha256,
+        artifactSha256: fixture.request.casimirSpec.artifactSha256,
+      },
+      masterProblem: {
+        planId: fixture.request.masterProblem.planId,
+        artifactSha256: fixture.request.masterProblem.artifactSha256,
+      },
+      derivationProgram: {
+        programId: fixture.request.derivationProgram.programId,
+        artifactSha256: fixture.request.derivationProgram.artifactSha256,
+      },
+      theoryGraph: {
+        graphId: fixture.request.theoryGraph.graphId,
+        snapshotSha256: fixture.request.theoryGraph.snapshotSha256,
+      },
+    });
     expect(certificate.authority).toMatchObject({
       formalPropositionChecked: true,
       validatesSemanticIntent: false,

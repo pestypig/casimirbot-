@@ -46,7 +46,9 @@ describe("runtime theory reflection gateway bridge", () => {
     });
     const capability = manifest.lanes
       .find((lane) => lane.lane_id === "workstation_tool_reference")
-      ?.capabilities.find((candidate) => candidate.capability_id === CAPABILITY);
+      ?.capabilities.find(
+        (candidate) => candidate.capability_id === CAPABILITY,
+      );
 
     expect(capability).toMatchObject({
       capability_id: CAPABILITY,
@@ -73,12 +75,15 @@ describe("runtime theory reflection gateway bridge", () => {
           "resolved_source_ref",
           "resolved_text_hash",
         ]),
-          when_to_use: expect.stringContaining("concise, faithful central subject"),
+        when_to_use: expect.stringContaining(
+          "concise, faithful central subject",
+        ),
         when_not_to_use: expect.stringContaining("observation-only"),
         request_shape_hint: {
           capability_lane_call: expect.objectContaining({
             capability: CAPABILITY,
-              prompt: "<concise central semantic theory topic derived from the resolved source>",
+            prompt:
+              "<concise central semantic theory topic derived from the resolved source>",
           }),
         },
       },
@@ -95,7 +100,8 @@ describe("runtime theory reflection gateway bridge", () => {
         capability_lane_call: {
           capability: CAPABILITY,
           prompt,
-          conversation_context: "The user asked to map the concept across physical scales.",
+          conversation_context:
+            "The user asked to map the concept across physical scales.",
           mentioned_domains: ["statistical mechanics", "information theory"],
           build_explanation_plan: true,
           operation: "compare",
@@ -176,7 +182,11 @@ describe("runtime theory reflection gateway bridge", () => {
       {
         capability: CAPABILITY,
         prompt: runtimePrompt,
-        mentioned_domains: ["evolutionary biophysics", "astrochemistry", "objective collapse"],
+        mentioned_domains: [
+          "evolutionary biophysics",
+          "astrochemistry",
+          "objective collapse",
+        ],
         mentioned_symbols: ["p_DP_trigger"],
         mentioned_equations: ["p = 1 - exp(-dt/tau_DP)"],
         operation: "compare",
@@ -227,13 +237,107 @@ describe("runtime theory reflection gateway bridge", () => {
         },
       },
     });
-    const observation = result.call_results[0]?.observation as Record<string, unknown> | undefined;
-    expect(observation?.exact_badge_ids).not.toEqual(expect.arrayContaining([
-      "biology.evolution.selection_fitness_context",
-      "prebiotic.photochemistry.radiation_processing_context",
-      "collapse.objective.dp_hazard_probability",
-    ]));
+    const observation = result.call_results[0]?.observation as
+      Record<string, unknown> | undefined;
+    expect(observation?.exact_badge_ids).not.toEqual(
+      expect.arrayContaining([
+        "biology.evolution.selection_fitness_context",
+        "prebiotic.photochemistry.radiation_processing_context",
+        "collapse.objective.dp_hazard_probability",
+      ]),
+    );
   });
+
+  it("uses explicit current-turn badge and Lanyon case identities instead of blocking on a deictic procedure phrase", async () => {
+    const userPrompt =
+      "Re-prepare that same bounded procedure for study.casimir_dp.evidence_map_stage3 " +
+      "and advection_diffusion_full_1d so the evidence is current for this turn. " +
+      "Which semantic, boundary-condition, formal, numerical, and observable requirements are still missing? " +
+      "Do not start any downstream job.";
+    const capabilityLaneCall = enrichCapabilityLaneCandidatesFromBody(
+      { question: userPrompt },
+      {
+        capability: CAPABILITY,
+        prompt: "this",
+        operation: "compare",
+      },
+    ) as Record<string, unknown>;
+
+    expect(capabilityLaneCall).toMatchObject({
+      capability: CAPABILITY,
+      prompt: userPrompt,
+      user_semantic_prompt: userPrompt,
+      semantic_prompt_source:
+        "current_user_request_explicit_scientific_identity",
+      explicit_current_turn_badge_ids: ["study.casimir_dp.evidence_map_stage3"],
+      explicit_current_turn_lanyon_case_id: "advection_diffusion_full_1d",
+      referent_resolution_superseded_by:
+        "explicit_current_turn_scientific_identity",
+    });
+    expect(capabilityLaneCall).not.toHaveProperty(
+      "referent_resolution_block_reason",
+    );
+
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider(),
+      body: {
+        question: userPrompt,
+        turn_id: "ask:test:explicit-current-turn-theory-identities",
+        capability_lane_call: capabilityLaneCall,
+      },
+      turnId: "ask:test:explicit-current-turn-theory-identities",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]).toMatchObject({
+      ok: true,
+      delegation_status: "gateway_executed",
+      semantic_prompt_argument_source: "current_user_request",
+      observation: {
+        schema: "helix.theory_context_reflection_observation.v1",
+        status: "succeeded",
+        prompt: userPrompt,
+      },
+    });
+  });
+
+  it.each([
+    [
+      "negated",
+      "Do not re-prepare that same bounded procedure for study.casimir_dp.evidence_map_stage3 and advection_diffusion_full_1d.",
+    ],
+    [
+      "future",
+      "Later, re-prepare that same bounded procedure for study.casimir_dp.evidence_map_stage3 and advection_diffusion_full_1d.",
+    ],
+    [
+      "historical",
+      "Earlier I re-prepared that same bounded procedure for study.casimir_dp.evidence_map_stage3 and advection_diffusion_full_1d.",
+    ],
+    [
+      "quoted screen text",
+      'The screen says "Re-prepare that same bounded procedure for study.casimir_dp.evidence_map_stage3 and advection_diffusion_full_1d."',
+    ],
+  ])(
+    "does not let %s scientific IDs override deictic admission",
+    (_label, userPrompt) => {
+      const capabilityLaneCall = enrichCapabilityLaneCandidatesFromBody(
+        { question: userPrompt },
+        {
+          capability: CAPABILITY,
+          prompt: "this",
+        },
+      ) as Record<string, unknown>;
+
+      expect(capabilityLaneCall.prompt).toBe("this");
+      expect(capabilityLaneCall).not.toHaveProperty(
+        "explicit_current_turn_badge_ids",
+      );
+      expect(capabilityLaneCall).not.toHaveProperty(
+        "referent_resolution_superseded_by",
+      );
+    },
+  );
 
   it.each(["this", "That.", "IT?!"])(
     "fails closed before the gateway for unresolved deictic prompt %j",
@@ -263,7 +367,8 @@ describe("runtime theory reflection gateway bridge", () => {
         terminal_eligible: false,
         assistant_answer: false,
         observation: {
-          schema: "helix.workstation_tool_reference.theory_reflection_bridge_observation.v1",
+          schema:
+            "helix.workstation_tool_reference.theory_reflection_bridge_observation.v1",
           status: "blocked",
           blocked_reason: "referent_resolution_required",
         },
@@ -271,10 +376,13 @@ describe("runtime theory reflection gateway bridge", () => {
       expect(result.observation_packets[0]).toMatchObject({
         capability_key: CAPABILITY,
         status: "blocked",
-        missing_requirements: [expect.objectContaining({
-          code: "referent_resolution_required",
-          repair_action: "supply_resolved_semantic_prompt_and_source_provenance",
-        })],
+        missing_requirements: [
+          expect.objectContaining({
+            code: "referent_resolution_required",
+            repair_action:
+              "supply_resolved_semantic_prompt_and_source_provenance",
+          }),
+        ],
         terminal_eligible: false,
         post_tool_model_step_required: true,
         assistant_answer: false,

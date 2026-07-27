@@ -89,7 +89,10 @@ const appendBoundedArtifactHistory = (args: {
 }): HelixTurnArtifact[] => {
   const deduplicated = [...args.ledger, args.artifact].filter(
     (entry: HelixTurnArtifact, index: number, all: HelixTurnArtifact[]) =>
-      all.findIndex((candidate: HelixTurnArtifact) => candidate.artifact_id === entry.artifact_id) === index,
+      all.findIndex(
+        (candidate: HelixTurnArtifact) =>
+          candidate.artifact_id === entry.artifact_id,
+      ) === index,
   );
   const retainedIds = new Set(
     deduplicated
@@ -98,7 +101,8 @@ const appendBoundedArtifactHistory = (args: {
       .map((entry: HelixTurnArtifact) => entry.artifact_id),
   );
   return deduplicated.filter(
-    (entry: HelixTurnArtifact) => entry.kind !== args.kind || retainedIds.has(entry.artifact_id),
+    (entry: HelixTurnArtifact) =>
+      entry.kind !== args.kind || retainedIds.has(entry.artifact_id),
   );
 };
 
@@ -106,13 +110,16 @@ const RECOVERABLE_TERMINAL_REJECTION_REASONS = new Set([
   "missing_post_tool_model_step",
   "missing_evidence_reentry",
   "missing_required_observation",
+  "visible_answer_policy_repair_required",
   "route_requires_synthesis",
   "solver_continuation_pending",
   "pending_tool_call",
 ]);
 
 const readRecord = (value: unknown): RecordLike | null =>
-  value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as RecordLike)
+    : null;
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
@@ -149,42 +156,68 @@ const stableValue = (value: unknown): unknown => {
 };
 
 const hashShort = (value: unknown, length = 16): string =>
-  crypto.createHash("sha256").update(JSON.stringify(stableValue(value))).digest("hex").slice(0, length);
+  crypto
+    .createHash("sha256")
+    .update(JSON.stringify(stableValue(value)))
+    .digest("hex")
+    .slice(0, length);
 
-const actionFingerprint = (capabilityId: string | null, action: HelixAgentContinuationAction | null, args: RecordLike): string =>
+const actionFingerprint = (
+  capabilityId: string | null,
+  action: HelixAgentContinuationAction | null,
+  args: RecordLike,
+): string =>
   `sha256:${hashShort([capabilityId, action?.panel_id ?? null, action?.action_id ?? null, args], 24)}`;
 
-const currentTurnArtifacts = (payload: RecordLike, turnId: string): HelixTurnArtifact[] => {
+const currentTurnArtifacts = (
+  payload: RecordLike,
+  turnId: string,
+): HelixTurnArtifact[] => {
   if (!Array.isArray(payload.current_turn_artifact_ledger)) return [];
   return (payload.current_turn_artifact_ledger as unknown[])
     .map((value) => readRecord(value) as HelixTurnArtifact | null)
-    .filter((artifact): artifact is HelixTurnArtifact => Boolean(
-      artifact &&
-      readString(artifact.artifact_id) &&
-      readString(artifact.kind) &&
-      (!artifact.turn_id || artifact.turn_id === turnId) &&
-      !["prior_context", "prior_turn_context", "prior_artifact"].includes(readString(artifact.source_scope) ?? ""),
-    ));
+    .filter((artifact): artifact is HelixTurnArtifact =>
+      Boolean(
+        artifact &&
+        readString(artifact.artifact_id) &&
+        readString(artifact.kind) &&
+        (!artifact.turn_id || artifact.turn_id === turnId) &&
+        !["prior_context", "prior_turn_context", "prior_artifact"].includes(
+          readString(artifact.source_scope) ?? "",
+        ),
+      ),
+    );
 };
 
 const artifactIsObservation = (artifact: HelixTurnArtifact): boolean => {
   const kind = readString(artifact.kind)?.toLowerCase() ?? "";
   if (!kind || ADMINISTRATIVE_ARTIFACT_KINDS.has(kind)) return false;
   const payload = readRecord(artifact.payload);
-  if (readBoolean(payload?.terminal_eligible) === true && readBoolean(payload?.assistant_answer) === true) return false;
+  if (
+    readBoolean(payload?.terminal_eligible) === true &&
+    readBoolean(payload?.assistant_answer) === true
+  )
+    return false;
   return (
-    /(?:^|_)(?:observation|receipt|result|results|evidence|packet|sidecar|reflection|validation|failure)(?:_|$)/.test(kind) ||
+    /(?:^|_)(?:observation|receipt|result|results|evidence|packet|sidecar|reflection|validation|failure)(?:_|$)/.test(
+      kind,
+    ) ||
     kind.endsWith("_summary") ||
     kind === "typed_failure"
   );
 };
 
-const collectObservationRefs = (payload: RecordLike, turnId: string): string[] => {
+const collectObservationRefs = (
+  payload: RecordLike,
+  turnId: string,
+): string[] => {
   const refs = currentTurnArtifacts(payload, turnId)
     .filter(artifactIsObservation)
     .map((artifact: HelixTurnArtifact) => artifact.artifact_id);
   const runtimeLoop = readRecord(payload.agent_runtime_loop);
-  const iterations = Array.isArray(runtimeLoop?.iterations) ? runtimeLoop.iterations : [];
+  const iterations = Array.isArray(runtimeLoop?.iterations)
+    ? runtimeLoop.iterations
+    : [];
   for (const rawIteration of iterations) {
     const iteration = readRecord(rawIteration);
     refs.push(...uniqueStrings([iteration?.observed_artifact_refs]));
@@ -193,7 +226,9 @@ const collectObservationRefs = (payload: RecordLike, turnId: string): string[] =
 };
 
 const collectMissingRequirementIds = (payload: RecordLike): string[] => {
-  const docsContinuationContract = readRecord(payload.docs_continuation_contract);
+  const docsContinuationContract = readRecord(
+    payload.docs_continuation_contract,
+  );
   const records = [
     payload,
     readRecord(payload.goal_satisfaction_evaluation),
@@ -234,16 +269,21 @@ const collectMissingRequirementIds = (payload: RecordLike): string[] => {
   return uniqueStrings(values);
 };
 
-const normalizeGoalStatus = (payload: RecordLike): {
+const normalizeGoalStatus = (
+  payload: RecordLike,
+): {
   status: HelixAgentContinuationGoalStatus;
   satisfied: boolean;
   terminalProductAllowed: boolean | null;
 } => {
   const evaluation = readRecord(payload.goal_satisfaction_evaluation);
-  const docsContinuationContract = readRecord(payload.docs_continuation_contract);
+  const docsContinuationContract = readRecord(
+    payload.docs_continuation_contract,
+  );
   const docsContinuationPending = Boolean(
     docsContinuationContract &&
-    readString(docsContinuationContract.current_docs_phase) !== "terminal_ready",
+    readString(docsContinuationContract.current_docs_phase) !==
+      "terminal_ready",
   );
   const report = readRecord(payload.satisfaction_report);
   const authority = readRecord(payload.route_evidence_authority);
@@ -256,18 +296,47 @@ const normalizeGoalStatus = (payload: RecordLike): {
     solverTrace?.completed_solver_path === true &&
     solverTrace?.route_authority_ok === true &&
     solverTrace?.terminal_authority_ok === true;
-  const terminalStatus = (readString(payload.final_status) ?? readString(payload.status) ?? "").toLowerCase();
-  const evaluationStatus = (readString(evaluation?.satisfaction) ?? readString(report?.satisfaction) ?? "").toLowerCase();
-  const raw = ["satisfied", "terminal_satisfied", "answered", "final_answer", "complete", "completed"].includes(terminalStatus)
+  const terminalStatus = (
+    readString(payload.final_status) ??
+    readString(payload.status) ??
+    ""
+  ).toLowerCase();
+  const evaluationStatus = (
+    readString(evaluation?.satisfaction) ??
+    readString(report?.satisfaction) ??
+    ""
+  ).toLowerCase();
+  const raw = [
+    "satisfied",
+    "terminal_satisfied",
+    "answered",
+    "final_answer",
+    "complete",
+    "completed",
+  ].includes(terminalStatus)
     ? terminalStatus
     : evaluationStatus || terminalStatus;
   const satisfied =
     !docsContinuationPending &&
-    ["satisfied", "terminal_satisfied", "answered", "final_answer", "complete", "completed"].includes(raw);
-  let status: HelixAgentContinuationGoalStatus = satisfied ? "satisfied" : "unknown";
-  if (/needs_user_input|pending_input|ask_user|clarif/.test(raw)) status = "needs_user_input";
+    [
+      "satisfied",
+      "terminal_satisfied",
+      "answered",
+      "final_answer",
+      "complete",
+      "completed",
+    ].includes(raw);
+  let status: HelixAgentContinuationGoalStatus = satisfied
+    ? "satisfied"
+    : "unknown";
+  if (/needs_user_input|pending_input|ask_user|clarif/.test(raw))
+    status = "needs_user_input";
   else if (/blocked|failed|failure|non_retryable/.test(raw)) status = "blocked";
-  else if (!satisfied && (/unsatisfied|partial|in_progress|pending|needs_/.test(raw) || collectMissingRequirementIds(payload).length > 0)) {
+  else if (
+    !satisfied &&
+    (/unsatisfied|partial|in_progress|pending|needs_/.test(raw) ||
+      collectMissingRequirementIds(payload).length > 0)
+  ) {
     status = "in_progress";
   }
   return {
@@ -276,21 +345,42 @@ const normalizeGoalStatus = (payload: RecordLike): {
     terminalProductAllowed:
       providerTerminalAllowed || completedSolverTerminalAllowed
         ? true
-        : readBoolean(authority?.terminal_product_allowed) ??
-      readBoolean(readRecord(payload.terminal_answer_authority)?.allowed) ??
-      null,
+        : (readBoolean(authority?.terminal_product_allowed) ??
+          readBoolean(readRecord(payload.terminal_answer_authority)?.allowed) ??
+          null),
   };
 };
 
-const classifyFailure = (code: string | null, message: string | null): HelixAgentContinuationFailureClass => {
+const classifyFailure = (
+  code: string | null,
+  message: string | null,
+): HelixAgentContinuationFailureClass => {
   const text = `${code ?? ""} ${message ?? ""}`.toLowerCase();
   if (!text.trim()) return "none";
-  if (/terminal|post_tool_model_step|evidence_reentry/.test(text)) return "terminal_authority";
-  if (/route|capability_not_allowed|admission|forbidden_terminal/.test(text)) return "route";
-  if (/permission|unauthori[sz]ed|forbidden|approval|auth_required|access_denied/.test(text)) return "permission";
-  if (/invalid_arg|missing_arg|validation|malformed|parse_error/.test(text)) return "invalid_args";
-  if (/missing_(?:evidence|observation|receipt|sidecar)|evidence_missing|not_materialized/.test(text)) return "missing_evidence";
-  if (/timeout|timed_out|rate_limit|temporar|unavailable|busy|connection|retry/.test(text)) return "temporary";
+  if (/terminal|post_tool_model_step|evidence_reentry/.test(text))
+    return "terminal_authority";
+  if (/route|capability_not_allowed|admission|forbidden_terminal/.test(text))
+    return "route";
+  if (
+    /permission|unauthori[sz]ed|forbidden|approval|auth_required|access_denied/.test(
+      text,
+    )
+  )
+    return "permission";
+  if (/invalid_arg|missing_arg|validation|malformed|parse_error/.test(text))
+    return "invalid_args";
+  if (
+    /missing_(?:evidence|observation|receipt|sidecar)|evidence_missing|not_materialized/.test(
+      text,
+    )
+  )
+    return "missing_evidence";
+  if (
+    /timeout|timed_out|rate_limit|temporar|unavailable|busy|connection|retry/.test(
+      text,
+    )
+  )
+    return "temporary";
   if (/provider|model|backend|api_key|upstream/.test(text)) return "provider";
   return "unknown";
 };
@@ -305,40 +395,72 @@ const classifyRetryability = (args: {
   if (args.status === "succeeded") return "not_applicable";
   const text = `${args.code ?? ""} ${args.message ?? ""}`.toLowerCase();
   if (
-    /runtime_capability_not_admitted_by_tool_policy|runtime_tool_forbidden_by_tool_policy|route_contract_forbidden/.test(text)
+    /runtime_capability_not_admitted_by_tool_policy|runtime_tool_forbidden_by_tool_policy|route_contract_forbidden/.test(
+      text,
+    )
   ) {
     return "non_retryable";
   }
   const explicit = readString(args.record?.retryability);
-  if (["retryable", "non_retryable", "requires_user_input", "unknown"].includes(explicit ?? "")) {
+  if (
+    ["retryable", "non_retryable", "requires_user_input", "unknown"].includes(
+      explicit ?? "",
+    )
+  ) {
     return explicit as HelixAgentContinuationRetryability;
   }
-  if (readBoolean(args.record?.repairable) === true || readBoolean(args.record?.retryable) === true) return "retryable";
+  if (
+    readBoolean(args.record?.repairable) === true ||
+    readBoolean(args.record?.retryable) === true
+  )
+    return "retryable";
   if (readBoolean(args.record?.retryable) === false) return "non_retryable";
-  if (args.failureClass === "permission" || /requires_user|missing_user|confirmation_required/.test(text)) {
+  if (
+    args.failureClass === "permission" ||
+    /requires_user|missing_user|confirmation_required/.test(text)
+  ) {
     return "requires_user_input";
   }
-  if (args.failureClass === "invalid_args" || args.failureClass === "missing_evidence" || args.failureClass === "temporary") {
+  if (
+    args.failureClass === "invalid_args" ||
+    args.failureClass === "missing_evidence" ||
+    args.failureClass === "temporary"
+  ) {
     return "retryable";
   }
-  if (args.failureClass === "terminal_authority" && RECOVERABLE_TERMINAL_REJECTION_REASONS.has(args.code ?? "")) {
+  if (
+    args.failureClass === "terminal_authority" &&
+    RECOVERABLE_TERMINAL_REJECTION_REASONS.has(args.code ?? "")
+  ) {
     return "retryable";
   }
-  if (/unsupported|permanent|not_implemented|route_contract_forbidden/.test(text)) return "non_retryable";
+  if (
+    /unsupported|permanent|not_implemented|route_contract_forbidden/.test(text)
+  )
+    return "non_retryable";
   return "unknown";
 };
 
-const readAttemptRecord = (payload: RecordLike, turnId: string): RecordLike | null => {
+const readAttemptRecord = (
+  payload: RecordLike,
+  turnId: string,
+): RecordLike | null => {
   const direct = Array.isArray(payload.runtime_tool_observations)
     ? payload.runtime_tool_observations
         .map((entry: unknown) => readRecord(entry))
-        .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry))
+        .filter((entry: RecordLike | null): entry is RecordLike =>
+          Boolean(entry),
+        )
         .at(-1)
     : null;
   if (direct) return direct;
   const artifacts = currentTurnArtifacts(payload, turnId);
   const attemptArtifact = artifacts
-    .filter((artifact: HelixTurnArtifact) => /runtime_tool_(?:observation|call)|gateway_(?:observation|result)|capability_lane_(?:observation|result)/.test(artifact.kind))
+    .filter((artifact: HelixTurnArtifact) =>
+      /runtime_tool_(?:observation|call)|gateway_(?:observation|result)|capability_lane_(?:observation|result)/.test(
+        artifact.kind,
+      ),
+    )
     .at(-1);
   return readRecord(attemptArtifact?.payload) ?? null;
 };
@@ -346,12 +468,18 @@ const readAttemptRecord = (payload: RecordLike, turnId: string): RecordLike | nu
 const normalizeAttempt = (
   payload: RecordLike,
   turnId: string,
-  supplied: Partial<HelixAgentContinuationAttempt> | RecordLike | null | undefined,
+  supplied:
+    Partial<HelixAgentContinuationAttempt> | RecordLike | null | undefined,
 ): HelixAgentContinuationAttempt | null => {
   const record = readRecord(supplied) ?? readAttemptRecord(payload, turnId);
   if (!record) return null;
-  const action = (readRecord(record.action) ?? readRecord(record.requested_action)) as HelixAgentContinuationAction | null;
-  const args = readRecord(record.args) ?? readRecord(action?.args) ?? readRecord(record.arguments) ?? {};
+  const action = (readRecord(record.action) ??
+    readRecord(record.requested_action)) as HelixAgentContinuationAction | null;
+  const args =
+    readRecord(record.args) ??
+    readRecord(action?.args) ??
+    readRecord(record.arguments) ??
+    {};
   const capabilityId =
     readString(record.capability_id) ??
     readString(record.capability) ??
@@ -362,8 +490,14 @@ const normalizeAttempt = (
       : null);
   const rawStatus = (
     readString(record.status) ??
-    (readString(record.schema) === HELIX_TERMINAL_REJECTION_OBSERVATION_SCHEMA ? "failed" : null) ??
-    (readBoolean(record.ok) === true ? "succeeded" : readBoolean(record.ok) === false ? "failed" : "unknown")
+    (readString(record.schema) === HELIX_TERMINAL_REJECTION_OBSERVATION_SCHEMA
+      ? "failed"
+      : null) ??
+    (readBoolean(record.ok) === true
+      ? "succeeded"
+      : readBoolean(record.ok) === false
+        ? "failed"
+        : "unknown")
   ).toLowerCase();
   const status: HelixAgentContinuationAttempt["status"] =
     /success|succeeded|complete|observed|ok/.test(rawStatus)
@@ -387,21 +521,22 @@ const normalizeAttempt = (
     readString(readRecord(record.error)?.message) ??
     null;
   const explicitFailureClass = readString(record.failure_class);
-  const failureClass = status === "succeeded"
-    ? "none"
-    : [
-        "none",
-        "invalid_args",
-        "permission",
-        "missing_evidence",
-        "temporary",
-        "provider",
-        "route",
-        "terminal_authority",
-        "unknown",
-      ].includes(explicitFailureClass ?? "")
-      ? explicitFailureClass as HelixAgentContinuationFailureClass
-      : classifyFailure(failureCode, failureMessage);
+  const failureClass =
+    status === "succeeded"
+      ? "none"
+      : [
+            "none",
+            "invalid_args",
+            "permission",
+            "missing_evidence",
+            "temporary",
+            "provider",
+            "route",
+            "terminal_authority",
+            "unknown",
+          ].includes(explicitFailureClass ?? "")
+        ? (explicitFailureClass as HelixAgentContinuationFailureClass)
+        : classifyFailure(failureCode, failureMessage);
   const fingerprint =
     readString(record.action_fingerprint) ??
     readString(record.fingerprint) ??
@@ -418,7 +553,13 @@ const normalizeAttempt = (
     failure_class: failureClass,
     failure_code: failureCode,
     failure_message: failureMessage,
-    retryability: classifyRetryability({ record, status, failureClass, code: failureCode, message: failureMessage }),
+    retryability: classifyRetryability({
+      record,
+      status,
+      failureClass,
+      code: failureCode,
+      message: failureMessage,
+    }),
     observation_refs: uniqueStrings([
       record.observation_refs,
       record.observed_artifact_refs,
@@ -434,7 +575,10 @@ const collectTriedFingerprints = (
   previousState: HelixAgentContinuationState | null,
   lastAttempt: HelixAgentContinuationAttempt | null,
 ): string[] => {
-  const values: unknown[] = [previousState?.tried_action_fingerprints, lastAttempt?.action_fingerprint];
+  const values: unknown[] = [
+    previousState?.tried_action_fingerprints,
+    lastAttempt?.action_fingerprint,
+  ];
   const loop = readRecord(payload.agent_runtime_loop);
   const iterations = Array.isArray(loop?.iterations) ? loop.iterations : [];
   for (const rawIteration of iterations) {
@@ -444,12 +588,15 @@ const collectTriedFingerprints = (
       iteration?.executed_action_fingerprint,
     ]);
     values.push(...iterationFingerprints);
-    const capability = readString(iteration?.chosen_capability) ?? readString(iteration?.executed_action_key);
+    const capability =
+      readString(iteration?.chosen_capability) ??
+      readString(iteration?.executed_action_key);
     // Capability-only fingerprints are a fallback for legacy iterations that
     // did not record arguments. Recording both forms makes every later call to
     // the same capability look tried, even when it targets a different page,
     // crop, source, or query.
-    if (capability && iterationFingerprints.length === 0) values.push(`capability:${capability}`);
+    if (capability && iterationFingerprints.length === 0)
+      values.push(`capability:${capability}`);
   }
   return uniqueStrings(values);
 };
@@ -477,6 +624,9 @@ const AFFORDANCE_CONTROL_KEYS = new Set([
   "tried",
   "action_fingerprint",
   "mode",
+  "requires_confirmation",
+  "executes_automatically",
+  "output_role",
   "terminal_eligible",
   "assistant_answer",
   "raw_content_included",
@@ -484,8 +634,9 @@ const AFFORDANCE_CONTROL_KEYS = new Set([
 
 const inlineAffordanceArgs = (record: RecordLike): RecordLike =>
   Object.fromEntries(
-    Object.entries(record).filter(([key, value]) =>
-      !AFFORDANCE_CONTROL_KEYS.has(key) && value !== undefined
+    Object.entries(record).filter(
+      ([key, value]) =>
+        !AFFORDANCE_CONTROL_KEYS.has(key) && value !== undefined,
     ),
   );
 
@@ -497,7 +648,8 @@ const normalizeAffordanceCandidate = (args: {
 }): HelixAgentContinuationAffordance | null => {
   const record = readRecord(args.value);
   if (!record) return null;
-  const action = (readRecord(record.action) ?? readRecord(record.suggested_action)) as HelixAgentContinuationAction | null;
+  const action = (readRecord(record.action) ??
+    readRecord(record.suggested_action)) as HelixAgentContinuationAction | null;
   const suppliedLaneRequest =
     readRecord(record.lane_request) ??
     readRecord(record.capability_lane_call) ??
@@ -535,7 +687,9 @@ const normalizeAffordanceCandidate = (args: {
       }
     : suppliedLaneRequest;
   const fingerprint = actionFingerprint(capabilityId, action, affordanceArgs);
-  const capabilityOnlyFingerprint = capabilityId ? `capability:${capabilityId}` : null;
+  const capabilityOnlyFingerprint = capabilityId
+    ? `capability:${capabilityId}`
+    : null;
   return {
     affordance_id:
       readString(record.affordance_id) ??
@@ -547,8 +701,14 @@ const normalizeAffordanceCandidate = (args: {
     lane_request: laneRequest,
     source_ref: args.sourceRef,
     reason: args.reason ?? readString(record.reason),
-    admissible: readBoolean(record.admissible) ?? readBoolean(record.allowed) ?? true,
-    tried: args.triedFingerprints.has(fingerprint) || Boolean(capabilityOnlyFingerprint && args.triedFingerprints.has(capabilityOnlyFingerprint)),
+    admissible:
+      readBoolean(record.admissible) ?? readBoolean(record.allowed) ?? true,
+    tried:
+      args.triedFingerprints.has(fingerprint) ||
+      Boolean(
+        capabilityOnlyFingerprint &&
+        args.triedFingerprints.has(capabilityOnlyFingerprint),
+      ),
     action_fingerprint: fingerprint,
   };
 };
@@ -560,14 +720,25 @@ const collectAffordances = (
 ): HelixAgentContinuationAffordance[] => {
   const tried = new Set(triedFingerprints);
   const candidates: HelixAgentContinuationAffordance[] = [];
-  const push = (value: unknown, sourceRef: string | null, reason?: string | null): void => {
+  const push = (
+    value: unknown,
+    sourceRef: string | null,
+    reason?: string | null,
+  ): void => {
     const values = Array.isArray(value) ? value : [value];
     for (const entry of values) {
-      const normalized = normalizeAffordanceCandidate({ value: entry, sourceRef, reason, triedFingerprints: tried });
+      const normalized = normalizeAffordanceCandidate({
+        value: entry,
+        sourceRef,
+        reason,
+        triedFingerprints: tried,
+      });
       if (normalized) candidates.push(normalized);
     }
   };
-  for (const rawHint of Array.isArray(payload.runtime_continuation_hints) ? payload.runtime_continuation_hints : []) {
+  for (const rawHint of Array.isArray(payload.runtime_continuation_hints)
+    ? payload.runtime_continuation_hints
+    : []) {
     const hint = readRecord(rawHint);
     push(hint, readString(hint?.hint_id), readString(hint?.reason));
   }
@@ -577,38 +748,82 @@ const collectAffordances = (
     push(artifactPayload?.next_admissible_affordances, artifact.artifact_id);
   }
   const available = readRecord(payload.available_capabilities);
-  for (const rawCapability of Array.isArray(available?.capabilities) ? available.capabilities : []) {
+  for (const rawCapability of Array.isArray(available?.capabilities)
+    ? available.capabilities
+    : []) {
     const capability = readRecord(rawCapability);
-    if (!capability || readBoolean(capability.allowed) === false || readBoolean(capability.admissible) === false) continue;
-    if (readString(capability.goal_fit) !== "primary" && readBoolean(capability.recommended) !== true) continue;
-    push(capability, readString(available?.artifact_id) ?? `${turnId}:available_capabilities`);
+    if (
+      !capability ||
+      readBoolean(capability.allowed) === false ||
+      readBoolean(capability.admissible) === false
+    )
+      continue;
+    if (
+      readString(capability.goal_fit) !== "primary" &&
+      readBoolean(capability.recommended) !== true
+    )
+      continue;
+    push(
+      capability,
+      readString(available?.artifact_id) ?? `${turnId}:available_capabilities`,
+    );
   }
-  return candidates.filter((candidate: HelixAgentContinuationAffordance, index: number, all: HelixAgentContinuationAffordance[]) =>
-    all.findIndex((entry: HelixAgentContinuationAffordance) => entry.action_fingerprint === candidate.action_fingerprint) === index,
+  return candidates.filter(
+    (
+      candidate: HelixAgentContinuationAffordance,
+      index: number,
+      all: HelixAgentContinuationAffordance[],
+    ) =>
+      all.findIndex(
+        (entry: HelixAgentContinuationAffordance) =>
+          entry.action_fingerprint === candidate.action_fingerprint,
+      ) === index,
   );
 };
 
-const dimension = (max: number | null, consumed: number): HelixAgentContinuationBudgetDimension => ({
+const dimension = (
+  max: number | null,
+  consumed: number,
+): HelixAgentContinuationBudgetDimension => ({
   max,
   consumed: Math.max(0, consumed),
   remaining: max === null ? null : Math.max(0, max - consumed),
 });
 
 const readBudget = (payload: RecordLike): HelixAgentContinuationBudget => {
-  const budget = readRecord(payload.agent_loop_budget) ?? readRecord(payload.budget) ?? {};
+  const budget =
+    readRecord(payload.agent_loop_budget) ?? readRecord(payload.budget) ?? {};
   const loop = readRecord(payload.agent_runtime_loop) ?? {};
-  const softMaxIterations = readNumber(loop.max_iterations) ?? readNumber(budget.max_iterations);
-  const softMaxTools = readNumber(loop.max_tool_calls) ?? readNumber(budget.max_tool_calls);
-  const softMaxDecisions = readNumber(loop.max_llm_decisions) ?? readNumber(budget.max_llm_decisions);
-  const hardMaxIterations = readNumber(loop.hard_max_iterations) ?? readNumber(budget.hard_max_iterations) ?? softMaxIterations;
-  const hardMaxTools = readNumber(loop.hard_max_tool_calls) ?? readNumber(budget.hard_max_tool_calls) ?? softMaxTools;
-  const hardMaxDecisions = readNumber(loop.hard_max_llm_decisions) ?? readNumber(budget.hard_max_llm_decisions) ?? softMaxDecisions;
+  const softMaxIterations =
+    readNumber(loop.max_iterations) ?? readNumber(budget.max_iterations);
+  const softMaxTools =
+    readNumber(loop.max_tool_calls) ?? readNumber(budget.max_tool_calls);
+  const softMaxDecisions =
+    readNumber(loop.max_llm_decisions) ?? readNumber(budget.max_llm_decisions);
+  const hardMaxIterations =
+    readNumber(loop.hard_max_iterations) ??
+    readNumber(budget.hard_max_iterations) ??
+    softMaxIterations;
+  const hardMaxTools =
+    readNumber(loop.hard_max_tool_calls) ??
+    readNumber(budget.hard_max_tool_calls) ??
+    softMaxTools;
+  const hardMaxDecisions =
+    readNumber(loop.hard_max_llm_decisions) ??
+    readNumber(budget.hard_max_llm_decisions) ??
+    softMaxDecisions;
   const consumedIterations =
     (Array.isArray(loop.iterations) ? loop.iterations.length : null) ??
     readNumber(budget.consumed_iterations) ??
     0;
-  const consumedTools = readNumber(loop.executed_tool_call_count) ?? readNumber(budget.consumed_tool_calls) ?? 0;
-  const consumedDecisions = readNumber(loop.llm_decision_count) ?? readNumber(budget.consumed_llm_decisions) ?? 0;
+  const consumedTools =
+    readNumber(loop.executed_tool_call_count) ??
+    readNumber(budget.consumed_tool_calls) ??
+    0;
+  const consumedDecisions =
+    readNumber(loop.llm_decision_count) ??
+    readNumber(budget.consumed_llm_decisions) ??
+    0;
   const soft = {
     iterations: dimension(softMaxIterations, consumedIterations),
     tool_calls: dimension(softMaxTools, consumedTools),
@@ -619,24 +834,43 @@ const readBudget = (payload: RecordLike): HelixAgentContinuationBudget => {
     tool_calls: dimension(hardMaxTools, consumedTools),
     model_decisions: dimension(hardMaxDecisions, consumedDecisions),
   };
-  const softRemaining = ([soft.iterations.remaining, soft.tool_calls.remaining, soft.model_decisions.remaining] as Array<number | null>)
-    .filter((value: number | null): value is number => value !== null);
-  const hardRemaining = ([hard.iterations.remaining, hard.tool_calls.remaining, hard.model_decisions.remaining] as Array<number | null>)
-    .filter((value: number | null): value is number => value !== null);
+  const softRemaining = (
+    [
+      soft.iterations.remaining,
+      soft.tool_calls.remaining,
+      soft.model_decisions.remaining,
+    ] as Array<number | null>
+  ).filter((value: number | null): value is number => value !== null);
+  const hardRemaining = (
+    [
+      hard.iterations.remaining,
+      hard.tool_calls.remaining,
+      hard.model_decisions.remaining,
+    ] as Array<number | null>
+  ).filter((value: number | null): value is number => value !== null);
   const softExhausted = softRemaining.some((value: number) => value <= 0);
-  const softApproaching = !softExhausted && softRemaining.some((value: number) => value <= 1);
+  const softApproaching =
+    !softExhausted && softRemaining.some((value: number) => value <= 1);
   return {
     soft: {
       ...soft,
-      pressure: softExhausted ? "exhausted" : softApproaching ? "approaching" : "none",
+      pressure: softExhausted
+        ? "exhausted"
+        : softApproaching
+          ? "approaching"
+          : "none",
       exhausted: softExhausted,
     },
     hard: {
       ...hard,
       exhausted: hardRemaining.some((value: number) => value <= 0),
     },
-    extension_count: readNumber(loop.budget_extension_count) ?? readNumber(budget.budget_extension_count) ?? 0,
-    max_extensions: readNumber(loop.max_extensions) ?? readNumber(budget.max_extensions),
+    extension_count:
+      readNumber(loop.budget_extension_count) ??
+      readNumber(budget.budget_extension_count) ??
+      0,
+    max_extensions:
+      readNumber(loop.max_extensions) ?? readNumber(budget.max_extensions),
   };
 };
 
@@ -653,11 +887,14 @@ const resolveAllowedDecisions = (args: {
   if (args.goalSatisfied) return ["answer"];
   const canAct =
     !args.budget.hard.exhausted &&
-    (
-      args.capabilityProposalAllowed ||
-      args.affordances.some((affordance: HelixAgentContinuationAffordance) => affordance.admissible && !affordance.tried)
-    );
-  const canRetry = !args.budget.hard.exhausted && args.lastAttempt?.retryability === "retryable";
+    (args.capabilityProposalAllowed ||
+      args.affordances.some(
+        (affordance: HelixAgentContinuationAffordance) =>
+          affordance.admissible && !affordance.tried,
+      ));
+  const canRetry =
+    !args.budget.hard.exhausted &&
+    args.lastAttempt?.retryability === "retryable";
   if (canAct) {
     decisions.add("act");
   }
@@ -669,7 +906,9 @@ const resolveAllowedDecisions = (args: {
   if (
     args.goalStatus === "needs_user_input" ||
     args.lastAttempt?.retryability === "requires_user_input" ||
-    (args.missingRequirementIds.length > 0 && !decisions.has("act") && !decisions.has("retry"))
+    (args.missingRequirementIds.length > 0 &&
+      !decisions.has("act") &&
+      !decisions.has("retry"))
   ) {
     decisions.add("ask_user");
   }
@@ -680,7 +919,9 @@ const resolveAllowedDecisions = (args: {
   ) {
     decisions.add("fail");
   }
-  return ["act", "retry", "ask_user", "answer", "fail"].filter((decision) => decisions.has(decision as HelixAgentContinuationDecision)) as HelixAgentContinuationDecision[];
+  return ["act", "retry", "ask_user", "answer", "fail"].filter((decision) =>
+    decisions.has(decision as HelixAgentContinuationDecision),
+  ) as HelixAgentContinuationDecision[];
 };
 
 export const buildHelixAgentContinuationState = (
@@ -688,30 +929,57 @@ export const buildHelixAgentContinuationState = (
 ): HelixAgentContinuationState => {
   const previousState = args.previousState ?? null;
   const previousSequence = Number.isFinite(previousState?.sequence)
-    ? previousState?.sequence ?? 0
+    ? (previousState?.sequence ?? 0)
     : 0;
   const sequence = previousSequence + 1;
   const observations = collectObservationRefs(args.payload, args.turnId);
-  const previousObservations = new Set(previousState?.observation_refs?.all ?? []);
-  const newObservations = observations.filter((ref: string) => !previousObservations.has(ref));
-  const existingObservations = observations.filter((ref: string) => previousObservations.has(ref));
-  const lastAttempt = normalizeAttempt(args.payload, args.turnId, args.lastAttempt);
+  const previousObservations = new Set(
+    previousState?.observation_refs?.all ?? [],
+  );
+  const newObservations = observations.filter(
+    (ref: string) => !previousObservations.has(ref),
+  );
+  const existingObservations = observations.filter((ref: string) =>
+    previousObservations.has(ref),
+  );
+  const lastAttempt = normalizeAttempt(
+    args.payload,
+    args.turnId,
+    args.lastAttempt,
+  );
   const missingRequirementIds = uniqueStrings([
     collectMissingRequirementIds(args.payload),
-    lastAttempt?.failure_class === "missing_evidence" ? lastAttempt.failure_code : null,
+    lastAttempt?.failure_class === "missing_evidence"
+      ? lastAttempt.failure_code
+      : null,
   ]);
   const previousMissing = new Set(previousState?.missing_requirement_ids ?? []);
   const currentMissing = new Set(missingRequirementIds);
-  const resolvedRequirements = [...previousMissing].filter((id: string) => !currentMissing.has(id));
-  const addedRequirements = missingRequirementIds.filter((id: string) => !previousMissing.has(id));
-  const triedFingerprints = collectTriedFingerprints(args.payload, previousState, lastAttempt);
-  const affordances = collectAffordances(args.payload, args.turnId, triedFingerprints);
+  const resolvedRequirements = [...previousMissing].filter(
+    (id: string) => !currentMissing.has(id),
+  );
+  const addedRequirements = missingRequirementIds.filter(
+    (id: string) => !previousMissing.has(id),
+  );
+  const triedFingerprints = collectTriedFingerprints(
+    args.payload,
+    previousState,
+    lastAttempt,
+  );
+  const affordances = collectAffordances(
+    args.payload,
+    args.turnId,
+    triedFingerprints,
+  );
   const previousAffordanceIds = new Set(
     previousState?.next_admissible_affordances?.map(
       (entry: HelixAgentContinuationAffordance) => entry.affordance_id,
     ) ?? [],
   );
-  const newAffordanceCount = affordances.filter((entry: HelixAgentContinuationAffordance) => !previousAffordanceIds.has(entry.affordance_id)).length;
+  const newAffordanceCount = affordances.filter(
+    (entry: HelixAgentContinuationAffordance) =>
+      !previousAffordanceIds.has(entry.affordance_id),
+  ).length;
   const failedAttemptHasOnlyBookkeepingObservations = Boolean(
     lastAttempt &&
     (lastAttempt.status === "failed" || lastAttempt.status === "blocked") &&
@@ -719,18 +987,21 @@ export const buildHelixAgentContinuationState = (
     newAffordanceCount === 0,
   );
   const madeProgress =
-    (newObservations.length > 0 && !failedAttemptHasOnlyBookkeepingObservations) ||
+    (newObservations.length > 0 &&
+      !failedAttemptHasOnlyBookkeepingObservations) ||
     resolvedRequirements.length > 0 ||
     newAffordanceCount > 0;
   const repeatedFingerprint = Boolean(
     previousState?.last_attempt?.action_fingerprint &&
     lastAttempt?.action_fingerprint &&
-    previousState.last_attempt.action_fingerprint === lastAttempt.action_fingerprint,
+    previousState.last_attempt.action_fingerprint ===
+      lastAttempt.action_fingerprint,
   );
   const noProgressRepeatCount = madeProgress
     ? 0
     : previousState
-      ? (previousState.progress?.no_progress_repeat_count ?? 0) + (repeatedFingerprint || lastAttempt ? 1 : 0)
+      ? (previousState.progress?.no_progress_repeat_count ?? 0) +
+        (repeatedFingerprint || lastAttempt ? 1 : 0)
       : 0;
   const normalizedGoal = normalizeGoalStatus(args.payload);
   const recoverableTerminalRejectionPending = Boolean(
@@ -751,7 +1022,9 @@ export const buildHelixAgentContinuationState = (
       args.capabilityProposal?.allowed === true &&
       !budget.hard.exhausted &&
       uniqueStrings(args.capabilityProposal.admittedCapabilityIds).length > 0,
-    admitted_capability_ids: uniqueStrings(args.capabilityProposal?.admittedCapabilityIds ?? []).sort(),
+    admitted_capability_ids: uniqueStrings(
+      args.capabilityProposal?.admittedCapabilityIds ?? [],
+    ).sort(),
     authority: "helix_policy_admits_runtime_proposal" as const,
   };
   const reasonCodes = uniqueStrings([
@@ -759,9 +1032,15 @@ export const buildHelixAgentContinuationState = (
     resolvedRequirements.length > 0 ? "requirements_resolved" : null,
     addedRequirements.length > 0 ? "requirements_added" : null,
     newAffordanceCount > 0 ? "new_affordance" : null,
-    repeatedFingerprint && !madeProgress ? "repeated_action_without_progress" : null,
-    failedAttemptHasOnlyBookkeepingObservations ? "failed_attempt_observation_only" : null,
-    budget.soft.pressure !== "none" ? `soft_budget_${budget.soft.pressure}` : null,
+    repeatedFingerprint && !madeProgress
+      ? "repeated_action_without_progress"
+      : null,
+    failedAttemptHasOnlyBookkeepingObservations
+      ? "failed_attempt_observation_only"
+      : null,
+    budget.soft.pressure !== "none"
+      ? `soft_budget_${budget.soft.pressure}`
+      : null,
     budget.hard.exhausted ? "hard_resource_boundary_exhausted" : null,
     !previousState ? "initial_continuation_state" : null,
   ]);
@@ -825,11 +1104,21 @@ export const appendHelixAgentContinuationStateToPayload = (args: {
   const existingStates = Array.isArray(args.payload.agent_continuation_states)
     ? (args.payload.agent_continuation_states as unknown[])
         .map((value) => readRecord(value) as HelixAgentContinuationState | null)
-        .filter((value): value is HelixAgentContinuationState => Boolean(value?.schema === HELIX_AGENT_CONTINUATION_STATE_SCHEMA))
+        .filter((value): value is HelixAgentContinuationState =>
+          Boolean(value?.schema === HELIX_AGENT_CONTINUATION_STATE_SCHEMA),
+        )
     : [];
   const states = [...existingStates, args.state]
-    .filter((state: HelixAgentContinuationState, index: number, all: HelixAgentContinuationState[]) =>
-      all.findIndex((candidate: HelixAgentContinuationState) => candidate.state_id === state.state_id) === index,
+    .filter(
+      (
+        state: HelixAgentContinuationState,
+        index: number,
+        all: HelixAgentContinuationState[],
+      ) =>
+        all.findIndex(
+          (candidate: HelixAgentContinuationState) =>
+            candidate.state_id === state.state_id,
+        ) === index,
     )
     .slice(-HELIX_AGENT_CONTINUATION_STATE_HISTORY_LIMIT);
   args.payload.agent_continuation_state = args.state;
@@ -855,7 +1144,8 @@ export const appendHelixAgentContinuationStateToPayload = (args: {
   if (debug) {
     debug.agent_continuation_state = args.state;
     debug.agent_continuation_states = states;
-    debug.current_turn_artifact_ledger = args.payload.current_turn_artifact_ledger;
+    debug.current_turn_artifact_ledger =
+      args.payload.current_turn_artifact_ledger;
   }
 };
 
@@ -884,8 +1174,20 @@ export const buildHelixTerminalRejectionObservation = (args: {
     failure_class: "terminal_authority",
     retryability: recoverable ? "retryable" : "non_retryable",
     next_affordances: recoverable
-      ? [{ decision: "answer", reason: "Produce a route-approved answer grounded in the observations already re-entered." }]
-      : [{ decision: "fail", reason: "The candidate conflicts with the committed route or terminal policy." }],
+      ? [
+          {
+            decision: "answer",
+            reason:
+              "Produce a route-approved answer grounded in the observations already re-entered.",
+          },
+        ]
+      : [
+          {
+            decision: "fail",
+            reason:
+              "The candidate conflicts with the committed route or terminal policy.",
+          },
+        ],
     terminal_eligible: false,
     assistant_answer: false,
     raw_content_included: false,
@@ -896,14 +1198,34 @@ export const appendHelixTerminalRejectionObservationToPayload = (args: {
   payload: RecordLike;
   observation: HelixTerminalRejectionObservation;
 }): void => {
-  const observations = Array.isArray(args.payload.terminal_rejection_observations)
+  const observations = Array.isArray(
+    args.payload.terminal_rejection_observations,
+  )
     ? (args.payload.terminal_rejection_observations as unknown[])
-        .map((value) => readRecord(value) as HelixTerminalRejectionObservation | null)
-        .filter((value): value is HelixTerminalRejectionObservation => Boolean(value?.schema === HELIX_TERMINAL_REJECTION_OBSERVATION_SCHEMA))
+        .map(
+          (value) =>
+            readRecord(value) as HelixTerminalRejectionObservation | null,
+        )
+        .filter((value): value is HelixTerminalRejectionObservation =>
+          Boolean(
+            value?.schema === HELIX_TERMINAL_REJECTION_OBSERVATION_SCHEMA,
+          ),
+        )
     : [];
-  args.payload.terminal_rejection_observations = [...observations, args.observation]
-    .filter((entry: HelixTerminalRejectionObservation, index: number, all: HelixTerminalRejectionObservation[]) =>
-      all.findIndex((candidate: HelixTerminalRejectionObservation) => candidate.observation_id === entry.observation_id) === index,
+  args.payload.terminal_rejection_observations = [
+    ...observations,
+    args.observation,
+  ]
+    .filter(
+      (
+        entry: HelixTerminalRejectionObservation,
+        index: number,
+        all: HelixTerminalRejectionObservation[],
+      ) =>
+        all.findIndex(
+          (candidate: HelixTerminalRejectionObservation) =>
+            candidate.observation_id === entry.observation_id,
+        ) === index,
     )
     .slice(-HELIX_TERMINAL_REJECTION_OBSERVATION_HISTORY_LIMIT);
   const ledger = Array.isArray(args.payload.current_turn_artifact_ledger)
@@ -925,8 +1247,10 @@ export const appendHelixTerminalRejectionObservationToPayload = (args: {
   });
   const debug = readRecord(args.payload.debug);
   if (debug) {
-    debug.terminal_rejection_observations = args.payload.terminal_rejection_observations;
-    debug.current_turn_artifact_ledger = args.payload.current_turn_artifact_ledger;
+    debug.terminal_rejection_observations =
+      args.payload.terminal_rejection_observations;
+    debug.current_turn_artifact_ledger =
+      args.payload.current_turn_artifact_ledger;
   }
 };
 
@@ -941,26 +1265,50 @@ export const resolveHelixContinuationBudgetExtension = (args: {
     increments: { iterations: 0, tool_calls: 0, model_decisions: 0 },
   });
   if (args.state.goal.satisfied) return none("goal_already_satisfied");
-  if (args.state.budget.hard.exhausted) return none("hard_resource_boundary_exhausted");
-  if (args.state.budget.soft.pressure === "none") return none("soft_budget_not_under_pressure");
+  if (args.state.budget.hard.exhausted)
+    return none("hard_resource_boundary_exhausted");
+  if (args.state.budget.soft.pressure === "none")
+    return none("soft_budget_not_under_pressure");
   if (
     args.state.budget.max_extensions !== null &&
     args.state.budget.extension_count >= args.state.budget.max_extensions
   ) {
     return none("maximum_budget_extensions_reached");
   }
-  if (args.state.progress.no_progress_repeat_count >= 2) return none("repeated_no_progress_boundary_reached");
-  const hasUntriedAffordance = args.state.next_admissible_affordances.some((entry: HelixAgentContinuationAffordance) => entry.admissible && !entry.tried);
-  const hasRetryableAttempt = args.state.last_attempt?.retryability === "retryable";
-  if (!args.state.progress.made_progress && !hasUntriedAffordance && !hasRetryableAttempt) {
+  if (args.state.progress.no_progress_repeat_count >= 2)
+    return none("repeated_no_progress_boundary_reached");
+  const hasUntriedAffordance = args.state.next_admissible_affordances.some(
+    (entry: HelixAgentContinuationAffordance) =>
+      entry.admissible && !entry.tried,
+  );
+  const hasRetryableAttempt =
+    args.state.last_attempt?.retryability === "retryable";
+  if (
+    !args.state.progress.made_progress &&
+    !hasUntriedAffordance &&
+    !hasRetryableAttempt
+  ) {
     return none("no_progress_or_untried_admissible_action");
   }
   const proposed = {
-    iterations: Math.max(0, Math.min(2, args.hard.iterations - args.current.iterations)),
-    tool_calls: Math.max(0, Math.min(1, args.hard.tool_calls - args.current.tool_calls)),
-    model_decisions: Math.max(0, Math.min(2, args.hard.model_decisions - args.current.model_decisions)),
+    iterations: Math.max(
+      0,
+      Math.min(2, args.hard.iterations - args.current.iterations),
+    ),
+    tool_calls: Math.max(
+      0,
+      Math.min(1, args.hard.tool_calls - args.current.tool_calls),
+    ),
+    model_decisions: Math.max(
+      0,
+      Math.min(2, args.hard.model_decisions - args.current.model_decisions),
+    ),
   };
-  if (proposed.iterations === 0 && proposed.tool_calls === 0 && proposed.model_decisions === 0) {
+  if (
+    proposed.iterations === 0 &&
+    proposed.tool_calls === 0 &&
+    proposed.model_decisions === 0
+  ) {
     return none("hard_resource_boundary_has_no_remaining_capacity");
   }
   return {
@@ -978,7 +1326,10 @@ export const formatHelixAgentContinuationStateForRuntime = (
   state: HelixAgentContinuationState,
 ): string => {
   const hasUntriedLaneRequest = state.next_admissible_affordances.some(
-    (affordance) => affordance.admissible && !affordance.tried && Boolean(affordance.lane_request),
+    (affordance) =>
+      affordance.admissible &&
+      !affordance.tried &&
+      Boolean(affordance.lane_request),
   );
   const mayProposeBoundedRecovery =
     state.allowed_decisions.includes("retry") &&
@@ -996,7 +1347,7 @@ export const formatHelixAgentContinuationStateForRuntime = (
       ? "Retry is allowed but no concrete lane_request was prescribed. You may propose exactly one bounded recovery capability grounded in the failed observation, its missing requirements, and the same source identity. Helix must independently admit the capability and arguments before execution. Do not broaden the source, invent identifiers, or repeat an unchanged failed request."
       : mayProposeManifestCapability
         ? "Act may be satisfied by proposing exactly one capability_id from capability_proposal.admitted_capability_ids with the minimum arguments needed for the user goal. This is a proposal, not admission: Helix independently validates the capability, arguments, permissions, source identity, and route before execution."
-      : "Tool actions and retries require an untried admitted affordance.",
+        : "Tool actions and retries require an untried admitted affordance.",
     "If answer is absent from allowed_decisions, do not produce a terminal answer or bounded failure. Continue with the permitted act/retry, or ask the user only when ask_user is allowed and no bounded recovery can be grounded. Answer when the goal is satisfied or when the admitted recovery surface is exhausted. Budgets are resource boundaries, not conclusions.",
   ].join("\n");
 };

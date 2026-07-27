@@ -29,6 +29,41 @@ describe("Helix Ask tool lifecycle trace", () => {
     expect(contract?.allowedTerminalKinds).toEqual(expect.arrayContaining(["doc_summary"]));
   });
 
+  it("preserves an exact admitted capability ahead of coarse family projections", () => {
+    const capability = "theory-experiment-procedure.prepare";
+    const payload: Record<string, unknown> = {
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:exact-admitted-capability",
+        capability_family: "theory_locator",
+        requested_capability: capability,
+        admission_status: "admitted",
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: "ask:test:exact-admitted-capability",
+        requested_capability: capability,
+        selected_capability: capability,
+        admitted_capability: capability,
+        admitted_tool_families: ["theory_locator"],
+      },
+      operational_capability_trace: {
+        policy_admitted_capability: "theory_locator",
+      },
+    };
+
+    expect(
+      buildToolLifecycleTrace({
+        turnId: "ask:test:exact-admitted-capability",
+        payload,
+      }),
+    ).toMatchObject({
+      requested_capability: capability,
+      admitted_capability: capability,
+      tool_family: "theory_locator",
+    });
+  });
+
   it("does not mark Moral Graph family reentered when top-level reentry failed", () => {
     const turnId = "ask:test:moral-graph-family-reentry-failed";
     const moralRef = `${turnId}:moral_graph_reflection:1`;
@@ -2635,6 +2670,313 @@ describe("Helix Ask tool lifecycle trace", () => {
       visible_terminal_kind: "doc_summary",
       first_broken_rail: "terminal_materialization",
       repair_target: "terminal_materializer",
+      codex_parity_class: "terminal_product_not_allowed",
+      rail_failure_code: "terminal_product_mismatch",
+    });
+  });
+
+  it("lets a committed compound route authorize synthesis after an evidence-only theory reflection tool", () => {
+    const turnId = "ask:test:committed-compound-theory-reflection";
+    const observationRef = `${turnId}:theory_context_reflection`;
+    const terminalKind = "compound_evidence_synthesis_answer";
+    const payload: Record<string, unknown> = {
+      active_prompt:
+        "Compare the selected theory badges, reflect their current context, and synthesize the bounded comparison.",
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        turn_id: turnId,
+        goal_kind: "theory_context_reflection",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        turn_id: turnId,
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: [
+          "theory_context_reflection_answer",
+          "model_synthesized_answer",
+        ],
+      },
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        commit_id: "committed-route:compound-theory-reflection",
+        prompt_hash: "prompt-hash:compound-theory-reflection",
+        committed_at_stage: "post_prompt_source_arbitration",
+        prompt_intent: {
+          primary_intent_kind: "general_reasoning",
+          secondary_intent_kinds: [],
+        },
+        route: {
+          selected_route: "/ask",
+          source_target: "theory_locator",
+          target_kind: "theory_locator",
+          strength: "hard",
+          source_identity: null,
+          route_reason: "explicit_capability_contract",
+          stale_metadata_policy: "ignore_unless_matches_commit",
+        },
+        canonical_goal: {
+          goal_kind: "theory_locator",
+          required_terminal_kind: terminalKind,
+          allowed_terminal_artifact_kinds: [
+            terminalKind,
+            "model_synthesized_answer",
+          ],
+          forbidden_terminal_artifact_kinds: [
+            "tool_receipt",
+            "workspace_action_receipt",
+          ],
+        },
+        capability_policy: {
+          allowed_tool_families: ["theory_locator"],
+          suppressed_tool_families: [],
+          required_capability_families: ["theory_locator"],
+          mutating_families_allowed: false,
+        },
+        suppression: {
+          contextual_tool_mentions: [],
+          negative_constraints: [],
+          suppressed_families: [],
+          firewall_required: true,
+        },
+        terminal_product: {
+          terminal_authority_required: true,
+          evidence_reentry_required: true,
+          followup_reasoning_required: true,
+          required_terminal_product: terminalKind,
+        },
+        transitions: [],
+        compatibility: {
+          source_goal_capability_terminal_compatible: true,
+          stale_metadata_ignored: true,
+          shortcut_firewall_applied: false,
+          violations: [],
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      route_evidence_authority: {
+        schema: "helix.route_evidence_authority.v1",
+        turn_id: turnId,
+        terminal_product_allowed: true,
+        required_terminal_kind: terminalKind,
+        allowed_terminal_artifact_kinds: [terminalKind],
+        forbidden_terminal_artifact_kinds: [
+          "tool_receipt",
+          "workspace_action_receipt",
+        ],
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "helix_ask.reflect_theory_context",
+        requested_capability_family: "theory_locator",
+        requested_capability_source: "explicit_user_command",
+        required_observation_kinds_for_requested_capability: [
+          "theory_context_reflection",
+          "helix_theory_context_reflection_tool_receipt",
+        ],
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: turnId,
+        capability_family: "theory_locator",
+        requested_capability: "helix_ask.reflect_theory_context",
+        selected_capability: "helix_ask.reflect_theory_context",
+        admission_status: "admitted",
+      },
+      operational_capability_trace: {
+        model_proposed_capability: "helix_ask.reflect_theory_context",
+        policy_admitted_capability: "helix_ask.reflect_theory_context",
+        executed_capability: "helix_ask.reflect_theory_context",
+      },
+      tool_lifecycle_trace: {
+        schema: "helix.tool_lifecycle_trace.v1",
+        requested_capability: "helix_ask.reflect_theory_context",
+        admitted_capability: "helix_ask.reflect_theory_context",
+        executed_capability: "helix_ask.reflect_theory_context",
+        lifecycle_stage: "reentered_solver",
+        status: "completed",
+        observation_refs: [observationRef],
+        evidence_refs: [observationRef],
+      },
+      capability_result: {
+        schema: "helix.capability_result.v1",
+        turn_id: turnId,
+        capability_key: "helix_ask.reflect_theory_context",
+        requested_capability: "helix_ask.reflect_theory_context",
+        admitted_capability: "helix_ask.reflect_theory_context",
+        executed_capability: "helix_ask.reflect_theory_context",
+        status: "succeeded",
+        reentered_solver: true,
+        selected_for_answer: true,
+        observation_refs: [observationRef],
+        evidence_refs: [observationRef],
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: `${turnId}:final_answer_draft`,
+        support_refs: [observationRef],
+      },
+      terminal_artifact_kind: terminalKind,
+      final_answer_source: terminalKind,
+      terminal_answer_authority: {
+        schema: "helix.terminal_answer_authority.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: terminalKind,
+        final_answer_source: terminalKind,
+        support_refs: [observationRef],
+        server_authoritative: true,
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        turn_id: turnId,
+        selected_terminal_artifact_kind: terminalKind,
+        terminal_artifact_kind: terminalKind,
+        support_refs: [observationRef],
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: terminalKind,
+        final_answer_source: terminalKind,
+        selected_observation_refs: [observationRef],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: observationRef,
+          kind: "helix_theory_context_reflection_tool_receipt",
+          payload: {
+            schema: "helix.theory_context_reflection_tool_receipt.v1",
+            capability: "helix_ask.reflect_theory_context",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId, payload });
+    const index = buildArtifactQueryIndex({ turnId, payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      required_terminal_kind: terminalKind,
+      materialized_terminal_artifact_kind: terminalKind,
+      terminal_authority_kind: terminalKind,
+      visible_terminal_kind: terminalKind,
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      required_terminal_kind: terminalKind,
+      selected_terminal_kind: terminalKind,
+      visible_terminal_kind: terminalKind,
+      codex_parity_class: "complete",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+  });
+
+  it("keeps a compound synthesis terminal blocked when the committed route forbids it", () => {
+    const turnId = "ask:test:forbidden-compound-theory-reflection";
+    const observationRef = `${turnId}:theory_context_reflection`;
+    const terminalKind = "compound_evidence_synthesis_answer";
+    const payload: Record<string, unknown> = {
+      active_prompt: "Reflect the current theory context.",
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        turn_id: turnId,
+        goal_kind: "theory_context_reflection",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        turn_id: turnId,
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+        forbidden_terminal_artifact_kinds: [terminalKind],
+      },
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        canonical_goal: {
+          goal_kind: "theory_locator",
+          required_terminal_kind: "model_synthesized_answer",
+          allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+          forbidden_terminal_artifact_kinds: [terminalKind],
+        },
+      },
+      route_evidence_authority: {
+        schema: "helix.route_evidence_authority.v1",
+        turn_id: turnId,
+        terminal_product_allowed: false,
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+        forbidden_terminal_artifact_kinds: [terminalKind],
+      },
+      tool_call_admission_decision: {
+        requested_capability: "helix_ask.reflect_theory_context",
+        requested_capability_family: "theory_locator",
+        requested_capability_source: "explicit_user_command",
+        required_observation_kinds_for_requested_capability: [
+          "helix_theory_context_reflection_tool_receipt",
+        ],
+      },
+      capability_plan: {
+        requested_capability: "helix_ask.reflect_theory_context",
+        selected_capability: "helix_ask.reflect_theory_context",
+      },
+      operational_capability_trace: {
+        executed_capability: "helix_ask.reflect_theory_context",
+      },
+      tool_lifecycle_trace: {
+        requested_capability: "helix_ask.reflect_theory_context",
+        admitted_capability: "helix_ask.reflect_theory_context",
+        executed_capability: "helix_ask.reflect_theory_context",
+        lifecycle_stage: "reentered_solver",
+        observation_refs: [observationRef],
+        evidence_refs: [observationRef],
+      },
+      final_answer_draft: {
+        draft_id: `${turnId}:final_answer_draft`,
+        support_refs: [observationRef],
+      },
+      terminal_artifact_kind: terminalKind,
+      terminal_answer_authority: {
+        terminal_artifact_kind: terminalKind,
+        support_refs: [observationRef],
+      },
+      terminal_authority_single_writer: {
+        selected_terminal_artifact_kind: terminalKind,
+        support_refs: [observationRef],
+      },
+      terminal_presentation: {
+        terminal_artifact_kind: terminalKind,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: observationRef,
+          kind: "helix_theory_context_reflection_tool_receipt",
+          payload: {
+            capability: "helix_ask.reflect_theory_context",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId, payload });
+    const index = buildArtifactQueryIndex({ turnId, payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      required_terminal_kind: "model_synthesized_answer",
+      materialized_terminal_artifact_kind: terminalKind,
+      rail_status: "broken",
+      rail_failure_code: "terminal_product_mismatch",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
       codex_parity_class: "terminal_product_not_allowed",
       rail_failure_code: "terminal_product_mismatch",
     });

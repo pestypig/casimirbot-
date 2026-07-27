@@ -1,0 +1,272 @@
+{
+  "schema_version": "casimir_dp_apparatus_coherence_residual_stage4_2b_verification_receipt/1",
+  "campaign_id": "casimir-dp-apparatus-coherence-residual-stage4-2b-v1",
+  "campaign_run_id": "casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z",
+  "verified_at": "2026-07-26T13:02:58.280Z",
+  "evidence_class": "synthetic_apparatus_identifiability_forecast",
+  "claim_ceiling": "apparatus_identifiability_no_go_and_redesign_target_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-apparatus-coherence-residual-stage4-2b.v1.json",
+    "config_sha256": "2abf8808fe73f6099d3e9e93e1bed2c8ca33d1094b6a93e9ad926f5fd900fa3e",
+    "authority_manifest_path": "configs/research/casimir-dp-stage4-2b-authorities.v1.json",
+    "authority_manifest_sha256": "dd3e423c02fdb16481c91c7ff3ee8583aa740efc71e5a04902ce32cf10754d35",
+    "fixture_path": "configs/research/fixtures/casimir-dp-stage4-2b-campaign.synthetic.v1.json",
+    "fixture_sha256": "ca89c5385bd55290b1cda8084b3d067cbd76420c810164fc958f310de11d1b8c",
+    "report_json_path": "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-report.json",
+    "report_json_sha256": "2ebd9971bacc393842dc71bfd80063d7b244231947074bc70b3be25bd7ad5b67",
+    "report_markdown_path": "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-report.md",
+    "report_markdown_sha256": "e29564c6cedcace388233f6006b98683fab54f9326b96ab9bbaf3334f33adcbe",
+    "campaign_trace_path": "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-trace.jsonl",
+    "campaign_trace_sha256": "727d78249462f0b4171532af37db97be5500a3a7a870cc56b2e533cae0ae0df7",
+    "campaign_receipt_path": "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-receipt.json",
+    "campaign_receipt_sha256": "50632b32c4133fe3f0f5eee3cbbb157a983d0a9da69de6239d58563ca88f569c",
+    "maintained_report_path": "docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-report.md",
+    "maintained_report_matches_immutable_markdown": true,
+    "git_head": "705759a201ee77313919de906c53dc8565de75bc",
+    "worktree_state": "dirty_uncommitted_source_and_content_hashes_authoritative",
+    "authority_mode": "role_path_and_content_hash_tuple"
+  },
+  "verification_inputs": {
+    "explicit_repo_telemetry": {
+      "path": "reports/repo-telemetry-stage4-2b-20260726T130100867Z.json",
+      "sha256": "d5352113448ec3556f18438fea77f629add306743b01cee1c1fe8d8c59c50b5b",
+      "auto_merge_used": false
+    },
+    "adapter_request": {
+      "path": "artifacts/casimir-dp-stage4-2b-20260726T130100867Z-adapter-request.json",
+      "sha256": "080c429ec912cf2472517de3ed6ae79217515b3b2ecb7938fe1a4c90c6f8a7bf",
+      "auto_telemetry": false,
+      "explicit_hard_inputs": [
+        "build.status",
+        "tests.status",
+        "schema.contracts",
+        "deps.coherence"
+      ],
+      "stale_proxy_carry_forward_allowed": false
+    },
+    "combined_vitest_report": {
+      "path": "reports/vitest-stage4-2b-final.json",
+      "sha256": "1786b19db2fd5d2e21ceba5a56b7d3e89c8f1b8de2be1fef137694b6c2867513",
+      "test_files_total": 51,
+      "test_suites_total": 110,
+      "test_suites_passed": 110,
+      "tests_total": 509,
+      "tests_passed": 509,
+      "tests_failed": 0,
+      "success": true
+    },
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-2b-20260726T130100867Z-bound-validated.jsonl",
+      "sha256": "3894af959e1f3de8d28ede457727a97688c2fd64031c3512f941f5b89a889ffd",
+      "bytes": 3285,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true,
+      "validated_exporter_path": "scripts/research/export-casimir-dp-stage4-verification-trace.ts",
+      "validated_exporter_sha256": "2711992b5eede5b438724817a994e3d7b55fe724d3620bf6b3dbdbefeb368178"
+    }
+  },
+  "local_gates": {
+    "focused_stage4_2b_runtime_contract_campaign_and_theory": {
+      "files": 9,
+      "tests": 84,
+      "status": "pass"
+    },
+    "inherited_stage3_stage4_stage4_1_stage4_2a": {
+      "files": 17,
+      "tests": 192,
+      "status": "pass"
+    },
+    "data_readiness_proposal_design_next_computations_and_dp": {
+      "files": 5,
+      "tests": 31,
+      "status": "pass"
+    },
+    "paper_equation_badge_and_root_leaf": {
+      "files": 4,
+      "tests": 53,
+      "status": "pass"
+    },
+    "warp_required": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    },
+    "combined_receipt_grade_unique_replay": {
+      "files": 51,
+      "suites": 110,
+      "tests": 509,
+      "status": "pass"
+    },
+    "production_build": {
+      "status": "pass_with_warnings",
+      "command": "npm run build",
+      "exit_code": 0,
+      "warnings_present": true,
+      "note": "The production client and server bundles completed. Existing browser-externalization, large-chunk, duplicate-key, and duplicate-case warnings remain outside this campaign's scientific authority."
+    },
+    "dependency_coherence": {
+      "status": "pass",
+      "command": "npm ls --depth=0",
+      "exit_code": 0,
+      "package_lock_sha256": "1833546cf15db039c1895a05e29e80338c271aff935d488034e7e9e6ab025cba"
+    },
+    "repository_wide_typecheck": {
+      "status": "not_separately_supplied",
+      "included_in_adapter_telemetry": false
+    },
+    "equation_sidecar": {
+      "paper_markers": 41,
+      "source_entries": 41,
+      "generated_entries": 41,
+      "source_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
+      "source_sha256": "9193c5e8ad4bedbb1679f8a7e421cebe83f72975906dba95b5a838e0e3e5e24f",
+      "generated_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
+      "generated_sha256": "f3191cd86fbff410cfe7a5098232fa2351a2664d96e6fbfff4854e9e33b98d37",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 27,
+      "edges": 79,
+      "stage4_2b_badges": 1,
+      "calculator_payloads": 0,
+      "observable_bridge_edges": 0,
+      "graph_path": "shared/theory/casimir-dp-study-theory-badges.ts",
+      "graph_sha256_before_downstream_receipt_binding": "9ab892fad7682637e0b6e5be0b18cff9dc87fb5fb01cac05c839cdc179e158c8",
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 213,
+      "validation": "pass",
+      "strict_congruence_errors": 0,
+      "strict_congruence_warnings": 0,
+      "strict_congruence_infos": 4,
+      "report_json_path": "reports/math-report.json",
+      "report_json_sha256": "2b17904abcc09d821ff161364624a131fd4ea504647391e6287dea7284ef46f5",
+      "report_markdown_path": "reports/math-report.md",
+      "report_markdown_sha256": "7f88a7a0b411d1584a02061f0fcf5c4844b8f2338afb817fea6a57fda4018c67"
+    },
+    "physics_root_to_leaf_manifest": {
+      "status": "pass",
+      "manifest_path": "configs/physics-root-leaf-manifest.v1.json",
+      "manifest_sha256": "73ea8830fec6230802530067bbcd054d704090655c52d552f906d89f057a7a11",
+      "readiness_and_scientific_falsifier_rules_separated": true
+    },
+    "toe_preflight": {
+      "status": "pass",
+      "overall_pass": true,
+      "strict_ready_release_gate": "ready"
+    }
+  },
+  "adapter_verification": {
+    "trace_id": "casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T130100867Z-final",
+    "run_id": "2325",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "local_auth_context": "ENABLE_AGI_AUTH=0; AGI_TENANT_REQUIRED=0",
+    "certificate": {
+      "certificate_hash": "38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34",
+      "certificate_id": "constraint-pack:repo-convergence:38b2e69264ac",
+      "integrity_ok": true,
+      "status": "GREEN"
+    }
+  },
+  "certificate_scope": {
+    "certifies": "repo-convergence constraint-pack over the four explicitly supplied hard software metrics",
+    "hard_metric_scope": {
+      "build": "full production client and server bundle completed with warnings",
+      "tests": "51-file, 110-suite, 509-test receipt-grade replay",
+      "schema": "Stage-4.2B Runtimes A-G, strict campaign contract, 19 fixtures, cross-runtime lineage, blinding, partition separation, paper, sidecar, Theory Badge, math, root-to-leaf, and required GR/warp scope",
+      "dependencies": "top-level npm dependency graph plus content-addressed package lock"
+    },
+    "directly_binds_campaign_hashes_in_trace_notes": true,
+    "directly_binds_combined_vitest_report_sha256_in_trace_notes": true,
+    "lint_proxy_supplied": false,
+    "full_repository_typecheck_proxy_supplied": false,
+    "scientific_scope": "none",
+    "warp_viability_oracle_status": "not_evaluated",
+    "green_is_not_warp_admissible": true,
+    "why": "The certificate establishes the declared repository software metrics and provenance only. It does not turn synthetic apparatus inputs into measurements, make the current signatures identifiable, estimate acquisition power, exclude a DP region, observe a coherence residual, identify objective collapse, supply a Casimir-to-collapse kernel, solve manifold dynamics, or establish physical viability."
+  },
+  "certificate_provenance": {
+    "fresh_adapter_execution": true,
+    "fresh_validated_single_run_training_trace": true,
+    "prior_stage4_2a_certificate_artifact_reused": false,
+    "certificate_content_hash_matches_stage4_2a": true,
+    "explanation": "Run 2325, its trace identity, timestamp, explicit no-auto-telemetry request, and validated single-record trace are fresh. The certificate content hash matches Stage-4.2A because repo-convergence certificates are content-addressed over the same four normalized passing software metrics; this is not reuse of the Stage-4.2A trace or certificate artifact."
+  },
+  "bulk_trace_export_disposition": {
+    "path": "artifacts/training-trace-stage4-2b-20260726T130100867Z-bulk.jsonl",
+    "sha256": "16c7f188aef71d4c7616236ee95ca3a5c4905e978c3e77b2c993cf841dfc10df",
+    "bytes": 4496690,
+    "line_count": 2464,
+    "json_lines": 2463,
+    "invalid_lines": 1,
+    "nul_byte_count": 1392,
+    "status": "rejected_as_verification_authority",
+    "reason": "The collection export includes legacy NUL-corrupted history and one non-JSON record. The fail-closed single-run exporter retrieved and validated run 2325 directly; only that one-record JSONL is verification authority."
+  },
+  "campaign_receipt_transition": {
+    "pre_verification_state": "campaign_runtime_completed_pending_external_verification",
+    "downstream_verification_state": "pass",
+    "reason": "The immutable campaign receipt remains unchanged. This downstream receipt records the later fresh adapter execution and repository-gate evidence."
+  },
+  "campaign_result": {
+    "campaign_gate": "pass",
+    "runtime_a": "pass",
+    "runtime_b": "pass",
+    "runtime_c": "pass",
+    "runtime_d": "pass",
+    "runtime_e": "pass",
+    "runtime_f": "signature_not_identifiable",
+    "fixture_cases": 19,
+    "fixture_cases_passed": 19,
+    "primary_cells": 216,
+    "control_cells": 30,
+    "pilot_templates": 216,
+    "independent_replication_templates": 216,
+    "signature_rank": 7,
+    "maximum_absolute_whitened_cosine": 0.9999771044199663,
+    "worst_signature_pair": [
+      "signature-intercept",
+      "signature-thermal"
+    ],
+    "normalized_gram_condition": 179103.91134865975,
+    "required_acquisition": "not_estimable_until_identifiable",
+    "power": "not_estimable_until_identifiable",
+    "apparatus_go_no_go": "no_go_signature_identifiability_redesign_required",
+    "dp_region_excluded": false
+  },
+  "scientific_gates": {
+    "source_authority_integrity": "pass",
+    "runtime_coupling_integrity": "pass",
+    "synthetic_fixture_recovery": "pass",
+    "blinding_and_partition_contract": "pass",
+    "ordinary_prediction_construction": "pass_synthetic_only",
+    "frozen_dp_prediction_construction": "pass_synthetic_only",
+    "full_covariance_propagation": "pass_synthetic_only",
+    "conditional_joint_system_dp_null": "registered_model_only",
+    "signature_identifiability": "blocked",
+    "apparatus_power": "not_estimable_until_identifiable",
+    "required_acquisition": "not_estimable_until_identifiable",
+    "numeric_control_response_authority": "not_ready",
+    "measured_control_covariance": "not_ready",
+    "measured_ordinary_decoherence_closure": "not_ready",
+    "physical_blind": "not_ready",
+    "measured_evidence": "not_ready",
+    "dp_region_exclusion": "not_established",
+    "collapse_identification": "blocked",
+    "boundary_to_collapse_bridge": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "publication_claim": "synthetic_apparatus_identifiability_no_go_and_redesign_target_only"
+  }
+}

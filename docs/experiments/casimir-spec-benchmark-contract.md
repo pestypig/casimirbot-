@@ -341,6 +341,17 @@ and 5,940 arm responses. Only then may it derive the low-level paired binary
 episodes used by the bootstrap. A naked caller-provided array of VCR outcomes is
 mathematical input only and has no promotion authority.
 
+The implemented `casimir_spec_benchmark_promotion_gate/v1` is the final
+fail-closed consumer of that verifier's authenticated
+`casimir_spec_benchmark_sealed_population_receipt/v1`. It independently checks
+the receipt commitment, exact population and episode counts, episode and
+safety-population commitments, five-point practical effect, 99,999-draw paired
+bootstrap interval, hard-gate regressions, required tamper-family detection,
+zero-event safety bound, separate PDE/Lanyon reporting, and replay
+reproducibility. It cannot turn a self-hashed caller assertion into an
+authenticated population receipt; the server trust registry and independent
+custodian remain external prerequisites.
+
 Primary inference uses 99,999 deterministic percentile-bootstrap draws,
 resampling intact problem groups within each of the 66 cells while retaining all
 replicates and both arms. The PRNG seed is derived from the external policy

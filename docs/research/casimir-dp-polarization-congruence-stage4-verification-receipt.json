@@ -1,0 +1,301 @@
+{
+  "schema_version": "casimir_dp_polarization_congruence_stage4_verification_receipt/3",
+  "campaign_id": "casimir-dp-polarization-congruence-stage4-v1",
+  "campaign_run_id": "casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z",
+  "verified_at": "2026-07-25T17:22:44.4901471Z",
+  "claim_ceiling": "diagnostic",
+  "promotion_allowed": false,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-polarization-congruence-stage4.v1.json",
+    "config_sha256": "ade06cd7b95e27fe414614ad36512d5764d439c4fa6623f8499ad218ba07c3d7",
+    "authority_manifest_path": "configs/research/casimir-dp-stage4-authorities.v1.json",
+    "authority_manifest_sha256": "3f26ef115533ef78756fad70f3880f8ea1d1ace43cbc9a0e66d6d0b5e9c2918d",
+    "receipt_path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-receipt.json",
+    "receipt_sha256": "185a09ceb61b4f158afe16022783c8b184c1035f456cb341b5c90920b69b774a",
+    "report_json_path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-report.json",
+    "report_json_sha256": "2c56cd9b61928ee750cf0714435674cc923b4c81f02e325b8ee9e9e5a9816d0b",
+    "report_markdown_path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-report.md",
+    "report_markdown_sha256": "1221cf1e6b6c247c3253240c44ed78446318b2cdb2966610a63d08c7ec4f00a8",
+    "git_head": "705759a201ee77313919de906c53dc8565de75bc",
+    "worktree_state": "dirty_uncommitted_source_hashes_authoritative",
+    "source_authorities": 7,
+    "source_authority_mode": "exact_role_path_tracking_and_content_hash_tuple"
+  },
+  "immutable_stage3_upstream": {
+    "config_sha256": "231cb26e9c9bb523e2dda40a6178d8a484ec099f1868a74b995d8153337d29c2",
+    "campaign_run_id": "casimir-dp-evidence-map-stage3-v1-20260725T134544Z",
+    "receipt_sha256": "5bcd2400bfeaa57a85c4b726224ac25dc8ab4c56bd59dad1b6e54f7f11ff0346",
+    "downstream_verification_receipt_sha256": "2cf09b5c5f6d0a584a0c3fd56d8e53834b78f938814ac2ff5500651349930082",
+    "role_path_tuple_frozen": true,
+    "reused_without_mutation": true
+  },
+  "toolchain": {
+    "node": "v24.7.0",
+    "tsx": "4.21.0",
+    "zod": "3.25.76",
+    "package_lock_path": "package-lock.json",
+    "package_lock_sha256": "1833546cf15db039c1895a05e29e80338c271aff935d488034e7e9e6ab025cba",
+    "validated_trace_exporter_path": "scripts/research/export-casimir-dp-stage4-verification-trace.ts",
+    "validated_trace_exporter_sha256": "2711992b5eede5b438724817a994e3d7b55fe724d3620bf6b3dbdbefeb368178"
+  },
+  "verification_inputs": {
+    "stage4_adapter_vitest_input": {
+      "path": "reports/vitest-stage4-adapter-input.json",
+      "sha256": "1bf16b41ddf6c55cdb83bc834d8632dd23cdffd18afe63fb28a4379d465320b5",
+      "test_files_total": 5,
+      "test_suites_total": 10,
+      "test_suites_passed": 10,
+      "tests_total": 73,
+      "tests_passed": 73,
+      "tests_failed": 0,
+      "success": true
+    },
+    "repo_telemetry": {
+      "path": "reports/repo-telemetry-stage4-20260725T165932120Z.json",
+      "sha256": "17733e778e0d1777807adcf96ba8166426362d036098a2f0a592fcdf2c7e2e93",
+      "generated_at": "2026-07-25T17:11:47.119Z",
+      "auto_merge_used": false,
+      "build_status": "pass",
+      "tests_total": 73,
+      "tests_failed": 0,
+      "schema_scope": "stage4_runtime_contract_and_adversarial_schema_tests",
+      "dependency_scope": "npm_ls_depth_0_and_content_addressed_package_lock",
+      "lint_proxy_supplied": false,
+      "typecheck_proxy_supplied": false
+    },
+    "adapter_request": {
+      "path": "artifacts/casimir-dp-stage4-20260725T165932120Z-adapter-request.json",
+      "sha256": "e82265e05112e142407f5f00334c9e195b08663f8f763e725da7881a23f8ec27",
+      "auto_telemetry": false,
+      "explicit_hard_inputs": [
+        "build.status",
+        "tests.status",
+        "schema.contracts",
+        "deps.coherence"
+      ],
+      "stale_proxy_carry_forward_allowed": false
+    },
+    "warp_required_vitest_report": {
+      "path": "reports/vitest-stage4-warp-required.json",
+      "sha256": "279ed999db62721b5fd3b7726a49c9c72cb059cdf2f169c25f38ff510950e547",
+      "test_files_total": 18,
+      "test_suites_total": 44,
+      "test_suites_passed": 44,
+      "tests_total": 179,
+      "tests_passed": 179,
+      "tests_failed": 0,
+      "success": true
+    },
+    "combined_vitest_report": {
+      "path": "reports/vitest-stage4-final.json",
+      "sha256": "5497912cfb0add711babd1f00370b8a677c1dff8895ad5062f17048d38db5364",
+      "test_files_total": 27,
+      "test_suites_total": 62,
+      "test_suites_passed": 62,
+      "tests_total": 301,
+      "tests_passed": 301,
+      "tests_failed": 0,
+      "success": true
+    },
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-20260725T165932120Z-bound-validated.jsonl",
+      "sha256": "f40b4bdecb3f9e03f784e66c5b5db50d7e86571f31d0ae7547d110673d45bfd8",
+      "bytes": 1535,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true
+    }
+  },
+  "local_gates": {
+    "focused_stage4_runtimes_and_trace": {
+      "files": 5,
+      "tests": 73,
+      "status": "pass"
+    },
+    "paper_sidecar_graph_and_root_leaf_in_combined_battery": {
+      "files": 4,
+      "tests": 49,
+      "status": "pass"
+    },
+    "warp_required": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    },
+    "combined_receipt_grade": {
+      "files": 27,
+      "tests": 301,
+      "status": "pass"
+    },
+    "production_build": {
+      "status": "pass_with_warnings",
+      "command": "NODE_ENV=production npm run build",
+      "exit_code": 0,
+      "duration_ms": 76465,
+      "warnings_present": true,
+      "note": "The production client and server bundles completed. The build emitted existing browser-externalization, large-chunk, duplicate-key, and duplicate-case warnings; the adapter metric records only successful completion."
+    },
+    "post_campaign_code_build": {
+      "status": "pass_with_warnings",
+      "command": "NODE_ENV=production npm run build",
+      "exit_code": 0,
+      "duration_ms": 68323,
+      "scope": "final Stage-4 runtime, Theory Badge, root-to-leaf, equation-sidecar source, paper, proposal, and receipt-projection code state before the final receipt-hash text substitution",
+      "included_in_adapter_certificate": false,
+      "note": "This separate successful production build confirms that the final executable and graph edits bundle. The subsequent receipt-hash text substitution is validated by the post-receipt publication test rather than represented as a second adapter input."
+    },
+    "dependency_coherence": {
+      "status": "pass",
+      "command": "npm ls --depth=0",
+      "exit_code": 0
+    },
+    "strict_stage4_typescript": "pass",
+    "repository_wide_typecheck": {
+      "status": "baseline_failure_outside_stage4_scope",
+      "command_exit_code": 1,
+      "included_in_adapter_telemetry": false,
+      "stage4_regression_in_isolated_strict_check": false,
+      "note": "The current repository-wide tsc invocation reports a large pre-existing error backlog across unrelated CLI, client-test, and tools surfaces. The isolated strict Stage-4 source, runner, contract, exporter, and test surface passes."
+    },
+    "equation_sidecar": {
+      "paper_markers": 32,
+      "source_entries": 32,
+      "generated_entries": 32,
+      "source_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
+      "source_sha256": "33d5344e88a8cea59277905cb2ffeb4c08c3529fed8e97d080fbec60d8c5fa19",
+      "generated_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
+      "generated_sha256_at_combined_replay": "a5b1c9cf031df873e1258d4f25b50e86c7c09ea05023b985c81a7ad001056d2b",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 23,
+      "edges": 61,
+      "observable_bridge_edges_added": 0,
+      "module_path": "shared/theory/casimir-dp-study-theory-badges.ts",
+      "module_sha256": "542f93b1d6fce15f16e423311f60ec4a7208cf1e270ed66b9a595fc8a881780e",
+      "synthetic_blinding_state_propagated": true,
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 204,
+      "validation": "pass",
+      "strict_congruence_errors": 0,
+      "strict_congruence_warnings": 0,
+      "report_json_path": "reports/math-report.json",
+      "report_json_sha256": "981f06894435bac7892b12c8738b8200f1484696d3ac2b097f713cc9b348b6c8",
+      "report_markdown_path": "reports/math-report.md",
+      "report_markdown_sha256": "2cda2a36fcd637ae1071450617528ca424cf81a6787c5cf71ce70ad8c66988ef"
+    },
+    "physics_root_to_leaf": {
+      "status": "pass",
+      "manifest_path": "configs/physics-root-leaf-manifest.v1.json",
+      "manifest_sha256": "2b015eba34ce3dfd9d7369162d2355456c96e8c02020d3baf7ccf19a0fe8f2c2",
+      "synthetic_blinding_and_custodian_promotion_gate_propagated": true
+    },
+    "toe_preflight": "pass"
+  },
+  "adapter_verification": {
+    "trace_id": "casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z-final",
+    "run_id": "1",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "local_auth_context": "ENABLE_AGI_AUTH=0; AGI_TENANT_REQUIRED=0",
+    "certificate": {
+      "certificate_hash": "38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34",
+      "certificate_id": "constraint-pack:repo-convergence:38b2e69264ac",
+      "integrity_ok": true,
+      "status": "GREEN"
+    }
+  },
+  "certificate_scope": {
+    "certifies": "repo-convergence constraint-pack over the four explicitly supplied hard software metrics",
+    "hard_metric_scope": {
+      "build": "full production client and server bundle completed with warnings",
+      "tests": "five focused Stage-4 files and 73 tests",
+      "schema": "Stage-4 runtime contract plus adversarial schema tests, not every repository API/type contract",
+      "dependencies": "top-level npm dependency graph plus content-addressed package lock"
+    },
+    "lint_proxy_supplied": false,
+    "full_repository_typecheck_proxy_supplied": false,
+    "directly_binds_stage4_config_or_report_bytes": false,
+    "directly_binds_combined_vitest_report_sha256": false,
+    "scientific_scope": "none",
+    "warp_viability_oracle_status": "not_evaluated",
+    "green_is_not_warp_admissible": true,
+    "why": "The certificate binds normalized supplied software metrics, not the referenced campaign bytes, paths, test-report hashes, scientific predictions, measured data, collapse identification, manifold dynamics, or the WARP viability oracle. Exact artifacts are independently content-addressed by this downstream receipt."
+  },
+  "adapter_telemetry_provenance": {
+    "auto_telemetry_disabled": true,
+    "existing_repo_telemetry_merged": false,
+    "stale_lint_or_typecheck_reports_merged": false,
+    "explicit_request_content_addressed": true,
+    "focused_vitest_source_is_current": true,
+    "production_build_source_is_current": true,
+    "stage4_schema_source_is_current": true,
+    "top_level_dependency_source_is_current": true,
+    "full_repository_schema_coverage_certified": false,
+    "full_repository_test_suite_certified": false,
+    "current_full_repository_typecheck_certified": false
+  },
+  "certificate_provenance": {
+    "fresh_adapter_execution": true,
+    "fresh_isolated_training_trace_store": true,
+    "prior_stage3_certificate_artifact_reused": false,
+    "certificate_content_hash_matches_stage3": false,
+    "explanation": "The authoritative Stage-4 adapter request disables auto-telemetry and supplies an explicit, content-addressed metric set. Its trace id, isolated run id, timestamp, certificate, and validated one-record training trace are fresh. No earlier certificate or trace artifact is reused."
+  },
+  "superseded_verification_attempts": [
+    {
+      "campaign_run_id": "casimir-dp-polarization-congruence-stage4-v1-20260725T163307292Z",
+      "receipt_sha256": "fee31b5c9e4a8514f596c02bbea3710137d0c2289c04754f86d6a0a61e43276a",
+      "preserved_path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T163307292Z/superseded-downstream-verification-receipt.json",
+      "reason": "The campaign encoded a sealed custodian state and sentinel mapping hash without a real custody receipt."
+    },
+    {
+      "campaign_run_id": "casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z",
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "validated_trace_sha256": "d2063b6848819720649eac5c959c3bf9abc514fdc0a32a914fbc72547d557479",
+      "reason": "The first fresh execution allowed CLI default-path auto-telemetry and therefore retained stale lint/typecheck proxy provenance. It remains a historical attempt and is not verification authority."
+    }
+  ],
+  "campaign_receipt_transition": {
+    "pre_verification_state": "pending_external_verification",
+    "downstream_verification_state": "pass",
+    "reason": "The immutable campaign receipt was issued before the external adapter call and remains unchanged. This content-addressed downstream receipt records the subsequent repository-gate execution while preserving the immutable campaign bundle."
+  },
+  "blinding_state": {
+    "lane_status": "synthetic_contract_only",
+    "synthetic_blinding_contract": "pass",
+    "custodian_receipt_status": "not_created",
+    "custodian_receipt_path": null,
+    "custodian_mapping_sha256": null,
+    "measured_comparison_allowed": false,
+    "unblinding_timestamp": null,
+    "automatic_unblinding_allowed": false,
+    "meaning": "Reserved labels exercise the fail-closed software contract only. No physical blind, custody mapping, measured comparison, or unblinding exists or is authorized."
+  },
+  "scientific_gates": {
+    "software_and_synthetic_predictions": "pass",
+    "polarization_qed_synthetic_closure": "pass",
+    "thermal_radiative_synthetic_closure": "pass",
+    "synthetic_evidence_boundary": "pass",
+    "synthetic_blinding_contract": "pass",
+    "measured_evidence": "not_ready",
+    "ordinary_physics_closure": "not_ready",
+    "polarization_qed_measured_lane": "not_ready",
+    "thermal_measured_lane": "not_ready",
+    "tensor_dimensional_congruence": "pass",
+    "unchanged_named_dp": "reused_without_mutation",
+    "registered_bridge_numeric_comparison": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "publication_claim": "diagnostic_protocol_only"
+  }
+}

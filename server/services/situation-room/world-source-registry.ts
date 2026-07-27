@@ -1,4 +1,10 @@
 import type { HelixWorldEvent } from "@shared/helix-world-event";
+import {
+  assertHelixRoomSourceNamespaceAdmission,
+  isHelixRoomSourceIngressSourceId,
+  matchesHelixRoomSourceAdmission,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 
 export type WorldSourceSeen = {
   room_id: string;
@@ -28,8 +34,21 @@ const sourceRegistry = new Map<string, WorldSourceSeen>();
 const sourceKey = (input: { room_id: string; source_id?: string | null; world_id: string }): string =>
   `${input.room_id}:${input.source_id ?? `minecraft:${input.world_id}`}:${input.world_id}`;
 
-export function recordWorldSourceSeen(event: HelixWorldEvent): WorldSourceSeen {
+export function recordWorldSourceSeen(
+  event: HelixWorldEvent,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
+): WorldSourceSeen {
   const sourceId = event.source_id ?? `minecraft:${event.world_id}`;
+  assertHelixRoomSourceNamespaceAdmission(
+    {
+      source_id: sourceId,
+      room_id: event.room_id,
+      world_id: event.world_id,
+    },
+    options.sourceAdmission,
+  );
   const key = sourceKey({ room_id: event.room_id, source_id: sourceId, world_id: event.world_id });
   const existing = sourceRegistry.get(key);
   const actorIds = new Set(existing?.actor_ids ?? []);
@@ -53,8 +72,19 @@ export function recordWorldSourceSeen(event: HelixWorldEvent): WorldSourceSeen {
 export function updateWorldSourceDebug(
   event: HelixWorldEvent,
   debug: NonNullable<WorldSourceSeen["latest_debug"]>,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
 ): void {
   const sourceId = event.source_id ?? `minecraft:${event.world_id}`;
+  assertHelixRoomSourceNamespaceAdmission(
+    {
+      source_id: sourceId,
+      room_id: event.room_id,
+      world_id: event.world_id,
+    },
+    options.sourceAdmission,
+  );
   const key = sourceKey({ room_id: event.room_id, source_id: sourceId, world_id: event.world_id });
   const existing = sourceRegistry.get(key);
   if (!existing) return;
@@ -64,10 +94,38 @@ export function updateWorldSourceDebug(
   });
 }
 
-export function listWorldSourcesSeen(): WorldSourceSeen[] {
-  return Array.from(sourceRegistry.values()).sort((a: WorldSourceSeen, b: WorldSourceSeen) =>
-    b.latest_ts.localeCompare(a.latest_ts),
-  );
+export function listWorldSourcesSeen(options: {
+  sourceAdmission?: HelixRoomSourceAdmission | null;
+} = {}): WorldSourceSeen[] {
+  return Array.from(sourceRegistry.values())
+    .filter((source) =>
+      !isHelixRoomSourceIngressSourceId(source.source_id) ||
+      matchesHelixRoomSourceAdmission(
+        {
+          source_id: source.source_id,
+          room_id: source.room_id,
+          world_id: source.world_id,
+        },
+        options.sourceAdmission,
+      ),
+    )
+    .sort((a: WorldSourceSeen, b: WorldSourceSeen) =>
+      b.latest_ts.localeCompare(a.latest_ts),
+    );
+}
+
+export function forgetWorldSources(input: {
+  sourceId?: string | null;
+  roomId?: string | null;
+}): number {
+  let removed = 0;
+  for (const [key, source] of sourceRegistry.entries()) {
+    if (input.sourceId && source.source_id !== input.sourceId) continue;
+    if (input.roomId && source.room_id !== input.roomId) continue;
+    sourceRegistry.delete(key);
+    removed += 1;
+  }
+  return removed;
 }
 
 export function resetWorldSourceRegistry(): void {

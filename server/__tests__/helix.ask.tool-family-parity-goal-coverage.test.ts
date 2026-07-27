@@ -1283,6 +1283,156 @@ const modelVisibleRequiredArgSchemaCoverage = [
     ],
   },
   {
+    capability: "theory-experiment-procedure.prepare",
+    requiredArgs: ["prompt", "operation", "target", "selected_badge_ids"],
+    routeSnippets: [
+      'case "theory-experiment-procedure.prepare":',
+      'return schema(["prompt", "operation", "target", "selected_badge_ids"], {',
+      'selected_badge_ids: { type: "array", minItems: 1, items: { type: "string" }',
+    ],
+  },
+  {
+    capability: "theory-experiment-procedure.readmit",
+    requiredArgs: [
+      "procedure_artifact_ref",
+      "procedure_id",
+      "procedure_sha256",
+    ],
+    routeSnippets: [
+      'case "theory-experiment-procedure.readmit":',
+      'return schema(["procedure_artifact_ref", "procedure_id", "procedure_sha256"], {',
+      'procedure_artifact_ref: { type: "string", minLength: 1, description: "Exact original retained procedure artifact reference issued by the gateway." }',
+    ],
+  },
+  {
+    capability: "theory-experiment-procedure.evaluate_closure",
+    requiredArgs: ["prompt", "procedure_id", "procedure_sha256"],
+    routeSnippets: [
+      'case "theory-experiment-procedure.evaluate_closure":',
+      'return schema(["prompt", "procedure_id", "procedure_sha256"], {',
+      'procedure_sha256: { type: "string", minLength: 64',
+    ],
+  },
+  {
+    capability: "theory-semantic-admitter.normalize",
+    requiredArgs: [
+      "source_evidence_ref",
+      "source_packet",
+      "source_path",
+      "receipt_id",
+    ],
+    routeSnippets: [
+      'case "theory-semantic-admitter.normalize":',
+      'return schema(["source_evidence_ref", "source_packet", "source_path", "receipt_id"], {',
+      'source_evidence_ref: { type: "string", minLength: 1',
+      'source_packet: { type: "object", description: "Thin Casimir Spec source packet to normalize and admit." }',
+    ],
+  },
+  {
+    capability: "theory-artifact-producer.prepare_lanyon_request",
+    requiredArgs: [
+      "procedure_artifact_ref",
+      "procedure_id",
+      "procedure_sha256",
+      "semantic_admission_artifact_ref",
+      "case_id",
+    ],
+    routeSnippets: [
+      'case "theory-artifact-producer.prepare_lanyon_request":',
+      'return schema(["procedure_artifact_ref", "procedure_id", "procedure_sha256", "semantic_admission_artifact_ref", "case_id"], {',
+      'semantic_admission_artifact_ref: { type: "string", minLength: 1',
+    ],
+  },
+  {
+    capability: "theory-artifact-producer.admit_lanyon_snapshot",
+    requiredArgs: ["request_artifact_ref", "case_id"],
+    routeSnippets: [
+      'case "theory-artifact-producer.admit_lanyon_snapshot":',
+      'return schema(["request_artifact_ref", "case_id"], {',
+      'request_artifact_ref: { type: "string", minLength: 1',
+    ],
+  },
+  {
+    capability: "theory-formal-verifier.prepare_request",
+    requiredArgs: [
+      "procedure_artifact_ref",
+      "procedure_id",
+      "procedure_sha256",
+    ],
+    routeSnippets: [
+      'case "theory-formal-verifier.prepare_request":',
+      'return schema(["procedure_artifact_ref", "procedure_id", "procedure_sha256"], {',
+      'procedure_artifact_ref: { type: "string", minLength: 1, description: "Current-turn authoritative theory experiment procedure artifact reference." }',
+    ],
+  },
+  {
+    capability: "theory-formal-verifier.plan",
+    requiredArgs: ["prepared_request_id"],
+    routeSnippets: [
+      'case "theory-formal-verifier.plan":',
+      'return schema(["prepared_request_id"], {',
+      'prepared_request_id: { type: "string", minLength: 1, description: "Opaque ready server-owned formal prepared-request identifier." }',
+    ],
+  },
+  {
+    capability: "theory-formal-verifier.start",
+    requiredArgs: ["prepared_request_id", "plan_id"],
+    routeSnippets: [
+      'case "theory-formal-verifier.start":',
+      'return schema(["prepared_request_id", "plan_id"], {',
+      'plan_id: { type: "string", minLength: 1, description: "Exact formal preflight plan identifier." }',
+    ],
+  },
+  {
+    capability: "theory-formal-verifier.read_result",
+    requiredArgs: ["job_id"],
+    routeSnippets: [
+      'case "theory-formal-verifier.read_result":',
+      'return schema(["job_id"], {',
+      'job_id: { type: "string", minLength: 1, description: "Developer-scoped formal replay job identifier." }',
+    ],
+  },
+  {
+    capability: "theory-independent-numerical-verifier.prepare_request",
+    requiredArgs: [
+      "catalog_entry_id",
+      "procedure_id",
+      "procedure_sha256",
+    ],
+    routeSnippets: [
+      'case "theory-independent-numerical-verifier.prepare_request":',
+      '["catalog_entry_id", "procedure_id", "procedure_sha256"]',
+      "Opaque entry id resolved by the trusted server-owned numerical execution catalog.",
+    ],
+  },
+  {
+    capability: "theory-independent-numerical-verifier.plan",
+    requiredArgs: ["prepared_request_id"],
+    routeSnippets: [
+      'case "theory-independent-numerical-verifier.plan":',
+      'return schema(["prepared_request_id"], {',
+      "Opaque, owner-bound prepared request id issued by the server-owned numerical execution catalog rail.",
+    ],
+  },
+  {
+    capability: "theory-independent-numerical-verifier.start",
+    requiredArgs: ["plan_id"],
+    routeSnippets: [
+      'case "theory-independent-numerical-verifier.start":',
+      'return schema(["plan_id"], {',
+      'plan_id: { type: "string", minLength: 1, description: "Exact independent numerical preflight plan identifier." }',
+    ],
+  },
+  {
+    capability: "theory-independent-numerical-verifier.read_result",
+    requiredArgs: ["job_id"],
+    routeSnippets: [
+      'case "theory-independent-numerical-verifier.read_result":',
+      'return schema(["job_id"], {',
+      'job_id: { type: "string", minLength: 1, description: "Developer-scoped independent numerical replay job identifier." }',
+    ],
+  },
+  {
     capability: "helix_ask.reflect_theory_context",
     requiredArgs: ["prompt"],
     routeSnippets: [
@@ -1644,6 +1794,22 @@ describe("Helix Ask tool-family parity goal coverage", () => {
           .toEqual(expect.stringContaining(snippet));
       }
     }
+
+    const lanyonSchemaStart = routeSource.indexOf(
+      'case "theory-artifact-producer.admit_lanyon_snapshot":',
+    );
+    const lanyonSchemaEnd = routeSource.indexOf(
+      'case "theory-formal-verifier.prepare_request":',
+      lanyonSchemaStart,
+    );
+    expect(lanyonSchemaStart).toBeGreaterThanOrEqual(0);
+    expect(lanyonSchemaEnd).toBeGreaterThan(lanyonSchemaStart);
+    const lanyonSchemaBlock = routeSource.slice(
+      lanyonSchemaStart,
+      lanyonSchemaEnd,
+    );
+    expect(lanyonSchemaBlock).not.toContain("source_root");
+    expect(lanyonSchemaBlock).not.toContain("sourceRoot");
   });
 
   it("keeps optional support-bound live-source tool args model-visible in runtime schemas", () => {

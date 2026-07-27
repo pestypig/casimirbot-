@@ -1,0 +1,81 @@
+{
+  "schema_version": "casimir_dp_stage4_1_repo_telemetry/1",
+  "campaign_id": "casimir-dp-qed-scale-hierarchy-stage4-1-v1",
+  "campaign_run_id": "casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z",
+  "generated_at": "2026-07-25T18:35:00.000Z",
+  "auto_merge_used": false,
+  "build": {
+    "status": "pass",
+    "ok": true,
+    "exit_code": 0,
+    "warnings_present": true,
+    "scope": "production client and server bundles",
+    "note": "The build completed with existing browser-externalization, chunk-size, duplicate-key, and duplicate-case warnings."
+  },
+  "tests": {
+    "status": "pass",
+    "ok": true,
+    "files": 32,
+    "suites": 73,
+    "total": 328,
+    "passed": 328,
+    "failed": 0,
+    "report_path": "reports/vitest-stage4-1-final.json",
+    "report_sha256": "11415e8f234a5dab416645e39e2865cc826f70c2dac2d45a54d4bf6b7e65f47c",
+    "scope": "Stage-4 and Stage-4.1 runtimes, publication/sidecar/graph, math congruence/root-to-leaf, and all WARP_AGENTS required tests"
+  },
+  "schema": {
+    "contracts": "pass",
+    "ok": true,
+    "scope": [
+      "casimir_dp_qed_scale_hierarchy_calibration/1",
+      "casimir_dp_qed_scale_hierarchy_stage4_1/1",
+      "equation_action_sidecar_34_of_34",
+      "theory_badge_graph_24_badges_65_edges_zero_observable_bridges",
+      "physics_root_leaf_manifest",
+      "math_congruence_matrix"
+    ]
+  },
+  "deps": {
+    "coherence": "pass",
+    "command": "npm ls --depth=0",
+    "exit_code": 0,
+    "package_lock_path": "package-lock.json",
+    "package_lock_sha256": "1833546cf15db039c1895a05e29e80338c271aff935d488034e7e9e6ab025cba"
+  },
+  "typescript": {
+    "status": "pass",
+    "scope": [
+      "shared/casimir-dp-qed-scale-hierarchy-calibration.ts",
+      "shared/contracts/casimir-dp-qed-scale-hierarchy-stage4-1.v1.ts",
+      "scripts/research/run-casimir-dp-qed-scale-hierarchy-stage4-1.ts",
+      "scripts/build-math-congruence-matrix.ts"
+    ],
+    "full_repository_typecheck_supplied": false
+  },
+  "math_and_provenance": {
+    "math_entries": 205,
+    "math_validation": "pass",
+    "math_report_json_sha256": "fcebc30b9cbec4a66c92b5fdd89f6c3e7522aecd01ddde78ead6a5e65d1221ec",
+    "math_report_markdown_sha256": "8b36fc84d750f7d8cd694c5366a4788b2551a811c414693cca32a116790824b1",
+    "root_to_leaf_manifest_sha256": "690569714b140d8268c06a90500693240d6e80e74dcd76d9e62e55b05d4010ae",
+    "math_congruence_matrix_sha256": "84ef5a5dc6c35abe8aebe982aa5725857bc7c3e601d5fb5e4b155a6bb0568cce",
+    "equation_action_source_sha256": "fd4c004fb80ea7ef2ddd3c76b7435bdbd08ed4c0afc6f9493b84cfdd22952c4b",
+    "equation_action_generated_sha256": "dd7720f64a9bb99b3fcb1a941f3062cf90762fc2afa09d67c7d0dc5d3ac476c4",
+    "theory_badge_graph_sha256": "41f6ff13e1aee0fdad7546fb725edfd58bcfe8ef38b5662cacf6ba6e705ac4f9"
+  },
+  "campaign_artifacts": {
+    "config_path": "configs/research/casimir-dp-qed-scale-hierarchy-stage4-1.v1.json",
+    "config_sha256": "e2625c86a5366258677c58cbe78e73b8fcc1893ecd417b48765d74488f953478",
+    "immutable_report_json_sha256": "8f06bf394e64d40d24530e9e93b5d61edece3752318ece2095f27d61f55042c5",
+    "immutable_report_markdown_sha256": "6ae9530701fc35aa544b438709e789929b45eaf53ae950ec93ed976bb9703ba6",
+    "immutable_campaign_receipt_sha256": "d835b56a87ed6f6d78edfb8e627bceecb931575348232ca0fd77795f5ffe24af"
+  },
+  "claim_boundary": {
+    "evidence_class": "source_backed_calculation",
+    "maximum_claim": "qed_scale_identity_calibration",
+    "observable_bridge_edges_added": 0,
+    "scientific_scope": "none",
+    "physical_viability": "not_evaluated"
+  }
+}

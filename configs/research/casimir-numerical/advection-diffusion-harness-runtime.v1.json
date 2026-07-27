@@ -1,0 +1,38 @@
+{
+  "schema": "casimir_numerical_harness_runtime/v1",
+  "runtime_id": "casimir-node-harness-win32-x64-node-24.7.0",
+  "protocol": "casimir_numerical_harness_json_files/v1",
+  "launch_mode": "node_script",
+  "source": {
+    "logical_path": "tools/casimir-numerical/advection-diffusion-harness.mjs",
+    "sha256": "4b640f334af39a2b6d9e1e37884c9fbfb805b1baf99788a225025417dd78f0f1"
+  },
+  "runtime": {
+    "name": "Node.js",
+    "version": "24.7.0",
+    "executable_sha256": "c1b274a8d0a23e060fc42ce71c3cdfa1569b83d91ba82cc59fa907da97a425e9"
+  },
+  "platform": {
+    "description": "Microsoft Windows 10.0.26200 |X64|X64",
+    "sha256": "1ba89b0966e71bd6eeee30053a657fd2f8e279ad39c490f0b87cd4b0711c1426"
+  },
+  "execution": {
+    "replay_count": 2,
+    "network_allowed": false,
+    "arbitrary_command_allowed": false,
+    "outer_observed_process_required": true,
+    "refinement_levels": [
+      32,
+      64,
+      128
+    ]
+  },
+  "authority": {
+    "validates_numerical_implementation": false,
+    "validates_theory": false,
+    "validates_empirical_claim": false,
+    "validates_physical_mechanism": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  }
+}

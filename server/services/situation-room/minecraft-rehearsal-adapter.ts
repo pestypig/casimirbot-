@@ -7,6 +7,7 @@ import {
 import type { HelixPossibilityGraph } from "@shared/helix-environment-possibility-graph";
 import type { HelixEnvironmentStateSnapshot } from "@shared/helix-environment-state-snapshot";
 import { policyForEnvironmentSensorScope } from "@shared/helix-environment-sensor-scope";
+import type { HelixRoomSourceAdmission } from "@shared/helix-room-source-ingress";
 import { createEnvironmentProbeRequest } from "./environment-probe-broker";
 
 const hashShort = (value: unknown, size = 18): string =>
@@ -26,6 +27,7 @@ export function rehearseMinecraftGraph(input: {
   graph: HelixPossibilityGraph;
   request: HelixActionRehearsalRequest;
   environmentState: HelixEnvironmentStateSnapshot;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
   now?: string;
 }): HelixActionRehearsalResult {
   const now = input.now ?? new Date().toISOString();
@@ -83,6 +85,7 @@ export function rehearseMinecraftGraph(input: {
           objective: "Verify route feasibility before recommending the candidate procedure.",
           evidenceRefs: input.environmentState.evidence_refs,
           ttlMs: 10_000,
+          sourceAdmission: input.sourceAdmission,
         }),
       ]
     : [];

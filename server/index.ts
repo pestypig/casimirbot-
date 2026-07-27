@@ -6,6 +6,10 @@ import { createServer, get as httpGet, type Server, type ServerResponse } from "
 import os from "os";
 import { registerMetricsEndpoint, metrics } from "./metrics";
 import { jwtMiddleware } from "./auth/jwt";
+import {
+  isPublicRoomSourceIngressPath,
+  publicRoomSourceIngressParserErrorHandler,
+} from "./auth/public-source-ingress";
 import { otelMiddleware } from "./services/observability/otel-middleware";
 import { patchExpressAsyncHandlers } from "./utils/express-async-guard";
 import {
@@ -27,6 +31,32 @@ import {
 } from "./startup-screen";
 import { resolveMobileDeviceSignals } from "@shared/mobile-device-detection";
 import { serveStaticAssets } from "./static";
+import {
+  createHelixAgentApiRouter,
+  createHelixAgentProtectedResourceMetadataRouter,
+} from "./routes/helix-agent-api";
+import { createAgentAccessDiscoveryRouter } from
+  "./routes/agent-access-discovery";
+import { createHelixMcpRouter } from "./routes/helix-mcp";
+import { createHelixSharedLiveRoomRouter } from
+  "./routes/helix-shared-live-rooms";
+import {
+  HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
+  HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+  HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+} from "@shared/contracts/helix-shared-live-room-agent.v1";
+import { agentRunObserverRouter } from "./routes/agent-run-observer";
+import { createHelixAgentAccountBindingsRouter } from
+  "./routes/helix-agent-account-bindings";
+import {
+  sharedRealtimeRoomSourceCredentialClaimRouter,
+  sharedRealtimeRoomSourceLinkRouter,
+} from
+  "./routes/agi.realtime-room/source-link-routes";
+import {
+  installRuntimeToolConfirmationVerifierFromEnvironmentV1,
+} from
+  "./services/theory/runtime-tool-confirmation-server-bootstrap";
 
 type LatticeWatcherHandle = {
   close(): Promise<void>;
@@ -62,6 +92,8 @@ function loadLocalEnvFile(): void {
 }
 
 loadLocalEnvFile();
+const runtimeApprovalVerifierStatus =
+  installRuntimeToolConfirmationVerifierFromEnvironmentV1();
 patchExpressAsyncHandlers();
 const app = express();
 
@@ -124,6 +156,12 @@ const log = (message: string, source = "express") => {
 
 const bootStartedAt = new Date().toISOString();
 log(`boot start ts=${bootStartedAt} pid=${process.pid} node=${process.version}`);
+log(
+  runtimeApprovalVerifierStatus.configured
+    ? `[runtime-approval] trusted receipt verifier configured (keys=${runtimeApprovalVerifierStatus.trusted_key_count}; replay=durable_postgres)`
+    : "[runtime-approval] trusted receipt verifier unconfigured; governed internal mutations fail closed",
+  "runtime-approval",
+);
 writeVoiceLaneBreadcrumb("process.boot", {
   node: process.version,
   runtimeEnv,
@@ -397,7 +435,8 @@ const isPublicHealthRoute = (req: Request): boolean => {
     normalized === "/healthz" ||
     normalized === "/api/ready" ||
     normalized === "/version" ||
-    normalized === "/__selfcheck"
+    normalized === "/__selfcheck" ||
+    isPublicRoomSourceIngressPath(normalized)
   );
 };
 
@@ -437,17 +476,55 @@ const resolveRootRedirectTarget = (req: Request): string => {
 };
 
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT ?? "10mb";
+// External agent surfaces are mounted before the legacy parser/JWT middleware.
+// They enforce their own small parser, OAuth resource authentication, tenant
+// binding, origin/host checks, and rate limits.
+registerMetricsEndpoint(app);
+app.use(otelMiddleware);
+app.use(createAgentAccessDiscoveryRouter());
+app.use(createHelixAgentProtectedResourceMetadataRouter({
+  additionalResourcePaths: [
+    "/.well-known/oauth-protected-resource/api/v1/rooms",
+  ],
+  additionalScopes: [
+    HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+    HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
+    HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+  ],
+}));
+app.use("/api/v1/agent-runs", createHelixAgentApiRouter());
+app.use("/api/v1/rooms", createHelixSharedLiveRoomRouter());
+app.use("/mcp", createHelixMcpRouter());
+// First-party browser observation is deliberately cookie-authenticated and
+// remains separate from both external OAuth and the optional global bearer
+// middleware.
+app.use("/api/agi", agentRunObserverRouter);
+// The in-workstation source manager is first-party and uses the account
+// session cookie. Keep this narrow router available when external JWT auth is
+// enabled without moving the rest of the Realtime room surface.
+app.use("/api/agi", sharedRealtimeRoomSourceLinkRouter);
+// Source credentials are revealed exactly once through this trusted,
+// cookie-authenticated browser lane. Keep it outside external OAuth/JWT
+// middleware and separate from the ordinary room management router.
+app.use("/api/agi", sharedRealtimeRoomSourceCredentialClaimRouter);
+// Agent-binding readiness and revocation are first-party account-session
+// operations. Mount them before the optional legacy bearer middleware so
+// ENABLE_AUTH does not silently replace their documented cookie boundary.
+app.use("/api/account", createHelixAgentAccountBindingsRouter());
 app.use(express.json({
   limit: jsonBodyLimit,
   verify: (req, _res, buf) => {
-    if (req.originalUrl?.startsWith("/api/discord/interactions")) {
+    const originalUrl = (req as typeof req & { originalUrl?: string }).originalUrl;
+    if (
+      originalUrl?.startsWith("/api/discord/interactions") ||
+      originalUrl?.startsWith("/api/room-ingress/")
+    ) {
       (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
     }
   },
 }));
 app.use(express.urlencoded({ extended: false }));
-registerMetricsEndpoint(app);
-app.use(otelMiddleware);
+app.use(publicRoomSourceIngressParserErrorHandler);
 
 app.use((req, res, next) => {
   if (isPublicHealthRoute(req)) {

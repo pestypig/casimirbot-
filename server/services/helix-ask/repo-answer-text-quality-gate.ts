@@ -239,6 +239,49 @@ const collectSupportRefs = (payload: RecordLike): string[] => {
 
 const REPO_SYNTHESIS_MODEL_STEP_CAPABILITY = "model.synthesize_from_repo_evidence";
 
+const providerReentryProvesRepoSynthesis = (payload: RecordLike): boolean => {
+  const answer = readRecord(payload.repo_code_evidence_answer);
+  const reentry = readRecord(payload.provider_reasoning_reentry);
+  const bridge = readRecord(payload.provider_terminal_authority_bridge);
+  const candidate =
+    readRecord(payload.provider_terminal_candidate) ??
+    readRecord(bridge?.provider_terminal_candidate);
+  const candidateRef = readString(answer?.provider_terminal_candidate_ref);
+  const turnId = readString(answer?.turn_id) || readString(payload.turn_id);
+  const candidateObservationRefs = unique([
+    ...readArray(candidate?.grounded_in_observation_refs).map(readString),
+    ...readArray(candidate?.normalized_observation_refs).map(readString),
+  ]).filter(Boolean);
+  const answerObservationRefs = unique([
+    ...readArray(answer?.selected_observation_refs).map(readString),
+    ...readArray(answer?.support_refs).map(readString),
+  ]).filter(Boolean);
+  const sharedObservationRef = candidateObservationRefs.some((ref) =>
+    answerObservationRefs.includes(ref),
+  );
+  return Boolean(
+    candidateRef &&
+      turnId &&
+      readString(candidate?.schema) === "helix.agent_provider_terminal_candidate.v1" &&
+      readString(candidate?.candidate_id) === candidateRef &&
+      readString(candidate?.turn_id) === turnId &&
+      candidate?.provider_reasoning_completed === true &&
+      sharedObservationRef &&
+      readString(reentry?.schema) === "helix.provider_reasoning_reentry.v1" &&
+      readString(reentry?.turn_id) === turnId &&
+      readString(reentry?.provider_terminal_candidate_ref) === candidateRef &&
+      readString(reentry?.status) === "completed" &&
+      reentry?.evidence_reentered === true &&
+      reentry?.solver_completed === true &&
+      readString(bridge?.schema) === "helix.provider_terminal_authority_bridge.v1" &&
+      readString(bridge?.turn_id) === turnId &&
+      readString(bridge?.provider_terminal_candidate_ref) === candidateRef &&
+      bridge?.normalized_observations_ready === true &&
+      bridge?.terminal_authority_granted === true &&
+      bridge?.final_visible_answer_authorized === true,
+  );
+};
+
 const hasRepoSynthesisStepIdentity = (payload: RecordLike): boolean => {
   const answer = readRecord(payload.repo_code_evidence_answer);
   const draft = readRecord(payload.final_answer_draft);
@@ -249,6 +292,7 @@ const hasRepoSynthesisStepIdentity = (payload: RecordLike): boolean => {
   return (
     readString(answer?.model_step_capability) === REPO_SYNTHESIS_MODEL_STEP_CAPABILITY ||
     readString(draft?.model_step_capability) === REPO_SYNTHESIS_MODEL_STEP_CAPABILITY ||
+    providerReentryProvesRepoSynthesis(payload) ||
     attempts.some((entry) =>
       readString(entry.schema) === "helix.repo_evidence_synthesis_attempt.v1" &&
       readString(entry.model_step_capability) === REPO_SYNTHESIS_MODEL_STEP_CAPABILITY
@@ -257,6 +301,7 @@ const hasRepoSynthesisStepIdentity = (payload: RecordLike): boolean => {
 };
 
 const hasModelSynthesis = (payload: RecordLike): boolean => {
+  if (providerReentryProvesRepoSynthesis(payload)) return true;
   const answer = readRecord(payload.repo_code_evidence_answer);
   if (answer?.model_authored === true && readString(answer.synthesis_attempt_ref) && hasRepoSynthesisStepIdentity(payload)) return true;
   const draft = readRecord(payload.final_answer_draft);

@@ -43,6 +43,7 @@ export type HelixAccountPolicyAccessState = "available" | "locked" | "hidden";
 
 export const HELIX_USER_WORKSTATION_PANEL_IDS = [
   "account-session",
+  "agent-access",
   "workstation-clipboard-history",
   "docs-viewer",
   "image-lens",
@@ -91,6 +92,7 @@ export const HELIX_DEVELOPER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "developer_workstation_panels",
     "experimental_panels",
     "runtime_agent_controls",
+    "room_source_ingress",
     "shared_realtime_rooms",
     "workstation_gateway_act",
   ],
@@ -113,6 +115,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "developer_workstation_panels",
     "experimental_panels",
     "live_answer_visual_capture_controls",
+    "room_source_ingress",
     "shared_realtime_rooms",
     "workstation_gateway_act",
   ],
@@ -334,7 +337,8 @@ export type HelixAccountSessionProfile = {
     | "password_account"
     | "guest";
   account_type?: HelixAccountType;
-  provider?: "google" | "local" | "guest" | null;
+  provider?: "google" | "external_oauth" | "local" | "guest" | null;
+  provider_alias?: string | null;
   provider_subject?: string | null;
   picture_url?: string | null;
   created_at: string;

@@ -1,0 +1,426 @@
+{
+  "schema_version": "casimir_dp_tensor_dimensional_congruence/1",
+  "campaign_id": "casimir-dp-polarization-congruence-stage4-v1",
+  "evidence_class": "synthetic_fixture",
+  "authority_receipt": {
+    "source_ref": "synthetic://casimir-dp-stage4/authority",
+    "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "actual_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "integrity_verified": true
+  },
+  "quantities": [
+    {
+      "quantity_id": "G_ee",
+      "role": "green_tensor",
+      "descriptor": {
+        "si_dimension": { "mass": 0, "length": -1, "time": 0, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "qed.electric_dyadic_green_tensor",
+        "tensor": { "rank": 2, "index_variance": ["cartesian", "cartesian"], "symmetry": "reciprocal" },
+        "representation": { "frame_id": "apparatus_orthonormal", "basis_id": "cartesian_xyz", "gauge_id": "macroscopic_qed_coulomb" },
+        "spectral": { "measure": "angular_frequency_rad_s", "fourier_convention": "F(omega)=integral_dt_exp(+i_omega_t)f(t)", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "scattering_green_tensor", "reference_state": "same_material_infinite_separation" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/G", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "identity_G_cartesian", "source_ref": "synthetic://stage4/transform/G", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "alpha_probe",
+      "role": "polarizability_tensor",
+      "descriptor": {
+        "si_dimension": { "mass": -1, "length": 0, "time": 4, "current": 2, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "probe.electric_polarizability_SI",
+        "tensor": { "rank": 2, "index_variance": ["cartesian", "cartesian"], "symmetry": "symmetric" },
+        "representation": { "frame_id": "apparatus_orthonormal", "basis_id": "cartesian_xyz", "gauge_id": "not_applicable" },
+        "spectral": { "measure": "angular_frequency_rad_s", "fourier_convention": "F(omega)=integral_dt_exp(+i_omega_t)f(t)", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "not_applicable", "reference_state": "calibrated_ground_state_probe" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/alpha", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "identity_alpha_cartesian", "source_ref": "synthetic://stage4/transform/alpha", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "S_FF",
+      "role": "force_noise_psd",
+      "descriptor": {
+        "si_dimension": { "mass": 2, "length": 2, "time": -3, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "qed.force_noise_two_sided_per_rad_s",
+        "tensor": { "rank": 2, "index_variance": ["cartesian", "cartesian"], "symmetry": "hermitian" },
+        "representation": { "frame_id": "apparatus_orthonormal", "basis_id": "cartesian_xyz", "gauge_id": "not_applicable" },
+        "spectral": { "measure": "per_rad_s", "fourier_convention": "F(omega)=integral_dt_exp(+i_omega_t)f(t)", "psd_sidedness": "two_sided", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "connected_force_covariance", "reference_state": "same_temperature_no_boundary_contrast" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/SFF", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "fdt_G_alpha_to_SFF", "source_ref": "synthetic://stage4/transform/SFF", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "S_DeltaU",
+      "role": "energy_difference_psd",
+      "descriptor": {
+        "si_dimension": { "mass": 2, "length": 4, "time": -3, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "coherence.branch_energy_difference_noise_two_sided_per_rad_s",
+        "tensor": { "rank": 0, "index_variance": [], "symmetry": "scalar" },
+        "representation": { "frame_id": "apparatus_orthonormal", "basis_id": "branch_a_minus_b", "gauge_id": "not_applicable" },
+        "spectral": { "measure": "per_rad_s", "fourier_convention": "F(omega)=integral_dt_exp(+i_omega_t)f(t)", "psd_sidedness": "two_sided", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "connected_branch_energy_covariance", "reference_state": "same_temperature_no_boundary_contrast" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/SDeltaU", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "branch_displacement_contract_SFF", "source_ref": "synthetic://stage4/transform/SDeltaU", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "chi",
+      "role": "coherence_exponent",
+      "descriptor": {
+        "si_dimension": { "mass": 0, "length": 0, "time": 0, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "coherence.filter_function_exponent",
+        "tensor": { "rank": 0, "index_variance": [], "symmetry": "scalar" },
+        "representation": { "frame_id": "apparatus_orthonormal", "basis_id": "branch_a_minus_b", "gauge_id": "not_applicable" },
+        "spectral": { "measure": "time_domain", "fourier_convention": "two_sided_angular_frequency_filter_integral", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "not_applicable", "reference_state": "normalized_initial_coherence" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/chi", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "filter_function_to_chi", "source_ref": "synthetic://stage4/transform/chi", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "T_ren",
+      "role": "renormalized_stress_energy_tensor",
+      "descriptor": {
+        "si_dimension": { "mass": 1, "length": -1, "time": -2, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "gravity.complete_apparatus_renormalized_stress_energy",
+        "tensor": { "rank": 2, "index_variance": ["covariant", "covariant"], "symmetry": "symmetric" },
+        "representation": { "frame_id": "apparatus_orthonormal_x0_equals_ct", "basis_id": "tetrad_hat_mu", "gauge_id": "background_harmonic" },
+        "spectral": { "measure": "time_domain", "fourier_convention": "not_applicable_point_space", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "registered_point_splitting_complete_apparatus", "reference_state": "same_apparatus_boundary_off" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/T", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "coordinate_to_tetrad_T", "source_ref": "synthetic://stage4/transform/T", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "N_TT",
+      "role": "stress_noise_kernel",
+      "descriptor": {
+        "si_dimension": { "mass": 2, "length": -2, "time": -4, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "gravity.symmetrized_connected_stress_noise_kernel",
+        "tensor": { "rank": 4, "index_variance": ["covariant", "covariant", "covariant", "covariant"], "symmetry": "pair_symmetric" },
+        "representation": { "frame_id": "apparatus_orthonormal_x0_equals_ct", "basis_id": "tetrad_hat_mu", "gauge_id": "background_harmonic" },
+        "spectral": { "measure": "four_frequency", "fourier_convention": "four_dimensional_retarded_transform", "psd_sidedness": "two_sided", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "symmetrized_connected_renormalized_covariance", "reference_state": "same_apparatus_boundary_off" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/N", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "coordinate_to_tetrad_N", "source_ref": "synthetic://stage4/transform/N", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "G_ret",
+      "role": "retarded_metric_response",
+      "descriptor": {
+        "si_dimension": { "mass": -1, "length": 1, "time": 2, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "gravity.retarded_tensor_to_metric_response",
+        "tensor": { "rank": 4, "index_variance": ["covariant", "covariant", "contravariant", "contravariant"], "symmetry": "retarded_rank4" },
+        "representation": { "frame_id": "apparatus_orthonormal_x0_equals_ct", "basis_id": "tetrad_hat_mu", "gauge_id": "harmonic_linearized_gravity" },
+        "spectral": { "measure": "four_frequency", "fourier_convention": "four_dimensional_retarded_transform", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "retarded_response_about_registered_background", "reference_state": "minkowski_weak_field_background" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/Gret", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "registered_retarded_kernel", "source_ref": "synthetic://stage4/transform/Gret", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "h_metric",
+      "role": "metric_perturbation",
+      "descriptor": {
+        "si_dimension": { "mass": 0, "length": 0, "time": 0, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "gravity.dimensionless_metric_perturbation",
+        "tensor": { "rank": 2, "index_variance": ["covariant", "covariant"], "symmetry": "symmetric" },
+        "representation": { "frame_id": "apparatus_orthonormal_x0_equals_ct", "basis_id": "tetrad_hat_mu", "gauge_id": "harmonic_linearized_gravity" },
+        "spectral": { "measure": "four_frequency", "fourier_convention": "four_dimensional_retarded_transform", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "response_difference", "reference_state": "same_apparatus_boundary_off" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/h", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "Gret_contract_TN_to_h", "source_ref": "synthetic://stage4/transform/h", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "phi_metric",
+      "role": "coherence_phase",
+      "descriptor": {
+        "si_dimension": { "mass": 0, "length": 0, "time": 0, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "coherence.metric_induced_unitary_phase",
+        "tensor": { "rank": 0, "index_variance": [], "symmetry": "scalar" },
+        "representation": { "frame_id": "apparatus_orthonormal_x0_equals_ct", "basis_id": "branch_a_minus_b", "gauge_id": "gauge_invariant_closed_path_observable" },
+        "spectral": { "measure": "time_domain", "fourier_convention": "action_integral_over_hold_time", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "phase_difference", "reference_state": "same_path_boundary_off" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/phase", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "metric_to_closed_path_phase", "source_ref": "synthetic://stage4/transform/phase", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "Gamma_bridge",
+      "role": "collapse_rate",
+      "descriptor": {
+        "si_dimension": { "mass": 0, "length": 0, "time": -1, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "coherence.registered_bridge_nonunitary_rate",
+        "tensor": { "rank": 0, "index_variance": [], "symmetry": "scalar" },
+        "representation": { "frame_id": "apparatus_orthonormal_x0_equals_ct", "basis_id": "branch_a_minus_b", "gauge_id": "gauge_invariant_master_equation_observable" },
+        "spectral": { "measure": "not_spectral", "fourier_convention": "markovian_rate_after_registered_kernel_integration", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "connected_rate_difference", "reference_state": "zero_coupling_generator" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/rate", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "metric_noise_to_rate", "source_ref": "synthetic://stage4/transform/rate", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "omega_C",
+      "role": "compton_angular_frequency",
+      "descriptor": {
+        "si_dimension": { "mass": 0, "length": 0, "time": -1, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "frequency.compton_rest_energy_angular",
+        "tensor": { "rank": 0, "index_variance": [], "symmetry": "scalar" },
+        "representation": { "frame_id": "probe_rest_frame", "basis_id": "scalar", "gauge_id": "not_applicable" },
+        "spectral": { "measure": "angular_frequency_rad_s", "fourier_convention": "identity_omega_C_equals_mc2_over_hbar", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "not_applicable", "reference_state": "probe_rest_mass" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/omegaC", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "mass_energy_to_compton_bookkeeping", "source_ref": "synthetic://stage4/transform/omegaC", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "Gamma_DP",
+      "role": "dp_rate",
+      "descriptor": {
+        "si_dimension": { "mass": 0, "length": 0, "time": -1, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "frequency.dp_self_energy_inverse_timescale",
+        "tensor": { "rank": 0, "index_variance": [], "symmetry": "scalar" },
+        "representation": { "frame_id": "probe_mass_density_frame", "basis_id": "scalar", "gauge_id": "not_applicable" },
+        "spectral": { "measure": "not_spectral", "fourier_convention": "identity_Gamma_DP_equals_EG_over_hbar", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "registered_mass_density_smearing", "reference_state": "identical_branch_mass_density" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/GammaDP", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "EG_to_DP_rate_bookkeeping", "source_ref": "synthetic://stage4/transform/GammaDP", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    },
+    {
+      "quantity_id": "omega_cavity",
+      "role": "cavity_angular_frequency",
+      "descriptor": {
+        "si_dimension": { "mass": 0, "length": 0, "time": -1, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "frequency.cavity_mode_angular",
+        "tensor": { "rank": 0, "index_variance": [], "symmetry": "scalar" },
+        "representation": { "frame_id": "apparatus_orthonormal", "basis_id": "registered_cavity_mode", "gauge_id": "macroscopic_qed_coulomb" },
+        "spectral": { "measure": "angular_frequency_rad_s", "fourier_convention": "registered_cavity_eigenmode", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "not_applicable", "reference_state": "registered_material_cavity" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/omegaCavity", "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "geometry_to_cavity_frequency", "source_ref": "synthetic://stage4/transform/omegaCavity", "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "integrity_verified": true }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "qed_G_alpha_to_SFF",
+      "kind": "green_alpha_to_force_noise",
+      "source_quantity_ids": ["G_ee", "alpha_probe"],
+      "target_quantity_id": "S_FF",
+      "descriptor": {
+        "si_dimension": { "mass": 2, "length": 2, "time": -3, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "transform.qed_green_probe_to_force_noise",
+        "tensor": { "rank": 2, "index_variance": ["cartesian", "cartesian"], "symmetry": "hermitian" },
+        "representation": { "frame_id": "apparatus_orthonormal", "basis_id": "cartesian_xyz", "gauge_id": "macroscopic_qed_coulomb" },
+        "spectral": { "measure": "per_rad_s", "fourier_convention": "F(omega)=integral_dt_exp(+i_omega_t)f(t)", "psd_sidedness": "two_sided", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "connected_force_covariance", "reference_state": "same_temperature_no_boundary_contrast" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/edge/G-alpha-SFF", "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "actual_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "fdt_G_alpha_to_SFF", "source_ref": "synthetic://stage4/edge-transform/G-alpha-SFF", "expected_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "actual_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "integrity_verified": true }
+      },
+      "dimension_transform": {
+        "source_powers": [{ "quantity_id": "G_ee", "power": 1 }, { "quantity_id": "alpha_probe", "power": 1 }],
+        "kernel_dimension": { "mass": 3, "length": 3, "time": -7, "current": -2, "temperature": 0, "amount": 0, "luminous_intensity": 0 }
+      },
+      "semantic_mapping": { "equation_id": "macroscopic_qed_fdt_force_noise", "mapping_description": "Source-backed Green/polarizability contraction with material loss and temperature.", "passed": true },
+      "tensor_mapping": { "contraction_description": "Complex dyadic contraction leaves a Hermitian Cartesian force covariance.", "passed": true },
+      "representation_mapping": { "frame_basis_map": "shared apparatus Cartesian basis", "gauge_map": "macroscopic-QED observable contraction", "passed": true },
+      "explicit_coupling_or_fdt_ref": "synthetic://stage4/equations/macroscopic-qed-fdt",
+      "sourced_transfer_kernel_ref": null,
+      "source_term_kind": "not_applicable"
+    },
+    {
+      "edge_id": "qed_SFF_to_SDeltaU",
+      "kind": "force_noise_to_energy_noise",
+      "source_quantity_ids": ["S_FF"],
+      "target_quantity_id": "S_DeltaU",
+      "descriptor": {
+        "si_dimension": { "mass": 2, "length": 4, "time": -3, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "transform.force_noise_to_branch_energy_noise",
+        "tensor": { "rank": 0, "index_variance": [], "symmetry": "scalar" },
+        "representation": { "frame_id": "apparatus_orthonormal", "basis_id": "branch_a_minus_b", "gauge_id": "not_applicable" },
+        "spectral": { "measure": "per_rad_s", "fourier_convention": "F(omega)=integral_dt_exp(+i_omega_t)f(t)", "psd_sidedness": "two_sided", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "connected_branch_energy_covariance", "reference_state": "same_temperature_no_boundary_contrast" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/edge/SFF-SDeltaU", "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "actual_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "branch_displacement_contract_SFF", "source_ref": "synthetic://stage4/edge-transform/SFF-SDeltaU", "expected_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "actual_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "integrity_verified": true }
+      },
+      "dimension_transform": {
+        "source_powers": [{ "quantity_id": "S_FF", "power": 1 }],
+        "kernel_dimension": { "mass": 0, "length": 2, "time": 0, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 }
+      },
+      "semantic_mapping": { "equation_id": "linearized_branch_energy_noise", "mapping_description": "Delta-x_i S_FF^ij Delta-x_j within the registered linear-response domain.", "passed": true },
+      "tensor_mapping": { "contraction_description": "Two branch-displacement vectors contract the rank-two force covariance to a scalar.", "passed": true },
+      "representation_mapping": { "frame_basis_map": "branch displacement and force PSD share the apparatus basis", "gauge_map": "not applicable", "passed": true },
+      "explicit_coupling_or_fdt_ref": "synthetic://stage4/equations/linearized-branch-coupling",
+      "sourced_transfer_kernel_ref": null,
+      "source_term_kind": "not_applicable"
+    },
+    {
+      "edge_id": "qed_SDeltaU_to_chi",
+      "kind": "energy_noise_to_chi",
+      "source_quantity_ids": ["S_DeltaU"],
+      "target_quantity_id": "chi",
+      "descriptor": {
+        "si_dimension": { "mass": 0, "length": 0, "time": 0, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "transform.energy_noise_to_filter_exponent",
+        "tensor": { "rank": 0, "index_variance": [], "symmetry": "scalar" },
+        "representation": { "frame_id": "apparatus_orthonormal", "basis_id": "branch_a_minus_b", "gauge_id": "not_applicable" },
+        "spectral": { "measure": "time_domain", "fourier_convention": "two_sided_angular_frequency_filter_integral", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "not_applicable", "reference_state": "normalized_initial_coherence" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/edge/SDeltaU-chi", "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "actual_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "two_sided_filter_function_to_chi", "source_ref": "synthetic://stage4/edge-transform/SDeltaU-chi", "expected_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "actual_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "integrity_verified": true }
+      },
+      "dimension_transform": {
+        "source_powers": [{ "quantity_id": "S_DeltaU", "power": 1 }],
+        "kernel_dimension": { "mass": -2, "length": -4, "time": 3, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 }
+      },
+      "semantic_mapping": { "equation_id": "two_sided_filter_function_chi", "mapping_description": "S_DeltaU is integrated against the registered filter and divided by hbar squared.", "passed": true },
+      "tensor_mapping": { "contraction_description": "Scalar PSD remains scalar after frequency integration.", "passed": true },
+      "representation_mapping": { "frame_basis_map": "same branch convention", "gauge_map": "not applicable", "passed": true },
+      "explicit_coupling_or_fdt_ref": "synthetic://stage4/equations/filter-function",
+      "sourced_transfer_kernel_ref": null,
+      "source_term_kind": "not_applicable"
+    },
+    {
+      "edge_id": "bridge_TN_to_Gret",
+      "kind": "stress_noise_to_retarded_response",
+      "source_quantity_ids": ["T_ren", "N_TT"],
+      "target_quantity_id": "G_ret",
+      "descriptor": {
+        "si_dimension": { "mass": -1, "length": 1, "time": 2, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "transform.complete_tensor_noise_to_registered_retarded_response",
+        "tensor": { "rank": 4, "index_variance": ["covariant", "covariant", "contravariant", "contravariant"], "symmetry": "retarded_rank4" },
+        "representation": { "frame_id": "apparatus_orthonormal_x0_equals_ct", "basis_id": "tetrad_hat_mu", "gauge_id": "harmonic_linearized_gravity" },
+        "spectral": { "measure": "four_frequency", "fourier_convention": "four_dimensional_retarded_transform", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "registered_retarded_response_about_background", "reference_state": "same_apparatus_boundary_off" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/edge/TN-Gret", "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "actual_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "registered_TN_to_Gret_preflight", "source_ref": "synthetic://stage4/edge-transform/TN-Gret", "expected_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "actual_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "integrity_verified": true }
+      },
+      "dimension_transform": {
+        "source_powers": [{ "quantity_id": "T_ren", "power": 1 }, { "quantity_id": "N_TT", "power": 1 }],
+        "kernel_dimension": { "mass": -4, "length": 4, "time": 8, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 }
+      },
+      "semantic_mapping": { "equation_id": "registered_tensor_noise_response_preflight", "mapping_description": "Complete mean and connected stress tensors select the registered causal response domain.", "passed": true },
+      "tensor_mapping": { "contraction_description": "Rank-two and pair-symmetric rank-four sources are admitted only to a rank-four retarded response contract.", "passed": true },
+      "representation_mapping": { "frame_basis_map": "shared orthonormal tetrad", "gauge_map": "harmonic gauge and linearized constraints", "passed": true },
+      "explicit_coupling_or_fdt_ref": "synthetic://stage4/equations/stochastic-gravity",
+      "sourced_transfer_kernel_ref": "synthetic://stage4/kernels/retarded-tensor-response",
+      "source_term_kind": "full_renormalized_tensor"
+    },
+    {
+      "edge_id": "bridge_Gret_TN_to_h",
+      "kind": "retarded_response_to_metric",
+      "source_quantity_ids": ["G_ret", "T_ren", "N_TT"],
+      "target_quantity_id": "h_metric",
+      "descriptor": {
+        "si_dimension": { "mass": 0, "length": 0, "time": 0, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "transform.retarded_response_to_metric_perturbation",
+        "tensor": { "rank": 2, "index_variance": ["covariant", "covariant"], "symmetry": "symmetric" },
+        "representation": { "frame_id": "apparatus_orthonormal_x0_equals_ct", "basis_id": "tetrad_hat_mu", "gauge_id": "harmonic_linearized_gravity" },
+        "spectral": { "measure": "four_frequency", "fourier_convention": "four_dimensional_retarded_transform", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "response_difference", "reference_state": "same_apparatus_boundary_off" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/edge/Gret-TN-h", "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "actual_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "Gret_contract_TN_to_h", "source_ref": "synthetic://stage4/edge-transform/Gret-TN-h", "expected_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "actual_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "integrity_verified": true }
+      },
+      "dimension_transform": {
+        "source_powers": [{ "quantity_id": "G_ret", "power": 1 }, { "quantity_id": "T_ren", "power": 1 }, { "quantity_id": "N_TT", "power": 1 }],
+        "kernel_dimension": { "mass": -2, "length": 2, "time": 4, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 }
+      },
+      "semantic_mapping": { "equation_id": "retarded_metric_response_convolution", "mapping_description": "The sourced retarded tensor kernel maps the complete tensor source and covariance to a metric perturbation.", "passed": true },
+      "tensor_mapping": { "contraction_description": "Registered rank-four response contractions yield a symmetric rank-two metric perturbation.", "passed": true },
+      "representation_mapping": { "frame_basis_map": "shared orthonormal tetrad", "gauge_map": "harmonic gauge and constraint-preserving solution", "passed": true },
+      "explicit_coupling_or_fdt_ref": "synthetic://stage4/equations/retarded-metric-response",
+      "sourced_transfer_kernel_ref": "synthetic://stage4/kernels/retarded-tensor-response",
+      "source_term_kind": "full_renormalized_tensor"
+    },
+    {
+      "edge_id": "bridge_h_to_phase",
+      "kind": "metric_to_phase",
+      "source_quantity_ids": ["h_metric"],
+      "target_quantity_id": "phi_metric",
+      "descriptor": {
+        "si_dimension": { "mass": 0, "length": 0, "time": 0, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "transform.metric_to_closed_path_unitary_phase",
+        "tensor": { "rank": 0, "index_variance": [], "symmetry": "scalar" },
+        "representation": { "frame_id": "apparatus_orthonormal_x0_equals_ct", "basis_id": "branch_a_minus_b", "gauge_id": "gauge_invariant_closed_path_observable" },
+        "spectral": { "measure": "time_domain", "fourier_convention": "action_integral_over_hold_time", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "phase_difference", "reference_state": "same_path_boundary_off" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/edge/h-phase", "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "actual_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "metric_to_closed_path_phase", "source_ref": "synthetic://stage4/edge-transform/h-phase", "expected_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "actual_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "integrity_verified": true }
+      },
+      "dimension_transform": {
+        "source_powers": [{ "quantity_id": "h_metric", "power": 1 }],
+        "kernel_dimension": { "mass": 0, "length": 0, "time": 0, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 }
+      },
+      "semantic_mapping": { "equation_id": "closed_path_action_phase", "mapping_description": "A registered matter action maps h_munu to a dimensionless unitary phase.", "passed": true },
+      "tensor_mapping": { "contraction_description": "Worldline/matter tensors contract h_munu to a scalar action phase.", "passed": true },
+      "representation_mapping": { "frame_basis_map": "tetrad metric to branch-path observable", "gauge_map": "closed-path gauge invariant phase", "passed": true },
+      "explicit_coupling_or_fdt_ref": "synthetic://stage4/equations/matter-action-phase",
+      "sourced_transfer_kernel_ref": "synthetic://stage4/kernels/metric-to-matter-phase",
+      "source_term_kind": "not_applicable"
+    },
+    {
+      "edge_id": "bridge_hN_to_rate",
+      "kind": "metric_to_rate",
+      "source_quantity_ids": ["h_metric", "N_TT"],
+      "target_quantity_id": "Gamma_bridge",
+      "descriptor": {
+        "si_dimension": { "mass": 0, "length": 0, "time": -1, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 },
+        "semantic_quantity_id": "transform.metric_noise_to_nonunitary_rate",
+        "tensor": { "rank": 0, "index_variance": [], "symmetry": "scalar" },
+        "representation": { "frame_id": "apparatus_orthonormal_x0_equals_ct", "basis_id": "branch_a_minus_b", "gauge_id": "gauge_invariant_master_equation_observable" },
+        "spectral": { "measure": "not_spectral", "fourier_convention": "registered_generator_after_two_sided_kernel_integration", "psd_sidedness": "not_applicable", "canonical_jacobian": 1 },
+        "renormalization": { "prescription": "connected_rate_difference", "reference_state": "zero_coupling_generator" },
+        "evidence_receipt": { "source_ref": "synthetic://stage4/edge/hN-rate", "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "actual_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "integrity_verified": true },
+        "transform_receipt": { "transform_id": "metric_noise_to_registered_rate", "source_ref": "synthetic://stage4/edge-transform/hN-rate", "expected_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "actual_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "integrity_verified": true }
+      },
+      "dimension_transform": {
+        "source_powers": [{ "quantity_id": "h_metric", "power": 1 }, { "quantity_id": "N_TT", "power": 1 }],
+        "kernel_dimension": { "mass": -2, "length": 2, "time": 3, "current": 0, "temperature": 0, "amount": 0, "luminous_intensity": 0 }
+      },
+      "semantic_mapping": { "equation_id": "registered_metric_noise_master_equation", "mapping_description": "The sourced metric/noise kernel maps to a nonnegative rate with phase kept distinct.", "passed": true },
+      "tensor_mapping": { "contraction_description": "Matter coupling tensors contract the metric/noise covariance to a scalar generator rate.", "passed": true },
+      "representation_mapping": { "frame_basis_map": "tetrad metric/noise to branch master equation", "gauge_map": "registered gauge-invariant matter observable", "passed": true },
+      "explicit_coupling_or_fdt_ref": "synthetic://stage4/equations/metric-noise-master-equation",
+      "sourced_transfer_kernel_ref": "synthetic://stage4/kernels/metric-to-coherence-rate",
+      "source_term_kind": "not_applicable"
+    }
+  ],
+  "convention_checks": {
+    "planck_energy_J": 3.313035075e-19,
+    "frequency_Hz": 500000000000000,
+    "angular_frequency_rad_s": 3141592653589793,
+    "planck_constant_J_s": 6.62607015e-34,
+    "reduced_planck_constant_J_s": 1.0545718176461565e-34,
+    "relative_tolerance": 1e-12,
+    "psd_per_Hz": 6.283185307179586e-40,
+    "psd_per_rad_s": 1e-40,
+    "spectral_jacobian_relative_tolerance": 1e-12
+  },
+  "physical_checks": {
+    "stress_conservation_residual": 1e-12,
+    "stress_conservation_tolerance": 1e-10,
+    "stress_tensor_symmetry_passed": true,
+    "stress_noise_pair_symmetry_passed": true,
+    "gauge_constraints_passed": true,
+    "covariance_minimum_eigenvalue": 0,
+    "covariance_psd_tolerance": 1e-15
+  },
+  "invariance_checks": {
+    "basis_round_trip_relative_error": 1e-14,
+    "basis_round_trip_tolerance": 1e-12,
+    "unit_round_trip_relative_error": 1e-14,
+    "unit_round_trip_tolerance": 1e-12
+  },
+  "recovery_limits": {
+    "zero_coupling": true,
+    "no_boundary_contrast": true,
+    "standard_qed": true,
+    "ordinary_gr": true,
+    "standard_or_dp": true
+  }
+}

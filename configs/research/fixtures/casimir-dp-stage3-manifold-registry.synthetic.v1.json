@@ -1,0 +1,101 @@
+{
+  "schema_version": "casimir_dp_manifold_kernel_registry/1",
+  "registry_id": "casimir-dp-stage3-synthetic-manifold-registry",
+  "registry_version": "1.0.0",
+  "campaign_unblinded_at": "2026-07-23T12:00:00.000Z",
+  "entries": [
+    {
+      "entry_kind": "candidate",
+      "model_id": "M_bridge_tensor_noise_v1",
+      "version": "1.0.0",
+      "maturity": "stage0_exploratory",
+      "proposed_scope": "Synthetic contract fixture for a boundary-conditioned tensor-noise bridge; no empirical claim.",
+      "sources": [
+        {
+          "source_id": "martin-verdaguer-1999",
+          "url": "https://doi.org/10.1103/PhysRevD.60.084008"
+        },
+        {
+          "source_id": "phillips-hu-2001",
+          "url": "https://doi.org/10.1103/PhysRevD.63.104001"
+        },
+        {
+          "source_id": "lindblad-1976",
+          "url": "https://doi.org/10.1007/BF01608499"
+        }
+      ],
+      "equation_ids": [
+        "synthetic-einstein-langevin-retarded-response",
+        "synthetic-tensor-noise-to-cptp-generator"
+      ],
+      "quantum_field_and_state": "Electromagnetic field in a declared stationary Gaussian boundary state.",
+      "apparatus_geometry_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "stress_energy": {
+        "source_kind": "renormalized_tensor",
+        "renormalized_t_munu_prescription": "Point-split renormalized expectation relative to the declared open-boundary reference state.",
+        "subtraction_reference_state": "Open-boundary apparatus state at matched material and thermodynamic controls.",
+        "frame_and_basis": "Laboratory orthonormal tetrad in the weak-field apparatus frame.",
+        "boundary_and_surface_terms": "Plate, coating, support, and surface counterterm contributions retained in the source ledger.",
+        "representative_renormalized_t00_J_m3": -0.000001,
+        "conservation_residual": 1e-10,
+        "conservation_tolerance": 1e-8,
+        "symmetry_identities_passed": true
+      },
+      "stress_noise": {
+        "tensor_noise_kernel_prescription": "Connected symmetrized stress-energy bitensor with the same subtraction state.",
+        "covariance_ordering_convention": "One-half anticommutator connected covariance.",
+        "covariance_is_positive_semidefinite": true,
+        "covariance_minimum_eigenvalue": 0
+      },
+      "causal_response": {
+        "retarded_tensor_to_metric_kernel": "Gauge-fixed retarded linearized Einstein operator inverse acting on the tensor source and noise.",
+        "is_retarded_and_causal": true,
+        "gauge_and_coordinate_contract": "Lorenz-gauge weak-field perturbation in laboratory coordinates.",
+        "constraint_contract": "Linearized Hamiltonian and momentum constraints with conserved source residual below tolerance.",
+        "fourier_convention": "X(omega)=integral dt exp(+i omega t) X(t); inverse uses exp(-i omega t)/(2 pi).",
+        "psd_sidedness": "two_sided",
+        "units_contract": "SI tensor components, angular frequency in rad/s, two-sided PSD per rad/s.",
+        "dimensional_closure_passed": true
+      },
+      "matter_dynamics": {
+        "metric_to_matter_coherence_equation": "Synthetic frozen Markovian influence-functional reduction mapped to the prepared path-density difference.",
+        "evolution_kind": "markovian",
+        "deterministic_phase_and_rate_are_distinct": true,
+        "complete_positivity_passed": true,
+        "trace_preservation_passed": true,
+        "physical_rate_produced": true,
+        "rate_validation_value_s": 0.000001
+      },
+      "recovery_limits": {
+        "zero_coupling": true,
+        "no_boundary_contrast": true,
+        "weak_field": true,
+        "standard_qed": true,
+        "ordinary_gr": true,
+        "standard_or_dp": true
+      },
+      "parameter_contract": {
+        "frozen_ranges_or_priors": "Synthetic proper bounded ranges frozen before the synthetic unblinding timestamp.",
+        "manifest_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "validity": {
+        "domain_of_validity": "Stationary Gaussian field state, weak metric perturbations, declared geometry band, and Markovian coarse-graining.",
+        "uncertainty_model": "Joint covariance over material response, tensor discretization, kernel interpolation, and coherence estimator."
+      },
+      "companion_observable": {
+        "observable_id": "bridge_force_noise_companion",
+        "prediction_contract": "The same frozen kernel predicts the independent force-noise companion channel."
+      },
+      "falsifiers": {
+        "experiment_internal": [
+          "Fail if held-out material, distance, temperature, path-swap, or echo dependence departs from the frozen kernel outside uncertainty."
+        ],
+        "independent": [
+          "Fail if an independently calibrated force-noise measurement excludes the shared frozen kernel parameters."
+        ]
+      },
+      "preregistered_at": "2026-07-20T12:00:00.000Z",
+      "empirical_validation_claim": false
+    }
+  ]
+}

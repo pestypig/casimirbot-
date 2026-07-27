@@ -75,6 +75,107 @@ describe("repo evidence presentation sanitizer", () => {
     expect(gate.terminal_allowed).toBe(true);
   });
 
+  it("accepts current-turn provider reasoning after repository observation re-entry", () => {
+    const turnId = "turn:repo-provider-reentry";
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex`;
+    const observationRef = `${turnId}:repo_code_evidence_observation`;
+    const answerText =
+      "Terminal authority is implemented in server/services/helix-ask/terminal-authority-single-writer.ts, which selects the final artifact after repository evidence is re-entered into the provider.";
+    const candidate = {
+      schema: "helix.agent_provider_terminal_candidate.v1",
+      candidate_id: candidateRef,
+      turn_id: turnId,
+      provider_reasoning_completed: true,
+      grounded_in_observation_refs: [observationRef],
+      normalized_observation_refs: [observationRef],
+    };
+    const gate = evaluateRepoAnswerTextQualityGate({
+      turnId,
+      answerRef: `${candidateRef}:route_product:repo_code_evidence_answer`,
+      answerText,
+      payload: {
+        turn_id: turnId,
+        repo_code_evidence_answer: {
+          turn_id: turnId,
+          answer_text: answerText,
+          provider_terminal_candidate_ref: candidateRef,
+          selected_observation_refs: [observationRef],
+          support_refs: [observationRef],
+        },
+        provider_terminal_candidate: candidate,
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          turn_id: turnId,
+          status: "completed",
+          provider_terminal_candidate_ref: candidateRef,
+          evidence_reentered: true,
+          solver_completed: true,
+        },
+        provider_terminal_authority_bridge: {
+          schema: "helix.provider_terminal_authority_bridge.v1",
+          turn_id: turnId,
+          provider_terminal_candidate_ref: candidateRef,
+          provider_terminal_candidate: candidate,
+          normalized_observations_ready: true,
+          terminal_authority_granted: true,
+          final_visible_answer_authorized: true,
+        },
+      },
+    });
+
+    expect(gate.ok).toBe(true);
+    expect(gate.violations).toEqual([]);
+    expect(gate.terminal_allowed).toBe(true);
+  });
+
+  it("rejects a provider candidate whose observation refs do not support the repo answer", () => {
+    const turnId = "turn:repo-provider-reentry-mismatch";
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex`;
+    const gate = evaluateRepoAnswerTextQualityGate({
+      turnId,
+      answerRef: `${candidateRef}:route_product:repo_code_evidence_answer`,
+      answerText:
+        "Terminal authority is implemented in server/services/helix-ask/terminal-authority-single-writer.ts and selects the final visible answer.",
+      payload: {
+        turn_id: turnId,
+        repo_code_evidence_answer: {
+          turn_id: turnId,
+          provider_terminal_candidate_ref: candidateRef,
+          selected_observation_refs: [`${turnId}:answer-observation`],
+          support_refs: [`${turnId}:answer-observation`],
+        },
+        provider_terminal_candidate: {
+          schema: "helix.agent_provider_terminal_candidate.v1",
+          candidate_id: candidateRef,
+          turn_id: turnId,
+          provider_reasoning_completed: true,
+          grounded_in_observation_refs: [`${turnId}:different-observation`],
+        },
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          turn_id: turnId,
+          status: "completed",
+          provider_terminal_candidate_ref: candidateRef,
+          evidence_reentered: true,
+          solver_completed: true,
+        },
+        provider_terminal_authority_bridge: {
+          schema: "helix.provider_terminal_authority_bridge.v1",
+          turn_id: turnId,
+          provider_terminal_candidate_ref: candidateRef,
+          normalized_observations_ready: true,
+          terminal_authority_granted: true,
+          final_visible_answer_authorized: true,
+        },
+      },
+    });
+
+    expect(gate.ok).toBe(false);
+    expect(gate.violations).toEqual(
+      expect.arrayContaining(["missing_model_synthesis", "wrong_model_step_identity"]),
+    );
+  });
+
   it("rejects repo answers synthesized under the generic direct-answer identity", () => {
     const gate = evaluateRepoAnswerTextQualityGate({
       turnId: "turn:repo-quality-wrong-step",

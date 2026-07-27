@@ -7,6 +7,7 @@ import {
 } from "@shared/helix-action-rehearsal";
 import type { HelixPossibilityGraph } from "@shared/helix-environment-possibility-graph";
 import type { HelixEnvironmentStateSnapshot } from "@shared/helix-environment-state-snapshot";
+import type { HelixRoomSourceAdmission } from "@shared/helix-room-source-ingress";
 import { rehearseMinecraftGraph } from "./minecraft-rehearsal-adapter";
 import { validatePossibilityGraph } from "./possibility-graph-validator";
 
@@ -34,6 +35,7 @@ export function rehearsePossibilityGraph(input: {
   graph: HelixPossibilityGraph;
   environmentState: HelixEnvironmentStateSnapshot;
   request?: HelixActionRehearsalRequest | null;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
   now?: string;
 }): { request: HelixActionRehearsalRequest; result: HelixActionRehearsalResult } {
   const request = input.request ?? createActionRehearsalRequest({ graph: input.graph });
@@ -76,7 +78,7 @@ export function rehearsePossibilityGraph(input: {
     };
   }
   const result = input.graph.domain === "minecraft"
-    ? rehearseMinecraftGraph({ graph: input.graph, request, environmentState: input.environmentState, now: input.now })
-    : rehearseMinecraftGraph({ graph: input.graph, request, environmentState: input.environmentState, now: input.now });
+    ? rehearseMinecraftGraph({ graph: input.graph, request, environmentState: input.environmentState, sourceAdmission: input.sourceAdmission, now: input.now })
+    : rehearseMinecraftGraph({ graph: input.graph, request, environmentState: input.environmentState, sourceAdmission: input.sourceAdmission, now: input.now });
   return { request, result };
 }

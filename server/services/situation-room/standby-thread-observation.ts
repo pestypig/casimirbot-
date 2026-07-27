@@ -20,6 +20,7 @@ import type {
   StandbyCalloutProposal,
 } from "@shared/helix-standby-callout";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
+import type { HelixRoomSourceAdmission } from "@shared/helix-room-source-ingress";
 import type { InterjectionDecision } from "./interjection-policy";
 import { appendHelixThreadEvent } from "../helix-thread/ledger";
 
@@ -73,6 +74,7 @@ export const compactGoals = (goals?: SituationGoalHypothesis[]): SituationGoalHy
 export async function appendStandbyObservationToThread(input: {
   binding: HelixSituationThreadBinding | null;
   world_event?: HelixWorldEvent | null;
+  source_admission?: HelixRoomSourceAdmission | null;
   signal?: SituationEventSignal | null;
   state_projection?: SituationStateProjection | null;
   goal_hypotheses?: SituationGoalHypothesis[];
@@ -164,6 +166,8 @@ export async function appendStandbyObservationToThread(input: {
         kind: "standby_observation",
         binding_id: binding.binding_id,
         salience_reason: input.salience_receipt?.reason ?? null,
+        source_admission_binding_id: input.source_admission?.binding_id ?? null,
+        source_admission_request_id: input.source_admission?.request_id ?? null,
       },
     });
     appendHelixThreadEvent({
@@ -201,6 +205,7 @@ export async function appendStandbyObservationToThread(input: {
 export function buildStandbyObservationRef(input: {
   binding: HelixSituationThreadBinding;
   world_event?: HelixWorldEvent | null;
+  source_admission?: HelixRoomSourceAdmission | null;
   signal?: SituationEventSignal | null;
   state_projection?: SituationStateProjection | null;
   goal_hypotheses?: SituationGoalHypothesis[];
@@ -224,6 +229,7 @@ export function buildStandbyObservationRef(input: {
     source_id: binding.source_id ?? input.world_event?.source_id ?? null,
     graph_id: binding.graph_id ?? input.signal?.graph_id ?? null,
     world_id: binding.world_id ?? input.world_event?.world_id ?? null,
+    source_admission: input.source_admission ?? null,
     world_event: compactWorldEvent(input.world_event),
     signal: input.signal
       ? {

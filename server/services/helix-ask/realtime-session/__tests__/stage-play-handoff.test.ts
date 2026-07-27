@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   listStagePlayLiveSourceConversationEvents,
+  recordStagePlayLiveSourceConversationEvent,
   resetStagePlayLiveSourceConversationStoreForTest,
 } from "../../../stage-play/stage-play-live-source-conversation-store";
 import { bridgeRealtimeTranscriptToStagePlay, resetRealtimeStagePlayAskHandoffsForTests } from "../../live-source/realtime-stage-play-handoff";
@@ -265,6 +266,120 @@ describe("Realtime transcript Stage Play handoff", () => {
     expect(handoff.required_grounding_capability_ids).toEqual(["docs.search"]);
     expect(handoff.required_grounding_capability_ids).not.toContain(
       "internet-search.search_web",
+    );
+  });
+
+  it("requires the exact procedure tool for an affirmative continuation bound to hash-checked Realtime context", () => {
+    recordStagePlayLiveSourceConversationEvent({
+      threadId: "helix-ask:desktop",
+      text: [
+        "Prepared the seven-stage comparison for badges",
+        "study.casimir_dp.evidence_map_stage3 and physics.energy.energy_density",
+        "with pinned Lanyon case advection_diffusion_full_1d.",
+      ].join(" "),
+      source: "assistant_answer",
+      turnId: "ask:prior:theory-procedure",
+      evidenceRefs: ["ask:prior:theory-procedure:terminal"],
+      now: new Date(100).toISOString(),
+    });
+    const transcriptText = [
+      "Continue that same comparison.",
+      "Re-prepare the procedure so its evidence is current for this turn,",
+      "then identify the missing semantic, formal, numerical, and observable requirements.",
+      "Do not start downstream jobs.",
+    ].join(" ");
+    const observation = buildRealtimeTranscriptObservation({
+      realtimeSessionId: "realtime:theory-procedure-continuation",
+      nowMs: 200,
+      body: {
+        event_type: "transcript.final",
+        event_ref: "provider-event:theory-procedure-continuation",
+        transcript_text: transcriptText,
+      },
+    })!;
+    const handoff = bridgeRealtimeTranscriptToStagePlay({
+      realtimeSessionId: "realtime:theory-procedure-continuation",
+      threadId: "helix-ask:desktop",
+      providerEventRef: "provider-event:theory-procedure-continuation",
+      transcriptText,
+      observation,
+      sourceBinding: { focus_panel_id: "workflow-demo-lab" },
+      selectedRuntimeAgentProvider: "codex",
+      nowMs: 200,
+    });
+
+    expect(handoff.worker_admission).toMatchObject({
+      outcome: "worker_grounded",
+      interaction_mode: "worker_required",
+      candidate_readonly_capability_ids: [
+        "theory-experiment-procedure.prepare",
+      ],
+      dispatch: {
+        kind: "ask_runtime",
+        requested: true,
+      },
+    });
+    expect(handoff.worker_admission.reason_codes).toContain(
+      "realtime_context_pack_bound_for_argument_admission",
+    );
+    expect(handoff.required_grounding_capability_ids).toEqual([
+      "theory-experiment-procedure.prepare",
+    ]);
+    expect(handoff.route_metadata).toMatchObject({
+      requiredGroundingCapabilityIds: [
+        "theory-experiment-procedure.prepare",
+      ],
+      source_target_intent: {
+        required_grounding_capability_ids: [
+          "theory-experiment-procedure.prepare",
+        ],
+        grounded_feedback_requires_observation: true,
+      },
+    });
+  });
+
+  it.each([
+    "Do not re-prepare that same theory comparison yet.",
+    "If we later re-prepare that same theory comparison, what would happen?",
+    "The screen says “re-prepare that same theory comparison.” Explain the wording.",
+  ])("does not admit a retained procedure from non-affirmative current language: %s", (transcriptText) => {
+    recordStagePlayLiveSourceConversationEvent({
+      threadId: "helix-ask:desktop",
+      text: [
+        "Prepared badges study.casimir_dp.evidence_map_stage3 and",
+        "physics.energy.energy_density using advection_diffusion_full_1d.",
+      ].join(" "),
+      source: "assistant_answer",
+      turnId: "ask:prior:theory-procedure-suppressed",
+      evidenceRefs: ["ask:prior:theory-procedure-suppressed:terminal"],
+      now: new Date(100).toISOString(),
+    });
+    const suffix = transcriptText.length.toString(16);
+    const observation = buildRealtimeTranscriptObservation({
+      realtimeSessionId: `realtime:theory-procedure-suppressed:${suffix}`,
+      nowMs: 200,
+      body: {
+        event_type: "transcript.final",
+        event_ref: `provider-event:theory-procedure-suppressed:${suffix}`,
+        transcript_text: transcriptText,
+      },
+    })!;
+    const handoff = bridgeRealtimeTranscriptToStagePlay({
+      realtimeSessionId: `realtime:theory-procedure-suppressed:${suffix}`,
+      threadId: "helix-ask:desktop",
+      providerEventRef: `provider-event:theory-procedure-suppressed:${suffix}`,
+      transcriptText,
+      observation,
+      sourceBinding: { focus_panel_id: "workflow-demo-lab" },
+      selectedRuntimeAgentProvider: "codex",
+      nowMs: 200,
+    });
+
+    expect(handoff.worker_admission.candidate_readonly_capability_ids).not.toContain(
+      "theory-experiment-procedure.prepare",
+    );
+    expect(handoff.required_grounding_capability_ids).not.toContain(
+      "theory-experiment-procedure.prepare",
     );
   });
 

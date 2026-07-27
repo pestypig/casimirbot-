@@ -1,7 +1,30 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { canonicalizeCasimirSpecValueV1 } from "@shared/contracts/casimir-spec-scientific-claim-ir.v1";
+import {
+  buildCasimirArtifactGenerationReceiptV1,
+  buildCasimirArtifactGenerationRequestV1,
+  type CasimirArtifactGenerationRequestV1,
+} from "@shared/contracts/casimir-artifact-generation.v1";
+import {
+  buildCasimirLanyonAdapterPolicyV1,
+  CASIMIR_LANYON_ADAPTER_CONTRACT_ID,
+  CASIMIR_LANYON_PRODUCER_ID,
+  type CasimirLanyonAdapterPolicyV1,
+} from "@shared/contracts/casimir-lanyon-advection-diffusion-adapter.v1";
+import {
+  buildCasimirFormalVerificationCertificateV1,
+} from "@shared/contracts/casimir-formal-verification-certificate.v1";
+import {
+  CASIMIR_FORMAL_VERIFICATION_REQUEST_SCHEMA_VERSION,
+} from "@shared/contracts/casimir-formal-verification-request.v1";
+import {
+  buildCasimirIndependentNumericalVerificationCertificateV1,
+  CASIMIR_INDEPENDENT_NUMERICAL_REQUEST_SCHEMA_VERSION,
+} from "@shared/contracts/casimir-independent-numerical-verification.v1";
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
 import {
   buildCodexContinuationAffordanceRetryInstruction,
@@ -52,6 +75,71 @@ import {
   stripCodexScholarlyEvidenceDecisionMarkers,
   validateCodexScholarlyEvidenceDecision,
 } from "../codex-provider";
+
+const buildIntegrityValidLanyonReceipt = async (input: {
+  request: CasimirArtifactGenerationRequestV1;
+  policy: CasimirLanyonAdapterPolicyV1;
+  caseId: string;
+}) => {
+  const selectedCase = input.policy.cases.find(
+    (entry) => entry.caseId === input.caseId,
+  );
+  if (!selectedCase) throw new Error("test Lanyon case not found");
+  const sourceByRole = {
+    build_manifest: {
+      logicalPath: `casimir/lanyon/${input.caseId}/build-manifest.json`,
+      artifactSha256: "1".repeat(64),
+      sizeBytes: 1,
+    },
+    formal_source: selectedCase.formalSource,
+    implementation_source: selectedCase.implementationSource,
+    numerical_case: selectedCase.specification,
+  } as const;
+  return buildCasimirArtifactGenerationReceiptV1({
+    generatedAt: "2026-07-26T12:00:01.000Z",
+    receiptId: `lanyon-receipt:${input.request.requestId}`,
+    request: {
+      schemaVersion: input.request.schemaVersion,
+      requestId: input.request.requestId,
+      artifactSha256: input.request.artifactSha256,
+      casimirSpec: input.request.casimirSpec,
+      claimId: input.request.claim.claimId,
+      propositionSha256: input.request.claim.propositionSha256,
+      masterProblem: input.request.masterProblem,
+      derivationProgram: input.request.derivationProgram,
+    },
+    producer: {
+      producerId: CASIMIR_LANYON_PRODUCER_ID,
+      adapterId: CASIMIR_LANYON_ADAPTER_CONTRACT_ID,
+      adapterRevisionSha256: input.policy.artifactSha256,
+      upstreamRepository: {
+        uri: input.policy.repository.uri,
+        commitSha: input.policy.repository.commitSha,
+        sourceTreeSha256: input.policy.repository.selectedSourceTreeSha256,
+      },
+    },
+    run: {
+      status: "succeeded",
+      startedAt: "2026-07-26T12:00:00.000Z",
+      completedAt: "2026-07-26T12:00:01.000Z",
+      transcriptSha256: "2".repeat(64),
+      environmentSha256: "3".repeat(64),
+    },
+    artifacts: input.request.requestedArtifacts
+      .map((artifact) => {
+        const source = sourceByRole[artifact.role];
+        return {
+          ...artifact,
+          logicalPath: source.logicalPath,
+          artifactSha256: source.artifactSha256,
+          sizeBytes: source.sizeBytes,
+          derivedFromSha256s: [input.request.sourcePacket.artifactSha256],
+        };
+      })
+      .sort((left, right) => left.artifactId.localeCompare(right.artifactId)),
+    blockers: [],
+  });
+};
 
 describe("Codex provider capability lane adapter", () => {
   const previousLiveTranslationExternalBackends = process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
@@ -137,6 +225,773 @@ describe("Codex provider capability lane adapter", () => {
         },
       },
     });
+  });
+
+  it("normalizes exact theory evidence payloads without promoting their authority", async () => {
+    const hash = (digit: string): string => digit.repeat(64);
+    const observationAuthority = {
+      output_role: "evidence_for_synthesis",
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    } as const;
+    const payloadAuthority = {
+      outputRole: "evidence_for_bounded_synthesis",
+      assistantAnswer: false,
+      terminalEligible: false,
+      promotionAllowed: false,
+      postToolModelStepRequired: true,
+    } as const;
+    const semanticObservation = {
+      schema: "casimir.theory_semantic_admitter.observation.v1",
+      status: "succeeded",
+      claim_ir: {
+        artifactId: "casimir_spec_scientific_claim_ir",
+        schemaVersion: "casimir_spec_scientific_claim_ir/v1",
+        specId: "spec:test:semantic",
+      },
+      semantic_admission_receipt: {
+        schemaVersion: "casimir_spec_semantic_admission_receipt/v1",
+        receiptId: "semantic-receipt:test",
+        claimBoundary: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          postToolModelStepRequired: true,
+        },
+      },
+      ...observationAuthority,
+    };
+    const generationReceipt = {
+      artifactId: "casimir_artifact_generation_receipt",
+      schemaVersion: "casimir_artifact_generation_receipt/v1",
+      receiptId: "lanyon-receipt:test",
+      run: { status: "succeeded" },
+      authority: payloadAuthority,
+    };
+    const formalCertificate =
+      await buildCasimirFormalVerificationCertificateV1({
+        generatedAt: "2026-07-26T12:00:00.000Z",
+        certificateId: "formal-certificate:test",
+        request: {
+          schemaVersion:
+            CASIMIR_FORMAL_VERIFICATION_REQUEST_SCHEMA_VERSION,
+          requestId: "formal-request:test",
+          artifactSha256: hash("1"),
+          propositionSha256: hash("2"),
+          casimirSpec: {
+            semanticSha256: hash("3"),
+            artifactSha256: hash("4"),
+          },
+          masterProblem: {
+            planId: "master-problem:test",
+            artifactSha256: hash("5"),
+          },
+          derivationProgram: {
+            programId: "derivation-program:test",
+            artifactSha256: hash("6"),
+          },
+          theoryGraph: {
+            graphId: "theory-graph:test",
+            snapshotSha256: hash("7"),
+          },
+        },
+        status: "failed",
+        theorem: {
+          claimId: "claim:formal-test",
+          theoremName: "formal_test",
+          statementSha256: hash("2"),
+          emittedSourceSha256: hash("3"),
+        },
+        environment: {
+          prover: "lean4",
+          pinnedVersion: "4.19.0",
+          toolchainPolicySha256: hash("4"),
+          kernelBinarySha256: hash("5"),
+          imports: [],
+        },
+        replay: {
+          observationMode: "outer_observed_process",
+          requiredReplayCount: 2,
+          completedReplayCount: 0,
+          byteIdentical: false,
+          aggregateTranscriptSha256: hash("6"),
+          runs: [],
+        },
+        axiomAudit: {
+          declaredAxiomIds: [],
+          allowedAxiomIds: [],
+          usedAxiomIds: [],
+          hiddenAxiomsDetected: false,
+          reportSha256: hash("7"),
+        },
+        blockers: [{
+          code: "formal_replay_failed",
+          message: "The formal replay did not pass.",
+          evidenceRefs: [],
+        }],
+      });
+    const numericalCertificate =
+      await buildCasimirIndependentNumericalVerificationCertificateV1({
+        generatedAt: "2026-07-26T12:00:00.000Z",
+        certificateId: "numerical-certificate:test",
+        request: {
+          schemaVersion:
+            CASIMIR_INDEPENDENT_NUMERICAL_REQUEST_SCHEMA_VERSION,
+          requestId: "numerical-request:test",
+          artifactSha256: hash("8"),
+          casimirSpec: {
+            semanticSha256: hash("9"),
+            artifactSha256: hash("a"),
+          },
+          claimId: "claim:numerical-test",
+          propositionSha256: hash("b"),
+          frozenCase: {
+            caseId: "case:numerical-test",
+            inputsSha256: hash("c"),
+            meshSha256: hash("d"),
+            initialConditionsSha256: hash("e"),
+            boundaryConditionsSha256: hash("f"),
+            observableIds: ["observable:test"],
+          },
+        },
+        status: "passed",
+        lineageAudit: {
+          primaryLineageId: "lineage:primary",
+          independentLineageId: "lineage:independent",
+          sourceDistinct: true,
+          buildManifestDistinct: true,
+          independenceEstablished: true,
+        },
+        runs: {
+          primary: {
+            implementationId: "implementation:primary",
+            completedReplayCount: 2,
+            byteIdentical: true,
+            aggregateOutputManifestSha256: hash("c"),
+            aggregateTranscriptSha256: hash("d"),
+            refinementLevels: 3,
+          },
+          independent: {
+            implementationId: "implementation:independent",
+            completedReplayCount: 2,
+            byteIdentical: true,
+            aggregateOutputManifestSha256: hash("e"),
+            aggregateTranscriptSha256: hash("f"),
+            refinementLevels: 3,
+          },
+        },
+        comparisons: [{
+          observableId: "observable:test",
+          unit: "1",
+          maximumAbsoluteError: 0,
+          maximumRelativeError: 0,
+          observedConvergenceOrder: 2,
+          absoluteTolerance: 1e-8,
+          relativeTolerance: 1e-6,
+          withinTolerance: true,
+          convergenceSatisfied: true,
+        }],
+        blockers: [],
+      });
+    const result = buildCodexNormalizedObservationArtifacts({
+      turnId: "ask:test:theory-evidence-normalization",
+      gatewayCallResults: [
+        {
+          capability_id: "theory-semantic-admitter.normalize",
+          ok: true,
+          observation: semanticObservation,
+          observation_packet: {
+            call_id: "ask:test:theory-evidence-normalization:semantic",
+            produced_artifact_refs: ["gateway:semantic"],
+          },
+        },
+        {
+          capability_id:
+            "theory-artifact-producer.admit_lanyon_snapshot",
+          ok: true,
+          observation: {
+            schema:
+              "casimir.theory_artifact_producer.lanyon_admission_observation.v1",
+            status: "admitted",
+            receipt: generationReceipt,
+            ...observationAuthority,
+          },
+          observation_packet: {
+            call_id: "ask:test:theory-evidence-normalization:lanyon",
+            produced_artifact_refs: ["gateway:lanyon"],
+          },
+        },
+        {
+          capability_id: "theory-formal-verifier.read_result",
+          ok: true,
+          observation: {
+            schema: "casimir.theory_formal_verifier.result_observation.v1",
+            status: "completed",
+            certificate: formalCertificate,
+            ...observationAuthority,
+          },
+          observation_packet: {
+            call_id: "ask:test:theory-evidence-normalization:formal",
+            produced_artifact_refs: ["gateway:formal"],
+          },
+        },
+        {
+          capability_id:
+            "theory-independent-numerical-verifier.read_result",
+          ok: true,
+          observation: {
+            schema:
+              "casimir.theory_independent_numerical_verifier.result_observation.v1",
+            status: "completed",
+            certificate: numericalCertificate,
+            ...observationAuthority,
+          },
+          observation_packet: {
+            call_id: "ask:test:theory-evidence-normalization:numerical",
+            produced_artifact_refs: ["gateway:numerical"],
+          },
+        },
+      ] as never[],
+    });
+
+    const expectedPayloads = new Map<string, Record<string, unknown>>([
+      ["semantic_admission", semanticObservation],
+      ["formal_certificate", formalCertificate],
+      ["numerical_certificate", numericalCertificate],
+    ]);
+    expect(result.missingNormalizationFailures).toEqual([
+      "provider_observation_normalization_missing:theory-artifact-producer.admit_lanyon_snapshot",
+    ]);
+    expect(result.artifacts.map((artifact) => artifact.kind)).toEqual([
+      "semantic_admission",
+      "formal_certificate",
+      "numerical_certificate",
+    ]);
+    for (const artifact of result.artifacts) {
+      const payload = expectedPayloads.get(String(artifact.kind));
+      expect(payload).toBeDefined();
+      expect(artifact).toMatchObject({
+        schema: "helix.current_turn_artifact.v1",
+        source_scope: "current_turn_context",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        payload,
+      });
+      expect(artifact.content_sha256).toBe(
+        crypto
+          .createHash("sha256")
+          .update(canonicalizeCasimirSpecValueV1(payload))
+          .digest("hex"),
+      );
+    }
+    expect(result.artifacts[1]).toMatchObject({
+      artifact_id:
+        "ask:test:theory-evidence-normalization:codex_normalized:formal_certificate:3",
+      extracted_from_observation_field: "certificate",
+      payload_schema: "casimir_formal_verification_certificate/v1",
+      status: "failed",
+    });
+  });
+
+  it("normalizes only an integrity-valid nonterminal Lanyon request preparation", async () => {
+    const turnId = "ask:test:lanyon-request-normalization";
+    const capabilityId =
+      "theory-artifact-producer.prepare_lanyon_request";
+    const policy = await buildCasimirLanyonAdapterPolicyV1();
+    const selectedCase = policy.cases[0];
+    const request = await buildCasimirArtifactGenerationRequestV1({
+      generatedAt: "2026-07-26T12:00:00.000Z",
+      requestId: "lanyon-request:normalization-test",
+      casimirSpec: {
+        specId: "spec:lanyon-normalization-test",
+        schemaVersion: "casimir_spec_scientific_claim_ir/v1",
+        semanticSha256: "a".repeat(64),
+        artifactSha256: "b".repeat(64),
+      },
+      claim: {
+        claimId: "claim:lanyon-normalization-test",
+        propositionSha256: "c".repeat(64),
+      },
+      sourcePacket: {
+        packetId: `lanyon:${selectedCase.caseId}:specification`,
+        mediaType: "text/x-racket",
+        artifactSha256: selectedCase.specification.sha256,
+      },
+      masterProblem: {
+        schemaVersion: "theory_master_problem/v1",
+        planId: "master:lanyon-normalization-test",
+        artifactSha256: "d".repeat(64),
+      },
+      derivationProgram: {
+        schemaVersion: "theory_derivation_program/v1",
+        programId: "derivation:lanyon-normalization-test",
+        sourceMasterProblemPlanId: "master:lanyon-normalization-test",
+        artifactSha256: "e".repeat(64),
+      },
+      producerPolicy: {
+        adapterContractId: CASIMIR_LANYON_ADAPTER_CONTRACT_ID,
+        adapterContractSha256: policy.artifactSha256,
+        allowedProducerIds: [CASIMIR_LANYON_PRODUCER_ID],
+        immutableRepositoryPinRequired: true,
+        outputHashRequired: true,
+        providerOutputTrusted: false,
+      },
+      requestedArtifacts: [
+        {
+          artifactId: "artifact:lanyon:build",
+          role: "build_manifest",
+          mediaType: "application/json",
+        },
+        {
+          artifactId: "artifact:lanyon:formal",
+          role: "formal_source",
+          mediaType: "text/x-lean",
+        },
+        {
+          artifactId: "artifact:lanyon:implementation",
+          role: "implementation_source",
+          mediaType: "text/x-c",
+        },
+        {
+          artifactId: "artifact:lanyon:numerical",
+          role: "numerical_case",
+          mediaType: "text/x-racket",
+        },
+      ],
+    });
+    const observation = {
+      schema:
+        "casimir.theory_artifact_producer.lanyon_request_observation.v1",
+      status: "succeeded",
+      request,
+      bindings: {
+        source_turn_id: turnId,
+        procedure_artifact_ref: `${turnId}:procedure`,
+        procedure_id: "procedure:lanyon-normalization-test",
+        procedure_sha256: "f".repeat(64),
+        semantic_admission_artifact_ref: `${turnId}:semantic-admission`,
+        lanyon_case_id: selectedCase.caseId,
+        lanyon_adapter_policy_sha256: policy.artifactSha256,
+        casimir_spec_semantic_sha256: request.casimirSpec.semanticSha256,
+        casimir_spec_artifact_sha256: request.casimirSpec.artifactSha256,
+        claim_id: request.claim.claimId,
+        proposition_sha256: request.claim.propositionSha256,
+      },
+      authority: {
+        evidence_only: true,
+        prepares_request_only: true,
+        executes_tools: false,
+        reads_source_bytes: false,
+        validates_semantic_intent: false,
+        validates_formal_proposition: false,
+        validates_numerical_implementation: false,
+        validates_empirical_claim: false,
+        validates_physical_truth: false,
+      },
+      output_role: "candidate_next_step",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const gatewayResult = {
+      capability_id: capabilityId,
+      ok: true,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      gateway_admission: {
+        requested_capability: capabilityId,
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        schema: "helix.agent_step_observation_packet.v1",
+        call_id: `${turnId}:lanyon-request`,
+        capability_key: capabilityId,
+        turn_id: turnId,
+        status: "succeeded",
+        produced_artifact_refs: ["gateway:lanyon-request"],
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation,
+    };
+
+    const valid = buildCodexNormalizedObservationArtifacts({
+      turnId,
+      gatewayCallResults: [gatewayResult] as never[],
+    });
+    expect(valid.missingNormalizationFailures).toEqual([]);
+    expect(valid.artifacts).toHaveLength(1);
+    expect(valid.artifacts[0]).toMatchObject({
+      schema: "helix.current_turn_artifact.v1",
+      kind: "theory_artifact_producer_lanyon_request_observation",
+      capability_key: capabilityId,
+      payload_schema:
+        "casimir.theory_artifact_producer.lanyon_request_observation.v1",
+      status: "succeeded",
+      terminal_eligible: false,
+      assistant_answer: false,
+      payload: {
+        request: {
+          artifactSha256: request.artifactSha256,
+        },
+        authority: {
+          prepares_request_only: true,
+          executes_tools: false,
+        },
+        next_affordances: [
+          {
+            schema: "helix.provider_next_affordance.v1",
+            capability:
+              "theory-artifact-producer.admit_lanyon_snapshot",
+            mode: "read",
+            requires_confirmation: false,
+            executes_automatically: false,
+            lane_request: {
+              capability:
+                "theory-artifact-producer.admit_lanyon_snapshot",
+              request_artifact_ref:
+                `${turnId}:codex_normalized:theory_artifact_producer_lanyon_request_observation:1`,
+              case_id: selectedCase.caseId,
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+      },
+    });
+
+    const tampered = structuredClone(gatewayResult);
+    tampered.observation.request.artifactSha256 = "0".repeat(64);
+    const rejected = buildCodexNormalizedObservationArtifacts({
+      turnId,
+      gatewayCallResults: [tampered] as never[],
+    });
+    expect(rejected.artifacts).toEqual([]);
+    expect(rejected.missingNormalizationFailures).toEqual([
+      `provider_observation_normalization_missing:${capabilityId}`,
+    ]);
+
+    const requestArtifactRef = String(valid.artifacts[0]?.artifact_id);
+    const generationReceipt = await buildIntegrityValidLanyonReceipt({
+      request,
+      policy,
+      caseId: selectedCase.caseId,
+    });
+    const admissionCapability =
+      "theory-artifact-producer.admit_lanyon_snapshot";
+    const admissionResult = {
+      capability_id: admissionCapability,
+      ok: true,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      gateway_admission: {
+        requested_capability: admissionCapability,
+        admission_status: "admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        schema: "helix.agent_step_observation_packet.v1",
+        call_id: `${turnId}:lanyon-admission`,
+        capability_key: admissionCapability,
+        turn_id: turnId,
+        status: "succeeded",
+        produced_artifact_refs: ["gateway:lanyon-admission"],
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation: {
+        schema:
+          "casimir.theory_artifact_producer.lanyon_admission_observation.v1",
+        status: "admitted",
+        caseId: selectedCase.caseId,
+        request_artifact_ref: requestArtifactRef,
+        receipt: generationReceipt,
+        artifactBindings: {
+          formal_source_path:
+            "lanyon/advection-diffusion/formal-source.lean",
+        },
+        output_role: "evidence_for_synthesis",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    const chained = buildCodexNormalizedObservationArtifacts({
+      turnId,
+      gatewayCallResults: [
+        gatewayResult,
+        admissionResult,
+      ] as never[],
+    });
+    expect(chained.missingNormalizationFailures).toEqual([]);
+    expect(chained.artifacts.map((artifact) => artifact.kind)).toEqual([
+      "theory_artifact_producer_lanyon_request_observation",
+      "artifact_generation_receipt",
+      "theory_artifact_producer_lanyon_continuation_observation",
+    ]);
+    const receiptArtifact = chained.artifacts[1];
+    const continuationArtifact = chained.artifacts[2];
+    expect(receiptArtifact?.payload).toEqual(generationReceipt);
+    expect(receiptArtifact?.content_sha256).toBe(
+      crypto
+        .createHash("sha256")
+        .update(canonicalizeCasimirSpecValueV1(generationReceipt))
+        .digest("hex"),
+    );
+    const continuationArtifactRef = String(
+      continuationArtifact?.artifact_id,
+    );
+    const receiptEvidenceArtifactRef = String(
+      receiptArtifact?.artifact_id,
+    );
+    expect(continuationArtifact).toMatchObject({
+      schema: "helix.current_turn_artifact.v1",
+      kind:
+        "theory_artifact_producer_lanyon_continuation_observation",
+      payload_schema:
+        "casimir.theory_artifact_producer.lanyon_admission_observation.v1",
+      payload: {
+        receipt: generationReceipt,
+        receipt_evidence_artifact_ref: receiptEvidenceArtifactRef,
+        next_affordances: [
+          {
+            capability: "theory-formal-verifier.prepare_request",
+            mode: "read",
+            requires_confirmation: false,
+            executes_automatically: false,
+            lane_request: {
+              capability: "theory-formal-verifier.prepare_request",
+              procedure_artifact_ref:
+                observation.bindings.procedure_artifact_ref,
+              procedure_id: observation.bindings.procedure_id,
+              procedure_sha256:
+                observation.bindings.procedure_sha256,
+              semantic_admission_artifact_ref:
+                observation.bindings.semantic_admission_artifact_ref,
+              artifact_generation_artifact_ref:
+                continuationArtifactRef,
+            },
+          },
+          {
+            capability:
+              "theory-experiment-procedure.evaluate_closure",
+            mode: "read",
+            requires_confirmation: false,
+            executes_automatically: false,
+            lane_request: {
+              capability:
+                "theory-experiment-procedure.evaluate_closure",
+              procedure_artifact_ref:
+                observation.bindings.procedure_artifact_ref,
+              procedure_id: observation.bindings.procedure_id,
+              procedure_sha256:
+                observation.bindings.procedure_sha256,
+              source_target_intent: {
+                evidence_revision_ref: receiptEvidenceArtifactRef,
+                admission_observation_ref: continuationArtifactRef,
+              },
+            },
+          },
+        ],
+      },
+    });
+    const continuationPayload = continuationArtifact
+      ?.payload as Record<string, unknown>;
+    const continuationAffordances =
+      continuationPayload.next_affordances as Array<
+        Record<string, unknown>
+      >;
+    expect(
+      continuationAffordances.map(
+        (affordance) => affordance.capability,
+      ),
+    ).toEqual([
+      "theory-formal-verifier.prepare_request",
+      "theory-experiment-procedure.evaluate_closure",
+    ]);
+    expect(
+      continuationAffordances.some((affordance) =>
+        String(affordance.capability).includes(
+          "independent-numerical",
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      continuationAffordances.some(
+        (affordance) =>
+          affordance.capability === "theory-formal-verifier.start",
+      ),
+    ).toBe(false);
+  });
+
+  it("normalizes theory lifecycle receipts without promoting them as certificates", () => {
+    const observationAuthority = {
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    } as const;
+    const result = buildCodexNormalizedObservationArtifacts({
+      turnId: "ask:test:theory-non-certificate-observations",
+      gatewayCallResults: [
+        {
+          capability_id: "theory-formal-verifier.prepare_request",
+          ok: false,
+          observation: {
+            schema:
+              "casimir.theory_formal_verifier.preparation_observation.v1",
+            status: "blocked",
+            disposition: "blocked",
+            ...observationAuthority,
+          },
+          observation_packet: {
+            call_id: "ask:test:theory-prepare",
+            produced_artifact_refs: [],
+          },
+        },
+        {
+          capability_id: "theory-formal-verifier.plan",
+          ok: true,
+          observation: {
+            schema: "casimir.theory_formal_verifier.plan_observation.v1",
+            status: "ready",
+            ...observationAuthority,
+          },
+          observation_packet: {
+            call_id: "ask:test:theory-plan",
+            produced_artifact_refs: [],
+          },
+        },
+        {
+          capability_id: "theory-formal-verifier.start",
+          ok: true,
+          observation: {
+            schema: "casimir.theory_formal_verifier.start_observation.v1",
+            status: "running",
+            ...observationAuthority,
+          },
+          observation_packet: {
+            call_id: "ask:test:theory-start",
+            produced_artifact_refs: [],
+          },
+        },
+        {
+          capability_id: "theory-formal-verifier.read_result",
+          ok: true,
+          observation: {
+            schema: "casimir.theory_formal_verifier.result_observation.v1",
+            status: "running",
+            certificate: null,
+            ...observationAuthority,
+          },
+          observation_packet: {
+            call_id: "ask:test:theory-formal-pending",
+            produced_artifact_refs: [],
+          },
+        },
+        {
+          capability_id:
+            "theory-independent-numerical-verifier.read_result",
+          ok: false,
+          observation: {
+            schema:
+              "casimir.theory_independent_numerical_verifier.result_observation.v1",
+            status: "failed",
+            certificate: null,
+            ...observationAuthority,
+          },
+          observation_packet: {
+            call_id: "ask:test:theory-numerical-failed",
+            produced_artifact_refs: [],
+          },
+        },
+      ].map((result) => ({
+        ...result,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        gateway_admission: {
+          requested_capability: result.capability_id,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        observation: {
+          ...result.observation,
+          output_role: "candidate_next_step",
+          next_affordances: [],
+        },
+        observation_packet: {
+          ...result.observation_packet,
+          schema: "helix.agent_step_observation_packet.v1",
+          capability_key: result.capability_id,
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      })) as never[],
+    });
+
+    expect(result.artifacts.map((artifact) => artifact.kind)).toEqual([
+      "theory_formal_verifier_preparation_observation",
+      "theory_formal_verifier_plan_observation",
+      "theory_formal_verifier_start_observation",
+      "theory_formal_verifier_result_observation",
+      "theory_independent_numerical_verifier_result_observation",
+    ]);
+    expect(
+      result.artifacts.some((artifact) =>
+        ["formal_certificate", "numerical_certificate"].includes(
+          String(artifact.kind),
+        ),
+      ),
+    ).toBe(false);
+    expect(result.missingNormalizationFailures).toEqual([]);
+  });
+
+  it("fails closed when a completed theory verifier read omits its certificate", () => {
+    const result = buildCodexNormalizedObservationArtifacts({
+      turnId: "ask:test:theory-completed-certificate-missing",
+      gatewayCallResults: [{
+        capability_id: "theory-formal-verifier.read_result",
+        ok: true,
+        observation: {
+          schema: "casimir.theory_formal_verifier.result_observation.v1",
+          status: "completed",
+          certificate: null,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        observation_packet: {
+          call_id: "ask:test:theory-completed-certificate-missing:call",
+          produced_artifact_refs: [],
+        },
+      } as never],
+    });
+
+    expect(result.artifacts).toEqual([]);
+    expect(result.missingNormalizationFailures).toEqual([
+      "provider_observation_normalization_missing:theory-formal-verifier.read_result",
+    ]);
   });
 
   it("normalizes docs search candidates without requiring an already-open document", () => {

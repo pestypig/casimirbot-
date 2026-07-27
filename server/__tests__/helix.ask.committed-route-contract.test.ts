@@ -256,6 +256,50 @@ describe("Helix Ask committed route contract", () => {
     expect(payload.terminal_artifact_kind).toBe("direct_answer_text");
   });
 
+  it("commits the admitted repo runtime capability with explicit route authority", () => {
+    const prompt =
+      "Find where the Helix Ask terminal authority is implemented in this codebase.";
+    const testTurnId = "ask:test:repo-runtime-capability-route-repair";
+    const payload: Record<string, unknown> = {
+      turn_id: testTurnId,
+      source_target_intent: {
+        target_source: "repo_code",
+        target_kind: "repo_code",
+        strength: "hard",
+        precedence_reason: "explicit_repo_code_source_target",
+      },
+      canonical_goal_frame: {
+        goal_kind: "unknown",
+        required_terminal_kind: "unknown",
+      },
+      tool_call_admission_decision: {
+        requested_capability: "repo.search",
+        selected_capability: "repo.search",
+        admitted_capability: "repo.search",
+        admitted_tool_families: ["repo_code"],
+      },
+    };
+    const initial = buildCommittedAskRoute({
+      turnId: testTurnId,
+      promptText: prompt,
+      selectedRoute: "/ask",
+      payload,
+    });
+    expect(initial.route).toMatchObject({
+      source_target: "repo_code",
+      target_kind: "repo_code",
+      strength: "hard",
+      route_reason: "explicit_capability_contract",
+    });
+    expect(initial.canonical_goal).toMatchObject({
+      goal_kind: "repo_evidence",
+      required_terminal_kind: "repo_code_evidence_answer",
+    });
+    expect(initial.canonical_goal.allowed_terminal_artifact_kinds).toContain(
+      "repo_code_evidence_answer",
+    );
+  });
+
   it("reports a specific runtime failure when model-only direct answer artifact is missing", () => {
     const prompt = "theres a paper still in the image lens, can you see it?";
     const testTurnId = "ask:test:model-only-runtime-not-called";

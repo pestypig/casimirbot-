@@ -3,8 +3,10 @@ import {
   type HelixSharedRealtimeRoomConsent,
   type HelixSharedRealtimeRoomConsentPatch,
 } from "@shared/helix-shared-realtime-room";
+import { invalidateRoomSourceRuntimeState } from "../../../situation-room/room-source-runtime-state";
 import { withSharedRealtimeRoomTransaction } from "./database";
 import { SharedRealtimeRoomDomainError } from "./domain-error";
+import type { Queryable } from "./types";
 import {
   assertAccessibleMember,
   assertOpenRoom,
@@ -41,7 +43,10 @@ const normalizeConsentPatch = (
 } => {
   const record = value as Record<string, unknown>;
   const unknownKeys = Object.keys(record).filter(
-    (key) => !consentPatchKeys.includes(key as keyof HelixSharedRealtimeRoomConsentPatch),
+    (key: string) =>
+      !consentPatchKeys.includes(
+        key as keyof HelixSharedRealtimeRoomConsentPatch,
+      ),
   );
   if (unknownKeys.length > 0) {
     throw new SharedRealtimeRoomDomainError(
@@ -84,48 +89,57 @@ export async function patchOwnSharedRealtimeRoomConsent(input: {
   const profileId = cleanRequired(input.profileId, "profileId");
   const normalized = normalizeConsentPatch(input.consentPatch);
 
-  return withSharedRealtimeRoomTransaction(async (client) => {
-    const { room, member } = await assertAccessibleMember(client, roomId, profileId, true);
-    assertOpenRoom(room);
-    const previous = normalizeConsent(member.consent);
-    const updatedAt = nowIso();
-    const consent: HelixSharedRealtimeRoomConsent = {
-      ...previous,
-      ...normalized.patch,
-      consent_version: previous.consent_version + 1,
-      consent_receipt_ref: createId("consent"),
-      updated_at: updatedAt,
-    };
-    await client.query(
-      `
+  const result =
+    await withSharedRealtimeRoomTransaction<HelixSharedRealtimeRoom>(
+      async (client: Queryable): Promise<HelixSharedRealtimeRoom> => {
+        const { room, member } = await assertAccessibleMember(
+          client,
+          roomId,
+          profileId,
+          true,
+        );
+        assertOpenRoom(room);
+        const previous = normalizeConsent(member.consent);
+        const updatedAt = nowIso();
+        const consent: HelixSharedRealtimeRoomConsent = {
+          ...previous,
+          ...normalized.patch,
+          consent_version: previous.consent_version + 1,
+          consent_receipt_ref: createId("consent"),
+          updated_at: updatedAt,
+        };
+        await client.query(
+          `
         UPDATE helix_shared_realtime_room_members
         SET consent = $3::jsonb, last_seen_at = $4, updated_at = $4
         WHERE room_id = $1 AND profile_id = $2 AND presence <> 'left';
       `,
-      [roomId, profileId, JSON.stringify(consent), updatedAt],
-    );
-    await insertAuditEvent({
-      db: client,
-      roomId,
-      actorParticipantId: member.participant_id,
-      eventType: "consent_updated",
-      metadata: {
-        consent_version: consent.consent_version,
-        changed_fields: normalized.changedKeys,
+          [roomId, profileId, JSON.stringify(consent), updatedAt],
+        );
+        await insertAuditEvent({
+          db: client,
+          roomId,
+          actorParticipantId: member.participant_id,
+          eventType: "consent_updated",
+          metadata: {
+            consent_version: consent.consent_version,
+            changed_fields: normalized.changedKeys,
+          },
+          createdAt: updatedAt,
+        });
+        await refreshRoomReadinessStatus(client, roomId);
+        const refreshed = await readRoomRow(client, roomId);
+        if (!refreshed) {
+          throw new SharedRealtimeRoomDomainError(
+            "shared_realtime_room_unavailable",
+            503,
+            "The shared Realtime room consent could not be updated.",
+          );
+        }
+        return projectRoom(client, refreshed, profileId);
       },
-      createdAt: updatedAt,
-    });
-    await refreshRoomReadinessStatus(client, roomId);
-    const refreshed = await readRoomRow(client, roomId);
-    if (!refreshed) {
-      throw new SharedRealtimeRoomDomainError(
-        "shared_realtime_room_unavailable",
-        503,
-        "The shared Realtime room consent could not be updated.",
-      );
-    }
-    return projectRoom(client, refreshed, profileId);
-  });
+    );
+  return result;
 }
 
 export async function updateSharedRealtimeRoomPresence(input: {
@@ -143,8 +157,13 @@ export async function updateSharedRealtimeRoomPresence(input: {
     );
   }
 
-  return withSharedRealtimeRoomTransaction(async (client) => {
-    const { room, member } = await assertAccessibleMember(client, roomId, profileId, true);
+  return withSharedRealtimeRoomTransaction(async (client: Queryable) => {
+    const { room, member } = await assertAccessibleMember(
+      client,
+      roomId,
+      profileId,
+      true,
+    );
     assertOpenRoom(room);
     const updatedAt = nowIso();
     await client.query(
@@ -189,66 +208,110 @@ export async function leaveOrCloseSharedRealtimeRoom(input: {
   const roomId = cleanRequired(input.roomId, "roomId");
   const profileId = cleanRequired(input.profileId, "profileId");
 
-  return withSharedRealtimeRoomTransaction(async (client) => {
-    const { room, member } = await assertAccessibleMember(client, roomId, profileId, true);
-    const changedAt = nowIso();
-    if (memberRole(member.member_role) === "owner") {
-      if (roomStatus(room.status) !== "closed") {
-        await client.query(
-          `
+  const result =
+    await withSharedRealtimeRoomTransaction<SharedRealtimeRoomLeaveResult>(
+      async (client: Queryable): Promise<SharedRealtimeRoomLeaveResult> => {
+        const { room, member } = await assertAccessibleMember(
+          client,
+          roomId,
+          profileId,
+          true,
+        );
+        const changedAt = nowIso();
+        if (memberRole(member.member_role) === "owner") {
+          if (roomStatus(room.status) !== "closed") {
+            await client.query(
+              `
             UPDATE helix_shared_realtime_rooms
             SET status = 'closed', closed_at = $2, updated_at = $2
             WHERE room_id = $1;
           `,
-          [roomId, changedAt],
-        );
-        await client.query(
-          `
+              [roomId, changedAt],
+            );
+            await client.query(
+              `
             UPDATE helix_shared_realtime_room_invites
             SET status = 'revoked', revoked_at = $2
             WHERE room_id = $1 AND status = 'active';
           `,
-          [roomId, changedAt],
+              [roomId, changedAt],
+            );
+            await client.query(
+              `
+            UPDATE helix_room_source_bindings
+            SET status = 'revoked', revoked_at = $2, updated_at = $2
+            WHERE room_id = $1 AND status = 'active';
+          `,
+              [roomId, changedAt],
+            );
+            await client.query(
+              `
+            UPDATE helix_room_source_credentials
+            SET status = 'revoked', revoked_at = $2
+            WHERE binding_id IN (
+              SELECT binding_id
+              FROM helix_room_source_bindings
+              WHERE room_id = $1
+            )
+              AND status = 'active';
+          `,
+              [roomId, changedAt],
+            );
+            await client.query(
+              `
+            UPDATE helix_environment_adapter_admissions
+            SET status = 'revoked', revoked_at = $2, updated_at = $2
+            WHERE room_id = $1 AND status = 'active';
+          `,
+              [roomId, changedAt],
+            );
+            await insertAuditEvent({
+              db: client,
+              roomId,
+              actorParticipantId: member.participant_id,
+              eventType: "room_closed",
+              metadata: { reason: "owner_closed" },
+              createdAt: changedAt,
+            });
+          }
+          const closedRoom = await readRoomRow(client, roomId);
+          if (!closedRoom) {
+            throw new SharedRealtimeRoomDomainError(
+              "shared_realtime_room_unavailable",
+              503,
+              "The shared Realtime room could not be closed.",
+            );
+          }
+          return {
+            action: "closed",
+            room: await projectRoom(client, closedRoom, profileId),
+          };
+        }
+
+        await client.query(
+          `
+        UPDATE helix_shared_realtime_room_members
+        SET presence = 'left', left_at = $3, last_seen_at = $3, updated_at = $3
+        WHERE room_id = $1 AND profile_id = $2 AND presence <> 'left';
+      `,
+          [roomId, profileId, changedAt],
         );
         await insertAuditEvent({
           db: client,
           roomId,
           actorParticipantId: member.participant_id,
-          eventType: "room_closed",
-          metadata: { reason: "owner_closed" },
+          eventType: "participant_left",
+          metadata: { slot_number: 2 },
           createdAt: changedAt,
         });
-      }
-      const closedRoom = await readRoomRow(client, roomId);
-      if (!closedRoom) {
-        throw new SharedRealtimeRoomDomainError(
-          "shared_realtime_room_unavailable",
-          503,
-          "The shared Realtime room could not be closed.",
-        );
-      }
-      return { action: "closed", room: await projectRoom(client, closedRoom, profileId) };
-    }
-
-    await client.query(
-      `
-        UPDATE helix_shared_realtime_room_members
-        SET presence = 'left', left_at = $3, last_seen_at = $3, updated_at = $3
-        WHERE room_id = $1 AND profile_id = $2 AND presence <> 'left';
-      `,
-      [roomId, profileId, changedAt],
+        if (roomStatus(room.status) !== "closed") {
+          await refreshRoomReadinessStatus(client, roomId);
+        }
+        return { action: "left", room: null };
+      },
     );
-    await insertAuditEvent({
-      db: client,
-      roomId,
-      actorParticipantId: member.participant_id,
-      eventType: "participant_left",
-      metadata: { slot_number: 2 },
-      createdAt: changedAt,
-    });
-    if (roomStatus(room.status) !== "closed") {
-      await refreshRoomReadinessStatus(client, roomId);
-    }
-    return { action: "left", room: null };
-  });
+  if (result.action === "closed") {
+    invalidateRoomSourceRuntimeState({ roomId });
+  }
+  return result;
 }

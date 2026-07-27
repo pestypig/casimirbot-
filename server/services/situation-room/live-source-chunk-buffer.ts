@@ -30,6 +30,10 @@ import {
   HELIX_LIVE_SOURCE_RATE_POLICY_SCHEMA,
   type HelixLiveSourceRatePolicy,
 } from "@shared/helix-live-source-rate-policy";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 import { recordSituationSourceHeartbeat } from "./situation-source-capability-store";
 import { recordLiveSourceProducerLifecycleEvent } from "./live-source-producer-lifecycle-store";
 import { observeSourceBindingState } from "./source-binding-status-store";
@@ -55,6 +59,12 @@ const cleanString = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed || null;
+};
+
+const assertGenericLiveSourceId = (sourceId: string): void => {
+  if (isHelixRoomSourceIngressSourceId(sourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
 };
 
 export const normalizeLiveSourceModality = (value: unknown): HelixLiveSourceChunkModality => {
@@ -154,7 +164,9 @@ export function upsertLiveSourceProducer(input: {
   rawContentPolicy?: HelixLiveSourceRawContentPolicy;
   now?: string;
 }): HelixLiveSourceProducer {
+  assertGenericLiveSourceId(input.sourceId);
   const existing = producersBySource.get(input.sourceId);
+  if (existing) assertGenericLiveSourceId(existing.source_id);
   const now = input.now ?? nowIso();
   const cadenceMs = input.cadenceMs ?? existing?.cadence_ms ?? null;
   const producer: HelixLiveSourceProducer = {
@@ -201,13 +213,21 @@ export function listLiveSourceProducers(input: {
 } = {}): HelixLiveSourceProducer[] {
   const sourceSet = input.sourceIds?.length ? new Set(input.sourceIds) : null;
   return Array.from(producersBySource.values())
+    .filter(
+      (producer: HelixLiveSourceProducer) =>
+        !isHelixRoomSourceIngressSourceId(producer.source_id),
+    )
     .filter((producer: HelixLiveSourceProducer) => !input.threadId || producer.thread_id === input.threadId)
     .filter((producer: HelixLiveSourceProducer) => !sourceSet || sourceSet.has(producer.source_id))
     .sort((a: HelixLiveSourceProducer, b: HelixLiveSourceProducer) => a.modality.localeCompare(b.modality) || a.source_id.localeCompare(b.source_id));
 }
 
 export function getLiveSourceProducer(sourceId: string): HelixLiveSourceProducer | null {
-  return producersBySource.get(sourceId) ?? null;
+  if (isHelixRoomSourceIngressSourceId(sourceId)) return null;
+  const producer = producersBySource.get(sourceId) ?? null;
+  return producer && !isHelixRoomSourceIngressSourceId(producer.source_id)
+    ? producer
+    : null;
 }
 
 export function appendLiveSourceChunk(input: {
@@ -225,6 +245,7 @@ export function appendLiveSourceChunk(input: {
   backpressure_policy?: HelixLiveSourceBackpressurePolicy;
   raw_content_policy?: HelixLiveSourceRawContentPolicy;
 }): { chunk: HelixLiveSourceChunk; producer: HelixLiveSourceProducer; buffer_status: HelixLiveSourceBufferStatus } {
+  assertGenericLiveSourceId(input.source_id);
   const ts = input.ts ?? nowIso();
   const chunk: HelixLiveSourceChunk = {
     schema: HELIX_LIVE_SOURCE_CHUNK_SCHEMA,
@@ -338,10 +359,20 @@ export function listLiveSourceChunks(input: {
   modality?: HelixLiveSourceChunkModality | null;
   limit?: number;
 } = {}): HelixLiveSourceChunk[] {
+  if (
+    input.sourceId &&
+    isHelixRoomSourceIngressSourceId(input.sourceId)
+  ) {
+    return [];
+  }
   const chunks = input.sourceId
     ? [...(chunksBySource.get(input.sourceId) ?? [])]
     : Array.from(chunksBySource.values()).flat();
   return chunks
+    .filter(
+      (chunk: HelixLiveSourceChunk) =>
+        !isHelixRoomSourceIngressSourceId(chunk.source_id),
+    )
     .filter((chunk: HelixLiveSourceChunk) => !input.threadId || chunk.thread_id === input.threadId)
     .filter((chunk: HelixLiveSourceChunk) => !input.modality || chunk.modality === input.modality)
     .sort((a: HelixLiveSourceChunk, b: HelixLiveSourceChunk) => Date.parse(a.ts) - Date.parse(b.ts) || a.sequence_index - b.sequence_index)
@@ -362,7 +393,12 @@ export function getLatestLiveSourceChunk(input: {
 export function getLiveSourceChunk(chunkId: string): HelixLiveSourceChunk | null {
   for (const chunks of chunksBySource.values()) {
     const match = chunks.find((chunk: HelixLiveSourceChunk) => chunk.chunk_id === chunkId);
-    if (match) return match;
+    if (
+      match &&
+      !isHelixRoomSourceIngressSourceId(match.source_id)
+    ) {
+      return match;
+    }
   }
   return null;
 }
@@ -397,10 +433,16 @@ const backpressureForSource = (
 };
 
 export function getLiveSourceBufferStatus(input: { threadId: string }): HelixLiveSourceBufferStatus {
-  const producers = Array.from(producersBySource.values()).filter((producer: HelixLiveSourceProducer) => producer.thread_id === input.threadId);
+  const producers = Array.from(producersBySource.values()).filter(
+    (producer: HelixLiveSourceProducer) =>
+      !isHelixRoomSourceIngressSourceId(producer.source_id) &&
+      producer.thread_id === input.threadId,
+  );
   const jobs = listLiveSourceAnalysisJobs({ threadId: input.threadId, limit: 500 });
   const sources = producers.map((producer: HelixLiveSourceProducer) => {
-    const chunks = chunksBySource.get(producer.source_id) ?? [];
+    const chunks = (chunksBySource.get(producer.source_id) ?? []).filter(
+      (chunk) => !isHelixRoomSourceIngressSourceId(chunk.source_id),
+    );
     const latest = chunks.at(-1);
     const analysisDepth = jobs.filter((job: HelixLiveSourceAnalysisJob) => job.source_id === producer.source_id && (job.status === "queued" || job.status === "running")).length;
     const stats = ensureStats(producer.source_id);
@@ -431,19 +473,22 @@ export function getLiveSourceBufferStatus(input: { threadId: string }): HelixLiv
 
 export function setLiveSourceRatePolicy(input: Record<string, unknown>): { producer: HelixLiveSourceProducer; rate_policy: HelixLiveSourceRatePolicy } {
   const sourceId = cleanString(input.source_id) ?? `source:${normalizeLiveSourceModality(input.modality)}:${cleanString(input.thread_id) ?? "helix-ask:desktop"}`;
-  const threadId = cleanString(input.thread_id) ?? producersBySource.get(sourceId)?.thread_id ?? "helix-ask:desktop";
-  const modality = normalizeLiveSourceModality(input.modality ?? producersBySource.get(sourceId)?.modality);
-  const captureMode = normalizeCaptureMode(input.capture_mode ?? producersBySource.get(sourceId)?.capture_mode);
-  const cadenceMs = typeof input.cadence_ms === "number" ? input.cadence_ms : producersBySource.get(sourceId)?.cadence_ms ?? null;
+  assertGenericLiveSourceId(sourceId);
+  const existing = producersBySource.get(sourceId);
+  if (existing) assertGenericLiveSourceId(existing.source_id);
+  const threadId = cleanString(input.thread_id) ?? existing?.thread_id ?? "helix-ask:desktop";
+  const modality = normalizeLiveSourceModality(input.modality ?? existing?.modality);
+  const captureMode = normalizeCaptureMode(input.capture_mode ?? existing?.capture_mode);
+  const cadenceMs = typeof input.cadence_ms === "number" ? input.cadence_ms : existing?.cadence_ms ?? null;
   const producer = upsertLiveSourceProducer({
     sourceId,
     threadId,
     modality,
-    status: normalizeProducerStatus(input.status ?? producersBySource.get(sourceId)?.status ?? "active"),
+    status: normalizeProducerStatus(input.status ?? existing?.status ?? "active"),
     cadenceMs,
     captureMode,
-    backpressurePolicy: normalizeBackpressurePolicy(input.backpressure_policy ?? producersBySource.get(sourceId)?.backpressure_policy),
-    rawContentPolicy: normalizeRawPolicy(input.raw_content_policy ?? producersBySource.get(sourceId)?.raw_content_policy),
+    backpressurePolicy: normalizeBackpressurePolicy(input.backpressure_policy ?? existing?.backpressure_policy),
+    rawContentPolicy: normalizeRawPolicy(input.raw_content_policy ?? existing?.raw_content_policy),
   });
   return {
     producer,
@@ -467,6 +512,7 @@ export function setLiveSourceProducerStatus(input: {
   threadId?: string | null;
   status: HelixLiveSourceProducerStatus;
 }): HelixLiveSourceProducer | null {
+  assertGenericLiveSourceId(input.sourceId);
   const existing = producersBySource.get(input.sourceId);
   if (!existing && !input.threadId) return null;
   return upsertLiveSourceProducer({
@@ -489,6 +535,7 @@ export function queueLiveSourceAnalysisJob(input: {
   outputRefs?: string[];
   summary?: string;
 }): HelixLiveSourceAnalysisJob {
+  assertGenericLiveSourceId(input.chunk.source_id);
   const now = nowIso();
   const job: HelixLiveSourceAnalysisJob = {
     schema: HELIX_LIVE_SOURCE_ANALYSIS_JOB_SCHEMA,
@@ -530,6 +577,16 @@ export function completeLiveSourceAnalysisJobsForChunk(input: {
   summary: string;
 }): HelixLiveSourceAnalysisJob[] {
   const jobs = analysisJobsByThread.get(input.threadId) ?? [];
+  const matchingJobs = jobs.filter(
+    (job: HelixLiveSourceAnalysisJob) => job.chunk_id === input.chunkId,
+  );
+  if (
+    matchingJobs.some((job) =>
+      isHelixRoomSourceIngressSourceId(job.source_id),
+    )
+  ) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
   const updated = jobs.map((job: HelixLiveSourceAnalysisJob) => job.chunk_id === input.chunkId && (job.status === "queued" || job.status === "running")
     ? {
         ...job,
@@ -539,7 +596,11 @@ export function completeLiveSourceAnalysisJobsForChunk(input: {
       }
     : job);
   analysisJobsByThread.set(input.threadId, updated);
-  const completed = updated.filter((job: HelixLiveSourceAnalysisJob) => job.chunk_id === input.chunkId);
+  const completed = updated.filter(
+    (job: HelixLiveSourceAnalysisJob) =>
+      job.chunk_id === input.chunkId &&
+      !isHelixRoomSourceIngressSourceId(job.source_id),
+  );
   const chunk = getLiveSourceChunk(input.chunkId);
   const producer = chunk ? getLiveSourceProducer(chunk.source_id) : null;
   if (producer) {
@@ -562,7 +623,12 @@ export function completeLiveSourceAnalysisJobsForChunk(input: {
 export function getLiveSourceAnalysisJob(jobId: string): HelixLiveSourceAnalysisJob | null {
   for (const jobs of analysisJobsByThread.values()) {
     const match = jobs.find((job: HelixLiveSourceAnalysisJob) => job.job_id === jobId);
-    if (match) return match;
+    if (
+      match &&
+      !isHelixRoomSourceIngressSourceId(match.source_id)
+    ) {
+      return match;
+    }
   }
   return null;
 }
@@ -573,8 +639,11 @@ export function updateLiveSourceAnalysisJob(input: {
   outputRefs?: string[];
   summary?: string;
 }): HelixLiveSourceAnalysisJob | null {
-  const existing = getLiveSourceAnalysisJob(input.jobId);
+  const existing = Array.from(analysisJobsByThread.values())
+    .flat()
+    .find((job) => job.job_id === input.jobId) ?? null;
   if (!existing) return null;
+  assertGenericLiveSourceId(existing.source_id);
   const jobs = analysisJobsByThread.get(existing.thread_id) ?? [];
   const updatedJob: HelixLiveSourceAnalysisJob = {
     ...existing,
@@ -611,10 +680,41 @@ export function listLiveSourceAnalysisJobs(input: {
     ? [...(analysisJobsByThread.get(input.threadId) ?? [])]
     : Array.from(analysisJobsByThread.values()).flat();
   return entries
+    .filter(
+      (job: HelixLiveSourceAnalysisJob) =>
+        !isHelixRoomSourceIngressSourceId(job.source_id),
+    )
     .filter((job: HelixLiveSourceAnalysisJob) => !input.sourceId || job.source_id === input.sourceId)
     .filter((job: HelixLiveSourceAnalysisJob) => !input.chunkId || job.chunk_id === input.chunkId)
     .filter((job: HelixLiveSourceAnalysisJob) => !input.status || input.status === "any" || job.status === input.status)
     .slice(-(input.limit ?? 100));
+}
+
+export function removeLiveSourceChunkBufferState(input: {
+  sourceId: string;
+}): {
+  producers: number;
+  chunks: number;
+  analysisJobs: number;
+} {
+  const sourceId = input.sourceId.trim();
+  if (!sourceId) return { producers: 0, chunks: 0, analysisJobs: 0 };
+  const producerRemoved = producersBySource.delete(sourceId) ? 1 : 0;
+  const chunksRemoved = chunksBySource.get(sourceId)?.length ?? 0;
+  chunksBySource.delete(sourceId);
+  sourceStats.delete(sourceId);
+  let analysisJobsRemoved = 0;
+  for (const [threadId, jobs] of analysisJobsByThread.entries()) {
+    const retained = jobs.filter((job) => job.source_id !== sourceId);
+    analysisJobsRemoved += jobs.length - retained.length;
+    if (retained.length > 0) analysisJobsByThread.set(threadId, retained);
+    else analysisJobsByThread.delete(threadId);
+  }
+  return {
+    producers: producerRemoved,
+    chunks: chunksRemoved,
+    analysisJobs: analysisJobsRemoved,
+  };
 }
 
 export function resetLiveSourceChunkBufferForTest(input: { maxChunks?: number } = {}): void {

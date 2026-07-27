@@ -4,7 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
-import { planRouter } from "../routes/agi.plan";
+import {
+  attachHelixProviderPreflightRouteContext,
+  planRouter,
+} from "../routes/agi.plan";
 import { helixRuntimeGoalSessionStore } from "../services/helix-ask/agent-providers/goal-runtime-session";
 
 const originalEnableCodexAgent = process.env.ENABLE_CODEX_AGENT;
@@ -93,6 +96,135 @@ const parseSseEvents = (text: string): Array<{ event: string; data: Record<strin
     });
 
 describe("Helix Ask agent provider route metadata", () => {
+  it("preflights a natural continuation against the valid active document", () => {
+    const turnId = "ask:test:active-doc-natural-followup";
+    const result = attachHelixProviderPreflightRouteContext({
+      turnId,
+      body: {
+        turn_id: turnId,
+        sessionId: "thread:active-doc-natural-followup",
+        question: "What is the main idea?",
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
+          hasDocContext: true,
+        },
+      },
+    });
+
+    expect(result.active_workspace_source_resolution).toMatchObject({
+      resolved_source_target: "active_doc",
+      reason: "active_doc_evidence_followup",
+      active_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
+    });
+    expect(result.source_target_intent).toMatchObject({
+      target_source: "active_doc",
+      target_kind: "active_doc",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+      precedence_reason: "active_doc_evidence_followup_source_target",
+    });
+    expect(result.canonical_goal_frame).toBeUndefined();
+  });
+
+  it("preflights an affirmative theory procedure as grounded synthesis instead of model-only chat", () => {
+    const turnId = "ask:test:theory-procedure-preflight";
+    const prompt =
+      "Prepare a theory experiment procedure for badge study.casimir_dp.evidence_map_stage3, but configure Lanyon for an unregistered two-dimensional adaptive-mesh advection-diffusion case. Do not improvise support or run code; give the exact typed limitation and missing requirements.";
+    const affirmative = attachHelixProviderPreflightRouteContext({
+      turnId,
+      body: { turn_id: turnId, question: prompt },
+    });
+    const canonicalGoal = affirmative.canonical_goal_frame as Record<string, unknown>;
+
+    expect(canonicalGoal).toMatchObject({
+      schema: "helix.canonical_goal_frame.v1",
+      turn_id: turnId,
+      goal_kind: "theory_context_reflection",
+      answer_scope: "current_turn_action",
+      requested_capability: "theory-experiment-procedure.prepare",
+      required_terminal_kind: "model_synthesized_answer",
+      allows_workspace_context: true,
+      allows_prior_artifacts: false,
+      classifier_reasons: expect.arrayContaining([
+        "provider_preflight_explicit_capability_contract",
+        "affirmative_theory_experiment_procedure",
+      ]),
+    });
+    expect(canonicalGoal.goal_kind).not.toBe("model_only_concept");
+    expect(canonicalGoal.required_terminal_kind).not.toBe("direct_answer_text");
+
+    const deferred = attachHelixProviderPreflightRouteContext({
+      turnId: `${turnId}:future`,
+      body: {
+        turn_id: `${turnId}:future`,
+        question:
+          "Later we may prepare the theory experiment procedure for Lanyon after review; explain the idea now.",
+      },
+    });
+    expect(deferred.canonical_goal_frame).toMatchObject({
+      goal_kind: "model_only_concept",
+      answer_scope: "model_only",
+      required_terminal_kind: "direct_answer_text",
+    });
+  });
+
+  it("defers a hard visual source request to the solver instead of stamping it model-only", () => {
+    const turnId = "ask:test:visual-source-preflight";
+    const result = attachHelixProviderPreflightRouteContext({
+      turnId,
+      body: {
+        turn_id: turnId,
+        sessionId: "thread:visual-source-preflight",
+        question: "What is happening right now in the visual screen capture?",
+      },
+    });
+
+    expect(result.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      target_kind: "visual_capture",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(result.canonical_goal_frame).toMatchObject({
+      goal_kind: "visual_capture_describe",
+      answer_scope: "workspace_state",
+      requested_capability: "situation-room.describe_visual_capture",
+      required_terminal_kind: "model_synthesized_answer",
+      classifier_reasons: expect.arrayContaining([
+        "visual_capture_describe_contract_intent",
+        "provider_visual_source_requires_runtime_observation_reentry",
+      ]),
+    });
+    expect(result.route_product_contract).toMatchObject({
+      source_target: "visual_capture",
+      required_terminal_kind: "model_synthesized_answer",
+      evidence_reentry_required: true,
+      followup_reasoning_required: true,
+    });
+  });
+
+  it.each([
+    "Do not inspect the visual screen capture; explain that phrase normally without tools.",
+    "Yesterday I asked you to inspect the visual screen capture; explain why that request was useful without tools.",
+    "Later we may inspect the visual screen capture; explain the idea now without tools.",
+    "The screen says 'inspect the visual screen capture'; explain the quoted text without tools.",
+  ])("keeps contextual visual language model-only during provider preflight: %s", (question) => {
+    const turnId = `ask:test:visual-context:${question.length}`;
+    const result = attachHelixProviderPreflightRouteContext({
+      turnId,
+      body: { turn_id: turnId, question },
+    });
+
+    expect(result.canonical_goal_frame).toMatchObject({
+      goal_kind: "model_only_concept",
+      answer_scope: "model_only",
+      required_terminal_kind: "direct_answer_text",
+    });
+  });
+
   it("rejects the Helix-native runtime for a guest account", async () => {
     const priorBypass = process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS;
     process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS = "0";
@@ -699,7 +831,7 @@ describe("Helix Ask agent provider route metadata", () => {
       ok: true,
       runtime: "codex",
       agent_runtime: "codex",
-      text: "42",
+      text: "The planner-derived calculator observation reports 42.",
       workstation_gateway_reentry_status: "completed",
       terminal_authority_status: "authorized_by_terminal_authority_single_writer",
       provider_reasoning_reentry: { status: "completed", evidence_reentered: true },
@@ -1165,7 +1297,7 @@ describe("Helix Ask agent provider route metadata", () => {
     });
   });
 
-  it("preserves the provider candidate while single-writer selects deterministic calculator evidence", async () => {
+  it("preserves grounded provider calculator reasoning under workstation evaluation authority", async () => {
     process.env.ENABLE_CODEX_AGENT = "1";
     process.env.CODEX_AGENT_FAKE_STDOUT = "The calculator observation reports 21.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
@@ -1191,7 +1323,7 @@ describe("Helix Ask agent provider route metadata", () => {
       ok: true,
       runtime: "codex",
       agent_runtime: "codex",
-      text: "21",
+      text: "The calculator observation reports 21.",
       workstation_gateway_reentry_status: "completed",
       terminal_authority_status: "authorized_by_terminal_authority_single_writer",
       final_answer_source: "workstation_tool_evaluation",
@@ -1249,7 +1381,7 @@ describe("Helix Ask agent provider route metadata", () => {
       },
       terminal_presentation: {
         schema: "helix.terminal_presentation.v1",
-        concise_text: "21",
+        concise_text: "The calculator observation reports 21.",
         final_answer_source: "workstation_tool_evaluation",
         terminal_artifact_kind: "workstation_tool_evaluation",
       },
@@ -1425,7 +1557,7 @@ describe("Helix Ask agent provider route metadata", () => {
       ok: true,
       runtime: "codex",
       agent_runtime: "codex",
-      text: "64",
+      text: "The streamed calculator observation reports 64.",
       workstation_gateway_reentry_status: "completed",
       terminal_authority_status: "authorized_by_terminal_authority_single_writer",
       final_answer_source: "workstation_tool_evaluation",
@@ -1458,7 +1590,7 @@ describe("Helix Ask agent provider route metadata", () => {
       },
       terminal_presentation: {
         schema: "helix.terminal_presentation.v1",
-        concise_text: "64",
+        concise_text: "The streamed calculator observation reports 64.",
         final_answer_source: "workstation_tool_evaluation",
         terminal_artifact_kind: "workstation_tool_evaluation",
       },

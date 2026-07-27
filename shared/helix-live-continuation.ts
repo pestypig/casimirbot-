@@ -80,7 +80,13 @@ export type HelixLiveSourceAdmissionReceipt =
       | "screen_capture"
       | "browser_audio"
       | "operator_text";
-    transport?: "cloudflarelink" | "local_panel" | "browser" | "manual" | "unknown";
+    transport?:
+      | "room_source_ingress"
+      | "cloudflarelink"
+      | "local_panel"
+      | "browser"
+      | "manual"
+      | "unknown";
     source_identity: {
       world_id?: string | null;
       server_id?: string | null;

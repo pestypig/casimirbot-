@@ -1,0 +1,259 @@
+{
+  "schema_version": "casimir_dp_qed_scale_hierarchy_stage4_1_verification_receipt/1",
+  "campaign_id": "casimir-dp-qed-scale-hierarchy-stage4-1-v1",
+  "campaign_run_id": "casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z",
+  "verified_at": "2026-07-25T18:41:33.162Z",
+  "evidence_class": "source_backed_calculation",
+  "claim_ceiling": "qed_scale_identity_calibration",
+  "promotion_allowed": false,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-qed-scale-hierarchy-stage4-1.v1.json",
+    "config_sha256": "e2625c86a5366258677c58cbe78e73b8fcc1893ecd417b48765d74488f953478",
+    "authority_manifest_path": "configs/research/casimir-dp-stage4-1-authorities.v1.json",
+    "authority_manifest_sha256": "cd681b977d47de6715322249c1026ecf5e963ac81735d6c29aa5100942824f4f",
+    "fixture_path": "configs/research/fixtures/casimir-dp-qed-scale-hierarchy.codata2022.v1.json",
+    "fixture_sha256": "784e5d456940b55f07f81a7c421fc7ba323c9aefb34b65863f1c1a999803d392",
+    "receipt_path": "artifacts/research/casimir-dp-qed-scale-hierarchy-stage4-1/casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z/qed-scale-hierarchy-stage4-1-receipt.json",
+    "receipt_sha256": "d835b56a87ed6f6d78edfb8e627bceecb931575348232ca0fd77795f5ffe24af",
+    "report_json_path": "artifacts/research/casimir-dp-qed-scale-hierarchy-stage4-1/casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z/qed-scale-hierarchy-stage4-1-report.json",
+    "report_json_sha256": "8f06bf394e64d40d24530e9e93b5d61edece3752318ece2095f27d61f55042c5",
+    "report_markdown_path": "artifacts/research/casimir-dp-qed-scale-hierarchy-stage4-1/casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z/qed-scale-hierarchy-stage4-1-report.md",
+    "report_markdown_sha256": "6ae9530701fc35aa544b438709e789929b45eaf53ae950ec93ed976bb9703ba6",
+    "git_head": "705759a201ee77313919de906c53dc8565de75bc",
+    "worktree_state": "dirty_uncommitted_source_hashes_authoritative",
+    "authority_mode": "role_path_and_content_hash_tuple"
+  },
+  "immutable_stage4_upstream": {
+    "config_sha256": "ade06cd7b95e27fe414614ad36512d5764d439c4fa6623f8499ad218ba07c3d7",
+    "authority_manifest_sha256": "3f26ef115533ef78756fad70f3880f8ea1d1ace43cbc9a0e66d6d0b5e9c2918d",
+    "campaign_run_id": "casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z",
+    "report_json_sha256": "2c56cd9b61928ee750cf0714435674cc923b4c81f02e325b8ee9e9e5a9816d0b",
+    "report_markdown_sha256": "1221cf1e6b6c247c3253240c44ed78446318b2cdb2966610a63d08c7ec4f00a8",
+    "campaign_receipt_sha256": "185a09ceb61b4f158afe16022783c8b184c1035f456cb341b5c90920b69b774a",
+    "downstream_verification_receipt_sha256": "721b9f6aeab4b181ccc5ac21b4bc81c984d3b1fb72cdf76e55abedba11e38440",
+    "role_path_tuple_frozen": true,
+    "reused_without_mutation": true
+  },
+  "source_and_software_authority": {
+    "codata_registry_path": "configs/constants/codata-2022.v1.json",
+    "codata_registry_sha256": "5a7e10ed709577c224cf45f78199dd143a7f9cf10d6f8fe8c018e168454b7a61",
+    "runtime_path": "shared/casimir-dp-qed-scale-hierarchy-calibration.ts",
+    "runtime_sha256": "f1f8e4e904faeba71883f17578fa4f3d6f2f1dfb961d4e00725c63cf4de25f02",
+    "contract_path": "shared/contracts/casimir-dp-qed-scale-hierarchy-stage4-1.v1.ts",
+    "contract_sha256": "8bdcf140697817ee36dd048a96cd6ad425d6a7113d946ef58e02b4c09b5fb8f4",
+    "runner_path": "scripts/research/run-casimir-dp-qed-scale-hierarchy-stage4-1.ts",
+    "runner_sha256": "781621c890ea2ea3a74078b4b8b407f16da9b7031f7969bc8c0e3c2f02debfdd",
+    "official_source_snapshots": {
+      "nist_codata_2022_ascii_sha256": "77fb90e66c40db3e6eb16630bc9c88e4c7c8beddbe5e71be406f2f26e3f67e67",
+      "nist_sp961_wall_chart_sha256": "5b7f6d0a2dd9379bb4d02be1ceec4d2ac5dfb5e68772b2a834084739b0c03e0a",
+      "codata_2022_adjustment_paper_sha256": "4d7e7f34b98ab2fc4df68b38247f818f6fc8bdf7f25f91abcdfbc329e22d2f32"
+    }
+  },
+  "verification_inputs": {
+    "repo_telemetry": {
+      "path": "reports/repo-telemetry-stage4-1-20260725T183020238Z.json",
+      "sha256": "4a628543e71f44e1b4a8ccba9faeb7401d5703feaea17d29f385f494fe240569",
+      "auto_merge_used": false
+    },
+    "adapter_request": {
+      "path": "artifacts/casimir-dp-stage4-1-20260725T183020238Z-adapter-request.json",
+      "sha256": "401f5553eaa3fb7cb4b2df225d3befbc4445166dced5271fcd04091d7db504ba",
+      "auto_telemetry": false,
+      "explicit_hard_inputs": [
+        "build.status",
+        "tests.status",
+        "schema.contracts",
+        "deps.coherence"
+      ],
+      "stale_proxy_carry_forward_allowed": false
+    },
+    "combined_vitest_report": {
+      "path": "reports/vitest-stage4-1-final.json",
+      "sha256": "11415e8f234a5dab416645e39e2865cc826f70c2dac2d45a54d4bf6b7e65f47c",
+      "test_files_total": 32,
+      "test_suites_total": 73,
+      "test_suites_passed": 73,
+      "tests_total": 328,
+      "tests_passed": 328,
+      "tests_failed": 0,
+      "success": true
+    },
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-1-20260725T183020238Z-bound-validated.jsonl",
+      "sha256": "cb59e4fdf60c645756902b93479ddd8a6bbe124aa6fb372dcd9c3d191a5ffcc6",
+      "bytes": 2044,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true
+    }
+  },
+  "local_gates": {
+    "focused_stage4_1_runtime_and_contract": {
+      "files": 2,
+      "tests": 18,
+      "status": "pass"
+    },
+    "publication_sidecar_graph_root_and_new_runtime": {
+      "files": 6,
+      "tests": 68,
+      "status": "pass"
+    },
+    "math_congruence_and_root": {
+      "files": 4,
+      "tests": 24,
+      "status": "pass"
+    },
+    "stage4_and_stage4_1_physics": {
+      "files": 7,
+      "tests": 91,
+      "status": "pass"
+    },
+    "warp_required": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    },
+    "combined_receipt_grade": {
+      "files": 32,
+      "suites": 73,
+      "tests": 328,
+      "status": "pass"
+    },
+    "post_binding_publication_replay": {
+      "files": 6,
+      "tests": 56,
+      "status": "pass",
+      "scope": "paper provenance, equation actions, Stage-4.1 runtime and campaign, and physics root-to-leaf projections"
+    },
+    "production_build": {
+      "status": "pass_with_warnings",
+      "command": "npm run build",
+      "exit_code": 0,
+      "warnings_present": true,
+      "note": "The production client and server bundles completed. Existing browser-externalization, large-chunk, duplicate-key, and duplicate-case warnings remain outside this campaign's scientific authority."
+    },
+    "dependency_coherence": {
+      "status": "pass",
+      "command": "npm ls --depth=0",
+      "exit_code": 0,
+      "package_lock_sha256": "1833546cf15db039c1895a05e29e80338c271aff935d488034e7e9e6ab025cba"
+    },
+    "strict_stage4_1_typescript": {
+      "status": "pass",
+      "scope": "runtime, contract, runner, and math-congruence builder"
+    },
+    "repository_wide_typecheck": {
+      "status": "not_supplied",
+      "included_in_adapter_telemetry": false
+    },
+    "equation_sidecar": {
+      "paper_markers": 34,
+      "source_entries": 34,
+      "generated_entries": 34,
+      "source_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
+      "source_sha256": "fd4c004fb80ea7ef2ddd3c76b7435bdbd08ed4c0afc6f9493b84cfdd22952c4b",
+      "generated_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
+      "generated_sha256": "dd7720f64a9bb99b3fcb1a941f3062cf90762fc2afa09d67c7d0dc5d3ac476c4",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 24,
+      "edges": 65,
+      "observable_bridge_edges_added": 0,
+      "module_path": "shared/theory/casimir-dp-study-theory-badges.ts",
+      "module_sha256": "41f6ff13e1aee0fdad7546fb725edfd58bcfe8ef38b5662cacf6ba6e705ac4f9",
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 205,
+      "validation": "pass",
+      "strict_congruence_errors": 0,
+      "strict_congruence_warnings": 0,
+      "report_json_path": "reports/math-report.json",
+      "report_json_sha256": "fcebc30b9cbec4a66c92b5fdd89f6c3e7522aecd01ddde78ead6a5e65d1221ec",
+      "report_markdown_path": "reports/math-report.md",
+      "report_markdown_sha256": "8b36fc84d750f7d8cd694c5366a4788b2551a811c414693cca32a116790824b1"
+    },
+    "math_congruence_matrix": {
+      "rows": 31,
+      "path": "configs/math-congruence-matrix.v1.json",
+      "sha256": "84ef5a5dc6c35abe8aebe982aa5725857bc7c3e601d5fb5e4b155a6bb0568cce",
+      "status": "pass"
+    },
+    "physics_root_to_leaf": {
+      "status": "pass",
+      "manifest_path": "configs/physics-root-leaf-manifest.v1.json",
+      "manifest_sha256": "690569714b140d8268c06a90500693240d6e80e74dcd76d9e62e55b05d4010ae",
+      "stage4_1_semantic_nonbridge_propagated": true
+    }
+  },
+  "adapter_verification": {
+    "trace_id": "casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z-final",
+    "run_id": "2322",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "local_auth_context": "ENABLE_AGI_AUTH=0; AGI_TENANT_REQUIRED=0",
+    "certificate": {
+      "certificate_hash": "38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34",
+      "certificate_id": "constraint-pack:repo-convergence:38b2e69264ac",
+      "integrity_ok": true,
+      "status": "GREEN"
+    }
+  },
+  "certificate_scope": {
+    "certifies": "repo-convergence constraint-pack over the four explicitly supplied hard software metrics",
+    "hard_metric_scope": {
+      "build": "full production client and server bundle completed with warnings",
+      "tests": "normalized pass status supplied from the 32-file, 328-test replay; the exact report hash is bound by this downstream receipt, not by the certificate payload",
+      "schema": "Stage-4.1 runtime, contract, publication, sidecar, Theory Badge, math-congruence, and root-to-leaf scope",
+      "dependencies": "top-level npm dependency graph plus content-addressed package lock"
+    },
+    "lint_proxy_supplied": false,
+    "full_repository_typecheck_proxy_supplied": false,
+    "directly_binds_campaign_artifact_bytes": false,
+    "directly_binds_combined_vitest_report_sha256": false,
+    "scientific_scope": "none",
+    "warp_viability_oracle_status": "not_evaluated",
+    "green_is_not_warp_admissible": true,
+    "why": "The certificate binds normalized supplied software metrics, not CODATA truth, independent spectroscopy, measured Casimir data, a transfer kernel, collapse identification, manifold dynamics, or the WARP viability oracle. This receipt independently content-addresses the exact campaign and verification artifacts."
+  },
+  "certificate_provenance": {
+    "fresh_adapter_execution": true,
+    "fresh_isolated_training_trace_store": true,
+    "prior_stage4_certificate_artifact_reused": false,
+    "certificate_content_hash_matches_stage4": true,
+    "explanation": "The trace id, adapter run, timestamp, explicit request, and one-record trace are fresh. The certificate content hash matches Stage 4 because the repo-convergence certificate is content-addressed over the same normalized four passing software metrics; it is not reuse of the Stage-4 trace or certificate artifact."
+  },
+  "campaign_receipt_transition": {
+    "pre_verification_state": "pending_external_verification",
+    "downstream_verification_state": "pass",
+    "reason": "The immutable campaign receipt remains unchanged. This downstream receipt records the later fresh adapter execution and repository-gate evidence."
+  },
+  "scientific_gates": {
+    "software_identity_calibration": "pass",
+    "source_authority_integrity": "pass",
+    "algebraic_identity_closure": "pass",
+    "codata_tabulation_consistency": "pass",
+    "covariance_semantics": "pass",
+    "leading_reduced_mass_closure": "pass",
+    "measured_evidence": "not_ready",
+    "apparatus_material_response": "not_ready",
+    "ordinary_physics_apparatus_closure": "not_ready",
+    "precision_spectroscopy": "not_ready",
+    "independent_empirical_validation": "not_evaluated",
+    "polarization_or_helicity_model": "not_evaluated",
+    "casimir_to_atomic_transfer": "blocked",
+    "atomic_to_dp_transfer": "blocked",
+    "compton_to_collapse_clock": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "publication_claim": "diagnostic_constants_calibration_only"
+  }
+}

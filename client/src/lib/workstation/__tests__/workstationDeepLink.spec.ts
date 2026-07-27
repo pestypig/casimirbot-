@@ -10,6 +10,10 @@ import {
   parseWorkstationViewStateFromUrl,
 } from "@/lib/workstation/workstationDeepLink";
 import { coerceHelixWorkstationActions } from "@/lib/workstation/workstationActionContract";
+import {
+  HELIX_USER_ACCOUNT_POLICY,
+  resolveHelixAccountPanelAccess,
+} from "@shared/helix-account-session";
 
 describe("workstationDeepLink", () => {
   it("parses canonical workstation view state from query params", () => {
@@ -22,6 +26,21 @@ describe("workstationDeepLink", () => {
     expect(state.activeDocPath).toBe("docs/papers.md");
     expect(state.anchor).toBe("intro");
     expect(state.pathRef?.displaySegments).toEqual(["Workspace", "docs", "papers.md"]);
+  });
+
+  it("admits the public Agent Access workstation deep link", () => {
+    const state = parseWorkstationViewStateFromUrl(
+      "/desktop?panels=agent-access&focus=agent-access",
+    );
+
+    expect(state.panels).toEqual(["agent-access"]);
+    expect(state.focusPanel).toBe("agent-access");
+    expect(
+      resolveHelixAccountPanelAccess(
+        HELIX_USER_ACCOUNT_POLICY,
+        "agent-access",
+      ).state,
+    ).toBe("available");
   });
 
   it("normalizes doc paths and rejects raw absolute local paths", () => {

@@ -118,9 +118,33 @@ describe("doc equation actions", () => {
       markdown.matchAll(/<!--\s*helix-doc-equation-action\/v1\s+id=([A-Za-z0-9._:-]+)\s*-->/g),
       (match) => match[1],
     );
+    const generatedIds = generated.entries.map((entry) => entry.equationId);
 
+    expect(markerIds).toHaveLength(41);
     expect(source.entries.map((entry) => entry.equationId).sort()).toEqual([...markerIds].sort());
-    expect(generated.entries.map((entry) => entry.equationId).sort()).toEqual([...markerIds].sort());
+    expect([...generatedIds].sort()).toEqual([...markerIds].sort());
+    expect(generatedIds).toEqual(
+      expect.arrayContaining([
+        "cdp-stage3-composite-null",
+        "cdp-stage3-complex-coherence",
+        "cdp-stage3-complete-apparatus-mass",
+        "cdp-stage3-manifold-kernel-preflight",
+        "cdp-stage4-transverse-polarization-completeness",
+        "cdp-stage4-polarization-double-contrast",
+        "cdp-stage4-planck-stefan-boltzmann-closure",
+        "cdp-stage4-frequency-semantic-nonbridge",
+        "cdp-stage4-expanded-ordinary-null",
+        "cdp-qed-scale-hierarchy-identities",
+        "cdp-qed-hydrogen-reduced-mass-boundary",
+        "cdp-stage4-2b-spectral-thermometry-forward-model",
+        "cdp-stage4-2b-sensor-self-noise-forward-model",
+        "cdp-stage4-2b-ordinary-coherence-exponent",
+        "cdp-stage4-2b-residual-covariance",
+        "cdp-stage4-2b-joint-complex-residual",
+        "cdp-stage4-2b-frozen-dp-scaling",
+        "cdp-stage4-2b-identifiability-power-gate",
+      ]),
+    );
   });
 
   it("opens the Casimir-DP observable-separation theory path from the study", async () => {
@@ -174,6 +198,53 @@ describe("doc equation actions", () => {
       expect(entry?.equationId).toBe(equationId);
       expect(getDocEquationTheoryActions(entry)[0]?.preferredBadgeId).toBe(
         "study.casimir_dp.frequency_bridge_gate",
+      );
+    }
+  });
+
+  it("opens the Stage-4 polarization, thermal, congruence, and campaign paths", () => {
+    const expected = {
+      "cdp-stage4-polarization-double-contrast":
+        "study.casimir_dp.polarization_resolved_qed_control",
+      "cdp-stage4-planck-stefan-boltzmann-closure":
+        "study.casimir_dp.thermal_radiative_closure",
+      "cdp-stage4-frequency-semantic-nonbridge":
+        "study.casimir_dp.tensor_dimensional_congruence",
+      "cdp-stage4-expanded-ordinary-null":
+        "study.casimir_dp.polarization_congruence_stage4",
+    } as const;
+
+    for (const [equationId, preferredBadgeId] of Object.entries(expected)) {
+      const generatedEquation = readCasimirDpGeneratedEntry(equationId);
+      const entry = getDocEquationActionEntryForLatex(
+        `/${CASIMIR_DP_STUDY}`,
+        generatedEquation.latex,
+      );
+      expect(entry?.equationId).toBe(equationId);
+      expect(getDocEquationTheoryActions(entry)[0]?.preferredBadgeId).toBe(
+        preferredBadgeId,
+      );
+    }
+  });
+
+  it("opens the Stage-4.2B apparatus-residual badge from all seven coupled equations", () => {
+    for (const equationId of [
+      "cdp-stage4-2b-spectral-thermometry-forward-model",
+      "cdp-stage4-2b-sensor-self-noise-forward-model",
+      "cdp-stage4-2b-ordinary-coherence-exponent",
+      "cdp-stage4-2b-residual-covariance",
+      "cdp-stage4-2b-joint-complex-residual",
+      "cdp-stage4-2b-frozen-dp-scaling",
+      "cdp-stage4-2b-identifiability-power-gate",
+    ]) {
+      const generatedEquation = readCasimirDpGeneratedEntry(equationId);
+      const entry = getDocEquationActionEntryForLatex(
+        `/${CASIMIR_DP_STUDY}`,
+        generatedEquation.latex,
+      );
+      expect(entry?.equationId).toBe(equationId);
+      expect(getDocEquationTheoryActions(entry)[0]?.preferredBadgeId).toBe(
+        "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
       );
     }
   });

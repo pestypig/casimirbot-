@@ -46,10 +46,15 @@ registered observation:
 - What is the maximum claim permitted by the available evidence?
 - What additional independent observable is required for the next claim tier?
 
-The runtime may report `consistent`, `disfavored`, `not_identifiable`,
-`not_ready`, or `blocked`. It must never emit an automated verdict such as
+The runtime may report `not_disfavored_within_powered_region`, `disfavored`,
+`not_identifiable`, `not_ready`, or `blocked`. It must never emit an automated verdict such as
 `objective_collapse_proved`, `manifold_dynamics_proved`, or
 `quantum_foam_detected`.
+
+For implementation and human-facing output, replace the ambiguous
+`consistent` label with
+`not_disfavored_within_powered_region`. A compatibility state is not positive
+support.
 
 ## Frozen Scientific Lanes
 
@@ -212,6 +217,15 @@ The Stage-3 config must contain:
 - software/version identifiers; and
 - a `claim_ceiling: "diagnostic"` field.
 
+Pin the exact timestamped Stage-2 authority, not a mutable `current` alias. The
+frozen authority for this implementation is
+`casimir-dp-or-phase-stage2-v1-20260723T220236Z`, with config hash
+`b517e8fbf002303258a5269e7f37c6b16d4bc3c45c609072bdb2a9e5184e596d`
+and receipt hash
+`64f0e1c95307829540d3c01ad7cb7e10b15d510cb31cf8e73f88a8990d2c25ab`.
+Record any untracked local artifact as provenance, but put the immutable
+authority statement and hashes in a tracked manifest.
+
 Store measured data and synthetic fixtures under distinguishable evidence
 classes. Require a raw-data hash, calibration hash, uncertainty/covariance
 receipt, acquisition timestamp, apparatus state, and provenance reference for
@@ -248,12 +262,12 @@ every stage:
     states.
 11. Compute `Delta E/c^2`, vacuum-weight scale, weak-field upper bound, and
     ordinary gravitational phase.
-12. Freeze all model signatures, likelihoods, priors, exclusion criteria, and
-    falsifiers before unblinding.
-13. Run joint held-out model comparison across every registered experimental
+12. Evaluate the manifold-kernel registry with deterministic first-failure
+    behavior. Exclude every blocked bridge before model signatures are frozen.
+13. Freeze all admitted model signatures, likelihoods, priors, exclusion
+    criteria, and falsifiers before unblinding.
+14. Run joint held-out model comparison across every registered experimental
     axis.
-14. Evaluate the manifold-kernel registry with deterministic first-failure
-    behavior.
 15. Populate the outcome-to-claim ledger and apply the maximum-claim rules.
 16. Write the hash-backed receipt, maintained report, paper/proposal sections,
     and badge states.
@@ -693,6 +707,20 @@ treated as paired within-object changes.
 
 ### Models to freeze before unblinding
 
+Register the additive ordinary-physics baseline
+
+```math
+M_0 =
+  M_{\rm QED\ phase}
+  + M_{\rm technical\ dephasing}
+  + M_{\rm QED/environmental\ decoherence}
+  + M_{\rm ordinary\ gravity}.
+```
+
+Compare nested additions `M_0 + M_dp_<variant>` and, only after registry
+preflight, `M_0 + M_bridge_<id>`. Do not force these physically coexisting
+components into a mutually exclusive model choice.
+
 At minimum register:
 
 - `M_qed_phase`;
@@ -751,14 +779,16 @@ be explicit.
 
 For each model and parameter region, emit one of:
 
-- `consistent`: data do not disfavor the registered prediction;
+- `not_disfavored_within_powered_region`: data do not disfavor the registered
+  prediction within the demonstrated sensitivity region;
 - `disfavored`: preregistered criterion passed within demonstrated
   sensitivity;
 - `not_identifiable`: competing signatures are not separable in this design;
 - `not_ready`: required measured evidence or power is absent; or
 - `blocked`: model, prior, likelihood, kernel, or provenance is incomplete.
 
-`consistent` is not synonymous with `confirmed`.
+`not_disfavored_within_powered_region` is not synonymous with `confirmed` or
+supported.
 
 ### Focused tests
 

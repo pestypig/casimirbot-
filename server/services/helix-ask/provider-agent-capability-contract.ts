@@ -210,12 +210,12 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
     }),
   ),
   ...[
-    "helix_ask.reflect_theory_context",
+    "theory-badge-graph.reflect_discussion_context",
   ].map((capabilityId) =>
     sharedExplicitAlias(capabilityId, {
       permissionClass: "read_observe",
-      gatewayAliasTarget: "theory-badge-graph.reflect_discussion_context",
-      notes: "Provider-shared explicit route alias admitted onto the canonical theory-badge-graph.reflect_discussion_context gateway; alias is preserved in source_target_intent.alias_capability.",
+      gatewayAliasTarget: "helix_ask.reflect_theory_context",
+      notes: "Legacy graph-shaped route alias admitted onto the Ask-owned canonical reflection gateway; alias identity is preserved in source_target_intent.alias_capability.",
     }),
   ),
   ...[
@@ -259,6 +259,12 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
       notes: "Provider-shared explicit route alias admitted onto the canonical docs-viewer.open_doc gateway receipt; alias is preserved in source_target_intent.alias_capability.",
     }),
   ),
+  sharedExplicitAlias("image_lens.inspect", {
+    permissionClass: "read_observe",
+    gatewayAliasTarget: "situation-room.describe_visual_capture",
+    notes:
+      "Provider-shared visual source alias admitted onto the bounded SituationRun observation gateway; the observation must re-enter the runtime before terminal synthesis.",
+  }),
   ...[
     "runtime_evidence",
     "debug.inspect_current_turn",
@@ -271,8 +277,6 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
     "helix_ask.reflect_ideology_context",
     "helix_ask.bridge_theory_ideology_context",
     "helix_ask.build_civilization_scenario_frame",
-    "image_lens.inspect",
-    "situation-room.describe_visual_capture",
     "docs-viewer.identify_current_doc",
     "docs-viewer.validate_doc_candidates",
   ].map((capabilityId) =>
@@ -445,10 +449,12 @@ export const resolveProviderGatewayCapabilityId = (
   return explicitClassificationByCapability.get(normalized)?.provider_gateway_alias_target ?? normalized;
 };
 
-const currentGatewayCapabilities = listWorkstationGatewayCapabilities({
+const currentGatewayListing = listWorkstationGatewayCapabilities({
   agentRuntime: "codex",
   mode: "observe",
-}).capabilities;
+});
+
+const currentGatewayCapabilities = currentGatewayListing.capabilities;
 
 const currentGatewayCapabilityById = new Map(
   currentGatewayCapabilities.map((capability) => [
@@ -481,6 +487,20 @@ export const classifyProviderAgentCapability = (
       provider_availability: sharedProviderAvailability,
       required_contract_before_gateway: [],
       notes: "Already exposed through the shared workstation gateway manifest.",
+    };
+  }
+  if (
+    currentGatewayListing.unavailable_capabilities
+      ?.some((capability) => capability.capability_id === normalized)
+  ) {
+    return {
+      capability_id: normalized,
+      surface: "workstation_gateway",
+      availability: "blocked_pending_contract",
+      permission_class: "read_observe",
+      provider_availability: helixOnlyProviderAvailability,
+      required_contract_before_gateway: ["configure an approved runtime provider"],
+      notes: "The gateway contract exists, but this deployment does not advertise the capability because its runtime provider is not configured.",
     };
   }
   return explicitClassificationByCapability.get(normalized) ?? null;

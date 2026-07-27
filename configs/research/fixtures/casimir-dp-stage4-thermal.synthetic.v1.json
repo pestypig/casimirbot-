@@ -1,0 +1,94 @@
+{
+  "schema_version": "casimir_dp_radiative_thermal_closure/1",
+  "evidence_class": "synthetic_fixture",
+  "model_binding_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "authority_receipt": {
+    "source_ref": "synthetic://casimir-dp-stage4/thermal-authority-v1",
+    "evidence_class": "synthetic_fixture",
+    "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "actual_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "integrity_verified": true
+  },
+  "frequency_convention": {
+    "canonical_internal_variable": "omega_rad_s",
+    "conversion_relative_tolerance": 1e-12,
+    "spectral_checkpoints": [
+      {
+        "checkpoint_id": "terahertz-control",
+        "nu_Hz": 1000000000000,
+        "omega_rad_s": 6283185307179.586,
+        "temperature_K": 300
+      },
+      {
+        "checkpoint_id": "visible-control",
+        "nu_Hz": 500000000000000,
+        "omega_rad_s": 3141592653589793,
+        "temperature_K": 5772
+      }
+    ]
+  },
+  "integration": {
+    "dimensionless_x_max": 40,
+    "simpson_intervals": 4096,
+    "stefan_boltzmann_relative_tolerance": 1e-10
+  },
+  "reservoirs": {
+    "source_temperature_K": 300,
+    "environment_temperature_K": 250,
+    "source_emissivity": 0.8,
+    "environment_emissivity": 0.6,
+    "radiating_area_m2": 0.000001,
+    "view_factor": 0.75,
+    "material_receipt": {
+      "source_ref": "synthetic://casimir-dp-stage4/greybody-response-v1",
+      "evidence_class": "synthetic_fixture",
+      "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "integrity_verified": true
+    }
+  },
+  "geometry": {
+    "transfer_regime": "far_field",
+    "separation_m": 0.001,
+    "minimum_far_field_thermal_wavelength_ratio": 10,
+    "geometry_receipt": {
+      "source_ref": "synthetic://casimir-dp-stage4/far-field-geometry-v1",
+      "evidence_class": "synthetic_fixture",
+      "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "integrity_verified": true
+    }
+  },
+  "near_field_fdt": null,
+  "probe": {
+    "interaction_time_s": 0.1,
+    "branch_separation_m": 0.000001,
+    "oscillator_omega_rad_s": 628318.5307179586,
+    "heating_absorption_fraction": 0.000001,
+    "decoherence_coupling_efficiency": 0.25,
+    "recoil_anisotropy": 0.1,
+    "recoil_direction": [1, 0, 0]
+  },
+  "solar_benchmark": {
+    "luminosity_W": 3.828e26,
+    "radius_m": 695700000,
+    "reference_effective_temperature_K": 5772,
+    "absolute_tolerance_K": 2,
+    "receipt": {
+      "source_ref": "synthetic://casimir-dp-stage4/iau-nominal-solar-v1",
+      "evidence_class": "synthetic_fixture",
+      "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "actual_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "integrity_verified": true
+    }
+  },
+  "gates": {
+    "detailed_balance_absolute_tolerance_W": 1e-24,
+    "recoil_direction_norm_tolerance": 1e-12
+  },
+  "accounting": {
+    "zero_point_in_net_thermal_power": false,
+    "thermal_channel_already_counted_in_parent_qed": false,
+    "combine_far_field_and_near_field_outputs": false
+  }
+}

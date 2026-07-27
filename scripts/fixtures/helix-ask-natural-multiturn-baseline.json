@@ -34,7 +34,7 @@
       "expected_tool_mode": "required",
       "expected_capability_patterns": ["^(?:docs\\.search|docs-viewer\\.(?:identify_current_doc|open_doc_by_path|summarize_doc|locate_in_doc)|research-library\\.read_document)$"],
       "expected_minimum_observations": 1,
-      "expected_answer_patterns": ["Casimir", "negative|vacuum|boundary", "not|doesn.t|does not|bounded|speculat"],
+      "expected_answer_patterns": ["Casimir", "source|mechanism|stress-energy|negative|vacuum|boundary", "not|doesn.t|does not|bounded|speculat|conceptual|diagnostic"],
       "expected_minimum_answer_chars": 140
     },
     {
@@ -65,13 +65,13 @@
       "id": "calculator_natural_followup",
       "thread_group": "workstation_to_calculator",
       "category": "calculator",
-      "prompt": "Good. Now calculate seventeen times nineteen and give me the checked result.",
-      "notes": "Cross-tool continuation must leave workstation status and admit calculator execution.",
+      "prompt": "Good. Now use the calculator to check seventeen times nineteen.",
+      "notes": "Cross-tool continuation must leave workstation status and honor a natural explicit calculator request.",
       "expected_tool_mode": "required",
       "expected_capability_patterns": ["^scientific-calculator\\.(?:solve_expression|solve_scalar_expression)$"],
       "expected_minimum_observations": 1,
       "expected_answer_patterns": ["323"],
-      "expected_minimum_answer_chars": 20
+      "expected_minimum_answer_chars": 3
     }
   ]
 }

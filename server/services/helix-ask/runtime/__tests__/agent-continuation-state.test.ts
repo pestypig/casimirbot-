@@ -271,6 +271,300 @@ describe("agent continuation state", () => {
     expect(state.allowed_decisions).not.toContain("answer");
   });
 
+  it("preserves the exact normalized Lanyon request reference in the admission lane request", () => {
+    const requestArtifactRef =
+      "ask:continuation:codex_normalized:theory_artifact_producer_lanyon_request_observation:1";
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: ["lanyon_artifact_generation_receipt"],
+      },
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [
+        artifact({
+          id: requestArtifactRef,
+          kind: "theory_artifact_producer_lanyon_request_observation",
+          payload: {
+            next_affordances: [
+              {
+                schema: "helix.provider_next_affordance.v1",
+                affordance_id:
+                  "theory-artifact-producer:admit-lanyon:lanyon-request:test",
+                capability:
+                  "theory-artifact-producer.admit_lanyon_snapshot",
+                mode: "read",
+                reason:
+                  "exact_current_turn_lanyon_request_ready_for_pinned_source_admission",
+                requires_confirmation: false,
+                executes_automatically: false,
+                lane_request: {
+                  capability:
+                    "theory-artifact-producer.admit_lanyon_snapshot",
+                  request_artifact_ref: requestArtifactRef,
+                  case_id: "advection_diffusion_1d_periodic",
+                },
+                terminal_eligible: false,
+                assistant_answer: false,
+                raw_content_included: false,
+              },
+            ],
+          },
+        }),
+      ],
+    };
+
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: {
+        attempt_id: "attempt:lanyon-request",
+        capability_id:
+          "theory-artifact-producer.prepare_lanyon_request",
+        status: "succeeded",
+        observation_refs: [requestArtifactRef],
+      },
+    });
+
+    expect(state.next_admissible_affordances).toEqual([
+      expect.objectContaining({
+        capability_id:
+          "theory-artifact-producer.admit_lanyon_snapshot",
+        args: {
+          request_artifact_ref: requestArtifactRef,
+          case_id: "advection_diffusion_1d_periodic",
+        },
+        lane_request: {
+          capability:
+            "theory-artifact-producer.admit_lanyon_snapshot",
+          request_artifact_ref: requestArtifactRef,
+          case_id: "advection_diffusion_1d_periodic",
+          mode: "read",
+        },
+        admissible: true,
+        tried: false,
+      }),
+    ]);
+    expect(state.allowed_decisions).toContain("act");
+    expect(state.allowed_decisions).not.toContain("answer");
+  });
+
+  it("keeps post-Lanyon formal and revision-bound closure requests exact and replay-distinct", () => {
+    const procedureArgs = {
+      prompt: "Evaluate execution closure for the selected procedure.",
+      procedure_artifact_ref: "ask:continuation:procedure",
+      procedure_id: "procedure:continuation",
+      procedure_sha256: "a".repeat(64),
+    };
+    const originalClosureAffordance = {
+      schema: "helix.provider_next_affordance.v1",
+      affordance_id: "procedure:continuation:evaluate-closure",
+      capability: "theory-experiment-procedure.evaluate_closure",
+      mode: "read",
+      requires_confirmation: false,
+      executes_automatically: false,
+      lane_request: {
+        capability: "theory-experiment-procedure.evaluate_closure",
+        ...procedureArgs,
+      },
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const procedureArtifact = artifact({
+      id: "ask:continuation:procedure",
+      kind: "theory_experiment_procedure_observation",
+      payload: {
+        next_affordances: [originalClosureAffordance],
+      },
+    });
+    const beforeReceiptPayload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: [
+          "artifact_generation_receipt_required",
+          "formal_certificate_required",
+        ],
+      },
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [procedureArtifact],
+    };
+    const beforeReceipt = buildHelixAgentContinuationState({
+      payload: beforeReceiptPayload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: {
+        attempt_id: "attempt:initial-closure",
+        capability_id:
+          "theory-experiment-procedure.evaluate_closure",
+        args: procedureArgs,
+        status: "succeeded",
+      },
+    });
+    const originalClosure = beforeReceipt.next_admissible_affordances.find(
+      (affordance) =>
+        affordance.capability_id ===
+        "theory-experiment-procedure.evaluate_closure",
+    );
+    expect(originalClosure).toMatchObject({ tried: true });
+
+    const admissionArtifactRef =
+      "ask:continuation:lanyon-admission-continuation";
+    const receiptEvidenceArtifactRef =
+      "ask:continuation:artifact-generation-receipt";
+    const evidenceRevisionSha256 = "b".repeat(64);
+    const revisionIntent = {
+      schema: "helix.theory_execution_closure_evidence_revision.v1",
+      source_capability_id:
+        "theory-artifact-producer.admit_lanyon_snapshot",
+      admission_observation_ref: admissionArtifactRef,
+      evidence_revision_ref: receiptEvidenceArtifactRef,
+      evidence_revision_sha256: evidenceRevisionSha256,
+    };
+    const continuationArtifact = artifact({
+      id: admissionArtifactRef,
+      kind:
+        "theory_artifact_producer_lanyon_continuation_observation",
+      payload: {
+        next_affordances: [
+          {
+            schema: "helix.provider_next_affordance.v1",
+            affordance_id:
+              "theory-formal-verifier:prepare-after-lanyon",
+            capability: "theory-formal-verifier.prepare_request",
+            mode: "read",
+            requires_confirmation: false,
+            executes_automatically: false,
+            lane_request: {
+              capability: "theory-formal-verifier.prepare_request",
+              procedure_artifact_ref:
+                procedureArgs.procedure_artifact_ref,
+              procedure_id: procedureArgs.procedure_id,
+              procedure_sha256: procedureArgs.procedure_sha256,
+              semantic_admission_artifact_ref:
+                "ask:continuation:semantic-admission",
+              artifact_generation_artifact_ref:
+                admissionArtifactRef,
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          {
+            schema: "helix.provider_next_affordance.v1",
+            affordance_id:
+              "theory-experiment-procedure:evaluate-closure-after-lanyon",
+            capability:
+              "theory-experiment-procedure.evaluate_closure",
+            mode: "read",
+            requires_confirmation: false,
+            executes_automatically: false,
+            lane_request: {
+              capability:
+                "theory-experiment-procedure.evaluate_closure",
+              ...procedureArgs,
+              source_target_intent: revisionIntent,
+            },
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        ],
+      },
+    });
+    const afterReceipt = buildHelixAgentContinuationState({
+      payload: {
+        ...beforeReceiptPayload,
+        current_turn_artifact_ledger: [
+          procedureArtifact,
+          artifact({
+            id: receiptEvidenceArtifactRef,
+            kind: "artifact_generation_receipt",
+          }),
+          continuationArtifact,
+        ],
+      },
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      previousState: beforeReceipt,
+      lastAttempt: {
+        attempt_id: "attempt:lanyon-admission",
+        capability_id:
+          "theory-artifact-producer.admit_lanyon_snapshot",
+        args: {
+          request_artifact_ref:
+            "ask:continuation:lanyon-request",
+          case_id: "advection_diffusion_full_1d",
+        },
+        status: "succeeded",
+        observation_refs: [
+          receiptEvidenceArtifactRef,
+          admissionArtifactRef,
+        ],
+      },
+    });
+    const formalPrepare =
+      afterReceipt.next_admissible_affordances.find(
+        (affordance) =>
+          affordance.capability_id ===
+          "theory-formal-verifier.prepare_request",
+      );
+    const closureAffordances =
+      afterReceipt.next_admissible_affordances.filter(
+        (affordance) =>
+          affordance.capability_id ===
+          "theory-experiment-procedure.evaluate_closure",
+      );
+    const revisionClosure = closureAffordances.find(
+      (affordance) =>
+        (
+          affordance.args.source_target_intent as
+            | Record<string, unknown>
+            | undefined
+        )?.evidence_revision_ref === receiptEvidenceArtifactRef,
+    );
+    expect(formalPrepare).toMatchObject({
+      tried: false,
+      admissible: true,
+      args: {
+        procedure_artifact_ref:
+          procedureArgs.procedure_artifact_ref,
+        procedure_id: procedureArgs.procedure_id,
+        procedure_sha256: procedureArgs.procedure_sha256,
+        semantic_admission_artifact_ref:
+          "ask:continuation:semantic-admission",
+        artifact_generation_artifact_ref: admissionArtifactRef,
+      },
+      lane_request: {
+        capability: "theory-formal-verifier.prepare_request",
+        mode: "read",
+      },
+    });
+    expect(revisionClosure).toMatchObject({
+      tried: false,
+      admissible: true,
+      args: {
+        source_target_intent: revisionIntent,
+      },
+      lane_request: {
+        capability:
+          "theory-experiment-procedure.evaluate_closure",
+        mode: "read",
+        source_target_intent: revisionIntent,
+      },
+    });
+    expect(revisionClosure?.action_fingerprint).not.toBe(
+      originalClosure?.action_fingerprint,
+    );
+    expect(
+      afterReceipt.next_admissible_affordances.some((affordance) =>
+        affordance.capability_id.includes("independent-numerical"),
+      ),
+    ).toBe(false);
+    expect(afterReceipt.allowed_decisions).toContain("act");
+    expect(afterReceipt.allowed_decisions).not.toContain("answer");
+  });
+
   it("includes nested lane request arguments in affordance identity", () => {
     const payload: Record<string, unknown> = {
       goal_satisfaction_evaluation: {
@@ -328,6 +622,81 @@ describe("agent continuation state", () => {
     });
     expect(alternateState.next_admissible_affordances[0]?.action_fingerprint)
       .not.toBe(state.next_admissible_affordances[0]?.action_fingerprint);
+  });
+
+  it("keeps confirmation metadata out of exact verifier lane arguments and distinguishes poll attempts", () => {
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: ["formal_certificate"],
+      },
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [
+        artifact({
+          id: "ask:continuation:formal-poll:3",
+          kind: "theory_formal_verifier_result_observation",
+          payload: {
+            next_affordances: [
+              {
+                capability: "theory-formal-verifier.read_result",
+                mode: "read",
+                requires_confirmation: false,
+                executes_automatically: false,
+                output_role: "evidence_for_bounded_synthesis",
+                lane_request: {
+                  capability: "theory-formal-verifier.read_result",
+                  job_id: "formal-job:test",
+                  poll_attempt: 3,
+                },
+                terminal_eligible: false,
+                assistant_answer: false,
+                raw_content_included: false,
+              },
+            ],
+          },
+        }),
+      ],
+    };
+
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: {
+        attempt_id: "attempt:formal-poll:2",
+        capability_id: "theory-formal-verifier.read_result",
+        args: { job_id: "formal-job:test", poll_attempt: 2 },
+        status: "client_pending",
+        failure_code: null,
+        retryability: "retryable",
+      },
+    });
+
+    expect(state.next_admissible_affordances).toEqual([
+      expect.objectContaining({
+        capability_id: "theory-formal-verifier.read_result",
+        args: {
+          job_id: "formal-job:test",
+          poll_attempt: 3,
+        },
+        lane_request: {
+          capability: "theory-formal-verifier.read_result",
+          job_id: "formal-job:test",
+          mode: "read",
+          poll_attempt: 3,
+        },
+        admissible: true,
+        tried: false,
+      }),
+    ]);
+    expect(
+      state.next_admissible_affordances[0]?.args,
+    ).not.toHaveProperty("requires_confirmation");
+    expect(
+      state.next_admissible_affordances[0]?.args,
+    ).not.toHaveProperty("executes_automatically");
+    expect(state.allowed_decisions).toContain("act");
+    expect(state.allowed_decisions).not.toContain("answer");
   });
 
   it.each([

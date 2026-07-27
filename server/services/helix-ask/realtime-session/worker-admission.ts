@@ -252,6 +252,7 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
   transcriptText: string;
   sourceBinding?: RecordLike | null;
   sourceTargetIntent?: HelixAskSourceTargetIntent;
+  routeMetadata?: RecordLike | null;
   activeGoalBinding?: HelixRealtimeStagePlayGoalBindingV1 | null;
   selectedRuntimeAgentProvider?: string | null;
   evidenceRefs?: string[];
@@ -281,6 +282,9 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
         question: input.transcriptText,
         source_target_intent: sourceTargetIntent,
         workspace_context_snapshot: workspaceSnapshot,
+        ...(input.routeMetadata
+          ? { route_metadata: input.routeMetadata }
+          : {}),
       },
       includePlannerDerived: true,
     });
@@ -358,6 +362,9 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
     interactionMode === "worker_required" ? "realtime_worker_result_required" : null,
     interactionMode === "parallel_conversation" ? "realtime_parallel_conversation" : null,
     selectedRuntimeShouldReceiveTurn ? "selected_runtime_receives_substantive_utterance" : null,
+    input.routeMetadata
+      ? "realtime_context_pack_bound_for_argument_admission"
+      : null,
     primaryIntent !== "general_reasoning" ? `intent_${primaryIntent}` : "intent_general_reasoning",
     plannerFailed ? "normal_ask_gateway_policy_unavailable" : null,
   ].filter((entry): entry is string => Boolean(entry));

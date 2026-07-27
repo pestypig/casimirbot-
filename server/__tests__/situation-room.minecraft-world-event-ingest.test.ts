@@ -5,14 +5,31 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
 import {
+  HELIX_ROOM_SOURCE_ADMISSION_SCHEMA,
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
+import {
   __resetHelixThreadLedgerStore,
   getHelixThreadLedgerEvents,
 } from "../services/helix-thread/ledger";
 import {
   ingestWorldEvent,
+  ingestWorldEventBatch,
   resetWorldEventIngestState,
 } from "../services/situation-room/world-event-ingest";
-import { resetSituationThreadBindings } from "../services/situation-room/thread-binding-store";
+import {
+  createSituationThreadBinding,
+  resetSituationThreadBindings,
+} from "../services/situation-room/thread-binding-store";
+import { listWorldSourcesSeen } from "../services/situation-room/world-source-registry";
+import { queryEventJournal } from "../services/situation-room/event-journal-store";
+import { getLatestMinecraftWorldSenseContextForRoom } from "../services/situation-room/minecraft-world-sense-window";
+import { getLatestMinecraftSpatialEpisodeForRoom } from "../services/situation-room/minecraft-spatial-window";
+import { resolveProfileMinecraftSource } from "../services/situation-room/profile-source-registry";
+import { upsertSituationSourceBinding } from "../services/situation-room/situation-source-binding-store";
+import { upsertLiveContinuationJob } from "../services/situation-room/live-continuation-job-store";
+import { createLiveAnswerEnvironment } from "../services/situation-room/live-answer-environment-store";
 
 const createApp = async (): Promise<express.Express> => {
   const { planRouter } = await import("../routes/agi.plan");
@@ -224,6 +241,227 @@ describe("Minecraft world-event ingest", () => {
       error: "invalid_world_event",
     });
   }, 15000);
+
+  it("rejects reserved room-ingress source ids at canonical and legacy world-event boundaries", async () => {
+    const app = await createApp();
+    const [fixture] = readFixture("nether-low-health.jsonl");
+    const event: HelixWorldEvent = {
+      ...fixture,
+      source_id: "source:room-ingress:legacy-attempt",
+      meta: {
+        ...(fixture.meta ?? {}),
+        domain_adapter: "minecraft.paper_plugin.v1",
+      },
+    };
+
+    await expect(
+      ingestWorldEvent(event, { appendToThread: false }),
+    ).rejects.toThrow(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+
+    for (const attempt of [
+      request(app).post("/api/agi/situation/world-event").send(event),
+      request(app)
+        .post("/api/agi/situation/world-event/batch")
+        .send({ events: [event] }),
+      request(app)
+        .post("/api/agi/situation/world-event/replay")
+        .send({ reset: true, events: [event] }),
+    ]) {
+      const response = await attempt.expect(403);
+      expect(response.body).toMatchObject({
+        ok: false,
+        error: HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+    }
+  }, 30000);
+
+  it("diverts exact admitted protected batches into the minimal observation lane", async () => {
+    const roomId = "shared_realtime_room:protected-boundary";
+    const sourceId = "source:room-ingress:protected-boundary";
+    const worldId = "minecraft:minehut:protected-boundary";
+    const domainAdapter = "minecraft.paper_plugin.v1";
+    const requestId = "request:protected-boundary";
+    const admission: HelixRoomSourceAdmission = {
+      schema: HELIX_ROOM_SOURCE_ADMISSION_SCHEMA,
+      transport: "room_source_ingress",
+      binding_id: "room_source_binding:protected-boundary",
+      request_id: requestId,
+      room_id: roomId,
+      source_id: sourceId,
+      world_id: worldId,
+      domain_adapter: domainAdapter,
+      evidence_refs: [
+        "room_source_binding:protected-boundary",
+        `room_source_request:room_source_binding:protected-boundary:${requestId}`,
+      ],
+      content_role: "source_admission_not_assistant_answer",
+      reentry_required: true,
+      model_invoked: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const base = {
+      schema: "helix.world_event.v1" as const,
+      world_id: worldId,
+      room_id: roomId,
+      source_id: sourceId,
+      actor_id: "minecraft:player:protected",
+      actor_label: "ProtectedPlayer",
+      evidence_refs: ["evidence:protected-boundary"],
+    };
+    const events: HelixWorldEvent[] = [
+      {
+        ...base,
+        ts: "2026-07-26T12:00:00.000Z",
+        event_type: "entity_cluster_sample",
+        meta: {
+          domain_adapter: domainAdapter,
+          entity_type: "minecraft:chicken",
+          count: 8,
+        },
+      },
+      {
+        ...base,
+        ts: "2026-07-26T12:00:01.000Z",
+        event_type: "block_edit",
+        location: { x: 1, y: 64, z: 2 },
+        meta: {
+          domain_adapter: domainAdapter,
+          block_type: "minecraft:oak_fence",
+          action: "place",
+          x: 1,
+          y: 64,
+          z: 2,
+        },
+      },
+    ];
+
+    const result = await ingestWorldEventBatch(events, {
+      sourceAdmission: admission,
+      sourceOwnerProfileId: "profile:protected-owner",
+    });
+
+    expect(result).toMatchObject({
+      event_count: 2,
+      appended_count: 0,
+      suppressed_count: 2,
+      batch_receipts: [],
+      results: [
+        {
+          appended: false,
+          reason: "protected_observation_only",
+          source_admission: admission,
+        },
+        {
+          appended: false,
+          reason: "protected_observation_only",
+          source_admission: admission,
+        },
+      ],
+    });
+    expect(listWorldSourcesSeen()).toEqual([]);
+    expect(listWorldSourcesSeen({ sourceAdmission: admission })).toEqual([
+      expect.objectContaining({
+        room_id: roomId,
+        source_id: sourceId,
+        world_id: worldId,
+        event_count: 2,
+      }),
+    ]);
+    expect(queryEventJournal({}).returned_count).toBe(0);
+    expect(
+      queryEventJournal({ sourceAdmission: admission }).returned_count,
+    ).toBe(2);
+    expect(getLatestMinecraftWorldSenseContextForRoom(roomId)).toBeNull();
+    expect(getLatestMinecraftSpatialEpisodeForRoom(roomId)).toBeNull();
+    expect(
+      resolveProfileMinecraftSource({
+        profile_id: "profile:protected-owner",
+      }),
+    ).toMatchObject({ resolved: false, reason: "missing_source" });
+
+    await expect(
+      ingestWorldEvent(events[0], {
+        sourceAdmission: admission,
+        appendToThread: false,
+      }),
+    ).rejects.toThrow(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+    await expect(
+      ingestWorldEventBatch(
+        [events[0], readFixture("nether-low-health.jsonl")[0]],
+        { sourceAdmission: admission },
+      ),
+    ).rejects.toThrow(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  });
+
+  it("does not treat transport admission as thread or live-runtime authority", () => {
+    const requestId = "request:no-thread-authority";
+    const admission: HelixRoomSourceAdmission = {
+      schema: HELIX_ROOM_SOURCE_ADMISSION_SCHEMA,
+      transport: "room_source_ingress",
+      binding_id: "room_source_binding:no-thread-authority",
+      request_id: requestId,
+      room_id: "shared_realtime_room:no-thread-authority",
+      source_id: "source:room-ingress:no-thread-authority",
+      world_id: "minecraft:minehut:no-thread-authority",
+      domain_adapter: "minecraft.paper_plugin.v1",
+      evidence_refs: [
+        "room_source_binding:no-thread-authority",
+        `room_source_request:room_source_binding:no-thread-authority:${requestId}`,
+      ],
+      content_role: "source_admission_not_assistant_answer",
+      reentry_required: true,
+      model_invoked: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+
+    expect(
+      createSituationThreadBinding({
+        room_id: admission.room_id,
+        source_id: admission.source_id,
+        world_id: admission.world_id,
+        thread_id: "thread:attacker-selected",
+        sourceAdmission: admission,
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+    });
+    expect(() =>
+      upsertSituationSourceBinding({
+        thread_id: "thread:attacker-selected",
+        situation_run_id: "situation_run:attacker-selected",
+        source_id: admission.source_id,
+        modality: "visual_frame",
+        sourceAdmission: admission,
+      }),
+    ).toThrow(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+    expect(() =>
+      upsertLiveContinuationJob({
+        thread_id: "thread:attacker-selected",
+        room_id: admission.room_id,
+        source_ids: [admission.source_id],
+        objective: "Attach transport source to an arbitrary thread.",
+        sourceAdmission: admission,
+      }),
+    ).toThrow(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+    expect(() =>
+      createLiveAnswerEnvironment({
+        thread_id: "thread:attacker-selected",
+        created_turn_id: "turn:attacker-selected",
+        objective: "Attach transport source to an arbitrary live answer.",
+        room_id: admission.room_id,
+        source_ids: [admission.source_id],
+      }),
+    ).toThrow(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  });
 
   it("requires a dev bearer token when configured", async () => {
     process.env.HELIX_WORLD_EVENT_REQUIRE_TOKEN = "1";

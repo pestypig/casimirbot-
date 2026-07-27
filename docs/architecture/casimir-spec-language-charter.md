@@ -1,8 +1,10 @@
 # Casimir Spec Language Charter
 
-Status: milestone-1 draft design contract. No benchmark is preregistered or
-frozen, and no parser, Lean execution, Lanyon execution, or agent tool is
-admitted by this document.
+Status: implementation candidate. The canonical claim IR, a strict canonical
+JSON source-packet parser/formatter, snapshot-bound semantic-admission receipts,
+pinned Lean replay, developer-only formal/numerical agent rails, and a pinned
+Lanyon artifact adapter exist. No benchmark is preregistered or frozen, and
+these components do not establish scientific or physical truth.
 
 ## Purpose
 
@@ -25,14 +27,14 @@ readable rendering is for people; generated Lean is for a pinned proof checker;
 generated numerical code is for a separately governed runtime. None of those
 artifacts may silently widen another artifact's authority.
 
-Milestone 1 is deliberately non-executing. A valid IR is a specification, not a
+The source IR remains deliberately non-executing. A valid IR is a specification, not a
 proof, empirical receipt, physical-validity result, assistant answer, or
 terminal product. Later certificates must bind the source, IR, proposition,
 foundation, imports, assumptions, used axioms, toolchain, and replay transcript.
-Milestone-1 `display*` strings and source-map fragments are untrusted
+`display*` strings and source-map fragments remain untrusted
 presentation annotations: pointers must resolve against the authoritative AST,
-but human-rendering equivalence is not admitted until the deterministic
-parser/formatter and round-trip checks exist.
+and the implemented canonical JSON round trip does not yet establish that a
+future richer human-readable rendering preserves author intent.
 Semantic commitments intentionally exclude those presentation fields. Any
 consumer that displays or navigates the human-readable bundle must also verify
 the whole-artifact commitment; semantic commitment alone is insufficient.

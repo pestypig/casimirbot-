@@ -21,7 +21,38 @@ import {
   HELIX_DOCS_OPEN_DOC_CAPABILITY,
   HELIX_DOCS_SEARCH_CAPABILITY,
 } from "./docs-capability-contract";
+import {
+  THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+  theoryExperimentProcedurePromptMatch,
+} from "./theory-experiment-procedure-intent";
+import { isAffirmativeReadAloudPrompt } from "./referent-resolution";
 
+const THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY =
+  "theory-experiment-procedure.evaluate_closure" as const;
+const THEORY_EXPERIMENT_PROCEDURE_READMIT_CAPABILITY =
+  "theory-experiment-procedure.readmit" as const;
+const THEORY_SEMANTIC_ADMITTER_NORMALIZE_CAPABILITY =
+  "theory-semantic-admitter.normalize" as const;
+const THEORY_ARTIFACT_PRODUCER_PREPARE_LANYON_REQUEST_CAPABILITY =
+  "theory-artifact-producer.prepare_lanyon_request" as const;
+const THEORY_ARTIFACT_PRODUCER_ADMIT_LANYON_CAPABILITY =
+  "theory-artifact-producer.admit_lanyon_snapshot" as const;
+const THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY =
+  "theory-formal-verifier.prepare_request" as const;
+const THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY =
+  "theory-formal-verifier.plan" as const;
+const THEORY_FORMAL_VERIFIER_START_CAPABILITY =
+  "theory-formal-verifier.start" as const;
+const THEORY_FORMAL_VERIFIER_READ_RESULT_CAPABILITY =
+  "theory-formal-verifier.read_result" as const;
+const THEORY_INDEPENDENT_NUMERICAL_PREPARE_REQUEST_CAPABILITY =
+  "theory-independent-numerical-verifier.prepare_request" as const;
+const THEORY_INDEPENDENT_NUMERICAL_PLAN_CAPABILITY =
+  "theory-independent-numerical-verifier.plan" as const;
+const THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY =
+  "theory-independent-numerical-verifier.start" as const;
+const THEORY_INDEPENDENT_NUMERICAL_READ_RESULT_CAPABILITY =
+  "theory-independent-numerical-verifier.read_result" as const;
 export type ExplicitCapabilityContract = {
   schema: "helix.explicit_capability_contract.v1";
   capability: string;
@@ -39,8 +70,10 @@ export type ExplicitCapabilityContract = {
   optional_args: string[];
 };
 
-type ExplicitCapabilityContractDefinition =
-  Omit<ExplicitCapabilityContract, "required_args" | "optional_args"> &
+type ExplicitCapabilityContractDefinition = Omit<
+  ExplicitCapabilityContract,
+  "required_args" | "optional_args"
+> &
   Partial<Pick<ExplicitCapabilityContract, "required_args" | "optional_args">>;
 
 export type ExtractedExplicitCapabilityContract = {
@@ -49,7 +82,11 @@ export type ExtractedExplicitCapabilityContract = {
   matched_name: string;
   match_index: number;
   match_end_index: number;
-  source: "command_mention" | "compound_command_chain" | "capability_catalog_prompt";
+  source:
+    | "command_mention"
+    | "compound_command_chain"
+    | "capability_catalog_prompt"
+    | "natural_capability_intent";
 };
 
 const liveEnvironmentControlContract = (input: {
@@ -71,7 +108,8 @@ const liveEnvironmentControlContract = (input: {
     input.requiredObservationKind ?? "stage_play_workstation_control_receipt",
     "helix.workstation_goal_context_update.v1",
   ],
-  required_terminal_kind: input.requiredTerminalKind ?? "workstation_tool_evaluation",
+  required_terminal_kind:
+    input.requiredTerminalKind ?? "workstation_tool_evaluation",
   allowed_substitutions: [],
   forbidden_nearby_capabilities: input.forbiddenNearbyCapabilities ?? [
     "live_env.read_processed_live_source_mail",
@@ -95,7 +133,8 @@ const liveEnvironmentQueryContract = (input: {
   admission_families: ["live_environment"],
   required_observation_kinds: [
     "live_environment_tool_observation",
-    ...(input.requiredObservationKinds ?? (input.requiredObservationKind ? [input.requiredObservationKind] : [])),
+    ...(input.requiredObservationKinds ??
+      (input.requiredObservationKind ? [input.requiredObservationKind] : [])),
     "helix.workstation_goal_context_update.v1",
   ],
   required_terminal_kind: "model_synthesized_answer",
@@ -125,7 +164,8 @@ const liveEnvironmentEvidenceContract = (input: {
     "live_environment_tool_observation",
     ...(input.requiredObservationKinds ?? []),
   ],
-  required_terminal_kind: input.requiredTerminalKind ?? "model_synthesized_answer",
+  required_terminal_kind:
+    input.requiredTerminalKind ?? "model_synthesized_answer",
   allowed_substitutions: [],
   forbidden_nearby_capabilities: [
     "live_env.read_processed_live_source_mail",
@@ -150,7 +190,10 @@ const liveSourceMailEvidenceContract = (input: {
   required_observation_kinds: input.requiredObservationKinds,
   required_terminal_kind: "model_synthesized_answer",
   allowed_substitutions: [],
-  forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
+  forbidden_nearby_capabilities: [
+    "internet_search.web_research",
+    "model.direct_answer",
+  ],
 });
 
 const contextReflectionEvidenceContract = (input: {
@@ -165,6 +208,24 @@ const contextReflectionEvidenceContract = (input: {
   plan_family: "context_reflection",
   source_target: "context_reflection",
   admission_families: ["context_reflection"],
+  required_observation_kinds: input.requiredObservationKinds,
+  required_terminal_kind: "model_synthesized_answer",
+  allowed_substitutions: [],
+  forbidden_nearby_capabilities: ["model.direct_answer"],
+});
+
+const theoryExecutionEvidenceContract = (input: {
+  capability: string;
+  aliases?: string[];
+  requiredObservationKinds: string[];
+}): ExplicitCapabilityContractDefinition => ({
+  schema: "helix.explicit_capability_contract.v1",
+  capability: input.capability,
+  ...(input.aliases ? { aliases: input.aliases } : {}),
+  capability_family: "theory_locator",
+  plan_family: "theory_locator",
+  source_target: "theory_locator",
+  admission_families: ["theory_locator"],
   required_observation_kinds: input.requiredObservationKinds,
   required_terminal_kind: "model_synthesized_answer",
   allowed_substitutions: [],
@@ -208,6 +269,45 @@ const requiredArgsForCapability = (capability: string): string[] => {
     case "moral-graph.reflect_context":
     case "moral-graph.reflect_living_substrate_context":
       return ["prompt"];
+    case THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY:
+      return ["prompt", "operation", "target", "selected_badge_ids"];
+    case THEORY_EXPERIMENT_PROCEDURE_READMIT_CAPABILITY:
+      return ["procedure_artifact_ref", "procedure_id", "procedure_sha256"];
+    case THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY:
+      return ["prompt", "procedure_id", "procedure_sha256"];
+    case THEORY_SEMANTIC_ADMITTER_NORMALIZE_CAPABILITY:
+      return [
+        "source_evidence_ref",
+        "source_packet",
+        "source_path",
+        "receipt_id",
+      ];
+    case THEORY_ARTIFACT_PRODUCER_PREPARE_LANYON_REQUEST_CAPABILITY:
+      return [
+        "procedure_artifact_ref",
+        "procedure_id",
+        "procedure_sha256",
+        "semantic_admission_artifact_ref",
+        "case_id",
+      ];
+    case THEORY_ARTIFACT_PRODUCER_ADMIT_LANYON_CAPABILITY:
+      return ["request_artifact_ref", "case_id"];
+    case THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY:
+      return ["procedure_artifact_ref", "procedure_id", "procedure_sha256"];
+    case THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY:
+      return ["prepared_request_id"];
+    case THEORY_FORMAL_VERIFIER_START_CAPABILITY:
+      return ["prepared_request_id", "plan_id"];
+    case THEORY_FORMAL_VERIFIER_READ_RESULT_CAPABILITY:
+      return ["job_id"];
+    case THEORY_INDEPENDENT_NUMERICAL_PREPARE_REQUEST_CAPABILITY:
+      return ["catalog_entry_id", "procedure_id", "procedure_sha256"];
+    case THEORY_INDEPENDENT_NUMERICAL_PLAN_CAPABILITY:
+      return ["prepared_request_id"];
+    case THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY:
+      return ["plan_id"];
+    case THEORY_INDEPENDENT_NUMERICAL_READ_RESULT_CAPABILITY:
+      return ["job_id"];
     case "helix.theory.frontierVectorFieldTrace":
       return ["query"];
     case "helix_ask.reflect_live_synthetic_data":
@@ -264,25 +364,85 @@ const optionalArgsForCapability = (capability: string): string[] => {
     case "internet_search.web_research":
       return ["question", "prompt", "topic", "search_query"];
     case HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY:
-      return ["doi", "arxiv_id", "arxivId", "title", "journal", "reference", "citation", "limit"];
+      return [
+        "doi",
+        "arxiv_id",
+        "arxivId",
+        "title",
+        "journal",
+        "reference",
+        "citation",
+        "limit",
+      ];
     case HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY:
-      return ["paper_result_id", "paper_id", "result_id", "doi", "arxiv_id", "arxivId", "source_url", "pdf_url", "full_text_url", "url"];
+      return [
+        "paper_result_id",
+        "paper_id",
+        "result_id",
+        "doi",
+        "arxiv_id",
+        "arxivId",
+        "source_url",
+        "pdf_url",
+        "full_text_url",
+        "url",
+      ];
     case HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY:
-      return ["source_ref", "full_text_observation", "requested_variables", "variables"];
+      return [
+        "source_ref",
+        "full_text_observation",
+        "requested_variables",
+        "variables",
+      ];
     case HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY:
       return ["source_target_intent"];
     case "live_env.query_micro_reasoner_presets":
-      return ["query", "include_presets", "limit", "source_id", "source_ids", "preset_id"];
+      return [
+        "query",
+        "include_presets",
+        "limit",
+        "source_id",
+        "source_ids",
+        "preset_id",
+      ];
     case "live_env.draft_micro_reasoner_preset":
-      return ["base_preset_id", "candidate_prompts", "confidence_threshold", "escalation_mode", "allow_none", "wake_prompt_contract", "wake_contract_prompt", "wake_contract_title"];
+      return [
+        "base_preset_id",
+        "candidate_prompts",
+        "confidence_threshold",
+        "escalation_mode",
+        "allow_none",
+        "wake_prompt_contract",
+        "wake_contract_prompt",
+        "wake_contract_title",
+      ];
     case "live_env.route_micro_reasoner_prompt":
-      return ["candidate_prompts", "confidence_threshold", "escalation_mode", "allow_none", "wake_prompt_contract", "wake_contract_prompt", "wake_contract_title"];
+      return [
+        "candidate_prompts",
+        "confidence_threshold",
+        "escalation_mode",
+        "allow_none",
+        "wake_prompt_contract",
+        "wake_contract_prompt",
+        "wake_contract_title",
+      ];
     case "live_env.query_micro_reasoner_prompts":
     case "live_env.apply_micro_reasoner_preset":
     case "live_env.create_micro_reasoner_preset":
     case "live_env.update_micro_reasoner_prompt":
     case "live_env.test_micro_reasoner_prompt":
-      return ["query", "source_id", "source_ids", "preset_id", "role", "candidate_prompts", "base_preset_id", "scenario_text", "include_presets", "limit"];
+      return [
+        "query",
+        "source_id",
+        "source_ids",
+        "preset_id",
+        "role",
+        "candidate_prompts",
+        "base_preset_id",
+        "scenario_text",
+        "include_presets",
+        "limit",
+      ];
     case "live_env.read_card":
     case "live_env.query_event_log":
     case "live_env.query_world_events":
@@ -291,33 +451,156 @@ const optionalArgsForCapability = (capability: string): string[] => {
     case "live_env.query_job_evidence":
     case "live_env.request_probe":
     case "live_env.record_commentary":
-      return ["environment_id", "room_id", "world_id", "line_keys", "event_types", "title", "summary", "reason", "evidence_refs", "limit"];
+      return [
+        "environment_id",
+        "room_id",
+        "world_id",
+        "line_keys",
+        "event_types",
+        "title",
+        "summary",
+        "reason",
+        "evidence_refs",
+        "limit",
+      ];
     case "live_env.plan_stage_play_job":
     case "live_env.request_stage_play_checkpoint":
-      return ["objective", "objective_text", "room_id", "environment_id", "source_id", "job_id", "reason", "evidence_refs"];
+      return [
+        "objective",
+        "objective_text",
+        "room_id",
+        "environment_id",
+        "source_id",
+        "job_id",
+        "reason",
+        "evidence_refs",
+      ];
     case "live_env.configure_visual_observer_profile":
     case "live_env.apply_visual_observer_profile":
     case "live_env.query_visual_observer_profiles":
     case "live_env.test_visual_observer_profile":
     case "live_env.compare_visual_observer_profiles":
     case "live_env.request_visual_action_replay":
-      return ["profile_id", "profile_ids", "source_id", "source_ids", "title", "domain", "prompt", "summary", "include_presets", "limit"];
+      return [
+        "profile_id",
+        "profile_ids",
+        "source_id",
+        "source_ids",
+        "title",
+        "domain",
+        "prompt",
+        "summary",
+        "include_presets",
+        "limit",
+      ];
     case "live_env.configure_interpreter_profile":
     case "live_env.compare_mail_to_interpreter_profile":
     case "live_env.predict_live_source_immediate":
     case "live_env.compare_live_source_prediction":
     case "live_env.project_live_source_narrative":
-      return ["profile_id", "mail_ids", "narrative_state_id", "policy_id", "job_id", "source_id", "room_id", "environment_id", "objective", "objective_text", "evidence_refs", "limit"];
+      return [
+        "profile_id",
+        "mail_ids",
+        "narrative_state_id",
+        "policy_id",
+        "job_id",
+        "source_id",
+        "room_id",
+        "environment_id",
+        "objective",
+        "objective_text",
+        "evidence_refs",
+        "limit",
+      ];
     case "live_env.query_live_source_quality":
-      return ["source_ref", "source_refs", "source_id", "source_ids", "expected_cadence_ms", "mailbox_thread_id"];
+      return [
+        "source_ref",
+        "source_refs",
+        "source_id",
+        "source_ids",
+        "expected_cadence_ms",
+        "mailbox_thread_id",
+      ];
     case "live_env.summarize_live_source_current_state":
-      return ["source_ref", "source_refs", "source_id", "source_ids", "goal_id", "mail_limit", "limit", "query"];
+      return [
+        "source_ref",
+        "source_refs",
+        "source_id",
+        "source_ids",
+        "goal_id",
+        "mail_limit",
+        "limit",
+        "query",
+      ];
     case "live_env.record_live_source_mail_decision":
-      return ["evidence_refs", "mail_ids", "processed_packet_ids", "wake_request_id", "mailbox_thread_id", "route_metadata"];
+      return [
+        "evidence_refs",
+        "mail_ids",
+        "processed_packet_ids",
+        "wake_request_id",
+        "mailbox_thread_id",
+        "route_metadata",
+      ];
     case "live_env.request_interim_voice_callout":
-      return ["text", "message", "callout_text", "evidence_refs", "wake_request_id", "mailbox_thread_id", "route_metadata", "kind", "max_chars"];
+      return [
+        "text",
+        "message",
+        "callout_text",
+        "evidence_refs",
+        "wake_request_id",
+        "mailbox_thread_id",
+        "route_metadata",
+        "kind",
+        "max_chars",
+      ];
     case "helix_ask.reflect_theory_context":
       return ["source_ref", "source_refs", "refs", "question", "topic"];
+    case THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY:
+      return [
+        "comparison_badge_ids",
+        "target_observable",
+        "scale_min_log10_m",
+        "scale_max_log10_m",
+        "coordinate_frame",
+        "initial_boundary_conditions",
+        "formal_system",
+        "requested_precision",
+        "evidence_maturity_ceiling",
+        "evidence_artifacts",
+        "lanyon_requested",
+        "lanyon_case_id",
+        "procedure_id",
+        "source_target_intent",
+      ];
+    case THEORY_EXPERIMENT_PROCEDURE_READMIT_CAPABILITY:
+      return ["source_target_intent"];
+    case THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY:
+      return ["procedure_artifact_ref", "source_target_intent"];
+    case THEORY_SEMANTIC_ADMITTER_NORMALIZE_CAPABILITY:
+      return ["source_target_intent"];
+    case THEORY_ARTIFACT_PRODUCER_PREPARE_LANYON_REQUEST_CAPABILITY:
+      return ["claim_id", "source_target_intent"];
+    case THEORY_ARTIFACT_PRODUCER_ADMIT_LANYON_CAPABILITY:
+      return ["source_target_intent"];
+    case THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY:
+      return [
+        "semantic_admission_artifact_ref",
+        "artifact_generation_artifact_ref",
+        "claim_id",
+        "formal_artifact_id",
+        "theorem_name",
+        "environment_policy_id",
+        "source_target_intent",
+      ];
+    case THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY:
+    case THEORY_FORMAL_VERIFIER_START_CAPABILITY:
+    case THEORY_INDEPENDENT_NUMERICAL_PREPARE_REQUEST_CAPABILITY:
+    case THEORY_INDEPENDENT_NUMERICAL_PLAN_CAPABILITY:
+    case THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY:
+      return ["source_target_intent"];
+    case THEORY_FORMAL_VERIFIER_READ_RESULT_CAPABILITY:
+    case THEORY_INDEPENDENT_NUMERICAL_READ_RESULT_CAPABILITY:
+      return ["poll_attempt", "source_target_intent"];
     case "theory-badge-graph.propose_frontier_conjectures":
       return [
         "source_ref",
@@ -353,13 +636,38 @@ const optionalArgsForCapability = (capability: string): string[] => {
     case "helix_ask.reflect_context_attachments":
       return ["source_ref", "source_refs", "refs", "question", "topic"];
     case "helix_ask.reflect_ideology_context":
-      return ["inputKind", "refs", "options", "prompt", "source_ref", "source_refs"];
+      return [
+        "inputKind",
+        "refs",
+        "options",
+        "prompt",
+        "source_ref",
+        "source_refs",
+      ];
     case "helix_ask.bridge_theory_ideology_context":
-      return ["source_refs", "refs", "theory_reflection_ref", "ideology_reflection_ref"];
+      return [
+        "source_refs",
+        "refs",
+        "theory_reflection_ref",
+        "ideology_reflection_ref",
+      ];
     case "helix_ask.build_civilization_scenario_frame":
-      return ["refs", "options", "scenario", "scenario_text", "source_ref", "source_refs"];
+      return [
+        "refs",
+        "options",
+        "scenario",
+        "scenario_text",
+        "source_ref",
+        "source_refs",
+      ];
     case "helix_ask.reflect_civilization_bounds":
-      return ["scenarioFrameRef", "source_ref", "source_refs", "refs", "options"];
+      return [
+        "scenarioFrameRef",
+        "source_ref",
+        "source_refs",
+        "refs",
+        "options",
+      ];
     case "visual_analysis.inspect_image_region":
       return ["source_id", "bbox_px"];
     case "image_lens.inspect":
@@ -379,1370 +687,1719 @@ const normalizeExplicitCapabilityContract = (
   contract: ExplicitCapabilityContractDefinition,
 ): ExplicitCapabilityContract => ({
   ...contract,
-  required_args: contract.required_args ?? requiredArgsForCapability(contract.capability),
-  optional_args: contract.optional_args ?? optionalArgsForCapability(contract.capability),
+  required_args:
+    contract.required_args ?? requiredArgsForCapability(contract.capability),
+  optional_args:
+    contract.optional_args ?? optionalArgsForCapability(contract.capability),
 });
 
-const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinition[] = [
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "helix_ask.inspect_capability_catalog",
-    aliases: [
-      "helix.ask.inspect_capability_catalog",
-      "inspect_capability_catalog",
-      "capability_catalog",
-      "capability catalog",
-      "runtime_capability_catalog",
-      "runtime capability catalog",
-      "tool_catalog",
-      "tool catalog",
-    ],
-    capability_family: "capability_catalog",
-    plan_family: "capability_catalog",
-    source_target: "runtime_evidence",
-    admission_families: ["capability_catalog", "runtime_evidence"],
-    required_observation_kinds: ["capability_registry"],
-    required_terminal_kind: "capability_help_summary",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "helix_ask.reflect_workstation_tool_alignment",
-    aliases: [
-      "workstation_tool_alignment",
-      "workstation_tools_matrix",
-      "toolchain_matrix",
-      "tool_regression_matrix",
-      "release_checklist_tools",
-    ],
-    capability_family: "capability_catalog",
-    plan_family: "capability_catalog",
-    source_target: "runtime_evidence",
-    admission_families: ["capability_catalog", "runtime_evidence"],
-    required_observation_kinds: ["capability_registry"],
-    required_terminal_kind: "capability_help_summary",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "runtime_evidence",
-    aliases: ["runtime-evidence", "runtime evidence"],
-    capability_family: "capability_catalog",
-    plan_family: "capability_catalog",
-    source_target: "runtime_evidence",
-    admission_families: ["capability_catalog", "runtime_evidence"],
-    required_observation_kinds: ["capability_registry"],
-    required_terminal_kind: "capability_help_summary",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "debug.inspect_current_turn",
-    aliases: ["debug.inspect-current-turn", "debug_current_turn", "diagnose_debug_or_runtime_evidence"],
-    capability_family: "capability_catalog",
-    plan_family: "capability_catalog",
-    source_target: "runtime_evidence",
-    admission_families: ["runtime_evidence"],
-    required_observation_kinds: ["agent_runtime_loop", "debug_evidence_diagnosis"],
-    required_terminal_kind: "capability_help_summary",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "live_pipeline",
-    aliases: ["live-pipeline", "live_pipeline_control"],
-    capability_family: "live_environment",
-    plan_family: "live_environment",
-    source_target: "live_pipeline",
-    admission_families: ["live_pipeline"],
-    required_observation_kinds: [
-      "live_pipeline_receipt",
-      "visual_producer_cadence_receipt",
-      "tool_observation",
-    ],
-    required_terminal_kind: "workstation_tool_evaluation",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "scientific-calculator.solve_expression",
-    aliases: [
-      "calculator",
-      "calculator.solve_expression",
-      "calculator solve expression",
-      "calculator_stream",
-      "calculator stream",
-      "scientific-calculator",
-      "scientific calculator",
-      "solve expression",
-    ],
-    capability_family: "calculator",
-    plan_family: "workstation_action",
-    source_target: "calculator_stream",
-    admission_families: ["calculator", "workstation_action"],
-    required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
-    required_terminal_kind: "workstation_tool_evaluation",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "scientific-calculator.solve_with_steps",
-    aliases: ["calculator.solve_with_steps", "scientific calculator solve with steps", "solve with calculator steps"],
-    capability_family: "calculator",
-    plan_family: "workstation_action",
-    source_target: "calculator_stream",
-    admission_families: ["calculator", "workstation_action"],
-    required_observation_kinds: ["calculator_receipt", "calculator_subgoal_receipt", "workstation_tool_evaluation"],
-    required_terminal_kind: "workstation_tool_evaluation",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "scientific-calculator.solve",
-    aliases: ["calculator.solve", "scientific calculator solve"],
-    capability_family: "calculator",
-    plan_family: "workstation_action",
-    source_target: "calculator_stream",
-    admission_families: ["calculator", "workstation_action"],
-    required_observation_kinds: ["calculator_receipt", "calculator_subgoal_receipt", "workstation_tool_evaluation"],
-    required_terminal_kind: "workstation_tool_evaluation",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "scientific-calculator.open",
-    aliases: ["calculator.open", "open scientific calculator", "open calculator"],
-    capability_family: "calculator",
-    plan_family: "workstation_action",
-    source_target: "calculator_stream",
-    admission_families: ["calculator", "workstation_action"],
-    required_observation_kinds: ["workspace_action_receipt"],
-    required_terminal_kind: "workstation_tool_evaluation",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "scientific-calculator.start_equation_live_source",
-    aliases: ["calculator.start_equation_live_source", "calculator live source", "start equation live source"],
-    capability_family: "calculator",
-    plan_family: "workstation_action",
-    source_target: "calculator_stream",
-    admission_families: ["calculator", "workstation_action"],
-    required_observation_kinds: ["workspace_action_receipt", "calculator_live_source_status"],
-    required_terminal_kind: "workstation_tool_evaluation",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "workspace_os.status",
-    aliases: [
-      "workspace_status",
-      "workspace status",
-      "workspace_diagnostic",
-      "workspace diagnostic",
-      "workspace_os status",
-      "workspace_os_status",
-      "workspace os status",
-      "workstation status",
-      "workstation diagnostic",
-    ],
-    capability_family: "workspace_diagnostic",
-    plan_family: "workspace_diagnostic",
-    source_target: "workspace_diagnostic",
-    admission_families: ["workspace_diagnostic"],
-    required_observation_kinds: ["workspace_os_status_observation"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["debug.inspect_current_turn", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "docs-viewer.open",
-    aliases: [
-      "docs_viewer.open",
-      "docs_viewer open",
-      "docs_viewer to open",
-      "docs viewer open",
-      "docs viewer to open",
-    ],
-    capability_family: "docs_viewer",
-    plan_family: "docs",
-    source_target: "docs_viewer",
-    admission_families: ["docs_viewer"],
-    required_observation_kinds: ["doc_open_receipt", "docs_viewer_receipt"],
-    required_terminal_kind: "doc_open_receipt",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "docs-viewer.identify_current_doc",
-    aliases: ["docs_viewer.identify_current_doc", "docs viewer identify current doc", "identify current doc"],
-    capability_family: "docs_viewer",
-    plan_family: "docs",
-    source_target: "docs_viewer",
-    admission_families: ["docs_viewer"],
-    required_observation_kinds: ["active_doc_identity", "doc_open_receipt", "docs_viewer_receipt"],
-    required_terminal_kind: "doc_open_receipt",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "docs-viewer.search_docs",
-    runtime_capability: HELIX_DOCS_SEARCH_CAPABILITY,
-    aliases: ["docs_viewer.search_docs", "docs viewer search docs", "search docs"],
-    capability_family: "docs_viewer",
-    plan_family: "docs",
-    source_target: "docs_viewer",
-    admission_families: ["docs_viewer"],
-    required_observation_kinds: ["doc_search_results", "retrieval_context"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["docs-viewer.summarize_doc", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "docs-viewer.validate_doc_candidates",
-    aliases: ["docs_viewer.validate_doc_candidates", "docs viewer validate candidates", "validate doc candidates"],
-    capability_family: "docs_viewer",
-    plan_family: "docs",
-    source_target: "docs_viewer",
-    admission_families: ["docs_viewer"],
-    required_observation_kinds: ["doc_candidate_validation"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["docs-viewer.summarize_doc", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "docs-viewer.open_doc_by_path",
-    runtime_capability: HELIX_DOCS_OPEN_DOC_CAPABILITY,
-    aliases: ["docs_viewer.open_doc_by_path", "docs viewer open doc by path", "open doc by path"],
-    capability_family: "docs_viewer",
-    plan_family: "docs",
-    source_target: "docs_viewer",
-    admission_families: ["docs_viewer"],
-    required_observation_kinds: ["doc_open_receipt"],
-    required_terminal_kind: "doc_open_receipt",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "docs-viewer.locate_in_doc",
-    runtime_capability: HELIX_DOCS_SEARCH_CAPABILITY,
-    aliases: [
-      "docs_viewer.locate_in_doc",
-      "docs_viewer locate",
-      "docs_viewer to locate",
-      "docs viewer locate",
-      "docs viewer to locate",
-      "docs_viewer cite",
-      "docs_viewer to cite",
-      "docs viewer cite",
-      "docs viewer to cite",
-    ],
-    capability_family: "docs_viewer",
-    plan_family: "docs",
-    source_target: "docs_viewer",
-    admission_families: ["docs_viewer"],
-    required_observation_kinds: ["doc_location_result", "doc_location_matches", "doc_evidence_location"],
-    required_terminal_kind: "doc_location_matches",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["docs-viewer.summarize_doc", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "docs-viewer.summarize_doc",
-    runtime_capability: HELIX_DOCS_SEARCH_CAPABILITY,
-    aliases: [
-      "docs_viewer.summarize_doc",
-      "docs_viewer summarize",
-      "docs_viewer to summarize",
-      "docs viewer summarize",
-      "docs viewer to summarize",
-    ],
-    capability_family: "docs_viewer",
-    plan_family: "docs",
-    source_target: "docs_viewer",
-    admission_families: ["docs_viewer"],
-    required_observation_kinds: ["doc_summary", "observation_review"],
-    required_terminal_kind: "doc_summary",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["docs-viewer.locate_in_doc", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "docs-viewer.doc_equation_context",
-    runtime_capability: HELIX_DOCS_SEARCH_CAPABILITY,
-    aliases: [
-      "docs_viewer.doc_equation_context",
-      "docs_viewer equation context",
-      "docs_viewer to inspect equation context",
-      "docs viewer equation context",
-      "docs viewer to inspect equation context",
-    ],
-    capability_family: "docs_viewer",
-    plan_family: "docs",
-    source_target: "docs_viewer",
-    admission_families: ["docs_viewer"],
-    required_observation_kinds: ["doc_equation_context"],
-    required_terminal_kind: "doc_equation_context",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "repo-code.search_concept",
-    aliases: [
-      "repo_code.search_concept",
-      "repo code search concept",
-      "repo_code",
-      "repo code",
-      "repo_evidence",
-      "repository code",
-    ],
-    capability_family: "repo_code",
-    plan_family: "repo_evidence",
-    source_target: "repo_code",
-    admission_families: ["repo_code"],
-    required_observation_kinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate"],
-    required_terminal_kind: "repo_code_evidence_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["docs-viewer.locate_in_doc", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "workspace-directory.resolve",
-    aliases: [
-      "workspace_directory.resolve",
-      "workspace directory resolve",
-      "workspace_directory",
-      "workspace directory",
-      "workspace_directory_resolution",
-      "workspace directory resolution",
-    ],
-    capability_family: "workspace_directory",
-    plan_family: "workspace_directory",
-    source_target: "workspace_directory",
-    admission_families: ["workspace_directory"],
-    required_observation_kinds: ["workspace_directory_resolution"],
-    required_terminal_kind: "workspace_directory_resolution",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "internet_search.web_research",
-    runtime_capability: HELIX_INTERNET_SEARCH_CAPABILITY,
-    aliases: [
-      HELIX_INTERNET_SEARCH_CAPABILITY,
-      "internet_search",
-      "internet search",
-      "web_research",
-      "web research",
-      "web.search",
-      "web search",
-    ],
-    capability_family: "internet_search",
-    plan_family: "internet_search",
-    source_target: "internet_search",
-    admission_families: ["internet_search"],
-    required_observation_kinds: ["internet_search_observation"],
-    required_terminal_kind: "internet_search_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
-    aliases: [
-      "research_library.read_document",
-      "research library",
-      "saved full-text evidence",
-      "saved full text evidence",
-      "existing full-text evidence",
-      "existing full text evidence",
-      "saved research extraction",
-    ],
-    capability_family: "scholarly_research",
-    plan_family: "scholarly_research",
-    source_target: "research_library",
-    admission_families: ["scholarly_research"],
-    required_observation_kinds: ["research_library_observation"],
-    required_terminal_kind: "scholarly_research_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: [
-      HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-      HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
-      "internet_search.web_research",
-      "model.direct_answer",
-    ],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
-    aliases: [
-      "research_library.apply_evidence_enrichment",
-      "apply paper evidence enrichment",
-      "persist paper evidence enrichment",
-    ],
-    capability_family: "scholarly_research",
-    plan_family: "scholarly_research",
-    source_target: "research_library",
-    admission_families: ["scholarly_research"],
-    required_observation_kinds: ["paper_evidence_enrichment_observation"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: [
-      "scientific-calculator.solve_expression",
-      "theory-badge-graph.reflect_discussion_context",
-      "model.direct_answer",
-    ],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-    aliases: [
-      "scholarly_research.lookup_papers",
-      "scholarly_research",
-      "scholarly research",
-      "scholarly research lookup",
-      "lookup_papers",
-    ],
-    capability_family: "scholarly_research",
-    plan_family: "scholarly_research",
-    source_target: "scholarly_research",
-    admission_families: ["scholarly_research"],
-    required_observation_kinds: ["scholarly_research_observation"],
-    required_terminal_kind: "scholarly_research_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
-    aliases: [
-      "scholarly_research.fetch_full_text",
-      "scholarly research fetch full text",
-      "fetch_full_text",
-      "fetch full text",
-      "scholarly_full_text",
-      "scholarly full text",
-      "scholarly research full text",
-    ],
-    capability_family: "scholarly_research",
-    plan_family: "scholarly_research",
-    source_target: "scholarly_research",
-    admission_families: ["scholarly_research"],
-    required_observation_kinds: ["scholarly_full_text_observation"],
-    required_terminal_kind: "scholarly_research_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
-    aliases: [
-      "scholarly_research.extract_numeric_parameters",
-      "scholarly research extract numeric parameters",
-      "extract_numeric_parameters",
-      "extract numeric parameters",
-      "numeric_parameter_extraction",
-      "numeric parameter extraction",
-      "scholarly numeric parameters",
-    ],
-    capability_family: "scholarly_research",
-    plan_family: "scholarly_research",
-    source_target: "scholarly_research",
-    admission_families: ["scholarly_research"],
-    required_observation_kinds: ["scholarly_numeric_parameter_observation"],
-    required_terminal_kind: "scholarly_research_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
-  },
-  liveSourceMailEvidenceContract({
-    capability: "live_env.query_micro_reasoner_presets",
-    aliases: [
-      "microdeck",
-      "micro_reasoner_presets",
-      "micro reasoner presets",
-      "micro reasoner preset catalog",
-      "earbud_microdeck",
-      "audio_transcript_microdeck",
-      "earbud_translation_presets",
-      "stage_play_micro_reasoner_prompt_preset_query_result/v1",
-    ],
-    requiredObservationKinds: ["stage_play_micro_reasoner_prompt_preset_query_result"],
-  }),
-  liveSourceMailEvidenceContract({
-    capability: "live_env.draft_micro_reasoner_preset",
-    aliases: [
-      "microdeck_draft",
-      "micro_reasoner_preset_draft",
-      "micro reasoner preset draft",
-      "draft micro reasoner preset",
-      "earbud_microdeck_draft",
-      "audio_translation_preset_draft",
-      "stage_play_micro_reasoner_prompt_preset_draft/v1",
-    ],
-    requiredObservationKinds: ["stage_play_micro_reasoner_prompt_preset_draft"],
-  }),
-  liveSourceMailEvidenceContract({
-    capability: "live_env.route_micro_reasoner_prompt",
-    aliases: [
-      "microdeck_prompt_router",
-      "microdeck prompt router",
-      "micro reasoner prompt router",
-      "prompt_delegation",
-      "stage_play_micro_reasoner_prompt_delegation_result/v1",
-    ],
-    requiredObservationKinds: ["stage_play_micro_reasoner_prompt_delegation_result"],
-  }),
-  liveSourceMailEvidenceContract({
-    capability: "live_env.query_micro_reasoner_prompts",
-    aliases: [
-      "micro_reasoner_prompts",
-      "micro reasoner prompts",
-      "stage_play_micro_reasoner_prompt/v1",
-    ],
-    requiredObservationKinds: ["stage_play_micro_reasoner_prompt"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.apply_micro_reasoner_preset",
-    aliases: ["apply_micro_reasoner_preset", "apply micro reasoner preset"],
-    requiredObservationKind: "stage_play_micro_reasoner_prompt_preset",
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.create_micro_reasoner_preset",
-    aliases: ["create_micro_reasoner_preset", "create micro reasoner preset"],
-    requiredObservationKind: "stage_play_micro_reasoner_prompt_preset",
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.update_micro_reasoner_prompt",
-    aliases: ["update_micro_reasoner_prompt", "update micro reasoner prompt"],
-    requiredObservationKind: "stage_play_micro_reasoner_prompt",
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.test_micro_reasoner_prompt",
-    aliases: ["test_micro_reasoner_prompt", "test micro reasoner prompt"],
-    requiredObservationKind: "stage_play_micro_reasoner_prompt_test",
-  }),
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "live_env.check_live_source_mail",
-    aliases: [
-      "check_live_source_mail",
-      "live_source_mail.check",
-      "live_source_mail check",
-      "live_source_mail to check",
-      "live source mail check",
-      "live source mail to check",
-      "live source mailbox check",
-      "live source mailbox to check",
-      "check live source mail",
-      "check live source mailbox",
-      "check source mail",
-      "check mailbox",
-    ],
-    capability_family: "live_source_mail",
-    plan_family: "live_environment",
-    source_target: "live_source_mailbox",
-    admission_families: ["live_environment"],
-    required_observation_kinds: ["stage_play_live_source_mail_read_result"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "live_env.read_live_source_mail",
-    aliases: [
-      "read_live_source_mail",
-      "live_source_mail.read_raw",
-      "live_source_mail raw read",
-      "live_source_mail read raw",
-      "live_source_mail to read raw",
-      "live source mail raw read",
-      "live source mail read raw",
-      "live source mail to read raw",
-      "live source mailbox raw read",
-      "live source mailbox read raw",
-      "live source mailbox to read raw",
-      "raw live source mail",
-      "raw mail",
-      "read raw mail",
-      "unprocessed live source mail",
-      "debug live source mail",
-    ],
-    capability_family: "live_source_mail",
-    plan_family: "live_environment",
-    source_target: "live_source_mailbox",
-    admission_families: ["live_environment"],
-    required_observation_kinds: ["stage_play_live_source_mail_read_result"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "live_env.read_processed_live_source_mail",
-    aliases: [
-      "read_processed_live_source_mail",
-      "processed_live_source_mail",
-      "live_source_mail.read_processed",
-      "live_source_mail read",
-      "live_source_mail to read",
-      "live source mail read",
-      "live source mail to read",
-      "live source mailbox read",
-      "live source mailbox to read",
-    ],
-    capability_family: "live_source_mail",
-    plan_family: "live_environment",
-    source_target: "live_source_mailbox",
-    admission_families: ["live_environment"],
-    required_observation_kinds: ["stage_play_processed_mail_packet"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "live_env.process_live_source_mail",
-    aliases: [
-      "process_live_source_mail",
-      "live_source_mail.process",
-      "live_source_mail process",
-      "live_source_mail to process",
-      "live source mail process",
-      "live source mail to process",
-      "live source mailbox process",
-      "live source mailbox to process",
-    ],
-    capability_family: "live_source_mail",
-    plan_family: "live_environment",
-    source_target: "live_source_mailbox",
-    admission_families: ["live_environment"],
-    required_observation_kinds: ["stage_play_live_source_mail_read_result", "stage_play_processed_mail_packet"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
-  },
-  liveSourceMailEvidenceContract({
-    capability: "live_env.query_live_source_quality",
-    aliases: ["live_source_quality", "source_freshness", "stage_play_live_source_quality/v1"],
-    requiredObservationKinds: [
-      "stage_play_live_source_quality",
-      "helix.workstation_goal_context_update.v1",
-    ],
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.query_workstation_goal_context",
-    aliases: [
-      "workstation_goal_context",
-      "goal_context_updates",
-      "agent_goal_sessions",
-      "active_goals",
-      "active_goal_sessions",
-      "agent_goal_context",
-      "stage_play_workstation_goal_context_read_result/v1",
-    ],
-    requiredObservationKinds: [
-      "stage_play_workstation_goal_context_read_result",
-      "helix.agent_goal_session.v1",
-    ],
-  }),
-  liveSourceMailEvidenceContract({
-    capability: "live_env.summarize_live_source_current_state",
-    aliases: [
-      "live_answer_state",
-      "live_source_current_state",
-      "stage_play_live_source_current_state/v1",
-    ],
-    requiredObservationKinds: [
-      "stage_play_live_source_current_state",
-      "helix.workstation_goal_context_update.v1",
-    ],
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.read_card",
-    aliases: ["read_card", "live_card", "live card"],
-    requiredObservationKind: "live_environment_tool_observation",
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.query_event_log",
-    aliases: ["query_event_log", "event_log", "live event log"],
-    requiredObservationKind: "live_environment_tool_observation",
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.query_world_events",
-    aliases: ["query_world_events", "world_events", "world events"],
-    requiredObservationKind: "live_environment_tool_observation",
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.query_navigation_state",
-    aliases: ["query_navigation_state", "navigation_state", "navigation state"],
-    requiredObservationKind: "live_environment_tool_observation",
-  }),
-  liveEnvironmentEvidenceContract({
-    capability: "live_env.plan_stage_play_job",
-    aliases: ["plan_stage_play_job", "stage play job plan"],
-    requiredObservationKinds: ["stage_play_job_plan"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.configure_visual_observer_profile",
-    aliases: ["configure_visual_observer_profile", "visual_observer_profile", "visual observer profile"],
-    requiredObservationKind: "stage_play_visual_observer_profile",
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.apply_visual_observer_profile",
-    aliases: ["apply_visual_observer_profile", "apply visual observer profile", "apply visual observer shades"],
-    requiredObservationKind: "stage_play_visual_observer_profile",
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.query_visual_observer_profiles",
-    aliases: ["query_visual_observer_profiles", "visual observer profiles", "visual observer shades"],
-    requiredObservationKind: "stage_play_visual_observer_profile",
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.test_visual_observer_profile",
-    aliases: ["test_visual_observer_profile", "test visual observer profile"],
-    requiredObservationKind: "stage_play_visual_observer_profile_test",
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.compare_visual_observer_profiles",
-    aliases: ["compare_visual_observer_profiles", "compare visual observer profiles"],
-    requiredObservationKind: "stage_play_visual_observer_profile_test",
-  }),
-  liveEnvironmentEvidenceContract({
-    capability: "live_env.request_visual_action_replay",
-    aliases: ["request_visual_action_replay", "visual action replay"],
-    requiredObservationKinds: ["helix_visual_frame_action_replay_request"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.configure_interpreter_profile",
-    aliases: ["configure_interpreter_profile", "interpreter profile"],
-    requiredObservationKind: "stage_play_live_source_interpreter_profile",
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.compare_mail_to_interpreter_profile",
-    aliases: ["compare_mail_to_interpreter_profile", "mail interpreter profile comparison"],
-    requiredObservationKind: "stage_play_live_source_interpreter_profile_comparison",
-  }),
-  liveEnvironmentEvidenceContract({
-    capability: "live_env.request_stage_play_checkpoint",
-    aliases: ["request_stage_play_checkpoint", "stage play checkpoint"],
-    requiredObservationKinds: ["stage_play_checkpoint_request"],
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.predict_live_source_immediate",
-    aliases: ["predict_live_source_immediate", "predict live source immediate"],
-    requiredObservationKind: "helix_live_source_immediate_prediction",
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.compare_live_source_prediction",
-    aliases: ["compare_live_source_prediction", "compare live source prediction"],
-    requiredObservationKind: "helix_live_source_prediction_comparison",
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.project_live_source_narrative",
-    aliases: ["project_live_source_narrative", "live source narrative state"],
-    requiredObservationKind: "stage_play_live_source_narrative_state",
-  }),
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "live_env.reflect_live_source_mail_loop",
-    aliases: [
-      "reflect_live_source_mail_loop",
-      "live_source_mail.reflect",
-      "live_source_mail reflect",
-      "live_source_mail to reflect",
-      "live source mail reflect",
-      "live source mail to reflect",
-      "live source mailbox reflect",
-      "live source mailbox to reflect",
-      "live_source_mail_loop_reflection",
-      "mailbox loop reflection",
-    ],
-    capability_family: "live_source_mail",
-    plan_family: "live_environment",
-    source_target: "live_source_mailbox",
-    admission_families: ["live_environment"],
-    required_observation_kinds: ["stage_play_live_source_mail_loop_reflection"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "live_env.reflect_stage_play_context",
-    aliases: ["reflect_stage_play_context", "stage_play_reflection"],
-    capability_family: "live_environment",
-    plan_family: "live_environment",
-    source_target: "live_environment",
-    admission_families: ["live_environment"],
-    required_observation_kinds: ["live_environment_tool_observation", "stage_play_reflection_result"],
-    required_terminal_kind: "direct_answer_text",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: [
-      "live_env.configure_live_source_watch_job",
-      "live_env.read_processed_live_source_mail",
-      "live_env.read_live_source_mail",
-      "situation-room.describe_visual_capture",
-      "model.direct_answer",
-    ],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "live_env.narrator_say",
-    aliases: ["narrator.say", "narrator_say"],
-    capability_family: "live_environment",
-    plan_family: "live_environment",
-    source_target: "live_environment",
-    admission_families: ["live_environment", "workstation_action"],
-    required_observation_kinds: ["live_environment_tool_observation", "helix.narrator_say_request.v1"],
-    required_terminal_kind: "workstation_tool_evaluation",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: [
-      "live_env.narrator_bind_stream",
-      "live_env.read_processed_live_source_mail",
-      "live_env.read_live_source_mail",
-      "model.direct_answer",
-    ],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "live_env.narrator_bind_stream",
-    aliases: ["narrator.bind_stream", "narrator_bind_stream"],
-    capability_family: "live_environment",
-    plan_family: "live_environment",
-    source_target: "live_environment",
-    admission_families: ["live_environment", "workstation_action"],
-    required_observation_kinds: ["live_environment_tool_observation", "helix.narrator_bind_stream_request.v1"],
-    required_terminal_kind: "workstation_tool_evaluation",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: [
-      "live_env.narrator_say",
-      "live_env.read_processed_live_source_mail",
-      "live_env.read_live_source_mail",
-      "model.direct_answer",
-    ],
-  },
-  liveEnvironmentControlContract({
-    capability: "live_env.change_workstation_preset",
-    aliases: ["change_workstation_preset", "change_preset"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.set_visual_preset",
-    aliases: ["set_visual_preset", "visual_preset"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.set_audio_preset",
-    aliases: ["set_audio_preset", "audio_preset"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.bind_workstation_source",
-    aliases: ["bind_workstation_source", "bind_source"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.unbind_workstation_source",
-    aliases: ["unbind_workstation_source", "unbind_source"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.pause_workstation_loop",
-    aliases: ["pause_workstation_loop", "pause_loop"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.resume_workstation_loop",
-    aliases: ["resume_workstation_loop", "resume_loop"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.set_workstation_loop_state",
-    aliases: ["set_workstation_loop_state", "set_loop_state"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.configure_route_watch",
-    aliases: ["configure_route_watch", "route_watch_policy"],
-    requiredObservationKind: "stage_play_live_source_watch_job_policy_config_result",
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.configure_live_source_watch_job",
-    aliases: ["configure_live_source_watch_job", "live_source_watch_job", "watch_job_policy"],
-    requiredObservationKind: "stage_play_live_source_watch_job_policy_config_result",
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.repair_loop",
-    aliases: ["repair_loop"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.repair_workstation_source",
-    aliases: ["repair_workstation_source", "repair_source"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.update_live_answer_projection",
-    aliases: ["update_live_answer_projection", "update_live_answer"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.focus_process_graph",
-    aliases: ["focus_process_graph"],
-  }),
-  liveEnvironmentControlContract({
-    capability: "live_env.start_agent_goal_session",
-    aliases: ["start_agent_goal_session"],
-    requiredObservationKind: "stage_play_agent_goal_session_tool_result",
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.query_constructs",
-    aliases: ["query_constructs", "situation room constructs"],
-    requiredObservationKind: "live_environment_tool_observation",
-  }),
-  liveEnvironmentQueryContract({
-    capability: "live_env.query_job_evidence",
-    aliases: ["query_job_evidence", "live job evidence"],
-    requiredObservationKind: "live_environment_tool_observation",
-  }),
-  liveEnvironmentEvidenceContract({
-    capability: "live_env.request_probe",
-    aliases: ["request_probe", "bounded live evidence probe"],
-  }),
-  liveEnvironmentEvidenceContract({
-    capability: "live_env.record_commentary",
-    aliases: ["record_commentary", "live evidence commentary"],
-  }),
-  liveEnvironmentEvidenceContract({
-    capability: "live_env.spawn_field_worker",
-    aliases: ["spawn_field_worker", "spawn field worker"],
-  }),
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "live_env.evaluate_goal_satisfaction",
-    aliases: ["evaluate_goal_satisfaction", "goal_satisfaction"],
-    capability_family: "live_environment",
-    plan_family: "live_environment",
-    source_target: "live_environment",
-    admission_families: ["live_environment"],
-    required_observation_kinds: ["live_environment_tool_observation", "helix.live_environment_goal_satisfaction.v1"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: [
-      "live_env.start_agent_goal_session",
-      "live_env.read_processed_live_source_mail",
-      "live_env.read_live_source_mail",
-      "model.direct_answer",
-    ],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "live_env.record_live_source_mail_decision",
-    capability_family: "live_source_decision",
-    plan_family: "live_environment",
-    source_target: "live_source_mailbox",
-    admission_families: ["live_environment", "workstation_action"],
-    required_observation_kinds: [
-      "stage_play_processed_mail_packet",
-      "stage_play_live_source_mail_decision",
-    ],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "live_env.request_interim_voice_callout",
-    capability_family: "voice_delivery",
-    plan_family: "live_environment",
-    source_target: "live_environment",
-    admission_families: ["live_environment", "workstation_action"],
-    required_observation_kinds: [
-      "stage_play_live_source_mail_decision",
-      "live_source_interim_voice_callout_receipt",
-      "voice_hold_receipt",
-      "voice_block_receipt",
-      "voice_receipt",
-    ],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "text_to_speech.speak_text",
-    aliases: ["speak_text", "text_to_speech", "voice_delivery.speak_text"],
-    capability_family: "voice_delivery",
-    plan_family: "live_environment",
-    source_target: "voice_delivery",
-    admission_families: ["live_environment", "workstation_action"],
-    required_observation_kinds: [
-      "capability_lane_observation_packet",
-      "helix.agent_step_observation_packet.v1",
-    ],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: ["live_env.request_interim_voice_callout"],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-    required_args: ["text"],
-    optional_args: ["voice", "profile", "locale", "source_observation_ref"],
-  },
-  ...WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS.map((spec) => liveEnvironmentQueryContract({
-    capability: spec.capability,
-    aliases: [...spec.aliases],
-    requiredObservationKind: spec.explicitRequiredObservationKind,
-  })),
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "helix_ask.reflect_theory_context",
-    aliases: [
-      "theory-badge-graph.reflect_discussion_context",
-      "reflect_discussion_context",
-      "reflect_theory_context",
-      "theory_context",
-      "theory_context_reflection",
-      "theory_locator",
-      "theory_badge_graph",
-      "theory badge graph",
-    ],
-    capability_family: "theory_locator",
-    plan_family: "theory_locator",
-    source_target: "theory_locator",
-    admission_families: ["theory_locator"],
-    required_observation_kinds: ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"],
-    required_terminal_kind: "theory_context_reflection_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "helix.theory.frontierVectorFieldTrace",
-    aliases: [
-      "frontierVectorFieldTrace",
-      "frontier_vector_field_trace",
-      "theory_frontier_vector_field",
-      "theory_frontier_vector_field_trace",
-      "badge_coordinate_vector_trace",
-      "relation_tensor_trace",
-    ],
-    capability_family: "theory_locator",
-    plan_family: "theory_locator",
-    source_target: "theory_locator",
-    admission_families: ["theory_locator"],
-    required_observation_kinds: [
-      "helix_theory_frontier_vector_field_tool_receipt",
-      "theory_frontier_vector_field",
-    ],
-    required_terminal_kind: "theory_context_reflection_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "theory-badge-graph.propose_frontier_conjectures",
-    aliases: [
-      "propose_frontier_conjectures",
-      "theory_frontier_conjectures",
-      "frontier_conjecture_workbench",
-      "bounded_conjecture_workbench",
-      "theory_badge_graph_conjecture_workbench",
-    ],
-    capability_family: "theory_locator",
-    plan_family: "theory_locator",
-    source_target: "theory_locator",
-    admission_families: ["theory_locator"],
-    required_observation_kinds: [
-      "theory_frontier_conjecture_observation",
-      "theory_frontier_search",
-      "theory_frontier_candidate",
-      "helix_theory_context_reflection_tool_receipt",
-    ],
-    required_terminal_kind: "theory_context_reflection_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  contextReflectionEvidenceContract({
-    capability: "helix_ask.reflect_live_synthetic_data",
-    aliases: [
-      "live_synthetic_data_reflection",
-      "live_answer_synthetic_data",
-      "microdeck_reflection",
-      "macro_reasoner_deck_reflection",
-      "mail_loop_synthetic_data",
-      "live_answer_prediction_review",
-    ],
-    requiredObservationKinds: [
-      "helix_context_reflection_tool_receipt/v1",
-      "bounded_context_reference",
-    ],
-  }),
-  contextReflectionEvidenceContract({
-    capability: "helix_ask.reflect_context_attachments",
-    aliases: [
-      "context_reflection.attachments",
-      "context_reflection attachments",
-      "context_reflection to inspect attachments",
-      "context_attachment_reflection",
-      "context_binding_reflection",
-      "dragged_cutout_context",
-      "selected_ui_region",
-      "selected_context_refs",
-      "helix_context_reflection_tool_receipt/v1",
-    ],
-    requiredObservationKinds: [
-      "helix_context_reflection_tool_receipt/v1",
-      "context_attachment",
-      "bounded_context_reference",
-    ],
-  }),
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "moral-graph.reflect_context",
-    aliases: [
-      "helix_ask.reflect_moral_graph",
-      "moral_badge_locator",
-      "moral_graph_reflection",
-      "moral graph reflection",
-      "moral_graph",
-      "moral graph",
-    ],
-    capability_family: "moral_graph_reflection",
-    plan_family: "moral_graph_reflection",
-    source_target: "moral_graph",
-    admission_families: ["workstation_action"],
-    required_observation_kinds: [
-      "moral_graph_reflection",
-      "helix.moral_graph_reflection_observation.v1",
-      "ideology_context_reflection/v1",
-      "procedural_moral_classification/v1",
-    ],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "helix_ask.reflect_ideology_context",
-    aliases: [
-      "reflect_ideology_context",
-      "ideology_context_reflection",
-    ],
-    capability_family: "moral_graph_reflection",
-    plan_family: "moral_graph_reflection",
-    source_target: "workspace_action",
-    admission_families: ["workstation_action"],
-    required_observation_kinds: [
-      "ideology_context_reflection/v1",
-      "procedural_moral_classification/v1",
-      "helix_moral_graph_reflection_tool_result",
-      "workstation_tool_evaluation",
-    ],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "moral-graph.reflect_living_substrate_context",
-    aliases: [
-      "moral_living_substrate_reflection",
-      "moral living substrate reflection",
-      "living_substrate_moral_reflection",
-      "living substrate moral reflection",
-      "reflect_living_substrate_context",
-      "reflect living substrate context",
-    ],
-    capability_family: "context_reflection",
-    plan_family: "context_reflection",
-    source_target: "moral_graph",
-    admission_families: ["context_reflection"],
-    required_observation_kinds: [
-      "moral_living_substrate_reflection",
-      "helix.moral_living_substrate_reflection_observation.v1",
-    ],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["helix_ask.reflect_ideology_context", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "helix_ask.bridge_theory_ideology_context",
-    aliases: [
-      "bridge_theory_ideology_context",
-      "bridge theory ideology context",
-      "bridge theory and ideology context",
-      "theory_ideology_bridge",
-      "theory ideology bridge",
-      "theory_moral_bridge",
-      "theory moral bridge",
-    ],
-    capability_family: "moral_graph_reflection",
-    plan_family: "moral_graph_reflection",
-    source_target: "workspace_action",
-    admission_families: ["workstation_action"],
-    required_observation_kinds: ["helix_theory_ideology_bridge_tool_result", "theory_ideology_bridge"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "helix_ask.build_civilization_scenario_frame",
-    aliases: [
-      "build_civilization_scenario_frame",
-      "build civilization scenario frame",
-      "civilization_scenario_frame",
-      "civilization scenario frame",
-    ],
-    capability_family: "civilization_bounds",
-    plan_family: "civilization_bounds",
-    source_target: "workspace_action",
-    admission_families: ["workstation_action"],
-    required_observation_kinds: ["civilization_scenario_frame/v1", "helix_civilization_scenario_frame_tool_result"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "helix_ask.reflect_civilization_bounds",
-    aliases: [
-      "reflect_civilization_bounds",
-      "reflect civilization bounds",
-      "civilization_bounds",
-      "civilization bounds",
-      "civilization_bounds_reflection",
-      "civilization bounds reflection",
-      "civilization_bounds_roadmap/v1",
-    ],
-    capability_family: "civilization_bounds",
-    plan_family: "civilization_bounds",
-    source_target: "workspace_action",
-    admission_families: ["workstation_action"],
-    required_observation_kinds: ["civilization_bounds_roadmap/v1", "helix_civilization_bounds_tool_result"],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "visual_analysis.inspect_image_region",
-    aliases: [
-      "image lens pdf page",
-      "image lens page",
-      "image lens crop",
-      "image lens region",
-      "image lens observation",
-      "pdf page crop",
-      "exact equation row",
-      "equation row crop",
-      "crop ref",
-      "bbox",
-      "bounding box",
-    ],
-    capability_family: "visual_capture",
-    plan_family: "visual_capture",
-    source_target: "visual_capture",
-    admission_families: ["situation_run"],
-    required_observation_kinds: [
-      "capability_lane_observation_packet",
-      "visual_analysis.inspect_image_region",
-      "scientific_image_evidence_sidecar",
-    ],
-    required_terminal_kind: "image_lens_observation_report",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: [
-      "situation-room.describe_visual_capture",
-      "docs-viewer.locate_in_doc",
-      "repo-code.search_concept",
-      "model.direct_answer",
-    ],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "image_lens.inspect",
-    runtime_capability: "situation-room.describe_visual_capture",
-    aliases: [
-      "image_lens",
-      "image lens",
-      "image-lens",
-      "visual_capture",
-      "visual capture",
-      "visual capture inspect",
-      "situation-room.describe_visual_capture",
-      "situation room visual capture",
-      "image lens inspect",
-    ],
-    capability_family: "visual_capture",
-    plan_family: "visual_capture",
-    source_target: "visual_capture",
-    admission_families: ["situation_run"],
-    required_observation_kinds: ["visual_frame_evidence", "situation_context_pack", "visual_capture_coverage"],
-    required_terminal_kind: "situation_context_pack",
-    allowed_substitutions: ["situation-room.describe_visual_capture"],
-    forbidden_nearby_capabilities: ["docs-viewer.locate_in_doc", "repo-code.search_concept", "model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "workstation-notes.append_to_note",
-    aliases: ["workstation-notes.append", "workstation notes append"],
-    capability_family: "workstation",
-    plan_family: "workstation_action",
-    source_target: "workspace_action",
-    admission_families: ["notes", "workstation_action"],
-    required_observation_kinds: [
-      "workspace_action_receipt",
-      "note_update_receipt",
-      "note_action_receipt",
-    ],
-    required_terminal_kind: "model_synthesized_answer",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "workstation-notes.create_note",
-    aliases: ["workstation-notes.create", "workstation notes create", "create workstation note"],
-    capability_family: "workstation",
-    plan_family: "workstation_action",
-    source_target: "workspace_action",
-    admission_families: ["notes", "workstation_action"],
-    required_observation_kinds: [
-      "workspace_action_receipt",
-      "note_update_receipt",
-    ],
-    required_terminal_kind: "note_update_receipt",
-    allowed_substitutions: ["workstation-notes.create"],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-  {
-    schema: "helix.explicit_capability_contract.v1",
-    capability: "workstation-notes.open",
-    aliases: ["workstation notes open", "open workstation notes"],
-    capability_family: "workstation",
-    plan_family: "workstation_action",
-    source_target: "workspace_action",
-    admission_families: ["notes", "workstation_action"],
-    required_observation_kinds: ["workspace_action_receipt"],
-    required_terminal_kind: "workstation_tool_evaluation",
-    allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["model.direct_answer"],
-  },
-];
+const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinition[] =
+  [
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "helix_ask.inspect_capability_catalog",
+      aliases: [
+        "helix.ask.inspect_capability_catalog",
+        "inspect_capability_catalog",
+        "capability_catalog",
+        "capability catalog",
+        "runtime_capability_catalog",
+        "runtime capability catalog",
+        "tool_catalog",
+        "tool catalog",
+      ],
+      capability_family: "capability_catalog",
+      plan_family: "capability_catalog",
+      source_target: "runtime_evidence",
+      admission_families: ["capability_catalog", "runtime_evidence"],
+      required_observation_kinds: ["capability_registry"],
+      required_terminal_kind: "capability_help_summary",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "repo-code.search_concept",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "helix_ask.reflect_workstation_tool_alignment",
+      aliases: [
+        "workstation_tool_alignment",
+        "workstation_tools_matrix",
+        "toolchain_matrix",
+        "tool_regression_matrix",
+        "release_checklist_tools",
+      ],
+      capability_family: "capability_catalog",
+      plan_family: "capability_catalog",
+      source_target: "runtime_evidence",
+      admission_families: ["capability_catalog", "runtime_evidence"],
+      required_observation_kinds: ["capability_registry"],
+      required_terminal_kind: "capability_help_summary",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "repo-code.search_concept",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "runtime_evidence",
+      aliases: ["runtime-evidence", "runtime evidence"],
+      capability_family: "capability_catalog",
+      plan_family: "capability_catalog",
+      source_target: "runtime_evidence",
+      admission_families: ["capability_catalog", "runtime_evidence"],
+      required_observation_kinds: ["capability_registry"],
+      required_terminal_kind: "capability_help_summary",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "repo-code.search_concept",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "debug.inspect_current_turn",
+      aliases: [
+        "debug.inspect-current-turn",
+        "debug_current_turn",
+        "diagnose_debug_or_runtime_evidence",
+      ],
+      capability_family: "capability_catalog",
+      plan_family: "capability_catalog",
+      source_target: "runtime_evidence",
+      admission_families: ["runtime_evidence"],
+      required_observation_kinds: [
+        "agent_runtime_loop",
+        "debug_evidence_diagnosis",
+      ],
+      required_terminal_kind: "capability_help_summary",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "repo-code.search_concept",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "live_pipeline",
+      aliases: ["live-pipeline", "live_pipeline_control"],
+      capability_family: "live_environment",
+      plan_family: "live_environment",
+      source_target: "live_pipeline",
+      admission_families: ["live_pipeline"],
+      required_observation_kinds: [
+        "live_pipeline_receipt",
+        "visual_producer_cadence_receipt",
+        "tool_observation",
+      ],
+      required_terminal_kind: "workstation_tool_evaluation",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "scientific-calculator.solve_expression",
+      aliases: [
+        "calculator",
+        "calculator.solve_expression",
+        "calculator solve expression",
+        "calculator_stream",
+        "calculator stream",
+        "scientific-calculator",
+        "scientific calculator",
+        "solve expression",
+      ],
+      capability_family: "calculator",
+      plan_family: "workstation_action",
+      source_target: "calculator_stream",
+      admission_families: ["calculator", "workstation_action"],
+      required_observation_kinds: [
+        "calculator_receipt",
+        "workstation_tool_evaluation",
+      ],
+      required_terminal_kind: "workstation_tool_evaluation",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "repo-code.search_concept",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "scientific-calculator.solve_with_steps",
+      aliases: [
+        "calculator.solve_with_steps",
+        "scientific calculator solve with steps",
+        "solve with calculator steps",
+      ],
+      capability_family: "calculator",
+      plan_family: "workstation_action",
+      source_target: "calculator_stream",
+      admission_families: ["calculator", "workstation_action"],
+      required_observation_kinds: [
+        "calculator_receipt",
+        "calculator_subgoal_receipt",
+        "workstation_tool_evaluation",
+      ],
+      required_terminal_kind: "workstation_tool_evaluation",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "repo-code.search_concept",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "scientific-calculator.solve",
+      aliases: ["calculator.solve", "scientific calculator solve"],
+      capability_family: "calculator",
+      plan_family: "workstation_action",
+      source_target: "calculator_stream",
+      admission_families: ["calculator", "workstation_action"],
+      required_observation_kinds: [
+        "calculator_receipt",
+        "calculator_subgoal_receipt",
+        "workstation_tool_evaluation",
+      ],
+      required_terminal_kind: "workstation_tool_evaluation",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "repo-code.search_concept",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "scientific-calculator.open",
+      aliases: [
+        "calculator.open",
+        "open scientific calculator",
+        "open calculator",
+      ],
+      capability_family: "calculator",
+      plan_family: "workstation_action",
+      source_target: "calculator_stream",
+      admission_families: ["calculator", "workstation_action"],
+      required_observation_kinds: ["workspace_action_receipt"],
+      required_terminal_kind: "workstation_tool_evaluation",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "scientific-calculator.start_equation_live_source",
+      aliases: [
+        "calculator.start_equation_live_source",
+        "calculator live source",
+        "start equation live source",
+      ],
+      capability_family: "calculator",
+      plan_family: "workstation_action",
+      source_target: "calculator_stream",
+      admission_families: ["calculator", "workstation_action"],
+      required_observation_kinds: [
+        "workspace_action_receipt",
+        "calculator_live_source_status",
+      ],
+      required_terminal_kind: "workstation_tool_evaluation",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "workspace_os.status",
+      aliases: [
+        "workspace_status",
+        "workspace status",
+        "workspace_diagnostic",
+        "workspace diagnostic",
+        "workspace_os status",
+        "workspace_os_status",
+        "workspace os status",
+        "workstation status",
+        "workstation diagnostic",
+      ],
+      capability_family: "workspace_diagnostic",
+      plan_family: "workspace_diagnostic",
+      source_target: "workspace_diagnostic",
+      admission_families: ["workspace_diagnostic"],
+      required_observation_kinds: ["workspace_os_status_observation"],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "debug.inspect_current_turn",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "docs-viewer.open",
+      aliases: [
+        "docs_viewer.open",
+        "docs_viewer open",
+        "docs_viewer to open",
+        "docs viewer open",
+        "docs viewer to open",
+      ],
+      capability_family: "docs_viewer",
+      plan_family: "docs",
+      source_target: "docs_viewer",
+      admission_families: ["docs_viewer"],
+      required_observation_kinds: ["doc_open_receipt", "docs_viewer_receipt"],
+      required_terminal_kind: "doc_open_receipt",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "docs-viewer.identify_current_doc",
+      aliases: [
+        "docs_viewer.identify_current_doc",
+        "docs viewer identify current doc",
+        "identify current doc",
+      ],
+      capability_family: "docs_viewer",
+      plan_family: "docs",
+      source_target: "docs_viewer",
+      admission_families: ["docs_viewer"],
+      required_observation_kinds: [
+        "active_doc_identity",
+        "doc_open_receipt",
+        "docs_viewer_receipt",
+      ],
+      required_terminal_kind: "doc_open_receipt",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "docs-viewer.search_docs",
+      runtime_capability: HELIX_DOCS_SEARCH_CAPABILITY,
+      aliases: [
+        "docs_viewer.search_docs",
+        "docs viewer search docs",
+        "search docs",
+      ],
+      capability_family: "docs_viewer",
+      plan_family: "docs",
+      source_target: "docs_viewer",
+      admission_families: ["docs_viewer"],
+      required_observation_kinds: ["doc_search_results", "retrieval_context"],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "docs-viewer.summarize_doc",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "docs-viewer.validate_doc_candidates",
+      aliases: [
+        "docs_viewer.validate_doc_candidates",
+        "docs viewer validate candidates",
+        "validate doc candidates",
+      ],
+      capability_family: "docs_viewer",
+      plan_family: "docs",
+      source_target: "docs_viewer",
+      admission_families: ["docs_viewer"],
+      required_observation_kinds: ["doc_candidate_validation"],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "docs-viewer.summarize_doc",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "docs-viewer.open_doc_by_path",
+      runtime_capability: HELIX_DOCS_OPEN_DOC_CAPABILITY,
+      aliases: [
+        "docs_viewer.open_doc_by_path",
+        "docs viewer open doc by path",
+        "open doc by path",
+      ],
+      capability_family: "docs_viewer",
+      plan_family: "docs",
+      source_target: "docs_viewer",
+      admission_families: ["docs_viewer"],
+      required_observation_kinds: ["doc_open_receipt"],
+      required_terminal_kind: "doc_open_receipt",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "docs-viewer.locate_in_doc",
+      runtime_capability: HELIX_DOCS_SEARCH_CAPABILITY,
+      aliases: [
+        "docs_viewer.locate_in_doc",
+        "docs_viewer locate",
+        "docs_viewer to locate",
+        "docs viewer locate",
+        "docs viewer to locate",
+        "docs_viewer cite",
+        "docs_viewer to cite",
+        "docs viewer cite",
+        "docs viewer to cite",
+      ],
+      capability_family: "docs_viewer",
+      plan_family: "docs",
+      source_target: "docs_viewer",
+      admission_families: ["docs_viewer"],
+      required_observation_kinds: [
+        "doc_location_result",
+        "doc_location_matches",
+        "doc_evidence_location",
+      ],
+      required_terminal_kind: "doc_location_matches",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "docs-viewer.summarize_doc",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "docs-viewer.summarize_doc",
+      runtime_capability: HELIX_DOCS_SEARCH_CAPABILITY,
+      aliases: [
+        "docs_viewer.summarize_doc",
+        "docs_viewer summarize",
+        "docs_viewer to summarize",
+        "docs viewer summarize",
+        "docs viewer to summarize",
+      ],
+      capability_family: "docs_viewer",
+      plan_family: "docs",
+      source_target: "docs_viewer",
+      admission_families: ["docs_viewer"],
+      required_observation_kinds: ["doc_summary", "observation_review"],
+      required_terminal_kind: "doc_summary",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "docs-viewer.locate_in_doc",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "docs-viewer.doc_equation_context",
+      runtime_capability: HELIX_DOCS_SEARCH_CAPABILITY,
+      aliases: [
+        "docs_viewer.doc_equation_context",
+        "docs_viewer equation context",
+        "docs_viewer to inspect equation context",
+        "docs viewer equation context",
+        "docs viewer to inspect equation context",
+      ],
+      capability_family: "docs_viewer",
+      plan_family: "docs",
+      source_target: "docs_viewer",
+      admission_families: ["docs_viewer"],
+      required_observation_kinds: ["doc_equation_context"],
+      required_terminal_kind: "doc_equation_context",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "repo-code.search_concept",
+      runtime_capability: "repo.search",
+      aliases: [
+        "repo.search",
+        "repo_code.search_concept",
+        "repo code search concept",
+        "repo_code",
+        "repo code",
+        "repo_evidence",
+        "repository code",
+      ],
+      capability_family: "repo_code",
+      plan_family: "repo_evidence",
+      source_target: "repo_code",
+      admission_families: ["repo_code"],
+      required_observation_kinds: [
+        "repo_code_evidence_observation",
+        "repo_evidence_relevance_gate",
+      ],
+      required_terminal_kind: "repo_code_evidence_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "docs-viewer.locate_in_doc",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "workspace-directory.resolve",
+      aliases: [
+        "workspace_directory.resolve",
+        "workspace directory resolve",
+        "workspace_directory",
+        "workspace directory",
+        "workspace_directory_resolution",
+        "workspace directory resolution",
+      ],
+      capability_family: "workspace_directory",
+      plan_family: "workspace_directory",
+      source_target: "workspace_directory",
+      admission_families: ["workspace_directory"],
+      required_observation_kinds: ["workspace_directory_resolution"],
+      required_terminal_kind: "workspace_directory_resolution",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "internet_search.web_research",
+      runtime_capability: HELIX_INTERNET_SEARCH_CAPABILITY,
+      aliases: [
+        HELIX_INTERNET_SEARCH_CAPABILITY,
+        "internet_search",
+        "internet search",
+        "web_research",
+        "web research",
+        "web.search",
+        "web search",
+      ],
+      capability_family: "internet_search",
+      plan_family: "internet_search",
+      source_target: "internet_search",
+      admission_families: ["internet_search"],
+      required_observation_kinds: ["internet_search_observation"],
+      required_terminal_kind: "internet_search_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
+      aliases: [
+        "research_library.read_document",
+        "research library",
+        "saved full-text evidence",
+        "saved full text evidence",
+        "existing full-text evidence",
+        "existing full text evidence",
+        "saved research extraction",
+      ],
+      capability_family: "scholarly_research",
+      plan_family: "scholarly_research",
+      source_target: "research_library",
+      admission_families: ["scholarly_research"],
+      required_observation_kinds: ["research_library_observation"],
+      required_terminal_kind: "scholarly_research_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        "internet_search.web_research",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+      aliases: [
+        "research_library.apply_evidence_enrichment",
+        "apply paper evidence enrichment",
+        "persist paper evidence enrichment",
+      ],
+      capability_family: "scholarly_research",
+      plan_family: "scholarly_research",
+      source_target: "research_library",
+      admission_families: ["scholarly_research"],
+      required_observation_kinds: ["paper_evidence_enrichment_observation"],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "scientific-calculator.solve_expression",
+        "theory-badge-graph.reflect_discussion_context",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      aliases: [
+        "scholarly_research.lookup_papers",
+        "scholarly_research",
+        "scholarly research",
+        "scholarly research lookup",
+        "lookup_papers",
+      ],
+      capability_family: "scholarly_research",
+      plan_family: "scholarly_research",
+      source_target: "scholarly_research",
+      admission_families: ["scholarly_research"],
+      required_observation_kinds: ["scholarly_research_observation"],
+      required_terminal_kind: "scholarly_research_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "internet_search.web_research",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      aliases: [
+        "scholarly_research.fetch_full_text",
+        "scholarly research fetch full text",
+        "fetch_full_text",
+        "fetch full text",
+        "scholarly_full_text",
+        "scholarly full text",
+        "scholarly research full text",
+      ],
+      capability_family: "scholarly_research",
+      plan_family: "scholarly_research",
+      source_target: "scholarly_research",
+      admission_families: ["scholarly_research"],
+      required_observation_kinds: ["scholarly_full_text_observation"],
+      required_terminal_kind: "scholarly_research_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "internet_search.web_research",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+      aliases: [
+        "scholarly_research.extract_numeric_parameters",
+        "scholarly research extract numeric parameters",
+        "extract_numeric_parameters",
+        "extract numeric parameters",
+        "numeric_parameter_extraction",
+        "numeric parameter extraction",
+        "scholarly numeric parameters",
+      ],
+      capability_family: "scholarly_research",
+      plan_family: "scholarly_research",
+      source_target: "scholarly_research",
+      admission_families: ["scholarly_research"],
+      required_observation_kinds: ["scholarly_numeric_parameter_observation"],
+      required_terminal_kind: "scholarly_research_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "internet_search.web_research",
+        "model.direct_answer",
+      ],
+    },
+    liveSourceMailEvidenceContract({
+      capability: "live_env.query_micro_reasoner_presets",
+      aliases: [
+        "microdeck",
+        "micro_reasoner_presets",
+        "micro reasoner presets",
+        "micro reasoner preset catalog",
+        "earbud_microdeck",
+        "audio_transcript_microdeck",
+        "earbud_translation_presets",
+        "stage_play_micro_reasoner_prompt_preset_query_result/v1",
+      ],
+      requiredObservationKinds: [
+        "stage_play_micro_reasoner_prompt_preset_query_result",
+      ],
+    }),
+    liveSourceMailEvidenceContract({
+      capability: "live_env.draft_micro_reasoner_preset",
+      aliases: [
+        "microdeck_draft",
+        "micro_reasoner_preset_draft",
+        "micro reasoner preset draft",
+        "draft micro reasoner preset",
+        "earbud_microdeck_draft",
+        "audio_translation_preset_draft",
+        "stage_play_micro_reasoner_prompt_preset_draft/v1",
+      ],
+      requiredObservationKinds: [
+        "stage_play_micro_reasoner_prompt_preset_draft",
+      ],
+    }),
+    liveSourceMailEvidenceContract({
+      capability: "live_env.route_micro_reasoner_prompt",
+      aliases: [
+        "microdeck_prompt_router",
+        "microdeck prompt router",
+        "micro reasoner prompt router",
+        "prompt_delegation",
+        "stage_play_micro_reasoner_prompt_delegation_result/v1",
+      ],
+      requiredObservationKinds: [
+        "stage_play_micro_reasoner_prompt_delegation_result",
+      ],
+    }),
+    liveSourceMailEvidenceContract({
+      capability: "live_env.query_micro_reasoner_prompts",
+      aliases: [
+        "micro_reasoner_prompts",
+        "micro reasoner prompts",
+        "stage_play_micro_reasoner_prompt/v1",
+      ],
+      requiredObservationKinds: ["stage_play_micro_reasoner_prompt"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.apply_micro_reasoner_preset",
+      aliases: ["apply_micro_reasoner_preset", "apply micro reasoner preset"],
+      requiredObservationKind: "stage_play_micro_reasoner_prompt_preset",
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.create_micro_reasoner_preset",
+      aliases: ["create_micro_reasoner_preset", "create micro reasoner preset"],
+      requiredObservationKind: "stage_play_micro_reasoner_prompt_preset",
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.update_micro_reasoner_prompt",
+      aliases: ["update_micro_reasoner_prompt", "update micro reasoner prompt"],
+      requiredObservationKind: "stage_play_micro_reasoner_prompt",
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.test_micro_reasoner_prompt",
+      aliases: ["test_micro_reasoner_prompt", "test micro reasoner prompt"],
+      requiredObservationKind: "stage_play_micro_reasoner_prompt_test",
+    }),
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "live_env.check_live_source_mail",
+      aliases: [
+        "check_live_source_mail",
+        "live_source_mail.check",
+        "live_source_mail check",
+        "live_source_mail to check",
+        "live source mail check",
+        "live source mail to check",
+        "live source mailbox check",
+        "live source mailbox to check",
+        "check live source mail",
+        "check live source mailbox",
+        "check source mail",
+        "check mailbox",
+      ],
+      capability_family: "live_source_mail",
+      plan_family: "live_environment",
+      source_target: "live_source_mailbox",
+      admission_families: ["live_environment"],
+      required_observation_kinds: ["stage_play_live_source_mail_read_result"],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "internet_search.web_research",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "live_env.read_live_source_mail",
+      aliases: [
+        "read_live_source_mail",
+        "live_source_mail.read_raw",
+        "live_source_mail raw read",
+        "live_source_mail read raw",
+        "live_source_mail to read raw",
+        "live source mail raw read",
+        "live source mail read raw",
+        "live source mail to read raw",
+        "live source mailbox raw read",
+        "live source mailbox read raw",
+        "live source mailbox to read raw",
+        "raw live source mail",
+        "raw mail",
+        "read raw mail",
+        "unprocessed live source mail",
+        "debug live source mail",
+      ],
+      capability_family: "live_source_mail",
+      plan_family: "live_environment",
+      source_target: "live_source_mailbox",
+      admission_families: ["live_environment"],
+      required_observation_kinds: ["stage_play_live_source_mail_read_result"],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "internet_search.web_research",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "live_env.read_processed_live_source_mail",
+      aliases: [
+        "read_processed_live_source_mail",
+        "processed_live_source_mail",
+        "live_source_mail.read_processed",
+        "live_source_mail read",
+        "live_source_mail to read",
+        "live source mail read",
+        "live source mail to read",
+        "live source mailbox read",
+        "live source mailbox to read",
+      ],
+      capability_family: "live_source_mail",
+      plan_family: "live_environment",
+      source_target: "live_source_mailbox",
+      admission_families: ["live_environment"],
+      required_observation_kinds: ["stage_play_processed_mail_packet"],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "internet_search.web_research",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "live_env.process_live_source_mail",
+      aliases: [
+        "process_live_source_mail",
+        "live_source_mail.process",
+        "live_source_mail process",
+        "live_source_mail to process",
+        "live source mail process",
+        "live source mail to process",
+        "live source mailbox process",
+        "live source mailbox to process",
+      ],
+      capability_family: "live_source_mail",
+      plan_family: "live_environment",
+      source_target: "live_source_mailbox",
+      admission_families: ["live_environment"],
+      required_observation_kinds: [
+        "stage_play_live_source_mail_read_result",
+        "stage_play_processed_mail_packet",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "internet_search.web_research",
+        "model.direct_answer",
+      ],
+    },
+    liveSourceMailEvidenceContract({
+      capability: "live_env.query_live_source_quality",
+      aliases: [
+        "live_source_quality",
+        "source_freshness",
+        "stage_play_live_source_quality/v1",
+      ],
+      requiredObservationKinds: [
+        "stage_play_live_source_quality",
+        "helix.workstation_goal_context_update.v1",
+      ],
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.query_workstation_goal_context",
+      aliases: [
+        "workstation_goal_context",
+        "goal_context_updates",
+        "agent_goal_sessions",
+        "active_goals",
+        "active_goal_sessions",
+        "agent_goal_context",
+        "stage_play_workstation_goal_context_read_result/v1",
+      ],
+      requiredObservationKinds: [
+        "stage_play_workstation_goal_context_read_result",
+        "helix.agent_goal_session.v1",
+      ],
+    }),
+    liveSourceMailEvidenceContract({
+      capability: "live_env.summarize_live_source_current_state",
+      aliases: [
+        "live_answer_state",
+        "live_source_current_state",
+        "stage_play_live_source_current_state/v1",
+      ],
+      requiredObservationKinds: [
+        "stage_play_live_source_current_state",
+        "helix.workstation_goal_context_update.v1",
+      ],
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.read_card",
+      aliases: ["read_card", "live_card", "live card"],
+      requiredObservationKind: "live_environment_tool_observation",
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.query_event_log",
+      aliases: ["query_event_log", "event_log", "live event log"],
+      requiredObservationKind: "live_environment_tool_observation",
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.query_world_events",
+      aliases: ["query_world_events", "world_events", "world events"],
+      requiredObservationKind: "live_environment_tool_observation",
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.query_navigation_state",
+      aliases: [
+        "query_navigation_state",
+        "navigation_state",
+        "navigation state",
+      ],
+      requiredObservationKind: "live_environment_tool_observation",
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: "live_env.plan_stage_play_job",
+      aliases: ["plan_stage_play_job", "stage play job plan"],
+      requiredObservationKinds: ["stage_play_job_plan"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.configure_visual_observer_profile",
+      aliases: [
+        "configure_visual_observer_profile",
+        "visual_observer_profile",
+        "visual observer profile",
+      ],
+      requiredObservationKind: "stage_play_visual_observer_profile",
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.apply_visual_observer_profile",
+      aliases: [
+        "apply_visual_observer_profile",
+        "apply visual observer profile",
+        "apply visual observer shades",
+      ],
+      requiredObservationKind: "stage_play_visual_observer_profile",
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.query_visual_observer_profiles",
+      aliases: [
+        "query_visual_observer_profiles",
+        "visual observer profiles",
+        "visual observer shades",
+      ],
+      requiredObservationKind: "stage_play_visual_observer_profile",
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.test_visual_observer_profile",
+      aliases: ["test_visual_observer_profile", "test visual observer profile"],
+      requiredObservationKind: "stage_play_visual_observer_profile_test",
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.compare_visual_observer_profiles",
+      aliases: [
+        "compare_visual_observer_profiles",
+        "compare visual observer profiles",
+      ],
+      requiredObservationKind: "stage_play_visual_observer_profile_test",
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: "live_env.request_visual_action_replay",
+      aliases: ["request_visual_action_replay", "visual action replay"],
+      requiredObservationKinds: ["helix_visual_frame_action_replay_request"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.configure_interpreter_profile",
+      aliases: ["configure_interpreter_profile", "interpreter profile"],
+      requiredObservationKind: "stage_play_live_source_interpreter_profile",
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.compare_mail_to_interpreter_profile",
+      aliases: [
+        "compare_mail_to_interpreter_profile",
+        "mail interpreter profile comparison",
+      ],
+      requiredObservationKind:
+        "stage_play_live_source_interpreter_profile_comparison",
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: "live_env.request_stage_play_checkpoint",
+      aliases: ["request_stage_play_checkpoint", "stage play checkpoint"],
+      requiredObservationKinds: ["stage_play_checkpoint_request"],
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.predict_live_source_immediate",
+      aliases: [
+        "predict_live_source_immediate",
+        "predict live source immediate",
+      ],
+      requiredObservationKind: "helix_live_source_immediate_prediction",
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.compare_live_source_prediction",
+      aliases: [
+        "compare_live_source_prediction",
+        "compare live source prediction",
+      ],
+      requiredObservationKind: "helix_live_source_prediction_comparison",
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.project_live_source_narrative",
+      aliases: ["project_live_source_narrative", "live source narrative state"],
+      requiredObservationKind: "stage_play_live_source_narrative_state",
+    }),
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "live_env.reflect_live_source_mail_loop",
+      aliases: [
+        "reflect_live_source_mail_loop",
+        "live_source_mail.reflect",
+        "live_source_mail reflect",
+        "live_source_mail to reflect",
+        "live source mail reflect",
+        "live source mail to reflect",
+        "live source mailbox reflect",
+        "live source mailbox to reflect",
+        "live_source_mail_loop_reflection",
+        "mailbox loop reflection",
+      ],
+      capability_family: "live_source_mail",
+      plan_family: "live_environment",
+      source_target: "live_source_mailbox",
+      admission_families: ["live_environment"],
+      required_observation_kinds: [
+        "stage_play_live_source_mail_loop_reflection",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "internet_search.web_research",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "live_env.reflect_stage_play_context",
+      aliases: ["reflect_stage_play_context", "stage_play_reflection"],
+      capability_family: "live_environment",
+      plan_family: "live_environment",
+      source_target: "live_environment",
+      admission_families: ["live_environment"],
+      required_observation_kinds: [
+        "live_environment_tool_observation",
+        "stage_play_reflection_result",
+      ],
+      required_terminal_kind: "direct_answer_text",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "live_env.configure_live_source_watch_job",
+        "live_env.read_processed_live_source_mail",
+        "live_env.read_live_source_mail",
+        "situation-room.describe_visual_capture",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "live_env.narrator_say",
+      aliases: ["narrator.say", "narrator_say"],
+      capability_family: "live_environment",
+      plan_family: "live_environment",
+      source_target: "live_environment",
+      admission_families: ["live_environment", "workstation_action"],
+      required_observation_kinds: [
+        "live_environment_tool_observation",
+        "helix.narrator_say_request.v1",
+      ],
+      required_terminal_kind: "workstation_tool_evaluation",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "live_env.narrator_bind_stream",
+        "live_env.read_processed_live_source_mail",
+        "live_env.read_live_source_mail",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "live_env.narrator_bind_stream",
+      aliases: ["narrator.bind_stream", "narrator_bind_stream"],
+      capability_family: "live_environment",
+      plan_family: "live_environment",
+      source_target: "live_environment",
+      admission_families: ["live_environment", "workstation_action"],
+      required_observation_kinds: [
+        "live_environment_tool_observation",
+        "helix.narrator_bind_stream_request.v1",
+      ],
+      required_terminal_kind: "workstation_tool_evaluation",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "live_env.narrator_say",
+        "live_env.read_processed_live_source_mail",
+        "live_env.read_live_source_mail",
+        "model.direct_answer",
+      ],
+    },
+    liveEnvironmentControlContract({
+      capability: "live_env.change_workstation_preset",
+      aliases: ["change_workstation_preset", "change_preset"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.set_visual_preset",
+      aliases: ["set_visual_preset", "visual_preset"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.set_audio_preset",
+      aliases: ["set_audio_preset", "audio_preset"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.bind_workstation_source",
+      aliases: ["bind_workstation_source", "bind_source"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.unbind_workstation_source",
+      aliases: ["unbind_workstation_source", "unbind_source"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.pause_workstation_loop",
+      aliases: ["pause_workstation_loop", "pause_loop"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.resume_workstation_loop",
+      aliases: ["resume_workstation_loop", "resume_loop"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.set_workstation_loop_state",
+      aliases: ["set_workstation_loop_state", "set_loop_state"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.configure_route_watch",
+      aliases: ["configure_route_watch", "route_watch_policy"],
+      requiredObservationKind:
+        "stage_play_live_source_watch_job_policy_config_result",
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.configure_live_source_watch_job",
+      aliases: [
+        "configure_live_source_watch_job",
+        "live_source_watch_job",
+        "watch_job_policy",
+      ],
+      requiredObservationKind:
+        "stage_play_live_source_watch_job_policy_config_result",
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.repair_loop",
+      aliases: ["repair_loop"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.repair_workstation_source",
+      aliases: ["repair_workstation_source", "repair_source"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.update_live_answer_projection",
+      aliases: ["update_live_answer_projection", "update_live_answer"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.focus_process_graph",
+      aliases: ["focus_process_graph"],
+    }),
+    liveEnvironmentControlContract({
+      capability: "live_env.start_agent_goal_session",
+      aliases: ["start_agent_goal_session"],
+      requiredObservationKind: "stage_play_agent_goal_session_tool_result",
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.query_constructs",
+      aliases: ["query_constructs", "situation room constructs"],
+      requiredObservationKind: "live_environment_tool_observation",
+    }),
+    liveEnvironmentQueryContract({
+      capability: "live_env.query_job_evidence",
+      aliases: ["query_job_evidence", "live job evidence"],
+      requiredObservationKind: "live_environment_tool_observation",
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: "live_env.request_probe",
+      aliases: ["request_probe", "bounded live evidence probe"],
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: "live_env.record_commentary",
+      aliases: ["record_commentary", "live evidence commentary"],
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: "live_env.spawn_field_worker",
+      aliases: ["spawn_field_worker", "spawn field worker"],
+    }),
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "live_env.evaluate_goal_satisfaction",
+      aliases: ["evaluate_goal_satisfaction", "goal_satisfaction"],
+      capability_family: "live_environment",
+      plan_family: "live_environment",
+      source_target: "live_environment",
+      admission_families: ["live_environment"],
+      required_observation_kinds: [
+        "live_environment_tool_observation",
+        "helix.live_environment_goal_satisfaction.v1",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "live_env.start_agent_goal_session",
+        "live_env.read_processed_live_source_mail",
+        "live_env.read_live_source_mail",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "live_env.record_live_source_mail_decision",
+      capability_family: "live_source_decision",
+      plan_family: "live_environment",
+      source_target: "live_source_mailbox",
+      admission_families: ["live_environment", "workstation_action"],
+      required_observation_kinds: [
+        "stage_play_processed_mail_packet",
+        "stage_play_live_source_mail_decision",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "live_env.request_interim_voice_callout",
+      capability_family: "voice_delivery",
+      plan_family: "live_environment",
+      source_target: "live_environment",
+      admission_families: ["live_environment", "workstation_action"],
+      required_observation_kinds: [
+        "stage_play_live_source_mail_decision",
+        "live_source_interim_voice_callout_receipt",
+        "voice_hold_receipt",
+        "voice_block_receipt",
+        "voice_receipt",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "text_to_speech.speak_text",
+      aliases: ["speak_text", "text_to_speech", "voice_delivery.speak_text"],
+      capability_family: "voice_delivery",
+      plan_family: "live_environment",
+      source_target: "voice_delivery",
+      admission_families: ["live_environment", "workstation_action"],
+      required_observation_kinds: [
+        "capability_lane_observation_packet",
+        "helix.agent_step_observation_packet.v1",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: ["live_env.request_interim_voice_callout"],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+      required_args: ["text"],
+      optional_args: ["voice", "profile", "locale", "source_observation_ref"],
+    },
+    ...WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS.map((spec) =>
+      liveEnvironmentQueryContract({
+        capability: spec.capability,
+        aliases: [...spec.aliases],
+        requiredObservationKind: spec.explicitRequiredObservationKind,
+      }),
+    ),
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "helix_ask.reflect_theory_context",
+      aliases: [
+        "theory-badge-graph.reflect_discussion_context",
+        "reflect_discussion_context",
+        "reflect_theory_context",
+        "theory_context",
+        "theory_context_reflection",
+        "theory_locator",
+        "theory_badge_graph",
+        "theory badge graph",
+      ],
+      capability_family: "theory_locator",
+      plan_family: "theory_locator",
+      source_target: "theory_locator",
+      admission_families: ["theory_locator"],
+      required_observation_kinds: [
+        "helix_theory_context_reflection_tool_receipt",
+        "theory_context_reflection",
+      ],
+      required_terminal_kind: "theory_context_reflection_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+      aliases: ["theory_experiment_procedure_prepare"],
+      capability_family: "theory_locator",
+      plan_family: "theory_locator",
+      source_target: "theory_locator",
+      admission_families: ["theory_locator"],
+      required_observation_kinds: ["theory_experiment_procedure_observation"],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: THEORY_EXPERIMENT_PROCEDURE_READMIT_CAPABILITY,
+      aliases: ["theory_experiment_procedure_readmit"],
+      capability_family: "theory_locator",
+      plan_family: "theory_locator",
+      source_target: "theory_locator",
+      admission_families: ["theory_locator"],
+      required_observation_kinds: ["theory_experiment_procedure_observation"],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY,
+      aliases: [
+        "theory_experiment_procedure_evaluate_closure",
+        "theory_execution_closure",
+        "theory execution closure",
+        "execution closure",
+      ],
+      capability_family: "theory_locator",
+      plan_family: "theory_locator",
+      source_target: "theory_locator",
+      admission_families: ["theory_locator"],
+      required_observation_kinds: ["theory_experiment_execution_closure"],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    theoryExecutionEvidenceContract({
+      capability: THEORY_SEMANTIC_ADMITTER_NORMALIZE_CAPABILITY,
+      aliases: ["theory_semantic_admitter_normalize"],
+      requiredObservationKinds: ["semantic_admission"],
+    }),
+    theoryExecutionEvidenceContract({
+      capability:
+        THEORY_ARTIFACT_PRODUCER_PREPARE_LANYON_REQUEST_CAPABILITY,
+      aliases: ["theory_artifact_producer_prepare_lanyon_request"],
+      requiredObservationKinds: [
+        "theory_artifact_producer_lanyon_request_observation",
+      ],
+    }),
+    theoryExecutionEvidenceContract({
+      capability: THEORY_ARTIFACT_PRODUCER_ADMIT_LANYON_CAPABILITY,
+      aliases: ["theory_artifact_producer_admit_lanyon_snapshot"],
+      requiredObservationKinds: ["artifact_generation_receipt"],
+    }),
+    theoryExecutionEvidenceContract({
+      capability: THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY,
+      aliases: ["theory_formal_verifier_prepare_request"],
+      requiredObservationKinds: [
+        "theory_formal_verifier_preparation_observation",
+      ],
+    }),
+    theoryExecutionEvidenceContract({
+      capability: THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY,
+      aliases: ["theory_formal_verifier_plan"],
+      requiredObservationKinds: ["theory_formal_verifier_plan_observation"],
+    }),
+    theoryExecutionEvidenceContract({
+      capability: THEORY_FORMAL_VERIFIER_START_CAPABILITY,
+      aliases: ["theory_formal_verifier_start"],
+      requiredObservationKinds: ["theory_formal_verifier_start_observation"],
+    }),
+    theoryExecutionEvidenceContract({
+      capability: THEORY_FORMAL_VERIFIER_READ_RESULT_CAPABILITY,
+      aliases: ["theory_formal_verifier_read_result"],
+      requiredObservationKinds: ["formal_certificate"],
+    }),
+    theoryExecutionEvidenceContract({
+      capability: THEORY_INDEPENDENT_NUMERICAL_PREPARE_REQUEST_CAPABILITY,
+      aliases: ["theory_independent_numerical_verifier_prepare_request"],
+      requiredObservationKinds: [
+        "theory_independent_numerical_verifier_prepared_request_observation",
+      ],
+    }),
+    theoryExecutionEvidenceContract({
+      capability: THEORY_INDEPENDENT_NUMERICAL_PLAN_CAPABILITY,
+      aliases: ["theory_independent_numerical_verifier_plan"],
+      requiredObservationKinds: [
+        "theory_independent_numerical_verifier_plan_observation",
+      ],
+    }),
+    theoryExecutionEvidenceContract({
+      capability: THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY,
+      aliases: ["theory_independent_numerical_verifier_start"],
+      requiredObservationKinds: [
+        "theory_independent_numerical_verifier_start_observation",
+      ],
+    }),
+    theoryExecutionEvidenceContract({
+      capability: THEORY_INDEPENDENT_NUMERICAL_READ_RESULT_CAPABILITY,
+      aliases: ["theory_independent_numerical_verifier_read_result"],
+      requiredObservationKinds: ["numerical_certificate"],
+    }),
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "helix.theory.frontierVectorFieldTrace",
+      aliases: [
+        "frontierVectorFieldTrace",
+        "frontier_vector_field_trace",
+        "theory_frontier_vector_field",
+        "theory_frontier_vector_field_trace",
+        "badge_coordinate_vector_trace",
+        "relation_tensor_trace",
+      ],
+      capability_family: "theory_locator",
+      plan_family: "theory_locator",
+      source_target: "theory_locator",
+      admission_families: ["theory_locator"],
+      required_observation_kinds: [
+        "helix_theory_frontier_vector_field_tool_receipt",
+        "theory_frontier_vector_field",
+      ],
+      required_terminal_kind: "theory_context_reflection_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "theory-badge-graph.propose_frontier_conjectures",
+      aliases: [
+        "propose_frontier_conjectures",
+        "theory_frontier_conjectures",
+        "frontier_conjecture_workbench",
+        "bounded_conjecture_workbench",
+        "theory_badge_graph_conjecture_workbench",
+      ],
+      capability_family: "theory_locator",
+      plan_family: "theory_locator",
+      source_target: "theory_locator",
+      admission_families: ["theory_locator"],
+      required_observation_kinds: [
+        "theory_frontier_conjecture_observation",
+        "theory_frontier_search",
+        "theory_frontier_candidate",
+        "helix_theory_context_reflection_tool_receipt",
+      ],
+      required_terminal_kind: "theory_context_reflection_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    contextReflectionEvidenceContract({
+      capability: "helix_ask.reflect_live_synthetic_data",
+      aliases: [
+        "live_synthetic_data_reflection",
+        "live_answer_synthetic_data",
+        "microdeck_reflection",
+        "macro_reasoner_deck_reflection",
+        "mail_loop_synthetic_data",
+        "live_answer_prediction_review",
+      ],
+      requiredObservationKinds: [
+        "helix_context_reflection_tool_receipt/v1",
+        "bounded_context_reference",
+      ],
+    }),
+    contextReflectionEvidenceContract({
+      capability: "helix_ask.reflect_context_attachments",
+      aliases: [
+        "context_reflection.attachments",
+        "context_reflection attachments",
+        "context_reflection to inspect attachments",
+        "context_attachment_reflection",
+        "context_binding_reflection",
+        "dragged_cutout_context",
+        "selected_ui_region",
+        "selected_context_refs",
+        "helix_context_reflection_tool_receipt/v1",
+      ],
+      requiredObservationKinds: [
+        "helix_context_reflection_tool_receipt/v1",
+        "context_attachment",
+        "bounded_context_reference",
+      ],
+    }),
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "moral-graph.reflect_context",
+      aliases: [
+        "helix_ask.reflect_moral_graph",
+        "moral_badge_locator",
+        "moral_graph_reflection",
+        "moral graph reflection",
+        "moral_graph",
+        "moral graph",
+      ],
+      capability_family: "moral_graph_reflection",
+      plan_family: "moral_graph_reflection",
+      source_target: "moral_graph",
+      admission_families: ["workstation_action"],
+      required_observation_kinds: [
+        "moral_graph_reflection",
+        "helix.moral_graph_reflection_observation.v1",
+        "ideology_context_reflection/v1",
+        "procedural_moral_classification/v1",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "helix_ask.reflect_ideology_context",
+      aliases: ["reflect_ideology_context", "ideology_context_reflection"],
+      capability_family: "moral_graph_reflection",
+      plan_family: "moral_graph_reflection",
+      source_target: "workspace_action",
+      admission_families: ["workstation_action"],
+      required_observation_kinds: [
+        "ideology_context_reflection/v1",
+        "procedural_moral_classification/v1",
+        "helix_moral_graph_reflection_tool_result",
+        "workstation_tool_evaluation",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "moral-graph.reflect_living_substrate_context",
+      aliases: [
+        "moral_living_substrate_reflection",
+        "moral living substrate reflection",
+        "living_substrate_moral_reflection",
+        "living substrate moral reflection",
+        "reflect_living_substrate_context",
+        "reflect living substrate context",
+      ],
+      capability_family: "context_reflection",
+      plan_family: "context_reflection",
+      source_target: "moral_graph",
+      admission_families: ["context_reflection"],
+      required_observation_kinds: [
+        "moral_living_substrate_reflection",
+        "helix.moral_living_substrate_reflection_observation.v1",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "helix_ask.reflect_ideology_context",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "helix_ask.bridge_theory_ideology_context",
+      aliases: [
+        "bridge_theory_ideology_context",
+        "bridge theory ideology context",
+        "bridge theory and ideology context",
+        "theory_ideology_bridge",
+        "theory ideology bridge",
+        "theory_moral_bridge",
+        "theory moral bridge",
+      ],
+      capability_family: "moral_graph_reflection",
+      plan_family: "moral_graph_reflection",
+      source_target: "workspace_action",
+      admission_families: ["workstation_action"],
+      required_observation_kinds: [
+        "helix_theory_ideology_bridge_tool_result",
+        "theory_ideology_bridge",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "helix_ask.build_civilization_scenario_frame",
+      aliases: [
+        "build_civilization_scenario_frame",
+        "build civilization scenario frame",
+        "civilization_scenario_frame",
+        "civilization scenario frame",
+      ],
+      capability_family: "civilization_bounds",
+      plan_family: "civilization_bounds",
+      source_target: "workspace_action",
+      admission_families: ["workstation_action"],
+      required_observation_kinds: [
+        "civilization_scenario_frame/v1",
+        "helix_civilization_scenario_frame_tool_result",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "helix_ask.reflect_civilization_bounds",
+      aliases: [
+        "reflect_civilization_bounds",
+        "reflect civilization bounds",
+        "civilization_bounds",
+        "civilization bounds",
+        "civilization_bounds_reflection",
+        "civilization bounds reflection",
+        "civilization_bounds_roadmap/v1",
+      ],
+      capability_family: "civilization_bounds",
+      plan_family: "civilization_bounds",
+      source_target: "workspace_action",
+      admission_families: ["workstation_action"],
+      required_observation_kinds: [
+        "civilization_bounds_roadmap/v1",
+        "helix_civilization_bounds_tool_result",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "visual_analysis.inspect_image_region",
+      aliases: [
+        "image lens pdf page",
+        "image lens page",
+        "image lens crop",
+        "image lens region",
+        "image lens observation",
+        "pdf page crop",
+        "exact equation row",
+        "equation row crop",
+        "crop ref",
+        "bbox",
+        "bounding box",
+      ],
+      capability_family: "visual_capture",
+      plan_family: "visual_capture",
+      source_target: "visual_capture",
+      admission_families: ["situation_run"],
+      required_observation_kinds: [
+        "capability_lane_observation_packet",
+        "visual_analysis.inspect_image_region",
+        "scientific_image_evidence_sidecar",
+      ],
+      required_terminal_kind: "image_lens_observation_report",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: [
+        "situation-room.describe_visual_capture",
+        "docs-viewer.locate_in_doc",
+        "repo-code.search_concept",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "image_lens.inspect",
+      runtime_capability: "situation-room.describe_visual_capture",
+      aliases: [
+        "image_lens",
+        "image lens",
+        "image-lens",
+        "visual_capture",
+        "visual capture",
+        "visual capture inspect",
+        "situation-room.describe_visual_capture",
+        "situation room visual capture",
+        "image lens inspect",
+      ],
+      capability_family: "visual_capture",
+      plan_family: "visual_capture",
+      source_target: "visual_capture",
+      admission_families: ["situation_run"],
+      required_observation_kinds: [
+        "visual_frame_evidence",
+        "situation_context_pack",
+        "visual_capture_coverage",
+      ],
+      required_terminal_kind: "situation_context_pack",
+      allowed_substitutions: ["situation-room.describe_visual_capture"],
+      forbidden_nearby_capabilities: [
+        "docs-viewer.locate_in_doc",
+        "repo-code.search_concept",
+        "model.direct_answer",
+      ],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "workstation-notes.list_notes",
+      aliases: [
+        "workstation-notes.list",
+        "workstation notes list",
+        "list workstation notes",
+      ],
+      capability_family: "workstation",
+      plan_family: "workstation_action",
+      source_target: "workspace_action",
+      admission_families: ["notes", "workstation_action"],
+      required_observation_kinds: [
+        "workstation_notes_list_observation",
+        "helix.workstation_notes_list_observation.v1",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "workstation-notes.append_to_note",
+      aliases: ["workstation-notes.append", "workstation notes append"],
+      capability_family: "workstation",
+      plan_family: "workstation_action",
+      source_target: "workspace_action",
+      admission_families: ["notes", "workstation_action"],
+      required_observation_kinds: [
+        "workspace_action_receipt",
+        "note_update_receipt",
+        "note_action_receipt",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "workstation-notes.create_note",
+      aliases: [
+        "workstation-notes.create",
+        "workstation notes create",
+        "create workstation note",
+      ],
+      capability_family: "workstation",
+      plan_family: "workstation_action",
+      source_target: "workspace_action",
+      admission_families: ["notes", "workstation_action"],
+      required_observation_kinds: [
+        "workspace_action_receipt",
+        "note_update_receipt",
+      ],
+      required_terminal_kind: "note_update_receipt",
+      allowed_substitutions: ["workstation-notes.create"],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "workstation-notes.open",
+      aliases: ["workstation notes open", "open workstation notes"],
+      capability_family: "workstation",
+      plan_family: "workstation_action",
+      source_target: "workspace_action",
+      admission_families: ["notes", "workstation_action"],
+      required_observation_kinds: ["workspace_action_receipt"],
+      required_terminal_kind: "workstation_tool_evaluation",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+  ];
 
 const explicitCapabilityContracts: ExplicitCapabilityContract[] =
-  explicitCapabilityContractDefinitions.map(normalizeExplicitCapabilityContract);
+  explicitCapabilityContractDefinitions.map(
+    normalizeExplicitCapabilityContract,
+  );
 
 const commandVerb = String.raw`(?:call|use|run|invoke|execute|reflect(?:\s+on)?|inspect\s+using|locate\s+(?:in\s+doc\s+)?using|find\s+using)`;
 
-const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean)));
+const uniqueStrings = (values: string[]): string[] =>
+  Array.from(new Set(values.filter(Boolean)));
 
 const normalizeCapabilityKey = (value: unknown): string =>
   String(value ?? "")
@@ -1752,61 +2409,181 @@ const normalizeCapabilityKey = (value: unknown): string =>
     .replace(/_+/g, "_")
     .replace(/^_+|_+$/g, "");
 
-const capabilityKeysMatch = (
-  left: unknown,
-  right: unknown,
-): boolean => {
+const capabilityKeysMatch = (left: unknown, right: unknown): boolean => {
   const normalizedLeft = normalizeCapabilityKey(left);
   const normalizedRight = normalizeCapabilityKey(right);
-  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+  return Boolean(
+    normalizedLeft && normalizedRight && normalizedLeft === normalizedRight,
+  );
 };
 
-const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegex = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const commandMentionsCapability = (prompt: string, capability: string): boolean => {
+const commandMentionsCapability = (
+  prompt: string,
+  capability: string,
+): boolean => {
   const escaped = escapeRegex(capability);
-  return new RegExp(String.raw`\b${commandVerb}\b[\s\S]{0,80}\b${escaped}\b`, "i").test(prompt);
+  return new RegExp(
+    String.raw`\b${commandVerb}\b[\s\S]{0,80}\b${escaped}\b`,
+    "i",
+  ).test(prompt);
 };
 
 const capabilityMentionRegex = (capability: string): RegExp =>
   new RegExp(String.raw`\b${escapeRegex(capability)}\b`, "gi");
 
-const commandMentionsCapabilityAt = (prompt: string, capability: string, matchIndex: number): boolean => {
+const commandMentionsCapabilityAt = (
+  prompt: string,
+  capability: string,
+  matchIndex: number,
+): boolean => {
   const windowStart = Math.max(0, matchIndex - 100);
   const before = prompt.slice(windowStart, matchIndex);
   const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
-  return new RegExp(String.raw`\b${commandVerb}\b[\s\S]{0,100}$`, "i").test(clausePrefix) ||
-    commandMentionsCapability(`${clausePrefix}${prompt.slice(matchIndex, matchIndex + capability.length + 90).split(/[.!?;\n]/)[0] ?? ""}`, capability);
+  return (
+    new RegExp(String.raw`\b${commandVerb}\b[\s\S]{0,100}$`, "i").test(
+      clausePrefix,
+    ) ||
+    commandMentionsCapability(
+      `${clausePrefix}${prompt.slice(matchIndex, matchIndex + capability.length + 90).split(/[.!?;\n]/)[0] ?? ""}`,
+      capability,
+    )
+  );
 };
 
-const negatedCommandMentionsCapabilityAt = (prompt: string, matchIndex: number): boolean => {
+const negatedCommandMentionsCapabilityAt = (
+  prompt: string,
+  matchIndex: number,
+): boolean => {
   const before = prompt.slice(Math.max(0, matchIndex - 140), matchIndex);
   const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
   return new RegExp(
-    String.raw`\b(?:do\s+not|don't|dont|never|avoid|without|no)\b[\s\S]{0,80}\b(?:${commandVerb})?\b[\s\S]{0,80}$`,
+    String.raw`\b(?:do\s+not|don['’]t|dont|never|avoid|without|no)\b[\s\S]{0,80}\b(?:${commandVerb})?\b[\s\S]{0,80}$`,
     "i",
   ).test(clausePrefix);
 };
 
-const capabilityMentionIsQuotedAt = (prompt: string, matchIndex: number): boolean => {
+const capabilityMentionIsQuotedAt = (
+  prompt: string,
+  matchIndex: number,
+): boolean => {
+  const pairedQuotePattern =
+    /"[^"]*"|'[^']*'|“[^”]*”|„[^”]*”|‘[^’]*’|‚[^’]*’|«[^»]*»|‹[^›]*›|「[^」]*」|『[^』]*』/g;
+  for (const quoteMatch of prompt.matchAll(pairedQuotePattern)) {
+    const quoteStart =
+      typeof quoteMatch.index === "number" ? quoteMatch.index : -1;
+    const quoteEnd = quoteStart + quoteMatch[0].length;
+    if (quoteStart >= 0 && matchIndex > quoteStart && matchIndex < quoteEnd) {
+      return true;
+    }
+  }
   const before = prompt.slice(0, Math.max(0, matchIndex));
   const straightQuotes = (before.match(/(?<!\\)"/g) ?? []).length;
   const openCurlyQuotes = (before.match(/[“]/g) ?? []).length;
   const closeCurlyQuotes = (before.match(/[”]/g) ?? []).length;
-  return straightQuotes % 2 === 1 || openCurlyQuotes > closeCurlyQuotes;
+  const openCurlySingleQuotes = (before.match(/[‘]/g) ?? []).length;
+  const closeCurlySingleQuotes = (before.match(/[’]/g) ?? []).length;
+  const openGuillemets = (before.match(/[«‹]/g) ?? []).length;
+  const closeGuillemets = (before.match(/[»›]/g) ?? []).length;
+  return (
+    straightQuotes % 2 === 1 ||
+    openCurlyQuotes > closeCurlyQuotes ||
+    openCurlySingleQuotes > closeCurlySingleQuotes ||
+    openGuillemets > closeGuillemets
+  );
 };
 
-const capabilityMentionIsDeferredAt = (prompt: string, matchIndex: number): boolean => {
+const capabilityMentionIsDeferredAt = (
+  prompt: string,
+  matchIndex: number,
+): boolean => {
   const before = prompt.slice(Math.max(0, matchIndex - 160), matchIndex);
   const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
-  return /\b(?:later|eventually|someday|in\s+the\s+future|if|when|unless)\b[\s\S]{0,120}$/i.test(clausePrefix) ||
-    /\b(?:may|might|could|would|plan\s+to|intend\s+to)\s+(?:then\s+)?(?:call|use|run|invoke|execute)\b[\s\S]{0,80}$/i.test(clausePrefix);
+  return (
+    /\b(?:later|eventually|someday|in\s+the\s+future|if|when|unless)\b[\s\S]{0,120}$/i.test(
+      clausePrefix,
+    ) ||
+    /\b(?:may|might|could|would|plan\s+to|intend\s+to)\s+(?:then\s+)?(?:call|use|run|invoke|execute)\b[\s\S]{0,80}$/i.test(
+      clausePrefix,
+    )
+  );
 };
 
-const capabilityMentionIsNonExecutableContextAt = (prompt: string, matchIndex: number): boolean =>
-  capabilityMentionIsQuotedAt(prompt, matchIndex) || capabilityMentionIsDeferredAt(prompt, matchIndex);
+const capabilityMentionIsScreenVisibleAt = (
+  prompt: string,
+  matchIndex: number,
+): boolean => {
+  const before = prompt.slice(Math.max(0, matchIndex - 180), matchIndex);
+  const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
+  return /\b(?:screen|page|button|label|ui|text|menu|dropdown)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,100}$/i.test(
+    clausePrefix,
+  );
+};
 
-const capabilityMentionIsExplanatoryQuestionAt = (prompt: string, matchIndex: number): boolean => {
+const capabilityMentionIsHistoricalCommandAt = (
+  prompt: string,
+  matchIndex: number,
+): boolean => {
+  const before = prompt.slice(Math.max(0, matchIndex - 200), matchIndex);
+  const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
+  return /\b(?:earlier|previously|historically|last\s+turn|before)\b[\s\S]{0,100}\b(?:asked|said|mentioned|reported|described|discussed)\b[\s\S]{0,80}\b(?:call|use|run|invoke|execute|continue|evaluate|assess)\b[\s\S]{0,40}$/i.test(
+    clausePrefix,
+  );
+};
+
+const capabilityMentionIsNonExecutableContextAt = (
+  prompt: string,
+  matchIndex: number,
+): boolean =>
+  capabilityMentionIsQuotedAt(prompt, matchIndex) ||
+  capabilityMentionIsDeferredAt(prompt, matchIndex) ||
+  capabilityMentionIsScreenVisibleAt(prompt, matchIndex) ||
+  capabilityMentionIsHistoricalCommandAt(prompt, matchIndex);
+
+const theoryExecutionClosureCommandMatch = (
+  prompt: string,
+): {
+  matched_text: string;
+  match_index: number;
+  match_end_index: number;
+} | null => {
+  const matcher =
+    /\b(?:continue|evaluate|assess|run|execute|use|call|invoke)\b[\s\S]{0,100}\b((?:theory[-_\s]+)?execution[-_\s]+closure|theory-experiment-procedure\.evaluate_closure|theory_experiment_procedure_evaluate_closure)\b/gi;
+  for (const match of prompt.matchAll(matcher)) {
+    const fullMatchIndex = typeof match.index === "number" ? match.index : -1;
+    const matchedText = match[1] ?? "";
+    if (fullMatchIndex < 0 || !matchedText) continue;
+    const relativeMatchIndex = match[0].lastIndexOf(matchedText);
+    const matchIndex = fullMatchIndex + Math.max(0, relativeMatchIndex);
+    const before = prompt.slice(Math.max(0, matchIndex - 180), matchIndex);
+    const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
+    if (
+      capabilityMentionIsNonExecutableContextAt(prompt, matchIndex) ||
+      negatedCommandMentionsCapabilityAt(prompt, matchIndex) ||
+      /\b(?:earlier|previously|historically|last\s+turn|before|already)\b[\s\S]{0,160}$/i.test(
+        clausePrefix,
+      ) ||
+      /\b(?:screen|page|button|label|ui|text|menu|dropdown)\b[\s\S]{0,120}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,100}$/i.test(
+        clausePrefix,
+      )
+    ) {
+      continue;
+    }
+    return {
+      matched_text: matchedText,
+      match_index: matchIndex,
+      match_end_index: matchIndex + matchedText.length,
+    };
+  }
+  return null;
+};
+
+const capabilityMentionIsExplanatoryQuestionAt = (
+  prompt: string,
+  matchIndex: number,
+): boolean => {
   const boundaryIndex = Math.max(
     prompt.lastIndexOf(".", matchIndex - 1),
     prompt.lastIndexOf("?", matchIndex - 1),
@@ -1817,48 +2594,72 @@ const capabilityMentionIsExplanatoryQuestionAt = (prompt: string, matchIndex: nu
   const nextBoundaryCandidates = ["?", ";", ".", "!", "\n"]
     .map((boundary) => prompt.indexOf(boundary, matchIndex))
     .filter((index) => index >= matchIndex && index - matchIndex <= 240);
-  const clauseEnd = nextBoundaryCandidates.length > 0
-    ? Math.min(...nextBoundaryCandidates)
-    : Math.min(prompt.length, matchIndex + 240);
+  const clauseEnd =
+    nextBoundaryCandidates.length > 0
+      ? Math.min(...nextBoundaryCandidates)
+      : Math.min(prompt.length, matchIndex + 240);
   const clause = prompt.slice(boundaryIndex + 1, clauseEnd + 1);
   const asksAboutCapability =
-    /\b(?:does?|can|could|would|will|is|are)\b|\bdo\s+you\b|\b(?:allow|let)(?:s|ted)?\s+you\b/i.test(clause);
+    /\b(?:does?|can|could|would|will|is|are)\b|\bdo\s+you\b|\b(?:allow|let)(?:s|ted)?\s+you\b/i.test(
+      clause,
+    );
   const namesToolOrWorkflowInClause =
-    /\b(?:your|the|this|that)\s+(?:(?:research[-\s]?paper|scholarly|paper)\s+)?(?:tool|agent|workflow|capabilit(?:y|ies))\b/i.test(clause) ||
-    /\b(?:tool|agent|workflow)\s+for\s+(?:research|scholarly)\s+papers?\b/i.test(clause);
+    /\b(?:your|the|this|that)\s+(?:(?:research[-\s]?paper|scholarly|paper)\s+)?(?:tool|agent|workflow|capabilit(?:y|ies))\b/i.test(
+      clause,
+    ) ||
+    /\b(?:tool|agent|workflow)\s+for\s+(?:research|scholarly)\s+papers?\b/i.test(
+      clause,
+    );
   const continuesPriorCapabilityQuestion = /^\s*or\s+do\s+you\b/i.test(clause);
-  const priorQuestionContext = prompt.slice(Math.max(0, boundaryIndex - 240), boundaryIndex + 1);
+  const priorQuestionContext = prompt.slice(
+    Math.max(0, boundaryIndex - 240),
+    boundaryIndex + 1,
+  );
   const priorQuestionNamesToolOrWorkflow =
-    /\b(?:your|the|this|that)\s+(?:(?:research[-\s]?paper|scholarly|paper)\s+)?(?:tool|agent|workflow|capabilit(?:y|ies))\b/i.test(priorQuestionContext) ||
-    /\b(?:tool|agent|workflow)\s+for\s+(?:research|scholarly)\s+papers?\b/i.test(priorQuestionContext);
+    /\b(?:your|the|this|that)\s+(?:(?:research[-\s]?paper|scholarly|paper)\s+)?(?:tool|agent|workflow|capabilit(?:y|ies))\b/i.test(
+      priorQuestionContext,
+    ) ||
+    /\b(?:tool|agent|workflow)\s+for\s+(?:research|scholarly)\s+papers?\b/i.test(
+      priorQuestionContext,
+    );
   const historicalCapabilityReference =
-    /\b(?:earlier|previously|historically|last\s+turn|before)\b[\s\S]{0,120}\b(?:asked|mentioned|said|discussed|wondered)\b/i.test(clause) &&
-    namesToolOrWorkflowInClause;
+    /\b(?:earlier|previously|historically|last\s+turn|before)\b[\s\S]{0,120}\b(?:asked|mentioned|said|discussed|wondered)\b/i.test(
+      clause,
+    ) && namesToolOrWorkflowInClause;
   const explanatoryCapabilityQuestion =
     clause.includes("?") &&
     asksAboutCapability &&
-    (
-      namesToolOrWorkflowInClause ||
-      (continuesPriorCapabilityQuestion && priorQuestionNamesToolOrWorkflow)
-    );
+    (namesToolOrWorkflowInClause ||
+      (continuesPriorCapabilityQuestion && priorQuestionNamesToolOrWorkflow));
   return explanatoryCapabilityQuestion || historicalCapabilityReference;
 };
 
-const compoundCommandChainMentionsCapabilityAt = (prompt: string, matchIndex: number): boolean => {
+const compoundCommandChainMentionsCapabilityAt = (
+  prompt: string,
+  matchIndex: number,
+): boolean => {
   const before = prompt.slice(Math.max(0, matchIndex - 120), matchIndex);
   const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
-  if (!new RegExp(String.raw`\b${commandVerb}\b`, "i").test(prompt)) return false;
-  return /\b(?:then|and|plus|after|before|followed\s+by|next)\b[\s\S]{0,80}$/i.test(clausePrefix);
+  if (!new RegExp(String.raw`\b${commandVerb}\b`, "i").test(prompt))
+    return false;
+  return /\b(?:then|and|plus|after|before|followed\s+by|next)\b[\s\S]{0,80}$/i.test(
+    clausePrefix,
+  );
 };
 
 const commandClauseOrdinal = (prompt: string, matchIndex: number): number => {
   const before = prompt.slice(0, Math.max(0, matchIndex));
   return Array.from(
-    before.matchAll(/\b(?:then|next|followed\s+by|and\s+then|plus)\b\s+(?:call|use|run|invoke|execute)?\b/gi),
+    before.matchAll(
+      /\b(?:then|next|followed\s+by|and\s+then|plus)\b\s+(?:call|use|run|invoke|execute)?\b/gi,
+    ),
   ).length;
 };
 
-const commandMentionsContract = (prompt: string, contract: ExplicitCapabilityContract): boolean => {
+const commandMentionsContract = (
+  prompt: string,
+  contract: ExplicitCapabilityContract,
+): boolean => {
   const names = uniqueStrings([
     contract.capability,
     contract.runtime_capability ?? "",
@@ -1869,7 +2670,8 @@ const commandMentionsContract = (prompt: string, contract: ExplicitCapabilityCon
     for (const match of prompt.matchAll(matcher)) {
       const matchIndex = typeof match.index === "number" ? match.index : -1;
       if (matchIndex < 0) continue;
-      if (capabilityMentionIsNonExecutableContextAt(prompt, matchIndex)) continue;
+      if (capabilityMentionIsNonExecutableContextAt(prompt, matchIndex))
+        continue;
       if (negatedCommandMentionsCapabilityAt(prompt, matchIndex)) continue;
       if (commandMentionsCapabilityAt(prompt, name, matchIndex)) return true;
     }
@@ -1878,14 +2680,30 @@ const commandMentionsContract = (prompt: string, contract: ExplicitCapabilityCon
 };
 
 const hasConcreteCalculatorExpression = (prompt: string): boolean =>
-  /\bscientific-calculator\.solve(?:_expression|_with_steps)?\b/i.test(prompt) ||
-  /\b(?:with\s+(?:this\s+exact\s+)?expression|expression\s+is|expression)\s*:?\s*[0-9][0-9eE\s.+\-*/^%()[\]]{1,120}/i.test(prompt);
+  /\bscientific-calculator\.solve(?:_expression|_with_steps)?\b/i.test(
+    prompt,
+  ) ||
+  /\b(?:with\s+(?:this\s+exact\s+)?expression|expression\s+is|expression)\s*:?\s*[0-9][0-9eE\s.+\-*/^%()[\]]{1,120}/i.test(
+    prompt,
+  );
 
-const isConditionalPriorEvidenceCalculatorFollowup = (prompt: string): boolean => {
-  const conditional = /\b(?:if|when|provided\s+that|only\s+if|assuming)\b/i.test(prompt);
-  const priorEvidence = /\b(?:previous|prior|above|last|earlier)\b[\s\S]{0,100}\b(?:answers?|evidence|result|retrieval|values?|variables?)\b/i.test(prompt);
-  const sufficiencyCheck = /\b(?:enough|sufficient|usable|adequate|complete|fully\s+cited|unit[-\s]?bearing|cited)\b[\s\S]{0,120}\b(?:values?|numbers?|numerics?|parameters?|evidence|citations?|units?)\b/i.test(prompt);
-  const calculatorFollowup = /\b(?:bind|calculate|compute|evaluate|solve|run)\b[\s\S]{0,140}\b(?:formula|expression|calculator|numeric(?:al)?\s+expression|result)\b/i.test(prompt);
+const isConditionalPriorEvidenceCalculatorFollowup = (
+  prompt: string,
+): boolean => {
+  const conditional =
+    /\b(?:if|when|provided\s+that|only\s+if|assuming)\b/i.test(prompt);
+  const priorEvidence =
+    /\b(?:previous|prior|above|last|earlier)\b[\s\S]{0,100}\b(?:answers?|evidence|result|retrieval|values?|variables?)\b/i.test(
+      prompt,
+    );
+  const sufficiencyCheck =
+    /\b(?:enough|sufficient|usable|adequate|complete|fully\s+cited|unit[-\s]?bearing|cited)\b[\s\S]{0,120}\b(?:values?|numbers?|numerics?|parameters?|evidence|citations?|units?)\b/i.test(
+      prompt,
+    );
+  const calculatorFollowup =
+    /\b(?:bind|calculate|compute|evaluate|solve|run)\b[\s\S]{0,140}\b(?:formula|expression|calculator|numeric(?:al)?\s+expression|result)\b/i.test(
+      prompt,
+    );
   return conditional && priorEvidence && sufficiencyCheck && calculatorFollowup;
 };
 
@@ -1897,15 +2715,45 @@ const conditionalCalculatorFollowupSuppressesContract = (
   isConditionalPriorEvidenceCalculatorFollowup(prompt) &&
   !hasConcreteCalculatorExpression(prompt);
 
-const familySuppressed = (prompt: string, contract: ExplicitCapabilityContract): boolean => {
-  if (conditionalCalculatorFollowupSuppressesContract(prompt, contract)) return true;
+const familySuppressed = (
+  prompt: string,
+  contract: ExplicitCapabilityContract,
+): boolean => {
+  if (conditionalCalculatorFollowupSuppressesContract(prompt, contract))
+    return true;
   if (commandMentionsContract(prompt, contract)) return false;
   const suppression = detectContextualToolAdmissionSuppression(prompt);
   if (!suppression) return false;
   if (suppression.suppression_reason === "explanatory_only") return false;
-  return contract.admission_families.some((family: HelixToolCallAdmissionFamily) =>
-    contextualToolSuppressionBlocksFamily(suppression, family)
+  return contract.admission_families.some(
+    (family: HelixToolCallAdmissionFamily) =>
+      contextualToolSuppressionBlocksFamily(suppression, family),
   );
+};
+
+const naturalNotesListPromptMatch = (
+  prompt: string,
+): { matched_text: string; match_index: number; match_end_index: number } | null => {
+  if (!/\b(?:workstation\s+)?notes?\b/i.test(prompt)) return null;
+  if (
+    /\b(?:create|add|append|store|save|write|edit|update|delete|remove)\b[\s\S]{0,100}\b(?:workstation\s+)?notes?\b/i.test(prompt) ||
+    /\b(?:workstation\s+)?notes?\b[\s\S]{0,100}\b(?:create|add|append|store|save|write|edit|update|delete|remove)\b/i.test(prompt)
+  ) {
+    return null;
+  }
+  const match =
+    prompt.match(
+      /\b(?:check|list|show|review|inspect|browse|look\s+(?:at|through)|tell\s+me\s+(?:what|which))\b[\s\S]{0,120}\b(?:workstation\s+)?notes?\b/i,
+    ) ??
+    prompt.match(
+      /\b(?:what|which)\b[\s\S]{0,80}\b(?:topics?|subjects?|notes?)\b[\s\S]{0,80}\b(?:available|present|saved|in)\b[\s\S]{0,60}\b(?:workstation\s+)?notes?\b/i,
+    );
+  if (!match || typeof match.index !== "number") return null;
+  return {
+    matched_text: match[0],
+    match_index: match.index,
+    match_end_index: match.index + match[0].length,
+  };
 };
 
 export const explicitCapabilityContractForCapability = (
@@ -1913,12 +2761,19 @@ export const explicitCapabilityContractForCapability = (
 ): ExplicitCapabilityContract | null => {
   const normalized = String(capability ?? "").trim();
   if (!normalized) return null;
-  return explicitCapabilityContracts.find((contract: ExplicitCapabilityContract) =>
-    capabilityKeysMatch(contract.capability, normalized) ||
-    capabilityKeysMatch(contract.runtime_capability, normalized) ||
-    (contract.aliases ?? []).some((alias) => capabilityKeysMatch(alias, normalized)) ||
-    contract.allowed_substitutions.some((substitution) => capabilityKeysMatch(substitution, normalized))
-  ) ?? null;
+  return (
+    explicitCapabilityContracts.find(
+      (contract: ExplicitCapabilityContract) =>
+        capabilityKeysMatch(contract.capability, normalized) ||
+        capabilityKeysMatch(contract.runtime_capability, normalized) ||
+        (contract.aliases ?? []).some((alias) =>
+          capabilityKeysMatch(alias, normalized),
+        ) ||
+        contract.allowed_substitutions.some((substitution) =>
+          capabilityKeysMatch(substitution, normalized),
+        ),
+    ) ?? null
+  );
 };
 
 export const extractExplicitCapabilityContract = (
@@ -1933,8 +2788,11 @@ export const extractExplicitCapabilityContracts = (
   const prompt = String(promptText ?? "").trim();
   if (!prompt) return [];
   const matches: ExtractedExplicitCapabilityContract[] = [];
-  const capabilityCatalogContract = explicitCapabilityContractForCapability("helix_ask.inspect_capability_catalog");
-  const capabilityCatalogMatchIndex = askCapabilityCatalogPromptMatchIndex(prompt);
+  const capabilityCatalogContract = explicitCapabilityContractForCapability(
+    "helix_ask.inspect_capability_catalog",
+  );
+  const capabilityCatalogMatchIndex =
+    askCapabilityCatalogPromptMatchIndex(prompt);
   if (
     capabilityCatalogContract &&
     isAskCapabilityCatalogPrompt(prompt) &&
@@ -1949,6 +2807,82 @@ export const extractExplicitCapabilityContracts = (
       source: "capability_catalog_prompt",
     });
   }
+  const notesListContract = explicitCapabilityContractForCapability(
+    "workstation-notes.list_notes",
+  );
+  const notesListMatch = naturalNotesListPromptMatch(prompt);
+  if (
+    notesListContract &&
+    notesListMatch &&
+    !negatedCommandMentionsCapabilityAt(prompt, notesListMatch.match_index) &&
+    !capabilityMentionIsNonExecutableContextAt(prompt, notesListMatch.match_index) &&
+    !familySuppressed(prompt, notesListContract)
+  ) {
+    matches.push({
+      contract: notesListContract,
+      capability: notesListContract.capability,
+      matched_name: notesListMatch.matched_text,
+      match_index: notesListMatch.match_index,
+      match_end_index: notesListMatch.match_end_index,
+      source: "natural_capability_intent",
+    });
+  }
+  const voiceDeliveryContract = explicitCapabilityContractForCapability(
+    "text_to_speech.speak_text",
+  );
+  const voiceMatch = prompt.match(
+    /\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,120}\b(?:aloud|out\s*loud|outload|to\s+me)\b/i,
+  );
+  if (
+    voiceDeliveryContract &&
+    voiceMatch &&
+    typeof voiceMatch.index === "number" &&
+    isAffirmativeReadAloudPrompt(prompt) &&
+    !negatedCommandMentionsCapabilityAt(prompt, voiceMatch.index) &&
+    !capabilityMentionIsNonExecutableContextAt(prompt, voiceMatch.index) &&
+    !familySuppressed(prompt, voiceDeliveryContract)
+  ) {
+    matches.push({
+      contract: voiceDeliveryContract,
+      capability: voiceDeliveryContract.capability,
+      matched_name: voiceMatch[0],
+      match_index: voiceMatch.index,
+      match_end_index: voiceMatch.index + voiceMatch[0].length,
+      source: "natural_capability_intent",
+    });
+  }
+  const theoryExperimentProcedureContract =
+    explicitCapabilityContractForCapability(
+      THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+    );
+  const theoryExperimentProcedureMatch =
+    theoryExperimentProcedurePromptMatch(prompt);
+  if (theoryExperimentProcedureContract && theoryExperimentProcedureMatch) {
+    matches.push({
+      contract: theoryExperimentProcedureContract,
+      capability: theoryExperimentProcedureContract.capability,
+      matched_name: theoryExperimentProcedureMatch.matched_text,
+      match_index: theoryExperimentProcedureMatch.match_index,
+      match_end_index: theoryExperimentProcedureMatch.match_end_index,
+      source: "command_mention",
+    });
+  }
+  const theoryExecutionClosureContract =
+    explicitCapabilityContractForCapability(
+      THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY,
+    );
+  const theoryExecutionClosureMatch =
+    theoryExecutionClosureCommandMatch(prompt);
+  if (theoryExecutionClosureContract && theoryExecutionClosureMatch) {
+    matches.push({
+      contract: theoryExecutionClosureContract,
+      capability: theoryExecutionClosureContract.capability,
+      matched_name: theoryExecutionClosureMatch.matched_text,
+      match_index: theoryExecutionClosureMatch.match_index,
+      match_end_index: theoryExecutionClosureMatch.match_end_index,
+      source: "command_mention",
+    });
+  }
   for (const contract of explicitCapabilityContracts) {
     if (familySuppressed(prompt, contract)) continue;
     const names = uniqueStrings([
@@ -1961,14 +2895,27 @@ export const extractExplicitCapabilityContracts = (
       for (const match of prompt.matchAll(matcher)) {
         const matchIndex = typeof match.index === "number" ? match.index : -1;
         if (matchIndex < 0) continue;
-        if (capabilityMentionIsNonExecutableContextAt(prompt, matchIndex)) continue;
+        if (capabilityMentionIsNonExecutableContextAt(prompt, matchIndex))
+          continue;
         if (
           contract.capability !== "helix_ask.inspect_capability_catalog" &&
           capabilityMentionIsExplanatoryQuestionAt(prompt, matchIndex)
-        ) continue;
-        const commandMention = commandMentionsCapabilityAt(prompt, name, matchIndex);
-        const compoundMention = compoundCommandChainMentionsCapabilityAt(prompt, matchIndex);
-        if ((commandMention || compoundMention) && negatedCommandMentionsCapabilityAt(prompt, matchIndex)) continue;
+        )
+          continue;
+        const commandMention = commandMentionsCapabilityAt(
+          prompt,
+          name,
+          matchIndex,
+        );
+        const compoundMention = compoundCommandChainMentionsCapabilityAt(
+          prompt,
+          matchIndex,
+        );
+        if (
+          (commandMention || compoundMention) &&
+          negatedCommandMentionsCapabilityAt(prompt, matchIndex)
+        )
+          continue;
         if (!commandMention && !compoundMention) continue;
         const candidate: ExtractedExplicitCapabilityContract = {
           contract,
@@ -1984,9 +2931,12 @@ export const extractExplicitCapabilityContracts = (
   }
   const seen = new Set<string>();
   const orderedMatches = matches
-    .sort((left, right) =>
-      left.match_index - right.match_index ||
-      (right.match_end_index - right.match_index) - (left.match_end_index - left.match_index)
+    .sort(
+      (left, right) =>
+        left.match_index - right.match_index ||
+        right.match_end_index -
+          right.match_index -
+          (left.match_end_index - left.match_index),
     )
     .filter((match) => {
       const key = `${match.contract.capability}:${match.match_index}:${match.match_end_index}`;
@@ -2001,15 +2951,24 @@ export const extractExplicitCapabilityContracts = (
     clauseSeen.add(key);
     return true;
   });
-  return clauseDedupeMatches.filter((match, index, ordered) =>
-    !ordered.some((other, otherIndex) => {
-      if (otherIndex === index) return false;
-      const matchLength = Math.max(0, match.match_end_index - match.match_index);
-      const otherLength = Math.max(0, other.match_end_index - other.match_index);
-      return other.match_index <= match.match_index &&
-        other.match_end_index >= match.match_end_index &&
-        otherLength > matchLength;
-    })
+  return clauseDedupeMatches.filter(
+    (match, index, ordered) =>
+      !ordered.some((other, otherIndex) => {
+        if (otherIndex === index) return false;
+        const matchLength = Math.max(
+          0,
+          match.match_end_index - match.match_index,
+        );
+        const otherLength = Math.max(
+          0,
+          other.match_end_index - other.match_index,
+        );
+        return (
+          other.match_index <= match.match_index &&
+          other.match_end_index >= match.match_end_index &&
+          otherLength > matchLength
+        );
+      }),
   );
 };
 
@@ -2024,8 +2983,10 @@ export const explicitCapabilityMatches = (
   const contract = explicitCapabilityContractForCapability(requested);
   return Boolean(
     capabilityKeysMatch(contract?.runtime_capability, actual) ||
-      contract?.allowed_substitutions.some((substitution) => capabilityKeysMatch(substitution, actual)) ||
-      contract?.aliases?.some((alias) => capabilityKeysMatch(alias, actual)),
+    contract?.allowed_substitutions.some((substitution) =>
+      capabilityKeysMatch(substitution, actual),
+    ) ||
+    contract?.aliases?.some((alias) => capabilityKeysMatch(alias, actual)),
   );
 };
 

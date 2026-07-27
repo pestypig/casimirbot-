@@ -75,15 +75,21 @@ export const helixToolOutputRoleForTerminalKind = (
 ): HelixToolOutputRole | null => {
   const normalized = typeof kind === "string" ? kind.trim().toLowerCase() : "";
   if (!normalized) return null;
-  if (HELIX_SELF_TERMINAL_ARTIFACT_KINDS.has(normalized)) return "self_terminal";
-  if (/sidecar|context_pack|client_projection|panel_generated_answer|live_card_projection/i.test(normalized)) {
+  if (HELIX_SELF_TERMINAL_ARTIFACT_KINDS.has(normalized))
+    return "self_terminal";
+  if (
+    /sidecar|context_pack|client_projection|panel_generated_answer|live_card_projection/i.test(
+      normalized,
+    )
+  ) {
     return "ambient_context";
   }
   return null;
 };
 
-export const helixTerminalKindIsSelfTerminal = (kind: string | null | undefined): boolean =>
-  helixToolOutputRoleForTerminalKind(kind) === "self_terminal";
+export const helixTerminalKindIsSelfTerminal = (
+  kind: string | null | undefined,
+): boolean => helixToolOutputRoleForTerminalKind(kind) === "self_terminal";
 
 export type HelixTerminalCandidate = {
   schema: "helix.terminal_candidate.v1";
@@ -124,6 +130,7 @@ export type HelixTerminalAuthoritySingleWriterRejectionReason =
   | "route_requires_synthesis"
   | "missing_required_observation"
   | "missing_evidence_reentry"
+  | "visible_answer_policy_repair_required"
   | "route_contract_disallowed"
   | "deterministic_receipt_fallback_nonterminal"
   | "route_contract_forbids_model_synthesized_answer"
@@ -327,7 +334,8 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     compound_materialized_draft_can_satisfy_terminal?: boolean;
     terminal_projection_kind_match?: boolean;
     terminal_projection_guard_applied?: boolean;
-    terminal_projection_guard_action?: "project_authority_artifact" | "fail_closed" | null;
+    terminal_projection_guard_action?:
+      "project_authority_artifact" | "fail_closed" | null;
     terminal_projection_failure_code?: "terminal_projection_mismatch" | null;
   };
 };

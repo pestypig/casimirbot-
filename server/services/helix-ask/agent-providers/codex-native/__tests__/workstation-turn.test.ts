@@ -213,6 +213,137 @@ describe("Codex native governed workstation turn", () => {
     expect(nativeTurnRunner).toHaveBeenCalledOnce();
   });
 
+  it("passes executor-owned current-turn evidence to a native theory procedure call", async () => {
+    const turnId = "ask:test:native-theory-procedure";
+    const capabilityId = "theory-experiment-procedure.prepare";
+    const receipt = await signInLocalAccountSession({
+      profile_id: "profile:native-theory-procedure-developer",
+      account_type: "developer",
+    });
+    const accountContext = await resolveWorkstationGatewayAccountContext(
+      receipt.session?.session_id,
+    );
+    const artifact = {
+      schema: "helix.repo_search_observation.v1",
+      artifact_id: "repo-observation:native-theory",
+      status: "succeeded",
+      query: "native theory evidence",
+      hits: [{ path: "docs/example.md", line: 4 }],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const authoritativeEvidenceArtifacts = [
+      {
+        schema: "helix.current_turn_artifact.v1",
+        artifact_id: `${turnId}:ledger:repo-observation:native-theory`,
+        kind: "repo_code_evidence_observation",
+        turn_id: turnId,
+        source_scope: "current_turn_context",
+        produced_artifact_refs: ["repo-observation:native-theory"],
+        payload: artifact,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    ];
+    const nativeTurnRunner = vi.fn(
+      async (turn: RunCodexNativeAppServerTurnInput) => {
+        const binding = readBinding(turn.prompt);
+        const admission = await turn.validateRouteProposal({
+          schema: "helix.runtime_semantic_route_proposal.v1",
+          turn_id: turnId,
+          proposal_source: "agent_runtime",
+          prompt_hash: binding.prompt_hash,
+          proposed_route: "theory_experiment_procedure",
+          proposed_tool_family: "theory",
+          proposed_capability_id: capabilityId,
+          proposed_capability_ids: [capabilityId],
+          confidence: "high",
+          uncertainty: [],
+          reason_summary:
+            "The requested comparison requires the admitted theory procedure.",
+          supporting_hint_refs: [],
+        });
+        const execution = await turn.executeCapability({
+          capabilityId,
+          arguments: {
+            prompt: "Compare admitted native evidence with the selected badge.",
+            operation: "compare",
+            target: "native evidence comparison",
+            selected_badge_ids: ["study.casimir_dp.evidence_map_stage3"],
+            evidence_artifacts: [
+              {
+                artifact_ref: "repo-observation:native-theory",
+                source_turn_id: turnId,
+                kind: "repo_observation",
+                artifact,
+              },
+            ],
+          },
+          iteration: 1,
+        });
+        expect(execution).toMatchObject({
+          ok: true,
+          content: {
+            observation: {
+              procedure: {
+                evidenceBindings: [
+                  {
+                    artifactRef: "repo-observation:native-theory",
+                    admission: "current_turn_admitted",
+                  },
+                ],
+              },
+            },
+          },
+        });
+        return nativeResult({
+          turn,
+          proposal: admission.proposal!,
+          admitted: admission.admittedCapabilityIds,
+          requested: [capabilityId],
+          executed: [capabilityId],
+          observationRefs: execution.observationRef
+            ? [execution.observationRef]
+            : [],
+          ok: execution.ok,
+        });
+      },
+    );
+
+    const result = await runCodexNativeWorkstationTurn({
+      prompt: "Prepare the theory comparison from admitted evidence.",
+      turnId,
+      cwd: process.cwd(),
+      accountContext,
+      requestedMode: "read",
+      allowedWorkstationTools: [capabilityId],
+      authoritativeEvidenceArtifacts,
+      nativeTurnRunner,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      gatewayCallResults: [
+        {
+          ok: true,
+          capability_id: capabilityId,
+          observation: {
+            procedure: {
+              evidenceBindings: [
+                {
+                  artifactRef: "repo-observation:native-theory",
+                  authority: "evidence_only",
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+  });
+
   it("admits and executes an ordered compound capability set from one native route proposal", async () => {
     const receipt = await signInLocalAccountSession({
       profile_id: "profile:native-workstation-compound-developer",

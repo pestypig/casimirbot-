@@ -12,6 +12,7 @@ import {
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
 import { extractScholarlySourceTargets } from "./scholarly-research-intent";
+import { isAffirmativeTheoryExperimentProcedurePrompt } from "./theory-experiment-procedure-intent";
 import { hasWorkstationPanelScopeCue } from "./workstation-active-context-intent";
 
 const KNOWN_WORKSTATION_PANEL_IDS = [
@@ -61,7 +62,7 @@ export type ToolUseRestatementV1 = {
 };
 
 const hasLocalWorkspaceScopeCue = (promptText: string): boolean =>
-  /\b(?:docs?\s+viewer|documents?\s+viewer|current\s+(?:doc|document)|active\s+(?:doc|document)|repo|repository|codebase|working\s+tree|workspace|local\s+files?|our\s+docs?|from\s+(?:our|local|the\s+)?docs?)\b/i.test(promptText) ||
+  /\b(?:docs?\s+viewer|documents?\s+viewer|current\s+(?:doc|document)|active\s+(?:doc|document)|repo|repository|codebase|working\s+tree|workspace|workstation|local\s+files?|our\s+docs?|from\s+(?:our|local|the\s+)?docs?)\b/i.test(promptText) ||
   hasKnownWorkstationSurfaceScopeCue(promptText) ||
   /\b(?:theory\s+badge\s+graph|current\s+badge\s+graph|selected\s+badges?|badge\s+(?:selection|combination|trace|branch))\b/i.test(promptText) ||
   /\b(?:current\s+)?(?:NHM[-\s]?2\s+)?(?:white\s*paper|whitepaper|doc(?:ument)?|paper)\b[\s\S]{0,120}\b(?:document\s+)?evidence\b/i.test(promptText) ||
@@ -265,6 +266,7 @@ export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV
   const requiresVoiceDelivery = !suppressed && hasAffirmativeVoiceReadAloudCue(prompt);
   const localSourceScope =
     requiresDocsViewer ||
+    isAffirmativeTheoryExperimentProcedurePrompt(prompt) ||
     hasWorkstationPanelScopeCue(prompt) ||
     hasLocalWorkspaceScopeCue(prompt) ||
     hasLocalObservationScopeCue(prompt);

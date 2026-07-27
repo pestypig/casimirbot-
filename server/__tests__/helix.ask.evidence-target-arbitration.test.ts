@@ -10,6 +10,37 @@ const arbitrate = (promptText: string) =>
   });
 
 describe("Helix Ask evidence target arbitration", () => {
+  it("binds a natural named-document locator to the canonical docs.search capability", () => {
+    const arbitration = arbitrate("Can you find the NHM2 current status whitepaper?");
+
+    expect(arbitration).toMatchObject({
+      selected_candidate_id: "docs_viewer.affirmative_document_search",
+      selected_target_source: "docs_viewer",
+      selected_target_kind: "docs_viewer",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(arbitration.available_capabilities).toContain("docs.search");
+    expect(arbitration.available_capabilities).not.toContain("internet-search.search_web");
+  });
+
+  it("does not reinterpret a natural workstation-health question as web freshness", () => {
+    const arbitration = arbitrate("How is the workstation doing right now?");
+
+    expect(arbitration.selected_target_source).not.toBe("internet_search");
+    expect(arbitration.available_capabilities).not.toContain("internet-search.search_web");
+  });
+
+  it.each([
+    "Do not check how the workstation is doing right now.",
+    "Later, check how the workstation is doing, but not now.",
+    'The screen says "How is the workstation doing right now?" Explain that wording.',
+  ])("keeps contextual workstation-health wording non-operational: %s", (prompt) => {
+    const arbitration = arbitrate(prompt);
+
+    expect(arbitration.selected_target_source).not.toBe("internet_search");
+  });
+
   it("gives capability help precedence over scholarly and Image Lens lexical cues", () => {
     const arbitration = buildAskEvidenceTargetArbitration({
       turnId: "ask:test:capability-help-precedence",

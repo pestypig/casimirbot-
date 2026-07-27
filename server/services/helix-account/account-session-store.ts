@@ -152,9 +152,13 @@ export const isGuestSharedRealtimeRoomHostingEnabled = (): boolean =>
 const GUEST_ROOM_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 const readStoredPolicy = (
-  value: HelixAccountCapabilityPolicy | string,
+  value: unknown,
 ): HelixAccountCapabilityPolicy | null => {
-  if (typeof value !== "string") return value;
+  if (typeof value !== "string") {
+    return value && typeof value === "object"
+      ? (value as HelixAccountCapabilityPolicy)
+      : null;
+  }
   try {
     const parsed = JSON.parse(value);
     return parsed && typeof parsed === "object"
@@ -175,8 +179,11 @@ const storedPolicyHasSharedRoomsExperiment = (
   );
 };
 
-const activePolicyFromRow = (
-  row: Pick<SessionRow, "account_type" | "account_policy">,
+export const resolveEffectiveAccountPolicyFromStoredRow = (
+  row: {
+    account_type: unknown;
+    account_policy: unknown;
+  },
 ): HelixAccountCapabilityPolicy => {
   const accountType = normalizeAccountType(row.account_type) ?? "user";
   if (
@@ -272,7 +279,7 @@ function sessionFromRow(row: SessionRow): HelixAccountSession {
     // Authorization follows the current base account policy. The stored JSON
     // can opt a session into the one recognized public experiment, but cannot
     // preserve retired locks or grant arbitrary capabilities after deployment.
-    account_policy: activePolicyFromRow(row),
+    account_policy: resolveEffectiveAccountPolicyFromStoredRow(row),
     status: row.status === "signed_out" ? "signed_out" : "active",
     memory_scope: row.memory_scope === "session_only" ? "session_only" : "profile",
     created_at: iso(row.created_at),

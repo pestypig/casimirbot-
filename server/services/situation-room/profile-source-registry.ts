@@ -1,3 +1,8 @@
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
+
 export type ProfileLiveSourceFamily =
   | "minecraft"
   | "discord_voice"
@@ -40,6 +45,17 @@ const normalize = (value?: string | null): string | null => {
   return trimmed ? trimmed : null;
 };
 
+const isReservedProfileSourceId = (sourceId: unknown): boolean =>
+  isHelixRoomSourceIngressSourceId(
+    typeof sourceId === "string" ? normalize(sourceId) : null,
+  );
+
+const assertGenericProfileSourceId = (sourceId: unknown): void => {
+  if (isReservedProfileSourceId(sourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
+};
+
 const sourceKey = (source: {
   profile_id: string;
   source_family: ProfileLiveSourceFamily;
@@ -68,6 +84,7 @@ export function recordProfileLiveSource(input: {
   const roomId = normalize(input.room_id);
   const sourceId = normalize(input.source_id);
   if (!profileId || !roomId || !sourceId) return null;
+  assertGenericProfileSourceId(sourceId);
   const source: ProfileLiveSource = {
     profile_id: profileId,
     source_family: input.source_family,
@@ -84,6 +101,7 @@ export function recordProfileLiveSource(input: {
 export function listProfileLiveSources(profileId?: string | null): ProfileLiveSource[] {
   const normalizedProfile = normalize(profileId);
   return Array.from(profileSources.values())
+    .filter((source: ProfileLiveSource) => !isReservedProfileSourceId(source.source_id))
     .filter((source: ProfileLiveSource) => !normalizedProfile || source.profile_id === normalizedProfile)
     .sort((a: ProfileLiveSource, b: ProfileLiveSource) => b.last_seen_at.localeCompare(a.last_seen_at));
 }
@@ -98,6 +116,14 @@ export function resolveProfileMinecraftSource(input: {
   const worldId = normalize(input.world_id);
   const roomId = normalize(input.room_id);
   const sourceId = normalize(input.source_id);
+  if (isReservedProfileSourceId(sourceId)) {
+    return {
+      resolved: false,
+      profile_id: profileId,
+      reason: "missing_source",
+      candidates: [],
+    };
+  }
   const candidates = listProfileLiveSources(profileId).filter(
     (source: ProfileLiveSource) => source.source_family === "minecraft" && source.status === "active",
   );

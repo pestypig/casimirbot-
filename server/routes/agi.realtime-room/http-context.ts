@@ -6,6 +6,8 @@ import type {
 import { readHelixSessionCookie } from "../../services/helix-account/session-cookie";
 import { resolveWorkstationGatewayAccountContext } from
   "../../services/helix-ask/workstation-tool-gateway/account-policy";
+import type { HelixWorkstationGatewayAccountContext } from
+  "../../services/helix-ask/workstation-tool-gateway/account-policy";
 import {
   isSharedRealtimeRoomDomainError,
   readSharedRealtimeRoom,
@@ -23,6 +25,8 @@ import { projectSharedRealtimeRoomParticipantContext } from
   "../../services/helix-ask/realtime-room/participant-context";
 import { isGuestSharedRealtimeRoomHostingEnabled } from
   "../../services/helix-account/account-session-store";
+import { SharedLiveRoomControlError } from
+  "../../services/shared-live-room-control/service";
 
 export type SharedRoomRequestAccount = {
   sessionId: string;
@@ -54,6 +58,18 @@ export const withRuntimeProjection = (
 export const requireSharedRoomAccount = async (
   req: Request,
 ): Promise<SharedRoomRequestAccount> => {
+  const context = await requireSharedRoomAccountContext(req);
+  return {
+    sessionId: context.session_id!,
+    profileId: context.profile_id!,
+    displayName: context.account_session!.profile.display_name,
+    isGuest: context.account_session!.profile.auth_mode === "guest",
+  };
+};
+
+export const requireSharedRoomAccountContext = async (
+  req: Request,
+): Promise<HelixWorkstationGatewayAccountContext> => {
   const sessionId = readHelixSessionCookie(req.headers.cookie);
   const context = await resolveWorkstationGatewayAccountContext(sessionId);
   if (
@@ -79,12 +95,7 @@ export const requireSharedRoomAccount = async (
       "Enable Shared Live Rooms in Account & Sessions before creating or joining a room.",
     );
   }
-  return {
-    sessionId: context.session_id,
-    profileId: context.profile_id,
-    displayName: context.account_session.profile.display_name,
-    isGuest: context.account_session.profile.auth_mode === "guest",
-  };
+  return context;
 };
 
 export const requireSharedRoomHostingAllowed = (
@@ -122,6 +133,34 @@ export const throwRuntimeError = (
 };
 
 const respondError = (res: Response, error: unknown): void => {
+  if (error instanceof SharedLiveRoomControlError) {
+    const legacyError: HelixSharedRealtimeRoomErrorCode =
+      error.code === "unauthorized"
+        ? "shared_realtime_room_auth_required"
+        : error.code === "account_policy_blocked" ||
+            error.code === "insufficient_scope"
+          ? "shared_realtime_room_locked_by_account_policy"
+          : error.code === "room_not_found"
+            ? "shared_realtime_room_not_found"
+            : error.code === "room_forbidden"
+              ? "shared_realtime_room_forbidden"
+              : error.code === "room_closed"
+                ? "shared_realtime_room_closed"
+                : error.code === "invalid_request"
+                  ? "shared_realtime_room_invalid_request"
+                  : error.code === "room_runtime_conflict" ||
+                      error.code === "idempotency_conflict" ||
+                      error.code === "idempotency_in_progress" ||
+                      error.code === "outcome_unknown"
+                    ? "shared_realtime_room_runtime_conflict"
+                    : "shared_realtime_room_unavailable";
+    res.status(error.status).json(buildHelixSharedRealtimeRoomResponse({
+      ok: false,
+      error: legacyError,
+      message: error.message,
+    }));
+    return;
+  }
   if (isSharedRealtimeRoomDomainError(error)) {
     res.status(error.statusCode).json(buildHelixSharedRealtimeRoomResponse({
       ok: false,

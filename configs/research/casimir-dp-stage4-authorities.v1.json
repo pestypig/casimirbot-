@@ -1,0 +1,60 @@
+{
+  "schema_version": "casimir_dp_stage4_authorities/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-polarization-congruence-stage4-v1",
+  "frozen_at": "2026-07-25T00:00:00.000Z",
+  "claim_ceiling": "diagnostic",
+  "promotion_allowed": false,
+  "stage3_authority": {
+    "run_id": "casimir-dp-evidence-map-stage3-v1-20260725T134544Z",
+    "config": {
+      "path": "configs/research/casimir-dp-evidence-map-stage3.v1.json",
+      "sha256": "231cb26e9c9bb523e2dda40a6178d8a484ec099f1868a74b995d8153337d29c2",
+      "tracked": false
+    },
+    "maintained_report": {
+      "path": "docs/research/casimir-dp-evidence-map-stage3-report.md",
+      "sha256": "41aae6d542a19b6564f88ae7c8e7f2531abf90b08a7d02c11b043e5c691cc23a",
+      "tracked": false
+    },
+    "immutable_report_json": {
+      "path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-report.json",
+      "sha256": "feb799bcf93f1497673d58eac1a98a773ac1e1b0767082104af7b7d6c8e3508b",
+      "tracked": false
+    },
+    "immutable_report_markdown": {
+      "path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-report.md",
+      "sha256": "41aae6d542a19b6564f88ae7c8e7f2531abf90b08a7d02c11b043e5c691cc23a",
+      "tracked": false
+    },
+    "immutable_receipt": {
+      "path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-receipt.json",
+      "sha256": "5bcd2400bfeaa57a85c4b726224ac25dc8ab4c56bd59dad1b6e54f7f11ff0346",
+      "tracked": false
+    },
+    "downstream_verification_receipt": {
+      "path": "docs/research/casimir-dp-evidence-map-stage3-verification-receipt.json",
+      "sha256": "2cf09b5c5f6d0a584a0c3fd56d8e53834b78f938814ac2ff5500651349930082",
+      "tracked": false
+    },
+    "final_gates": {
+      "software_and_synthetic_diagnostics": "pass",
+      "measured_evidence": "not_ready",
+      "ordinary_decoherence_closure": "not_ready",
+      "collapse_identification": "blocked",
+      "manifold_dynamics": "blocked",
+      "publication_claim": "diagnostic_protocol_only"
+    },
+    "authority_rule": "The timestamped Stage-3 report and receipt plus the downstream verification receipt are immutable upstream evidence. Stage 4 may hash-link them but must not rewrite or promote their scientific gates."
+  },
+  "stage4_scope": {
+    "ordinary_physics_additions": [
+      "polarization_resolved_macroscopic_qed",
+      "radiative_thermal_fdt_closure"
+    ],
+    "congruence_validator": "tensor_dimensional_semantic_congruence",
+    "named_dp_policy": "reuse Stage-3 parameter manifest without mutation",
+    "bridge_policy": "admit only a preregistered numerical kernel; a schema-only registry remains blocked",
+    "synthetic_policy": "prediction fixtures validate software and falsifier behavior only"
+  }
+}

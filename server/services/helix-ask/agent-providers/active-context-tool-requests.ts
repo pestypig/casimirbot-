@@ -806,6 +806,42 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
       });
       continue;
     }
+    if (
+      selectedCapability === "image_lens.inspect" ||
+      selectedCapability === "situation-room.describe_visual_capture"
+    ) {
+      const authoritativeSourceTargetIntent =
+        readRecord(body.source_target_intent ?? body.sourceTargetIntent) ??
+        admission;
+      const threadId =
+        readString(authoritativeSourceTargetIntent.thread_id) ??
+        readString(body.thread_id ?? body.threadId ?? body.session_id ?? body.sessionId);
+      const key = `situation-room.describe_visual_capture:${threadId ?? "helix-ask:desktop"}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      requests.push({
+        schema: "helix.workstation_gateway.structured_admission_call_request.v1",
+        derivation_source: "helix_structured_source_target_admission",
+        capability_id: "situation-room.describe_visual_capture",
+        mode: "read",
+        arguments: {
+          ...(threadId ? { thread_id: threadId } : {}),
+          ...(readPrompt(body) ? { prompt: readPrompt(body) } : {}),
+          source_target_intent: {
+            ...authoritativeSourceTargetIntent,
+            source: "helix_structured_source_target_admission",
+            target_source: "visual_capture",
+            target_kind: "visual_capture",
+            selected_capability: "situation-room.describe_visual_capture",
+            alias_capability:
+              selectedCapability === "image_lens.inspect"
+                ? selectedCapability
+                : undefined,
+          },
+        },
+      });
+      continue;
+    }
     const query = readGatewayQuery(body, admission);
     if (!query) continue;
     if (isCapabilityCatalogSelection(selectedCapability)) {

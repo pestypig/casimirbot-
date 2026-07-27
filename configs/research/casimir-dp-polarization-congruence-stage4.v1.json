@@ -1,0 +1,331 @@
+{
+  "schema_version": "casimir_dp_polarization_congruence_stage4/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-polarization-congruence-stage4-v1",
+  "implementation_version": "1.2.0",
+  "evidence_cutoff": "2026-07-25",
+  "claim_ceiling": "diagnostic",
+  "promotion_allowed": false,
+  "stage3_authority_manifest": {
+    "role": "stage4_authority_manifest",
+    "path": "configs/research/casimir-dp-stage4-authorities.v1.json",
+    "sha256": "3f26ef115533ef78756fad70f3880f8ea1d1ace43cbc9a0e66d6d0b5e9c2918d",
+    "tracked": false,
+    "required_at_runtime": true
+  },
+  "upstream_authorities": [
+    {
+      "role": "stage3_config",
+      "path": "configs/research/casimir-dp-evidence-map-stage3.v1.json",
+      "sha256": "231cb26e9c9bb523e2dda40a6178d8a484ec099f1868a74b995d8153337d29c2",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-report.json",
+      "sha256": "feb799bcf93f1497673d58eac1a98a773ac1e1b0767082104af7b7d6c8e3508b",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-report.md",
+      "sha256": "41aae6d542a19b6564f88ae7c8e7f2531abf90b08a7d02c11b043e5c691cc23a",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_immutable_receipt",
+      "path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-receipt.json",
+      "sha256": "5bcd2400bfeaa57a85c4b726224ac25dc8ab4c56bd59dad1b6e54f7f11ff0346",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage3_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-evidence-map-stage3-verification-receipt.json",
+      "sha256": "2cf09b5c5f6d0a584a0c3fd56d8e53834b78f938814ac2ff5500651349930082",
+      "tracked": false,
+      "required_at_runtime": true
+    }
+  ],
+  "source_registry": [
+    {
+      "source_id": "rahi-et-al-2009-scattering",
+      "url": "https://arxiv.org/abs/0908.2649",
+      "supports": "Casimir interactions expressed through object scattering amplitudes and translation matrices, including material, geometry, and temperature dependence.",
+      "does_not_support": "A polarization-dependent collapse channel or a Casimir-to-DP transfer kernel."
+    },
+    {
+      "source_id": "fuchs-et-al-2017-polarization-mixing",
+      "url": "https://arxiv.org/abs/1707.04577",
+      "supports": "Macroscopic-QED Green tensors with reflection matrices that can mix optical polarizations in nonreciprocal media.",
+      "does_not_support": "Objective collapse, gravitational curvature, or manifold dynamics caused by polarization."
+    },
+    {
+      "source_id": "scheel-buhmann-2008-macroscopic-qed",
+      "url": "https://arxiv.org/abs/0902.3586",
+      "supports": "Causal macroscopic-QED field quantization, Green tensors, material response, and fluctuation-dissipation structure.",
+      "does_not_support": "A unique quantum-vacuum ontology or gravitational-collapse bridge."
+    },
+    {
+      "source_id": "brown-maclay-1969-stress",
+      "url": "https://doi.org/10.1103/PhysRev.184.1272",
+      "supports": "The complete electromagnetic stress-energy structure for the ideal parallel-plate Casimir configuration.",
+      "does_not_support": "Replacing a conserved tensor source with scalar pressure or inferring curvature sign from one stress component."
+    },
+    {
+      "source_id": "nist-codata-2018-radiation-constants",
+      "url": "https://physics.nist.gov/cuu/pdf/RevModPhys.93.025010.pdf",
+      "supports": "Exact SI constants and the Stefan-Boltzmann constant relation to k, hbar, c, and pi.",
+      "does_not_support": "A thermal-frequency resonance with collapse or a prediction of stellar structure from Planck's constant alone."
+    },
+    {
+      "source_id": "iau-2015-nominal-solar-constants",
+      "url": "https://arxiv.org/abs/1510.07674",
+      "supports": "Nominal solar luminosity and radius values for a flux-equivalent effective-temperature benchmark.",
+      "does_not_support": "A first-principles solar model from blackbody radiation alone."
+    },
+    {
+      "source_id": "diosi-1989-dynamical-model",
+      "url": "https://doi.org/10.1103/PhysRevA.40.1165",
+      "supports": "A named gravity-related dynamical reduction model with mass-density-based dynamics.",
+      "does_not_support": "A standard polarization, Casimir-boundary, or cavity-mode term in the unchanged DP model."
+    },
+    {
+      "source_id": "penrose-1996-or",
+      "url": "https://doi.org/10.1007/BF02105068",
+      "supports": "The branch-dependent spacetime motivation and order-of-magnitude lifetime hbar over E_Delta.",
+      "does_not_support": "A generative Casimir-boundary response, polarization coupling, cavity resonance, or experimental proof of manifold collapse."
+    },
+    {
+      "source_id": "hu-verdaguer-2008-stochastic-gravity",
+      "url": "https://doi.org/10.12942/lrr-2008-3",
+      "supports": "Semiclassical mean stress and stochastic-gravity noise-kernel framework with explicit tensor structure.",
+      "does_not_support": "An already registered Casimir-noise-to-material-coherence kernel for this experiment."
+    }
+  ],
+  "conventions": {
+    "units": "SI",
+    "coordinate_frame": "right_handed_apparatus_frame_with_plus_k_propagation_axis",
+    "metric_signature": "-+++",
+    "angular_frequency_relation": "omega=2*pi*nu",
+    "frequency_density_conversion": "S_omega(omega)=S_nu(nu)/(2*pi)",
+    "psd_sidedness": "two_sided",
+    "polarization_basis": "transverse_jones_stokes",
+    "handedness_reference": "right_handed_relative_to_plus_k",
+    "stokes_v_convention": "V=2*Im(E_x*conj(E_y))",
+    "mirror_transform": "helicity_flips_under_active_mirror",
+    "cavity_contrast": "on_minus_off",
+    "helicity_contrast": "R_minus_L",
+    "double_contrast": "(R_minus_L)_cavity_on-(R_minus_L)_cavity_off"
+  },
+  "evidence_policy": {
+    "synthetic_can_validate_software_only": true,
+    "synthetic_can_satisfy_measured_gate": false,
+    "same_dimension_implies_connection": false,
+    "polarization_residual_is_collapse": false,
+    "polarization_residual_is_manifold_evidence": false,
+    "standard_dp_is_polarization_blind_at_fixed_delta_rho": true,
+    "bridge_requires_registered_numerical_kernel": true,
+    "blackbody_closure_is_collapse_bridge": false
+  },
+  "blinding": {
+    "lane_status": "synthetic_contract_only",
+    "blind_labels": [
+      "POLARIZATION_CELL_ALPHA",
+      "POLARIZATION_CELL_BETA"
+    ],
+    "mapping_stored_in_repository": false,
+    "custodian_receipt_status": "not_created",
+    "custodian_receipt_path": null,
+    "custodian_mapping_sha256": null,
+    "preregistration_timestamp": "2026-07-25T00:00:00.000Z",
+    "measured_comparison_allowed": false,
+    "unblinding_timestamp": null,
+    "automatic_unblinding_allowed": false
+  },
+  "preregistration": {
+    "expanded_null_model_id": "M0_prime_ordinary_physics",
+    "expanded_null_components": [
+      "M_qed_phase",
+      "M_technical_dephasing",
+      "M_qed_environmental_decoherence",
+      "M_ordinary_gravity",
+      "M_polarization_resolved_qed",
+      "M_thermal_radiative_fdt"
+    ],
+    "named_dp_model_id": "M_dp_regularized_synthetic_v1",
+    "named_dp_parameter_manifest_sha256": "4868b598b05e76f43f9814858f81c27cf8d8a783d360deb56e26793aad7047c6",
+    "named_dp_reuse_policy": "reused_without_mutation",
+    "named_dp_boundary_rule": "no_polarization_or_boundary_term_at_fixed_delta_rho",
+    "bridge_registry_model_id": "M_bridge_tensor_noise_v1",
+    "bridge_admission_rule": "registered_numeric_kernel_frozen_before_unblinding",
+    "compatibility_wording": "not_disfavored_within_powered_region",
+    "prediction_axes": [
+      {
+        "axis_id": "helicity",
+        "ordinary_physics_signature": "calibrated material scattering and Green response may produce RCP/LCP contrast",
+        "unchanged_dp_signature": "zero helicity contrast at fixed delta_rho",
+        "bridge_signature": "only the sign and scaling of a frozen registered numerical kernel",
+        "required_control": "matched RCP/LCP cells with complete Jones/Stokes and material receipts",
+        "falsifier": "basis dependence, unmatched branch state, or failure to follow calibrated material response rejects an intrinsic interpretation"
+      },
+      {
+        "axis_id": "active_mirror",
+        "ordinary_physics_signature": "pseudoscalar optical terms reverse with the registered mirror convention",
+        "unchanged_dp_signature": "mirror-even at fixed delta_rho",
+        "bridge_signature": "preregistered mirror parity plus independent companion",
+        "required_control": "active mirror pair with unchanged geometry, temperature, branch state, and detector convention",
+        "falsifier": "wrong mirror parity rejects the registered signature"
+      },
+      {
+        "axis_id": "material_and_distance",
+        "ordinary_physics_signature": "strong response through reflection matrices, geometry, Green tensors, and loss",
+        "unchanged_dp_signature": "no material or boundary term at fixed delta_rho",
+        "bridge_signature": "frozen causal stress/noise-kernel distance and material scaling",
+        "required_control": "multi-material and multi-distance held-out cells",
+        "falsifier": "failure of the held-out material/distance law rejects the corresponding model"
+      },
+      {
+        "axis_id": "temperature",
+        "ordinary_physics_signature": "Planck occupation, FDT noise, emissivity, heating, recoil, and detailed-balance scaling",
+        "unchanged_dp_signature": "no standard thermal boundary term",
+        "bridge_signature": "only registered thermal/noise scaling without double counting",
+        "required_control": "thermometry, spectral emissivity, near/far-field routing, and heating sidecars",
+        "falsifier": "ordinary thermal covariance tracking rejects an irreducible-collapse assignment"
+      },
+      {
+        "axis_id": "hold_time_and_echo",
+        "ordinary_physics_signature": "unitary phase and filter-function-dependent decoherence; conditionable terms may refocus",
+        "unchanged_dp_signature": "unchanged named master-equation coherence and companion prediction",
+        "bridge_signature": "frozen kernel line shape, echo response, and companion observable",
+        "required_control": "multiple hold times, path swap, echo, and companion readout",
+        "falsifier": "echo recovery or wrong line shape rejects the registered intrinsic attribution"
+      },
+      {
+        "axis_id": "branch_mass_density",
+        "ordinary_physics_signature": "boundary-induced branch changes are explicit confounds",
+        "unchanged_dp_signature": "E_G and companions follow only the frozen branch mass-density difference",
+        "bridge_signature": "must preserve or explicitly model delta_rho changes",
+        "required_control": "wavepacket and branch-trajectory receipts inside the frozen tolerance",
+        "falsifier": "failure of fixed-delta-rho equivalence invalidates the boundary contrast"
+      }
+    ]
+  },
+  "runtime_fixtures": {
+    "polarization_qed": {
+      "path": "configs/research/fixtures/casimir-dp-stage4-polarization.synthetic.v1.json",
+      "sha256": "f2568478cca512cc93f86f4905bc61a9c9c56e6473f0f73479206f82de6a2a60",
+      "schema_version": "casimir_dp_polarization_qed_control/1",
+      "evidence_class": "synthetic"
+    },
+    "thermal_radiative": {
+      "path": "configs/research/fixtures/casimir-dp-stage4-thermal.synthetic.v1.json",
+      "sha256": "562552ca24e553b60f024e94153eb5cacd033b575c7f9303352c445ede224812",
+      "schema_version": "casimir_dp_radiative_thermal_closure/1",
+      "evidence_class": "synthetic"
+    },
+    "tensor_congruence": {
+      "path": "configs/research/fixtures/casimir-dp-stage4-congruence.synthetic.v1.json",
+      "sha256": "160ab99dc055e1487c2598db827f432c293b725b4cc1c997c3858eb44e064de0",
+      "schema_version": "casimir_dp_tensor_dimensional_congruence/1",
+      "evidence_class": "synthetic"
+    }
+  },
+  "deterministic_seeds": {
+    "synthetic": 410041,
+    "randomization": 410042,
+    "resampling": 410043
+  },
+  "software": {
+    "runtime": "typescript",
+    "runner": "scripts/research/run-casimir-dp-polarization-congruence-stage4.ts",
+    "module_ids": [
+      "shared/casimir-dp-polarization-qed-control.ts",
+      "shared/casimir-dp-radiative-thermal-closure.ts",
+      "shared/casimir-dp-tensor-dimensional-congruence.ts",
+      "shared/casimir-dp-polarization-congruence-stage4.ts"
+    ],
+    "source_authorities": [
+      {
+        "role": "polarization_qed_runtime",
+        "path": "shared/casimir-dp-polarization-qed-control.ts",
+        "sha256": "f83659a3ad5854e5530c7ce46d339b85cddbaec82d0966e8e329f400c75b8641",
+        "tracked": false,
+        "required_at_runtime": true
+      },
+      {
+        "role": "thermal_radiative_runtime",
+        "path": "shared/casimir-dp-radiative-thermal-closure.ts",
+        "sha256": "673a2e480cae16288ab13a19badde363231d75db2a2540d5bd28ac59eb6e7006",
+        "tracked": false,
+        "required_at_runtime": true
+      },
+      {
+        "role": "thermal_physics_constants",
+        "path": "shared/physics-const.ts",
+        "sha256": "6c55518de3f27ce4d71f4ddb19ffd5c9b55bd3bbbc02cdc3c23e10247a7b7ce5",
+        "tracked": true,
+        "required_at_runtime": true
+      },
+      {
+        "role": "tensor_congruence_runtime",
+        "path": "shared/casimir-dp-tensor-dimensional-congruence.ts",
+        "sha256": "015dc17487ac6f07dcc9260812d3ded0b94ed9d3b4a7b15d01d7d8a658a7b0a4",
+        "tracked": false,
+        "required_at_runtime": true
+      },
+      {
+        "role": "stage4_orchestrator",
+        "path": "shared/casimir-dp-polarization-congruence-stage4.ts",
+        "sha256": "d70192b175df5dc7efbab9b00d77a957060667bdf06ee8b5628dfe76f01be970",
+        "tracked": false,
+        "required_at_runtime": true
+      },
+      {
+        "role": "stage4_contract",
+        "path": "shared/contracts/casimir-dp-polarization-congruence-stage4.v1.ts",
+        "sha256": "0522eb940dd56df1e63c59978f939c7124ac16032fe3e670966fe0615867af3a",
+        "tracked": false,
+        "required_at_runtime": true
+      },
+      {
+        "role": "stage4_runner",
+        "path": "scripts/research/run-casimir-dp-polarization-congruence-stage4.ts",
+        "sha256": "1412eef8310a29149fbbaf89e38b3a9eba570e211060cda438be96d6d3e220ec",
+        "tracked": false,
+        "required_at_runtime": true
+      }
+    ],
+    "source_snapshot": {
+      "git_head": "705759a201ee77313919de906c53dc8565de75bc",
+      "worktree_state": "dirty_uncommitted_source_hashes_authoritative",
+      "authority_mode": "content_hashes"
+    }
+  },
+  "run_order": [
+    "hash_link_immutable_stage3_authorities",
+    "freeze_units_frequency_psd_frame_handedness_and_mirror_conventions",
+    "freeze_polarization_states_randomization_blinding_and_calibration",
+    "validate_jones_stokes_mueller_and_matched_control_sidecars",
+    "run_polarization_resolved_macroscopic_qed_control",
+    "run_planck_fdt_and_stefan_boltzmann_thermal_closure",
+    "run_tensor_dimensional_and_semantic_congruence",
+    "freeze_helicity_mirror_material_temperature_and_companion_signatures",
+    "version_expanded_null_unchanged_dp_and_registered_bridge_comparator",
+    "run_blinded_synthetic_prediction_comparison",
+    "populate_stage4_outcome_falsifier_and_nonclaim_ledger",
+    "write_hash_backed_stage4_receipt_report_and_evidence_state"
+  ],
+  "final_status_policy": {
+    "software_and_synthetic_predictions": "pass",
+    "measured_evidence": "not_ready",
+    "ordinary_physics_closure": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "publication_claim": "diagnostic_protocol_only"
+  }
+}

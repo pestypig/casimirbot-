@@ -9,6 +9,13 @@ import {
 const hashShort = (value: unknown): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
 
+export const buildWorkstationGatewayObservationArtifactRef = (input: {
+  turnId: string;
+  capabilityId: string;
+  observation: unknown;
+}): string =>
+  `${input.turnId}:workstation_gateway:${input.capabilityId}:${hashShort(input.observation)}`;
+
 export const buildWorkstationGatewayObservationPacket = (input: {
   turnId: string;
   iteration: number;
@@ -27,7 +34,7 @@ export const buildWorkstationGatewayObservationPacket = (input: {
   missingAffordanceKinds?: HelixWorkstationTypedAffordanceKind[];
 }): HelixAgentStepObservationPacket => {
   const observationHash = hashShort(input.observation);
-  const artifactRef = `${input.turnId}:workstation_gateway:${input.capabilityId}:${observationHash}`;
+  const artifactRef = buildWorkstationGatewayObservationArtifactRef(input);
   const producedAffordanceKinds = input.producedAffordanceKinds ?? Array.from(new Set(
     (input.producedAffordances ?? []).map((affordance) => affordance.kind),
   ));

@@ -2,9 +2,32 @@
 
 Date: 2026-05-05
 
-Status: working local-dev observe-only pipeline with explicit Helix Ask thread binding.
+Status: legacy local-dev tunnel milestone plus first-party hosted room-source path.
 
-## Current Pipeline
+## Hosted Production Pipeline
+
+The production replacement for the temporary tunnel is:
+
+```txt
+Minehut Paper server
+  -> HelixPaperSensor plugin
+  -> https://casimirbot.com/api/room-ingress/v1/bindings/<opaque-binding-id>
+  -> durable Shared Live Room source binding
+  -> exact room/source/world admission
+  -> canonical Situation Room world-event and environment-source services
+  -> optional Helix thread toolObservation when explicitly bound
+```
+
+Generate the link as the developer owner of a Shared Live Room, then paste the
+returned `plugin_config` into the Paper sensor configuration. The bearer is
+shown once, stored hashed, scoped to that room/source/world, expiring,
+rotatable, replay-protected, and read-only. See
+`docs/minecraft-room-source-ingress.md`.
+
+The published domain replaces Cloudflare only when it serves the full Express
+API. It does not make a private `localhost` server public.
+
+## Verified Legacy Local Pipeline
 
 The verified path is:
 
@@ -135,9 +158,11 @@ Expected:
 }
 ```
 
-### Cloudflare Quick Tunnel
+### Cloudflare Quick Tunnel (local-development fallback only)
 
-Minehut cannot call `127.0.0.1:5050` on the local PC. A public HTTPS tunnel is required.
+Minehut cannot call `127.0.0.1:5050` on the local PC. If testing against a
+private local server instead of the published CasimirBot API, a public HTTPS
+tunnel is still required.
 
 Start a tunnel:
 
@@ -174,7 +199,10 @@ Restart Cloudflare tunnel: new trycloudflare.com URL needed.
 Restart PC: new trycloudflare.com URL needed.
 ```
 
-Quick Tunnel URLs are temporary and should not be treated as stable infrastructure.
+Quick Tunnel URLs are temporary and should not be treated as stable or
+production infrastructure. A published first-party room-source link does not
+change on Minehut, local-PC, or tunnel restarts; it changes only when the room
+owner rotates or revokes the binding.
 
 ## Plugin Build
 

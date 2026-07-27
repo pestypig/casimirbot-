@@ -24,6 +24,8 @@ import {
   type HelixContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
 import { buildHelixCompoundCapabilityContract } from "./compound-capability-contract";
+import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
+import { readCommittedAskRoute } from "./committed-ask-route";
 import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "./workstation-context-feed-query-tool-contracts";
 import { resolveHelixRuntimeObservationReentry } from "./runtime/turn-lifecycle";
 
@@ -201,10 +203,12 @@ const artifactKindTokens = (artifact: RecordLike): string[] => {
   return unique([
     readString(artifact.kind),
     readString(artifact.schema),
+    readString(artifact.observation_kind),
     readString(artifact.payload_kind),
     readString(artifact.payload_schema),
     readString(payload?.kind),
     readString(payload?.schema),
+    readString(payload?.observation_kind),
     readString(payload?.type),
   ]);
 };
@@ -760,9 +764,86 @@ const artifactSearchText = (artifact: RecordLike): string => {
   ].join("\n").toLowerCase();
 };
 
+const artifactStructuredCapabilityTokens = (artifact: RecordLike): string[] => {
+  const payload = artifactPayload(artifact);
+  return unique([
+    readString(artifact.capability),
+    readString(artifact.capability_key),
+    readString(artifact.source_capability_id),
+    readString(payload?.capability),
+    readString(payload?.capability_key),
+    readString(payload?.source_capability_id),
+  ]);
+};
+
+const THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY =
+  "theory-experiment-procedure.prepare" as const;
+const THEORY_EXPERIMENT_PROCEDURE_OBSERVATION_SCHEMA =
+  "casimir.theory_experiment_procedure.observation.v1" as const;
+const THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY =
+  "theory-experiment-procedure.evaluate_closure" as const;
+const THEORY_EXPERIMENT_EXECUTION_CLOSURE_OBSERVATION_SCHEMA =
+  "casimir.theory_experiment_execution_closure.observation.v1" as const;
+
+const artifactHasCompatibleStructuredCapabilityIdentity = (
+  artifact: RecordLike,
+  capability: string,
+): boolean =>
+  artifactStructuredCapabilityTokens(artifact).every((token) =>
+    explicitCapabilityMatches(capability, token)
+  );
+
+const artifactHasRequiredPayloadSchemaForCapability = (
+  artifact: RecordLike,
+  capability: string,
+): boolean => {
+  const requiredSchema = explicitCapabilityMatches(
+    THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+    capability,
+  )
+    ? THEORY_EXPERIMENT_PROCEDURE_OBSERVATION_SCHEMA
+    : explicitCapabilityMatches(
+          THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY,
+          capability,
+        )
+      ? THEORY_EXPERIMENT_EXECUTION_CLOSURE_OBSERVATION_SCHEMA
+      : null;
+  if (!requiredSchema) return true;
+  const payload = artifactPayload(artifact);
+  return (
+    normalizedEqual(
+      artifact.payload_schema,
+      requiredSchema,
+    ) &&
+    normalizedEqual(
+      payload?.schema,
+      requiredSchema,
+    )
+  );
+};
+
 const artifactSupportsCapabilityObservation = (artifact: RecordLike, capability: string | null): boolean => {
   const normalizedCapability = normalize(capability);
   if (!normalizedCapability) return false;
+  const requestedCapability = readString(capability);
+  if (
+    !artifactHasRequiredPayloadSchemaForCapability(
+      artifact,
+      requestedCapability,
+    )
+  ) {
+    return false;
+  }
+  const structuredCapabilities = artifactStructuredCapabilityTokens(artifact);
+  if (structuredCapabilities.length > 0) {
+    // A normalized artifact may carry the requested, runtime, and source identities
+    // at different nesting levels. Registered runtime capabilities/aliases are valid,
+    // but one exact field must never mask a conflicting populated identity field.
+    return artifactHasCompatibleStructuredCapabilityIdentity(
+      artifact,
+      requestedCapability,
+    );
+  }
   const text = artifactSearchText(artifact);
   if (normalizedCapability === "scientific_calculator_solve_expression") {
     return /scientific[-_]calculator[-_.:]solve[-_]expression|calculator_result|calculator_receipt|workstation_tool_evaluation/.test(text);
@@ -836,7 +917,28 @@ const artifactSupportsCapabilityObservation = (artifact: RecordLike, capability:
   if (normalizedCapability.startsWith("live_env_")) {
     return text.includes(normalizedCapability) || /stage_play|live_source|mail_packet|mailbox|live_env/.test(text);
   }
-  return text.includes(normalizedCapability);
+  return false;
+};
+
+const artifactSupportsCapabilityOrUnscopedObservationKind = (
+  artifact: RecordLike,
+  capability: string | null,
+  requiredKinds: string[],
+): boolean => {
+  if (
+    !artifactHasRequiredPayloadSchemaForCapability(
+      artifact,
+      readString(capability),
+    )
+  ) {
+    return false;
+  }
+  const capabilityMatch = artifactSupportsCapabilityObservation(artifact, capability);
+  if (artifactStructuredCapabilityTokens(artifact).length > 0) return capabilityMatch;
+  return (
+    capabilityMatch ||
+    requiredKinds.some((kind) => observationKindMatches(artifact, kind))
+  );
 };
 
 const textToSpeechReceiptRecord = (artifact: RecordLike): RecordLike | null => {
@@ -896,13 +998,27 @@ const capabilityObservationArtifact = (
       const text = artifactSearchText(artifact);
       const normalizedArtifactKind = normalize(artifact.kind);
       const normalizedCapability = normalize(capability);
-      const requiredKindMatch = requiredKinds.some((kind) => observationKindMatches(artifact, kind));
-      const exactArtifactKindMatch = requiredKinds.some((kind) => normalizedArtifactKind === normalize(kind));
       const capabilityMatch = artifactSupportsCapabilityObservation(artifact, capability);
+      const structuredCapabilityMismatch =
+        artifactStructuredCapabilityTokens(artifact).length > 0 && !capabilityMatch;
+      const payloadSchemaMismatch =
+        !artifactHasRequiredPayloadSchemaForCapability(
+          artifact,
+          readString(capability),
+        );
+      const artifactIdentityMismatch =
+        structuredCapabilityMismatch || payloadSchemaMismatch;
+      const requiredKindMatch =
+        !artifactIdentityMismatch &&
+        requiredKinds.some((kind) => observationKindMatches(artifact, kind));
+      const exactArtifactKindMatch =
+        !artifactIdentityMismatch &&
+        requiredKinds.some((kind) => normalizedArtifactKind === normalize(kind));
       const genericObservation = /(?:observation|evidence|result|receipt|context|trace|packet|resolution|reflection|registry|summary)/i.test(
         artifactDisplayKind(artifact) ?? "",
       );
       let score = 0;
+      if (artifactIdentityMismatch) score -= 1_000;
       if (capabilityMatch) score += 100;
       if (requiredKindMatch) score += 70;
       if (exactArtifactKindMatch) score += 45;
@@ -947,6 +1063,15 @@ const explicitObservationCoverageMode = (capability: string | null): "all" | "an
     normalized === "situation_room_describe_visual_capture" ||
     normalized === "docs_viewer_locate_in_doc" ||
     normalized === "scientific_calculator_solve_expression"
+  ) {
+    return "any";
+  }
+  if (
+    !explicitContract &&
+    resolveToolFamilyContract({
+      toolName: capability,
+      toolFamily: capability,
+    })
   ) {
     return "any";
   }
@@ -1047,19 +1172,155 @@ const supportRefsCount = (payload: RecordLike, artifacts: RecordLike[]): number 
   );
 };
 
-const requiredTerminalKind = (payload: RecordLike, contract: ToolFamilyContract | null): string | null => {
+type EffectiveTerminalProductPolicy = {
+  requiredTerminalKind: string | null;
+  allowedTerminalKinds: string[];
+  forbiddenTerminalKinds: string[];
+  routeAuthorityActive: boolean;
+  authoritySource:
+    | "committed_ask_route"
+    | "route_evidence_authority"
+    | "route_product_contract"
+    | "canonical_goal_frame"
+    | "tool_family_contract";
+};
+
+const readRouteEvidenceAuthority = (payload: RecordLike): RecordLike | null => {
+  const direct = readRecord(payload.route_evidence_authority);
+  if (direct?.schema === "helix.route_evidence_authority.v1") return direct;
+
+  const trace = readRecord(payload.ask_turn_solver_trace);
+  const traceAuthority = readRecord(trace?.route_evidence_authority);
+  if (traceAuthority?.schema === "helix.route_evidence_authority.v1") return traceAuthority;
+
+  const debug = readRecord(payload.debug);
+  const debugAuthority = readRecord(debug?.route_evidence_authority);
+  if (debugAuthority?.schema === "helix.route_evidence_authority.v1") return debugAuthority;
+
+  const debugTrace = readRecord(debug?.ask_turn_solver_trace);
+  const debugTraceAuthority = readRecord(debugTrace?.route_evidence_authority);
+  return debugTraceAuthority?.schema === "helix.route_evidence_authority.v1"
+    ? debugTraceAuthority
+    : null;
+};
+
+const effectiveTerminalProductPolicy = (
+  payload: RecordLike,
+  contract: ToolFamilyContract | null,
+): EffectiveTerminalProductPolicy => {
+  const committedRoute = readCommittedAskRoute(payload);
+  const committedGoal = readRecord(committedRoute?.canonical_goal);
+  const routeEvidenceAuthority = readRouteEvidenceAuthority(payload);
   const canonicalGoal = readRecord(payload.canonical_goal_frame);
   const routeProductContract = readRecord(payload.route_product_contract);
-  return (
-    firstString(
-      canonicalGoal?.required_terminal_kind,
-      routeProductContract?.required_terminal_artifact_kind,
-      routeProductContract?.required_terminal_kind,
-    ) ||
-    readStringArray(routeProductContract?.allowed_terminal_artifact_kinds)[0] ||
-    contract?.allowedTerminalKinds[0] ||
-    null
+  const committedAllowed = readStringArray(
+    committedGoal?.allowed_terminal_artifact_kinds,
   );
+  const committedForbidden = readStringArray(
+    committedGoal?.forbidden_terminal_artifact_kinds,
+  );
+  const routeEvidenceAllowed =
+    routeEvidenceAuthority?.terminal_product_allowed === true
+      ? readStringArray(routeEvidenceAuthority.allowed_terminal_artifact_kinds)
+      : [];
+  const routeEvidenceForbidden = readStringArray(
+    routeEvidenceAuthority?.forbidden_terminal_artifact_kinds,
+  );
+  const routeProductAllowed = readStringArray(
+    routeProductContract?.allowed_terminal_artifact_kinds,
+  );
+  const routeProductForbidden = readStringArray(
+    routeProductContract?.forbidden_terminal_artifact_kinds,
+  );
+
+  if (committedRoute && committedGoal) {
+    const compoundPolicy = applyCompoundTerminalPolicy(payload, {
+      allowed: committedAllowed,
+      forbidden: unique([
+        ...committedForbidden,
+        ...routeEvidenceForbidden,
+      ]),
+      requiredTerminalKind: firstString(
+        committedGoal.required_terminal_kind,
+        routeEvidenceAuthority?.terminal_product_allowed === true
+          ? routeEvidenceAuthority.required_terminal_kind
+          : null,
+      ),
+    });
+    return {
+      requiredTerminalKind:
+        compoundPolicy.requiredTerminalKind ||
+        compoundPolicy.allowed[0] ||
+        null,
+      allowedTerminalKinds: compoundPolicy.allowed,
+      forbiddenTerminalKinds: compoundPolicy.forbidden,
+      routeAuthorityActive: true,
+      authoritySource: "committed_ask_route",
+    };
+  }
+
+  if (
+    routeEvidenceAuthority &&
+    routeEvidenceAuthority.terminal_product_allowed === true
+  ) {
+    const compoundPolicy = applyCompoundTerminalPolicy(payload, {
+      allowed: routeEvidenceAllowed,
+      forbidden: routeEvidenceForbidden,
+      requiredTerminalKind: readString(
+        routeEvidenceAuthority.required_terminal_kind,
+      ),
+    });
+    return {
+      requiredTerminalKind:
+        compoundPolicy.requiredTerminalKind ||
+        compoundPolicy.allowed[0] ||
+        null,
+      allowedTerminalKinds: compoundPolicy.allowed,
+      forbiddenTerminalKinds: compoundPolicy.forbidden,
+      routeAuthorityActive: true,
+      authoritySource: "route_evidence_authority",
+    };
+  }
+
+  if (routeProductContract) {
+    const compoundPolicy = applyCompoundTerminalPolicy(payload, {
+      allowed: routeProductAllowed,
+      forbidden: routeProductForbidden,
+      requiredTerminalKind: firstString(
+        routeProductContract.required_terminal_artifact_kind,
+        routeProductContract.required_terminal_kind,
+      ),
+    });
+    return {
+      requiredTerminalKind:
+        compoundPolicy.requiredTerminalKind ||
+        compoundPolicy.allowed[0] ||
+        null,
+      allowedTerminalKinds: compoundPolicy.allowed,
+      forbiddenTerminalKinds: compoundPolicy.forbidden,
+      routeAuthorityActive: true,
+      authoritySource: "route_product_contract",
+    };
+  }
+
+  const canonicalRequired = readString(canonicalGoal?.required_terminal_kind);
+  if (canonicalRequired) {
+    return {
+      requiredTerminalKind: canonicalRequired,
+      allowedTerminalKinds: [canonicalRequired],
+      forbiddenTerminalKinds: [],
+      routeAuthorityActive: false,
+      authoritySource: "canonical_goal_frame",
+    };
+  }
+
+  return {
+    requiredTerminalKind: contract?.allowedTerminalKinds[0] || null,
+    allowedTerminalKinds: contract?.allowedTerminalKinds ?? [],
+    forbiddenTerminalKinds: [],
+    routeAuthorityActive: false,
+    authoritySource: "tool_family_contract",
+  };
 };
 
 const materializedTerminalKind = (payload: RecordLike): string | null => {
@@ -1353,22 +1614,18 @@ const buildToolTurnChainAudit = (input: {
   );
   const selectedCapabilityObservationProvesExecution = Boolean(
     selectedCapabilityObservationArtifact &&
-      (
-        artifactSupportsCapabilityObservation(
-          selectedCapabilityObservationArtifact,
-          selectedCapability ?? requestedCapability ?? input.capability,
-        ) ||
-        requestedObservationKinds.some((kind) =>
-          observationKindMatches(selectedCapabilityObservationArtifact, kind)
-        )
+      artifactSupportsCapabilityOrUnscopedObservationKind(
+        selectedCapabilityObservationArtifact,
+        selectedCapability ?? requestedCapability ?? input.capability,
+        requestedObservationKinds,
       ),
   );
   const hasCompatibleCapabilityObservation = input.artifacts.some((artifact) =>
-    artifactSupportsCapabilityObservation(
+    artifactSupportsCapabilityOrUnscopedObservationKind(
       artifact,
       selectedCapability ?? requestedCapability ?? input.capability,
-    ) ||
-    requestedObservationKinds.some((kind) => observationKindMatches(artifact, kind))
+      requestedObservationKinds,
+    )
   );
   if (
     !selectedCapability &&
@@ -1529,21 +1786,30 @@ const buildToolTurnChainAudit = (input: {
   const selectedObservationSupportsRequestedCapability = Boolean(
     requestedCapability &&
       observationArtifact &&
-      (
-        artifactSupportsCapabilityObservation(observationArtifact, requestedCapability) ||
-        requestedObservationKinds.some((kind) => observationKindMatches(observationArtifact, kind))
+      artifactSupportsCapabilityOrUnscopedObservationKind(
+        observationArtifact,
+        requestedCapability,
+        requestedObservationKinds,
       ),
   );
   const observedArtifactSupportsRequestedCapability =
     requestedObservationKinds.length === 0 ||
     selectedObservationSupportsRequestedCapability ||
     input.artifacts.some((artifact) =>
-      requestedObservationKinds.some((kind) => observationKindMatches(artifact, kind)),
+      artifactSupportsCapabilityOrUnscopedObservationKind(
+        artifact,
+        requestedCapability,
+        requestedObservationKinds,
+      ),
     );
+  const effectiveTerminalPolicy = effectiveTerminalProductPolicy(
+    input.payload,
+    input.contract,
+  );
   const requiredTerminal =
     requestedCapabilityContract?.capability === "image_lens.inspect"
       ? requestedCapabilityContract.required_terminal_kind
-      : requiredTerminalKind(input.payload, input.contract);
+      : effectiveTerminalPolicy.requiredTerminalKind;
   const supportCount = supportRefsCount(input.payload, input.artifacts);
   const materializedTerminal = materializedTerminalKind(input.payload);
   const authorityTerminalEvidence = terminalAuthorityEvidence(input.payload);
@@ -1629,8 +1895,12 @@ const buildToolTurnChainAudit = (input: {
         turnId: input.turnId,
         candidateRefs: unique([
           observationRef,
+          readString(observationArtifact?.provider_gateway_observation_ref),
+          readString(observationArtifact?.observation_ref),
           readString(observationPayload?.provider_gateway_observation_ref),
           readString(observationPayload?.observation_ref),
+          ...readStringArray(observationArtifact?.provider_gateway_packet_refs),
+          ...readStringArray(observationPayload?.provider_gateway_packet_refs),
         ]),
       })
     : null;
@@ -1667,20 +1937,43 @@ const buildToolTurnChainAudit = (input: {
   );
   const expectedReentryMissing = Boolean(observationNeedsReentry && expectedReentry);
   const terminalProjectionMismatch = Boolean(authorityTerminal && visibleTerminal && !normalizedEqual(authorityTerminal, visibleTerminal));
+  const materializedTerminalIsReceipt = Boolean(
+    materializedTerminal &&
+      TERMINAL_RECEIPT_KINDS.has(normalize(materializedTerminal)),
+  );
+  const effectiveAllowedTerminalKinds = materializedTerminalIsReceipt
+    ? input.contract?.allowedTerminalKinds ?? []
+    : effectiveTerminalPolicy.allowedTerminalKinds;
+  const effectiveForbiddenTerminalKinds =
+    effectiveTerminalPolicy.forbiddenTerminalKinds;
   const terminalProductMismatch = Boolean(
     requiredTerminal &&
       materializedTerminal &&
       !observationTerminalAllowed &&
       materializedTerminal !== "typed_failure" &&
-      !normalizedEqual(requiredTerminal, materializedTerminal) &&
-      !(input.contract?.allowedTerminalKinds ?? []).some((kind) => normalizedEqual(kind, materializedTerminal)),
+      (
+        effectiveForbiddenTerminalKinds.some((kind) =>
+          normalizedEqual(kind, materializedTerminal),
+        ) ||
+        (
+          !normalizedEqual(requiredTerminal, materializedTerminal) &&
+          !effectiveAllowedTerminalKinds.some((kind) =>
+            normalizedEqual(kind, materializedTerminal),
+          )
+        )
+      ),
   );
   const terminalProductAllowed = Boolean(
     materializedTerminal &&
       !terminalProductMismatch &&
+      !effectiveForbiddenTerminalKinds.some((kind) =>
+        normalizedEqual(kind, materializedTerminal),
+      ) &&
       (!requiredTerminal ||
         normalizedEqual(requiredTerminal, materializedTerminal) ||
-        (input.contract?.allowedTerminalKinds ?? []).some((kind) => normalizedEqual(kind, materializedTerminal))),
+        effectiveAllowedTerminalKinds.some((kind) =>
+          normalizedEqual(kind, materializedTerminal),
+        )),
   );
   const concreteTurnChainComplete = Boolean(
     executedCapability &&
@@ -2967,9 +3260,10 @@ export const buildArtifactQueryIndex = (input: {
     const observedRef = observationArtifact ? artifactRef(observationArtifact) : null;
     const artifactSupportsSubgoal = Boolean(
       observationArtifact &&
-        (
-          artifactSupportsCapabilityObservation(observationArtifact, effectiveCapability) ||
-          requiredObservationKinds.some((kind) => observationKindMatches(observationArtifact, kind))
+        artifactSupportsCapabilityOrUnscopedObservationKind(
+          observationArtifact,
+          effectiveCapability,
+          requiredObservationKinds,
         ),
     );
     const canReconcileFromArtifacts =
@@ -3230,11 +3524,9 @@ export const buildArtifactQueryIndex = (input: {
     ? "any"
     : requestedCapabilityContract
     ? explicitObservationCoverageMode(requestedCapabilityContract.capability)
-    : requestedToolFamilyContract?.requiredObservationKinds.includes("live_environment_tool_observation")
-    ? "any"
     : requestedToolFamilyContract
-    ? "all"
-    : contract?.requiredObservationKinds.includes("live_environment_tool_observation")
+    ? "any"
+    : contract
     ? "any"
     : "all";
   const requiredObservationCoverage = requiredObservationKinds.map((kind) => {

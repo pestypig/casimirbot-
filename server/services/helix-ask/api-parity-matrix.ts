@@ -49,7 +49,7 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
     expected: {
       source_target: "visual_capture",
       target_kind: "visual_capture",
-      terminal_artifact_kind: "situation_context_pack",
+      terminal_artifact_kind: "model_synthesized_answer",
       forbidden_routes: ["live_pipeline_control", "process_graph_overview", "no_tool_direct"],
       forbidden_terminal_artifacts: ["live_pipeline_receipt", "client_projection", "process_graph_overview"],
       required_trace_flags_absent: ["receipt_promoted_to_answer", "tool_called_without_admission"],

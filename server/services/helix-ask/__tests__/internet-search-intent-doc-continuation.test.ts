@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
 import {
   buildToolUseRestatement,
   detectInternetSearchIntent,
   hasAffirmativeDocsViewerSearchCue,
 } from "../internet-search-intent";
+import {
+  arbitrateAskSourceTarget,
+  isHardDocsEvidenceSourceTargetIntent,
+} from "../ask-source-target-arbitrator";
+import { buildToolCallAdmissionDecision } from "../tool-call-admission";
 import {
   buildRealtimeTranscriptWorkerAdmission,
   resolveRealtimeTranscriptSourceTargetIntent,
@@ -127,11 +131,27 @@ describe("Docs Viewer admission for prior document discussion", () => {
   it("treats an exact whitepaper locator command as local Docs evidence", () => {
     const prompt = "Find the NHM2 current status whitepaper.";
     const restatement = buildToolUseRestatement(prompt);
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: "ask:test:docs-locator",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    });
 
     expect(restatement.requiredToolFamilies).toContain("docs_viewer");
     expect(restatement.requiredToolFamilies).not.toContain("internet_search");
     expect(restatement.freshnessRequired).toBe(false);
     expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
+    expect(isHardDocsEvidenceSourceTargetIntent(sourceTarget)).toBe(true);
+    expect(buildToolCallAdmissionDecision({
+      turnId: "ask:test:docs-locator",
+      sourceTargetIntent: sourceTarget,
+      promptText: prompt,
+    })).toMatchObject({
+      requested_capability: "docs-viewer.search_docs",
+      selected_capability: "docs.search",
+      requested_capability_source: "hard_source_target_policy",
+      mandatory_capability_admitted: true,
+    });
   });
 
   it.each([

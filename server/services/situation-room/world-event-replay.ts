@@ -7,6 +7,10 @@ import type {
 import type { HelixWorldEvent } from "@shared/helix-world-event";
 import type { HelixStandbyObservationBatchReceipt } from "@shared/helix-standby-observation-batch";
 import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
+import {
   ingestWorldEventBatch,
   ingestWorldEvent,
   resetWorldEventIngestState,
@@ -34,6 +38,13 @@ export const replayWorldEvents = async (args: {
   deterministicNow?: string | null;
   events: HelixWorldEvent[];
 }): Promise<WorldEventReplayResult> => {
+  if (
+    args.events.some((event) =>
+      isHelixRoomSourceIngressSourceId(event.source_id),
+    )
+  ) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
   if (args.reset !== false) {
     resetWorldEventIngestState();
   }

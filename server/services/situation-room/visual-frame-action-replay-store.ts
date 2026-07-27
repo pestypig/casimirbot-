@@ -6,6 +6,10 @@ import {
   type HelixVisualFrameActionReplayResult,
   type HelixVisualFrameActionReplayStatus,
 } from "@shared/helix-visual-frame-action-replay";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 
 const requestsById = new Map<string, HelixVisualFrameActionReplayRequest>();
 const resultsByRequestId = new Map<string, HelixVisualFrameActionReplayResult[]>();
@@ -19,6 +23,15 @@ const hashShort = (value: unknown, size = 18): string =>
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
+
+const isReservedReplaySourceId = (sourceId: unknown): boolean =>
+  isHelixRoomSourceIngressSourceId(readString(sourceId));
+
+const assertGenericReplaySourceId = (sourceId: unknown): void => {
+  if (isReservedReplaySourceId(sourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
+};
 
 const uniqueStrings = (values: unknown): string[] => {
   const raw = Array.isArray(values) ? values : values == null ? [] : [values];
@@ -37,6 +50,11 @@ const addMs = (iso: string, ms: number): string =>
 function expireRequests(now = new Date().toISOString()): void {
   const nowMs = Date.parse(now);
   for (const [id, request] of requestsById.entries()) {
+    if (isReservedReplaySourceId(request.source_id)) {
+      requestsById.delete(id);
+      resultsByRequestId.delete(id);
+      continue;
+    }
     if (request.status === "completed" || request.status === "failed" || request.status === "expired") continue;
     if (Date.parse(request.expires_at) <= nowMs) {
       requestsById.set(id, {
@@ -61,6 +79,7 @@ export function requestVisualFrameActionReplay(input: Record<string, unknown>): 
   expireRequests(now);
   const threadId = readString(input.thread_id ?? input.threadId) ?? "helix-ask:desktop";
   const sourceId = readString(input.source_id ?? input.sourceId) ?? `source:visual_frame:${threadId}`;
+  assertGenericReplaySourceId(sourceId);
   const shadeProfileIds = uniqueStrings(input.shade_profile_ids ?? input.shadeProfileIds ?? input.profile_ids ?? input.profileIds);
   const requestedFrameHistoryIds = uniqueStrings(input.frame_history_ids ?? input.frameHistoryIds ?? input.history_ids ?? input.historyIds);
   const requestedFrameIds = uniqueStrings(input.frame_ids ?? input.frameIds);
@@ -106,6 +125,7 @@ export function listPendingVisualFrameActionReplayRequests(input: {
   expireRequests(now);
   const limit = Math.max(1, Math.min(input.limit ?? 25, 100));
   return Array.from(requestsById.values())
+    .filter((request) => !isReservedReplaySourceId(request.source_id))
     .filter((request) => request.status === "pending_client_frames" || request.status === "running")
     .filter((request) => !input.threadId || request.thread_id === input.threadId)
     .filter((request) => !input.sourceId || request.source_id === input.sourceId)
@@ -121,6 +141,7 @@ export function updateVisualFrameActionReplayRequestStatus(input: {
 }): HelixVisualFrameActionReplayRequest | null {
   const existing = requestsById.get(input.replayRequestId);
   if (!existing) return null;
+  assertGenericReplaySourceId(existing.source_id);
   const now = input.now ?? new Date().toISOString();
   const updated: HelixVisualFrameActionReplayRequest = {
     ...existing,
@@ -140,6 +161,19 @@ export function recordVisualFrameActionReplayResult(input: Record<string, unknow
 } {
   const now = readString(input.created_at ?? input.createdAt) ?? new Date().toISOString();
   const replayRequestId = readString(input.replay_request_id ?? input.replayRequestId) ?? "visual_frame_action_replay:unknown";
+  const request = requestsById.get(replayRequestId) ?? null;
+  const existing = resultsByRequestId.get(replayRequestId) ?? [];
+  const explicitSourceId = readString(input.source_id ?? input.sourceId);
+  const sourceId =
+    explicitSourceId ??
+    request?.source_id ??
+    existing.at(-1)?.source_id ??
+    "source:visual_frame:unknown";
+  assertGenericReplaySourceId(sourceId);
+  assertGenericReplaySourceId(request?.source_id);
+  for (const prior of existing) {
+    assertGenericReplaySourceId(prior.source_id);
+  }
   const status = input.status === "failed" || input.status === "skipped" ? input.status : "completed";
   const result: HelixVisualFrameActionReplayResult = {
     schema: HELIX_VISUAL_FRAME_ACTION_REPLAY_RESULT_SCHEMA,
@@ -147,7 +181,7 @@ export function recordVisualFrameActionReplayResult(input: Record<string, unknow
       `visual_frame_action_replay_result:${hashShort([replayRequestId, input.source_frame_history_id, input.source_frame_id, input.shade_profile_id, now])}`,
     replay_request_id: replayRequestId,
     thread_id: readString(input.thread_id ?? input.threadId) ?? "helix-ask:desktop",
-    source_id: readString(input.source_id ?? input.sourceId) ?? "source:visual_frame:unknown",
+    source_id: sourceId,
     source_frame_history_id: readString(input.source_frame_history_id ?? input.sourceFrameHistoryId),
     source_frame_id: readString(input.source_frame_id ?? input.sourceFrameId),
     replay_frame_id: readString(input.replay_frame_id ?? input.replayFrameId),
@@ -164,9 +198,7 @@ export function recordVisualFrameActionReplayResult(input: Record<string, unknow
     raw_content_included: false,
     context_role: "tool_evidence",
   };
-  const existing = resultsByRequestId.get(replayRequestId) ?? [];
   resultsByRequestId.set(replayRequestId, [...existing, result].slice(-MAX_REPLAY_RESULTS_PER_REQUEST));
-  const request = requestsById.get(replayRequestId) ?? null;
   if (!request) return { request: null, result };
   const results = resultsByRequestId.get(replayRequestId) ?? [];
   const completedCount = results.filter((entry) => entry.status === "completed").length;
@@ -197,10 +229,15 @@ export function listVisualFrameActionReplayResults(input: {
   limit?: number;
 } = {}): HelixVisualFrameActionReplayResult[] {
   const limit = Math.max(1, Math.min(input.limit ?? 100, 250));
+  const request = input.replayRequestId
+    ? requestsById.get(input.replayRequestId) ?? null
+    : null;
+  if (request && isReservedReplaySourceId(request.source_id)) return [];
   const entries = input.replayRequestId
     ? [...(resultsByRequestId.get(input.replayRequestId) ?? [])]
     : Array.from(resultsByRequestId.values()).flat();
   return entries
+    .filter((entry) => !isReservedReplaySourceId(entry.source_id))
     .filter((entry) => !input.threadId || entry.thread_id === input.threadId)
     .sort((left, right) => left.created_at.localeCompare(right.created_at))
     .slice(-limit);

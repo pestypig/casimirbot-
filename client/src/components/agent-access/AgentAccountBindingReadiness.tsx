@@ -1,0 +1,362 @@
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  CircleAlert,
+  Link2,
+  LoaderCircle,
+  RefreshCw,
+  Unlink,
+  UserRoundX,
+} from "lucide-react";
+
+export const AGENT_ACCOUNT_BINDINGS_ENDPOINT =
+  "/api/account/session/agent-bindings";
+
+export type SanitizedAgentAccountBinding = {
+  provider: string;
+  issuer: string;
+  status: "active" | "revoked";
+  tenantRef: string;
+};
+
+export type AgentAccountBindingReadinessState =
+  | {
+      kind: "loading";
+      bindings: readonly [];
+    }
+  | {
+      kind: "linked";
+      bindings: readonly SanitizedAgentAccountBinding[];
+    }
+  | {
+      kind: "not_linked";
+      bindings: readonly SanitizedAgentAccountBinding[];
+    }
+  | {
+      kind: "signed_out";
+      bindings: readonly [];
+    }
+  | {
+      kind: "unavailable";
+      bindings: readonly [];
+    };
+
+type RecordLike = Record<string, unknown>;
+
+const EMPTY_BINDINGS = [] as const;
+
+const isRecord = (value: unknown): value is RecordLike =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const sanitizedDisplayText = (
+  value: unknown,
+  maxLength: number,
+): string | null => {
+  if (typeof value !== "string") return null;
+  const normalized = value
+    .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+  return normalized || null;
+};
+
+const sanitizedIssuer = (value: unknown): string | null => {
+  const candidate = sanitizedDisplayText(value, 512);
+  if (!candidate) return null;
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
+      return null;
+    }
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+};
+
+const sanitizedTenantRef = (value: unknown): string | null => {
+  const candidate = sanitizedDisplayText(value, 96);
+  return candidate && /^tenant:sha256:[a-f0-9]{8,64}$/i.test(candidate)
+    ? candidate
+    : null;
+};
+
+const sanitizedProvider = (value: unknown): string | null => {
+  const candidate = sanitizedDisplayText(value, 80);
+  return candidate && /^[a-z0-9][a-z0-9._: -]*$/i.test(candidate)
+    ? candidate
+    : null;
+};
+
+const sanitizedBinding = (
+  value: unknown,
+): SanitizedAgentAccountBinding | null => {
+  if (!isRecord(value)) return null;
+  if (value.subject_included !== false || value.bearer_included !== false) {
+    return null;
+  }
+  const provider = sanitizedProvider(value.provider);
+  const issuer = sanitizedIssuer(value.issuer);
+  const tenantRef = sanitizedTenantRef(value.tenant_ref);
+  const status =
+    value.status === "active" || value.status === "revoked"
+      ? value.status
+      : null;
+  if (!provider || !issuer || !tenantRef || !status) return null;
+  return {
+    provider,
+    issuer,
+    status,
+    tenantRef,
+  };
+};
+
+export const parseAgentAccountBindingReadiness = (
+  value: unknown,
+): Exclude<
+  AgentAccountBindingReadinessState,
+  { kind: "loading" | "signed_out" | "unavailable" }
+> | null => {
+  if (
+    !isRecord(value) ||
+    value.schema !== "helix.agent_account_bindings.v1" ||
+    typeof value.oauth_ready !== "boolean" ||
+    !Array.isArray(value.bindings)
+  ) {
+    return null;
+  }
+  const bindings = value.bindings
+    .map(sanitizedBinding)
+    .filter(
+      (binding): binding is SanitizedAgentAccountBinding => binding !== null,
+    );
+  const hasActiveBinding = bindings.some(
+    (binding) => binding.status === "active",
+  );
+  if (value.oauth_ready !== hasActiveBinding) return null;
+  return {
+    kind: hasActiveBinding ? "linked" : "not_linked",
+    bindings,
+  };
+};
+
+const stateCopy = (
+  state: AgentAccountBindingReadinessState,
+): {
+  title: string;
+  body: string;
+  badge: string;
+  icon: typeof Link2;
+  tone: string;
+} => {
+  switch (state.kind) {
+    case "linked":
+      return {
+        title: "Linked for agent access",
+        body: "This signed-in profile has an active, server-verified agent binding. An AI client must still be explicitly configured with the MCP endpoint and complete its authorized OAuth connection.",
+        badge: "Active binding",
+        icon: Link2,
+        tone: "border-emerald-300/25 bg-emerald-400/10 text-emerald-100",
+      };
+    case "not_linked":
+      return {
+        title: "No active agent binding",
+        body: "This signed-in profile has no active OAuth agent binding. This read-only panel cannot create, reactivate, or authorize one.",
+        badge: "Not linked",
+        icon: Unlink,
+        tone: "border-amber-300/25 bg-amber-400/10 text-amber-100",
+      };
+    case "signed_out":
+      return {
+        title: "Sign in to check binding status",
+        body: "A workstation account session is required to inspect agent bindings. Signing in does not add the MCP endpoint or grant an AI client access.",
+        badge: "Signed out",
+        icon: UserRoundX,
+        tone: "border-slate-300/20 bg-slate-400/10 text-slate-200",
+      };
+    case "unavailable":
+      return {
+        title: "Binding readiness unavailable",
+        body: "The account-binding status service is unavailable or not configured. No agent access has been inferred.",
+        badge: "Configuration unavailable",
+        icon: CircleAlert,
+        tone: "border-rose-300/25 bg-rose-400/10 text-rose-100",
+      };
+    case "loading":
+      return {
+        title: "Checking account binding",
+        body: "Reading the current workstation account's sanitized agent-binding projection.",
+        badge: "Checking",
+        icon: LoaderCircle,
+        tone: "border-cyan-300/25 bg-cyan-400/10 text-cyan-100",
+      };
+  }
+};
+
+export function AgentAccountBindingReadiness() {
+  const [state, setState] = useState<AgentAccountBindingReadinessState>({
+    kind: "loading",
+    bindings: EMPTY_BINDINGS,
+  });
+  const activeRequest = useRef<AbortController | null>(null);
+
+  const refresh = useCallback((): void => {
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    setState({ kind: "loading", bindings: EMPTY_BINDINGS });
+
+    void fetch(AGENT_ACCOUNT_BINDINGS_ENDPOINT, {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (controller.signal.aborted) return;
+        if (response.status === 401) {
+          setState({ kind: "signed_out", bindings: EMPTY_BINDINGS });
+          return;
+        }
+        if (!response.ok) {
+          setState({ kind: "unavailable", bindings: EMPTY_BINDINGS });
+          return;
+        }
+        const parsed = parseAgentAccountBindingReadiness(await response.json());
+        setState(parsed ?? { kind: "unavailable", bindings: EMPTY_BINDINGS });
+      })
+      .catch((error: unknown) => {
+        if (
+          controller.signal.aborted ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
+          return;
+        }
+        setState({ kind: "unavailable", bindings: EMPTY_BINDINGS });
+      })
+      .finally(() => {
+        if (activeRequest.current === controller) {
+          activeRequest.current = null;
+        }
+      });
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    return () => {
+      activeRequest.current?.abort();
+      activeRequest.current = null;
+    };
+  }, [refresh]);
+
+  const copy = stateCopy(state);
+  const StateIcon = copy.icon;
+
+  return (
+    <section
+      className="rounded-xl border border-white/10 bg-slate-950/80 p-4 shadow-[0_18px_70px_-48px_rgba(34,211,238,0.65)]"
+      aria-labelledby="agent-account-binding-readiness-title"
+      data-agent-binding-readiness={state.kind}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className={`rounded-lg border p-2 ${copy.tone}`}>
+            <StateIcon
+              className={`h-5 w-5 ${
+                state.kind === "loading" ? "animate-spin" : ""
+              }`}
+              aria-hidden="true"
+            />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-300">
+              OAuth account readiness
+            </p>
+            <h2
+              id="agent-account-binding-readiness-title"
+              className="mt-1 text-base font-semibold text-white"
+            >
+              {copy.title}
+            </h2>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${copy.tone}`}
+          >
+            {copy.badge}
+          </span>
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={state.kind === "loading"}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-wait disabled:opacity-50"
+            aria-label="Refresh binding status"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${
+                state.kind === "loading" ? "animate-spin" : ""
+              }`}
+              aria-hidden="true"
+            />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <p
+        className="mt-3 text-xs leading-5 text-slate-300"
+        role="status"
+        aria-live="polite"
+      >
+        {copy.body}
+      </p>
+
+      {state.bindings.length > 0 ? (
+        <div className="mt-4 space-y-2" aria-label="Sanitized agent bindings">
+          {state.bindings.map((binding, index) => (
+            <dl
+              key={`${binding.issuer}:${binding.tenantRef}:${index}`}
+              className="grid gap-2 rounded-lg border border-white/10 bg-black/20 p-3 text-[11px] sm:grid-cols-2"
+            >
+              <div className="min-w-0">
+                <dt className="text-slate-500">Provider</dt>
+                <dd className="mt-0.5 break-words text-slate-200">
+                  {binding.provider}
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-slate-500">Status</dt>
+                <dd className="mt-0.5 text-slate-200">{binding.status}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-slate-500">Issuer</dt>
+                <dd className="mt-0.5 break-all font-mono text-cyan-100/80">
+                  {binding.issuer}
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-slate-500">Tenant reference</dt>
+                <dd className="mt-0.5 break-all font-mono text-slate-300">
+                  {binding.tenantRef}
+                </dd>
+              </div>
+            </dl>
+          ))}
+        </div>
+      ) : null}
+
+      <p className="mt-3 text-[10px] leading-4 text-slate-500">
+        Read-only status. This surface does not install an MCP connection, start
+        OAuth, or expose account subjects or credentials.
+      </p>
+    </section>
+  );
+}
+
+export default AgentAccountBindingReadiness;

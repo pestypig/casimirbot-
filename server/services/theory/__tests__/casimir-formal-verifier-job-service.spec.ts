@@ -9,8 +9,17 @@ import { buildCasimirFormalLeanReplayPolicyV1 } from "../../../../shared/contrac
 import { buildCasimirFormalVerificationRequestV1 } from "../../../../shared/contracts/casimir-formal-verification-request.v1";
 import {
   createCasimirFormalVerifierJobService,
+  installCasimirFormalVerifierDependenciesForServerV1,
+  planCasimirFormalVerifierJobV1,
+  readCasimirFormalVerifierJobResultV1,
+  startCasimirFormalVerifierJobV1,
   type CasimirFormalVerifierSealedInputV1,
 } from "../casimir-formal-verifier-job-service";
+import {
+  buildRuntimeToolConfirmationTestReceipt,
+  createTrustedRuntimeTestReplayLedger,
+  verifyTrustedRuntimeTestReceipt,
+} from "./runtime-tool-confirmation-fixture";
 
 const roots: string[] = [];
 const hash = (digit: string): string => digit.repeat(64);
@@ -18,6 +27,7 @@ const sha256 = (value: Uint8Array | string): string =>
   createHash("sha256").update(value).digest("hex");
 
 afterEach(async () => {
+  installCasimirFormalVerifierDependenciesForServerV1({});
   while (roots.length > 0) {
     const root = roots.pop();
     if (root && path.resolve(root).startsWith(path.resolve(os.tmpdir()))) {
@@ -212,6 +222,97 @@ describe("Casimir formal verifier job service", () => {
     expect(ready.planId).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it("routes default wrappers only through trusted server-bootstrap dependencies", async () => {
+    const fixture = await makeFixture();
+    const profileId = "profile:server-bootstrap";
+    const sessionId = "session:server-bootstrap";
+    const turnId = "ask:server-bootstrap";
+    installCasimirFormalVerifierDependenciesForServerV1({
+      resolveLeanExecutablePath: () => fixture.executablePath,
+      verifyTrustedRuntimeReceipt: verifyTrustedRuntimeTestReceipt,
+      confirmationReplayLedger: createTrustedRuntimeTestReplayLedger(),
+      now: () => Date.parse("2026-07-25T00:02:00.000Z"),
+      runner: async () => ({
+        startedAt: "2026-07-24T12:00:01.000Z",
+        completedAt: "2026-07-24T12:00:02.000Z",
+        exitCode: 0,
+        signal: null,
+        stdout:
+          "casimir_formal_verifier_demo : True\n'casimir_formal_verifier_demo' does not depend on any axioms\n",
+        stderr: "",
+        timedOut: false,
+        outputLimitExceeded: false,
+        spawnError: null,
+      }),
+    });
+
+    const planned = await planCasimirFormalVerifierJobV1({
+      accountType: "developer",
+      profileId,
+      sealedInput: fixture.sealedInput,
+    });
+    const approvalReceipt = await buildRuntimeToolConfirmationTestReceipt({
+      binding: {
+        capabilityId: "theory-formal-verifier.start",
+        planId: planned.planId as string,
+        accountType: "developer",
+        profileId,
+        sessionId,
+        turnId,
+        sealedInputSha256: planned.sealedInputSha256 as string,
+      },
+    });
+    const started = await startCasimirFormalVerifierJobV1({
+      accountType: "developer",
+      profileId,
+      sessionId,
+      turnId,
+      sealedInput: fixture.sealedInput,
+      planId: planned.planId,
+      approvalReceipt,
+    });
+    expect(started).toMatchObject({
+      ok: true,
+      status: "running",
+    });
+
+    let completed = readCasimirFormalVerifierJobResultV1({
+      accountType: "developer",
+      profileId,
+      jobId: started.jobId,
+    });
+    for (
+      let attempt = 0;
+      attempt < 50 && completed.status === "running";
+      attempt += 1
+    ) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 5));
+      completed = readCasimirFormalVerifierJobResultV1({
+        accountType: "developer",
+        profileId,
+        jobId: started.jobId,
+      });
+    }
+    expect(completed).toMatchObject({
+      ok: true,
+      status: "completed",
+      certificate: { status: "passed" },
+    });
+
+    installCasimirFormalVerifierDependenciesForServerV1({});
+    expect(
+      await planCasimirFormalVerifierJobV1({
+        accountType: "developer",
+        profileId,
+        sealedInput: fixture.sealedInput,
+      }),
+    ).toMatchObject({
+      ok: false,
+      status: "blocked",
+      issues: expect.arrayContaining(["lean_executable_not_configured"]),
+    });
+  });
+
   it("requires a matching plan and runtime approval before starting", async () => {
     const fixture = await makeFixture();
     const service = createCasimirFormalVerifierJobService({
@@ -235,6 +336,13 @@ describe("Casimir formal verifier job service", () => {
       sealedInput: fixture.sealedInput,
       planId: planned.planId,
     });
+    const legacy = await service.start({
+      accountType: "developer",
+      profileId: "profile:developer",
+      sealedInput: fixture.sealedInput,
+      planId: planned.planId,
+      approvalToken: "runtime-approved",
+    });
 
     expect(mismatched).toMatchObject({
       ok: false,
@@ -244,8 +352,13 @@ describe("Casimir formal verifier job service", () => {
     expect(unconfirmed).toMatchObject({
       ok: false,
       status: "needs_confirmation",
-      issues: ["runtime_approval_token_required"],
+      issues: ["runtime_approval_receipt_required"],
       nextCapability: "request_user_confirmation",
+    });
+    expect(legacy).toMatchObject({
+      ok: false,
+      status: "blocked",
+      issues: ["runtime_approval_legacy_token_rejected"],
     });
   });
 
@@ -253,6 +366,9 @@ describe("Casimir formal verifier job service", () => {
     const fixture = await makeFixture();
     const service = createCasimirFormalVerifierJobService({
       resolveLeanExecutablePath: () => fixture.executablePath,
+      verifyTrustedRuntimeReceipt: verifyTrustedRuntimeTestReceipt,
+      confirmationReplayLedger: createTrustedRuntimeTestReplayLedger(),
+      now: () => Date.parse("2026-07-25T00:02:00.000Z"),
       runner: async () => ({
         startedAt: "2026-07-24T12:00:01.000Z",
         completedAt: "2026-07-24T12:00:02.000Z",
@@ -272,12 +388,27 @@ describe("Casimir formal verifier job service", () => {
       profileId,
       sealedInput: fixture.sealedInput,
     });
+    const sessionId = "session:formal-verifier";
+    const turnId = "ask:formal-verifier";
+    const approvalReceipt = await buildRuntimeToolConfirmationTestReceipt({
+      binding: {
+        capabilityId: "theory-formal-verifier.start",
+        planId: planned.planId as string,
+        accountType: "developer",
+        profileId,
+        sessionId,
+        turnId,
+        sealedInputSha256: planned.sealedInputSha256 as string,
+      },
+    });
     const started = await service.start({
       accountType: "developer",
       profileId,
       sealedInput: fixture.sealedInput,
       planId: planned.planId,
-      approvalToken: "runtime-approved",
+      sessionId,
+      turnId,
+      approvalReceipt,
     });
 
     expect(started).toMatchObject({
@@ -325,6 +456,174 @@ describe("Casimir formal verifier job service", () => {
         terminalEligible: false,
         postToolModelStepRequired: true,
       },
+    });
+
+    const replayed = await service.start({
+      accountType: "developer",
+      profileId,
+      sealedInput: fixture.sealedInput,
+      planId: planned.planId,
+      sessionId,
+      turnId,
+      approvalReceipt,
+    });
+    expect(replayed).toMatchObject({
+      ok: false,
+      status: "blocked",
+      issues: ["runtime_approval_receipt_already_consumed"],
+    });
+  });
+
+  it("fails closed on unconfigured, mismatched, and expired runtime receipts", async () => {
+    const fixture = await makeFixture();
+    const profileId = "profile:developer";
+    const sessionId = "session:formal-verifier";
+    const turnId = "ask:formal-verifier";
+    const unconfigured = createCasimirFormalVerifierJobService({
+      resolveLeanExecutablePath: () => fixture.executablePath,
+    });
+    const unconfiguredPlan = await unconfigured.plan({
+      accountType: "developer",
+      profileId,
+      sealedInput: fixture.sealedInput,
+    });
+    const unconfiguredReceipt = await buildRuntimeToolConfirmationTestReceipt({
+      binding: {
+        capabilityId: "theory-formal-verifier.start",
+        planId: unconfiguredPlan.planId as string,
+        accountType: "developer",
+        profileId,
+        sessionId,
+        turnId,
+        sealedInputSha256: unconfiguredPlan.sealedInputSha256 as string,
+      },
+    });
+    expect(
+      await unconfigured.start({
+        accountType: "developer",
+        profileId,
+        sessionId,
+        turnId,
+        sealedInput: fixture.sealedInput,
+        planId: unconfiguredPlan.planId,
+        approvalReceipt: unconfiguredReceipt,
+      }),
+    ).toMatchObject({
+      ok: false,
+      status: "blocked",
+      issues: ["runtime_approval_receipt_issuer_unconfigured"],
+    });
+
+    const noLedger = createCasimirFormalVerifierJobService({
+      resolveLeanExecutablePath: () => fixture.executablePath,
+      verifyTrustedRuntimeReceipt: verifyTrustedRuntimeTestReceipt,
+      now: () => Date.parse("2026-07-25T00:02:00.000Z"),
+    });
+    const noLedgerPlan = await noLedger.plan({
+      accountType: "developer",
+      profileId,
+      sealedInput: fixture.sealedInput,
+    });
+    const noLedgerReceipt = await buildRuntimeToolConfirmationTestReceipt({
+      requestId: "runtime-confirmation-request:no-ledger",
+      receiptId: "runtime-confirmation-receipt:no-ledger",
+      binding: {
+        capabilityId: "theory-formal-verifier.start",
+        planId: noLedgerPlan.planId as string,
+        accountType: "developer",
+        profileId,
+        sessionId,
+        turnId,
+        sealedInputSha256: noLedgerPlan.sealedInputSha256 as string,
+      },
+    });
+    expect(
+      await noLedger.start({
+        accountType: "developer",
+        profileId,
+        sessionId,
+        turnId,
+        sealedInput: fixture.sealedInput,
+        planId: noLedgerPlan.planId,
+        approvalReceipt: noLedgerReceipt,
+      }),
+    ).toMatchObject({
+      ok: false,
+      status: "blocked",
+      issues: ["runtime_approval_receipt_replay_ledger_unconfigured"],
+    });
+
+    const service = createCasimirFormalVerifierJobService({
+      resolveLeanExecutablePath: () => fixture.executablePath,
+      verifyTrustedRuntimeReceipt: verifyTrustedRuntimeTestReceipt,
+      confirmationReplayLedger: createTrustedRuntimeTestReplayLedger(),
+      now: () => Date.parse("2026-07-25T00:10:00.000Z"),
+    });
+    const planned = await service.plan({
+      accountType: "developer",
+      profileId,
+      sealedInput: fixture.sealedInput,
+    });
+    const wrongTurn = await buildRuntimeToolConfirmationTestReceipt({
+      requestId: "runtime-confirmation-request:wrong-turn",
+      receiptId: "runtime-confirmation-receipt:wrong-turn",
+      binding: {
+        capabilityId: "theory-formal-verifier.start",
+        planId: planned.planId as string,
+        accountType: "developer",
+        profileId,
+        sessionId,
+        turnId: "ask:other-turn",
+        sealedInputSha256: planned.sealedInputSha256 as string,
+      },
+      expiresAt: "2026-07-25T00:15:00.000Z",
+    });
+    expect(
+      await service.start({
+        accountType: "developer",
+        profileId,
+        sessionId,
+        turnId,
+        sealedInput: fixture.sealedInput,
+        planId: planned.planId,
+        approvalReceipt: wrongTurn,
+      }),
+    ).toMatchObject({
+      ok: false,
+      status: "blocked",
+      issues: ["runtime_approval_receipt_binding_mismatch:turnId"],
+    });
+
+    const expired = await buildRuntimeToolConfirmationTestReceipt({
+      requestId: "runtime-confirmation-request:expired",
+      receiptId: "runtime-confirmation-receipt:expired",
+      binding: {
+        capabilityId: "theory-formal-verifier.start",
+        planId: planned.planId as string,
+        accountType: "developer",
+        profileId,
+        sessionId,
+        turnId,
+        sealedInputSha256: planned.sealedInputSha256 as string,
+      },
+      issuedAt: "2026-07-25T00:00:00.000Z",
+      approvedAt: "2026-07-25T00:01:00.000Z",
+      expiresAt: "2026-07-25T00:05:00.000Z",
+    });
+    expect(
+      await service.start({
+        accountType: "developer",
+        profileId,
+        sessionId,
+        turnId,
+        sealedInput: fixture.sealedInput,
+        planId: planned.planId,
+        approvalReceipt: expired,
+      }),
+    ).toMatchObject({
+      ok: false,
+      status: "blocked",
+      issues: ["runtime_approval_receipt_expired"],
     });
   });
 });

@@ -94,6 +94,22 @@ async function makePassedCertificate(
       requestId: request.requestId,
       artifactSha256: request.artifactSha256,
       propositionSha256: request.claim.propositionSha256,
+      casimirSpec: {
+        semanticSha256: request.casimirSpec.semanticSha256,
+        artifactSha256: request.casimirSpec.artifactSha256,
+      },
+      masterProblem: {
+        planId: request.masterProblem.planId,
+        artifactSha256: request.masterProblem.artifactSha256,
+      },
+      derivationProgram: {
+        programId: request.derivationProgram.programId,
+        artifactSha256: request.derivationProgram.artifactSha256,
+      },
+      theoryGraph: {
+        graphId: request.theoryGraph.graphId,
+        snapshotSha256: request.theoryGraph.snapshotSha256,
+      },
     },
     status: "passed",
     theorem: {
@@ -216,6 +232,24 @@ describe("casimir_formal_verification_certificate/v1", () => {
         request,
       ),
     ).toEqual([]);
+    expect(certificate.request).toMatchObject({
+      casimirSpec: {
+        semanticSha256: request.casimirSpec.semanticSha256,
+        artifactSha256: request.casimirSpec.artifactSha256,
+      },
+      masterProblem: {
+        planId: request.masterProblem.planId,
+        artifactSha256: request.masterProblem.artifactSha256,
+      },
+      derivationProgram: {
+        programId: request.derivationProgram.programId,
+        artifactSha256: request.derivationProgram.artifactSha256,
+      },
+      theoryGraph: {
+        graphId: request.theoryGraph.graphId,
+        snapshotSha256: request.theoryGraph.snapshotSha256,
+      },
+    });
     expect(certificate.authority).toMatchObject({
       formalPropositionChecked: true,
       validatesSemanticIntent: false,
@@ -273,6 +307,44 @@ describe("casimir_formal_verification_certificate/v1", () => {
     expect(
       await validateCasimirFormalVerificationCertificateIntegrityV1(
         certificate,
+      ),
+    ).toContain("artifactSha256 does not match certificate content");
+  });
+
+  it("rejects substitution across every scientific lineage binding", async () => {
+    const request = await makeRequest();
+    const certificate = await makePassedCertificate(request);
+    const substituted = structuredClone(certificate);
+    substituted.request.casimirSpec.semanticSha256 = hash("0");
+    substituted.request.casimirSpec.artifactSha256 = hash("1");
+    substituted.request.masterProblem.planId = "master-problem-substituted";
+    substituted.request.masterProblem.artifactSha256 = hash("2");
+    substituted.request.derivationProgram.programId =
+      "derivation-program-substituted";
+    substituted.request.derivationProgram.artifactSha256 = hash("3");
+    substituted.request.theoryGraph.graphId = "theory-graph-substituted";
+    substituted.request.theoryGraph.snapshotSha256 = hash("4");
+
+    expect(
+      validateCasimirFormalVerificationCertificateAgainstRequestV1(
+        substituted,
+        request,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "certificate Casimir Spec semantic hash does not match request",
+        "certificate Casimir Spec artifact hash does not match request",
+        "certificate Master Problem planId does not match request",
+        "certificate Master Problem artifact hash does not match request",
+        "certificate derivation programId does not match request",
+        "certificate derivation program artifact hash does not match request",
+        "certificate Theory Graph graphId does not match request",
+        "certificate Theory Graph snapshot hash does not match request",
+      ]),
+    );
+    expect(
+      await validateCasimirFormalVerificationCertificateIntegrityV1(
+        substituted,
       ),
     ).toContain("artifactSha256 does not match certificate content");
   });

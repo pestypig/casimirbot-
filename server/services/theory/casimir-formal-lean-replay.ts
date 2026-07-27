@@ -494,6 +494,22 @@ async function buildCertificate(input: {
       requestId: input.request.requestId,
       artifactSha256: input.request.artifactSha256,
       propositionSha256: input.request.claim.propositionSha256,
+      casimirSpec: {
+        semanticSha256: input.request.casimirSpec.semanticSha256,
+        artifactSha256: input.request.casimirSpec.artifactSha256,
+      },
+      masterProblem: {
+        planId: input.request.masterProblem.planId,
+        artifactSha256: input.request.masterProblem.artifactSha256,
+      },
+      derivationProgram: {
+        programId: input.request.derivationProgram.programId,
+        artifactSha256: input.request.derivationProgram.artifactSha256,
+      },
+      theoryGraph: {
+        graphId: input.request.theoryGraph.graphId,
+        snapshotSha256: input.request.theoryGraph.snapshotSha256,
+      },
     },
     status: passed ? "passed" : input.runs.length === 0 ? "blocked" : "failed",
     theorem: {

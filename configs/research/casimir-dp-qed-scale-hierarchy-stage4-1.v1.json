@@ -1,0 +1,185 @@
+{
+  "schema_version": "casimir_dp_qed_scale_hierarchy_stage4_1/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-qed-scale-hierarchy-stage4-1-v1",
+  "implementation_version": "1.0.0",
+  "evidence_cutoff": "2026-07-25",
+  "evidence_class": "source_backed_calculation",
+  "claim_ceiling": "qed_scale_identity_calibration",
+  "promotion_allowed": false,
+  "stage4_1_authority_manifest": {
+    "role": "stage4_1_authority_manifest",
+    "path": "configs/research/casimir-dp-stage4-1-authorities.v1.json",
+    "sha256": "cd681b977d47de6715322249c1026ecf5e963ac81735d6c29aa5100942824f4f",
+    "tracked": false,
+    "required_at_runtime": true
+  },
+  "upstream_authorities": [
+    {
+      "role": "stage4_config",
+      "path": "configs/research/casimir-dp-polarization-congruence-stage4.v1.json",
+      "sha256": "ade06cd7b95e27fe414614ad36512d5764d439c4fa6623f8499ad218ba07c3d7",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_input_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-authorities.v1.json",
+      "sha256": "3f26ef115533ef78756fad70f3880f8ea1d1ace43cbc9a0e66d6d0b5e9c2918d",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-report.json",
+      "sha256": "2c56cd9b61928ee750cf0714435674cc923b4c81f02e325b8ee9e9e5a9816d0b",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-report.md",
+      "sha256": "1221cf1e6b6c247c3253240c44ed78446318b2cdb2966610a63d08c7ec4f00a8",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_immutable_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-receipt.json",
+      "sha256": "185a09ceb61b4f158afe16022783c8b184c1035f456cb341b5c90920b69b774a",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-polarization-congruence-stage4-verification-receipt.json",
+      "sha256": "721b9f6aeab4b181ccc5ac21b4bc81c984d3b1fb72cdf76e55abedba11e38440",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "codata_2022_constants_registry",
+      "path": "configs/constants/codata-2022.v1.json",
+      "sha256": "5a7e10ed709577c224cf45f78199dd143a7f9cf10d6f8fe8c018e168454b7a61",
+      "tracked": true,
+      "required_at_runtime": true
+    }
+  ],
+  "source_registry": [
+    {
+      "source_id": "nist-codata-2022-ascii-table",
+      "url": "https://physics.nist.gov/cuu/Constants/Table/allascii.txt",
+      "citation": "NIST Standard Reference Database 121, CODATA 2022 ASCII table",
+      "supports": "Printed values, units, and one-standard-deviation uncertainties used in the dedicated Stage-4.1 fixture.",
+      "does_not_support": "Independent validation among correlated adjusted constants or any Casimir, DP, collapse, resonance, or manifold transfer."
+    },
+    {
+      "source_id": "nist-codata-2022-sp961-wall-chart",
+      "url": "https://physics.nist.gov/cuu/pdf/wall_2022.pdf",
+      "citation": "NIST SP 961, CODATA Recommended Values of the Fundamental Physical Constants: 2022",
+      "supports": "A human-readable cross-check of CODATA 2022 values, uncertainties, units, and quantity names.",
+      "does_not_support": "A new experiment, statistical independence, precision spectroscopy, or a Casimir-to-collapse mechanism."
+    },
+    {
+      "source_id": "codata-2022-full-adjustment-paper",
+      "url": "https://physics.nist.gov/cuu/pdf/JPCRD2022CODATA.pdf",
+      "citation": "CODATA Recommended Values of the Fundamental Physical Constants: 2022, Journal of Physical and Chemical Reference Data",
+      "supports": "Correlated least-squares-adjustment provenance and the correction structure required for precision hydrogen spectroscopy.",
+      "does_not_support": "Treating shared algebra as independent empirical confirmation or connecting atomic scales to Casimir or DP variables."
+    },
+    {
+      "source_id": "bipm-si-defining-constants",
+      "url": "https://www.bipm.org/en/measurement-units/si-defining-constants",
+      "citation": "BIPM, The International System of Units (SI): Defining constants",
+      "supports": "The exact defining numerical values and zero defining uncertainty of h and c in SI.",
+      "does_not_support": "Adjusted atomic constants, spectroscopy corrections, a Compton oscillator, or any collapse or manifold claim."
+    }
+  ],
+  "evidence_policy": {
+    "constants_calibration_is_independent_measurement": false,
+    "codata_tabulations_are_correlated": true,
+    "cross_covariance_required_for_significance": true,
+    "leading_hydrogenic_scale_is_precision_spectroscopy": false,
+    "same_identity_family_implies_casimir_dp_connection": false,
+    "alpha_fs_is_universal_emission_probability": false,
+    "calibration_can_modify_immutable_stage4": false,
+    "calibration_can_satisfy_measured_gate": false,
+    "observable_bridge_edges_allowed": false
+  },
+  "runtime_fixture": {
+    "path": "configs/research/fixtures/casimir-dp-qed-scale-hierarchy.codata2022.v1.json",
+    "sha256": "784e5d456940b55f07f81a7c421fc7ba323c9aefb34b65863f1c1a999803d392",
+    "schema_version": "casimir_dp_qed_scale_hierarchy_calibration/1",
+    "evidence_class": "source_backed_calculation"
+  },
+  "deterministic_seed": 4102022,
+  "software": {
+    "runtime": "typescript",
+    "runner": "scripts/research/run-casimir-dp-qed-scale-hierarchy-stage4-1.ts",
+    "module_ids": [
+      "shared/casimir-dp-qed-scale-hierarchy-calibration.ts",
+      "shared/contracts/casimir-dp-qed-scale-hierarchy-stage4-1.v1.ts"
+    ],
+    "source_authorities": [
+      {
+        "role": "qed_scale_hierarchy_runtime",
+        "path": "shared/casimir-dp-qed-scale-hierarchy-calibration.ts",
+        "sha256": "f1f8e4e904faeba71883f17578fa4f3d6f2f1dfb961d4e00725c63cf4de25f02",
+        "tracked": false,
+        "required_at_runtime": true
+      },
+      {
+        "role": "stage4_1_contract",
+        "path": "shared/contracts/casimir-dp-qed-scale-hierarchy-stage4-1.v1.ts",
+        "sha256": "8bdcf140697817ee36dd048a96cd6ad425d6a7113d946ef58e02b4c09b5fb8f4",
+        "tracked": false,
+        "required_at_runtime": true
+      },
+      {
+        "role": "stage4_1_runner",
+        "path": "scripts/research/run-casimir-dp-qed-scale-hierarchy-stage4-1.ts",
+        "sha256": "781621c890ea2ea3a74078b4b8b407f16da9b7031f7969bc8c0e3c2f02debfdd",
+        "tracked": false,
+        "required_at_runtime": true
+      }
+    ],
+    "source_snapshot": {
+      "git_head": "705759a201ee77313919de906c53dc8565de75bc",
+      "worktree_state": "dirty_uncommitted_source_hashes_authoritative",
+      "authority_mode": "content_hashes"
+    }
+  },
+  "run_order": [
+    "hash_link_immutable_stage4_authorities",
+    "freeze_codata_units_symbols_species_mass_and_frequency_conventions",
+    "validate_source_provenance_uncertainty_covariance_and_rounding",
+    "compute_compton_energy_frequency_and_wavelength_closure",
+    "compute_bohr_classical_radius_rydberg_and_hartree_closure",
+    "compute_leading_hydrogenic_reduced_mass_closure",
+    "validate_dimensionless_scale_hierarchy_and_reference_envelopes",
+    "freeze_precision_correction_ledger_and_semantic_nonbridge",
+    "populate_stage4_1_outcome_nonclaim_and_falsifier_ledger",
+    "write_hash_backed_stage4_1_receipt_report_and_evidence_state"
+  ],
+  "final_status_policy": {
+    "software_identity_calibration": "pass",
+    "source_authority_integrity": "pass",
+    "algebraic_identity_closure": "pass",
+    "codata_tabulation_consistency": "pass",
+    "covariance_semantics": "pass",
+    "leading_reduced_mass_closure": "pass",
+    "measured_evidence": "not_ready",
+    "apparatus_material_response": "not_ready",
+    "ordinary_physics_apparatus_closure": "not_ready",
+    "precision_spectroscopy": "not_ready",
+    "independent_empirical_validation": "not_evaluated",
+    "polarization_or_helicity_model": "not_evaluated",
+    "casimir_to_atomic_transfer": "blocked",
+    "atomic_to_dp_transfer": "blocked",
+    "compton_to_collapse_clock": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "publication_claim": "diagnostic_constants_calibration_only"
+  }
+}

@@ -21,6 +21,10 @@ import {
   type HelixSourceBindingStatusLedgerTransition,
 } from "@shared/helix-source-binding-status-ledger";
 import type { HelixObservationJournalEntry } from "@shared/helix-observation-journal";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 import type { HelixSituationSourceBindingModality } from "@shared/helix-situation-source-binding";
 import { appendObservationJournalEntry, listObservationJournalEntries } from "./observation-journal-store";
 import { upsertSituationSourceBinding } from "./situation-source-binding-store";
@@ -42,6 +46,15 @@ const hashShort = (value: unknown, size = 18): string =>
 
 const cleanString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
+
+const isReservedBindingSourceId = (sourceId: unknown): boolean =>
+  isHelixRoomSourceIngressSourceId(cleanString(sourceId));
+
+const assertGenericBindingSourceId = (sourceId: unknown): void => {
+  if (isReservedBindingSourceId(sourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
+};
 
 const unique = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value: string | null | undefined) => cleanString(value)).filter((value: string | null): value is string => Boolean(value))));
@@ -86,6 +99,7 @@ export function appendSourceBindingStatusLedger(input: {
   replayed_from_refs?: string[];
   created_at?: string;
 }): HelixSourceBindingStatusLedgerEntry {
+  assertGenericBindingSourceId(input.source_id);
   const createdAt = input.created_at ?? new Date().toISOString();
   const entry: HelixSourceBindingStatusLedgerEntry = {
     schema: HELIX_SOURCE_BINDING_STATUS_LEDGER_SCHEMA,
@@ -141,6 +155,7 @@ export function upsertSourceBindingStatus(input: {
 }): HelixSourceBindingStatus {
   const threadId = cleanString(input.thread_id) ?? "helix-ask:desktop";
   const sourceId = cleanString(input.source_id) ?? "unknown_source";
+  assertGenericBindingSourceId(sourceId);
   const modality = cleanString(input.modality) ?? (input.source_kind ? helixDefaultModalityForSourceKind(input.source_kind) : "visual_frame");
   const sourceKind = input.source_kind ?? helixEvidenceSourceKindForModality(modality);
   const statusId = statusIdFor({
@@ -182,7 +197,11 @@ export function upsertSourceBindingStatus(input: {
 }
 
 export function getSourceBindingStatus(statusId: string): HelixSourceBindingStatus | null {
-  return statuses.get(statusId) ?? statuses.get(`source_binding_status:${statusId.replace(/^source_binding_status:/, "")}`) ?? null;
+  const status =
+    statuses.get(statusId) ??
+    statuses.get(`source_binding_status:${statusId.replace(/^source_binding_status:/, "")}`) ??
+    null;
+  return status && !isReservedBindingSourceId(status.source_id) ? status : null;
 }
 
 export function listSourceBindingStatuses(input: {
@@ -194,6 +213,7 @@ export function listSourceBindingStatuses(input: {
 } = {}): HelixSourceBindingStatus[] {
   const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
   return Array.from(statuses.values())
+    .filter((status: HelixSourceBindingStatus) => !isReservedBindingSourceId(status.source_id))
     .filter((status: HelixSourceBindingStatus) => !input.threadId || status.thread_id === input.threadId)
     .filter((status: HelixSourceBindingStatus) => !input.sourceId || status.source_id === input.sourceId)
     .filter((status: HelixSourceBindingStatus) => !input.situationRunId || status.situation_run_id === input.situationRunId)
@@ -213,6 +233,7 @@ export function recordObservedUnboundSource(input: {
   evidenceRefs?: string[];
   now?: string;
 }): HelixSourceBindingStatus {
+  assertGenericBindingSourceId(input.sourceId);
   const existingId = latestStatusBySource.get(sourceKeyFor({ threadId: input.threadId, sourceId: input.sourceId }));
   const existing = existingId ? statuses.get(existingId) ?? null : null;
   const sourceKind = helixEvidenceSourceKindForModality(input.modality);
@@ -265,6 +286,7 @@ export function observeSourceBindingState(input: {
   evidenceRefs?: string[];
   now?: string;
 }): HelixSourceBindingStatus {
+  assertGenericBindingSourceId(input.sourceId);
   const bound = listSourceBindingStatuses({
     threadId: input.threadId,
     sourceId: input.sourceId,
@@ -312,6 +334,7 @@ export function createSourceBindingRepairCandidate(input: {
   const sourceKind = input.sourceKind ?? helixEvidenceSourceKindForModality(modality);
   const threadId = cleanString(input.threadId) ?? "helix-ask:desktop";
   const sourceId = cleanString(input.sourceId) ?? "unknown_source";
+  assertGenericBindingSourceId(sourceId);
   const now = input.now ?? new Date().toISOString();
   const observations = input.oldUnboundObservationRefs?.length
     ? input.oldUnboundObservationRefs
@@ -401,6 +424,7 @@ export function attachSourceToSituationRun(input: {
   descriptorRefs?: string[];
   now?: string;
 }): HelixSourceBindingStatus {
+  assertGenericBindingSourceId(input.sourceId);
   const modality = (cleanString(input.modality) ?? (input.sourceKind ? helixDefaultModalityForSourceKind(input.sourceKind) : "visual_frame")) as HelixSituationSourceBindingModality;
   const sourceKind = input.sourceKind ?? helixEvidenceSourceKindForModality(modality);
   const binding = upsertSituationSourceBinding({
@@ -469,6 +493,7 @@ export function replayUnboundEvidenceThroughRepair(input: {
 }): string[] {
   const candidate = repairCandidates.get(input.repairCandidateId);
   if (!candidate) return [];
+  assertGenericBindingSourceId(candidate.source_id);
   const now = input.now ?? new Date().toISOString();
   const fromMs = input.replayWindow ? Date.parse(input.replayWindow.from_ts) : null;
   const toMs = input.replayWindow ? Date.parse(input.replayWindow.to_ts) : null;
@@ -541,6 +566,7 @@ export function acceptSourceBindingRepairCandidate(input: {
 } | null {
   const candidate = repairCandidates.get(input.repairCandidateId);
   if (!candidate) return null;
+  assertGenericBindingSourceId(candidate.source_id);
   const now = input.now ?? new Date().toISOString();
   const situationRunId = cleanString(input.targetSituationRunId) ?? candidate.target_situation_run_id;
   if (!situationRunId) return null;
@@ -661,6 +687,7 @@ export function listSourceBindingStatusLedger(input: {
 } = {}): HelixSourceBindingStatusLedgerTransition[] {
   const limit = Math.max(1, Math.min(input.limit ?? 50, 500));
   return ledger
+    .filter((entry: HelixSourceBindingStatusLedgerEntry) => !isReservedBindingSourceId(entry.source_id))
     .filter((entry: HelixSourceBindingStatusLedgerEntry) => !input.threadId || entry.thread_id === input.threadId)
     .filter((entry: HelixSourceBindingStatusLedgerEntry) => !input.sourceId || entry.source_id === input.sourceId)
     .slice(-limit)
@@ -674,6 +701,7 @@ export function listSourceBindingRepairCandidates(input: {
 } = {}): HelixSourceBindingRepairCandidate[] {
   const limit = Math.max(1, Math.min(input.limit ?? 50, 500));
   return Array.from(repairCandidates.values())
+    .filter((candidate: HelixSourceBindingRepairCandidate) => !isReservedBindingSourceId(candidate.source_id))
     .filter((candidate: HelixSourceBindingRepairCandidate) => !input.threadId || candidate.thread_id === input.threadId)
     .filter((candidate: HelixSourceBindingRepairCandidate) => !input.sourceId || candidate.source_id === input.sourceId)
     .slice(-limit);

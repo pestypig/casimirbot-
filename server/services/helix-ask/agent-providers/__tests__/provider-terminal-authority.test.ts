@@ -6,8 +6,10 @@ const buildLanePacket = () => ({
   schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
   turn_id: "turn-lane-authority",
   iteration: 0,
-  call_id: "turn-lane-authority:capability_lane:utility_text.normalize_text:call",
-  decision_id: "turn-lane-authority:capability_lane:utility_text.normalize_text:decision",
+  call_id:
+    "turn-lane-authority:capability_lane:utility_text.normalize_text:call",
+  decision_id:
+    "turn-lane-authority:capability_lane:utility_text.normalize_text:decision",
   capability_key: "utility_text.normalize_text",
   panel_id: "capability_lane",
   action: "normalize_text",
@@ -43,18 +45,92 @@ const buildLanePacket = () => ({
   raw_content_included: false,
 });
 
+const buildActionableBlockedTheoryPacket = (turnId: string) => ({
+  schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
+  turn_id: turnId,
+  iteration: 2,
+  call_id: `${turnId}:capability_lane:helix_ask.reflect_theory_context:call`,
+  decision_id: `${turnId}:capability_lane:helix_ask.reflect_theory_context:decision`,
+  capability_key: "helix_ask.reflect_theory_context",
+  panel_id: "capability_lane",
+  action: "reflect_theory_context",
+  status: "blocked" as const,
+  produced_artifact_refs: [`${turnId}:theory-reflection:blocked`],
+  observation_summary:
+    "Theory reflection requires current-turn semantic source provenance.",
+  receipts: [],
+  missing_requirements: [
+    {
+      code: "semantic_source_provenance_required",
+      message:
+        "Supply a current-turn semantic source packet before graph reflection.",
+      repair_action: "supply_current_turn_semantic_source",
+    },
+  ],
+  state_delta: {},
+  suggested_next_steps: ["repair", "ask_user"],
+  produced_affordances: [],
+  consumed_affordances: [],
+  typed_handoff_contract: {
+    schema: "helix.workstation_typed_handoff_contract.v1",
+    producer_capability: "helix_ask.reflect_theory_context",
+    consumer_capability: null,
+    required_affordance_kinds: [],
+    produced_affordance_kinds: [],
+    missing_affordance_kinds: [],
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  terminal_eligible: false,
+  post_tool_model_step_required: true,
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
+const buildSatisfiedCommittedSubgoalContract = (turnId: string) => ({
+  schema: "helix.compound_capability_contract.v1",
+  turn_id: turnId,
+  rail_status: "satisfied",
+  subgoals: [
+    {
+      subgoal_id: `${turnId}:subgoal:prepare`,
+      requested_capability: "theory-experiment-procedure.prepare",
+      satisfaction: "satisfied",
+      satisfied: true,
+      rail_status: "satisfied",
+      observation_ref: `${turnId}:procedure`,
+      observation_refs: [`${turnId}:procedure`],
+      support_refs: [`${turnId}:procedure`],
+    },
+    {
+      subgoal_id: `${turnId}:subgoal:closure`,
+      requested_capability: "theory-experiment-procedure.evaluate_closure",
+      satisfaction: "satisfied",
+      satisfied: true,
+      rail_status: "satisfied",
+      observation_ref: `${turnId}:closure`,
+      observation_refs: [`${turnId}:closure`],
+      support_refs: [`${turnId}:closure`],
+    },
+  ],
+});
+
 const buildPendingTextToSpeechPacket = () => ({
   schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
   turn_id: "turn-voice-authority",
   iteration: 0,
-  call_id: "turn-voice-authority:capability_lane:text_to_speech.speak_text:call",
-  decision_id: "turn-voice-authority:capability_lane:text_to_speech.speak_text:decision",
+  call_id:
+    "turn-voice-authority:capability_lane:text_to_speech.speak_text:call",
+  decision_id:
+    "turn-voice-authority:capability_lane:text_to_speech.speak_text:decision",
   capability_key: "text_to_speech.speak_text",
   panel_id: "capability_lane",
   action: "speak_text",
   status: "client_pending" as const,
   produced_artifact_refs: ["ask:lane:voice:pending-handoff"],
-  observation_summary: "Text-to-speech request accepted; browser playback receipt is pending.",
+  observation_summary:
+    "Text-to-speech request accepted; browser playback receipt is pending.",
   receipts: [
     {
       receipt_ref: "ask:lane:voice:pending-handoff",
@@ -121,7 +197,8 @@ const buildScholarlyNumericObservationResult = () => ({
     action: "extract_numeric_parameters",
     status: "failed",
     produced_artifact_refs: ["ask:scholarly:numeric:missing-vars"],
-    observation_summary: "Numeric extraction found missing requested variables.",
+    observation_summary:
+      "Numeric extraction found missing requested variables.",
     receipts: [],
     missing_requirements: ["missing_requested_numeric_variables"],
     state_delta: {
@@ -131,7 +208,9 @@ const buildScholarlyNumericObservationResult = () => ({
         reason: "missing_requested_numeric_variables",
         recommended_next_capability: "scholarly-research.lookup_papers",
         missing_variables: ["B_T"],
-        recovery_queries: ["tokamak toroidal magnetic field operating parameter table"],
+        recovery_queries: [
+          "tokamak toroidal magnetic field operating parameter table",
+        ],
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -199,7 +278,9 @@ const buildScholarlyNumericObservationResult = () => ({
       reason: "missing_requested_numeric_variables",
       recommended_next_capability: "scholarly-research.lookup_papers",
       missing_variables: ["B_T"],
-      recovery_queries: ["tokamak toroidal magnetic field operating parameter table"],
+      recovery_queries: [
+        "tokamak toroidal magnetic field operating parameter table",
+      ],
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -249,7 +330,10 @@ const buildRuntimeSelectedScholarlyFullTextResult = () => ({
     observation_summary: "Page-grounded full text is available.",
     receipts: [],
     missing_requirements: [],
-    state_delta: { evidence_state: "full_text_usable", selected_for_answer: false },
+    state_delta: {
+      evidence_state: "full_text_usable",
+      selected_for_answer: false,
+    },
     suggested_next_steps: ["continue_reasoning"],
     produced_affordances: [],
     consumed_affordances: [],
@@ -275,7 +359,9 @@ const buildRuntimeSelectedScholarlyFullTextResult = () => ({
     schema: "helix.scholarly_full_text_observation.v1",
     artifact_id: "ask:scholarly:full-text:selected",
     evidence_state: "full_text_usable",
-    selected_chunks: [{ page_number: 3, text: "The measured value was 4.0 mJy." }],
+    selected_chunks: [
+      { page_number: 3, text: "The measured value was 4.0 mJy." },
+    ],
     selected_for_answer: false,
     terminal_eligible: false,
     assistant_answer: false,
@@ -317,10 +403,14 @@ const buildRuntimeSelectedScholarlyLookupResult = () => ({
     status: "failed",
     observation_ref: "ask:scholarly:lookup:partial",
     produced_artifact_refs: ["ask:scholarly:lookup:partial"],
-    observation_summary: "Multiple providers returned paper candidates; one provider was rate limited.",
+    observation_summary:
+      "Multiple providers returned paper candidates; one provider was rate limited.",
     receipts: [],
     missing_requirements: ["semantic_scholar_http_429", "lookup_weak_match"],
-    state_delta: { evidence_state: "lookup_weak_match", selected_for_answer: false },
+    state_delta: {
+      evidence_state: "lookup_weak_match",
+      selected_for_answer: false,
+    },
     suggested_next_steps: ["retry", "continue_reasoning"],
     produced_affordances: [],
     consumed_affordances: [],
@@ -346,12 +436,14 @@ const buildRuntimeSelectedScholarlyLookupResult = () => ({
     schema: "helix.scholarly_research_observation.v1",
     artifact_id: "ask:scholarly:lookup:partial",
     evidence_state: "lookup_weak_match",
-    papers: [{
-      result_id: "arxiv:magnetar-review",
-      title: "Magnetars: neutron stars with huge magnetic storms",
-      evidence_refs: ["arxiv:1211.2086v1"],
-      identifiers: { arxiv_id: "1211.2086v1" },
-    }],
+    papers: [
+      {
+        result_id: "arxiv:magnetar-review",
+        title: "Magnetars: neutron stars with huge magnetic storms",
+        evidence_refs: ["arxiv:1211.2086v1"],
+        identifiers: { arxiv_id: "1211.2086v1" },
+      },
+    ],
     selected_for_answer: false,
     terminal_eligible: false,
     assistant_answer: false,
@@ -394,7 +486,8 @@ const buildScholarlyFullTextRecoveryResult = () => ({
     action: "fetch_full_text",
     status: "blocked",
     produced_artifact_refs: ["ask:scholarly:full-text:recovery"],
-    observation_summary: "Full-text fetch blocked because the paper identity was not fetchable.",
+    observation_summary:
+      "Full-text fetch blocked because the paper identity was not fetchable.",
     receipts: [],
     missing_requirements: ["fetchable_paper_identity_required"],
     state_delta: {
@@ -403,7 +496,9 @@ const buildScholarlyFullTextRecoveryResult = () => ({
         status: "available",
         reason: "fetchable_paper_identity_required",
         recommended_next_capability: "scholarly-research.lookup_papers",
-        recovery_queries: ["deuterium tritium fusion Maxwellian averaged reactivity sigma v cross section table accessible pdf"],
+        recovery_queries: [
+          "deuterium tritium fusion Maxwellian averaged reactivity sigma v cross section table accessible pdf",
+        ],
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -482,31 +577,39 @@ const buildCalculatorUnsupportedExpressionResult = () => ({
     action: "solve_expression",
     status: "blocked",
     produced_artifact_refs: ["ask:calculator:blocked-expression"],
-    observation_summary: "Calculator gateway blocked expression: unsupported_expression_syntax.",
+    observation_summary:
+      "Calculator gateway blocked expression: unsupported_expression_syntax.",
     receipts: [],
-    missing_requirements: [{
-      code: "unsupported_expression_syntax",
-      message: "Provide a simple arithmetic expression using numbers and arithmetic operators only.",
-      repair_action: "ask_user",
-      rejected_expression: "explain why receipts matter",
-      normalized_expression: "explain why receipts matter",
-      required_affordance_kind: "bound_calculator_expression",
-    }],
+    missing_requirements: [
+      {
+        code: "unsupported_expression_syntax",
+        message:
+          "Provide a simple arithmetic expression using numbers and arithmetic operators only.",
+        repair_action: "ask_user",
+        rejected_expression: "explain why receipts matter",
+        normalized_expression: "explain why receipts matter",
+        required_affordance_kind: "bound_calculator_expression",
+      },
+    ],
     state_delta: {},
     suggested_next_steps: ["repair"],
-    produced_affordances: [{
-      kind: "calculator_result",
-      status: "blocked",
-      terminal_eligible: false,
-      assistant_answer: false,
-    }],
-    consumed_affordances: [{
-      kind: "bound_calculator_expression",
-      status: "missing",
-      missing_inputs: ["bound_calculator_expression"],
-      terminal_eligible: false,
-      assistant_answer: false,
-    }],
+    produced_affordances: [
+      {
+        kind: "calculator_result",
+        status: "blocked",
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+    ],
+    consumed_affordances: [
+      {
+        kind: "bound_calculator_expression",
+        status: "missing",
+        missing_inputs: ["bound_calculator_expression"],
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+    ],
     typed_handoff_contract: {
       schema: "helix.workstation_typed_handoff_contract.v1",
       producer_capability: "scientific-calculator.solve_expression",
@@ -571,7 +674,8 @@ describe("provider terminal authority for capability lanes", () => {
       post_tool_model_step_required: false,
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
-      terminal_authority_status: "authorized_by_model_only_direct_answer_contract",
+      terminal_authority_status:
+        "authorized_by_model_only_direct_answer_contract",
       terminal_authority_granted: true,
       blockers: [],
     });
@@ -605,7 +709,8 @@ describe("provider terminal authority for capability lanes", () => {
       route: "/ask/turn",
       gatewayCallResults: [gatewayResult as never],
       normalizedObservationPackets: [gatewayResult.observation_packet as never],
-      providerText: "The observed search found a relevant review by Nanda Rea (2012).",
+      providerText:
+        "The observed search found a relevant review by Nanda Rea (2012).",
       ok: true,
       solverCompleted: true,
       goalSatisfied: true,
@@ -701,7 +806,8 @@ describe("provider terminal authority for capability lanes", () => {
       post_tool_model_step_required: false,
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
-      terminal_authority_status: "provider_terminal_candidate_missing_for_model_only_direct_answer",
+      terminal_authority_status:
+        "provider_terminal_candidate_missing_for_model_only_direct_answer",
       terminal_authority_granted: false,
       blockers: ["provider_terminal_candidate_missing"],
     });
@@ -737,7 +843,8 @@ describe("provider terminal authority for capability lanes", () => {
       raw_content_included: false,
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
-      terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+      terminal_authority_status:
+        "authorized_by_helix_provider_candidate_bridge",
       terminal_authority_granted: true,
       final_visible_answer_authorized: true,
       selected_observation_refs: ["ask:lane:utility:authority-obs"],
@@ -749,7 +856,9 @@ describe("provider terminal authority for capability lanes", () => {
       all_capability_lane_observations_succeeded: true,
       all_observations_succeeded: true,
       capability_lane_observation_refs: ["ask:lane:utility:authority-obs"],
-      successful_capability_lane_observation_refs: ["ask:lane:utility:authority-obs"],
+      successful_capability_lane_observation_refs: [
+        "ask:lane:utility:authority-obs",
+      ],
       normalized_observation_packet_count: 1,
       capability_lane_observation_packet_count: 1,
       terminal_authority_granted: true,
@@ -762,6 +871,139 @@ describe("provider terminal authority for capability lanes", () => {
     });
   });
 
+  it("re-enters an actionable blocked extra lane observation after every committed subgoal is satisfied", () => {
+    const turnId = "turn-theory-actionable-blocker-reentry";
+    const packet = buildActionableBlockedTheoryPacket(turnId);
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId,
+      threadId: "thread-theory-actionable-blocker-reentry",
+      route: "/ask/turn",
+      gatewayCallResults: [],
+      capabilityLaneObservationPackets: [packet],
+      normalizedObservationPackets: [packet],
+      committedSubgoalContract: buildSatisfiedCommittedSubgoalContract(turnId),
+      providerText:
+        "The bounded procedure and closure were observed; semantic source provenance remains an explicit limitation.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "completed",
+      evidence_reentered: true,
+      required_committed_subgoals_satisfied: true,
+      actionable_blocked_capability_lane_observation_refs: [
+        `${turnId}:theory-reflection:blocked`,
+      ],
+      reentered_capability_lane_observation_refs: [
+        `${turnId}:theory-reflection:blocked`,
+      ],
+    });
+    expect(result.providerTerminalAuthorityBridge).toMatchObject({
+      all_capability_lane_observations_succeeded: false,
+      all_observations_succeeded: false,
+      all_capability_lane_observations_reentry_compatible: true,
+      all_observations_reentry_compatible: true,
+      normalized_observations_ready: true,
+      terminal_authority_granted: true,
+      actionable_blocked_capability_lane_observation_refs: [
+        `${turnId}:theory-reflection:blocked`,
+      ],
+    });
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_granted: true,
+      selected_observation_refs: [`${turnId}:theory-reflection:blocked`],
+      blockers: [],
+    });
+    expect(result.terminalAnswerAuthority).not.toBeNull();
+  });
+
+  it.each([
+    {
+      label: "missing committed subgoal contract",
+      contract: null,
+      normalized: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    },
+    {
+      label: "unsatisfied committed subgoal",
+      contract: {
+        ...buildSatisfiedCommittedSubgoalContract(
+          "turn-theory-actionable-blocker-reentry-adversarial",
+        ),
+        rail_status: "missing_observation",
+      },
+      normalized: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    },
+    {
+      label: "missing exact normalized blocked packet",
+      contract: buildSatisfiedCommittedSubgoalContract(
+        "turn-theory-actionable-blocker-reentry-adversarial",
+      ),
+      normalized: false,
+      solverCompleted: true,
+      goalSatisfied: true,
+    },
+    {
+      label: "solver not completed",
+      contract: buildSatisfiedCommittedSubgoalContract(
+        "turn-theory-actionable-blocker-reentry-adversarial",
+      ),
+      normalized: true,
+      solverCompleted: false,
+      goalSatisfied: true,
+    },
+    {
+      label: "goal not satisfied",
+      contract: buildSatisfiedCommittedSubgoalContract(
+        "turn-theory-actionable-blocker-reentry-adversarial",
+      ),
+      normalized: true,
+      solverCompleted: true,
+      goalSatisfied: false,
+    },
+  ])(
+    "does not re-enter a blocked lane from $label",
+    ({ contract, normalized, solverCompleted, goalSatisfied }) => {
+      const turnId = "turn-theory-actionable-blocker-reentry-adversarial";
+      const packet = buildActionableBlockedTheoryPacket(turnId);
+      const result = buildHelixProviderReasoningReentry({
+        runtime: "codex",
+        providerLabel: "Codex Workstation Mode",
+        turnId,
+        threadId: "thread-theory-actionable-blocker-reentry-adversarial",
+        route: "/ask/turn",
+        gatewayCallResults: [],
+        capabilityLaneObservationPackets: [packet],
+        normalizedObservationPackets: normalized ? [packet] : [],
+        committedSubgoalContract: contract,
+        providerText: "This candidate must remain non-terminal.",
+        ok: true,
+        solverCompleted,
+        goalSatisfied,
+      });
+
+      expect(result.providerReasoningReentry).toMatchObject({
+        status: "completed_not_terminal",
+        evidence_reentered: false,
+        actionable_blocked_capability_lane_observation_refs: [],
+      });
+      expect(result.providerTerminalAuthorityBridge).toMatchObject({
+        all_capability_lane_observations_succeeded: false,
+        all_capability_lane_observations_reentry_compatible: false,
+        all_observations_reentry_compatible: false,
+        terminal_authority_granted: false,
+      });
+      expect(result.terminalAnswerAuthority).toBeNull();
+    },
+  );
+
   it("records lane evidence re-entry even when solver completion still blocks terminal authority", () => {
     const packet = buildLanePacket();
     const result = buildHelixProviderReasoningReentry({
@@ -773,7 +1015,8 @@ describe("provider terminal authority for capability lanes", () => {
       gatewayCallResults: [],
       capabilityLaneObservationPackets: [packet],
       normalizedObservationPackets: [packet],
-      providerText: "The page observation contains no readable equation, so another bounded step may be needed.",
+      providerText:
+        "The page observation contains no readable equation, so another bounded step may be needed.",
       ok: true,
       solverCompleted: false,
       goalSatisfied: false,
@@ -805,7 +1048,8 @@ describe("provider terminal authority for capability lanes", () => {
       gatewayCallResults: [],
       capabilityLaneObservationPackets: [packet],
       normalizedObservationPackets: [packet],
-      providerText: "I sent it to the text-to-speech lane. Playback is pending on the client side.",
+      providerText:
+        "I sent it to the text-to-speech lane. Playback is pending on the client side.",
       ok: true,
       solverCompleted: true,
       goalSatisfied: true,
@@ -817,7 +1061,8 @@ describe("provider terminal authority for capability lanes", () => {
       post_tool_model_step_required: false,
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
-      terminal_authority_status: "authorized_by_helix_provider_candidate_bridge",
+      terminal_authority_status:
+        "authorized_by_helix_provider_candidate_bridge",
       terminal_authority_granted: true,
       blockers: [],
       selected_observation_refs: ["ask:lane:voice:pending-handoff"],
@@ -868,7 +1113,8 @@ describe("provider terminal authority for capability lanes", () => {
       route: "/ask/turn",
       gatewayCallResults: [gatewayResult as never],
       normalizedObservationPackets: [gatewayResult.observation_packet],
-      providerText: "The paper evidence was fetched, but B_T was not available in the extracted numeric bindings.",
+      providerText:
+        "The paper evidence was fetched, but B_T was not available in the extracted numeric bindings.",
       ok: true,
       solverCompleted: true,
       goalSatisfied: true,
@@ -896,7 +1142,9 @@ describe("provider terminal authority for capability lanes", () => {
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
       terminal_authority_granted: false,
-      blockers: expect.arrayContaining(["gateway_observation_missing_or_failed"]),
+      blockers: expect.arrayContaining([
+        "gateway_observation_missing_or_failed",
+      ]),
     });
     expect(result.providerTerminalAuthorityBridge).toMatchObject({
       terminal_authority_granted: false,
@@ -920,7 +1168,8 @@ describe("provider terminal authority for capability lanes", () => {
         fullTextResult.observation_packet as never,
         numericResult.observation_packet as never,
       ],
-      providerText: "The PDF reports a measured flux density of 4.0 mJy on page 3.",
+      providerText:
+        "The PDF reports a measured flux density of 4.0 mJy on page 3.",
       ok: true,
       solverCompleted: true,
       goalSatisfied: true,
@@ -980,7 +1229,8 @@ describe("provider terminal authority for capability lanes", () => {
       route: "/ask/turn",
       gatewayCallResults: [gatewayResult as never],
       normalizedObservationPackets: [gatewayResult.observation_packet],
-      providerText: "The paper lookup was relevant, but the selected identity was not fetchable. Re-query for an accessible full-text source before numeric extraction.",
+      providerText:
+        "The paper lookup was relevant, but the selected identity was not fetchable. Re-query for an accessible full-text source before numeric extraction.",
       ok: true,
       solverCompleted: true,
       goalSatisfied: true,
@@ -993,7 +1243,9 @@ describe("provider terminal authority for capability lanes", () => {
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
       terminal_authority_granted: false,
-      blockers: expect.arrayContaining(["gateway_observation_missing_or_failed"]),
+      blockers: expect.arrayContaining([
+        "gateway_observation_missing_or_failed",
+      ]),
     });
     expect(result.providerTerminalAuthorityBridge).toMatchObject({
       terminal_authority_granted: false,
@@ -1049,7 +1301,10 @@ describe("provider terminal authority for capability lanes", () => {
         observation_summary: "Selected DOI metadata and abstract are usable.",
         receipts: [],
         missing_requirements: [],
-        state_delta: { evidence_state: "lookup_usable", selected_for_answer: true },
+        state_delta: {
+          evidence_state: "lookup_usable",
+          selected_for_answer: true,
+        },
         suggested_next_steps: [],
         terminal_eligible: false,
         post_tool_model_step_required: true,
@@ -1072,7 +1327,8 @@ describe("provider terminal authority for capability lanes", () => {
     const fullTextResult = buildScholarlyFullTextRecoveryResult() as any;
     fullTextResult.gateway_admission.source_target_intent = optionalIntent;
     fullTextResult.gateway_admission.admission_status = "admitted";
-    fullTextResult.gateway_admission.admission_reason = "optional_full_text_attempt";
+    fullTextResult.gateway_admission.admission_reason =
+      "optional_full_text_attempt";
     fullTextResult.gateway_admission.blocked_reason = undefined;
     fullTextResult.observation.evidence_state = "full_text_unavailable";
     fullTextResult.observation.selected_for_answer = false;
@@ -1094,7 +1350,9 @@ describe("provider terminal authority for capability lanes", () => {
       threadId: "thread-scholar-optional-full-text",
       route: "/ask/turn",
       gatewayCallResults,
-      normalizedObservationPackets: gatewayCallResults.map((entry: any) => entry.observation_packet),
+      normalizedObservationPackets: gatewayCallResults.map(
+        (entry: any) => entry.observation_packet,
+      ),
       providerText: [
         "The DOI metadata and abstract support a bounded microtubule/Alzheimer hypothesis summary.",
         "The optional full text was unavailable, so this does not claim paper-body evidence or support a consciousness conclusion.",
@@ -1135,7 +1393,8 @@ describe("provider terminal authority for capability lanes", () => {
       route: "/ask/turn",
       gatewayCallResults: [gatewayResult as never],
       normalizedObservationPackets: [gatewayResult.observation_packet],
-      providerText: "The calculator did not produce a result because the requested expression was prose, not a bound arithmetic expression.",
+      providerText:
+        "The calculator did not produce a result because the requested expression was prose, not a bound arithmetic expression.",
       ok: true,
       solverCompleted: true,
       goalSatisfied: true,

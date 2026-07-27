@@ -3,6 +3,11 @@ import type {
   HelixLiveContinuationEvidenceThreshold,
   HelixWorkerLaneReceipt,
 } from "@shared/helix-live-continuation";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 
 export type LiveContinuationJobStatus = "active" | "paused" | "blocked" | "stale" | "stopped";
 export type LiveContinuationJobMode = "single_agent";
@@ -50,6 +55,7 @@ export type UpsertLiveContinuationJobInput = {
   lanes_enabled?: LiveContinuationLane[] | null;
   cooldowns?: Partial<LiveContinuationJob["cooldowns"]> | null;
   last_observation_refs?: string[] | null;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
   now?: string;
 };
 
@@ -152,6 +158,9 @@ export function upsertLiveContinuationJob(input: UpsertLiveContinuationJobInput)
   }
 
   const sourceIds = uniqueStrings(input.source_ids ?? []);
+  if (sourceIds.some(isHelixRoomSourceIngressSourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
   const jobId =
     normalizeString(input.job_id) ??
     buildJobId({
@@ -211,6 +220,10 @@ export function listLiveContinuationJobs(filter: ListLiveContinuationJobsFilter 
   const roomId = normalizeString(filter.roomId);
   const sourceId = normalizeString(filter.sourceId);
   return Array.from(jobs.values())
+    .filter(
+      (job: LiveContinuationJob) =>
+        !job.source_ids.some(isHelixRoomSourceIngressSourceId),
+    )
     .filter((job: LiveContinuationJob) => !threadId || job.thread_id === threadId)
     .filter((job: LiveContinuationJob) => !roomId || job.room_id === roomId)
     .filter((job: LiveContinuationJob) => !sourceId || job.source_ids.includes(sourceId))
@@ -230,7 +243,12 @@ function updateLiveContinuationJobStatus(
   const normalizedJobId = normalizeString(jobId);
   if (!normalizedJobId) return null;
   const existing = jobs.get(normalizedJobId);
-  if (!existing) return null;
+  if (
+    !existing ||
+    existing.source_ids.some(isHelixRoomSourceIngressSourceId)
+  ) {
+    return null;
+  }
   const updated: LiveContinuationJob = {
     ...existing,
     status,

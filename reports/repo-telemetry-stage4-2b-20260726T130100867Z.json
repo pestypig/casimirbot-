@@ -1,0 +1,34 @@
+{
+  "generatedAt": "2026-07-26T13:01:00.867Z",
+  "source": "explicit_stage4_2b_receipt_grade_replay",
+  "repo": {
+    "build": {
+      "status": "pass",
+      "ok": true,
+      "exitCode": 0,
+      "command": "npm run build",
+      "warningsPresent": true
+    },
+    "tests": {
+      "total": 509,
+      "failed": 0,
+      "passed": 509,
+      "status": "pass",
+      "files": 51,
+      "suites": 110,
+      "reportPath": "reports/vitest-stage4-2b-final.json",
+      "reportSha256": "1786b19db2fd5d2e21ceba5a56b7d3e89c8f1b8de2be1fef137694b6c2867513"
+    },
+    "schema": {
+      "contracts": "pass",
+      "ok": true,
+      "scope": "stage4_2b_runtimes_a_through_g_strict_contract_19_fixtures_coupled_lineage_blinding_replication_theory_badge_equation_sidecar_math_root_leaf_and_required_gr_warp"
+    },
+    "deps": {
+      "coherence": "pass",
+      "exitCode": 0,
+      "command": "npm ls --depth=0",
+      "packageLockSha256": "1833546cf15db039c1895a05e29e80338c271aff935d488034e7e9e6ab025cba"
+    }
+  }
+}

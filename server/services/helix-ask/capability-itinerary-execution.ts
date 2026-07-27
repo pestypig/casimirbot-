@@ -3,6 +3,7 @@ export type HelixCapabilityItineraryArtifactLike = {
   kind?: unknown;
   payload?: unknown;
   source_scope?: unknown;
+  executed_args?: unknown;
 };
 
 export type HelixCapabilityItineraryExecutionState = {
@@ -189,6 +190,7 @@ const artifactCapability = (artifact: HelixCapabilityItineraryArtifactLike): str
   const result = readRecord(payload?.result);
   const action = readRecord(payload?.action);
   return (
+    readString((artifact as Record<string, unknown>).capability_key) ??
     readString(payload?.capability_key) ??
     readString(payload?.selected_capability) ??
     readString(payload?.requested_capability) ??
@@ -346,6 +348,10 @@ const observationKindBelongsToCapability = (
     return /ideology_context_reflection|procedural_moral_classification|helix_moral_graph_reflection/i.test(text) ||
       /^(?:ideology_context_reflection\/v1|procedural_moral_classification\/v1|helix_moral_graph_reflection_tool_result|workstation_tool_evaluation)$/i.test(kind);
   }
+  if (capability === "moral-graph.reflect_context" || runtimeCapability === "moral-graph.reflect_context") {
+    return /moral_graph_reflection|ideology_context_reflection|procedural_moral_classification/i.test(text) ||
+      /^(?:moral_graph_reflection|helix\.moral_graph_reflection_observation\.v1|ideology_context_reflection\/v1|procedural_moral_classification\/v1)$/i.test(kind);
+  }
   if (capability === "helix_ask.bridge_theory_ideology_context" || runtimeCapability === "helix_ask.bridge_theory_ideology_context") {
     return /helix_theory_ideology_bridge_tool_result|theory_ideology_bridge/i.test(text) ||
       /^(?:helix_theory_ideology_bridge_tool_result|theory_ideology_bridge)$/i.test(kind);
@@ -369,6 +375,14 @@ const observationKindBelongsToCapability = (
   if (capability === "workstation-notes.append_to_note" || runtimeCapability === "workstation-notes.append_to_note") {
     return /workstation[-_]notes[-_.:]append[-_]to[-_]note|note_update_receipt|note_action_receipt|workspace_action_receipt/i.test(text) ||
       /^(?:note_update_receipt|note_action_receipt|workspace_action_receipt)$/i.test(kind);
+  }
+  if (capability === "workstation-notes.list_notes" || runtimeCapability === "workstation-notes.list_notes") {
+    return /workstation[-_]notes[-_.:]list[-_]notes|workstation_notes_list_observation/i.test(text) ||
+      /^(?:workstation_notes_list_observation|helix\.workstation_notes_list_observation\.v1)$/i.test(kind);
+  }
+  if (capability === "text_to_speech.speak_text" || runtimeCapability === "text_to_speech.speak_text") {
+    return /text_to_speech[-_.:]speak_text|voice_receipt|capability_lane_observation_packet/i.test(text) ||
+      /^(?:voice_receipt|capability_lane_observation_packet)$/i.test(kind);
   }
   return false;
 };
@@ -491,7 +505,7 @@ const artifactMatchesRequiredObservationKind = (
   ) {
     return true;
   }
-  return false;
+  return observationKindBelongsToCapability(artifact, capability, runtimeCapability);
 };
 
 const artifactSupportsSubgoalObservation = (
@@ -525,7 +539,31 @@ const artifactValidationErrors = (artifact: HelixCapabilityItineraryArtifactLike
 
 const artifactArgs = (artifact: HelixCapabilityItineraryArtifactLike): Record<string, unknown> | null => {
   const payload = artifactPayload(artifact);
-  return readRecord(payload?.args);
+  const observation = readRecord(payload?.observation);
+  const result = readRecord(payload?.result);
+  const action = readRecord(payload?.action);
+  const structuredArgs =
+    readRecord(artifact.executed_args) ??
+    readRecord(payload?.executed_args) ??
+    readRecord(payload?.arguments) ??
+    readRecord(payload?.args) ??
+    readRecord(observation?.executed_args) ??
+    readRecord(observation?.arguments) ??
+    readRecord(observation?.args) ??
+    readRecord(result?.executed_args) ??
+    readRecord(result?.arguments) ??
+    readRecord(result?.args) ??
+    readRecord(action?.executed_args) ??
+    readRecord(action?.arguments) ??
+    readRecord(action?.args);
+  if (structuredArgs) return structuredArgs;
+  const calculatorExpression = artifactCalculatorExpression(artifact);
+  if (calculatorExpression) {
+    return { expression: calculatorExpression };
+  }
+  return (
+    null
+  );
 };
 
 const argValuePresent = (value: unknown): boolean => {
@@ -739,7 +777,7 @@ export const isHelixCapabilityItineraryFamilyObserved = (
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
       artifactMatchesObservationKind(
         artifact,
-        /helix_theory_context_reflection_tool_receipt|theory_context_reflection|theory_frontier_search|theory_frontier_candidate|theory_frontier_conjecture_observation|theory_frontier_exact_contract_verification/i,
+        /helix_theory_context_reflection_tool_receipt|theory_context_reflection|theory_experiment_procedure_observation|casimir\.theory_experiment_procedure\.observation\.v1|theory_experiment_execution_closure_observation|casimir\.theory_experiment_execution_closure\.observation\.v1|theory_frontier_search|theory_frontier_candidate|theory_frontier_conjecture_observation|theory_frontier_exact_contract_verification/i,
       ),
     );
   }
@@ -822,17 +860,22 @@ export const isHelixCapabilityItineraryFamilyObserved = (
     );
   }
   if (family === "voice_delivery") {
-    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      /voice_(?:hold|block|receipt)|live_source_interim_voice_callout_receipt/i.test([
+    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) => {
+      const payload = artifactPayload(artifact);
+      const successfulTextToSpeech =
+        artifactCapability(artifact) === "text_to_speech.speak_text" &&
+        /^(?:succeeded|completed|success|ok)$/i.test(readString(payload?.status) ?? "");
+      return successfulTextToSpeech ||
+      /voice_(?:hold|block|receipt)|live_source_interim_voice_callout_receipt|text_to_speech[-_.:]speak_text/i.test([
         artifactKind(artifact),
         artifactSchema(artifact),
         artifactId(artifact),
-      ].join(" ")),
-    );
+      ].join(" "));
+    });
   }
   if (family === "moral_graph_reflection") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      /ideology_context_reflection|procedural_moral_classification|helix_moral_graph_reflection|theory_ideology_bridge/i.test([
+      /moral_graph_reflection|ideology_context_reflection|procedural_moral_classification|helix_moral_graph_reflection|theory_ideology_bridge/i.test([
         artifactKind(artifact),
         artifactSchema(artifact),
         artifactId(artifact),
@@ -871,7 +914,8 @@ export const isHelixCapabilityItineraryFamilyObserved = (
   }
   if (family === "workstation_action" || family === "notes") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      /workspace_action_receipt|note_update_receipt|workstation_tool_evaluation/i.test([
+      artifactCapability(artifact) === "workstation-notes.list_notes" ||
+      /workspace_action_receipt|note_update_receipt|workstation_notes_list_observation|workstation_tool_evaluation/i.test([
         artifactKind(artifact),
         artifactSchema(artifact),
       ].join(" ")),
@@ -879,7 +923,8 @@ export const isHelixCapabilityItineraryFamilyObserved = (
   }
   if (family === "workstation") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      /workspace_action_receipt|note_update_receipt|note_action_receipt|workstation_tool_evaluation/i.test([
+      artifactCapability(artifact) === "workstation-notes.list_notes" ||
+      /workspace_action_receipt|note_update_receipt|note_action_receipt|workstation_notes_list_observation|workstation_tool_evaluation/i.test([
         artifactKind(artifact),
         artifactSchema(artifact),
       ].join(" ")),
@@ -972,12 +1017,35 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       artifactKind(artifact) === "runtime_tool_call_validation" &&
       artifactMatchesCapability(artifact, requestedCapability, runtimeCapability, substitutions)
     );
-    const selectedArgs = runtimeCalls.length > 0
+    const observationArtifact = artifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
+      artifactSupportsSubgoalObservation(
+        artifact,
+        subgoalId,
+        requestedCapability,
+        runtimeCapability,
+        substitutions,
+        requiredObservationKinds,
+        argsHint,
+      )
+    ) ?? null;
+    const runtimeArgs = runtimeCalls.length > 0
       ? artifactArgs(runtimeCalls[0] as HelixCapabilityItineraryArtifactLike)
-      : argsHint ?? {};
-    const argsSource = runtimeCalls.length > 0
-      ? "runtime_tool_call"
-      : "contract_args_hint";
+      : null;
+    const observedExecutedArgs = observationArtifact
+      ? artifactArgs(observationArtifact)
+      : null;
+    const selectedArgs = {
+      ...(argsHint ?? {}),
+      ...(runtimeArgs ?? {}),
+      ...(observedExecutedArgs ?? {}),
+    };
+    const argsSource = observedExecutedArgs
+      ? runtimeArgs
+        ? "runtime_tool_call_reconciled_with_observation"
+        : "contract_hint_reconciled_with_observation"
+      : runtimeArgs
+        ? "runtime_tool_call"
+        : "contract_args_hint";
     const bindingCoveredRequiredArgs = boundRequiredArgsForSubgoal(subgoal);
     const missingRequiredArgs = missingRequiredArgsForSubgoal({
       capability: requestedCapability,
@@ -990,17 +1058,6 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       ...validationErrors,
       ...missingRequiredArgs.map((arg) => `missing_required_arg:${arg}`),
     ]);
-    const observationArtifact = artifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
-      artifactSupportsSubgoalObservation(
-        artifact,
-        subgoalId,
-        requestedCapability,
-        runtimeCapability,
-        substitutions,
-        requiredObservationKinds,
-        argsHint,
-      )
-    ) ?? null;
     const executedArtifact =
       artifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
         artifactProvesCompletedCapability(

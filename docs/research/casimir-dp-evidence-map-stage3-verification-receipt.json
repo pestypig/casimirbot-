@@ -1,0 +1,106 @@
+{
+  "schema_version": "casimir_dp_evidence_map_stage3_verification_receipt/1",
+  "campaign_id": "casimir-dp-evidence-map-stage3-v1",
+  "campaign_run_id": "casimir-dp-evidence-map-stage3-v1-20260725T134544Z",
+  "verified_at": "2026-07-25T13:59:19.549Z",
+  "claim_ceiling": "diagnostic",
+  "promotion_allowed": false,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-evidence-map-stage3.v1.json",
+    "config_sha256": "231cb26e9c9bb523e2dda40a6178d8a484ec099f1868a74b995d8153337d29c2",
+    "receipt_path": "artifacts/research/casimir-dp-evidence-map-stage3/casimir-dp-evidence-map-stage3-v1-20260725T134544Z/evidence-map-stage3-receipt.json",
+    "receipt_sha256": "5bcd2400bfeaa57a85c4b726224ac25dc8ab4c56bd59dad1b6e54f7f11ff0346",
+    "report_json_sha256": "feb799bcf93f1497673d58eac1a98a773ac1e1b0767082104af7b7d6c8e3508b",
+    "report_markdown_sha256": "41aae6d542a19b6564f88ae7c8e7f2531abf90b08a7d02c11b043e5c691cc23a"
+  },
+  "verification_inputs": {
+    "combined_vitest_report": {
+      "path": "reports/vitest-stage3.json",
+      "sha256": "fefce21c03c69204a9f5043cb78d32dd041bd70c7cb24db48e09f74ace6acacd",
+      "test_suites_total": 70,
+      "test_suites_passed": 70,
+      "tests_total": 312,
+      "tests_passed": 312,
+      "tests_failed": 0,
+      "success": true
+    },
+    "training_trace_export": {
+      "path": "artifacts/training-trace-stage3.jsonl",
+      "sha256": "34c72e1bd88a79ab4ec43b04a562f475f066bdb6e7e05d5c4ed977dc5f97be6d",
+      "matching_trace_count": 1
+    }
+  },
+  "local_gates": {
+    "focused_stage3_and_upstream": {
+      "files": 11,
+      "tests": 113,
+      "status": "pass"
+    },
+    "paper_and_equation_provenance": {
+      "files": 2,
+      "tests": 20,
+      "status": "pass"
+    },
+    "warp_required": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    },
+    "strict_stage3_typescript": "pass",
+    "equation_sidecar": {
+      "paper_markers": 27,
+      "source_entries": 27,
+      "generated_entries": 27,
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 19,
+      "edges": 46,
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 200,
+      "validation": "pass",
+      "strict_congruence_errors": 0,
+      "strict_congruence_warnings": 0
+    },
+    "physics_root_to_leaf": "pass",
+    "toe_preflight": "pass"
+  },
+  "adapter_verification": {
+    "trace_id": "casimir-dp-evidence-map-stage3-v1-20260725T134544Z",
+    "run_id": "2314",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate": {
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+      "integrity_ok": true,
+      "status": "GREEN"
+    }
+  },
+  "certificate_provenance": {
+    "fresh_adapter_execution": true,
+    "prior_stage2_certificate_artifact_reused": false,
+    "certificate_content_hash_matches_stage2": true,
+    "explanation": "The Stage-3 adapter execution has its own trace id, run id 2314, timestamp, and exported training trace. The verifier content-addresses the unchanged repo-convergence certificate payload, so an identical passing payload reproduces the earlier certificate hash. The Stage-2 certificate artifact was not reused; the Stage-3 authority is the new adapter trace plus this downstream receipt."
+  },
+  "campaign_receipt_transition": {
+    "pre_verification_state": "pending_external_verification",
+    "downstream_verification_state": "pass",
+    "reason": "The immutable campaign receipt was issued before the external adapter call and remains unchanged. This hash-backed downstream receipt records the subsequent certifying execution."
+  },
+  "scientific_gates": {
+    "software_and_synthetic_diagnostics": "pass",
+    "measured_evidence": "not_ready",
+    "ordinary_decoherence_closure": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "bridge_registration": "registered_not_validated",
+    "bridge_numerically_compared": false,
+    "publication_claim": "diagnostic_protocol_only"
+  }
+}

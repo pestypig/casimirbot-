@@ -57,6 +57,23 @@ const canonicalGoalFrame = {
 };
 
 describe("Helix Ask Workspace OS status tool", () => {
+  it("treats a natural workstation-health question as the same diagnostic contract", () => {
+    const promptText = "How is the workstation doing right now?";
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:workspace-os:natural-health",
+      threadId: "helix-ask:test",
+      promptText,
+    });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "workspace_diagnostic",
+      target_kind: "workspace_diagnostic",
+      strength: "hard",
+      precedence_reason: "workspace_os_status_source_target",
+    });
+    expect(sourceTargetIntent.explicit_cues).toContain("natural_workspace_health_question");
+  });
+
   it("gives a natural current-workstation-status read precedence over repository evidence", () => {
     const promptText = "What is the current workstation status?";
     const sourceTargetIntent = arbitrateAskSourceTarget({

@@ -51,6 +51,7 @@ workstationToolGatewayRouter.post(
       capabilityId:
         readString(body.capability_id) ?? readString(body.capabilityId) ?? "",
       arguments: readRecord(body.arguments ?? body.args),
+      approvalReceipt: body.approval_receipt ?? body.approvalReceipt,
       approvalToken:
         readString(body.approval_token) ?? readString(body.approvalToken),
       turnId: readString(body.turn_id) ?? readString(body.turnId),

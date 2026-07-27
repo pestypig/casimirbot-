@@ -1,0 +1,120 @@
+{
+  "schema_version": "casimir_dp_stage4_1_authorities/1",
+  "manifest_id": "casimir-dp-qed-scale-hierarchy-stage4-1-authorities-v1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-qed-scale-hierarchy-stage4-1-v1",
+  "generated_at": "2026-07-25T18:30:00.000Z",
+  "evidence_cutoff": "2026-07-25",
+  "evidence_class": "source_backed_calculation",
+  "claim_ceiling": "qed_scale_identity_calibration",
+  "promotion_allowed": false,
+  "immutable_stage4_rule": {
+    "status": "required",
+    "description": "Stage-4.1 is an append-only downstream calibration. It hash-links and does not rewrite the authoritative Stage-4 config, authority manifest, immutable report pair, campaign receipt, or downstream verification receipt.",
+    "upstream_semantic_status": "same_dimension_not_connected",
+    "observable_bridge_edges_added": 0
+  },
+  "upstream_stage4_authorities": [
+    {
+      "role": "stage4_config",
+      "path": "configs/research/casimir-dp-polarization-congruence-stage4.v1.json",
+      "sha256": "ade06cd7b95e27fe414614ad36512d5764d439c4fa6623f8499ad218ba07c3d7",
+      "tracked": false
+    },
+    {
+      "role": "stage4_input_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-authorities.v1.json",
+      "sha256": "3f26ef115533ef78756fad70f3880f8ea1d1ace43cbc9a0e66d6d0b5e9c2918d",
+      "tracked": false
+    },
+    {
+      "role": "stage4_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-report.json",
+      "sha256": "2c56cd9b61928ee750cf0714435674cc923b4c81f02e325b8ee9e9e5a9816d0b",
+      "tracked": false
+    },
+    {
+      "role": "stage4_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-report.md",
+      "sha256": "1221cf1e6b6c247c3253240c44ed78446318b2cdb2966610a63d08c7ec4f00a8",
+      "tracked": false
+    },
+    {
+      "role": "stage4_immutable_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-polarization-congruence-stage4/casimir-dp-polarization-congruence-stage4-v1-20260725T165932120Z/polarization-congruence-stage4-receipt.json",
+      "sha256": "185a09ceb61b4f158afe16022783c8b184c1035f456cb341b5c90920b69b774a",
+      "tracked": false
+    },
+    {
+      "role": "stage4_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-polarization-congruence-stage4-verification-receipt.json",
+      "sha256": "721b9f6aeab4b181ccc5ac21b4bc81c984d3b1fb72cdf76e55abedba11e38440",
+      "tracked": false
+    }
+  ],
+  "constants_registry_authority": {
+    "role": "codata_2022_constants_registry",
+    "path": "configs/constants/codata-2022.v1.json",
+    "sha256": "5a7e10ed709577c224cf45f78199dd143a7f9cf10d6f8fe8c018e168454b7a61",
+    "tracked": true,
+    "registry_is_campaign_authority": true
+  },
+  "official_source_snapshots": [
+    {
+      "source_id": "nist-codata-2022-ascii-table",
+      "citation": "NIST Standard Reference Database 121, 2022 CODATA recommended values of the fundamental physical constants",
+      "url": "https://physics.nist.gov/cuu/Constants/Table/allascii.txt",
+      "retrieved_at": "2026-07-25T18:30:00.000Z",
+      "bytes": 40801,
+      "sha256": "77fb90e66c40db3e6eb16630bc9c88e4c7c8beddbe5e71be406f2f26e3f67e67",
+      "supports": "Printed values and standard uncertainties for alpha_fs, m_e, the ordinary and reduced electron Compton wavelengths, a_0, r_e, R_infinity, cR_infinity, the Rydberg and Hartree energies, and m_p/m_e.",
+      "does_not_support": "Independent validation among adjusted constants, a physical Compton oscillator, a cavity transfer kernel, DP collapse, or manifold dynamics."
+    },
+    {
+      "source_id": "nist-codata-2022-sp961-wall-chart",
+      "citation": "NIST SP 961, CODATA Recommended Values of the Fundamental Physical Constants: 2022",
+      "url": "https://physics.nist.gov/cuu/pdf/wall_2022.pdf",
+      "retrieved_at": "2026-07-25T18:30:00.000Z",
+      "bytes": 63268,
+      "sha256": "5b7f6d0a2dd9379bb4d02be1ceec4d2ac5dfb5e68772b2a834084739b0c03e0a",
+      "supports": "Human-readable cross-check of the printed CODATA 2022 values, uncertainties, units, and conventional quantity names used by the fixture.",
+      "does_not_support": "A new measurement, statistical independence, precision hydrogen theory, Casimir physics, collapse identification, or spacetime-manifold dynamics."
+    },
+    {
+      "source_id": "codata-2022-full-adjustment-paper",
+      "citation": "CODATA Recommended Values of the Fundamental Physical Constants: 2022, Journal of Physical and Chemical Reference Data",
+      "url": "https://physics.nist.gov/cuu/pdf/JPCRD2022CODATA.pdf",
+      "retrieved_at": "2026-07-25T18:30:00.000Z",
+      "bytes": 5920363,
+      "sha256": "4d7e7f34b98ab2fc4df68b38247f818f6fc8bdf7f25f91abcdfbc329e22d2f32",
+      "supports": "The correlated least-squares-adjustment provenance and the need for relativistic, radiative, recoil, finite-size, hyperfine, and related corrections in precision spectroscopy.",
+      "does_not_support": "Treating algebraic closure as independent empirical confirmation or connecting atomic scales to Casimir, DP, collapse, resonance, or manifold variables without a sourced model."
+    }
+  ],
+  "live_source_authorities": [
+    {
+      "source_id": "bipm-si-defining-constants",
+      "citation": "BIPM, The International System of Units (SI): Defining constants",
+      "url": "https://www.bipm.org/en/measurement-units/si-defining-constants",
+      "checked_at": "2026-07-25T18:30:00.000Z",
+      "supports": "The exact SI numerical values and zero defining uncertainty of h and c.",
+      "does_not_support": "Any adjusted CODATA reference value, atomic-structure correction, or Casimir-to-collapse mechanism."
+    }
+  ],
+  "uncertainty_policy": {
+    "codata_outputs_are_correlated": true,
+    "absolute_standard_uncertainties_are_authoritative": true,
+    "relative_uncertainties_are_derived": true,
+    "printed_decimal_strings_and_rounding_resolutions_are_preserved": true,
+    "cross_covariance_required_for_reference_significance": true,
+    "without_cross_covariance": "not_computable_without_cross_covariance",
+    "fallback": "conservative_l1_relative_uncertainty_bound"
+  },
+  "scientific_boundaries": [
+    "The relation c*R_infinity=(alpha_fs^2/2)*nu_C is a sourced Coulomb/Dirac-QED scale-family identity, not a new bridge.",
+    "Compton frequency is rest-energy bookkeeping; this campaign does not model or detect an electron oscillator, material clock, cavity resonance, or collapse clock.",
+    "The leading reduced-mass hydrogenic result is not precision spectroscopy until the frozen correction ledger is implemented and validated.",
+    "No cavity, Casimir, DP, collapse, manifold, resonance, polarization, or transfer-kernel field is admitted by the calibration input contract.",
+    "Measured evidence, collapse identification, manifold dynamics, and physical viability cannot be promoted by Stage-4.1."
+  ]
+}

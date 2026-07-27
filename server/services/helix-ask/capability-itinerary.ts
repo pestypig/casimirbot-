@@ -16,7 +16,11 @@ import {
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
 import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
-import { buildHelixCompoundCapabilityContract } from "./compound-capability-contract";
+import {
+  buildHelixCompoundCapabilityContract,
+  buildHelixSingleCapabilityContractFromAdmission,
+} from "./compound-capability-contract";
+import type { ExplicitCapabilityContract } from "./explicit-capability-contract";
 import { isAskTurnCapabilityHelpIntent } from "./capability-catalog-intent";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
@@ -397,16 +401,27 @@ export function buildHelixCapabilityItinerary(input: {
   promptText: string;
   toolCallAdmissionDecision?: HelixToolCallAdmissionDecision | RecordLike | null;
   availableCapabilities?: unknown;
+  exactAdmittedCapabilityContract?: ExplicitCapabilityContract | null;
+  exactAdmittedCapabilityArgs?: RecordLike | null;
 }): HelixCapabilityItinerary {
   const admission = readRecord(input.toolCallAdmissionDecision);
   const capabilityHelpIntent = isAskTurnCapabilityHelpIntent(input.promptText);
   const capabilityHelpHasSeparateAction = /[?!.]\s*(?:then\s+)?(?:use|call|run|open|inspect|search|create|append|set|start|stop)\b/i.test(
     input.promptText,
   );
-  const candidateCompoundCapabilityContract = buildHelixCompoundCapabilityContract({
-    turnId: input.turnId,
-    promptText: input.promptText,
-  });
+  const candidateCompoundCapabilityContract =
+    buildHelixCompoundCapabilityContract({
+      turnId: input.turnId,
+      promptText: input.promptText,
+    }) ??
+    (input.exactAdmittedCapabilityContract
+      ? buildHelixSingleCapabilityContractFromAdmission({
+          turnId: input.turnId,
+          promptText: input.promptText,
+          contract: input.exactAdmittedCapabilityContract,
+          argsHint: input.exactAdmittedCapabilityArgs,
+        })
+      : null);
   const candidateCompoundSubgoals = Array.isArray(candidateCompoundCapabilityContract?.subgoals)
     ? candidateCompoundCapabilityContract.subgoals
     : [];

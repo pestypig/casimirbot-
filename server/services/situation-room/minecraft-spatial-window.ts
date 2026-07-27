@@ -10,11 +10,19 @@ import {
   type HelixMinecraftSpatialEpisode,
 } from "@shared/helix-minecraft-spatial-episode";
 import { recognizeMinecraftBuildPatterns } from "./minecraft-build-pattern-recognizer";
+import {
+  assertHelixRoomSourceNamespaceAdmission,
+  isHelixRoomSourceIngressSourceId,
+  matchesHelixRoomSourceAdmission,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 
 type SpatialWindow = {
   key: string;
   roomId: string;
   worldId: string;
+  sourceId: string;
+  sourceAdmission: HelixRoomSourceAdmission | null;
   actorKey: string;
   events: HelixMinecraftSpatialEvent[];
   latestEpisode: HelixMinecraftSpatialEpisode | null;
@@ -26,7 +34,11 @@ export type MinecraftSpatialIngestResult = {
 };
 
 const spatialWindows = new Map<string, SpatialWindow>();
-const latestEpisodesByRoom = new Map<string, HelixMinecraftSpatialEpisode>();
+const latestEpisodesByRoom = new Map<string, {
+  episode: HelixMinecraftSpatialEpisode;
+  sourceId: string;
+  sourceAdmission: HelixRoomSourceAdmission | null;
+}>();
 
 const SPATIAL_WINDOW_MAX_EVENTS = 250;
 const SPATIAL_WINDOW_MS = 180_000;
@@ -193,9 +205,12 @@ const normalizeSpatialEvent = (event: HelixWorldEvent): HelixMinecraftSpatialEve
 };
 
 const getWindowKey = (event: HelixMinecraftSpatialEvent): string =>
-  `${event.room_id}:${event.world_id}:${event.actor_id ?? event.actor_label ?? "world"}:${event.dimension}`;
+  `${event.room_id}:${event.world_id}:${event.source_id}:${event.actor_id ?? event.actor_label ?? "world"}:${event.dimension}`;
 
-const getOrCreateWindow = (event: HelixMinecraftSpatialEvent): SpatialWindow => {
+const getOrCreateWindow = (
+  event: HelixMinecraftSpatialEvent,
+  sourceAdmission: HelixRoomSourceAdmission | null,
+): SpatialWindow => {
   const key = getWindowKey(event);
   const existing = spatialWindows.get(key);
   if (existing) return existing;
@@ -203,6 +218,8 @@ const getOrCreateWindow = (event: HelixMinecraftSpatialEvent): SpatialWindow => 
     key,
     roomId: event.room_id,
     worldId: event.world_id,
+    sourceId: event.source_id,
+    sourceAdmission,
     actorKey: event.actor_id ?? event.actor_label ?? "world",
     events: [],
     latestEpisode: null,
@@ -291,14 +308,36 @@ const buildEpisode = (window: SpatialWindow): HelixMinecraftSpatialEpisode | nul
     model_invoked: false,
   };
   window.latestEpisode = episode;
-  latestEpisodesByRoom.set(window.roomId, episode);
+  latestEpisodesByRoom.set(window.roomId, {
+    episode,
+    sourceId: window.sourceId,
+    sourceAdmission: window.sourceAdmission,
+  });
   return episode;
 };
 
-export function ingestMinecraftSpatialWorldEvent(event: HelixWorldEvent): MinecraftSpatialIngestResult {
+export function ingestMinecraftSpatialWorldEvent(
+  event: HelixWorldEvent,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
+): MinecraftSpatialIngestResult {
+  if (event.source_id) {
+    assertHelixRoomSourceNamespaceAdmission(
+      {
+        source_id: event.source_id,
+        room_id: event.room_id,
+        world_id: event.world_id,
+      },
+      options.sourceAdmission,
+    );
+  }
   const spatialEvent = normalizeSpatialEvent(event);
   if (!spatialEvent) return { spatial_event: null, spatial_episode: null };
-  const window = getOrCreateWindow(spatialEvent);
+  const window = getOrCreateWindow(
+    spatialEvent,
+    options.sourceAdmission ?? null,
+  );
   window.events.push(spatialEvent);
   window.events.sort((a, b) => a.ts.localeCompare(b.ts) || a.event_id.localeCompare(b.event_id));
   compactWindow(window, spatialEvent.ts);
@@ -308,12 +347,66 @@ export function ingestMinecraftSpatialWorldEvent(event: HelixWorldEvent): Minecr
   };
 }
 
-export function getLatestMinecraftSpatialEpisodeForRoom(roomId: string): HelixMinecraftSpatialEpisode | null {
-  return latestEpisodesByRoom.get(roomId) ?? null;
+export function getLatestMinecraftSpatialEpisodeForRoom(
+  roomId: string,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
+): HelixMinecraftSpatialEpisode | null {
+  const stored = latestEpisodesByRoom.get(roomId) ?? null;
+  if (!stored) return null;
+  if (
+    isHelixRoomSourceIngressSourceId(stored.sourceId) &&
+    !matchesHelixRoomSourceAdmission(
+      {
+        source_id: stored.sourceId,
+        room_id: stored.episode.room_id,
+        world_id: stored.episode.world_id,
+      },
+      options.sourceAdmission,
+    )
+  ) {
+    return null;
+  }
+  return stored.episode;
 }
 
-export function listLatestMinecraftSpatialEpisodes(): HelixMinecraftSpatialEpisode[] {
-  return Array.from(latestEpisodesByRoom.values());
+export function listLatestMinecraftSpatialEpisodes(options: {
+  sourceAdmission?: HelixRoomSourceAdmission | null;
+} = {}): HelixMinecraftSpatialEpisode[] {
+  return Array.from(latestEpisodesByRoom.values())
+    .filter(
+      (stored) =>
+        !isHelixRoomSourceIngressSourceId(stored.sourceId) ||
+        matchesHelixRoomSourceAdmission(
+          {
+            source_id: stored.sourceId,
+            room_id: stored.episode.room_id,
+            world_id: stored.episode.world_id,
+          },
+          options.sourceAdmission,
+        ),
+    )
+    .map((stored) => stored.episode);
+}
+
+export function removeMinecraftSpatialWindows(input: {
+  sourceId?: string | null;
+  roomId?: string | null;
+}): number {
+  let removed = 0;
+  for (const [key, window] of spatialWindows.entries()) {
+    if (input.sourceId && window.sourceId !== input.sourceId) continue;
+    if (input.roomId && window.roomId !== input.roomId) continue;
+    spatialWindows.delete(key);
+    removed += 1;
+  }
+  for (const [roomId, stored] of latestEpisodesByRoom.entries()) {
+    if (input.sourceId && stored.sourceId !== input.sourceId) continue;
+    if (input.roomId && roomId !== input.roomId) continue;
+    latestEpisodesByRoom.delete(roomId);
+  }
+  return removed;
 }
 
 export function resetMinecraftSpatialWindows(): void {

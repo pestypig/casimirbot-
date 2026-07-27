@@ -247,6 +247,7 @@ export type HelixCapabilityLaneOneShotHandler = {
     authorizedGatewayCapability?: HelixWorkstationCapabilityManifest | null;
     accountType?: "developer" | "user" | null;
     profileId?: string | null;
+    authoritativeEvidenceArtifacts?: unknown[];
   }): HelixCapabilityLaneOneShotCallResult | Promise<HelixCapabilityLaneOneShotCallResult>;
 };
 
@@ -1157,6 +1158,7 @@ export const governedWorkstationGatewayBridgeHandler: HelixCapabilityLaneOneShot
       iteration,
       accountType: input.accountType ?? undefined,
       profileId: input.profileId ?? null,
+      authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
     });
     const observationRef = gatewayResult.artifact_refs[0] ??
       `${turnId}:capability_lane:${capability}:${hashShort({ ok: gatewayResult.ok, arguments: gatewayArguments })}`;

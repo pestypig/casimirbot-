@@ -215,11 +215,13 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   const { researchLibraryRouter } = await import("./routes/research-library");
   const { googleAuthRouter } = await import("./routes/google-auth");
   const { profileIngressRouter } = await import("./routes/profile-ingress");
+  const { roomSourceIngressRouter } = await import("./routes/room-source-ingress");
   app.use("/api/auth", googleAuthRouter);
   app.use("/api/account", accountSessionRouter);
   app.use("/api/docs", docsTranslationRouter);
   app.use("/api/research-library", researchLibraryRouter);
   app.use("/api/profile-ingress", profileIngressRouter);
+  app.use("/api/room-ingress", roomSourceIngressRouter);
   app.use("/api/mission-board", missionBoardRouter);
   app.use("/api", halobankSolarRouter);
   const evolutionAuthEnabled = flagEnabled(

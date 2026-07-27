@@ -14,6 +14,7 @@ export type PanelId =
   | "live-energy"
   | "helix-phoenix"
   | "endpoints"
+  | "agent-access"
   | "taskbar"
   | "docs-viewer"
   | "casimir-tiles"
@@ -234,6 +235,27 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultSize: { w: 520, h: 420 },
     defaultPosition: { x: 60, y: 420 },
     defaultOpen: true
+  },
+  {
+    id: "agent-access",
+    title: "Agent Access",
+    loader: load(() => import("@/components/workstation/AgentAccessPanel")),
+    defaultSize: { w: 900, h: 720 },
+    defaultPosition: { x: 120, y: 80 },
+    endpoints: [
+      "POST /mcp",
+      "GET /.well-known/oauth-protected-resource/mcp",
+      "/api/v1/agent-runs",
+    ],
+    keywords: [
+      "MCP",
+      "OpenAI",
+      "Codex",
+      "Gemini",
+      "OAuth",
+      "external agent",
+    ],
+    mobileReady: true,
   },
   {
     id: "taskbar",

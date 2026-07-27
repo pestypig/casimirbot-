@@ -1,0 +1,177 @@
+{
+  "schema_version": "casimir_dp_qed_green_noise/1",
+  "evidence_class": "synthetic_fixture",
+  "model_domain": "planar_reduced_order",
+  "model_binding_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "coupling_limit_case": "registered_coupling",
+  "zero_limit_absolute_tolerance": 0,
+  "green_tensor": {
+    "source_kind": "planar_reduced_order",
+    "receipt": {
+      "source_ref": "synthetic://green/planar-v1",
+      "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "actual_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "integrity_verified": true
+    },
+    "solver_name": "synthetic-planar-green",
+    "solver_version": "1",
+    "model_binding_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "reciprocity_required": true,
+    "reciprocity_relative_tolerance": 1e-12,
+    "interpolation_relative_error": 1e-7,
+    "maximum_interpolation_relative_error": 1e-5,
+    "samples": [
+      {
+        "omega_rad_s": 10,
+        "real_m_inv": [[1, 0.1, 0], [0.1, 2, 0], [0, 0, 3]],
+        "imaginary_m_inv": [[0.1, 0.01, 0], [0.01, 0.2, 0], [0, 0, 0.3]]
+      },
+      {
+        "omega_rad_s": 20,
+        "real_m_inv": [[0.8, 0.08, 0], [0.08, 1.6, 0], [0, 0, 2.4]],
+        "imaginary_m_inv": [[0.2, 0.02, 0], [0.02, 0.4, 0], [0, 0, 0.6]]
+      }
+    ]
+  },
+  "material": {
+    "material_id": "synthetic-lossy-conductor",
+    "evidence_class": "synthetic_fixture",
+    "response_kind": "complex_permittivity_permeability",
+    "receipt": {
+      "source_ref": "synthetic://material/loss-table-v1",
+      "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "integrity_verified": true
+    },
+    "measured_response_over_required_band": false,
+    "loss_parameter": 0.02,
+    "extrapolation_ref": "synthetic://material/tails-v1",
+    "kramers_kronig": {
+      "maximum_relative_error": 1e-6,
+      "standard_uncertainty": 1e-7,
+      "tolerance": 2e-6,
+      "receipt_ref": "synthetic://material/kk-check-v1"
+    }
+  },
+  "geometry": {
+    "evidence_class": "synthetic_fixture",
+    "receipt": {
+      "source_ref": "synthetic://geometry/planar-v1",
+      "expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "integrity_verified": true
+    },
+    "gap_m": 1e-6,
+    "surface_distance_m": 5e-7,
+    "roughness_rms_m": 1e-9,
+    "coating_thickness_m": 1e-7,
+    "alignment_standard_uncertainty_rad": 1e-6,
+    "temperature_K": 4,
+    "measured_geometry_and_alignment": false
+  },
+  "probe": {
+    "state_ref": "synthetic://probe/ground-state-v1",
+    "response_receipt": {
+      "source_ref": "synthetic://probe/polarizability-v1",
+      "expected_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "actual_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "integrity_verified": true
+    },
+    "polarizability_SI": [[1e-30, 0, 0], [0, 1e-30, 0], [0, 0, 1e-30]]
+  },
+  "branch_trace": {
+    "model_binding_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "time_s": [0, 0.1],
+    "branch_a_potential_J": [-1e-30, -1e-30],
+    "branch_b_potential_J": [-5e-31, -5e-31],
+    "branch_a_potential_standard_uncertainty_J": [1e-33, 1e-33],
+    "branch_b_potential_standard_uncertainty_J": [1e-33, 1e-33],
+    "branch_a_force_N": [[-1e-20, 0, 0], [-1e-20, 0, 0]],
+    "branch_b_force_N": [[-5e-21, 0, 0], [-5e-21, 0, 0]],
+    "branch_a_force_standard_uncertainty_N": [[1e-22, 1e-23, 1e-23], [1e-22, 1e-23, 1e-23]],
+    "branch_b_force_standard_uncertainty_N": [[5e-23, 1e-23, 1e-23], [5e-23, 1e-23, 1e-23]],
+    "differential_force_gradient_N_m": [1e-14, 1e-14],
+    "differential_force_gradient_standard_uncertainty_N_m": [1e-16, 1e-16],
+    "path_swap": false
+  },
+  "noise": {
+    "model_binding_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "receipt": {
+      "source_ref": "synthetic://noise/fdt-v1",
+      "expected_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "actual_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "integrity_verified": true
+    },
+    "spectrum_convention": "two_sided_angular_frequency",
+    "source_kind": "explicit_fluctuation_dissipation_model",
+    "fluctuation_dissipation_ref": "synthetic://noise/fdt-formula-v1",
+    "includes_material_loss": true,
+    "includes_temperature": true,
+    "includes_geometry": true,
+    "two_sided_frequency_absolute_tolerance_rad_s": 1e-12,
+    "two_sided_relative_tolerance": 1e-12,
+    "omega_rad_s": [-20, -10, 0, 10, 20],
+    "energy_difference_psd_J2_s": [1e-66, 2e-66, 3e-66, 2e-66, 1e-66],
+    "energy_difference_psd_standard_uncertainty_J2_s": [1e-68, 2e-68, 3e-68, 2e-68, 1e-68],
+    "force_noise_psd_N2_s": [
+      [[1e-50, 0, 0], [0, 5e-51, 0], [0, 0, 5e-51]],
+      [[2e-50, 0, 0], [0, 1e-50, 0], [0, 0, 1e-50]],
+      [[3e-50, 0, 0], [0, 1.5e-50, 0], [0, 0, 1.5e-50]],
+      [[2e-50, 0, 0], [0, 1e-50, 0], [0, 0, 1e-50]],
+      [[1e-50, 0, 0], [0, 5e-51, 0], [0, 0, 5e-51]]
+    ],
+    "force_noise_psd_standard_uncertainty_N2_s": [
+      [[1e-52, 0, 0], [0, 5e-53, 0], [0, 0, 5e-53]],
+      [[2e-52, 0, 0], [0, 1e-52, 0], [0, 0, 1e-52]],
+      [[3e-52, 0, 0], [0, 1.5e-52, 0], [0, 0, 1.5e-52]],
+      [[2e-52, 0, 0], [0, 1e-52, 0], [0, 0, 1e-52]],
+      [[1e-52, 0, 0], [0, 5e-53, 0], [0, 0, 5e-53]]
+    ],
+    "ramsey_filter_abs2_s2": [0.0001, 0.0001, 0.0001, 0.0001, 0.0001],
+    "echo_filter_abs2_s2": [0.00001, 0.000005, 0, 0.000005, 0.00001],
+    "linearized_check": {
+      "enabled": true,
+      "linear_response_domain_confirmed": true,
+      "branch_displacement_m": [1e-8, 0, 0],
+      "maximum_relative_error": 1e-12
+    }
+  },
+  "heating_model": {
+    "formula_id": "harmonic_oscillator_two_sided_force_psd_n_dot/1",
+    "source_ref": "synthetic://heating/harmonic-oscillator-v1",
+    "source_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "oscillator_mass_kg": 1e-18,
+    "oscillator_omega_rad_s": 10,
+    "coupling_direction": [1, 0, 0]
+  },
+  "sensitivity_runs": [
+    {
+      "parameter": "material_loss",
+      "parameter_value": 0.03,
+      "phase_rad": 475,
+      "ramsey_chi": 0.06,
+      "model_binding_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "parameter": "temperature",
+      "parameter_value": 8,
+      "phase_rad": 474,
+      "ramsey_chi": 0.08,
+      "model_binding_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "parameter": "surface_distance",
+      "parameter_value": 6e-7,
+      "phase_rad": 300,
+      "ramsey_chi": 0.03,
+      "model_binding_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "parameter": "geometry",
+      "parameter_value": 1.1,
+      "phase_rad": 450,
+      "ramsey_chi": 0.05,
+      "model_binding_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "schema": "casimir_numerical_build_manifest/v1",
+  "manifest_id": "casimir-advection-diffusion-analytic-reference-msvc-19.41.34123",
+  "lineage_id": "casimir-analytic-periodic-solution",
+  "implementation_id": "casimir-advection-diffusion-analytic-reference",
+  "source": {
+    "logical_path": "tools/casimir-numerical/advection-diffusion-analytic-reference.c",
+    "sha256": "8250e128bc80a7158e3156b2a65fa5b1ea93bc0dd8933003a9614b86ec5e1d33"
+  },
+  "toolchain": {
+    "compiler": "Microsoft C/C++ Optimizing Compiler 19.41.34123.0 x64",
+    "compiler_sha256": "5a85e24e8545c3cc58f8961020a546838acf8f78ed7a3342472836130016f77b",
+    "flags": [
+      "/nologo",
+      "/O2",
+      "/fp:strict",
+      "/std:c11",
+      "/Brepro"
+    ]
+  },
+  "runtime_environment": {
+    "ucrtbase_version": "10.0.26100.8875",
+    "ucrtbase_sha256": "5e7709a6b71bb818260b6f05c5bb3b6ca0c3ca9bc2f58c6242c1cd9d826d0079",
+    "platform_sha256": "1ba89b0966e71bd6eeee30053a657fd2f8e279ad39c490f0b87cd4b0711c1426"
+  },
+  "output": {
+    "logical_name": "analytic-reference.exe",
+    "sha256": "77ce1a11b7f88d72f27483a951e6f94e8b0f7c60333e6a58d3706ddf02dadf86",
+    "reproducible_builds_observed": 2,
+    "reproducible_builds_byte_identical": true
+  },
+  "claim_boundary": {
+    "uses_lanyon_generated_source": false,
+    "is_independent_numerical_solver": false,
+    "is_frozen_analytic_reference": true,
+    "validates_generated_code": false,
+    "validates_numerical_implementation": false,
+    "validates_theory": false,
+    "terminal_eligible": false
+  }
+}

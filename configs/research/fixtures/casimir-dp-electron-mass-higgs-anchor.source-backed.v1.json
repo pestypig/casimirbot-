@@ -1,0 +1,289 @@
+{
+  "schema_version": "casimir_dp_electron_mass_higgs_anchor_stage4_2a_input/1",
+  "calibration_id": "stage4-2a-electron-mass-higgs-anchor-v1",
+  "evidence_class": "source_backed_calculation",
+  "claim_ceiling": "electron_mass_metrology_replay_and_conditional_sm_tree_mapping_only",
+  "promotion_allowed": false,
+  "source_registry": [
+    {
+      "source_id": "koehler_2015_penning_detailed",
+      "citation": "F. Kohler et al., The electron mass from g-factor measurements on hydrogen-like carbon-12 C5+, Journal of Physics B 48, 144032 (2015), corrected detailed analysis.",
+      "url": "https://arxiv.org/abs/1604.04380",
+      "supports": "Corrected Larmor-to-cyclotron frequency ratio, systematic correction table, ion binding ledger, bound-state-QED input, and relative electron-mass result.",
+      "does_not_support": "An independent CODATA confirmation, a direct Higgs-electron measurement, or any cross-mechanism transfer."
+    },
+    {
+      "source_id": "sturm_2014_nature",
+      "citation": "S. Sturm et al., High-precision measurement of the atomic mass of the electron, Nature 506, 467-470 (2014).",
+      "url": "https://doi.org/10.1038/nature13026",
+      "supports": "The original Penning-trap and bound-electron-g measurement program and source history.",
+      "does_not_support": "Use of the original image-current sign after the corrected detailed analysis or an independent adjustment-level pull."
+    },
+    {
+      "source_id": "codata_2022",
+      "citation": "P. J. Mohr et al., CODATA recommended values of the fundamental physical constants: 2022.",
+      "url": "https://physics.nist.gov/cuu/pdf/JPCRD2022CODATA.pdf",
+      "supports": "The atomic mass constant, electron relative mass, electron SI mass-energy views, fine-structure constant, and Fermi constant used for correlated conversions and convention checks.",
+      "does_not_support": "Independence from source experiments contributing to the adjustment or a precision running electron Yukawa without matching inputs."
+    },
+    {
+      "source_id": "pdg_2025_higgs",
+      "citation": "Particle Data Group, Status of Higgs Boson Physics, Review of Particle Physics (2025).",
+      "url": "https://pdg.lbl.gov/2025/reviews/rpp2025-rev-higgs-boson.pdf",
+      "supports": "The Standard Model Higgs-Yukawa convention and the distinction between a tree anchor and a matched running parameter.",
+      "does_not_support": "A direct observation of the Standard Model electron Yukawa coupling."
+    },
+    {
+      "source_id": "cms_hig_21_015",
+      "citation": "CMS Collaboration, Search for the Higgs boson decay to a pair of electrons in proton-proton collisions at 13 TeV, Physics Letters B 846, 137783 (2023).",
+      "url": "https://cms-results.web.cern.ch/cms-results/public-results/publications/HIG-21-015/",
+      "supports": "The 95 percent confidence upper limit on the H to electron-positron branching fraction.",
+      "does_not_support": "A direct electron Yukawa observation or a model-independent coupling-modifier reconstruction from a square root of branching fractions."
+    }
+  ],
+  "penning_replay": {
+    "experiment_id": "koehler_2015_carbon_12_c5_corrected",
+    "selected_publication_state": "detailed_corrected_analysis_supersedes_original_image_current_sign",
+    "species": "12C5+",
+    "charge_state_abs_e": 5,
+    "frequency_ratio_symbol": "Gamma",
+    "frequency_ratio_definition": "omega_L_over_omega_c",
+    "observational_equation": "m_e=(|g_b|/2)(|e|/|q|)(omega_c/omega_L)m_ion",
+    "gamma_statistical": 4376.210502112,
+    "gamma_corrected": 4376.210500872,
+    "gamma_statistical_standard_uncertainty": 1.02e-7,
+    "gamma_systematic_standard_uncertainty": 6.9e-8,
+    "published_total_relative_shift_ppt": -283.3,
+    "correction_rounding_resolution_ppt": 0.1,
+    "corrections": [
+      {
+        "correction_id": "image_charge",
+        "relative_shift_ppt": -282.4,
+        "relative_standard_uncertainty_ppt": 14.1,
+        "uncertainty_semantics": "standard"
+      },
+      {
+        "correction_id": "line_shape_dip",
+        "relative_shift_ppt": 0,
+        "relative_standard_uncertainty_ppt": 5.2,
+        "uncertainty_semantics": "standard"
+      },
+      {
+        "correction_id": "magnetron_frequency",
+        "relative_shift_ppt": 0,
+        "relative_standard_uncertainty_ppt": 3.2,
+        "uncertainty_semantics": "standard"
+      },
+      {
+        "correction_id": "second_pna_dipole",
+        "relative_shift_ppt": 0,
+        "relative_standard_uncertainty_ppt": 3,
+        "uncertainty_semantics": "upper_bound"
+      },
+      {
+        "correction_id": "axial_frequency_drift",
+        "relative_shift_ppt": 0,
+        "relative_standard_uncertainty_ppt": 1.2,
+        "uncertainty_semantics": "negligible_upper_bound"
+      },
+      {
+        "correction_id": "motional_magnetic_field",
+        "relative_shift_ppt": 0,
+        "relative_standard_uncertainty_ppt": 0.8,
+        "uncertainty_semantics": "negligible_upper_bound"
+      },
+      {
+        "correction_id": "image_current",
+        "relative_shift_ppt": -2.2,
+        "relative_standard_uncertainty_ppt": 0.55,
+        "uncertainty_semantics": "standard"
+      },
+      {
+        "correction_id": "electric_c4",
+        "relative_shift_ppt": 0,
+        "relative_standard_uncertainty_ppt": 0.5,
+        "uncertainty_semantics": "standard"
+      },
+      {
+        "correction_id": "gamma_lineshape_asymmetry",
+        "relative_shift_ppt": 0,
+        "relative_standard_uncertainty_ppt": 0.3,
+        "uncertainty_semantics": "standard"
+      },
+      {
+        "correction_id": "magnetic_b2",
+        "relative_shift_ppt": 1.36,
+        "relative_standard_uncertainty_ppt": 0.27,
+        "uncertainty_semantics": "standard"
+      },
+      {
+        "correction_id": "gaussian_lineshape_fit",
+        "relative_shift_ppt": 0,
+        "relative_standard_uncertainty_ppt": 0.1,
+        "uncertainty_semantics": "standard"
+      },
+      {
+        "correction_id": "electric_c6",
+        "relative_shift_ppt": 0,
+        "relative_standard_uncertainty_ppt": 0.059,
+        "uncertainty_semantics": "standard"
+      },
+      {
+        "correction_id": "residual_special_relativity",
+        "relative_shift_ppt": -0.042,
+        "relative_standard_uncertainty_ppt": 0.002,
+        "uncertainty_semantics": "standard"
+      }
+    ],
+    "bound_state_qed": {
+      "g_factor_abs": 2.0010415901798,
+      "g_factor_abs_standard_uncertainty": 4.7e-12,
+      "framework": "bound_state_qed",
+      "recoil_included": true,
+      "finite_nuclear_size_included": true,
+      "higher_order_two_loop_estimate_included": true,
+      "value_is_source_specific_final_value": true
+    },
+    "ion_mass_ledger": {
+      "neutral_carbon_relative_mass_u": 12,
+      "neutral_carbon_mass_is_exact_in_source_epoch": true,
+      "removed_electron_count": 5,
+      "ionization_energies": [
+        {
+          "electron_index": 1,
+          "energy_eV": 11.2603,
+          "standard_uncertainty_eV": 0.001
+        },
+        {
+          "electron_index": 2,
+          "energy_eV": 24.3845,
+          "standard_uncertainty_eV": 0.0009
+        },
+        {
+          "electron_index": 3,
+          "energy_eV": 47.88778,
+          "standard_uncertainty_eV": 0.00012
+        },
+        {
+          "electron_index": 4,
+          "energy_eV": 64.49358,
+          "standard_uncertainty_eV": 0.00019
+        },
+        {
+          "electron_index": 5,
+          "energy_eV": 392.09049,
+          "standard_uncertainty_eV": 0.00003
+        }
+      ],
+      "published_total_binding_energy_eV": 540.1166,
+      "published_total_binding_energy_standard_uncertainty_eV": 0.0014,
+      "source_epoch_atomic_mass_energy_equivalent_eV": 931494061,
+      "source_epoch_atomic_mass_energy_standard_uncertainty_eV": 21,
+      "published_ion_relative_mass_u": 11.9972576802917,
+      "published_ion_relative_mass_standard_uncertainty_u": 1.8e-12,
+      "self_consistent_electron_mass_dependence_included": true
+    },
+    "published_result": {
+      "A_r_e": 0.0005485799090694,
+      "statistical_standard_uncertainty": 1.28e-14,
+      "systematic_standard_uncertainty": 8.6e-15,
+      "theory_standard_uncertainty": 1.3e-15
+    }
+  },
+  "codata_conversions": {
+    "adjustment_id": "CODATA-2022",
+    "source_overlap_class": "shared_adjustment_ancestor_not_independent",
+    "cross_covariance_status": "not_supplied",
+    "independence_significance_status": "not_computable_without_cross_covariance",
+    "independent_confirmation_claimed": false,
+    "conversion_semantics": "deterministic_fully_correlated_views",
+    "atomic_mass_constant_kg": {
+      "value": 1.66053906892e-27,
+      "standard_uncertainty": 5.2e-37
+    },
+    "exact_si": {
+      "c_m_s": 299792458,
+      "h_J_s": 6.62607015e-34,
+      "elementary_charge_C": 1.602176634e-19
+    },
+    "alpha_fs_zero_momentum": {
+      "value": 0.0072973525643,
+      "standard_uncertainty": 1.1e-12
+    },
+    "references": {
+      "A_r_e": {
+        "value": 0.0005485799090441,
+        "standard_uncertainty": 9.7e-15,
+        "rounding_resolution": 1e-16
+      },
+      "m_e_OS_kg": {
+        "value": 9.1093837139e-31,
+        "standard_uncertainty": 2.8e-40,
+        "rounding_resolution": 1e-41
+      },
+      "E_e_OS_J": {
+        "value": 8.187105788e-14,
+        "standard_uncertainty": 2.6e-23,
+        "rounding_resolution": 1e-24
+      },
+      "E_e_OS_MeV": {
+        "value": 0.51099895069,
+        "standard_uncertainty": 1.6e-10,
+        "rounding_resolution": 1e-11
+      }
+    }
+  },
+  "electroweak_tree_mapping": {
+    "unit_convention": "natural_energy_hbar_c_equal_1",
+    "fermi_constant_GeV_minus2": 0.000011663787,
+    "fermi_constant_standard_uncertainty_GeV_minus2": 6e-12,
+    "fermi_scale_definition": "v_F=(sqrt(2)*G_F)^(-1/2)",
+    "reference_v_F_tree_GeV": 246.21965,
+    "lagrangian_convention": "L_Y=-y_e*bar(L_e)*Phi*e_R+h.c.;<Phi>=(0,v_F/sqrt(2))",
+    "mass_relation": "m_e*c^2=y_e_lagrangian_tree*v_F_tree/sqrt(2)",
+    "vertex_relation": "g_h_e_e_tree=m_e*c^2/v_F_tree=y_e_lagrangian_tree/sqrt(2)",
+    "inferred_tree_value_is_direct_measurement": false,
+    "extra_c_squared_factor_applied": false,
+    "precision_matching": {
+      "status": "not_supplied",
+      "mu_GeV": null,
+      "scheme": null,
+      "tadpole_prescription": null,
+      "qed_electroweak_matching": null,
+      "perturbative_order": null,
+      "running_value_claimed": false
+    }
+  },
+  "collider_lane": {
+    "source_id": "cms_hig_21_015",
+    "channel": "H_to_e_plus_e_minus",
+    "branching_fraction_upper_limit": 0.0003,
+    "confidence_level": 0.95,
+    "result_kind": "upper_bound_only",
+    "direct_observation_claimed": false,
+    "naive_coupling_modifier_reconstruction_authorized": false,
+    "standard_model_tree_anchor_excluded": false
+  },
+  "formal_zero_v_limit": {
+    "enabled": true,
+    "fixed_lagrangian_yukawa": true,
+    "experimental_switch": false,
+    "domain_exit_required": true,
+    "unchanged_low_energy_model_extrapolation_allowed": false
+  },
+  "nonbridge_policy": {
+    "observable_bridge_edges_allowed": false,
+    "shared_energy_units_create_causal_edge": false,
+    "mass_frequency_identity_is_new_dynamics": false,
+    "vacuum_word_equivalence_allowed": false
+  },
+  "tolerances": {
+    "source_numeric_relative_tolerance": 1e-14,
+    "gamma_shift_rounding_tolerance_ppt": 0.1,
+    "systematic_budget_tolerance_ppt": 0.1,
+    "mass_replay_uncertainty_multiplier": 3,
+    "correlated_comparison_uncertainty_multiplier": 5,
+    "identity_relative_tolerance": 1e-12,
+    "fermi_scale_absolute_tolerance_GeV": 0.00001
+  }
+}

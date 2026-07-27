@@ -9,6 +9,10 @@ import {
   type HelixLiveSourceSurface,
 } from "@shared/helix-live-source-identity";
 import type { HelixLiveSourceChunk } from "@shared/helix-live-source-chunk";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 
 const identitiesByRef = new Map<string, HelixLiveSourceIdentity>();
 const latestRefBySource = new Map<string, string>();
@@ -42,6 +46,9 @@ export function upsertLiveSourceIdentityFromChunk(input: {
   latestEvidenceRefs?: string[];
   freshnessMs?: number | null;
 }): HelixLiveSourceIdentity {
+  if (isHelixRoomSourceIngressSourceId(input.chunk.source_id)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
   const epoch = Math.max(1, Math.trunc(input.chunk.source_epoch ?? input.chunk.sequence_index ?? 1));
   const ref = `live_source_identity:${hashShort([
     input.chunk.thread_id,
@@ -83,15 +90,40 @@ export function upsertLiveSourceIdentityFromChunk(input: {
 }
 
 export function getLiveSourceIdentity(ref: string): HelixLiveSourceIdentity | null {
-  return identitiesByRef.get(ref) ?? null;
+  const identity = identitiesByRef.get(ref) ?? null;
+  return identity && !isHelixRoomSourceIngressSourceId(identity.source_id)
+    ? identity
+    : null;
 }
 
 export function getLatestLiveSourceIdentity(input: {
   threadId: string;
   sourceId: string;
 }): HelixLiveSourceIdentity | null {
+  if (isHelixRoomSourceIngressSourceId(input.sourceId)) return null;
   const ref = latestRefBySource.get(`${input.threadId}::${input.sourceId}`);
-  return ref ? identitiesByRef.get(ref) ?? null : null;
+  const identity = ref ? identitiesByRef.get(ref) ?? null : null;
+  return identity && !isHelixRoomSourceIngressSourceId(identity.source_id)
+    ? identity
+    : null;
+}
+
+export function removeLiveSourceIdentities(input: { sourceId: string }): number {
+  let removed = 0;
+  for (const [ref, identity] of identitiesByRef.entries()) {
+    if (identity.source_id !== input.sourceId) continue;
+    identitiesByRef.delete(ref);
+    removed += 1;
+  }
+  for (const [key, ref] of latestRefBySource.entries()) {
+    if (!key.endsWith(`::${input.sourceId}`)) continue;
+    latestRefBySource.delete(key);
+    if (identitiesByRef.has(ref)) {
+      identitiesByRef.delete(ref);
+      removed += 1;
+    }
+  }
+  return removed;
 }
 
 export function resetLiveSourceIdentitiesForTest(): void {

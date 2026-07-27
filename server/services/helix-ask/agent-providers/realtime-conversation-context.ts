@@ -38,6 +38,12 @@ export type RealtimeConversationContextMaterialization = {
   latestGroundedAnswer: {
     text: string;
     ref: string;
+    textHash: string;
+  } | null;
+  latestPriorUserTurn: {
+    text: string;
+    ref: string;
+    textHash: string;
   } | null;
 };
 
@@ -192,6 +198,7 @@ export const materializeRealtimeConversationContext = (input: {
       }),
       promptLines: [],
       latestGroundedAnswer: null,
+      latestPriorUserTurn: null,
     };
   }
   const pack = readContextPack(storedPack);
@@ -221,6 +228,7 @@ export const materializeRealtimeConversationContext = (input: {
       }),
       promptLines: [],
       latestGroundedAnswer: null,
+      latestPriorUserTurn: null,
     };
   }
   const normalizedQuestion = input.question.trim();
@@ -248,7 +256,14 @@ export const materializeRealtimeConversationContext = (input: {
     workstationSources: pack.workstation_sources,
     modelContextIncluded: bindingValid,
   });
-  if (!bindingValid) return { audit, promptLines: [], latestGroundedAnswer: null };
+  if (!bindingValid) {
+    return {
+      audit,
+      promptLines: [],
+      latestGroundedAnswer: null,
+      latestPriorUserTurn: null,
+    };
+  }
 
   const modelContext = {
     schema: pack.schema,
@@ -261,12 +276,22 @@ export const materializeRealtimeConversationContext = (input: {
     workstation_goal_summaries: pack.workstation_goal_summaries,
     workstation_sources: pack.workstation_sources,
   };
+  const latestGroundedAnswer = pack.grounded_answers.at(-1) ?? null;
+  const latestPriorUserTurn = priorUserTurns.at(-1) ?? null;
   return {
     audit,
-    latestGroundedAnswer: pack.grounded_answers.length > 0
+    latestGroundedAnswer: latestGroundedAnswer
       ? {
-          text: pack.grounded_answers.at(-1)!.summary,
-          ref: pack.grounded_answers.at(-1)!.ref,
+          text: latestGroundedAnswer.summary,
+          ref: latestGroundedAnswer.ref,
+          textHash: sha256(latestGroundedAnswer.summary),
+        }
+      : null,
+    latestPriorUserTurn: latestPriorUserTurn
+      ? {
+          text: latestPriorUserTurn.summary,
+          ref: latestPriorUserTurn.ref,
+          textHash: sha256(latestPriorUserTurn.summary),
         }
       : null,
     promptLines: [

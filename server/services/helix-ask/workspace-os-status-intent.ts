@@ -12,9 +12,25 @@ const clipboardMutationPattern =
 const diagnosticQualifierPattern =
   /\b(?:status|health|available|availability|capabilit(?:y|ies)|diagnos(?:e|is|tic)?|why|failed|failure|blocked|permission|fallback|bound|binding|stale|missing)\b/i;
 
+const naturalWorkspaceHealthPattern =
+  /\bhow\s+(?:is|are)\s+(?:the\s+)?(?:workspace|workstation)(?:\s+os)?\s+(?:doing|running|working|behaving)(?:\s+(?:right\s+now|currently|today))?\b/i;
+
+const contextualWorkspaceHealthPattern =
+  /\b(?:do\s+not|don't|dont|never|without|later|next\s+time|in\s+the\s+future|not\s+now|not\s+yet|hypothetically)\b[\s\S]{0,120}\b(?:workspace|workstation)(?:\s+os)?\b/i;
+
+const screenVisibleWorkspaceHealthPattern =
+  /\b(?:screen|visible\s+text|label|button|debug|ui\s+text)\b[\s\S]{0,100}\b(?:says|shows|reads|contains|mentions)\b[\s\S]{0,100}\b(?:workspace|workstation)(?:\s+os)?\b/i;
+
 export const isWorkspaceOsStatusPrompt = (promptText: string | null | undefined): boolean => {
   const prompt = String(promptText ?? "").trim();
   if (!prompt) return false;
+  if (
+    contextualWorkspaceHealthPattern.test(prompt) ||
+    screenVisibleWorkspaceHealthPattern.test(prompt)
+  ) {
+    return false;
+  }
+  if (naturalWorkspaceHealthPattern.test(prompt)) return true;
   if (!workspaceOsSurfacePattern.test(prompt)) return false;
   if (!workspaceOsDiagnosticPattern.test(prompt)) return false;
   if (clipboardMutationPattern.test(prompt) && !diagnosticQualifierPattern.test(prompt)) return false;
@@ -32,5 +48,6 @@ export const workspaceOsStatusReasonCodes = (promptText: string | null | undefin
   if (/\bruntime\s+memory|memory\s+pressure\b/i.test(prompt)) reasons.add("runtime_memory_status");
   if (/\bfallback\b/i.test(prompt)) reasons.add("fallback_metadata_requested");
   if (/\b(?:device\s+drivers?|peripherals?)\b/i.test(prompt)) reasons.add("device_driver_analogy_status");
+  if (naturalWorkspaceHealthPattern.test(prompt)) reasons.add("natural_workspace_health_question");
   return reasons.size > 0 ? [...reasons] : ["workspace_os_status_prompt"];
 };

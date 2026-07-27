@@ -44,6 +44,45 @@
       "expected_minimum_observations": 1,
       "expected_answer_patterns": ["Casimir|vacuum", "represent|graph|badge", "unresolved|missing|unsupported|boundary"],
       "expected_minimum_answer_chars": 140
+    },
+    {
+      "id": "natural_notes_inventory",
+      "category": "workstation_notes",
+      "prompt": "Check my workstation notes and tell me what topics are available.",
+      "notes": "Natural read-only notes request: select the governed notes-list capability, re-enter its bounded observation, and summarize only observed titles or the empty state.",
+      "workspace_context_snapshot": {
+        "activePanel": "workstation-notes",
+        "notes_context": {
+          "notes": []
+        }
+      },
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^workstation-notes\\.list_notes$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["notes?|topics?|available|empty"],
+      "expected_minimum_answer_chars": 40
+    },
+    {
+      "id": "natural_moral_graph_reflection",
+      "category": "moral_graph",
+      "prompt": "Use the moral graph to reflect on whether a research team should publish an exciting result before the main uncertainty is resolved.",
+      "notes": "Natural moral reflection: the exact graph observation must close its itinerary family before Codex synthesizes the bounded recommendation.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^moral-graph\\.reflect_context$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["uncertainty|evidence", "publish|publication|disclose|disclosure"],
+      "expected_minimum_answer_chars": 100
+    },
+    {
+      "id": "natural_literal_voice_delivery",
+      "category": "voice_delivery",
+      "prompt": "Say this aloud: The evidence is diagnostic, not conclusive.",
+      "notes": "Natural literal voice command: resolve the text after the colon, execute the governed text-to-speech lane, and materialize a terminal acknowledgment.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": ["^text_to_speech\\.speak_text$"],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": ["diagnostic|conclusive|spoken|aloud"],
+      "expected_minimum_answer_chars": 20
     }
   ]
 }

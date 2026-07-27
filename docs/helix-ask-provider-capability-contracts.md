@@ -90,17 +90,17 @@ capability-lane, or workstation-gateway changes.
 
 ## Availability Labels
 
-| Label | Meaning |
-| --- | --- |
-| `shared_gateway_now` | Exposed through `workstation-tool-gateway/registry.ts` for Helix, Codex, and future providers. |
-| `shared_capability_lane_now` | Exposed through the capability-lane runner for Helix, Codex, and future providers without adding a workstation gateway manifest entry. |
-| `safe_to_graduate_next` | Read/observe capability that can be promoted after bounded observation, debug, and negative-admission tests exist. |
-| `requires_confirmation_contract` | Side-effecting output such as voice; needs explicit affirmative admission, confirmation/playback policy, and receipts. |
-| `candidate_host_receipt_bridge` | Narrow Codex Workstation host-dispatch bridge with structured action envelope and receipt; absent from the shared provider gateway manifest. |
-| `helix_native_only` | Helix-owned live-environment behavior that should not be provider-facing until a narrower contract exists. |
-| `legacy_dynamic_panel_only` | Retired or panel-local dynamic action; do not count as provider gateway parity. |
-| `blocked_pending_contract` | Mutating/control capability or ambiguous lifecycle; fail closed until a permission and receipt contract exists. |
-| `client_projection_only` | Client UI behavior such as read-aloud playback, not an agent tool. |
+| Label                            | Meaning                                                                                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared_gateway_now`             | Exposed through `workstation-tool-gateway/registry.ts` for Helix, Codex, and future providers.                                               |
+| `shared_capability_lane_now`     | Exposed through the capability-lane runner for Helix, Codex, and future providers without adding a workstation gateway manifest entry.       |
+| `safe_to_graduate_next`          | Read/observe capability that can be promoted after bounded observation, debug, and negative-admission tests exist.                           |
+| `requires_confirmation_contract` | Side-effecting output such as voice; needs explicit affirmative admission, confirmation/playback policy, and receipts.                       |
+| `candidate_host_receipt_bridge`  | Narrow Codex Workstation host-dispatch bridge with structured action envelope and receipt; absent from the shared provider gateway manifest. |
+| `helix_native_only`              | Helix-owned live-environment behavior that should not be provider-facing until a narrower contract exists.                                   |
+| `legacy_dynamic_panel_only`      | Retired or panel-local dynamic action; do not count as provider gateway parity.                                                              |
+| `blocked_pending_contract`       | Mutating/control capability or ambiguous lifecycle; fail closed until a permission and receipt contract exists.                              |
+| `client_projection_only`         | Client UI behavior such as read-aloud playback, not an agent tool.                                                                           |
 
 ## Shared Now
 
@@ -120,6 +120,7 @@ workstation.readable_surface.observe
 docs-viewer.read_visible_surface
 docs-viewer.read_active_translation
 scientific-calculator.read_visible_result
+scientific-calculator.read_visible_theory_run_result
 scientific-calculator.open_panel
 scientific-calculator.focus_panel
 scientific-calculator.show_gateway_solve
@@ -130,18 +131,32 @@ account_session.set_interface_language
 docs-viewer.open_doc
 repo.search
 docs.search
-internet-search.search_web
 research-library.read_document
 research-library.apply_evidence_enrichment
 scholarly-research.lookup_papers
 scholarly-research.fetch_full_text
 scholarly-research.extract_numeric_parameters
 civilization-bounds.reflect_system_bounds
-theory-badge-graph.reflect_discussion_context
+helix_ask.reflect_theory_context
 theory-badge-graph.propose_frontier_conjectures
+theory-formal-verifier.prepare_request
 theory-formal-verifier.plan
 theory-formal-verifier.start
 theory-formal-verifier.read_result
+theory-runtime-canary.inspect
+theory-runtime-canary.plan
+theory-runtime-canary.start
+theory-runtime-canary.read_result
+theory-artifact-producer.prepare_lanyon_request
+theory-artifact-producer.admit_lanyon_snapshot
+theory-semantic-admitter.normalize
+theory-independent-numerical-verifier.prepare_request
+theory-independent-numerical-verifier.plan
+theory-independent-numerical-verifier.start
+theory-independent-numerical-verifier.read_result
+theory-experiment-procedure.prepare
+theory-experiment-procedure.readmit
+theory-experiment-procedure.evaluate_closure
 moral-graph.reflect_context
 moral-graph.reflect_living_substrate_context
 text_to_speech.speak_text
@@ -185,7 +200,30 @@ live_env.test_micro_reasoner_prompt
 live_env.query_visual_observer_profiles
 live_env.test_visual_observer_profile
 live_env.compare_visual_observer_profiles
+room.evidence.read_bound
+situation-room.describe_visual_capture
+room.list
+room.inspect
+room.create
+room.source.list
+room.source.create
 ```
+
+The Shared Live Room entries use the same provider-neutral gateway but are not
+Agent API solver-continuation tools. `room.create` and `room.source.create`
+remain affirmative, confirmed, idempotent control actions. The Agent API
+`database_scope` admits only the separate read-only bound-room evidence
+capability.
+
+| Capability                 | Required args                | Observation or receipt                                      | Boundary                                                                                                                                                     |
+| -------------------------- | ---------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `room.evidence.read_bound` | none                         | `helix.shared_live_room.bound_room_evidence_observation.v1` | Read-only Agent-continuation capability; exact run-room binding, current role/consent, source provenance, freshness, and current-turn re-entry are required. |
+| `situation-room.describe_visual_capture` | `thread_id`, `prompt` | `helix.visual_situation_observation.v1` | Read-only bounded SituationRun evidence; execution failure remains an admitted observation, and successful evidence must re-enter the runtime before synthesis. |
+| `room.list`                | none                         | `helix.shared_live_room.list_receipt.v1`                    | Server-authenticated account policy filters the list.                                                                                                        |
+| `room.inspect`             | `room_id`                    | `helix.shared_live_room.inspect_receipt.v1`                 | Current membership is rechecked; the receipt is nonterminal.                                                                                                 |
+| `room.create`              | `idempotency_key`            | `helix.shared_live_room.create_receipt.v1`                  | Confirmed mutation through the shared lifecycle service.                                                                                                     |
+| `room.source.list`         | `room_id`                    | `helix.shared_live_room.source_list_receipt.v1`             | Developer-owner read; no bearer or raw source payload.                                                                                                       |
+| `room.source.create`       | `room_id`, `idempotency_key` | `helix.shared_live_room.source_create_receipt.v1`           | Confirmed observation-only binding; returns only a short-lived owner-bound delivery handle.                                                                  |
 
 ## Shared Capability Lanes
 
@@ -215,9 +253,11 @@ They do not grant source admission by lexical mention: quoted, negated,
 historical, future, or screen-visible "inspect" wording must not execute the
 lane. Region/frame output is visual evidence for the next model step, not a
 terminal answer, and must remain behind evidence re-entry plus Helix terminal
-authority. The older `image_lens.inspect` explicit capability remains a
-non-runner alias candidate until an explicit alias-to-lane admission contract is
-added.
+authority. The older `image_lens.inspect` capability is now an explicit
+provider-shared alias to the bounded
+`situation-room.describe_visual_capture` gateway. The alias grants no lexical
+execution authority; hard visual source admission must already exist, and the
+gateway observation must re-enter the runtime before terminal synthesis.
 
 The shared gateway capabilities above are bounded gateway observations/receipts
 with no assistant answer authority and no raw content inclusion:
@@ -288,37 +328,52 @@ required args and input schemas. The provider contract must name every shared
 observation or receipt schema so catalog review can tell which lifecycle shape a
 capability uses:
 
-| Schema | Used for |
-| --- | --- |
-| `helix.workspace_os_status_observation.v1` | Workspace/runtime status observations. |
-| `helix.workstation_active_context_observation.v1` | Active workstation focus/context observations. |
-| `helix.theory_badge_graph_current_context_observation.v1` | Bounded current Theory Badge Graph selection, trace, branch possibilities, boundary, and semantic lens observations. |
-| `helix.workstation_notes_list_observation.v1` | Body-redacted Workstation Notes index observations. |
-| `helix.calculator_solve_observation.v1` | Calculator solve observations. |
-| `helix.calculator_scalar_solve_observation.v1` | Scalar calculator solve observations. |
-| `helix.calculator_expression_classification_observation.v1` | Calculator expression classification observations. |
-| `helix.calculator_variable_binding_observation.v1` | Calculator variable-binding observations. |
-| `helix.calculator_active_context_observation.v1` | Active calculator expression/result context observations. |
-| `helix.workstation_readable_surface_observation.v1` | Registered readable workstation surface observations for docs, translations, calculator results, and future safe surfaces. |
-| `helix.workstation_ui_action_receipt.v1` | Host-side panel/open/focus/autofill projection receipts. |
-| `helix.repo_search_observation.v1` | Repository search observations. |
-| `helix.docs_search_observation.v1` | Documentation search observations. |
-| `helix.internet_search_observation.v1` | Internet search observations. |
-| `helix.scholarly_research_observation.v1` | Scholarly paper lookup observations. |
-| `helix.scholarly_full_text_observation.v1` | Scholarly full-text observations with bounded chunks. |
-| `helix.research_library_observation.v1` | Profile-scoped bounded page evidence read from an encrypted saved research extraction without network retrieval. |
-| `helix.paper_evidence_enrichment_observation.v1` | Profile-scoped result of validating and revisioning an agent-authored paper-evidence proposal; observation-only and never exact-equation authority. |
-| `helix.scholarly_numeric_parameter_observation.v1` | Scholarly numeric parameter observations with cited values and units. |
-| `helix.civilization_bounds_reflection_observation.v1` | Civilization-bounds reflection observations. |
-| `helix.theory_context_reflection_observation.v1` | Theory badge graph reflection observations. |
-| `helix.moral_graph_reflection_observation.v1` | Moral Graph context reflection observations. |
-| `helix.moral_living_substrate_reflection_observation.v1` | Moral Graph living-substrate reflection observations. |
-| `helix.theory_frontier_conjecture_observation.v1` | Theory badge graph frontier conjecture workbench observations. |
-| `casimir.theory_formal_verifier.plan_observation.v1` | Developer-only sealed-input preflight observations; no Lean execution. |
-| `casimir.theory_formal_verifier.start_observation.v1` | Confirmation-gated formal replay job receipts. |
-| `casimir.theory_formal_verifier.result_observation.v1` | Developer-scoped replay status and evidence-only formal certificates. |
-| `helix.interim_voice_callout_tool_result.v1` | Voice/narrator request receipts and host playback projections. |
-| `helix.live_environment_tool_observation.v1` | Graduated live-environment read/dry-run observations. |
+| Schema                                                                          | Used for                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `helix.workspace_os_status_observation.v1`                                      | Workspace/runtime status observations.                                                                                                                                                                                                                                                            |
+| `helix.workstation_active_context_observation.v1`                               | Active workstation focus/context observations.                                                                                                                                                                                                                                                    |
+| `helix.theory_badge_graph_current_context_observation.v1`                       | Bounded current Theory Badge Graph selection, trace, branch possibilities, boundary, and semantic lens observations.                                                                                                                                                                              |
+| `helix.workstation_notes_list_observation.v1`                                   | Body-redacted Workstation Notes index observations.                                                                                                                                                                                                                                               |
+| `helix.calculator_solve_observation.v1`                                         | Calculator solve observations.                                                                                                                                                                                                                                                                    |
+| `helix.calculator_scalar_solve_observation.v1`                                  | Scalar calculator solve observations.                                                                                                                                                                                                                                                             |
+| `helix.calculator_expression_classification_observation.v1`                     | Calculator expression classification observations.                                                                                                                                                                                                                                                |
+| `helix.calculator_variable_binding_observation.v1`                              | Calculator variable-binding observations.                                                                                                                                                                                                                                                         |
+| `helix.calculator_active_context_observation.v1`                                | Active calculator expression/result context observations.                                                                                                                                                                                                                                         |
+| `helix.workstation_readable_surface_observation.v1`                             | Registered readable workstation surface observations for docs, translations, calculator results, and future safe surfaces.                                                                                                                                                                        |
+| `helix.workstation_ui_action_receipt.v1`                                        | Host-side panel/open/focus/autofill projection receipts.                                                                                                                                                                                                                                          |
+| `helix.repo_search_observation.v1`                                              | Repository search observations.                                                                                                                                                                                                                                                                   |
+| `helix.docs_search_observation.v1`                                              | Documentation search observations.                                                                                                                                                                                                                                                                |
+| `helix.internet_search_observation.v1`                                          | Internet search observations.                                                                                                                                                                                                                                                                     |
+| `helix.scholarly_research_observation.v1`                                       | Scholarly paper lookup observations.                                                                                                                                                                                                                                                              |
+| `helix.scholarly_full_text_observation.v1`                                      | Scholarly full-text observations with bounded chunks.                                                                                                                                                                                                                                             |
+| `helix.research_library_observation.v1`                                         | Profile-scoped bounded page evidence read from an encrypted saved research extraction without network retrieval.                                                                                                                                                                                  |
+| `helix.paper_evidence_enrichment_observation.v1`                                | Profile-scoped result of validating and revisioning an agent-authored paper-evidence proposal; observation-only and never exact-equation authority.                                                                                                                                               |
+| `helix.scholarly_numeric_parameter_observation.v1`                              | Scholarly numeric parameter observations with cited values and units.                                                                                                                                                                                                                             |
+| `helix.civilization_bounds_reflection_observation.v1`                           | Civilization-bounds reflection observations.                                                                                                                                                                                                                                                      |
+| `helix.theory_context_reflection_observation.v1`                                | Theory badge graph reflection observations.                                                                                                                                                                                                                                                       |
+| `helix.moral_graph_reflection_observation.v1`                                   | Moral Graph context reflection observations.                                                                                                                                                                                                                                                      |
+| `helix.moral_living_substrate_reflection_observation.v1`                        | Moral Graph living-substrate reflection observations.                                                                                                                                                                                                                                             |
+| `helix.theory_frontier_conjecture_observation.v1`                               | Theory badge graph frontier conjecture workbench observations.                                                                                                                                                                                                                                    |
+| `casimir.theory_formal_verifier.preparation_observation.v1`                     | Developer-only, server-catalog-bound formal preparation receipt; no Lean execution and no caller-authored theorem/environment authority.                                                                                                                                                          |
+| `casimir.theory_formal_verifier.plan_observation.v1`                            | Developer-only sealed-input preflight observations; no Lean execution.                                                                                                                                                                                                                            |
+| `casimir.theory_formal_verifier.start_observation.v1`                           | Confirmation-gated formal replay job receipts.                                                                                                                                                                                                                                                    |
+| `casimir.theory_formal_verifier.result_observation.v1`                          | Developer-scoped replay status and evidence-only formal certificates.                                                                                                                                                                                                                             |
+| `casimir.formal_runtime_canary.inspection_observation.v1`                       | Developer-only readiness inspection for the exact no-import Lean runtime self-test; no execution or scientific authority.                                                                                                                                                                         |
+| `casimir.formal_runtime_canary.plan_observation.v1`                             | Developer-only hash-bound preflight for the exact self-test; no execution and no approval issuance.                                                                                                                                                                                               |
+| `casimir.formal_runtime_canary.start_observation.v1`                            | Confirmation-gated, developer-scoped receipt for starting only the pinned self-test.                                                                                                                                                                                                              |
+| `casimir.formal_runtime_canary.result_observation.v1`                           | Developer-scoped running, failure, or completion evidence for the self-test; non-scientific, closure-ineligible, and nonterminal.                                                                                                                                                                 |
+| `casimir.theory_independent_numerical_verifier.prepared_request_observation.v1` | Developer-only resolution of an opaque server-owned numerical execution catalog entry; no caller-authored policy or path authority and no execution.                                                                                                                                              |
+| `casimir.theory_independent_numerical_verifier.plan_observation.v1`             | Developer-only sealed numerical preflight observations; no harness execution.                                                                                                                                                                                                                     |
+| `casimir.theory_independent_numerical_verifier.start_observation.v1`            | Confirmation-gated independent numerical replay job receipts.                                                                                                                                                                                                                                     |
+| `casimir.theory_independent_numerical_verifier.result_observation.v1`           | Developer-scoped replay status and bounded numerical certificates.                                                                                                                                                                                                                                |
+| `casimir.theory_artifact_producer.lanyon_request_observation.v1`                | Developer-only preparation of a hash-bound generation request from exact current-turn procedure and semantic evidence; provider normalization emits one exact, non-automatic `admit_lanyon_snapshot` affordance bound to that normalized artifact. It reads no source bytes and executes nothing. |
+| `casimir.theory_artifact_producer.lanyon_admission_observation.v1`              | Developer-only read-only admission of the exact pinned Lanyon source snapshot and its non-terminal generation receipt.                                                                                                                                                                            |
+| `casimir.theory_semantic_admitter.observation.v1`                               | Developer-only deterministic source normalization plus canonical claim IR and snapshot-bound, non-terminal semantic-admission evidence.                                                                                                                                                           |
+| `casimir.theory_experiment_procedure.observation.v1`                            | Developer-only seven-stage procedure preparation or exact owner/session-bound readmission with current-turn evidence bindings, dependency ordering, scale checkpoints, and bounded downstream affordances.                                                                                        |
+| `casimir.theory_experiment_execution_closure.observation.v1`                    | Developer-only, read-only evidence-coverage evaluation and claim-bounded candidate ranking; not a scientific conclusion or terminal answer.                                                                                                                                                       |
+| `helix.theory_run_context_observation.v1`                                       | Bounded selected runtime-result context for current-turn explanation; it remains evidence for synthesis rather than an answer.                                                                                                                                                                    |
+| `helix.interim_voice_callout_tool_result.v1`                                    | Voice/narrator request receipts and host playback projections.                                                                                                                                                                                                                                    |
+| `helix.live_environment_tool_observation.v1`                                    | Graduated live-environment read/dry-run observations.                                                                                                                                                                                                                                             |
 
 ## Shared Gateway Required Args
 
@@ -326,35 +381,77 @@ The shared gateway manifest owns exact JSON schemas. This table names the
 required args that provider agents must supply for currently shared
 capabilities with non-empty `input_schema.required`:
 
-| Capability | Required args |
-| --- | --- |
-| `scientific-calculator.solve_expression` | `expression` |
-| `scientific-calculator.solve_scalar_expression` | `expression` |
-| `scientific-calculator.classify_expression` | `expression` |
-| `scientific-calculator.bind_variables` | `expression`, `numeric_evidence` |
-| `scientific-calculator.show_gateway_solve` | `expression`, `result` |
-| `scientific-calculator.prefill_expression` | `expression` |
-| `workstation.open_panel` | `panel_id` |
-| `workstation.focus_panel` | `panel_id` |
-| `account_session.set_interface_language` | `language` |
-| `docs-viewer.open_doc` | `path` |
-| `theory-badge-graph.current_context` | `current_context` |
-| `moral-graph.reflect_living_substrate_context` | `prompt` |
-| `repo.search` | `query` |
-| `docs.search` | `query` |
-| `internet-search.search_web` | `query` |
-| `research-library.apply_evidence_enrichment` | `document_id`, `proposal` |
-| `scholarly-research.lookup_papers` | `query` |
-| `civilization-bounds.reflect_system_bounds` | `prompt` |
-| `theory-badge-graph.reflect_discussion_context` | `prompt` |
-| `theory-badge-graph.propose_frontier_conjectures` | `prompt` |
-| `theory-formal-verifier.plan` | `request`, `policy`, `theorem_source_path`, `import_source_paths` |
-| `theory-formal-verifier.start` | `request`, `policy`, `theorem_source_path`, `import_source_paths`, `plan_id` |
-| `theory-formal-verifier.read_result` | `job_id` |
-| `moral-graph.reflect_context` | `prompt` |
-| `text_to_speech.speak_text` | `text` |
-| `live_env.request_interim_voice_callout` | `text` |
-| `live_env.narrator_say` | `text` |
+| Capability                                              | Required args                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scientific-calculator.solve_expression`                | `expression`                                                                                                                                                                                                                                                              |
+| `scientific-calculator.solve_scalar_expression`         | `expression`                                                                                                                                                                                                                                                              |
+| `scientific-calculator.classify_expression`             | `expression`                                                                                                                                                                                                                                                              |
+| `scientific-calculator.bind_variables`                  | `expression`, `numeric_evidence`                                                                                                                                                                                                                                          |
+| `scientific-calculator.show_gateway_solve`              | `expression`, `result`                                                                                                                                                                                                                                                    |
+| `scientific-calculator.prefill_expression`              | `expression`                                                                                                                                                                                                                                                              |
+| `workstation.open_panel`                                | `panel_id`                                                                                                                                                                                                                                                                |
+| `workstation.focus_panel`                               | `panel_id`                                                                                                                                                                                                                                                                |
+| `account_session.set_interface_language`                | `language`                                                                                                                                                                                                                                                                |
+| `docs-viewer.open_doc`                                  | `path`                                                                                                                                                                                                                                                                    |
+| `theory-badge-graph.current_context`                    | `current_context`                                                                                                                                                                                                                                                         |
+| `moral-graph.reflect_living_substrate_context`          | `prompt`                                                                                                                                                                                                                                                                  |
+| `repo.search`                                           | `query`                                                                                                                                                                                                                                                                   |
+| `docs.search`                                           | `query`                                                                                                                                                                                                                                                                   |
+| `internet-search.search_web`                            | `query`                                                                                                                                                                                                                                                                   |
+| `research-library.apply_evidence_enrichment`            | `document_id`, `proposal`                                                                                                                                                                                                                                                 |
+| `scholarly-research.lookup_papers`                      | `query`                                                                                                                                                                                                                                                                   |
+| `civilization-bounds.reflect_system_bounds`             | `prompt`                                                                                                                                                                                                                                                                  |
+| `helix_ask.reflect_theory_context`                      | `prompt`                                                                                                                                                                                                                                                                  |
+| `theory-experiment-procedure.prepare`                   | `prompt`, `operation`, `target`, `selected_badge_ids`                                                                                                                                                                                                                     |
+| `theory-experiment-procedure.readmit`                   | `procedure_artifact_ref`, `procedure_id`, `procedure_sha256`                                                                                                                                                                                                              |
+| `theory-experiment-procedure.evaluate_closure`          | `prompt`, `procedure_id`, `procedure_sha256`                                                                                                                                                                                                                              |
+| `theory-badge-graph.propose_frontier_conjectures`       | `prompt`                                                                                                                                                                                                                                                                  |
+| `theory-formal-verifier.prepare_request`                | `procedure_artifact_ref`, `procedure_id`, `procedure_sha256`; optional selectors remain non-authoritative, and the current production catalog permits blocked preparation only                                                                                            |
+| `theory-formal-verifier.plan`                           | `prepared_request_id`                                                                                                                                                                                                                                                     |
+| `theory-formal-verifier.start`                          | `prepared_request_id`, `plan_id`                                                                                                                                                                                                                                          |
+| `theory-formal-verifier.read_result`                    | `job_id`                                                                                                                                                                                                                                                                  |
+| `theory-runtime-canary.start`                           | `plan_id`; trusted single-use runtime approval is supplied through the gateway control envelope, not caller-authored tool args                                                                                                                                            |
+| `theory-runtime-canary.read_result`                     | `job_id`; optional `poll_attempt` only drives bounded polling affordance identity                                                                                                                                                                                         |
+| `theory-semantic-admitter.normalize`                    | `source_evidence_ref`, `source_packet`, `source_path`, `receipt_id`; the exact packet must be admitted from current-turn evidence, while catalog, registered-identity, and graph snapshots remain server-owned                                                            |
+| `theory-artifact-producer.prepare_lanyon_request`       | `procedure_artifact_ref`, `procedure_id`, `procedure_sha256`, `semantic_admission_artifact_ref`, `case_id`; optional `claim_id` disambiguates multi-claim packets                                                                                                         |
+| `theory-artifact-producer.admit_lanyon_snapshot`        | `request_artifact_ref`, `case_id`; the request must be the exact current-turn preparation artifact, and the source root remains exclusively server-owned                                                                                                                  |
+| `theory-independent-numerical-verifier.prepare_request` | `catalog_entry_id`, `procedure_id`, `procedure_sha256`; the exact procedure must be admitted from current-turn evidence and match the trusted server enrollment, which owns request, policy, generation evidence, sandbox identity, and all source/build/executable paths |
+| `theory-independent-numerical-verifier.plan`            | `prepared_request_id`; owner-bound opaque id returned by `prepare_request`                                                                                                                                                                                                |
+| `theory-independent-numerical-verifier.start`           | `plan_id`; runtime confirmation required and the exact sealed packet is retrieved server-side                                                                                                                                                                             |
+| `theory-independent-numerical-verifier.read_result`     | `job_id`                                                                                                                                                                                                                                                                  |
+| `scientific-calculator.read_visible_theory_run_result`  | `request_id`, `receipt_id`                                                                                                                                                                                                                                                |
+| `moral-graph.reflect_context`                           | `prompt`                                                                                                                                                                                                                                                                  |
+| `text_to_speech.speak_text`                             | `text`                                                                                                                                                                                                                                                                    |
+| `live_env.request_interim_voice_callout`                | `text`                                                                                                                                                                                                                                                                    |
+| `live_env.narrator_say`                                 | `text`                                                                                                                                                                                                                                                                    |
+
+## Theory Procedure Readmission Boundary
+
+`theory-experiment-procedure.readmit` is a developer-only, read-only
+continuation capability. It accepts only the exact
+`procedure_artifact_ref`/`procedure_id`/`procedure_sha256` triple from a
+previously prepared procedure. The reference must be byte-for-byte equal to
+the exact observation reference issued and retained by the preparation
+gateway. A merely shape-valid or same-origin sibling reference, an alias, or a
+reference from another origin turn fails closed.
+
+The retained procedure is keyed to the exact account type, developer profile,
+and session that prepared it. Retention is process-local for 24 hours, is
+bounded to 256 entries, and does not survive a server restart or transfer to
+another process. An expired, evicted, cross-owner, or unavailable entry returns
+`retained_procedure_not_found`; it is never reconstructed from caller-authored
+arguments.
+
+Preparation without both a nonempty profile and session may still support
+current-turn closure evaluation, but it is not retained or advertised for
+cross-turn readmission. A readmission call without that owner context fails as
+`procedure_owner_context_required`.
+
+Successful readmission emits a fresh
+`casimir.theory_experiment_procedure.observation.v1` for the current turn while
+preserving the original procedure id and SHA. The capability is non-mutating,
+requires no confirmation, and keeps `assistant_answer=false`,
+`terminal_eligible=false`, and `post_tool_model_step_required=true`.
 
 ## Workstation Notes Read Boundary
 
@@ -438,8 +535,6 @@ helix_ask.reflect_context_attachments
 helix_ask.reflect_ideology_context
 helix_ask.bridge_theory_ideology_context
 helix_ask.build_civilization_scenario_frame
-image_lens.inspect
-situation-room.describe_visual_capture
 docs-viewer.identify_current_doc
 docs-viewer.validate_doc_candidates
 ```

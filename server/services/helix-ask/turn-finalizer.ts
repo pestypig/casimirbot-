@@ -749,6 +749,8 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
       terminal_text: presentedTerminalText,
       terminal_item_id: terminalItem.item_id,
       route: args.route,
+      terminal_eligible: true,
+      assistant_answer: false,
     });
     const poisonAudit = auditHelixAskContextForPoison({
       thread_id: args.threadId,
@@ -813,6 +815,7 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
         payload,
         turnId: args.turnId,
         threadId: args.threadId,
+        prompt: args.prompt,
         artifactLedger: finalizerTerminalSelectionArtifacts,
       });
     }
@@ -899,6 +902,7 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
         payload,
         turnId: args.turnId,
         threadId: args.threadId,
+        prompt: args.prompt,
         artifactLedger: finalizerTerminalSelectionArtifacts,
       });
     }
@@ -1036,6 +1040,7 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
     const terminalEnvelope = resolveTerminalAnswerEnvelope(payload, {
       threadId: args.threadId,
       turnId: args.turnId,
+      prompt: args.prompt,
     });
     applyTerminalAnswerEnvelope(payload, terminalEnvelope);
     payload.loop_parity_trace = buildLoopParityTrace({
@@ -1186,6 +1191,8 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
           terminal_artifact_kind: "doc_concept_explanation",
           terminal_text: repairedText,
           route: readAskTurnString(payload.route_reason_code) ?? readAskTurnString(payload.route) ?? args.route,
+          terminal_eligible: true,
+          assistant_answer: false,
         });
       } else if (conceptArtifact && conceptText.trim() && !responseBoundaryCanPromoteDocConceptExplanation) {
         payload.response_boundary_doc_concept_projection_suppressed = true;
@@ -1249,6 +1256,8 @@ export const createHelixAskTurnFinalizer = (dependencies: HelixAskTurnFinalizerD
         terminal_artifact_kind: "workstation_tool_evaluation",
         terminal_text: calculatorCompoundDraftText,
         route: "calculator_solve / calculator_compound_chain",
+        terminal_eligible: true,
+        assistant_answer: false,
       });
       if (payload.terminal_presentation && typeof payload.terminal_presentation === "object") {
         const presentation = payload.terminal_presentation as Record<string, unknown>;

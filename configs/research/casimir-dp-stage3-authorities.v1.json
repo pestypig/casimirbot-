@@ -1,0 +1,77 @@
+{
+  "schema_version": "casimir_dp_stage3_authorities/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-evidence-map-stage3-v1",
+  "frozen_at": "2026-07-25T00:00:00.000Z",
+  "claim_ceiling": "diagnostic",
+  "stage2_authority": {
+    "run_id": "casimir-dp-or-phase-stage2-v1-20260723T220236Z",
+    "config": {
+      "path": "configs/research/casimir-dp-or-phase-stage2.v1.json",
+      "sha256": "b517e8fbf002303258a5269e7f37c6b16d4bc3c45c609072bdb2a9e5184e596d",
+      "tracked": true
+    },
+    "maintained_report": {
+      "path": "docs/research/casimir-dp-or-phase-stage2-report.md",
+      "sha256": "179e2e1674ca611e6977259c7b154b6e0d8450ef6d969c1ca3b4482e19cc2746",
+      "tracked": true
+    },
+    "immutable_report": {
+      "path": "artifacts/research/casimir-dp-or-phase-stage2/casimir-dp-or-phase-stage2-v1-20260723T220236Z/or-phase-stage2-report.json",
+      "sha256": "6e1772306598ca37f3407f170d28c5252955747b82ef0610b71ff4c0f9ee7c0c",
+      "tracked": false
+    },
+    "immutable_receipt": {
+      "path": "artifacts/research/casimir-dp-or-phase-stage2/casimir-dp-or-phase-stage2-v1-20260723T220236Z/or-phase-stage2-receipt.json",
+      "sha256": "64f0e1c95307829540d3c01ad7cb7e10b15d510cb31cf8e73f88a8990d2c25ab",
+      "tracked": false,
+      "generated_at": "2026-07-23T22:02:36.903Z",
+      "report_json_sha256": "6e1772306598ca37f3407f170d28c5252955747b82ef0610b71ff4c0f9ee7c0c",
+      "report_markdown_sha256": "179e2e1674ca611e6977259c7b154b6e0d8450ef6d969c1ca3b4482e19cc2746"
+    },
+    "final_gates": {
+      "software_and_algebraic_diagnostics": "pass",
+      "measured_qed_phase_and_coherence": "not_ready",
+      "ordinary_decoherence_closure": "not_ready",
+      "collapse_identification": "blocked",
+      "manifold_dynamics": "blocked",
+      "publication_claim": "diagnostic_protocol_only"
+    },
+    "authority_rule": "The timestamped run is authoritative. The mutable artifacts/research/casimir-dp-or-phase-stage2/current alias is explicitly non-authoritative."
+  },
+  "proposal_authorities": [
+    {
+      "role": "experiment_proposal_baseline",
+      "path": "docs/research/casimir-dp-experiment-proposal.md",
+      "sha256": "712f0b58b7e2862e1ce2c103c0cbc45d8a9a2a4fee6889e179c5e4d22c63083b",
+      "tracked": true
+    },
+    {
+      "role": "proposal_closure_config",
+      "path": "configs/research/casimir-dp-proposal-closure.v1.json",
+      "sha256": "7b3b2673c95d4eebca060261385f3b0659365c1112c1d9d42bc1d8700686b8ba",
+      "tracked": true
+    },
+    {
+      "role": "proposal_closure_report",
+      "path": "docs/research/casimir-dp-proposal-closure-report.md",
+      "sha256": "5385a47b09877dbecd0fca2f508b1533b3a1a0aacd366d3231d361c746c159b1",
+      "tracked": true
+    }
+  ],
+  "data_readiness_authorities": [
+    {
+      "role": "data_readiness_config",
+      "path": "configs/research/casimir-dp-data-readiness.v1.json",
+      "sha256": "a95e7a22c20e29ed9c34f45ece90916748a9264a32be8315663819171b406475",
+      "tracked": true
+    },
+    {
+      "role": "data_readiness_report",
+      "path": "docs/research/casimir-dp-data-readiness-report.md",
+      "sha256": "3939b2b773c5227046c964325abd54ca21bb164b0f0cf0c6aca84dfbc0235b90",
+      "tracked": true
+    }
+  ],
+  "reproducibility_note": "The tracked config and maintained report reproduce the Stage-2 scientific authority. The original timestamped JSON report and receipt hashes are retained as immutable local provenance; Stage 3 must fail closed if those local artifacts are present but do not match."
+}

@@ -4,6 +4,7 @@ import {
   buildToolUseRestatement,
   detectInternetSearchIntent,
 } from "../internet-search-intent";
+import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
 
 describe("internet-search intent for Theory Badge Graph context", () => {
   it("does not turn current graph-state language into a web-freshness request", () => {
@@ -26,6 +27,43 @@ describe("internet-search intent for Theory Badge Graph context", () => {
       searchRequested: true,
       strength: "hard",
     });
+  });
+
+  it("treats current-turn evidence language as procedure lifecycle scope", () => {
+    const prompt =
+      "Re-prepare that same bounded procedure for study.casimir_dp.evidence_map_stage3 and advection_diffusion_full_1d so the evidence is current for this turn. Which semantic, boundary-condition, formal, numerical, and observable requirements are still missing? Do not start any downstream job.";
+    const restatement = buildToolUseRestatement(prompt);
+
+    expect(restatement.requiredToolFamilies).not.toContain("internet_search");
+    expect(restatement.freshnessRequired).toBe(false);
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
+    expect(arbitrateAskSourceTarget({
+      turnId: "ask:test:current-turn-procedure-evidence",
+      threadId: "thread:test",
+      promptText: prompt,
+    }).target_source).not.toBe("internet_search");
+  });
+
+  it("still admits an explicit current web request alongside procedure preparation", () => {
+    const prompt =
+      "Re-prepare that same bounded procedure for study.casimir_dp.evidence_map_stage3 and advection_diffusion_full_1d, then search the web for the current OpenAI API status.";
+    const restatement = buildToolUseRestatement(prompt);
+
+    expect(restatement.requiredToolFamilies).toContain("internet_search");
+    expect(restatement.freshnessRequired).toBe(true);
+    expect(detectInternetSearchIntent(prompt)).toMatchObject({
+      searchRequested: true,
+      strength: "hard",
+    });
+  });
+
+  it("keeps genuine current web facts on the internet-search path", () => {
+    const prompt = "What is the current OpenAI API status?";
+    const restatement = buildToolUseRestatement(prompt);
+
+    expect(restatement.requiredToolFamilies).toContain("internet_search");
+    expect(restatement.freshnessRequired).toBe(true);
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(true);
   });
 
   it("does not treat an unrelated current graph as Theory Badge Graph workspace state", () => {

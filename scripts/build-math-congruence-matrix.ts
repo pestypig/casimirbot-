@@ -58,6 +58,48 @@ const DEFAULT_BY_EQUATION: Record<string, Omit<MatrixRow, "id" | "root_id" | "eq
     residual: { metric: "semiclassical_backreaction_residual", comparator: "<=", threshold: "5.0e-3" },
     falsifier: { condition: "semiclassical_backreaction_residual > 5.0e-3", evidence: "renormalized_stress_energy_audit" },
   },
+  curvature_unit_proxy_contract: {
+    binding: {
+      operator: "equals",
+      lhs: "map_units(curvature_signal, scale_assumptions)",
+      rhs: "kappa_ref",
+    },
+    residual: {
+      metric: "curvature_unit_proxy_residual",
+      comparator: "<=",
+      threshold: "0.05",
+    },
+    falsifier: {
+      condition: "curvature_unit_proxy_residual > 0.05",
+      evidence: "curvature_unit_proxy_diagnostic_trace",
+      uncertainty_model:
+        "declared_mapping_scale_with_traceable_calibration_window",
+    },
+    provenance_class: "proxy",
+    claim_tier: "diagnostic",
+    uncertainty_model_id: "curvature_unit_proxy_uq_v1",
+  },
+  atomic_energy_to_energy_density_proxy: {
+    binding: {
+      operator: "equals",
+      lhs: "rho_atomic_proxy",
+      rhs: "E_atomic / V_proxy",
+    },
+    residual: {
+      metric: "atomic_energy_density_proxy_residual",
+      comparator: "<=",
+      threshold: "0.15",
+    },
+    falsifier: {
+      condition: "atomic_energy_density_proxy_residual > 0.15",
+      evidence: "atomic_energy_density_proxy_trace",
+      uncertainty_model:
+        "traceable_atomic_energy_and_declared_proxy_volume",
+    },
+    provenance_class: "proxy",
+    claim_tier: "diagnostic",
+    uncertainty_model_id: "atomic_energy_density_proxy_uq_v1",
+  },
   stress_energy_conservation: {
     binding: { operator: "equals", lhs: "nabla_mu T_mu_nu", rhs: "0" },
     residual: { metric: "covariant_divergence_norm", comparator: "<=", threshold: "1.0e-6" },
@@ -132,9 +174,7 @@ export function buildMathCongruenceMatrix(options?: { repoRoot?: string }): Math
         id: `${rootId}__${equationId}`,
         root_id: rootId,
         equation_id: equationId,
-        binding: defaults.binding,
-        residual: defaults.residual,
-        falsifier: defaults.falsifier,
+        ...defaults,
       });
     }
   }

@@ -17,6 +17,10 @@ import type { HelixAskSourceTarget } from "@shared/helix-ask-source-target-inten
 import type { HelixCausalTurnEvent } from "@shared/helix-causal-turn-timeline";
 import type { HelixTurnLifecycle } from "@shared/helix-turn-lifecycle";
 import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
+import {
   buildHelixAccountCapabilityPolicy,
   resolveHelixRuntimeAgentAccess,
   type HelixAccountType,
@@ -104,7 +108,14 @@ import {
   runExplicitWorkstationGatewayCalls,
 } from "../services/helix-ask/agent-providers/explicit-workstation-gateway";
 import { buildHelixProviderGatewayObservationPayload } from "../services/helix-ask/agent-providers/workstation-gateway-observation";
-import { listWorkstationGatewayCapabilities } from "../services/helix-ask/workstation-tool-gateway/registry";
+import {
+  callWorkstationGatewayCapability,
+  listWorkstationGatewayCapabilities,
+} from "../services/helix-ask/workstation-tool-gateway/registry";
+import {
+  HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY,
+  HELIX_BOUND_ROOM_EVIDENCE_OBSERVATION_SCHEMA,
+} from "../services/helix-ask/workstation-tool-gateway/bound-room-evidence";
 import { evaluateWorkstationToolPlan } from "../services/helix-ask/workstation-tool-result-evaluator";
 import { evaluateWorkstationToolReceipt } from "../services/helix-ask/workstation-tool-evaluator";
 import { runAskLevelTheoryContextReflectionTool } from "../services/helix-ask/theory-context-reflection-tool";
@@ -843,6 +854,10 @@ import {
   explicitCapabilityContractForCapability,
   extractExplicitCapabilityContract,
 } from "../services/helix-ask/explicit-capability-contract";
+import {
+  isAffirmativeTheoryExperimentProcedurePrompt,
+  THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+} from "../services/helix-ask/theory-experiment-procedure-intent";
 import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-itinerary";
 import { buildHelixCapabilityItineraryExecutionState } from "../services/helix-ask/capability-itinerary-execution";
 import { resolveCompoundCapabilitySynthesisReadiness } from "../services/helix-ask/compound-capability-synthesis";
@@ -889,6 +904,12 @@ import {
 } from "../services/helix-ask/turn-finalizer";
 import { resolveCurrentTurnProviderTerminalIdentity } from "../services/helix-ask/terminal-identity-precedence";
 import { buildCapabilityBindingMismatchObservation } from "../services/helix-ask/runtime-authority-contract";
+import {
+  assertCurrentHelixExternalExecutionActive,
+  assertHelixExternalExecutionActive,
+  currentHelixExternalCapabilityPolicy,
+  helixExternalPolicyAllowsCapability,
+} from "../services/helix-ask/runtime/external-capability-policy";
 import { assertNoLiveSourceSecondLoop } from "../services/helix-ask/live-source-second-loop-guard";
 import { presentTerminalArtifact } from "../services/helix-ask/universal-terminal-presenter";
 import { auditTerminalPresentationCoverage } from "../services/helix-ask/terminal-presentation-coverage-audit";
@@ -1892,6 +1913,36 @@ import type { HelixRuntimeToolCallV1 } from "@shared/helix-agent-step-observatio
 
 const HELIX_DOCS_SYNTHESIS_BRIDGE_VERSION = "e68.live_docs_synthesis_reentry_completion.v1";
 const HELIX_SERVER_BUILD_STARTED_AT_MS = Date.now();
+const HELIX_LEGACY_REPO_SEARCH_CAPABILITY = "repo.search";
+const HELIX_LEGACY_DOCS_SEARCH_CAPABILITY = "docs.search";
+
+const helixExternalPolicyAllowsLegacyReadCapability = (
+  capabilityId: string,
+): boolean => {
+  const policy = currentHelixExternalCapabilityPolicy();
+  return (
+    policy === null ||
+    helixExternalPolicyAllowsCapability(policy, capabilityId)
+  );
+};
+
+const runHelixPolicyAdmittedLegacyRepoSearch = async (
+  plan: Parameters<typeof runRepoSearch>[0],
+  runner: typeof runRepoSearch = runRepoSearch,
+): Promise<RepoSearchResult> => {
+  if (
+    !helixExternalPolicyAllowsLegacyReadCapability(
+      HELIX_LEGACY_REPO_SEARCH_CAPABILITY,
+    )
+  ) {
+    return {
+      hits: [],
+      truncated: false,
+      error: `external_agent_capability_not_admitted:${HELIX_LEGACY_REPO_SEARCH_CAPABILITY}`,
+    };
+  }
+  return runner(plan);
+};
 
 const readServerBuildCommit = (): string | null => {
   const fromEnv =
@@ -2011,6 +2062,97 @@ const validateWorldEventDevToken = (req: Request, res: Response): boolean => {
   });
   return false;
 };
+
+const rejectLegacyRoomSourceWorldEvents = (
+  events: Array<{ source_id?: string | null }>,
+  res: Response,
+): boolean => {
+  if (
+    !events.some((event) =>
+      isHelixRoomSourceIngressSourceId(event.source_id),
+    )
+  ) {
+    return false;
+  }
+  res.status(403).json({
+    ok: false,
+    error: HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+    message:
+      "Room-ingress source identities are accepted only through their bound first-party room ingress route.",
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  return true;
+};
+
+const hasReservedRoomSourceIdField = (
+  value: unknown,
+  sourceIdField = false,
+  seen = new Set<object>(),
+): boolean => {
+  if (typeof value === "string") {
+    return sourceIdField && isHelixRoomSourceIngressSourceId(value);
+  }
+  if (!value || typeof value !== "object") return false;
+  if (seen.has(value)) return false;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.some((entry) =>
+      hasReservedRoomSourceIdField(entry, sourceIdField, seen),
+    );
+  }
+  return Object.entries(value as Record<string, unknown>).some(
+    ([key, entry]) => {
+      const entryIsSourceIdField =
+        /(?:^|_)source_ids?$/.test(key) ||
+        /(?:^source|Source)Ids?$/.test(key);
+      return hasReservedRoomSourceIdField(
+        entry,
+        entryIsSourceIdField,
+        seen,
+      );
+    },
+  );
+};
+
+const hasReservedRoomSourcePathSegment = (pathValue: string): boolean =>
+  pathValue.split("/").some((segment) => {
+    if (!segment) return false;
+    try {
+      return isHelixRoomSourceIngressSourceId(
+        decodeURIComponent(segment),
+      );
+    } catch {
+      return false;
+    }
+  });
+
+// The generic Situation APIs must never mint, mutate, or query the protected
+// room-ingress namespace. Canonical service guards remain the authority; this
+// boundary supplies one consistent typed failure before route-specific parsing.
+planRouter.use("/situation", (req, res, next) => {
+  if (
+    !hasReservedRoomSourcePathSegment(req.path) &&
+    !hasReservedRoomSourceIdField(req.params) &&
+    !hasReservedRoomSourceIdField(req.query) &&
+    !hasReservedRoomSourceIdField(req.body)
+  ) {
+    next();
+    return;
+  }
+  res.status(403).json({
+    ok: false,
+    error: HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+    message:
+      "Room-ingress source identities are accepted only through their bound first-party room ingress route.",
+    content_role: "source_namespace_rejection_not_assistant_answer",
+    reentry_required: true,
+    answer_authority: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  });
+});
 
 const situationThreadBindingRequestSchema = z.object({
   room_id: z.string().trim().min(1),
@@ -2228,6 +2370,7 @@ planRouter.post("/situation/source-binding/attach-source-to-active-run", (req, r
       raw_content_included: false,
     });
   }
+  if (rejectLegacyRoomSourceWorldEvents([{ source_id: sourceId }], res)) return;
   const activeRun = requestedSituationRunId
     ? listLiveSituationRuns({ threadId, environmentId: requestedEnvironmentId ?? null, limit: 50 })
         .find((run) => run.situation_run_id === requestedSituationRunId) ?? null
@@ -2327,6 +2470,14 @@ planRouter.post("/situation/source-binding/:bindingId/replay-window", (req, res)
       raw_content_included: false,
     });
   }
+  if (
+    rejectLegacyRoomSourceWorldEvents(
+      [{ source_id: binding.source_id }],
+      res,
+    )
+  ) {
+    return;
+  }
   const maxEvents =
     typeof body.max_events === "number" && Number.isFinite(body.max_events)
       ? Math.max(1, Math.min(200, Math.trunc(body.max_events)))
@@ -2364,6 +2515,7 @@ planRouter.post("/situation/world-event/attach-source-to-thread", (req, res) => 
   const roomId = readRouteString(body.room_id);
   const sourceId = readRouteString(body.source_id);
   const worldId = readRouteString(body.world_id);
+  if (rejectLegacyRoomSourceWorldEvents([{ source_id: sourceId }], res)) return;
   const source = listWorldSourcesSeen().find((entry) =>
     (!roomId || entry.room_id === roomId) &&
     (!sourceId || entry.source_id === sourceId) &&
@@ -2787,6 +2939,19 @@ planRouter.post("/situation/live-continuation/start", (req, res) => {
   }
   const sourceIds = liveContinuationStringArray(body.source_ids ?? body.sourceIds);
   const singleSourceId = liveContinuationString(body.source_id ?? body.sourceId);
+  const requestedSourceIds = sourceIds.length
+    ? sourceIds
+    : singleSourceId
+      ? [singleSourceId]
+      : [];
+  if (
+    rejectLegacyRoomSourceWorldEvents(
+      requestedSourceIds.map((source_id) => ({ source_id })),
+      res,
+    )
+  ) {
+    return;
+  }
   const lanesEnabled = liveContinuationStringArray(body.lanes_enabled ?? body.lanesEnabled)
     .filter((lane): lane is LiveContinuationLane => LIVE_CONTINUATION_LANE_VALUES.has(lane as LiveContinuationLane));
   const job = upsertLiveContinuationJob({
@@ -2794,7 +2959,7 @@ planRouter.post("/situation/live-continuation/start", (req, res) => {
     room_id: roomId,
     environment_id: liveContinuationString(body.environment_id ?? body.environmentId),
     contract_id: liveContinuationString(body.contract_id ?? body.contractId),
-    source_ids: sourceIds.length ? sourceIds : singleSourceId ? [singleSourceId] : [],
+    source_ids: requestedSourceIds,
     objective,
     status: "active",
     voice_policy:
@@ -2996,14 +3161,14 @@ planRouter.post("/situation/live-continuation/source-health/query", (req, res) =
       contract_id: job?.contract_id ?? null,
       source_id: sourceId,
       source_kind: "minecraft_world_events",
-      transport: "cloudflarelink",
+      transport: "unknown",
       source_identity: {},
       freshness: {
-        status: job ? "connected" : "unknown",
-        last_seen_at: job?.updated_at ?? null,
+        status: "unknown",
+        last_seen_at: null,
         stale_after_ms: job?.cooldowns.min_tick_interval_ms ?? null,
       },
-      trust_level: job ? "admitted_live_source" : "unverified",
+      trust_level: "unverified",
       ...helixReceiptNotAnswerFlags,
       evidence_refs: job ? [`live_continuation_job:${job.job_id}`, `source:${sourceId}`] : [`source:${sourceId}:unknown`],
     },
@@ -6524,6 +6689,16 @@ planRouter.get("/situation/categorization-jobs/:jobId/receipts", (req, res) => {
 
 planRouter.post("/situation/event-window/query", (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const requestedSourceId =
+    typeof body.source_id === "string" ? body.source_id : null;
+  if (
+    rejectLegacyRoomSourceWorldEvents(
+      [{ source_id: requestedSourceId }],
+      res,
+    )
+  ) {
+    return;
+  }
   const result = queryEventWindow({
     thread_id: typeof body.thread_id === "string" ? body.thread_id : null,
     room_id: typeof body.room_id === "string" ? body.room_id : null,
@@ -7893,6 +8068,17 @@ planRouter.post("/situation/goal-session/start", (req, res) => {
       issues: parsed.error.issues,
     });
   }
+  if (
+    rejectLegacyRoomSourceWorldEvents(
+      [
+        { source_id: parsed.data.source_id ?? null },
+        ...parsed.data.source_ids.map((source_id) => ({ source_id })),
+      ],
+      res,
+    )
+  ) {
+    return;
+  }
   const result = startSituationGoalSessionFromRequest(parsed.data);
   return res.status(result.status).json(result.body);
 });
@@ -7905,6 +8091,17 @@ planRouter.post("/situation/goal-session", (req, res) => {
       error: "invalid_situation_goal_session",
       issues: parsed.error.issues,
     });
+  }
+  if (
+    rejectLegacyRoomSourceWorldEvents(
+      [
+        { source_id: parsed.data.source_id ?? null },
+        ...parsed.data.source_ids.map((source_id) => ({ source_id })),
+      ],
+      res,
+    )
+  ) {
+    return;
   }
   const result = startSituationGoalSessionFromRequest(parsed.data);
   return res.status(result.status).json(result.body);
@@ -8043,6 +8240,15 @@ planRouter.post("/situation/world-event", async (req, res) => {
       issues: parsed.error.issues,
     });
   }
+  if (
+    rejectLegacyRoomSourceWorldEvents(
+      [{ source_id: parsed.data.source_id ?? null }],
+      res,
+    )
+  ) {
+    return;
+  }
+  if (rejectLegacyRoomSourceWorldEvents([parsed.data], res)) return;
   const result = await ingestWorldEvent(parsed.data, {
     threadId:
       typeof req.query.thread_id === "string" && req.query.thread_id.trim()
@@ -8105,6 +8311,7 @@ planRouter.post("/situation/world-event/batch", async (req, res) => {
       issues: parsed.error.issues,
     });
   }
+  if (rejectLegacyRoomSourceWorldEvents(parsed.data.events, res)) return;
   const maxBatch = readWorldEventMaxBatch();
   if (parsed.data.events.length > maxBatch) {
     return res.status(400).json({
@@ -8132,6 +8339,7 @@ planRouter.post("/situation/world-event/replay", async (req, res) => {
       issues: parsed.error.issues,
     });
   }
+  if (rejectLegacyRoomSourceWorldEvents(parsed.data.events, res)) return;
   const maxBatch = readWorldEventMaxBatch();
   if (parsed.data.events.length > maxBatch) {
     return res.status(400).json({
@@ -17888,6 +18096,13 @@ function collectPathCandidatesForQuery(
   question: string,
   options?: { allowlist?: RegExp[]; avoidlist?: RegExp[]; topicProfile?: HelixAskTopicProfile | null },
 ): AskCandidate[] {
+  if (
+    !helixExternalPolicyAllowsLegacyReadCapability(
+      HELIX_LEGACY_REPO_SEARCH_CAPABILITY,
+    )
+  ) {
+    return [];
+  }
   const allowlist = options?.allowlist ?? [];
   const avoidlist = options?.avoidlist ?? [];
   const pathHints: Array<{ value: string; explicit: boolean }> = [];
@@ -17949,6 +18164,13 @@ function collectDocsGrepCandidates(
   question: string,
   options?: { allowlist?: RegExp[]; avoidlist?: RegExp[]; limit?: number },
 ): AskCandidate[] {
+  if (
+    !helixExternalPolicyAllowsLegacyReadCapability(
+      HELIX_LEGACY_DOCS_SEARCH_CAPABILITY,
+    )
+  ) {
+    return [];
+  }
   const allowlist = options?.allowlist ?? [];
   const avoidlist = options?.avoidlist ?? [];
   const tokens = new Set<string>();
@@ -18008,6 +18230,13 @@ async function collectSlotDocCandidates(args: {
   topicProfile?: HelixAskTopicProfile | null;
   limitPerSlot?: number;
 }): Promise<AskCandidate[]> {
+  if (
+    !helixExternalPolicyAllowsLegacyReadCapability(
+      HELIX_LEGACY_DOCS_SEARCH_CAPABILITY,
+    )
+  ) {
+    return [];
+  }
   if (!args.slotPlan || args.slotIds.length === 0) return [];
   const snapshot = await loadCodeLattice();
   if (!snapshot) return [];
@@ -19578,6 +19807,13 @@ async function collectGitTrackedCandidatesForQueries(
   stage05Cards?: Stage05EvidenceCard[];
   observations?: HelixEvidenceObservation[];
 }> {
+  if (
+    !helixExternalPolicyAllowsLegacyReadCapability(
+      HELIX_LEGACY_REPO_SEARCH_CAPABILITY,
+    )
+  ) {
+    return { candidates: [], queryHitCount: 0 };
+  }
   if (queries.length === 0) {
     return { candidates: [], queryHitCount: 0 };
   }
@@ -21013,6 +21249,13 @@ async function buildAskContextFromQueries(
   stage05?: Stage05Telemetry;
   stage05Cards?: Stage05EvidenceCard[];
 }> {
+  if (
+    !helixExternalPolicyAllowsLegacyReadCapability(
+      HELIX_LEGACY_REPO_SEARCH_CAPABILITY,
+    )
+  ) {
+    return { context: "", files: [] };
+  }
   const snapshot = await loadCodeLattice();
   if (!snapshot) return { context: "", files: [] };
   const laneQueries = queries
@@ -21867,6 +22110,13 @@ async function buildAmbiguityCandidateSnapshot(args: {
   seedTerms?: string[];
   topicProfile?: HelixAskTopicProfile | null;
 }): Promise<{ candidates: AskCandidate[]; queries: string[] }> {
+  if (
+    !helixExternalPolicyAllowsLegacyReadCapability(
+      HELIX_LEGACY_REPO_SEARCH_CAPABILITY,
+    )
+  ) {
+    return { candidates: [], queries: [] };
+  }
   const snapshot = await loadCodeLattice();
   if (!snapshot) return { candidates: [], queries: [] };
   const rawQueries = [
@@ -49538,6 +49788,13 @@ const sanitizeHelixRuntimeCalculatorArgs = (args: {
 };
 
 const buildHelixCapabilityInputSchema = (capability: Pick<HelixAvailableCapability, "capability_key" | "requires_action">): Record<string, unknown> => {
+  if (capability.capability_key === HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY) {
+    return {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    };
+  }
   const schema = (required: string[], properties: Record<string, unknown>): Record<string, unknown> => ({
     type: "object",
     required,
@@ -49624,6 +49881,142 @@ const buildHelixCapabilityInputSchema = (capability: Pick<HelixAvailableCapabili
         basisVersion: { type: "string", description: "Optional coordinate-basis version override." },
         scoringVersion: { type: "string", description: "Optional scoring version override." },
         searchSeed: { type: "string", description: "Optional deterministic replay seed." },
+      });
+    case "theory-experiment-procedure.prepare":
+      return schema(["prompt", "operation", "target", "selected_badge_ids"], {
+        prompt: { type: "string", minLength: 1, description: "Scientific comparison, prediction, derivation, explanation, proof, or bound request." },
+        operation: { type: "string", enum: ["compare", "predict", "derive", "explain", "prove", "bound"] },
+        target: { type: "string", minLength: 1, description: "Bounded scientific target for the seven-stage procedure." },
+        target_observable: { type: "string", description: "Optional observable the procedure should resolve." },
+        selected_badge_ids: { type: "array", minItems: 1, items: { type: "string" }, description: "Registered Theory Badge ids selected for the procedure." },
+        comparison_badge_ids: { type: "array", items: { type: "string" }, description: "Optional comparison-only Theory Badge ids." },
+        scale_min_log10_m: { type: "number" },
+        scale_max_log10_m: { type: "number" },
+        coordinate_frame: { type: "string" },
+        initial_boundary_conditions: { type: "array", items: { type: "string" } },
+        formal_system: { type: "string" },
+        requested_precision: { type: "string" },
+        evidence_maturity_ceiling: { type: "string", enum: ["exploratory", "reduced_order", "diagnostic", "certified"] },
+        evidence_artifacts: { type: "array", items: { type: "object" } },
+        lanyon_requested: { type: "boolean" },
+        lanyon_case_id: { type: "string" },
+        procedure_id: { type: "string" },
+        source_target_intent: { type: "object" },
+      });
+    case "theory-experiment-procedure.readmit":
+      return schema(["procedure_artifact_ref", "procedure_id", "procedure_sha256"], {
+        procedure_artifact_ref: { type: "string", minLength: 1, description: "Exact original retained procedure artifact reference issued by the gateway." },
+        procedure_id: { type: "string", minLength: 1, description: "Exact retained procedure identifier." },
+        procedure_sha256: { type: "string", pattern: "^[a-f0-9]{64}$", description: "Exact retained procedure content hash." },
+        source_target_intent: { type: "object" },
+      });
+    case "theory-experiment-procedure.evaluate_closure":
+      return schema(["prompt", "procedure_id", "procedure_sha256"], {
+        prompt: { type: "string", minLength: 1, description: "Closure question to evaluate against the exact bound procedure and current-turn evidence." },
+        procedure_artifact_ref: { type: "string", description: "Current-turn or explicitly readmitted procedure artifact reference." },
+        procedure_id: { type: "string", minLength: 1, description: "Exact procedure identifier." },
+        procedure_sha256: { type: "string", minLength: 64, description: "Exact procedure content hash." },
+        source_target_intent: { type: "object" },
+      });
+    case "theory-semantic-admitter.normalize":
+      return schema(["source_evidence_ref", "source_packet", "source_path", "receipt_id"], {
+        source_evidence_ref: { type: "string", minLength: 1, description: "Exact current-turn authoritative source packet artifact reference." },
+        source_packet: { type: "object", description: "Thin Casimir Spec source packet to normalize and admit." },
+        source_path: { type: "string", minLength: 1, description: "Exact source path represented by the packet." },
+        receipt_id: { type: "string", minLength: 1, description: "Current-turn source receipt identifier." },
+        source_target_intent: { type: "object" },
+      });
+    case "theory-artifact-producer.prepare_lanyon_request":
+      return schema(["procedure_artifact_ref", "procedure_id", "procedure_sha256", "semantic_admission_artifact_ref", "case_id"], {
+        procedure_artifact_ref: { type: "string", minLength: 1, description: "Exact current-turn Theory Experiment Procedure artifact reference." },
+        procedure_id: { type: "string", minLength: 1, description: "Exact Theory Experiment Procedure identifier." },
+        procedure_sha256: { type: "string", pattern: "^[a-f0-9]{64}$", description: "Exact Theory Experiment Procedure SHA-256." },
+        semantic_admission_artifact_ref: { type: "string", minLength: 1, description: "Exact current-turn semantic-admission artifact reference bound by the procedure." },
+        case_id: { type: "string", minLength: 1, description: "Registered pinned Lanyon case identifier selected by the procedure." },
+        claim_id: { type: "string", minLength: 1, description: "Optional exact admitted claim identifier; required when the semantic packet has multiple claims." },
+        source_target_intent: { type: "object" },
+      });
+    case "theory-artifact-producer.admit_lanyon_snapshot":
+      return schema(["request_artifact_ref", "case_id"], {
+        request_artifact_ref: { type: "string", minLength: 1, description: "Exact current-turn artifact reference produced by theory-artifact-producer.prepare_lanyon_request." },
+        case_id: { type: "string", minLength: 1, description: "Registered Lanyon case identifier." },
+        source_target_intent: { type: "object" },
+      });
+    case "theory-formal-verifier.prepare_request":
+      return schema(["procedure_artifact_ref", "procedure_id", "procedure_sha256"], {
+        procedure_artifact_ref: { type: "string", minLength: 1, description: "Current-turn authoritative theory experiment procedure artifact reference." },
+        procedure_id: { type: "string", minLength: 1, description: "Exact theory experiment procedure identifier." },
+        procedure_sha256: { type: "string", pattern: "^[a-f0-9]{64}$", description: "Exact theory experiment procedure SHA-256." },
+        semantic_admission_artifact_ref: { type: "string", minLength: 1, description: "Current-turn authoritative semantic-admission artifact reference." },
+        artifact_generation_artifact_ref: { type: "string", minLength: 1, description: "Current-turn authoritative formal-artifact producer reference." },
+        claim_id: { type: "string", minLength: 1, description: "Optional exact admitted claim selection." },
+        formal_artifact_id: { type: "string", minLength: 1, description: "Optional server-governed formal artifact selection." },
+        theorem_name: { type: "string", minLength: 1, description: "Optional theorem selection hint; it is not authority until registered." },
+        environment_policy_id: { type: "string", minLength: 1, description: "Optional server-governed Lean environment policy selection." },
+        source_target_intent: { type: "object" },
+      });
+    case "theory-formal-verifier.plan":
+      return schema(["prepared_request_id"], {
+        prepared_request_id: { type: "string", minLength: 1, description: "Opaque ready server-owned formal prepared-request identifier." },
+        source_target_intent: { type: "object" },
+      });
+    case "theory-formal-verifier.start":
+      return schema(["prepared_request_id", "plan_id"], {
+        prepared_request_id: { type: "string", minLength: 1, description: "Opaque ready server-owned formal prepared-request identifier used for preflight." },
+        plan_id: { type: "string", minLength: 1, description: "Exact formal preflight plan identifier." },
+        source_target_intent: { type: "object" },
+      });
+    case "theory-formal-verifier.read_result":
+      return schema(["job_id"], {
+        job_id: { type: "string", minLength: 1, description: "Developer-scoped formal replay job identifier." },
+        poll_attempt: { type: "integer", minimum: 0 },
+        source_target_intent: { type: "object" },
+      });
+    case "theory-independent-numerical-verifier.prepare_request":
+      return schema(
+        ["catalog_entry_id", "procedure_id", "procedure_sha256"],
+        {
+          catalog_entry_id: {
+            type: "string",
+            minLength: 1,
+            description:
+              "Opaque entry id resolved by the trusted server-owned numerical execution catalog.",
+          },
+          procedure_id: {
+            type: "string",
+            minLength: 1,
+            description:
+              "Exact theory experiment procedure identifier bound by the enrolled catalog entry.",
+          },
+          procedure_sha256: {
+            type: "string",
+            pattern: "^[a-f0-9]{64}$",
+            description:
+              "Exact theory experiment procedure hash bound by the enrolled catalog entry.",
+          },
+          source_target_intent: { type: "object" },
+        },
+      );
+    case "theory-independent-numerical-verifier.plan":
+      return schema(["prepared_request_id"], {
+        prepared_request_id: {
+          type: "string",
+          minLength: 1,
+          description:
+            "Opaque, owner-bound prepared request id issued by the server-owned numerical execution catalog rail.",
+        },
+        source_target_intent: { type: "object" },
+      });
+    case "theory-independent-numerical-verifier.start":
+      return schema(["plan_id"], {
+        plan_id: { type: "string", minLength: 1, description: "Exact independent numerical preflight plan identifier." },
+        source_target_intent: { type: "object" },
+      });
+    case "theory-independent-numerical-verifier.read_result":
+      return schema(["job_id"], {
+        job_id: { type: "string", minLength: 1, description: "Developer-scoped independent numerical replay job identifier." },
+        poll_attempt: { type: "integer", minimum: 0 },
+        source_target_intent: { type: "object" },
       });
     case "docs-viewer.open":
     case "scientific-calculator.open":
@@ -51316,7 +51709,9 @@ const buildHelixRuntimeToolCallFromDecision = (args: {
       args.decision.decision_id,
     ])}`,
     capability_key: capabilityKey,
-    args: capabilityKey === HELIX_WORKSPACE_OS_STATUS_CAPABILITY
+    args:
+      capabilityKey === HELIX_WORKSPACE_OS_STATUS_CAPABILITY ||
+      capabilityKey === HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY
       ? {}
       : { ...selectedArgsWithRuntimeRepairs },
     reason: args.decision.model_decision?.reason ?? args.decision.why_this_capability_satisfies_goal,
@@ -51387,6 +51782,9 @@ const helixRuntimeToolAdmissionFamiliesForCapability = (
   capabilityKey: string,
 ): HelixToolCallAdmissionFamily[] => {
   if (capabilityKey === "model.direct_answer") return ["model_only"];
+  if (capabilityKey === HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY) {
+    return ["live_environment"];
+  }
   if (capabilityKey === HELIX_WORKSPACE_OS_STATUS_CAPABILITY) return ["workspace_diagnostic"];
   if (capabilityKey === HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY) return ["workspace_directory"];
   if (capabilityKey === HELIX_INTERNET_SEARCH_CAPABILITY) return ["internet_search"];
@@ -51479,6 +51877,20 @@ const validateHelixRuntimeToolCall = (args: {
 }): { validation: HelixRuntimeToolCallValidation; capability: HelixAvailableCapability | null } => {
   const capability = args.availableCapabilities.capabilities.find((entry) => entry.capability_key === args.call.capability_key) ?? null;
   const errors: string[] = [];
+  const externalCapabilityPolicy =
+    currentHelixExternalCapabilityPolicy();
+  if (
+    externalCapabilityPolicy &&
+    args.call.capability_key !== "model.direct_answer" &&
+    !helixExternalPolicyAllowsCapability(
+      externalCapabilityPolicy,
+      args.call.capability_key,
+    )
+  ) {
+    errors.push(
+      `external_agent_capability_not_admitted:${args.call.capability_key}`,
+    );
+  }
   const toolAdmissionSuppressed = args.availableCapabilities.tool_admission_suppressed === true;
   const contextualSuppressionRecord =
     args.availableCapabilities.contextual_tool_suppression &&
@@ -53611,6 +54023,18 @@ const buildHelixAvailableCapabilitiesArtifact = (args: {
       goal_fit: "possible",
       reason: "Retrieves current-turn file-backed repo evidence for internal project concepts before the model synthesizes an answer.",
     },
+    ...(currentHelixExternalCapabilityPolicy()
+      ? [{
+          capability_key: HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY,
+          label: "Read fresh evidence from this run's bound room",
+          lane: "live" as const,
+          requires_action: true,
+          expected_artifacts: ["bound_room_evidence_observation"],
+          goal_fit: "possible" as const,
+          reason:
+            "Reads only the authenticated external run's exact active room binding and fresh, exact-provenance Minecraft observations; it cannot execute world commands and must re-enter reasoning before any answer.",
+        }]
+      : []),
     {
       capability_key: HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY,
       label: "Inspect Helix Ask capability catalog",
@@ -54660,7 +55084,7 @@ const buildHelixAvailableCapabilitiesArtifact = (args: {
       return forcedCapabilityKeys.has(capability.capability_key);
     }),
   ];
-  const catalog: HelixAvailableCapability[] = visibleBaseCatalog.map((capability) => {
+  const unscopedCatalog: HelixAvailableCapability[] = visibleBaseCatalog.map((capability) => {
     const goalFit: HelixAvailableCapability["goal_fit"] = forbiddenKeys.has(capability.capability_key)
       ? "forbidden"
       : primaryKeys.has(capability.capability_key)
@@ -54684,6 +55108,18 @@ const buildHelixAvailableCapabilitiesArtifact = (args: {
       model_visible_input_schema: modelVisibleInputSchema,
     };
   });
+  const externalCapabilityPolicy =
+    currentHelixExternalCapabilityPolicy();
+  const catalog = externalCapabilityPolicy
+    ? unscopedCatalog.filter(
+        (capability) =>
+          capability.capability_key === "model.direct_answer" ||
+          helixExternalPolicyAllowsCapability(
+            externalCapabilityPolicy,
+            capability.capability_key,
+          ),
+      )
+    : unscopedCatalog;
   const selectedActionCapability =
     selectedActionKey &&
     goalKind !== "repo_code_evidence_question" &&
@@ -54736,6 +55172,12 @@ const buildHelixAvailableCapabilitiesArtifact = (args: {
         }
       : {}),
   };
+};
+
+export const __testHelixExternalCapabilityMenuBoundary = {
+  buildHelixAvailableCapabilitiesArtifact,
+  helixExternalPolicyAllowsLegacyReadCapability,
+  runHelixPolicyAdmittedLegacyRepoSearch,
 };
 
 const buildHelixAgentStepDecisionArtifact = (args: {
@@ -61252,6 +61694,9 @@ const helixArtifactKindMatchesRuntimeCapability = (capability: string | null | u
   }
   if (capability === HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY) return artifact.kind === "workspace_directory_resolution";
   if (capability === HELIX_WORKSPACE_OS_STATUS_CAPABILITY) return artifact.kind === "workspace_os_status_observation";
+  if (capability === HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY) {
+    return artifact.kind === "bound_room_evidence_observation";
+  }
   if (capability === HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY || capability === HELIX_ASK_WORKSTATION_TOOL_ALIGNMENT_CAPABILITY) {
     return artifact.kind === "capability_registry";
   }
@@ -67194,6 +67639,280 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
       ) {
         loopIteration.stop_reason = "budget_extended";
       }
+      continue;
+    }
+    if (
+      runtimeToolCall &&
+      runtimeToolValidation?.valid &&
+      runtimeToolCall.capability_key ===
+        HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY
+    ) {
+      if (loop.executed_tool_call_count >= loop.max_tool_calls) {
+        if (
+          extendHelixRuntimeLoopBudgetIfProgressing(
+            "max_tool_calls_reached_with_missing_bound_room_evidence",
+          )
+        ) {
+          loopIteration.stop_reason = "budget_extended";
+        } else {
+          loop.stop_reason = "budget_exhausted";
+          loop.budget_exhaustion_reason = "max_tool_calls";
+          loopIteration.stop_reason = loop.stop_reason;
+          break;
+        }
+      }
+      const gatewayResult = await callWorkstationGatewayCapability({
+        capabilityId: HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY,
+        agentRuntime: "helix",
+        mode: "read",
+        turnId: args.turnId,
+        iteration,
+        arguments: {},
+      });
+      const evidenceArtifactKind = gatewayResult.ok
+        ? "bound_room_evidence_observation"
+        : "bound_room_evidence_error";
+      const evidenceArtifactRef =
+        gatewayResult.observation_packet.produced_artifact_refs[0] ??
+        `${runtimeToolCall.call_id}:${evidenceArtifactKind}`;
+      const evidenceArtifact: HelixTurnArtifact = {
+        artifact_id: evidenceArtifactRef,
+        turn_id: args.turnId,
+        producer_item_id: gatewayResult.observation_packet.call_id,
+        kind: evidenceArtifactKind,
+        created_at_ms: Date.now(),
+        source_scope: "current_turn",
+        goal_hash: hashDebugExportPayloadShort([
+          args.turnId,
+          HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY,
+          evidenceArtifactRef,
+        ]),
+        payload: {
+          ...(gatewayResult.observation as Record<string, unknown>),
+          source_gateway_admission: gatewayResult.gateway_admission,
+          provider_gateway_packet_refs:
+            gatewayResult.observation_packet.produced_artifact_refs,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      };
+      if (gatewayResult.ok) {
+        args.payload.bound_room_evidence_observation =
+          evidenceArtifact.payload;
+      } else {
+        args.payload.bound_room_evidence_failure = evidenceArtifact.payload;
+      }
+      const runtimeObservation: HelixRuntimeToolObservation = {
+        schema: "helix.runtime_tool_observation.v1",
+        turn_id: args.turnId,
+        call_id: runtimeToolCall.call_id,
+        capability_key: runtimeToolCall.capability_key,
+        status: gatewayResult.ok
+          ? "completed"
+          : gatewayResult.gateway_admission.admission_status === "blocked"
+            ? "blocked"
+            : "failed",
+        artifact_refs: [evidenceArtifact.artifact_id],
+        produced_artifacts: [
+          "runtime_tool_call",
+          "runtime_tool_call_validation",
+          evidenceArtifactKind,
+        ],
+        validation_ref:
+          `${runtimeToolCall.call_id}:runtime_tool_call_validation`,
+        repairable:
+          (gatewayResult.observation as Record<string, unknown>).retryable ===
+          true,
+        summary: gatewayResult.observation_packet.observation_summary,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      const runtimeObservationArtifact = buildHelixRuntimeToolCallArtifact({
+        turnId: args.turnId,
+        kind: "runtime_tool_observation",
+        producerItemId: "agent_runtime_bound_room_evidence_gateway",
+        payload: runtimeObservation,
+      });
+      const observationPacket = buildHelixAgentStepObservationPacket({
+        turnId: args.turnId,
+        iteration,
+        call: {
+          schema: "helix.runtime_tool_call.v1",
+          call_id: runtimeToolCall.call_id,
+          turn_id: args.turnId,
+          decision_id: decision.decision_id,
+          capability_key: runtimeToolCall.capability_key,
+          panel_id: "workstation-gateway",
+          action: "read_bound_room_evidence",
+          runtime_shape: "run_panel_action",
+          args: {},
+          validation: {
+            ok: runtimeToolValidation.valid,
+            violations: runtimeToolValidation.errors,
+          },
+          policy: {
+            mutating: false,
+            manual_only: false,
+            explicit_attachment_only: false,
+            confirmation_required: false,
+            terminal_eligible: false,
+          },
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        } satisfies HelixRuntimeToolCallV1,
+        result: {
+          ok: gatewayResult.ok,
+          status: gatewayResult.ok ? "succeeded" : "failed",
+          summary: runtimeObservation.summary,
+          produced_artifact_refs: [evidenceArtifact.artifact_id],
+          receipts: [{
+            receipt_ref: runtimeObservationArtifact.artifact_id,
+            kind: "runtime_tool_observation",
+            status: runtimeObservation.status,
+          }],
+        },
+      });
+      const observationPacketArtifact: HelixTurnArtifact = {
+        artifact_id:
+          `${runtimeToolCall.call_id}:agent_step_observation_packet`,
+        turn_id: args.turnId,
+        producer_item_id: "helix_tool_router",
+        kind: "agent_step_observation_packet",
+        created_at_ms: Date.now(),
+        source_scope: "current_turn",
+        goal_hash: hashDebugExportPayloadShort([
+          args.turnId,
+          "agent_step_observation_packet",
+          runtimeToolCall.call_id,
+        ]),
+        payload: observationPacket,
+      };
+      currentTurnArtifacts = mergeAskTurnLedgerArtifacts([
+        ...currentTurnArtifacts,
+        evidenceArtifact,
+        runtimeObservationArtifact,
+        observationPacketArtifact,
+      ]);
+      args.payload.current_turn_artifact_ledger = currentTurnArtifacts;
+      args.payload.agent_step_observation_packets = [
+        ...(Array.isArray(args.payload.agent_step_observation_packets)
+          ? args.payload.agent_step_observation_packets
+          : []),
+        observationPacket,
+      ];
+      loop.executed_tool_call_count += 1;
+      loopIteration.observation_role = "executed_tool_result";
+      loopIteration.executed_action_key = runtimeToolCall.capability_key;
+      loopIteration.produced_artifacts = [
+        "runtime_tool_call",
+        "runtime_tool_call_validation",
+        evidenceArtifactKind,
+        "runtime_tool_observation",
+        "agent_step_observation_packet",
+      ];
+      loopIteration.observed_artifact_refs = [
+        runtimeToolCall.call_id,
+        `${runtimeToolCall.call_id}:runtime_tool_call_validation`,
+        evidenceArtifact.artifact_id,
+        runtimeObservationArtifact.artifact_id,
+        observationPacketArtifact.artifact_id,
+      ];
+      satisfactionReport = evaluateTurnSatisfaction({
+        goalFrame: args.goalFrame,
+        canonicalGoalFrame: args.canonicalGoalFrame,
+        toolChoice: null,
+        currentTurnArtifacts,
+        workspaceState: args.workspaceSnapshot ?? null,
+        pendingServerRequest: null,
+      });
+      refreshed = refreshHelixGoalSatisfactionEvaluationArtifact({
+        turnId: args.turnId,
+        transcript: args.transcript,
+        canonicalGoalFrame: args.canonicalGoalFrame,
+        currentTurnArtifacts,
+        satisfactionReport,
+        selectedAction,
+      });
+      currentTurnArtifacts = refreshed.artifacts;
+      args.payload.current_turn_artifact_ledger = currentTurnArtifacts;
+      goalSatisfactionEvaluation = refreshed.evaluation;
+      applyInterimVoiceCalloutStatusGoalSatisfactionIfPresent();
+      loopIteration.satisfaction = goalSatisfactionEvaluation.satisfaction;
+      const satisfactionObservationResult =
+        appendHelixRuntimeGoalSatisfactionObservation({
+          payload: args.payload,
+          turnId: args.turnId,
+          iteration,
+          trigger: "runtime_tool_observation",
+          triggeringArtifactRefs: [
+            evidenceArtifact.artifact_id,
+            runtimeObservationArtifact.artifact_id,
+          ],
+          currentTurnArtifacts,
+          goalSatisfactionEvaluation,
+          satisfactionReport,
+          dependencies:
+            buildHelixRuntimeGoalSatisfactionObservationDependencies(),
+        });
+      currentTurnArtifacts = satisfactionObservationResult.artifacts;
+      args.payload.current_turn_artifact_ledger = currentTurnArtifacts;
+      loopIteration.satisfaction_observation_ref =
+        satisfactionObservationResult.observation.observation_id;
+      loopIteration.missing_requirement_ids =
+        satisfactionObservationResult.observation.missing_requirement_ids;
+      loopIteration.observed_artifact_refs = [
+        ...(loopIteration.observed_artifact_refs ?? []),
+        satisfactionObservationResult.observation.observation_id,
+      ];
+      loopIteration.produced_artifacts = [
+        ...loopIteration.produced_artifacts,
+        "runtime_goal_satisfaction_observation",
+      ];
+      const postToolReviewResult = await appendHelixPostToolObservationReview({
+        payload: args.payload,
+        turnId: args.turnId,
+        iteration,
+        transcript: args.transcript,
+        canonicalGoalFrame: args.canonicalGoalFrame,
+        runtimeToolCall,
+        toolObservation: runtimeObservation,
+        artifactsCreated: [
+          evidenceArtifact.artifact_id,
+          runtimeObservationArtifact.artifact_id,
+          observationPacketArtifact.artifact_id,
+          satisfactionObservationResult.observation.observation_id,
+        ],
+        goalSatisfactionEvaluation,
+        loop,
+        currentTurnArtifacts,
+      });
+      currentTurnArtifacts = postToolReviewResult.artifacts;
+      args.payload.current_turn_artifact_ledger = currentTurnArtifacts;
+      args.payload.post_tool_observation_reviews = [
+        ...(Array.isArray(args.payload.post_tool_observation_reviews)
+          ? args.payload.post_tool_observation_reviews
+          : []),
+        postToolReviewResult.review,
+      ];
+      loopIteration.observed_artifact_refs = [
+        ...(loopIteration.observed_artifact_refs ?? []),
+        postToolReviewResult.review.review_id,
+      ];
+      loopIteration.produced_artifacts = [
+        ...loopIteration.produced_artifacts,
+        "post_tool_observation_review",
+      ];
+      availableCapabilities = buildHelixAvailableCapabilitiesArtifact({
+        turnId: args.turnId,
+        transcript: args.transcript,
+        canonicalGoalFrame: args.canonicalGoalFrame,
+        selectedAction,
+        workspaceSnapshot: args.workspaceSnapshot ?? null,
+        artifacts: currentTurnArtifacts,
+      });
+      publishRuntimeAvailableCapabilities(availableCapabilities);
       continue;
     }
     if (
@@ -80056,6 +80775,7 @@ const runHelixAskLocalWithOverflowRetry = async (
   },
   options: HelixAskOverflowOptions = {},
 ): Promise<{ result: LocalAskResult; overflow?: HelixAskOverflowMeta; llm?: HelixAskLlmCallMeta }> => {
+  assertCurrentHelixExternalExecutionActive();
   const steps = parseOverflowPolicy(HELIX_ASK_OVERFLOW_RETRY_POLICY);
   const fallbackMaxTokens = Math.max(1, Math.floor(options.fallbackMaxTokens ?? 256));
   let prompt = applyDialogueProfilePrompt(
@@ -80090,6 +80810,7 @@ const runHelixAskLocalWithOverflowRetry = async (
   }
 
   while (true) {
+    assertCurrentHelixExternalExecutionActive();
     attempts += 1;
     const invokeStartedAtMs = Date.now();
     try {
@@ -80104,6 +80825,7 @@ const runHelixAskLocalWithOverflowRetry = async (
         },
         ctx,
       )) as LocalAskResult;
+      assertCurrentHelixExternalExecutionActive();
       const invokeEndedAtMs = Date.now();
       const promptTokens = estimateTokenCount(prompt);
       const overflow =
@@ -80123,6 +80845,7 @@ const runHelixAskLocalWithOverflowRetry = async (
       });
       return { result, overflow, llm };
     } catch (error) {
+      assertCurrentHelixExternalExecutionActive();
       const message = error instanceof Error ? error.message : String(error);
       const details = parseHelixAskLlmErrorDetails(error);
       const overflowError = HELIX_ASK_OVERFLOW_RETRY && OVERFLOW_ERROR_RE.test(message);
@@ -101251,6 +101974,8 @@ type HelixAskExecutionArgs = {
   tenantId?: string | null;
   responder: HelixAskResponder;
   streamChunk?: (chunk: string) => void;
+  signal?: AbortSignal;
+  deadlineAt?: string;
   skipReportMode?: boolean;
   reportContext?: {
     parentTraceId?: string;
@@ -102202,12 +102927,31 @@ const executeHelixAsk = async ({
   request,
   personaId,
   tenantId,
-  responder,
-  streamChunk,
+  responder: upstreamResponder,
+  streamChunk: upstreamStreamChunk,
+  signal,
+  deadlineAt,
   skipReportMode,
   reportContext,
 }: HelixAskExecutionArgs): Promise<void> => {
   // @ts-ignore TS2563: this route body currently exceeds TypeScript's control-flow-analysis size limit.
+  const assertExecutionActive = (): void => {
+    assertHelixExternalExecutionActive({ signal, deadlineAt });
+    assertCurrentHelixExternalExecutionActive();
+  };
+  assertExecutionActive();
+  const responder: HelixAskResponder = {
+    send: (status, payload) => {
+      assertExecutionActive();
+      upstreamResponder.send(status, payload);
+    },
+  };
+  const streamChunk = upstreamStreamChunk
+    ? (chunk: string): void => {
+        assertExecutionActive();
+        upstreamStreamChunk(chunk);
+      }
+    : undefined;
   const parsed = { data: request };
   const askRequestStartedAt = Date.now();
   const askSessionId = parsed.data.sessionId;
@@ -102411,6 +103155,7 @@ const executeHelixAsk = async ({
     detail?: string,
     meta?: Record<string, unknown>,
   ): number => {
+    assertExecutionActive();
     const startedAt = Date.now();
     logProgress(stage, "start", startedAt);
     logEvent(stage, "start", detail, undefined, true, meta);
@@ -102423,6 +103168,7 @@ const executeHelixAsk = async ({
     ok = true,
     meta?: Record<string, unknown>,
   ): void => {
+    assertExecutionActive();
     logProgress(stage, ok ? "done" : "error", startedAt, ok);
     logEvent(stage, ok ? "done" : "error", detail, startedAt, ok, meta);
   };
@@ -102431,6 +103177,7 @@ const executeHelixAsk = async ({
   let attachContextCapsuleToResult: (target: LocalAskResult, finalTextRaw?: string) => void =
     () => {};
   try {
+    assertExecutionActive();
     logDebug("executeHelixAsk START", {
       traceId: askTraceId,
       sessionId: askSessionId ?? null,
@@ -102944,11 +103691,15 @@ const executeHelixAsk = async ({
       stageDeadlineMs: number,
       operation: () => Promise<T>,
     ): Promise<T | null> => {
+      assertExecutionActive();
       if (!fastQualityMode) {
         const timeoutMs = HELIX_ASK_HELPER_TIMEOUT_MS;
         try {
-          return await withTimeout(operation(), timeoutMs, stage);
+          const result = await withTimeout(operation(), timeoutMs, stage);
+          assertExecutionActive();
+          return result;
         } catch (error) {
+          assertExecutionActive();
           const message = error instanceof Error ? error.message : String(error);
           if (message.includes(`${stage}_timeout`) || message.includes("_timeout")) {
             logEvent("Helper timeout", stage, `timeoutMs=${timeoutMs}`);
@@ -102973,8 +103724,11 @@ const executeHelixAsk = async ({
       }
       pushFastQualityDecision(stage, "allow", "helper_timeout_applied", undefined, timeoutMs, stageRemainingMs);
       try {
-        return await withTimeout(operation(), timeoutMs, stage);
+        const result = await withTimeout(operation(), timeoutMs, stage);
+        assertExecutionActive();
+        return result;
       } catch (error) {
+        assertExecutionActive();
         const message = error instanceof Error ? error.message : String(error);
         if (message.includes(`${stage}_timeout`) || message.includes("_timeout")) {
           pushFastQualityDecision(
@@ -105341,6 +106095,8 @@ const executeHelixAsk = async ({
               blockPayload = { status, payload };
             },
           },
+          signal,
+          deadlineAt,
           skipReportMode: true,
           reportContext: {
             parentTraceId: askTraceId,
@@ -108190,7 +108946,8 @@ const executeHelixAsk = async ({
               mode: "preflight",
             });
             if (repoSearchPlan) {
-              const repoSearchResult = await runRepoSearch(repoSearchPlan);
+              const repoSearchResult =
+                await runHelixPolicyAdmittedLegacyRepoSearch(repoSearchPlan);
               const repoSearchHits = repoSearchResult.hits.filter(
                 (hit) => !isIndexOnlyPath(hit.filePath ?? ""),
               );
@@ -111874,7 +112631,8 @@ const executeHelixAsk = async ({
             `terms=${repoSearchPlan.terms.join(",")}`,
             searchStart,
           );
-          const repoSearchResult: RepoSearchResult = await runRepoSearch(repoSearchPlan);
+          const repoSearchResult: RepoSearchResult =
+            await runHelixPolicyAdmittedLegacyRepoSearch(repoSearchPlan);
           const repoSearchHits = repoSearchResult.hits.filter(
             (hit) => !isIndexOnlyPath(hit.filePath ?? ""),
           );
@@ -113832,7 +114590,8 @@ const executeHelixAsk = async ({
                 ...codeFloorPlan,
                 paths: Array.from(new Set(codeFloorExpansionPaths)),
               };
-              const expandedResult: RepoSearchResult = await runRepoSearch(expandedPlan);
+              const expandedResult: RepoSearchResult =
+                await runHelixPolicyAdmittedLegacyRepoSearch(expandedPlan);
               const expandedHits = expandedResult.hits.filter(
                 (hit) => !isIndexOnlyPath(hit.filePath ?? ""),
               );
@@ -129247,6 +130006,7 @@ const executeHelixAsk = async ({
         fastStageDeadlines.finalize,
       );
     }
+    assertExecutionActive();
     logDebug("streamEmitter.finalize start", {
       cleanedLength: typeof cleanedText === "string" ? cleanedText.length : 0,
     });
@@ -129800,6 +130560,7 @@ const executeHelixAsk = async ({
       }
     }
     scrubSkippedLlmTransportErrors(debugPayload);
+    assertExecutionActive();
     const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
     reconcileTerminalFailureWithToolRail(responsePayload as Record<string, unknown>);
     attachContextCapsuleToResult(
@@ -129818,6 +130579,7 @@ const executeHelixAsk = async ({
     logDebug("responder.send(200) complete");
     return;
   } catch (error) {
+    assertExecutionActive();
     const message = error instanceof Error ? error.message : String(error);
     logDebug("executeHelixAsk ERROR", { message });
     const buildRuntimeFallbackDebug = ({
@@ -137808,6 +138570,158 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       });
       const earlyAllowsSituationTerminal =
         !earlyRouteProductContract.forbidden_terminal_artifact_kinds.includes("situation_context_pack");
+      const providerVisualThreadId =
+        readAskTurnString(earlySourceTargetIntent.thread_id) ?? earlyAuthorityThreadId;
+      const providerVisualSituationRoute =
+        earlySourceTargetIntent.target_source === "visual_capture"
+          ? routeSituationContextTurn({
+              threadId: providerVisualThreadId,
+              promptText: String(options?.questionSeed ?? transcriptSeed ?? ""),
+              inputModality: "typed",
+              turnId: earlyResponseTurnId,
+              submittedAt: new Date().toISOString(),
+              serverReceivedAt: new Date().toISOString(),
+              answerStartedAt: new Date().toISOString(),
+            })
+          : null;
+      if (providerVisualSituationRoute) {
+        payload.provider_visual_situation_route_diagnostic = {
+          schema: "helix.provider_visual_situation_route_diagnostic.v1",
+          turn_id: earlyResponseTurnId,
+          thread_id: providerVisualThreadId,
+          route: providerVisualSituationRoute.route,
+          answerable: providerVisualSituationRoute.situation_evidence_selection.answerable,
+          answer_text_present: Boolean(providerVisualSituationRoute.answer_text),
+          situation_run_id:
+            providerVisualSituationRoute.active_situation_context.situation_run_id ?? null,
+          selected_observation_count:
+            providerVisualSituationRoute.situation_evidence_selection.selected_observation_refs.length,
+          assistant_answer: false,
+          raw_content_included: false,
+        };
+      }
+      if (
+        providerVisualSituationRoute &&
+        providerVisualSituationRoute.route === "situation_context_question" &&
+        providerVisualSituationRoute.answer_text &&
+        earlyAllowsSituationTerminal
+      ) {
+        const providerSituationContextPack = buildSituationContextPack({
+          threadId:
+            providerVisualSituationRoute.active_situation_context.thread_id ||
+            providerVisualThreadId,
+        });
+        const providerVisualObservationRefs = uniqueAskTurnStrings([
+          ...providerVisualSituationRoute.active_situation_context.latest_observation_refs,
+          ...providerVisualSituationRoute.active_situation_context.latest_field_evaluation_refs,
+          ...providerVisualSituationRoute.active_situation_context.latest_interpretation_run_refs,
+        ]);
+        const providerVisualArtifactIds = {
+          frame: `${earlyResponseTurnId}:visual_frame_evidence`,
+          context: `${earlyResponseTurnId}:situation_context_pack:${providerSituationContextPack.context_pack_id}`,
+          coverage: `${earlyResponseTurnId}:visual_capture_coverage`,
+        };
+        const existingProviderVisualLedger = Array.isArray(payload.current_turn_artifact_ledger)
+          ? (payload.current_turn_artifact_ledger as HelixTurnArtifact[])
+          : [];
+        const providerVisualArtifacts: HelixTurnArtifact[] = [
+          {
+            artifact_id: providerVisualArtifactIds.frame,
+            kind: "visual_frame_evidence",
+            turn_id: earlyResponseTurnId,
+            created_at_ms: Date.now(),
+            source_scope: "current_turn",
+            payload: {
+              ...providerVisualSituationRoute.situation_evidence_selection,
+              active_situation_context: providerVisualSituationRoute.active_situation_context,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+          {
+            artifact_id: providerVisualArtifactIds.context,
+            kind: "situation_context_pack",
+            turn_id: earlyResponseTurnId,
+            created_at_ms: Date.now(),
+            source_scope: "current_turn",
+            payload: {
+              ...providerSituationContextPack,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+          {
+            artifact_id: providerVisualArtifactIds.coverage,
+            kind: "visual_capture_coverage",
+            turn_id: earlyResponseTurnId,
+            created_at_ms: Date.now(),
+            source_scope: "current_turn",
+            payload: {
+              situation_run_id:
+                providerVisualSituationRoute.active_situation_context.situation_run_id ?? null,
+              selected_observation_refs: providerVisualObservationRefs,
+              selection_status: providerVisualSituationRoute.active_situation_context.status,
+              freshness_summary:
+                providerVisualSituationRoute.active_situation_context.freshness_summary,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        ];
+        payload.active_situation_context =
+          providerVisualSituationRoute.active_situation_context as unknown as Record<string, unknown>;
+        payload.situation_evidence_selection =
+          providerVisualSituationRoute.situation_evidence_selection as unknown as Record<string, unknown>;
+        payload.situation_context_pack =
+          providerSituationContextPack as unknown as Record<string, unknown>;
+        payload.capability_selection_result = {
+          schema: "helix.ask_capability_selection_result.v1",
+          capability_id: "situation-room.describe_visual_capture",
+          selected_capability: "situation-room.describe_visual_capture",
+          selected_capabilities: ["situation-room.describe_visual_capture"],
+          capability_family: "visual_capture",
+          admission_status: "admitted",
+          assistant_answer: false,
+          raw_content_included: false,
+        };
+        payload.tool_lifecycle_trace = {
+          schema: HELIX_TOOL_LIFECYCLE_TRACE_SCHEMA,
+          turn_id: earlyResponseTurnId,
+          tool_call_id: `${earlyResponseTurnId}:situation-room.describe_visual_capture`,
+          tool_family: "visual_capture",
+          requested_capability: "situation-room.describe_visual_capture",
+          admitted_capability: "situation-room.describe_visual_capture",
+          executed_capability: "situation-room.describe_visual_capture",
+          lifecycle_stage: "completed",
+          status: "completed",
+          session_ref:
+            providerVisualSituationRoute.active_situation_context.situation_run_id ?? null,
+          process_ref: null,
+          observation_refs: Object.values(providerVisualArtifactIds),
+          receipt_refs: [],
+          evidence_refs: providerVisualObservationRefs,
+          reentry_authority: "situation_context_turn_router",
+          runtime_lifecycle_verified: true,
+          matched_reentry_refs: Object.values(providerVisualArtifactIds),
+          failure_reason: null,
+          retry_recommendation: "allow_terminal",
+          fallback_used: false,
+          fallback_equivalent: false,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        };
+        payload.current_turn_artifact_ledger = [
+          ...existingProviderVisualLedger.filter(
+            (artifact) => !Object.values(providerVisualArtifactIds).includes(artifact.artifact_id),
+          ),
+          ...providerVisualArtifacts,
+        ];
+        applySituationContextFinalAnswer(
+          providerVisualSituationRoute.answer_text,
+          providerVisualArtifactIds.context,
+        );
+      }
       if (responseSessionId && !payload.situation_context_pack && earlyAllowsSituationTerminal) {
         const activeSituationSession =
           getActiveSituationGoalSessionForThread(responseSessionId) ??
@@ -147556,7 +148470,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           mode: "fallback",
         });
         if (repoSearchPlan) {
-          const repoSearchResult = await runRepoSearch(repoSearchPlan);
+          const repoSearchResult =
+            await runHelixPolicyAdmittedLegacyRepoSearch(repoSearchPlan);
           const repoSearchHits = repoSearchResult.hits.filter(
             (hit) => !isIndexOnlyPath(hit.filePath ?? ""),
           );
@@ -167220,10 +168135,39 @@ const maybeApplyRuntimePostulateReviewPayload = async (args: {
   return nextPayload;
 };
 
-const attachHelixProviderPreflightModelOnlyRouteContext = (args: {
+export const attachHelixProviderPreflightRouteContext = (args: {
   body: Record<string, unknown>;
   turnId: string;
 }): Record<string, unknown> => {
+  const incomingWorkspaceSnapshot = normalizeIncomingAskTurnWorkspaceSnapshot({
+    sessionId: readHelixAskRuntimeSessionId(args.body),
+    snapshot: args.body.workspace_context_snapshot ?? args.body.workspaceContextSnapshot,
+  });
+  if (incomingWorkspaceSnapshot) {
+    const activeWorkspaceSourceResolution = buildActiveWorkspaceSourceResolution({
+      turnId: args.turnId,
+      promptText: readHelixAskRuntimePrompt(args.body),
+      workspaceSnapshot: incomingWorkspaceSnapshot,
+    });
+    if (activeWorkspaceSourceResolution.reason === "active_doc_evidence_followup") {
+      const sourceTargetIntent = arbitrateAskSourceTarget({
+        turnId: args.turnId,
+        threadId:
+          readHelixAskRuntimeThreadId(args.body) ??
+          readHelixAskRuntimeSessionId(args.body) ??
+          "helix-ask:desktop",
+        promptText: readHelixAskRuntimePrompt(args.body),
+        activeWorkspaceSourceResolution,
+      });
+      return {
+        ...args.body,
+        workspace_context_snapshot: incomingWorkspaceSnapshot,
+        active_workspace_source_resolution: activeWorkspaceSourceResolution,
+        source_target_intent: sourceTargetIntent,
+        sourceTargetIntent,
+      };
+    }
+  }
   if (args.body.canonical_goal_frame && typeof args.body.canonical_goal_frame === "object") {
     return args.body;
   }
@@ -167238,13 +168182,124 @@ const attachHelixProviderPreflightModelOnlyRouteContext = (args: {
     transcript,
     retrievalSignal,
   });
+  const sourceTargetIntent = arbitrateAskSourceTarget({
+    turnId: args.turnId,
+    threadId:
+      readHelixAskRuntimeThreadId(args.body) ??
+      readHelixAskRuntimeSessionId(args.body) ??
+      "helix-ask:desktop",
+    promptText: transcript,
+  });
   const normalized = transcript.toLowerCase();
+  if (isAffirmativeTheoryExperimentProcedurePrompt(transcript)) {
+    return {
+      ...args.body,
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        turn_id: args.turnId,
+        goal_kind: "theory_context_reflection",
+        answer_scope: "current_turn_action",
+        requested_capability: THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+        required_terminal_kind: "model_synthesized_answer",
+        allows_workspace_context: true,
+        allows_prior_artifacts: false,
+        corpus_anchors: [],
+        numeric_tokens: [],
+        concept_tokens: [
+          THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+          "theory_experiment_procedure_observation",
+        ],
+        confidence: "high",
+        classifier_reasons: [
+          "provider_preflight_explicit_capability_contract",
+          "affirmative_theory_experiment_procedure",
+        ],
+      },
+    };
+  }
   const explicitNoToolDirectAnswer =
     /\b(?:answer\s+normally|answer\s+directly|no\s+tools?|do\s+not\s+use\s+tools?|without\s+tools?|do\s+not\s+use\s+tools?\s+or\s+panels?)\b/i.test(transcript);
   const explicitToolOrSourceRequest =
     /\b(?:use|run|open|search|browse|look\s*up|lookup|find|crop|inspect|reflect|calculate|compute|solve|create|make|append|save|postulate|calculator|image\s+lens|pdf|doc|docs|paper|web|internet|moral\s+graph|theory\s+badge|note)\b/i.test(normalized) &&
     !explicitNoToolDirectAnswer;
-  if (scopeContract.answer_scope !== "model_only" && (!explicitNoToolDirectAnswer || explicitToolOrSourceRequest)) return args.body;
+  const hardSourceTargetRequiresSolver =
+    sourceTargetIntent.strength === "hard" &&
+    sourceTargetIntent.target_source !== "model_only" &&
+    sourceTargetIntent.target_source !== "unknown";
+  if (
+    (scopeContract.answer_scope !== "model_only" || hardSourceTargetRequiresSolver) &&
+    (!explicitNoToolDirectAnswer || explicitToolOrSourceRequest)
+  ) {
+    const canonicalGoalFrame = hardSourceTargetRequiresSolver
+      ? buildAskTurnCanonicalGoalFrame({
+          turnId: args.turnId,
+          goalFrame: buildAskTurnUniversalGoalFrame({
+            transcript,
+            workspaceSnapshot: incomingWorkspaceSnapshot,
+          }),
+          requestBody: args.body,
+          retrievalRequiredSignal: retrievalSignal,
+        })
+      : null;
+    const providerCanonicalGoalFrame =
+      canonicalGoalFrame &&
+      sourceTargetIntent.target_source === "visual_capture"
+        ? {
+            ...canonicalGoalFrame,
+            goal_kind: "visual_capture_describe",
+            requested_capability:
+              "situation-room.describe_visual_capture",
+            required_terminal_kind: "model_synthesized_answer",
+            allowed_terminal_artifact_kinds: [
+              "model_synthesized_answer",
+              "situation_context_pack",
+              "typed_failure",
+            ],
+            forbidden_terminal_artifact_kinds: [
+              "direct_answer_text",
+              "model_only_concept",
+              "no_tool_direct",
+              "panel_generated_answer",
+            ],
+            classifier_reasons: Array.from(
+              new Set([
+                ...canonicalGoalFrame.classifier_reasons,
+                "provider_visual_source_requires_runtime_observation_reentry",
+              ]),
+            ),
+          }
+        : canonicalGoalFrame;
+    const providerRouteProductContract =
+      providerCanonicalGoalFrame &&
+      sourceTargetIntent.target_source === "visual_capture"
+        ? {
+            ...buildRouteProductContract({
+              turnId: args.turnId,
+              threadId: sourceTargetIntent.thread_id,
+              sourceTargetIntent,
+              promptText: transcript,
+            }),
+            goal_kind: "visual_capture_describe",
+            required_terminal_kind: "model_synthesized_answer",
+            required_terminal_artifact_kind: "model_synthesized_answer",
+            evidence_reentry_required: true,
+            followup_reasoning_required: true,
+            precedence_reason:
+              "provider_visual_source_requires_runtime_observation_reentry",
+          }
+        : null;
+    return {
+      ...args.body,
+      source_target_intent: sourceTargetIntent,
+      sourceTargetIntent,
+      ...(providerCanonicalGoalFrame
+        ? { canonical_goal_frame: providerCanonicalGoalFrame }
+        : {}),
+      ...(providerRouteProductContract
+        ? { route_product_contract: providerRouteProductContract }
+        : {}),
+    };
+  }
   return {
     ...args.body,
     canonical_goal_frame: {
@@ -167261,6 +168316,277 @@ const attachHelixProviderPreflightModelOnlyRouteContext = (args: {
       classifier_reasons: ["provider_preflight_scope_contract_model_only", scopeContract.reason],
     },
   };
+};
+
+const applyHelixProviderVisualSituationTerminalRepair = (args: {
+  payload: Record<string, unknown>;
+  body: Record<string, unknown>;
+  turnId: string;
+}): Record<string, unknown> => {
+  const sourceTargetIntent =
+    args.payload.source_target_intent &&
+    typeof args.payload.source_target_intent === "object" &&
+    !Array.isArray(args.payload.source_target_intent)
+      ? (args.payload.source_target_intent as Record<string, unknown>)
+      : args.body.source_target_intent &&
+          typeof args.body.source_target_intent === "object" &&
+          !Array.isArray(args.body.source_target_intent)
+        ? (args.body.source_target_intent as Record<string, unknown>)
+        : null;
+  if (readAskTurnString(sourceTargetIntent?.target_source) !== "visual_capture") {
+    return args.payload;
+  }
+  const promptText = readHelixAskRuntimePrompt(args.body);
+  const threadId =
+    readAskTurnString(sourceTargetIntent?.thread_id) ??
+    readHelixAskRuntimeThreadId(args.body) ??
+    "helix-ask:desktop";
+  const route = routeSituationContextTurn({
+    threadId,
+    promptText,
+    inputModality: "typed",
+    turnId: args.turnId,
+    submittedAt: new Date().toISOString(),
+    serverReceivedAt: new Date().toISOString(),
+    answerStartedAt: new Date().toISOString(),
+  });
+  const diagnostic = {
+    schema: "helix.provider_visual_situation_route_diagnostic.v1",
+    turn_id: args.turnId,
+    thread_id: threadId,
+    route: route.route,
+    answerable: route.situation_evidence_selection.answerable,
+    answer_text_present: Boolean(route.answer_text),
+    situation_run_id: route.active_situation_context.situation_run_id ?? null,
+    selected_observation_count: route.situation_evidence_selection.selected_observation_refs.length,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  if (route.route !== "situation_context_question" || !route.answer_text) {
+    return {
+      ...args.payload,
+      provider_visual_situation_route_diagnostic: diagnostic,
+    };
+  }
+  const contextPack = buildSituationContextPack({
+    threadId: route.active_situation_context.thread_id || threadId,
+  });
+  const observationRefs = uniqueAskTurnStrings([
+    ...route.active_situation_context.latest_observation_refs,
+    ...route.active_situation_context.latest_field_evaluation_refs,
+    ...route.active_situation_context.latest_interpretation_run_refs,
+  ]);
+  const artifactIds = {
+    frame: `${args.turnId}:visual_frame_evidence`,
+    context: `${args.turnId}:situation_context_pack:${contextPack.context_pack_id}`,
+    coverage: `${args.turnId}:visual_capture_coverage`,
+  };
+  const artifacts: HelixTurnArtifact[] = [
+    {
+      artifact_id: artifactIds.frame,
+      kind: "visual_frame_evidence",
+      turn_id: args.turnId,
+      producer_item_id: "situation-room.describe_visual_capture",
+      created_at_ms: Date.now(),
+      source_scope: "current_turn",
+      payload: {
+        ...route.situation_evidence_selection,
+        active_situation_context: route.active_situation_context,
+        answer_text: route.answer_text,
+        text: route.answer_text,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    },
+    {
+      artifact_id: artifactIds.context,
+      kind: "situation_context_pack",
+      turn_id: args.turnId,
+      producer_item_id: "situation-room.describe_visual_capture",
+      created_at_ms: Date.now(),
+      source_scope: "current_turn",
+      payload: {
+        ...contextPack,
+        answer_text: route.answer_text,
+        text: route.answer_text,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    },
+    {
+      artifact_id: artifactIds.coverage,
+      kind: "visual_capture_coverage",
+      turn_id: args.turnId,
+      producer_item_id: "situation-room.describe_visual_capture",
+      created_at_ms: Date.now(),
+      source_scope: "current_turn",
+      payload: {
+        situation_run_id: route.active_situation_context.situation_run_id ?? null,
+        selected_observation_refs: observationRefs,
+        selection_status: route.active_situation_context.status,
+        freshness_summary: route.active_situation_context.freshness_summary,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    },
+  ];
+  const existingLedger = Array.isArray(args.payload.current_turn_artifact_ledger)
+    ? (args.payload.current_turn_artifact_ledger as HelixTurnArtifact[])
+    : [];
+  const currentLedger = [
+    ...existingLedger.filter(
+      (artifact) =>
+        artifact.kind !== "typed_failure" &&
+        !Object.values(artifactIds).includes(artifact.artifact_id),
+    ),
+    ...artifacts,
+  ];
+  const routeProductContract =
+    args.payload.route_product_contract &&
+    typeof args.payload.route_product_contract === "object" &&
+    !Array.isArray(args.payload.route_product_contract)
+      ? (args.payload.route_product_contract as Record<string, unknown>)
+      : buildRouteProductContract({
+          turnId: args.turnId,
+          threadId,
+          sourceTargetIntent: sourceTargetIntent ?? {},
+          promptText,
+        });
+  const allowedKinds = Array.isArray(routeProductContract.allowed_terminal_artifact_kinds)
+    ? routeProductContract.allowed_terminal_artifact_kinds.filter(
+        (entry): entry is string => typeof entry === "string",
+      )
+    : [];
+  const canonicalGoalFrame =
+    args.payload.canonical_goal_frame &&
+    typeof args.payload.canonical_goal_frame === "object" &&
+    !Array.isArray(args.payload.canonical_goal_frame)
+      ? (args.payload.canonical_goal_frame as HelixAskCanonicalGoalFrame)
+      : buildAskTurnCanonicalGoalFrame({
+          turnId: args.turnId,
+          goalFrame: buildAskTurnUniversalGoalFrame({ transcript: promptText }),
+          requestBody: args.body,
+        });
+  const nextPayload: Record<string, unknown> = {
+    ...args.payload,
+    canonical_goal_frame: canonicalGoalFrame,
+    active_situation_context: route.active_situation_context,
+    situation_evidence_selection: route.situation_evidence_selection,
+    situation_context_pack: contextPack,
+    provider_visual_situation_route_diagnostic: diagnostic,
+    current_turn_artifact_ledger: currentLedger,
+    route_product_contract: {
+      ...routeProductContract,
+      required_terminal_kind: "situation_context_pack",
+      allowed_terminal_artifact_kinds: Array.from(
+        new Set([...allowedKinds, "situation_context_pack", "typed_failure"]),
+      ),
+    },
+    capability_selection_result: {
+      schema: "helix.ask_capability_selection_result.v1",
+      capability_id: "situation-room.describe_visual_capture",
+      selected_capability: "situation-room.describe_visual_capture",
+      selected_capabilities: ["situation-room.describe_visual_capture"],
+      capability_family: "visual_capture",
+      admission_status: "admitted",
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    tool_lifecycle_trace: {
+      schema: "helix.tool_lifecycle_trace.v1",
+      turn_id: args.turnId,
+      tool_call_id: `${args.turnId}:situation-room.describe_visual_capture`,
+      tool_family: "visual_capture",
+      requested_capability: "situation-room.describe_visual_capture",
+      admitted_capability: "situation-room.describe_visual_capture",
+      executed_capability: "situation-room.describe_visual_capture",
+      lifecycle_stage: "completed",
+      status: "completed",
+      session_ref: route.active_situation_context.situation_run_id ?? null,
+      process_ref: null,
+      observation_refs: Object.values(artifactIds),
+      receipt_refs: [],
+      evidence_refs: observationRefs,
+      reentry_authority: "situation_context_turn_router",
+      runtime_lifecycle_verified: true,
+      matched_reentry_refs: Object.values(artifactIds),
+      failure_reason: null,
+      retry_recommendation: "allow_terminal",
+      fallback_used: false,
+      fallback_equivalent: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    goal_satisfaction_evaluation: {
+      schema: "helix.goal_satisfaction_evaluation.v1",
+      turn_id: args.turnId,
+      satisfaction: "satisfied",
+      next_decision: "allow_terminal",
+      terminal_artifact_kind: "situation_context_pack",
+      terminal_artifact_id: artifactIds.context,
+      observed_results: [
+        {
+          kind: "situation_context_pack",
+          ref: artifactIds.context,
+          supports_goal: true,
+        },
+      ],
+      required_evidence: [
+        { kind: "situation_context_pack", satisfied: true, ref: artifactIds.context },
+        { kind: "visual_observation", satisfied: observationRefs.length > 0, refs: observationRefs },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+  const committedRoute = buildCommittedAskRoute({
+    turnId: args.turnId,
+    promptText,
+    selectedRoute: "/ask",
+    payload: nextPayload,
+  });
+  nextPayload.committed_ask_route = committedRoute;
+  nextPayload.route_evidence_authority = buildRouteEvidenceAuthority({
+    committedRoute,
+    payload: nextPayload,
+  });
+  const debug =
+    nextPayload.debug && typeof nextPayload.debug === "object" && !Array.isArray(nextPayload.debug)
+      ? (nextPayload.debug as Record<string, unknown>)
+      : {};
+  nextPayload.debug = {
+    ...debug,
+    provider_visual_situation_route_diagnostic: diagnostic,
+    canonical_goal_frame: canonicalGoalFrame,
+    current_turn_artifact_ledger: currentLedger,
+    capability_selection_result: nextPayload.capability_selection_result,
+    tool_lifecycle_trace: nextPayload.tool_lifecycle_trace,
+    goal_satisfaction_evaluation: nextPayload.goal_satisfaction_evaluation,
+    committed_ask_route: committedRoute,
+    route_evidence_authority: nextPayload.route_evidence_authority,
+  };
+  delete nextPayload.typed_failure;
+  delete nextPayload.terminal_failure_text;
+  delete nextPayload.terminal_error_code;
+  delete nextPayload.terminal_authority_single_writer;
+  delete nextPayload.terminal_answer_authority;
+  delete nextPayload.terminal_presentation;
+  delete nextPayload.terminal_artifact_kind;
+  delete nextPayload.terminal_artifact_id;
+  delete nextPayload.terminal_artifact_owner_turn_id;
+  delete nextPayload.final_answer_source;
+  delete nextPayload.selected_final_answer;
+  delete nextPayload.assistant_answer;
+  delete nextPayload.answer;
+  delete nextPayload.text;
+  applyHelixTerminalAuthoritySingleWriter({
+    payload: nextPayload,
+    turnId: args.turnId,
+    threadId,
+    artifactLedger: currentLedger,
+  });
+  return nextPayload;
 };
 
 const applyHelixProviderCalculatorGatewayTerminalRepair = (args: {
@@ -167379,108 +168705,19 @@ const applyHelixProviderCalculatorGatewayTerminalRepair = (args: {
     threadId: readHelixAskRuntimeSessionId(args.body) ?? "helix-ask:desktop",
     artifactLedger: coverage.artifacts,
   });
-  if (
-    readAskTurnString(nextPayload.terminal_artifact_kind) !== "workstation_tool_evaluation" ||
-    readAskTurnString(nextPayload.final_answer_source) !== "workstation_tool_evaluation"
-  ) {
-    const singleReceiptResult =
-      coverage.receipts.length === 1
-        ? readHelixCalculatorReceiptResultText(coverage.receipts[0])
-        : null;
-    const evaluationText =
-      singleReceiptResult ??
-      readAskTurnString(coverage.evaluation.answer_text) ??
-      readAskTurnString(coverage.evaluation.summary) ??
-      readAskTurnString(coverage.evaluation.text) ??
-      "Calculator result available.";
-    const evaluationId =
-      readAskTurnString(coverage.evaluation.evaluation_id) ??
-      `${args.turnId}:runtime_calculator_workstation_tool_evaluation`;
-    nextPayload.ok = true;
-    nextPayload.response_type = "final_answer";
-    nextPayload.final_status = "completed";
-    nextPayload.status = "completed";
-    nextPayload.final_answer_source = "workstation_tool_evaluation";
-    nextPayload.terminal_artifact_kind = "workstation_tool_evaluation";
-    nextPayload.terminal_artifact_id = evaluationId;
-    nextPayload.terminal_artifact_owner_turn_id = args.turnId;
-    nextPayload.selected_final_answer = evaluationText;
-    nextPayload.answer = evaluationText;
-    nextPayload.text = evaluationText;
-    nextPayload.assistant_answer = evaluationText;
-    nextPayload.goal_satisfaction_evaluation = {
-      ...(nextPayload.goal_satisfaction_evaluation &&
-      typeof nextPayload.goal_satisfaction_evaluation === "object" &&
-      !Array.isArray(nextPayload.goal_satisfaction_evaluation)
-        ? (nextPayload.goal_satisfaction_evaluation as Record<string, unknown>)
-        : {}),
-      schema: "helix.goal_satisfaction_evaluation.v1",
-      turn_id: args.turnId,
-      satisfaction: "satisfied",
-      next_decision: "allow_terminal",
-      terminal_artifact_kind: "workstation_tool_evaluation",
-      terminal_artifact_id: evaluationId,
-      evidence_refs: coverage.receipts
-        .map((receipt) => readAskTurnString(receipt.receipt_id))
-        .filter((entry): entry is string => Boolean(entry)),
-      assistant_answer: false,
-      raw_content_included: false,
-    };
-    nextPayload.terminal_answer_authority = recordHelixTurnTerminalAuthority({
-      thread_id: readHelixAskRuntimeSessionId(args.body) ?? "helix-ask:desktop",
-      turn_id: args.turnId,
-      final_answer_source: "workstation_tool_evaluation",
-      terminal_artifact_kind: "workstation_tool_evaluation",
-      terminal_text: evaluationText,
-      terminal_item_id: evaluationId,
-      route: "/ask",
-    });
-    nextPayload.terminal_presentation = {
-      ...(nextPayload.terminal_presentation &&
-      typeof nextPayload.terminal_presentation === "object" &&
-      !Array.isArray(nextPayload.terminal_presentation)
-        ? (nextPayload.terminal_presentation as Record<string, unknown>)
-        : {}),
-      schema: "helix.terminal_presentation.v1",
-      turn_id: args.turnId,
-      terminal_artifact_kind: "workstation_tool_evaluation",
-      final_answer_source: "workstation_tool_evaluation",
-      terminal_authority_ref: evaluationId,
-      concise_text: evaluationText,
-      assistant_answer: false,
-      raw_content_included: false,
-    };
-    delete nextPayload.terminal_error_code;
-    delete nextPayload.terminal_failure_text;
-    delete nextPayload.typed_failure;
-    if (nextPayload.debug && typeof nextPayload.debug === "object" && !Array.isArray(nextPayload.debug)) {
-      Object.assign(nextPayload.debug as Record<string, unknown>, {
-        ok: true,
-        response_type: "final_answer",
-        final_status: "completed",
-        status: "completed",
-        final_answer_source: "workstation_tool_evaluation",
-        terminal_artifact_kind: "workstation_tool_evaluation",
-        terminal_artifact_id: evaluationId,
-        selected_final_answer: evaluationText,
-        answer: evaluationText,
-        text: evaluationText,
-        assistant_answer: evaluationText,
-        goal_satisfaction_evaluation: nextPayload.goal_satisfaction_evaluation,
-        terminal_answer_authority: nextPayload.terminal_answer_authority,
-        terminal_presentation: nextPayload.terminal_presentation,
-        terminal_error_code: null,
-      });
-    }
-  }
   const synchronizeCalculatorProviderSummary = (summary: Record<string, unknown> | null): void => {
     if (!summary) return;
-    summary.final_answer_source = "workstation_tool_evaluation";
-    summary.terminal_artifact_kind = "workstation_tool_evaluation";
-    summary.terminal_authority_result = "authorized_by_terminal_authority_single_writer";
-    summary.terminal_authority_granted = true;
-    summary.final_visible_answer_authorized = true;
-    summary.final_visible_answer_source = "workstation_tool_evaluation";
+    summary.final_answer_source = readAskTurnString(nextPayload.final_answer_source);
+    summary.terminal_artifact_kind = readAskTurnString(nextPayload.terminal_artifact_kind);
+    summary.terminal_authority_result =
+      readAskTurnString(nextPayload.terminal_artifact_kind) === "typed_failure"
+        ? "rejected_by_terminal_authority_single_writer"
+        : "authorized_by_terminal_authority_single_writer";
+    summary.terminal_authority_granted =
+      readAskTurnString(nextPayload.terminal_artifact_kind) !== "typed_failure";
+    summary.final_visible_answer_authorized =
+      readAskTurnString(nextPayload.terminal_artifact_kind) !== "typed_failure";
+    summary.final_visible_answer_source = readAskTurnString(nextPayload.final_answer_source);
   };
   synchronizeCalculatorProviderSummary(
     nextPayload.provider_gateway_debug_summary &&
@@ -167653,7 +168890,7 @@ planRouter.post("/ask/turn", async (req, res) => {
         body,
         headers: req.headers,
       });
-      const providerBody = attachHelixProviderPreflightModelOnlyRouteContext({
+      const providerBody = attachHelixProviderPreflightRouteContext({
         body,
         turnId: admissionTurnId,
       });
@@ -169289,7 +170526,7 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       return;
     }
     if (streamAgentProvider.id !== "helix") {
-      const streamProviderBody = attachHelixProviderPreflightModelOnlyRouteContext({
+      const streamProviderBody = attachHelixProviderPreflightRouteContext({
         body: req.body as Record<string, unknown>,
         turnId: streamTurnId,
       });
@@ -174991,6 +176228,60 @@ planRouter.post("/ask", async (req, res) => {
     });
   }
 });
+
+export const helixAskExternalTurnRouteBridge:
+  import("../services/helix-agent-api/governed-external-turn-executor").HelixAskExternalTurnRouteBridge =
+  {
+    prepareRequest: ({ request, personaId, tenantId }) => {
+      const parsed = LocalAskRequest.safeParse(request);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          issues: parsed.error.issues,
+        };
+      }
+      return {
+        ok: true,
+        execute: ({ responder, streamChunk, signal, deadlineAt }) =>
+          executeHelixAsk({
+            request: parsed.data,
+            personaId,
+            tenantId,
+            responder: responder as HelixAskResponder,
+            streamChunk,
+            signal,
+            deadlineAt,
+          }),
+      };
+    },
+    finalizePayload: ({
+      payload,
+      threadId,
+      turnId,
+      prompt,
+      sessionId,
+    }) => {
+      const envelope = resolveTerminalAnswerEnvelope(payload, {
+        threadId,
+        turnId,
+      });
+      return finalizeHelixAskTurnPayload({
+        payload,
+        threadId,
+        turnId,
+        prompt,
+        sessionId,
+        terminalText: envelope.terminal_text,
+        finalAnswerSource: envelope.final_answer_source,
+        terminalArtifactKind: envelope.terminal_artifact_kind,
+        route:
+          readAskTurnString(payload.route_reason_code) ??
+          readAskTurnString(payload.route) ??
+          "external_agent_full_solver",
+        clientVisibleText: envelope.terminal_text,
+      });
+    },
+  };
 
 const describeHelixAskJobError = (payload: unknown, status: number): string => {
   if (typeof payload === "string" && payload.trim()) {

@@ -1,0 +1,187 @@
+{
+  "schema_version": "casimir_dp_complex_coherence/1",
+  "primary_boundary_state": "blind-A",
+  "object_receipt": {
+    "campaign_id": "casimir-dp-stage3-synthetic-coherence-v1",
+    "object_id": "mesoscopic-test-object",
+    "mass_kg": 3.8877e-18,
+    "density_profile_ref": "synthetic://density/uniform-sphere-v1",
+    "density_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "branch_separation_m": 2e-8,
+    "branch_receipt_ref": "synthetic://branches/symmetric-v1",
+    "branch_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "phase_calibration": {
+    "source_ref": "synthetic://phase-calibration/four-quadrature-v1",
+    "standard_uncertainty_rad": 0.002
+  },
+  "phase_conditioner": {
+    "mode": "none",
+    "source_ref": null,
+    "artifact_sha256": null,
+    "trained_block_ids": []
+  },
+  "decay_shape_gate": {
+    "minimum_distinct_hold_times": 4,
+    "minimum_time_span_s": 0.15,
+    "minimum_signal_to_noise": 3,
+    "maximum_basis_correlation": 0.999
+  },
+  "uncertainty_model": {
+    "method": "binomial_plus_cluster_sandwich",
+    "interval_standard_deviations": 1.959963984540054,
+    "minimum_clusters_per_cell": 2
+  },
+  "nuisance_gate": {
+    "minimum_blocks": 4,
+    "minimum_distinct_values": 2,
+    "required_numeric_channels": [
+      "surface_distance_m",
+      "temperature_K",
+      "net_charge_C",
+      "pressure_Pa",
+      "vibration_rms_m",
+      "laser_phase_rad"
+    ]
+  },
+  "decision_thresholds": {
+    "coherent_phase_rad": 0.05,
+    "phase_conditioning_visibility_gain": 0.05,
+    "echo_visibility_gain": 0.05,
+    "visibility_loss_fraction": 0.1,
+    "path_swap_phase_error_rad": 0.03,
+    "path_swap_visibility_error": 0.03
+  },
+  "provenance": {
+    "evidence_class": "synthetic_fixture",
+    "raw_expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "raw_actual_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "calibration_expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "calibration_actual_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "covariance_expected_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "covariance_actual_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "receipt_integrity_verified": true
+  },
+  "blocks": [
+    {
+      "block_id": "t000-forward",
+      "blind_boundary_state": "blind-A",
+      "hold_time_s": 0,
+      "cluster_id": "cluster-00",
+      "analysis_role": "principal",
+      "path_orientation": 1,
+      "path_swap": false,
+      "echo_pair_id": null,
+      "echo_sequence_id": null,
+      "toggling_function_ref": null,
+      "toggling_function_sha256": null,
+      "static_boundary_confirmed": true,
+      "phase_predictor_rad": null,
+      "nuisances": {
+        "surface_distance_m": 1e-6,
+        "material_id": "synthetic-gold",
+        "temperature_K": 4,
+        "net_charge_C": 0,
+        "pressure_Pa": 1e-9,
+        "vibration_rms_m": 1e-12,
+        "laser_phase_rad": 0
+      },
+      "quadratures": [
+        { "analysis_phase_rad": 0, "plus_count": 9500, "minus_count": 500 },
+        { "analysis_phase_rad": 1.5707963267948966, "plus_count": 5000, "minus_count": 5000 },
+        { "analysis_phase_rad": 3.141592653589793, "plus_count": 500, "minus_count": 9500 },
+        { "analysis_phase_rad": 4.71238898038469, "plus_count": 5000, "minus_count": 5000 }
+      ]
+    },
+    {
+      "block_id": "t050-forward",
+      "blind_boundary_state": "blind-A",
+      "hold_time_s": 0.05,
+      "cluster_id": "cluster-01",
+      "analysis_role": "principal",
+      "path_orientation": 1,
+      "path_swap": false,
+      "echo_pair_id": null,
+      "echo_sequence_id": null,
+      "toggling_function_ref": null,
+      "toggling_function_sha256": null,
+      "static_boundary_confirmed": true,
+      "phase_predictor_rad": null,
+      "nuisances": {
+        "surface_distance_m": 1e-6,
+        "material_id": "synthetic-gold",
+        "temperature_K": 4,
+        "net_charge_C": 0,
+        "pressure_Pa": 1e-9,
+        "vibration_rms_m": 1e-12,
+        "laser_phase_rad": 0
+      },
+      "quadratures": [
+        { "analysis_phase_rad": 0, "plus_count": 8900, "minus_count": 1100 },
+        { "analysis_phase_rad": 1.5707963267948966, "plus_count": 5000, "minus_count": 5000 },
+        { "analysis_phase_rad": 3.141592653589793, "plus_count": 1100, "minus_count": 8900 },
+        { "analysis_phase_rad": 4.71238898038469, "plus_count": 5000, "minus_count": 5000 }
+      ]
+    },
+    {
+      "block_id": "t100-forward",
+      "blind_boundary_state": "blind-A",
+      "hold_time_s": 0.1,
+      "cluster_id": "cluster-02",
+      "analysis_role": "principal",
+      "path_orientation": 1,
+      "path_swap": false,
+      "echo_pair_id": null,
+      "echo_sequence_id": null,
+      "toggling_function_ref": null,
+      "toggling_function_sha256": null,
+      "static_boundary_confirmed": true,
+      "phase_predictor_rad": null,
+      "nuisances": {
+        "surface_distance_m": 1e-6,
+        "material_id": "synthetic-gold",
+        "temperature_K": 4,
+        "net_charge_C": 0,
+        "pressure_Pa": 1e-9,
+        "vibration_rms_m": 1e-12,
+        "laser_phase_rad": 0
+      },
+      "quadratures": [
+        { "analysis_phase_rad": 0, "plus_count": 8400, "minus_count": 1600 },
+        { "analysis_phase_rad": 1.5707963267948966, "plus_count": 5000, "minus_count": 5000 },
+        { "analysis_phase_rad": 3.141592653589793, "plus_count": 1600, "minus_count": 8400 },
+        { "analysis_phase_rad": 4.71238898038469, "plus_count": 5000, "minus_count": 5000 }
+      ]
+    },
+    {
+      "block_id": "t200-forward",
+      "blind_boundary_state": "blind-A",
+      "hold_time_s": 0.2,
+      "cluster_id": "cluster-03",
+      "analysis_role": "held_out",
+      "path_orientation": 1,
+      "path_swap": false,
+      "echo_pair_id": null,
+      "echo_sequence_id": null,
+      "toggling_function_ref": null,
+      "toggling_function_sha256": null,
+      "static_boundary_confirmed": true,
+      "phase_predictor_rad": null,
+      "nuisances": {
+        "surface_distance_m": 1e-6,
+        "material_id": "synthetic-gold",
+        "temperature_K": 4,
+        "net_charge_C": 0,
+        "pressure_Pa": 1e-9,
+        "vibration_rms_m": 1e-12,
+        "laser_phase_rad": 0
+      },
+      "quadratures": [
+        { "analysis_phase_rad": 0, "plus_count": 7950, "minus_count": 2050 },
+        { "analysis_phase_rad": 1.5707963267948966, "plus_count": 5000, "minus_count": 5000 },
+        { "analysis_phase_rad": 3.141592653589793, "plus_count": 2050, "minus_count": 7950 },
+        { "analysis_phase_rad": 4.71238898038469, "plus_count": 5000, "minus_count": 5000 }
+      ]
+    }
+  ]
+}

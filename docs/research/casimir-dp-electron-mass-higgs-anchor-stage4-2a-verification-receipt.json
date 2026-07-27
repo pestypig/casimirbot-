@@ -1,0 +1,296 @@
+{
+  "schema_version": "casimir_dp_electron_mass_higgs_anchor_stage4_2a_verification_receipt/1",
+  "campaign_id": "casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1",
+  "campaign_run_id": "casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1-20260725T211750900Z",
+  "verified_at": "2026-07-25T21:31:09.549Z",
+  "evidence_class": "source_backed_diagnostic_replay",
+  "claim_ceiling": "mass_energy_frequency_and_radiometric_calibration_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a.v1.json",
+    "config_sha256": "1459d48bbd1630e372b7b936b4931b48713afcb7c64e5df527e50f04edd087b2",
+    "authority_manifest_path": "configs/research/casimir-dp-stage4-2a-authorities.v1.json",
+    "authority_manifest_sha256": "1e4dde8f5a162b5368376b7ccaf07e19e725e6edb24b447aa6b1292732ce3b5f",
+    "campaign_receipt_path": "artifacts/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a/casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1-20260725T211750900Z/electron-mass-higgs-anchor-stage4-2a-receipt.json",
+    "campaign_receipt_sha256": "592a6245993411801672c6fa6ffa4cea4484e4fcf9164ad03f586a55333b17c3",
+    "report_json_path": "artifacts/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a/casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1-20260725T211750900Z/electron-mass-higgs-anchor-stage4-2a-report.json",
+    "report_json_sha256": "a53a2f1cdc7e4b2d1c9957aaa0a73316d77037371002b7ced4a2978a630fe35d",
+    "report_markdown_path": "artifacts/research/casimir-dp-electron-mass-higgs-anchor-stage4-2a/casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1-20260725T211750900Z/electron-mass-higgs-anchor-stage4-2a-report.md",
+    "report_markdown_sha256": "d7dbf59d6e284ef60ccae58f0f01076b453de1a81fcb2b6863bf44d969f7357a",
+    "git_head": "705759a201ee77313919de906c53dc8565de75bc",
+    "worktree_state": "dirty_uncommitted_source_hashes_authoritative",
+    "authority_mode": "role_path_and_content_hash_tuple"
+  },
+  "immutable_stage4_1_upstream": {
+    "config_sha256": "e2625c86a5366258677c58cbe78e73b8fcc1893ecd417b48765d74488f953478",
+    "authority_manifest_sha256": "cd681b977d47de6715322249c1026ecf5e963ac81735d6c29aa5100942824f4f",
+    "campaign_run_id": "casimir-dp-qed-scale-hierarchy-stage4-1-v1-20260725T183020238Z",
+    "report_json_sha256": "8f06bf394e64d40d24530e9e93b5d61edece3752318ece2095f27d61f55042c5",
+    "report_markdown_sha256": "6ae9530701fc35aa544b438709e789929b45eaf53ae950ec93ed976bb9703ba6",
+    "campaign_receipt_sha256": "d835b56a87ed6f6d78edfb8e627bceecb931575348232ca0fd77795f5ffe24af",
+    "downstream_verification_receipt_sha256": "a7f60aa9b12b7c1c143a7a1681048a61275495aaed33e1dfa6caa11e9e44b8db",
+    "role_path_tuple_frozen": true,
+    "reused_without_mutation": true
+  },
+  "source_and_software_authority": {
+    "mass_fixture": {
+      "path": "configs/research/fixtures/casimir-dp-electron-mass-higgs-anchor.source-backed.v1.json",
+      "sha256": "63cf7ec526aaf3161600cbc90e08a372d28267a6c0607a395e18ea6f8621ad41"
+    },
+    "solar_fixture": {
+      "path": "configs/research/fixtures/casimir-dp-planck-solar-calibration.source-backed.v1.json",
+      "sha256": "fcae03d2161774a93de3aae6770ad465f4ad07fbc77084ce3f59fe78d6bdc303"
+    },
+    "tsis_hsrs_snapshot": {
+      "path": "configs/research/source-snapshots/tsis1-hsrs-20260725-480-800nm.csv",
+      "sha256": "a9b28d4ec51a10e077fd6999f992fe8829c18328a77c50ad4c0849ef1bd23d79"
+    },
+    "mass_runtime": {
+      "path": "shared/casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts",
+      "sha256": "17ef9a21417a9da1a4c0500747108bc9a787c09c2a159b9464927e55b952d610"
+    },
+    "solar_runtime": {
+      "path": "shared/casimir-dp-planck-solar-calibration-stage4-2a.ts",
+      "sha256": "cbc89e378d3dd590e110d9c75bd7f12024e7348cfb3dcfdaf25c25f34c011261"
+    },
+    "campaign_contract": {
+      "path": "shared/contracts/casimir-dp-electron-mass-higgs-anchor-stage4-2a.v1.ts",
+      "sha256": "799ecc7ef6fc51322c72d47e2525187c411ae7ab0f22cf7b167c845963a236c1"
+    },
+    "campaign_runner": {
+      "path": "scripts/research/run-casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts",
+      "sha256": "a174ffa055a0e34d387d4e1ea593f7ef401ef4edabd3f48bdc9a5aba4268d5d8"
+    },
+    "theory_badge_graph": {
+      "path": "shared/theory/casimir-dp-study-theory-badges.ts",
+      "sha256": "fc2efdcb804679b19f249e965663c974d59a88f96554a878f644cfb3f17e351c"
+    }
+  },
+  "verification_inputs": {
+    "explicit_repo_telemetry": {
+      "path": "reports/repo-telemetry-stage4-2a-20260725T211750900Z.json",
+      "sha256": "a8289e76533e752c92d120a05679ecbcb9f8e16c6065d86c42f86f46c9af41a3",
+      "auto_merge_used": false
+    },
+    "adapter_request": {
+      "path": "artifacts/casimir-dp-stage4-2a-20260725T211750900Z-adapter-request.json",
+      "sha256": "5bcf2ace0adc40f64f46e8138255b9351a19d9be2c092782ea9e9369f78e8d33",
+      "auto_telemetry": false,
+      "explicit_hard_inputs": [
+        "build.status",
+        "tests.status",
+        "schema.contracts",
+        "deps.coherence"
+      ],
+      "stale_proxy_carry_forward_allowed": false
+    },
+    "combined_vitest_report": {
+      "path": "reports/vitest-stage4-2a-final.json",
+      "sha256": "31cd4ee50582c30859f5b542cbf041c7f41f1fb9d4476d1e001ff7110d31cb95",
+      "test_files_total": 25,
+      "test_suites_total": 58,
+      "test_suites_passed": 58,
+      "tests_total": 260,
+      "tests_passed": 260,
+      "tests_failed": 0,
+      "success": true
+    },
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-2a-20260725T211750900Z-bound-validated.jsonl",
+      "sha256": "d98cea52156b0f490c7e1785f76bbe86228fb4fed3e909a0c27b885b2d252a30",
+      "bytes": 2352,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true,
+      "validated_exporter_path": "scripts/research/export-casimir-dp-stage4-verification-trace.ts",
+      "validated_exporter_sha256": "2711992b5eede5b438724817a994e3d7b55fe724d3620bf6b3dbdbefeb368178"
+    }
+  },
+  "local_gates": {
+    "focused_stage4_2a_runtime_campaign_and_theory": {
+      "files": 4,
+      "tests": 44,
+      "status": "pass"
+    },
+    "physics_root_to_leaf": {
+      "files": 1,
+      "tests": 16,
+      "status": "pass"
+    },
+    "paper_and_equation_sidecar": {
+      "files": 2,
+      "tests": 21,
+      "status": "pass"
+    },
+    "warp_required": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    },
+    "combined_receipt_grade": {
+      "files": 25,
+      "suites": 58,
+      "tests": 260,
+      "status": "pass"
+    },
+    "production_build": {
+      "status": "pass_with_warnings",
+      "command": "npm run build",
+      "exit_code": 0,
+      "warnings_present": true,
+      "note": "The production client and server bundles completed. Existing browser-externalization, large-chunk, duplicate-key, and duplicate-case warnings remain outside this campaign's scientific authority."
+    },
+    "dependency_coherence": {
+      "status": "pass",
+      "command": "npm ls --depth=0",
+      "exit_code": 0,
+      "package_lock_sha256": "1833546cf15db039c1895a05e29e80338c271aff935d488034e7e9e6ab025cba"
+    },
+    "repository_wide_typecheck": {
+      "status": "not_separately_supplied",
+      "included_in_adapter_telemetry": false
+    },
+    "equation_sidecar": {
+      "paper_markers": 34,
+      "source_entries": 34,
+      "generated_entries": 34,
+      "source_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
+      "source_sha256": "fd4c004fb80ea7ef2ddd3c76b7435bdbd08ed4c0afc6f9493b84cfdd22952c4b",
+      "generated_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
+      "generated_sha256": "dd7720f64a9bb99b3fcb1a941f3062cf90762fc2afa09d67c7d0dc5d3ac476c4",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 26,
+      "edges": 72,
+      "projected_stage4_2a_badges": 2,
+      "calculator_payloads": 0,
+      "observable_bridge_edges": 0,
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 207,
+      "validation": "pass",
+      "report_json_path": "reports/math-report.json",
+      "report_json_sha256": "77624d0a48b902e8ee4a9823def615a4c55902218a0de761c4dd6f361905c4fe",
+      "report_markdown_path": "reports/math-report.md",
+      "report_markdown_sha256": "879e4973307f8850bf02a662dafcc4401d35ad4996a6db8011356acf8268ff1e"
+    },
+    "physics_root_to_leaf_manifest": {
+      "status": "pass",
+      "manifest_path": "configs/physics-root-leaf-manifest.v1.json",
+      "manifest_sha256": "b599023d3dc3f22d6a5fa47302045decea9065ab9b1cb6d6511a1b1f5336cb68",
+      "readiness_and_scientific_falsifier_rules_separated": true
+    }
+  },
+  "adapter_verification": {
+    "trace_id": "casimir-dp-electron-mass-higgs-anchor-stage4-2a-v1-20260725T211750900Z-final",
+    "run_id": "2324",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "local_auth_context": "ENABLE_AGI_AUTH=0; AGI_TENANT_REQUIRED=0",
+    "certificate": {
+      "certificate_hash": "38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34",
+      "certificate_id": "constraint-pack:repo-convergence:38b2e69264ac",
+      "integrity_ok": true,
+      "status": "GREEN"
+    }
+  },
+  "certificate_scope": {
+    "certifies": "repo-convergence constraint-pack over the four explicitly supplied hard software metrics",
+    "hard_metric_scope": {
+      "build": "full production client and server bundle completed with warnings",
+      "tests": "25-file, 58-suite, 260-test receipt-grade replay",
+      "schema": "Stage-4.2A runtime, contract, adversarial fixture, paper, sidecar, Theory Badge, math, root-to-leaf, and required GR/warp scope",
+      "dependencies": "top-level npm dependency graph plus content-addressed package lock"
+    },
+    "directly_binds_campaign_hashes_in_trace_notes": true,
+    "directly_binds_combined_vitest_report_sha256_in_trace_notes": true,
+    "lint_proxy_supplied": false,
+    "full_repository_typecheck_proxy_supplied": false,
+    "scientific_scope": "none",
+    "warp_viability_oracle_status": "not_evaluated",
+    "green_is_not_warp_admissible": true,
+    "why": "The certificate establishes the declared repository software metrics and provenance only. It does not validate the primary-source physics, independently measure the electron mass or Yukawa coupling, perform a full solar spectral fit, observe a coherence residual, identify objective collapse, establish a DP rate law, supply a Casimir-to-collapse kernel, solve manifold dynamics, or create a cosmological lift."
+  },
+  "certificate_provenance": {
+    "fresh_adapter_execution": true,
+    "fresh_validated_single_run_training_trace": true,
+    "prior_stage4_1_certificate_artifact_reused": false,
+    "certificate_content_hash_matches_stage4_1": true,
+    "explanation": "Run 2324, its trace identity, timestamp, explicit no-auto-telemetry request, and validated single-record trace are fresh. The certificate content hash matches Stage-4.1 because repo-convergence certificates are content-addressed over the same four normalized passing software metrics; this is not reuse of the Stage-4.1 trace or certificate artifact."
+  },
+  "superseded_verification_attempts": [
+    {
+      "trace_id": "adapter:802f9d4d-10c8-4836-a4ce-dcda57c8d84a",
+      "run_id": "2323",
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "reason": "This fresh adapter execution used auto-merged repository telemetry rather than the explicit content-addressed Stage-4.2A test manifest. It is historical only and is not verification authority."
+    }
+  ],
+  "bulk_trace_export_disposition": {
+    "status": "rejected_not_retained",
+    "reason": "The collection export included legacy NUL-corrupted history and one non-JSON record. The fail-closed single-run exporter retrieved run 2324 directly, rejected NULs, validated identity and certificate shape, and wrote the authoritative one-record JSONL."
+  },
+  "campaign_receipt_transition": {
+    "pre_verification_state": "campaign_runtime_completed_pending_external_verification",
+    "downstream_verification_state": "pass",
+    "reason": "The immutable campaign receipt remains unchanged. This downstream receipt records the later fresh adapter execution and repository-gate evidence."
+  },
+  "diagnostic_outputs": {
+    "electron_mass_replay_kg": 9.109383714344148e-31,
+    "electron_rest_energy_MeV": 0.5109989507166681,
+    "electron_compton_frequency_Hz": 1.2355899655495845e20,
+    "conditional_tree_yukawa": 2.9350283136667487e-6,
+    "stefan_boltzmann_numerical_W_m2_K4": 5.6703744193165394e-8,
+    "coarse_tsis_wien_color_temperature_K": 5795.543909999999,
+    "coarse_grid_bracket_K": [
+      5572.638375,
+      5913.82031632653
+    ],
+    "coarse_grid_bracket_is_statistical_uncertainty": false,
+    "full_spectral_fit_performed": false,
+    "iau_luminosity_radius_effective_temperature_K": 5772.003429098914,
+    "color_minus_bolometric_K": 23.540480901085175
+  },
+  "scientific_gates": {
+    "source_authority_integrity": "pass",
+    "penning_observational_replay": "pass",
+    "codata_correlated_reproduction": "pass",
+    "unit_dimension_closure": "pass",
+    "conditional_sm_tree_mapping": "pass",
+    "planck_spectral_density_closure": "pass",
+    "stefan_boltzmann_closure": "pass",
+    "solar_color_temperature_recovery": "pass",
+    "solar_bolometric_temperature_recovery": "pass",
+    "temperature_semantics": "pass",
+    "cross_scale_dependency_semantics": "pass",
+    "independent_electron_mass_validation": "not_ready",
+    "running_yukawa_at_higgs_scale": "blocked",
+    "direct_electron_yukawa_observation": "not_ready",
+    "electron_mass_from_higgs_identification": "blocked",
+    "higgs_origin_identification": "blocked",
+    "independent_solar_validation": "not_ready",
+    "measured_spectral_fit_significance": "not_ready",
+    "stellar_structure_inference": "not_evaluated",
+    "measured_casimir_coherence_evidence": "not_ready",
+    "objective_nonunitary_collapse_level_1": "not_ready",
+    "dp_rate_law_level_2": "blocked",
+    "casimir_boundary_modifies_dp_rate_level_3": "blocked",
+    "casimir_higgs_dp_transfer": "blocked",
+    "compton_to_collapse_clock": "blocked",
+    "thermal_to_dp_transfer": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "cosmological_lift": "blocked",
+    "physical_viability": "not_evaluated",
+    "publication_claim": "diagnostic_cross_scale_calibration_only"
+  }
+}

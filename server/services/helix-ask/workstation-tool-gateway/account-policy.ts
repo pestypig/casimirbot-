@@ -347,9 +347,11 @@ export const callAccountAuthorizedWorkstationGatewayCapability = async (input: {
   requestedRuntime?: string | null;
   capabilityId: string;
   arguments?: Record<string, unknown>;
+  approvalReceipt?: unknown;
   approvalToken?: string | null;
   turnId?: string | null;
   iteration?: number | null;
+  authoritativeEvidenceArtifacts?: unknown[];
 }): Promise<HelixGovernedWorkstationGatewayCallResult> => {
   const requestedMode = cleanString(input.requestedMode);
   const requestedRuntime = cleanString(input.requestedRuntime);
@@ -372,11 +374,15 @@ export const callAccountAuthorizedWorkstationGatewayCapability = async (input: {
     mode: authorization.effective_mode,
     capabilityId: input.capabilityId,
     arguments: input.arguments,
+    approvalReceipt: input.approvalReceipt,
     approvalToken: cleanString(input.approvalToken),
+    sessionId: input.accountContext.session_id,
     turnId: cleanString(input.turnId),
     iteration: input.iteration,
     accountType: input.accountContext.account_policy.account_type,
     profileId: input.accountContext.profile_id,
+    accountContext: input.accountContext,
+    authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
   });
   return {
     status_code: result.ok ? 200 : 400,

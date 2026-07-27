@@ -177,6 +177,8 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
       return "scholarly_full_text_lookup";
     case "research-library.read_document":
       return "scholarly_saved_full_text_read";
+    case "research-library.apply_evidence_enrichment":
+      return "scholarly_evidence_enrichment";
     case "scholarly-research.extract_numeric_parameters":
       return "scholarly_numeric_parameter_extraction";
     case "live_env.check_live_source_mail":
@@ -203,6 +205,20 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
       return "visual_capture_describe";
     case "helix_ask.reflect_theory_context":
     case "theory-badge-graph.propose_frontier_conjectures":
+    case "theory-experiment-procedure.prepare":
+    case "theory-experiment-procedure.readmit":
+    case "theory-experiment-procedure.evaluate_closure":
+    case "theory-semantic-admitter.normalize":
+    case "theory-artifact-producer.prepare_lanyon_request":
+    case "theory-artifact-producer.admit_lanyon_snapshot":
+    case "theory-formal-verifier.prepare_request":
+    case "theory-formal-verifier.plan":
+    case "theory-formal-verifier.start":
+    case "theory-formal-verifier.read_result":
+    case "theory-independent-numerical-verifier.prepare_request":
+    case "theory-independent-numerical-verifier.plan":
+    case "theory-independent-numerical-verifier.start":
+    case "theory-independent-numerical-verifier.read_result":
       return "theory_context_reflection";
     case "helix.theory.frontierVectorFieldTrace":
       return "theory_frontier_vector_field";
@@ -222,6 +238,8 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "workstation-notes.append_to_note":
     case "workstation-notes.create_note":
       return "workstation_note_edit";
+    case "workstation-notes.list_notes":
+      return "workstation_note_list";
     case "workstation-notes.open":
       return "workstation_note_open";
     default:
@@ -267,6 +285,7 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "scholarly-research.extract_numeric_parameters":
       return "external_scholarly_research";
     case "research-library.read_document":
+    case "research-library.apply_evidence_enrichment":
       return "profile_scholarly_evidence";
     case "live_env.check_live_source_mail":
     case "live_env.read_live_source_mail":
@@ -292,6 +311,20 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "helix_ask.reflect_theory_context":
     case "theory-badge-graph.propose_frontier_conjectures":
     case "helix.theory.frontierVectorFieldTrace":
+    case "theory-experiment-procedure.prepare":
+    case "theory-experiment-procedure.readmit":
+    case "theory-experiment-procedure.evaluate_closure":
+    case "theory-semantic-admitter.normalize":
+    case "theory-artifact-producer.prepare_lanyon_request":
+    case "theory-artifact-producer.admit_lanyon_snapshot":
+    case "theory-formal-verifier.prepare_request":
+    case "theory-formal-verifier.plan":
+    case "theory-formal-verifier.start":
+    case "theory-formal-verifier.read_result":
+    case "theory-independent-numerical-verifier.prepare_request":
+    case "theory-independent-numerical-verifier.plan":
+    case "theory-independent-numerical-verifier.start":
+    case "theory-independent-numerical-verifier.read_result":
       return "theory_context";
     case "helix_ask.reflect_live_synthetic_data":
     case "helix_ask.reflect_context_attachments":
@@ -307,6 +340,7 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
       return "civilization_bounds";
     case "workstation-notes.append_to_note":
     case "workstation-notes.create_note":
+    case "workstation-notes.list_notes":
     case "workstation-notes.open":
       return "workspace_state";
     default:

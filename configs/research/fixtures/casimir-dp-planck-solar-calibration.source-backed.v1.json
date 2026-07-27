@@ -1,0 +1,205 @@
+{
+  "schema_version": "casimir_dp_planck_solar_calibration_stage4_2a_input/1",
+  "calibration_id": "stage4-2a-planck-solar-radiometric-calibration-v1",
+  "evidence_class": "source_backed_radiometric_calibration",
+  "claim_ceiling": "cross_scale_constant_unit_and_normalization_consistency_only",
+  "promotion_allowed": false,
+  "source_registry": [
+    {
+      "source_id": "bipm_si_defining_constants",
+      "citation": "BIPM, The International System of Units (SI), defining constants.",
+      "url": "https://www.bipm.org/en/measurement-units/si-defining-constants",
+      "supports": "The exact SI numerical values and unit semantics of h, c, and k_B.",
+      "does_not_support": "A physical bridge from energy-frequency bookkeeping to objective collapse."
+    },
+    {
+      "source_id": "iau_2015_resolution_b3",
+      "citation": "IAU 2015 Resolution B3 on recommended nominal conversion constants for selected solar and planetary properties.",
+      "url": "https://www.iau.org/common/Uploaded%20files/IAUGA2015-Resolution-B3-recommended-nominal-conversion.pdf",
+      "supports": "Nominal solar luminosity, photospheric radius, and flux-equivalent effective temperature.",
+      "does_not_support": "A spectrum-only temperature, a true time-invariant solar property, stellar structure, or DP collapse."
+    },
+    {
+      "source_id": "tsis1_hsrs",
+      "citation": "TSIS-1 Hybrid Solar Reference Spectrum, LASP Interactive Solar Irradiance Datacenter.",
+      "url": "https://lasp.colorado.edu/lisird/data/tsis1_hsrs/",
+      "supports": "A frozen solar spectral-irradiance snapshot at 1 AU for a diagnostic Wien color-temperature recovery.",
+      "does_not_support": "A perfect-blackbody Sun, complete cross-wavelength covariance, a unique photospheric temperature, or a collapse mechanism."
+    }
+  ],
+  "constants": {
+    "h_J_s": 6.62607015e-34,
+    "hbar_J_s": 1.0545718176461565e-34,
+    "c_m_s": 299792458,
+    "k_B_J_K": 1.380649e-23,
+    "wien_lambda_displacement_m_K": 0.002897771955,
+    "stefan_boltzmann_reference_W_m2_K4": 5.670374419e-8
+  },
+  "conventions": {
+    "internal_frequency": "cyclic_nu_Hz",
+    "angular_frequency_relation": "omega_equals_2pi_nu",
+    "wavelength_density_unit": "W_m-2_sr-1_m-1",
+    "frequency_density_unit": "W_m-2_sr-1_Hz-1",
+    "angular_frequency_density_unit": "W_m-2_sr-1_per_rad_s",
+    "observed_solar_quantity": "spectral_irradiance_at_1_AU_W_m-2_nm-1",
+    "color_temperature_definition": "wien_peak_of_frozen_continuum_snapshot",
+    "bolometric_temperature_definition": "flux_equivalent_L_over_4piR2_sigma"
+  },
+  "numerical_integration": {
+    "x_max": 40,
+    "simpson_intervals": 4096,
+    "planck_moment_relative_tolerance": 1e-10,
+    "sigma_relative_tolerance": 1e-10,
+    "spectral_jacobian_relative_tolerance": 1e-12
+  },
+  "spectral_checkpoints": [
+    {
+      "checkpoint_id": "solar-visible-500nm",
+      "wavelength_nm": 500,
+      "temperature_K": 5772
+    },
+    {
+      "checkpoint_id": "laboratory-infrared-1000nm",
+      "wavelength_nm": 1000,
+      "temperature_K": 300
+    }
+  ],
+  "tsis_hsrs_snapshot": {
+    "source_id": "tsis1_hsrs",
+    "query_url": "https://lasp.colorado.edu/lisird/latis/dap/tsis1_hsrs.csv?wavelength%3E=480&wavelength%3C=800&stride(10000)",
+    "source_snapshot_path": "configs/research/source-snapshots/tsis1-hsrs-20260725-480-800nm.csv",
+    "source_snapshot_format": "wavelength_nm,irradiance_W_m2_nm,standard_uncertainty_W_m2_nm",
+    "retrieved_at": "2026-07-25T00:00:00.000Z",
+    "expected_snapshot_sha256": "a9b28d4ec51a10e077fd6999f992fe8829c18328a77c50ad4c0849ef1bd23d79",
+    "actual_snapshot_sha256": "a9b28d4ec51a10e077fd6999f992fe8829c18328a77c50ad4c0849ef1bd23d79",
+    "integrity_verified": true,
+    "complete_cross_wavelength_covariance_supplied": false,
+    "selection_frozen_before_evaluation": true,
+    "points": [
+      {
+        "wavelength_nm": 480,
+        "irradiance_W_m2_nm": 2.1587899659501315,
+        "standard_uncertainty_W_m2_nm": 0.0064763701520860195,
+        "use_for_peak": true,
+        "exclusion_reason": null
+      },
+      {
+        "wavelength_nm": 490,
+        "irradiance_W_m2_nm": 2.1520164323547006,
+        "standard_uncertainty_W_m2_nm": 0.006456049624830484,
+        "use_for_peak": true,
+        "exclusion_reason": null
+      },
+      {
+        "wavelength_nm": 500,
+        "irradiance_W_m2_nm": 2.185974015820813,
+        "standard_uncertainty_W_m2_nm": 0.006557921878993511,
+        "use_for_peak": true,
+        "exclusion_reason": null
+      },
+      {
+        "wavelength_nm": 520,
+        "irradiance_W_m2_nm": 2.0897567498657583,
+        "standard_uncertainty_W_m2_nm": 0.006269270554184914,
+        "use_for_peak": true,
+        "exclusion_reason": null
+      },
+      {
+        "wavelength_nm": 540,
+        "irradiance_W_m2_nm": 2.024054403116798,
+        "standard_uncertainty_W_m2_nm": 0.0060721635818481445,
+        "use_for_peak": true,
+        "exclusion_reason": null
+      },
+      {
+        "wavelength_nm": 550,
+        "irradiance_W_m2_nm": 1.9873728798657417,
+        "standard_uncertainty_W_m2_nm": 0.005962118972092867,
+        "use_for_peak": false,
+        "exclusion_reason": "outside_frozen_peak_window"
+      },
+      {
+        "wavelength_nm": 570,
+        "irradiance_W_m2_nm": 1.7013367235743762,
+        "standard_uncertainty_W_m2_nm": 0.005104010459035635,
+        "use_for_peak": false,
+        "exclusion_reason": "outside_frozen_peak_window"
+      },
+      {
+        "wavelength_nm": 580,
+        "irradiance_W_m2_nm": 1.8883073909387826,
+        "standard_uncertainty_W_m2_nm": 0.005664922297000885,
+        "use_for_peak": false,
+        "exclusion_reason": "outside_frozen_peak_window"
+      },
+      {
+        "wavelength_nm": 590,
+        "irradiance_W_m2_nm": 1.8385964139949678,
+        "standard_uncertainty_W_m2_nm": 0.0055157896131277084,
+        "use_for_peak": false,
+        "exclusion_reason": "outside_frozen_peak_window"
+      },
+      {
+        "wavelength_nm": 600,
+        "irradiance_W_m2_nm": 1.808398896464896,
+        "standard_uncertainty_W_m2_nm": 0.005425197072327137,
+        "use_for_peak": false,
+        "exclusion_reason": "outside_frozen_peak_window"
+      },
+      {
+        "wavelength_nm": 650,
+        "irradiance_W_m2_nm": 1.6166965763532042,
+        "standard_uncertainty_W_m2_nm": 0.004850090015679598,
+        "use_for_peak": false,
+        "exclusion_reason": "outside_frozen_peak_window"
+      },
+      {
+        "wavelength_nm": 700,
+        "irradiance_W_m2_nm": 1.4482250217809916,
+        "standard_uncertainty_W_m2_nm": 0.004344675224274397,
+        "use_for_peak": false,
+        "exclusion_reason": "outside_frozen_peak_window"
+      },
+      {
+        "wavelength_nm": 750,
+        "irradiance_W_m2_nm": 1.2901371076858879,
+        "standard_uncertainty_W_m2_nm": 0.003870411543175578,
+        "use_for_peak": false,
+        "exclusion_reason": "outside_frozen_peak_window"
+      },
+      {
+        "wavelength_nm": 800,
+        "irradiance_W_m2_nm": 1.1410126688728452,
+        "standard_uncertainty_W_m2_nm": 0.0034230381716042757,
+        "use_for_peak": false,
+        "exclusion_reason": "outside_frozen_peak_window"
+      }
+    ],
+    "accepted_color_temperature_min_K": 5700,
+    "accepted_color_temperature_max_K": 5900
+  },
+  "iau_solar_bolometric": {
+    "source_id": "iau_2015_resolution_b3",
+    "luminosity_W": 3.828e26,
+    "photospheric_radius_m": 695700000,
+    "nominal_effective_temperature_K": 5772,
+    "absolute_tolerance_K": 2,
+    "emitting_area_convention": "4_pi_R_squared",
+    "nominal_values_are_true_time_invariant_solar_properties": false
+  },
+  "dependency_semantics": {
+    "planck_integral_and_sigma_independent_theories": false,
+    "spectral_and_bolometric_temperature_independent_when_sources_overlap": false,
+    "shared_h_is_independent_dp_evidence": false,
+    "source_overlap_class": "correlated_calibration_with_distinct_operational_temperature_definitions",
+    "cross_covariance_required_for_significance": true
+  },
+  "nonbridge_policy": {
+    "common_constants_imply_collapse_clock": false,
+    "color_temperature_equals_effective_temperature": false,
+    "solar_temperature_supports_dp": false,
+    "observable_bridge_edges_allowed": false,
+    "apparatus_thermal_transfer_modeled": false,
+    "cosmological_lift_registered": false
+  }
+}

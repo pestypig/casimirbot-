@@ -2,6 +2,7 @@ package com.casimirbot.helixsensor;
 
 import com.casimirbot.helixsensor.scope.SensorScope;
 import com.casimirbot.helixsensor.scope.SensorScopePolicy;
+import java.net.URI;
 import org.bukkit.configuration.file.FileConfiguration;
 
 public record HelixSensorConfig(
@@ -74,7 +75,10 @@ public record HelixSensorConfig(
             config.getBoolean("helix.enabled", true),
             stripTrailingSlash(config.getString("helix.endpoint", "http://localhost:5050")),
             config.getString("helix.bearer_token", "replace-me"),
-            config.getString("helix.source_id", "source:minecraft-paper-plugin"),
+            config.getString(
+                "helix.source_id",
+                "source:room-ingress:replace-with-generated-id"
+            ),
             config.getString("helix.room_id", "room:minecraft"),
             config.getString("helix.world_id", "minecraft:paper-server"),
             config.getString("helix.domain_adapter", "minecraft.paper_plugin.v1"),
@@ -130,7 +134,31 @@ public record HelixSensorConfig(
     }
 
     public boolean sensorUploadsAllowed() {
-        return enabled && !executionEnabled;
+        return enabled
+            && !executionEnabled
+            && secureEndpointAllowed(endpoint)
+            && credentialAllowedForEndpoint(endpoint, bearerToken);
+    }
+
+    static boolean credentialAllowedForEndpoint(String endpoint, String bearerToken) {
+        if (!HelixHttpClient.isRoomIngressEndpoint(endpoint)) return true;
+        return bearerToken != null
+            && !bearerToken.isBlank()
+            && !"replace-me".equalsIgnoreCase(bearerToken.trim());
+    }
+
+    static boolean secureEndpointAllowed(String endpoint) {
+        try {
+            URI uri = URI.create(endpoint);
+            if ("https".equalsIgnoreCase(uri.getScheme())) return true;
+            String host = uri.getHost();
+            return "http".equalsIgnoreCase(uri.getScheme()) &&
+                ("localhost".equalsIgnoreCase(host) ||
+                    "127.0.0.1".equals(host) ||
+                    "::1".equals(host));
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     private static int positive(int value, int fallback) {

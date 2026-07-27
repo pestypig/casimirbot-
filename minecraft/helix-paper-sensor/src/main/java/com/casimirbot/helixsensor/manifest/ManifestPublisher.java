@@ -7,13 +7,19 @@ import com.casimirbot.helixsensor.HelixSensorRuntimeStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
 public final class ManifestPublisher {
     private final JavaPlugin plugin;
     private final HelixSensorConfig config;
     private final HelixHttpClient httpClient;
     private final HelixSensorRuntimeStatus runtimeStatus;
+    private final AtomicBoolean publishInFlight = new AtomicBoolean(false);
+    private final AtomicBoolean firstAdmissionDelivered = new AtomicBoolean(false);
+    private BukkitTask refreshTask;
 
     public ManifestPublisher(JavaPlugin plugin, HelixSensorConfig config, HelixHttpClient httpClient, HelixSensorRuntimeStatus runtimeStatus) {
         this.plugin = plugin;
@@ -22,14 +28,68 @@ public final class ManifestPublisher {
         this.runtimeStatus = runtimeStatus;
     }
 
-    public void publishAsync() {
+    public void start(Runnable onFirstAdmission) {
+        if (refreshTask != null) return;
+        long refreshTicks = Math.max(100L, config.heartbeatIntervalTicks());
+        refreshTask = plugin.getServer().getScheduler().runTaskTimerAsynchronously(
+            plugin,
+            () -> publishIfIdle(onFirstAdmission),
+            0L,
+            refreshTicks
+        );
+    }
+
+    public void stop() {
+        if (refreshTask != null) {
+            refreshTask.cancel();
+            refreshTask = null;
+        }
+    }
+
+    public CompletableFuture<HelixHttpClient.IngressResponse> publishAsync() {
         runtimeStatus.recordManifestAttempt();
-        httpClient.postManifestAsync(HelixJson.stringify(buildManifest(config, Instant.now().toString())))
-            .thenRun(() -> plugin.getLogger().info("Published Helix environment source manifest."))
-            .exceptionally(error -> {
-                plugin.getLogger().warning("Failed to publish Helix manifest: " + error.getMessage());
-                return null;
-            });
+        return httpClient.postManifestAsync(
+            HelixJson.stringify(buildManifest(config, Instant.now().toString()))
+        );
+    }
+
+    private void publishIfIdle(Runnable onFirstAdmission) {
+        if (
+            httpClient.terminallyPaused() ||
+            !publishInFlight.compareAndSet(false, true)
+        ) {
+            return;
+        }
+        publishAsync().whenComplete((response, error) -> {
+            publishInFlight.set(false);
+            if (error != null) {
+                plugin.getLogger().warning(
+                    "Failed to publish Helix manifest: " + error.getMessage()
+                );
+                return;
+            }
+            if (httpClient.terminallyPaused()) return;
+            if (!response.success()) {
+                if (
+                    !"client_backoff".equals(response.errorCode()) &&
+                    !"client_terminally_paused".equals(response.errorCode())
+                ) {
+                    plugin.getLogger().warning(
+                        "Helix manifest was not admitted: " + response.failureSummary()
+                    );
+                }
+                return;
+            }
+            if (firstAdmissionDelivered.compareAndSet(false, true)) {
+                plugin.getLogger().info(
+                    "Published and admitted the Helix environment source manifest."
+                );
+                plugin.getServer().getScheduler().runTask(
+                    plugin,
+                    onFirstAdmission
+                );
+            }
+        });
     }
 
     public static Map<String, Object> buildManifest(HelixSensorConfig config, String now) {

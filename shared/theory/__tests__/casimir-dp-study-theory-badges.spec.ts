@@ -25,11 +25,364 @@ describe("Casimir / DP quantum-foam study badges", () => {
         "study.casimir_dp.data_readiness_stage1",
         "study.casimir_dp.proposal_closure",
         "study.casimir_dp.penrose_or_branch_geometry_context",
+        "study.casimir_dp.complex_coherence_discriminator",
+        "study.casimir_dp.qed_green_noise_budget",
+        "study.casimir_dp.dp_companion_signature",
+        "study.casimir_dp.casimir_gravity_upper_bound",
+        "study.casimir_dp.blinded_model_comparison",
+        "study.casimir_dp.manifold_kernel_registry",
+        "study.casimir_dp.evidence_map_stage3",
+        "study.casimir_dp.polarization_resolved_qed_control",
+        "study.casimir_dp.thermal_radiative_closure",
+        "study.casimir_dp.tensor_dimensional_congruence",
+        "study.casimir_dp.polarization_congruence_stage4",
+        "study.casimir_dp.qed_scale_hierarchy_stage4_1",
+        "study.casimir_dp.electron_mass_higgs_anchor_stage4_2a",
+        "study.casimir_dp.planck_solar_calibration_stage4_2a",
+        "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
         "study.casimir_dp.claim_boundary",
       ]),
     );
+    expect(branch.badges).toHaveLength(27);
+    expect(branch.edges).toHaveLength(79);
     expect(branch.badges.every((badge) => badge.claimBoundary.diagnosticOnly)).toBe(true);
     expect(branch.badges.every((badge) => badge.claimBoundary.promotionAllowed === false)).toBe(true);
+  });
+
+  it("connects Stage-4 polarization, thermal, and congruence controls without inventing a bridge", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const stage4Ids = [
+      "study.casimir_dp.polarization_resolved_qed_control",
+      "study.casimir_dp.thermal_radiative_closure",
+      "study.casimir_dp.tensor_dimensional_congruence",
+      "study.casimir_dp.polarization_congruence_stage4",
+    ];
+    const stage4 = branch.badges.filter((badge) =>
+      stage4Ids.includes(badge.id)
+    );
+    const campaign = stage4.find((badge) =>
+      badge.id === "study.casimir_dp.polarization_congruence_stage4"
+    );
+
+    expect(stage4).toHaveLength(4);
+    expect(stage4.every((badge) =>
+      badge.tags.includes("synthetic_validation")
+    )).toBe(true);
+    expect(stage4.every((badge) =>
+      badge.tags.includes("measured_not_ready")
+    )).toBe(true);
+    expect(stage4.every((badge) =>
+      badge.tags.includes("synthetic_blinding_contract_only")
+    )).toBe(true);
+    expect(stage4.every((badge) =>
+      badge.calculatorPayloads.length === 0
+    )).toBe(true);
+    expect(branch.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        from: "physics.radiation.mode_context",
+        to: "study.casimir_dp.polarization_resolved_qed_control",
+        relation: "requires",
+      }),
+      expect.objectContaining({
+        from: "solar.spectrum.stefan_boltzmann_luminosity",
+        to: "study.casimir_dp.thermal_radiative_closure",
+        relation: "diagnostic_checks",
+      }),
+      expect.objectContaining({
+        from: "physics.quantum.energy_frequency",
+        to: "study.casimir_dp.tensor_dimensional_congruence",
+        relation: "requires",
+      }),
+      expect.objectContaining({
+        from: "study.casimir_dp.evidence_map_stage3",
+        to: campaign?.id,
+        relation: "requires",
+      }),
+    ]));
+    expect(branch.edges.some((edge) =>
+      edge.observableBridge != null &&
+      stage4Ids.includes(edge.from)
+    )).toBe(false);
+    expect(branch.badges.find((badge) =>
+      badge.id === "study.casimir_dp.tensor_dimensional_congruence"
+    )?.equations[0]?.displayLatex).toContain("not\\Rightarrow");
+    expect(campaign?.assumptions.join(" ")).toContain(
+      "no custodian receipt or mapping has been created",
+    );
+    expect(campaign?.assumptions.join(" ")).toContain(
+      "measured comparison and unblinding are unauthorized",
+    );
+  });
+
+  it("registers Stage-4.1 as a source-backed QED identity calibration and semantic non-bridge", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const calibration = branch.badges.find(
+      (badge) =>
+        badge.id === "study.casimir_dp.qed_scale_hierarchy_stage4_1",
+    );
+    const calibrationEdges = branch.edges.filter(
+      (edge) =>
+        edge.from === calibration?.id ||
+        edge.to === calibration?.id,
+    );
+
+    expect(calibration).toEqual(
+      expect.objectContaining({
+        level: "diagnostic_gate",
+        status: "diagnostic",
+        calculatorPayloads: [],
+        claimBoundary: expect.objectContaining({
+          diagnosticOnly: true,
+          physicalMechanismClaimAllowed: false,
+          promotionAllowed: false,
+        }),
+      }),
+    );
+    expect(calibration?.tags).toEqual(
+      expect.arrayContaining([
+        "stage_4_1",
+        "stage_1_reduced_order",
+        "source_backed_calculation",
+        "same_dimension_not_connected",
+        "maximum_claim:qed_scale_identity_calibration",
+      ]),
+    );
+    expect(calibration?.equations[0]?.displayLatex).toContain(
+      "\\nu_R^{(\\infty)}=\\frac{\\alpha_{fs}^2}{2}\\nu_C",
+    );
+    expect(calibration?.assumptions.join(" ")).toContain(
+      "not independent confirmations",
+    );
+    expect(calibration?.assumptions.join(" ")).toContain(
+      "No cavity-mode, Casimir, DP, collapse, manifold, resonance, polarization, or transfer-kernel variable",
+    );
+    expect(calibrationEdges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "study.casimir_dp.polarization_congruence_stage4",
+          to: calibration?.id,
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "study.casimir_dp.tensor_dimensional_congruence",
+          to: calibration?.id,
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "physics.atomic.electronic_level_structure_context",
+          to: calibration?.id,
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: calibration?.id,
+          to: "study.casimir_dp.claim_boundary",
+          relation: "documents",
+        }),
+      ]),
+    );
+    expect(calibrationEdges).toHaveLength(5);
+    expect(
+      calibrationEdges.some((edge) => edge.observableBridge != null),
+    ).toBe(false);
+  });
+
+  it("registers Stage-4.2A mass and radiometric calibrations as a zero-bridge dependency ladder", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const massAnchor = branch.badges.find(
+      (badge) =>
+        badge.id ===
+          "study.casimir_dp.electron_mass_higgs_anchor_stage4_2a",
+    );
+    const solarCalibration = branch.badges.find(
+      (badge) =>
+        badge.id ===
+          "study.casimir_dp.planck_solar_calibration_stage4_2a",
+    );
+    const stage4_2aIds = [massAnchor?.id, solarCalibration?.id].filter(
+      (id): id is string => id != null,
+    );
+    const stage4_2aEdges = branch.edges.filter(
+      (edge) =>
+        stage4_2aIds.includes(edge.from) ||
+        stage4_2aIds.includes(edge.to),
+    );
+    const stage4_2bId =
+      "study.casimir_dp.apparatus_coherence_residual_stage4_2b";
+    const stage4_2aLadderEdges = stage4_2aEdges.filter(
+      (edge) => edge.from !== stage4_2bId && edge.to !== stage4_2bId,
+    );
+    const stage4_2bDependencyEdges = stage4_2aEdges.filter(
+      (edge) => edge.from === stage4_2bId || edge.to === stage4_2bId,
+    );
+
+    expect(massAnchor).toEqual(expect.objectContaining({
+      level: "diagnostic_gate",
+      status: "diagnostic",
+      calculatorPayloads: [],
+      claimBoundary: expect.objectContaining({
+        diagnosticOnly: true,
+        physicalMechanismClaimAllowed: false,
+        promotionAllowed: false,
+      }),
+    }));
+    expect(massAnchor?.tags).toEqual(expect.arrayContaining([
+      "stage_4_2a",
+      "source_backed_replay",
+      "same_dimension_not_connected",
+      "maximum_claim:electron_mass_metrology_replay_and_conditional_sm_tree_mapping_only",
+    ]));
+    expect(massAnchor?.assumptions.join(" ")).toContain(
+      "not independent confirmations",
+    );
+    expect(massAnchor?.assumptions.join(" ")).toContain(
+      "supplies no Casimir, DP, collapse, manifold, cosmological, or quantum-foam transfer law",
+    );
+
+    expect(solarCalibration).toEqual(expect.objectContaining({
+      level: "diagnostic_gate",
+      status: "diagnostic",
+      calculatorPayloads: [],
+      claimBoundary: expect.objectContaining({
+        diagnosticOnly: true,
+        physicalMechanismClaimAllowed: false,
+        promotionAllowed: false,
+      }),
+    }));
+    expect(solarCalibration?.tags).toEqual(expect.arrayContaining([
+      "stage_4_2a",
+      "coarse_wien_peak_not_full_fit",
+      "temperature_semantics_separated",
+      "same_dimension_not_connected",
+      "promotion_blocked",
+    ]));
+    expect(solarCalibration?.assumptions.join(" ")).toContain(
+      "coarse frozen-grid Wien-peak color diagnostic",
+    );
+    expect(solarCalibration?.assumptions.join(" ")).toContain(
+      "flux-equivalent luminosity-radius conversion",
+    );
+    expect(solarCalibration?.assumptions.join(" ")).toContain(
+      "not a full spectral fit",
+    );
+    expect(solarCalibration?.units).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        symbol: "T_color_TSIS",
+        unit: "K",
+        dimensionSignature: "Theta",
+      }),
+      expect.objectContaining({
+        symbol: "T_eff_IAU",
+        unit: "K",
+        dimensionSignature: "Theta",
+      }),
+      expect.objectContaining({
+        symbol: "B_lambda",
+        unit: "W m^-2 sr^-1 m^-1",
+        dimensionSignature: "M L^-1 T^-3",
+      }),
+      expect.objectContaining({
+        symbol: "B_nu",
+        unit: "W m^-2 sr^-1 Hz^-1",
+        dimensionSignature: "M T^-2",
+      }),
+      expect.objectContaining({
+        symbol: "B_omega",
+        unit: "W m^-2 sr^-1 per_rad_s",
+        dimensionSignature: "M T^-2",
+      }),
+      expect.objectContaining({
+        symbol: "sigma_SB",
+        unit: "W m^-2 K^-4",
+        dimensionSignature: "M T^-3 Theta^-4",
+      }),
+    ]));
+    expect(solarCalibration?.sourceRefs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path:
+          "configs/research/source-snapshots/tsis1-hsrs-20260725-480-800nm.csv",
+      }),
+    ]));
+    expect(stage4_2aLadderEdges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        from: massAnchor?.id,
+        to: "study.casimir_dp.qed_scale_hierarchy_stage4_1",
+        relation: "requires",
+      }),
+      expect.objectContaining({
+        from: massAnchor?.id,
+        to: solarCalibration?.id,
+        relation: "diagnostic_checks",
+      }),
+      expect.objectContaining({
+        from: "study.casimir_dp.frequency_bridge_gate",
+        to: massAnchor?.id,
+        relation: "requires",
+      }),
+      expect.objectContaining({
+        from: solarCalibration?.id,
+        to: "study.casimir_dp.thermal_radiative_closure",
+        relation: "diagnostic_checks",
+      }),
+      expect.objectContaining({
+        from: "solar.spectrum.stefan_boltzmann_luminosity",
+        to: solarCalibration?.id,
+        relation: "diagnostic_checks",
+      }),
+      expect.objectContaining({
+        from: massAnchor?.id,
+        to: "study.casimir_dp.claim_boundary",
+        relation: "documents",
+      }),
+      expect.objectContaining({
+        from: solarCalibration?.id,
+        to: "study.casimir_dp.claim_boundary",
+        relation: "documents",
+      }),
+    ]));
+    expect(stage4_2aLadderEdges).toHaveLength(7);
+    expect(stage4_2bDependencyEdges).toEqual([
+      expect.objectContaining({
+        from: massAnchor?.id,
+        to: stage4_2bId,
+        relation: "requires",
+      }),
+    ]);
+    expect(
+      stage4_2aEdges.some((edge) => edge.observableBridge != null),
+    ).toBe(false);
+    expect(
+      stage4_2aEdges.some((edge) => edge.relation === "derives"),
+    ).toBe(false);
+  });
+
+  it("exposes the Stage-3 evidence map without promoting synthetic or blocked lanes", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const stage3Ids = [
+      "study.casimir_dp.complex_coherence_discriminator",
+      "study.casimir_dp.qed_green_noise_budget",
+      "study.casimir_dp.dp_companion_signature",
+      "study.casimir_dp.casimir_gravity_upper_bound",
+      "study.casimir_dp.blinded_model_comparison",
+      "study.casimir_dp.manifold_kernel_registry",
+      "study.casimir_dp.evidence_map_stage3",
+    ];
+    const stage3 = branch.badges.filter((badge) => stage3Ids.includes(badge.id));
+    const registry = stage3.find(
+      (badge) => badge.id === "study.casimir_dp.manifold_kernel_registry",
+    );
+
+    expect(stage3).toHaveLength(7);
+    expect(stage3.every((badge) => badge.tags.includes("synthetic_validation"))).toBe(true);
+    expect(stage3.every((badge) => badge.tags.includes("measured_not_ready"))).toBe(true);
+    expect(stage3.every((badge) => badge.calculatorPayloads.length === 0)).toBe(true);
+    expect(registry?.status).toBe("blocked");
+    expect(branch.edges.some((edge) =>
+      edge.from === registry?.id &&
+      edge.to === "study.casimir_dp.blinded_model_comparison" &&
+      edge.relation === "requires"
+    )).toBe(true);
+    expect(branch.edges.some((edge) => edge.relation === "derives" && edge.from === registry?.id)).toBe(false);
+    expect(branch.edges.some((edge) => edge.observableBridge != null)).toBe(false);
   });
 
   it("registers proposal completeness separately from commissioning and evidence", () => {
@@ -137,7 +490,7 @@ describe("Casimir / DP quantum-foam study badges", () => {
       "penrose_or_timescale_notation_context",
     ]);
     expect(context?.assumptions.join(" ")).toContain("does not validate Orch OR");
-    expect(branch.edges.filter((edge) => edge.from === context?.id || edge.to === context?.id)).toHaveLength(6);
+    expect(branch.edges.filter((edge) => edge.from === context?.id || edge.to === context?.id)).toHaveLength(7);
     expect(branch.edges.some((edge) =>
       edge.from === context?.id &&
       edge.to === "orch_or.claim_boundary.exploratory_only" &&
@@ -164,6 +517,142 @@ describe("Casimir / DP quantum-foam study badges", () => {
     expect(hypothesis?.equations[0]?.operatorKind).toBe("noncomputable_reference");
   });
 
+  it("registers Stage-4.2B as a synthetic-only zero-bridge apparatus forecast", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find(
+      (candidate) =>
+        candidate.id ===
+        "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
+    );
+    const incidentEdges = branch.edges.filter(
+      (edge) => edge.from === badge?.id || edge.to === badge?.id,
+    );
+    const assumptions = badge?.assumptions.join(" ") ?? "";
+    const sourceRefPaths = badge?.sourceRefs.map((sourceRef) => sourceRef.path) ?? [];
+    const sourceRefKeys = new Set(
+      badge?.sourceRefs.flatMap((sourceRef) => [sourceRef.path, sourceRef.id]) ?? [],
+    );
+
+    expect(badge).toEqual(expect.objectContaining({
+      level: "diagnostic_gate",
+      status: "diagnostic",
+      calculatorPayloads: [],
+    }));
+    expect(badge?.claimBoundary).toEqual(expect.objectContaining({
+      diagnosticOnly: true,
+      promotionAllowed: false,
+      physicalMechanismClaimAllowed: false,
+    }));
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "synthetic_only_v1",
+      "synthetic_validation",
+      "measured_not_ready",
+      "collapse_identification_blocked",
+      "manifold_dynamics_blocked",
+      "physical_viability_not_evaluated",
+      "runtime_g_campaign_pass",
+      "runtime_f_signature_not_identifiable",
+      "fresh_adapter_verifier_pass_integrity_ok",
+      "current_no_go_not_dp_exclusion",
+      "maximum_synthetic_claim:apparatus_residual_and_frozen_dp_signature_software_recovery_only",
+      "maximum_source_backed_claim:apparatus_power_and_identifiability_forecast_only",
+    ]));
+    expect(assumptions).toContain(
+      "registered nonrelativistic Markovian mass-density DP generator",
+    );
+    expect(assumptions).toContain(
+      "complete joint-system equivalence",
+    );
+    expect(assumptions).toContain(
+      "not a theorem about Penrose OR",
+    );
+    expect(assumptions).toContain(
+      "Stage-4.2B v1 accepts synthetic_fixture evidence only",
+    );
+    expect(assumptions).toContain(
+      "blocks Runtime F as signature_not_identifiable",
+    );
+    expect(assumptions).toContain(
+      "acquisition power and a DP exclusion are not estimable",
+    );
+    expect(assumptions).toContain(
+      "Fresh adapter run 2325 passes",
+    );
+    const reportJsonPath =
+      "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-report.json";
+    const reportMarkdownPath =
+      "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-report.md";
+    const tracePath =
+      "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-trace.jsonl";
+    const receiptPath =
+      "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-receipt.json";
+    const adapterTracePath =
+      "artifacts/training-trace-stage4-2b-20260726T130100867Z-bound-validated.jsonl";
+    const verificationReceiptPath =
+      "docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-verification-receipt.json";
+    expect(sourceRefPaths).toEqual(expect.arrayContaining([
+      "docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-plan.md",
+      "shared/contracts/casimir-dp-apparatus-coherence-residual-stage4-2b.v1.ts",
+      "tests/casimir-dp-stage4-2b-contract.spec.ts",
+      "scripts/research/run-casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+      "configs/research/casimir-dp-stage4-2b-authorities.v1.json",
+      "configs/research/fixtures/casimir-dp-stage4-2b-campaign.synthetic.v1.json",
+      "tests/casimir-dp-stage4-2b-campaign.spec.ts",
+      reportJsonPath,
+      reportMarkdownPath,
+      tracePath,
+      receiptPath,
+      adapterTracePath,
+      verificationReceiptPath,
+    ]));
+    expect(badge?.sourceRefs.find(
+      (sourceRef) => sourceRef.path === reportJsonPath,
+    )?.id).toBe(
+      "2ebd9971bacc393842dc71bfd80063d7b244231947074bc70b3be25bd7ad5b67",
+    );
+    expect(badge?.sourceRefs.find(
+      (sourceRef) => sourceRef.path === reportMarkdownPath,
+    )?.id).toBe(
+      "e29564c6cedcace388233f6006b98683fab54f9326b96ab9bbaf3334f33adcbe",
+    );
+    expect(badge?.sourceRefs.find(
+      (sourceRef) => sourceRef.path === tracePath,
+    )?.id).toBe(
+      "727d78249462f0b4171532af37db97be5500a3a7a870cc56b2e533cae0ae0df7",
+    );
+    expect(badge?.sourceRefs.find(
+      (sourceRef) => sourceRef.path === receiptPath,
+    )?.id).toBe(
+      "50632b32c4133fe3f0f5eee3cbbb157a983d0a9da69de6239d58563ca88f569c",
+    );
+    expect(badge?.sourceRefs.find(
+      (sourceRef) => sourceRef.path === adapterTracePath,
+    )?.id).toBe(
+      "3894af959e1f3de8d28ede457727a97688c2fd64031c3512f941f5b89a889ffd",
+    );
+    expect(badge?.sourceRefs.find(
+      (sourceRef) => sourceRef.path === verificationReceiptPath,
+    )?.id).toBe(
+      "194a58bcfa4cc855c8a50a8a862fac391a01ee55c4dc9feeb1d6e98526b8bf3d",
+    );
+    expect(sourceRefKeys.has(
+      badge?.observables?.[0]?.operationalDefinitionRef ?? "",
+    )).toBe(true);
+    expect(sourceRefKeys.has(
+      badge?.observables?.[0]?.responseModelRef ?? "",
+    )).toBe(true);
+    expect(incidentEdges).toHaveLength(7);
+    expect(
+      incidentEdges.some((edge) => edge.observableBridge != null),
+    ).toBe(false);
+    expect(
+      incidentEdges.some((edge) => edge.relation === "derives"),
+    ).toBe(false);
+    expect(
+      branch.edges.some((edge) => edge.observableBridge != null),
+    ).toBe(false);
+  });
+
   it("keeps Compton, DP, and cavity frequencies separate until a transfer kernel exists", () => {
     const branch = buildCasimirDpStudyTheoryBadgesV1();
     const gate = branch.badges.find((badge) => badge.id === "study.casimir_dp.frequency_bridge_gate");
@@ -186,7 +675,7 @@ describe("Casimir / DP quantum-foam study badges", () => {
       input: {
         query: "Open the CDP-QF-1 Casimir Diósi-Penrose quantum foam manifold-response study and explain the decoherence and observable gates",
         simulationOwners: ["casimir_dp_study"],
-        limit: 20,
+        limit: 30,
       },
     });
     expect(matches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toEqual(

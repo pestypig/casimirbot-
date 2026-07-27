@@ -28,6 +28,14 @@ Optional:
 - `max_hits`
 - `doc_class`
 - `bundle_kind`
+- `mechanics_collection_ids`
+- `adapter_profile_id`
+
+When `mechanics_collection_ids` is present, `adapter_profile_id` is required.
+The gateway resolves the collection IDs through the trusted environment
+adapter registry and replaces caller-supplied paths with that collection's
+allowlisted document paths. Unknown or cross-profile collections fail closed.
+This keeps versioned rules retrieval separate from fresh room telemetry.
 
 Explicit route aliases:
 
@@ -61,6 +69,8 @@ Required observation fields:
 - `document_candidates` with optional `doc_class`, `bundle_kind`, `canonical`,
   `sidecars`, and `tool_hints` from `docs/doc-taxonomy.v1.json`
 - `evidence_refs`
+- optional `mechanics_scope` with the compatible adapter profile, collection
+  versions, and bounded document paths
 - `missing_requirements`
 - `terminal_eligible=false`
 - `post_tool_model_step_required=true`
@@ -108,5 +118,8 @@ Required stable tests:
 - focused docs-viewer plus "this document" materializes a docs observation
 - no docs observation means no document-content answer
 - final prose cannot create open-doc action metadata
+- a title-blind game-rule query resolves only the adapter-compatible mechanics
+  collection
+- unknown and cross-profile mechanics collections are blocked
 - docs+repo compound executes only requested capabilities unless another
   capability is required by an explicit route contract

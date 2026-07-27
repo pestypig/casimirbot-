@@ -32,6 +32,10 @@ import type {
   LiveCommentarySession,
 } from "@shared/helix-live-commentary";
 import type { VoiceSpeakAuthorityRef } from "@shared/voice-proposal";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 
 const sources = new Map<string, WorkstationLiveSource>();
 const eventsBySource = new Map<string, WorkstationLiveSourceEvent[]>();
@@ -51,6 +55,12 @@ const cleanString = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed || null;
+};
+
+const assertGenericWorkstationSourceId = (sourceId: string): void => {
+  if (isHelixRoomSourceIngressSourceId(sourceId)) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
 };
 
 const normalizeKind = (value: unknown): WorkstationLiveSourceKind => {
@@ -172,7 +182,9 @@ export function upsertWorkstationLiveSource(input: {
 }): WorkstationLiveSource {
   const now = input.now ?? new Date().toISOString();
   const sourceId = cleanString(input.source_id) ?? `source:live:${hashShort([input.kind, input.environment_id, now], 12)}`;
+  assertGenericWorkstationSourceId(sourceId);
   const existing = sources.get(sourceId);
+  if (existing) assertGenericWorkstationSourceId(existing.source_id);
   const source: WorkstationLiveSource = {
     schema: HELIX_WORKSTATION_LIVE_SOURCE_SCHEMA,
     source_id: sourceId,
@@ -228,6 +240,7 @@ export function ingestWorkstationLiveSourceEvent(input: {
     sink_receipts: LiveOutputSinkReceipt[];
   }>;
 } {
+  assertGenericWorkstationSourceId(input.source_id);
   const ts = input.ts ?? new Date().toISOString();
   const kind = normalizeKind(input.kind);
   const payload = input.payload ?? {};
@@ -359,17 +372,44 @@ export function ingestWorkstationLiveSourceEvent(input: {
 }
 
 export function listWorkstationLiveSources(): WorkstationLiveSource[] {
-  return Array.from(sources.values()).sort((a: WorkstationLiveSource, b: WorkstationLiveSource) => b.updated_at.localeCompare(a.updated_at));
+  return Array.from(sources.values())
+    .filter(
+      (source: WorkstationLiveSource) =>
+        !isHelixRoomSourceIngressSourceId(source.source_id),
+    )
+    .sort((a: WorkstationLiveSource, b: WorkstationLiveSource) => b.updated_at.localeCompare(a.updated_at));
 }
 
 export function listWorkstationLiveSourceEvents(sourceId?: string | null): WorkstationLiveSourceEvent[] {
-  if (sourceId) return eventsBySource.get(sourceId) ?? [];
-  return Array.from(eventsBySource.values()).flat().sort((a: WorkstationLiveSourceEvent, b: WorkstationLiveSourceEvent) => a.ts.localeCompare(b.ts));
+  if (isHelixRoomSourceIngressSourceId(sourceId)) return [];
+  if (sourceId) {
+    return (eventsBySource.get(sourceId) ?? []).filter(
+      (event) => !isHelixRoomSourceIngressSourceId(event.source_id),
+    );
+  }
+  return Array.from(eventsBySource.values())
+    .flat()
+    .filter(
+      (event: WorkstationLiveSourceEvent) =>
+        !isHelixRoomSourceIngressSourceId(event.source_id),
+    )
+    .sort((a: WorkstationLiveSourceEvent, b: WorkstationLiveSourceEvent) => a.ts.localeCompare(b.ts));
 }
 
 export function listWorkstationLiveSourceWindows(sourceId?: string | null): LiveSourceWindowSummary[] {
-  if (sourceId) return windowsBySource.get(sourceId) ?? [];
-  return Array.from(windowsBySource.values()).flat().sort((a: LiveSourceWindowSummary, b: LiveSourceWindowSummary) => a.from_ts.localeCompare(b.from_ts));
+  if (isHelixRoomSourceIngressSourceId(sourceId)) return [];
+  if (sourceId) {
+    return (windowsBySource.get(sourceId) ?? []).filter(
+      (window) => !isHelixRoomSourceIngressSourceId(window.source_id),
+    );
+  }
+  return Array.from(windowsBySource.values())
+    .flat()
+    .filter(
+      (window: LiveSourceWindowSummary) =>
+        !isHelixRoomSourceIngressSourceId(window.source_id),
+    )
+    .sort((a: LiveSourceWindowSummary, b: LiveSourceWindowSummary) => a.from_ts.localeCompare(b.from_ts));
 }
 
 export function setWorkstationLiveSourceStatus(input: {
@@ -377,8 +417,10 @@ export function setWorkstationLiveSourceStatus(input: {
   status: WorkstationLiveSource["status"];
   now?: string;
 }): WorkstationLiveSource | null {
+  assertGenericWorkstationSourceId(input.source_id);
   const existing = sources.get(input.source_id);
   if (!existing) return null;
+  assertGenericWorkstationSourceId(existing.source_id);
   const next: WorkstationLiveSource = {
     ...existing,
     status: input.status,
@@ -393,8 +435,10 @@ export function setWorkstationLiveSourceTickRate(input: {
   tick_rate_ms: number;
   now?: string;
 }): WorkstationLiveSource | null {
+  assertGenericWorkstationSourceId(input.source_id);
   const existing = sources.get(input.source_id);
   if (!existing) return null;
+  assertGenericWorkstationSourceId(existing.source_id);
   const next: WorkstationLiveSource = {
     ...existing,
     tick_rate_ms: Number.isFinite(input.tick_rate_ms) && input.tick_rate_ms > 0 ? Math.trunc(input.tick_rate_ms) : existing.tick_rate_ms,
@@ -408,8 +452,10 @@ export function resetWorkstationLiveSourceCounters(input: {
   source_id: string;
   now?: string;
 }): WorkstationLiveSource | null {
+  assertGenericWorkstationSourceId(input.source_id);
   const existing = sources.get(input.source_id);
   if (!existing) return null;
+  assertGenericWorkstationSourceId(existing.source_id);
   const now = input.now ?? new Date().toISOString();
   eventsBySource.set(existing.source_id, []);
   windowsBySource.set(existing.source_id, []);
@@ -423,6 +469,27 @@ export function resetWorkstationLiveSourceCounters(input: {
   };
   sources.set(next.source_id, next);
   return next;
+}
+
+export function removeWorkstationLiveSourceState(input: {
+  sourceId: string;
+}): {
+  sources: number;
+  events: number;
+  windows: number;
+} {
+  const sourceId = input.sourceId.trim();
+  if (!sourceId) return { sources: 0, events: 0, windows: 0 };
+  const sourceRemoved = sources.delete(sourceId) ? 1 : 0;
+  const eventsRemoved = eventsBySource.get(sourceId)?.length ?? 0;
+  const windowsRemoved = windowsBySource.get(sourceId)?.length ?? 0;
+  eventsBySource.delete(sourceId);
+  windowsBySource.delete(sourceId);
+  return {
+    sources: sourceRemoved,
+    events: eventsRemoved,
+    windows: windowsRemoved,
+  };
 }
 
 export function resetWorkstationLiveSources(): void {

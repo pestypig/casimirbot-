@@ -4,12 +4,29 @@ import type {
   HelixEnvironmentManifestProbeType,
   HelixEnvironmentSourceModality,
 } from "@shared/helix-environment-source-manifest";
+import {
+  assertHelixRoomSourceNamespaceAdmission,
+  isHelixRoomSourceIngressSourceId,
+  matchesHelixRoomSourceAdmission,
+  type HelixRoomSourceAdmission,
+} from "@shared/helix-room-source-ingress";
 
 const manifestsBySource = new Map<string, HelixEnvironmentSourceManifest>();
 
 export function registerEnvironmentSourceManifest(
   manifest: HelixEnvironmentSourceManifest,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
 ): HelixEnvironmentSourceManifest {
+  assertHelixRoomSourceNamespaceAdmission(
+    {
+      source_id: manifest.source_id,
+      room_id: manifest.room_id,
+      domain_adapter: manifest.domain_adapter,
+    },
+    options.sourceAdmission,
+  );
   if (manifest.assistant_answer !== false) throw new Error("environment source manifest cannot be an assistant answer");
   if (manifest.raw_content_included !== false) throw new Error("environment source manifest cannot include raw content");
   if (manifest.execution_policy.may_execute_live_actions !== false) {
@@ -22,19 +39,67 @@ export function registerEnvironmentSourceManifest(
   return manifest;
 }
 
-export function getEnvironmentSourceManifest(sourceId: string): HelixEnvironmentSourceManifest | null {
-  return manifestsBySource.get(sourceId) ?? null;
+export function getEnvironmentSourceManifest(
+  sourceId: string,
+  options: {
+    sourceAdmission?: HelixRoomSourceAdmission | null;
+  } = {},
+): HelixEnvironmentSourceManifest | null {
+  const manifest = manifestsBySource.get(sourceId) ?? null;
+  if (
+    manifest &&
+    isHelixRoomSourceIngressSourceId(manifest.source_id) &&
+    !matchesHelixRoomSourceAdmission(
+      {
+        source_id: manifest.source_id,
+        room_id: manifest.room_id,
+        domain_adapter: manifest.domain_adapter,
+      },
+      options.sourceAdmission,
+    )
+  ) {
+    return null;
+  }
+  return manifest;
 }
 
 export function listEnvironmentSourceManifests(input?: {
   roomId?: string | null;
   domainAdapterPrefix?: string | null;
+  sourceAdmission?: HelixRoomSourceAdmission | null;
 }): HelixEnvironmentSourceManifest[] {
   return Array.from(manifestsBySource.values()).filter((manifest) => {
+    if (
+      isHelixRoomSourceIngressSourceId(manifest.source_id) &&
+      !matchesHelixRoomSourceAdmission(
+        {
+          source_id: manifest.source_id,
+          room_id: manifest.room_id,
+          domain_adapter: manifest.domain_adapter,
+        },
+        input?.sourceAdmission,
+      )
+    ) {
+      return false;
+    }
     if (input?.roomId && manifest.room_id !== input.roomId) return false;
     if (input?.domainAdapterPrefix && !manifest.domain_adapter.startsWith(input.domainAdapterPrefix)) return false;
     return true;
   });
+}
+
+export function removeEnvironmentSourceManifests(input: {
+  sourceId?: string | null;
+  roomId?: string | null;
+}): number {
+  let removed = 0;
+  for (const [sourceId, manifest] of manifestsBySource.entries()) {
+    if (input.sourceId && sourceId !== input.sourceId) continue;
+    if (input.roomId && manifest.room_id !== input.roomId) continue;
+    manifestsBySource.delete(sourceId);
+    removed += 1;
+  }
+  return removed;
 }
 
 export function sourceSupportsEnvironmentModality(

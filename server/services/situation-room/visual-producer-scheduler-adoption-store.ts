@@ -5,6 +5,10 @@ import {
   type HelixVisualProducerSchedulerAdoptionStatus,
 } from "@shared/helix-visual-producer-scheduler-adoption";
 import type { HelixLiveSourceCaptureMode } from "@shared/helix-live-source-producer";
+import {
+  HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
+  isHelixRoomSourceIngressSourceId,
+} from "@shared/helix-room-source-ingress";
 import { recordLiveSourceProducerLifecycleEvent } from "./live-source-producer-lifecycle-store";
 
 const adoptionsByProducerId = new Map<string, HelixVisualProducerSchedulerAdoption>();
@@ -33,7 +37,18 @@ const normalizeStatus = (value: unknown): HelixVisualProducerSchedulerAdoptionSt
 
 export function recordVisualProducerSchedulerAdoption(input: Record<string, unknown>): HelixVisualProducerSchedulerAdoption {
   const producerId = asString(input.producer_id ?? input.producerId) ?? `live_source_producer:${hashShort([input.source_id, input.thread_id])}`;
-  const sourceId = asString(input.source_id ?? input.sourceId) ?? `source:visual_frame:${asString(input.thread_id) ?? "helix-ask:desktop"}`;
+  const snakeSourceId = asString(input.source_id);
+  const camelSourceId = asString(input.sourceId);
+  if (
+    isHelixRoomSourceIngressSourceId(snakeSourceId) ||
+    isHelixRoomSourceIngressSourceId(camelSourceId)
+  ) {
+    throw new Error(HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR);
+  }
+  if (snakeSourceId && camelSourceId && snakeSourceId !== camelSourceId) {
+    throw new Error("visual_producer_scheduler_identity_mismatch");
+  }
+  const sourceId = snakeSourceId ?? camelSourceId ?? `source:visual_frame:${asString(input.thread_id) ?? "helix-ask:desktop"}`;
   const threadId = asString(input.thread_id ?? input.threadId) ?? "helix-ask:desktop";
   const clientStreamConfirmed = input.client_stream_confirmed === true;
   const intervalActive = input.interval_active === true;
@@ -80,14 +95,31 @@ export function recordVisualProducerSchedulerAdoption(input: Record<string, unkn
 
 export function getVisualProducerSchedulerAdoption(producerIdOrSourceId: string | null | undefined): HelixVisualProducerSchedulerAdoption | null {
   if (!producerIdOrSourceId) return null;
-  return adoptionsByProducerId.get(producerIdOrSourceId) ??
+  if (isHelixRoomSourceIngressSourceId(producerIdOrSourceId)) return null;
+  const adoption = adoptionsByProducerId.get(producerIdOrSourceId) ??
     Array.from(adoptionsByProducerId.values()).find((entry) => entry.source_id === producerIdOrSourceId) ??
     null;
+  return adoption && !isHelixRoomSourceIngressSourceId(adoption.source_id)
+    ? adoption
+    : null;
 }
 
 export function listVisualProducerSchedulerAdoptions(input: { threadId?: string | null } = {}): HelixVisualProducerSchedulerAdoption[] {
   return Array.from(adoptionsByProducerId.values())
+    .filter((entry) => !isHelixRoomSourceIngressSourceId(entry.source_id))
     .filter((entry) => !input.threadId || entry.thread_id === input.threadId);
+}
+
+export function removeVisualProducerSchedulerAdoptions(input: {
+  sourceId: string;
+}): number {
+  let removed = 0;
+  for (const [producerId, adoption] of adoptionsByProducerId.entries()) {
+    if (adoption.source_id !== input.sourceId) continue;
+    adoptionsByProducerId.delete(producerId);
+    removed += 1;
+  }
+  return removed;
 }
 
 export function resetVisualProducerSchedulerAdoptionsForTest(): void {

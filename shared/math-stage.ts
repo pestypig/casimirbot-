@@ -4525,6 +4525,451 @@ export const mathStageRegistry: MathStageEntry[] = [
     },
   },
   {
+    tag: "CASIMIR_DP_EVIDENCE_MAP_STAGE3",
+    module: "shared/casimir-dp-complex-coherence.ts",
+    stage: "diagnostic",
+    notes:
+      "Complex-coherence, independent phase-conditioning, path-swap, echo, and decay-shape discriminator. Synthetic recovery cannot identify objective collapse.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-complex-coherence.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-complex-coherence.spec.ts" },
+    ],
+    units: {
+      analysis_phase_rad: "1",
+      coherence_re: "1",
+      coherence_im: "1",
+      visibility: "1",
+      phase_rad: "1",
+      hold_time_s: "T",
+      chi: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_EVIDENCE_MAP_STAGE3",
+    module: "shared/casimir-dp-qed-green-noise.ts",
+    stage: "reduced-order",
+    notes:
+      "Measurement-constrained reduced-order material/Green/noise budget with shared mean and fluctuation receipts; measured apparatus closure remains not ready.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-qed-green-noise.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-qed-green-noise.spec.ts" },
+    ],
+    units: {
+      frequency_Hz: "T^-1",
+      omega_rad_s: "T^-1",
+      potential_J: "M L^2 T^-2",
+      force_N: "M L T^-2",
+      force_noise_N2_Hz: "M^2 L^2 T^-3",
+      energy_noise_J2_Hz: "M^2 L^4 T^-3",
+      phase_rad: "1",
+      chi: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_EVIDENCE_MAP_STAGE3",
+    module: "shared/casimir-dp-dp-companion.ts",
+    stage: "exploratory",
+    notes:
+      "Separates the Penrose lifetime envelope from one named regularized dynamical-DP companion calculation. The exploratory DP self-energy dependency constrains the lane claim.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-dp-companion.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-dp-companion.spec.ts" },
+    ],
+    units: {
+      physical_cutoff_m: "L",
+      numerical_softening_m: "L",
+      deltaE_G_J: "M L^2 T^-2",
+      tau_OR_s: "T",
+      gamma_OR_s: "T^-1",
+      diffusion_kg2_m2_s3: "M^2 L^2 T^-3",
+      heating_W: "M L^2 T^-3",
+      radiation_rate_s: "T^-1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_EVIDENCE_MAP_STAGE3",
+    module: "shared/casimir-dp-gravity-upper-bound.ts",
+    stage: "reduced-order",
+    notes:
+      "Signed complete-apparatus scalar energy ledger and ordinary weak-field mass, weight, metric, and phase upper bounds; tensor claims remain blocked without a conserved source.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-gravity-upper-bound.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-gravity-upper-bound.spec.ts" },
+    ],
+    units: {
+      delta_energy_J: "M L^2 T^-2",
+      delta_mass_kg: "M",
+      weight_N: "M L T^-2",
+      potential_m2_s2: "L^2 T^-2",
+      metric_h00: "1",
+      phase_rad: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_EVIDENCE_MAP_STAGE3",
+    module: "shared/casimir-dp-model-comparison.ts",
+    stage: "diagnostic",
+    notes:
+      "Blinded held-out comparison of a composite ordinary-physics null against named nested DP and only registered bridge extensions, with power and identifiability gates.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-model-comparison.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-model-comparison.spec.ts" },
+    ],
+    units: {
+      observed_value: "varies",
+      predicted_value: "varies",
+      standard_uncertainty: "varies",
+      standardized_residual: "1",
+      predictive_score: "1",
+      power: "1",
+      signature_correlation: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_EVIDENCE_MAP_STAGE3",
+    module: "shared/casimir-dp-manifold-kernel-registry.ts",
+    stage: "diagnostic",
+    notes:
+      "Fail-closed schema and consistency validator for a proposed tensor/noise-to-metric-to-coherence kernel. Candidate kernels remain exploratory and registration is not validation.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-manifold-kernel-registry.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-manifold-kernel-registry.spec.ts" },
+    ],
+    units: {
+      registry_status: "1",
+      conservation_residual: "1",
+      covariance_min_eigenvalue: "varies",
+      physical_rate_s: "T^-1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_EVIDENCE_MAP_STAGE3",
+    module: "shared/casimir-dp-evidence-map-stage3.ts",
+    stage: "diagnostic",
+    notes:
+      "Hash-linked Stage-3 authority rail, run-order ledger, cross-axis signatures, and outcome-to-claim map. Per-lane least-mature ceilings remain explicit.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-evidence-map-stage3.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-evidence-map-stage3.spec.ts" },
+    ],
+    units: {
+      run_stage: "1",
+      gate_status: "1",
+      maximum_claim: "1",
+      evidence_class: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_POLARIZATION_CONGRUENCE_STAGE4",
+    module: "shared/casimir-dp-polarization-qed-control.ts",
+    stage: "reduced-order",
+    notes:
+      "Polarization-resolved reduced-order macroscopic-QED control with Jones/Stokes state physicality, TE/TM-to-circular basis invariance, reciprocal/nonreciprocal reflection response, mirror parity, matched controls, double contrasts, sensitivities, and limiting cases. Synthetic coefficients are not an apparatus Green-tensor solution.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-polarization-qed-control.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-polarization-qed-control.spec.ts" },
+    ],
+    units: {
+      phase_rad: "1",
+      ramsey_chi: "1",
+      coherence_decay_rate_s: "T^-1",
+      axial_force_N: "M L T^-2",
+      heating_W: "M L^2 T^-3",
+      axial_torque_N_m: "M L^2 T^-2",
+      trap_shift_rad_s: "T^-1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_POLARIZATION_CONGRUENCE_STAGE4",
+    module: "shared/casimir-dp-radiative-thermal-closure.ts",
+    stage: "exploratory",
+    notes:
+      "Planck/FDT thermal-radiative control with explicit h/hbar and nu/omega normalization, numerical Stefan-Boltzmann recovery, near/far-field routing, detailed balance, zero-point separation, recoil, noise, heating, decoherence, and covariance. The far-field fixture is a synthetic greybody benchmark.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-radiative-thermal-closure.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-radiative-thermal-closure.spec.ts" },
+    ],
+    units: {
+      frequency_Hz: "T^-1",
+      omega_rad_s: "T^-1",
+      temperature_K: "Theta",
+      sigma_W_m2_K4: "M T^-3 Theta^-4",
+      net_power_W: "M L^2 T^-3",
+      recoil_force_N: "M L T^-2",
+      power_noise_W2_Hz: "M^2 L^4 T^-5",
+      decoherence_rate_s: "T^-1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_POLARIZATION_CONGRUENCE_STAGE4",
+    module: "shared/casimir-dp-tensor-dimensional-congruence.ts",
+    stage: "diagnostic",
+    notes:
+      "Fail-closed validator for SI dimensions, semantic quantity identities, tensor rank/symmetry, frame/basis/gauge maps, h/hbar, nu/omega, PSD Jacobians, FDT, conservation, covariance, receipts, and recovery limits. Equal inverse-time dimensions remain same_dimension_not_connected without a sourced transfer kernel.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-tensor-dimensional-congruence.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-tensor-dimensional-congruence.spec.ts" },
+    ],
+    units: {
+      convention_relative_error: "1",
+      spectral_jacobian_relative_error: "1",
+      conservation_residual: "1",
+      covariance_min_eigenvalue: "varies",
+      compton_omega_rad_s: "T^-1",
+      dp_inverse_timescale_s: "T^-1",
+      cavity_omega_rad_s: "T^-1",
+      numerical_bridge_output: "blocked",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_POLARIZATION_CONGRUENCE_STAGE4",
+    module: "shared/casimir-dp-polarization-congruence-stage4.ts",
+    stage: "diagnostic",
+    notes:
+      "Hash-linked Stage-4 orchestrator that expands the ordinary-physics null with polarization-QED and thermal/FDT controls, reuses the named DP manifest without mutation, admits only a frozen registered numerical bridge, and maps synthetic predictions to explicit nonclaims.",
+    checks: [
+      { type: "test", path: "tests/casimir-dp-polarization-congruence-stage4.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-polarization-congruence-stage4.spec.ts" },
+    ],
+    units: {
+      run_stage: "1",
+      gate_status: "1",
+      model_state: "1",
+      evidence_class: "1",
+      maximum_claim: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_QED_SCALE_HIERARCHY_STAGE4_1",
+    module: "shared/casimir-dp-qed-scale-hierarchy-calibration.ts",
+    stage: "reduced-order",
+    notes:
+      "Source-backed CODATA 2022 electron Compton, Rydberg, Bohr-radius, classical-electron-radius, and leading reduced-mass hydrogen identity calibration with explicit uncertainty, covariance, literal, rounding, namespace, and correction-ledger gates. The diagnostic wrapper preserves Stage-4's semantic non-bridge and cannot support Casimir, DP, collapse, manifold, resonance, polarization, or viability claims.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-qed-scale-hierarchy-calibration.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-qed-scale-hierarchy-calibration.spec.ts",
+      },
+    ],
+    units: {
+      fine_structure_alpha: "1",
+      compton_frequency_Hz: "T^-1",
+      rydberg_frequency_Hz: "T^-1",
+      electron_mass_kg: "M",
+      rydberg_energy_J: "M L^2 T^-2",
+      hartree_energy_J: "M L^2 T^-2",
+      reduced_compton_wavelength_m: "L",
+      bohr_radius_m: "L",
+      classical_electron_radius_m: "L",
+      calibration_gate: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_ELECTRON_MASS_HIGGS_ANCHOR_STAGE4_2A",
+    module: "shared/casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts",
+    stage: "diagnostic",
+    notes:
+      "Source-backed, theory-assisted Penning/bound-electron mass replay with correlated CODATA conversions, a conditional Standard Model tree-level Yukawa parameterization, collider upper-bound semantics, and a fail-closed zero bridge into Casimir, DP, collapse, manifolds, or physical viability.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-electron-mass-higgs-anchor-stage4-2a.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-electron-mass-higgs-anchor-stage4-2a.spec.ts",
+      },
+    ],
+    units: {
+      electron_relative_atomic_mass: "1",
+      electron_mass_kg: "M",
+      electron_rest_energy_J: "M L^2 T^-2",
+      fermi_scale_GeV: "M L^2 T^-2",
+      electron_yukawa_tree: "1",
+      compton_frequency_Hz: "T^-1",
+      calibration_gate: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_PLANCK_SOLAR_CALIBRATION_STAGE4_2A",
+    module: "shared/casimir-dp-planck-solar-calibration-stage4-2a.ts",
+    stage: "diagnostic",
+    notes:
+      "Source-backed Planck spectral-density and Stefan-Boltzmann closure with a frozen TSIS Wien color-temperature diagnostic and a separate IAU luminosity-radius bolometric effective temperature. Shared constants and dimensions are calibration dependencies, not DP evidence.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-planck-solar-calibration-stage4-2a.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-planck-solar-calibration-stage4-2a.spec.ts",
+      },
+    ],
+    units: {
+      frequency_Hz: "T^-1",
+      omega_rad_s: "T^-1",
+      photon_energy_J: "M L^2 T^-2",
+      planck_radiance_lambda: "M L^-1 T^-3",
+      stefan_boltzmann_constant: "M T^-3 Theta^-4",
+      color_temperature_K: "Theta",
+      bolometric_effective_temperature_K: "Theta",
+      calibration_gate: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_APPARATUS_COHERENCE_RESIDUAL_STAGE4_2B",
+    module: "shared/casimir-dp-apparatus-scale-transport-stage4-2b.ts",
+    stage: "diagnostic",
+    notes:
+      "Composition-aware apparatus and complete-joint-system branch-density ledger with mass conservation, branch-swap, boundary-equivalence, covariance-ancestry, and sensitivity-weighted mismatch gates. Design-class branch states remain distinct from experimentally demonstrated preparation.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-apparatus-scale-transport-stage4-2b.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-apparatus-scale-transport-stage4-2b.spec.ts",
+      },
+    ],
+    units: {
+      total_mass_kg: "M",
+      branch_separation_m: "L",
+      smearing_length_m: "L",
+      hold_time_s: "T",
+      density_l1_mismatch_kg: "M",
+      scale_transport_gate: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_APPARATUS_COHERENCE_RESIDUAL_STAGE4_2B",
+    module: "shared/casimir-dp-apparatus-spectral-thermometry-stage4-2b.ts",
+    stage: "diagnostic",
+    notes:
+      "Response-corrected synthetic apparatus spectral thermometry with detector response, reflected/stray subtraction, non-blackbody and LTE diagnostics, covariance propagation, and boundary-inclusive/free-space recovery. It is not measured apparatus thermometry.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-apparatus-spectral-thermometry-stage4-2b.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-apparatus-spectral-thermometry-stage4-2b.spec.ts",
+      },
+    ],
+    units: {
+      wavelength_m: "L",
+      detector_power_W: "M L^2 T^-3",
+      spectral_covariance_W2: "M^2 L^4 T^-6",
+      temperature_estimate_K: "Theta",
+      jump_rate_s: "T^-1",
+      thermometry_gate: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_APPARATUS_COHERENCE_RESIDUAL_STAGE4_2B",
+    module: "shared/casimir-dp-apparatus-response-covariance-stage4-2b.ts",
+    stage: "diagnostic",
+    notes:
+      "Frozen sensor-forward and nuisance-response model that separates physical disturbance from sensor self-noise, preserves complex cross spectra, and constructs full measured/prediction/shared-calibration residual covariance. Raw sensor PSDs and mean Casimir pressure are not admissible substitutes.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-apparatus-response-covariance-stage4-2b.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-apparatus-response-covariance-stage4-2b.spec.ts",
+      },
+    ],
+    units: {
+      angular_frequency_rad_s: "T^-1",
+      hold_time_s: "T",
+      branch_energy_J: "M L^2 T^-2",
+      energy_difference_psd: "M^2 L^4 T^-3",
+      response_covariance_gate: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_APPARATUS_COHERENCE_RESIDUAL_STAGE4_2B",
+    module: "shared/casimir-dp-dp-scaling-forecast-stage4-2b.ts",
+    stage: "diagnostic",
+    notes:
+      "Frozen named regularized nonrelativistic Markovian mass-density DP forecast with E_G convergence, sub-voxel sensitivity, mass/separation/time scaling, companion reconciliation, and a conditional boundary null only under complete joint-system equivalence. No Casimir modifier is inserted into the registered generator.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-dp-scaling-forecast-stage4-2b.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-dp-scaling-forecast-stage4-2b.spec.ts",
+      },
+    ],
+    units: {
+      mass_kg: "M",
+      radius_m: "L",
+      branch_separation_m: "L",
+      E_G_J: "M L^2 T^-2",
+      Gamma_DP_s: "T^-1",
+      dp_forecast_gate: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_APPARATUS_COHERENCE_RESIDUAL_STAGE4_2B",
+    module: "shared/casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
+    stage: "diagnostic",
+    notes:
+      "Pilot-frozen complex-coherence comparator using a raw Re/Im likelihood or coverage-qualified Gaussian log visibility, exact on/off pairing, full positive-definite covariance, immutable row ordering, and explicit confirmatory-leakage and post-hoc-retuning rejection. Synthetic recovery is not measured residual evidence.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-apparatus-coherence-residual-stage4-2b.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-apparatus-coherence-residual-stage4-2b.spec.ts",
+      },
+    ],
+    units: {
+      complex_coherence: "1",
+      residual_log_visibility: "1",
+      residual_phase_rad: "1",
+      residual_covariance: "1",
+      coherence_residual_gate: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_APPARATUS_COHERENCE_RESIDUAL_STAGE4_2B",
+    module: "shared/casimir-dp-apparatus-identifiability-stage4-2b.ts",
+    stage: "diagnostic",
+    notes:
+      "Nuisance-profiled signature-rank, conditioning, cosine-separation, power, coverage, companion-SNR, required-acquisition, and apparatus go/no-go forecast. An underpowered no-go constrains the frozen apparatus design and does not falsify DP.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-apparatus-identifiability-stage4-2b.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-apparatus-identifiability-stage4-2b.spec.ts",
+      },
+    ],
+    units: {
+      whitened_signature: "1",
+      fisher_information: "1",
+      achieved_power: "1",
+      companion_snr: "1",
+      required_windows: "1",
+      identifiability_gate: "1",
+    },
+  },
+  {
     tag: "PROOF_MATH",
     module: "shared/curvature-proxy.ts",
     stage: "reduced-order",

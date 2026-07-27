@@ -282,6 +282,47 @@ describe("Helix Ask workstation answer synthesizer", () => {
     expect(answer).not.toBe("The discussion appears near hull geometry, Casimir cavity coupling, stability checks, and terminal solver policy.");
   });
 
+  it("retains arbitrary requested graph identities without promoting them to proof", () => {
+    const prompt =
+      "Locate the Alpha-7 boundary theory and the beta-field scale theory in the Theory Badge Graph. Explain their relationship without treating proximity as proof.";
+    const plan = planWorkstationToolUse(prompt).tool_plan;
+
+    expect(plan).toBeTruthy();
+    const answer = synthesizeWorkstationToolAnswer({
+      prompt,
+      plan: plan!,
+      evaluation: {
+        schema: "helix.workstation_tool_evaluation.v1",
+        evaluation_id: "eval:requested-theory-identities",
+        thread_id: "thread:test",
+        tool_receipt_id: "receipt:requested-theory-identities",
+        result: "supports_subgoal",
+        summary:
+          "Theory reflection located discussion context as evidence only: The graph returned nearby diagnostic and scale-boundary rows.",
+        evidence_refs: ["workstation:theory-badge-graph.reflect_discussion_context"],
+        model_invoked: false,
+        deterministic_gate: true,
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    expect(answer).toContain("Alpha-7 boundary theory");
+    expect(answer).toContain("beta-field scale theory");
+    expect(answer).toContain("query scope only");
+    expect(answer).toContain("preserves the query scope");
+    expect(answer).toContain("does not assert a registered relationship or proof");
+  });
+
+  it("does not invent a requested-identity line when the query names no graph target", () => {
+    const prompt = "Explain how the Theory Badge Graph represents claim boundaries.";
+    const plan = planWorkstationToolUse(prompt).tool_plan;
+
+    expect(plan).toBeTruthy();
+    const answer = synthesizeWorkstationToolAnswer({ prompt, plan: plan! });
+
+    expect(answer).not.toContain("Requested graph identities:");
+  });
+
   it("keeps calculator numeric authority separate from theory reflection context", () => {
     const prompt = "Explain photon energy using E=hf and calculate it for f=5e14 Hz.";
     const plan = planWorkstationToolUse(prompt).tool_plan;
