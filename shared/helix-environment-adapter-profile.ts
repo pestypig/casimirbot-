@@ -15,6 +15,8 @@ export const HELIX_MINECRAFT_ADAPTER_PROFILE_ID =
   "game.minecraft.readonly.v1" as const;
 export const HELIX_SYNTHETIC_GAME_ADAPTER_PROFILE_ID =
   "game.synthetic_fixture.readonly.v1" as const;
+export const HELIX_SYSTEM_CLOCK_ADAPTER_PROFILE_ID =
+  "system.clock.readonly.v1" as const;
 
 const identifierSchema = z
   .string()
@@ -52,6 +54,8 @@ const snapshotSectionSchema = z.enum([
   "domain_specific",
 ]);
 const probeTypeSchema = z.enum([
+  "actor_status",
+  "nearby_entities",
   "route_feasibility",
   "reachability",
   "line_of_sight",

@@ -45,10 +45,13 @@ const FORMAL_START_CAPABILITY = "theory-formal-verifier.start";
 const NUMERICAL_PLAN_CAPABILITY = "theory-independent-numerical-verifier.plan";
 const NUMERICAL_START_CAPABILITY =
   "theory-independent-numerical-verifier.start";
+const CANARY_PLAN_CAPABILITY = "theory-runtime-canary.plan";
+const CANARY_START_CAPABILITY = "theory-runtime-canary.start";
 const ROOM_CREATE_CAPABILITY = HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY;
 const FORMAL_PLAN_ID = "formal-plan:test";
 const FORMAL_PREPARED_REQUEST_ID = "formal-prepared:test";
 const NUMERICAL_PLAN_ID = "numerical-plan:test";
+const CANARY_PLAN_ID = "formal-runtime-canary-plan:test";
 const SEALED_INPUT_SHA256 = "a".repeat(64);
 
 const readBinding = (prompt: string) =>
@@ -56,14 +59,23 @@ const readBinding = (prompt: string) =>
 
 const planGatewayResult = (input: {
   capabilityId:
-    typeof FORMAL_PLAN_CAPABILITY | typeof NUMERICAL_PLAN_CAPABILITY;
+    | typeof FORMAL_PLAN_CAPABILITY
+    | typeof NUMERICAL_PLAN_CAPABILITY
+    | typeof CANARY_PLAN_CAPABILITY;
   turnId: string;
 }): HelixWorkstationGatewayCallResult => {
   const formal = input.capabilityId === FORMAL_PLAN_CAPABILITY;
+  const runtimeCanary = input.capabilityId === CANARY_PLAN_CAPABILITY;
   const startCapabilityId = formal
     ? FORMAL_START_CAPABILITY
-    : NUMERICAL_START_CAPABILITY;
-  const planId = formal ? FORMAL_PLAN_ID : NUMERICAL_PLAN_ID;
+    : runtimeCanary
+      ? CANARY_START_CAPABILITY
+      : NUMERICAL_START_CAPABILITY;
+  const planId = formal
+    ? FORMAL_PLAN_ID
+    : runtimeCanary
+      ? CANARY_PLAN_ID
+      : NUMERICAL_PLAN_ID;
   return {
     schema: "helix.workstation_tool_gateway.call_result.v1",
     manifest_version: "read-observe-act.v1",
@@ -107,13 +119,17 @@ const planGatewayResult = (input: {
     observation: {
       schema: formal
         ? "casimir.theory_formal_verifier.plan_observation.v1"
-        : "casimir.theory_independent_numerical_verifier.plan_observation.v1",
+        : runtimeCanary
+          ? "casimir.formal_runtime_canary.plan_observation.v1"
+          : "casimir.theory_independent_numerical_verifier.plan_observation.v1",
       ok: true,
       status: "ready",
       planId,
       ...(formal
         ? { prepared_request_id: FORMAL_PREPARED_REQUEST_ID }
-        : { preparedRequestId: "numerical-prepared:test" }),
+        : runtimeCanary
+          ? {}
+          : { preparedRequestId: "numerical-prepared:test" }),
       sealedInputSha256: SEALED_INPUT_SHA256,
       confirmationRequired: true,
       nextCapability: startCapabilityId,
@@ -528,6 +544,13 @@ describe("Codex native runtime approval host seam", () => {
       planId: NUMERICAL_PLAN_ID,
       arguments: { plan_id: NUMERICAL_PLAN_ID },
       expectedGatewayArguments: { plan_id: NUMERICAL_PLAN_ID },
+    },
+    {
+      planCapabilityId: CANARY_PLAN_CAPABILITY,
+      startCapabilityId: CANARY_START_CAPABILITY,
+      planId: CANARY_PLAN_ID,
+      arguments: { plan_id: CANARY_PLAN_ID },
+      expectedGatewayArguments: { plan_id: CANARY_PLAN_ID },
     },
   ] as const)(
     "injects only the trusted host receipt into $startCapabilityId",

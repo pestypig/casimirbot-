@@ -16,6 +16,7 @@ import type { HelixAskEnvelopeSection, HelixAskResponseEnvelope } from "@shared/
 import type { HelixAskSourceTarget } from "@shared/helix-ask-source-target-intent";
 import type { HelixCausalTurnEvent } from "@shared/helix-causal-turn-timeline";
 import type { HelixTurnLifecycle } from "@shared/helix-turn-lifecycle";
+import { HELIX_TOOL_LIFECYCLE_TRACE_SCHEMA } from "@shared/helix-tool-lifecycle";
 import {
   HELIX_ROOM_SOURCE_NAMESPACE_RESERVED_ERROR,
   isHelixRoomSourceIngressSourceId,
@@ -584,10 +585,22 @@ import {
 import {
   buildHelixConversationMemoryDebug,
   buildHelixConversationMemoryPacket,
+  detectHelixFollowupReferences,
   renderHelixConversationMemoryForModel,
   resolveHelixContextResumeFrameRecallText,
   resolveHelixPendingTaskFrameClarification,
 } from "../services/helix-ask/conversation-memory-selector";
+import { attachProviderConversationMemoryReferentContext } from "../services/helix-ask/provider-conversation-memory-context";
+import {
+  extractRuntimeDocumentEvidencePaths,
+  extractRuntimeSelectedEnvironmentProbeLocators,
+  extractRuntimeSelectedObservationRefs,
+  persistHelixAskRuntimeTurnThreadCompletion,
+} from "../services/helix-ask/runtime-turn-thread-persistence";
+import {
+  readHelixSharedRoomIdFromAskSession,
+  resolveHelixSharedRoomAskSessionAccess,
+} from "../services/helix-ask/shared-room-ask-session";
 import {
   buildHelixRollingSessionContextDebug,
   buildHelixRollingSessionContextPacket,
@@ -1467,6 +1480,7 @@ import {
 } from "../services/helix-ask/hard-tool-route-metadata";
 import {
   buildAskTurnScientificImageComparisonRouteMetadata,
+  isAskTurnScientificImageEvidencePrompt,
   isAskTurnScientificImageTextComparisonPrompt,
 } from "../services/helix-ask/scientific-image-route-metadata";
 import { ScientificCalculatorRuntimeRouteMetadataSchema } from "../services/helix-ask/scientific-calculator-runtime-route-metadata";
@@ -1954,11 +1968,13 @@ const readServerBuildCommit = (): string | null => {
     "";
   if (fromEnv.trim()) return fromEnv.trim();
   try {
-    return execFileSync("git", ["rev-parse", "HEAD"], {
-      cwd: process.cwd(),
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim() || null;
+    return (
+      execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim() || null
+    );
   } catch {
     return null;
   }
@@ -2293,32 +2309,38 @@ planRouter.get("/situation/source-binding-status-ledger", (req, res) => {
   });
 });
 
-planRouter.post("/situation/world-event/run-thread-binding-check", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
-  const roomId = readRouteString(body.room_id);
-  const sourceId = readRouteString(body.source_id);
-  const worldId = readRouteString(body.world_id);
-  const sources = listWorldSourcesSeen();
-  const latestSource = sources.find((source) =>
+planRouter.post(
+  "/situation/world-event/run-thread-binding-check",
+  (req, res) => {
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
+    const roomId = readRouteString(body.room_id);
+    const sourceId = readRouteString(body.source_id);
+    const worldId = readRouteString(body.world_id);
+    const sources = listWorldSourcesSeen();
+    const latestSource = sources.find((source) =>
     (!roomId || source.room_id === roomId) &&
     (!sourceId || source.source_id === sourceId) &&
     (!worldId || source.world_id === worldId)
   ) ?? sources[0] ?? null;
-  const bindings = listSituationThreadBindings();
-  const matchingBinding = latestSource
-    ? bindings.find((binding) =>
-        binding.thread_id === threadId &&
-        binding.room_id === latestSource.room_id &&
-        binding.source_id === latestSource.source_id &&
-        binding.world_id === latestSource.world_id
-      ) ?? null
-    : null;
-  const latestDebug = latestSource?.latest_debug ?? null;
-  const appended = latestDebug?.append_decision === "appended";
-  const exactSourceMatch = Boolean(latestSource && (!roomId || latestSource.room_id === roomId) && (!sourceId || latestSource.source_id === sourceId) && (!worldId || latestSource.world_id === worldId));
-  const ok = Boolean(latestSource && matchingBinding && appended);
-  return res.status(200).json({
+    const bindings = listSituationThreadBindings();
+    const matchingBinding = latestSource
+      ? (bindings.find(
+          (binding) =>
+            binding.thread_id === threadId &&
+            binding.room_id === latestSource.room_id &&
+            binding.source_id === latestSource.source_id &&
+            binding.world_id === latestSource.world_id,
+        ) ?? null)
+      : null;
+    const latestDebug = latestSource?.latest_debug ?? null;
+    const appended = latestDebug?.append_decision === "appended";
+    const exactSourceMatch = Boolean(latestSource && (!roomId || latestSource.room_id === roomId) && (!sourceId || latestSource.source_id === sourceId) && (!worldId || latestSource.world_id === worldId));
+    const ok = Boolean(latestSource && matchingBinding && appended);
+    return res.status(200).json({
     ok,
     schema: "helix.world_event_thread_binding_check.v1",
     thread_id: threadId,
@@ -2348,19 +2370,27 @@ planRouter.post("/situation/world-event/run-thread-binding-check", (req, res) =>
     raw_content_included: false,
     context_policy: "compact_context_pack_only",
   });
-});
+  },
+);
 
-planRouter.post("/situation/source-binding/attach-source-to-active-run", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
-  const sourceId = readRouteString(body.source_id);
-  const modality = readRouteString(body.modality);
-  const requestedSituationRunId = readRouteString(body.situation_run_id);
-  const requestedEnvironmentId = readRouteString(body.environment_id);
-  const replayPolicy = readRouteString(body.replay_policy) === "explicit_replay_window" || readRouteString(body.replay_policy) === "none"
-    ? readRouteString(body.replay_policy) as "explicit_replay_window" | "none"
-    : "future_only";
-  if (!sourceId || !modality) {
+planRouter.post(
+  "/situation/source-binding/attach-source-to-active-run",
+  (req, res) => {
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
+    const sourceId = readRouteString(body.source_id);
+    const modality = readRouteString(body.modality);
+    const requestedSituationRunId = readRouteString(body.situation_run_id);
+    const requestedEnvironmentId = readRouteString(body.environment_id);
+    const replayPolicy =
+      readRouteString(body.replay_policy) === "explicit_replay_window" || readRouteString(body.replay_policy) === "none"
+        ? (readRouteString(body.replay_policy) as
+            "explicit_replay_window" | "none")
+        : "future_only";
+    if (!sourceId || !modality) {
     return res.status(400).json({
       ok: false,
       schema: "helix.attach_source_to_active_run_response.v1",
@@ -2370,12 +2400,20 @@ planRouter.post("/situation/source-binding/attach-source-to-active-run", (req, r
       raw_content_included: false,
     });
   }
-  if (rejectLegacyRoomSourceWorldEvents([{ source_id: sourceId }], res)) return;
-  const activeRun = requestedSituationRunId
-    ? listLiveSituationRuns({ threadId, environmentId: requestedEnvironmentId ?? null, limit: 50 })
-        .find((run) => run.situation_run_id === requestedSituationRunId) ?? null
-    : listLiveSituationRuns({ threadId, environmentId: requestedEnvironmentId ?? null, limit: 1 }).at(-1) ?? null;
-  if (!activeRun) {
+    if (rejectLegacyRoomSourceWorldEvents([{ source_id: sourceId }], res)) return;
+    const activeRun = requestedSituationRunId
+      ? (listLiveSituationRuns({
+          threadId,
+          environmentId: requestedEnvironmentId ?? null,
+          limit: 50,
+        }).find((run) => run.situation_run_id === requestedSituationRunId) ??
+        null)
+      : (listLiveSituationRuns({
+          threadId,
+          environmentId: requestedEnvironmentId ?? null,
+          limit: 1,
+        }).at(-1) ?? null);
+    if (!activeRun) {
     return res.status(409).json({
       ok: false,
       schema: "helix.attach_source_to_active_run_response.v1",
@@ -2389,17 +2427,17 @@ planRouter.post("/situation/source-binding/attach-source-to-active-run", (req, r
       raw_content_included: false,
     });
   }
-  const attachedEnvironment = addLiveAnswerEnvironmentSourceIds({
+    const attachedEnvironment = addLiveAnswerEnvironmentSourceIds({
     environment_id: activeRun.environment_id,
     source_ids: [sourceId],
   })?.environment ?? getLiveAnswerEnvironment(activeRun.environment_id);
-  const activeRunForBinding = attachedEnvironment
+    const activeRunForBinding = attachedEnvironment
     ? ensureLiveSituationRunForEnvironment({
         environment: attachedEnvironment,
         advanceEpoch: false,
       })
     : activeRun;
-  const situationSourceBinding = upsertSituationSourceBinding({
+    const situationSourceBinding = upsertSituationSourceBinding({
     thread_id: threadId,
     situation_run_id: activeRunForBinding.situation_run_id,
     environment_id: activeRunForBinding.environment_id,
@@ -2408,14 +2446,16 @@ planRouter.post("/situation/source-binding/attach-source-to-active-run", (req, r
     binding_policy: "repair_acceptance",
     replay_policy: replayPolicy,
   });
-  const worldSource = modality === "world_event"
-    ? listWorldSourcesSeen().find((entry) =>
-        entry.source_id === sourceId ||
-        readRouteString(body.room_id) === entry.room_id ||
-        readRouteString(body.world_id) === entry.world_id
-      ) ?? null
-    : null;
-  const threadBindingReceipt = worldSource
+    const worldSource =
+      modality === "world_event"
+        ? (listWorldSourcesSeen().find(
+            (entry) =>
+              entry.source_id === sourceId ||
+              readRouteString(body.room_id) === entry.room_id ||
+              readRouteString(body.world_id) === entry.world_id,
+          ) ?? null)
+        : null;
+    const threadBindingReceipt = worldSource
     ? createSituationThreadBinding({
         room_id: worldSource.room_id,
         source_id: worldSource.source_id,
@@ -2425,7 +2465,7 @@ planRouter.post("/situation/source-binding/attach-source-to-active-run", (req, r
         append_policy: "salient_only",
       })
     : null;
-  const repairTransition = recordSourceBindingRepairAccepted({
+    const repairTransition = recordSourceBindingRepairAccepted({
     source_id: sourceId,
     thread_id: threadId,
     environment_id: activeRunForBinding.environment_id,
@@ -2437,7 +2477,7 @@ planRouter.post("/situation/source-binding/attach-source-to-active-run", (req, r
       threadBindingReceipt?.binding?.binding_id ?? null,
     ].filter((entry): entry is string => Boolean(entry)),
   });
-  return res.status(200).json({
+    return res.status(200).json({
     ok: true,
     schema: "helix.attach_source_to_active_run_response.v1",
     action_id: "situation-room.attach_source_to_active_run",
@@ -2453,13 +2493,19 @@ planRouter.post("/situation/source-binding/attach-source-to-active-run", (req, r
     assistant_answer: false,
     raw_content_included: false,
   });
-});
+  },
+);
 
-planRouter.post("/situation/source-binding/:bindingId/replay-window", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const bindingId = decodeURIComponent(req.params.bindingId ?? "");
-  const binding = getSituationSourceBinding(bindingId);
-  if (!binding) {
+planRouter.post(
+  "/situation/source-binding/:bindingId/replay-window",
+  (req, res) => {
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const bindingId = decodeURIComponent(req.params.bindingId ?? "");
+    const binding = getSituationSourceBinding(bindingId);
+    if (!binding) {
     return res.status(404).json({
       ok: false,
       schema: "helix.source_binding_replay_window_receipt.v1",
@@ -2470,7 +2516,7 @@ planRouter.post("/situation/source-binding/:bindingId/replay-window", (req, res)
       raw_content_included: false,
     });
   }
-  if (
+    if (
     rejectLegacyRoomSourceWorldEvents(
       [{ source_id: binding.source_id }],
       res,
@@ -2478,50 +2524,56 @@ planRouter.post("/situation/source-binding/:bindingId/replay-window", (req, res)
   ) {
     return;
   }
-  const maxEvents =
+    const maxEvents =
     typeof body.max_events === "number" && Number.isFinite(body.max_events)
       ? Math.max(1, Math.min(200, Math.trunc(body.max_events)))
       : 30;
-  const startTs = readRouteString(body.start_ts);
-  const endTs = readRouteString(body.end_ts);
-  const query = queryEventJournal({
+    const startTs = readRouteString(body.start_ts);
+    const endTs = readRouteString(body.end_ts);
+    const query = queryEventJournal({
     source_id: binding.source_id,
     from_ts: startTs ?? undefined,
     to_ts: endTs ?? undefined,
     limit: maxEvents,
     include_raw_events: true,
   });
-  const events = query.events
+    const events = query.events
     .map((entry) => entry.raw_event)
     .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
-  const receipt = replaySourceWindowIntoRun({
+    const receipt = replaySourceWindowIntoRun({
     bindingId,
     events,
     reason: readRouteString(body.reason) ?? "explicit replay-window request",
     maxEvents,
   });
-  return res.status(receipt.ok ? 200 : 409).json({
+    return res.status(receipt.ok ? 200 : 409).json({
     ...receipt,
     action_id: "situation-room.replay_source_window_into_run",
     matched_event_count: query.matched_count,
     returned_event_count: query.returned_count,
     raw_content_included: false,
   });
-});
+  },
+);
 
-planRouter.post("/situation/world-event/attach-source-to-thread", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
-  const roomId = readRouteString(body.room_id);
-  const sourceId = readRouteString(body.source_id);
-  const worldId = readRouteString(body.world_id);
-  if (rejectLegacyRoomSourceWorldEvents([{ source_id: sourceId }], res)) return;
-  const source = listWorldSourcesSeen().find((entry) =>
+planRouter.post(
+  "/situation/world-event/attach-source-to-thread",
+  (req, res) => {
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
+    const roomId = readRouteString(body.room_id);
+    const sourceId = readRouteString(body.source_id);
+    const worldId = readRouteString(body.world_id);
+    if (rejectLegacyRoomSourceWorldEvents([{ source_id: sourceId }], res)) return;
+    const source = listWorldSourcesSeen().find((entry) =>
     (!roomId || entry.room_id === roomId) &&
     (!sourceId || entry.source_id === sourceId) &&
     (!worldId || entry.world_id === worldId)
   ) ?? null;
-  if (!source) {
+    if (!source) {
     return res.status(404).json({
       ok: false,
       error: "world_event_source_not_seen",
@@ -2530,7 +2582,7 @@ planRouter.post("/situation/world-event/attach-source-to-thread", (req, res) => 
       raw_content_included: false,
     });
   }
-  const receipt = createSituationThreadBinding({
+    const receipt = createSituationThreadBinding({
     room_id: source.room_id,
     source_id: source.source_id,
     world_id: source.world_id,
@@ -2538,7 +2590,7 @@ planRouter.post("/situation/world-event/attach-source-to-thread", (req, res) => 
     mode: "standby_receipts",
     append_policy: "salient_only",
   });
-  const repair_transition = receipt.ok
+    const repair_transition = receipt.ok
     ? recordSourceBindingRepairAccepted({
         source_id: source.source_id,
         thread_id: threadId,
@@ -2547,7 +2599,7 @@ planRouter.post("/situation/world-event/attach-source-to-thread", (req, res) => 
         evidence_refs: [receipt.binding?.binding_id ?? source.source_id].filter(Boolean) as string[],
       })
     : null;
-  return res.status(receipt.ok ? 200 : 400).json({
+    return res.status(receipt.ok ? 200 : 400).json({
     ok: receipt.ok,
     schema: "helix.world_event_attach_source_to_thread_response.v1",
     receipt,
@@ -2557,13 +2609,14 @@ planRouter.post("/situation/world-event/attach-source-to-thread", (req, res) => 
     raw_content_included: false,
     context_policy: "compact_context_pack_only",
   });
-});
+  },
+);
 
 planRouter.get("/situation/minecraft-spatial/latest", (req, res) => {
   const roomId = typeof req.query.room_id === "string" ? req.query.room_id.trim() : "";
   const episode = roomId
     ? getLatestMinecraftSpatialEpisodeForRoom(roomId)
-    : listLatestMinecraftSpatialEpisodes().at(-1) ?? null;
+    : (listLatestMinecraftSpatialEpisodes().at(-1) ?? null);
   return res.status(200).json({
     ok: true,
     schema: "helix.minecraft_spatial_latest_response.v1",
@@ -2819,7 +2872,10 @@ planRouter.get("/situation/live-agentic-review", (req, res) => {
 });
 
 planRouter.post("/situation/live-agentic-review/request", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const environmentId = typeof body.environment_id === "string" ? body.environment_id.trim() : "";
   const threadId = typeof body.thread_id === "string" ? body.thread_id.trim() : "helix-ask:desktop";
   const environment = environmentId
@@ -2880,15 +2936,23 @@ const LIVE_CONTINUATION_LANE_VALUES = new Set<LiveContinuationLane>([
   "voice_gate",
 ]);
 
-const liveContinuationTriggerFromBody = (value: unknown): LiveContinuationTrigger =>
+const liveContinuationTriggerFromBody = (
+  value: unknown,
+): LiveContinuationTrigger =>
   typeof value === "string" && LIVE_CONTINUATION_TRIGGER_VALUES.has(value as LiveContinuationTrigger)
-    ? value as LiveContinuationTrigger
+    ? (value as LiveContinuationTrigger)
     : "manual_refresh";
 
-const findLiveContinuationJob = (body: Record<string, unknown>): LiveContinuationJob | null => {
+const findLiveContinuationJob = (
+  body: Record<string, unknown>,
+): LiveContinuationJob | null => {
   const jobId = liveContinuationString(body.job_id ?? body.jobId);
   if (jobId) {
-    return listLiveContinuationJobs({ includeStopped: true, status: "any" }).find((job) => job.job_id === jobId) ?? null;
+    return (
+      listLiveContinuationJobs({ includeStopped: true, status: "any" }).find(
+        (job) => job.job_id === jobId,
+      ) ?? null
+    );
   }
   const roomId = liveContinuationString(body.room_id ?? body.roomId);
   if (roomId) return getActiveLiveContinuationJobForRoom(roomId);
@@ -2921,7 +2985,10 @@ const buildLiveContinuationJobReceipt = (args: {
 });
 
 planRouter.post("/situation/live-continuation/start", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = liveContinuationString(body.thread_id ?? body.threadId);
   const roomId = liveContinuationString(body.room_id ?? body.roomId);
   const objective = liveContinuationString(body.objective);
@@ -2988,7 +3055,10 @@ planRouter.post("/situation/live-continuation/start", (req, res) => {
 });
 
 planRouter.post("/situation/live-continuation/query", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const jobId = liveContinuationString(body.job_id ?? body.jobId);
   const threadId = liveContinuationString(body.thread_id ?? body.threadId);
   const roomId = liveContinuationString(body.room_id ?? body.roomId);
@@ -3012,13 +3082,18 @@ planRouter.post("/situation/live-continuation/query", (req, res) => {
   });
 });
 
-const handleLiveContinuationLifecycle = (
-  action: "pause" | "resume" | "stop",
-  updater: (jobId: string, now?: string) => LiveContinuationJob | null,
-) => (req: Request, res: Response) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const jobId = liveContinuationString(body.job_id ?? body.jobId);
-  if (!jobId) {
+const handleLiveContinuationLifecycle =
+  (
+    action: "pause" | "resume" | "stop",
+    updater: (jobId: string, now?: string) => LiveContinuationJob | null,
+  ) =>
+  (req: Request, res: Response) => {
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const jobId = liveContinuationString(body.job_id ?? body.jobId);
+    if (!jobId) {
     return res.status(400).json({
       ok: false,
       receipt: buildLiveContinuationJobReceipt({
@@ -3030,8 +3105,8 @@ const handleLiveContinuationLifecycle = (
       error: "missing_live_continuation_job_id",
     });
   }
-  const job = updater(jobId, new Date().toISOString());
-  if (!job) {
+    const job = updater(jobId, new Date().toISOString());
+    if (!job) {
     return res.status(404).json({
       ok: false,
       receipt: buildLiveContinuationJobReceipt({
@@ -3043,7 +3118,7 @@ const handleLiveContinuationLifecycle = (
       error: "live_continuation_job_not_found",
     });
   }
-  return res.status(200).json({
+    return res.status(200).json({
     ok: true,
     receipt: buildLiveContinuationJobReceipt({
       action: `live_continuation.${action}`,
@@ -3052,14 +3127,17 @@ const handleLiveContinuationLifecycle = (
     }),
     job,
   });
-};
+  };
 
 planRouter.post("/situation/live-continuation/pause", handleLiveContinuationLifecycle("pause", pauseLiveContinuationJob));
 planRouter.post("/situation/live-continuation/resume", handleLiveContinuationLifecycle("resume", resumeLiveContinuationJob));
 planRouter.post("/situation/live-continuation/stop", handleLiveContinuationLifecycle("stop", stopLiveContinuationJob));
 
 planRouter.post("/situation/live-continuation/tick", async (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const job = findLiveContinuationJob(body);
   if (!job) {
     return res.status(404).json({
@@ -3096,11 +3174,15 @@ planRouter.post("/situation/live-continuation/tick", async (req, res) => {
 });
 
 planRouter.post("/situation/live-continuation/worker-lane/run", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const laneRaw = liveContinuationString(body.lane);
-  const lane = laneRaw && LIVE_CONTINUATION_LANE_VALUES.has(laneRaw as LiveContinuationLane)
-    ? laneRaw as LiveContinuationLane
-    : "world_state";
+  const lane =
+    laneRaw && LIVE_CONTINUATION_LANE_VALUES.has(laneRaw as LiveContinuationLane)
+      ? (laneRaw as LiveContinuationLane)
+      : "world_state";
   const evidenceRefs = liveContinuationStringArray(body.evidence_refs ?? body.evidenceRefs);
   return res.status(200).json({
     ok: true,
@@ -3119,7 +3201,10 @@ planRouter.post("/situation/live-continuation/worker-lane/run", (req, res) => {
 });
 
 planRouter.post("/situation/live-continuation/goal/evaluate", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const job = findLiveContinuationJob(body);
   const threadId = job?.thread_id ?? liveContinuationString(body.thread_id ?? body.threadId) ?? "helix-ask:desktop";
   const roomId = job?.room_id ?? liveContinuationString(body.room_id ?? body.roomId) ?? "room:minecraft-minehut";
@@ -3146,11 +3231,16 @@ planRouter.post("/situation/live-continuation/goal/evaluate", (req, res) => {
   });
 });
 
-planRouter.post("/situation/live-continuation/source-health/query", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const job = findLiveContinuationJob(body);
-  const sourceId = liveContinuationString(body.source_id ?? body.sourceId) ?? job?.source_ids[0] ?? "source:unknown";
-  return res.status(200).json({
+planRouter.post(
+  "/situation/live-continuation/source-health/query",
+  (req, res) => {
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const job = findLiveContinuationJob(body);
+    const sourceId = liveContinuationString(body.source_id ?? body.sourceId) ?? job?.source_ids[0] ?? "source:unknown";
+    return res.status(200).json({
     ok: true,
     receipt: {
       schema: HELIX_LIVE_SOURCE_ADMISSION_RECEIPT_SCHEMA,
@@ -3173,7 +3263,8 @@ planRouter.post("/situation/live-continuation/source-health/query", (req, res) =
       evidence_refs: job ? [`live_continuation_job:${job.job_id}`, `source:${sourceId}`] : [`source:${sourceId}:unknown`],
     },
   });
-});
+  },
+);
 
 planRouter.get("/situation/companion-policy", (req, res) => {
   const threadId = typeof req.query.thread_id === "string" && req.query.thread_id.trim()
@@ -3189,7 +3280,10 @@ planRouter.get("/situation/companion-policy", (req, res) => {
 });
 
 planRouter.post("/situation/companion-policy", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const names = Array.isArray(body.direct_address_names)
     ? body.direct_address_names.filter((entry: unknown): entry is string => typeof entry === "string")
     : undefined;
@@ -3220,14 +3314,17 @@ planRouter.post("/situation/companion-policy", (req, res) => {
 });
 
 planRouter.post("/situation/companion-session/start", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const minecraftSource =
     body.minecraft_source && typeof body.minecraft_source === "object"
-      ? body.minecraft_source as Record<string, unknown>
+      ? (body.minecraft_source as Record<string, unknown>)
       : {};
   const visualSource =
     body.visual_source && typeof body.visual_source === "object"
-      ? body.visual_source as Record<string, unknown>
+      ? (body.visual_source as Record<string, unknown>)
       : {};
   const preset = typeof body.preset === "string" && body.preset.trim()
     ? body.preset.trim()
@@ -3296,7 +3393,10 @@ planRouter.get("/situation/companion-session/status/:sessionId", (req, res) => {
 });
 
 planRouter.post("/situation/voice-lane/event", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const transcript = typeof body.transcript === "string" ? body.transcript : "";
   const evidenceRefs = Array.isArray(body.evidence_refs)
     ? body.evidence_refs.filter((entry: unknown): entry is string => typeof entry === "string")
@@ -3354,7 +3454,10 @@ planRouter.post("/situation/voice-lane/event", (req, res) => {
 });
 
 planRouter.post("/situation/live-commentary/session", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const environmentId = typeof body.environment_id === "string" ? body.environment_id.trim() : "";
   const environment = environmentId ? getLiveAnswerEnvironment(environmentId) : null;
   if (!environment) {
@@ -3400,7 +3503,10 @@ planRouter.get("/situation/live-answer-environment/:environmentId", (req, res) =
 });
 
 const handleLiveAnswerEnvironmentCreate = (req: Request, res: Response) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim() ? body.thread_id.trim() : "helix-ask:desktop";
   const objective = typeof body.objective === "string" && body.objective.trim()
     ? body.objective.trim()
@@ -3429,7 +3535,10 @@ const handleLiveAnswerEnvironmentCreate = (req: Request, res: Response) => {
     const cadenceResult = setVisualProducerCadence({
       threadId,
       sourceId,
-      environmentId: typeof body.environment_id === "string" ? body.environment_id : activeEnvironment?.environment_id ?? null,
+      environmentId:
+        typeof body.environment_id === "string"
+          ? body.environment_id
+          : (activeEnvironment?.environment_id ?? null),
       pipelineId: runtimeContext.active_pipeline_id,
       cadenceMs: requestedCadenceMs,
       captureMode: "interval",
@@ -3498,7 +3607,9 @@ const handleLiveAnswerEnvironmentCreate = (req: Request, res: Response) => {
       source_ids: sourceIds,
       graph_id: typeof body.graph_id === "string" ? body.graph_id : null,
       preset,
-      line_schema: Array.isArray(body.line_schema) ? body.line_schema as any : null,
+      line_schema: Array.isArray(body.line_schema)
+        ? (body.line_schema as any)
+        : null,
       mode: typeof body.mode === "string" ? body.mode : null,
     });
     let schemaSelection = selectLiveSchemaForEnvironment({
@@ -3550,7 +3661,9 @@ const handleLiveAnswerEnvironmentCreate = (req: Request, res: Response) => {
       }
     }
     for (const sourceId of sourceIds) {
-      if (sourceId.startsWith("source:calculator") || preset === "calculator_prime_stream" || preset === "calculator_equation_interpreter") {
+      if (
+        sourceId.startsWith("source:calculator") || preset === "calculator_prime_stream" || preset === "calculator_equation_interpreter"
+      ) {
         upsertWorkstationLiveSource({
           source_id: sourceId,
           kind: "calculator_series",
@@ -3561,17 +3674,25 @@ const handleLiveAnswerEnvironmentCreate = (req: Request, res: Response) => {
             body.source_config && typeof body.source_config === "object" && typeof (body.source_config as Record<string, unknown>).tick_rate_ms === "number"
               ? (body.source_config as Record<string, number>).tick_rate_ms
               : 1000,
-          config: body.source_config && typeof body.source_config === "object" ? body.source_config as Record<string, unknown> : {},
+          config:
+            body.source_config && typeof body.source_config === "object"
+              ? (body.source_config as Record<string, unknown>)
+              : {},
         });
       }
-      if (sourceId.startsWith("source:physics") || preset === "physics_stability_tracker") {
+      if (
+        sourceId.startsWith("source:physics") || preset === "physics_stability_tracker"
+      ) {
         upsertWorkstationLiveSource({
           source_id: sourceId,
           kind: "physics_simulation",
           panel_id: "situation-room-pipelines",
           thread_id: environment.thread_id,
           environment_id: environment.environment_id,
-          config: body.source_config && typeof body.source_config === "object" ? body.source_config as Record<string, unknown> : {},
+          config:
+            body.source_config && typeof body.source_config === "object"
+              ? (body.source_config as Record<string, unknown>)
+              : {},
         });
       }
     }
@@ -3717,34 +3838,45 @@ planRouter.post("/situation/live-answer-environment/:environmentId/pause", handl
 planRouter.post("/situation/live-answer-environment/:environmentId/resume", handleLiveAnswerEnvironmentStatus("active"));
 planRouter.post("/situation/live-answer-environment/:environmentId/stop", handleLiveAnswerEnvironmentStatus("completed"));
 
-planRouter.post("/situation/live-answer-environment/:environmentId/line-schema", (req, res) => {
-  const environmentId = typeof req.params.environmentId === "string" ? decodeURIComponent(req.params.environmentId).trim() : "";
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  if (!environmentId || !Array.isArray(body.line_schema)) {
+planRouter.post(
+  "/situation/live-answer-environment/:environmentId/line-schema",
+  (req, res) => {
+    const environmentId = typeof req.params.environmentId === "string" ? decodeURIComponent(req.params.environmentId).trim() : "";
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    if (!environmentId || !Array.isArray(body.line_schema)) {
     return res.status(400).json({
       ok: false,
       error: "missing_line_schema",
       message: "line schema update requires environmentId and line_schema.",
     });
   }
-  const result = setLiveAnswerEnvironmentLineSchema({
+    const result = setLiveAnswerEnvironmentLineSchema({
     environment_id: environmentId,
     line_schema: body.line_schema as any,
   });
-  return res.status(result ? 200 : 404).json({
+    return res.status(result ? 200 : 404).json({
     ok: Boolean(result),
     schema: "helix.live_answer_environment_line_schema_receipt.v1",
     environment: result?.environment ?? null,
     delta: result?.delta ?? null,
     error: result ? null : "environment_not_found",
   });
-});
+  },
+);
 
-planRouter.post("/situation/live-answer-environment/:environmentId/derive-line-schema", (req, res) => {
-  const environmentId = typeof req.params.environmentId === "string" ? decodeURIComponent(req.params.environmentId).trim() : "";
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const environment = environmentId ? getLiveAnswerEnvironment(environmentId) : null;
-  if (!environment) {
+planRouter.post(
+  "/situation/live-answer-environment/:environmentId/derive-line-schema",
+  (req, res) => {
+    const environmentId = typeof req.params.environmentId === "string" ? decodeURIComponent(req.params.environmentId).trim() : "";
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const environment = environmentId ? getLiveAnswerEnvironment(environmentId) : null;
+    if (!environment) {
     return res.status(404).json({
       ok: false,
       error: "environment_not_found",
@@ -3753,31 +3885,37 @@ planRouter.post("/situation/live-answer-environment/:environmentId/derive-line-s
       context_policy: "compact_context_pack_only",
     });
   }
-  const evidenceId = typeof body.visual_evidence_id === "string" && body.visual_evidence_id.trim()
+    const evidenceId = typeof body.visual_evidence_id === "string" && body.visual_evidence_id.trim()
     ? body.visual_evidence_id.trim()
     : null;
-  const evidence = evidenceId
-    ? listVisualFrameEvidence({ threadId: environment.thread_id, limit: 200 }).find((entry) => entry.evidence_id === evidenceId) ?? null
-    : listVisualFrameEvidence({ threadId: environment.thread_id, limit: 1 }).at(-1) ?? null;
-  const capabilities = buildSituationSourceCapabilities({
+    const evidence = evidenceId
+      ? (listVisualFrameEvidence({
+          threadId: environment.thread_id,
+          limit: 200,
+        }).find((entry) => entry.evidence_id === evidenceId) ?? null)
+      : (listVisualFrameEvidence({
+          threadId: environment.thread_id,
+          limit: 1,
+        }).at(-1) ?? null);
+    const capabilities = buildSituationSourceCapabilities({
     threadId: environment.thread_id,
     roomId: environment.room_id ?? null,
   });
-  const derivation = deriveLiveLineSchema({
+    const derivation = deriveLiveLineSchema({
     environment,
     visualEvidence: evidence,
     activeModalities: capabilities.filter((entry) => entry.status === "active").map((entry) => entry.modality),
   });
-  const schemaSelection = selectLiveSchemaForEnvironment({
+    const schemaSelection = selectLiveSchemaForEnvironment({
     environment,
     activeModalities: capabilities.filter((entry) => entry.status === "active").map((entry) => entry.modality),
     objectiveText: typeof body.objective_text === "string" ? body.objective_text : environment.objective,
   });
-  const result = setLiveAnswerEnvironmentLineSchema({
+    const result = setLiveAnswerEnvironmentLineSchema({
     environment_id: environment.environment_id,
     line_schema: derivation.line_schema,
   });
-  appendInterpretedEvent({
+    appendInterpretedEvent({
     thread_id: environment.thread_id,
     room_id: environment.room_id ?? null,
     source_family: "visual_snapshot",
@@ -3790,7 +3928,7 @@ planRouter.post("/situation/live-answer-environment/:environmentId/derive-line-s
     deterministic: true,
     created_at: derivation.created_at,
   });
-  return res.status(result ? 200 : 404).json({
+    return res.status(result ? 200 : 404).json({
     ok: Boolean(result),
     schema: "helix.live_line_schema_derivation_response.v1",
     derivation,
@@ -3808,7 +3946,8 @@ planRouter.post("/situation/live-answer-environment/:environmentId/derive-line-s
     raw_content_included: false,
     context_policy: "compact_context_pack_only",
   });
-});
+  },
+);
 
 planRouter.get("/situation/live-workstation-pipeline/list", (_req, res) => {
   return res.status(200).json({
@@ -3819,7 +3958,10 @@ planRouter.get("/situation/live-workstation-pipeline/list", (_req, res) => {
 });
 
 planRouter.post("/situation/live-workstation-pipeline/create", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim() ? body.thread_id.trim() : "helix-ask:desktop";
   const objective = typeof body.objective === "string" && body.objective.trim()
     ? body.objective.trim()
@@ -3953,7 +4095,10 @@ planRouter.get("/situation/workstation-live-source/events", (req, res) => {
 });
 
 const handleWorkstationLiveSourceEvent = (req: Request, res: Response) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const sourceId = typeof body.source_id === "string" && body.source_id.trim()
     ? body.source_id.trim()
     : "source:manual-feed";
@@ -3966,11 +4111,16 @@ const handleWorkstationLiveSourceEvent = (req: Request, res: Response) => {
         : undefined;
   const payload =
     kind === "physics_simulation" && (!body.payload || Object.keys(body.payload as Record<string, unknown>).length === 0)
-      ? buildPhysicsStabilityTick({
-          config: body.source_config && typeof body.source_config === "object" ? body.source_config as any : null,
+      ? (buildPhysicsStabilityTick({
+          config:
+            body.source_config && typeof body.source_config === "object"
+              ? (body.source_config as any)
+              : null,
           sample_index: seq ?? 1,
-        }) as unknown as Record<string, unknown>
-      : body.payload && typeof body.payload === "object" ? body.payload as Record<string, unknown> : {};
+        }) as unknown as Record<string, unknown>)
+      : body.payload && typeof body.payload === "object"
+        ? (body.payload as Record<string, unknown>)
+        : {};
   const result = ingestWorkstationLiveSourceEvent({
     source_id: sourceId,
     kind,
@@ -3981,7 +4131,10 @@ const handleWorkstationLiveSourceEvent = (req: Request, res: Response) => {
     ts: typeof body.ts === "string" ? body.ts : undefined,
     panel_id: typeof body.panel_id === "string" ? body.panel_id : null,
     thread_id: typeof body.thread_id === "string" ? body.thread_id : null,
-    trace: body.trace && typeof body.trace === "object" ? body.trace as Record<string, unknown> : null,
+    trace:
+      body.trace && typeof body.trace === "object"
+        ? (body.trace as Record<string, unknown>)
+        : null,
     evidence_refs: Array.isArray(body.evidence_refs) ? body.evidence_refs.map(String) : undefined,
   });
   const modality = normalizeLiveSourceModality(kind === "minecraft_world_events"
@@ -4060,7 +4213,10 @@ planRouter.get("/situation/source-capabilities", (req, res) => {
 });
 
 planRouter.post("/situation/source-capability/register", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const capability = registerSituationSourceCapability(body);
   return res.status(200).json({
     ok: true,
@@ -4073,7 +4229,10 @@ planRouter.post("/situation/source-capability/register", (req, res) => {
 });
 
 planRouter.post("/situation/source-capability/update", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const capability = updateSituationSourceCapability(body);
   return res.status(capability ? 200 : 400).json({
     ok: Boolean(capability),
@@ -4087,7 +4246,10 @@ planRouter.post("/situation/source-capability/update", (req, res) => {
 });
 
 planRouter.post("/situation/source/heartbeat", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const sourceId = typeof body.source_id === "string" && body.source_id.trim() ? body.source_id.trim() : "";
   if (!sourceId) {
     return res.status(400).json({
@@ -4123,7 +4285,10 @@ planRouter.post("/situation/source/heartbeat", (req, res) => {
 });
 
 planRouter.post("/situation/live-source/chunk", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const result = appendLiveSourceChunkFromBody(body);
   const analysisJob = body.spawn_analysis_job === false
     ? null
@@ -4158,7 +4323,10 @@ planRouter.post("/situation/test-harness/live-visual-source", (req, res) => {
       raw_content_included: false,
     });
   }
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const scenario = typeof body.scenario === "string" ? body.scenario.trim() : "";
   const receipt = scenario === "active_run_with_unbound_visual_source"
     ? seedBackendLiveVisualSourceSwitchForAskTest(body)
@@ -4241,7 +4409,10 @@ planRouter.get("/situation/live-source/analysis-jobs/:jobId", (req, res) => {
 });
 
 planRouter.post("/situation/live-source/analysis-jobs/run-due", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim() ? body.thread_id.trim() : null;
   const sourceId = typeof body.source_id === "string" && body.source_id.trim() ? body.source_id.trim() : null;
   const limit = typeof body.limit === "number" && Number.isFinite(body.limit) ? body.limit : 4;
@@ -4279,7 +4450,10 @@ planRouter.post("/situation/live-source/analysis-jobs/:jobId/run", (req, res) =>
 });
 
 planRouter.post("/situation/live-source/rate-policy", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const result = setLiveSourceRatePolicy(body);
   return res.status(200).json({
     ok: true,
@@ -4309,7 +4483,10 @@ const readRouteNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
 planRouter.post("/situation/live-source/descriptor", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const descriptor = upsertLiveSourceDescriptor(body);
   return res.status(200).json({
     ok: true,
@@ -4384,7 +4561,10 @@ planRouter.get("/situation/live-schema/inspect", (req, res) => {
 });
 
 planRouter.post("/situation/live-schema/reselect", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const environmentId = readRouteString(body.environment_id);
   const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
   const environment = environmentId
@@ -4431,7 +4611,10 @@ planRouter.post("/situation/live-schema/reselect", (req, res) => {
 });
 
 planRouter.post("/situation/live-schema/repair", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const environmentId = readRouteString(body.environment_id);
   const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
   const environment = environmentId
@@ -4502,7 +4685,10 @@ const requestVisualProducerClientAdoption = (input: {
 });
 
 planRouter.post("/client-action/request", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const action = requestClientCapabilityAction(body);
   return res.status(200).json({
     ok: true,
@@ -4525,7 +4711,10 @@ planRouter.get("/client-action/pending", (req, res) => {
 });
 
 planRouter.post("/client-action/:actionRequestId/adopt", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const actionRequestId = req.params.actionRequestId;
   const action = getClientCapabilityAction(actionRequestId);
   if (!action) {
@@ -4541,7 +4730,10 @@ planRouter.post("/client-action/:actionRequestId/adopt", (req, res) => {
     action_request_id: actionRequestId,
     thread_id: readRouteString(body.thread_id) ?? action.thread_id,
   });
-  const observed = body.observed_state && typeof body.observed_state === "object" ? body.observed_state as Record<string, unknown> : {};
+  const observed =
+    body.observed_state && typeof body.observed_state === "object"
+      ? (body.observed_state as Record<string, unknown>)
+      : {};
   const sourceId = readRouteString(body.source_id) ?? readRouteString(observed.source_id);
   if (action.capability === "visual_capture" && sourceId) {
     const priorDescriptor = getLatestLiveSourceDescriptorForSource(sourceId);
@@ -4614,7 +4806,10 @@ planRouter.post("/client-action/:actionRequestId/fail", (req, res) => {
 });
 
 planRouter.post("/situation/live-source/producer/start", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
   const sourceId = readRouteString(body.source_id) ?? `source:visual_frame:${threadId}`;
   const result = setVisualProducerCadence({
@@ -4667,7 +4862,10 @@ planRouter.post("/situation/live-source/producer/start", (req, res) => {
 });
 
 planRouter.post("/situation/live-source/producer/set-cadence", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
   const sourceId = readRouteString(body.source_id);
   if (!sourceId) {
@@ -4743,7 +4941,10 @@ planRouter.post("/situation/live-source/producer/set-cadence", (req, res) => {
 });
 
 planRouter.post("/situation/live-source/producer/heartbeat", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
   const sourceId = readRouteString(body.source_id);
   if (!sourceId) {
@@ -4794,7 +4995,10 @@ planRouter.post("/situation/live-source/producer/heartbeat", (req, res) => {
 });
 
 planRouter.post("/situation/live-source/producer/adopt", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const adoption = recordVisualProducerSchedulerAdoption(body);
   const sourceId = readRouteString(body.source_id);
   if (sourceId) {
@@ -4836,7 +5040,10 @@ planRouter.get("/situation/live-source/producer/adoptions", (req, res) => {
 });
 
 planRouter.post("/situation/live-source/producer/tick-due", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
   const sourceId = readRouteString(body.source_id);
   if (!sourceId) {
@@ -4946,7 +5153,10 @@ planRouter.post("/situation/live-source/producers/:producerId/run-cadence-accept
 });
 
 planRouter.post("/situation/live-runtime/repair-plan", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
   const producerId = readRouteString(body.producer_id);
   const freshness = producerId ? readLiveSourceProducerFreshness({ producerId }) : null;
@@ -4987,7 +5197,10 @@ planRouter.post("/situation/live-runtime/repair-plan", (req, res) => {
 });
 
 planRouter.post("/situation/live-runtime/repair", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = readRouteString(body.thread_id) ?? "helix-ask:desktop";
   const producerId = readRouteString(body.producer_id);
   const freshness = producerId ? readLiveSourceProducerFreshness({ producerId }) : null;
@@ -5032,10 +5245,15 @@ planRouter.post("/situation/live-runtime/repair", (req, res) => {
   });
 });
 
-const setLiveSourceStatusRoute = (status: "paused" | "active" | "stopped") => (req: Request, res: Response) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const sourceId = typeof body.source_id === "string" && body.source_id.trim() ? body.source_id.trim() : "";
-  if (!sourceId) {
+const setLiveSourceStatusRoute =
+  (status: "paused" | "active" | "stopped") =>
+  (req: Request, res: Response) => {
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const sourceId = typeof body.source_id === "string" && body.source_id.trim() ? body.source_id.trim() : "";
+    if (!sourceId) {
     return res.status(400).json({
       ok: false,
       error: "missing_source_id",
@@ -5043,12 +5261,12 @@ const setLiveSourceStatusRoute = (status: "paused" | "active" | "stopped") => (r
       raw_content_included: false,
     });
   }
-  const producer = setLiveSourceProducerStatus({
+    const producer = setLiveSourceProducerStatus({
     sourceId,
     threadId: typeof body.thread_id === "string" ? body.thread_id : null,
     status,
   });
-  return res.status(producer ? 200 : 404).json({
+    return res.status(producer ? 200 : 404).json({
     ok: Boolean(producer),
     schema: "helix.live_source_status_response.v1",
     producer,
@@ -5057,14 +5275,17 @@ const setLiveSourceStatusRoute = (status: "paused" | "active" | "stopped") => (r
     raw_content_included: false,
     context_policy: "compact_context_pack_only",
   });
-};
+  };
 
 planRouter.post("/situation/live-source/pause", setLiveSourceStatusRoute("paused"));
 planRouter.post("/situation/live-source/resume", setLiveSourceStatusRoute("active"));
 planRouter.post("/situation/live-source/stop", setLiveSourceStatusRoute("stopped"));
 
 planRouter.post("/situation/live-source/pipeline/compose", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const objective = typeof body.objective === "string" && body.objective.trim()
     ? body.objective.trim()
     : typeof body.prompt === "string" && body.prompt.trim()
@@ -5096,7 +5317,10 @@ planRouter.post("/situation/live-source/pipeline/compose", (req, res) => {
 });
 
 planRouter.post("/situation/live-source/pipeline/execute", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const planId = typeof body.plan_id === "string" && body.plan_id.trim() ? body.plan_id.trim() : null;
   const objective = typeof body.objective === "string" && body.objective.trim()
     ? body.objective.trim()
@@ -5282,15 +5506,24 @@ planRouter.get("/situation/live-environment/fidelity", (req, res) => {
 planRouter.post("/situation/live-source/event", handleWorkstationLiveSourceEvent);
 
 planRouter.post("/situation/live-source/batch", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const events = Array.isArray(body.events) ? body.events : [];
   const results = events.map((entry: unknown) => {
-    const event = entry && typeof entry === "object" ? entry as Record<string, unknown> : {};
+    const event =
+      entry && typeof entry === "object"
+        ? (entry as Record<string, unknown>)
+        : {};
     return ingestWorkstationLiveSourceEvent({
       source_id: typeof event.source_id === "string" && event.source_id.trim() ? event.source_id.trim() : "source:manual-feed",
       kind: typeof event.kind === "string" ? event.kind : typeof event.source_family === "string" ? event.source_family : "manual_feed",
       event_type: typeof event.event_type === "string" ? event.event_type : "source_tick",
-      payload: event.payload && typeof event.payload === "object" ? event.payload as Record<string, unknown> : {},
+      payload:
+        event.payload && typeof event.payload === "object"
+          ? (event.payload as Record<string, unknown>)
+          : {},
       environment_id: typeof event.environment_id === "string" ? event.environment_id : typeof body.environment_id === "string" ? body.environment_id : null,
       seq:
         typeof event.seq === "number"
@@ -5301,7 +5534,10 @@ planRouter.post("/situation/live-source/batch", (req, res) => {
       ts: typeof event.ts === "string" ? event.ts : undefined,
       panel_id: typeof event.panel_id === "string" ? event.panel_id : null,
       thread_id: typeof event.thread_id === "string" ? event.thread_id : typeof body.thread_id === "string" ? body.thread_id : null,
-      trace: event.trace && typeof event.trace === "object" ? event.trace as Record<string, unknown> : null,
+      trace:
+        event.trace && typeof event.trace === "object"
+          ? (event.trace as Record<string, unknown>)
+          : null,
       evidence_refs: Array.isArray(event.evidence_refs) ? event.evidence_refs.map(String) : undefined,
     });
   });
@@ -5346,7 +5582,10 @@ planRouter.post("/situation/live-source/:sourceId/reset-counters", (req, res) =>
 });
 
 planRouter.post("/situation/live-source/:sourceId/tick-rate", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const source = setWorkstationLiveSourceTickRate({
     source_id: decodeURIComponent(req.params.sourceId ?? ""),
     tick_rate_ms: typeof body.tick_rate_ms === "number" ? body.tick_rate_ms : Number(body.tick_rate_ms ?? 0),
@@ -5410,7 +5649,10 @@ planRouter.get("/situation/interpreted-log", (req, res) => {
 });
 
 planRouter.post("/situation/interpreted-log/steer", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim() ? body.thread_id.trim() : "";
   const prompt = typeof body.prompt === "string" && body.prompt.trim() ? body.prompt.trim() : "";
   const roomId = typeof body.room_id === "string" && body.room_id.trim() ? body.room_id.trim() : null;
@@ -5519,7 +5761,10 @@ planRouter.get("/situation/clarification-dialogue/pending", (req, res) => {
 });
 
 planRouter.post("/situation/clarification-dialogue/detect", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim() ? body.thread_id.trim() : "";
   const roomId = typeof body.room_id === "string" && body.room_id.trim() ? body.room_id.trim() : null;
   if (!threadId) return res.status(400).json({ ok: false, error: "missing_thread_id" });
@@ -5561,7 +5806,10 @@ planRouter.post("/situation/clarification-dialogue/detect", (req, res) => {
 });
 
 planRouter.post("/situation/clarification-dialogue/rank-latest", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim() ? body.thread_id.trim() : "";
   const roomId = typeof body.room_id === "string" && body.room_id.trim() ? body.room_id.trim() : null;
   if (!threadId) return res.status(400).json({ ok: false, error: "missing_thread_id" });
@@ -5586,7 +5834,10 @@ planRouter.post("/situation/clarification-dialogue/rank-latest", (req, res) => {
 });
 
 planRouter.post("/situation/clarification-dialogue/answer", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim() ? body.thread_id.trim() : "";
   const roomId = typeof body.room_id === "string" && body.room_id.trim() ? body.room_id.trim() : null;
   const questionId = typeof body.question_id === "string" && body.question_id.trim() ? body.question_id.trim() : null;
@@ -5604,9 +5855,10 @@ planRouter.post("/situation/clarification-dialogue/answer", (req, res) => {
       : storedQuestion?.ranking?.hypothesis_id
         ? [storedQuestion.ranking.hypothesis_id]
       : [];
-  const clarificationNeedId = typeof body.need_id === "string" && body.need_id.trim()
-    ? body.need_id.trim()
-    : storedQuestion?.need_id ?? null;
+  const clarificationNeedId =
+    typeof body.need_id === "string" && body.need_id.trim()
+      ? body.need_id.trim()
+      : (storedQuestion?.need_id ?? null);
   const profileId = typeof body.profile_id === "string" && body.profile_id.trim() ? body.profile_id.trim() : null;
   const steeringEvidence = recordUserSteeringEvidence({
     threadId,
@@ -5676,7 +5928,10 @@ planRouter.post("/situation/clarification-dialogue/answer", (req, res) => {
 });
 
 planRouter.post("/situation/clarification-dialogue/dismiss", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const needId = typeof body.need_id === "string" && body.need_id.trim() ? body.need_id.trim() : null;
   const proposalId = typeof body.proposal_id === "string" && body.proposal_id.trim() ? body.proposal_id.trim() : null;
   if (needId) dismissClarificationNeed(needId);
@@ -5711,7 +5966,10 @@ planRouter.get("/situation/steering-memory", (req, res) => {
 });
 
 planRouter.post("/situation/steering-memory/archive", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim() ? body.thread_id.trim() : "";
   const profileId = typeof body.profile_id === "string" && body.profile_id.trim() ? body.profile_id.trim() : null;
   if (!threadId) return res.status(400).json({ ok: false, error: "missing_thread_id" });
@@ -5782,13 +6040,18 @@ planRouter.get("/situation/live-workers", (req, res) => {
 });
 
 planRouter.post("/situation/live-workers/run-due", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim()
     ? body.thread_id.trim()
     : "helix-ask:desktop";
-  const environmentId = typeof body.environment_id === "string" && body.environment_id.trim()
-    ? body.environment_id.trim()
-    : getActiveLiveAnswerEnvironmentForThread(threadId)?.environment_id ?? null;
+  const environmentId =
+    typeof body.environment_id === "string" && body.environment_id.trim()
+      ? body.environment_id.trim()
+      : (getActiveLiveAnswerEnvironmentForThread(threadId)?.environment_id ??
+        null);
   const runs = runDueLiveWorkers({
     threadId,
     environmentId,
@@ -5984,12 +6247,15 @@ planRouter.get("/situation/live-cognition/tangents", (req, res) => {
   });
 });
 
-planRouter.get("/situation/live-cognition/arbitration-candidates", (req, res) => {
-  const query = readLiveCognitionQuery(req);
-  const status = typeof req.query.status === "string" && req.query.status.trim()
-    ? req.query.status.trim() as any
-    : null;
-  return res.status(200).json({
+planRouter.get(
+  "/situation/live-cognition/arbitration-candidates",
+  (req, res) => {
+    const query = readLiveCognitionQuery(req);
+    const status =
+      typeof req.query.status === "string" && req.query.status.trim()
+        ? (req.query.status.trim() as any)
+        : null;
+    return res.status(200).json({
     ok: true,
     schema: "helix.live_cognition_arbitration_candidates_response.v1",
     candidates: listLiveArbitrationCandidates({
@@ -6002,7 +6268,8 @@ planRouter.get("/situation/live-cognition/arbitration-candidates", (req, res) =>
     raw_content_included: false,
     context_policy: "compact_context_pack_only",
   });
-});
+  },
+);
 
 planRouter.post("/situation/live-cognition/arbitration-candidates/:candidateId/consume", (req, res) => {
   const mode = req.body && typeof req.body === "object" && (req.body as Record<string, unknown>).mode === "explicit_ask"
@@ -6395,9 +6662,15 @@ planRouter.get("/situation/procedure-epochs/:closureId/replay", (req, res) => {
 });
 
 planRouter.post("/situation/live-cognition/run-acceptance", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim() ? body.thread_id.trim() : "helix-ask:desktop";
-  const scenario = typeof body.scenario === "string" && body.scenario.trim() ? body.scenario.trim() as any : undefined;
+  const scenario =
+    typeof body.scenario === "string" && body.scenario.trim()
+      ? (body.scenario.trim() as any)
+      : undefined;
   const situationRunId = typeof body.situation_run_id === "string" && body.situation_run_id.trim() ? body.situation_run_id.trim() : null;
   const acceptance = runSituationRunAcceptance({
     threadId,
@@ -6414,7 +6687,10 @@ planRouter.post("/situation/live-cognition/run-acceptance", (req, res) => {
 });
 
 planRouter.post("/situation/interpreted-log/archive", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim() ? body.thread_id.trim() : "";
   const roomId = typeof body.room_id === "string" && body.room_id.trim() ? body.room_id.trim() : null;
   if (!threadId) return res.status(400).json({ ok: false, error: "missing_thread_id" });
@@ -6589,7 +6865,10 @@ planRouter.get("/situation/tool-traces/archive", (req, res) => {
 planRouter.get("/situation/categorization-jobs", (req, res) => {
   const threadId = typeof req.query.thread_id === "string" ? req.query.thread_id.trim() : null;
   const roomId = typeof req.query.room_id === "string" ? req.query.room_id.trim() : null;
-  const status = typeof req.query.status === "string" ? req.query.status.trim() as "any" : "any";
+  const status =
+    typeof req.query.status === "string"
+      ? (req.query.status.trim() as "any")
+      : "any";
   const jobs = listContinuousCategorizationJobs({ threadId, roomId, status });
   return res.json({
     ok: true,
@@ -6601,7 +6880,10 @@ planRouter.get("/situation/categorization-jobs", (req, res) => {
 });
 
 planRouter.post("/situation/categorization-jobs/start", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim() ? body.thread_id.trim() : "";
   const sourceFamily = typeof body.source_family === "string" && body.source_family.trim() ? body.source_family.trim() : "";
   if (!threadId || !sourceFamily) return res.status(400).json({ ok: false, error: "missing_thread_id_or_source_family" });
@@ -6654,7 +6936,10 @@ for (const [routeName, status, action] of [
 }
 
 planRouter.post("/situation/categorization-jobs/:jobId/archive", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const job = getContinuousCategorizationJob(decodeURIComponent(req.params.jobId ?? ""));
   if (!job) return res.status(404).json({ ok: false, error: "job_not_found" });
   const archive = archiveCategorizationSession({
@@ -6688,7 +6973,10 @@ planRouter.get("/situation/categorization-jobs/:jobId/receipts", (req, res) => {
 });
 
 planRouter.post("/situation/event-window/query", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const requestedSourceId =
     typeof body.source_id === "string" ? body.source_id : null;
   if (
@@ -6716,7 +7004,7 @@ planRouter.post("/situation/event-window/query", (req, res) => {
 planRouter.get("/situation/live-line-tool-requests", (req, res) => {
   const threadId = typeof req.query.thread_id === "string" ? req.query.thread_id : null;
   const status = typeof req.query.status === "string" ? req.query.status : "any";
-  const requestStatus: HelixLiveLineToolRequestStatus | "any" = (
+  const requestStatus: HelixLiveLineToolRequestStatus | "any" =
     status === "proposed" ||
     status === "approved" ||
     status === "dispatched" ||
@@ -6725,7 +7013,8 @@ planRouter.get("/situation/live-line-tool-requests", (req, res) => {
     status === "dismissed" ||
     status === "failed" ||
     status === "any"
-  ) ? status : "any";
+      ? status
+      : "any";
   const limit = typeof req.query.limit === "string" && Number.isFinite(Number(req.query.limit))
     ? Number(req.query.limit)
     : 100;
@@ -6764,7 +7053,10 @@ planRouter.get("/situation/live-line-tool-evaluations", (req, res) => {
 });
 
 planRouter.post("/situation/live-line-tool-requests/plan", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim()
     ? body.thread_id.trim()
     : "helix-ask:desktop";
@@ -6823,7 +7115,10 @@ planRouter.post("/situation/live-line-tool-requests/plan", (req, res) => {
 });
 
 planRouter.post("/situation/live-line-tool-request/run", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" ? body.thread_id : null;
   const requestId = typeof body.request_id === "string" ? body.request_id : null;
   if (!threadId || !requestId) {
@@ -6862,7 +7157,10 @@ planRouter.post("/situation/live-line-tool-request/run", (req, res) => {
 });
 
 planRouter.post("/situation/visual-source/start", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const receipt = startVisualSnapshotSource(body);
   return res.status(receipt.ok ? 200 : 400).json({
     ok: receipt.ok,
@@ -6875,10 +7173,15 @@ planRouter.post("/situation/visual-source/start", (req, res) => {
   });
 });
 
-const updateVisualSourceRoute = (status: "permission_required" | "paused" | "active" | "stopped") => (req: Request, res: Response) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const sourceId = typeof body.source_id === "string" && body.source_id.trim() ? body.source_id.trim() : "";
-  if (!sourceId) {
+const updateVisualSourceRoute =
+  (status: "permission_required" | "paused" | "active" | "stopped") =>
+  (req: Request, res: Response) => {
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const sourceId = typeof body.source_id === "string" && body.source_id.trim() ? body.source_id.trim() : "";
+    if (!sourceId) {
     return res.status(400).json({
       ok: false,
       error: "missing_source_id",
@@ -6887,8 +7190,8 @@ const updateVisualSourceRoute = (status: "permission_required" | "paused" | "act
       context_policy: "compact_context_pack_only",
     });
   }
-  const receipt = setVisualSnapshotSourceStatus({ sourceId, status });
-  const activationReceipt = buildSourceActivationReceipt({
+    const receipt = setVisualSnapshotSourceStatus({ sourceId, status });
+    const activationReceipt = buildSourceActivationReceipt({
     sourceId,
     threadId: receipt.source?.thread_id ?? "helix-ask:desktop",
     modality: "visual_frame",
@@ -6900,7 +7203,7 @@ const updateVisualSourceRoute = (status: "permission_required" | "paused" | "act
       : "Visual source status update failed.",
     nextRequiredAction: receipt.source?.status === "permission_required" ? "grant_visual_capture_permission" : null,
   });
-  return res.status(receipt.ok ? 200 : 404).json({
+    return res.status(receipt.ok ? 200 : 404).json({
     ok: receipt.ok,
     schema: "helix.visual_snapshot_source_status_response.v1",
     receipt,
@@ -6910,14 +7213,17 @@ const updateVisualSourceRoute = (status: "permission_required" | "paused" | "act
     raw_image_included: false,
     context_policy: "compact_context_pack_only",
   });
-};
+  };
 
 planRouter.post("/situation/visual-source/pause", updateVisualSourceRoute("paused"));
 planRouter.post("/situation/visual-source/resume", updateVisualSourceRoute("active"));
 planRouter.post("/situation/visual-source/stop", updateVisualSourceRoute("stopped"));
 planRouter.post("/situation/visual-source/permission-required", updateVisualSourceRoute("permission_required"));
 planRouter.post("/situation/visual-source/permission-granted", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const sourceId = typeof body.source_id === "string" && body.source_id.trim() ? body.source_id.trim() : "";
   if (!sourceId) {
     return res.status(400).json({
@@ -7000,7 +7306,10 @@ planRouter.post("/situation/visual-source/permission-granted", (req, res) => {
 });
 
 planRouter.post("/situation/audio-source/permission-granted", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const sourceId = typeof body.source_id === "string" && body.source_id.trim()
     ? body.source_id.trim()
     : `audio_transcript:${typeof body.thread_id === "string" ? body.thread_id : "helix-ask:desktop"}`;
@@ -7035,10 +7344,14 @@ planRouter.post("/situation/audio-source/permission-granted", (req, res) => {
   });
 });
 
-const updateAudioSourceRoute = (status: "paused" | "stopped") => (req: Request, res: Response) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const sourceId = typeof body.source_id === "string" && body.source_id.trim() ? body.source_id.trim() : "";
-  if (!sourceId) {
+const updateAudioSourceRoute =
+  (status: "paused" | "stopped") => (req: Request, res: Response) => {
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const sourceId = typeof body.source_id === "string" && body.source_id.trim() ? body.source_id.trim() : "";
+    if (!sourceId) {
     return res.status(400).json({
       ok: false,
       error: "missing_source_id",
@@ -7046,7 +7359,7 @@ const updateAudioSourceRoute = (status: "paused" | "stopped") => (req: Request, 
       raw_content_included: false,
     });
   }
-  const capability = recordSituationSourceHeartbeat({
+    const capability = recordSituationSourceHeartbeat({
     source_id: sourceId,
     thread_id: typeof body.thread_id === "string" ? body.thread_id : null,
     room_id: typeof body.room_id === "string" ? body.room_id : null,
@@ -7054,7 +7367,7 @@ const updateAudioSourceRoute = (status: "paused" | "stopped") => (req: Request, 
     status,
     ts: typeof body.ts === "string" ? body.ts : null,
   });
-  const activationReceipt = buildSourceActivationReceipt({
+    const activationReceipt = buildSourceActivationReceipt({
     sourceId,
     threadId: capability.thread_id,
     modality: "audio_transcript",
@@ -7063,7 +7376,7 @@ const updateAudioSourceRoute = (status: "paused" | "stopped") => (req: Request, 
     ok: true,
     summary: `Audio transcript source is ${status}.`,
   });
-  return res.status(200).json({
+    return res.status(200).json({
     ok: true,
     schema: "helix.audio_source_status_response.v1",
     capability,
@@ -7073,13 +7386,16 @@ const updateAudioSourceRoute = (status: "paused" | "stopped") => (req: Request, 
     raw_transcript_included: false,
     context_policy: "compact_context_pack_only",
   });
-};
+  };
 
 planRouter.post("/situation/audio-source/pause", updateAudioSourceRoute("paused"));
 planRouter.post("/situation/audio-source/stop", updateAudioSourceRoute("stopped"));
 
 planRouter.post("/situation/audio-source/transcript-chunk", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const sourceId = typeof body.source_id === "string" && body.source_id.trim()
     ? body.source_id.trim()
     : `audio_transcript:${typeof body.thread_id === "string" ? body.thread_id : "helix-ask:desktop"}`;
@@ -7194,7 +7510,10 @@ planRouter.post("/situation/audio-source/transcript-chunk", (req, res) => {
 });
 
 planRouter.post("/situation/visual-source/set-cadence", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const receipt = updateVisualSnapshotSource(body);
   return res.status(receipt.ok ? 200 : 404).json({
     ok: receipt.ok,
@@ -7217,39 +7536,49 @@ const parseInlineVisualImage = (
       : "";
   if (!raw) return null;
   const dataUrlMatch = /^data:([^;,]+);base64,([\s\S]+)$/i.exec(raw);
-  const mimeType = typeof body.mime_type === "string" && body.mime_type.trim()
-    ? body.mime_type.trim()
-    : dataUrlMatch?.[1] ?? "image/png";
+  const mimeType =
+    typeof body.mime_type === "string" && body.mime_type.trim()
+      ? body.mime_type.trim()
+      : (dataUrlMatch?.[1] ?? "image/png");
   const imageBase64 = (dataUrlMatch?.[2] ?? raw).replace(/\s+/g, "");
   if (!imageBase64) return null;
   return { imageBase64, mimeType };
 };
 
-const recordVisualFrameRoute = (schema: "helix.visual_frame_record_response.v1" | "helix.visual_frame_capture_response.v1") =>
+const recordVisualFrameRoute =
+  (
+    schema: "helix.visual_frame_record_response.v1" | "helix.visual_frame_capture_response.v1",
+  ) =>
   (req: Request, res: Response) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const frame = recordVisualFrame(body);
-  const chunkResult = appendLiveSourceChunk({
-    source_id: frame.source_id,
-    thread_id: frame.thread_id,
-    environment_id: typeof body.environment_id === "string" ? body.environment_id : null,
-    participant_id: typeof body.participant_id === "string" ? body.participant_id : null,
-    modality: "visual_frame",
-    ts: frame.ts,
-    compact_summary: "Visual frame captured as live-source chunk.",
-    payload_ref: frame.frame_id,
-    evidence_refs: [frame.frame_id, ...(frame.related_event_refs ?? [])],
-    capture_mode: typeof body.capture_mode === "string" ? body.capture_mode as any : "manual",
-  });
-  const analysisJob = queueLiveSourceAnalysisJob({
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const frame = recordVisualFrame(body);
+    const chunkResult = appendLiveSourceChunk({
+      source_id: frame.source_id,
+      thread_id: frame.thread_id,
+      environment_id: typeof body.environment_id === "string" ? body.environment_id : null,
+      participant_id: typeof body.participant_id === "string" ? body.participant_id : null,
+      modality: "visual_frame",
+      ts: frame.ts,
+      compact_summary: "Visual frame captured as live-source chunk.",
+      payload_ref: frame.frame_id,
+      evidence_refs: [frame.frame_id, ...(frame.related_event_refs ?? [])],
+      capture_mode:
+        typeof body.capture_mode === "string"
+          ? (body.capture_mode as any)
+          : "manual",
+    });
+    const analysisJob = queueLiveSourceAnalysisJob({
     chunk: chunkResult.chunk,
     analyzerId: "visual_analysis",
   });
-  recordPipelineChunkLifecycle({
+    recordPipelineChunkLifecycle({
     chunk: chunkResult.chunk,
     analysisJob,
   });
-  return res.status(200).json({
+    return res.status(200).json({
     ok: true,
     schema,
     frame,
@@ -7269,7 +7598,7 @@ const recordVisualFrameRoute = (schema: "helix.visual_frame_record_response.v1" 
     raw_image_included: false,
     context_policy: "compact_context_pack_only",
   });
-};
+  };
 
 planRouter.post("/situation/visual-frame", recordVisualFrameRoute("helix.visual_frame_record_response.v1"));
 planRouter.post("/situation/visual-source/capture-frame", recordVisualFrameRoute("helix.visual_frame_capture_response.v1"));
@@ -7281,7 +7610,10 @@ planRouter.get("/situation/visual-provider/health", (_req, res) => {
 });
 
 planRouter.post("/situation/visual-frame/analyze", async (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   try {
     const inlineImage = parseInlineVisualImage(body);
     let analysisBody = { ...body };
@@ -7320,7 +7652,10 @@ planRouter.post("/situation/visual-frame/analyze", async (req, res) => {
         compact_summary: "Visual frame submitted for inline analysis.",
         payload_ref: frame.frame_id,
         evidence_refs: [frame.frame_id, ...(frame.related_event_refs ?? [])],
-        capture_mode: typeof body.capture_mode === "string" ? body.capture_mode as any : "manual",
+        capture_mode:
+          typeof body.capture_mode === "string"
+            ? (body.capture_mode as any)
+            : "manual",
       });
       inlineChunk = chunkResult.chunk;
       inlineAnalysisJob = queueLiveSourceAnalysisJob({
@@ -7351,9 +7686,10 @@ planRouter.post("/situation/visual-frame/analyze", async (req, res) => {
         incomingPrompt === genericClientPrompt ||
         incomingPrompt === genericServerPrompt ||
         incomingPrompt === defaultVisionPrompt(genericServerPrompt);
-      const prompt = observerProfile && promptLooksGeneric
-        ? observerProfile.prompt
-        : incomingPrompt ?? defaultVisionPrompt(genericServerPrompt);
+      const prompt =
+        observerProfile && promptLooksGeneric
+          ? observerProfile.prompt
+          : (incomingPrompt ?? defaultVisionPrompt(genericServerPrompt));
       const provider = getVisionProvider();
       const summary = await provider.describeImage(inlineImage.imageBase64, inlineImage.mimeType, prompt);
       const providerHealth = getVisionProviderHealth();
@@ -7518,7 +7854,10 @@ planRouter.get("/situation/visual-frame/latest", (req, res) => {
 });
 
 planRouter.post("/situation/visual-frame/replay/request", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const replay = requestVisualFrameActionReplay(body);
   return res.json({
     ok: true,
@@ -7543,13 +7882,13 @@ planRouter.get("/situation/visual-frame/replay/pending", (req, res) => {
     : 25;
   const pending = listPendingVisualFrameActionReplayRequests({ threadId, sourceId, limit })
     .map((request) =>
-      request.status === "pending_client_frames"
-        ? updateVisualFrameActionReplayRequestStatus({
-            replayRequestId: request.replay_request_id,
-            status: "running",
-          }) ?? request
-        : request
-    );
+    request.status === "pending_client_frames"
+      ? (updateVisualFrameActionReplayRequestStatus({
+          replayRequestId: request.replay_request_id,
+          status: "running",
+        }) ?? request)
+      : request,
+  );
   return res.json({
     ok: true,
     schema: "helix.visual_frame_action_replay_pending_response.v1",
@@ -7562,7 +7901,10 @@ planRouter.get("/situation/visual-frame/replay/pending", (req, res) => {
 });
 
 planRouter.post("/situation/visual-frame/replay/result", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const recorded = recordVisualFrameActionReplayResult(body);
   return res.json({
     ok: true,
@@ -7619,7 +7961,10 @@ planRouter.get("/situation/visual-frame/timeline", (req, res) => {
 });
 
 planRouter.post("/situation/visual-frame/align-with-events", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const threadId = typeof body.thread_id === "string" && body.thread_id.trim()
     ? body.thread_id.trim()
     : "helix-ask:desktop";
@@ -7692,30 +8037,42 @@ planRouter.get("/situation/profile-archives", (req, res) => {
   });
 });
 
-planRouter.post("/situation/profile-archives/:archiveId/replay", async (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const profileId = typeof body.profile_id === "string" ? body.profile_id : "";
-  const archive = profileId ? getProfileSituationArchive(profileId, decodeURIComponent(req.params.archiveId ?? "")) : null;
-  if (!archive) return res.status(404).json({ ok: false, error: "archive_not_found" });
-  const result = await replayCategorizationWindow({
+planRouter.post(
+  "/situation/profile-archives/:archiveId/replay",
+  async (req, res) => {
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const profileId = typeof body.profile_id === "string" ? body.profile_id : "";
+    const archive = profileId ? getProfileSituationArchive(profileId, decodeURIComponent(req.params.archiveId ?? "")) : null;
+    if (!archive) return res.status(404).json({ ok: false, error: "archive_not_found" });
+    const result = await replayCategorizationWindow({
     threadId: archive.thread_id,
     maxEvents: typeof body.max_events === "number" ? body.max_events : 100,
   });
-  return res.json({ ok: true, schema: "helix.profile_archive_replay_response.v1", archive, result });
-});
+    return res.json({ ok: true, schema: "helix.profile_archive_replay_response.v1", archive, result });
+  },
+);
 
-planRouter.post("/situation/profile-archives/:archiveId/compare-current", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const profileId = typeof body.profile_id === "string" ? body.profile_id : "";
-  const threadId = typeof body.thread_id === "string" ? body.thread_id : "";
-  if (!profileId || !threadId) return res.status(400).json({ ok: false, error: "missing_profile_id_or_thread_id" });
-  const comparison = compareCurrentSessionToArchive({
+planRouter.post(
+  "/situation/profile-archives/:archiveId/compare-current",
+  (req, res) => {
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const profileId = typeof body.profile_id === "string" ? body.profile_id : "";
+    const threadId = typeof body.thread_id === "string" ? body.thread_id : "";
+    if (!profileId || !threadId) return res.status(400).json({ ok: false, error: "missing_profile_id_or_thread_id" });
+    const comparison = compareCurrentSessionToArchive({
     profileId,
     archiveId: decodeURIComponent(req.params.archiveId ?? ""),
     threadId,
   });
-  return res.status(comparison ? 200 : 404).json({ ok: Boolean(comparison), comparison, error: comparison ? null : "archive_not_found" });
-});
+    return res.status(comparison ? 200 : 404).json({ ok: Boolean(comparison), comparison, error: comparison ? null : "archive_not_found" });
+  },
+);
 
 planRouter.get("/situation/pattern-candidates", (req, res) => {
   const threadId = typeof req.query.thread_id === "string" ? req.query.thread_id.trim() : "";
@@ -7730,25 +8087,31 @@ planRouter.get("/situation/pattern-candidates", (req, res) => {
   });
 });
 
-planRouter.post("/situation/pattern-candidates/:candidateId/promote", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-  const threadId = typeof body.thread_id === "string" ? body.thread_id : "";
-  const observedReplayCount = typeof body.observed_replay_count === "number" ? body.observed_replay_count : 2;
-  const candidate = threadId ? getPatternCandidate(threadId, decodeURIComponent(req.params.candidateId ?? "")) : null;
-  if (!candidate) return res.status(404).json({ ok: false, error: "candidate_not_found" });
-  const promotion = evaluatePatternCandidatePromotion({
+planRouter.post(
+  "/situation/pattern-candidates/:candidateId/promote",
+  (req, res) => {
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const threadId = typeof body.thread_id === "string" ? body.thread_id : "";
+    const observedReplayCount = typeof body.observed_replay_count === "number" ? body.observed_replay_count : 2;
+    const candidate = threadId ? getPatternCandidate(threadId, decodeURIComponent(req.params.candidateId ?? "")) : null;
+    if (!candidate) return res.status(404).json({ ok: false, error: "candidate_not_found" });
+    const promotion = evaluatePatternCandidatePromotion({
     candidate,
     observedReplayCount,
     requiredReplayCount: typeof body.required_replay_count === "number" ? body.required_replay_count : 2,
     promote: true,
   });
-  return res.json({
+    return res.json({
     ok: true,
     schema: "helix.pattern_candidate_promotion_response.v1",
     promotion,
     candidate: getPatternCandidate(threadId, candidate.candidate_id),
   });
-});
+  },
+);
 
 planRouter.get("/situation/subgoal-evaluations", (req, res) => {
   const threadId = typeof req.query.thread_id === "string" ? req.query.thread_id.trim() : "";
@@ -7984,10 +8347,18 @@ const startSituationGoalSessionFromRequest = (
       },
     };
   }
-  const resolvedSource = worldEventSourceMissing ? null : exactSeen ?? seenSources[0] ?? null;
+  const resolvedSource = worldEventSourceMissing
+    ? null
+    : (exactSeen ?? seenSources[0] ?? null);
   const roomId = requestedRoomId ?? resolvedSource?.room_id ?? "room:minecraft-minehut";
-  const sourceId = worldEventSourceMissing ? null : requestedSourceId ?? resolvedSource?.source_id ?? "source:minecraft-server";
-  const worldId = worldEventSourceMissing ? null : requestedWorldId ?? resolvedSource?.world_id ?? "minecraft:minehut";
+  const sourceId = worldEventSourceMissing
+    ? null
+    : (requestedSourceId ??
+      resolvedSource?.source_id ??
+      "source:minecraft-server");
+  const worldId = worldEventSourceMissing
+    ? null
+    : (requestedWorldId ?? resolvedSource?.world_id ?? "minecraft:minehut");
   const bindingReceipt = createSituationThreadBinding({
     room_id: roomId,
     source_id: sourceId,
@@ -8685,7 +9056,9 @@ const shouldCaptureRefineryTrace = (
   if (REFINERY_TRACE_ON_REFINE) return true;
   if (!personaId) return false;
   if (REFINERY_TRACE_PERSONAS.size === 0) return false;
-  return REFINERY_TRACE_PERSONAS.has(personaId) || REFINERY_TRACE_PERSONAS.has("all");
+  return (
+    REFINERY_TRACE_PERSONAS.has(personaId) || REFINERY_TRACE_PERSONAS.has("all")
+  );
 };
 
 const clampRatio = (value: number): number => Math.min(Math.max(value, 0), 1);
@@ -9048,7 +9421,7 @@ const extractRequestId = (value: unknown): string | undefined => {
 };
 
 const resolveHostContext = (): string =>
-  process.env.CI ? "ci" : process.env.NODE_ENV ?? "local";
+  process.env.CI ? "ci" : (process.env.NODE_ENV ?? "local");
 
 const collectExecutionEnvelopes = (
   steps: ExecutionResult[],
@@ -10432,11 +10805,11 @@ const buildKnowledgeHints = (args: {
   const wantsWarp = args.intent?.wantsWarp || args.intent?.wantsPhysics;
   const preferred =
     (primaryId && candidates.find((c) => c.id === primaryId)) ??
-    (args.resonanceSelection?.ranking
+    args.resonanceSelection?.ranking
       ?.map((entry) => entry.patchId)
       .map((id) => candidates.find((c) => c.id === id))
       .find(Boolean) ??
-      candidates[0]);
+    candidates[0];
   if (preferred) {
     const nodes = preferred.nodes
       .slice()
@@ -10549,15 +10922,20 @@ function prioritizeKnowledgeContext(
   return ordered;
 }
 
-function selectToolForGoal(goal: string, manifest: ToolManifestEntry[]): string {
+function selectToolForGoal(
+  goal: string,
+  manifest: ToolManifestEntry[],
+): string {
   const available = new Set(manifest.map((entry) => entry.name));
   const prefersLocalSpawn =
     process.env.LLM_POLICY?.toLowerCase() === "local" && available.has(LOCAL_SPAWN_TOOL_NAME);
   const fallback = prefersLocalSpawn
     ? LOCAL_SPAWN_TOOL_NAME
     : available.has(HTTP_TOOL_NAME)
-        ? HTTP_TOOL_NAME
-        : manifest.find((entry) => entry.name === llmLocalSpec.name)?.name ?? manifest[0]?.name ?? llmLocalSpec.name;
+      ? HTTP_TOOL_NAME
+      : (manifest.find((entry) => entry.name === llmLocalSpec.name)?.name ??
+        manifest[0]?.name ??
+        llmLocalSpec.name);
   const normalized = goal.toLowerCase();
   const modelOnlyConceptSourceSignal = detectModelOnlyConceptSourceSignal(goal);
 
@@ -11069,8 +11447,8 @@ const pickDeterministicSeed = (args: {
   traceId?: string | null;
   fallback?: string;
 }): string => {
-  const candidates = [args.sessionId, args.traceId, args.fallback].map((entry) =>
-    typeof entry === "string" ? entry.trim() : "",
+  const candidates = [args.sessionId, args.traceId, args.fallback].map(
+    (entry) => (typeof entry === "string" ? entry.trim() : ""),
   );
   for (const entry of candidates) {
     if (entry) return entry;
@@ -12390,7 +12768,7 @@ const HELIX_ASK_WARP_PATH_BOOST =
   /(modules\/warp|client\/src\/lib\/warp-|warp-module|natario-warp|warp-theta|energy-pipeline|docs\/knowledge\/warp)/i;
 const HELIX_ASK_CONCEPTUAL_FOCUS =
   /\b(what is|what's|define|definition|meaning|concept|theory|how (?:does|do)|effect|impact|influence|consequences?)\b/i;
-  const HELIX_ASK_DEFINITION_FOCUS =
+const HELIX_ASK_DEFINITION_FOCUS =
     /\b(what does\b[^?]{0,80}\bmean\b|what is|what's|define|definition|meaning|concept|theory|in\s+(gpa|pa|kpa|mpa|bar|psi|hz|khz|mhz|ghz|w|mw|gw|j|ev|kg|g|m|cm|mm|nm|s|ms|ns))\b/i;
 const HELIX_ASK_CONCEPT_FAST_PATH_INTENTS = new Set([
   "repo.warp_definition_docs_first",
@@ -13037,7 +13415,6 @@ const SCAFFOLD_HEADING_RE =
 const SCAFFOLD_LINE_RE =
   /^(no (general reasoning|repo evidence) provided|definition|key questions|notes|scope)\s*:/i;
 const SCAFFOLD_LIST_RE = /^(\d+\.\s+|[-*]\s+)/;
-
 
 function resolveFallbackIntentProfile(target: "general" | "hybrid" | "repo"): HelixAskIntentProfile {
   if (target === "general") {
@@ -13877,9 +14254,10 @@ function extractAnswerBlock(value: string): string {
     .map((segment) => stripAnswerBoundaryPrefix(segment).trim())
     .filter(Boolean);
   if (splitSegments.length > 0) {
-    const longest = splitSegments.reduce((best, candidate) =>
-      best.length >= candidate.length ? best : candidate,
-    "");
+    const longest = splitSegments.reduce(
+      (best, candidate) => (best.length >= candidate.length ? best : candidate),
+      "",
+    );
     if (longest) return longest;
   }
   const startIndex = value.lastIndexOf(HELIX_ASK_ANSWER_START);
@@ -13991,7 +14369,9 @@ const toTitleCase = (value: string): string =>
   value
     .toLowerCase()
     .split(" ")
-    .map((token) => (token ? token.charAt(0).toUpperCase() + token.slice(1) : token))
+    .map((token) =>
+      token ? token.charAt(0).toUpperCase() + token.slice(1) : token,
+    )
     .join(" ");
 
 type HelixAskConceptNoteEntry = {
@@ -14518,7 +14898,6 @@ function shouldForceIdeologyNarrativeDeterministic(question: string): boolean {
   );
 }
 
-
 function repairAnswerFilePathFragments(
   answer: string,
   contextFiles: string[],
@@ -14585,19 +14964,39 @@ function repairAnswerFilePathFragments(
 
 function cleanDanglingFileExtensionFragments(value: string): string {
   if (!value) return value;
-  return value
-    .replace(/([.!?])\s+(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\.(?=\s|$)/gi, "$1")
-    // Remove orphan dotted extension fragments left after partial path scrub (e.g. "[.ts]" / ".ts"),
-    // but preserve valid citations like "[server/services/mixer/collapse.ts]".
-    .replace(/\[\.(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\](?=\s|[,.!?;:]|$)/gi, "")
-    .replace(/(^|[\s(\[])\.(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\](?=\s|[,.!?;:]|$)/gi, "$1")
-    .replace(/(^|[\s(\[])\.(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\b(?=\s|[,.!?;:]|$)/gi, "$1")
-    // Remove orphaned extension+bracket fragments left after citation scrub (e.g. "ts]").
-    .replace(/(^|[\s(])(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\](?=\s|[,.!?;:]|$)/gi, "$1")
-    .replace(/(^|[\s(])(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\b(?=\s*\])/gi, "$1")
-    .replace(/\[\s*\]/g, "")
-    .replace(/(^|[\s(])\](?=\s|[,.!?;:]|$)/g, "$1")
-    .replace(/[ \t]{2,}/g, " ");
+  return (
+    value
+      .replace(
+        /([.!?])\s+(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\.(?=\s|$)/gi,
+        "$1",
+      )
+      // Remove orphan dotted extension fragments left after partial path scrub (e.g. "[.ts]" / ".ts"),
+      // but preserve valid citations like "[server/services/mixer/collapse.ts]".
+      .replace(
+        /\[\.(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\](?=\s|[,.!?;:]|$)/gi,
+        "",
+      )
+      .replace(
+        /(^|[\s(\[])\.(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\](?=\s|[,.!?;:]|$)/gi,
+        "$1",
+      )
+      .replace(
+        /(^|[\s(\[])\.(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\b(?=\s|[,.!?;:]|$)/gi,
+        "$1",
+      )
+      // Remove orphaned extension+bracket fragments left after citation scrub (e.g. "ts]").
+      .replace(
+        /(^|[\s(])(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\](?=\s|[,.!?;:]|$)/gi,
+        "$1",
+      )
+      .replace(
+        /(^|[\s(])(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\b(?=\s*\])/gi,
+        "$1",
+      )
+      .replace(/\[\s*\]/g, "")
+      .replace(/(^|[\s(])\](?=\s|[,.!?;:]|$)/g, "$1")
+      .replace(/[ \t]{2,}/g, " ")
+  );
 }
 
 function dedupeAdjacentCitationBrackets(value: string): string {
@@ -14675,8 +15074,6 @@ function stripTruncationMarkers(value: string): string {
   const remainder = lines.slice(start).join("\n").trim();
   return remainder || "";
 }
-
-
 
 const LONGPROMPT_HEADING = /^#{1,6}\s+(.+)$/;
 const LONGPROMPT_CODE_FENCE = /^```/;
@@ -15618,7 +16015,10 @@ const shouldInjectMissionSoftSignal = (
 ): boolean => {
   if (!HELIX_ASK_DOTTIE_SOFT_SIGNAL) return false;
   if (HELIX_ASK_MISSION_SOFT_SIGNAL_RE.test(normalizedQuestion)) return true;
-  return topicTags.includes("helix_ask") && (topicTags.includes("telemetry") || topicTags.includes("trace"));
+  return (
+    topicTags.includes("helix_ask") &&
+    (topicTags.includes("telemetry") || topicTags.includes("trace"))
+  );
 };
 
 const answerContainsCapsuleFocusTerm = (text: string, terms: string[]): boolean => {
@@ -16871,7 +17271,7 @@ const SLOT_PLAN_PASS_SCHEMA = z.object({
   clarify_candidates: z.array(z.string().min(1).max(120)).max(6).optional(),
 });
 
-  const STRUCTURAL_SLOTS = new Set([
+const STRUCTURAL_SLOTS = new Set([
     "definition",
     "repo_mapping",
     "verification",
@@ -16880,8 +17280,8 @@ const SLOT_PLAN_PASS_SCHEMA = z.object({
     "pipeline",
   ]);
 
-  // Slot tiers for reasoning contract (A=hard, B=strong, C=soft).
-  const SLOT_TIER_SOURCES: Record<HelixAskSlotPlanEntry["source"], "A" | "B" | "C"> = {
+// Slot tiers for reasoning contract (A=hard, B=strong, C=soft).
+const SLOT_TIER_SOURCES: Record<HelixAskSlotPlanEntry["source"], "A" | "B" | "C"> = {
     concept: "A",
     turn_contract: "A",
     memory: "A",
@@ -16893,18 +17293,18 @@ const SLOT_PLAN_PASS_SCHEMA = z.object({
     token: "C",
   };
 
-  const resolveSlotTier = (slot: HelixAskSlotPlanEntry): "A" | "B" | "C" =>
+const resolveSlotTier = (slot: HelixAskSlotPlanEntry): "A" | "B" | "C" =>
     SLOT_TIER_SOURCES[slot.source] ?? "C";
 
-  // Only sources with hard evidence can force required coverage slots.
-  const HARD_REQUIRED_SLOT_SOURCES = new Set<HelixAskSlotPlanEntry["source"]>([
+// Only sources with hard evidence can force required coverage slots.
+const HARD_REQUIRED_SLOT_SOURCES = new Set<HelixAskSlotPlanEntry["source"]>([
     "concept",
     "turn_contract",
     "memory",
     "memory_resolved",
   ]);
 
-  const isHardRequiredSlot = (slot: HelixAskSlotPlanEntry): boolean =>
+const isHardRequiredSlot = (slot: HelixAskSlotPlanEntry): boolean =>
     slot.required && !isWeakSlot(slot) && HARD_REQUIRED_SLOT_SOURCES.has(slot.source);
 
 const DOC_SURFACES = new Set(["docs", "knowledge", "ethos"]);
@@ -17563,7 +17963,7 @@ const buildCanonicalSlotPlan = (args: {
   };
   const candidates = args.disableConceptCandidates
     ? []
-    : args.candidates ?? listConceptCandidates(args.question, 4);
+    : (args.candidates ?? listConceptCandidates(args.question, 4));
   for (const candidate of candidates) {
     const card = candidate.card;
     const aliasSources = [card.sourcePath, ...(card.mustIncludeFiles ?? [])].filter(Boolean);
@@ -17587,7 +17987,7 @@ const buildCanonicalSlotPlan = (args: {
     ...(directives?.conceptSlots ?? []),
     ...(directives?.requiredSlots ?? []).filter((slot) => !STRUCTURAL_SLOTS.has(normalizeSlotName(slot))),
   ];
-    for (const slot of planSlots) {
+  for (const slot of planSlots) {
       const conceptCard = resolveConceptCardForSlot(slot);
       const aliasSources = conceptCard
         ? [conceptCard.sourcePath, ...(conceptCard.mustIncludeFiles ?? [])].filter(Boolean)
@@ -17642,9 +18042,9 @@ const buildCanonicalSlotPlan = (args: {
     }
   }
   const slots = slotOrder.map((id) => slotMap.get(id)).filter(Boolean) as HelixAskSlotPlanEntry[];
-    const requiredSlots = slots.filter(isHardRequiredSlot);
-    return { slots, coverageSlots: requiredSlots.map((slot) => slot.id) };
-  };
+  const requiredSlots = slots.filter(isHardRequiredSlot);
+  return { slots, coverageSlots: requiredSlots.map((slot) => slot.id) };
+};
 
 const restrictSlotPlanToCoverage = (
   slotPlan: HelixAskSlotPlan | null,
@@ -17734,7 +18134,7 @@ const collectCoverageSlotAliases = (
   if (coverageSlots.length === 0) return [];
   const aliases = new Set<string>();
   for (const slot of coverageSlots) {
-    const values = slotAliasMap ? slotAliasMap[slot] ?? [] : [];
+    const values = slotAliasMap ? (slotAliasMap[slot] ?? []) : [];
     for (const value of values) {
       const cleaned = normalizeAliasValue(value);
       if (cleaned) aliases.add(cleaned);
@@ -17863,14 +18263,14 @@ const buildSlotQueryTerms = (slot: HelixAskSlotPlanEntry): string[] => {
 const hasDocSurface = (slot: HelixAskSlotPlanEntry): boolean =>
   Boolean(slot.surfaces?.some((surface) => DOC_SURFACES.has(surface)));
 
-  const resolveDocRequiredSlots = (slotPlan: HelixAskSlotPlan | null): string[] => {
+const resolveDocRequiredSlots = (slotPlan: HelixAskSlotPlan | null): string[] => {
     if (!slotPlan) return [];
     return slotPlan.slots
       .filter((slot) => slot.required && hasDocSurface(slot) && isHardRequiredSlot(slot))
       .map((slot) => slot.id);
   };
 
-  const resolveRequiredSlots = (slotPlan: HelixAskSlotPlan | null): string[] => {
+const resolveRequiredSlots = (slotPlan: HelixAskSlotPlan | null): string[] => {
     if (!slotPlan) return [];
     return slotPlan.slots.filter(isHardRequiredSlot).map((slot) => slot.id);
   };
@@ -18439,7 +18839,11 @@ function hasAtlasGraphRuntimeLink(args: {
   const edgeTypeRuntime = args.edgeTypes.some((edgeType) =>
     edgeType === "imports" || edgeType === "defines" || edgeType === "calls" || edgeType === "use",
   );
-  return symbolOverlap || (queryHasRuntimeCue && runtimeSnippet) || (queryHasRuntimeCue && edgeTypeRuntime);
+  return (
+    symbolOverlap ||
+    (queryHasRuntimeCue && runtimeSnippet) ||
+    (queryHasRuntimeCue && edgeTypeRuntime)
+  );
 }
 
 function normalizeAtlasRepoPath(filePath: string): string {
@@ -19401,7 +19805,8 @@ const collectWideStage05PathCandidates = (args: {
     const seedText = readStage05ConnectivityProbeText(current.path);
     if (!seedText.trim()) continue;
     const questionHitCount = questionTokens.reduce(
-      (count, token) => (seedText.toLowerCase().includes(token) ? count + 1 : count),
+      (count, token) =>
+        seedText.toLowerCase().includes(token) ? count + 1 : count,
       0,
     );
     if (questionHitCount > 0) {
@@ -19570,7 +19975,7 @@ function buildStage05InputPaths(args: {
   }
   const resolveCandidateScore = (value: string): number => {
     const normalized = normalizeStage05Path(value);
-    return normalized ? scoreByPath.get(normalized) ?? 0 : 0;
+    return normalized ? (scoreByPath.get(normalized) ?? 0) : 0;
   };
   const stage0Ordered = Array.from(
     new Set(
@@ -19990,7 +20395,9 @@ async function collectGitTrackedCandidatesForQueries(
   });
   const stage05InputPaths = stage05InputPathBuild.paths;
   const stage05SummaryPolicy = resolveStage05SummaryPolicy();
-  if (HELIX_ASK_STAGE05_ENABLED && stage05IntentEligible && stage05InputPaths.length > 0) {
+  if (
+    HELIX_ASK_STAGE05_ENABLED && stage05IntentEligible && stage05InputPaths.length > 0
+  ) {
     let stage05Result = await buildStage05EvidenceCards({
       enabled: true,
       llmFirst: stage05SummaryPolicy.llmFirst,
@@ -20097,12 +20504,11 @@ async function collectGitTrackedCandidatesForQueries(
                 ? "adaptive_expand_improved_card_count"
                 : "adaptive_expand_improved_confidence";
           } else {
-            stage05AdaptiveReason =
-              stage05AdaptiveResult.telemetry.summary_hard_fail
-                ? stage05AdaptiveResult.telemetry.summary_fail_reason ??
-                  stage05AdaptiveResult.telemetry.fallback_reason ??
-                  "adaptive_expand_summary_hard_fail"
-                : "adaptive_expand_no_improvement";
+            stage05AdaptiveReason = stage05AdaptiveResult.telemetry.summary_hard_fail
+              ? (stage05AdaptiveResult.telemetry.summary_fail_reason ??
+                stage05AdaptiveResult.telemetry.fallback_reason ??
+                "adaptive_expand_summary_hard_fail")
+              : "adaptive_expand_no_improvement";
           }
         } catch (error) {
           stage05AdaptiveReason =
@@ -20467,7 +20873,7 @@ function applyStage0DebugFields(
   }
   const failOpenReason =
     telemetry.fail_open_reason ??
-    (telemetry.used ? null : telemetry.fallback_reason ?? null);
+    (telemetry.used ? null : (telemetry.fallback_reason ?? null));
   if (!nextUsed && failOpenReason) {
     debugPayload.stage0_fail_open_reason = failOpenReason;
   } else if (nextUsed) {
@@ -20502,17 +20908,20 @@ function mergeRepoSearchStage0Telemetry(
   const nextBuildAge = readFinite(next.build_age_ms);
   const used = current.used || next.used;
   const shadowOnly = used ? false : current.shadow_only && next.shadow_only;
-  const fallbackReason = used ? null : next.fallback_reason ?? current.fallback_reason ?? null;
+  const fallbackReason = used
+    ? null
+    : (next.fallback_reason ?? current.fallback_reason ?? null);
   const activePolicyDecision =
     (next.used ? next.policy_decision : null) ??
     (current.used ? current.policy_decision : null) ??
     null;
-  const failOpenReason =
-    used
-      ? null
-      : next.fail_open_reason ??
-        current.fail_open_reason ??
-        (next.fallback_reason ?? current.fallback_reason ?? null);
+  const failOpenReason = used
+    ? null
+    : (next.fail_open_reason ??
+      current.fail_open_reason ??
+      next.fallback_reason ??
+      current.fallback_reason ??
+      null);
   return normalizeStage0TelemetryInvariant({
     used,
     shadow_only: shadowOnly,
@@ -20530,8 +20939,9 @@ function mergeRepoSearchStage0Telemetry(
     canary_hit: Boolean(current.canary_hit) || Boolean(next.canary_hit),
     soft_must_include_applied:
       Boolean(current.soft_must_include_applied) || Boolean(next.soft_must_include_applied),
-    policy_decision:
-      used ? activePolicyDecision ?? "stage0_active" : next.policy_decision ?? current.policy_decision,
+    policy_decision: used
+      ? (activePolicyDecision ?? "stage0_active")
+      : (next.policy_decision ?? current.policy_decision),
     fail_open_reason: failOpenReason,
   });
 }
@@ -20574,9 +20984,11 @@ function mergeStage05Telemetry(
       ...next,
       summary_hard_fail: nextHardFailEffective,
       summary_fail_reason: nextHardFailEffective
-        ? next.summary_fail_reason ??
+        ? (next.summary_fail_reason ??
           next.fallback_reason ??
-          (nextCoverageGap ? "stage05_slot_coverage_missing" : "stage05_summary_hard_fail")
+          (nextCoverageGap
+            ? "stage05_slot_coverage_missing"
+            : "stage05_summary_hard_fail"))
         : null,
       kind_counts: {
         code: next.kind_counts?.code ?? 0,
@@ -20603,21 +21015,21 @@ function mergeStage05Telemetry(
   const nextRecoversSummaryHardFail =
     nextSoftCodePathGap ||
     nextSoftRuntimeFail ||
-    next.used &&
-    !next.summary_hard_fail &&
-    !nextCoverageGap &&
-    nextCoverageMissing.length === 0;
+    (next.used &&
+      !next.summary_hard_fail &&
+      !nextCoverageGap &&
+      nextCoverageMissing.length === 0);
   const mergedSlotCoverage =
     nextRecoversSummaryHardFail && next.slot_coverage
       ? next.slot_coverage
       : mergedRequired.length > 0
-      ? {
+        ? {
           required: mergedRequired,
           present: mergedPresent,
           missing: mergedMissing,
           ratio: mergedRequired.length > 0 ? (mergedRequired.length - mergedMissing.length) / mergedRequired.length : 1,
         }
-      : current.slot_coverage ?? next.slot_coverage ?? null;
+        : (current.slot_coverage ?? next.slot_coverage ?? null);
   const summaryHardFail = nextHardFailEffective
     ? true
     : nextRecoversSummaryHardFail
@@ -20635,7 +21047,10 @@ function mergeStage05Telemetry(
       binary: (current.kind_counts?.binary ?? 0) + (next.kind_counts?.binary ?? 0),
     },
     llm_used: current.llm_used || next.llm_used,
-    fallback_reason: current.used || next.used ? null : next.fallback_reason ?? current.fallback_reason,
+    fallback_reason:
+      current.used || next.used
+        ? null
+        : (next.fallback_reason ?? current.fallback_reason),
     extract_ms: current.extract_ms + next.extract_ms,
     total_ms: current.total_ms + next.total_ms,
     budget_capped: current.budget_capped || next.budget_capped,
@@ -20643,13 +21058,17 @@ function mergeStage05Telemetry(
     summary_hard_fail: summaryHardFail,
     summary_fail_reason: summaryHardFail
       ? nextHardFailEffective
-        ? next.summary_fail_reason ??
+        ? (next.summary_fail_reason ??
           next.fallback_reason ??
-          (nextCoverageGap ? "stage05_slot_coverage_missing" : current.summary_fail_reason)
+          (nextCoverageGap
+            ? "stage05_slot_coverage_missing"
+            : current.summary_fail_reason))
         : current.summary_fail_reason
       : null,
     slot_plan:
-      next.slot_plan?.required?.length || next.slot_plan?.slots?.length ? next.slot_plan : current.slot_plan ?? null,
+      next.slot_plan?.required?.length || next.slot_plan?.slots?.length
+        ? next.slot_plan
+        : (current.slot_plan ?? null),
     slot_coverage: mergedSlotCoverage,
     fullfile_mode: current.fullfile_mode || next.fullfile_mode,
     two_pass_used: current.two_pass_used || next.two_pass_used,
@@ -20790,7 +21209,7 @@ function applyStage05DebugFields(
   const stage05SoftCodePathGap = isStage05SoftCodePathGapTelemetry(stage05);
   const stage05SoftRuntimeFail = isStage05SoftRuntimeFailTelemetry(stage05);
   const stage05SoftRuntimeFailReason = stage05SoftRuntimeFail
-    ? stage05.summary_fail_reason ?? stage05.fallback_reason ?? null
+    ? (stage05.summary_fail_reason ?? stage05.fallback_reason ?? null)
     : null;
   const stage05CoverageGap = isStage05CoverageGapTelemetry(stage05);
   const stage05HardFailEffective =
@@ -20800,10 +21219,10 @@ function applyStage05DebugFields(
   const stage05Recovered =
     stage05SoftCodePathGap ||
     stage05SoftRuntimeFail ||
-    nextUsed &&
-    !stage05.summary_hard_fail &&
-    !stage05CoverageGap &&
-    (stage05.slot_coverage?.missing?.length ?? 0) === 0;
+    (nextUsed &&
+      !stage05.summary_hard_fail &&
+      !stage05CoverageGap &&
+      (stage05.slot_coverage?.missing?.length ?? 0) === 0);
   if (stage05HardFailEffective) {
     debugPayload.stage05_summary_hard_fail = true;
   } else if (stage05Recovered) {
@@ -20949,9 +21368,11 @@ function applyStage05DebugFields(
   writeScoped(
     "summary_fail_reason",
     stage05HardFailEffective
-      ? stage05.summary_fail_reason ??
-        stage05.fallback_reason ??
-        (stage05CoverageGap ? "stage05_slot_coverage_missing" : "stage05_summary_hard_fail")
+      ? (stage05.summary_fail_reason ??
+          stage05.fallback_reason ??
+          (stage05CoverageGap
+            ? "stage05_slot_coverage_missing"
+            : "stage05_summary_hard_fail"))
       : null,
   );
   writeScoped("soft_code_path_gap_applied", stage05SoftCodePathGap);
@@ -21040,7 +21461,11 @@ function buildMustIncludeCandidates(
     if (!preview) continue;
     const baseScore = Math.max(1, scoreHelixAskTopicPath(filePath, topicProfile));
     const tokenScore = tokens.length
-      ? tokens.reduce((acc, token) => (filePath.toLowerCase().includes(token) ? acc + 2 : acc), 0)
+      ? tokens.reduce(
+          (acc, token) =>
+            filePath.toLowerCase().includes(token) ? acc + 2 : acc,
+          0,
+        )
       : 0;
     const score = baseScore + tokenScore + 25;
     candidates.push({
@@ -21617,7 +22042,7 @@ const isDefinitionQuestion = (question: string): boolean => {
   return true;
 };
 
-  const collectDefinitionRegistryPaths = (
+const collectDefinitionRegistryPaths = (
     question: string,
     conceptMatch: HelixAskConceptMatch | null,
     definitionFocus: boolean,
@@ -21867,10 +22292,10 @@ const buildGraphEvidenceDocBlocks = (args: {
   return { blocks, paths };
 };
 
-  const DOC_PROOF_SPAN_RE = /\bSpan:\s*L\d+/i;
-  const DOC_SECTION_LINE_RE = /\b(Section|Title|Heading|Subheading|Doc):\s+/i;
+const DOC_PROOF_SPAN_RE = /\bSpan:\s*L\d+/i;
+const DOC_SECTION_LINE_RE = /\b(Section|Title|Heading|Subheading|Doc):\s+/i;
 
-  const resolveDefinitionDocBlocks = (
+const resolveDefinitionDocBlocks = (
     docBlocks: Array<{ path: string; block: string }>,
     conceptMatch: HelixAskConceptMatch | null,
     definitionFocus: boolean,
@@ -22398,7 +22823,7 @@ function buildGroundedAskPrompt(
     );
   }
   lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
-  lines.push("Do not include the words \"Question:\" or \"Context sources\".");
+  lines.push('Do not include the words "Question:" or "Context sources".');
   lines.push("Keep paragraphs focused and separate sections with blank lines.");
   lines.push("Do not repeat the question or include headings like Question or Context.");
   lines.push("Do not output tool logs, certificates, command transcripts, or repeat the prompt/context.");
@@ -22550,7 +22975,7 @@ function extractContextFromPrompt(prompt: string): string {
   return context.trim();
 }
 
-  const SCAFFOLD_JUNK_LINE_RE = [
+const SCAFFOLD_JUNK_LINE_RE = [
     /^",?\s*no headings\./i,
     /^general reasoning\s*:/i,
     /^repo evidence\s*:/i,
@@ -22559,11 +22984,11 @@ function extractContextFromPrompt(prompt: string): string {
     /^(md|json|html)[`.)\s]/i,
   ];
 
-  const INLINE_JSON_TEXT_RE = /\{\s*"text"\s*:\s*"([^"]+)"[^}]*\}/g;
-  const NO_EVIDENCE_RE =
+const INLINE_JSON_TEXT_RE = /\{\s*"text"\s*:\s*"([^"]+)"[^}]*\}/g;
+const NO_EVIDENCE_RE =
     /\b(no|not enough)\s+repo[-\s]?evidenced?\b|\bno\s+repo\s+evidence\b|\bno\s+evidence\s+(was|is)\s+found\b|\bno\s+repo[-\s]?grounded\b|\bcould\s+not\s+confirm\b/i;
 
-  function stripInlineJsonArtifacts(value: string): string {
+function stripInlineJsonArtifacts(value: string): string {
     if (!value) return value;
     return value.replace(INLINE_JSON_TEXT_RE, (_match, text: string) => {
       const decoded = text
@@ -22651,7 +23076,7 @@ function appendEvidenceSources(
 
 const EVIDENCE_BULLET_RE = /^\s*(\d+\.\s+|[-*]\s+)/;
 
-  function filterEvidenceBulletsByPath(
+function filterEvidenceBulletsByPath(
     text: string,
     allowPath: (path: string) => boolean,
   ): string {
@@ -23492,7 +23917,11 @@ const shouldDirectUseDeterministicRepoRuntimeFallback = (args: {
     return true;
   }
   if (family === "implementation_code_path") {
-    return /^Where in repo:/im.test(fallbackText) && /^Call chain:/im.test(fallbackText) && /^Sources:/im.test(fallbackText);
+    return (
+      /^Where in repo:/im.test(fallbackText) &&
+      /^Call chain:/im.test(fallbackText) &&
+      /^Sources:/im.test(fallbackText)
+    );
   }
   if (family === "roadmap_planning") {
     return (
@@ -24413,7 +24842,6 @@ const rewriteConversationScientificVoice = (text: string): string => {
   return lines.length > 0 ? lines.join("\n\n").trim() : text;
 };
 
-
 const rewriteIdeologyScientificVoice = (text: string, question: string): string => {
   if (!isScientificMicroReport(text)) return text;
   const confirmedBullets = extractSectionBullets(extractScientificPrimaryBody(text));
@@ -24580,10 +25008,10 @@ type HelixAskTreeWalkMetrics = {
 
 type HelixAskTreeWalkMode = "full" | "root_to_anchor" | "root_to_leaf" | "root_only" | "anchor_only";
 
-  const normalizeTreeWalkKey = (value: string): string =>
+const normalizeTreeWalkKey = (value: string): string =>
     value.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
 
-  const TREE_TOKEN_STOPWORDS = new Set([
+const TREE_TOKEN_STOPWORDS = new Set([
     "a",
     "an",
     "and",
@@ -24613,9 +25041,9 @@ type HelixAskTreeWalkMode = "full" | "root_to_anchor" | "root_to_leaf" | "root_o
     "within",
   ]);
 
-  const TREE_SHORT_TOKENS = new Set(["ts", "qi", "gr", "ai", "ml", "ui", "ux"]);
+const TREE_SHORT_TOKENS = new Set(["ts", "qi", "gr", "ai", "ml", "ui", "ux"]);
 
-  const tokenizeTreeText = (value: string): string[] =>
+const tokenizeTreeText = (value: string): string[] =>
     value
       .toLowerCase()
       .split(/[^a-z0-9]+/g)
@@ -24629,8 +25057,8 @@ type HelixAskTreeWalkMode = "full" | "root_to_anchor" | "root_to_leaf" | "root_o
       });
 
 const TREE_DOCS_DIR = "docs/knowledge/trees";
-  type DefinitionTreeDocEntry = { key: string; path: string; tokens: string[] };
-  let definitionTreeDocCache: DefinitionTreeDocEntry[] | null = null;
+type DefinitionTreeDocEntry = { key: string; path: string; tokens: string[] };
+let definitionTreeDocCache: DefinitionTreeDocEntry[] | null = null;
 
 const sanitizeTreeDocSlug = (value: string): string =>
   value
@@ -24673,7 +25101,7 @@ const collectTreeFiles = (dir: string): string[] => {
   return entries;
 };
 
-  const loadDefinitionTreeDocIndex = (): DefinitionTreeDocEntry[] => {
+const loadDefinitionTreeDocIndex = (): DefinitionTreeDocEntry[] => {
     if (definitionTreeDocCache) return definitionTreeDocCache;
     const index: DefinitionTreeDocEntry[] = [];
     const treeFiles = collectTreeFiles(path.resolve(process.cwd(), "docs/knowledge"));
@@ -24731,7 +25159,7 @@ const collectTreeFiles = (dir: string): string[] => {
     return index;
   };
 
-  const findDefinitionTreeDocPaths = (question: string, limit = 3): string[] => {
+const findDefinitionTreeDocPaths = (question: string, limit = 3): string[] => {
     const normalizedQuestion = normalizeTreeWalkKey(question);
     const questionTokens = new Set(tokenizeTreeText(question));
     if (!normalizedQuestion && questionTokens.size === 0) return [];
@@ -24759,7 +25187,7 @@ const collectTreeFiles = (dir: string): string[] => {
       .map(([path]) => path);
   };
 
-  const findDefinitionTreeDocPathsForPack = (
+const findDefinitionTreeDocPathsForPack = (
     graphPack?: HelixAskGraphPack | null,
     limit = 3,
   ): string[] => {
@@ -25355,7 +25783,7 @@ function buildHelixAskScaffoldPrompt(
     lines.push("Each bullet must cite at least one file path from the context in parentheses.");
     lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
   }
-  lines.push("No preamble, no question restatement, no \"FINAL:\", no headings.");
+  lines.push('No preamble, no question restatement, no "FINAL:", no headings.');
   lines.push("");
   lines.push(`Question: ${question}`);
   lines.push("");
@@ -25409,7 +25837,7 @@ function buildHelixAskEvidencePrompt(
       lines.push("Treat graph/tree JSON as derivation hints only; bind them to .md docs before citing.");
     }
   }
-  lines.push("No preamble, no question restatement, no \"FINAL:\", no headings.");
+  lines.push('No preamble, no question restatement, no "FINAL:", no headings.');
   lines.push("");
   lines.push(`Question: ${question}`);
   lines.push("");
@@ -25444,7 +25872,7 @@ function buildHelixAskPromptEvidencePrompt(
     lines.push("Each bullet should be 1-2 sentences and cite at least one prompt chunk id from the context.");
     lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
   }
-  lines.push("No preamble, no question restatement, no \"FINAL:\", no headings.");
+  lines.push('No preamble, no question restatement, no "FINAL:", no headings.');
   lines.push("");
   lines.push(`Question: ${question}`);
   lines.push("");
@@ -25478,7 +25906,7 @@ function buildGeneralAskEvidencePrompt(
     lines.push("Each bullet should be 1-2 sentences.");
     lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
   }
-  lines.push("No preamble, no question restatement, no \"FINAL:\", no headings.");
+  lines.push('No preamble, no question restatement, no "FINAL:", no headings.');
   lines.push("");
   lines.push(`Question: ${question}`);
   lines.push("");
@@ -25609,7 +26037,7 @@ function buildHelixAskIdeologySynthesisPrompt(
     );
   }
   lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
-  lines.push("Do not include the words \"Question:\" or \"Context sources\".");
+  lines.push('Do not include the words "Question:" or "Context sources".');
   lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
   lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
   lines.push("");
@@ -25762,7 +26190,7 @@ function buildHelixAskSynthesisPrompt(
     );
   }
   lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
-  lines.push("Do not include the words \"Question:\" or \"Context sources\".");
+  lines.push('Do not include the words "Question:" or "Context sources".');
   lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
   lines.push("");
   lines.push(`Question: ${question}`);
@@ -26496,7 +26924,9 @@ function buildHelixAskCitationRepairPrompt(
     "Do not add new claims or steps. Preserve the format and wording as much as possible.",
   ];
   if (format === "steps") {
-    lines.push("Keep the numbered step list and the trailing \"In practice,\" paragraph.");
+    lines.push(
+      'Keep the numbered step list and the trailing "In practice," paragraph.',
+    );
     if (stageTags) {
       lines.push("Preserve any stage tags already present.");
     }
@@ -26640,11 +27070,14 @@ const hasArtifactJsonSpill = (value: string): boolean => {
   return false;
 };
 
-
 const hasModelPlaceholderOrStub = (value: string): boolean => {
   const normalized = value.trim();
   if (!normalized) return false;
-  return RELATION_MODEL_PLACEHOLDER_RE.test(normalized) || STUB_TEXT_RE.test(normalized) || GENERIC_GROUNDED_RE.test(normalized);
+  return (
+    RELATION_MODEL_PLACEHOLDER_RE.test(normalized) ||
+    STUB_TEXT_RE.test(normalized) ||
+    GENERIC_GROUNDED_RE.test(normalized)
+  );
 };
 
 const isDeterministicHeadingScaffoldNoise = (value: string): boolean => {
@@ -26972,7 +27405,6 @@ const detectDeterministicContractNoiseReasons = (args: {
   }
   return Array.from(reasons);
 };
-
 
 const evaluateRelationContractHardFail = (args: {
   contract: HelixAskAnswerContract;
@@ -28173,12 +28605,14 @@ const rewriteUnsupportedScaffoldToBoundedUncertainty = (
   return `${rewritten.trim()}\n\n${localizedLines.missingEvidence}`;
 };
 
-
 type HelixAskFailureClass = "infra_fail" | "parse_fail";
 
 const classifyHelixAskFailure = (
   reason: HelixAskTypedFailReason,
-): HelixAskFailureClass => (reason === "TIMEOUT" || reason === "GENERIC_COLLAPSE" ? "infra_fail" : "parse_fail");
+): HelixAskFailureClass =>
+  reason === "TIMEOUT" || reason === "GENERIC_COLLAPSE"
+    ? "infra_fail"
+    : "parse_fail";
 
 const buildHelixAskTypedFailReasonFromStatus = (status: string): HelixAskTypedFailReason => {
   const normalized = String(status || "").toLowerCase();
@@ -28205,7 +28639,6 @@ const attachHelixAskStageTiming = (
   debugPayload.stage_timing_ms = { ...base, [key]: Number.isFinite(durationMs) ? Math.max(0, durationMs) : 0 };
 };
 
-
 function buildHelixAskDriftRepairPrompt(
   question: string,
   answer: string,
@@ -28225,7 +28658,9 @@ function buildHelixAskDriftRepairPrompt(
     lines.push(`Return the final answer in language tag ${normalizedResponseLanguage}.`);
   }
   if (format === "steps") {
-    lines.push("Keep the numbered step list and the trailing \"In practice,\" paragraph.");
+    lines.push(
+      'Keep the numbered step list and the trailing "In practice," paragraph.',
+    );
     if (stageTags) {
       lines.push("Preserve any stage tags already present.");
     }
@@ -28306,7 +28741,7 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
   return value.trim();
 };
 
-  const LocalAskRequest = z
+const LocalAskRequest = z
   .object({
     prompt: z.string().min(1).optional(),
     question: z.string().min(1).optional(),
@@ -28569,7 +29004,7 @@ function buildMoodHintPrompt(text: string): string {
     `Choose exactly one mood from: ${LUMA_MOOD_VALUES.join(", ")}. Use question for neutral prompts.`,
   );
   lines.push(
-    "Return strict JSON only: {\"mood\":\"<mood|null>\",\"confidence\":0..1,\"reason\":\"short\"}.",
+    'Return strict JSON only: {"mood":"<mood|null>","confidence":0..1,"reason":"short"}.',
   );
   lines.push("If unclear, use mood null with low confidence.");
   lines.push("");
@@ -28967,7 +29402,11 @@ const isConversationFillerTurn = (transcript: string): boolean => {
   ) {
     return false;
   }
-  return normalized.length <= 28 && HELIX_CONVERSATION_FILLER_RE.test(normalized) && strippedLead.length <= 6;
+  return (
+    normalized.length <= 28 &&
+    HELIX_CONVERSATION_FILLER_RE.test(normalized) &&
+    strippedLead.length <= 6
+  );
 };
 
 const isConversationExploratoryTurn = (transcript: string): boolean => {
@@ -29377,7 +29816,9 @@ const withAskTurnDocContextValidity = (
 ): HelixAskTurnWorkspaceSessionSnapshot => {
   const activeDocPath = normalizeAskTurnWorkspaceDocPath(snapshot.activeDocPath);
   const docContextValid = Boolean(activeDocPath);
-  const source = activeDocPath ? snapshot.docContextSource ?? snapshot.source ?? "active_doc_path" : snapshot.source ?? "none";
+  const source = activeDocPath
+    ? (snapshot.docContextSource ?? snapshot.source ?? "active_doc_path")
+    : (snapshot.source ?? "none");
   const hadDocContextClaim =
     snapshot.hasDocContext === true || snapshot.docContextFailureReason === "has_doc_context_without_active_doc_path";
   return {
@@ -29446,7 +29887,10 @@ const normalizeIncomingAskTurnWorkspaceSnapshot = (args: {
       ? (raw.attached_visual_evidence as Record<string, unknown>)
       : null;
   const snapshot: HelixAskTurnWorkspaceSessionSnapshot = {
-    sessionId: typeof raw.sessionId === "string" && raw.sessionId.trim() ? raw.sessionId.trim() : args.sessionId ?? "anonymous",
+    sessionId:
+      typeof raw.sessionId === "string" && raw.sessionId.trim()
+        ? raw.sessionId.trim()
+        : (args.sessionId ?? "anonymous"),
     activePanel,
     activeDocPath,
     source: rawSource ?? (activeDocPath ? "incoming_workspace_snapshot" : "none"),
@@ -29503,25 +29947,27 @@ const mergeAskTurnWorkspaceSnapshots = (args: {
   const incomingDocPanelAuthoritative = args.incoming.activePanel === "docs-viewer";
   const incomingNotesPanelAuthoritative = args.incoming.activePanel === "workstation-notes";
   const activeDocPath = incomingDocPanelAuthoritative
-    ? incomingDocPath ?? lastOpenedDocPath ?? storedDocPath
-    : lastOpenedDocPath ?? storedDocPath ?? incomingDocPath;
+    ? (incomingDocPath ?? lastOpenedDocPath ?? storedDocPath)
+    : (lastOpenedDocPath ?? storedDocPath ?? incomingDocPath);
   const workspaceActionLedger = dedupeAskTurnWorkspaceActionLedger([
     ...(args.stored.workspaceActionLedger ?? []),
     ...(args.incoming.workspaceActionLedger ?? []),
   ]);
   const latestLedgerAction = readAskTurnLatestLedgerAction(workspaceActionLedger);
   const activeNoteId = incomingNotesPanelAuthoritative
-    ? args.incoming.activeNoteId ?? null
-    : args.incoming.activeNoteId ?? args.stored.activeNoteId;
+    ? (args.incoming.activeNoteId ?? null)
+    : (args.incoming.activeNoteId ?? args.stored.activeNoteId);
   const lastCreatedNoteId = incomingNotesPanelAuthoritative
-    ? args.incoming.lastCreatedNoteId ?? null
-    : args.incoming.lastCreatedNoteId ?? args.stored.lastCreatedNoteId;
+    ? (args.incoming.lastCreatedNoteId ?? null)
+    : (args.incoming.lastCreatedNoteId ?? args.stored.lastCreatedNoteId);
   const activeNoteBody = incomingNotesPanelAuthoritative
-    ? args.incoming.activeNoteBody ?? null
-    : args.incoming.activeNoteBody ?? args.stored.activeNoteBody ?? null;
+    ? (args.incoming.activeNoteBody ?? null)
+    : (args.incoming.activeNoteBody ?? args.stored.activeNoteBody ?? null);
   const lastCreatedNoteBody = incomingNotesPanelAuthoritative
-    ? args.incoming.lastCreatedNoteBody ?? null
-    : args.incoming.lastCreatedNoteBody ?? args.stored.lastCreatedNoteBody ?? null;
+    ? (args.incoming.lastCreatedNoteBody ?? null)
+    : (args.incoming.lastCreatedNoteBody ??
+      args.stored.lastCreatedNoteBody ??
+      null);
   const recentNotes = incomingNotesPanelAuthoritative
     ? normalizeAskTurnWorkspaceRecentNotes(args.incoming.recentNotes ?? [])
     : normalizeAskTurnWorkspaceRecentNotes([
@@ -29533,28 +29979,38 @@ const mergeAskTurnWorkspaceSnapshots = (args: {
     ...args.incoming,
     activeDocPath,
     activeNoteId,
-    activeNoteTitle:
-      incomingNotesPanelAuthoritative
-        ? normalizeAskTurnWorkspaceNoteTitleValue(args.incoming.activeNoteTitle, activeNoteId)
-        : normalizeAskTurnWorkspaceNoteTitleValue(args.incoming.activeNoteTitle, activeNoteId) ??
-          normalizeAskTurnWorkspaceNoteTitleValue(args.stored.activeNoteTitle, activeNoteId),
+    activeNoteTitle: incomingNotesPanelAuthoritative
+      ? normalizeAskTurnWorkspaceNoteTitleValue(args.incoming.activeNoteTitle, activeNoteId)
+      : (normalizeAskTurnWorkspaceNoteTitleValue(
+          args.incoming.activeNoteTitle,
+          activeNoteId,
+        ) ??
+        normalizeAskTurnWorkspaceNoteTitleValue(
+          args.stored.activeNoteTitle,
+          activeNoteId,
+        )),
     activeNoteBody,
     lastCreatedNoteId,
-    lastCreatedNoteTitle:
-      incomingNotesPanelAuthoritative
-        ? normalizeAskTurnWorkspaceNoteTitleValue(args.incoming.lastCreatedNoteTitle, lastCreatedNoteId)
-        : normalizeAskTurnWorkspaceNoteTitleValue(args.incoming.lastCreatedNoteTitle, lastCreatedNoteId) ??
-          normalizeAskTurnWorkspaceNoteTitleValue(args.stored.lastCreatedNoteTitle, lastCreatedNoteId),
+    lastCreatedNoteTitle: incomingNotesPanelAuthoritative
+      ? normalizeAskTurnWorkspaceNoteTitleValue(args.incoming.lastCreatedNoteTitle, lastCreatedNoteId)
+      : (normalizeAskTurnWorkspaceNoteTitleValue(
+          args.incoming.lastCreatedNoteTitle,
+          lastCreatedNoteId,
+        ) ??
+        normalizeAskTurnWorkspaceNoteTitleValue(
+          args.stored.lastCreatedNoteTitle,
+          lastCreatedNoteId,
+        )),
     lastCreatedNoteBody,
     recentNotes,
     source:
       activeDocPath && activeDocPath === incomingDocPath
-        ? args.incoming.source ?? "incoming_workspace_snapshot"
+        ? (args.incoming.source ?? "incoming_workspace_snapshot")
         : activeDocPath && activeDocPath === lastOpenedDocPath
           ? "last_opened_doc"
-        : activeDocPath && activeDocPath === storedDocPath
-          ? args.stored.source ?? "server_session"
-          : args.incoming.source ?? args.stored.source ?? "none",
+          : activeDocPath && activeDocPath === storedDocPath
+            ? (args.stored.source ?? "server_session")
+            : (args.incoming.source ?? args.stored.source ?? "none"),
     hasNoteContext: incomingNotesPanelAuthoritative
       ? args.incoming.hasNoteContext
       : args.incoming.hasNoteContext || args.stored.hasNoteContext,
@@ -29592,7 +30048,11 @@ const buildAskTurnWorkspaceRefBinding = (args: {
   return {
     activeDocPath,
     activeDocTitle: activeDocPath ? readAskTurnDocTitleForPath(activeDocPath) : null,
-    activeDocSource: activeDocPath ? args.workspaceSnapshot?.docContextSource ?? args.workspaceSnapshot?.source ?? "workspace_snapshot" : "none",
+    activeDocSource: activeDocPath
+      ? (args.workspaceSnapshot?.docContextSource ??
+        args.workspaceSnapshot?.source ??
+        "workspace_snapshot")
+      : "none",
     activeNoteId,
     activeNoteTitle,
     activeNoteSource:
@@ -31586,7 +32046,9 @@ const isAskTurnMinecraftSituationGoalSessionIntent = (transcript: string): boole
   if (hasQuestionPrefix && !hasExplicitStartCue) return false;
   const hasMinecraftScope =
     /\b(?:minecraft|minehut|mine\s*hut|server|world)\b/.test(normalized) &&
-    /\b(?:source|session|situation|monitor|watch|standby|dottie|danger|progress|game)\b/.test(normalized);
+    /\b(?:source|session|situation|monitor|watch|standby|dottie|danger|progress|game)\b/.test(
+      normalized,
+    );
   const hasSituationSessionCue =
     hasExplicitStartCue ||
     /\bonly\s+tell\s+me\b/.test(normalized);
@@ -31656,7 +32118,9 @@ const buildAskTurnSituationTranslateJobArgs = (transcript: string): Record<strin
   };
 };
 
-const isAskTurnSituationRoomTranslateJobIntent = (transcript: string): boolean => {
+const isAskTurnSituationRoomTranslateJobIntent = (
+  transcript: string,
+): boolean => {
   const normalized = transcript.trim().toLowerCase();
   if (!isAskTurnSituationRoomIntent(normalized)) return false;
   const hasTranslateCue = /\b(?:translate|translation)\b/.test(normalized);
@@ -31666,7 +32130,12 @@ const isAskTurnSituationRoomTranslateJobIntent = (transcript: string): boolean =
     /\b(?:current\s+room\s+source|room\s+source|situation\s+room\s+source|source\s+feed|live\s+source|active\s+source|selected\s+source)\b/.test(
       normalized,
     ) || /\busing\s+(?:the\s+)?(?:current\s+)?(?:room|source)\b/.test(normalized);
-  return hasTranslateCue && hasJobRoutingVerb && hasJobOrPipelineCue && hasSourceScope;
+  return (
+    hasTranslateCue &&
+    hasJobRoutingVerb &&
+    hasJobOrPipelineCue &&
+    hasSourceScope
+  );
 };
 
 const isAskTurnSituationRoomCompoundTranslateJobIntent = (transcript: string): boolean => {
@@ -31733,7 +32202,9 @@ const scoreAskTurnLatestDocCandidate = (tokens: string[], relPath: string, text:
   return { score, matchedTokens };
 };
 
-const buildAskTurnLatestDocSelectionArtifact = (topic: string | null): HelixAskLatestDocSelectionArtifact | null => {
+const buildAskTurnLatestDocSelectionArtifact = (
+  topic: string | null,
+): HelixAskLatestDocSelectionArtifact | null => {
   if (!topic) return null;
   const tokens = tokenizeAskTurnDocTopic(topic);
   if (tokens.length === 0) return null;
@@ -31844,7 +32315,9 @@ const buildAskTurnLatestDocSelectionArtifact = (topic: string | null): HelixAskL
             ? "candidate:latest_alias"
             : "candidate:topic_recency_ranked",
     }));
-  const selectedCandidate = selected ? candidates.find((candidate) => candidate.path === selected.path) ?? null : null;
+  const selectedCandidate = selected
+    ? (candidates.find((candidate) => candidate.path === selected.path) ?? null)
+    : null;
   const conflicts: HelixAskLatestDocSelectionArtifact["conflicts"] = [];
   const aliasCandidates = candidates.filter((candidate) => candidate.alias_latest);
   for (const aliasCandidate of aliasCandidates) {
@@ -33035,7 +33508,10 @@ const resolveAskTurnSummaryBareNoteSinkArg = (
     if (mentionedWorkspaceTitle) return mentionedWorkspaceTitle;
     const normalized = normalizeAskTurnRequestedNoteTitle(rawTarget);
     if (!normalized) continue;
-    return findAskTurnWorkspaceNoteTitleMatch(normalized, workspaceSnapshot) ?? normalized;
+    return (
+      findAskTurnWorkspaceNoteTitleMatch(normalized, workspaceSnapshot) ??
+      normalized
+    );
   }
   return null;
 };
@@ -33826,17 +34302,22 @@ const readAskTurnDocTitleForPath = (docPath: string): string | null => {
 const renderAskTurnDocFileStemLabel = (docPath: string): string => {
   const normalized = normalizeAskTurnWorkspaceDocPath(docPath) ?? docPath;
   const stem = path.posix.basename(normalized).replace(/\.[a-z0-9]+$/i, "");
-  return stem
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b([a-z])/g, (match) => match.toUpperCase()) || normalized;
+  return (
+    stem
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b([a-z])/g, (match) => match.toUpperCase()) || normalized
+  );
 };
 
 const renderAskTurnDocDisplayLabel = (docPath?: string | null): string => {
   const normalized = docPath ? normalizeAskTurnWorkspaceDocPath(docPath) : null;
   if (!normalized) return "Document";
-  return readAskTurnDocTitleForPath(normalized) ?? renderAskTurnDocFileStemLabel(normalized);
+  return (
+    readAskTurnDocTitleForPath(normalized) ??
+    renderAskTurnDocFileStemLabel(normalized)
+  );
 };
 
 const renderAskTurnDocReferenceBlock = (args: {
@@ -33888,7 +34369,9 @@ const validateAskTurnDocCandidates = (args: {
     const normalizedTerm = term.toLowerCase();
     if (normalizedText.includes(normalizedTerm)) return true;
     const parts = normalizedTerm.split(/\s+/).filter(Boolean);
-    return parts.length > 1 && parts.every((part) => normalizedText.includes(part));
+    return (
+      parts.length > 1 && parts.every((part) => normalizedText.includes(part))
+    );
   };
   const candidates = matches.map((match) => {
     const title = readAskTurnDocTitleForPath(match.path);
@@ -33943,9 +34426,15 @@ const validateAskTurnDocCandidates = (args: {
     } satisfies HelixAskDocCandidateValidationCandidate;
   });
   const ranked = [...candidates].sort((a, b) => {
-    const statusScore = (status: HelixAskDocCandidateValidationStatus) => (status === "strong" ? 2 : status === "ambiguous" ? 1 : 0);
+    const statusScore = (status: HelixAskDocCandidateValidationStatus) =>
+      status === "strong" ? 2 : status === "ambiguous" ? 1 : 0;
     const recencyDelta = extractAskTurnSortableDateFromPath(b.path) - extractAskTurnSortableDateFromPath(a.path);
-    return statusScore(b.validationStatus) - statusScore(a.validationStatus) || b.score - a.score || recencyDelta || a.path.localeCompare(b.path);
+    return (
+      statusScore(b.validationStatus) - statusScore(a.validationStatus) ||
+      b.score - a.score ||
+      recencyDelta ||
+      a.path.localeCompare(b.path)
+    );
   });
   const strong = ranked.filter((candidate) => candidate.validationStatus === "strong");
   const top = ranked[0] ?? null;
@@ -34152,10 +34641,16 @@ const resolveAskTurnVerifiedNoteTarget = (args: {
       missing_reason: null,
     };
   }
-  const findCandidate = (title: string | null): (typeof candidates)[number] | null => {
+  const findCandidate = (
+    title: string | null,
+  ): (typeof candidates)[number] | null => {
     const key = normalizeAskTurnNoteTitleKey(title);
     if (!key) return null;
-    return candidates.find((candidate) => normalizeAskTurnNoteTitleKey(candidate.title) === key) ?? null;
+    return (
+      candidates.find(
+        (candidate) => normalizeAskTurnNoteTitleKey(candidate.title) === key,
+      ) ?? null
+    );
   };
   const findMentionedCandidate = (): (typeof candidates)[number] | null => {
     const transcriptKey = normalizeAskTurnNoteTitleKey(args.transcript);
@@ -34373,7 +34868,10 @@ const isAskTurnDocDocCompareIntent = (transcript: string): boolean => {
   if (isAskTurnDocVsNoteCompareIntent(transcript)) return false;
   const docRefs = extractAskTurnDocPathArgs(transcript);
   if (docRefs.length >= 2) return true;
-  return /\b(?:doc|docs|document|paper|figure|figures)\b/.test(normalized) && /\bwith\b/.test(normalized);
+  return (
+    /\b(?:doc|docs|document|paper|figure|figures)\b/.test(normalized) &&
+    /\bwith\b/.test(normalized)
+  );
 };
 
 const shouldGateAskTurnExplicitPathCompare = (args: {
@@ -34481,7 +34979,13 @@ const isAskTurnDocLocateToNoteIntent = (transcript: string): boolean => {
   const normalized = transcript.trim().toLowerCase();
   if (!isAskTurnDocLocateIntent(transcript)) return false;
   const hasWriteCue = /\b(?:add|append|save|put|write|store|stash|file|park|place|drop)\b[\s\S]*\b(?:to|into|in|inside)\b/i.test(normalized);
-  return hasWriteCue && Boolean(resolveAskTurnAnyNoteSinkArg(transcript) ?? resolveAskTurnLocationNamedNoteSinkArg(transcript));
+  return (
+    hasWriteCue &&
+    Boolean(
+      resolveAskTurnAnyNoteSinkArg(transcript) ??
+      resolveAskTurnLocationNamedNoteSinkArg(transcript),
+    )
+  );
 };
 
 const isAskTurnExistingNoteMutationIntent = (transcript: string): boolean => {
@@ -35015,7 +35519,10 @@ const hasHelixAskTurnArtifactBackedStepResult = (
   stepResults.some((step) => {
     if (step.status !== "completed") return false;
     if (step.result_artifact && typeof step.result_artifact === "object") return true;
-    return Array.isArray(step.actual_artifacts) && step.actual_artifacts.some((artifact) => artifact !== "turn_final_text");
+    return (
+      Array.isArray(step.actual_artifacts) &&
+      step.actual_artifacts.some((artifact) => artifact !== "turn_final_text")
+    );
   });
 
 const buildAskTurnNavigationOpenAction = (
@@ -35576,7 +36083,9 @@ const resolveAskTurnActionSelection = (args: {
       action_id: "create_job",
       args: buildAskTurnSituationTranslateJobArgs(args.transcript),
     };
-  } else if (!isLiveAnswerEnvironmentIntent(args.transcript) && !isLiveWorkstationPipelineIntent(args.transcript) && isAskTurnMinecraftSituationGoalSessionIntent(args.transcript)) {
+  } else if (
+    !isLiveAnswerEnvironmentIntent(args.transcript) && !isLiveWorkstationPipelineIntent(args.transcript) && isAskTurnMinecraftSituationGoalSessionIntent(args.transcript)
+  ) {
     selected = {
       panel_id: "situation-room-pipelines",
       action_id: "start_situation_goal_session",
@@ -35585,7 +36094,9 @@ const resolveAskTurnActionSelection = (args: {
         sessionId: args.sessionId,
       }),
     };
-  } else if (!isLiveAnswerEnvironmentIntent(args.transcript) && isLiveCommentaryPolicyIntent(args.transcript)) {
+  } else if (
+    !isLiveAnswerEnvironmentIntent(args.transcript) && isLiveCommentaryPolicyIntent(args.transcript)
+  ) {
     selected = {
       panel_id: "situation-room-pipelines",
       action_id: "set_live_commentary_policy",
@@ -35664,10 +36175,14 @@ const resolveAskTurnActionSelection = (args: {
     selected = { panel_id: "situation-room-sources", action_id: "open", args: {} };
   } else if (switchViewerToDocFromNotes) {
     selected = { panel_id: "docs-viewer", action_id: "open", args: {} };
-  } else if (HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG && isAskTurnOpenDocGoalIntent(args.transcript)) {
+  } else if (
+    HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG && isAskTurnOpenDocGoalIntent(args.transcript)
+  ) {
     const query = resolveAskTurnOpenDocSearchQueryArg(args.transcript);
     selected = query ? { panel_id: "docs-viewer", action_id: "search_docs", args: { query, limit: 5 } } : null;
-  } else if (isAskTurnDocIdentityIntent(args.transcript) && !isAskTurnDocIdentityExplainHybridIntent(args.transcript)) {
+  } else if (
+    isAskTurnDocIdentityIntent(args.transcript) && !isAskTurnDocIdentityExplainHybridIntent(args.transcript)
+  ) {
     const activeDocPath = normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath);
     selected = { panel_id: "docs-viewer", action_id: "identify_current_doc", args: activeDocPath ? { path: activeDocPath } : {} };
   } else if (isAskTurnDocsReadAloudIntent(args.transcript)) {
@@ -35706,21 +36221,31 @@ const resolveAskTurnActionSelection = (args: {
         limit: 5,
       },
     };
-  } else if (resolveAskTurnDocPathArg(args.transcript) && /\b(?:open|view|show|pull\s+up|read)\b/i.test(normalized)) {
+  } else if (
+    resolveAskTurnDocPathArg(args.transcript) && /\b(?:open|view|show|pull\s+up|read)\b/i.test(normalized)
+  ) {
     const path = resolveAskTurnDocPathArg(args.transcript);
     selected = {
       panel_id: "docs-viewer",
       action_id: isAskTurnReadAloudRequested(args.transcript) ? "open_doc_and_read" : "open_doc_by_path",
       args: path ? { path } : {},
     };
-  } else if (isAskTurnStrictLatestDocAcquisitionIntent(args.transcript) && resolveAskTurnLatestDocTopicArg(args.transcript)) {
+  } else if (
+    isAskTurnStrictLatestDocAcquisitionIntent(args.transcript) && resolveAskTurnLatestDocTopicArg(args.transcript)
+  ) {
     selected = buildAskTurnLatestDocAcquisitionAction(args.transcript);
-  } else if (HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG && isAskTurnTopicDocAcquisitionIntent(args.transcript)) {
+  } else if (
+    HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG && isAskTurnTopicDocAcquisitionIntent(args.transcript)
+  ) {
     const query = resolveAskTurnOpenDocSearchQueryArg(args.transcript);
     selected = query ? { panel_id: "docs-viewer", action_id: "search_docs", args: { query, limit: 5 } } : null;
-  } else if (/\b(?:go\s+to|open|view|show|jump\s+(?:over\s+)?to|switch\s+(?:me\s+)?(?:over\s+)?to|move\s+me\s+(?:over\s+)?to)\s+(?:the\s+)?(?:docs?|focs?)(?:\s+(?:viewer|panel))?\b/.test(normalized)) {
+  } else if (
+    /\b(?:go\s+to|open|view|show|jump\s+(?:over\s+)?to|switch\s+(?:me\s+)?(?:over\s+)?to|move\s+me\s+(?:over\s+)?to)\s+(?:the\s+)?(?:docs?|focs?)(?:\s+(?:viewer|panel))?\b/.test(normalized)
+  ) {
     selected = { panel_id: "docs-viewer", action_id: "open", args: {} };
-  } else if (/\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note\b/.test(normalized)) {
+  } else if (
+    /\b(?:create|make|new|start)\s+(?:a\s+)?(?:[\w-]+\s+){0,3}note\b/.test(normalized)
+  ) {
     const title = resolveAskTurnCreateNoteTitleArg(args.transcript) ?? resolveAskTurnTitleArg(args.transcript);
     const body = resolveAskTurnCreateNoteBodyArg(args.transcript);
     selected = {
@@ -35755,7 +36280,9 @@ const resolveAskTurnActionSelection = (args: {
         ...(query ? { query } : {}),
       },
     };
-  } else if (isAskTurnSummarizeAndAddToNoteIntent(args.transcript) && frameRequestsNoteUpdate) {
+  } else if (
+    isAskTurnSummarizeAndAddToNoteIntent(args.transcript) && frameRequestsNoteUpdate
+  ) {
     const noteTitle = frameNoteTarget?.value ?? resolveAskTurnSummaryNoteTargetWithWorkspace(args.transcript, args.workspaceSnapshot);
     selected = {
       panel_id: "workstation-notes",
@@ -35768,7 +36295,9 @@ const resolveAskTurnActionSelection = (args: {
     };
   } else if (isAskTurnArtifactToNoteIntent(args.transcript)) {
     const text = isAskTurnCurrentDocIdentityTransferIntent(args.transcript)
-      ? normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath) ?? readAskTurnLatestResultArtifactText(args.sessionId)
+      ? (normalizeAskTurnWorkspaceDocPath(
+          args.workspaceSnapshot?.activeDocPath,
+        ) ?? readAskTurnLatestResultArtifactText(args.sessionId))
       : readAskTurnLatestResultArtifactText(args.sessionId);
     const wantsClipboardReceiptToNote =
       /\b(?:latest|last|recent)\s+clipboard\b/i.test(normalized) ||
@@ -35776,8 +36305,15 @@ const resolveAskTurnActionSelection = (args: {
     const bareNoteTarget = resolveAskTurnArtifactBareNoteTargetArg(args.transcript);
     const safeBareNoteTarget = bareNoteTarget && !isAskTurnDeicticNoteTarget(bareNoteTarget) ? bareNoteTarget : null;
     const noteTitle = wantsClipboardReceiptToNote
-      ? safeBareNoteTarget ?? resolveAskTurnNoteTargetWithWorkspace(args.transcript, args.workspaceSnapshot)
-      : resolveAskTurnNoteTargetWithWorkspace(args.transcript, args.workspaceSnapshot) ?? safeBareNoteTarget;
+      ? (safeBareNoteTarget ??
+        resolveAskTurnNoteTargetWithWorkspace(
+          args.transcript,
+          args.workspaceSnapshot,
+        ))
+      : (resolveAskTurnNoteTargetWithWorkspace(
+          args.transcript,
+          args.workspaceSnapshot,
+        ) ?? safeBareNoteTarget);
     if (!noteTitle && isAskTurnDeicticNoteTarget(resolveAskTurnAnyNoteSinkArg(args.transcript))) {
       return {
         action: selected,
@@ -37524,8 +38060,10 @@ const renderAskTurnDocLocationAnswer = (args: {
     (args.selectedAction ? findAskTurnDocLocationMatchesForAction(args.selectedAction) : []).length > 0
       ? typeof args.selectedAction?.args?.query === "string"
         ? args.selectedAction.args.query.trim()
-        : resolveAskTurnDocLocateQuery(args.transcript) ?? "the requested topic"
-      : resolveAskTurnDocLocateQuery(args.transcript) ?? "the requested topic";
+        : (resolveAskTurnDocLocateQuery(args.transcript) ??
+          "the requested topic")
+      : (resolveAskTurnDocLocateQuery(args.transcript) ??
+        "the requested topic");
   const path =
     normalizeAskTurnDocPathForRead(args.selectedAction?.args?.path) ??
     normalizeAskTurnDocPathForRead(args.workspaceSnapshot?.activeDocPath);
@@ -37597,12 +38135,16 @@ const evaluateHelixRuntimeCalculatorExpression = (expression: string): number | 
   }
 };
 
-const readHelixCalculatorReceiptExpression = (receipt: Record<string, unknown>): string | null => {
+const readHelixCalculatorReceiptExpression = (
+  receipt: Record<string, unknown>,
+): string | null => {
   const setup =
     receipt.calculator_setup && typeof receipt.calculator_setup === "object" && !Array.isArray(receipt.calculator_setup)
       ? (receipt.calculator_setup as Record<string, unknown>)
       : {};
-  return readAskTurnString(receipt.expression) ?? readAskTurnString(setup.expression);
+  return (
+    readAskTurnString(receipt.expression) ?? readAskTurnString(setup.expression)
+  );
 };
 
 const readHelixCalculatorReceiptObservedResult = (receipt: Record<string, unknown>): string | null =>
@@ -38003,7 +38545,8 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
       consumed_artifacts: consumedArtifacts,
       produced_artifacts: producedArtifacts,
       blocked_missing_artifacts: blockedMissing,
-      error_code: step.status === "failed" ? step.reason ?? "step_failed" : null,
+      error_code:
+        step.status === "failed" ? (step.reason ?? "step_failed") : null,
       contract_pass: contractPass,
       contract_fail_reason: contractFailReason,
       expected_artifacts: expectedArtifacts,
@@ -38019,18 +38562,18 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
               terminal_eligible: false,
               raw_content_included: false,
             }
-        : step.id === "final_answer_compose_capability_help"
-          ? {
+          : step.id === "final_answer_compose_capability_help"
+            ? {
               kind: "capability_help_summary",
               text: buildAskTurnCapabilityHelpSummary(null),
               capability_catalog_ref: "capability_catalog_observation",
               workstation_tool_alignment_ref: "workstation_tool_alignment",
               live_synthetic_data_reflection_ref: "live_synthetic_data_reflection",
             }
-          : calculatorRuntimeReceiptPayload
-            ? calculatorRuntimeReceiptPayload
-          : step.action?.action_id === "locate_in_doc"
-          ? docLocationTargetRequest?.requested_output === "equation_location"
+            : calculatorRuntimeReceiptPayload
+              ? calculatorRuntimeReceiptPayload
+              : step.action?.action_id === "locate_in_doc"
+                ? docLocationTargetRequest?.requested_output === "equation_location"
             ? docEquationLocationValidation.valid
               ? {
                   ...(docEquationLocationPayload ?? {
@@ -38091,20 +38634,20 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
               matched_terms: typeof step.action.args?.query === "string" ? [step.action.args.query] : [],
               confidence: docLocationMatches.length > 0 ? "high" : "low",
             }
-          : step.action?.action_id === "search_docs"
-            ? {
+                : step.action?.action_id === "search_docs"
+                  ? {
                 kind: "doc_search_results",
                 query: typeof step.action.args?.query === "string" ? step.action.args.query : null,
                 matches: searchAskTurnDocsForQuery(String(step.action.args?.query ?? ""), 8),
               }
-          : step.action?.action_id === "validate_doc_candidates"
-            ? validateAskTurnDocCandidates({
+                  : step.action?.action_id === "validate_doc_candidates"
+                    ? validateAskTurnDocCandidates({
                 query: String(step.action.args?.query ?? ""),
                 transcript: String(step.action.args?.transcript ?? step.action.args?.query ?? ""),
                 limit: 8,
               })
-          : step.action?.action_id === "open_latest_doc_by_topic"
-            ? {
+                    : step.action?.action_id === "open_latest_doc_by_topic"
+                      ? {
                 ...(latestDocSelection && typeof latestDocSelection === "object" ? latestDocSelection : {}),
                 kind: "doc_open_receipt",
                 path:
@@ -38136,8 +38679,8 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
                 status: "opened",
                 message: "Opened the best matching document.",
               }
-          : step.action?.action_id === "open_doc_by_path"
-            ? {
+                      : step.action?.action_id === "open_doc_by_path"
+                        ? {
                 kind: "doc_open_receipt",
                 path: resolveAskTurnWorkspaceActionDocPath(step.action),
                 title: resolveAskTurnWorkspaceActionDocPath(step.action)
@@ -38149,9 +38692,9 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
                   ? `Opened document: ${readAskTurnDocTitleForPath(String(resolveAskTurnWorkspaceActionDocPath(step.action))) ?? resolveAskTurnWorkspaceActionDocPath(step.action)}`
                   : "Document open attempted, but no path was available.",
               }
-          : step.action?.action_id === "summarize_doc"
-            ? step.action.args?.requested_output === "doc_numeric_answer"
-              ? {
+                        : step.action?.action_id === "summarize_doc"
+                          ? step.action.args?.requested_output === "doc_numeric_answer"
+                            ? {
                   kind: "doc_numeric_answer",
                   query: typeof step.action.args?.query === "string" ? step.action.args.query : "",
                   requested_variables: extractAskTurnRetrievalSignalAnchors(String(step.action.args?.query ?? "")).variables ?? [],
@@ -38163,8 +38706,8 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
                   extraction_method: "nearest_anchor_match",
                   confidence: "low",
                 }
-              : step.action.args?.requested_output === "doc_concept_explanation"
-                ? {
+                            : step.action.args?.requested_output === "doc_concept_explanation"
+                              ? {
                     kind: "doc_concept_explanation",
                     query: typeof step.action.args?.query === "string" ? step.action.args.query : "",
                     concept: "scientific concept",
@@ -38187,27 +38730,31 @@ const buildAskTurnStepResults = (executionTrace: HelixAskTurnPlanStep[]) =>
                       .map((text, index) => ({ text: clipConversationText(text, 260), line_start: index + 1, line_end: index + 1 })) ?? [],
                     confidence: resolveAskTurnWorkspaceActionDocPath(step.action) ? "medium" : "low",
                   }
-                : {
-                  kind: "doc_summary",
-                path: resolveAskTurnWorkspaceActionDocPath(step.action),
-                text:
-                  (() => {
-                    const docPath = resolveAskTurnWorkspaceActionDocPath(step.action);
-                    return renderAskTurnScopedParityGapSummary({
-                      transcript: stepActionTranscript,
-                      docText: readAskTurnDocMarkdownPreview(docPath) ?? "",
-                      activeDocPath: docPath,
-                    }) ??
-                      buildAskTurnDocExplainText({
-                        transcript: stepActionTranscript,
-                        docPath,
-                      }) ??
-                      (docPath
-                        ? `Summary unavailable for ${docPath}.`
-                        : "Summary unavailable because no active document path was provided.");
-                  })(),
-                }
-          : step.action?.action_id === "copy_receipt_to_note" || step.action?.action_id === "append_to_note"
+                              : {
+                                  kind: "doc_summary",
+                                  path: resolveAskTurnWorkspaceActionDocPath(step.action),
+                                  text: (() => {
+                                    const docPath = resolveAskTurnWorkspaceActionDocPath(step.action);
+                                    return (
+                                      renderAskTurnScopedParityGapSummary({
+                                        transcript: stepActionTranscript,
+                                        docText:
+                                          readAskTurnDocMarkdownPreview(
+                                            docPath,
+                                          ) ?? "",
+                                        activeDocPath: docPath,
+                                      }) ??
+                                      buildAskTurnDocExplainText({
+                                        transcript: stepActionTranscript,
+                                        docPath,
+                                      }) ??
+                                      (docPath
+                                        ? `Summary unavailable for ${docPath}.`
+                                        : "Summary unavailable because no active document path was provided.")
+                                    );
+                                  })(),
+                                }
+                          : step.action?.action_id === "copy_receipt_to_note" || step.action?.action_id === "append_to_note"
             ? {
                 kind: "note_update_receipt",
                 panel_id: step.action.panel_id,
@@ -39241,7 +39788,10 @@ const renderAskTurnScopedParityGapSummary = (args: {
 
 const isAskTurnSectionAnchorOnlySummary = (text: string): boolean => {
   const bulletLines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^[-*]\s+\S/.test(line));
-  return bulletLines.length > 0 && bulletLines.every((line) => /^[-*]\s+Section anchor:/i.test(line));
+  return (
+    bulletLines.length > 0 &&
+    bulletLines.every((line) => /^[-*]\s+Section anchor:/i.test(line))
+  );
 };
 
 const scopedAskTurnDocSummaryTextSatisfiesPrompt = (transcript: string, text: string): boolean => {
@@ -39476,7 +40026,12 @@ const buildAskTurnFocusedDocAnswerArtifact = (args: {
       ...(args.docSummaryArtifact ? ["doc_summary"] : []),
       ...(args.docLocationArtifact ? ["doc_location_matches"] : []),
     ],
-    confidence: kind === "numeric" ? (values.length > 0 ? "high" : "low") : snippets.length > 0 ? "medium" : "low",
+    confidence:
+      kind === "numeric"
+        ? values.length > 0
+          ? "high"
+          : "low"
+        : snippets.length > 0 ? "medium" : "low",
   };
 };
 
@@ -39539,9 +40094,9 @@ const composeAskTurnDocCandidateValidationFinal = (args: {
         ? "latest verified topic candidate"
         : args.openSelectionReason === "validated_topic_candidate"
           ? "validated topic candidate"
-          : readAskTurnString(selectedCandidate?.selectionReason) ??
+          : (readAskTurnString(selectedCandidate?.selectionReason) ??
             readAskTurnString(args.validationArtifact.selected_reason) ??
-            "validated topic candidate";
+            "validated topic candidate");
     return [
       "Opened document:",
       renderAskTurnDocReferenceBlock({ heading: "Document", path: selectedPath }),
@@ -39549,7 +40104,9 @@ const composeAskTurnDocCandidateValidationFinal = (args: {
     ].filter(Boolean).join("\n");
   }
   const missingTerms = candidates
-    .flatMap((candidate) => (Array.isArray(candidate.missingTerms) ? candidate.missingTerms : []))
+    .flatMap((candidate) =>
+      Array.isArray(candidate.missingTerms) ? candidate.missingTerms : [],
+    )
     .map((entry) => String(entry ?? "").trim())
     .filter(Boolean);
   const uniqueMissing = Array.from(new Set(missingTerms)).slice(0, 5);
@@ -40400,7 +40957,10 @@ const collectAskTurnCurrentTurnLedgerArtifacts = (args: {
       pushArtifact(
         producerItemId,
         kind,
-        artifact ?? (kind === "workspace_action_receipt" ? buildWorkspaceActionReceiptPayload() ?? { ok: true } : { ok: true }),
+        artifact ??
+          (kind === "workspace_action_receipt"
+            ? (buildWorkspaceActionReceiptPayload() ?? { ok: true })
+            : { ok: true }),
       );
     }
   }
@@ -41363,13 +41923,13 @@ const buildAskTurnEquationRetrievalIntent = (args: {
     required,
     strength: required ? "hard" : semanticIntent.strength !== "none" || (documentIntent.required && (hasEquationTerm || hasCalculatorTerm)) ? "soft" : "none",
     requested_outputs: required
-      ? uniqueAskTurnStrings([
+      ? (uniqueAskTurnStrings([
           "document",
           terms.documentTerms.includes("paper") ? "paper" : null,
           "source_path",
           "equation_location",
           hasCalculatorTerm ? "calculator_usable_formula" : null,
-        ]) as HelixAskEquationRetrievalIntent["requested_outputs"]
+        ]) as HelixAskEquationRetrievalIntent["requested_outputs"])
       : [],
     anchors: {
       corpus_terms: terms.corpusTerms,
@@ -41949,12 +42509,18 @@ const buildAskTurnEvidenceTargetRequest = (args: {
   };
 };
 
-const askTurnTextIncludesFoldedToken = (text: string, token: string): boolean => {
+const askTurnTextIncludesFoldedToken = (
+  text: string,
+  token: string,
+): boolean => {
   const normalizedText = text.toLowerCase();
   const normalizedToken = token.toLowerCase();
   const foldedText = normalizedText.replace(/[._\-\s]+/g, "");
   const foldedToken = normalizedToken.replace(/[._\-\s]+/g, "");
-  return normalizedText.includes(normalizedToken) || (foldedToken.length > 0 && foldedText.includes(foldedToken));
+  return (
+    normalizedText.includes(normalizedToken) ||
+    (foldedToken.length > 0 && foldedText.includes(foldedToken))
+  );
 };
 
 const enrichAskTurnDocEvidenceMatches = (
@@ -42060,7 +42626,11 @@ const isAskTurnExplicitEquationFormulaLine = (line: string): boolean => {
   const hasFormulaAssignment = /\b[a-zA-Z_][a-zA-Z0-9_]*(?:\([^)]*\))?\s*=\s*[-+()a-zA-Z0-9_.*\/\s]+/.test(text);
   const hasNamedFormulaTarget = /\b(?:properTimeS_expected|properMinusCoordinateS_expected|tau_expected|coordinateTimeS)\b/.test(text);
   if (isMarkdownTableRow && !(hasNamedFormulaTarget && hasFormulaAssignment)) return false;
-  return hasFormulaAssignment && (hasNamedFormulaTarget || /\b(?:alpha|tau|coordinateTimeS|properTime|T)\b/.test(text));
+  return (
+    hasFormulaAssignment &&
+    (hasNamedFormulaTarget ||
+      /\b(?:alpha|tau|coordinateTimeS|properTime|T)\b/.test(text))
+  );
 };
 
 const buildAskTurnDocEquationLocationPayload = (args: {
@@ -42114,7 +42684,9 @@ const buildAskTurnDocEquationLocationPayload = (args: {
   };
 };
 
-const validateAskTurnDocEquationLocationArtifact = (artifact: Record<string, unknown> | null): { valid: boolean; failures: string[] } => {
+const validateAskTurnDocEquationLocationArtifact = (
+  artifact: Record<string, unknown> | null,
+): { valid: boolean; failures: string[] } => {
   const failures: string[] = [];
   if (!artifact) return { valid: false, failures: ["artifact_missing"] };
   if (artifact.evidence_kind !== "equation" && artifact.evidence_kind !== "explicit_equation") failures.push("evidence_kind_not_equation");
@@ -42133,13 +42705,19 @@ const validateAskTurnDocEquationLocationArtifact = (artifact: Record<string, unk
     ? artifact.equations.filter((equation): equation is Record<string, unknown> => Boolean(equation && typeof equation === "object"))
     : [];
   const hasEquationObject = equations.some((equation) => readAskTurnString(equation.raw_text) && equation.calculator_usable !== false);
-  const hasEquationSnippet = hasEquationObject || snippets.some((snippet) => {
-    const text = readAskTurnString(snippet.text) ?? "";
-    const markers = Array.isArray(snippet.matched_equation_markers)
+  const hasEquationSnippet =
+    hasEquationObject ||
+    snippets.some((snippet) => {
+      const text = readAskTurnString(snippet.text) ?? "";
+      const markers = Array.isArray(snippet.matched_equation_markers)
       ? snippet.matched_equation_markers.map((marker) => String(marker ?? "")).filter(Boolean)
       : collectAskTurnEquationMarkers(text);
-    return Boolean(snippet.equation_like) && markers.length > 0 && isAskTurnExplicitEquationFormulaLine(text);
-  });
+      return (
+        Boolean(snippet.equation_like) &&
+        markers.length > 0 &&
+        isAskTurnExplicitEquationFormulaLine(text)
+      );
+    });
   if (!hasEquationSnippet) failures.push("equation_like_snippet_missing");
   return { valid: failures.length === 0, failures };
 };
@@ -42412,7 +42990,11 @@ const buildAskTurnEvidenceValidity = (args: {
     },
     source_binding: {
       ...(sourcePath ? { source_path: sourcePath } : {}),
-      source_title: readAskTurnString(payload?.source_title) ?? (sourcePath ? readAskTurnDocTitleForPath(sourcePath) ?? undefined : undefined),
+      source_title:
+        readAskTurnString(payload?.source_title) ??
+        (sourcePath
+          ? (readAskTurnDocTitleForPath(sourcePath) ?? undefined)
+          : undefined),
       snippets_present: snippets.length > 0,
       line_spans_present: hasLineSpans,
     },
@@ -42583,9 +43165,11 @@ const buildAskTurnEquationExtractionAttemptArtifact = (args: {
     snippets_checked: snippetsChecked,
     result,
     created_artifact_id: args.validation.valid
-      ? readAskTurnString(args.equationLocationPayload?.kind) ?? "doc_equation_location"
+      ? (readAskTurnString(args.equationLocationPayload?.kind) ??
+        "doc_equation_location")
       : args.calculatorValidation?.valid
-        ? readAskTurnString(args.calculatorEvidencePayload?.kind) ?? "doc_calculator_evidence"
+        ? (readAskTurnString(args.calculatorEvidencePayload?.kind) ??
+          "doc_calculator_evidence")
         : undefined,
     failure_code: args.validation.valid || args.calculatorValidation?.valid ? undefined : "equation_source_unavailable",
   };
@@ -42608,7 +43192,9 @@ const buildAskTurnEquationUsableEvidenceRescueArtifact = (args: {
   const prefersCalculatorEvidence =
     /\b(?:table|row|rows|key[-\s]?value|field|fields|evidence|inputs?|mission[-\s]?time)\b/i.test(args.transcript) &&
     !/\b(?:equation|formula)\b/i.test(args.transcript);
-  const query = prefersCalculatorEvidence ? args.transcript : buildAskTurnEquationRetrievalQuery(args.transcript) ?? args.transcript;
+  const query = prefersCalculatorEvidence
+    ? args.transcript
+    : (buildAskTurnEquationRetrievalQuery(args.transcript) ?? args.transcript);
   const result = runMathEvidenceTool({
     turn_id: args.turnId,
     query,
@@ -42757,7 +43343,7 @@ const buildAskTurnPanelControlReceiptArtifact = (args: {
       ? action?.action_id === "open_directory"
         ? "open_directory"
         : "open"
-      : intent?.action_id ?? action?.action_id ?? "open";
+      : (intent?.action_id ?? action?.action_id ?? "open");
   if (!["open", "open_directory", "solve_expression", "solve_with_steps"].includes(actionId)) return null;
   const registryEntry =
     WORKSPACE_ACTION_REGISTRY.find((entry) => entry.target_id === panelId && entry.action_id === actionId && entry.enabled) ??
@@ -44122,7 +44708,7 @@ const resolveAskTurnHardDocsEvidenceSourceTargetIntent = (args: {
     promptText: args.transcript,
   });
   return isHardDocsEvidenceSourceTargetIntent(sourceTargetIntent)
-    ? sourceTargetIntent as unknown as Record<string, unknown>
+    ? (sourceTargetIntent as unknown as Record<string, unknown>)
     : null;
 };
 
@@ -44307,19 +44893,23 @@ const buildAskTurnCanonicalGoalFrame = (args: {
     return {
       turn_id: args.turnId,
       goal_kind: earlyCapabilityArbitration.canonical_goal_kind as HelixAskCanonicalGoalKind,
-      answer_scope: earlyCapabilityArbitration.contract_state === "suppressed_contextual_reference" ||
+      answer_scope:
+        earlyCapabilityArbitration.contract_state === "suppressed_contextual_reference" ||
         earlyCapabilityArbitration.contract_state === "conversational_referent_no_evidence"
-        ? "model_only"
-        : answerScopeForExplicitCapability(earlyCapabilityArbitration.requested_capability) as HelixAskCanonicalAnswerScope,
+          ? "model_only"
+          : (answerScopeForExplicitCapability(
+              earlyCapabilityArbitration.requested_capability,
+            ) as HelixAskCanonicalAnswerScope),
       required_terminal_kind: (earlyCapabilityArbitration.required_terminal_kind ?? "direct_answer_text") as HelixAskRequiredTerminalKind,
       allows_workspace_context:
         earlyCapabilityArbitration.contract_state !== "suppressed_contextual_reference" &&
         earlyCapabilityArbitration.contract_state !== "conversational_referent_no_evidence",
       allows_prior_artifacts: earlyCapabilityArbitration.contract_state === "conversational_referent_no_evidence",
       corpus_anchors: [],
-      numeric_tokens: earlyCapabilityArbitration.requested_capability === "scientific-calculator.solve_expression"
-        ? retrievalSignal.anchors.numeric_tokens ?? []
-        : [],
+      numeric_tokens:
+        earlyCapabilityArbitration.requested_capability === "scientific-calculator.solve_expression"
+          ? (retrievalSignal.anchors.numeric_tokens ?? [])
+          : [],
       concept_tokens: uniqueAskTurnStrings([
         earlyCapabilityArbitration.contract_state,
         earlyCapabilityArbitration.requested_capability,
@@ -44690,7 +45280,9 @@ const buildAskTurnCanonicalGoalFrame = (args: {
       ]),
     };
   }
-  if (selectedEvidenceTarget?.target_source === "repo_code" && repoCodeIntent.repoEvidenceRequested) {
+  if (
+    selectedEvidenceTarget?.target_source === "repo_code" && repoCodeIntent.repoEvidenceRequested
+  ) {
     const repoGoalKind = repoCodeIntent.strength === "hard" ? "repo_code_evidence_question" : "repo_entity_definition";
     return {
       turn_id: args.turnId,
@@ -44699,7 +45291,9 @@ const buildAskTurnCanonicalGoalFrame = (args: {
       required_terminal_kind: "repo_code_evidence_answer",
       allows_workspace_context: true,
       allows_prior_artifacts: false,
-      corpus_anchors: repoCodeIntent.projectEntity ? [repoCodeIntent.projectEntity] : retrievalSignal.anchors.corpus ?? [],
+      corpus_anchors: repoCodeIntent.projectEntity
+        ? [repoCodeIntent.projectEntity]
+        : (retrievalSignal.anchors.corpus ?? []),
       numeric_tokens: retrievalSignal.anchors.alpha_tokens ?? [],
       concept_tokens: uniqueAskTurnStrings([
         ...repoCodeIntent.requestedOutputs,
@@ -45024,7 +45618,9 @@ const buildAskTurnCanonicalGoalFrame = (args: {
       required_terminal_kind: "repo_code_evidence_answer",
       allows_workspace_context: true,
       allows_prior_artifacts: false,
-      corpus_anchors: repoCodeIntent.projectEntity ? [repoCodeIntent.projectEntity] : retrievalSignal.anchors.corpus ?? [],
+      corpus_anchors: repoCodeIntent.projectEntity
+        ? [repoCodeIntent.projectEntity]
+        : (retrievalSignal.anchors.corpus ?? []),
       numeric_tokens: retrievalSignal.anchors.alpha_tokens ?? [],
       concept_tokens: uniqueAskTurnStrings([
         ...repoCodeIntent.requestedOutputs,
@@ -45637,7 +46233,9 @@ const buildAskTurnCanonicalGoalFrame = (args: {
       required_terminal_kind: "repo_code_evidence_answer",
       allows_workspace_context: true,
       allows_prior_artifacts: false,
-      corpus_anchors: repoCodeIntent.projectEntity ? [repoCodeIntent.projectEntity] : retrievalSignal.anchors.corpus ?? [],
+      corpus_anchors: repoCodeIntent.projectEntity
+        ? [repoCodeIntent.projectEntity]
+        : (retrievalSignal.anchors.corpus ?? []),
       numeric_tokens: retrievalSignal.anchors.alpha_tokens ?? [],
       concept_tokens: uniqueAskTurnStrings([
         ...repoCodeIntent.requestedOutputs,
@@ -46284,7 +46882,11 @@ const isAskTurnSufficientTerminalArtifact = (args: {
     if (artifact.kind !== "doc_numeric_answer" && !(artifact.kind === "focused_doc_answer" && answerKind === "numeric")) {
       return false;
     }
-    return askTurnArtifactHasNumericValues(artifact) && askTurnArtifactHasSourcePath(artifact) && askTurnArtifactHasEvidenceSnippets(artifact);
+    return (
+      askTurnArtifactHasNumericValues(artifact) &&
+      askTurnArtifactHasSourcePath(artifact) &&
+      askTurnArtifactHasEvidenceSnippets(artifact)
+    );
   }
   if (wantsConcept) {
     if (
@@ -46293,7 +46895,11 @@ const isAskTurnSufficientTerminalArtifact = (args: {
     ) {
       return false;
     }
-    return askTurnArtifactHasNonemptyText(artifact) && askTurnArtifactHasSourcePath(artifact) && askTurnArtifactHasEvidenceSnippets(artifact);
+    return (
+      askTurnArtifactHasNonemptyText(artifact) &&
+      askTurnArtifactHasSourcePath(artifact) &&
+      askTurnArtifactHasEvidenceSnippets(artifact)
+    );
   }
   if ((artifact.kind === "doc_summary" || artifact.kind === "focused_doc_answer") && args.transcript) {
     const text =
@@ -46652,7 +47258,11 @@ const isAskTurnDebugDiagnosisContractIntent = (transcript: string): boolean => {
     /\b(?:inspect|show|open|copy|review|analy[sz]e|diagnos(?:e|is)|explain|summari[sz]e|reason\s+from|given)\b[\s\S]{0,100}\b(?:debug\s+(?:export|trace|facts?|payload|copy|evidence|log)|trace|runtime|agent\s+loop|route|router|classifier|deterministic|tool\s+calls?|receipt|artifact|failure|error)\b/i.test(
       transcript,
     );
-  return explicitRuntimeArtifact || diagnosticAction || isWorkstationToolDiagnosticPrompt(transcript);
+  return (
+    explicitRuntimeArtifact ||
+    diagnosticAction ||
+    isWorkstationToolDiagnosticPrompt(transcript)
+  );
 };
 
 const hasAskTurnDebugEvidenceTopicPhrase = (transcript: string): boolean =>
@@ -46688,8 +47298,12 @@ const isAskTurnExplicitCurrentRuntimeDebugEvidenceRequest = (transcript: string)
 };
 
 const isAskTurnLiveEnvironmentReviewIntent = (transcript: string): boolean =>
-  /\b(?:auntie\s+dottie|dottie|live\s+(?:answer\s+)?environment|live\s+card|event\s+log|commentary\s+feed|field\s+(?:worker|agent)|route\s+context|navigation\s+state|world\s+event|route\s+evidence|perturbation|blackboard)\b/i.test(transcript) &&
-  /\b(?:what|check|query|read|retrieve|status|latest|current|happening|changed|route|path|gateway|drift|evidence|observed|prediction|commentary|tool\s+call)\b/i.test(transcript) ||
+  (/\b(?:auntie\s+dottie|dottie|live\s+(?:answer\s+)?environment|live\s+card|event\s+log|commentary\s+feed|field\s+(?:worker|agent)|route\s+context|navigation\s+state|world\s+event|route\s+evidence|perturbation|blackboard)\b/i.test(
+    transcript,
+  ) &&
+    /\b(?:what|check|query|read|retrieve|status|latest|current|happening|changed|route|path|gateway|drift|evidence|observed|prediction|commentary|tool\s+call)\b/i.test(
+      transcript,
+    )) ||
   hasExecutableAskTurnMicroReasonerPresetCue(transcript);
 
 const hasNegatedLiveSourceMailLoopIntent = (transcript: string): boolean =>
@@ -46734,7 +47348,9 @@ const hasAskTurnLiveSourceMailInterpretationCue = (transcript: string): boolean 
   return interpretationCue.test(transcript) && sourceCue.test(transcript);
 };
 
-const isAskTurnProcessedMailCheckpointIntent = (transcript: string): boolean => {
+const isAskTurnProcessedMailCheckpointIntent = (
+  transcript: string,
+): boolean => {
   if (!isAskTurnLiveSourceMailLoopIntent(transcript)) return false;
   if (isCompactUiMailboxWakePrompt(transcript)) return true;
   if (hasAskTurnVisualObserverProfileCue(transcript)) return false;
@@ -46743,7 +47359,9 @@ const isAskTurnProcessedMailCheckpointIntent = (transcript: string): boolean => 
     /\blive_env\.read_processed_live_source_mail\b/i.test(transcript) ||
     /\bstage_play_processed_mail_packet\b/i.test(transcript) ||
     /\b(?:processed\s+(?:live[-\s]?source\s+)?mail|processed\s+packet|visual\s+mail|latest\s+visual\s+update|new\s+source\s+mail)\b/i.test(transcript);
-  return processedMailCue || hasAskTurnLiveSourceMailInterpretationCue(transcript);
+  return (
+    processedMailCue || hasAskTurnLiveSourceMailInterpretationCue(transcript)
+  );
 };
 
 const applyStagePlayMailWakeCanonicalGoalFrame = (
@@ -47607,7 +48225,8 @@ const applyMailLoopCheckpointContinuationToPayload = (args: {
   args.payload.stage_play_mail_loop_checkpoint_continuation = continuationPayload;
   args.payload.stage_play_live_source_mail_transcript_entries = [
     ...(Array.isArray(args.payload.stage_play_live_source_mail_transcript_entries)
-      ? args.payload.stage_play_live_source_mail_transcript_entries as unknown[]
+      ? (args.payload
+          .stage_play_live_source_mail_transcript_entries as unknown[])
       : []),
     ...transcriptEntries,
   ];
@@ -47617,7 +48236,7 @@ const applyMailLoopCheckpointContinuationToPayload = (args: {
   ]);
   args.payload.stage_play_live_source_mail_transcript_rows = [
     ...(Array.isArray(args.payload.stage_play_live_source_mail_transcript_rows)
-      ? args.payload.stage_play_live_source_mail_transcript_rows as unknown[]
+      ? (args.payload.stage_play_live_source_mail_transcript_rows as unknown[])
       : []),
     ...rows,
   ];
@@ -47636,7 +48255,9 @@ const applyMailLoopCheckpointContinuationToPayload = (args: {
   return { artifacts, artifact };
 };
 
-const artifactHasStagePlayLiveSourceLoopState = (artifact: HelixTurnArtifact): boolean => {
+const artifactHasStagePlayLiveSourceLoopState = (
+  artifact: HelixTurnArtifact,
+): boolean => {
   const payload = readAskTurnArtifactPayloadRecord(artifact);
   const observation = artifact.kind === "live_environment_tool_observation"
     ? readAskTurnLiveEnvironmentObservationRecord(artifact)
@@ -47665,27 +48286,32 @@ const artifactHasStagePlayLiveSourceLoopState = (artifact: HelixTurnArtifact): b
     return true;
   }
   const rows = Array.isArray(observation.transcriptRows ?? observation.transcript_rows)
-    ? (observation.transcriptRows ?? observation.transcript_rows) as unknown[]
+    ? ((observation.transcriptRows ?? observation.transcript_rows) as unknown[])
     : [];
   return rows.some((row) => {
     if (!row || typeof row !== "object" || Array.isArray(row)) return false;
     const rowRecord = row as Record<string, unknown>;
-    return readAskTurnString(rowRecord.rowKind ?? rowRecord.row_kind) === "loop_state";
+    return (
+      readAskTurnString(rowRecord.rowKind ?? rowRecord.row_kind) ===
+      "loop_state"
+    );
   });
 };
 
 const hasInterimVoiceCalloutCompletionObservation = (
   artifacts: HelixTurnArtifact[] | null | undefined,
-): boolean => (artifacts ?? []).some((artifact) => {
-  const payload = readAskTurnArtifactPayloadRecord(artifact);
-  const observation = artifact.kind === "live_environment_tool_observation"
+): boolean =>
+  (artifacts ?? []).some((artifact) => {
+    const payload = readAskTurnArtifactPayloadRecord(artifact);
+    const observation = artifact.kind === "live_environment_tool_observation"
     ? readAskTurnLiveEnvironmentObservationRecord(artifact)
     : payload;
-  const receipt = observation?.receipt && typeof observation.receipt === "object" && !Array.isArray(observation.receipt)
-    ? observation.receipt as Record<string, unknown>
-    : null;
-  const receiptStatus = readAskTurnString(receipt?.status);
-  return (
+    const receipt =
+      observation?.receipt && typeof observation.receipt === "object" && !Array.isArray(observation.receipt)
+        ? (observation.receipt as Record<string, unknown>)
+        : null;
+    const receiptStatus = readAskTurnString(receipt?.status);
+    return (
     readAskTurnString(observation?.schema) === "helix.interim_voice_callout_tool_result.v1" ||
     readAskTurnString(observation?.artifactId ?? observation?.artifact_id) === "live_source_interim_voice_callout_receipt" ||
     readAskTurnString(observation?.artifactId ?? observation?.artifact_id) === "voice_hold_receipt" ||
@@ -47701,7 +48327,7 @@ const hasInterimVoiceCalloutCompletionObservation = (
       "blocked_missing_text",
     ].includes(receiptStatus))
   );
-});
+  });
 
 const hasCurrentTurnLiveSourceMailboxObservation = (
   artifacts: HelixTurnArtifact[] | null | undefined,
@@ -48319,9 +48945,14 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
     if (!payload || payload.selected_for_answer === false) return false;
     return Array.isArray(payload.papers) && payload.papers.length > 0;
   };
-  const scholarlyFullTextEvidenceSatisfies = (payload: Record<string, unknown> | null | undefined): boolean => {
+  const scholarlyFullTextEvidenceSatisfies = (
+    payload: Record<string, unknown> | null | undefined,
+  ): boolean => {
     if (!payload || payload.selected_for_answer === false) return false;
-    return Array.isArray(payload.selected_chunks) && payload.selected_chunks.length > 0;
+    return (
+      Array.isArray(payload.selected_chunks) &&
+      payload.selected_chunks.length > 0
+    );
   };
   const internetSearchEvidenceSatisfies = (payload: Record<string, unknown> | null | undefined): boolean => {
     if (!payload || payload.selected_for_answer === false) return false;
@@ -48564,45 +49195,50 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
       return Boolean(actionKey && actionKey === selectedActionKey);
     }) ??
     (terminalContract.goal_kind === "docs_panel_open"
-      ? actionReceiptArtifacts.find((artifact) => artifact.kind === "workspace_action_receipt") ?? null
+      ? (actionReceiptArtifacts.find(
+          (artifact) => artifact.kind === "workspace_action_receipt",
+        ) ?? null)
       : null);
-  const requiredActions: HelixGoalSatisfactionEvaluation["required_actions"] =
-    (terminalContract.required_actions ?? []).map((requiredAction) => {
-      const receipt =
-        actionReceiptArtifacts.find((artifact) => actionKeyForArtifact(artifact) === requiredAction) ??
+  const requiredActions: HelixGoalSatisfactionEvaluation["required_actions"] = (terminalContract.required_actions ?? []).map((requiredAction) => {
+    const receipt =
+      actionReceiptArtifacts.find((artifact) => actionKeyForArtifact(artifact) === requiredAction) ??
         currentTurnArtifacts.find((artifact) => artifactMatchesRequiredAction(artifact, requiredAction)) ??
-        (terminalContract.goal_kind === "docs_panel_open" && requiredAction === "docs-viewer.open"
-          ? actionReceiptArtifacts.find((artifact) => artifact.kind === "workspace_action_receipt") ?? null
-          : null);
-      const terminalActionSatisfied =
+      (terminalContract.goal_kind === "docs_panel_open" && requiredAction === "docs-viewer.open"
+        ? (actionReceiptArtifacts.find(
+            (artifact) => artifact.kind === "workspace_action_receipt",
+          ) ?? null)
+        : null);
+    const terminalActionSatisfied =
         args.satisfactionReport.satisfied &&
         requiredAction === "situation-room.live-source.set_rate" &&
         ["live_pipeline_receipt", "visual_producer_cadence_receipt", "workspace_action_receipt"].includes(
           args.satisfactionReport.terminal_artifact_kind ?? "",
         );
-      const retrievalActionSatisfied =
+    const retrievalActionSatisfied =
         (terminalContract.goal_kind === "scholarly_research_lookup" ||
           terminalContract.goal_kind === "internet_search_lookup") &&
         Boolean(receipt);
-      const workspaceStatusActionSatisfied =
+    const workspaceStatusActionSatisfied =
         terminalContract.goal_kind === "workspace_status_diagnostic" &&
         Boolean(receipt);
-      const capabilityHelpActionSatisfied =
+    const capabilityHelpActionSatisfied =
         terminalContract.goal_kind === "capability_help" &&
         Boolean(receipt);
-      const theoryContextReflectionActionSatisfied =
+    const theoryContextReflectionActionSatisfied =
         terminalContract.goal_kind === "theory_context_reflection" &&
         Boolean(receipt);
-      const noteMutationActionSatisfied =
+    const noteMutationActionSatisfied =
         terminalContract.goal_kind === "note_mutation" &&
         Boolean(receipt);
-      const restoreViewStateActionSatisfied =
+    const restoreViewStateActionSatisfied =
         terminalContract.goal_kind === "panel_control" &&
         requiredAction === HELIX_WORKSTATION_RESTORE_VIEW_STATE_CAPABILITY &&
         Boolean(receipt);
-      const rawMailReadArtifact =
-        terminalContract.goal_kind === "live_source_processed_mail_interpretation" &&
-        (requiredAction === "live_env.check_live_source_mail" || requiredAction === "live_env.read_live_source_mail") &&
+    const rawMailReadArtifact =
+      (terminalContract.goal_kind ===
+        "live_source_processed_mail_interpretation" &&
+        (requiredAction === "live_env.check_live_source_mail" ||
+          requiredAction === "live_env.read_live_source_mail") &&
         currentTurnArtifacts.find((artifact) => {
           const artifactPayload = readAskTurnArtifactPayloadRecord(artifact);
           return (
@@ -48611,8 +49247,9 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
             artifactPayload?.ok !== false &&
             isStagePlayLiveSourceMailReadObservationArtifact(artifact)
           );
-        }) || null;
-      const processedMailReadReceiptExists =
+        })) ||
+      null;
+    const processedMailReadReceiptExists =
         terminalContract.goal_kind === "live_source_processed_mail_interpretation" &&
         requiredAction === "live_env.read_processed_live_source_mail" &&
         currentTurnArtifacts.some((artifact) => {
@@ -48623,23 +49260,23 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
             artifactPayload?.ok !== false
           );
         });
-      const processedMailPacketExists =
+    const processedMailPacketExists =
         terminalContract.goal_kind === "live_source_processed_mail_interpretation" &&
         requiredAction === "live_env.read_processed_live_source_mail" &&
         currentTurnArtifacts.some(artifactHasSatisfyingStagePlayProcessedMailPacket);
-      const processedMailReadActionSatisfied =
+    const processedMailReadActionSatisfied =
         terminalContract.goal_kind === "live_source_processed_mail_interpretation" &&
         requiredAction === "live_env.read_processed_live_source_mail" &&
         Boolean(receipt || (processedMailReadReceiptExists && processedMailPacketExists));
-      const rawMailReadActionSatisfied =
+    const rawMailReadActionSatisfied =
         terminalContract.goal_kind === "live_source_processed_mail_interpretation" &&
         (requiredAction === "live_env.check_live_source_mail" || requiredAction === "live_env.read_live_source_mail") &&
         Boolean(receipt || rawMailReadArtifact);
-      const docOpenBestPrerequisiteActionSatisfied =
+    const docOpenBestPrerequisiteActionSatisfied =
         terminalContract.goal_kind === "doc_open_best" &&
         Boolean(receipt) &&
         (requiredAction === "docs-viewer.search_docs" || requiredAction === "docs-viewer.validate_doc_candidates");
-      return {
+    return {
         action_key: requiredAction,
         required: true,
         satisfied: Boolean(
@@ -48678,7 +49315,7 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
             ? undefined
             : `${requiredTerminalKind ?? "workspace_action_receipt"}_missing_or_wrong_action`,
       };
-    });
+  });
   if (requiredActions.length === 0 && receiptActionArtifact) {
     const receiptActionKey = actionKeyForArtifact(receiptActionArtifact);
     requiredActions.push({
@@ -48727,15 +49364,17 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
           Boolean(payload.field_evaluation)
         )
     );
-  const requiredEvidence: HelixGoalSatisfactionEvaluation["required_evidence"] = evidenceRequirements.map((kind) => {
-    const matchingArtifact = currentTurnArtifacts.find((artifact) => {
-      const payload = readAskTurnArtifactPayloadRecord(artifact);
-      if (kind.endsWith("_coverage") && artifact.kind === kind) {
+  const requiredEvidence: HelixGoalSatisfactionEvaluation["required_evidence"] =
+    evidenceRequirements.map((kind) => {
+      const matchingArtifact =
+        currentTurnArtifacts.find((artifact) => {
+          const payload = readAskTurnArtifactPayloadRecord(artifact);
+          if (kind.endsWith("_coverage") && artifact.kind === kind) {
         return readAskTurnString(payload?.coverage) === "complete";
       }
-      if (artifact.kind === kind) return true;
-      if (kind === "active_doc_path" && artifact.kind === "active_doc_identity") return true;
-      if (
+          if (artifact.kind === kind) return true;
+          if (kind === "active_doc_path" && artifact.kind === "active_doc_identity") return true;
+          if (
         terminalContract.goal_kind === "doc_open_best" &&
         kind === "doc_candidate_validation" &&
         artifact.kind === "doc_open_receipt" &&
@@ -48743,20 +49382,31 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
       ) {
         return true;
       }
-      if (kind === "line_backed_locations" && ["doc_location_result", "doc_evidence_location", "doc_location_matches"].includes(artifact.kind)) {
-        const allowNoMatchLocation = !isAskTurnDocLocationCitationRequired(args.transcript);
-        return hasHelixLineBackedDocLocations(payload) || (allowNoMatchLocation && isHelixDocLocationNoMatchArtifact(artifact));
-      }
-      if (kind === "visual_observation" && isVisualEvidenceArtifactKind(artifact.kind)) {
+          if (
+            kind === "line_backed_locations" && ["doc_location_result", "doc_evidence_location", "doc_location_matches"].includes(artifact.kind)
+          ) {
+            const allowNoMatchLocation = !isAskTurnDocLocationCitationRequired(args.transcript);
+            return (
+              hasHelixLineBackedDocLocations(payload) ||
+              (allowNoMatchLocation &&
+                isHelixDocLocationNoMatchArtifact(artifact))
+            );
+          }
+          if (kind === "visual_observation" && isVisualEvidenceArtifactKind(artifact.kind)) {
         return hasVisualObservationEvidence(payload);
       }
-      if (kind === "field_evaluation" && isVisualEvidenceArtifactKind(artifact.kind)) {
+          if (kind === "field_evaluation" && isVisualEvidenceArtifactKind(artifact.kind)) {
         return hasFieldEvaluationEvidence(payload);
       }
-      if (kind === "selected_visual_evidence" && isVisualEvidenceArtifactKind(artifact.kind)) {
-        return hasVisualObservationEvidence(payload) || hasFieldEvaluationEvidence(payload);
-      }
-      if (kind === "live_control_receipt") {
+          if (
+            kind === "selected_visual_evidence" && isVisualEvidenceArtifactKind(artifact.kind)
+          ) {
+            return (
+              hasVisualObservationEvidence(payload) ||
+              hasFieldEvaluationEvidence(payload)
+            );
+          }
+          if (kind === "live_control_receipt") {
         const payloadText = JSON.stringify(payload ?? {});
         return (
           ["live_pipeline_receipt", "visual_producer_cadence_receipt", "workspace_action_receipt", "tool_observation"].includes(artifact.kind) &&
@@ -48766,7 +49416,7 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
           )
         );
       }
-      if (kind === "live_environment_binding_diagnosis") {
+          if (kind === "live_environment_binding_diagnosis") {
         return (
           artifact.kind === "live_environment_binding_diagnosis" ||
           (
@@ -48775,56 +49425,72 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
           )
         );
       }
-      if (kind === "live_environment_tool_observation" && artifact.kind === "live_environment_tool_observation") {
-        return readAskTurnString(payload?.schema) === "helix.live_environment_tool_observation.v1";
-      }
-      if (kind === "stage_play_processed_mail_packet" || kind === "processed_mail_packet") {
+          if (
+            kind === "live_environment_tool_observation" && artifact.kind === "live_environment_tool_observation"
+          ) {
+            return (
+              readAskTurnString(payload?.schema) ===
+              "helix.live_environment_tool_observation.v1"
+            );
+          }
+          if (kind === "stage_play_processed_mail_packet" || kind === "processed_mail_packet") {
         return artifactHasSatisfyingStagePlayProcessedMailPacket(artifact);
       }
-      if (kind === "live_source_decision_or_checkpoint_summary") {
-        if (isStagePlayLiveSourceMailDecisionObservationArtifact(artifact)) return true;
-        return processedMailPacketAllowsDirectCheckpoint && artifactHasSatisfyingStagePlayProcessedMailPacket(artifact);
-      }
-      if (kind === "loop_state") {
+          if (kind === "live_source_decision_or_checkpoint_summary") {
+            if (isStagePlayLiveSourceMailDecisionObservationArtifact(artifact)) return true;
+            return (
+              processedMailPacketAllowsDirectCheckpoint &&
+              artifactHasSatisfyingStagePlayProcessedMailPacket(artifact)
+            );
+          }
+          if (kind === "loop_state") {
         return artifactHasStagePlayLiveSourceLoopState(artifact);
       }
-      if (kind === "stage_play_live_source_mail_decision" && artifact.kind === "live_environment_tool_observation") {
-        const observation = payload?.observation;
-        const observationRecord = observation && typeof observation === "object" && !Array.isArray(observation)
-          ? observation as Record<string, unknown>
-          : null;
-        return (
+          if (
+            kind === "stage_play_live_source_mail_decision" && artifact.kind === "live_environment_tool_observation"
+          ) {
+            const observation = payload?.observation;
+            const observationRecord =
+              observation && typeof observation === "object" && !Array.isArray(observation)
+                ? (observation as Record<string, unknown>)
+                : null;
+            return (
           readAskTurnString(observationRecord?.artifactId) === "stage_play_live_source_mail_decision" ||
           readAskTurnString(observationRecord?.schemaVersion) === "stage_play_live_source_mail_decision/v1" ||
           Boolean(readAskTurnString(observationRecord?.decisionId))
         );
-      }
-      if (kind === "stage_play_live_source_watch_job_policy" && artifact.kind === "live_environment_tool_observation") {
+          }
+          if (kind === "stage_play_live_source_watch_job_policy" && artifact.kind === "live_environment_tool_observation") {
         return isStagePlayLiveSourceWatchJobPolicyObservationArtifact(artifact);
       }
-      if (kind === "scholarly_research_observation" || kind === "scholarly_full_text_observation") {
+          if (kind === "scholarly_research_observation" || kind === "scholarly_full_text_observation") {
         return scholarlyEvidenceSatisfiesKind(kind, artifact, payload);
       }
-      if (kind === "internet_search_observation" && artifact.kind === "internet_search_observation") {
+          if (kind === "internet_search_observation" && artifact.kind === "internet_search_observation") {
         return internetSearchEvidenceSatisfies(payload);
       }
-      if (kind === "workspace_os_status_observation" && artifact.kind === "workspace_os_status_observation") {
-        return readAskTurnString(payload?.schema) === "helix.workspace_os_status_observation.v1";
-      }
-      if (kind === "capability_registry" && artifact.kind === "capability_registry") {
+          if (
+            kind === "workspace_os_status_observation" && artifact.kind === "workspace_os_status_observation"
+          ) {
+            return (
+              readAskTurnString(payload?.schema) ===
+              "helix.workspace_os_status_observation.v1"
+            );
+          }
+          if (kind === "capability_registry" && artifact.kind === "capability_registry") {
         return true;
       }
-      if (
+          if (
         kind === "helix_theory_context_reflection_tool_receipt" &&
         artifact.kind === "helix_theory_context_reflection_tool_receipt"
       ) {
         return true;
       }
-      if (kind === "debug_evidence" && ["debug_evidence_diagnosis", "typed_failure"].includes(artifact.kind)) return true;
-      return false;
-    }) ?? null;
-    const matchingPayload = matchingArtifact ? readAskTurnArtifactPayloadRecord(matchingArtifact) : null;
-    const terminalKindSatisfies =
+          if (kind === "debug_evidence" && ["debug_evidence_diagnosis", "typed_failure"].includes(artifact.kind)) return true;
+          return false;
+        }) ?? null;
+      const matchingPayload = matchingArtifact ? readAskTurnArtifactPayloadRecord(matchingArtifact) : null;
+      const terminalKindSatisfies =
       args.satisfactionReport.satisfied &&
       Boolean(args.satisfactionReport.terminal_artifact_kind) &&
       (args.satisfactionReport.terminal_artifact_kind === kind ||
@@ -48848,7 +49514,7 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
         (kind === "live_source_decision_or_checkpoint_summary" &&
           args.satisfactionReport.terminal_artifact_kind === "model_synthesized_answer" &&
           processedMailPacketAllowsDirectCheckpoint));
-    const matchingArtifactSatisfiesEvidence =
+      const matchingArtifactSatisfiesEvidence =
       kind === "line_backed_locations"
         ? Boolean(matchingArtifact)
       : kind === "live_environment_tool_observation"
@@ -48909,20 +49575,20 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
           (kind === "note_update_receipt" || kind === "note_action_receipt")
         ? Boolean(matchingArtifact)
         : Boolean(matchingArtifact && args.satisfactionReport.satisfied);
-    return {
-      kind,
-      required: true,
-      satisfied: Boolean(terminalKindSatisfies || matchingArtifactSatisfiesEvidence),
-      evidence_ref:
+      return {
+        kind,
+        required: true,
+        satisfied: Boolean(terminalKindSatisfies || matchingArtifactSatisfiesEvidence),
+        evidence_ref:
         terminalKindSatisfies
           ? args.satisfactionReport.terminal_artifact_id
           : matchingArtifact?.artifact_id,
-      failure_reason:
-        terminalKindSatisfies || matchingArtifactSatisfiesEvidence
-          ? undefined
-          : args.satisfactionReport.missing_reason ?? `missing:${kind}`,
-    };
-  });
+        failure_reason:
+          terminalKindSatisfies || matchingArtifactSatisfiesEvidence
+            ? undefined
+            : (args.satisfactionReport.missing_reason ?? `missing:${kind}`),
+      };
+    });
   const observedResults: HelixGoalSatisfactionEvaluation["observed_results"] = currentTurnArtifacts.map((artifact) => {
     const payload = readAskTurnArtifactPayloadRecord(artifact);
     const status = readAskTurnString(payload?.status) ?? (artifact.kind === "typed_failure" ? "failed" : "observed");
@@ -49001,11 +49667,16 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
     if (!payload || payload.ok === false) return false;
     return payload.observation !== null && payload.observation !== undefined;
   });
-  const successfulWorkspaceOsStatusObservation = currentTurnArtifacts.some((artifact) => {
-    if (artifact.kind !== "workspace_os_status_observation") return false;
-    const payload = readAskTurnArtifactPayloadRecord(artifact);
-    return readAskTurnString(payload?.schema) === "helix.workspace_os_status_observation.v1";
-  });
+  const successfulWorkspaceOsStatusObservation = currentTurnArtifacts.some(
+    (artifact) => {
+      if (artifact.kind !== "workspace_os_status_observation") return false;
+      const payload = readAskTurnArtifactPayloadRecord(artifact);
+      return (
+        readAskTurnString(payload?.schema) ===
+        "helix.workspace_os_status_observation.v1"
+      );
+    },
+  );
   const docLocationEvidenceOnlySatisfied =
     terminalContract.goal_kind === "doc_evidence_location" &&
     requiredActions.length === 0 &&
@@ -49175,10 +49846,24 @@ const readHelixRouteCoverageActionKey = (artifact: HelixTurnArtifact): string | 
   return targetId && actionId ? `${targetId}.${actionId}` : null;
 };
 
-const isHelixRouteCoverageCompletedStatus = (artifact: HelixTurnArtifact): boolean => {
+const isHelixRouteCoverageCompletedStatus = (
+  artifact: HelixTurnArtifact,
+): boolean => {
   const payload = readAskTurnArtifactPayloadRecord(artifact);
   const status = (readAskTurnString(payload?.status) ?? "").toLowerCase();
-  return !status || ["completed", "complete", "succeeded", "success", "ok", "opened", "created", "appended"].includes(status);
+  return (
+    !status ||
+    [
+      "completed",
+      "complete",
+      "succeeded",
+      "success",
+      "ok",
+      "opened",
+      "created",
+      "appended",
+    ].includes(status)
+  );
 };
 
 const isHelixRouteCoverageLiveControlReceipt = (artifact: HelixTurnArtifact): boolean => {
@@ -49408,7 +50093,11 @@ const buildHelixRouteCoveragePayload = (args: {
     ) ?? null;
     const allowNoMatchLocation = !isAskTurnDocLocationCitationRequired(args.transcript);
     const noMatch = allowNoMatchLocation
-      ? artifacts.find((artifact) => isHelixTypedNoMatchArtifact(artifact) || isHelixDocLocationNoMatchArtifact(artifact)) ?? null
+      ? (artifacts.find(
+          (artifact) =>
+            isHelixTypedNoMatchArtifact(artifact) ||
+            isHelixDocLocationNoMatchArtifact(artifact),
+        ) ?? null)
       : null;
     const terminalLocationSatisfied =
       args.satisfactionReport.satisfied &&
@@ -49546,8 +50235,13 @@ const refreshHelixGoalSatisfactionEvaluationArtifact = (args: {
         "agent_step_authority_check",
         "available_capabilities",
       ];
-      return !refreshManagedKinds.includes(artifact.kind) &&
-        !(artifact.kind === "agent_step_decision" && artifact.artifact_id === `${args.turnId}:agent_step_decision`);
+      return (
+        !refreshManagedKinds.includes(artifact.kind) &&
+        !(
+          artifact.kind === "agent_step_decision" &&
+          artifact.artifact_id === `${args.turnId}:agent_step_decision`
+        )
+      );
     },
   );
   const routeCoverageArtifacts = buildHelixRouteCoverageArtifacts({
@@ -50810,7 +51504,7 @@ const buildHelixRuntimeToolCallFromDecision = (args: {
     if (capabilityKey !== HELIX_INTERNET_SEARCH_CAPABILITY) return selectedArgsWithDefaults;
     const base =
       selectedArgsWithDefaults && typeof selectedArgsWithDefaults === "object" && !Array.isArray(selectedArgsWithDefaults)
-        ? selectedArgsWithDefaults as Record<string, unknown>
+        ? (selectedArgsWithDefaults as Record<string, unknown>)
         : {};
     const query =
       readAskTurnString(base.query) ??
@@ -50824,7 +51518,7 @@ const buildHelixRuntimeToolCallFromDecision = (args: {
     if (!capabilityKey.startsWith("live_env.")) return selectedArgsWithRetrievalDefaults;
     const base =
       selectedArgsWithRetrievalDefaults && typeof selectedArgsWithRetrievalDefaults === "object" && !Array.isArray(selectedArgsWithRetrievalDefaults)
-        ? selectedArgsWithRetrievalDefaults as Record<string, unknown>
+        ? (selectedArgsWithRetrievalDefaults as Record<string, unknown>)
         : {};
     if (capabilityKey === "live_env.request_interim_voice_callout") {
       const voiceIntent = classifyAskTurnVoiceOutputIntent(args.transcript);
@@ -51383,7 +52077,7 @@ const buildHelixRuntimeToolCallFromDecision = (args: {
       : [];
     const packetSalience =
       latestProcessedPacket?.salience && typeof latestProcessedPacket.salience === "object" && !Array.isArray(latestProcessedPacket.salience)
-        ? latestProcessedPacket.salience as Record<string, unknown>
+        ? (latestProcessedPacket.salience as Record<string, unknown>)
         : null;
     const packetVoiceCandidate = packetSalience?.voiceCandidate === true || packetSalience?.voice_candidate === true;
     const packetCalloutDraft =
@@ -51393,28 +52087,33 @@ const buildHelixRuntimeToolCallFromDecision = (args: {
     const comparisonRecommendedDecision =
       readAskTurnString(latestProfileComparison?.recommendedDecision ?? latestProfileComparison?.recommended_decision) ?? null;
     const comparisonMatchedCriteria = Array.isArray(latestProfileComparison?.matchedCriteria ?? latestProfileComparison?.matched_criteria)
-      ? (latestProfileComparison?.matchedCriteria ?? latestProfileComparison?.matched_criteria) as unknown[]
+      ? ((latestProfileComparison?.matchedCriteria ??
+          latestProfileComparison?.matched_criteria) as unknown[])
       : [];
     const comparisonSuppressedCriteria = Array.isArray(latestProfileComparison?.suppressedCriteria ?? latestProfileComparison?.suppressed_criteria)
-      ? (latestProfileComparison?.suppressedCriteria ?? latestProfileComparison?.suppressed_criteria) as unknown[]
+      ? ((latestProfileComparison?.suppressedCriteria ??
+          latestProfileComparison?.suppressed_criteria) as unknown[])
       : [];
     const comparisonObservedFacts = Array.isArray(latestProfileComparison?.observedFacts ?? latestProfileComparison?.observed_facts)
-      ? (latestProfileComparison?.observedFacts ?? latestProfileComparison?.observed_facts) as unknown[]
+      ? ((latestProfileComparison?.observedFacts ??
+          latestProfileComparison?.observed_facts) as unknown[])
       : [];
     const comparisonInferredMeaning = Array.isArray(latestProfileComparison?.inferredMeaning ?? latestProfileComparison?.inferred_meaning)
-      ? (latestProfileComparison?.inferredMeaning ?? latestProfileComparison?.inferred_meaning) as unknown[]
+      ? ((latestProfileComparison?.inferredMeaning ??
+          latestProfileComparison?.inferred_meaning) as unknown[])
       : [];
     const comparisonId = readAskTurnString(latestProfileComparison?.comparisonId ?? latestProfileComparison?.comparison_id);
     const comparisonProfileId = readAskTurnString(latestProfileComparison?.profileId ?? latestProfileComparison?.profile_id);
     const packetJobId = readAskTurnString(latestProcessedPacket?.jobId ?? latestProcessedPacket?.job_id);
     const artifactWatchPolicy = latestStagePlayLiveSourceWatchJobPolicy(args.currentTurnArtifacts);
-    const packetWatchPolicy = !artifactWatchPolicy && packetJobId
-      ? listStagePlayLiveSourceWatchJobPolicies({
-          threadId: args.threadId,
-          jobId: packetJobId,
-          limit: 1,
-        }).at(-1) ?? null
-      : null;
+    const packetWatchPolicy =
+      !artifactWatchPolicy && packetJobId
+        ? (listStagePlayLiveSourceWatchJobPolicies({
+            threadId: args.threadId,
+            jobId: packetJobId,
+            limit: 1,
+          }).at(-1) ?? null)
+        : null;
     const activeWatchPolicy = artifactWatchPolicy ?? packetWatchPolicy;
     const activeInterpretationMode =
       readAskTurnString(activeWatchPolicy?.interpretationMode ?? activeWatchPolicy?.interpretation_mode) ?? null;
@@ -51422,9 +52121,9 @@ const buildHelixRuntimeToolCallFromDecision = (args: {
       readAskTurnString(activeWatchPolicy?.outputCadence ?? activeWatchPolicy?.output_cadence) ?? null;
     const activeOutputPolicy =
       activeWatchPolicy?.outputPolicy && typeof activeWatchPolicy.outputPolicy === "object" && !Array.isArray(activeWatchPolicy.outputPolicy)
-        ? activeWatchPolicy.outputPolicy as Record<string, unknown>
+        ? (activeWatchPolicy.outputPolicy as Record<string, unknown>)
         : activeWatchPolicy?.output_policy && typeof activeWatchPolicy.output_policy === "object" && !Array.isArray(activeWatchPolicy.output_policy)
-          ? activeWatchPolicy.output_policy as Record<string, unknown>
+          ? (activeWatchPolicy.output_policy as Record<string, unknown>)
           : null;
     const activeObjective = readAskTurnString(readObservation?.activeObjective ?? readObservation?.active_objective);
     const outputIntent = detectLiveSourceMailOutputIntent(args.transcript);
@@ -51540,11 +52239,15 @@ const buildHelixRuntimeToolCallFromDecision = (args: {
         ? `The processed visual mail shows ${packetObservedFacts.slice(0, 2).join("; ")}.`
       : null;
     const defaultVoiceCalloutDraft = shouldRequestVoiceCallout
-      ? voiceCandidate.draft ?? buildStagePlayMailBatchTextAnswerDraft(items).replace(/^The latest visual-summary mail reports\s+/i, "")
+      ? (voiceCandidate.draft ??
+        buildStagePlayMailBatchTextAnswerDraft(items).replace(
+          /^The latest visual-summary mail reports\s+/i,
+          "",
+        ))
       : null;
     const baseInterpretation =
       base.interpretation && typeof base.interpretation === "object" && !Array.isArray(base.interpretation)
-        ? base.interpretation as Record<string, unknown>
+        ? (base.interpretation as Record<string, unknown>)
         : null;
     const defaultInterpretation = shouldRecordInterpretation || defaultDecision === "record_interpretation"
       ? packetsForDecision.length > 0
@@ -51574,7 +52277,7 @@ const buildHelixRuntimeToolCallFromDecision = (args: {
       : null;
     const baseTextAnswerDraft = readAskTurnString(base.text_answer_draft) ?? readAskTurnString(base.textAnswerDraft);
     const textAnswerDraft = shouldDraftTextAnswer
-      ? baseTextAnswerDraft ?? defaultTextAnswerDraft
+      ? (baseTextAnswerDraft ?? defaultTextAnswerDraft)
       : shouldRecordInterpretation
         ? null
         : baseTextAnswerDraft;
@@ -51675,13 +52378,14 @@ const buildHelixRuntimeToolCallFromDecision = (args: {
   const selectedArgsWithWorkspaceDirectoryDefaults =
     capabilityKey === HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY
       ? {
-          ...(
-            selectedArgsWithLiveSourceMailDefaults &&
+          ...(selectedArgsWithLiveSourceMailDefaults &&
             typeof selectedArgsWithLiveSourceMailDefaults === "object" &&
             !Array.isArray(selectedArgsWithLiveSourceMailDefaults)
-              ? selectedArgsWithLiveSourceMailDefaults as Record<string, unknown>
-              : {}
-          ),
+            ? (selectedArgsWithLiveSourceMailDefaults as Record<
+                string,
+                unknown
+              >)
+            : {}),
           query:
             readAskTurnString((selectedArgsWithLiveSourceMailDefaults as Record<string, unknown> | null)?.query) ??
             readAskTurnString((selectedArgsWithLiveSourceMailDefaults as Record<string, unknown> | null)?.uri) ??
@@ -51692,14 +52396,18 @@ const buildHelixRuntimeToolCallFromDecision = (args: {
             : ["doc", "panel", "path"],
         }
       : selectedArgsWithLiveSourceMailDefaults;
-  const selectedArgsWithRuntimeRepairs = normalizeHelixRuntimeToolArgsForCapability(
-    capabilityKey,
-    selectedArgsWithWorkspaceDirectoryDefaults &&
+  const selectedArgsWithRuntimeRepairs =
+    normalizeHelixRuntimeToolArgsForCapability(
+      capabilityKey,
+      selectedArgsWithWorkspaceDirectoryDefaults &&
       typeof selectedArgsWithWorkspaceDirectoryDefaults === "object" &&
       !Array.isArray(selectedArgsWithWorkspaceDirectoryDefaults)
-      ? selectedArgsWithWorkspaceDirectoryDefaults as Record<string, unknown>
-      : {},
-  );
+        ? (selectedArgsWithWorkspaceDirectoryDefaults as Record<
+            string,
+            unknown
+          >)
+        : {},
+    );
   return {
     schema: "helix.runtime_tool_call.v1",
     turn_id: args.turnId,
@@ -51831,8 +52539,11 @@ const contextualSuppressionBlocksRuntimeCapability = (
 ): boolean => {
   if (!suppression || capabilityKey === "model.direct_answer") return false;
   const families = helixRuntimeToolAdmissionFamiliesForCapability(capabilityKey);
-  return families.length > 0 && families.every((family) =>
-    contextualToolSuppressionBlocksFamily(suppression, family),
+  return (
+    families.length > 0 &&
+    families.every((family) =>
+      contextualToolSuppressionBlocksFamily(suppression, family),
+    )
   );
 };
 
@@ -51896,9 +52607,10 @@ const validateHelixRuntimeToolCall = (args: {
     args.availableCapabilities.contextual_tool_suppression &&
     typeof args.availableCapabilities.contextual_tool_suppression === "object" &&
     !Array.isArray(args.availableCapabilities.contextual_tool_suppression)
-      ? args.availableCapabilities.contextual_tool_suppression as unknown as HelixContextualToolAdmissionSuppression & {
+      ? (args.availableCapabilities
+          .contextual_tool_suppression as unknown as HelixContextualToolAdmissionSuppression & {
           blocked_capability_keys?: unknown;
-        }
+        })
       : null;
   const contextualSuppressionBlockedCapabilityKeys = new Set(
     Array.isArray(contextualSuppressionRecord?.blocked_capability_keys)
@@ -52278,7 +52990,7 @@ const appendCompoundSubgoalInvalidArgsTypedFailure = (args: {
   args.payload.typed_failure = typedFailurePayload;
   args.payload.terminal_presentation = {
     ...(args.payload.terminal_presentation && typeof args.payload.terminal_presentation === "object" && !Array.isArray(args.payload.terminal_presentation)
-      ? args.payload.terminal_presentation as Record<string, unknown>
+      ? (args.payload.terminal_presentation as Record<string, unknown>)
       : {}),
     schema: "helix.terminal_presentation.v1",
     turn_id: args.turnId,
@@ -52515,7 +53227,9 @@ const hasAskTurnDocumentInternalLookupCue = (prompt: string): boolean => {
   );
 };
 
-const isAskTurnWorkspaceObjectLocationDiscoveryPrompt = (prompt: string): boolean => {
+const isAskTurnWorkspaceObjectLocationDiscoveryPrompt = (
+  prompt: string,
+): boolean => {
   const text = prompt.trim();
   if (!text || hasAskTurnDocumentInternalLookupCue(text)) return false;
   const retrievalAction =
@@ -52525,7 +53239,12 @@ const isAskTurnWorkspaceObjectLocationDiscoveryPrompt = (prompt: string): boolea
   const namedSubjectCue =
     /\b[A-Z][A-Z0-9-]{2,}\b/.test(text) ||
     /\b[A-Z][A-Za-z0-9-]{2,}\s+(?:theory|spec|design|paper|doc|report|memo|file)\b/.test(text);
-  return retrievalAction && (workspaceObjectCue || namedSubjectCue || hasUnknownSourceArtifactDiscoveryIntent(text));
+  return (
+    retrievalAction &&
+    (workspaceObjectCue ||
+      namedSubjectCue ||
+      hasUnknownSourceArtifactDiscoveryIntent(text))
+  );
 };
 
 const hasHelixDocSearchObservation = (artifacts?: HelixTurnArtifact[] | null): boolean =>
@@ -52967,7 +53686,8 @@ const appendHelixPostToolObservationReview = async (args: {
     typeof args.payload.agent_continuation_state === "object" &&
     !Array.isArray(args.payload.agent_continuation_state) &&
     (args.payload.agent_continuation_state as Record<string, unknown>).schema === "helix.agent_continuation_state.v1"
-      ? args.payload.agent_continuation_state as unknown as HelixAgentContinuationState
+      ? (args.payload
+          .agent_continuation_state as unknown as HelixAgentContinuationState)
       : null;
   const continuationState = buildHelixAgentContinuationState({
     payload: args.payload,
@@ -53005,7 +53725,7 @@ const appendHelixPostToolObservationReview = async (args: {
   return {
     review,
     artifacts: Array.isArray(args.payload.current_turn_artifact_ledger)
-      ? args.payload.current_turn_artifact_ledger as HelixTurnArtifact[]
+      ? (args.payload.current_turn_artifact_ledger as HelixTurnArtifact[])
       : mergeAskTurnLedgerArtifacts([...args.currentTurnArtifacts, artifact]),
   };
 };
@@ -53129,7 +53849,8 @@ const resolveHelixAgentStepActionForCapability = (args: {
         argString("query", "term", "text") ??
         locateQuery ??
         (hasUnknownSourceArtifactDiscoveryIntent(args.transcript)
-          ? resolveAskTurnOpenDocSearchQueryArg(args.transcript) ?? args.transcript.trim()
+          ? (resolveAskTurnOpenDocSearchQueryArg(args.transcript) ??
+            args.transcript.trim())
           : null);
       const path =
         normalizeAskTurnWorkspaceDocPath(argString("path", "doc_path")) ??
@@ -53149,9 +53870,13 @@ const resolveHelixAgentStepActionForCapability = (args: {
         : null;
     }
     case "live-source.set_rate":
-      return selectedActionKey === "live-source.set_rate" ? args.selectedAction ?? null : null;
+      return selectedActionKey === "live-source.set_rate"
+        ? (args.selectedAction ?? null)
+        : null;
     case "live-source.status":
-      return selectedActionKey === "live-source.status" ? args.selectedAction ?? null : null;
+      return selectedActionKey === "live-source.status"
+        ? (args.selectedAction ?? null)
+        : null;
     case "scientific-calculator.open":
       return { panel_id: "scientific-calculator", action_id: "open", args: {} };
     case "scientific-calculator.solve_expression":
@@ -53186,7 +53911,7 @@ const resolveHelixAgentStepActionForCapability = (args: {
       return { panel_id: "workstation-notes", action_id: "open", args: {} };
     case "workstation-notes.create":
       return selectedActionKey === "workstation-notes.create"
-        ? args.selectedAction ?? null
+        ? (args.selectedAction ?? null)
         : { panel_id: "workstation-notes", action_id: "create_note", args: { title: argString("title") ?? "Helix Ask Note", text: argString("text", "body", "content") ?? "" } };
     case "workstation-notes.append":
       if (selectedActionKey === "workstation-notes.append") return args.selectedAction ?? null;
@@ -53261,25 +53986,28 @@ const buildHelixAvailableCapabilitiesArtifact = (args: {
   const primaryKeys = new Set<string>();
   const possibleKeys = new Set<string>();
   const forbiddenKeys = new Set<string>();
-  const artifactForcedCapabilityKeys = uniqueAskTurnStrings((args.artifacts ?? []).flatMap((artifact) => {
-    const payload = readAskTurnArtifactPayloadRecord(artifact);
-    const contract =
-      artifact.kind === "compound_capability_contract"
-        ? payload
-        : payload?.compound_capability_contract && typeof payload.compound_capability_contract === "object" && !Array.isArray(payload.compound_capability_contract)
-          ? payload.compound_capability_contract as Record<string, unknown>
-          : null;
-    const subgoals = Array.isArray(contract?.subgoals) ? contract.subgoals : [];
-    return subgoals.flatMap((entry) => {
-      const record = entry && typeof entry === "object" && !Array.isArray(entry)
-        ? entry as Record<string, unknown>
-        : null;
-      return [
+  const artifactForcedCapabilityKeys = uniqueAskTurnStrings(
+    (args.artifacts ?? []).flatMap((artifact) => {
+      const payload = readAskTurnArtifactPayloadRecord(artifact);
+      const contract =
+        artifact.kind === "compound_capability_contract"
+          ? payload
+          : payload?.compound_capability_contract && typeof payload.compound_capability_contract === "object" && !Array.isArray(payload.compound_capability_contract)
+            ? (payload.compound_capability_contract as Record<string, unknown>)
+            : null;
+      const subgoals = Array.isArray(contract?.subgoals) ? contract.subgoals : [];
+      return subgoals.flatMap((entry) => {
+        const record =
+          entry && typeof entry === "object" && !Array.isArray(entry)
+            ? (entry as Record<string, unknown>)
+            : null;
+        return [
         readAskTurnString(record?.runtime_capability),
         readAskTurnString(record?.requested_capability),
       ];
-    });
-  }));
+      });
+    }),
+  );
   const forcedCapabilityKeys = new Set(uniqueAskTurnStrings([
     ...(args.forcedCapabilityKeys ?? []),
     ...artifactForcedCapabilityKeys,
@@ -53314,7 +54042,10 @@ const buildHelixAvailableCapabilitiesArtifact = (args: {
     docsContinuationDecision?.docs_continuation_contract &&
     typeof docsContinuationDecision.docs_continuation_contract === "object" &&
     !Array.isArray(docsContinuationDecision.docs_continuation_contract)
-      ? docsContinuationDecision.docs_continuation_contract as Record<string, unknown>
+      ? (docsContinuationDecision.docs_continuation_contract as Record<
+          string,
+          unknown
+        >)
       : null;
   const docsRequiredNextCapability = readAskTurnString(docsContinuationContract?.required_next_capability);
   const docsForbiddenRepeatedCapabilities = Array.isArray(docsContinuationContract?.forbidden_repeated_capabilities)
@@ -55136,10 +55867,16 @@ const buildHelixAvailableCapabilitiesArtifact = (args: {
   const possibleCatalogRecommendation = catalog.find((capability) => capability.goal_fit === "possible")?.capability_key ?? null;
   const recommended =
     workstationToolPlan.intent === "narrator_debug_probe"
-      ? primaryCatalogRecommendation ?? selectedActionCapability ?? possibleCatalogRecommendation
+      ? (primaryCatalogRecommendation ??
+        selectedActionCapability ??
+        possibleCatalogRecommendation)
       : goalKind === "live_environment_review"
-      ? primaryCatalogRecommendation ?? selectedActionCapability ?? possibleCatalogRecommendation
-      : selectedActionCapability ?? primaryCatalogRecommendation ?? possibleCatalogRecommendation;
+        ? (primaryCatalogRecommendation ??
+          selectedActionCapability ??
+          possibleCatalogRecommendation)
+        : (selectedActionCapability ??
+          primaryCatalogRecommendation ??
+          possibleCatalogRecommendation);
   return {
     schema: "helix.available_capabilities.v1",
     turn_id: args.turnId,
@@ -55258,13 +55995,14 @@ const buildHelixAgentStepDecisionArtifact = (args: {
       : null;
   const docsContinuationContract =
     args.availableCapabilities.docs_continuation_contract ??
-    (
-      docsContinuationDecision?.docs_continuation_contract &&
+    (docsContinuationDecision?.docs_continuation_contract &&
       typeof docsContinuationDecision.docs_continuation_contract === "object" &&
       !Array.isArray(docsContinuationDecision.docs_continuation_contract)
-        ? docsContinuationDecision.docs_continuation_contract as Record<string, unknown>
-        : null
-    );
+      ? (docsContinuationDecision.docs_continuation_contract as Record<
+          string,
+          unknown
+        >)
+      : null);
   const docsRequiredNextCapability = readAskTurnString(docsContinuationContract?.required_next_capability);
   const docsContinuationAction =
     docsContinuationDecision?.recommended_capability_hint?.suggested_action &&
@@ -55275,7 +56013,7 @@ const buildHelixAgentStepDecisionArtifact = (args: {
     docsContinuationAction?.args &&
     typeof docsContinuationAction.args === "object" &&
     !Array.isArray(docsContinuationAction.args)
-      ? docsContinuationAction.args as Record<string, unknown>
+      ? (docsContinuationAction.args as Record<string, unknown>)
       : null;
   const repoEvidenceGoalNeedsSearch =
     (args.canonicalGoalFrame.goal_kind === "repo_code_evidence_question" ||
@@ -55313,39 +56051,43 @@ const buildHelixAgentStepDecisionArtifact = (args: {
     itineraryContinuationRequired
       ? capabilityItineraryExecutionState.next_missing_family
       : null;
-  const nextMissingItineraryCapability =
-    nextMissingItineraryFamily
-      ? args.availableCapabilities.capabilities.find((capability) =>
+  const nextMissingItineraryCapability = nextMissingItineraryFamily
+    ? (args.availableCapabilities.capabilities.find(
+        (capability) =>
           capability.requires_action &&
           capability.goal_fit !== "forbidden" &&
           capability.availability !== "permission_denied" &&
           capability.availability !== "not_available" &&
-          helixRuntimeToolAdmissionFamiliesForCapability(capability.capability_key).includes(
+          helixRuntimeToolAdmissionFamiliesForCapability(
+            capability.capability_key,
+          ).includes(
             nextMissingItineraryFamily as HelixToolCallAdmissionFamily,
           ),
-        )?.capability_key ?? null
-      : null;
+      )?.capability_key ?? null)
+    : null;
   const nextMissingItinerarySubgoal =
     capabilityItineraryExecutionState.next_missing_subgoal_id
-      ? capabilityItineraryExecutionState.compound_subgoal_ledger.find((entry) =>
-          readAskTurnString(entry.subgoal_id) === capabilityItineraryExecutionState.next_missing_subgoal_id,
-        ) ?? null
-      : capabilityItineraryExecutionState.compound_subgoal_ledger.find((entry) =>
-          readAskTurnString(entry.satisfaction) !== "satisfied",
-        ) ?? null;
+      ? (capabilityItineraryExecutionState.compound_subgoal_ledger.find(
+          (entry) =>
+            readAskTurnString(entry.subgoal_id) ===
+            capabilityItineraryExecutionState.next_missing_subgoal_id,
+        ) ?? null)
+      : (capabilityItineraryExecutionState.compound_subgoal_ledger.find(
+          (entry) => readAskTurnString(entry.satisfaction) !== "satisfied",
+        ) ?? null);
   const nextMissingItineraryActionArgs =
     nextMissingItinerarySubgoal?.bound_args &&
     typeof nextMissingItinerarySubgoal.bound_args === "object" &&
     !Array.isArray(nextMissingItinerarySubgoal.bound_args)
-      ? nextMissingItinerarySubgoal.bound_args as Record<string, unknown>
+      ? (nextMissingItinerarySubgoal.bound_args as Record<string, unknown>)
       : nextMissingItinerarySubgoal?.selected_args &&
         typeof nextMissingItinerarySubgoal.selected_args === "object" &&
         !Array.isArray(nextMissingItinerarySubgoal.selected_args)
-        ? nextMissingItinerarySubgoal.selected_args as Record<string, unknown>
+        ? (nextMissingItinerarySubgoal.selected_args as Record<string, unknown>)
         : nextMissingItinerarySubgoal?.args &&
           typeof nextMissingItinerarySubgoal.args === "object" &&
           !Array.isArray(nextMissingItinerarySubgoal.args)
-          ? nextMissingItinerarySubgoal.args as Record<string, unknown>
+          ? (nextMissingItinerarySubgoal.args as Record<string, unknown>)
           : null;
   const itineraryContinuationBlocked =
     itineraryContinuationRequired &&
@@ -55363,11 +56105,16 @@ const buildHelixAgentStepDecisionArtifact = (args: {
   const liveEnvironmentGoalNeedsEvidence =
     args.canonicalGoalFrame.goal_kind === "live_environment_review" &&
     args.goalSatisfactionEvaluation?.satisfaction !== "satisfied";
-  const hasInterimVoiceCalloutObservation = (args.artifacts ?? []).some((artifact) => {
-    if (artifact.kind !== "live_environment_tool_observation") return false;
-    const payload = readAskTurnArtifactPayloadRecord(artifact);
-    return readAskTurnString(payload?.tool_name) === "live_env.request_interim_voice_callout";
-  });
+  const hasInterimVoiceCalloutObservation = (args.artifacts ?? []).some(
+    (artifact) => {
+      if (artifact.kind !== "live_environment_tool_observation") return false;
+      const payload = readAskTurnArtifactPayloadRecord(artifact);
+      return (
+        readAskTurnString(payload?.tool_name) ===
+        "live_env.request_interim_voice_callout"
+      );
+    },
+  );
   const voiceOutputInterimCalloutGoalNeedsTool =
     args.canonicalGoalFrame.goal_kind === "live_environment_review" &&
     !isAskTurnLiveSourceMailLoopIntent(args.transcript) &&
@@ -55400,43 +56147,47 @@ const buildHelixAgentStepDecisionArtifact = (args: {
       ? null
       : itineraryContinuationBlocked
         ? null
-      : voiceOutputInterimCalloutGoalNeedsTool
-        ? "live_env.request_interim_voice_callout"
-      : capabilityHelpGoalNeedsCatalog
-        ? HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY
-      : nextMissingItineraryCapability
-        ? nextMissingItineraryCapability
-      : compoundSynthesisReadiness.synthesis_required
-        ? "model.direct_answer"
-      : repoEvidenceGoalNeedsSearch
-      ? "repo-code.search_concept"
-      : scholarlyResearchGoalNeedsSearch
-        ? HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY
-      : scholarlyResearchGoalNeedsFullText
-        ? HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY
-      : internetSearchGoalNeedsSearch
-        ? HELIX_INTERNET_SEARCH_CAPABILITY
-      : theoryLocatorGoalNeedsEvidence
-        ? helixTheoryFrontierVectorFieldRequested(args.transcript)
+        : voiceOutputInterimCalloutGoalNeedsTool
+          ? "live_env.request_interim_voice_callout"
+          : capabilityHelpGoalNeedsCatalog
+            ? HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY
+            : nextMissingItineraryCapability
+              ? nextMissingItineraryCapability
+              : compoundSynthesisReadiness.synthesis_required
+                ? "model.direct_answer"
+                : repoEvidenceGoalNeedsSearch
+                  ? "repo-code.search_concept"
+                  : scholarlyResearchGoalNeedsSearch
+                    ? HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY
+                    : scholarlyResearchGoalNeedsFullText
+                      ? HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY
+                      : internetSearchGoalNeedsSearch
+                        ? HELIX_INTERNET_SEARCH_CAPABILITY
+                        : theoryLocatorGoalNeedsEvidence
+                          ? helixTheoryFrontierVectorFieldRequested(args.transcript)
           ? HELIX_THEORY_FRONTIER_VECTOR_FIELD_TRACE_CAPABILITY
           : HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY
-      : workspaceStatusGoalNeedsEvidence
-        ? HELIX_WORKSPACE_OS_STATUS_CAPABILITY
-      : workspaceStatusGoalReadyForSynthesis
-        ? null
-      : modelDirectAnswerGoal
-      ? "model.direct_answer"
-      : docsRequiredNextCapability
-        ? docsRequiredNextCapability
-      : docsSummaryCanSummarizeSearchCandidate
-        ? "docs-viewer.summarize_doc"
-      : docsSummaryNeedsSearch
-        ? "docs-viewer.search_docs"
-      : liveEnvironmentGoalNeedsEvidence
-        ? args.availableCapabilities.recommended_capability_key ?? selectedActionCapability ?? null
-      : selectedActionCapability ??
-    args.availableCapabilities.recommended_capability_key ??
-    null;
+                          : workspaceStatusGoalNeedsEvidence
+                            ? HELIX_WORKSPACE_OS_STATUS_CAPABILITY
+                            : workspaceStatusGoalReadyForSynthesis
+                              ? null
+                              : modelDirectAnswerGoal
+                                ? "model.direct_answer"
+                                : docsRequiredNextCapability
+                                  ? docsRequiredNextCapability
+                                  : docsSummaryCanSummarizeSearchCandidate
+                                    ? "docs-viewer.summarize_doc"
+                                    : docsSummaryNeedsSearch
+                                      ? "docs-viewer.search_docs"
+                                      : liveEnvironmentGoalNeedsEvidence
+                                        ? (args.availableCapabilities
+                                            .recommended_capability_key ??
+                                          selectedActionCapability ??
+                                          null)
+                                        : (selectedActionCapability ??
+                                          args.availableCapabilities
+                                            .recommended_capability_key ??
+                                          null);
   const chosen = args.availableCapabilities.capabilities.find((capability) => capability.capability_key === chosenCapability) ?? null;
   const action = resolveHelixAgentStepActionForCapability({
     capabilityKey: chosenCapability,
@@ -55681,7 +56432,7 @@ const buildHelixAgentStepDecisionArtifact = (args: {
             "final_answer_draft",
             compoundSynthesisReadiness.required_terminal_kind ?? "model_synthesized_answer",
           ]))
-      : chosen?.expected_artifacts ?? [],
+        : (chosen?.expected_artifacts ?? []),
     stop_condition:
       itineraryContinuationRequired
         ? `continue until capability itinerary observes: ${capabilityItineraryExecutionState.missing_observation_families.join(", ")}`
@@ -55724,7 +56475,9 @@ type HelixAgentStepLlmParsedDecision = {
   confidence: number | null;
 };
 
-const buildHelixAgentStepCalculatorHintSummary = (coverageState: unknown): Array<Record<string, unknown>> => {
+const buildHelixAgentStepCalculatorHintSummary = (
+  coverageState: unknown,
+): Array<Record<string, unknown>> => {
   if (!coverageState || typeof coverageState !== "object" || Array.isArray(coverageState)) return [];
   const state = coverageState as Record<string, unknown>;
   const calculatorCoverage =
@@ -55752,12 +56505,17 @@ const buildHelixAgentStepCalculatorHintSummary = (coverageState: unknown): Array
       ? calculatorCoverage.planned_subgoal_ids.map(normalizeRequirementKey).filter(Boolean)
       : [],
   );
-  const matchesRequirement = (subgoalId: unknown, requirementId: string): boolean => {
+  const matchesRequirement = (
+    subgoalId: unknown,
+    requirementId: string,
+  ): boolean => {
     const normalizedSubgoal = normalizeRequirementKey(subgoalId);
     if (!normalizedSubgoal || !requirementId) return false;
-    return normalizedSubgoal === requirementId ||
+    return (
+      normalizedSubgoal === requirementId ||
       normalizedSubgoal.includes(requirementId) ||
-      requirementId.includes(normalizedSubgoal);
+      requirementId.includes(normalizedSubgoal)
+    );
   };
   const hintIsCovered = (subgoalId: unknown): boolean => {
     const normalizedSubgoal = normalizeRequirementKey(subgoalId);
@@ -56293,11 +57051,15 @@ const buildHelixPreferredDocsOpenDecisionJson = (args: {
     return null;
   }
   const artifacts = args.currentTurnArtifacts ?? [];
-  const openReceipt = artifacts.find((artifact) => {
-    if (artifact.kind !== "doc_open_receipt") return false;
-    const payload = readAskTurnArtifactPayloadRecord(artifact);
-    return readAskTurnString(payload?.status)?.toLowerCase() === "opened" && Boolean(readHelixRouteCoverageArtifactPath(artifact));
-  }) ?? null;
+  const openReceipt =
+    artifacts.find((artifact) => {
+      if (artifact.kind !== "doc_open_receipt") return false;
+      const payload = readAskTurnArtifactPayloadRecord(artifact);
+      return (
+        readAskTurnString(payload?.status)?.toLowerCase() === "opened" &&
+        Boolean(readHelixRouteCoverageArtifactPath(artifact))
+      );
+    }) ?? null;
   if (openReceipt) {
     return {
       next_step: "answer",
@@ -56555,7 +57317,7 @@ const invokeHelixAgentStepDecisionLlm = async (args: {
     "- Tool receipts, routes, and classifiers are observations, not completion.",
     "- Use next_action when a visible tool should be called before answering.",
     "- Use answer when current observations already satisfy the goal.",
-    "- For model-only conceptual/background turns, use answer with chosen_capability \"model.direct_answer\" to create the direct_answer_text observation; do not fail just because direct_answer_text is not present yet.",
+    '- For model-only conceptual/background turns, use answer with chosen_capability "model.direct_answer" to create the direct_answer_text observation; do not fail just because direct_answer_text is not present yet.',
     `- For repo-code evidence turns after repo_code_evidence_observation exists, use answer with chosen_capability "${HELIX_MODEL_SYNTHESIZE_FROM_REPO_EVIDENCE_CAPABILITY}", not model.direct_answer.`,
     "- For scholarly research turns after scholarly_research_observation or scholarly_full_text_observation exists, answer only from compact scholarly observations; do not switch to docs-viewer or repo-code.",
     `- For internet search turns after internet_search_observation exists, use answer with chosen_capability "${HELIX_MODEL_SYNTHESIZE_FROM_INTERNET_SEARCH_CAPABILITY}", not model.direct_answer, repo-code, docs-viewer, or scholarly-research.`,
@@ -56568,7 +57330,7 @@ const invokeHelixAgentStepDecisionLlm = async (args: {
     "- After a processed mail packet exists, choose live_env.record_live_source_mail_decision before answering when recommendedNext is record_interpretation, request_voice_callout, request_more_evidence, or request_stage_play_checkpoint.",
     "- If a processed mail packet recommends draft_text_answer, you may answer from the packet as a checkpoint summary without recording a separate decision first.",
     "- After a raw stage_play_live_source_mail_read_result exists without processed packets, choose live_env.record_live_source_mail_decision before answering or failing.",
-    "- If the mail read result has no items, record decision wait_for_next_summary with rationale \"No unread live-source updates. Standing by for the next source update.\"",
+    '- If the mail read result has no items, record decision wait_for_next_summary with rationale "No unread live-source updates. Standing by for the next source update."',
     "- Do not claim visual evidence is unavailable when live-source mail or visual evidence refs exist; record a wait/request_more_evidence decision instead.",
     "- Use ask_user only when a required argument is missing.",
     "- Use repair when observations show the previous tool result is insufficient but a visible capability can repair it.",
@@ -56583,7 +57345,7 @@ const invokeHelixAgentStepDecisionLlm = async (args: {
     "- For internet-search tools, provide args.query as a concise web search phrase copied from the user goal. Optional providers are tavily, exa, and google_custom_search; do not use this tool for DOI, journal, citation, arXiv, or PDF retrieval.",
     "- For docs open goals, do not repeat docs-viewer.search_docs after doc_search_results exist. Validate the selected candidate first, then open the validated path for a doc_open_receipt.",
     "- For docs summary goals, obey docs_continuation_contract when present. Its required_next_capability is the next model-visible docs step. Do not choose a forbidden_repeated_capability, and do not answer until doc_summary exists.",
-    "- For docs evidence synthesis goals, obey docs_continuation_contract. When current_docs_phase is synthesis_required, choose answer with chosen_capability \"model.direct_answer\" to create a final_answer_draft with doc evidence refs. model.direct_answer is evidence re-entry here, not terminal authority; only doc_evidence_synthesis_answer may terminalize.",
+    '- For docs evidence synthesis goals, obey docs_continuation_contract. When current_docs_phase is synthesis_required, choose answer with chosen_capability "model.direct_answer" to create a final_answer_draft with doc evidence refs. model.direct_answer is evidence re-entry here, not terminal authority; only doc_evidence_synthesis_answer may terminalize.',
     "- If docs_open_preferred_next_action_json is present and still fits the observations, choose it; the model still owns the choice.",
     "- For calculator turns, inspect calculator_candidate_hints/runtime_continuation_hints in coverage state and return calculator-ready args for the chosen subgoal.",
     "- If calculator_action_hints are present, choose one missing hint and copy its args into the JSON args object.",
@@ -57182,7 +57944,7 @@ const inferHelixCalculatorProblemRequirements = (args: {
     ], "presentation"));
   }
   if (
-    (/\bpotential\s+energy\b|\bgravitational\s+energy\b|\bmgh\b/.test(text)) &&
+    /\bpotential\s+energy\b|\bgravitational\s+energy\b|\bmgh\b/.test(text) &&
     !/\bmaximum\s+height\b|\bmax\s+height\b|\bcould\s+reach\b/.test(text)
   ) {
     add(calculatorRequirement("gravitational_potential_energy", "Compute gravitational potential energy", [
@@ -57372,19 +58134,23 @@ const inferHelixPromptRequirementCoverageItems = (args: {
   return requirements.slice(0, 16);
 };
 
-const collectHelixPromptCoverageText = (payload: Record<string, unknown>, artifacts: HelixTurnArtifact[]): {
+const collectHelixPromptCoverageText = (
+  payload: Record<string, unknown>,
+  artifacts: HelixTurnArtifact[],
+): {
   answerText: string;
   artifactText: string;
   evidenceRefs: string[];
 } => {
-  const answerText = [
-    payload.selected_final_answer,
-    payload.finalAnswer,
-    payload.answer,
-    payload.text,
-    payload.content,
-  ]
-    .find((entry) => typeof entry === "string" && entry.trim()) as string | undefined ?? "";
+  const answerText =
+    ([
+      payload.selected_final_answer,
+      payload.finalAnswer,
+      payload.answer,
+      payload.text,
+      payload.content,
+    ].find((entry) => typeof entry === "string" && entry.trim()) as
+      string | undefined) ?? "";
   const usefulArtifacts = artifacts.filter((artifact) =>
     [
       "final_answer_draft",
@@ -57535,7 +58301,11 @@ const buildHelixPromptRequirementCoverage = (args: {
     return {
       ...requirement,
       satisfied,
-      evidence_ref: satisfied ? (answerSatisfied ? `${args.turnId}:terminal_answer_text` : evidenceRefs[0]) : undefined,
+      evidence_ref: satisfied
+        ? answerSatisfied
+          ? `${args.turnId}:terminal_answer_text`
+          : evidenceRefs[0]
+        : undefined,
       failure_reason: satisfied
         ? undefined
         : terminalIsFailure
@@ -57689,11 +58459,12 @@ const buildHelixDocRetrievalCoverage = (args: {
       required: true,
       satisfied: !terminalIsFailure && satisfied,
       evidence_ref: !terminalIsFailure && satisfied ? evidenceRef : undefined,
-      failure_reason: !terminalIsFailure && satisfied
-        ? undefined
-        : terminalIsFailure
-          ? "terminal_failure_before_doc_retrieval_coverage"
-          : failureReason ?? "doc_retrieval_requirement_missing",
+      failure_reason:
+        !terminalIsFailure && satisfied
+          ? undefined
+          : terminalIsFailure
+            ? "terminal_failure_before_doc_retrieval_coverage"
+            : (failureReason ?? "doc_retrieval_requirement_missing"),
     });
   };
   if (scope === "workspace_object_location") {
@@ -57867,7 +58638,10 @@ const buildHelixCalculatorPlanCoverageArtifact = (args: {
     return {
       ...requirement,
       satisfied: Boolean(matchingReceipt),
-      evidence_ref: matchingReceipt ? readAskTurnString(matchingReceipt.receipt_id) ?? `${args.turnId}:calculator_receipt:${requirement.id}` : undefined,
+      evidence_ref: matchingReceipt
+        ? (readAskTurnString(matchingReceipt.receipt_id) ??
+          `${args.turnId}:calculator_receipt:${requirement.id}`)
+        : undefined,
       failure_reason: matchingReceipt ? undefined : "no_matching_calculator_receipt",
     };
   });
@@ -58057,10 +58831,16 @@ const appendHelixRuntimeCalculatorCoverageArtifacts = (args: {
       }
     : null;
   const artifacts = mergeAskTurnLedgerArtifacts([
-    ...args.artifacts.filter((artifact) => (
-      artifact.kind !== "calculator_plan_coverage" &&
-      !(artifact.kind === "workstation_tool_evaluation" && readAskTurnString(readAskTurnArtifactPayloadRecord(artifact)?.tool_key) === "scientific-calculator.solve_expression")
-    )),
+    ...args.artifacts.filter(
+      (artifact) =>
+        artifact.kind !== "calculator_plan_coverage" &&
+        !(
+          artifact.kind === "workstation_tool_evaluation" &&
+          readAskTurnString(
+            readAskTurnArtifactPayloadRecord(artifact)?.tool_key,
+          ) === "scientific-calculator.solve_expression"
+        ),
+    ),
     coverageArtifact,
     ...(evaluationArtifact ? [evaluationArtifact] : []),
   ]);
@@ -58117,7 +58897,9 @@ const buildCompoundCapabilitySynthesisModelPrompt = (args: {
     observationKind: string | null,
     capability: string | null,
   ): string => {
-    const observationArtifact = observationRef ? artifactsById.get(observationRef) ?? null : null;
+    const observationArtifact = observationRef
+      ? (artifactsById.get(observationRef) ?? null)
+      : null;
     const directSummary = payloadSummary(observationArtifact);
     if (directSummary) return directSummary;
     const linkedRuntimeObservation = args.artifacts.find((artifact) => {
@@ -58198,17 +58980,17 @@ const appendHelixRuntimeModelDirectAnswerArtifacts = async (args: {
   if (docEvidenceSynthesisGoal) {
     const debugRecord =
       args.payload.debug && typeof args.payload.debug === "object" && !Array.isArray(args.payload.debug)
-        ? args.payload.debug as Record<string, unknown>
+        ? (args.payload.debug as Record<string, unknown>)
         : null;
     const docsContinuationContract =
       args.payload.docs_continuation_contract &&
       typeof args.payload.docs_continuation_contract === "object" &&
       !Array.isArray(args.payload.docs_continuation_contract)
-        ? args.payload.docs_continuation_contract as Record<string, unknown>
+        ? (args.payload.docs_continuation_contract as Record<string, unknown>)
         : debugRecord?.docs_continuation_contract &&
           typeof debugRecord.docs_continuation_contract === "object" &&
           !Array.isArray(debugRecord.docs_continuation_contract)
-          ? debugRecord.docs_continuation_contract as Record<string, unknown>
+          ? (debugRecord.docs_continuation_contract as Record<string, unknown>)
           : null;
     const requiredCapability = readAskTurnString(docsContinuationContract?.required_next_capability);
     const alreadyHasDocLocation = workingArtifacts.some((artifact) =>
@@ -58216,12 +58998,17 @@ const appendHelixRuntimeModelDirectAnswerArtifacts = async (args: {
       artifact.kind === "doc_location_result" ||
       artifact.kind === "doc_evidence_location"
     );
-    if (requiredCapability === "docs-viewer.locate_in_doc" && !alreadyHasDocLocation) {
+    if (
+      requiredCapability === "docs-viewer.locate_in_doc" && !alreadyHasDocLocation
+    ) {
       const actionArgs =
         docsContinuationContract?.required_action_args &&
         typeof docsContinuationContract.required_action_args === "object" &&
         !Array.isArray(docsContinuationContract.required_action_args)
-          ? docsContinuationContract.required_action_args as Record<string, unknown>
+          ? (docsContinuationContract.required_action_args as Record<
+              string,
+              unknown
+            >)
           : null;
       const locatePath = readAskTurnString(actionArgs?.path);
       const locateQuery =
@@ -58615,7 +59402,7 @@ const appendHelixRuntimeModelDirectAnswerArtifacts = async (args: {
         args.payload.route_product_contract &&
         typeof args.payload.route_product_contract === "object" &&
         !Array.isArray(args.payload.route_product_contract)
-          ? args.payload.route_product_contract as Record<string, unknown>
+          ? (args.payload.route_product_contract as Record<string, unknown>)
           : null,
       finalAnswerDraftRef: draftArtifact.artifact_id,
     });
@@ -58638,9 +59425,13 @@ const appendHelixRuntimeModelDirectAnswerArtifacts = async (args: {
         llm_reentry_satisfied: Boolean(postObservationLlmReentryRef),
       };
       args.payload.doc_evidence_synthesis_answer = docEvidenceAnswerArtifact.payload;
-      finalArtifacts = mergeAskTurnLedgerArtifacts(finalArtifacts.map((entry) =>
-        entry.artifact_id === docEvidenceAnswerArtifact?.artifact_id ? docEvidenceAnswerArtifact as HelixTurnArtifact : entry,
-      ));
+      finalArtifacts = mergeAskTurnLedgerArtifacts(
+        finalArtifacts.map((entry) =>
+          entry.artifact_id === docEvidenceAnswerArtifact?.artifact_id
+            ? (docEvidenceAnswerArtifact as HelixTurnArtifact)
+            : entry,
+        ),
+      );
     }
     if (!docEvidenceAnswerArtifact) {
       const materialized = materializeDocEvidenceSynthesisAnswer({
@@ -58887,23 +59678,30 @@ export const __testHelixCalculatorCompoundPlanning = {
   sanitizeHelixRuntimeCalculatorArgs,
 };
 
-const collectHelixRuntimeComposerRepoEvidence = (artifacts: HelixTurnArtifact[]): Array<Record<string, unknown>> =>
+const collectHelixRuntimeComposerRepoEvidence = (
+  artifacts: HelixTurnArtifact[],
+): Array<Record<string, unknown>> =>
   artifacts.flatMap((artifact): Array<Record<string, unknown>> => {
     if (artifact.kind !== "repo_code_evidence_observation") return [];
     const payload = readAskTurnArtifactPayloadRecord(artifact);
     if (!payload) return [];
     const spans = Array.isArray(payload.spans) ? payload.spans : [];
-    return [{
-      artifact_ref: artifact.artifact_id,
-      schema: readAskTurnString(payload.schema) ?? "helix.repo_code_evidence_observation.v1",
-      concept: readAskTurnString(payload.concept),
-      query: readAskTurnString(payload.query),
-      evidence_refs: Array.isArray(payload.evidence_refs) ? payload.evidence_refs.slice(0, 8) : [],
-      spans: spans
-        .map((entry) => (entry && typeof entry === "object" && !Array.isArray(entry) ? (entry as Record<string, unknown>) : null))
-        .filter((entry): entry is Record<string, unknown> => Boolean(entry))
-        .slice(0, 8)
-        .map((span) => ({
+    return [
+      {
+        artifact_ref: artifact.artifact_id,
+        schema: readAskTurnString(payload.schema) ?? "helix.repo_code_evidence_observation.v1",
+        concept: readAskTurnString(payload.concept),
+        query: readAskTurnString(payload.query),
+        evidence_refs: Array.isArray(payload.evidence_refs) ? payload.evidence_refs.slice(0, 8) : [],
+        spans: spans
+        .map((entry) =>
+            entry && typeof entry === "object" && !Array.isArray(entry)
+              ? (entry as Record<string, unknown>)
+              : null,
+          )
+          .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+          .slice(0, 8)
+          .map((span) => ({
           ref: readAskTurnString(span.ref),
           path: readAskTurnString(span.path),
           start_line: span.start_line,
@@ -58919,7 +59717,8 @@ const collectHelixRuntimeComposerRepoEvidence = (artifacts: HelixTurnArtifact[])
           source_kind: readAskTurnString(span.source_kind),
           score: span.score,
         })),
-    }];
+      },
+    ];
   });
 
 export const __testHelixScholarlyFinalFallback = {
@@ -59347,7 +60146,9 @@ const invokeHelixPostObservationComposerLlm = async (args: {
         Math.max(0, Date.now() - startedAt),
       );
     }
-    if (args.fallbackText && args.canonicalGoalFrame.goal_kind === "calculator_solve" && modelText) {
+    if (
+      args.fallbackText && args.canonicalGoalFrame.goal_kind === "calculator_solve" && modelText
+    ) {
       const normalizedModelText = modelText.toLowerCase();
       const missingReceiptResults = args.receipts
         .map((receipt) => readAskTurnString(receipt.result_text) ?? readAskTurnString(receipt.result))
@@ -59355,7 +60156,14 @@ const invokeHelixPostObservationComposerLlm = async (args: {
         .filter((result) => {
           const exact = result.toLowerCase();
           const significant = exact.match(/^[-+]?\d+(?:\.\d{0,5})?/)?.[0];
-          return !normalizedModelText.includes(exact) && Boolean(significant && significant.length >= 4 && !normalizedModelText.includes(significant));
+          return (
+            !normalizedModelText.includes(exact) &&
+            Boolean(
+              significant &&
+              significant.length >= 4 &&
+              !normalizedModelText.includes(significant),
+            )
+          );
         });
       if (missingReceiptResults.length > 0) {
         return buildDraft(
@@ -59367,7 +60175,10 @@ const invokeHelixPostObservationComposerLlm = async (args: {
       }
     }
     return buildDraft(
-      modelText || (voiceSideEffectContentGoal ? args.fallbackText : (compoundInterimVoiceFallbackText || args.fallbackText)),
+      modelText ||
+        (voiceSideEffectContentGoal
+          ? args.fallbackText
+          : compoundInterimVoiceFallbackText || args.fallbackText),
       modelText ? "llm_post_observation_composer" : "deterministic_receipt_fallback",
       modelText
         ? null
@@ -59569,9 +60380,11 @@ const buildHelixRuntimeLiveEnvironmentFallbackText = createHelixRuntimeLiveEnvir
   getLiveAnswerEnvironment: (environmentId) => getLiveAnswerEnvironment(environmentId),
 });
 
-const readHelixRuntimeRecord = (value: unknown): Record<string, unknown> | null =>
+const readHelixRuntimeRecord = (
+  value: unknown,
+): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : null;
 const maybeRecordStagePlayAskCheckpointReceipt = (args: {
   payload: Record<string, unknown>;
@@ -59924,9 +60737,10 @@ const promoteHelixAgentStepDecisionWithLlm = async (args: {
     !(args.currentTurnArtifacts ?? []).some((artifact) => {
       if (artifact.kind !== "live_environment_tool_observation") return false;
       const payload = readAskTurnArtifactPayloadRecord(artifact);
-      const observation = payload?.observation && typeof payload.observation === "object" && !Array.isArray(payload.observation)
-        ? payload.observation as Record<string, unknown>
-        : null;
+      const observation =
+        payload?.observation && typeof payload.observation === "object" && !Array.isArray(payload.observation)
+          ? (payload.observation as Record<string, unknown>)
+          : null;
       return (
         readAskTurnString(payload?.tool_name) === "live_env.start_agent_goal_session" ||
         readAskTurnString(observation?.schema) === "stage_play_agent_goal_session_tool_result/v1"
@@ -60018,7 +60832,7 @@ const promoteHelixAgentStepDecisionWithLlm = async (args: {
     preferredDocsOpenDecisionJson?.args &&
     typeof preferredDocsOpenDecisionJson.args === "object" &&
     !Array.isArray(preferredDocsOpenDecisionJson.args)
-      ? preferredDocsOpenDecisionJson.args as Record<string, unknown>
+      ? (preferredDocsOpenDecisionJson.args as Record<string, unknown>)
       : {};
   const docsContinuationContract =
     args.docsContinuationContract ??
@@ -60034,7 +60848,10 @@ const promoteHelixAgentStepDecisionWithLlm = async (args: {
     docsContinuationContract?.required_action_args &&
     typeof docsContinuationContract.required_action_args === "object" &&
     !Array.isArray(docsContinuationContract.required_action_args)
-      ? docsContinuationContract.required_action_args as Record<string, unknown>
+      ? (docsContinuationContract.required_action_args as Record<
+          string,
+          unknown
+        >)
       : {};
   const forbiddenDocsCapabilities = Array.isArray(docsContinuationContract?.forbidden_repeated_capabilities)
     ? docsContinuationContract.forbidden_repeated_capabilities.map((entry) => String(entry ?? "").trim()).filter(Boolean)
@@ -60050,10 +60867,10 @@ const promoteHelixAgentStepDecisionWithLlm = async (args: {
       .find((payload) => Boolean(payload)) ?? null;
   const capabilityItineraryExecutionStateForCompoundRepair =
     capabilityItineraryExecutionPayloadForCompoundRepair ??
-    buildHelixCapabilityItineraryExecutionState({
+    (buildHelixCapabilityItineraryExecutionState({
       capabilityItinerary: capabilityItineraryPayloadForCompoundRepair,
       artifacts: currentArtifactsForCompoundRepair,
-    }) as unknown as Record<string, unknown>;
+    }) as unknown as Record<string, unknown>);
   const compoundSubgoalLedgerForRepair = Array.isArray(capabilityItineraryExecutionStateForCompoundRepair?.compound_subgoal_ledger)
     ? capabilityItineraryExecutionStateForCompoundRepair.compound_subgoal_ledger
         .filter((entry): entry is Record<string, unknown> =>
@@ -60074,16 +60891,18 @@ const promoteHelixAgentStepDecisionWithLlm = async (args: {
     readAskTurnString(nextMissingCompoundSubgoal?.requested_capability);
   const requiredCompoundActionArgs =
     nextMissingCompoundSubgoal?.bound_args && typeof nextMissingCompoundSubgoal.bound_args === "object" && !Array.isArray(nextMissingCompoundSubgoal.bound_args)
-      ? nextMissingCompoundSubgoal.bound_args as Record<string, unknown>
+      ? (nextMissingCompoundSubgoal.bound_args as Record<string, unknown>)
       : nextMissingCompoundSubgoal?.selected_args && typeof nextMissingCompoundSubgoal.selected_args === "object" && !Array.isArray(nextMissingCompoundSubgoal.selected_args)
-        ? nextMissingCompoundSubgoal.selected_args as Record<string, unknown>
+        ? (nextMissingCompoundSubgoal.selected_args as Record<string, unknown>)
         : nextMissingCompoundSubgoal?.args && typeof nextMissingCompoundSubgoal.args === "object" && !Array.isArray(nextMissingCompoundSubgoal.args)
-          ? nextMissingCompoundSubgoal.args as Record<string, unknown>
+          ? (nextMissingCompoundSubgoal.args as Record<string, unknown>)
           : {};
   const requiredCompoundExpectedArtifacts = Array.isArray(nextMissingCompoundSubgoal?.required_observation_kinds)
     ? nextMissingCompoundSubgoal.required_observation_kinds.map((entry) => String(entry ?? "").trim()).filter(Boolean)
     : [];
-  const docsActionArgsSatisfyRequired = (actual: Record<string, unknown> | null | undefined): boolean => {
+  const docsActionArgsSatisfyRequired = (
+    actual: Record<string, unknown> | null | undefined,
+  ): boolean => {
     const requiredEntries = Object.entries(requiredDocsActionArgs).filter(([, value]) => value !== undefined && value !== null && value !== "");
     if (requiredEntries.length === 0) return true;
     const actualRecord = actual && typeof actual === "object" && !Array.isArray(actual) ? actual : {};
@@ -60098,7 +60917,9 @@ const promoteHelixAgentStepDecisionWithLlm = async (args: {
         const actualArray = Array.isArray(actualValue) ? actualValue.map((entry) => String(entry ?? "")) : [];
         return requiredValue.every((entry) => actualArray.includes(String(entry ?? "")));
       }
-      return String(actualValue ?? "").trim() === String(requiredValue ?? "").trim();
+      return (
+        String(actualValue ?? "").trim() === String(requiredValue ?? "").trim()
+      );
     });
   };
   const parsedChoosesDocsAction = parsed.next_step === "next_action" || parsed.next_step === "repair";
@@ -60116,17 +60937,15 @@ const promoteHelixAgentStepDecisionWithLlm = async (args: {
     parsed.next_step === "answer";
   const parsedViolatesDocsContinuation =
     Boolean(requiredDocsCapability) &&
-    (
-      requiredDocsCapability === "model.direct_answer"
-        ? !parsedChoosesRequiredDocsModelSynthesis
-        : parsedTriedDocsTerminalBeforeRequiredAction ||
-          parsedChoosesDocsAction &&
-          (
-            parsed.chosen_capability !== requiredDocsCapability ||
-            (parsed.chosen_capability ? forbiddenDocsCapabilities.includes(parsed.chosen_capability) : false) ||
-            !parsedChoosesRequiredDocsActionWithRequiredArgs
-          )
-    );
+    (requiredDocsCapability === "model.direct_answer"
+      ? !parsedChoosesRequiredDocsModelSynthesis
+      : parsedTriedDocsTerminalBeforeRequiredAction ||
+        (parsedChoosesDocsAction &&
+          (parsed.chosen_capability !== requiredDocsCapability ||
+            (parsed.chosen_capability
+              ? forbiddenDocsCapabilities.includes(parsed.chosen_capability)
+              : false) ||
+            !parsedChoosesRequiredDocsActionWithRequiredArgs)));
   if (parsedViolatesDocsContinuation) {
     const repairedNextStep: HelixAgentStepNextStep =
       requiredDocsCapability === "model.direct_answer" ? "answer" : "next_action";
@@ -60273,9 +61092,11 @@ const promoteHelixAgentStepDecisionWithLlm = async (args: {
       why_this_capability_satisfies_goal:
         `Compound itinerary repaired ${parsed.chosen_capability ?? parsed.next_step} to the first incomplete subgoal ${requiredCompoundCapability}.`,
       action: repairedAction,
-      expected_artifacts: requiredCompoundExpectedArtifacts.length > 0
-        ? requiredCompoundExpectedArtifacts
-        : requiredCompoundCapabilityManifest?.expected_artifacts ?? args.decision.expected_artifacts,
+      expected_artifacts:
+        requiredCompoundExpectedArtifacts.length > 0
+          ? requiredCompoundExpectedArtifacts
+          : (requiredCompoundCapabilityManifest?.expected_artifacts ??
+            args.decision.expected_artifacts),
       action_authorization: {
         ...args.decision.action_authorization,
         required_before_tool_execution: true,
@@ -60306,7 +61127,9 @@ const promoteHelixAgentStepDecisionWithLlm = async (args: {
     parsed.chosen_capability === "docs-viewer.validate_doc_candidates" &&
     hasSelectedHelixDocCandidateValidationObservation(args.currentTurnArtifacts) &&
     Boolean(preferredDocsCapability && preferredDocsCapability === "docs-viewer.open_doc_by_path");
-  if (parsedRepeatsCompletedDocsSearch || parsedRepeatsCompletedDocsValidation) {
+  if (
+    parsedRepeatsCompletedDocsSearch || parsedRepeatsCompletedDocsValidation
+  ) {
     const preferredDocsCapabilityManifest = args.availableCapabilities.capabilities.find(
       (capability) => capability.capability_key === preferredDocsCapability,
     ) ?? null;
@@ -60324,7 +61147,8 @@ const promoteHelixAgentStepDecisionWithLlm = async (args: {
         : preferredDocsBaseAction;
     const preferredDocsExpectedArtifacts = Array.isArray(preferredDocsOpenDecisionJson?.expected_artifacts)
       ? preferredDocsOpenDecisionJson.expected_artifacts.filter((artifact): artifact is string => typeof artifact === "string" && artifact.trim().length > 0)
-      : preferredDocsCapabilityManifest?.expected_artifacts ?? args.decision.expected_artifacts;
+      : (preferredDocsCapabilityManifest?.expected_artifacts ??
+        args.decision.expected_artifacts);
     return {
       ...args.decision,
       decision_id: `${args.turnId}:agent_step_decision:${hashDebugExportPayloadShort([
@@ -60375,7 +61199,9 @@ const promoteHelixAgentStepDecisionWithLlm = async (args: {
     };
   }
   const visibleCapability = parsed.chosen_capability
-    ? args.availableCapabilities.capabilities.find((capability) => capability.capability_key === parsed.chosen_capability) ?? null
+    ? (args.availableCapabilities.capabilities.find(
+        (capability) => capability.capability_key === parsed.chosen_capability,
+      ) ?? null)
     : null;
   const invalidNextAction =
     (parsed.next_step === "next_action" || parsed.next_step === "repair") &&
@@ -60439,9 +61265,11 @@ const promoteHelixAgentStepDecisionWithLlm = async (args: {
         : effectiveNextStep === "ask_user"
           ? "request_user_input"
           : "fail_closed";
-  const expectedArtifacts = parsed.expected_artifacts.length > 0
-    ? parsed.expected_artifacts
-    : visibleCapability?.expected_artifacts ?? args.decision.expected_artifacts;
+  const expectedArtifacts =
+    parsed.expected_artifacts.length > 0
+      ? parsed.expected_artifacts
+      : (visibleCapability?.expected_artifacts ??
+        args.decision.expected_artifacts);
   return {
     ...args.decision,
     decision_id: `${args.turnId}:agent_step_decision:${hashDebugExportPayloadShort([
@@ -61106,7 +61934,7 @@ const buildHelixAgentRuntimePlanStep = (args: {
     required_artifacts:
       args.decision.expected_artifacts.length > 0
         ? args.decision.expected_artifacts
-        : args.capability?.expected_artifacts ?? [],
+        : (args.capability?.expected_artifacts ?? []),
     reason: "agent_runtime_loop_next_action",
   };
 };
@@ -61181,9 +62009,11 @@ const isHardLiveSourceMailboxBackendAskTurn = (
     mailboxClassifierReason &&
     readAskTurnString(canonical?.goal_kind) === "live_environment_review" &&
     readAskTurnString(canonical?.answer_scope) === "live_environment_state";
-  return mailboxClassifierReason && (
-    (targetSource === "live_source_mailbox" && (mustEnterBackendAsk || hardStrength)) ||
-    canonicalMailboxTurn
+  return (
+    mailboxClassifierReason &&
+    ((targetSource === "live_source_mailbox" &&
+      (mustEnterBackendAsk || hardStrength)) ||
+      canonicalMailboxTurn)
   );
 };
 
@@ -61687,10 +62517,16 @@ const appendHelixPreobservedRuntimeHintIterations = (args: {
   }
 };
 
-const helixArtifactKindMatchesRuntimeCapability = (capability: string | null | undefined, artifact: HelixTurnArtifact): boolean => {
+const helixArtifactKindMatchesRuntimeCapability = (
+  capability: string | null | undefined,
+  artifact: HelixTurnArtifact,
+): boolean => {
   if (!capability || capability === "model.direct_answer") return false;
   if (capability === HELIX_WORKSTATION_RESTORE_VIEW_STATE_CAPABILITY) {
-    return artifact.kind === "workspace_action_receipt" || artifact.kind === "workstation_view_state_restore";
+    return (
+      artifact.kind === "workspace_action_receipt" ||
+      artifact.kind === "workstation_view_state_restore"
+    );
   }
   if (capability === HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY) return artifact.kind === "workspace_directory_resolution";
   if (capability === HELIX_WORKSPACE_OS_STATUS_CAPABILITY) return artifact.kind === "workspace_os_status_observation";
@@ -61748,7 +62584,12 @@ const helixArtifactKindMatchesRuntimeCapability = (capability: string | null | u
   if (capability.startsWith("scientific-calculator.")) {
     return ["calculator_receipt", "calculator_subgoal_receipt", "calculator_result_validation", "workstation_tool_evaluation", "tool_evaluation"].includes(artifact.kind);
   }
-  if (capability.startsWith("workstation-notes.")) return ["note_update_receipt", "workspace_action_receipt"].includes(artifact.kind) || artifact.kind.startsWith("note_");
+  if (capability.startsWith("workstation-notes."))
+    return (
+      ["note_update_receipt", "workspace_action_receipt"].includes(
+        artifact.kind,
+      ) || artifact.kind.startsWith("note_")
+    );
   if (capability === "image_lens.inspect" || capability === "situation-room.describe_visual_capture") {
     return ["visual_frame_evidence", "situation_context_pack", "visual_capture_coverage", "visual_context_pack"].includes(artifact.kind);
   }
@@ -61799,7 +62640,11 @@ const appendHelixPreobservedAgentStepLoopIterations = (args: {
       ? (args.agentStepLoop as Record<string, unknown>)
       : null;
   const steps = Array.isArray(stepLoop?.steps)
-    ? stepLoop.steps.map((step) => (step && typeof step === "object" && !Array.isArray(step) ? (step as Record<string, unknown>) : null))
+    ? stepLoop.steps.map((step) =>
+        step && typeof step === "object" && !Array.isArray(step)
+          ? (step as Record<string, unknown>)
+          : null,
+      )
     : [];
   if (steps.length === 0) return;
   const artifactById = new Map(args.artifacts.map((artifact) => [artifact.artifact_id, artifact]));
@@ -62496,7 +63341,8 @@ const applyHelixAgentLoopBudgetFailureToPayload = (args: {
     });
     args.payload.stage_play_live_source_mail_transcript_entries = [
       ...(Array.isArray(args.payload.stage_play_live_source_mail_transcript_entries)
-        ? args.payload.stage_play_live_source_mail_transcript_entries as unknown[]
+        ? (args.payload
+            .stage_play_live_source_mail_transcript_entries as unknown[])
         : []),
       ...transcriptEntries,
     ];
@@ -62506,7 +63352,8 @@ const applyHelixAgentLoopBudgetFailureToPayload = (args: {
     ]);
     args.payload.stage_play_live_source_mail_transcript_rows = [
       ...(Array.isArray(args.payload.stage_play_live_source_mail_transcript_rows)
-        ? args.payload.stage_play_live_source_mail_transcript_rows as unknown[]
+        ? (args.payload
+            .stage_play_live_source_mail_transcript_rows as unknown[])
         : []),
       ...transcriptEntries.map((entry) => entry.row),
     ];
@@ -62929,11 +63776,12 @@ const appendLiveSourcePhaseRepairToPayload = (
   repairs.push(normalizedRepair);
   payload.live_source_phase_repairs = repairs;
 
-  const existing = payload.live_source_phase_repair &&
+  const existing =
+    payload.live_source_phase_repair &&
     typeof payload.live_source_phase_repair === "object" &&
     !Array.isArray(payload.live_source_phase_repair)
-    ? payload.live_source_phase_repair as Record<string, unknown>
-    : null;
+      ? (payload.live_source_phase_repair as Record<string, unknown>)
+      : null;
   const repairPhase = typeof normalizedRepair.phase === "string" ? normalizedRepair.phase : null;
   const existingPhase = typeof existing?.phase === "string" ? existing.phase : null;
   const repairSelected = typeof normalizedRepair.selected_operation === "string" ? normalizedRepair.selected_operation : null;
@@ -63115,7 +63963,7 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
         "live_source_mailbox.stage_play_mail_wake_route_metadata"
     )
       ? existingRuntimeEvidenceTargetArbitration
-      : buildAskEvidenceTargetArbitration({
+      : (buildAskEvidenceTargetArbitration({
           turnId: args.turnId,
           threadId:
             readAskTurnString(args.payload.thread_id) ??
@@ -63124,7 +63972,7 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
             args.turnId,
           promptText: args.transcript,
           routeMetadata: runtimeRouteMetadata,
-        }) as Record<string, unknown>;
+        }) as Record<string, unknown>);
   args.payload.evidence_target_arbitration = runtimeEvidenceTargetArbitration;
   const runtimeSourceTargetIntent = coerceLiveSourceMailboxSourceTargetIntent({
     sourceTargetIntent: runtimeRawSourceTargetIntent,
@@ -63279,11 +64127,14 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
     args.canonicalGoalFrame = {
       ...args.canonicalGoalFrame,
       goal_kind: runtimePlanGoalKind as HelixAskCanonicalGoalKind,
-      answer_scope: runtimeContractState === "suppressed_contextual_reference"
-        ? "model_only"
-        : runtimeGoalSessionCapabilitySelected
-          ? "current_turn_action"
-          : answerScopeForExplicitCapability(readAskTurnString(runtimeCapabilityPlan.requested_capability)) as HelixAskCanonicalAnswerScope,
+      answer_scope:
+        runtimeContractState === "suppressed_contextual_reference"
+          ? "model_only"
+          : runtimeGoalSessionCapabilitySelected
+            ? "current_turn_action"
+            : (answerScopeForExplicitCapability(
+                readAskTurnString(runtimeCapabilityPlan.requested_capability),
+              ) as HelixAskCanonicalAnswerScope),
       required_terminal_kind: runtimePlanTerminalKind as HelixAskRequiredTerminalKind,
       allows_workspace_context: runtimeContractState !== "suppressed_contextual_reference",
       allows_prior_artifacts: false,
@@ -63583,7 +64434,8 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
       typeof args.payload.agent_continuation_state === "object" &&
       !Array.isArray(args.payload.agent_continuation_state) &&
       (args.payload.agent_continuation_state as Record<string, unknown>).schema === "helix.agent_continuation_state.v1"
-        ? args.payload.agent_continuation_state as unknown as HelixAgentContinuationState
+        ? (args.payload
+            .agent_continuation_state as unknown as HelixAgentContinuationState)
         : null;
     const state = buildHelixAgentContinuationState({
       payload: args.payload,
@@ -63594,7 +64446,7 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
     });
     appendHelixAgentContinuationStateToPayload({ payload: args.payload, state });
     currentTurnArtifacts = Array.isArray(args.payload.current_turn_artifact_ledger)
-      ? args.payload.current_turn_artifact_ledger as HelixTurnArtifact[]
+      ? (args.payload.current_turn_artifact_ledger as HelixTurnArtifact[])
       : currentTurnArtifacts;
     return state;
   };
@@ -63627,7 +64479,10 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
       !Array.isArray(args.payload.tool_call_admission_decision)
         ? (args.payload.tool_call_admission_decision as Record<string, unknown>)
         : null;
-    return readAskTurnString(admission?.admission_mode) === "unknown_source_discovery";
+    return (
+      readAskTurnString(admission?.admission_mode) ===
+      "unknown_source_discovery"
+    );
   };
   const runtimeCapabilityAttemptCount = (capabilityKey: string): number =>
     currentTurnArtifacts.filter((artifact) => {
@@ -63713,7 +64568,9 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
         ? (args.payload.capability_itinerary_execution_state as Record<string, unknown>)
         : null;
     const compoundSubgoalLedger = Array.isArray(capabilityItineraryExecutionState?.compound_subgoal_ledger)
-      ? capabilityItineraryExecutionState.compound_subgoal_ledger as Array<Record<string, unknown>>
+      ? (capabilityItineraryExecutionState.compound_subgoal_ledger as Array<
+          Record<string, unknown>
+        >)
       : [];
     const materializePendingSubgoalInputBindings = (
       baseArgs: Record<string, unknown>,
@@ -64085,7 +64942,9 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
     }
     return { query };
   };
-  const appendUnknownSourceDiscoveryRepair = (event: Record<string, unknown>): void => {
+  const appendUnknownSourceDiscoveryRepair = (
+    event: Record<string, unknown>,
+  ): void => {
     const payload = {
       schema: "helix.unknown_source_discovery_continuation_repair.v1",
       turn_id: args.turnId,
@@ -64095,7 +64954,8 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
     };
     args.payload.unknown_source_discovery_continuation_repair = payload;
     const existingEvents = Array.isArray(args.payload.unknown_source_discovery_continuation_repairs)
-      ? args.payload.unknown_source_discovery_continuation_repairs as unknown[]
+      ? (args.payload
+          .unknown_source_discovery_continuation_repairs as unknown[])
       : [];
     args.payload.unknown_source_discovery_continuation_repairs = [...existingEvents, payload];
     currentTurnArtifacts = mergeAskTurnLedgerArtifacts([
@@ -64433,7 +65293,7 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
           artifacts: currentTurnArtifacts,
           goalSatisfactionEvaluation,
         });
-      loop.executed_tool_call_count = countHelixConsumedToolCallsFromArtifacts(currentTurnArtifacts);
+  loop.executed_tool_call_count = countHelixConsumedToolCallsFromArtifacts(currentTurnArtifacts);
   appendHelixPreobservedRuntimeHintIterations({
     loop,
     hints: migratedRuntimeHints,
@@ -64761,7 +65621,10 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
       docsSynthesisCapabilitiesAfterObservation.docs_continuation_contract &&
       typeof docsSynthesisCapabilitiesAfterObservation.docs_continuation_contract === "object" &&
       !Array.isArray(docsSynthesisCapabilitiesAfterObservation.docs_continuation_contract)
-        ? docsSynthesisCapabilitiesAfterObservation.docs_continuation_contract as Record<string, unknown>
+        ? (docsSynthesisCapabilitiesAfterObservation.docs_continuation_contract as Record<
+            string,
+            unknown
+          >)
         : null;
     const contractPhase = readAskTurnString(docsSynthesisContinuationContract?.current_docs_phase);
     const contractRequiredCapability = readAskTurnString(docsSynthesisContinuationContract?.required_next_capability);
@@ -64777,13 +65640,16 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
         docsSynthesisContinuationContract?.required_action_args &&
         typeof docsSynthesisContinuationContract.required_action_args === "object" &&
         !Array.isArray(docsSynthesisContinuationContract.required_action_args)
-          ? docsSynthesisContinuationContract.required_action_args as Record<string, unknown>
+          ? (docsSynthesisContinuationContract.required_action_args as Record<
+              string,
+              unknown
+            >)
           : null;
       const decisionActionArgs =
         input.decision.action?.args &&
         typeof input.decision.action.args === "object" &&
         !Array.isArray(input.decision.action.args)
-          ? input.decision.action.args as Record<string, unknown>
+          ? (input.decision.action.args as Record<string, unknown>)
           : null;
       const locatePath = readAskTurnString(contractActionArgs?.path) ?? readAskTurnString(decisionActionArgs?.path);
       const locateQuery =
@@ -65169,7 +66035,11 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
     return true;
   };
 
-  for (let iteration = loop.iterations.length + 1; iteration <= loop.max_iterations; iteration += 1) {
+  for (
+    let iteration = loop.iterations.length + 1;
+    iteration <= loop.max_iterations;
+    iteration += 1
+  ) {
     if (
       loop.llm_decision_count >= loop.max_llm_decisions &&
       goalSatisfactionEvaluation.satisfaction !== "satisfied"
@@ -65208,7 +66078,10 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
       availableCapabilities.docs_continuation_contract &&
       typeof availableCapabilities.docs_continuation_contract === "object" &&
       !Array.isArray(availableCapabilities.docs_continuation_contract)
-        ? availableCapabilities.docs_continuation_contract as Record<string, unknown>
+        ? (availableCapabilities.docs_continuation_contract as Record<
+            string,
+            unknown
+          >)
         : null;
     if (docsContinuationContract) {
       args.payload.docs_continuation_contract = docsContinuationContract;
@@ -65292,7 +66165,10 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
       docsContinuationContract?.required_action_args &&
       typeof docsContinuationContract.required_action_args === "object" &&
       !Array.isArray(docsContinuationContract.required_action_args)
-        ? docsContinuationContract.required_action_args as Record<string, unknown>
+        ? (docsContinuationContract.required_action_args as Record<
+            string,
+            unknown
+          >)
         : {};
     const docsContinuationExpectedArtifacts = Array.isArray(docsContinuationContract?.expected_next_artifacts)
       ? docsContinuationContract.expected_next_artifacts
@@ -65442,7 +66318,8 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
     const docsSummaryContinuationAction =
       docsSummaryContinuationDecision &&
       (docsSummaryContinuationDecision.decision === "continue" || docsSummaryContinuationDecision.decision === "retry")
-        ? docsSummaryContinuationDecision.recommended_capability_hint?.suggested_action ?? null
+        ? (docsSummaryContinuationDecision.recommended_capability_hint
+            ?.suggested_action ?? null)
         : null;
     if (docsSummaryContinuationDecision && docsSummaryContinuationAction) {
       const recommendedCapability = helixCapabilityKeyForAction(docsSummaryContinuationAction);
@@ -65871,7 +66748,8 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
           ? "final_answer"
           : decision.next_step === "fail" || decision.next_step === "fail_closed"
             ? "typed_failure"
-            : decision.chosen_capability ?? helixCapabilityKeyForAction(decision.action);
+            : (decision.chosen_capability ??
+              helixCapabilityKeyForAction(decision.action));
       const lockReason =
         currentLiveSourceTurnPhase.phaseLock.reason ??
         currentLiveSourceTurnPhase.reason ??
@@ -65992,7 +66870,8 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
       const selectedOperationBeforeRepair =
         decision.next_step === "answer"
           ? "final_answer"
-          : decision.chosen_capability ?? helixCapabilityKeyForAction(decision.action);
+          : (decision.chosen_capability ??
+            helixCapabilityKeyForAction(decision.action));
       appendLiveSourcePhaseRepairToPayload(args.payload, {
         phase: currentLiveSourceTurnPhase?.phase ?? "configure_watch_job",
         selected_operation: selectedOperationBeforeRepair,
@@ -66051,7 +66930,8 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
       const selectedOperationBeforeRepair =
         decision.next_step === "answer"
           ? "final_answer"
-          : decision.chosen_capability ?? helixCapabilityKeyForAction(decision.action);
+          : (decision.chosen_capability ??
+            helixCapabilityKeyForAction(decision.action));
       appendLiveSourcePhaseRepairToPayload(args.payload, {
         phase: currentLiveSourceTurnPhase?.phase ?? "configure_interpreter_profile",
         selected_operation: selectedOperationBeforeRepair,
@@ -66479,7 +67359,8 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
       const selectedOperationBeforeRepair =
         decision.next_step === "answer"
           ? "final_answer"
-          : decision.chosen_capability ?? helixCapabilityKeyForAction(decision.action);
+          : (decision.chosen_capability ??
+            helixCapabilityKeyForAction(decision.action));
       appendLiveSourcePhaseRepairToPayload(args.payload, {
         phase: "record_decision",
         selected_operation: selectedOperationBeforeRepair,
@@ -66856,7 +67737,8 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
     const liveSourcePhaseSelectedOperation =
       decision.next_step === "answer"
         ? "final_answer"
-        : decision.chosen_capability ?? helixCapabilityKeyForAction(decision.action);
+        : (decision.chosen_capability ??
+          helixCapabilityKeyForAction(decision.action));
     const liveSourcePhaseAppliesToCanonicalGoal =
       /^(?:live_source_processed_mail_interpretation|live_source_mailbox_review|live_environment_review|processed_mail_interpretation|processed_mail_voice_decision|live_pipeline_control|live_pipeline_repair)$/.test(
         args.canonicalGoalFrame.goal_kind,
@@ -67003,7 +67885,9 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
     const selectedCapabilityForTranscript =
       decision.next_step === "answer"
         ? "final_answer"
-        : decision.chosen_capability ?? helixCapabilityKeyForAction(decision.action) ?? decision.next_step;
+        : (decision.chosen_capability ??
+          helixCapabilityKeyForAction(decision.action) ??
+          decision.next_step);
     emitAgentRuntimeTranscript({
       role: "agent",
       type: "model_decision",
@@ -67019,7 +67903,9 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
     });
     const chosenCapability = decision.chosen_capability;
     const capability = chosenCapability
-      ? availableCapabilities.capabilities.find((entry) => entry.capability_key === chosenCapability) ?? null
+      ? (availableCapabilities.capabilities.find(
+          (entry) => entry.capability_key === chosenCapability,
+        ) ?? null)
       : null;
     const shouldPrepareRuntimeToolCall =
       (decision.next_step === "next_action" || decision.next_step === "repair") &&
@@ -69559,7 +70445,9 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
           break;
         }
       }
-      if (runtimeToolCall.capability_key === HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) {
+      if (
+        runtimeToolCall.capability_key === HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY
+      ) {
         const scholarlyFullTextArgs = normalizeHelixRuntimeToolArgsForCapability(
           runtimeToolCall.capability_key,
           runtimeToolCall.args,
@@ -69584,7 +70472,7 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
             )
           ) as Record<string, unknown> | undefined;
         const scholarlyPapers = Array.isArray(latestScholarlyResearchPayload?.papers)
-          ? latestScholarlyResearchPayload.papers as unknown as HelixScholarlyPaperResult[]
+          ? (latestScholarlyResearchPayload.papers as unknown as HelixScholarlyPaperResult[])
           : [];
         const maxPages = Number(scholarlyFullTextArgs.max_pages ?? scholarlyFullTextArgs.maxPages) > 0
           ? Math.min(Number(scholarlyFullTextArgs.max_pages ?? scholarlyFullTextArgs.maxPages), 80)
@@ -70048,11 +70936,16 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
         observation: repoEvidencePayload,
         sourceTargetExactContract: repoSourceTargetExactContract,
       });
-      const previousWeakRepoEvidenceCount = currentTurnArtifacts.filter((artifact) => {
-        if (artifact.kind !== "repo_evidence_relevance_gate") return false;
-        const payload = readAskTurnArtifactPayloadRecord(artifact);
-        return payload?.repair_required === true && payload?.terminal_allowed !== true;
-      }).length;
+      const previousWeakRepoEvidenceCount = currentTurnArtifacts.filter(
+        (artifact) => {
+          if (artifact.kind !== "repo_evidence_relevance_gate") return false;
+          const payload = readAskTurnArtifactPayloadRecord(artifact);
+          return (
+            payload?.repair_required === true &&
+            payload?.terminal_allowed !== true
+          );
+        },
+      ).length;
       const repeatedWeakRepoEvidence =
         repoSearchHits.length > 0 &&
         repoEvidenceRelevanceGate.repair_required === true &&
@@ -70369,7 +71262,10 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
         args.payload.live_environment_turn_relevance &&
         typeof args.payload.live_environment_turn_relevance === "object" &&
         !Array.isArray(args.payload.live_environment_turn_relevance)
-          ? args.payload.live_environment_turn_relevance as Record<string, unknown>
+          ? (args.payload.live_environment_turn_relevance as Record<
+              string,
+              unknown
+            >)
           : null;
       const relevantEnvironmentIds = Array.isArray(liveEnvironmentRelevance?.relevant_environment_ids)
         ? liveEnvironmentRelevance.relevant_environment_ids
@@ -70691,9 +71587,12 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
     };
     const duplicateAction = executionTrace.some((step) => {
       const existingKey = helixCapabilityKeyForAction(step.action);
-      return existingKey === actionKey &&
-        JSON.stringify(normalizeRuntimeDuplicateArgs(step.action?.args ?? {})) ===
-        JSON.stringify(normalizeRuntimeDuplicateArgs(action.args ?? {}));
+      return (
+        existingKey === actionKey &&
+        JSON.stringify(
+          normalizeRuntimeDuplicateArgs(step.action?.args ?? {}),
+        ) === JSON.stringify(normalizeRuntimeDuplicateArgs(action.args ?? {}))
+      );
     });
     if (duplicateAction) {
       const duplicateCallId = runtimeToolCall?.call_id ?? `${args.turnId}:runtime_tool_call:${iteration}:duplicate_action`;
@@ -71305,7 +72204,10 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
         docsSynthesisCapabilitiesAfterObservation?.docs_continuation_contract &&
         typeof docsSynthesisCapabilitiesAfterObservation.docs_continuation_contract === "object" &&
         !Array.isArray(docsSynthesisCapabilitiesAfterObservation.docs_continuation_contract)
-          ? docsSynthesisCapabilitiesAfterObservation.docs_continuation_contract as Record<string, unknown>
+          ? (docsSynthesisCapabilitiesAfterObservation.docs_continuation_contract as Record<
+              string,
+              unknown
+            >)
           : null;
       const docsSynthesisRequiredAfterObservation =
         readAskTurnString(docsSynthesisContinuationContract?.current_docs_phase) === "synthesis_required" &&
@@ -71958,7 +72860,8 @@ const buildHelixObservationReviewArtifact = (args: {
     next_action: nextAction,
     reason: doesSatisfyGoal
       ? "Observed artifact satisfies the canonical goal contract."
-      : missingPiece ?? "Observed artifact does not yet satisfy the canonical goal contract.",
+      : (missingPiece ??
+        "Observed artifact does not yet satisfy the canonical goal contract."),
     assistant_answer: false,
     raw_content_included: false,
   };
@@ -72224,10 +73127,14 @@ const collectAskTurnBlockedMissingArtifacts = (executionTrace: HelixAskTurnPlanS
   return Array.from(out);
 };
 
-const collectAskTurnUnsatisfiedResultArtifacts = (stepResults: ReturnType<typeof buildAskTurnStepResults>): string[] => {
+const collectAskTurnUnsatisfiedResultArtifacts = (
+  stepResults: ReturnType<typeof buildAskTurnStepResults>,
+): string[] => {
   const out = new Set<string>();
   const globallyActual = new Set(
-    stepResults.flatMap((result) => (Array.isArray(result.actual_artifacts) ? result.actual_artifacts : [])),
+    stepResults.flatMap((result) =>
+      Array.isArray(result.actual_artifacts) ? result.actual_artifacts : [],
+    ),
   );
   for (const result of stepResults) {
     if (result.contract_pass !== false) continue;
@@ -72315,7 +73222,10 @@ const hasAskTurnExistingNoteMutationObjectiveSatisfied = (args: {
     args.stepResults.some((result) => {
       const actualArtifacts = Array.isArray(result.actual_artifacts) ? result.actual_artifacts : [];
       if (actualArtifacts.some((artifact) => String(artifact ?? "").trim() === "note_update_receipt")) return true;
-      const artifact = result.result_artifact && typeof result.result_artifact === "object" ? result.result_artifact as Record<string, unknown> : null;
+      const artifact =
+        result.result_artifact && typeof result.result_artifact === "object"
+          ? (result.result_artifact as Record<string, unknown>)
+          : null;
       return readAskTurnString(artifact?.kind) === "note_update_receipt";
     });
   if (!hasNoteUpdate) return false;
@@ -72357,7 +73267,10 @@ const hasAskTurnOpenDocObjectiveSatisfied = (args: {
   const hasOpenedDocStep = args.stepResults.some((result) => {
     const actualArtifacts = Array.isArray(result.actual_artifacts) ? result.actual_artifacts : [];
     if (!actualArtifacts.some((artifact) => String(artifact ?? "").trim() === "active_doc_path")) return false;
-    const action = result.artifact && typeof result.artifact === "object" ? result.artifact as HelixAskTurnSelectedAction : null;
+    const action =
+      result.artifact && typeof result.artifact === "object"
+        ? (result.artifact as HelixAskTurnSelectedAction)
+        : null;
     if (action?.panel_id !== "docs-viewer") return false;
     if (!["open_doc", "open_doc_by_path", "open_latest_doc_by_topic", "open_doc_and_read"].includes(action.action_id)) return false;
     return Boolean(normalizeAskTurnWorkspaceDocPath(action.args?.path));
@@ -72440,7 +73353,9 @@ const createAskTurnRuntime = (args: {
   const requiredArtifacts = Array.from(
     new Set(
       args.planItems
-        .flatMap((step) => (Array.isArray(step.required_artifacts) ? step.required_artifacts : []))
+        .flatMap((step) =>
+          Array.isArray(step.required_artifacts) ? step.required_artifacts : [],
+        )
         .map((entry) => String(entry ?? "").trim())
         .filter(Boolean),
     ),
@@ -72796,7 +73711,9 @@ const buildAskTurnUniversalGoalFrame = (args: {
     pushEvidenceRequirement("repo_code_evidence_answer", "project-local concepts must synthesize from repo evidence");
   }
   if (retrievalRequiredSignal.required) {
-    const query = equationIntent.required ? buildAskTurnEquationRetrievalQuery(raw) ?? raw : raw;
+    const query = equationIntent.required
+      ? (buildAskTurnEquationRetrievalQuery(raw) ?? raw)
+      : raw;
     pushUniqueAskTurnGoalFrameRef(workspaceRefs, {
       kind: "doc_topic",
       value: query,
@@ -73029,12 +73946,16 @@ const buildAskTurnUniversalGoalFrame = (args: {
     pushRequestedOutput("answer", "capability_help_phrase");
     pushEvidenceRequirement("capability_help_summary", "capability help requires registry-grounded capability summary", false);
   }
-  if (docsPanelOpenIntent || (panelControlIntent?.confidence === "high" && !panelControlIntent.conflict)) {
+  if (
+    docsPanelOpenIntent || (panelControlIntent?.confidence === "high" && !panelControlIntent.conflict)
+  ) {
     pushRequestedOutput("workspace_action", "panel_control_phrase");
     pushEvidenceRequirement("workspace_action_receipt", "panel navigation requires a workspace action receipt");
     mutationTargets.push({
       kind: "workspace_panel",
-      value: docsPanelOpenIntent ? "docs-viewer" : panelControlIntent?.panel_id ?? "docs-viewer",
+      value: docsPanelOpenIntent
+        ? "docs-viewer"
+        : (panelControlIntent?.panel_id ?? "docs-viewer"),
       resolution: "explicit",
       confidence: 0.95,
     });
@@ -73632,30 +74553,31 @@ const buildAskTurnRuntimeRepairStepId = (runtime: HelixAskTurnRuntime, baseId: s
   return `${baseId}_repair_${Date.now()}`;
 };
 
-const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapability[] => [
-  {
-    capability_id: "docs-viewer.locate_in_doc.exact",
-    panel_id: "docs-viewer",
-    action_id: "locate_in_doc",
-    lane: "workspace",
-    produces: ["doc_location_matches"],
-    requires: ["doc_context"],
-    confirmation_required: false,
-    arg_resolver: ({ runtime, transcript, selectedAction, workspaceSnapshot }) => {
-      const query =
-        typeof selectedAction?.args?.query === "string"
-          ? selectedAction.args.query.trim()
-          : resolveAskTurnDocLocateQuery(transcript) ?? "";
-      const path =
+const buildAskTurnCapabilityRegistryForRuntime =
+  (): HelixAskTurnRuntimeCapability[] => [
+    {
+      capability_id: "docs-viewer.locate_in_doc.exact",
+      panel_id: "docs-viewer",
+      action_id: "locate_in_doc",
+      lane: "workspace",
+      produces: ["doc_location_matches"],
+      requires: ["doc_context"],
+      confirmation_required: false,
+      arg_resolver: ({ runtime, transcript, selectedAction, workspaceSnapshot }) => {
+        const query =
+          typeof selectedAction?.args?.query === "string"
+            ? selectedAction.args.query.trim()
+            : (resolveAskTurnDocLocateQuery(transcript) ?? "");
+        const path =
         normalizeAskTurnDocPathForRead(selectedAction?.args?.path) ??
         normalizeAskTurnDocPathForRead(workspaceSnapshot?.activeDocPath);
-      const alreadyAttempted = runtime.plan_items.some(
+        const alreadyAttempted = runtime.plan_items.some(
         (step) => step.action?.panel_id === "docs-viewer" && step.action?.action_id === "locate_in_doc",
       );
-      if (alreadyAttempted) return { ok: false, missing_args: [], reason: "exact_locate_already_attempted" };
-      if (!query) return { ok: false, missing_args: ["query"], reason: "missing_locate_query" };
-      if (!path) return { ok: false, missing_args: ["path"], reason: "missing_doc_path" };
-      return {
+        if (alreadyAttempted) return { ok: false, missing_args: [], reason: "exact_locate_already_attempted" };
+        if (!query) return { ok: false, missing_args: ["query"], reason: "missing_locate_query" };
+        if (!path) return { ok: false, missing_args: ["path"], reason: "missing_doc_path" };
+        return {
         ok: true,
         title: `Locate "${clipConversationText(query, 80)}" in the active document.`,
         reason: "doc_location_matches_exact_search",
@@ -73665,34 +74587,34 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
           args: { path, query, locate_strategy: "exact" },
         },
       };
+      },
     },
-  },
-  {
-    capability_id: "docs-viewer.locate_in_doc.variant",
-    panel_id: "docs-viewer",
-    action_id: "locate_in_doc",
-    lane: "workspace",
-    produces: ["doc_location_matches"],
-    requires: ["doc_context"],
-    confirmation_required: false,
-    arg_resolver: ({ runtime, transcript, selectedAction, workspaceSnapshot }) => {
-      const query =
-        typeof selectedAction?.args?.query === "string"
-          ? selectedAction.args.query.trim()
-          : resolveAskTurnDocLocateQuery(transcript) ?? "";
-      const path =
+    {
+      capability_id: "docs-viewer.locate_in_doc.variant",
+      panel_id: "docs-viewer",
+      action_id: "locate_in_doc",
+      lane: "workspace",
+      produces: ["doc_location_matches"],
+      requires: ["doc_context"],
+      confirmation_required: false,
+      arg_resolver: ({ runtime, transcript, selectedAction, workspaceSnapshot }) => {
+        const query =
+          typeof selectedAction?.args?.query === "string"
+            ? selectedAction.args.query.trim()
+            : (resolveAskTurnDocLocateQuery(transcript) ?? "");
+        const path =
         normalizeAskTurnDocPathForRead(selectedAction?.args?.path) ??
         normalizeAskTurnDocPathForRead(workspaceSnapshot?.activeDocPath);
-      const alreadyRetried = runtime.plan_items.some(
+        const alreadyRetried = runtime.plan_items.some(
         (step) =>
           step.action?.panel_id === "docs-viewer" &&
           step.action?.action_id === "locate_in_doc" &&
           step.action.args?.locate_strategy === "variant",
       );
-      if (alreadyRetried) return { ok: false, missing_args: [], reason: "variant_locate_already_attempted" };
-      if (!query) return { ok: false, missing_args: ["query"], reason: "missing_locate_query" };
-      if (!path) return { ok: false, missing_args: ["path"], reason: "missing_doc_path" };
-      return {
+        if (alreadyRetried) return { ok: false, missing_args: [], reason: "variant_locate_already_attempted" };
+        if (!query) return { ok: false, missing_args: ["query"], reason: "missing_locate_query" };
+        if (!path) return { ok: false, missing_args: ["path"], reason: "missing_doc_path" };
+        return {
         ok: true,
         title: `Retry document location search with variants for "${clipConversationText(query, 80)}".`,
         reason: "doc_location_matches_missing_variant_search",
@@ -73702,31 +74624,35 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
           args: { path, query, locate_strategy: "variant", variant_of: query },
         },
       };
+      },
     },
-  },
-  {
-    capability_id: "docs-viewer.resolve_context",
-    panel_id: "docs-viewer",
-    action_id: "open",
-    lane: "workspace",
-    produces: ["doc_context", "workspace_context"],
-    requires: [],
-    confirmation_required: false,
-    arg_resolver: ({ transcript, workspaceSnapshot }) => {
-      const panelControlIntent = classifyAskTurnPanelControlIntent(transcript);
-      const explicitPath = resolveAskTurnDocPathArg(transcript);
-      const latestTopic = resolveAskTurnLatestDocTopicArg(transcript);
-      const latestDocAction = HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG ? buildAskTurnLatestDocAcquisitionAction(transcript) : null;
-      const action: HelixAskTurnSelectedAction = explicitPath
-        ? { panel_id: "docs-viewer", action_id: "open_doc_by_path", args: { path: explicitPath } }
-        : latestTopic
-          ? latestDocAction ?? { panel_id: "docs-viewer", action_id: "open_latest_doc_by_topic", args: { topic: latestTopic } }
-          : panelControlIntent?.panel_id === "docs-viewer" && !panelControlIntent.conflict
+    {
+      capability_id: "docs-viewer.resolve_context",
+      panel_id: "docs-viewer",
+      action_id: "open",
+      lane: "workspace",
+      produces: ["doc_context", "workspace_context"],
+      requires: [],
+      confirmation_required: false,
+      arg_resolver: ({ transcript, workspaceSnapshot }) => {
+        const panelControlIntent = classifyAskTurnPanelControlIntent(transcript);
+        const explicitPath = resolveAskTurnDocPathArg(transcript);
+        const latestTopic = resolveAskTurnLatestDocTopicArg(transcript);
+        const latestDocAction = HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG ? buildAskTurnLatestDocAcquisitionAction(transcript) : null;
+        const action: HelixAskTurnSelectedAction = explicitPath
+          ? { panel_id: "docs-viewer", action_id: "open_doc_by_path", args: { path: explicitPath } }
+          : latestTopic
+            ? (latestDocAction ?? {
+                panel_id: "docs-viewer",
+                action_id: "open_latest_doc_by_topic",
+                args: { topic: latestTopic },
+              })
+            : panelControlIntent?.panel_id === "docs-viewer" && !panelControlIntent.conflict
             ? { panel_id: "docs-viewer", action_id: panelControlIntent.action_id === "open_directory" ? "open_directory" : "open", args: {} }
           : hasValidAskTurnDocContext(workspaceSnapshot)
             ? { panel_id: "docs-viewer", action_id: "verify_active_doc", args: { path: workspaceSnapshot?.activeDocPath } }
             : { panel_id: "docs-viewer", action_id: "open", args: {} };
-      return {
+        return {
         ok: true,
         title: `Resolve document context for "${clipConversationText(transcript, 90)}".`,
         reason: explicitPath
@@ -73738,9 +74664,9 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
               : "doc_context_missing_open_docs",
         action,
       };
+      },
     },
-  },
-  {
+    {
     capability_id: "docs-viewer.identify_current_doc",
     panel_id: "docs-viewer",
     action_id: "identify_current_doc",
@@ -73758,7 +74684,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "docs-viewer.summarize_doc",
     panel_id: "docs-viewer",
     action_id: "summarize_doc",
@@ -73776,7 +74702,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "workstation-notes.open",
     panel_id: "workstation-notes",
     action_id: "open",
@@ -73791,7 +74717,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       action: { panel_id: "workstation-notes", action_id: "open", args: {} },
     }),
   },
-  {
+    {
     capability_id: "workstation-notes.create_note",
     panel_id: "workstation-notes",
     action_id: "create_note",
@@ -73810,7 +74736,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "workstation-notes.append_to_note",
     panel_id: "workstation-notes",
     action_id: "append_to_note",
@@ -73840,7 +74766,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "workstation-notes.list_notes",
     panel_id: "workstation-notes",
     action_id: "list_notes",
@@ -73855,7 +74781,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       action: { panel_id: "workstation-notes", action_id: "list_notes", args: {} },
     }),
   },
-  {
+    {
     capability_id: "workstation-notes.set_active_note",
     panel_id: "workstation-notes",
     action_id: "set_active_note",
@@ -73874,7 +74800,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "workstation-clipboard-history.read_clipboard",
     panel_id: "workstation-clipboard-history",
     action_id: "read_clipboard",
@@ -73889,7 +74815,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       action: { panel_id: "workstation-clipboard-history", action_id: "read_clipboard", args: {} },
     }),
   },
-  {
+    {
     capability_id: "workstation-clipboard-history.write_clipboard",
     panel_id: "workstation-clipboard-history",
     action_id: "write_clipboard",
@@ -73908,7 +74834,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "workstation-clipboard-history.copy_receipt_to_clipboard",
     panel_id: "workstation-clipboard-history",
     action_id: "copy_receipt_to_clipboard",
@@ -73923,7 +74849,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       action: { panel_id: "workstation-clipboard-history", action_id: "copy_receipt_to_clipboard", args: {} },
     }),
   },
-  {
+    {
     capability_id: "workstation-clipboard-history.copy_receipt_to_note",
     panel_id: "workstation-clipboard-history",
     action_id: "copy_receipt_to_note",
@@ -73942,7 +74868,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "situation-room-sources.open",
     panel_id: "situation-room-sources",
     action_id: "open",
@@ -73957,7 +74883,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       action: { panel_id: "situation-room-sources", action_id: "open", args: {} },
     }),
   },
-  {
+    {
     capability_id: "situation-room-pipelines.open",
     panel_id: "situation-room-pipelines",
     action_id: "open",
@@ -73972,7 +74898,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       action: { panel_id: "situation-room-pipelines", action_id: "open", args: {} },
     }),
   },
-  {
+    {
     capability_id: "situation-room-pipelines.create_job",
     panel_id: "situation-room-pipelines",
     action_id: "create_job",
@@ -74013,7 +74939,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "situation-room-pipelines.start_situation_goal_session",
     panel_id: "situation-room-pipelines",
     action_id: "start_situation_goal_session",
@@ -74037,7 +74963,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "situation-room-pipelines.create_live_answer_environment",
     panel_id: "situation-room-pipelines",
     action_id: "create_live_answer_environment",
@@ -74061,7 +74987,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "situation-room-pipelines.set_live_commentary_policy",
     panel_id: "situation-room-pipelines",
     action_id: "set_live_commentary_policy",
@@ -74088,7 +75014,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "situation-room-pipelines.request_agentic_review",
     panel_id: "situation-room-pipelines",
     action_id: "request_agentic_review",
@@ -74116,7 +75042,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "situation-room-pipelines.set_companion_policy",
     panel_id: "situation-room-pipelines",
     action_id: "set_companion_policy",
@@ -74143,7 +75069,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "situation-room-pipelines.dottie.manifest",
     panel_id: "situation-room-pipelines",
     action_id: "dottie.manifest",
@@ -74174,7 +75100,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "situation-room-pipelines.create_live_workstation_pipeline",
     panel_id: "situation-room-pipelines",
     action_id: "create_live_workstation_pipeline",
@@ -74201,7 +75127,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       };
     },
   },
-  {
+    {
     capability_id: "reasoning.followup",
     panel_id: null,
     action_id: null,
@@ -74216,7 +75142,7 @@ const buildAskTurnCapabilityRegistryForRuntime = (): HelixAskTurnRuntimeCapabili
       action: null,
     }),
   },
-];
+  ];
 
 const selectAskTurnRuntimeCapabilityStep = (args: {
   runtime: HelixAskTurnRuntime;
@@ -74357,15 +75283,15 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     !wantsPanelControl &&
     /\b(?:open|go\s+to|switch\s+(?:me\s+)?(?:over\s+)?to|show|move\s+me\s+(?:over\s+)?to|switch\s+my\s+viewer\s+to|put\s+me\s+on)\s+(?:up\s+)?(?:the\s+)?(?:docs?|documents?|papers?|docs?\s+(?:viewer|panel))\b/i.test(normalized);
   const wantsCreateNoteBasic = /\b(?:create|make|new|start)\s+(?:a\s+)?(?:(?:workstation|scratch|research|scientist)\s+)?note\b/i.test(normalized);
-  const topicDocQuery =
-    (wantsCreateNoteBasic
-      ? null
-      : buildAskTurnEquationRetrievalQuery(args.transcript) ??
-        resolveAskTurnCreateThenOpenDocTopicArg(args.transcript) ??
-        resolveAskTurnOpenDocSearchQueryArg(args.transcript) ??
-        (retrievalRequiredSignal.required
-      ? buildAskTurnEquationRetrievalQuery(args.transcript) ?? args.transcript
-          : null));
+  const topicDocQuery = wantsCreateNoteBasic
+    ? null
+    : (buildAskTurnEquationRetrievalQuery(args.transcript) ??
+      resolveAskTurnCreateThenOpenDocTopicArg(args.transcript) ??
+      resolveAskTurnOpenDocSearchQueryArg(args.transcript) ??
+      (retrievalRequiredSignal.required
+        ? (buildAskTurnEquationRetrievalQuery(args.transcript) ??
+          args.transcript)
+        : null));
   const openDocGoalIntent = isAskTurnOpenDocGoalIntent(args.transcript);
   const wantsClipboard = /\b(?:read|open|show|check)\s+(?:the\s+)?clipboard\b/i.test(normalized);
   const wantsLocate =
@@ -74645,7 +75571,16 @@ const selectAskTurnInitialCapabilityPlan = (args: {
       },
       ...targetQueryVariants.map((variant, index): HelixAskTurnPlanStep => ({
         id: buildAskTurnRuntimeRepairStepId(
-          { ...runtime, plan_items: [...planItems, ...Array.from({ length: 2 + index }, () => ({} as HelixAskTurnPlanStep))] },
+          {
+            ...runtime,
+            plan_items: [
+              ...planItems,
+              ...Array.from(
+                { length: 2 + index },
+                () => ({}) as HelixAskTurnPlanStep,
+              ),
+            ],
+          },
           `temporal_target_variant_search_${index + 1}`,
         ),
         lane: "workspace",
@@ -74667,7 +75602,10 @@ const selectAskTurnInitialCapabilityPlan = (args: {
                   ...runtime,
                   plan_items: [
                     ...planItems,
-                    ...Array.from({ length: 2 + targetQueryVariants.length }, () => ({} as HelixAskTurnPlanStep)),
+                    ...Array.from(
+                      { length: 2 + targetQueryVariants.length },
+                      () => ({}) as HelixAskTurnPlanStep,
+                    ),
                   ],
                 },
                 "contextual_followup_validate_temporal_target",
@@ -74693,7 +75631,10 @@ const selectAskTurnInitialCapabilityPlan = (args: {
             ...runtime,
             plan_items: [
               ...planItems,
-              ...Array.from({ length: 2 + targetQueryVariants.length + (activeDocPath ? 1 : 0) }, () => ({} as HelixAskTurnPlanStep)),
+              ...Array.from(
+                { length: 2 + targetQueryVariants.length + (activeDocPath ? 1 : 0) },
+                () => ({}) as HelixAskTurnPlanStep,
+              ),
             ],
           },
           "contextual_followup_compose_temporal_compare",
@@ -74748,9 +75689,8 @@ const selectAskTurnInitialCapabilityPlan = (args: {
         ? buildAskTurnLatestDocAcquisitionAction(args.transcript)
         : null;
     const latestDocActionPath = normalizeAskTurnWorkspaceDocPath(latestDocAction?.args?.path);
-    const selectedSearchResult =
-      latestDocActionPath
-        ? {
+    const selectedSearchResult = latestDocActionPath
+      ? {
             match:
               searchMatches.find((candidate) => candidate.path === latestDocActionPath) ?? {
                 path: latestDocActionPath,
@@ -74761,25 +75701,27 @@ const selectAskTurnInitialCapabilityPlan = (args: {
               },
             reason: "latest_verified_topic_candidate" as const,
           }
-        : (selectAskTurnDocSearchResultForOpen(searchMatches, args.transcript) ??
-          (retrievalRequiredSignal.requested_outputs.includes("latest_doc")
-            ? (() => {
-                const latestStrong =
+      : (selectAskTurnDocSearchResultForOpen(searchMatches, args.transcript) ??
+        (retrievalRequiredSignal.requested_outputs.includes("latest_doc")
+          ? (() => {
+              const latestStrong =
                   candidateValidation.candidates.find((candidate) => candidate.validationStatus === "strong") ??
                   candidateValidation.candidates[0] ??
                   null;
-                const match = latestStrong
-                  ? searchMatches.find((candidate) => candidate.path === latestStrong.path) ?? {
-                      path: latestStrong.path,
-                      line_start: 1,
-                      line_end: 1,
-                      snippet: latestStrong.evidenceSnippet,
-                      score: latestStrong.score,
-                    }
-                  : null;
-                return match ? { match, reason: "latest_verified_topic_candidate" as const } : null;
-              })()
-            : null));
+              const match = latestStrong
+                ? (searchMatches.find(
+                    (candidate) => candidate.path === latestStrong.path,
+                  ) ?? {
+                    path: latestStrong.path,
+                    line_start: 1,
+                    line_end: 1,
+                    snippet: latestStrong.evidenceSnippet,
+                    score: latestStrong.score,
+                  })
+                : null;
+              return match ? { match, reason: "latest_verified_topic_candidate" as const } : null;
+            })()
+          : null));
     const searchAction: HelixAskTurnSelectedAction = {
       panel_id: "docs-viewer",
       action_id: "search_docs",
@@ -74882,7 +75824,8 @@ const selectAskTurnInitialCapabilityPlan = (args: {
         ) {
           const locateQuery =
             retrievalRequiredSignal.requested_outputs.includes("equation_location")
-              ? buildAskTurnEquationRetrievalQuery(args.transcript) ?? topicDocQuery
+              ? (buildAskTurnEquationRetrievalQuery(args.transcript) ??
+                topicDocQuery)
               : (retrievalRequiredSignal.anchors.artifact_ids?.[0] ??
                 retrievalRequiredSignal.anchors.table_names?.[0] ??
                 retrievalRequiredSignal.anchors.alpha_tokens?.[0] ??
@@ -75224,15 +76167,21 @@ const selectAskTurnInitialCapabilityPlan = (args: {
       missingArgs.add("active_doc_path");
     }
   }
-  if (wantsArtifactCarryoverToNote && !wantsCurrentDocPathToNote && !wantsLocateToNote) {
+  if (
+    wantsArtifactCarryoverToNote && !wantsCurrentDocPathToNote && !wantsLocateToNote
+  ) {
     const title =
       resolveAskTurnCreateNoteTitleArg(args.transcript) ??
       resolveAskTurnNoteTargetWithWorkspace(args.transcript, args.workspaceSnapshot) ??
       (typeof args.workspaceSnapshot?.activeNoteTitle === "string" ? args.workspaceSnapshot.activeNoteTitle : null);
     const latestText = readAskTurnLatestResultArtifactText(args.sessionId);
-    if (!title && isAskTurnDeicticNoteWriteWithoutExplicitTitle(args.transcript)) {
+    if (
+      !title && isAskTurnDeicticNoteWriteWithoutExplicitTitle(args.transcript)
+    ) {
       missingArgs.add("note_title");
-    } else if (latestText && !isAskTurnSafeDefaultPreserveToNoteIntent(args.transcript)) {
+    } else if (
+      latestText && !isAskTurnSafeDefaultPreserveToNoteIntent(args.transcript)
+    ) {
       planItems.push({
         id: buildAskTurnRuntimeRepairStepId({ ...runtime, plan_items: planItems }, "workspace_action_append_latest_result"),
         lane: "workspace",
@@ -75259,7 +76208,7 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     } else {
       const query = /\bfalsifier\b/i.test(normalized)
         ? "falsifier condition"
-        : resolveAskTurnDocLocateQuery(args.transcript) ?? "key condition";
+        : (resolveAskTurnDocLocateQuery(args.transcript) ?? "key condition");
       const path = normalizeAskTurnWorkspaceDocPath(args.workspaceSnapshot?.activeDocPath);
       planItems.push(
         {
@@ -75507,14 +76456,18 @@ const selectAskTurnInitialCapabilityPlan = (args: {
     locateWorkspaceActions.find((action) => normalizeAskTurnWorkspaceDocPath(action.args?.path) === explicitLocatePath) ??
     locateWorkspaceActions[0] ??
     null;
-  const firstWorkspaceAction = locateWorkspaceAction ??
+  const firstWorkspaceAction =
+    locateWorkspaceAction ??
     (wantsDocsRetrievalToNote
-      ? planItems
+      ? (planItems
           .filter((step) => step.lane === "workspace" && step.action)
           .map((step) => step.action)
-          .filter((action): action is HelixAskTurnSelectedAction => Boolean(action))
-          .at(-1) ?? null
-      : planItems.find((step) => step.lane === "workspace" && step.action)?.action ?? null);
+          .filter((action): action is HelixAskTurnSelectedAction =>
+            Boolean(action),
+          )
+          .at(-1) ?? null)
+      : (planItems.find((step) => step.lane === "workspace" && step.action)
+          ?.action ?? null));
   return {
     plan_items: planItems,
     selected_action: firstWorkspaceAction,
@@ -75564,7 +76517,7 @@ const proposeAskTurnRuntimeNextStep = (args: {
     const query =
       typeof args.selectedAction?.args?.query === "string"
         ? args.selectedAction.args.query.trim()
-        : resolveAskTurnDocLocateQuery(args.transcript) ?? "";
+        : (resolveAskTurnDocLocateQuery(args.transcript) ?? "");
     const path =
       normalizeAskTurnDocPathForRead(args.selectedAction?.args?.path) ??
       normalizeAskTurnDocPathForRead(args.workspaceSnapshot?.activeDocPath);
@@ -75599,7 +76552,9 @@ const proposeAskTurnRuntimeNextStep = (args: {
       ...registrySelection.traces,
     ];
   }
-  if (args.missingArtifacts.includes("doc_context") || (args.missingArtifacts.includes("workspace_context") && hasDocCue)) {
+  if (
+    args.missingArtifacts.includes("doc_context") || (args.missingArtifacts.includes("workspace_context") && hasDocCue)
+  ) {
     const explicitPath = resolveAskTurnDocPathArg(args.transcript);
     const latestTopic = resolveAskTurnLatestDocTopicArg(args.transcript);
     const latestDocAction = HELIX_E10_6_DOC_ACQUISITION_REPAIR_FLAG
@@ -75608,7 +76563,11 @@ const proposeAskTurnRuntimeNextStep = (args: {
     const action: HelixAskTurnSelectedAction = explicitPath
       ? { panel_id: "docs-viewer", action_id: "open_doc_by_path", args: { path: explicitPath } }
       : latestTopic
-        ? latestDocAction ?? { panel_id: "docs-viewer", action_id: "open_latest_doc_by_topic", args: { topic: latestTopic } }
+        ? (latestDocAction ?? {
+            panel_id: "docs-viewer",
+            action_id: "open_latest_doc_by_topic",
+            args: { topic: latestTopic },
+          })
         : hasValidAskTurnDocContext(args.workspaceSnapshot)
           ? { panel_id: "docs-viewer", action_id: "verify_active_doc", args: { path: args.workspaceSnapshot?.activeDocPath } }
           : { panel_id: "docs-viewer", action_id: "open", args: {} };
@@ -75866,7 +76825,9 @@ const applyAskTurnRuntimeObservations = (args: {
     for (const artifactName of actualArtifacts) {
       if (!artifactName) continue;
       runtime.artifact_store[artifactName] =
-        resultArtifact && resultArtifact.kind === artifactName ? resultArtifact : result?.artifact ?? step.action ?? { ok: true };
+        resultArtifact && resultArtifact.kind === artifactName
+          ? resultArtifact
+          : (result?.artifact ?? step.action ?? { ok: true });
       if (!runtime.satisfied_artifacts.includes(artifactName)) {
         runtime.satisfied_artifacts.push(artifactName);
       }
@@ -75931,7 +76892,8 @@ const applyAskTurnRuntimeObservations = (args: {
       text:
         typeof args.pendingServerRequest.prompt === "string"
           ? args.pendingServerRequest.prompt
-          : args.terminalText ?? "Pending user input is required before this turn can continue.",
+          : (args.terminalText ??
+            "Pending user input is required before this turn can continue."),
     };
   } else if (runtime.failed_subgoals.length > 0) {
     runtime.status = "failed";
@@ -76074,7 +77036,9 @@ const executeAskTurnPlanItemsWithArtifactContinuation = (args: {
   const capabilitySelectionTrace: HelixAskTurnCapabilitySelectionTraceEntry[] = [];
   const runtimeContinuationHints: HelixRuntimeContinuationHint[] = [];
   let availableArtifacts = new Set<string>(
-    stepResults.flatMap((result) => (Array.isArray(result.actual_artifacts) ? result.actual_artifacts : [])),
+    stepResults.flatMap((result) =>
+      Array.isArray(result.actual_artifacts) ? result.actual_artifacts : [],
+    ),
   );
   for (let iteration = 0; iteration < 2; iteration += 1) {
     const artifactStore: Record<string, unknown> = Object.fromEntries(
@@ -76194,7 +77158,7 @@ const buildHelixAskTranscriptScaffold = (args: {
       : [];
   const publicCommentaryTimeline =
     Array.isArray(payload.public_commentary_timeline) && payload.public_commentary_timeline.length > 1
-      ? payload.public_commentary_timeline as HelixAskPublicCommentaryEventV1[]
+      ? (payload.public_commentary_timeline as HelixAskPublicCommentaryEventV1[])
       : buildHelixAskPublicCommentaryTimeline({
           turnId,
           traceId,
@@ -76284,8 +77248,13 @@ const ensureHelixAskTurnTranscriptScaffold = (args: {
     eventSource: args.eventSource ?? "reconstructed",
   });
   const existingFinalEvents = existingTranscriptEvents
-    .map((event) => event && typeof event === "object" && !Array.isArray(event) ? event as HelixAskTurnTranscriptEvent : null)
-    .filter((event): event is HelixAskTurnTranscriptEvent => Boolean(event && (event.type === "final_answer" || event.source_event_type === "terminal_answer")));
+    .map((event) =>
+      event && typeof event === "object" && !Array.isArray(event)
+        ? (event as HelixAskTurnTranscriptEvent)
+        : null,
+    )
+    .filter((event): event is HelixAskTurnTranscriptEvent => Boolean(event && (event.type === "final_answer" || event.source_event_type === "terminal_answer")),
+    );
   const finalEvents = existingFinalEvents.length > 0
     ? existingFinalEvents
     : readAskTurnString(payload.selected_final_answer)
@@ -76721,7 +77690,11 @@ const shouldUseAskTurnModelDecisionLlm = (args: {
   if (!normalized) return false;
   if (isConversationFillerTurn(normalized)) return false;
   if (args.terminalKind === "clarify") return false;
-  return args.terminalKind === "reasoning" || args.plannedSteps.length > 1 || normalized.split(/\s+/).length >= 8;
+  return (
+    args.terminalKind === "reasoning" ||
+    args.plannedSteps.length > 1 ||
+    normalized.split(/\s+/).length >= 8
+  );
 };
 
 const parseAskTurnModelDecisionJson = (
@@ -76951,7 +77924,11 @@ const resolveAskTurnModelDecisionCapabilityStep = (args: {
   if (actionCandidate) {
     const missing = actionCandidate.required_args.filter((key) => {
       const value = providedArgs[key];
-      return value === undefined || value === null || (typeof value === "string" && !value.trim());
+      return (
+        value === undefined ||
+        value === null ||
+        (typeof value === "string" && !value.trim())
+      );
     });
     if (missing.length > 0) {
       args.audit.error_code = `missing_next_args:${missing.join(",")}`;
@@ -78011,14 +78988,18 @@ const HELIX_ASK_TURN_CLAIM_COUNT_WORDS: Record<string, number> = {
   ten: 10,
 };
 
-const extractAskTurnRequestedClaimCount = (transcript: string): number | null => {
+const extractAskTurnRequestedClaimCount = (
+  transcript: string,
+): number | null => {
   const normalized = transcript.trim().toLowerCase();
   const digitMatch = normalized.match(/\b([1-9]|10)\s+(?:key\s+)?claims?\b/);
   if (digitMatch) return Number(digitMatch[1]);
   const wordMatch = normalized.match(
     /\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:key\s+)?claims?\b/,
   );
-  return wordMatch ? HELIX_ASK_TURN_CLAIM_COUNT_WORDS[wordMatch[1]] ?? null : null;
+  return wordMatch
+    ? (HELIX_ASK_TURN_CLAIM_COUNT_WORDS[wordMatch[1]] ?? null)
+    : null;
 };
 
 const inferAskTurnDocFileType = (pathLike: string | null | undefined): string => {
@@ -78463,7 +79444,10 @@ const buildAskTurnEvidenceRetrievalFailure = (args: {
       if (step.status !== "completed" || step.reason !== null || step.lane !== "workspace" || step.action?.panel_id !== "docs-viewer") {
         return false;
       }
-      return step.action.action_id === "search_docs" || Boolean(normalizeAskTurnWorkspaceDocPath(step.action.args?.path));
+      return (
+        step.action.action_id === "search_docs" ||
+        Boolean(normalizeAskTurnWorkspaceDocPath(step.action.args?.path))
+      );
     }),
   );
   const producedNoteContext = Boolean(args.executionTrace?.some((step) => step.status === "completed" && step.reason === null && step.lane === "workspace" && (step.id === "workspace_action_create_note" || step.action?.panel_id === "workstation-notes" || step.action?.action_id === "copy_selection_to_note" || step.action?.action_id === "copy_receipt_to_note")));
@@ -79055,7 +80039,10 @@ const resolveAskTurnTransitionErrorCode = (payload: Record<string, unknown>): He
   return null;
 };
 
-const buildAskTurnModelAppendedNoteReceiptText = (payload: Record<string, unknown>, questionSeed: string): string | null => {
+const buildAskTurnModelAppendedNoteReceiptText = (
+  payload: Record<string, unknown>,
+  questionSeed: string,
+): string | null => {
   if (
     !/\b(?:put|add|save|store|copy|append|write)\b[\s\S]*\b(?:note|notepad)\b/i.test(questionSeed) &&
     !isAskTurnDocLocateToNoteIntent(questionSeed)
@@ -79090,7 +80077,10 @@ const buildAskTurnModelAppendedNoteReceiptText = (payload: Record<string, unknow
     : [];
   const noteAppendAudit = audits.find((audit) => {
     const capability = readAskTurnString(audit.next_capability);
-    return capability === "workstation-notes.append_to_note" && audit.operational_step_appended === true;
+    return (
+      capability === "workstation-notes.append_to_note" &&
+      audit.operational_step_appended === true
+    );
   });
   if (noteAppendAudit) {
     const nextArgs =
@@ -79260,14 +80250,18 @@ const buildAskTurnAssistantAnswerFromState = (args: {
   const currentLooksLikeCompareArtifact =
     /\b(?:compared|key differences|missing from note|already in note|doc-vs-note)\b/i.test(currentText);
   const currentTurnProducedCompare = Array.isArray(args.payload.step_results)
-    ? (args.payload.step_results as Array<Record<string, unknown>>).some((step) => {
-        const artifact =
+    ? (args.payload.step_results as Array<Record<string, unknown>>).some(
+        (step) => {
+          const artifact =
           step?.result_artifact && typeof step.result_artifact === "object"
             ? (step.result_artifact as Record<string, unknown>)
             : null;
-        const kind = readAskTurnString(artifact?.kind);
-        return kind === "comparison_summary" || kind === "doc_vs_note_compare";
-      })
+          const kind = readAskTurnString(artifact?.kind);
+          return (
+            kind === "comparison_summary" || kind === "doc_vs_note_compare"
+          );
+        },
+      )
     : false;
   if (currentLooksLikeCompareArtifact && !currentTurnProducedCompare && !askTurnHasCompareCueOutsideProtectedArgs(questionSeed)) {
     return buildHelixAskNormalTurnFallbackText(questionSeed);
@@ -79414,7 +80408,9 @@ const resolveAskTurnObservationGroundedFinal = (args: {
   return null;
 };
 
-const evaluateConversationClarifyRequirement = (transcript: string): {
+const evaluateConversationClarifyRequirement = (
+  transcript: string,
+): {
   required: boolean;
   routeReasonCode: HelixConversationRouteReasonCode | null;
   prompt: string | null;
@@ -79446,7 +80442,8 @@ const evaluateConversationClarifyRequirement = (transcript: string): {
     return {
       required: true,
       routeReasonCode: "clarify:ambiguous_intent",
-      prompt: "I may have misread that doc request. Did you mean \"doc\" and should I open the latest NHM2 document?",
+      prompt:
+        'I may have misread that doc request. Did you mean "doc" and should I open the latest NHM2 document?',
     };
   }
   if (HELIX_CONVERSATION_MISSING_CREATE_NOTE_NAME_RE.test(normalized)) {
@@ -79630,7 +80627,7 @@ const buildConversationClassifierPrompt = (args: {
   lines.push("Classify the user turn for routing into observe, act, verify, or clarify.");
   lines.push("Return strict JSON only with fields:");
   lines.push(
-    "{\"mode\":\"observe|act|verify|clarify\",\"confidence\":0..1,\"dispatch_hint\":boolean,\"clarify_needed\":boolean,\"reason\":\"<=160 chars\"}",
+    '{"mode":"observe|act|verify|clarify","confidence":0..1,"dispatch_hint":boolean,"clarify_needed":boolean,"reason":"<=160 chars"}',
   );
   lines.push("Dispatch hint policy:");
   lines.push("- true for substantive claim/check/decision/risk/action turns.");
@@ -79670,7 +80667,7 @@ const buildConversationBriefPrompt = (args: {
   lines.push("Keep to 1-3 short sentences. Do not overstate certainty.");
   lines.push(`Return the brief text in language tag ${normalizedResponseLanguage}.`);
   lines.push("Keep canonical framework terms, file paths, and API identifiers unchanged.");
-  lines.push("Return strict JSON only: {\"text\":\"...\"}");
+  lines.push('Return strict JSON only: {"text":"..."}');
   lines.push("");
   lines.push(`Classification mode: ${args.classification.mode}`);
   lines.push(`Dispatch hint: ${args.classification.dispatch_hint ? "true" : "false"}`);
@@ -80617,7 +81614,11 @@ const extractHelixAskLlmCallMetaFromResult = (
       : undefined;
   const retryDelaysMs = Array.isArray(result?.__llm_http_retry_delays_ms)
     ? result.__llm_http_retry_delays_ms
-        .map((value) => (typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : null))
+        .map((value) =>
+          typeof value === "number" && Number.isFinite(value)
+            ? Math.max(0, Math.floor(value))
+            : null,
+        )
         .filter((value): value is number => value !== null)
         .slice(0, 8)
     : undefined;
@@ -81091,8 +82092,6 @@ const buildSlotClarifyLine = (args: {
   }
   return `I could not confirm "${label}" yet. Please point to the relevant files or clarify the term.`;
 };
-
-
 
 const sanitizePlanClarifyLine = (value: string): string => {
   const line = value.trim();
@@ -81609,7 +82608,7 @@ const renderFrontierScientificContract = (args: {
   const lensSeed = resolveFrontierLensSeed(args.question);
   const hypothesisAssumptionSeed =
     args.verification.supportRatio > 0
-      ? args.verification.unsupportedClaims[0] ?? ""
+      ? (args.verification.unsupportedClaims[0] ?? "")
       : "";
   const hypothesisAssumption = clipFrontierComparisonField(
     hypothesisAssumptionSeed,
@@ -82070,12 +83069,18 @@ const hasWarpEthosDomainPair = (question: string): boolean => {
 const hasWarpEthosRelationConnectorCue = (question: string): boolean => {
   const normalized = question.replace(/\s+/g, " ").trim();
   if (!normalized) return false;
-  return HELIX_ASK_RELATION_QUERY_RE.test(normalized) || HELIX_ASK_RELATION_CONNECTOR_RE.test(normalized);
+  return (
+    HELIX_ASK_RELATION_QUERY_RE.test(normalized) ||
+    HELIX_ASK_RELATION_CONNECTOR_RE.test(normalized)
+  );
 };
 
 const isWarpEthosRelationHeuristicQuestion = (question: string): boolean => {
   if (!question?.trim()) return false;
-  return hasWarpEthosDomainPair(question) && hasWarpEthosRelationConnectorCue(question);
+  return (
+    hasWarpEthosDomainPair(question) &&
+    hasWarpEthosRelationConnectorCue(question)
+  );
 };
 
 const isWarpEthosRelationQuestion = (question: string): boolean => {
@@ -82099,7 +83104,12 @@ const isWarpEthosRelationQuestion = (question: string): boolean => {
     /\b(?:warp|warp\s+bubble|warp\s+drive)\b[\s\S]{0,80}\b(?:in|within|under)\b[\s\S]{0,40}\b(?:mission\s+ethos|ethos|ideology)\b/i.test(
       normalized,
     );
-  return hasConnector || compactConnector || policyConnector || hasImplicitIdeologyBridge;
+  return (
+    hasConnector ||
+    compactConnector ||
+    policyConnector ||
+    hasImplicitIdeologyBridge
+  );
 };
 
 const isExplicitReportRequest = (question: string): boolean => {
@@ -84625,10 +85635,15 @@ const createHelixAskComposerV2ClaimCounts = (): HelixAskComposerV2ClaimCounts =>
   reasoned_inference: 0,
 });
 
-const shouldApplyHelixAskComposerV2ForPlan = (plan: HelixAskAnswerPlan): boolean => {
+const shouldApplyHelixAskComposerV2ForPlan = (
+  plan: HelixAskAnswerPlan,
+): boolean => {
   if (!HELIX_ASK_COMPOSER_V2_BRIEF_FIRST_ENABLED) return false;
   if (HELIX_ASK_COMPOSER_V2_SCOPE === "all") return true;
-  return plan.prompt_family !== "equation_formalism" && plan.prompt_family !== "roadmap_planning";
+  return (
+    plan.prompt_family !== "equation_formalism" &&
+    plan.prompt_family !== "roadmap_planning"
+  );
 };
 
 const shouldRunHelixAskComposerV2ForSoftReason = (
@@ -86526,7 +87541,7 @@ const renderHelixAskComposerV2FiveSectionAnswer = (args: {
     ...args.brief.evidence_anchor_hints,
   ]).slice(0, 12);
   lines.push(
-    `Sources: ${mergedSources.length > 0 ? mergedSources.join(", ") : args.brief.evidence_anchor_hints[0] ?? "server/routes/agi.plan.ts"}`,
+    `Sources: ${mergedSources.length > 0 ? mergedSources.join(", ") : (args.brief.evidence_anchor_hints[0] ?? "server/routes/agi.plan.ts")}`,
   );
   return lines.join("\n").trim();
 };
@@ -87125,7 +88140,7 @@ const materializeHelixAskComposerV2Output = (args: {
       fallback_reason: linked.failReasons[0] ?? "link_failed",
     };
   }
-  const rendered = (args.plan
+  const rendered = args.plan
     ? renderHelixAskComposerV2PlannedAnswer({
         plan: args.plan,
         claims: linked.claims,
@@ -87136,7 +88151,7 @@ const materializeHelixAskComposerV2Output = (args: {
         claims: linked.claims,
         brief: args.brief,
         verbosity: args.verbosity,
-      }));
+      });
   return {
     ok: Boolean(rendered),
     rendered_text: rendered,
@@ -87947,12 +88962,12 @@ const buildHelixAskUniversalFamilyDegradeAnswer = (args: {
   switch (args.plan.prompt_family) {
     case "definition_overview":
       {
-      const shouldUseDeterministicDefinitionSentence =
+        const shouldUseDeterministicDefinitionSentence =
         asksDefinitionQuestion ||
         isLowSignalHelixAskUniversalFamilyDegradeSentence(conciseEvidence) ||
         /\b(?:in practical terms,\s*)?bounded linkage supported by cited repo evidence\b/i.test(conciseEvidence) ||
         /\brepo-grounded summary prepared from current in-family evidence\b/i.test(conciseEvidence);
-      const deterministicDefinitionSentence = (() => {
+        const deterministicDefinitionSentence = (() => {
         const docAnchor = docSourceHints[0] ?? primarySource;
         const implAnchors = codeSourceHints.slice(0, 2);
         const conceptLabel = questionTopicTerms.slice(0, 3).join(" ").trim() || "this concept";
@@ -87963,12 +88978,12 @@ const buildHelixAskUniversalFamilyDegradeAnswer = (args: {
         }
         return ensureSentence(`In this codebase, ${conceptLabel} is grounded in ${docAnchor}`);
       })();
-      lines.push("Definition:");
-      lines.push(
-        `- ${(shouldUseDeterministicDefinitionSentence ? deterministicDefinitionSentence : conciseEvidence)} [${primarySource}]`,
-      );
-      lines.push("");
-      if (asksHowSolvedInCodebase) {
+        lines.push("Definition:");
+        lines.push(
+          `- ${shouldUseDeterministicDefinitionSentence ? deterministicDefinitionSentence : conciseEvidence} [${primarySource}]`,
+        );
+        lines.push("");
+        if (asksHowSolvedInCodebase) {
         lines.push("How it is solved in codebase:");
         if (docSourceHints.length > 0) {
           lines.push(`- Definition and constraints are grounded in ${docSourceHints[0]}.`);
@@ -87982,25 +88997,25 @@ const buildHelixAskUniversalFamilyDegradeAnswer = (args: {
         }
         lines.push("");
       }
-      lines.push("Why it matters:");
-      const whyMattersSentence = asksHowSolvedInCodebase
+        lines.push("Why it matters:");
+        const whyMattersSentence = asksHowSolvedInCodebase
         ? "It links the repo-level definition to concrete implementation paths so the mechanism can be inspected and verified."
         : "It provides a repo-grounded definition with explicit scope for follow-up mechanism or equation asks.";
-      lines.push(
+        lines.push(
         `- ${whyMattersSentence} [${primarySource}]`,
       );
-      lines.push("");
-      lines.push("Key terms:");
-      if (questionTopicTerms.length > 0) {
+        lines.push("");
+        lines.push("Key terms:");
+        if (questionTopicTerms.length > 0) {
         for (const term of questionTopicTerms) {
           lines.push(`- ${term}`);
         }
       } else {
         lines.push("- repo-grounded definition");
       }
-      lines.push("");
-      lines.push("Repo anchors:");
-      if (docSourceHints.length > 0) {
+        lines.push("");
+        lines.push("Repo anchors:");
+        if (docSourceHints.length > 0) {
         for (const source of docSourceHints.slice(0, 2)) {
           lines.push(`- ${source}`);
         }
@@ -88303,38 +89318,38 @@ const buildHelixAskUniversalFamilyDegradeAnswer = (args: {
       break;
     case "recommendation_decision":
       {
-      const missingSlots = args.plan.evidence_pack.slot_missing ?? [];
-      lines.push("Decision:");
-      if (sourceHints.length > 0) {
+        const missingSlots = args.plan.evidence_pack.slot_missing ?? [];
+        lines.push("Decision:");
+        if (sourceHints.length > 0) {
         lines.push(`- Start from ${sourceHints.slice(0, 3).join(", ")} before widening the requested change.`);
       } else {
         lines.push("- Keep the decision bounded to the currently retrieved repo evidence.");
       }
-      lines.push("");
-      lines.push("Rationale:");
-      if (codeSourceHints.length > 0 || docSourceHints.length > 0) {
-        lines.push(
-          `- Current grounding is strongest in ${(codeSourceHints.slice(0, 2).concat(docSourceHints.slice(0, 1))).join(" and ")}.`,
-        );
-      } else {
+        lines.push("");
+        lines.push("Rationale:");
+        if (codeSourceHints.length > 0 || docSourceHints.length > 0) {
+          lines.push(
+            `- Current grounding is strongest in ${codeSourceHints.slice(0, 2).concat(docSourceHints.slice(0, 1)).join(" and ")}.`,
+          );
+        } else {
         lines.push("- Current grounding is partial, so the recommendation stays conservative.");
       }
-      lines.push("");
-      lines.push("Constraints:");
-      lines.push("- Preserve grounding to locked evidence only.");
-      lines.push("- No post-lock anchor mutation.");
-      lines.push("");
-      lines.push("Risks:");
-      if (missingSlots.length > 0) {
+        lines.push("");
+        lines.push("Constraints:");
+        lines.push("- Preserve grounding to locked evidence only.");
+        lines.push("- No post-lock anchor mutation.");
+        lines.push("");
+        lines.push("Risks:");
+        if (missingSlots.length > 0) {
         lines.push(
           `- Missing coverage for ${missingSlots.slice(0, 3).map((slot) => slot.replace(/-/g, " ")).join(", ")} can misplace the change surface.`,
         );
       } else {
         lines.push("- Remaining risk is primarily around repo scope, not missing evidence slots.");
       }
-      lines.push("");
-      lines.push("Fallback plan:");
-      if (sourceHints.length > 0) {
+        lines.push("");
+        lines.push("Fallback plan:");
+        if (sourceHints.length > 0) {
         lines.push(`- Retry with explicit route/module anchors near ${sourceHints.slice(0, 2).join(" and ")}.`);
       } else {
         lines.push("- Retry with narrower prompt scope and explicit evidence anchors.");
@@ -88995,7 +90010,7 @@ const collectEquationRescueCandidates = (args: {
     dominantFamily !== "generic" &&
     incomingPathHints.length >= 3 &&
     !hasInFamilyHint
-      ? HELIX_ASK_EQUATION_FAMILY_CORE_SEED_PATHS[dominantFamily] ?? []
+      ? (HELIX_ASK_EQUATION_FAMILY_CORE_SEED_PATHS[dominantFamily] ?? [])
       : [];
   const questionNeedles = extractEquationNeedlesFromQuestion(question);
   const questionSymbolTerms = extractEquationSymbolTerms(question);
@@ -89319,7 +90334,11 @@ const collectEquationRescueCandidates = (args: {
     const leftSemantic = left.semanticFit.ok ? 1 : 0;
     const rightSemantic = right.semanticFit.ok ? 1 : 0;
     if (rightSemantic !== leftSemantic) return rightSemantic - leftSemantic;
-    return right.score - left.score || left.path.localeCompare(right.path) || left.line - right.line;
+    return (
+      right.score - left.score ||
+      left.path.localeCompare(right.path) ||
+      left.line - right.line
+    );
   });
 
   return candidates.slice(0, maxCandidates);
@@ -89576,7 +90595,7 @@ const buildEquationProgressiveFallbackAnswer = (args: {
   const dominantFamily = resolveDominantEquationFamily(args.question ?? "", queryConstraints);
   const topicLabel =
     dominantFamily === "generic"
-      ? args.candidates[0]?.domainFamily ?? "generic"
+      ? (args.candidates[0]?.domainFamily ?? "generic")
       : dominantFamily;
   const primary = args.candidates[0];
   if (!primary) return null;
@@ -91257,7 +92276,7 @@ const buildHelixAskEquationSemanticRerankPrompt = (args: {
       ...candidateLines,
       "",
       "Return JSON only with this shape:",
-      "{\"ranked\":[{\"id\":\"c1\",\"fit\":0.0,\"reason\":\"...\"}]}",
+      '{"ranked":[{"id":"c1","fit":0.0,"reason":"..."}]}',
       "",
       "Rules:",
       "- fit in [0,1]",
@@ -91766,7 +92785,10 @@ const sanitizeSourcesLine = (
     const rawTokens = extractCitationTokensFromText(line);
     const filteredPaths = rawPaths.filter((entry) => {
       const normalized = (normalizeEvidenceRef(entry) ?? entry).toLowerCase();
-      return allowedPathSet.has(normalized) || allowedPathSet.has(entry.toLowerCase());
+      return (
+        allowedPathSet.has(normalized) ||
+        allowedPathSet.has(entry.toLowerCase())
+      );
     });
     const filteredTokens = rawTokens.filter((token) => allowedTokenSet.has(token.toLowerCase()));
     const combined = normalizeCitations([...filteredPaths, ...filteredTokens]);
@@ -92354,8 +93376,6 @@ const stripCitationRepairArtifacts = (value: string): string => {
   cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
   return cleaned;
 };
-
-
 
 const sanitizeCitationRepairOutput = (
   value: string,
@@ -93708,7 +94728,6 @@ planRouter.delete("/helix-ask/graph-lock", (req, res) => {
   return res.json({ ok: true, sessionId, treeIds: [], locked: false });
 });
 
-
 type HelixAskResponder = {
   send: (status: number, payload: unknown) => void;
 };
@@ -94935,7 +95954,9 @@ const summarizeHelixDebugExportObservation = (value: unknown): Record<string, un
   };
 };
 
-const summarizeHelixDebugExportArtifacts = (value: unknown): Record<string, unknown>[] => {
+const summarizeHelixDebugExportArtifacts = (
+  value: unknown,
+): Record<string, unknown>[] => {
   const entries = Array.isArray(value) ? value : [];
   return entries.slice(0, 40).map((entry, index) => {
     const record = asDebugExportRecord(entry) ?? {};
@@ -94973,7 +95994,11 @@ const summarizeHelixDebugExportArtifacts = (value: unknown): Record<string, unkn
         readDebugExportString(payload?.result) ??
         readDebugExportString(payload?.value) ??
         readDebugExportString(payload?.computed_result),
-      text_preview: text ? (text.length <= 240 ? text : `${text.slice(0, 240)}...`) : null,
+      text_preview: text
+        ? text.length <= 240
+          ? text
+          : `${text.slice(0, 240)}...`
+        : null,
     };
   });
 };
@@ -95846,7 +96871,11 @@ const buildHelixModelTurnFidelityAudit = (
       "";
     const chosenCapability = readDebugExportString(iteration?.chosen_capability);
     const nextStep = readDebugExportString(iteration?.next_step);
-    return source === "deterministic_policy_fallback" && Boolean(chosenCapability) && nextStep !== "answer";
+    return (
+      source === "deterministic_policy_fallback" &&
+      Boolean(chosenCapability) &&
+      nextStep !== "answer"
+    );
   });
   const rejectedToolCalls = asDebugExportArray(loopParityTrace?.rejected_tool_calls)
     .map((entry) => asDebugExportRecord(entry))
@@ -96475,10 +97504,13 @@ const buildStagePlayWakeTransactionDebug = (args: {
   const terminalKind =
     readDebugExportString(args.mailboxWakeResultProjection?.status) === "completed"
       ? "stage_play_live_source_mail_wake_result"
-      : readDebugExportString(args.payload.terminal_artifact_kind) ??
-    readDebugExportString(terminalAuthority?.terminal_artifact_kind) ??
-    readDebugExportString(asDebugExportRecord(args.payload.resolved_turn_summary)?.terminal_artifact_kind) ??
-    null;
+      : (readDebugExportString(args.payload.terminal_artifact_kind) ??
+        readDebugExportString(terminalAuthority?.terminal_artifact_kind) ??
+        readDebugExportString(
+          asDebugExportRecord(args.payload.resolved_turn_summary)
+            ?.terminal_artifact_kind,
+        ) ??
+        null);
   const failureCode =
     readDebugExportString(args.payload.terminal_error_code) ??
     readDebugExportString(typedFailure?.terminal_error_code) ??
@@ -96818,7 +97850,9 @@ const buildStagePlayLiveSourceMailboxDebugProof = (args: {
     ...(won ? ["live_environment_tool_observation"] : []),
     ...(hasMailboxReadExecution || hasMailboxReadCapability ? ["stage_play_live_source_mail_read_result", "stage_play_processed_mail_packet"] : []),
     ...(hasMailboxDecisionExecution || hasMailboxDecisionCapability ? ["stage_play_live_source_mail_decision"] : []),
-    ...((hasMailboxDecisionExecution || hasMailboxDecisionCapability) ? ["stage_play_live_source_narrative_state"] : []),
+    ...(hasMailboxDecisionExecution || hasMailboxDecisionCapability
+      ? ["stage_play_live_source_narrative_state"]
+      : []),
     ...(hasMailboxConfigureExecution || hasMailboxConfigureCapability ? ["stage_play_live_source_watch_job_policy"] : []),
     ...(hasInterpreterProfileConfigureExecution || hasInterpreterProfileConfigureCapability ? ["stage_play_live_source_interpreter_profile"] : []),
     ...(hasInterpreterProfileCompareExecution || hasInterpreterProfileCompareCapability ? ["stage_play_live_source_interpreter_profile_comparison"] : []),
@@ -96853,7 +97887,9 @@ const buildStagePlayLiveSourceMailboxDebugProof = (args: {
   const mailboxDebugCapability =
     mailboxCapabilityPriority.find((capability) => executedMailboxCapabilities.includes(capability)) ??
     (won
-      ? mailboxCapabilityPriority.find((capability) => capabilityStrings.includes(capability)) ?? null
+      ? (mailboxCapabilityPriority.find((capability) =>
+          capabilityStrings.includes(capability),
+        ) ?? null)
       : null);
   const causalTrace = [...causalTraceRecords].reverse().find((record) =>
     Boolean(readDebugExportString(record.traceId) ?? readDebugExportString(record.trace_id)) ||
@@ -97150,7 +98186,9 @@ const readReasoningBattleCausalTimeline = (payload: Record<string, unknown>) => 
   return getHelixCausalTurnTimeline(payload);
 };
 
-const buildSolverControllerDebugSummary = (payload: Record<string, unknown>): HelixDebugExportEnvelope["solver_controller_summary"] => {
+const buildSolverControllerDebugSummary = (
+  payload: Record<string, unknown>,
+): HelixDebugExportEnvelope["solver_controller_summary"] => {
   const controller = asDebugExportRecord(payload.solver_controller_decision);
   const terminalAuthority = asDebugExportRecord(payload.terminal_answer_authority);
   const terminalWriter = asDebugExportRecord(payload.terminal_authority_single_writer);
@@ -97182,11 +98220,10 @@ const buildSolverControllerDebugSummary = (payload: Record<string, unknown>): He
     required_terminal_kind:
       readDebugExportString(controller?.required_terminal_kind) ??
       readDebugExportString(canonicalGoal?.required_terminal_kind),
-    selected_terminal_artifact_kind:
-      terminalSelectedAnswer
-        ? terminalWriterKind
-          ?? payloadTerminalKind
-        : readDebugExportString(controller?.selected_terminal_artifact_kind) ?? payloadTerminalKind,
+    selected_terminal_artifact_kind: terminalSelectedAnswer
+      ? (terminalWriterKind ?? payloadTerminalKind)
+      : (readDebugExportString(controller?.selected_terminal_artifact_kind) ??
+        payloadTerminalKind),
     poison_ok: terminalSelectedAnswer ? true : readDebugExportBoolean(poisonAudit?.ok),
     route_authority_ok: terminalSelectedAnswer ? true : readDebugExportBoolean(routeAuthority?.route_authority_ok),
     terminal_authority_route: readDebugExportString(terminalAuthority?.route) ?? (terminalSelectedAnswer ? payloadRoute : null),
@@ -97239,10 +98276,10 @@ const buildDebugExportMandatoryNextTool = (
     tool_name: allowedTools[0],
     allowed_tools: allowedTools,
     terminal_forbidden: true,
-    reason:
-      missingEvidence
-        ? `missing ${missingEvidence}`
-        : readDebugExportString(phaseLock?.reason) ?? "terminal forbidden by phase lock",
+    reason: missingEvidence
+      ? `missing ${missingEvidence}`
+      : (readDebugExportString(phaseLock?.reason) ??
+        "terminal forbidden by phase lock"),
     missing_required_evidence: missingEvidence,
     blocking_reasons: blockingReasons,
     canonical_goal: readDebugExportString(phase?.canonicalGoal),
@@ -97296,7 +98333,9 @@ const buildDebugExportPhaseControllerTrajectory = (input: {
   };
 };
 
-const buildDebugExportEvidenceReentryProof = (payload: Record<string, unknown>): Record<string, unknown> => {
+const buildDebugExportEvidenceReentryProof = (
+  payload: Record<string, unknown>,
+): Record<string, unknown> => {
   const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
   const solverTrace = asDebugExportRecord(payload.ask_turn_solver_trace);
   const evidenceReentryGate = asDebugExportRecord(solverTrace?.evidence_reentry_gate);
@@ -97334,17 +98373,18 @@ const buildDebugExportEvidenceReentryProof = (payload: Record<string, unknown>):
     .filter((entry) => readDebugExportBoolean(entry.reentered_solver) === true)
     .map((entry) => readDebugExportString(entry.ref))
     .filter((entry): entry is string => Boolean(entry));
-  const hasEvidenceReentry = artifactReentryAudit?.runtime_lifecycle_verified === true
-    ? auditReenteredRefs.length > 0
-    : (
-        Boolean(evidenceReentryGate) ||
-        readDebugExportBoolean(asDebugExportRecord(payload.capability_result)?.reentered_solver) === true ||
-        (
-          providerBridgeAuthorized &&
+  const hasEvidenceReentry =
+    artifactReentryAudit?.runtime_lifecycle_verified === true
+      ? auditReenteredRefs.length > 0
+      : Boolean(evidenceReentryGate) ||
+        readDebugExportBoolean(
+          asDebugExportRecord(payload.capability_result)?.reentered_solver,
+        ) === true ||
+        (providerBridgeAuthorized &&
           providerBridgeSelectedRefs.length > 0 &&
-          readDebugExportString(asDebugExportRecord(payload.provider_reasoning_reentry)?.status) === "completed"
-        )
-      );
+          readDebugExportString(
+            asDebugExportRecord(payload.provider_reasoning_reentry)?.status,
+          ) === "completed");
   const hasFinalDraft =
     Boolean(payload.final_answer_draft) ||
     ledger.some((entry) => readDebugExportString(asDebugExportRecord(entry)?.kind) === "final_answer_draft") ||
@@ -98240,7 +99280,8 @@ const syncTerminalProjectionDebugExportMirrors = (
     authority_origin:
       finalAnswerSource === "final_answer_draft"
         ? "selected_final_answer"
-        : readDebugExportString(authority?.authority_origin) ?? finalAnswerSource,
+        : (readDebugExportString(authority?.authority_origin) ??
+          finalAnswerSource),
     server_authoritative: true,
     debug_export_synchronized: true,
     assistant_answer: false,
@@ -98457,8 +99498,10 @@ const buildHelixDebugExportEnvelope = (args: {
       readDebugExportString(previousWriter?.source) === authoritativeEnvelopeSource &&
       readDebugExportString(previousWriter?.visible_text) === authoritativeEnvelopeText;
     const preSynchronizationWriter = previousWriterMatchesEnvelope
-      ? asDebugExportRecord(previousWriter?.pre_synchronization_terminal_authority_single_writer) ?? null
-      : previousWriter ?? null;
+      ? (asDebugExportRecord(
+          previousWriter?.pre_synchronization_terminal_authority_single_writer,
+        ) ?? null)
+      : (previousWriter ?? null);
     const previousWriterAudit = asDebugExportRecord(previousWriter?.audit);
     const previousWriterIntegrity = asDebugExportRecord(previousWriter?.integrity);
     const synchronizedWriterAudit = {
@@ -98802,12 +99845,13 @@ const buildHelixDebugExportEnvelope = (args: {
     asDebugExportRecord(payload.repo_evidence_synthesis_repair_observation) ??
     findDebugExportArtifactPayload(ledger, "repo_evidence_synthesis_repair_observation");
   const providerRouteProductMaterialization = asDebugExportRecord(payload.provider_route_product_materialization);
-  const providerDocsSupportRefs = Array.isArray(providerRouteProductMaterialization?.selected_observation_refs) &&
+  const providerDocsSupportRefs =
+    Array.isArray(providerRouteProductMaterialization?.selected_observation_refs) &&
     ledger.some((entry) => {
       const kind = readDebugExportString(asDebugExportRecord(entry)?.kind);
       return kind === "doc_search_results" || kind === "retrieval_context";
     })
-      ? providerRouteProductMaterialization.selected_observation_refs as unknown[]
+      ? (providerRouteProductMaterialization.selected_observation_refs as unknown[])
       : [];
   const providerDocsTerminalizationOk =
     readDebugExportString(providerRouteProductMaterialization?.status) === "materialized" &&
@@ -98868,13 +99912,12 @@ const buildHelixDebugExportEnvelope = (args: {
   let finalAnswerSource =
     readDebugExportString(payload.final_answer_source) ??
     readDebugExportString(debugTerminalAuthority?.final_answer_source);
-  let terminalArtifactKind =
-    terminalWriterSelectedAnswer
-      ? terminalWriterKind
-      : readDebugExportString(payload.terminal_artifact_kind) ??
-        resolvedTerminalKind ??
-        readDebugExportString(truthTerminal?.terminal_artifact_kind) ??
-        readDebugExportString(debugTerminalAuthority?.terminal_artifact_kind);
+  let terminalArtifactKind = terminalWriterSelectedAnswer
+    ? terminalWriterKind
+    : (readDebugExportString(payload.terminal_artifact_kind) ??
+      resolvedTerminalKind ??
+      readDebugExportString(truthTerminal?.terminal_artifact_kind) ??
+      readDebugExportString(debugTerminalAuthority?.terminal_artifact_kind));
   let terminalErrorCode =
     readDebugExportString(payload.terminal_error_code) ??
     resolvedTerminalErrorCode ??
@@ -98970,10 +100013,11 @@ const buildHelixDebugExportEnvelope = (args: {
       finalAnswerSource === "final_answer_draft" ||
       richModelOnlyConceptApplies
     );
-  const resolvedFinalDraftTerminalKind =
-    resolvedFinalDraftTerminal
-      ? terminalWriterKind ?? terminalWriterMaterializedKind ?? "model_synthesized_answer"
-      : null;
+  const resolvedFinalDraftTerminalKind = resolvedFinalDraftTerminal
+    ? (terminalWriterKind ??
+      terminalWriterMaterializedKind ??
+      "model_synthesized_answer")
+    : null;
   const typedFailureText =
     readDebugExportString(debugTerminalPresentation?.concise_text) ??
     readDebugExportString(payload.selected_final_answer) ??
@@ -98987,17 +100031,16 @@ const buildHelixDebugExportEnvelope = (args: {
     (terminalArtifactKind === "typed_failure" ||
       finalAnswerSource === "typed_failure" ||
       Boolean(terminalErrorCode));
-  let selectedFinalAnswer =
-    mailboxWakeResultSelectedFinalAnswer
-      ? mailboxWakeResultSelectedFinalAnswer
-      : resolvedFinalDraftTerminal
-      ? terminalWriterVisibleText ?? finalDraftText
+  let selectedFinalAnswer = mailboxWakeResultSelectedFinalAnswer
+    ? mailboxWakeResultSelectedFinalAnswer
+    : resolvedFinalDraftTerminal
+      ? (terminalWriterVisibleText ?? finalDraftText)
       : terminalIsTypedFailure
-      ? typedFailureText
-      : terminalWriterVisibleText ??
-        readDebugExportString(debugTerminalPresentation?.concise_text) ??
-        readDebugExportString(payload.selected_final_answer) ??
-        terminalAuthorityText;
+        ? typedFailureText
+        : (terminalWriterVisibleText ??
+          readDebugExportString(debugTerminalPresentation?.concise_text) ??
+          readDebugExportString(payload.selected_final_answer) ??
+          terminalAuthorityText);
   let debugExportTerminalAuthority =
     mailboxWakeResultProjection && mailboxWakeResultSelectedFinalAnswer
       ? {
@@ -99384,11 +100427,11 @@ const buildHelixDebugExportEnvelope = (args: {
           ],
         })
       : null;
-  const liveSourceMailboxAuthoritySummary =
-    mailboxRouteWon
-      ? asDebugExportRecord(stagePlayLiveSourceMailboxDebug?.authority_summary) ??
-        asDebugExportRecord(payload.live_source_mailbox_authority_summary)
-      : null;
+  const liveSourceMailboxAuthoritySummary = mailboxRouteWon
+    ? (asDebugExportRecord(
+        stagePlayLiveSourceMailboxDebug?.authority_summary,
+      ) ?? asDebugExportRecord(payload.live_source_mailbox_authority_summary))
+    : null;
   const mailboxGenericRuntimeTrace =
     liveSourceMailboxAuthoritySummary ? summarizeMailboxGenericRuntimeTrace(payload) : null;
   const requestMetadataForMailboxEnvelope = asDebugExportRecord(payload.request_metadata);
@@ -99406,7 +100449,9 @@ const buildHelixDebugExportEnvelope = (args: {
         originalSourceTarget:
           asDebugExportRecord(stagePlayLiveSourceMailboxDebug?.source_target_intent) ?? debugSourceTargetIntent,
       })
-    : asDebugExportRecord(stagePlayLiveSourceMailboxDebug?.source_target_intent) ?? debugSourceTargetIntent;
+    : (asDebugExportRecord(
+        stagePlayLiveSourceMailboxDebug?.source_target_intent,
+      ) ?? debugSourceTargetIntent);
   const debugCanonicalGoal = asDebugExportRecord(payload.canonical_goal_frame);
   const debugCanonicalReasons = Array.isArray(debugCanonicalGoal?.classifier_reasons)
     ? debugCanonicalGoal.classifier_reasons.map(readDebugExportString).filter((entry): entry is string => Boolean(entry))
@@ -99608,7 +100653,10 @@ const buildHelixDebugExportEnvelope = (args: {
   const currentTurnArtifactLedgerKindsDebug = ledger
     .map((entry) => {
       const record = asDebugExportRecord(entry);
-      return readDebugExportString(record?.kind) ?? readDebugExportString(asDebugExportRecord(record?.payload)?.kind);
+      return (
+        readDebugExportString(record?.kind) ??
+        readDebugExportString(asDebugExportRecord(record?.payload)?.kind)
+      );
     })
     .filter((entry): entry is string => Boolean(entry));
   const docsSynthesisDebug =
@@ -101451,14 +102499,22 @@ const resolveSessionPinnedResponseLanguage = (args: {
   sessionMemory: HelixAskSessionMemory | null;
 }): string | null => {
   if (hasExplicitResponseLanguageOverride(args.request)) return null;
-  return normalizeLanguageTag(args.sessionMemory?.userPrefs?.preferredResponseLanguage ?? null) ?? null;
+  return (
+    normalizeLanguageTag(
+      args.sessionMemory?.userPrefs?.preferredResponseLanguage ?? null,
+    ) ?? null
+  );
 };
 
 const resolveDetectedResponseLanguageCandidate = (args: {
   sourceLanguage?: string | null;
   languageDetected?: string | null;
 }): string | null => {
-  return normalizeLanguageTag(args.languageDetected ?? null) ?? normalizeLanguageTag(args.sourceLanguage ?? null) ?? null;
+  return (
+    normalizeLanguageTag(args.languageDetected ?? null) ??
+    normalizeLanguageTag(args.sourceLanguage ?? null) ??
+    null
+  );
 };
 
 const INTERPRETER_FAIL_CLOSED_STATUSES = new Set<HelixAskInterpreterStatus>([
@@ -101703,9 +102759,10 @@ const normalizeHelixAskErrorEnvelope = (
   const httpStatus = Number.isFinite(sourceStatus) ? Number(sourceStatus) : status;
   const message = typeof source.message === "string" ? source.message : typeof source.error === "string" ? source.error : "request_failed";
   const timeoutClass = classifyHelixAskTimeoutFailClass(message);
-  const failClass = typeof source.fail_class === "string" && source.fail_class.trim()
-    ? source.fail_class
-    : timeoutClass ?? (httpStatus >= 500 ? "infra_fail" : "http_error");
+  const failClass =
+    typeof source.fail_class === "string" && source.fail_class.trim()
+      ? source.fail_class
+      : (timeoutClass ?? (httpStatus >= 500 ? "infra_fail" : "http_error"));
   const failReason = typeof source.fail_reason === "string" && source.fail_reason.trim()
     ? source.fail_reason
     : message;
@@ -105243,8 +106300,11 @@ const executeHelixAsk = async ({
       debugPayload.fast_quality_decisions = next;
     };
     const baseQuestion = (questionValue ?? question ?? prompt ?? "").trim();
-    const promptResearchContractInput =
-      (prompt && prompt.trim().length > 0 ? prompt : parsed.data.question?.trim() ?? baseQuestion).trim();
+    const promptResearchContractInput = (
+      prompt && prompt.trim().length > 0
+        ? prompt
+        : (parsed.data.question?.trim() ?? baseQuestion)
+    ).trim();
     const promptResearchContract = parsePromptResearchContract(promptResearchContractInput);
     const promptResearchRetrievalContract = buildPromptResearchRetrievalContract(
       promptResearchContract,
@@ -105272,10 +106332,10 @@ const executeHelixAsk = async ({
       normalizeLanguageTag(parsed.data.sourceLanguage ?? null) ??
       normalizeLanguageTag(parsed.data.languageDetected ?? null) ??
       null;
-  const interpreterArtifact = parsed.data.interpreter ?? null;
-  const interpreterStatus = parsed.data.interpreterStatus ?? null;
-  const interpreterError = parsed.data.interpreterError ?? null;
-  const interpreterDispatchEligible = shouldApplyInterpreterDispatchState({
+    const interpreterArtifact = parsed.data.interpreter ?? null;
+    const interpreterStatus = parsed.data.interpreterStatus ?? null;
+    const interpreterError = parsed.data.interpreterError ?? null;
+    const interpreterDispatchEligible = shouldApplyInterpreterDispatchState({
     artifact: interpreterArtifact,
     status: interpreterStatus,
     sourceLanguage: parsed.data.sourceLanguage ?? null,
@@ -105283,11 +106343,11 @@ const executeHelixAsk = async ({
     codeMixed: parsed.data.codeMixed === true,
     sourceText: sourceQuestion || baseQuestion,
   });
-  const interpreterConfidence =
+    const interpreterConfidence =
     interpreterArtifact && Number.isFinite(interpreterArtifact.selected_pivot.confidence)
       ? clampNumber(interpreterArtifact.selected_pivot.confidence, 0, 1)
       : null;
-  const pivotConfidenceValue =
+    const pivotConfidenceValue =
     HELIX_ASK_INTERPRETER_ACTIVE && interpreterDispatchEligible && interpreterConfidence !== null
       ? interpreterConfidence
       : typeof parsed.data.pivotConfidence === "number" && Number.isFinite(parsed.data.pivotConfidence)
@@ -105387,7 +106447,9 @@ const executeHelixAsk = async ({
         lang_schema_version: parsed.data.lang_schema_version ?? HELIX_LANG_SCHEMA_VERSION,
         interpreter_status: interpreterStatus,
         interpreter_confidence: interpreterConfidence,
-        interpreter_dispatch_state: interpreterDispatchEligible ? interpreterArtifact?.dispatch_state ?? null : null,
+        interpreter_dispatch_state: interpreterDispatchEligible
+          ? (interpreterArtifact?.dispatch_state ?? null)
+          : null,
         interpreter_confirm_prompt: interpreterConfirmPrompt,
         interpreter_term_ids: interpreterArtifact?.term_ids ?? [],
         interpreter_concept_ids: interpreterArtifact?.concept_ids ?? [],
@@ -105452,7 +106514,7 @@ const executeHelixAsk = async ({
         debugPayload.interpreter_error = interpreterError;
         debugPayload.interpreter_confidence = interpreterConfidence;
         debugPayload.interpreter_dispatch_state = interpreterDispatchEligible
-          ? interpreterArtifact?.dispatch_state ?? null
+          ? (interpreterArtifact?.dispatch_state ?? null)
           : null;
         debugPayload.interpreter_top2_gap = interpreterArtifact?.ambiguity?.top2_gap ?? null;
       }
@@ -105825,15 +106887,15 @@ const executeHelixAsk = async ({
         };
       }
       if (!bypassSingleBlock) {
-      const reportExplicitRepo =
+        const reportExplicitRepo =
         HELIX_ASK_REPO_FORCE.test(rawQuestion) ||
         HELIX_ASK_REPO_EXPECTS.test(rawQuestion) ||
         HELIX_ASK_FILE_HINT.test(rawQuestion);
-      const reportRepoContext =
+        const reportRepoContext =
         reportExplicitRepo ||
         HELIX_ASK_REPO_HINT.test(rawQuestion) ||
         /helix(?:[-\s]+)ask|\/api\/agi\/ask|codebase|repository|repo|arbiter|evidence gate|constraint|live events?|routing/i.test(rawQuestion);
-      const helixAskAnchorFiles = reportRepoContext && /helix ask/i.test(rawQuestion)
+        const helixAskAnchorFiles = reportRepoContext && /helix ask/i.test(rawQuestion)
         ? [
             "server/routes/agi.plan.ts",
             "server/services/helix-ask/arbiter.ts",
@@ -105842,15 +106904,15 @@ const executeHelixAsk = async ({
             "docs/helix-ask-flow.md",
           ]
         : [];
-      logEvent(
+        logEvent(
         "Report mode",
         "start",
         reportDecision.reason ?? "enabled",
       );
-      if (debugPayload) {
+        if (debugPayload) {
         debugPayload.report_blocks_count = limitedBlocks.length;
       }
-      if (dryRun) {
+        if (dryRun) {
         const dryReportPayload: LocalAskResult = { text: "", report_mode: true, dry_run: true };
         attachContextCapsuleToResult(dryReportPayload, "");
         const responsePayload = debugPayload
@@ -105859,9 +106921,9 @@ const executeHelixAsk = async ({
         responder.send(200, responsePayload);
         return;
       }
-      const blockResults: HelixAskReportBlockResult[] = [];
-      const reportLiveEvents: HelixAskTraceEvent[] = [];
-      const reportBlockDetails: Array<{
+        const blockResults: HelixAskReportBlockResult[] = [];
+        const reportLiveEvents: HelixAskTraceEvent[] = [];
+        const reportBlockDetails: Array<{
         id: string;
         label?: string;
         question: string;
@@ -105916,82 +106978,82 @@ const executeHelixAsk = async ({
         duration_ms?: number;
         prefetch_files_count?: number;
       }> = [];
-      for (let index = 0; index < limitedBlocks.length; index += 1) {
-        const block = limitedBlocks[index];
-        const blockTraceId = `${askTraceId}:b${index + 1}`.slice(0, 128);
-        const blockStart = Date.now();
-        const blockText = normalizeReportBlockText(block.text);
-        const blockTextForQuestion = blockText || block.text;
-        const blockHints = resolveReportBlockHints(block.text, { typeHint: block.typeHint });
-        const blockHasRepoCue =
+        for (let index = 0; index < limitedBlocks.length; index += 1) {
+          const block = limitedBlocks[index];
+          const blockTraceId = `${askTraceId}:b${index + 1}`.slice(0, 128);
+          const blockStart = Date.now();
+          const blockText = normalizeReportBlockText(block.text);
+          const blockTextForQuestion = blockText || block.text;
+          const blockHints = resolveReportBlockHints(block.text, { typeHint: block.typeHint });
+          const blockHasRepoCue =
           HELIX_ASK_REPO_FORCE.test(blockTextForQuestion) ||
           HELIX_ASK_REPO_EXPECTS.test(blockTextForQuestion) ||
           HELIX_ASK_REPO_HINT.test(blockTextForQuestion) ||
           HELIX_ASK_FILE_HINT.test(blockTextForQuestion) ||
           REPORT_BLOCK_REPO_CUE_RE.test(blockTextForQuestion);
-        const slotRepoContext = Boolean(block.slotId);
-        const blockRepoContext =
+          const slotRepoContext = Boolean(block.slotId);
+          const blockRepoContext =
           slotRepoContext ||
           reportRepoContext ||
           reportExplicitRepo ||
           blockHints.repoFocus ||
           blockHasRepoCue;
-        const blockAnchorFiles = Array.from(
+          const blockAnchorFiles = Array.from(
           new Set([...helixAskAnchorFiles, ...blockHints.anchorFiles]),
         );
-        const slotScopeOverride =
+          const slotScopeOverride =
           block.typeHint === "concept"
             ? buildSlotReportBlockScopeOverride(block.slotSurfaces ?? [], block.slotId)
             : null;
-        const blockScopeOverride = blockRepoContext
+          const blockScopeOverride = blockRepoContext
           ? buildReportBlockScopeOverride(blockAnchorFiles, blockHints.hintIds)
           : {};
-        const mergedBlockScopeOverride = slotScopeOverride
+          const mergedBlockScopeOverride = slotScopeOverride
           ? mergePlanScope(blockScopeOverride, slotScopeOverride)
           : blockScopeOverride;
-        const needsRepoPrefix =
+          const needsRepoPrefix =
           blockRepoContext &&
           !HELIX_ASK_REPO_FORCE.test(blockTextForQuestion) &&
           !HELIX_ASK_REPO_EXPECTS.test(blockTextForQuestion) &&
           !HELIX_ASK_REPO_HINT.test(blockTextForQuestion) &&
           !HELIX_ASK_FILE_HINT.test(blockTextForQuestion);
-        const needsHelixAskAnchor =
+          const needsHelixAskAnchor =
           blockRepoContext &&
           blockAnchorFiles.length > 0 &&
           !/helix ask/i.test(blockTextForQuestion);
-        const needsCitationPrompt =
+          const needsCitationPrompt =
           blockRepoContext &&
           !/\b(cite|citation|file|path|source)\b/i.test(blockTextForQuestion);
-        const prefix = needsHelixAskAnchor
+          const prefix = needsHelixAskAnchor
           ? "In this repo's Helix Ask system, "
           : needsRepoPrefix
             ? "In this repo, "
             : "";
-        const baseBlockQuestion = `${prefix}${blockTextForQuestion}`.trim();
-        const anchorHint =
+          const baseBlockQuestion = `${prefix}${blockTextForQuestion}`.trim();
+          const anchorHint =
           blockAnchorFiles.length > 0 ? `Use files: ${blockAnchorFiles.join(", ")}.` : "";
-        const baseSlotAliasText = (block.slotAliases ?? [])
+          const baseSlotAliasText = (block.slotAliases ?? [])
           .map((alias) => alias.trim())
           .filter(Boolean)
           .slice(0, 4);
-        if (block.slotId) {
+          if (block.slotId) {
           baseSlotAliasText.push(block.slotId.replace(/-/g, " "));
         }
-        const slotAliasText = baseSlotAliasText.length
+          const slotAliasText = baseSlotAliasText.length
           ? `Use slot terms: ${Array.from(new Set(baseSlotAliasText)).join(", ")}.`
           : "";
-        const baseEvidenceText = (block.slotEvidenceCriteria ?? [])
+          const baseEvidenceText = (block.slotEvidenceCriteria ?? [])
           .map((entry) => entry.trim())
           .filter(Boolean)
           .slice(0, 3);
-        const evidenceText = baseEvidenceText.length
+          const evidenceText = baseEvidenceText.length
           ? `Evidence target: ${Array.from(new Set(baseEvidenceText)).join(", ")}.`
           : "";
-        const blockQuestion = needsCitationPrompt
+          const blockQuestion = needsCitationPrompt
           ? `${baseBlockQuestion} Cite repo file paths. ${anchorHint} ${slotAliasText} ${evidenceText}`.trim()
           : `${baseBlockQuestion} ${anchorHint} ${slotAliasText} ${evidenceText}`.trim();
-        const blockQueryText = block.slotId ? "" : blockTextForQuestion;
-        const blockSearchQuery = buildReportBlockSearchQuery({
+          const blockQueryText = block.slotId ? "" : blockTextForQuestion;
+          const blockSearchQuery = buildReportBlockSearchQuery({
           blockText: blockQueryText,
           searchTerms: block.slotId ? [] : blockHints.searchTerms,
           anchorFiles: block.slotId ? [] : blockAnchorFiles,
@@ -106001,12 +107063,12 @@ const executeHelixAsk = async ({
           slotId: block.slotId,
           includeHelixAsk: block.slotId ? false : blockHints.includeHelixAsk,
         });
-        const blockSearchSeed =
+          const blockSearchSeed =
           blockSearchQuery ||
           (block.slotId ? block.slotId.replace(/-/g, " ") : blockTextForQuestion);
-        const blockHeadingSeedSlots = buildDocHeadingSeedSlots(blockSearchSeed);
-        let blockPrefetchContext: { context: string; files: string[] } | null = null;
-        if (blockRepoContext && blockSearchSeed) {
+          const blockHeadingSeedSlots = buildDocHeadingSeedSlots(blockSearchSeed);
+          let blockPrefetchContext: { context: string; files: string[] } | null = null;
+          if (blockRepoContext && blockSearchSeed) {
           const prefetchStart = Date.now();
           const blockTopicTags = inferHelixAskTopicTags(blockSearchSeed, blockSearchSeed);
           const blockTopicProfile = buildHelixAskTopicProfile(blockTopicTags);
@@ -106050,13 +107112,13 @@ const executeHelixAsk = async ({
             prefetchStart,
           );
         }
-        logEvent(
+          logEvent(
           "Report block",
           "start",
           `block=${index + 1}/${limitedBlocks.length}`,
           blockStart,
         );
-        if (
+          if (
           blockRepoContext &&
           (blockAnchorFiles.length > 0 || mergedBlockScopeOverride.allowlistTiers)
         ) {
@@ -106075,8 +107137,8 @@ const executeHelixAsk = async ({
             blockStart,
           );
         }
-        let blockPayload: { status: number; payload: any } | null = null;
-        await executeHelixAsk({
+          let blockPayload: { status: number; payload: any } | null = null;
+          await executeHelixAsk({
           request: {
             ...request,
             question: blockQuestion,
@@ -106105,14 +107167,14 @@ const executeHelixAsk = async ({
             planScopeOverride: mergedBlockScopeOverride,
           },
         });
-        const resolvedBlockPayload = blockPayload as { status: number; payload: any } | null;
-        const failedBlock =
+          const resolvedBlockPayload = blockPayload as { status: number; payload: any } | null;
+          const failedBlock =
           !resolvedBlockPayload || resolvedBlockPayload.status >= 400;
-        const rawBlockAnswer =
+          const rawBlockAnswer =
           resolvedBlockPayload && resolvedBlockPayload.status < 400
             ? String(resolvedBlockPayload.payload?.text ?? "").trim()
             : "Unable to complete this block. Please clarify or point to the relevant files.";
-        const blockDebug = resolvedBlockPayload?.payload?.debug as
+          const blockDebug = resolvedBlockPayload?.payload?.debug as
           | {
               arbiter_mode?: string;
               clarify_triggered?: boolean;
@@ -106158,49 +107220,52 @@ const executeHelixAsk = async ({
               slot_alias_coverage_rate?: number;
             }
           | undefined;
-        const blockLiveEvents = resolvedBlockPayload?.payload?.debug?.live_events as
+          const blockLiveEvents = resolvedBlockPayload?.payload?.debug?.live_events as
           | HelixAskTraceEvent[]
           | undefined;
-        if (Array.isArray(blockLiveEvents)) {
+          if (Array.isArray(blockLiveEvents)) {
           reportLiveEvents.push(...blockLiveEvents);
         }
-        const evidenceOk = failedBlock ? false : blockDebug?.evidence_gate_ok !== false;
-        const coverageApplied = !failedBlock && Boolean(blockDebug?.coverage_gate_applied);
-        const driftDetected =
+          const evidenceOk = failedBlock ? false : blockDebug?.evidence_gate_ok !== false;
+          const coverageApplied = !failedBlock && Boolean(blockDebug?.coverage_gate_applied);
+          const driftDetected =
           !failedBlock &&
           (/drifted too far/i.test(rawBlockAnswer) ||
             ((Boolean(blockDebug?.belief_gate_applied) ||
               Boolean(blockDebug?.rattling_gate_applied)) &&
               !evidenceOk));
-        let clarify =
+          let clarify =
           failedBlock ||
           Boolean(blockDebug?.clarify_triggered) ||
           /^what do you mean|please point|could you clarify/i.test(rawBlockAnswer);
-        if (blockRepoContext) {
+          if (blockRepoContext) {
           const repoExpectationFailed = coverageApplied || !evidenceOk;
           if (repoExpectationFailed) {
             clarify = true;
           }
         }
-        if (driftDetected) {
+          if (driftDetected) {
           clarify = true;
         }
-        const rawMode = failedBlock || driftDetected ? "clarify" : blockDebug?.arbiter_mode ?? "general";
-        const mode: HelixAskReportBlockResult["mode"] =
+          const rawMode =
+            failedBlock || driftDetected
+              ? "clarify"
+              : (blockDebug?.arbiter_mode ?? "general");
+          const mode: HelixAskReportBlockResult["mode"] =
           clarify
             ? "clarify"
             : rawMode === "repo_grounded" || rawMode === "hybrid" || rawMode === "general"
               ? rawMode
               : "general";
-        const clarifyTerms = (
+          const clarifyTerms = (
           failedBlock && block.label
             ? [block.label]
             : (blockDebug?.coverage_missing_keys ?? blockDebug?.ambiguity_terms ?? [])
         ).slice(0, 2);
-        const rawScientific = isScientificMicroReport(rawBlockAnswer);
-        let blockAnswer = rawBlockAnswer;
-        let blockNextEvidence: string[] = [];
-        if (clarify) {
+          const rawScientific = isScientificMicroReport(rawBlockAnswer);
+          let blockAnswer = rawBlockAnswer;
+          let blockNextEvidence: string[] = [];
+          if (clarify) {
           if (rawScientific) {
             blockNextEvidence = extractNextEvidenceLines(rawBlockAnswer);
             blockAnswer = rawBlockAnswer;
@@ -106236,11 +107301,11 @@ const executeHelixAsk = async ({
             );
           }
         }
-        let citations: string[] = [];
-        let citationFallbackApplied = false;
-        let scrubbedPaths: string[] = [];
-        let dedupeApplied = false;
-        if (!clarify) {
+          let citations: string[] = [];
+          let citationFallbackApplied = false;
+          let scrubbedPaths: string[] = [];
+          let dedupeApplied = false;
+          if (!clarify) {
           const allowedPaths = Array.from(
             new Set([...(blockDebug?.context_files ?? []), ...blockAnchorFiles]),
           );
@@ -106254,7 +107319,7 @@ const executeHelixAsk = async ({
             citationFallbackApplied = citations.length > 0;
           }
         }
-        blockResults.push({
+          blockResults.push({
           id: block.id,
           index,
           label: block.label,
@@ -106266,7 +107331,7 @@ const executeHelixAsk = async ({
           traceId: blockTraceId,
           nextEvidence: blockNextEvidence,
         });
-        if (debugPayload) {
+          if (debugPayload) {
           const blockDuration = Math.max(0, Date.now() - blockStart);
           reportBlockDetails.push({
             id: block.id,
@@ -106328,18 +107393,18 @@ const executeHelixAsk = async ({
             prefetch_files_count: blockPrefetchContext?.files.length ?? 0,
           });
         }
-        logEvent(
+          logEvent(
           "Report block",
           "ok",
           `mode=${mode}`,
           blockStart,
         );
-      }
-      let reportText = buildHelixAskReportAnswer(blockResults, omittedCount);
-      const reportMetrics = debugPayload
+        }
+        let reportText = buildHelixAskReportAnswer(blockResults, omittedCount);
+        const reportMetrics = debugPayload
         ? computeReportMetrics(blockResults, reportBlockDetails)
         : null;
-      if (HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR) {
+        if (HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR) {
         const reportRelationQuery =
           isWarpEthosRelationHeuristicQuestion(baseQuestion) ||
           isWarpEthosRelationQuestion(baseQuestion);
@@ -106393,7 +107458,7 @@ const executeHelixAsk = async ({
           debugPayload.report_quality_floor_text_length = reportText.trim().length;
         }
       }
-      const reportPayload: LocalAskResult = {
+        const reportPayload: LocalAskResult = {
         text: reportText,
         report_mode: true,
         report_blocks: blockResults.map((block) => ({
@@ -106409,7 +107474,7 @@ const executeHelixAsk = async ({
           trace_id: block.traceId,
         })),
       };
-      if (debugPayload) {
+        if (debugPayload) {
         debugPayload.report_blocks = reportPayload.report_blocks as any;
         debugPayload.report_blocks_detail = reportBlockDetails as any;
         debugPayload.report_metrics = reportMetrics as any;
@@ -106422,9 +107487,9 @@ const executeHelixAsk = async ({
           traceEvents: combinedEvents,
         });
       }
-      attachContextCapsuleToResult(reportPayload, reportText);
-      responder.send(200, debugPayload ? { ...reportPayload, debug: debugPayload } : reportPayload);
-      return;
+        attachContextCapsuleToResult(reportPayload, reportText);
+        responder.send(200, debugPayload ? { ...reportPayload, debug: debugPayload } : reportPayload);
+        return;
       }
     }
     const routingSourceText = [
@@ -106557,7 +107622,7 @@ const executeHelixAsk = async ({
           ? getHelixAskSessionMemory(parsed.data.sessionId)
           : null;
     }
-      if (sessionMemoryForTags?.recentTopics?.length) {
+    if (sessionMemoryForTags?.recentTopics?.length) {
         const carryoverTopics = selectCarryoverTopicTags({
           inferredTopics: topicTags,
           recentTopics: sessionMemoryForTags.recentTopics,
@@ -106580,7 +107645,7 @@ const executeHelixAsk = async ({
           (debugPayload as Record<string, unknown>).topic_carryover = carryoverTopics.slice(0, 8);
         }
       }
-      logEvent(
+    logEvent(
         "Topic tags",
         topicTags.length ? "ok" : "none",
         topicTags.length ? topicTags.join(", ") : "none",
@@ -106593,7 +107658,9 @@ const executeHelixAsk = async ({
     let stage05SummaryFailReason: string | null = null;
     let stage05SummaryMissingSlots: string[] = [];
     let stage05SummaryClarifyLine: string | null = null;
-    const absorbStage05SummaryGuard = (telemetry: Stage05Telemetry | undefined): void => {
+    const absorbStage05SummaryGuard = (
+      telemetry: Stage05Telemetry | undefined,
+    ): void => {
       if (!telemetry) return;
       const telemetryMissingSlots = telemetry.slot_coverage?.missing ?? [];
       const telemetrySoftCodePathGap = isStage05SoftCodePathGapTelemetry(telemetry);
@@ -106606,10 +107673,10 @@ const executeHelixAsk = async ({
       const telemetryRecoversSummaryHardFail =
         telemetrySoftCodePathGap ||
         telemetrySoftRuntimeFail ||
-        telemetry.used &&
-        !telemetry.summary_hard_fail &&
-        !telemetryCoverageGap &&
-        telemetryMissingSlots.length === 0;
+        (telemetry.used &&
+          !telemetry.summary_hard_fail &&
+          !telemetryCoverageGap &&
+          telemetryMissingSlots.length === 0);
       if (telemetryRecoversSummaryHardFail) {
         stage05SummaryHardFail = false;
         stage05SummaryFailReason = null;
@@ -106713,31 +107780,31 @@ const executeHelixAsk = async ({
       "star",
       "constraints",
     ]);
-      const repoExpectationSignals: string[] = [];
-      let repoExpectationScore = 0;
+    const repoExpectationSignals: string[] = [];
+    let repoExpectationScore = 0;
     if (explicitRepoExpectation) {
       repoExpectationScore = 3;
       repoExpectationSignals.push("explicit_repo");
     }
-      if (hasFilePathHints) {
+    if (hasFilePathHints) {
         repoExpectationScore = Math.max(repoExpectationScore, 3);
         repoExpectationSignals.push("file_path");
       }
-      const conceptRepoMatch = Boolean(
+    const conceptRepoMatch = Boolean(
         (conceptMatch as HelixAskConceptMatch | null)?.card?.sourcePath,
       );
-      if (conceptRepoMatch) {
+    if (conceptRepoMatch) {
         repoExpectationScore = Math.max(repoExpectationScore, 2);
         repoExpectationSignals.push("concept_match");
       }
-      if (promptResearchRepoRequired) {
+    if (promptResearchRepoRequired) {
         repoExpectationScore = Math.max(repoExpectationScore, 3);
         repoExpectationSignals.push("prompt_research_contract");
       }
-      const tagSignals = multilangPreferGeneralRouting
+    const tagSignals = multilangPreferGeneralRouting
         ? []
         : topicTags.filter((tag) => repoNativeTags.has(tag));
-      if (tagSignals.length) {
+    if (tagSignals.length) {
         repoExpectationScore = Math.max(repoExpectationScore, 2);
         repoExpectationSignals.push(...tagSignals.map((tag) => `tag:${tag}`));
       }
@@ -106766,7 +107833,7 @@ const executeHelixAsk = async ({
           ? "medium"
           : "low";
     let requiresRepoEvidence = explicitRepoExpectation || conceptRepoMatch || promptResearchRepoRequired;
-      let hasRepoHints =
+    let hasRepoHints =
         explicitRepoExpectation ||
         repoHintMatched ||
         conceptRepoMatch ||
@@ -107147,7 +108214,8 @@ const executeHelixAsk = async ({
           scores.sort((a, b) => b.score - a.score);
           const top = scores[0];
           const second = scores[1];
-          const margin = top && second ? top.score - second.score : top?.score ?? 0;
+          const margin =
+            top && second ? top.score - second.score : (top?.score ?? 0);
           if (
             top &&
             margin >= HELIX_ASK_AMBIGUITY_DOMINANCE_THRESHOLD &&
@@ -108733,7 +109801,7 @@ const executeHelixAsk = async ({
     if (debugPayload) {
       debugPayload.verification_anchor_required = verificationAnchorRequired;
     }
-        let preflightContext:
+    let preflightContext:
           | {
               context: string;
               files: string[];
@@ -109217,7 +110285,7 @@ const executeHelixAsk = async ({
             : "falsifiable.constraints.gr_viability_certificate";
       const label =
         intentStrategy === "constraint_report"
-          ? intentProfile.label ?? intentProfile.id
+          ? (intentProfile.label ?? intentProfile.id)
           : constraintIntentId;
       logProgress("Constraint loop", label, constraintStart);
       answerPath.push("constraint:loop");
@@ -111061,11 +112129,13 @@ const executeHelixAsk = async ({
               fastQualityBudgets.helperMinMs,
               fastStageDeadlines.query_hints,
             );
-            if (!queryBudgetCheck.ok || getFastElapsedMs() > fastStageDeadlines.query_hints) {
+            if (
+              !queryBudgetCheck.ok || getFastElapsedMs() > fastStageDeadlines.query_hints
+            ) {
               queryHints = [];
               planDirectives = null;
               const reason = !queryBudgetCheck.ok
-                ? queryBudgetCheck.reason ?? "min_budget_not_met"
+                ? (queryBudgetCheck.reason ?? "min_budget_not_met")
                 : "query_hints_stage_deadline_exceeded";
               recordFastDecision(
                 "query_hints",
@@ -111475,10 +112545,10 @@ const executeHelixAsk = async ({
             }
           }
         }
-          slotAliases = collectSlotAliasHints(slotPlan);
-          slotEvidenceHints = collectSlotEvidenceHints(slotPlan);
-          slotAliasMap = buildSlotAliasMap(slotPlan);
-          coverageSlotAliasMap =
+        slotAliases = collectSlotAliasHints(slotPlan);
+        slotEvidenceHints = collectSlotEvidenceHints(slotPlan);
+        slotAliasMap = buildSlotAliasMap(slotPlan);
+        coverageSlotAliasMap =
             slotAliasMap && coverageSlots.length > 0
               ? Object.fromEntries(
                   Object.entries(slotAliasMap).filter(([slotId]) =>
@@ -111486,7 +112556,7 @@ const executeHelixAsk = async ({
                   ),
                 )
               : null;
-          if (debugPayload) {
+        if (debugPayload) {
             const tierCounts = { A: 0, B: 0, C: 0 } as { A: number; B: number; C: number };
             const tierList = slotPlan.slots.map((slot) => {
               const tier = resolveSlotTier(slot);
@@ -111504,7 +112574,7 @@ const executeHelixAsk = async ({
             (debugPayload as Record<string, unknown>).slot_plan_explicit_path_focus =
               slotPlanExplicitPathEquationMode;
           }
-          if (coverageSlotsFromRequest) {
+        if (coverageSlotsFromRequest) {
             const coverageSlotAliases = collectCoverageSlotAliases(slotAliasMap, coverageSlots);
             if (
               coverageSlotAliases.length > 0 ||
@@ -111524,7 +112594,7 @@ const executeHelixAsk = async ({
             graphHintTerms,
           );
         }
-          if (slotPlan.slots.length > 0) {
+        if (slotPlan.slots.length > 0) {
             const slotLabels = slotPlan.slots
               .slice(0, 6)
               .map((slot) => `${slot.id}${slot.required ? "" : "?"}`);
@@ -111815,7 +112885,7 @@ const executeHelixAsk = async ({
         coverageSlotSummary = null;
         docSlotSummary = null;
         docSlotTargets = [];
-          docBlocks = mergeDefinitionRegistryBlocks([], definitionRegistryBlocks);
+        docBlocks = mergeDefinitionRegistryBlocks([], definitionRegistryBlocks);
         minDocEvidenceCards = 0;
         if (objectiveLoopEnabled && objectiveLoopState.length > 0) {
           beginObjectiveRetrievalPass(contextText ? "context_reuse" : "initial_retrieval", queries);
@@ -112122,7 +113192,9 @@ const executeHelixAsk = async ({
           }
           const slotCountForDocs =
             docSlotSummary?.slots.length ??
-            (coverageSlots.length > 0 ? coverageSlots.length : coverageSlotSummary?.slots.length ?? 0);
+            (coverageSlots.length > 0
+              ? coverageSlots.length
+              : (coverageSlotSummary?.slots.length ?? 0));
           minDocEvidenceCards = definitionFocus
             ? Math.max(1, Math.min(slotCountForDocs || 0, 3) || 1)
             : Math.max(2, Math.min(slotCountForDocs || 0, 4) || 2);
@@ -112143,10 +113215,9 @@ const executeHelixAsk = async ({
           ) {
             const docsAllowlist = (planScope?.docsAllowlist ?? []).flat();
             const slotDocsAllowlist = docsAllowlist.length ? docsAllowlist : [/^docs\//i];
-            const slotHints =
-              docSlotSummary?.missingSlots?.length
-                ? docSlotSummary.missingSlots
-                : coverageSlotSummary?.slots ?? [];
+            const slotHints = docSlotSummary?.missingSlots?.length
+              ? docSlotSummary.missingSlots
+              : (coverageSlotSummary?.slots ?? []);
             const docQueries = mergeHelixAskQueries(
               queries,
               [...slotHints, ...slotAliases, ...slotEvidenceHints],
@@ -112358,7 +113429,7 @@ const executeHelixAsk = async ({
               contextStart,
             );
           }
-        if (debugPayload && (contextFiles.length > 0 || blockScoped)) {
+          if (debugPayload && (contextFiles.length > 0 || blockScoped)) {
           debugPayload.context_files = contextFiles.slice();
           debugPayload.context_files_count = contextFiles.length;
         }
@@ -113127,10 +114198,9 @@ const executeHelixAsk = async ({
           evidenceOk: evidenceGateOk,
           slotCoverageOk,
           docCoverageOk: !docSlotCoverageFailed,
-          missingSlots:
-            docSlotSummary?.missingSlots?.length
-              ? docSlotSummary.missingSlots
-              : coverageSlotSummary?.missingSlots ?? [],
+          missingSlots: docSlotSummary?.missingSlots?.length
+            ? docSlotSummary.missingSlots
+            : (coverageSlotSummary?.missingSlots ?? []),
           retrievalConfidence,
         });
         applyContextAttempt = (
@@ -113547,10 +114617,9 @@ const executeHelixAsk = async ({
             coverageSlotSummary?.missingSlots?.length ??
             0;
           const observedDelta = `slots:${beforeMissingSlots}->${afterMissingSlots}; evidence:${beforeEvidenceOk ? "ok" : "fail"}->${evidenceGateOk ? "ok" : "fail"}`;
-          const missingSlots =
-            docSlotSummary?.missingSlots?.length
-              ? docSlotSummary.missingSlots
-              : coverageSlotSummary?.missingSlots ?? [];
+          const missingSlots = docSlotSummary?.missingSlots?.length
+            ? docSlotSummary.missingSlots
+            : (coverageSlotSummary?.missingSlots ?? []);
           if (objectiveLoopEnabled && objectiveLoopState.length > 0) {
             const objectiveCoveredSlots = Array.from(
               new Set([
@@ -113569,10 +114638,8 @@ const executeHelixAsk = async ({
           }
           return { applied: true, observedDelta, missingSlots };
         };
-        if (
-          objectiveLoopEnabled &&
-          objectiveLoopState.length > 0
-        ) {
+        if (objectiveLoopEnabled &&
+          objectiveLoopState.length > 0) {
           const objectiveRetrieveProposalBudget = clampNumber(
             Math.floor((parsed.data.max_tokens ?? HELIX_ASK_ANSWER_MAX_TOKENS) * 0.22),
             120,
@@ -113580,7 +114647,7 @@ const executeHelixAsk = async ({
           );
           const objectiveRetrieveProposalModel =
             dialogueProfile === "dot_min_steps_v1"
-              ? (process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini")
+              ? process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini"
               : undefined;
           const objectiveLoopForceRetrieveProposalLlm = computeObjectiveLoopPrimaryActive();
           const canUseObjectiveRetrieveProposal =
@@ -113824,10 +114891,11 @@ const executeHelixAsk = async ({
                       `objectiveRetrieveProposal:${currentState.objective_id}:llm`,
                     );
                   } else {
-                    objectiveRetrieveProposalReason = objectiveRetrieveProposalRepairAttempted
-                      ? objectiveRetrieveProposalRepairFailReason ??
-                        "objective_retrieve_proposal_parse_failed_after_repair"
-                      : "objective_retrieve_proposal_parse_failed";
+                    objectiveRetrieveProposalReason =
+                      objectiveRetrieveProposalRepairAttempted
+                        ? (objectiveRetrieveProposalRepairFailReason ??
+                          "objective_retrieve_proposal_parse_failed_after_repair")
+                        : "objective_retrieve_proposal_parse_failed";
                     if (objectiveRetrieveProposalMode !== "llm") {
                       objectiveRetrieveProposalMode = "heuristic_fallback";
                       objectiveRetrieveProposalFailReason = objectiveRetrieveProposalReason;
@@ -113961,9 +115029,9 @@ const executeHelixAsk = async ({
                     : "retrieval_applied",
                   decision_reason: objectiveRetrieveProposalUsed
                     ? objectiveRetrieveProposalReason
-                    : (objectiveMissingAfter.length === 0
+                    : objectiveMissingAfter.length === 0
                       ? "objective_slots_closed"
-                      : objectiveRetrieveProposalReason),
+                      : objectiveRetrieveProposalReason,
                   evidence_delta: {
                     before_ref_count: 0,
                     after_ref_count: objectiveResult.files.length,
@@ -114228,10 +115296,9 @@ const executeHelixAsk = async ({
         }
         let retryMissingSlots: string[] = [];
         if (shouldRetryRetrieval) {
-          const retrySlotTargets =
-            docSlotSummary?.missingSlots?.length
-              ? docSlotSummary.missingSlots
-              : coverageSlotSummary?.missingSlots ?? [];
+          const retrySlotTargets = docSlotSummary?.missingSlots?.length
+            ? docSlotSummary.missingSlots
+            : (coverageSlotSummary?.missingSlots ?? []);
           const retrySlotHints = buildRetryHintsForSlots(slotPlan, retrySlotTargets);
           const retryHints = [
             ...(topicProfile?.mustIncludeFiles ?? []),
@@ -114332,11 +115399,12 @@ const executeHelixAsk = async ({
           (docSlotSummary?.missingSlots?.length ?? 0) > 0 ||
           (coverageSlotSummary?.missingSlots?.length ?? 0) > 0 ||
           retryMissingSlots.length > 0;
-        if (HELIX_ASK_AGENT_CODE_FIRST && missingSlotsForCodeFirst && canAgentAct()) {
-          const codeSlotTargets =
-            docSlotSummary?.missingSlots?.length
-              ? docSlotSummary.missingSlots
-              : coverageSlotSummary?.missingSlots ?? retryMissingSlots;
+        if (
+          HELIX_ASK_AGENT_CODE_FIRST && missingSlotsForCodeFirst && canAgentAct()
+        ) {
+          const codeSlotTargets = docSlotSummary?.missingSlots?.length
+            ? docSlotSummary.missingSlots
+            : (coverageSlotSummary?.missingSlots ?? retryMissingSlots);
           const codeSlotHints = buildRetryHintsForSlots(slotPlan, codeSlotTargets);
           const codeHints = [
             ...(topicProfile?.mustIncludeFiles ?? []),
@@ -114430,25 +115498,25 @@ const executeHelixAsk = async ({
         } else if (!canAgentAct() && missingSlotsForCodeFirst) {
           markAgentStopIfBlocked();
         }
-          const repoDocsRequired =
+        const repoDocsRequired =
             requiresRepoEvidence ||
             intentDomain === "repo" ||
             intentDomain === "hybrid" ||
             intentDomain === "falsifiable";
-          const definitionDocRequired = definitionFocus && (repoDocsRequired || Boolean(conceptMatch));
-          const definitionDocBlocks = resolveDefinitionDocBlocks(
+        const definitionDocRequired = definitionFocus && (repoDocsRequired || Boolean(conceptMatch));
+        const definitionDocBlocks = resolveDefinitionDocBlocks(
             docBlocks,
             conceptMatch,
             definitionFocus,
           );
-          const definitionDocOk = !definitionDocRequired || definitionDocBlocks.length > 0;
-          definitionDocMissing = definitionDocRequired && !definitionDocOk;
-          if (debugPayload) {
+        const definitionDocOk = !definitionDocRequired || definitionDocBlocks.length > 0;
+        definitionDocMissing = definitionDocRequired && !definitionDocOk;
+        if (debugPayload) {
             debugPayload.definition_doc_required = definitionDocRequired;
             debugPayload.definition_doc_ok = definitionDocOk;
             debugPayload.definition_doc_blocks = definitionDocBlocks.length;
           }
-          docSlotCoverageFailed =
+        docSlotCoverageFailed =
             (repoDocsRequired &&
               docSlotTargets.length > 0 &&
               ((docSlotSummary?.missingSlots?.length ?? 0) > 0 ||
@@ -114502,17 +115570,18 @@ const executeHelixAsk = async ({
             frontierLensLock: frontierSessionLockNext,
             preferredResponseLanguage: responseLanguage,
           };
-          if (slotsToRecord.length > 0 || contextFiles.length > 0 || resolvedConcepts.length > 0) {
+          if (
+            slotsToRecord.length > 0 || contextFiles.length > 0 || resolvedConcepts.length > 0
+          ) {
             recordHelixAskSessionMemory({
               sessionId: parsed.data.sessionId,
               slots: slotsToRecord,
               pinnedFiles: contextFiles,
               resolvedConcepts,
               graphTreeIds: graphPack?.treeIds,
-              openSlots:
-                docSlotSummary?.missingSlots?.length
-                  ? docSlotSummary.missingSlots
-                  : coverageSlotSummary?.missingSlots ?? [],
+              openSlots: docSlotSummary?.missingSlots?.length
+                ? docSlotSummary.missingSlots
+                : (coverageSlotSummary?.missingSlots ?? []),
               attempts: agentActions.map((entry) => entry.action),
               recentTopics: topicTags,
               userPrefs,
@@ -114726,11 +115795,12 @@ const executeHelixAsk = async ({
             failClosedReason = "evidence_gate_failed";
           }
         }
-        if (failClosedReason === "doc_slot_missing" && warpEthosRelationQuery && evidenceGateOk) {
-          const unresolvedSlots =
-            docSlotSummary?.missingSlots?.length
-              ? docSlotSummary.missingSlots
-              : coverageSlotSummary?.missingSlots ?? [];
+        if (
+          failClosedReason === "doc_slot_missing" && warpEthosRelationQuery && evidenceGateOk
+        ) {
+          const unresolvedSlots = docSlotSummary?.missingSlots?.length
+            ? docSlotSummary.missingSlots
+            : (coverageSlotSummary?.missingSlots ?? []);
           const unresolvedCore = unresolvedSlots.filter((slot) => !isHybridRelationAuxiliarySlot(slot));
           if (unresolvedCore.length === 0) {
             failClosedReason = null;
@@ -115046,7 +116116,7 @@ const executeHelixAsk = async ({
             debugRecord.frontier_route_guard_reason = "FRONTIER_LENS_NON_GENERAL_GUARD";
           }
         }
-      const termPriorGeneralArbiterLock =
+        const termPriorGeneralArbiterLock =
           shouldApplyTermPriorGeneralArbiterLock({
             termPriorGeneralRouteLock,
             termPriorRepoOverrideApplied,
@@ -115234,14 +116304,14 @@ const executeHelixAsk = async ({
           const compositeFallbackProfile = compositeRequest.enabled
             ? getHelixAskIntentProfileById("hybrid.composite_system_synthesis")
             : null;
-          const fallbackProfile =
-            keepGeneralClarifyIntent
-              ? resolveFallbackIntentProfile("general")
-              : relationFallbackProfile ??
-                compositeFallbackProfile ??
-                (intentProfile.domain === "repo" || intentProfile.domain === "falsifiable"
-                  ? intentProfile
-                  : resolveFallbackIntentProfile("hybrid"));
+          const fallbackProfile = keepGeneralClarifyIntent
+            ? resolveFallbackIntentProfile("general")
+            : (relationFallbackProfile ??
+              compositeFallbackProfile ??
+              (intentProfile.domain === "repo" ||
+              intentProfile.domain === "falsifiable"
+                ? intentProfile
+                : resolveFallbackIntentProfile("hybrid")));
           intentProfile = fallbackProfile;
           intentDomain = fallbackProfile.domain;
           intentTier = fallbackProfile.tier;
@@ -115422,15 +116492,15 @@ const executeHelixAsk = async ({
           contextFiles = Array.from(merged);
         }
         runtimeMustIncludeOk = mustIncludeOk;
-    }
+      }
 
-        const definitionRegistryPaths = collectDefinitionRegistryPaths(
+      const definitionRegistryPaths = collectDefinitionRegistryPaths(
           baseQuestion,
           conceptMatch,
           definitionFocus,
           graphPack,
         );
-        if (definitionRegistryPaths.length > 0) {
+      if (definitionRegistryPaths.length > 0) {
           const registryBlocks = buildDefinitionRegistryBlocks(
             definitionRegistryPaths,
             baseQuestion,
@@ -115568,7 +116638,7 @@ const executeHelixAsk = async ({
         }
       }
 
-        if (HELIX_ASK_CODE_ALIGNMENT && (docBlocks.length > 0 || graphEvidenceItems.length > 0)) {
+      if (HELIX_ASK_CODE_ALIGNMENT && (docBlocks.length > 0 || graphEvidenceItems.length > 0)) {
           if (docBlocks.length > 0) {
             codeAlignment = await buildCodeAlignmentFromDocBlocks(
               docBlocks,
@@ -115732,7 +116802,7 @@ const executeHelixAsk = async ({
           ? contextText
           : [promptContextText, contextText].filter(Boolean).join("\n\n");
         let evidenceContextSource = combinedContext;
-          if (definitionFocus) {
+        if (definitionFocus) {
             const definitionDocBlocks = resolveDefinitionDocBlocks(
               docBlocks,
               conceptMatch,
@@ -115748,33 +116818,33 @@ const executeHelixAsk = async ({
               evidenceContextSource = mergedDefinitionContext;
             }
           }
-          const evidenceContext = clipAskText(
+        const evidenceContext = clipAskText(
             evidenceContextSource,
             HELIX_ASK_SCAFFOLD_CONTEXT_CHARS,
           );
-          const definitionDocBlocks = resolveDefinitionDocBlocks(
+        const definitionDocBlocks = resolveDefinitionDocBlocks(
             docBlocks,
             conceptMatch,
             definitionFocus,
           );
-          const definitionEvidenceFiles = definitionFocus
+        const definitionEvidenceFiles = definitionFocus
             ? definitionDocBlocks.length
               ? definitionDocBlocks.map((block) => block.path)
               : contextFiles.filter((filePath) => isDefinitionDocPath(filePath))
             : contextFiles;
-          const definitionEvidenceContext = definitionFocus
+        const definitionEvidenceContext = definitionFocus
             ? definitionDocBlocks.length
               ? definitionDocBlocks.map((block) => block.block).join("\n\n")
               : ""
             : "";
-          const stage05RepoScaffold = buildStage05EvidenceScaffold({
+        const stage05RepoScaffold = buildStage05EvidenceScaffold({
             cards: stage05EvidenceCards,
             maxCards: Math.min(6, HELIX_ASK_STAGE05_MAX_CARDS),
           });
-          const stage05RepoPaths = filterExistingEvidencePaths(
+        const stage05RepoPaths = filterExistingEvidencePaths(
             stage05EvidenceCards.map((card) => card.path),
           );
-          const applyStage05RepoScaffoldFallback = (
+        const applyStage05RepoScaffoldFallback = (
             current: string,
             sourceFiles: string[],
             sourceContext: string,
@@ -115796,7 +116866,7 @@ const executeHelixAsk = async ({
             }
             return withSources.trim();
           };
-          const allowConceptFastPath =
+        const allowConceptFastPath =
             conceptFastPath &&
             conceptMatch &&
             (!definitionFocus ||
@@ -115864,7 +116934,7 @@ const executeHelixAsk = async ({
                 "deterministic_fallback",
                 fastEvidenceCheck.ok
                   ? "fast_mode_prefer_deterministic"
-                  : fastEvidenceCheck.reason ?? "min_budget_not_met",
+                  : (fastEvidenceCheck.reason ?? "min_budget_not_met"),
                 fastEvidenceCheck.remainingMs,
                 fastStageDeadlines.synthesis_start,
               );
@@ -116077,8 +117147,10 @@ const executeHelixAsk = async ({
       }
 
       if ((!isRepoQuestion || wantsHybrid) && !dryRun) {
-          if (promptContextText) {
-          if (HELIX_ASK_SINGLE_LLM || fastQualityMode || forceDeterministicScaffolds) {
+        if (promptContextText) {
+          if (
+            HELIX_ASK_SINGLE_LLM || fastQualityMode || forceDeterministicScaffolds
+          ) {
             promptSynthesisPath = "deterministic";
             promptScaffold = clipAskText(promptContextText, HELIX_ASK_SCAFFOLD_CONTEXT_CHARS);
             if (fastQualityMode) {
@@ -116092,7 +117164,7 @@ const executeHelixAsk = async ({
                 "deterministic_fallback",
                 promptCardBudget.ok
                   ? "fast_mode_prefer_deterministic"
-                  : promptCardBudget.reason ?? "min_budget_not_met",
+                  : (promptCardBudget.reason ?? "min_budget_not_met"),
                 promptCardBudget.remainingMs,
                 fastStageDeadlines.synthesis_start,
               );
@@ -116548,8 +117620,8 @@ const executeHelixAsk = async ({
       const relationAnchorMissing = relationAnchorsRequired && !relationDualDomainOk;
       const relationCoverageWeak =
         relationQuery &&
-        ((coverageSlotSummary?.coveredSlots.length ?? 0) < 2 &&
-          (docSlotSummary?.coveredSlots.length ?? 0) < 2);
+        (coverageSlotSummary?.coveredSlots.length ?? 0) < 2 &&
+        (docSlotSummary?.coveredSlots.length ?? 0) < 2;
       const needleNatarioRelationProof = evaluateNeedleNatarioRelationProof({
         question: baseQuestion,
         docBlocks,
@@ -116715,25 +117787,24 @@ const executeHelixAsk = async ({
         intentStrategy !== "constraint_report" &&
         (!skipIdeologyClarify || stage05HardFailActive)
       ) {
-          const planClarify = sanitizePlanClarifyLine(clarifyOverride ?? planDirectives?.clarifyQuestion ?? "");
-          const missingSlots =
-            docSlotSummary?.missingSlots?.length
-              ? docSlotSummary.missingSlots
-              : coverageSlotSummary?.missingSlots ?? [];
-          const clarifySlots = filterClarifySlots(missingSlots);
-          const definitionClarify = definitionDocMissing
+        const planClarify = sanitizePlanClarifyLine(clarifyOverride ?? planDirectives?.clarifyQuestion ?? "");
+        const missingSlots = docSlotSummary?.missingSlots?.length
+          ? docSlotSummary.missingSlots
+          : (coverageSlotSummary?.missingSlots ?? []);
+        const clarifySlots = filterClarifySlots(missingSlots);
+        const definitionClarify = definitionDocMissing
             ? "Definition questions require at least one docs/*.md span. Please point to the relevant doc file."
             : "";
-          const codeFloorClarify =
-            failClosedReason === "stage0_code_floor_missing"
-              ? stage0CodeFloorClarifyLine ?? STAGE0_CODE_FLOOR_CLARIFY_LINE
-              : "";
-          const stage05Clarify =
-            failClosedReason === "stage05_summary_hard_fail"
-              ? stage05SummaryClarifyLine ??
-                "I couldn't complete required Stage-0.5 evidence summaries. Please narrow by module/path/symbol and retry."
-              : "";
-          if (HELIX_ASK_SESSION_MEMORY && parsed.data.sessionId && clarifySlots.length > 0) {
+        const codeFloorClarify =
+          failClosedReason === "stage0_code_floor_missing"
+            ? (stage0CodeFloorClarifyLine ?? STAGE0_CODE_FLOOR_CLARIFY_LINE)
+            : "";
+        const stage05Clarify =
+          failClosedReason === "stage05_summary_hard_fail"
+            ? (stage05SummaryClarifyLine ??
+              "I couldn't complete required Stage-0.5 evidence summaries. Please narrow by module/path/symbol and retry.")
+            : "";
+        if (HELIX_ASK_SESSION_MEMORY && parsed.data.sessionId && clarifySlots.length > 0) {
             recordHelixAskSessionMemory({
               sessionId: parsed.data.sessionId,
             lastClarifySlots: clarifySlots,
@@ -117478,11 +118549,11 @@ const executeHelixAsk = async ({
     );
     const forcedAnswerShortCircuitEligible =
       forcedAnswerIsHard &&
-      ((!hasClarifyOrFailClosedPath ||
+      (!hasClarifyOrFailClosedPath ||
         isMathForcedRule ||
         isConceptForcedRule ||
         isClarifyForcedRule ||
-        isResearchContractFailClosedForcedRule) ||
+        isResearchContractFailClosedForcedRule ||
         isStage05HardFailForcedRule) &&
       forcedRule !== null &&
       isHelixAskHardForcedShortCircuitRule(forcedRule);
@@ -118426,10 +119497,9 @@ const executeHelixAsk = async ({
         contract: helixTurnContract,
         coveredSlots: directRuntimeCoveredSlots,
       });
-      const directRuntimeSlotMissing =
-        docSlotSummary?.missingSlots?.length
-          ? docSlotSummary.missingSlots
-          : coverageSlotSummary?.missingSlots ?? [];
+      const directRuntimeSlotMissing = docSlotSummary?.missingSlots?.length
+        ? docSlotSummary.missingSlots
+        : (coverageSlotSummary?.missingSlots ?? []);
       const directRuntimeConnectedHintPathCount = debugPayload
         ? Math.max(
             0,
@@ -118502,7 +119572,7 @@ const executeHelixAsk = async ({
       });
       const dialogueProfileModel =
         dialogueProfile === "dot_min_steps_v1"
-          ? (process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini")
+          ? process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini"
           : undefined;
       const answerPrompt = applyDialogueProfilePrompt(prompt ?? "", dialogueProfile, baseQuestion);
       const answerFallbackTokens = answerMaxTokens;
@@ -118936,7 +120006,9 @@ const executeHelixAsk = async ({
       }
 
       const fallbackNeeded = !resultForAnswer || !resultForAnswer.text?.trim();
-      if ((answerGenerationFailed || fallbackNeeded) && primaryContractResult?.text?.trim()) {
+      if (
+        (answerGenerationFailed || fallbackNeeded) && primaryContractResult?.text?.trim()
+      ) {
         result = { text: primaryContractResult.text } as LocalAskResult;
         resultForAnswer = result;
         answerText = primaryContractResult.text;
@@ -118965,7 +120037,7 @@ const executeHelixAsk = async ({
           deterministicRepoRuntimeFallbackUsed = true;
         }
         const selectedFallback = useRepoRuntimeFallback
-          ? deterministicRepoRuntimeFallback ?? repoRuntimeFallbackMessage
+          ? (deterministicRepoRuntimeFallback ?? repoRuntimeFallbackMessage)
           : fallbackAnswer ||
             (openWorldBypassMode === "active"
               ? openWorldRuntimeFallbackMessage
@@ -119115,9 +120187,13 @@ const executeHelixAsk = async ({
       const hasToolEvidence =
         docBlocks.length > 0 || (codeAlignment?.spans?.length ?? 0) > 0;
       let answerContractApplied = false;
-      let answerContractSource: "inline" | "helper" | "primary" | "relation_packet" | "none" = answerContract
-        ? (answerContractPrimaryUsed ? "primary" : "inline")
-        : "none";
+      let answerContractSource:
+        "inline" | "helper" | "primary" | "relation_packet" | "none" =
+        answerContract
+          ? answerContractPrimaryUsed
+            ? "primary"
+            : "inline"
+          : "none";
       const contractEvidenceContext = resolveHelixAskCanonicalEvidenceContext({
         packet: evidencePacketV2,
         evidenceText,
@@ -119419,35 +120495,35 @@ const executeHelixAsk = async ({
         debugPayload.answer_contract_applied = false;
       }
       if (!answerContractApplied) {
-      const enforceFormat =
+        const enforceFormat =
         formatEnforcementLevel === "strict" || intentDomain !== "hybrid";
-      if (enforceFormat) {
+        if (enforceFormat) {
         cleaned = enforceHelixAskAnswerFormat(cleaned, formatSpec.format, baseQuestion);
       }
-      const nonReportGuard = enforceNonReportModeGuard(
+        const nonReportGuard = enforceNonReportModeGuard(
         cleaned,
         reportDecision.enabled,
         intentStrategy,
       );
-      cleaned = nonReportGuard.text;
-      if (debugPayload && !reportDecision.enabled && intentStrategy !== "constraint_report") {
+        cleaned = nonReportGuard.text;
+        if (debugPayload && !reportDecision.enabled && intentStrategy !== "constraint_report") {
         debugPayload.report_mode_mismatch = nonReportGuard.mismatch;
         debugPayload.report_scaffold_guard_triggered = nonReportGuard.hadScaffold;
       }
-      cleaned = stripTruncationMarkers(cleaned);
-      if (!cleaned.trim()) {
+        cleaned = stripTruncationMarkers(cleaned);
+        if (!cleaned.trim()) {
         const fallback = stripPromptEchoFromAnswer(result.text, baseQuestion);
         cleaned = fallback.trim() ? fallback.trim() : result.text.trim();
         cleaned = stripTruncationMarkers(cleaned);
         cleaned = stripInlineJsonArtifacts(cleaned);
       }
-      if (debugPayload) {
+        if (debugPayload) {
         debugPayload.answer_after_format = clipAskText(
           cleaned,
           HELIX_ASK_ANSWER_PREVIEW_CHARS,
         );
       }
-      if (
+        if (
         !HELIX_ASK_FORCE_FULL_ANSWERS &&
         toolResultsPresent &&
         hasToolEvidence &&
@@ -119465,13 +120541,13 @@ const executeHelixAsk = async ({
           debugPayload.tool_results_fallback_reason = "llm_denied_evidence";
         }
       }
-      const shortMetaAfterClean = isShortAnswer(cleaned, verbosity);
-      const hasCitationsAfterClean =
+        const shortMetaAfterClean = isShortAnswer(cleaned, verbosity);
+        const hasCitationsAfterClean =
         extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
-      const singleLlmVeryShort =
+        const singleLlmVeryShort =
         shortMetaAfterClean.sentences < HELIX_ASK_SINGLE_LLM_SHORT_FALLBACK_MIN_SENTENCES ||
         shortMetaAfterClean.tokens < HELIX_ASK_SINGLE_LLM_SHORT_FALLBACK_MIN_TOKENS;
-      const singleLlmShortFallbackEligible =
+        const singleLlmShortFallbackEligible =
         !HELIX_ASK_FORCE_FULL_ANSWERS &&
         HELIX_ASK_SINGLE_LLM &&
         !isIdeologyReferenceIntent &&
@@ -119481,12 +120557,11 @@ const executeHelixAsk = async ({
         hasToolEvidence &&
         !hasCitationsAfterClean &&
         singleLlmVeryShort;
-      if (singleLlmShortFallbackEligible) {
-        const missingSlotsForShortFallback =
-          docSlotSummary?.missingSlots?.length
+        if (singleLlmShortFallbackEligible) {
+          const missingSlotsForShortFallback = docSlotSummary?.missingSlots?.length
             ? docSlotSummary.missingSlots
-            : coverageSlotSummary?.missingSlots ?? [];
-        const shortFallbackText = buildSingleLlmShortAnswerFallback({
+            : (coverageSlotSummary?.missingSlots ?? []);
+          const shortFallbackText = buildSingleLlmShortAnswerFallback({
           question: baseQuestion,
           definitionFocus,
           docBlocks,
@@ -119502,8 +120577,8 @@ const executeHelixAsk = async ({
             slotPlanHeadingSeedSlots.length > 0 ? slotPlanHeadingSeedSlots : headingSeedSlots,
           requiresRepoEvidence,
         });
-        const fallbackMeta = isShortAnswer(shortFallbackText, verbosity);
-        if (!fallbackMeta.short || shortFallbackText.length > cleaned.length + 80) {
+          const fallbackMeta = isShortAnswer(shortFallbackText, verbosity);
+          if (!fallbackMeta.short || shortFallbackText.length > cleaned.length + 80) {
           cleaned = shortFallbackText;
           answerPath.push("shortAnswerFallback");
           if (debugPayload) {
@@ -119511,13 +120586,13 @@ const executeHelixAsk = async ({
             debugPayload.answer_short_fallback_reason = "single_llm_short_answer";
           }
         }
-      }
-      const baselineCleaned = cleaned;
-      const allowCitationRepair =
+        }
+        const baselineCleaned = cleaned;
+        const allowCitationRepair =
         !HELIX_ASK_SINGLE_LLM &&
         (microPassEnabled || intentStrategy === "constraint_report") &&
         intentProfile.id !== "repo.ideology_reference";
-      if (allowCitationRepair && (!fastQualityMode || canStartHelperCall("citation_repair", FAST_QUALITY_FINALIZE_BY_MS))) {
+        if (allowCitationRepair && (!fastQualityMode || canStartHelperCall("citation_repair", FAST_QUALITY_FINALIZE_BY_MS))) {
         const repairEvidenceContext = resolveHelixAskCanonicalEvidenceContext({
           packet: evidencePacketV2,
           evidenceText,
@@ -119812,10 +120887,8 @@ const executeHelixAsk = async ({
           }
         }
       }
-      if (
-        intentDomain === "repo" &&
-        !hasRepoCitations()
-      ) {
+      if (intentDomain === "repo" &&
+        !hasRepoCitations()) {
         if (repoEvidencePaths.length) {
           cleaned = `${cleaned}\n\nSources: ${repoEvidencePaths.join(", ")}`;
           answerPath.push("citationFallback:sources");
@@ -119846,10 +120919,9 @@ const executeHelixAsk = async ({
             (debugPayload as Record<string, unknown>).scientific_response_skipped_runtime_fallback = true;
           }
         } else if (HELIX_ASK_SCIENTIFIC_CLARIFY && !isIdeologyReferenceIntent) {
-          const missingSlots =
-            docSlotSummary?.missingSlots?.length
-              ? docSlotSummary.missingSlots
-              : coverageSlotSummary?.missingSlots ?? [];
+          const missingSlots = docSlotSummary?.missingSlots?.length
+            ? docSlotSummary.missingSlots
+            : (coverageSlotSummary?.missingSlots ?? []);
           const scientific = buildScientificMicroReport({
             question: baseQuestion,
             claimLedger: [],
@@ -120399,13 +121471,13 @@ const executeHelixAsk = async ({
           );
         }
     }
-    const scientificReportSupportedClaims = (platonicResult.claimLedger ?? []).some(
+      const scientificReportSupportedClaims = (platonicResult.claimLedger ?? []).some(
       (entry) => entry.supported && entry.type !== "question",
     );
-    const scientificReportHasCitations =
+      const scientificReportHasCitations =
       extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
-    const allowRattlingScientificEscalation = !warpEthosRelationQuery;
-    const shouldRenderScientificMicroReport =
+      const allowRattlingScientificEscalation = !warpEthosRelationQuery;
+      const shouldRenderScientificMicroReport =
       HELIX_ASK_SCIENTIFIC_CLARIFY &&
       !deterministicRepoRuntimeFallbackUsed &&
       !isIdeologyReferenceIntent &&
@@ -120421,12 +121493,11 @@ const executeHelixAsk = async ({
             claimGateFailed ||
             !scientificReportSupportedClaims ||
             !scientificReportHasCitations)));
-    if (shouldRenderScientificMicroReport) {
-      const missingSlots =
-        docSlotSummary?.missingSlots?.length
+      if (shouldRenderScientificMicroReport) {
+        const missingSlots = docSlotSummary?.missingSlots?.length
           ? docSlotSummary.missingSlots
-          : coverageSlotSummary?.missingSlots ?? [];
-      const scientific = buildScientificMicroReport({
+          : (coverageSlotSummary?.missingSlots ?? []);
+        const scientific = buildScientificMicroReport({
         question: baseQuestion,
         claimLedger: platonicResult.claimLedger,
         uncertaintyRegister: platonicResult.uncertaintyRegister,
@@ -120442,8 +121513,8 @@ const executeHelixAsk = async ({
         hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
         requiresRepoEvidence,
       });
-      cleaned = scientific.text;
-      platonicResult = applyHelixAskPlatonicGates({
+        cleaned = scientific.text;
+        platonicResult = applyHelixAskPlatonicGates({
         question: baseQuestion,
         answer: cleaned,
         domain: platonicDomain,
@@ -120462,7 +121533,7 @@ const executeHelixAsk = async ({
         conceptMatch,
         templateLockedAnswer: lockedByIdeologyTemplate,
       });
-      if (debugPayload) {
+        if (debugPayload) {
         debugPayload.scientific_response_applied = true;
         debugPayload.next_evidence_count = scientific.nextEvidence.length;
         debugPayload.next_evidence_coverage =
@@ -120473,11 +121544,11 @@ const executeHelixAsk = async ({
             ? scientific.hypothesisCount / Math.max(1, missingSlots.length)
             : 0;
       }
-    }
-    if (debugPayload) {
+      }
+      if (debugPayload) {
       debugPayload.claim_ref_rate = computeClaimRefRate(platonicResult.claimLedger);
     }
-    if (HELIX_ASK_TRAINING_TRACE) {
+      if (HELIX_ASK_TRAINING_TRACE) {
         try {
           const notes: string[] = [];
           if (platonicResult.coverageGateApplied) {
@@ -120677,10 +121748,9 @@ const executeHelixAsk = async ({
             treeWalkBindingRate >= HELIX_ASK_TREE_WALK_MIN_BIND_FOR_TOOL_RESULTS
               ? treeWalkBlock
               : undefined,
-          missingSlots:
-            docSlotSummary?.missingSlots?.length
-              ? docSlotSummary.missingSlots
-              : coverageSlotSummary?.missingSlots ?? [],
+          missingSlots: docSlotSummary?.missingSlots?.length
+            ? docSlotSummary.missingSlots
+            : (coverageSlotSummary?.missingSlots ?? []),
           slotPlan,
           anchorFiles: contextFiles,
           searchedTerms: retrievalQueries,
@@ -120990,10 +122060,9 @@ const executeHelixAsk = async ({
             treeWalkBindingRate >= HELIX_ASK_TREE_WALK_MIN_BIND_FOR_TOOL_RESULTS
               ? treeWalkBlock
               : undefined,
-          missingSlots:
-            docSlotSummary?.missingSlots?.length
-              ? docSlotSummary.missingSlots
-              : coverageSlotSummary?.missingSlots ?? [],
+          missingSlots: docSlotSummary?.missingSlots?.length
+            ? docSlotSummary.missingSlots
+            : (coverageSlotSummary?.missingSlots ?? []),
           slotPlan,
           anchorFiles: contextFiles,
           searchedTerms: retrievalQueries,
@@ -121029,7 +122098,9 @@ const executeHelixAsk = async ({
         !deterministicRepoRuntimeFallbackUsed &&
         (intentDomain === "repo" || intentDomain === "hybrid") &&
         (!evidenceGateOk ||
-          !((platonicResult.claimLedger ?? []).some((entry) => entry.supported && entry.type !== "question")) ||
+          !(platonicResult.claimLedger ?? []).some(
+            (entry) => entry.supported && entry.type !== "question",
+          ) ||
           !(extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned)));
       if (shouldForceUnverifiedHeading) {
         cleaned = enforceUnverifiedHeading(cleaned);
@@ -121147,7 +122218,7 @@ const executeHelixAsk = async ({
       const safetyScore = securityRiskPrompt ? 1 : 0.3;
       const coverageScore = Math.min(
         1,
-        Math.max(0, coverageSlotSummary?.ratio ?? (docSlotSummary?.ratio ?? 0)),
+        Math.max(0, coverageSlotSummary?.ratio ?? docSlotSummary?.ratio ?? 0),
       );
       const relationSecondPassDeficits = {
         bridgeDeficit: relationPacketFloorCheck.bridgeCount < HELIX_ASK_RELATION_PACKET_MIN_BRIDGES,
@@ -121591,11 +122662,11 @@ const executeHelixAsk = async ({
                 weakEvidenceForDeterministicFallback = false;
                 answerPath.push("answer_rescue:llm_second_pass");
                 const rescueReason = weakEvidenceRescueEligible
-                  ? (rescueAllowRepoHints
-                      ? "explicit_repo_mapping_weak_evidence"
-                      : securityRiskPrompt
-                        ? "security_weak_evidence"
-                        : "general_weak_evidence")
+                  ? rescueAllowRepoHints
+                    ? "explicit_repo_mapping_weak_evidence"
+                    : securityRiskPrompt
+                      ? "security_weak_evidence"
+                      : "general_weak_evidence"
                   : "adaptive_quality_risk";
                 logEvent(
                   "Answer rescue",
@@ -122071,7 +123142,8 @@ const executeHelixAsk = async ({
         const finalCitationTokens = finalTokens.length > 0 ? finalTokens : finalFallbackTokens;
         if (
           repoStyleSourceAppendAllowed &&
-          (extractFilePathsFromText(cleaned).length === 0 && !hasSourcesLine(cleaned)) &&
+          extractFilePathsFromText(cleaned).length === 0 &&
+          !hasSourcesLine(cleaned) &&
           finalCitationTokens.length > 0
         ) {
           cleaned = `${cleaned}\n\nSources: ${finalCitationTokens.slice(0, 8).join(", ")}`.trim();
@@ -122867,8 +123939,8 @@ const executeHelixAsk = async ({
               } else {
                 cleaned =
                   relevanceClarifyMessage ??
-                  ("I couldn't verify an exact equation quote with a matching file citation from current evidence. " +
-                    `Please provide module/path/symbol (for example: [${fallbackExamples[0]}] or [${fallbackExamples[1]}]) and retry.`);
+                  "I couldn't verify an exact equation quote with a matching file citation from current evidence. " +
+                    `Please provide module/path/symbol (for example: [${fallbackExamples[0]}] or [${fallbackExamples[1]}]) and retry.`;
                 answerPath.push("clarify:equation_quote_contract_missing");
                 if (debugPayload) {
                   (debugPayload as Record<string, unknown>).helix_ask_fail_reason =
@@ -122898,8 +123970,8 @@ const executeHelixAsk = async ({
                 contractCitationTokens,
               ) ??
               relevanceClarifyMessage ??
-              ("I couldn't verify an exact equation quote with a matching file citation from current evidence. " +
-                `Closest files were [${fallbackExamples[0]}] and [${fallbackExamples[1]}].`);
+              "I couldn't verify an exact equation quote with a matching file citation from current evidence. " +
+                `Closest files were [${fallbackExamples[0]}] and [${fallbackExamples[1]}].`;
             equationFallbackAllowPaths = normalizeCitations([
               ...equationFallbackAllowPaths,
               ...extractFilePathsFromText(cleaned),
@@ -123378,27 +124450,27 @@ const executeHelixAsk = async ({
         ? null
         : equationForcedGeneralExplain
           ? null
-          : equationSelectorFirst ??
+          : (equationSelectorFirst ??
             buildEquationClaimBackingAssembly({
-            question: baseQuestion,
-            draftAnswer: cleaned,
-            answerContract,
-            evidenceText: finalCanonicalEvidence.evidenceWithSources,
-            docBlocks,
-            codeAlignment,
-            stage05Cards: stage05EvidenceCards,
-            allowedCitations: normalizeCitations([
-              ...contractCitationTokens,
-              ...allowedSourcePaths,
-              ...finalCanonicalEvidence.contextFiles,
-              ...finalCanonicalEvidence.citationTokens,
-            ]),
-            queryConstraints,
-            strictPrompt: equationQuoteStrictRequired,
-            explicitPathOnlyExtraction: equationExplicitPathOnlyExtraction,
-            intentContract: equationIntentContract,
-            recoveryReason: equationRecoveryReason,
-          });
+              question: baseQuestion,
+              draftAnswer: cleaned,
+              answerContract,
+              evidenceText: finalCanonicalEvidence.evidenceWithSources,
+              docBlocks,
+              codeAlignment,
+              stage05Cards: stage05EvidenceCards,
+              allowedCitations: normalizeCitations([
+                ...contractCitationTokens,
+                ...allowedSourcePaths,
+                ...finalCanonicalEvidence.contextFiles,
+                ...finalCanonicalEvidence.citationTokens,
+              ]),
+              queryConstraints,
+              strictPrompt: equationQuoteStrictRequired,
+              explicitPathOnlyExtraction: equationExplicitPathOnlyExtraction,
+              intentContract: equationIntentContract,
+              recoveryReason: equationRecoveryReason,
+            }));
       if (equationPromptDetected || equationQuoteContract.required) {
         if (equationGenericBypassApplied && debugPayload) {
           const debugRecord = debugPayload as Record<string, unknown>;
@@ -124645,10 +125717,9 @@ const executeHelixAsk = async ({
           ...allowedSourcePaths,
           ...equationFallbackAllowPaths,
         ], 32);
-        const finalSlotMissing =
-          docSlotSummary?.missingSlots?.length
-            ? docSlotSummary.missingSlots
-            : coverageSlotSummary?.missingSlots ?? [];
+        const finalSlotMissing = docSlotSummary?.missingSlots?.length
+          ? docSlotSummary.missingSlots
+          : (coverageSlotSummary?.missingSlots ?? []);
         let finalCoveredSlots = Array.from(
           new Set([
             ...(coverageSlotSummary?.coveredSlots ?? []),
@@ -125733,7 +126804,7 @@ const executeHelixAsk = async ({
           );
           const objectiveRetrieveProposalModel =
             dialogueProfile === "dot_min_steps_v1"
-              ? (process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini")
+              ? process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini"
               : undefined;
           const objectiveLoopForceRetrieveProposalLlm = computeObjectiveLoopPrimaryActive();
           const canUseObjectiveRetrieveProposal =
@@ -125896,7 +126967,7 @@ const executeHelixAsk = async ({
                   objectiveRecoverySkippedReason ?? "agent_gate_blocked";
                 continue;
               }
-                if (objectiveAllowAgentGateBypass) {
+              if (objectiveAllowAgentGateBypass) {
                   objectiveRecoveryBudgetBypassCount += 1;
                   answerPath.push(
                   `objectiveScopedRetrievalRecovery:${currentState.objective_id}:attempt${objectiveRecoveryPassCount}:budget_bypass`,
@@ -126119,10 +127190,11 @@ const executeHelixAsk = async ({
                       `objectiveRetrieveProposal:${currentState.objective_id}:llm`,
                     );
                   } else {
-                    objectiveRetrieveProposalReason = objectiveRetrieveProposalRepairAttempted
-                      ? objectiveRetrieveProposalRepairFailReason ??
-                        "objective_retrieve_proposal_parse_failed_after_repair"
-                      : "objective_retrieve_proposal_parse_failed";
+                    objectiveRetrieveProposalReason =
+                      objectiveRetrieveProposalRepairAttempted
+                        ? (objectiveRetrieveProposalRepairFailReason ??
+                          "objective_retrieve_proposal_parse_failed_after_repair")
+                        : "objective_retrieve_proposal_parse_failed";
                     if (objectiveRetrieveProposalMode !== "llm") {
                       objectiveRetrieveProposalMode = "heuristic_fallback";
                       objectiveRetrieveProposalFailReason = objectiveRetrieveProposalReason;
@@ -126241,11 +127313,9 @@ const executeHelixAsk = async ({
                     const firstRejected = objectiveVariantOutcomes.find(
                       (entry) => entry.status === "rejected",
                     );
-                    throw (
-                      firstRejected && firstRejected.status === "rejected"
-                        ? firstRejected.reason
-                        : new Error("objective_recovery_no_variant_result")
-                    );
+                    throw firstRejected && firstRejected.status === "rejected"
+                      ? firstRejected.reason
+                      : new Error("objective_recovery_no_variant_result");
                   }
                   const bestVariant = fulfilledVariants.reduce((best, current) => {
                     if (current.score > best.score) return current;
@@ -126358,7 +127428,9 @@ const executeHelixAsk = async ({
                       : "retrieval_applied",
                     decision_reason: objectiveRetrieveProposalUsed
                       ? objectiveRetrieveProposalReason
-                      : (objectiveMissingAfter.length === 0 ? "objective_slots_closed" : objectiveRetrieveProposalReason),
+                      : objectiveMissingAfter.length === 0
+                        ? "objective_slots_closed"
+                        : objectiveRetrieveProposalReason,
                     evidence_delta: {
                       before_ref_count: 0,
                       after_ref_count: objectiveResult.files.length,
@@ -126663,11 +127735,11 @@ const executeHelixAsk = async ({
         }
         const objectiveMiniSynthModel =
           dialogueProfile === "dot_min_steps_v1"
-            ? (process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini")
+            ? process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini"
             : undefined;
         const objectiveMiniCriticModel =
           dialogueProfile === "dot_min_steps_v1"
-            ? (process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini")
+            ? process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini"
             : undefined;
         const objectiveLoopForceStageLlm = computeObjectiveLoopPrimaryActive();
         const canUseObjectiveMiniSynth =
@@ -126864,8 +127936,8 @@ const executeHelixAsk = async ({
               } else {
                 objectiveMiniSynthMode = "heuristic_fallback";
                 objectiveMiniSynthFailReason = objectiveMiniSynthRepairAttempted
-                  ? objectiveMiniSynthRepairFailReason ??
-                    "objective_mini_synth_parse_failed_after_repair"
+                  ? (objectiveMiniSynthRepairFailReason ??
+                    "objective_mini_synth_parse_failed_after_repair")
                   : "objective_mini_synth_parse_failed";
                 answerPath.push("objectiveMiniSynth:fallback");
               }
@@ -127126,10 +128198,11 @@ const executeHelixAsk = async ({
                 }
               } else {
                 objectiveMiniCriticMode = "heuristic_fallback";
-                objectiveMiniCriticFailReason = objectiveMiniCriticRepairAttempted
-                  ? objectiveMiniCriticRepairFailReason ??
-                    "objective_mini_critic_parse_failed_after_repair"
-                  : "objective_mini_critic_parse_failed";
+                objectiveMiniCriticFailReason =
+                  objectiveMiniCriticRepairAttempted
+                    ? (objectiveMiniCriticRepairFailReason ??
+                      "objective_mini_critic_parse_failed_after_repair")
+                    : "objective_mini_critic_parse_failed";
                 answerPath.push("objectiveMiniCritic:fallback");
                 for (const miniAnswer of objectiveMiniAnswers) {
                   pushObjectiveStepTranscript({
@@ -127395,7 +128468,7 @@ const executeHelixAsk = async ({
             );
             const objectiveAssemblyModel =
               dialogueProfile === "dot_min_steps_v1"
-                ? (process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini")
+                ? process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini"
                 : undefined;
             const objectiveUnresolvedCount = objectiveMiniValidation?.unresolved ?? 0;
             objectiveAssemblyRescueAttempted = false;
@@ -128671,8 +129744,8 @@ const executeHelixAsk = async ({
               currentAnswer: cleaned,
               blockedReason: objectiveStrictCoveredTerminal
                 ? null
-                : objectiveAssemblyBlockedReason ??
-                  "objective_terminal_guard_required_objective_unresolved",
+                : (objectiveAssemblyBlockedReason ??
+                  "objective_terminal_guard_required_objective_unresolved"),
               missingScopedRetrievalObjectiveIds: objectiveTerminalGuardMissingScopedIds,
               question: baseQuestion,
               visibleFailClosed: false,
@@ -128917,8 +129990,8 @@ const executeHelixAsk = async ({
             currentAnswer: cleanedText,
             blockedReason: objectiveStrictCoveredFinalTerminal
               ? null
-              : objectiveAssemblyBlockedReason ??
-                "objective_terminal_guard_final_required_objective_unresolved",
+              : (objectiveAssemblyBlockedReason ??
+                "objective_terminal_guard_final_required_objective_unresolved"),
             missingScopedRetrievalObjectiveIds: objectiveFinalTerminalGuardMissingScopedIds,
             question: baseQuestion,
             visibleFailClosed: false,
@@ -129226,7 +130299,8 @@ const executeHelixAsk = async ({
                 currentAnswer: cleanedText,
                 blockedReason: objectiveStrictCoveredGlobalTerminal
                   ? null
-                  : objectiveAssemblyBlockedReason ?? "global_terminal_validator_required_objective_guard",
+                  : (objectiveAssemblyBlockedReason ??
+                    "global_terminal_validator_required_objective_guard"),
                 missingScopedRetrievalObjectiveIds:
                   objectiveMissingScopedRetrievalCount > 0
                     ? objectiveMiniAnswers
@@ -129592,10 +130666,13 @@ const executeHelixAsk = async ({
         globalTerminalMode.startsWith("minimal_repair") &&
         !finalModeGateFrontierIntent &&
         finalAnswerPlanShadow?.prompt_family !== "roadmap_planning";
-      if (allowSoftModeGateSuppression && finalModeGateConsistencyReasons.length > 0) {
+      if (
+        allowSoftModeGateSuppression && finalModeGateConsistencyReasons.length > 0
+      ) {
         const finalModeGateIntentDomain = debugPayload
-          ? coerceHelixAskDebugString((debugPayload as Record<string, unknown>).intent_domain) ??
-            intentDomain
+          ? (coerceHelixAskDebugString(
+              (debugPayload as Record<string, unknown>).intent_domain,
+            ) ?? intentDomain)
           : intentDomain;
         const finalModeGateRepoOrHybrid =
           finalModeGateIntentDomain === "repo" || finalModeGateIntentDomain === "hybrid";
@@ -130407,9 +131484,13 @@ const executeHelixAsk = async ({
       if ((result as Record<string, unknown>).interpreter_confidence === undefined) {
         (result as Record<string, unknown>).interpreter_confidence = interpreterConfidence;
       }
-      if ((result as Record<string, unknown>).interpreter_dispatch_state === undefined) {
+      if (
+        (result as Record<string, unknown>).interpreter_dispatch_state === undefined
+      ) {
         (result as Record<string, unknown>).interpreter_dispatch_state =
-          interpreterDispatchEligible ? interpreterArtifact?.dispatch_state ?? null : null;
+          interpreterDispatchEligible
+            ? (interpreterArtifact?.dispatch_state ?? null)
+            : null;
       }
       if ((result as Record<string, unknown>).interpreter_confirm_prompt === undefined) {
         (result as Record<string, unknown>).interpreter_confirm_prompt =
@@ -130775,7 +131856,9 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
           currentTurnId: turnId,
           sessionId: sessionId ?? null,
           promptText: transcript,
-          allowsPriorArtifacts: false,
+          allowsPriorArtifacts:
+            detectHelixFollowupReferences(transcript).followup_kind ===
+            "previous_evidence",
           maxTurns: HELIX_ASK_CONVERSATION_RECENT_TURNS,
         });
   const conversationMemoryRendered = conversationMemoryPacket
@@ -131068,8 +132151,10 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     };
   }
   const conversationPendingKey = sessionId ?? null;
-  let existingPendingRequest =
-    conversationPendingKey ? helixConversationPendingInputBySession.get(conversationPendingKey) ?? null : null;
+  let existingPendingRequest = conversationPendingKey
+    ? (helixConversationPendingInputBySession.get(conversationPendingKey) ??
+      null)
+    : null;
   if (existingPendingRequest?.expiresAtMs && existingPendingRequest.expiresAtMs <= Date.now()) {
     if (conversationPendingKey) {
       helixConversationPendingInputBySession.delete(conversationPendingKey);
@@ -131596,7 +132681,9 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
       parsed.data.interpreter_schema_version ?? (interpreterArtifact ? HELIX_INTERPRETER_SCHEMA_VERSION : null),
     interpreter_status: interpreterStatus,
     interpreter_confidence: interpreterConfidence,
-    interpreter_dispatch_state: interpreterDispatchEligible ? interpreterArtifact?.dispatch_state ?? null : null,
+    interpreter_dispatch_state: interpreterDispatchEligible
+      ? (interpreterArtifact?.dispatch_state ?? null)
+      : null,
     interpreter_confirm_prompt: actionConfirmationRequired ? briefText : interpreterConfirmPrompt,
     interpreter_term_ids: interpreterArtifact?.term_ids ?? [],
     interpreter_concept_ids: interpreterArtifact?.concept_ids ?? [],
@@ -131654,15 +132741,21 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
   });
 });
 
-const handleAskTurnRequest = async (req: Request, res: Response): Promise<unknown> => {
-  const incoming = req.body && typeof req.body === "object" ? ({ ...(req.body as Record<string, unknown>) }) : {};
+const handleAskTurnRequest = async (
+  req: Request,
+  res: Response,
+): Promise<unknown> => {
+  const incoming =
+    req.body && typeof req.body === "object"
+      ? { ...(req.body as Record<string, unknown>) }
+      : {};
   const askTurnEventSink = (req as Request & { __helixAskTurnEventSink?: HelixAskTurnEventSink })
     .__helixAskTurnEventSink ?? null;
-const FORCE_EMPTY_TERMINAL_TEST_MARKER = "[[TEST_FORCE_EMPTY_TERMINAL]]";
-const PREEMIT_TERMINAL_TEST_MARKER = "[[TEST_PREEMIT_TERMINAL]]";
-const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
-const FORCE_META_TERMINAL_TEST_MARKER = "[[TEST_FORCE_META_TERMINAL]]";
-const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
+  const FORCE_EMPTY_TERMINAL_TEST_MARKER = "[[TEST_FORCE_EMPTY_TERMINAL]]";
+  const PREEMIT_TERMINAL_TEST_MARKER = "[[TEST_PREEMIT_TERMINAL]]";
+  const FORCE_EXPIRE_PENDING_TEST_MARKER = "[[TEST_FORCE_EXPIRE_PENDING]]";
+  const FORCE_META_TERMINAL_TEST_MARKER = "[[TEST_FORCE_META_TERMINAL]]";
+  const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   const readAskTurnObject = (value: unknown): Record<string, unknown> | null =>
     value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
   const readAskTurnStringArray = (value: unknown, limit = 12): string[] =>
@@ -131909,7 +133002,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       turnInputIntegrityAudit.violations.every((violation) => violation.kind === "missing_pasted_text_attachment");
     if (
       onlyMissingImageAttachment &&
-      isAskTurnScientificImageTextComparisonPrompt(incomingQuestion)
+      isAskTurnScientificImageEvidencePrompt(incomingQuestion)
     ) {
       turnInputIntegrityAudit.violations = [];
       turnInputIntegrityAudit.ok = true;
@@ -132041,14 +133134,19 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   const askTurnConversationMemoryPacket =
     process.env.HELIX_ASK_CONVERSATION_MEMORY_PACKET === "0"
       ? null
-      : preAdmittedContextResumeMemoryPacket ?? buildHelixConversationMemoryPacket({
+      : (preAdmittedContextResumeMemoryPacket ??
+        buildHelixConversationMemoryPacket({
           threadId: incomingThreadId,
-           currentTurnId: incomingTurnId,
-           sessionId: incomingSessionId ?? incomingThreadId,
-           promptText: incomingQuestion,
-           allowsPriorArtifacts: false,
-           contextResumeFrames: explicitContextResumeFrame ? [explicitContextResumeFrame] : [],
-         });
+          currentTurnId: incomingTurnId,
+          sessionId: incomingSessionId ?? incomingThreadId,
+          promptText: incomingQuestion,
+          allowsPriorArtifacts:
+            detectHelixFollowupReferences(incomingQuestion).followup_kind ===
+            "previous_evidence",
+          contextResumeFrames: explicitContextResumeFrame
+            ? [explicitContextResumeFrame]
+            : [],
+        }));
   const askTurnConversationMemoryRendered = askTurnConversationMemoryPacket
     ? renderHelixConversationMemoryForModel(askTurnConversationMemoryPacket)
     : null;
@@ -132607,7 +133705,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               [...calculatorPlannerResult.subgoals, ...coverageRepairGenericSubgoals].map((subgoal) => [subgoal.id, subgoal]),
             ).values(),
           ).slice(0, 5)
-      : calculatorPlannerRepairResult?.subgoals ?? calculatorPlannerResult.subgoals ?? null;
+        : (calculatorPlannerRepairResult?.subgoals ??
+          calculatorPlannerResult.subgoals ??
+          null);
   const calculatorPlannerRepairResultPayload: HelixCalculatorPlannerRepairResultPayload = {
     schema: "helix.calculator_planner_repair_result.v1",
     turn_id: incomingTurnId,
@@ -132937,9 +134037,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       const subgoalId = readAskTurnString(readHelixAgentStepDecisionActionArgs(decision).compound_subgoal_id);
       if (subgoalId) calculatorDecisionBySubgoal.set(subgoalId, decision);
     }
-    const annotateCalculatorReceiptPayload = (payload: Record<string, unknown>): Record<string, unknown> => {
+    const annotateCalculatorReceiptPayload = (
+      payload: Record<string, unknown>,
+    ): Record<string, unknown> => {
       const subgoalId = readAskTurnString(payload.subgoal_id);
-      const decision = subgoalId ? calculatorDecisionBySubgoal.get(subgoalId) ?? null : null;
+      const decision = subgoalId
+        ? (calculatorDecisionBySubgoal.get(subgoalId) ?? null)
+        : null;
       return decision
         ? {
             ...payload,
@@ -133279,7 +134383,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           required: true,
           satisfied: validation.satisfied,
           evidence_ref: validation.validation_id,
-          failure_reason: validation.satisfied ? undefined : validation.failure_reason ?? "validation_failed",
+          failure_reason: validation.satisfied
+            ? undefined
+            : (validation.failure_reason ?? "validation_failed"),
         })),
         {
           kind: "workstation_tool_evaluation",
@@ -133797,9 +134903,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         const runtimeReceiptFallbackAnswer = synthesizeCalculatorReceiptAnswer({
           prompt: incomingQuestion,
           receipts: calculatorReceiptEvidence,
-          coverage: (payload.calculator_plan_coverage && typeof payload.calculator_plan_coverage === "object"
-            ? (payload.calculator_plan_coverage as HelixCalculatorPlanCoverage)
-            : calculatorPlanCoverage),
+          coverage:
+            payload.calculator_plan_coverage &&
+            typeof payload.calculator_plan_coverage === "object"
+              ? (payload.calculator_plan_coverage as HelixCalculatorPlanCoverage)
+              : calculatorPlanCoverage,
         });
         const runtimeDraft = await invokeHelixPostObservationComposerLlm({
           turnId: incomingTurnId,
@@ -133823,9 +134931,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         let runtimeAnswerText = cleanHelixSatisfiedCalculatorAnswerText({
           text: runtimeDraft.text,
           fallbackText: runtimeReceiptFallbackAnswer,
-          calculatorCoverage: (payload.calculator_plan_coverage && typeof payload.calculator_plan_coverage === "object"
-            ? (payload.calculator_plan_coverage as HelixCalculatorPlanCoverage)
-            : calculatorPlanCoverage),
+          calculatorCoverage:
+            payload.calculator_plan_coverage &&
+            typeof payload.calculator_plan_coverage === "object"
+              ? (payload.calculator_plan_coverage as HelixCalculatorPlanCoverage)
+              : calculatorPlanCoverage,
           promptCoverage: null,
         });
         if (helixCalculatorAnswerConflictsWithExpressionResult(runtimeAnswerText)) {
@@ -133920,7 +135030,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               readAskTurnString(hint.suggested_args?.compound_subgoal_id) ??
               readAskTurnString(hint.suggested_action?.args?.compound_subgoal_id);
             const matchingReceipt = subgoalId
-              ? calculatorReceiptEvidence.find((receipt) => readAskTurnString(receipt.subgoal_id) === subgoalId) ?? null
+              ? (calculatorReceiptEvidence.find(
+                  (receipt) =>
+                    readAskTurnString(receipt.subgoal_id) === subgoalId,
+                ) ?? null)
               : null;
             if (
               hint.source === "calculator_compound_chain" &&
@@ -134253,19 +135366,22 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.compound_evidence_synthesis_answer &&
       typeof payload.compound_evidence_synthesis_answer === "object" &&
       !Array.isArray(payload.compound_evidence_synthesis_answer)
-        ? payload.compound_evidence_synthesis_answer as Record<string, unknown>
+        ? (payload.compound_evidence_synthesis_answer as Record<
+            string,
+            unknown
+          >)
         : null;
     const calculatorCompoundContract =
       payload.compound_capability_contract &&
       typeof payload.compound_capability_contract === "object" &&
       !Array.isArray(payload.compound_capability_contract)
-        ? payload.compound_capability_contract as Record<string, unknown>
+        ? (payload.compound_capability_contract as Record<string, unknown>)
         : null;
     const calculatorRouteProductContract =
       payload.route_product_contract &&
       typeof payload.route_product_contract === "object" &&
       !Array.isArray(payload.route_product_contract)
-        ? payload.route_product_contract as Record<string, unknown>
+        ? (payload.route_product_contract as Record<string, unknown>)
         : null;
     const calculatorCompoundSynthesisText =
       readAskTurnString(calculatorCompoundSynthesis?.answer_text) ??
@@ -134280,18 +135396,23 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       readAskTurnString(calculatorRouteProductContract?.required_terminal_artifact_kind) ===
         "compound_evidence_synthesis_answer"
     );
-    const calculatorCompoundReturnText =
-      calculatorCompoundSynthesisReady
-        ? calculatorCompoundSynthesisText!
-        : calculatorCompoundReturnHasEvidence && payload.final_answer_draft && typeof payload.final_answer_draft === "object"
-        ? readAskTurnString((payload.final_answer_draft as Record<string, unknown>).text) ?? calculatorTerminalText
+    const calculatorCompoundReturnText = calculatorCompoundSynthesisReady
+      ? calculatorCompoundSynthesisText!
+      : calculatorCompoundReturnHasEvidence && payload.final_answer_draft && typeof payload.final_answer_draft === "object"
+        ? (readAskTurnString(
+            (payload.final_answer_draft as Record<string, unknown>).text,
+          ) ?? calculatorTerminalText)
         : calculatorTerminalText;
     const calculatorReturnReceipts = mergeHelixCalculatorReceiptRecords(
       Array.isArray(payload.calculator_subgoal_receipts) && (payload.calculator_subgoal_receipts as unknown[]).length > 0
         ? (payload.calculator_subgoal_receipts as Array<Record<string, unknown>>)
-        : calculatorAuthorizedReceipts as unknown as Array<Record<string, unknown>>,
+        : (calculatorAuthorizedReceipts as unknown as Array<
+            Record<string, unknown>
+          >),
       preferDeterministicCasimirCavityChain && deterministicCalculatorCompoundChain?.receipts?.length
-        ? deterministicCalculatorCompoundChain.receipts as unknown as Array<Record<string, unknown>>
+        ? (deterministicCalculatorCompoundChain.receipts as unknown as Array<
+            Record<string, unknown>
+          >)
         : [],
     );
     const calculatorReturnReceiptBySubgoal = new Map(
@@ -134326,11 +135447,16 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
                   : `${prefix}Mode frequency: ${frequency.trim()}.\n${body}`,
             )
         : calculatorCompoundReturnText;
-    if (helixCalculatorAnswerConflictsWithExpressionResult(normalizedCalculatorCompoundReturnText)) {
-      const finalReceiptEvidence = Array.isArray(payload.calculator_subgoal_receipts) &&
+    if (
+      helixCalculatorAnswerConflictsWithExpressionResult(normalizedCalculatorCompoundReturnText)
+    ) {
+      const finalReceiptEvidence =
+        Array.isArray(payload.calculator_subgoal_receipts) &&
         (payload.calculator_subgoal_receipts as unknown[]).length > 0
-        ? (payload.calculator_subgoal_receipts as Array<Record<string, unknown>>)
-        : calculatorAuthorizedReceipts as unknown as Array<Record<string, unknown>>;
+          ? (payload.calculator_subgoal_receipts as Array<Record<string, unknown>>)
+          : (calculatorAuthorizedReceipts as unknown as Array<
+              Record<string, unknown>
+            >);
       normalizedCalculatorCompoundReturnText = sanitizeHelixCalculatorAnswerAgainstReceiptResults({
         text: normalizedCalculatorCompoundReturnText,
         prompt: incomingQuestion,
@@ -134552,7 +135678,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       explicitCapabilityContractForContinuation.source_target !== "live_source_mailbox" &&
       explicitCapabilityContractForContinuation.plan_family !== "live_environment"
     );
-  if (liveSourceContinuationIntent && !liveSourceContinuationBlockedByExplicitCapability) {
+  if (
+    liveSourceContinuationIntent && !liveSourceContinuationBlockedByExplicitCapability
+  ) {
     const shouldUseDesktopLiveThread =
       incomingThreadId !== "helix-ask:desktop" &&
       !incomingThreadId.startsWith("helix-ask:discord:");
@@ -134683,12 +135811,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           const latestSource = listWorldSourcesSeen()[0] ?? null;
           const bindings = listSituationThreadBindings();
           const matchingBinding = latestSource
-            ? bindings.find((binding) =>
-                binding.thread_id === liveThreadId &&
-                binding.room_id === latestSource.room_id &&
-                binding.source_id === latestSource.source_id &&
-                binding.world_id === latestSource.world_id
-              ) ?? null
+            ? (bindings.find(
+                (binding) =>
+                  binding.thread_id === liveThreadId &&
+                  binding.room_id === latestSource.room_id &&
+                  binding.source_id === latestSource.source_id &&
+                  binding.world_id === latestSource.world_id,
+              ) ?? null)
             : null;
           const latestDebug = latestSource?.latest_debug ?? null;
           const ok = Boolean(latestSource && matchingBinding && latestDebug?.append_decision === "appended");
@@ -134751,24 +135880,23 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       producerFreshness?.readiness_state === "waiting_for_client_adoption"
         ? "waiting for client adoption"
         : producerFreshness?.client_adoption_status === "adopted" && producerFreshness.stale_reason === "no_chunk_after_two_cadence_windows"
-        ? "adopted, latest chunk stale"
-        : producerFreshness?.readiness_state === "client_adopted_waiting_for_chunk"
-          ? "adopted, waiting for first chunk"
-          : producerFreshness?.readiness_state === "analysis_blocked"
-            ? "adopted, analysis blocked"
-            : producerFreshness?.client_adoption_status === "adopted" && producerFreshness.is_fresh
-              ? "adopted, fresh"
-              : cadenceReceipt?.cadence.status ?? "unknown";
-    const actionSummary =
-      producerFreshness?.next_required_action
-        ? producerFreshness.next_required_action
-        : runtimeContext.suggested_action === "request_visual_permission"
-          ? "grant visual capture permission"
-          : runtimeContext.suggested_action === "capture_frame_now"
-            ? "capture a fresh frame"
-            : runtimeContext.suggested_action === "run_due_analysis"
-              ? "run due analysis"
-              : nextActions[0] ?? runtimeContext.suggested_action;
+          ? "adopted, latest chunk stale"
+          : producerFreshness?.readiness_state === "client_adopted_waiting_for_chunk"
+            ? "adopted, waiting for first chunk"
+            : producerFreshness?.readiness_state === "analysis_blocked"
+              ? "adopted, analysis blocked"
+              : producerFreshness?.client_adoption_status === "adopted" && producerFreshness.is_fresh
+                ? "adopted, fresh"
+                : (cadenceReceipt?.cadence.status ?? "unknown");
+    const actionSummary = producerFreshness?.next_required_action
+      ? producerFreshness.next_required_action
+      : runtimeContext.suggested_action === "request_visual_permission"
+        ? "grant visual capture permission"
+        : runtimeContext.suggested_action === "capture_frame_now"
+          ? "capture a fresh frame"
+          : runtimeContext.suggested_action === "run_due_analysis"
+            ? "run due analysis"
+            : (nextActions[0] ?? runtimeContext.suggested_action);
     const liveCognitionDebugCounts = {
       observation_journal_count: listObservationJournalEntries({ threadId: liveThreadId, limit: 500 }).length,
       interpretation_card_count: listInterpretationCards({ threadId: liveThreadId, limit: 500 }).length,
@@ -135294,7 +136422,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   if (
     askTurnWorkstationToolPlanForStream.tool_plan &&
     askTurnTheoryReflectionRouteEligible &&
-    !isAskTurnScientificImageTextComparisonPrompt(incomingQuestion) &&
+    !isAskTurnScientificImageEvidencePrompt(incomingQuestion) &&
     !askTurnCompoundEvidenceRequested &&
     !askTurnExternalResearchRequested &&
     askTurnWorkstationToolPlanForStream.tool_plan.missing_requirements.length === 0
@@ -136498,7 +137626,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     pushAction(payload.workspace_action);
     return out;
   };
-  const normalizeAskTurnTopLevelEnvelope = (payload: Record<string, unknown>, status: number): void => {
+  const normalizeAskTurnTopLevelEnvelope = (
+    payload: Record<string, unknown>,
+    status: number,
+  ): void => {
     const turnContract =
       payload.turn_contract && typeof payload.turn_contract === "object"
         ? (payload.turn_contract as Record<string, unknown>)
@@ -136983,9 +138114,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             const artifactPayload = record.payload && typeof record.payload === "object"
               ? (record.payload as Record<string, unknown>)
               : null;
-            return readAskTurnString(artifactPayload?.answer_text) ?? readAskTurnString(artifactPayload?.text);
+            return (
+              readAskTurnString(artifactPayload?.answer_text) ??
+              readAskTurnString(artifactPayload?.text)
+            );
           })
-          .find((text): text is string => Boolean(text && !isAskTurnNonSubstantiveDirectAnswer(text))) ?? null;
+          .find((text): text is string => Boolean(text && !isAskTurnNonSubstantiveDirectAnswer(text)),
+          ) ?? null;
       const runtimeTerminal =
         payload.turn_runtime && typeof payload.turn_runtime === "object" &&
         (payload.turn_runtime as Record<string, unknown>).terminal &&
@@ -137071,47 +138206,51 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           reason: "workstation_tool_plan_authorized",
         };
       } else {
-      const currentTurnId =
+        const currentTurnId =
         readAskTurnString(payload.turn_id) ??
         readAskTurnString((payload.latest_result_artifact as Record<string, unknown> | undefined)?.turn_id) ??
         "unknown-turn";
-      const promptForScope = transcriptSeed;
-      const exactAnchorSet = extractAskTurnExactAnchorSet({ turnId: currentTurnId, transcript: promptForScope });
-      const contamination = checkAskTurnNoToolContamination({
+        const promptForScope = transcriptSeed;
+        const exactAnchorSet = extractAskTurnExactAnchorSet({ turnId: currentTurnId, transcript: promptForScope });
+        const contamination = checkAskTurnNoToolContamination({
         turnId: currentTurnId,
         transcript: promptForScope,
         selectedFinalAnswer: postNormalizeText,
         exactAnchors: exactAnchorSet.must_preserve,
       });
-      const terminalKind = readAskTurnString(payload.terminal_artifact_kind);
-      const richModelOnlyConceptTerminalAllowed =
+        const terminalKind = readAskTurnString(payload.terminal_artifact_kind);
+        const richModelOnlyConceptTerminalAllowed =
         readAskTurnString((payload.rich_model_only_concept_signal as Record<string, unknown> | undefined)?.schema) ===
           "helix.rich_model_only_concept_signal.v1" &&
         (payload.rich_model_only_concept_signal as Record<string, unknown> | undefined)?.applies === true &&
         terminalKind === "model_synthesized_answer" &&
         readAskTurnString(payload.final_answer_source) === "final_answer_draft";
-      const terminalKindViolatesScope =
+        const terminalKindViolatesScope =
         Boolean(terminalKind) &&
         !["direct_answer_text", "typed_failure"].includes(String(terminalKind)) &&
         !richModelOnlyConceptTerminalAllowed;
-      payload.no_tool_contamination_check = contamination;
-      if (contamination.verdict !== "clean" || terminalKindViolatesScope) {
-        const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
-        const ledgerDirectAnswer =
-          ledger
+        payload.no_tool_contamination_check = contamination;
+        if (contamination.verdict !== "clean" || terminalKindViolatesScope) {
+          const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
+          const ledgerDirectAnswer =
+            ledger
             .map((entry) => {
-              if (!entry || typeof entry !== "object") return null;
-              const record = entry as Record<string, unknown>;
-              if (readAskTurnString(record.kind) !== "direct_answer_text") return null;
-              const artifactPayload = record.payload && typeof record.payload === "object"
+                if (!entry || typeof entry !== "object") return null;
+                const record = entry as Record<string, unknown>;
+                if (readAskTurnString(record.kind) !== "direct_answer_text") return null;
+                const artifactPayload = record.payload && typeof record.payload === "object"
                 ? (record.payload as Record<string, unknown>)
                 : null;
-              return readAskTurnString(artifactPayload?.answer_text) ?? readAskTurnString(artifactPayload?.text);
-            })
-            .find((text): text is string => Boolean(text && !isAskTurnNonSubstantiveDirectAnswer(text))) ?? null;
-        const fallbackDirectAnswer = buildAskTurnModelOnlyFallbackAnswer(promptForScope);
-        const repairAnswer = ledgerDirectAnswer ?? fallbackDirectAnswer;
-        const repairContamination = repairAnswer
+                return (
+                  readAskTurnString(artifactPayload?.answer_text) ??
+                  readAskTurnString(artifactPayload?.text)
+                );
+              })
+              .find((text): text is string => Boolean(text && !isAskTurnNonSubstantiveDirectAnswer(text)),
+              ) ?? null;
+          const fallbackDirectAnswer = buildAskTurnModelOnlyFallbackAnswer(promptForScope);
+          const repairAnswer = ledgerDirectAnswer ?? fallbackDirectAnswer;
+          const repairContamination = repairAnswer
           ? checkAskTurnNoToolContamination({
               turnId: currentTurnId,
               transcript: promptForScope,
@@ -137119,11 +138258,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               exactAnchors: exactAnchorSet.must_preserve,
             })
           : null;
-        if (
-          repairAnswer &&
+          if (
+            repairAnswer &&
           repairContamination?.verdict === "clean" &&
           responseBoundaryCanPromoteModelOnlyDirectRepair
-        ) {
+          ) {
           payload.text = repairAnswer;
           payload.answer = repairAnswer;
           payload.assistant_answer = repairAnswer;
@@ -137142,10 +138281,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             (payload.terminal_artifact as Record<string, unknown>).kind = "final_answer";
           }
         } else if (
-          repairAnswer &&
+            repairAnswer &&
           repairContamination?.verdict === "clean" &&
           !responseBoundaryCanPromoteModelOnlyDirectRepair
-        ) {
+          ) {
           payload.response_boundary_model_only_direct_repair_suppressed = true;
           payload.response_boundary_model_only_direct_repair_suppression_reason =
             "model_only_direct_repair_requires_solver_or_terminal_authority";
@@ -137155,35 +138294,37 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               "model_only_direct_repair_requires_solver_or_terminal_authority";
           }
         } else {
-        const failureText = "I could not produce a direct answer that stayed inside the requested no-workspace scope.";
-        payload.text = failureText;
-        payload.answer = failureText;
-        payload.assistant_answer = failureText;
-        payload.selected_final_answer = failureText;
-        payload.final_answer_source = "typed_failure";
-        payload.response_type = "final_failure";
-        payload.final_status = "final_failure";
-        payload.terminal_error_code = "direct_answer_contamination";
-        payload.terminal_artifact_kind = "typed_failure";
-        const rejected = Array.isArray(payload.rejected_final_answer_repairs)
+            const failureText = "I could not produce a direct answer that stayed inside the requested no-workspace scope.";
+            payload.text = failureText;
+            payload.answer = failureText;
+            payload.assistant_answer = failureText;
+            payload.selected_final_answer = failureText;
+            payload.final_answer_source = "typed_failure";
+            payload.response_type = "final_failure";
+            payload.final_status = "final_failure";
+            payload.terminal_error_code = "direct_answer_contamination";
+            payload.terminal_artifact_kind = "typed_failure";
+            const rejected = Array.isArray(payload.rejected_final_answer_repairs)
           ? payload.rejected_final_answer_repairs
           : [];
-        payload.rejected_final_answer_repairs = [
-          ...rejected,
-          {
-            kind: terminalKindViolatesScope ? terminalKind ?? "workspace_terminal_artifact" : "active_doc_summary",
-            reason: "scope_contract_forbids_workspace_repair",
-          },
-        ];
-        if (payload.latest_result_artifact && typeof payload.latest_result_artifact === "object") {
+            payload.rejected_final_answer_repairs = [
+              ...rejected,
+              {
+                kind: terminalKindViolatesScope
+                  ? (terminalKind ?? "workspace_terminal_artifact")
+                  : "active_doc_summary",
+                reason: "scope_contract_forbids_workspace_repair",
+              },
+            ];
+            if (payload.latest_result_artifact && typeof payload.latest_result_artifact === "object") {
           (payload.latest_result_artifact as Record<string, unknown>).text = failureText;
         }
-        if (payload.terminal_artifact && typeof payload.terminal_artifact === "object") {
+            if (payload.terminal_artifact && typeof payload.terminal_artifact === "object") {
           (payload.terminal_artifact as Record<string, unknown>).text = failureText;
           (payload.terminal_artifact as Record<string, unknown>).kind = "final_failure";
         }
+          }
         }
-      }
       }
     }
     const normalizedTerminalError = readAskTurnString(payload.terminal_error_code);
@@ -137526,7 +138667,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       });
     }
   };
-  const attachAskTurnAsyncMetadataToPayload = (payload: Record<string, unknown>): void => {
+  const attachAskTurnAsyncMetadataToPayload = (
+    payload: Record<string, unknown>,
+  ): void => {
     const payloadTurnRuntime = payload.turn_runtime && typeof payload.turn_runtime === "object"
       ? (payload.turn_runtime as Record<string, unknown>)
       : null;
@@ -137654,11 +138797,17 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         general_controller_final_decision:
           hasPendingControllerRequest && pendingControllerDecision
             ? pendingControllerDecision.decision
-            : pendingControllerDecision?.decision ?? generalControllerDecisions[generalControllerDecisions.length - 1]?.decision ?? null,
+            : (pendingControllerDecision?.decision ??
+              generalControllerDecisions[generalControllerDecisions.length - 1]
+                ?.decision ??
+              null),
         general_controller_stop_reason:
           hasPendingControllerRequest && pendingControllerDecision
             ? pendingControllerDecision.reason
-            : pendingControllerDecision?.reason ?? generalControllerDecisions[generalControllerDecisions.length - 1]?.reason ?? null,
+            : (pendingControllerDecision?.reason ??
+              generalControllerDecisions[generalControllerDecisions.length - 1]
+                ?.reason ??
+              null),
         observe_then_decide_trace: observeThenDecideTrace,
       };
     }
@@ -138015,7 +139164,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       const openedPanelAction = responseWorkstationActions.find((entry) => {
         if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
         const action = entry as Record<string, unknown>;
-        return readAskTurnString(action.action_id) === "open" && Boolean(readAskTurnString(action.panel_id));
+        return (
+          readAskTurnString(action.action_id) === "open" &&
+          Boolean(readAskTurnString(action.panel_id))
+        );
       }) as Record<string, unknown> | undefined;
       const openedPanelId = readAskTurnString(openedPanelAction?.panel_id);
       if (openedPanelId) {
@@ -138202,10 +139354,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         raw_content_included: false,
       };
     }
-    const applySituationContextFinalAnswer = (missionAnswer: string, terminalArtifactId: string): void => {
+    const applySituationContextFinalAnswer = (
+      missionAnswer: string,
+      terminalArtifactId: string,
+    ): void => {
       const payloadSourceTargetIntent =
         payload.source_target_intent && typeof payload.source_target_intent === "object"
-          ? payload.source_target_intent as Record<string, unknown>
+          ? (payload.source_target_intent as Record<string, unknown>)
           : null;
       if (
         payloadSourceTargetIntent?.target_source === "procedure_memory" &&
@@ -138249,7 +139404,6 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.terminal_error_code = null;
       payload.terminal_artifact_kind = "situation_context_pack";
       payload.terminal_artifact_id = terminalArtifactId;
-      payload.route_reason_code = "situation_context_pack";
       payload.satisfaction_report = {
         satisfied: true,
         terminal_kind: "final_answer",
@@ -138391,11 +139545,18 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             (typeof left.confidence === "number" ? left.confidence : 0),
           );
         const selectedHypothesis =
-          sortedUtilityHypotheses.find((hypothesis: Record<string, unknown>) => {
-            const subject = String(hypothesis.subject_ref ?? "").toLowerCase().replace(/^minecraft:/, "");
-            const label = String(hypothesis.utility_label ?? "").toLowerCase();
-            return normalizedQuestion.includes(subject) || normalizedQuestion.includes(label.split(/\s+/)[0] ?? "");
-          }) ?? sortedUtilityHypotheses[0] ?? null;
+          sortedUtilityHypotheses.find(
+            (hypothesis: Record<string, unknown>) => {
+              const subject = String(hypothesis.subject_ref ?? "").toLowerCase().replace(/^minecraft:/, "");
+              const label = String(hypothesis.utility_label ?? "").toLowerCase();
+              return (
+                normalizedQuestion.includes(subject) ||
+                normalizedQuestion.includes(label.split(/\s+/)[0] ?? "")
+              );
+            },
+          ) ??
+          sortedUtilityHypotheses[0] ??
+          null;
         if (selectedHypothesis) {
           const label = String(selectedHypothesis.utility_label ?? "game utility hypothesis");
           const status = String(selectedHypothesis.status ?? "unknown");
@@ -138438,13 +139599,17 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       const clusters = Array.isArray(context.entity_clusters)
         ? (context.entity_clusters as Array<Record<string, unknown>>)
         : [];
-      const relevantClusters = clusters.filter((cluster: Record<string, unknown>) => {
-        const entity = String(cluster.entity_type ?? "").toLowerCase();
-        return normalizedQuestion.includes("farm") ||
-          normalizedQuestion.includes("animal") ||
-          normalizedQuestion.includes("chicken") ||
-          normalizedQuestion.includes(entity.replace(/^minecraft:/, ""));
-      });
+      const relevantClusters = clusters.filter(
+        (cluster: Record<string, unknown>) => {
+          const entity = String(cluster.entity_type ?? "").toLowerCase();
+          return (
+            normalizedQuestion.includes("farm") ||
+            normalizedQuestion.includes("animal") ||
+            normalizedQuestion.includes("chicken") ||
+            normalizedQuestion.includes(entity.replace(/^minecraft:/, ""))
+          );
+        },
+      );
       const selected = relevantClusters[0] ?? clusters[0] ?? null;
       if (!selected) return "";
       const hints = Array.isArray(context.interpretation_hints)
@@ -138539,12 +139704,12 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             "live_source_mailbox.stage_play_mail_wake_route_metadata"
         )
           ? existingEarlyEvidenceTargetArbitration
-          : buildAskEvidenceTargetArbitration({
+          : (buildAskEvidenceTargetArbitration({
               turnId: earlyResponseTurnId,
               threadId: earlyAuthorityThreadId,
               promptText: options?.questionSeed ?? transcriptSeed,
               routeMetadata: earlyWakeRouteMetadata,
-            }) as Record<string, unknown>;
+            }) as Record<string, unknown>);
       payload.evidence_target_arbitration = earlyEvidenceTargetArbitration;
       const earlySourceTargetIntent = coerceLiveSourceMailboxSourceTargetIntent({
         sourceTargetIntent: earlyRawSourceTargetIntent as Record<string, unknown>,
@@ -138717,10 +139882,6 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           ),
           ...providerVisualArtifacts,
         ];
-        applySituationContextFinalAnswer(
-          providerVisualSituationRoute.answer_text,
-          providerVisualArtifactIds.context,
-        );
       }
       if (responseSessionId && !payload.situation_context_pack && earlyAllowsSituationTerminal) {
         const activeSituationSession =
@@ -139043,14 +140204,14 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       }
       const attachedLiveAnswerRelevance = attachedLiveAnswerEnvironment
         ? evaluateLiveEnvironmentTurnRelevance({
-          threadId:
-            typeof attachedLiveAnswerEnvironment.thread_id === "string" && attachedLiveAnswerEnvironment.thread_id.trim()
-              ? attachedLiveAnswerEnvironment.thread_id
-              : responseSessionId ?? "helix-ask:desktop",
-          turnId: typeof payload.turn_id === "string" ? payload.turn_id : null,
-          prompt: String(options?.questionSeed ?? transcriptSeed ?? ""),
-          environments: [attachedLiveAnswerEnvironment as unknown as LiveAnswerEnvironment],
-        })
+            threadId:
+              typeof attachedLiveAnswerEnvironment.thread_id === "string" && attachedLiveAnswerEnvironment.thread_id.trim()
+                ? attachedLiveAnswerEnvironment.thread_id
+                : (responseSessionId ?? "helix-ask:desktop"),
+            turnId: typeof payload.turn_id === "string" ? payload.turn_id : null,
+            prompt: String(options?.questionSeed ?? transcriptSeed ?? ""),
+            environments: [attachedLiveAnswerEnvironment as unknown as LiveAnswerEnvironment],
+          })
         : null;
       const attachedLiveAnswerDirectStateQuestion =
         /\b(?:live\s+(?:answer\s+)?environment|live\s+card|this\s+environment|this\s+stream|this\s+tracker)\b/.test(directSituationQuestion) ||
@@ -139351,7 +140512,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       const wakeRouteMetadataForPresentation = readStagePlayMailWakeRouteMetadataFromPayload(payload);
       const retainedScientificImageComparisonForPresentation =
         !wakeRouteMetadataForPresentation &&
-        isAskTurnScientificImageTextComparisonPrompt(incomingQuestion);
+        isAskTurnScientificImageEvidencePrompt(incomingQuestion);
       const scientificImageComparisonRouteForPresentation =
         retainedScientificImageComparisonForPresentation
           ? buildAskTurnScientificImageComparisonRouteMetadata({
@@ -139424,7 +140585,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       });
       const retrievalSignalForToolEligibility =
         payload.retrieval_required_signal && typeof payload.retrieval_required_signal === "object"
-          ? payload.retrieval_required_signal as ReturnType<typeof buildAskTurnRetrievalRequiredSignal>
+          ? (payload.retrieval_required_signal as ReturnType<
+              typeof buildAskTurnRetrievalRequiredSignal
+            >)
           : buildAskTurnRetrievalRequiredSignal({
               turnId: responseTurnId,
               transcript: options?.questionSeed ?? transcriptSeed,
@@ -139435,8 +140598,12 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       if (
         asksToolEligibility ||
         routeProductContractForPresentation.source_target === "repo_code" ||
-        Array.isArray(sourceTargetRecordForToolEligibility.requested_outputs) &&
-          sourceTargetRecordForToolEligibility.requested_outputs.includes("tool_call_eligibility")
+        (Array.isArray(
+          sourceTargetRecordForToolEligibility.requested_outputs,
+        ) &&
+          sourceTargetRecordForToolEligibility.requested_outputs.includes(
+            "tool_call_eligibility",
+          ))
       ) {
         payload.tool_eligibility_diagnosis = {
           schema: "helix.tool_eligibility_diagnosis.v1",
@@ -139625,7 +140792,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       if (!preflightContextForPresentation) {
         const responseRetrievalRequiredSignal =
           payload.retrieval_required_signal && typeof payload.retrieval_required_signal === "object"
-            ? payload.retrieval_required_signal as ReturnType<typeof buildAskTurnRetrievalRequiredSignal>
+            ? (payload.retrieval_required_signal as ReturnType<
+                typeof buildAskTurnRetrievalRequiredSignal
+              >)
             : buildAskTurnRetrievalRequiredSignal({
                 turnId: responseTurnId,
                 transcript: options?.questionSeed ?? transcriptSeed,
@@ -139680,7 +140849,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         readAskTurnString(payload.terminal_error_code) === "concept_explanation_unavailable" &&
         (readAskTurnString(responseCanonicalGoal?.goal_kind) === "doc_scientific_concept" ||
           readAskTurnString(responseCanonicalGoal?.required_terminal_kind) === "doc_concept_explanation")
-          ? responseLedger.find((artifact) => artifact.kind === "doc_concept_explanation") ?? null
+          ? (responseLedger.find(
+              (artifact) => artifact.kind === "doc_concept_explanation",
+            ) ?? null)
           : null;
       if (responseDocConceptArtifact) {
         const conceptPayload = readAskTurnArtifactPayloadRecord(responseDocConceptArtifact) ?? {};
@@ -139752,7 +140923,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           }
         }
       }
-      if (!payload.terminal_presentation || typeof payload.terminal_presentation !== "object") {
+      if (
+        !payload.terminal_presentation || typeof payload.terminal_presentation !== "object"
+      ) {
         const terminalPresentationBundle = presentTerminalArtifact({
           turnId: responseTurnId,
           threadId: authorityThreadId,
@@ -139800,7 +140973,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           }
         }
         const ledger = Array.isArray(payload.current_turn_artifact_ledger)
-          ? payload.current_turn_artifact_ledger as Array<Record<string, unknown>>
+          ? (payload.current_turn_artifact_ledger as Array<
+              Record<string, unknown>
+            >)
           : [];
         payload.current_turn_artifact_ledger = [
           ...ledger,
@@ -140050,7 +141225,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         }
         const payloadAuthoritySourceTarget =
           payload.source_target_intent && typeof payload.source_target_intent === "object"
-            ? payload.source_target_intent as Record<string, unknown>
+            ? (payload.source_target_intent as Record<string, unknown>)
             : null;
         if (
           payloadAuthoritySourceTarget?.target_source === "procedure_memory" &&
@@ -140212,14 +141387,16 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         const postEnvelopeTerminalArtifactKindForTrace = postEnvelopeTerminalIdentity.terminalArtifactKind;
         const postEnvelopeFinalAnswerSourceForTrace = postEnvelopeTerminalIdentity.finalAnswerSource;
         const shouldRebuildMicroDeckCapabilityPlan = hasExecutableAskTurnMicroReasonerPresetCue(options?.questionSeed ?? transcriptSeed);
-        if (!readCapabilityPlanPayload(payload) || shouldRebuildMicroDeckCapabilityPlan) {
+        if (
+          !readCapabilityPlanPayload(payload) || shouldRebuildMicroDeckCapabilityPlan
+        ) {
           const capabilityPlanSourceTargetIntent =
             shouldRebuildMicroDeckCapabilityPlan &&
             payload.source_target_intent &&
             typeof payload.source_target_intent === "object" &&
             !Array.isArray(payload.source_target_intent)
-              ? payload.source_target_intent as Record<string, unknown>
-              : sourceTargetIntentForPresentation as Record<string, unknown>;
+              ? (payload.source_target_intent as Record<string, unknown>)
+              : (sourceTargetIntentForPresentation as Record<string, unknown>);
           payload.capability_plan = buildCapabilityPlan({
             turnId: responseTurnId,
             promptText: options?.questionSeed ?? transcriptSeed,
@@ -141033,10 +142210,14 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         typeof payload.repo_code_evidence_answer === "object" &&
         !Array.isArray(payload.repo_code_evidence_answer)
           ? (payload.repo_code_evidence_answer as Record<string, unknown>)
-          : responseBoundaryArtifacts
-              .filter((artifact) => artifact.kind === "repo_code_evidence_answer")
+          : (responseBoundaryArtifacts
+              .filter(
+                (artifact) => artifact.kind === "repo_code_evidence_answer",
+              )
               .map((artifact) => readAskTurnArtifactPayloadRecord(artifact))
-              .find((entry): entry is Record<string, unknown> => Boolean(entry)) ?? null;
+              .find((entry): entry is Record<string, unknown> =>
+                Boolean(entry),
+              ) ?? null);
       const repoAnswerTextForResponseBoundary =
         readAskTurnString(repoAnswerForResponseBoundary?.answer_text) ??
         readAskTurnString(repoAnswerForResponseBoundary?.text);
@@ -141332,7 +142513,14 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           richModelOnlyConceptSignalForBoundary?.applies !== true &&
           (() => {
             const kind = readAskTurnString(payload.terminal_artifact_kind);
-            return !kind || ["direct_answer_text", "model_synthesized_answer", "turn_final_text"].includes(kind);
+            return (
+              !kind ||
+              [
+                "direct_answer_text",
+                "model_synthesized_answer",
+                "turn_final_text",
+              ].includes(kind)
+            );
           })()
         )
       ) {
@@ -141838,7 +143026,14 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         readAskTurnString((payload.universal_final_composer as Record<string, unknown> | undefined)?.presentation_renderer) === "direct_answer" &&
         (() => {
           const kind = readAskTurnString(payload.terminal_artifact_kind);
-          return !kind || ["direct_answer_text", "model_synthesized_answer", "turn_final_text"].includes(kind);
+          return (
+            !kind ||
+            [
+              "direct_answer_text",
+              "model_synthesized_answer",
+              "turn_final_text",
+            ].includes(kind)
+          );
         })()
       ) {
         payload.final_answer_source = "model_direct_answer";
@@ -141958,8 +143153,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         final_gate_outcome:
           status < 400
             ? "resolved_terminal_answer"
-            : readAskTurnString(payload.terminal_error_code) ?? "ask_turn_failed",
-        fail_reason: status < 400 ? null : readAskTurnString(payload.terminal_failure_text) ?? readAskTurnString(payload.error),
+            : (readAskTurnString(payload.terminal_error_code) ??
+              "ask_turn_failed"),
+        fail_reason:
+          status < 400
+            ? null
+            : (readAskTurnString(payload.terminal_failure_text) ??
+              readAskTurnString(payload.error)),
         meta: {
           source_route: "/ask/turn",
           final_answer_source: readAskTurnString(payload.final_answer_source) ?? finalAnswerSourceForPresentation,
@@ -141994,7 +143194,14 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         ) &&
         (() => {
           const kind = readAskTurnString(payload.terminal_artifact_kind);
-          return !kind || ["direct_answer_text", "model_synthesized_answer", "turn_final_text"].includes(kind);
+          return (
+            !kind ||
+            [
+              "direct_answer_text",
+              "model_synthesized_answer",
+              "turn_final_text",
+            ].includes(kind)
+          );
         })() &&
         !finalResponseInterimVoiceTerminalAuthority
       ) {
@@ -142351,10 +143558,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         readAskTurnString(payload.terminal_artifact_kind) === "direct_answer_text" &&
         readAskTurnString(payload.final_answer_source) === "model_direct_answer" &&
         !finalResponseInterimVoiceTerminalAuthority
-          ? readAskTurnString(payload.selected_final_answer) ??
+          ? (readAskTurnString(payload.selected_final_answer) ??
             readAskTurnString(payload.answer) ??
             readAskTurnString(payload.text) ??
-            readAskTurnString(payload.assistant_answer)
+            readAskTurnString(payload.assistant_answer))
           : null;
       if (finalDirectAnswerTextForAuthority) {
         payload.terminal_answer_authority = recordHelixTurnTerminalAuthority({
@@ -142590,12 +143797,19 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       ) {
         const directAnswerArtifactId = readAskTurnString(responseSatisfactionReport.terminal_artifact_id);
         const directAnswerArtifact = Array.isArray(payload.current_turn_artifact_ledger)
-          ? (payload.current_turn_artifact_ledger as unknown[])
-              .map((entry) => entry && typeof entry === "object" && !Array.isArray(entry) ? (entry as Record<string, unknown>) : null)
-              .find((entry) => (
-                readAskTurnString(entry?.artifact_id) === directAnswerArtifactId ||
-                (readAskTurnString(entry?.kind) === "direct_answer_text" && !directAnswerArtifactId)
-              )) ?? null
+          ? ((payload.current_turn_artifact_ledger as unknown[])
+              .map((entry) =>
+                entry && typeof entry === "object" && !Array.isArray(entry)
+                  ? (entry as Record<string, unknown>)
+                  : null,
+              )
+              .find(
+                (entry) =>
+                  readAskTurnString(entry?.artifact_id) ===
+                    directAnswerArtifactId ||
+                  (readAskTurnString(entry?.kind) === "direct_answer_text" &&
+                    !directAnswerArtifactId),
+              ) ?? null)
           : null;
         const directAnswerPayload =
           directAnswerArtifact?.payload && typeof directAnswerArtifact.payload === "object" && !Array.isArray(directAnswerArtifact.payload)
@@ -142613,11 +143827,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           directAnswerProducedBy === "agent_runtime_loop" ||
           directAnswerProducerItemId === "agent_runtime_loop" ||
           Boolean(directAnswerProviderCandidateRef);
-        const directAnswerText =
-          directAnswerHasModelOrProviderAuthority
-            ? readAskTurnString(directAnswerPayload?.answer_text) ??
-              readAskTurnString(directAnswerPayload?.text)
-            : null;
+        const directAnswerText = directAnswerHasModelOrProviderAuthority
+          ? (readAskTurnString(directAnswerPayload?.answer_text) ??
+            readAskTurnString(directAnswerPayload?.text))
+          : null;
         const responseBoundaryCanPublishSatisfiedDirectAnswer =
           Boolean(directAnswerText) &&
           canPromoteAskTurnTerminalKindAtResponseBoundary(
@@ -143227,33 +144440,41 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         if (!text || text === "model.direct_answer") return null;
         return text;
       };
-      const loop = payload.agent_runtime_loop && typeof payload.agent_runtime_loop === "object" && !Array.isArray(payload.agent_runtime_loop)
-        ? payload.agent_runtime_loop as Record<string, unknown>
-        : null;
+      const loop =
+        payload.agent_runtime_loop && typeof payload.agent_runtime_loop === "object" && !Array.isArray(payload.agent_runtime_loop)
+          ? (payload.agent_runtime_loop as Record<string, unknown>)
+          : null;
       const iterations = Array.isArray(loop?.iterations)
         ? loop.iterations.filter((entry): entry is Record<string, unknown> =>
             Boolean(entry && typeof entry === "object" && !Array.isArray(entry)),
           )
         : [];
       for (const iteration of [...iterations].reverse()) {
-        const toolObservation = iteration.tool_observation && typeof iteration.tool_observation === "object" && !Array.isArray(iteration.tool_observation)
-          ? iteration.tool_observation as Record<string, unknown>
-          : null;
+        const toolObservation =
+          iteration.tool_observation && typeof iteration.tool_observation === "object" && !Array.isArray(iteration.tool_observation)
+            ? (iteration.tool_observation as Record<string, unknown>)
+            : null;
         const selected =
           readRuntimeCapability(iteration.executed_action_key) ??
           readRuntimeCapability(toolObservation?.tool_name) ??
           readRuntimeCapability(iteration.chosen_capability);
         if (selected) return selected;
       }
-      const lifecycle = payload.tool_lifecycle_trace && typeof payload.tool_lifecycle_trace === "object" && !Array.isArray(payload.tool_lifecycle_trace)
-        ? payload.tool_lifecycle_trace as Record<string, unknown>
-        : null;
-      const terminalAuthority = payload.terminal_answer_authority && typeof payload.terminal_answer_authority === "object" && !Array.isArray(payload.terminal_answer_authority)
-        ? payload.terminal_answer_authority as Record<string, unknown>
-        : null;
-      const terminalWriter = payload.terminal_authority_single_writer && typeof payload.terminal_authority_single_writer === "object" && !Array.isArray(payload.terminal_authority_single_writer)
-        ? payload.terminal_authority_single_writer as Record<string, unknown>
-        : null;
+      const lifecycle =
+        payload.tool_lifecycle_trace && typeof payload.tool_lifecycle_trace === "object" && !Array.isArray(payload.tool_lifecycle_trace)
+          ? (payload.tool_lifecycle_trace as Record<string, unknown>)
+          : null;
+      const terminalAuthority =
+        payload.terminal_answer_authority && typeof payload.terminal_answer_authority === "object" && !Array.isArray(payload.terminal_answer_authority)
+          ? (payload.terminal_answer_authority as Record<string, unknown>)
+          : null;
+      const terminalWriter =
+        payload.terminal_authority_single_writer && typeof payload.terminal_authority_single_writer === "object" && !Array.isArray(payload.terminal_authority_single_writer)
+          ? (payload.terminal_authority_single_writer as Record<
+              string,
+              unknown
+            >)
+          : null;
       return (
         readRuntimeCapability(lifecycle?.executed_capability) ??
         readRuntimeCapability(lifecycle?.selected_capability) ??
@@ -143271,9 +144492,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.selected_capability = selectedCapability;
       payload.selected_tool = selectedCapability;
       payload.executed_capability = selectedCapability;
-      const lifecycle = payload.tool_lifecycle_trace && typeof payload.tool_lifecycle_trace === "object" && !Array.isArray(payload.tool_lifecycle_trace)
-        ? payload.tool_lifecycle_trace as Record<string, unknown>
-        : null;
+      const lifecycle =
+        payload.tool_lifecycle_trace && typeof payload.tool_lifecycle_trace === "object" && !Array.isArray(payload.tool_lifecycle_trace)
+          ? (payload.tool_lifecycle_trace as Record<string, unknown>)
+          : null;
       if (lifecycle) {
         lifecycle.selected_capability = selectedCapability;
         lifecycle.selected_tool = selectedCapability;
@@ -143323,7 +144545,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             ? plannerRecord.selected_action
             : actionEnvelope &&
                 Array.isArray((actionEnvelope as { workstation_actions?: unknown }).workstation_actions)
-              ? ((actionEnvelope as { workstation_actions?: unknown[] }).workstation_actions ?? [])[0] ?? null
+              ? (((actionEnvelope as { workstation_actions?: unknown[] })
+                  .workstation_actions ?? [])[0] ?? null)
               : null;
       const runtimeTerminalText =
         typeof runtimeTerminal?.text === "string" && runtimeTerminal.text.trim()
@@ -143404,14 +144627,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         /pending_server_request|request_user_input/i.test(readAskTurnString(payload.route_reason_code) ?? "");
       const pendingServerRequestPresent =
         (payloadFinalStatus === "pending_input" || pendingServerRequestTerminal) && pendingServerRequestObjectPresent;
-      const terminalKind =
-        pendingServerRequestPresent
-          ? "pending_input"
-          : payloadFinalStatus === "final_failure" || readAskTurnString(payload.response_type) === "final_failure"
-            ? "final_failure"
-            : payloadFinalStatus === "final_answer" || readAskTurnString(payload.response_type) === "final_answer"
-              ? "final_answer"
-              : readAskTurnString(runtimeTerminal?.kind) ?? null;
+      const terminalKind = pendingServerRequestPresent
+        ? "pending_input"
+        : payloadFinalStatus === "final_failure" || readAskTurnString(payload.response_type) === "final_failure"
+          ? "final_failure"
+          : payloadFinalStatus === "final_answer" || readAskTurnString(payload.response_type) === "final_answer"
+            ? "final_answer"
+            : (readAskTurnString(runtimeTerminal?.kind) ?? null);
       const finalStatus =
         terminalKind === "pending_input"
           ? "pending_input"
@@ -144641,7 +145863,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               for (const section of readDocSectionIndex(activeDocPath).sections) {
                 const matchLineIndex = section.bodyLines.findIndex((line) => {
                   const lower = line.toLowerCase();
-                  return tokens.length > 0 && tokens.every((token) => lower.includes(token));
+                  return (
+                    tokens.length > 0 &&
+                    tokens.every((token) => lower.includes(token))
+                  );
                 });
                 if (matchLineIndex < 0) continue;
                 const snippet = buildIndexedDocSectionSnippet(section, matchLineIndex);
@@ -144751,9 +145976,16 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         }
       }
     }
-    const preFailureNoteCreateReceipt = stepResultsForNoteRepair
-      .map((step) => (step.result_artifact && typeof step.result_artifact === "object" ? (step.result_artifact as Record<string, unknown>) : null))
-      .find((artifact) => artifact?.kind === "note_update_receipt" && readAskTurnString(artifact.action_id) === "create_note") ?? null;
+    const preFailureNoteCreateReceipt =
+      stepResultsForNoteRepair
+      .map((step) =>
+          step.result_artifact && typeof step.result_artifact === "object"
+            ? (step.result_artifact as Record<string, unknown>)
+            : null,
+        )
+        .find(
+          (artifact) => artifact?.kind === "note_update_receipt" && readAskTurnString(artifact.action_id) === "create_note",
+        ) ?? null;
     const preFailureNoteCreateTitle = readAskTurnString(preFailureNoteCreateReceipt?.title);
     if (
       preFailureNoteCreateTitle &&
@@ -145510,7 +146742,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         }
         const existingPlannerContract =
           payload.planner_contract && typeof payload.planner_contract === "object"
-            ? payload.planner_contract as Record<string, unknown>
+            ? (payload.planner_contract as Record<string, unknown>)
             : null;
         if (existingPlannerContract) {
           existingPlannerContract.dispatch_policy = "needs_user_input";
@@ -145841,7 +147073,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       }
       const existingPlannerContract =
         payload.planner_contract && typeof payload.planner_contract === "object"
-          ? payload.planner_contract as Record<string, unknown>
+          ? (payload.planner_contract as Record<string, unknown>)
           : null;
       if (existingPlannerContract) {
         existingPlannerContract.dispatch_policy = "needs_user_input";
@@ -146112,13 +147344,17 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         payload.debug && typeof payload.debug === "object" && !Array.isArray(payload.debug)
           ? (payload.debug as Record<string, unknown>)
           : null;
-      const liveEnvironmentDraftTerminalKind = liveEnvironmentDraftIsDeterministicReceipt
-        ? "tool_receipt"
-        : readAskTurnString(
-            payload.canonical_goal_frame && typeof payload.canonical_goal_frame === "object" && !Array.isArray(payload.canonical_goal_frame)
-              ? (payload.canonical_goal_frame as Record<string, unknown>).required_terminal_kind
-              : null,
-          ) ?? "live_environment_tool_observation";
+      const liveEnvironmentDraftTerminalKind =
+        liveEnvironmentDraftIsDeterministicReceipt
+          ? "tool_receipt"
+          : (readAskTurnString(
+              payload.canonical_goal_frame &&
+                typeof payload.canonical_goal_frame === "object" &&
+                !Array.isArray(payload.canonical_goal_frame)
+                ? (payload.canonical_goal_frame as Record<string, unknown>)
+                    .required_terminal_kind
+                : null,
+            ) ?? "live_environment_tool_observation");
       const responseBoundaryCanPromoteLiveEnvironmentDraft =
         canPromoteAskTurnTerminalKindAtResponseBoundary(
           payload,
@@ -146559,8 +147795,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     }
     if (
       canonicalGoalFrame.goal_kind === "doc_evidence_synthesis" &&
-      (
-        !currentTurnArtifacts.some((artifact) => {
+      (!currentTurnArtifacts.some((artifact) => {
           if (artifact.kind !== "doc_evidence_synthesis_answer") return false;
           const artifactPayload = readAskTurnArtifactPayloadRecord(artifact);
           const answerText = readAskTurnString(artifactPayload?.answer_text) ?? readAskTurnString(artifactPayload?.text);
@@ -146573,24 +147808,23 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             payload.docs_continuation_contract &&
             typeof payload.docs_continuation_contract === "object" &&
             !Array.isArray(payload.docs_continuation_contract)
-              ? payload.docs_continuation_contract as Record<string, unknown>
+              ? (payload.docs_continuation_contract as Record<string, unknown>)
               : null;
           const requiredCapability = readAskTurnString(continuationContract?.required_next_capability);
           return Boolean(requiredCapability && requiredCapability !== "model.direct_answer");
-        })()
-      )
+        })())
     ) {
       const docsContinuationContractForLateGuard =
         payload.docs_continuation_contract &&
         typeof payload.docs_continuation_contract === "object" &&
         !Array.isArray(payload.docs_continuation_contract)
-          ? payload.docs_continuation_contract as Record<string, unknown>
+          ? (payload.docs_continuation_contract as Record<string, unknown>)
           : null;
       const agentStepDecisionForLateGuard =
         payload.agent_step_decision &&
         typeof payload.agent_step_decision === "object" &&
         !Array.isArray(payload.agent_step_decision)
-          ? payload.agent_step_decision as Record<string, unknown>
+          ? (payload.agent_step_decision as Record<string, unknown>)
           : null;
       const lateGuardChosenCapability =
         readAskTurnString(agentStepDecisionForLateGuard?.chosen_capability) ??
@@ -146603,16 +147837,19 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         agentStepDecisionForLateGuard?.action &&
         typeof agentStepDecisionForLateGuard.action === "object" &&
         !Array.isArray(agentStepDecisionForLateGuard.action)
-          ? agentStepDecisionForLateGuard.action as Record<string, unknown>
+          ? (agentStepDecisionForLateGuard.action as Record<string, unknown>)
           : null;
       const lateGuardActionArgs =
         (lateGuardAction?.args && typeof lateGuardAction.args === "object" && !Array.isArray(lateGuardAction.args)
-          ? lateGuardAction.args as Record<string, unknown>
+          ? (lateGuardAction.args as Record<string, unknown>)
           : null) ??
         (docsContinuationContractForLateGuard?.required_action_args &&
           typeof docsContinuationContractForLateGuard.required_action_args === "object" &&
           !Array.isArray(docsContinuationContractForLateGuard.required_action_args)
-          ? docsContinuationContractForLateGuard.required_action_args as Record<string, unknown>
+          ? (docsContinuationContractForLateGuard.required_action_args as Record<
+              string,
+              unknown
+            >)
           : null);
       const lateGuardDocsSearchQuery =
         readAskTurnString(lateGuardActionArgs?.query) ??
@@ -146821,7 +148058,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       if (docEvidenceCoverage.sufficient && docEvidenceRefs.length > 0) {
         const baseDecision =
           payload.agent_step_decision && typeof payload.agent_step_decision === "object" && !Array.isArray(payload.agent_step_decision)
-            ? payload.agent_step_decision as Record<string, unknown>
+            ? (payload.agent_step_decision as Record<string, unknown>)
             : {};
         const docsSynthesisDecision = {
           ...baseDecision,
@@ -146940,7 +148177,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       const latestDraftArtifact = [...currentTurnArtifacts].reverse().find((artifact) => artifact.kind === "final_answer_draft") ?? null;
       const latestDraftPayload =
         latestDraftArtifact?.payload && typeof latestDraftArtifact.payload === "object" && !Array.isArray(latestDraftArtifact.payload)
-          ? latestDraftArtifact.payload as Record<string, unknown>
+          ? (latestDraftArtifact.payload as Record<string, unknown>)
           : null;
       const latestDraftText =
         readAskTurnString(latestDraftPayload?.answer_text) ??
@@ -147186,13 +148423,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         payload.docs_continuation_contract &&
         typeof payload.docs_continuation_contract === "object" &&
         !Array.isArray(payload.docs_continuation_contract)
-          ? payload.docs_continuation_contract as Record<string, unknown>
+          ? (payload.docs_continuation_contract as Record<string, unknown>)
           : null;
       const postRuntimeDecision =
         payload.agent_step_decision &&
         typeof payload.agent_step_decision === "object" &&
         !Array.isArray(payload.agent_step_decision)
-          ? payload.agent_step_decision as Record<string, unknown>
+          ? (payload.agent_step_decision as Record<string, unknown>)
           : null;
       const postRuntimeCapability =
         readAskTurnString(postRuntimeDecision?.chosen_capability) ??
@@ -147203,18 +148440,21 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           postRuntimeDecision?.action &&
           typeof postRuntimeDecision.action === "object" &&
           !Array.isArray(postRuntimeDecision.action)
-            ? postRuntimeDecision.action as Record<string, unknown>
+            ? (postRuntimeDecision.action as Record<string, unknown>)
             : null;
         const postRuntimeActionArgs =
           (postRuntimeDecisionAction?.args &&
             typeof postRuntimeDecisionAction.args === "object" &&
             !Array.isArray(postRuntimeDecisionAction.args)
-            ? postRuntimeDecisionAction.args as Record<string, unknown>
+            ? (postRuntimeDecisionAction.args as Record<string, unknown>)
             : null) ??
           (postRuntimeDocsContract?.required_action_args &&
             typeof postRuntimeDocsContract.required_action_args === "object" &&
             !Array.isArray(postRuntimeDocsContract.required_action_args)
-            ? postRuntimeDocsContract.required_action_args as Record<string, unknown>
+            ? (postRuntimeDocsContract.required_action_args as Record<
+                string,
+                unknown
+              >)
             : null);
         const postRuntimeLocatePath = readAskTurnString(postRuntimeActionArgs?.path);
         const postRuntimeLocateQuery =
@@ -147330,7 +148570,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
                 String(requirement ?? "") === "final_answer_draft_doc_support_refs"
               )
             );
-          if (postRuntimeReadyForSynthesis && postRuntimeDocEvidenceRefs.length > 0) {
+          if (
+            postRuntimeReadyForSynthesis && postRuntimeDocEvidenceRefs.length > 0
+          ) {
             const postRuntimeSynthesisDecision = {
               schema: "helix.agent_step_decision.v1",
               turn_id: activeTurnId,
@@ -147401,7 +148643,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
               payload.route_product_contract &&
               typeof payload.route_product_contract === "object" &&
               !Array.isArray(payload.route_product_contract)
-                ? payload.route_product_contract as Record<string, unknown>
+                ? (payload.route_product_contract as Record<string, unknown>)
                 : {};
             payload.route_product_contract = {
               ...existingPostRuntimeRouteProductContract,
@@ -147503,7 +148745,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     const docSummaryArtifactForRuntimeTerminal =
       currentTurnArtifacts.find((artifact) => artifact.kind === "doc_summary") ??
       (readAskTurnResultArtifact(finalStepResults, "doc_summary")
-        ? {
+        ? ({
             artifact_id: `${activeTurnId}:runtime_doc_summary:result_artifact`,
             turn_id: activeTurnId,
             producer_item_id: "runtime_doc_summary",
@@ -147511,8 +148753,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             created_at_ms: Date.now(),
             source_scope: "current_turn",
             goal_hash: hashAskTurnGoalFrame(finalSatisfactionGoalFrame),
-            payload: readAskTurnResultArtifact(finalStepResults, "doc_summary") as Record<string, unknown>,
-          } satisfies HelixTurnArtifact
+            payload: readAskTurnResultArtifact(
+              finalStepResults,
+              "doc_summary",
+            ) as Record<string, unknown>,
+          } satisfies HelixTurnArtifact)
         : null);
     const shouldPromoteRuntimeDocSummary =
       Boolean(docSummaryArtifactForRuntimeTerminal) &&
@@ -148976,18 +150221,26 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         jobKind === "translate"
           ? `Translate${targetLanguage ? ` to ${targetLanguage}` : ""}`
           : jobKind.replace(/_/g, " ");
-      const openedSources = finalStepResults.some((result: ReturnType<typeof buildAskTurnStepResults>[number]) => {
-        const artifact = result.artifact && typeof result.artifact === "object"
+      const openedSources = finalStepResults.some(
+        (result: ReturnType<typeof buildAskTurnStepResults>[number]) => {
+          const artifact = result.artifact && typeof result.artifact === "object"
           ? (result.artifact as Record<string, unknown>)
           : null;
-        return readAskTurnString(artifact?.panel_id) === "situation-room-sources";
-      });
-      const openedPipelines = finalStepResults.some((result: ReturnType<typeof buildAskTurnStepResults>[number]) => {
-        const artifact = result.artifact && typeof result.artifact === "object"
+          return (
+            readAskTurnString(artifact?.panel_id) === "situation-room-sources"
+          );
+        },
+      );
+      const openedPipelines = finalStepResults.some(
+        (result: ReturnType<typeof buildAskTurnStepResults>[number]) => {
+          const artifact = result.artifact && typeof result.artifact === "object"
           ? (result.artifact as Record<string, unknown>)
           : null;
-        return readAskTurnString(artifact?.panel_id) === "situation-room-pipelines";
-      });
+          return (
+            readAskTurnString(artifact?.panel_id) === "situation-room-pipelines"
+          );
+        },
+      );
       const openedPanels = [
         openedSources ? "Situation Room Sources" : null,
         openedPipelines ? "Situation Room Pipelines" : null,
@@ -149044,13 +150297,16 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       fail_reason: universalComposerOutput.fail_reason,
     };
     const activeSituationSession = sessionId
-      ? getActiveSituationGoalSessionForThread(sessionId) ?? getActiveSituationGoalSessionForThread("helix-ask:desktop")
+      ? (getActiveSituationGoalSessionForThread(sessionId) ??
+        getActiveSituationGoalSessionForThread("helix-ask:desktop"))
       : getActiveSituationGoalSessionForThread("helix-ask:desktop");
     const activeLiveArtifact = sessionId
-      ? getActiveLiveSituationArtifactForThread(sessionId) ?? getActiveLiveSituationArtifactForThread("helix-ask:desktop")
+      ? (getActiveLiveSituationArtifactForThread(sessionId) ??
+        getActiveLiveSituationArtifactForThread("helix-ask:desktop"))
       : getActiveLiveSituationArtifactForThread("helix-ask:desktop");
     const activeLiveAnswerEnvironment = sessionId
-      ? getActiveLiveAnswerEnvironmentForThread(sessionId) ?? getActiveLiveAnswerEnvironmentForThread("helix-ask:desktop")
+      ? (getActiveLiveAnswerEnvironmentForThread(sessionId) ??
+        getActiveLiveAnswerEnvironmentForThread("helix-ask:desktop"))
       : getActiveLiveAnswerEnvironmentForThread("helix-ask:desktop");
     if ((activeSituationSession || activeLiveArtifact || activeLiveAnswerEnvironment) && canonicalGoalFrame.goal_kind !== "panel_control") {
       const contextPack = buildSituationContextPack({
@@ -149162,7 +150418,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     }
     payload.terminal_artifact_owner_turn_id =
       finalSatisfactionReport.terminal_artifact_id || payloadTerminalArtifactIdBeforeSatisfaction
-        ? (typeof payload.turn_id === "string" ? payload.turn_id : turnId)
+        ? typeof payload.turn_id === "string"
+          ? payload.turn_id
+          : turnId
         : null;
     payload.terminal_artifact_id = finalSatisfactionReport.terminal_artifact_id ?? payloadTerminalArtifactIdBeforeSatisfaction ?? null;
     payload.rejected_prior_artifacts = rejectedPriorArtifacts;
@@ -149205,7 +150463,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         : null;
     const repairedSimpleDirectText =
       payload.final_answer_contract_pass === true && payload.final_answer_contract_repair_applied === true
-        ? readAskTurnString(payload.answer) ?? readAskTurnString(payload.text) ?? readAskTurnString(payload.selected_final_answer)
+        ? (readAskTurnString(payload.answer) ??
+          readAskTurnString(payload.text) ??
+          readAskTurnString(payload.selected_final_answer))
         : null;
     const deterministicSimpleDirectText =
       readAskTurnString(deterministicSimpleDirectPayloadForProviderGuard?.answer_text) ?? repairedSimpleDirectText;
@@ -149531,8 +150791,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         });
         const lateModelTurnOverrideRaw =
           process.env.NODE_ENV === "test"
-            ? process.env.HELIX_MODEL_TURN_TEST_RESPONSE ??
-              process.env.HELIX_MODEL_ONLY_CONCEPT_FINAL_ANSWER_TEST_RESPONSE
+            ? (process.env.HELIX_MODEL_TURN_TEST_RESPONSE ??
+              process.env.HELIX_MODEL_ONLY_CONCEPT_FINAL_ANSWER_TEST_RESPONSE)
             : undefined;
         const lateModelTurnOverride =
           lateModelTurnOverrideRaw
@@ -150047,10 +151307,15 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       canonicalGoalFrame.goal_kind === "doc_evidence_location" &&
       resolvedFinalStatus !== "pending_input"
     ) {
-      const locationArtifact = currentTurnArtifacts.find((artifact) => {
-        if (!["doc_evidence_location", "doc_location_matches", "doc_location_result"].includes(artifact.kind)) return false;
-        return hasHelixLineBackedDocLocations(readAskTurnArtifactPayloadRecord(artifact)) || isHelixDocLocationNoMatchArtifact(artifact);
-      }) ?? null;
+      const locationArtifact =
+        currentTurnArtifacts.find((artifact) => {
+          if (!["doc_evidence_location", "doc_location_matches", "doc_location_result"].includes(artifact.kind)) return false;
+          return (
+            hasHelixLineBackedDocLocations(
+              readAskTurnArtifactPayloadRecord(artifact),
+            ) || isHelixDocLocationNoMatchArtifact(artifact)
+          );
+        }) ?? null;
       const locationPayload = locationArtifact ? readAskTurnArtifactPayloadRecord(locationArtifact) : null;
       const renderedLocationText = renderAskTurnDocLocationMatchesFromArtifact(locationPayload);
       if (locationArtifact && renderedLocationText) {
@@ -150400,8 +151665,12 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         currentTurnArtifacts.find((artifact) => artifact.kind === "workstation_tool_evaluation") ?? null;
       const calculatorReceiptArtifact =
         canonicalGoalFrame.goal_kind === "calculator_live_source"
-          ? currentTurnArtifacts.find((artifact) => artifact.kind === "workstation_live_source_receipt") ?? null
-          : currentTurnArtifacts.find((artifact) => artifact.kind === "calculator_receipt") ?? null;
+          ? (currentTurnArtifacts.find(
+              (artifact) => artifact.kind === "workstation_live_source_receipt",
+            ) ?? null)
+          : (currentTurnArtifacts.find(
+              (artifact) => artifact.kind === "calculator_receipt",
+            ) ?? null);
       const plannerToolPlan =
         earlyPlannerContract?.workstation_tool_plan && typeof earlyPlannerContract.workstation_tool_plan === "object"
           ? (earlyPlannerContract.workstation_tool_plan as HelixWorkstationToolPlan)
@@ -150492,7 +151761,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         };
       }
     }
-    if (canonicalGoalFrame.goal_kind === "panel_control" && resolvedFinalStatus !== "pending_input") {
+    if (
+      canonicalGoalFrame.goal_kind === "panel_control" && resolvedFinalStatus !== "pending_input"
+    ) {
       const earlyPlannerContract =
         payload.planner_contract && typeof payload.planner_contract === "object"
           ? (payload.planner_contract as { workstation_tool_plan?: unknown })
@@ -150503,7 +151774,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           : null;
       const workstationEvaluationArtifact =
         plannerToolPlan?.intent === "dottie_observer"
-          ? currentTurnArtifacts.find((artifact) => artifact.kind === "workstation_tool_evaluation") ?? null
+          ? (currentTurnArtifacts.find(
+              (artifact) => artifact.kind === "workstation_tool_evaluation",
+            ) ?? null)
           : null;
       if (plannerToolPlan?.intent === "dottie_observer" && workstationEvaluationArtifact) {
         const evaluationPayload = readAskTurnArtifactPayloadRecord(workstationEvaluationArtifact) as HelixWorkstationToolEvaluation | null;
@@ -150673,19 +151946,21 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       ) ||
       preConsistencyInterimVoiceFinalStatus
     ) {
-      const bridgeFinalText =
-        preConsistencyMailboxBridgeSatisfied
-          ? readAskTurnString(payload.selected_final_answer) ??
-            readAskTurnString(payload.answer) ??
-            readAskTurnString(payload.text) ??
-            readAskTurnString((payload.final_answer_draft as Record<string, unknown> | undefined)?.text) ??
-            finalText
-          : readAskTurnString(preConsistencyInterimVoiceDraftText?.text) ??
-            readAskTurnString(preConsistencyInterimVoiceDraftText?.answer_text) ??
-            readAskTurnString(payload.selected_final_answer) ??
-            readAskTurnString(payload.answer) ??
-            readAskTurnString(payload.text) ??
-            finalText;
+      const bridgeFinalText = preConsistencyMailboxBridgeSatisfied
+        ? (readAskTurnString(payload.selected_final_answer) ??
+          readAskTurnString(payload.answer) ??
+          readAskTurnString(payload.text) ??
+          readAskTurnString(
+            (payload.final_answer_draft as Record<string, unknown> | undefined)
+              ?.text,
+          ) ??
+          finalText)
+        : (readAskTurnString(preConsistencyInterimVoiceDraftText?.text) ??
+          readAskTurnString(preConsistencyInterimVoiceDraftText?.answer_text) ??
+          readAskTurnString(payload.selected_final_answer) ??
+          readAskTurnString(payload.answer) ??
+          readAskTurnString(payload.text) ??
+          finalText);
       finalText = bridgeFinalText;
       resolvedFinalStatus = "final_answer";
       finalAnswerSource = "final_answer_draft";
@@ -151115,7 +152390,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       payload.terminal_artifact_kind = "typed_failure";
       payload.final_artifact_scope = "current_turn";
     }
-    if (canonicalGoalFrame.goal_kind === "doc_equation_location" && resolvedFinalStatus !== "pending_input") {
+    if (
+      canonicalGoalFrame.goal_kind === "doc_equation_location" && resolvedFinalStatus !== "pending_input"
+    ) {
       const hasExistingEquationArtifact = currentTurnArtifacts.some((artifact) =>
         artifact.kind === "doc_equation_location" &&
         validateAskTurnDocEquationLocationArtifact(readAskTurnArtifactPayloadRecord(artifact)).valid,
@@ -151124,7 +152401,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         const activeDocPathForEquation = normalizeAskTurnWorkspaceDocPath(finalWorkspaceSnapshot?.activeDocPath);
         const activeDocRelPath = activeDocPathForEquation?.replace(/^\/+/, "");
         const activeDocFullPath = activeDocRelPath ? path.resolve(process.cwd(), activeDocRelPath) : null;
-        if (activeDocPathForEquation && activeDocFullPath && fs.existsSync(activeDocFullPath)) {
+        if (
+          activeDocPathForEquation && activeDocFullPath && fs.existsSync(activeDocFullPath)
+        ) {
           try {
             const activeDocText = fs.readFileSync(activeDocFullPath, "utf8");
             const extraction = extractDocEquationFromText({
@@ -151371,13 +152650,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       finalAnswerSource = workstationTerminalSource;
       payload.terminal_artifact_kind = workstationTerminalArtifactKind;
       payload.terminal_artifact_id =
-        (
-          workstationToolNoteMutationTerminal &&
-          (
-            readAskTurnString(payload.terminal_artifact_id)?.endsWith(":workstation_tool_evaluation") ||
-            readAskTurnString(payload.terminal_artifact_id)?.endsWith(":note_update_receipt")
-          )
-        )
+        workstationToolNoteMutationTerminal &&
+        (readAskTurnString(payload.terminal_artifact_id)?.endsWith(
+          ":workstation_tool_evaluation",
+        ) ||
+          readAskTurnString(payload.terminal_artifact_id)?.endsWith(
+            ":note_update_receipt",
+          ))
           ? `${activeTurnId}:model_synthesized_answer:from_note_receipt`
           : (readAskTurnString(payload.terminal_artifact_id) ?? `${activeTurnId}:${workstationTerminalArtifactKind}`);
       payload.terminal_artifact_owner_turn_id = activeTurnId;
@@ -151460,9 +152739,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             if (artifact.kind !== "direct_answer_text") return null;
             const artifactPayload = readAskTurnArtifactPayloadRecord(artifact);
             if (readAskTurnString(artifactPayload?.source) !== "model_direct_answer") return null;
-            return readAskTurnString(artifactPayload?.answer_text) ?? readAskTurnString(artifactPayload?.text);
+            return (
+              readAskTurnString(artifactPayload?.answer_text) ??
+              readAskTurnString(artifactPayload?.text)
+            );
           })
-          .find((text): text is string => Boolean(text && !isAskTurnNonSubstantiveDirectAnswer(text))) ??
+          .find((text): text is string => Boolean(text && !isAskTurnNonSubstantiveDirectAnswer(text)),
+          ) ??
         null;
       if (modelOnlyDirectAnswerText && !isAskTurnNonSubstantiveDirectAnswer(modelOnlyDirectAnswerText)) {
         finalText = modelOnlyDirectAnswerText;
@@ -151588,7 +152871,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       const openedPanelAction = workstationActions.find((entry) => {
         if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
         const action = entry as Record<string, unknown>;
-        return readAskTurnString(action.action_id) === "open" && Boolean(readAskTurnString(action.panel_id));
+        return (
+          readAskTurnString(action.action_id) === "open" &&
+          Boolean(readAskTurnString(action.panel_id))
+        );
       }) as Record<string, unknown> | undefined;
       const openedPanelId = readAskTurnString(openedPanelAction?.panel_id);
       if (openedPanelId) {
@@ -151754,7 +153040,14 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         "direct_answer" &&
       (() => {
         const kind = readAskTurnString(payload.terminal_artifact_kind);
-        return !kind || ["direct_answer_text", "model_synthesized_answer", "turn_final_text"].includes(kind);
+        return (
+          !kind ||
+          [
+            "direct_answer_text",
+            "model_synthesized_answer",
+            "turn_final_text",
+          ].includes(kind)
+        );
       })();
     if (helixRuntimeFinalAnswerComposer.shouldApplyHelixTerminalSingleWriterForPayload(payload, currentTurnArtifacts) && !skipDraftSelectionForModelOnlyDirect) {
       applyHelixTerminalAuthoritySingleWriter({
@@ -151776,15 +153069,19 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       const liveEnvironmentDraftIsDeterministicReceipt =
         readAskTurnString(liveEnvironmentDraft?.authority) === "deterministic_receipt_fallback" ||
         /^Stage Play tool receipt:\s*live_env\.reflect_stage_play_context\b/i.test(liveEnvironmentDraftText ?? "");
-      const successfulLiveEnvironmentToolObservationForTerminal = currentTurnArtifacts.some((artifact) => {
-        if (artifact.kind !== "live_environment_tool_observation") return false;
-        const observationPayload =
+      const successfulLiveEnvironmentToolObservationForTerminal =
+        currentTurnArtifacts.some((artifact) => {
+          if (artifact.kind !== "live_environment_tool_observation") return false;
+          const observationPayload =
           artifact.payload && typeof artifact.payload === "object" && !Array.isArray(artifact.payload)
             ? (artifact.payload as Record<string, unknown>)
             : null;
-        if (!observationPayload || observationPayload.ok === false) return false;
-        return observationPayload.observation !== null && observationPayload.observation !== undefined;
-      });
+          if (!observationPayload || observationPayload.ok === false) return false;
+          return (
+            observationPayload.observation !== null &&
+            observationPayload.observation !== undefined
+          );
+        });
       if (
         successfulLiveEnvironmentToolObservationForTerminal &&
         liveEnvironmentDraftText &&
@@ -151794,9 +153091,11 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           payload.debug && typeof payload.debug === "object" && !Array.isArray(payload.debug)
             ? (payload.debug as Record<string, unknown>)
             : null;
-        const liveEnvironmentDraftTerminalKind = liveEnvironmentDraftIsDeterministicReceipt
-          ? "tool_receipt"
-          : canonicalGoalFrame.required_terminal_kind ?? "live_environment_tool_observation";
+        const liveEnvironmentDraftTerminalKind =
+          liveEnvironmentDraftIsDeterministicReceipt
+            ? "tool_receipt"
+            : (canonicalGoalFrame.required_terminal_kind ??
+              "live_environment_tool_observation");
         const responseBoundaryCanPromoteLiveEnvironmentDraft =
           canPromoteAskTurnTerminalKindAtResponseBoundary(
             payload,
@@ -152254,7 +153553,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     ) {
       const conceptArtifact =
         repairedResponseBoundaryScientificCode === "concept_explanation_unavailable"
-          ? currentTurnArtifacts.find((artifact) => artifact.kind === "doc_concept_explanation") ?? null
+          ? (currentTurnArtifacts.find(
+              (artifact) => artifact.kind === "doc_concept_explanation",
+            ) ?? null)
           : null;
       const conceptPayload = conceptArtifact ? readAskTurnArtifactPayloadRecord(conceptArtifact) : null;
       const conceptText =
@@ -152980,9 +154281,16 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     const lateStepResultsForNoteCreateRepair = Array.isArray(payload.step_results)
       ? (payload.step_results as ReturnType<typeof buildAskTurnStepResults>)
       : [];
-    const lateNoteCreateReceipt = lateStepResultsForNoteCreateRepair
-      .map((step) => (step.result_artifact && typeof step.result_artifact === "object" ? (step.result_artifact as Record<string, unknown>) : null))
-      .find((artifact) => artifact?.kind === "note_update_receipt" && readAskTurnString(artifact.action_id) === "create_note") ?? null;
+    const lateNoteCreateReceipt =
+      lateStepResultsForNoteCreateRepair
+      .map((step) =>
+          step.result_artifact && typeof step.result_artifact === "object"
+            ? (step.result_artifact as Record<string, unknown>)
+            : null,
+        )
+        .find(
+          (artifact) => artifact?.kind === "note_update_receipt" && readAskTurnString(artifact.action_id) === "create_note",
+        ) ?? null;
     const lateNoteUpdateReceiptForBoundaryRepair = readAskTurnResultArtifact(lateStepResultsForNoteCreateRepair, "note_update_receipt");
     const lateNoteUpdateTitleForBoundaryRepair = readAskTurnString(lateNoteUpdateReceiptForBoundaryRepair?.title);
     const responseBoundaryDebugForNoteReceiptRepair =
@@ -153565,7 +154873,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   }
   if (
     !stagePlayMailWakeRouteMetadata &&
-    isAskTurnScientificImageTextComparisonPrompt(incomingQuestion)
+    isAskTurnScientificImageEvidencePrompt(incomingQuestion)
   ) {
     const scientificImageComparisonRoute = buildAskTurnScientificImageComparisonRouteMetadata({
       turnId,
@@ -155344,7 +156652,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   });
   const storedWorkspaceSnapshot =
     HELIX_E8_28_WORKSPACE_CONTEXT_ATTACH_FLAG && sessionId
-      ? helixAskTurnWorkspaceSnapshotBySession.get(sessionId) ?? null
+      ? (helixAskTurnWorkspaceSnapshotBySession.get(sessionId) ?? null)
       : null;
   const workspaceSessionSnapshot = mergeAskTurnWorkspaceSnapshots({
     incoming: incomingWorkspaceSnapshot,
@@ -155863,8 +157171,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     });
   }
   const reasoningContextMode = resolveAskTurnReasoningContextMode(parsed.data.context_mode);
-  let existingPendingRequest =
-    conversationPendingKey ? helixConversationPendingInputBySession.get(conversationPendingKey) ?? null : null;
+  let existingPendingRequest = conversationPendingKey
+    ? (helixConversationPendingInputBySession.get(conversationPendingKey) ??
+      null)
+    : null;
   let pendingStatusBefore:
     | "pending"
     | "resolved"
@@ -155947,7 +157257,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     recordPendingTransition("aborted_turn_transition", "equation_attempt_followup_overrode_stale_pending");
   }
   if (equationAttemptFollowupIntent.required) {
-    const priorAttempt = sessionId ? helixAskEquationExtractionAttemptBySession.get(sessionId) ?? null : null;
+    const priorAttempt = sessionId
+      ? (helixAskEquationExtractionAttemptBySession.get(sessionId) ?? null)
+      : null;
     const followupGoalFrame = buildAskTurnUniversalGoalFrame({
       transcript,
       workspaceSnapshot: workspaceSessionSnapshot,
@@ -156518,8 +157830,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       : [/\bkinetic\s+energy\b|\bke\b/i.test(transcript) ? "speed" : "numeric_value"];
     const promptText = /\bkinetic\s+energy\b|\bke\b/i.test(transcript)
       ? "What speed should I use before calculating the kinetic energy?"
-      : calculatorInterpretation.clarifying_question ??
-        "What numeric value should I use before running the calculator?";
+      : (calculatorInterpretation.clarifying_question ??
+        "What numeric value should I use before running the calculator?");
     const calculatorPendingTaskFrame =
       calculatorInterpretation.prompt_kind === "underdetermined_triangle"
         ? {
@@ -156728,21 +158040,27 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       if (environment.thread_id === sessionId || environment.thread_id === "helix-ask:desktop") return true;
       return !sessionId && environment.thread_id === "helix-ask:desktop";
     });
-    return candidates.find((environment) => {
-      if (
-        environment.preset === "calculator_prime_stream" &&
-        /\b(?:prime|candidate|gap|are\s+we\s+on|what\s+.*\s+on)\b/.test(liveEnvironmentPromptText)
-      ) {
-        return true;
-      }
-      if (
-        environment.preset === "minecraft_run_monitor" &&
-        /\b(?:minecraft|minehut|mine\s*hut|game|world)\b/.test(liveEnvironmentPromptText)
-      ) {
-        return true;
-      }
-      return false;
-    }) ?? null;
+    return (
+      candidates.find((environment) => {
+        if (
+          environment.preset === "calculator_prime_stream" &&
+          /\b(?:prime|candidate|gap|are\s+we\s+on|what\s+.*\s+on)\b/.test(
+            liveEnvironmentPromptText,
+          )
+        ) {
+          return true;
+        }
+        if (
+          environment.preset === "minecraft_run_monitor" &&
+          /\b(?:minecraft|minehut|mine\s*hut|game|world)\b/.test(
+            liveEnvironmentPromptText,
+          )
+        ) {
+          return true;
+        }
+        return false;
+      }) ?? null
+    );
   })();
   const liveEnvironmentSynthesisTargetForTurn =
     liveEnvironmentRelevanceForTurn?.relevant_environment_ids?.[0]
@@ -156810,7 +158128,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   }
   const hardScientificImageComparisonRouteForTurn =
     !sourceTargetWakeMetadataForTurnRouting &&
-    isAskTurnScientificImageTextComparisonPrompt(incomingQuestion);
+    isAskTurnScientificImageEvidencePrompt(incomingQuestion);
   if (hardScientificImageComparisonRouteForTurn) {
     const scientificImageComparisonRoute = buildAskTurnScientificImageComparisonRouteMetadata({
       turnId,
@@ -157054,7 +158372,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       sourceTargetIntentForTurnRouting.target_kind === "situation_epoch" ||
       !routeProductContractForTurnRouting.forbidden_terminal_artifact_kinds.includes("situation_context_pack")
     );
-  if (allowSituationContextEvidenceTerminal && situationContextTurnRoute.route !== "none" && situationContextTurnRoute.answer_text) {
+  if (
+    allowSituationContextEvidenceTerminal && situationContextTurnRoute.route !== "none" && situationContextTurnRoute.answer_text
+  ) {
     const situationAnswerText = situationContextTurnRoute.answer_text;
     const baseSituationGoalFrame = buildAskTurnUniversalGoalFrame({
       transcript,
@@ -157350,7 +158670,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           promptText: transcript,
           interpretationDebug: liveInterpretationDebugForSituation,
           procedureEpochReplay: situationContextTurnRoute.procedure_epoch_replay
-            ? situationContextTurnRoute.procedure_epoch_replay as unknown as Record<string, unknown>
+            ? (situationContextTurnRoute.procedure_epoch_replay as unknown as Record<
+                string,
+                unknown
+              >)
             : null,
         })
       : null;
@@ -159001,8 +160324,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       : null;
     const modelTurnOverrideRaw =
       process.env.NODE_ENV === "test"
-        ? process.env.HELIX_MODEL_TURN_TEST_RESPONSE ??
-          process.env.HELIX_MODEL_ONLY_CONCEPT_FINAL_ANSWER_TEST_RESPONSE
+        ? (process.env.HELIX_MODEL_TURN_TEST_RESPONSE ??
+          process.env.HELIX_MODEL_ONLY_CONCEPT_FINAL_ANSWER_TEST_RESPONSE)
         : undefined;
     const modelTurnOverride =
       modelTurnOverrideRaw
@@ -160011,7 +161334,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         };
         recordPendingTransition("pending", "pending_confirmation_still_required");
       }
-    } else if (existingPendingRequest && existingPendingRequest.kind === "clarify") {
+    } else if (
+      existingPendingRequest && existingPendingRequest.kind === "clarify"
+    ) {
       pendingResolution = {
         attempted: true,
         applied: false,
@@ -160109,9 +161434,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             typeof providedValues.selected_doc_candidate === "number" ? providedValues.selected_doc_candidate : null;
           const selectedDocCandidate =
             selectedDocCandidateRank !== null && existingPendingRequest.candidateOptions
-              ? existingPendingRequest.candidateOptions.find((option) => option.rank === selectedDocCandidateRank) ??
-                existingPendingRequest.candidateOptions[selectedDocCandidateRank - 1] ??
-                null
+              ? (existingPendingRequest.candidateOptions.find(
+                  (option) => option.rank === selectedDocCandidateRank,
+                ) ??
+                existingPendingRequest.candidateOptions[
+                  selectedDocCandidateRank - 1
+                ] ??
+                null)
               : null;
           const resolvedTargetPanel =
             typeof providedValues.target_panel === "string"
@@ -160549,16 +161878,19 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   const retrievalRequiredDocSummary =
     retrievalRequiredHard &&
     (isAskTurnDocsTopicSummaryPrompt(transcript) || isAskTurnDocAboutSummaryPrompt(transcript));
-  let policyLockForSelection =
-    pendingServerRequest
-      ? "needs_user_input"
-      : (retrievalRequiredHard
-        ? retrievalRequiredDocSummary
+  let policyLockForSelection = pendingServerRequest
+    ? "needs_user_input"
+    : retrievalRequiredHard
+      ? retrievalRequiredDocSummary
+        ? "workspace_only"
+        : "workspace_context_reasoning"
+      : ((pendingResolvedToAct ? "workspace_only" : dispatchPolicyLock) ??
+        (routeReasonCode === "dispatch:act"
           ? "workspace_only"
-          : "workspace_context_reasoning"
-        : ((pendingResolvedToAct ? "workspace_only" : dispatchPolicyLock) ?? (routeReasonCode === "dispatch:act"
-          ? "workspace_only"
-          : inferAskTurnDispatchPolicy({ routeReasonCode, pendingServerRequest: null }))));
+          : inferAskTurnDispatchPolicy({
+              routeReasonCode,
+              pendingServerRequest: null,
+            })));
   let plannerRepair: HelixAskTurnPlannerRepairState = {
     attempted: false,
     applied: false,
@@ -163192,7 +164524,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
       raw_content_included: false,
     });
   }
-  if (activeWorkstationToolPlan && activeWorkstationToolPlan.intent !== "direct_answer") {
+  if (
+    activeWorkstationToolPlan && activeWorkstationToolPlan.intent !== "direct_answer"
+  ) {
     const activeWorkstationPlanItems = buildAskTurnWorkstationToolPlanSteps(activeWorkstationToolPlan);
     const activeWorkstationMissingRequirements = activeWorkstationToolPlan.missing_requirements ?? [];
     const activeWorkstationAskToolStep =
@@ -163216,7 +164550,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     const activeWorkstationAskToolObservationRecord =
       activeWorkstationAskToolObservation?.observation &&
       typeof activeWorkstationAskToolObservation.observation === "object"
-        ? activeWorkstationAskToolObservation.observation as Record<string, unknown>
+        ? (activeWorkstationAskToolObservation.observation as Record<
+            string,
+            unknown
+          >)
         : null;
     const activeWorkstationReceiptIds = Array.from(new Set([
       readAskTurnString(activeWorkstationAskToolObservationRecord?.receipt_id),
@@ -163242,7 +164579,7 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             .reverse()
             .find((step) => step.kind === "run_panel_action" && step.panel_id && step.action_id)
         : null;
-      plannerContract = {
+    plannerContract = {
         ...plannerContract,
         plan_items:
           activeWorkstationMissingRequirements.length === 0 &&
@@ -163868,20 +165205,22 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         ? "artifact_synthesis"
         : "workstation_tool_evaluation"
       : undefined;
-  if (isClarifyTerminal || isSuppressedTerminal || isActTerminal || isControlConversationTerminal) {
+  if (
+    isClarifyTerminal || isSuppressedTerminal || isActTerminal || isControlConversationTerminal
+  ) {
     return respondAskTurn(
       200,
       {
-      ok: observationGroundedFinal?.finalStatus !== "final_failure",
-      text: briefText,
-      answer: briefText,
-      mode: routeDecision.classification.mode === "act" ? "act" : "observe",
-      trace_id: traceId,
-      turn_id: turnId,
-      final_answer_source: activeWorkstationFinalAnswerSource,
-      terminal_artifact_kind: activeWorkstationTerminalArtifactKind,
-      source_panel: activeWorkstationToolPlan?.steps.find((step) => typeof step.panel_id === "string")?.panel_id ?? undefined,
-      dispatch: {
+        ok: observationGroundedFinal?.finalStatus !== "final_failure",
+        text: briefText,
+        answer: briefText,
+        mode: routeDecision.classification.mode === "act" ? "act" : "observe",
+        trace_id: traceId,
+        turn_id: turnId,
+        final_answer_source: activeWorkstationFinalAnswerSource,
+        terminal_artifact_kind: activeWorkstationTerminalArtifactKind,
+        source_panel: activeWorkstationToolPlan?.steps.find((step) => typeof step.panel_id === "string")?.panel_id ?? undefined,
+        dispatch: {
         dispatch_hint: !isClarifyTerminal && !isSuppressedTerminal && dispatchHint,
         reason: isClarifyTerminal
           ? needsConfirmation
@@ -163889,44 +165228,46 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             : routeReasonCode
           : routeReasonCode,
       },
-      route_reason_code: routeReasonCode,
-      needs_confirmation: needsConfirmation,
-      terminal_error_code:
+        route_reason_code: routeReasonCode,
+        needs_confirmation: needsConfirmation,
+        terminal_error_code:
         observationGroundedFinal?.errorCode ??
         (routeReasonCode === "clarify:planner_repair_required"
           ? "planner_repair_required"
           : (pendingTerminalErrorCode ?? undefined)),
-      pending_resolution_attempted: pendingResolution.attempted,
-      pending_resolution_applied: pendingResolution.applied,
-      pending_resolution_reason: pendingResolution.reason,
-      pending_status_before: pendingStatusBefore,
-      pending_status_after: pendingStatusAfter,
-      pending_transition_reason: pendingTransitionReason,
-      pending_transition_trace: pendingTransitionTrace,
-      pending_request_id: pendingRequestId,
-      pending_intercepted_turn: pendingHandled,
-      pending_interception_reason: pendingHandled ? pendingResolution.reason ?? pendingTransitionReason : null,
-      brief: {
+        pending_resolution_attempted: pendingResolution.attempted,
+        pending_resolution_applied: pendingResolution.applied,
+        pending_resolution_reason: pendingResolution.reason,
+        pending_status_before: pendingStatusBefore,
+        pending_status_after: pendingStatusAfter,
+        pending_transition_reason: pendingTransitionReason,
+        pending_transition_trace: pendingTransitionTrace,
+        pending_request_id: pendingRequestId,
+        pending_intercepted_turn: pendingHandled,
+        pending_interception_reason: pendingHandled
+          ? (pendingResolution.reason ?? pendingTransitionReason)
+          : null,
+        brief: {
         text: briefText,
         source: "none",
       },
-      planner_contract: plannerContract,
-      execution_trace: executionTrace,
-      step_results: stepResults,
-      execution_lifecycle: executionLifecycle,
-      capability_selection_trace: capabilitySelectionTrace,
-      invariant_violations: invariantViolations,
-      pending_server_request: pendingServerRequest,
-      workspace_context_mode: reasoningContextMode,
-      workspace_context_snapshot: attachWorkspaceContextSnapshot,
-      turn_contract: {
+        planner_contract: plannerContract,
+        execution_trace: executionTrace,
+        step_results: stepResults,
+        execution_lifecycle: executionLifecycle,
+        capability_selection_trace: capabilitySelectionTrace,
+        invariant_violations: invariantViolations,
+        pending_server_request: pendingServerRequest,
+        workspace_context_mode: reasoningContextMode,
+        workspace_context_snapshot: attachWorkspaceContextSnapshot,
+        turn_contract: {
         lane: "conversation",
         terminal_kind: isClarifyTerminal ? "clarify" : "conversation",
         route_reason_code: routeReasonCode,
         dispatch_hint: dispatchHint,
         single_terminal_required: true,
       },
-      final_status: observationGroundedFinal?.finalStatus,
+        final_status: observationGroundedFinal?.finalStatus,
       },
       {
         questionSeed: transcript,
@@ -164180,8 +165521,8 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
             evidence_used_refs: [] as string[],
           };
     let hybridText = needsRetrieval
-      ? retrievalFailure?.clarify_text ??
-        "Needs retrieval before final comparison: I need concrete evidence references from docs/notes context."
+      ? (retrievalFailure?.clarify_text ??
+        "Needs retrieval before final comparison: I need concrete evidence references from docs/notes context.")
       : renderedFinal.text;
     if (activeWorkstationToolPlan) {
       hybridText = synthesizeWorkstationToolAnswer({
@@ -164369,7 +165710,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         ? renderAskTurnScientificMissingFinalText({ code: timeoutScientificCode })
         : "I could not summarize the current document because retrieval recovery did not complete before the turn deadline. Try reopening the document or ask me to identify the current doc first.";
       const recoveryFailureStep: HelixAskTurnPlanStep = {
-        id: timeoutIsModelOnly ? "direct_answer_unavailable" : timeoutScientificCode ?? "retrieval_recovery_failed",
+        id: timeoutIsModelOnly
+          ? "direct_answer_unavailable"
+          : (timeoutScientificCode ?? "retrieval_recovery_failed"),
         lane: "reasoning",
         title: timeoutIsModelOnly
           ? "Stop model-only direct answer and return a typed failure"
@@ -164377,7 +165720,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
           ? "Stop scientific extraction and return a typed failure"
           : "Stop retrieval recovery and return a typed failure",
         status: "failed",
-        reason: timeoutIsModelOnly ? "direct_answer_unavailable" : timeoutScientificCode ?? "retrieval_recovery_failed",
+        reason: timeoutIsModelOnly
+          ? "direct_answer_unavailable"
+          : (timeoutScientificCode ?? "retrieval_recovery_failed"),
         required_artifacts: timeoutIsModelOnly
           ? ["direct_answer_text"]
           : [
@@ -164407,9 +165752,13 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
         route_reason_code: routeReasonCode,
         response_type: "final_failure",
         final_status: "final_failure",
-        terminal_error_code: timeoutIsModelOnly ? "direct_answer_unavailable" : timeoutScientificCode ?? "retrieval_recovery_failed",
+        terminal_error_code: timeoutIsModelOnly
+          ? "direct_answer_unavailable"
+          : (timeoutScientificCode ?? "retrieval_recovery_failed"),
         retrieval_attempted: !timeoutIsModelOnly,
-        retrieval_fail_reason: timeoutIsModelOnly ? null : timeoutScientificCode ?? "retrieval_recovery_failed",
+        retrieval_fail_reason: timeoutIsModelOnly
+          ? null
+          : (timeoutScientificCode ?? "retrieval_recovery_failed"),
         retrieval_recovery_failed: !timeoutIsModelOnly && !timeoutScientificCode,
         scientific_extraction_failed: Boolean(timeoutScientificCode),
         scientific_extraction_fail_reason: timeoutScientificCode ?? null,
@@ -164462,9 +165811,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   if (capturedStatus >= 400) {
     return respondAskTurn(
       capturedStatus,
-      (capturedPayload && typeof capturedPayload === "object"
+      capturedPayload && typeof capturedPayload === "object"
         ? (capturedPayload as Record<string, unknown>)
-        : ({ error: "ask_turn_failed_upstream" } as Record<string, unknown>)),
+        : ({ error: "ask_turn_failed_upstream" } as Record<string, unknown>),
     );
   }
   const responsePayload =
@@ -165133,7 +166482,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
   responsePayload.pending_resolution_applied = pendingResolution.applied;
   responsePayload.pending_resolution_reason = pendingResolution.reason;
   responsePayload.pending_intercepted_turn = pendingHandled;
-  responsePayload.pending_interception_reason = pendingHandled ? pendingResolution.reason ?? pendingTransitionReason : null;
+  responsePayload.pending_interception_reason = pendingHandled
+    ? (pendingResolution.reason ?? pendingTransitionReason)
+    : null;
   responsePayload.planner_contract = plannerContract;
   responsePayload.execution_trace = executionTrace;
   responsePayload.step_results = stepResults;
@@ -165219,7 +166570,9 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     responsePayload.canonical_goal_frame && typeof responsePayload.canonical_goal_frame === "object" && !Array.isArray(responsePayload.canonical_goal_frame)
       ? (responsePayload.canonical_goal_frame as Record<string, unknown>)
       : null;
-  if (readAskTurnString(responsePayloadCanonicalGoalFrame?.goal_kind) === "panel_control") {
+  if (
+    readAskTurnString(responsePayloadCanonicalGoalFrame?.goal_kind) === "panel_control"
+  ) {
     const responseActionEnvelope =
       responsePayload.action_envelope && typeof responsePayload.action_envelope === "object" && !Array.isArray(responsePayload.action_envelope)
         ? (responsePayload.action_envelope as Record<string, unknown>)
@@ -165230,7 +166583,10 @@ const FORCE_RECOVERY_TIMEOUT_TEST_MARKER = "[[TEST_FORCE_RECOVERY_TIMEOUT]]";
     const openedPanelAction = workstationActions.find((entry) => {
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
       const action = entry as Record<string, unknown>;
-      return readAskTurnString(action.action_id) === "open" && Boolean(readAskTurnString(action.panel_id));
+      return (
+        readAskTurnString(action.action_id) === "open" &&
+        Boolean(readAskTurnString(action.panel_id))
+      );
     }) as Record<string, unknown> | undefined;
     const openedPanelId = readAskTurnString(openedPanelAction?.panel_id);
     const responseBoundaryDebugForPanelControlReceipt =
@@ -165360,7 +166716,9 @@ planRouter.get("/ask/turn/:turnId/debug-export", (req, res) => {
     payloadRecordForRailMirrors.payload_hash = hashDebugExportPayload(payloadWithoutHash);
   }
   const payloadArtifactIndexRecordForRailMirrors = asDebugExportRecord(payloadRecordForRailMirrors.artifact_query_index);
-  const compoundContractSubgoalCountForRailMirrorPayload = (record: Record<string, unknown>): number => {
+  const compoundContractSubgoalCountForRailMirrorPayload = (
+    record: Record<string, unknown>,
+  ): number => {
     const itinerary = asDebugExportRecord(record.capability_itinerary);
     const contract =
       asDebugExportRecord(record.compound_capability_contract) ??
@@ -165377,10 +166735,10 @@ planRouter.get("/ask/turn/:turnId/debug-export", (req, res) => {
       readDebugExportString(record.question) ??
       readDebugExportString(record.user_prompt);
     const promptDerivedContract = promptForRailMirror
-      ? buildHelixCompoundCapabilityContract({
+      ? (buildHelixCompoundCapabilityContract({
           turnId,
           promptText: promptForRailMirror,
-        }) as unknown as Record<string, unknown> | null
+        }) as unknown as Record<string, unknown> | null)
       : null;
     const admission = asDebugExportRecord(record.tool_call_admission_decision);
     const capabilityPlan = asDebugExportRecord(record.capability_plan);
@@ -165414,11 +166772,14 @@ planRouter.get("/ask/turn/:turnId/debug-export", (req, res) => {
       turnId,
       payload: payloadRecordForRailMirrors,
     });
-  const railTableForMirror =
-    existingRailTableForMirrorStale
-      ? asDebugExportRecord(rebuiltRailMirrorIndex?.codex_parity_agent_spine_rail_table) ?? existingRailTableForMirror
-      : existingRailTableForMirror ??
-        asDebugExportRecord(rebuiltRailMirrorIndex?.codex_parity_agent_spine_rail_table);
+  const railTableForMirror = existingRailTableForMirrorStale
+    ? (asDebugExportRecord(
+        rebuiltRailMirrorIndex?.codex_parity_agent_spine_rail_table,
+      ) ?? existingRailTableForMirror)
+    : (existingRailTableForMirror ??
+      asDebugExportRecord(
+        rebuiltRailMirrorIndex?.codex_parity_agent_spine_rail_table,
+      ));
   if (railTableForMirror) {
     payloadRecordForRailMirrors.artifact_query_index =
       payloadArtifactIndexRecordForRailMirrors
@@ -165446,13 +166807,13 @@ planRouter.get("/ask/turn/:turnId/debug-export", (req, res) => {
                 ? payloadArtifactIndexRecordForRailMirrors.historical_rail_events
                 : rebuiltRailMirrorIndex?.historical_rail_events,
           }
-        : rebuiltRailMirrorIndex ?? {
+        : (rebuiltRailMirrorIndex ?? {
             schema: "helix.artifact_query_index.v1",
             turn_id: turnId,
             codex_parity_agent_spine_rail_table: railTableForMirror,
             assistant_answer: false,
             raw_content_included: false,
-          };
+          });
     const mirroredArtifactIndex = asDebugExportRecord(payloadRecordForRailMirrors.artifact_query_index);
     payloadRecordForRailMirrors.codex_parity_agent_spine_rail_table = railTableForMirror;
     payloadRecordForRailMirrors.tool_turn_chain_audit =
@@ -165475,12 +166836,11 @@ planRouter.get("/ask/turn/:turnId/debug-export", (req, res) => {
       asDebugExportRecord(payloadRecordForRailMirrors.active_terminal_rail_status) ??
       asDebugExportRecord(mirroredArtifactIndex?.active_terminal_rail_status) ??
       rebuiltRailMirrorIndex?.active_terminal_rail_status;
-    payloadRecordForRailMirrors.historical_rail_events =
-      Array.isArray(payloadRecordForRailMirrors.historical_rail_events)
-        ? payloadRecordForRailMirrors.historical_rail_events
-        : Array.isArray(mirroredArtifactIndex?.historical_rail_events)
-          ? mirroredArtifactIndex?.historical_rail_events
-          : rebuiltRailMirrorIndex?.historical_rail_events ?? [];
+    payloadRecordForRailMirrors.historical_rail_events = Array.isArray(payloadRecordForRailMirrors.historical_rail_events)
+      ? payloadRecordForRailMirrors.historical_rail_events
+      : Array.isArray(mirroredArtifactIndex?.historical_rail_events)
+        ? mirroredArtifactIndex?.historical_rail_events
+        : (rebuiltRailMirrorIndex?.historical_rail_events ?? []);
     const debugRecord =
       payloadDebugRecordForRailMirrors ??
       ({
@@ -165783,7 +167143,10 @@ planRouter.get("/ask/turn/:turnId/reasoning-battle-stage", (req, res) => {
 });
 
 const maybeRecordAskTurnSteering = (req: Request): void => {
-  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
   const prompt = typeof body.raw_user_prompt === "string" && body.raw_user_prompt.trim()
     ? body.raw_user_prompt.trim()
     : typeof body.prompt === "string" && body.prompt.trim()
@@ -168074,12 +169437,13 @@ const maybeApplyRuntimePostulateReviewPayload = async (args: {
     score: proposalResult?.score ?? null,
     receiptId: proposalResult?.receiptId ?? null,
   });
-  const debug = args.payload.debug && typeof args.payload.debug === "object" && !Array.isArray(args.payload.debug)
-    ? args.payload.debug as Record<string, unknown>
-    : {};
+  const debug =
+    args.payload.debug && typeof args.payload.debug === "object" && !Array.isArray(args.payload.debug)
+      ? (args.payload.debug as Record<string, unknown>)
+      : {};
   const existingTerminalPresentation =
     args.payload.terminal_presentation && typeof args.payload.terminal_presentation === "object" && !Array.isArray(args.payload.terminal_presentation)
-      ? args.payload.terminal_presentation as Record<string, unknown>
+      ? (args.payload.terminal_presentation as Record<string, unknown>)
       : {};
   const terminal = materializePostulateRuntimeReviewTerminal({
     turnId: args.turnId,
@@ -168103,7 +169467,7 @@ const maybeApplyRuntimePostulateReviewPayload = async (args: {
   const artifactLedger = [...existingLedger, terminal.artifact];
   const routeProductContract =
     args.payload.route_product_contract && typeof args.payload.route_product_contract === "object" && !Array.isArray(args.payload.route_product_contract)
-      ? args.payload.route_product_contract as Record<string, unknown>
+      ? (args.payload.route_product_contract as Record<string, unknown>)
       : {};
   const routeAllowedKinds = Array.isArray(routeProductContract.allowed_terminal_artifact_kinds)
     ? routeProductContract.allowed_terminal_artifact_kinds.filter((entry): entry is string => typeof entry === "string")
@@ -168139,10 +169503,134 @@ export const attachHelixProviderPreflightRouteContext = (args: {
   body: Record<string, unknown>;
   turnId: string;
 }): Record<string, unknown> => {
+  const transcript = readHelixAskRuntimePrompt(args.body);
   const incomingWorkspaceSnapshot = normalizeIncomingAskTurnWorkspaceSnapshot({
     sessionId: readHelixAskRuntimeSessionId(args.body),
     snapshot: args.body.workspace_context_snapshot ?? args.body.workspaceContextSnapshot,
   });
+  if (
+    isAskTurnCapabilityCatalogAvailabilityPrompt(transcript) ||
+    isAskTurnCapabilityHelpIntent(transcript)
+  ) {
+    const threadId =
+      readHelixAskRuntimeThreadId(args.body) ??
+      readHelixAskRuntimeSessionId(args.body) ??
+      "helix-ask:desktop";
+    const sourceTargetIntent = {
+      schema: "helix.ask_source_target_intent.v1",
+      turn_id: args.turnId,
+      thread_id: threadId,
+      target_source: "capability_catalog",
+      target_kind: "capability_catalog_runtime",
+      selected_capability: HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY,
+      strength: "hard",
+      explicit_cues: ["capability_catalog_request"],
+      reasons: ["capability_help_requires_current_runtime_catalog"],
+      requested_outputs: ["capability_help_summary", "typed_failure"],
+      suppressed_routes: [
+        "visual_capture_describe",
+        "active_doc_summary",
+        "scholarly_research_lookup",
+        "no_tool_direct",
+      ],
+      precedence_reason: "capability_catalog_precedence",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      confidence: 0.99,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const canonicalGoalFrame = {
+      schema: "helix.canonical_goal_frame.v1",
+      turn_id: args.turnId,
+      goal_kind: "capability_help",
+      answer_scope: "runtime_evidence",
+      requested_capability: HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY,
+      required_terminal_kind: "capability_help_summary",
+      allowed_terminal_artifact_kinds: [
+        "capability_help_summary",
+        "typed_failure",
+      ],
+      forbidden_terminal_artifact_kinds: [
+        "active_image_lens_source_missing",
+        "direct_answer_text",
+        "model_only_concept",
+        "no_tool_direct",
+        "panel_generated_answer",
+      ],
+      allows_workspace_context: true,
+      allows_prior_artifacts: false,
+      corpus_anchors: [],
+      numeric_tokens: [],
+      concept_tokens: ["helix_ask_capability_catalog"],
+      confidence: "high",
+      classifier_reasons: [
+        "provider_preflight_capability_help",
+        "capability_catalog_precedence",
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const routeProductContract = {
+      schema: "helix.route_product_contract.v1",
+      turn_id: args.turnId,
+      source_target: "capability_catalog",
+      goal_kind: "capability_help",
+      required_terminal_kind: "capability_help_summary",
+      required_terminal_artifact_kind: "capability_help_summary",
+      allowed_terminal_artifact_kinds: [
+        "capability_help_summary",
+        "typed_failure",
+      ],
+      forbidden_terminal_artifact_kinds:
+        canonicalGoalFrame.forbidden_terminal_artifact_kinds,
+      evidence_reentry_required: true,
+      followup_reasoning_required: true,
+      precedence_reason: "capability_catalog_precedence",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const preflightBody: Record<string, unknown> = {
+      ...args.body,
+      ...(incomingWorkspaceSnapshot
+        ? { workspace_context_snapshot: incomingWorkspaceSnapshot }
+        : {}),
+      source_target_intent: sourceTargetIntent,
+      sourceTargetIntent,
+      canonical_goal_frame: canonicalGoalFrame,
+      route_product_contract: routeProductContract,
+      tool_call_admission_decision: buildToolCallAdmissionDecision({
+        turnId: args.turnId,
+        sourceTargetIntent,
+        routeProductContract,
+        canonicalGoalFrame,
+        promptText: transcript,
+      }),
+    };
+    const committedRoutePayload = {
+      ...preflightBody,
+      committed_ask_route: undefined,
+      committedAskRoute: undefined,
+    };
+    const committedRoute = buildCommittedAskRoute({
+      turnId: args.turnId,
+      promptText: transcript,
+      selectedRoute: "/ask/turn",
+      payload: committedRoutePayload,
+    });
+    const bodyWithCommittedRoute = {
+      ...preflightBody,
+      committed_ask_route: committedRoute,
+    };
+    return {
+      ...bodyWithCommittedRoute,
+      route_evidence_authority: buildRouteEvidenceAuthority({
+        committedRoute,
+        payload: bodyWithCommittedRoute,
+      }),
+    };
+  }
   if (incomingWorkspaceSnapshot) {
     const activeWorkspaceSourceResolution = buildActiveWorkspaceSourceResolution({
       turnId: args.turnId,
@@ -168171,7 +169659,6 @@ export const attachHelixProviderPreflightRouteContext = (args: {
   if (args.body.canonical_goal_frame && typeof args.body.canonical_goal_frame === "object") {
     return args.body;
   }
-  const transcript = readHelixAskRuntimePrompt(args.body);
   if (!transcript.trim()) return args.body;
   const retrievalSignal = buildAskTurnRetrievalRequiredSignal({
     turnId: args.turnId,
@@ -168315,6 +169802,63 @@ export const attachHelixProviderPreflightRouteContext = (args: {
       confidence: "high",
       classifier_reasons: ["provider_preflight_scope_contract_model_only", scopeContract.reason],
     },
+  };
+};
+
+export const attachHelixProviderConversationMemoryContext = (args: {
+  body: Record<string, unknown>;
+  turnId: string;
+}): Record<string, unknown> => {
+  if (process.env.HELIX_ASK_CONVERSATION_MEMORY_PACKET === "0") {
+    return args.body;
+  }
+  const promptText = readHelixAskRuntimePrompt(args.body);
+  const threadId =
+    readHelixAskRuntimeThreadId(args.body) ??
+    readHelixAskRuntimeSessionId(args.body) ??
+    "helix-ask:desktop";
+  const followup = detectHelixFollowupReferences(promptText);
+  const packet = buildHelixConversationMemoryPacket({
+    threadId,
+    currentTurnId: args.turnId,
+    sessionId: readHelixAskRuntimeSessionId(args.body) ?? threadId,
+    promptText,
+    allowsPriorArtifacts: followup.followup_kind === "previous_evidence",
+  });
+  const canonicalGoalFrame =
+    args.body.canonical_goal_frame &&
+    typeof args.body.canonical_goal_frame === "object" &&
+    !Array.isArray(args.body.canonical_goal_frame)
+      ? (args.body.canonical_goal_frame as Record<string, unknown>)
+      : null;
+  const bodyWithReferentContext =
+    attachProviderConversationMemoryReferentContext({
+      body: args.body,
+      packet,
+    });
+  return {
+    ...bodyWithReferentContext,
+    conversation_memory_packet: packet,
+    conversational_referent_resolution: {
+      schema: "helix.conversational_referent_resolution.v1",
+      turn_id: args.turnId,
+      followup_kind: followup.followup_kind,
+      phrases: followup.phrases,
+      allowed_for_current_goal: packet.allowed_for_current_goal,
+      allowed_use: packet.allowed_use,
+      reusable_evidence_refs: packet.reusable_evidence_refs,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    ...(canonicalGoalFrame
+      ? {
+          canonical_goal_frame: {
+            ...canonicalGoalFrame,
+            allows_prior_artifacts:
+              packet.allowed_use === "reuse_prior_evidence_refs",
+          },
+        }
+      : {}),
   };
 };
 
@@ -168740,6 +170284,184 @@ const applyHelixProviderCalculatorGatewayTerminalRepair = (args: {
   return nextPayload;
 };
 
+const applyHelixProviderSolverCompletionBoundary = (args: {
+  payload: Record<string, unknown>;
+  body: Record<string, unknown>;
+  turnId: string;
+  route: "/ask/turn" | "/ask/turn/stream";
+}): Record<string, unknown> => {
+  const realtimeRouteMetadata = RealtimeStagePlayRouteMetadataSchema.safeParse(
+    args.body.route_metadata ??
+      args.body.routeMetadata ??
+      args.payload.route_metadata ??
+      args.payload.routeMetadata,
+  );
+  if (!realtimeRouteMetadata.success) return args.payload;
+
+  const prompt = readHelixAskRuntimePrompt(args.body);
+  const threadId =
+    readAskTurnString(args.payload.thread_id) ??
+    readHelixAskRuntimeThreadId(args.body) ??
+    readHelixAskRuntimeSessionId(args.body) ??
+    "helix-ask:desktop";
+  const selectedRoute =
+    readAskTurnString(args.payload.route_reason_code) ??
+    readAskTurnString(args.payload.route) ??
+    args.route;
+
+  // Provider turns materialize their terminal candidate before the route-level
+  // solver trace is projected. Build that projection here so the same hard
+  // gate governs Ask text and any downstream Realtime spoken relay.
+  reconcileDebugExportAuthorityParity({
+    payload: args.payload,
+    turnId: args.turnId,
+    promptText: prompt,
+  });
+
+  const sourceTargetIntent =
+    args.payload.source_target_intent &&
+    typeof args.payload.source_target_intent === "object" &&
+    !Array.isArray(args.payload.source_target_intent)
+      ? (args.payload.source_target_intent as Record<string, unknown>)
+      : {};
+  const routeProductContract =
+    args.payload.route_product_contract &&
+    typeof args.payload.route_product_contract === "object" &&
+    !Array.isArray(args.payload.route_product_contract)
+      ? (args.payload.route_product_contract as Record<string, unknown>)
+      : (buildRouteProductContract({
+          turnId: args.turnId,
+          threadId,
+          sourceTargetIntent: sourceTargetIntent as Parameters<
+            typeof buildRouteProductContract
+          >[0]["sourceTargetIntent"],
+          promptText: prompt,
+        }) as unknown as Record<string, unknown>);
+
+  applyAskTurnSolverHardGateFailure({
+    dependencies: askTurnSolverHardGateFailureDependencies,
+    payload: args.payload,
+    threadId,
+    turnId: args.turnId,
+    route: selectedRoute,
+    prompt,
+    routeProductContract,
+    sourceTargetIntent,
+  });
+  return args.payload;
+};
+
+type HelixSharedRoomAskGuardFailure = {
+  statusCode: 401 | 403 | 404 | 503;
+  payload: Record<string, unknown>;
+};
+
+const buildHelixSharedRoomAskGuardFailure = (args: {
+  turnId: string;
+  statusCode: HelixSharedRoomAskGuardFailure["statusCode"];
+  error: string;
+  message: string;
+}): HelixSharedRoomAskGuardFailure => ({
+  statusCode: args.statusCode,
+  payload: {
+    schema: "helix.ask.shared_room_session_failure.v1",
+    ok: false,
+    error: args.error,
+    terminal_error_code: args.error,
+    fail_class: "shared_room_session_authority",
+    fail_reason: args.error,
+    message: args.message,
+    text: args.message,
+    turn_id: args.turnId,
+    response_type: "typed_failure",
+    final_status: "final_failure",
+    final_answer_source: "typed_failure",
+    terminal_artifact_kind: "typed_failure",
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+});
+
+const enforceHelixSharedRoomAskSessionAccess = async (args: {
+  req: Request;
+  body: Record<string, unknown>;
+  turnId: string;
+}): Promise<HelixSharedRoomAskGuardFailure | null> => {
+  const askSessionId = readHelixAskRuntimeSessionId(args.body);
+  if (!readHelixSharedRoomIdFromAskSession(askSessionId)) {
+    return null;
+  }
+  let accountStatus: Awaited<ReturnType<typeof getAccountSessionStatus>>;
+  try {
+    accountStatus = await getAccountSessionStatus(
+      readHelixSessionCookie(args.req.headers.cookie),
+    );
+  } catch {
+    return buildHelixSharedRoomAskGuardFailure({
+      turnId: args.turnId,
+      statusCode: 503,
+      error: "shared_realtime_room_account_unavailable",
+      message:
+        "The Shared GPT Live Room account boundary is temporarily unavailable.",
+    });
+  }
+  let access: Awaited<
+    ReturnType<typeof resolveHelixSharedRoomAskSessionAccess>
+  >;
+  try {
+    access = await resolveHelixSharedRoomAskSessionAccess({
+      sessionId: askSessionId,
+      profileId: accountStatus.session?.profile.profile_id ?? null,
+      accountPolicy: accountStatus.account_policy,
+    });
+  } catch {
+    return buildHelixSharedRoomAskGuardFailure({
+      turnId: args.turnId,
+      statusCode: 503,
+      error: "shared_realtime_room_membership_unavailable",
+      message:
+        "The Shared GPT Live Room membership boundary is temporarily unavailable.",
+    });
+  }
+  if (!access.scoped) return null;
+  if (!access.admitted) {
+    if (access.reason === "account_session_required") {
+      return buildHelixSharedRoomAskGuardFailure({
+        turnId: args.turnId,
+        statusCode: 401,
+        error: "shared_realtime_room_auth_required",
+        message:
+          "An active room participant session is required for this shared conversation.",
+      });
+    }
+    if (access.reason === "shared_room_policy_unavailable") {
+      return buildHelixSharedRoomAskGuardFailure({
+        turnId: args.turnId,
+        statusCode: 403,
+        error: "shared_realtime_room_locked_by_account_policy",
+        message:
+          "Shared GPT Live Rooms are not enabled for this account session.",
+      });
+    }
+    return buildHelixSharedRoomAskGuardFailure({
+      turnId: args.turnId,
+      statusCode: 404,
+      error: "shared_realtime_room_not_found",
+      message: "Shared GPT Live Room not found.",
+    });
+  }
+  args.body.shared_room_ask_session_access = {
+    schema: "helix.ask.shared_room_session_access.v1",
+    admitted: true,
+    membership_verified: true,
+    participant_id: access.participantId,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+  return null;
+};
+
 planRouter.post("/ask/turn", async (req, res) => {
   maybeRecordAskTurnSteering(req);
   const body = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
@@ -168748,9 +170470,19 @@ planRouter.post("/ask/turn", async (req, res) => {
   if (readHelixAskRuntimeTurnId(body) === null) {
     body.turn_id = admissionTurnId;
   }
+  const sharedRoomAskGuard = await enforceHelixSharedRoomAskSessionAccess({
+    req,
+    body,
+    turnId: admissionTurnId,
+  });
+  if (sharedRoomAskGuard) {
+    return res
+      .status(sharedRoomAskGuard.statusCode)
+      .json(sharedRoomAskGuard.payload);
+  }
   const askTurnBoundaryPrompt = readHelixAskRuntimePrompt(body);
   const retainedScientificImageComparisonAtBoundary =
-    isAskTurnScientificImageTextComparisonPrompt(askTurnBoundaryPrompt);
+    isAskTurnScientificImageEvidencePrompt(askTurnBoundaryPrompt);
   if (retainedScientificImageComparisonAtBoundary) {
     const scientificImageComparisonRoute = buildAskTurnScientificImageComparisonRouteMetadata({
       turnId: admissionTurnId,
@@ -168787,8 +170519,11 @@ planRouter.post("/ask/turn", async (req, res) => {
   let runtimeReleaseOutcome: HelixAskRuntimeTaskReleaseOutcome = "completed";
   try {
     if (askTurnAdmission.status !== "admitted") {
-      runtimeReleaseOutcome = askTurnAdmission.status === "queued" ? "aborted" : "rejected";
-      const payload = buildHelixAskTurnAdmissionPayload({ admission: askTurnAdmission });
+      runtimeReleaseOutcome =
+        askTurnAdmission.status === "queued" ? "aborted" : "rejected";
+      const payload = buildHelixAskTurnAdmissionPayload({
+        admission: askTurnAdmission,
+      });
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload,
         admission: runtimeAdmission,
@@ -168808,11 +170543,11 @@ planRouter.post("/ask/turn", async (req, res) => {
         route: "/ask/turn",
         statusCode: askTurnAdmission.status === "queued" ? 202 : 503,
       });
-      return res
-        .status(askTurnAdmission.status === "queued" ? 202 : 503)
-        .json(prepareHelixAskLiveResponsePayload(payload, {
+      return res.status(askTurnAdmission.status === "queued" ? 202 : 503).json(
+        prepareHelixAskLiveResponsePayload(payload, {
           mode: readHelixAskLiveDebugMode(body),
-        }));
+        }),
+      );
     }
     const runtimeGoalCommand = await routeHelixRuntimeGoalCommand({
       body,
@@ -168820,14 +170555,18 @@ planRouter.post("/ask/turn", async (req, res) => {
       route: "/ask/turn",
     });
     if (runtimeGoalCommand.handled) {
-      runtimeReleaseOutcome = runtimeGoalCommand.statusCode >= 400 ? "rejected" : "completed";
+      runtimeReleaseOutcome =
+        runtimeGoalCommand.statusCode >= 400 ? "rejected" : "completed";
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload: runtimeGoalCommand.payload,
         admission: runtimeAdmission,
         body,
         source: "helix_runtime_goal_command",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: runtimeGoalCommand.payload, body });
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: runtimeGoalCommand.payload,
+        body,
+      });
       recordHelixAskRuntimeTerminalCheckpoint({
         body,
         payload: runtimeGoalCommand.payload,
@@ -168840,21 +170579,27 @@ planRouter.post("/ask/turn", async (req, res) => {
         route: "/ask/turn",
         statusCode: runtimeGoalCommand.statusCode,
       });
-      return res.status(runtimeGoalCommand.statusCode).json(prepareHelixAskLiveResponsePayload(runtimeGoalCommand.payload, {
-        mode: readHelixAskLiveDebugMode(body),
-      }));
+      return res.status(runtimeGoalCommand.statusCode).json(
+        prepareHelixAskLiveResponsePayload(runtimeGoalCommand.payload, {
+          mode: readHelixAskLiveDebugMode(body),
+        }),
+      );
     }
     const simpleConversationIntent = isAskTurnSimpleConversationStatusCheck(
       readHelixAskRuntimePrompt(body),
     );
     const capabilityHelpIntent =
-      isAskTurnCapabilityCatalogAvailabilityPrompt(readHelixAskRuntimePrompt(body)) ||
-      isAskTurnCapabilityHelpIntent(readHelixAskRuntimePrompt(body));
+      isAskTurnCapabilityCatalogAvailabilityPrompt(
+        readHelixAskRuntimePrompt(body),
+      ) || isAskTurnCapabilityHelpIntent(readHelixAskRuntimePrompt(body));
     const provider = resolveHelixAgentProvider({
       body,
       headers: req.headers,
     });
-    const runtimeAccountAccess = await resolveHelixAskRuntimeAccountAccess(req, provider.id);
+    const runtimeAccountAccess = await resolveHelixAskRuntimeAccountAccess(
+      req,
+      provider.id,
+    );
     if (runtimeAccountAccess.state !== "available") {
       runtimeReleaseOutcome = "rejected";
       const payload = buildHelixAskRuntimeAccountPolicyBlock({
@@ -168881,17 +170626,22 @@ planRouter.post("/ask/turn", async (req, res) => {
         route: "/ask/turn",
         statusCode: 403,
       });
-      return res.status(403).json(prepareHelixAskLiveResponsePayload(payload, {
-        mode: readHelixAskLiveDebugMode(body),
-      }));
+      return res.status(403).json(
+        prepareHelixAskLiveResponsePayload(payload, {
+          mode: readHelixAskLiveDebugMode(body),
+        }),
+      );
     }
     if (provider.id !== "helix") {
       const requestedRuntime = selectHelixAgentRuntime({
         body,
         headers: req.headers,
       });
-      const providerBody = attachHelixProviderPreflightRouteContext({
-        body,
+      const providerBody = attachHelixProviderConversationMemoryContext({
+        body: attachHelixProviderPreflightRouteContext({
+          body,
+          turnId: admissionTurnId,
+        }),
         turnId: admissionTurnId,
       });
       const gatewayManifest = listWorkstationGatewayCapabilities({
@@ -168929,6 +170679,12 @@ planRouter.post("/ask/turn", async (req, res) => {
         body,
         turnId: admissionTurnId,
       });
+      payload = applyHelixProviderSolverCompletionBoundary({
+        payload,
+        body: providerBody,
+        turnId: admissionTurnId,
+        route: "/ask/turn",
+      });
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload,
         admission: runtimeAdmission,
@@ -168948,11 +170704,14 @@ planRouter.post("/ask/turn", async (req, res) => {
         route: "/ask/turn",
         statusCode: 200,
       });
-      return res.status(200).json(prepareHelixAskLiveResponsePayload(payload, {
-        mode: readHelixAskLiveDebugMode(body),
-      }));
+      return res.status(200).json(
+        prepareHelixAskLiveResponsePayload(payload, {
+          mode: readHelixAskLiveDebugMode(body),
+        }),
+      );
     }
-    const preGoldenMoralGraphPayload = await maybeBuildMoralGraphAskTurnTerminalPayload(body);
+    const preGoldenMoralGraphPayload =
+      await maybeBuildMoralGraphAskTurnTerminalPayload(body);
     if (preGoldenMoralGraphPayload) {
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload: preGoldenMoralGraphPayload,
@@ -168960,7 +170719,10 @@ planRouter.post("/ask/turn", async (req, res) => {
         body,
         source: "helix_ask_turn",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: preGoldenMoralGraphPayload, body });
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: preGoldenMoralGraphPayload,
+        body,
+      });
       recordHelixAskRuntimeTerminalCheckpoint({
         body,
         payload: preGoldenMoralGraphPayload,
@@ -168975,7 +170737,9 @@ planRouter.post("/ask/turn", async (req, res) => {
       });
       return res.status(200).json(preGoldenMoralGraphPayload);
     }
-    const helixGoldenPathRuntimeDecision = runHelixAskGoldenPathRuntime({ body });
+    const helixGoldenPathRuntimeDecision = runHelixAskGoldenPathRuntime({
+      body,
+    });
     if (helixGoldenPathRuntimeDecision.handled) {
       attachLiveSourceIdentityAuditForGoldenPathPayload({
         payload: helixGoldenPathRuntimeDecision.payload,
@@ -168988,7 +170752,10 @@ planRouter.post("/ask/turn", async (req, res) => {
         body,
         source: "helix_ask_golden_path_runtime",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: helixGoldenPathRuntimeDecision.payload, body });
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: helixGoldenPathRuntimeDecision.payload,
+        body,
+      });
       recordHelixAskRuntimeTerminalCheckpoint({
         body,
         payload: helixGoldenPathRuntimeDecision.payload,
@@ -169001,9 +170768,14 @@ planRouter.post("/ask/turn", async (req, res) => {
         route: "/ask/turn",
         statusCode: 200,
       });
-      return res.status(200).json(prepareHelixAskLiveResponsePayload(helixGoldenPathRuntimeDecision.payload, {
-        mode: readHelixAskLiveDebugMode(body),
-      }));
+      return res.status(200).json(
+        prepareHelixAskLiveResponsePayload(
+          helixGoldenPathRuntimeDecision.payload,
+          {
+            mode: readHelixAskLiveDebugMode(body),
+          },
+        ),
+      );
     }
     if (
       !simpleConversationIntent &&
@@ -169033,14 +170805,18 @@ planRouter.post("/ask/turn", async (req, res) => {
         agentRuntime: provider.id,
         turnId: admissionTurnId,
       });
-      let payload: Record<string, unknown> = buildHelixProviderGatewayObservationPayload({
-        provider,
-        turnId: admissionTurnId,
-        body,
-        runtimeSelectionTrace: runtimeSelectionTrace as Record<string, unknown>,
-        gatewayManifest,
-        gatewayCallResults,
-      });
+      let payload: Record<string, unknown> =
+        buildHelixProviderGatewayObservationPayload({
+          provider,
+          turnId: admissionTurnId,
+          body,
+          runtimeSelectionTrace: runtimeSelectionTrace as Record<
+            string,
+            unknown
+          >,
+          gatewayManifest,
+          gatewayCallResults,
+        });
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload,
         admission: runtimeAdmission,
@@ -169065,9 +170841,11 @@ planRouter.post("/ask/turn", async (req, res) => {
         route: "/ask/turn",
         statusCode: 200,
       });
-      return res.status(200).json(prepareHelixAskLiveResponsePayload(payload, {
-        mode: readHelixAskLiveDebugMode(body),
-      }));
+      return res.status(200).json(
+        prepareHelixAskLiveResponsePayload(payload, {
+          mode: readHelixAskLiveDebugMode(body),
+        }),
+      );
     }
     const goldenPathRuntimeDecision = runHelixAskGoldenPathRuntime({ body });
     if (goldenPathRuntimeDecision.handled) {
@@ -169082,7 +170860,10 @@ planRouter.post("/ask/turn", async (req, res) => {
         body,
         source: "helix_ask_golden_path_runtime",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: goldenPathRuntimeDecision.payload, body });
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: goldenPathRuntimeDecision.payload,
+        body,
+      });
       recordHelixAskRuntimeTerminalCheckpoint({
         body,
         payload: goldenPathRuntimeDecision.payload,
@@ -169095,23 +170876,44 @@ planRouter.post("/ask/turn", async (req, res) => {
         route: "/ask/turn",
         statusCode: 200,
       });
-      return res.status(200).json(prepareHelixAskLiveResponsePayload(goldenPathRuntimeDecision.payload, {
-        mode: readHelixAskLiveDebugMode(body),
-      }));
+      return res.status(200).json(
+        prepareHelixAskLiveResponsePayload(goldenPathRuntimeDecision.payload, {
+          mode: readHelixAskLiveDebugMode(body),
+        }),
+      );
     }
     const carryoverPrompt = readHelixAskRuntimePrompt(body);
     const turnLanguageContract = buildHelixAskLanguageContract({
       inputModality: "typed",
       sourceText: carryoverPrompt,
-      pivotText: typeof body.question === "string" ? body.question : typeof body.prompt === "string" ? body.prompt : carryoverPrompt,
-      sourceLanguage: typeof body.sourceLanguage === "string" ? body.sourceLanguage : null,
-      languageDetected: typeof body.languageDetected === "string" ? body.languageDetected : null,
-      languageConfidence: typeof body.languageConfidence === "number" ? body.languageConfidence : null,
-      responseLanguage: typeof body.responseLanguage === "string" ? body.responseLanguage : null,
-      preferredResponseLanguage: typeof body.preferredResponseLanguage === "string" ? body.preferredResponseLanguage : null,
+      pivotText:
+        typeof body.question === "string"
+          ? body.question
+          : typeof body.prompt === "string"
+            ? body.prompt
+            : carryoverPrompt,
+      sourceLanguage:
+        typeof body.sourceLanguage === "string" ? body.sourceLanguage : null,
+      languageDetected:
+        typeof body.languageDetected === "string"
+          ? body.languageDetected
+          : null,
+      languageConfidence:
+        typeof body.languageConfidence === "number"
+          ? body.languageConfidence
+          : null,
+      responseLanguage:
+        typeof body.responseLanguage === "string"
+          ? body.responseLanguage
+          : null,
+      preferredResponseLanguage:
+        typeof body.preferredResponseLanguage === "string"
+          ? body.preferredResponseLanguage
+          : null,
       codeMixed: typeof body.codeMixed === "boolean" ? body.codeMixed : null,
       translated: typeof body.translated === "boolean" ? body.translated : null,
-      pivotConfidence: typeof body.pivotConfidence === "number" ? body.pivotConfidence : null,
+      pivotConfidence:
+        typeof body.pivotConfidence === "number" ? body.pivotConfidence : null,
       normalizeLanguageTag,
     });
     body.language_contract = turnLanguageContract;
@@ -169129,19 +170931,26 @@ planRouter.post("/ask/turn", async (req, res) => {
     ) {
       body.languageDetected = turnLanguageContract.language_detected;
     }
-    if (typeof body.languageConfidence !== "number" && typeof turnLanguageContract.language_confidence === "number") {
+    if (
+      typeof body.languageConfidence !== "number" &&
+      typeof turnLanguageContract.language_confidence === "number"
+    ) {
       body.languageConfidence = turnLanguageContract.language_confidence;
     }
     if (typeof body.codeMixed !== "boolean") {
       body.codeMixed = turnLanguageContract.code_mixed;
     }
-    if (typeof body.responseLanguage !== "string" && typeof body.preferredResponseLanguage !== "string") {
+    if (
+      typeof body.responseLanguage !== "string" &&
+      typeof body.preferredResponseLanguage !== "string"
+    ) {
       body.responseLanguage = turnLanguageContract.response_language;
     }
     if (typeof body.lang_schema_version !== "string") {
       body.lang_schema_version = HELIX_LANG_SCHEMA_VERSION;
     }
-    const carryoverTurnId = readHelixAskRuntimeTurnId(body) ?? `ask:${crypto.randomUUID()}`;
+    const carryoverTurnId =
+      readHelixAskRuntimeTurnId(body) ?? `ask:${crypto.randomUUID()}`;
     const carryoverSessionId = readHelixAskRuntimeSessionId(body);
     const carryoverThreadId = readHelixAskRuntimeThreadId(body);
     const carryoverMultimodalTurnContext = normalizeHelixTurnInputItems({
@@ -169165,23 +170974,31 @@ planRouter.post("/ask/turn", async (req, res) => {
           turnId: carryoverTurnId,
         })
       : null;
-    const contextCompactionPausePayload = buildHelixAskContextCompactionPausePayload({
-      turnId: carryoverTurnId,
-      sessionId: carryoverSessionId,
-      threadId: carryoverThreadId,
-      promptText: carryoverPrompt,
-      multimodalTurnContext: carryoverMultimodalTurnContext,
-      conversationMemoryPacket: carryoverMemoryPacket,
-    });
+    const contextCompactionPausePayload =
+      buildHelixAskContextCompactionPausePayload({
+        turnId: carryoverTurnId,
+        sessionId: carryoverSessionId,
+        threadId: carryoverThreadId,
+        promptText: carryoverPrompt,
+        multimodalTurnContext: carryoverMultimodalTurnContext,
+        conversationMemoryPacket: carryoverMemoryPacket,
+      });
     if (contextCompactionPausePayload) {
-      persistHelixAskRuntimePendingRequest({ body, payload: contextCompactionPausePayload, route: "/ask/turn" });
+      persistHelixAskRuntimePendingRequest({
+        body,
+        payload: contextCompactionPausePayload,
+        route: "/ask/turn",
+      });
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload: contextCompactionPausePayload,
         admission: runtimeAdmission,
         body,
         source: "helix_ask_turn",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: contextCompactionPausePayload, body });
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: contextCompactionPausePayload,
+        body,
+      });
       recordHelixAskRuntimeTerminalCheckpoint({
         body,
         payload: contextCompactionPausePayload,
@@ -169194,11 +171011,16 @@ planRouter.post("/ask/turn", async (req, res) => {
         route: "/ask/turn",
         statusCode: 200,
       });
-      return res.status(200).json(prepareHelixAskLiveResponsePayload(contextCompactionPausePayload, {
-        mode: readHelixAskLiveDebugMode(body),
-      }));
+      return res.status(200).json(
+        prepareHelixAskLiveResponsePayload(contextCompactionPausePayload, {
+          mode: readHelixAskLiveDebugMode(body),
+        }),
+      );
     }
-    if (carryoverResolution?.matched && carryoverResolution.action === "request_user_input") {
+    if (
+      carryoverResolution?.matched &&
+      carryoverResolution.action === "request_user_input"
+    ) {
       const pendingServerRequest = {
         schema: "helix.pending_server_request.v1",
         request_id: `${carryoverTurnId}:pending_task_frame:request_user_input`,
@@ -169206,9 +171028,12 @@ planRouter.post("/ask/turn", async (req, res) => {
         kind: "request_user_input",
         prompt: carryoverResolution.prompt,
         reason: carryoverResolution.reason,
-        user_goal_summary: carryoverResolution.updated_frame?.original_user_request ?? carryoverPrompt,
+        user_goal_summary:
+          carryoverResolution.updated_frame?.original_user_request ??
+          carryoverPrompt,
         required_fields: carryoverResolution.updated_frame?.missing_slots ?? [],
-        missing_requirement_ids: carryoverResolution.updated_frame?.missing_slots ?? [],
+        missing_requirement_ids:
+          carryoverResolution.updated_frame?.missing_slots ?? [],
         unresolved_task_frame: carryoverResolution.updated_frame,
         assistant_answer: false,
         raw_content_included: false,
@@ -169251,7 +171076,11 @@ planRouter.post("/ask/turn", async (req, res) => {
           resolved_route_reason: carryoverResolution.reason,
         },
       };
-      persistHelixAskRuntimePendingRequest({ body, payload, route: "/ask/turn" });
+      persistHelixAskRuntimePendingRequest({
+        body,
+        payload,
+        route: "/ask/turn",
+      });
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload,
         admission: runtimeAdmission,
@@ -169271,18 +171100,26 @@ planRouter.post("/ask/turn", async (req, res) => {
         route: "/ask/turn",
         statusCode: 200,
       });
-      return res.status(200).json(prepareHelixAskLiveResponsePayload(payload, {
-        mode: readHelixAskLiveDebugMode(body),
-      }));
+      return res.status(200).json(
+        prepareHelixAskLiveResponsePayload(payload, {
+          mode: readHelixAskLiveDebugMode(body),
+        }),
+      );
     }
-    if (carryoverResolution?.matched && carryoverResolution.action === "route_calculator" && carryoverResolution.prompt) {
+    if (
+      carryoverResolution?.matched &&
+      carryoverResolution.action === "route_calculator" &&
+      carryoverResolution.prompt
+    ) {
       body.question = carryoverResolution.prompt;
       body.prompt = carryoverResolution.prompt;
       body.raw_user_prompt = carryoverResolution.prompt;
       body.pending_task_frame_original_prompt = carryoverPrompt;
-      body.pending_task_frame_resolution = carryoverResolution as unknown as Record<string, unknown>;
+      body.pending_task_frame_resolution =
+        carryoverResolution as unknown as Record<string, unknown>;
     }
-    const moralGraphPayload = await maybeBuildMoralGraphAskTurnTerminalPayload(body);
+    const moralGraphPayload =
+      await maybeBuildMoralGraphAskTurnTerminalPayload(body);
     if (moralGraphPayload) {
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload: moralGraphPayload,
@@ -169290,7 +171127,10 @@ planRouter.post("/ask/turn", async (req, res) => {
         body,
         source: "helix_ask_turn",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: moralGraphPayload, body });
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: moralGraphPayload,
+        body,
+      });
       recordHelixAskRuntimeTerminalCheckpoint({
         body,
         payload: moralGraphPayload,
@@ -169305,7 +171145,8 @@ planRouter.post("/ask/turn", async (req, res) => {
       });
       return res.status(200).json(moralGraphPayload);
     }
-    const theoryIdeologyBridgePayload = await maybeBuildTheoryIdeologyBridgeAskTurnTerminalPayload(body);
+    const theoryIdeologyBridgePayload =
+      await maybeBuildTheoryIdeologyBridgeAskTurnTerminalPayload(body);
     if (theoryIdeologyBridgePayload) {
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload: theoryIdeologyBridgePayload,
@@ -169313,7 +171154,10 @@ planRouter.post("/ask/turn", async (req, res) => {
         body,
         source: "helix_ask_turn",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: theoryIdeologyBridgePayload, body });
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: theoryIdeologyBridgePayload,
+        body,
+      });
       recordHelixAskRuntimeTerminalCheckpoint({
         body,
         payload: theoryIdeologyBridgePayload,
@@ -169328,7 +171172,8 @@ planRouter.post("/ask/turn", async (req, res) => {
       });
       return res.status(200).json(theoryIdeologyBridgePayload);
     }
-    const civilizationBoundsPayload = await maybeBuildCivilizationBoundsAskTurnTerminalPayload(body);
+    const civilizationBoundsPayload =
+      await maybeBuildCivilizationBoundsAskTurnTerminalPayload(body);
     if (civilizationBoundsPayload) {
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload: civilizationBoundsPayload,
@@ -169336,7 +171181,10 @@ planRouter.post("/ask/turn", async (req, res) => {
         body,
         source: "helix_ask_turn",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: civilizationBoundsPayload, body });
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: civilizationBoundsPayload,
+        body,
+      });
       recordHelixAskRuntimeTerminalCheckpoint({
         body,
         payload: civilizationBoundsPayload,
@@ -169378,7 +171226,11 @@ planRouter.post("/ask/turn", async (req, res) => {
       return res.status(500).json(payload);
     }
     if (captured.statusCode >= 500) runtimeReleaseOutcome = "failed";
-    if (captured.body && typeof captured.body === "object" && !Array.isArray(captured.body)) {
+    if (
+      captured.body &&
+      typeof captured.body === "object" &&
+      !Array.isArray(captured.body)
+    ) {
       const capturedRecord = captured.body as Record<string, unknown>;
       if (capturedRecord.language_contract === undefined) {
         capturedRecord.language_contract = turnLanguageContract;
@@ -169387,47 +171239,63 @@ planRouter.post("/ask/turn", async (req, res) => {
         capturedRecord.source_language = turnLanguageContract.source_language;
       }
       if (capturedRecord.language_detected === undefined) {
-        capturedRecord.language_detected = turnLanguageContract.language_detected;
+        capturedRecord.language_detected =
+          turnLanguageContract.language_detected;
       }
       if (capturedRecord.language_confidence === undefined) {
-        capturedRecord.language_confidence = turnLanguageContract.language_confidence;
+        capturedRecord.language_confidence =
+          turnLanguageContract.language_confidence;
       }
       if (capturedRecord.code_mixed === undefined) {
         capturedRecord.code_mixed = turnLanguageContract.code_mixed;
       }
       if (capturedRecord.response_language === undefined) {
-        capturedRecord.response_language = turnLanguageContract.response_language;
+        capturedRecord.response_language =
+          turnLanguageContract.response_language;
       }
       if (capturedRecord.translated === undefined) {
         capturedRecord.translated = turnLanguageContract.translated;
       }
       const capturedRequestMetadata =
-        capturedRecord.request_metadata && typeof capturedRecord.request_metadata === "object" && !Array.isArray(capturedRecord.request_metadata)
+        capturedRecord.request_metadata &&
+        typeof capturedRecord.request_metadata === "object" &&
+        !Array.isArray(capturedRecord.request_metadata)
           ? (capturedRecord.request_metadata as Record<string, unknown>)
-          : (capturedRecord.request_metadata === undefined
-            ? ((capturedRecord.request_metadata = {}) as Record<string, unknown>)
-            : null);
-      if (capturedRequestMetadata && capturedRequestMetadata.language_contract === undefined) {
+          : capturedRecord.request_metadata === undefined
+            ? ((capturedRecord.request_metadata = {}) as Record<
+                string,
+                unknown
+              >)
+            : null;
+      if (
+        capturedRequestMetadata &&
+        capturedRequestMetadata.language_contract === undefined
+      ) {
         capturedRequestMetadata.language_contract = turnLanguageContract;
       }
       const capturedDebug =
-        capturedRecord.debug && typeof capturedRecord.debug === "object" && !Array.isArray(capturedRecord.debug)
+        capturedRecord.debug &&
+        typeof capturedRecord.debug === "object" &&
+        !Array.isArray(capturedRecord.debug)
           ? (capturedRecord.debug as Record<string, unknown>)
           : null;
       if (capturedDebug && capturedDebug.language_contract === undefined) {
         capturedDebug.language_contract = turnLanguageContract;
       }
       if (capturedDebug && capturedDebug.response_language === undefined) {
-        capturedDebug.response_language = turnLanguageContract.response_language;
+        capturedDebug.response_language =
+          turnLanguageContract.response_language;
       }
       if (capturedDebug && capturedDebug.source_language === undefined) {
         capturedDebug.source_language = turnLanguageContract.source_language;
       }
       if (capturedDebug && capturedDebug.language_detected === undefined) {
-        capturedDebug.language_detected = turnLanguageContract.language_detected;
+        capturedDebug.language_detected =
+          turnLanguageContract.language_detected;
       }
       if (capturedDebug && capturedDebug.language_confidence === undefined) {
-        capturedDebug.language_confidence = turnLanguageContract.language_confidence;
+        capturedDebug.language_confidence =
+          turnLanguageContract.language_confidence;
       }
       if (capturedDebug && capturedDebug.code_mixed === undefined) {
         capturedDebug.code_mixed = turnLanguageContract.code_mixed;
@@ -169564,14 +171432,19 @@ const resolveHelixContextResumeFrameRecallForRuntime = (args: {
     readAskTurnString(args.body.threadId) ?? "",
     "helix-ask:desktop",
   ].map((entry) => readAskTurnString(entry) ?? "").filter(Boolean)));
-  if (/\b(?:pasted\s+(?:text|memo|note|document)|attached\s+(?:text|memo|note|document)|copied\s+(?:text|memo|note|document)|(?:text|memo|note|document)\s+attachment|attachment|previous\s+(?:paste|memo|note|document)|last\s+(?:paste|memo|note|document)|(?:paste|memo|note|document|text)\s+from\s+the\s+previous|pasted\s+(?:text|memo|note|document)\s+from\s+the\s+previous)\b/i.test(args.promptText)) {
+  if (
+    /\b(?:pasted\s+(?:text|memo|note|document)|attached\s+(?:text|memo|note|document)|copied\s+(?:text|memo|note|document)|(?:text|memo|note|document)\s+attachment|attachment|previous\s+(?:paste|memo|note|document)|last\s+(?:paste|memo|note|document)|(?:paste|memo|note|document|text)\s+from\s+the\s+previous|pasted\s+(?:text|memo|note|document)\s+from\s+the\s+previous)\b/i.test(args.promptText)
+  ) {
     const recentResumeThreadIds = getHelixThreadLedgerEvents({ limit: 200 })
       .filter((event) => event.event_type === "server_request_created")
       .filter((event) => event.request_kind === "request_user_input")
       .filter((event) => {
         const payload = asDebugExportRecord(event.request_payload);
         const resumeFrame = asDebugExportRecord(payload?.resume_frame);
-        return readAskTurnString(resumeFrame?.schema) === "helix.pasted_text_attachment_resume_frame.v1";
+        return (
+          readAskTurnString(resumeFrame?.schema) ===
+          "helix.pasted_text_attachment_resume_frame.v1"
+        );
       })
       .map((event) => readAskTurnString(event.thread_id))
       .filter((threadId): threadId is string => Boolean(threadId));
@@ -169617,7 +171490,10 @@ const readHelixAskRuntimeTerminalHash = (
     payload.terminal_answer_authority && typeof payload.terminal_answer_authority === "object"
       ? (payload.terminal_answer_authority as Record<string, unknown>)
       : null;
-  return readAskTurnString(authority?.terminal_text_hash) ?? hashHelixTerminalText(terminalText);
+  return (
+    readAskTurnString(authority?.terminal_text_hash) ??
+    hashHelixTerminalText(terminalText)
+  );
 };
 
 const persistHelixAskRuntimePendingRequest = (args: {
@@ -169760,18 +171636,25 @@ const recordHelixAskRuntimeCompletionCheckpoint = (args: {
 }): void => {
   const payload = args.payload ?? {};
   const finalStatus = checkpointStatusForAskPayload(args.statusCode, payload);
+  const sessionId = readHelixAskRuntimeSessionId(args.body);
+  const threadId =
+    readAskTurnString(payload.thread_id) ??
+    readHelixAskRuntimeThreadId(args.body) ??
+    sessionId;
+  const turnId =
+    readAskTurnString(payload.turn_id) ??
+    args.turnId ??
+    readHelixAskRuntimeTurnId(args.body) ??
+    `ask:${crypto.randomUUID()}`;
+  const traceId =
+    readAskTurnString(payload.trace_id) ??
+    args.traceId ??
+    readHelixAskRuntimeTurnTraceId(args.body);
   recordHelixAskTurnCheckpoint({
-    thread_id: readAskTurnString(payload.thread_id) ?? readHelixAskRuntimeThreadId(args.body),
-    turn_id:
-      readAskTurnString(payload.turn_id) ??
-      args.turnId ??
-      readHelixAskRuntimeTurnId(args.body) ??
-      `ask:${crypto.randomUUID()}`,
-    session_id: readHelixAskRuntimeSessionId(args.body),
-    trace_id:
-      readAskTurnString(payload.trace_id) ??
-      args.traceId ??
-      readHelixAskRuntimeTurnTraceId(args.body),
+    thread_id: threadId,
+    turn_id: turnId,
+    session_id: sessionId,
+    trace_id: traceId,
     route: args.route,
     checkpoint_type:
       finalStatus === "pending_input"
@@ -169789,6 +171672,22 @@ const recordHelixAskRuntimeCompletionCheckpoint = (args: {
     error_code:
       readAskTurnString(payload.terminal_error_code) ??
       readAskTurnString(payload.error),
+  });
+  persistHelixAskRuntimeTurnThreadCompletion({
+    threadId,
+    turnId,
+    sessionId,
+    traceId,
+    promptText: readHelixAskRuntimePrompt(args.body),
+    terminalText: readHelixAskRuntimeTerminalText(payload),
+    finalStatus,
+    failureCode:
+      readAskTurnString(payload.terminal_error_code) ??
+      readAskTurnString(payload.error),
+    documentEvidencePaths: extractRuntimeDocumentEvidencePaths(payload),
+    selectedObservationRefs: extractRuntimeSelectedObservationRefs(payload),
+    selectedEnvironmentProbeLocators:
+      extractRuntimeSelectedEnvironmentProbeLocators(payload),
   });
 };
 
@@ -169893,14 +171792,18 @@ const resolveHelixLanguageModelPolicyForAskBody = (args: {
       : undefined;
   const requestedSelectionMode =
     structuredSelection?.mode ??
-    (bodyRequestedProfile ? (bodyRequestedProfile === "auto" ? "auto" : "profile") : undefined) ??
+    (bodyRequestedProfile
+      ? bodyRequestedProfile === "auto"
+        ? "auto"
+        : "profile"
+      : undefined) ??
     (persistedPinnedModel || defaultPinnedModel ? "pinned" : undefined);
   const pinnedModel =
     structuredSelection?.mode === "pinned"
       ? structuredSelection.model
       : structuredSelection || bodyRequestedProfile
         ? undefined
-        : persistedPinnedModel ?? defaultPinnedModel;
+        : (persistedPinnedModel ?? defaultPinnedModel);
   const accountTypeRaw =
     readAskTurnString(args.body.account_type) ??
     readAskTurnString(args.body.accountType) ??
@@ -170109,14 +172012,19 @@ const writeAskTurnSse = (res: Response, event: string, data: unknown): void => {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 };
 
-const isInterimVoiceCalloutObservationArtifact = (artifact: unknown): artifact is HelixTurnArtifact => {
+const isInterimVoiceCalloutObservationArtifact = (
+  artifact: unknown,
+): artifact is HelixTurnArtifact => {
   if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) return false;
   const record = artifact as Record<string, unknown>;
   if (readAskTurnString(record.kind) !== "live_environment_tool_observation") return false;
   const payload = record.payload && typeof record.payload === "object" && !Array.isArray(record.payload)
     ? (record.payload as Record<string, unknown>)
     : null;
-  return readAskTurnString(payload?.tool_name) === "live_env.request_interim_voice_callout";
+  return (
+    readAskTurnString(payload?.tool_name) ===
+    "live_env.request_interim_voice_callout"
+  );
 };
 
 const writeInterimVoiceCalloutHandoffsFromArtifacts = (args: {
@@ -170305,6 +172213,16 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     trace_id: streamTraceId,
     traceId: streamTraceId,
   };
+  const sharedRoomAskGuard = await enforceHelixSharedRoomAskSessionAccess({
+    req,
+    body: req.body as Record<string, unknown>,
+    turnId: streamTurnId,
+  });
+  if (sharedRoomAskGuard) {
+    writeAskTurnSse(res, "turn_error", sharedRoomAskGuard.payload);
+    writeAskTurnSse(res, "turn_final", sharedRoomAskGuard.payload);
+    return res.end();
+  }
   const streamLanguageModelPolicy = resolveHelixLanguageModelPolicyForAskBody({
     body: req.body as Record<string, unknown>,
     promptText: question,
@@ -170347,18 +172265,23 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     streamBodyForRouteMetadata.sourceTargetIntent = streamDocsEvidenceRoute.sourceTargetIntent;
     streamBodyForRouteMetadata.mandatory_next_tool = streamDocsEvidenceRoute.sourceTargetIntent.mandatory_next_tool;
   }
-  if (isAskTurnScientificImageTextComparisonPrompt(question)) {
-    const streamScientificImageComparisonRoute = buildAskTurnScientificImageComparisonRouteMetadata({
-      turnId: streamTurnId,
-      threadId:
-        readHelixAskRuntimeThreadId(streamBodyForRouteMetadata) ??
-        readHelixAskRuntimeSessionId(streamBodyForRouteMetadata) ??
-        "helix-ask:desktop",
-    });
-    streamBodyForRouteMetadata.route_metadata = streamScientificImageComparisonRoute.metadata;
-    streamBodyForRouteMetadata.routeMetadata = streamScientificImageComparisonRoute.metadata;
-    streamBodyForRouteMetadata.source_target_intent = streamScientificImageComparisonRoute.sourceTargetIntent;
-    streamBodyForRouteMetadata.sourceTargetIntent = streamScientificImageComparisonRoute.sourceTargetIntent;
+  if (isAskTurnScientificImageEvidencePrompt(question)) {
+    const streamScientificImageComparisonRoute =
+      buildAskTurnScientificImageComparisonRouteMetadata({
+        turnId: streamTurnId,
+        threadId:
+          readHelixAskRuntimeThreadId(streamBodyForRouteMetadata) ??
+          readHelixAskRuntimeSessionId(streamBodyForRouteMetadata) ??
+          "helix-ask:desktop",
+      });
+    streamBodyForRouteMetadata.route_metadata =
+      streamScientificImageComparisonRoute.metadata;
+    streamBodyForRouteMetadata.routeMetadata =
+      streamScientificImageComparisonRoute.metadata;
+    streamBodyForRouteMetadata.source_target_intent =
+      streamScientificImageComparisonRoute.sourceTargetIntent;
+    streamBodyForRouteMetadata.sourceTargetIntent =
+      streamScientificImageComparisonRoute.sourceTargetIntent;
     delete streamBodyForRouteMetadata.mandatory_next_tool;
     delete streamBodyForRouteMetadata.mandatoryNextTool;
   }
@@ -170402,8 +172325,11 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
   const captureRes = createAskTurnCaptureResponse();
   try {
     if (askTurnAdmission.status !== "admitted") {
-      runtimeReleaseOutcome = askTurnAdmission.status === "queued" ? "aborted" : "rejected";
-      const payload = buildHelixAskTurnAdmissionPayload({ admission: askTurnAdmission });
+      runtimeReleaseOutcome =
+        askTurnAdmission.status === "queued" ? "aborted" : "rejected";
+      const payload = buildHelixAskTurnAdmissionPayload({
+        admission: askTurnAdmission,
+      });
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload,
         admission: runtimeAdmission,
@@ -170413,7 +172339,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       attachHelixAskStreamFinalDebugExport({
         payload,
         prompt: question,
-        sessionId: readHelixAskRuntimeSessionId(req.body as Record<string, unknown>),
+        sessionId: readHelixAskRuntimeSessionId(
+          req.body as Record<string, unknown>,
+        ),
       });
       recordHelixAskRuntimeTerminalCheckpoint({
         body: req.body as Record<string, unknown>,
@@ -170441,7 +172369,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       route: "/ask/turn/stream",
     });
     if (streamRuntimeGoalCommand.handled) {
-      runtimeReleaseOutcome = streamRuntimeGoalCommand.statusCode >= 400 ? "rejected" : "completed";
+      runtimeReleaseOutcome =
+        streamRuntimeGoalCommand.statusCode >= 400 ? "rejected" : "completed";
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload: streamRuntimeGoalCommand.payload,
         admission: runtimeAdmission,
@@ -170455,7 +172384,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       attachHelixAskStreamFinalDebugExport({
         payload: streamRuntimeGoalCommand.payload,
         prompt: question,
-        sessionId: readHelixAskRuntimeSessionId(req.body as Record<string, unknown>),
+        sessionId: readHelixAskRuntimeSessionId(
+          req.body as Record<string, unknown>,
+        ),
       });
       for (const event of streamRuntimeGoalCommand.transcriptEvents) {
         writeAskTurnSse(res, "turn_transcript_event", event);
@@ -170483,7 +172414,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       body: req.body as Record<string, unknown>,
       headers: req.headers,
     });
-    const streamRuntimeAccountAccess = await resolveHelixAskRuntimeAccountAccess(req, streamAgentProvider.id);
+    const streamRuntimeAccountAccess =
+      await resolveHelixAskRuntimeAccountAccess(req, streamAgentProvider.id);
     if (streamRuntimeAccountAccess.state !== "available") {
       runtimeReleaseOutcome = "rejected";
       const payload = buildHelixAskRuntimeAccountPolicyBlock({
@@ -170504,7 +172436,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       attachHelixAskStreamFinalDebugExport({
         payload,
         prompt: question,
-        sessionId: readHelixAskRuntimeSessionId(req.body as Record<string, unknown>),
+        sessionId: readHelixAskRuntimeSessionId(
+          req.body as Record<string, unknown>,
+        ),
       });
       recordHelixAskRuntimeTerminalCheckpoint({
         body: req.body as Record<string, unknown>,
@@ -170526,8 +172460,11 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       return;
     }
     if (streamAgentProvider.id !== "helix") {
-      const streamProviderBody = attachHelixProviderPreflightRouteContext({
-        body: req.body as Record<string, unknown>,
+      const streamProviderBody = attachHelixProviderConversationMemoryContext({
+        body: attachHelixProviderPreflightRouteContext({
+          body: req.body as Record<string, unknown>,
+          turnId: streamTurnId,
+        }),
         turnId: streamTurnId,
       });
       const requestedRuntime = selectHelixAgentRuntime({
@@ -170551,7 +172488,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         startedAtMs,
         phase: `${streamAgentProvider.label} runtime turn`,
       });
-      let providerResult: Awaited<ReturnType<typeof streamAgentProvider.runTurn>>;
+      let providerResult: Awaited<
+        ReturnType<typeof streamAgentProvider.runTurn>
+      >;
       try {
         providerResult = await streamAgentProvider.runTurn({
           runtime: streamAgentProvider.id,
@@ -170559,22 +172498,27 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           body: streamProviderBody,
           headers: req.headers,
           onTranscriptEvent: (event) => {
-            const record = event && typeof event === "object" && !Array.isArray(event)
-              ? event as Record<string, unknown>
-              : null;
+            const record =
+              event && typeof event === "object" && !Array.isArray(event)
+                ? (event as Record<string, unknown>)
+                : null;
             const voicePlaybackHandoff =
               record?.voice_playback_handoff &&
               typeof record.voice_playback_handoff === "object" &&
               !Array.isArray(record.voice_playback_handoff)
-                ? record.voice_playback_handoff as Record<string, unknown>
+                ? (record.voice_playback_handoff as Record<string, unknown>)
                 : null;
             if (voicePlaybackHandoff) {
               writeAskTurnSse(res, "interim_voice_callout_handoff", {
                 schema: "helix.interim_voice_callout_stream_handoff.v1",
                 turn_id: readAskTurnString(record?.turn_id) ?? streamTurnId,
                 artifact: voicePlaybackHandoff,
-                artifact_refs: Array.isArray(record?.voice_playback_handoff_refs)
-                  ? record.voice_playback_handoff_refs.filter((ref): ref is string => typeof ref === "string")
+                artifact_refs: Array.isArray(
+                  record?.voice_playback_handoff_refs,
+                )
+                  ? record.voice_playback_handoff_refs.filter(
+                      (ref): ref is string => typeof ref === "string",
+                    )
                   : [],
                 assistant_answer: false,
                 terminal_eligible: false,
@@ -170606,6 +172550,12 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         body: streamProviderBody,
         turnId: streamTurnId,
       });
+      payload = applyHelixProviderSolverCompletionBoundary({
+        payload,
+        body: streamProviderBody,
+        turnId: streamTurnId,
+        route: "/ask/turn/stream",
+      });
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload,
         admission: runtimeAdmission,
@@ -170633,26 +172583,34 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         turnId: streamTurnId,
         traceId: streamTraceId,
       });
-      const providerTranscriptEvents = Array.isArray(payload.turn_transcript_events)
+      const providerTranscriptEvents = Array.isArray(
+        payload.turn_transcript_events,
+      )
         ? payload.turn_transcript_events
         : [];
       const streamedProviderTranscriptIds = new Set(
         streamSink
           .getTranscriptEvents()
-          .map((event) => readAskTurnString((event as Record<string, unknown>).id))
+          .map((event) =>
+            readAskTurnString((event as Record<string, unknown>).id),
+          )
           .filter((id): id is string => Boolean(id)),
       );
       for (const event of providerTranscriptEvents) {
-        const eventId = event && typeof event === "object"
-          ? readAskTurnString((event as Record<string, unknown>).id)
-          : null;
+        const eventId =
+          event && typeof event === "object"
+            ? readAskTurnString((event as Record<string, unknown>).id)
+            : null;
         if (eventId && streamedProviderTranscriptIds.has(eventId)) continue;
         writeAskTurnSse(res, "turn_transcript_event", event);
       }
       writeAskTurnSse(res, "turn_final", payload);
       return;
     }
-    const preGoldenStreamMoralGraphPayload = await maybeBuildMoralGraphAskTurnTerminalPayload(req.body as Record<string, unknown>);
+    const preGoldenStreamMoralGraphPayload =
+      await maybeBuildMoralGraphAskTurnTerminalPayload(
+        req.body as Record<string, unknown>,
+      );
     if (preGoldenStreamMoralGraphPayload) {
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload: preGoldenStreamMoralGraphPayload,
@@ -170660,13 +172618,25 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         body: req.body as Record<string, unknown>,
         source: "helix_ask_turn_stream",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: preGoldenStreamMoralGraphPayload, body: req.body as Record<string, unknown> });
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: preGoldenStreamMoralGraphPayload,
+        body: req.body as Record<string, unknown>,
+      });
       const selectedAnswer = String(
-        preGoldenStreamMoralGraphPayload.selected_final_answer ?? preGoldenStreamMoralGraphPayload.assistant_answer ?? preGoldenStreamMoralGraphPayload.answer ?? preGoldenStreamMoralGraphPayload.text ?? "",
+        preGoldenStreamMoralGraphPayload.selected_final_answer ??
+          preGoldenStreamMoralGraphPayload.assistant_answer ??
+          preGoldenStreamMoralGraphPayload.answer ??
+          preGoldenStreamMoralGraphPayload.text ??
+          "",
       );
       const terminalAuthority =
-        preGoldenStreamMoralGraphPayload.terminal_answer_authority && typeof preGoldenStreamMoralGraphPayload.terminal_answer_authority === "object"
-          ? (preGoldenStreamMoralGraphPayload.terminal_answer_authority as Record<string, unknown>)
+        preGoldenStreamMoralGraphPayload.terminal_answer_authority &&
+        typeof preGoldenStreamMoralGraphPayload.terminal_answer_authority ===
+          "object"
+          ? (preGoldenStreamMoralGraphPayload.terminal_answer_authority as Record<
+              string,
+              unknown
+            >)
           : null;
       const terminalHash =
         typeof terminalAuthority?.terminal_text_hash === "string"
@@ -170674,8 +172644,16 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           : hashHelixTerminalText(selectedAnswer);
       const clientHash = hashHelixTerminalText(selectedAnswer);
       const terminalEvent = {
-        id: "stream:terminal_answer:" + String(preGoldenStreamMoralGraphPayload.turn_id ?? preGoldenStreamMoralGraphPayload.trace_id ?? crypto.randomUUID()),
-        turn_id: readAskTurnString(preGoldenStreamMoralGraphPayload.turn_id) ?? streamTurnId,
+        id:
+          "stream:terminal_answer:" +
+          String(
+            preGoldenStreamMoralGraphPayload.turn_id ??
+              preGoldenStreamMoralGraphPayload.trace_id ??
+              crypto.randomUUID(),
+          ),
+        turn_id:
+          readAskTurnString(preGoldenStreamMoralGraphPayload.turn_id) ??
+          streamTurnId,
         at_ms: Date.now(),
         source_event_type: "terminal_answer",
         event_source: "live",
@@ -170683,7 +172661,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         type: "final_answer",
         status: "final_answer",
         text: selectedAnswer,
-        final_answer_source: preGoldenStreamMoralGraphPayload.final_answer_source,
+        final_answer_source:
+          preGoldenStreamMoralGraphPayload.final_answer_source,
         terminal_authority_hash: terminalHash,
         client_visible_terminal_hash: clientHash,
         client_server_terminal_match: clientHash === terminalHash,
@@ -170728,20 +172707,35 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       });
       return res.end();
     }
-    const helixStreamGoldenPathRuntimeDecision = runHelixAskGoldenPathRuntime({ body: req.body as Record<string, unknown> });
+    const helixStreamGoldenPathRuntimeDecision = runHelixAskGoldenPathRuntime({
+      body: req.body as Record<string, unknown>,
+    });
     if (helixStreamGoldenPathRuntimeDecision.handled) {
-      const payload = helixStreamGoldenPathRuntimeDecision.payload as Record<string, unknown>;
+      const payload = helixStreamGoldenPathRuntimeDecision.payload as Record<
+        string,
+        unknown
+      >;
       attachLiveSourceIdentityAuditForGoldenPathPayload({
         payload,
         body: req.body as Record<string, unknown>,
         fallbackTurnId: streamTurnId,
       });
-      if (payload.debug && typeof payload.debug === "object" && !Array.isArray(payload.debug)) {
+      if (
+        payload.debug &&
+        typeof payload.debug === "object" &&
+        !Array.isArray(payload.debug)
+      ) {
         const debug = payload.debug as Record<string, unknown>;
-        if (payload.golden_path_runtime && typeof payload.golden_path_runtime === "object") {
+        if (
+          payload.golden_path_runtime &&
+          typeof payload.golden_path_runtime === "object"
+        ) {
           debug.golden_path_runtime = payload.golden_path_runtime;
         }
-        debug.golden_path_runtime_status = payload.golden_path_runtime_status ?? debug.golden_path_runtime_status ?? null;
+        debug.golden_path_runtime_status =
+          payload.golden_path_runtime_status ??
+          debug.golden_path_runtime_status ??
+          null;
       }
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload,
@@ -170752,7 +172746,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       attachHelixAskStreamFinalDebugExport({
         payload,
         prompt: question,
-        sessionId: readHelixAskRuntimeSessionId(req.body as Record<string, unknown>),
+        sessionId: readHelixAskRuntimeSessionId(
+          req.body as Record<string, unknown>,
+        ),
       });
       recordHelixAskRuntimeTerminalCheckpoint({
         body: req.body as Record<string, unknown>,
@@ -170781,10 +172777,12 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       return;
     }
     if (
-      !isAskTurnScientificImageTextComparisonPrompt(question) &&
+      !isAskTurnScientificImageEvidencePrompt(question) &&
       hasWorkstationGatewayCallsForTurn({
         body: req.body as Record<string, unknown>,
-        includePlannerDerived: hasSelectedHelixAgentRuntime(req.body as Record<string, unknown>),
+        includePlannerDerived: hasSelectedHelixAgentRuntime(
+          req.body as Record<string, unknown>,
+        ),
       })
     ) {
       const streamProviderBody = req.body as Record<string, unknown>;
@@ -170807,14 +172805,18 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         agentRuntime: streamAgentProvider.id,
         turnId: streamTurnId,
       });
-      const payload: Record<string, unknown> = buildHelixProviderGatewayObservationPayload({
-        provider: streamAgentProvider,
-        turnId: streamTurnId,
-        body: streamProviderBody,
-        runtimeSelectionTrace: runtimeSelectionTrace as Record<string, unknown>,
-        gatewayManifest,
-        gatewayCallResults,
-      });
+      const payload: Record<string, unknown> =
+        buildHelixProviderGatewayObservationPayload({
+          provider: streamAgentProvider,
+          turnId: streamTurnId,
+          body: streamProviderBody,
+          runtimeSelectionTrace: runtimeSelectionTrace as Record<
+            string,
+            unknown
+          >,
+          gatewayManifest,
+          gatewayCallResults,
+        });
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload,
         admission: runtimeAdmission,
@@ -170845,20 +172847,35 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       writeAskTurnSse(res, "turn_final", payload);
       return;
     }
-    const streamGoldenPathRuntimeDecision = runHelixAskGoldenPathRuntime({ body: req.body as Record<string, unknown> });
+    const streamGoldenPathRuntimeDecision = runHelixAskGoldenPathRuntime({
+      body: req.body as Record<string, unknown>,
+    });
     if (streamGoldenPathRuntimeDecision.handled) {
-      const payload = streamGoldenPathRuntimeDecision.payload as Record<string, unknown>;
+      const payload = streamGoldenPathRuntimeDecision.payload as Record<
+        string,
+        unknown
+      >;
       attachLiveSourceIdentityAuditForGoldenPathPayload({
         payload,
         body: req.body as Record<string, unknown>,
         fallbackTurnId: streamTurnId,
       });
-      if (payload.debug && typeof payload.debug === "object" && !Array.isArray(payload.debug)) {
+      if (
+        payload.debug &&
+        typeof payload.debug === "object" &&
+        !Array.isArray(payload.debug)
+      ) {
         const debug = payload.debug as Record<string, unknown>;
-        if (payload.golden_path_runtime && typeof payload.golden_path_runtime === "object") {
+        if (
+          payload.golden_path_runtime &&
+          typeof payload.golden_path_runtime === "object"
+        ) {
           debug.golden_path_runtime = payload.golden_path_runtime;
         }
-        debug.golden_path_runtime_status = payload.golden_path_runtime_status ?? debug.golden_path_runtime_status ?? null;
+        debug.golden_path_runtime_status =
+          payload.golden_path_runtime_status ??
+          debug.golden_path_runtime_status ??
+          null;
       }
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload,
@@ -170869,7 +172886,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       attachHelixAskStreamFinalDebugExport({
         payload,
         prompt: question,
-        sessionId: readHelixAskRuntimeSessionId(req.body as Record<string, unknown>),
+        sessionId: readHelixAskRuntimeSessionId(
+          req.body as Record<string, unknown>,
+        ),
       });
       recordHelixAskRuntimeTerminalCheckpoint({
         body: req.body as Record<string, unknown>,
@@ -170898,7 +172917,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       return;
     }
     const streamCarryoverBody = req.body as Record<string, unknown>;
-    const streamCarryoverPrompt = readHelixAskRuntimePrompt(streamCarryoverBody);
+    const streamCarryoverPrompt =
+      readHelixAskRuntimePrompt(streamCarryoverBody);
     const streamLanguageContract = buildHelixAskLanguageContract({
       inputModality: "typed",
       sourceText: streamCarryoverPrompt,
@@ -170908,21 +172928,38 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           : typeof streamCarryoverBody.prompt === "string"
             ? streamCarryoverBody.prompt
             : streamCarryoverPrompt,
-      sourceLanguage: typeof streamCarryoverBody.sourceLanguage === "string" ? streamCarryoverBody.sourceLanguage : null,
+      sourceLanguage:
+        typeof streamCarryoverBody.sourceLanguage === "string"
+          ? streamCarryoverBody.sourceLanguage
+          : null,
       languageDetected:
-        typeof streamCarryoverBody.languageDetected === "string" ? streamCarryoverBody.languageDetected : null,
+        typeof streamCarryoverBody.languageDetected === "string"
+          ? streamCarryoverBody.languageDetected
+          : null,
       languageConfidence:
-        typeof streamCarryoverBody.languageConfidence === "number" ? streamCarryoverBody.languageConfidence : null,
+        typeof streamCarryoverBody.languageConfidence === "number"
+          ? streamCarryoverBody.languageConfidence
+          : null,
       responseLanguage:
-        typeof streamCarryoverBody.responseLanguage === "string" ? streamCarryoverBody.responseLanguage : null,
+        typeof streamCarryoverBody.responseLanguage === "string"
+          ? streamCarryoverBody.responseLanguage
+          : null,
       preferredResponseLanguage:
         typeof streamCarryoverBody.preferredResponseLanguage === "string"
           ? streamCarryoverBody.preferredResponseLanguage
           : null,
-      codeMixed: typeof streamCarryoverBody.codeMixed === "boolean" ? streamCarryoverBody.codeMixed : null,
-      translated: typeof streamCarryoverBody.translated === "boolean" ? streamCarryoverBody.translated : null,
+      codeMixed:
+        typeof streamCarryoverBody.codeMixed === "boolean"
+          ? streamCarryoverBody.codeMixed
+          : null,
+      translated:
+        typeof streamCarryoverBody.translated === "boolean"
+          ? streamCarryoverBody.translated
+          : null,
       pivotConfidence:
-        typeof streamCarryoverBody.pivotConfidence === "number" ? streamCarryoverBody.pivotConfidence : null,
+        typeof streamCarryoverBody.pivotConfidence === "number"
+          ? streamCarryoverBody.pivotConfidence
+          : null,
       normalizeLanguageTag,
     });
     streamCarryoverBody.language_contract = streamLanguageContract;
@@ -170931,20 +172968,23 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       streamLanguageContract.source_language !== "mixed" &&
       streamLanguageContract.source_language !== "unknown"
     ) {
-      streamCarryoverBody.sourceLanguage = streamLanguageContract.source_language;
+      streamCarryoverBody.sourceLanguage =
+        streamLanguageContract.source_language;
     }
     if (
       typeof streamCarryoverBody.languageDetected !== "string" &&
       streamLanguageContract.language_detected !== "mixed" &&
       streamLanguageContract.language_detected !== "unknown"
     ) {
-      streamCarryoverBody.languageDetected = streamLanguageContract.language_detected;
+      streamCarryoverBody.languageDetected =
+        streamLanguageContract.language_detected;
     }
     if (
       typeof streamCarryoverBody.languageConfidence !== "number" &&
       typeof streamLanguageContract.language_confidence === "number"
     ) {
-      streamCarryoverBody.languageConfidence = streamLanguageContract.language_confidence;
+      streamCarryoverBody.languageConfidence =
+        streamLanguageContract.language_confidence;
     }
     if (typeof streamCarryoverBody.codeMixed !== "boolean") {
       streamCarryoverBody.codeMixed = streamLanguageContract.code_mixed;
@@ -170953,13 +172993,16 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       typeof streamCarryoverBody.responseLanguage !== "string" &&
       typeof streamCarryoverBody.preferredResponseLanguage !== "string"
     ) {
-      streamCarryoverBody.responseLanguage = streamLanguageContract.response_language;
+      streamCarryoverBody.responseLanguage =
+        streamLanguageContract.response_language;
     }
     if (typeof streamCarryoverBody.lang_schema_version !== "string") {
       streamCarryoverBody.lang_schema_version = HELIX_LANG_SCHEMA_VERSION;
     }
-    const streamCarryoverSessionId = readHelixAskRuntimeSessionId(streamCarryoverBody);
-    const streamCarryoverThreadId = readHelixAskRuntimeThreadId(streamCarryoverBody);
+    const streamCarryoverSessionId =
+      readHelixAskRuntimeSessionId(streamCarryoverBody);
+    const streamCarryoverThreadId =
+      readHelixAskRuntimeThreadId(streamCarryoverBody);
     const streamCarryoverMultimodalTurnContext = normalizeHelixTurnInputItems({
       request: streamCarryoverBody,
       threadId: streamCarryoverThreadId,
@@ -170981,15 +173024,16 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           turnId: streamTurnId,
         })
       : null;
-    const contextCompactionPausePayload = buildHelixAskContextCompactionPausePayload({
-      turnId: streamTurnId,
-      traceId: streamTraceId,
-      sessionId: streamCarryoverSessionId,
-      threadId: streamCarryoverThreadId,
-      promptText: streamCarryoverPrompt,
-      multimodalTurnContext: streamCarryoverMultimodalTurnContext,
-      conversationMemoryPacket: streamCarryoverMemoryPacket,
-    });
+    const contextCompactionPausePayload =
+      buildHelixAskContextCompactionPausePayload({
+        turnId: streamTurnId,
+        traceId: streamTraceId,
+        sessionId: streamCarryoverSessionId,
+        threadId: streamCarryoverThreadId,
+        promptText: streamCarryoverPrompt,
+        multimodalTurnContext: streamCarryoverMultimodalTurnContext,
+        conversationMemoryPacket: streamCarryoverMemoryPacket,
+      });
     if (contextCompactionPausePayload) {
       persistHelixAskRuntimePendingRequest({
         body: streamCarryoverBody,
@@ -171002,8 +173046,15 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         body: streamCarryoverBody,
         source: "helix_ask_turn_stream",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: contextCompactionPausePayload, body: streamCarryoverBody });
-      const selectedAnswer = String(contextCompactionPausePayload.selected_final_answer ?? contextCompactionPausePayload.answer ?? "");
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: contextCompactionPausePayload,
+        body: streamCarryoverBody,
+      });
+      const selectedAnswer = String(
+        contextCompactionPausePayload.selected_final_answer ??
+          contextCompactionPausePayload.answer ??
+          "",
+      );
       const terminalHash = hashHelixTerminalText(selectedAnswer);
       const terminalEvent = {
         id: `stream:terminal_answer:${streamTurnId}`,
@@ -171060,43 +173111,52 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       });
       return res.end();
     }
-    const streamContextResumeFrameRecall = resolveHelixContextResumeFrameRecallForRuntime({
-      body: streamCarryoverBody,
-      promptText: streamCarryoverPrompt,
-      currentTurnId: streamTurnId,
-      primaryThreadId: streamCarryoverThreadId,
-      sessionId: streamCarryoverSessionId,
-      allowsPriorArtifacts: true,
-    });
+    const streamContextResumeFrameRecall =
+      resolveHelixContextResumeFrameRecallForRuntime({
+        body: streamCarryoverBody,
+        promptText: streamCarryoverPrompt,
+        currentTurnId: streamTurnId,
+        primaryThreadId: streamCarryoverThreadId,
+        sessionId: streamCarryoverSessionId,
+        allowsPriorArtifacts: true,
+      });
     const selectedStreamConversationMemoryPacket =
       streamContextResumeFrameRecall?.packet ?? streamCarryoverMemoryPacket;
     const selectedStreamConversationMemoryThreadId =
       streamContextResumeFrameRecall?.threadId ?? streamCarryoverThreadId;
     const streamConversationMemoryRecallText =
-      currentTurnExplicitlyRequestsCapabilityOverContextResumeRecall(streamCarryoverPrompt)
+      currentTurnExplicitlyRequestsCapabilityOverContextResumeRecall(
+        streamCarryoverPrompt,
+      )
         ? null
-        : streamContextResumeFrameRecall?.recallText ??
+        : (streamContextResumeFrameRecall?.recallText ??
           resolveHelixContextResumeFrameRecallText({
             packet: streamCarryoverMemoryPacket,
             promptText: streamCarryoverPrompt,
           }) ??
           (streamCarryoverMemoryPacket?.allowed_for_current_goal === true &&
-          streamCarryoverMemoryPacket.allowed_use === "conversational_continuity" &&
+          streamCarryoverMemoryPacket.allowed_use ===
+            "conversational_continuity" &&
           shouldUseConversationMemoryRecallTerminal(streamCarryoverPrompt) &&
           streamCarryoverMemoryPacket.latest_answer_summary
             ? `The last answer was: ${streamCarryoverMemoryPacket.latest_answer_summary}`
-            : null);
-    if (streamConversationMemoryRecallText && selectedStreamConversationMemoryPacket) {
+            : null));
+    if (
+      streamConversationMemoryRecallText &&
+      selectedStreamConversationMemoryPacket
+    ) {
       const conversationMemoryEvidenceRef = `${streamTurnId}:conversation_memory_packet`;
       const conversationMemoryRouteAuthorityAudit = {
         schema: "helix.route_authority_audit.v1",
         turn_id: streamTurnId,
         source_target: "conversation_memory",
-        selected_route: "conversation_memory_recall / current_thread_prior_answer",
+        selected_route:
+          "conversation_memory_recall / current_thread_prior_answer",
         terminal_artifact_kind: "model_synthesized_answer",
         final_answer_source: "conversation_memory_recall_answer",
         route_authority_ok: true,
-        reason: "context_resume_frame_recall_selected_conversation_memory_packet",
+        reason:
+          "context_resume_frame_recall_selected_conversation_memory_packet",
         assistant_answer: false,
         raw_content_included: false,
       };
@@ -171106,18 +173166,20 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         selected_evidence_refs: [conversationMemoryEvidenceRef],
         selected_memory_refs: [conversationMemoryEvidenceRef],
         terminal_ready: true,
-        reason: "context_resume_frame_recall_selected_conversation_memory_packet",
+        reason:
+          "context_resume_frame_recall_selected_conversation_memory_packet",
         assistant_answer: false,
         raw_content_included: false,
       };
-      const conversationMemoryTerminalAuthority = recordHelixTurnTerminalAuthority({
-        thread_id: selectedStreamConversationMemoryThreadId,
-        turn_id: streamTurnId,
-        final_answer_source: "conversation_memory_recall_answer",
-        terminal_artifact_kind: "model_synthesized_answer",
-        terminal_text: streamConversationMemoryRecallText,
-        route: "conversation_memory_recall / current_thread_prior_answer",
-      });
+      const conversationMemoryTerminalAuthority =
+        recordHelixTurnTerminalAuthority({
+          thread_id: selectedStreamConversationMemoryThreadId,
+          turn_id: streamTurnId,
+          final_answer_source: "conversation_memory_recall_answer",
+          terminal_artifact_kind: "model_synthesized_answer",
+          terminal_text: streamConversationMemoryRecallText,
+          route: "conversation_memory_recall / current_thread_prior_answer",
+        });
       const conversationMemorySourceTargetIntent = {
         schema: "helix.ask_source_target_intent.v1",
         turn_id: streamTurnId,
@@ -171185,7 +173247,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           deterministic_content_role: "evidence_not_assistant_answer",
         },
         conversation_memory_packet: selectedStreamConversationMemoryPacket,
-        conversation_memory_selector: buildHelixConversationMemoryDebug(selectedStreamConversationMemoryPacket),
+        conversation_memory_selector: buildHelixConversationMemoryDebug(
+          selectedStreamConversationMemoryPacket,
+        ),
         route_authority_audit: conversationMemoryRouteAuthorityAudit,
         evidence_reentry_proof: conversationMemoryEvidenceReentryProof,
         terminal_answer_authority: conversationMemoryTerminalAuthority,
@@ -171197,7 +173261,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           terminal_artifact_kind: "model_synthesized_answer",
           final_answer_source: "conversation_memory_recall_answer",
           terminal_text: streamConversationMemoryRecallText,
-          terminal_text_hash: conversationMemoryTerminalAuthority.terminal_text_hash,
+          terminal_text_hash:
+            conversationMemoryTerminalAuthority.terminal_text_hash,
           terminal_kind: "answer",
           authority_origin: "conversation_memory_recall_answer",
           assistant_answer: false,
@@ -171243,11 +173308,15 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         debug: {
           conversation_memory_packet: selectedStreamConversationMemoryPacket,
           conversation_memory_admission: {
-            allowed_for_current_goal: selectedStreamConversationMemoryPacket.allowed_for_current_goal,
-            allowed_reason: selectedStreamConversationMemoryPacket.allowed_reason,
+            allowed_for_current_goal:
+              selectedStreamConversationMemoryPacket.allowed_for_current_goal,
+            allowed_reason:
+              selectedStreamConversationMemoryPacket.allowed_reason,
             allowed_use: selectedStreamConversationMemoryPacket.allowed_use,
           },
-          conversation_memory_selector: buildHelixConversationMemoryDebug(selectedStreamConversationMemoryPacket),
+          conversation_memory_selector: buildHelixConversationMemoryDebug(
+            selectedStreamConversationMemoryPacket,
+          ),
           route_authority_audit: conversationMemoryRouteAuthorityAudit,
           evidence_reentry_proof: conversationMemoryEvidenceReentryProof,
           terminal_answer_authority: conversationMemoryTerminalAuthority,
@@ -171266,7 +173335,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         route: "conversation_memory_recall / current_thread_prior_answer",
         clientVisibleText: streamConversationMemoryRecallText,
       });
-      const terminalHash = hashHelixTerminalText(streamConversationMemoryRecallText);
+      const terminalHash = hashHelixTerminalText(
+        streamConversationMemoryRecallText,
+      );
       const terminalEvent = {
         id: `stream:terminal_answer:${streamTurnId}`,
         turn_id: streamTurnId,
@@ -171322,7 +173393,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       });
       return res.end();
     }
-    if (streamCarryoverResolution?.matched && streamCarryoverResolution.action === "request_user_input") {
+    if (
+      streamCarryoverResolution?.matched &&
+      streamCarryoverResolution.action === "request_user_input"
+    ) {
       const pendingServerRequest = {
         schema: "helix.pending_server_request.v1",
         request_id: `${streamTurnId}:pending_task_frame:request_user_input`,
@@ -171330,9 +173404,13 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         kind: "request_user_input",
         prompt: streamCarryoverResolution.prompt,
         reason: streamCarryoverResolution.reason,
-        user_goal_summary: streamCarryoverResolution.updated_frame?.original_user_request ?? streamCarryoverPrompt,
-        required_fields: streamCarryoverResolution.updated_frame?.missing_slots ?? [],
-        missing_requirement_ids: streamCarryoverResolution.updated_frame?.missing_slots ?? [],
+        user_goal_summary:
+          streamCarryoverResolution.updated_frame?.original_user_request ??
+          streamCarryoverPrompt,
+        required_fields:
+          streamCarryoverResolution.updated_frame?.missing_slots ?? [],
+        missing_requirement_ids:
+          streamCarryoverResolution.updated_frame?.missing_slots ?? [],
         unresolved_task_frame: streamCarryoverResolution.updated_frame,
         assistant_answer: false,
         raw_content_included: false,
@@ -171377,15 +173455,24 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           resolved_route_reason: streamCarryoverResolution.reason,
         },
       };
-      persistHelixAskRuntimePendingRequest({ body: streamCarryoverBody, payload, route: "/ask/turn/stream" });
+      persistHelixAskRuntimePendingRequest({
+        body: streamCarryoverBody,
+        payload,
+        route: "/ask/turn/stream",
+      });
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload,
         admission: runtimeAdmission,
         body: streamCarryoverBody,
         source: "helix_ask_turn_stream",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload, body: streamCarryoverBody });
-      const terminalHash = hashHelixTerminalText(streamCarryoverResolution.prompt ?? "");
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload,
+        body: streamCarryoverBody,
+      });
+      const terminalHash = hashHelixTerminalText(
+        streamCarryoverResolution.prompt ?? "",
+      );
       const terminalEvent = {
         id: `stream:request_user_input:${streamTurnId}`,
         turn_id: streamTurnId,
@@ -171449,10 +173536,14 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       streamCarryoverBody.question = streamCarryoverResolution.prompt;
       streamCarryoverBody.prompt = streamCarryoverResolution.prompt;
       streamCarryoverBody.raw_user_prompt = streamCarryoverResolution.prompt;
-      streamCarryoverBody.pending_task_frame_original_prompt = streamCarryoverPrompt;
-      streamCarryoverBody.pending_task_frame_resolution = streamCarryoverResolution as unknown as Record<string, unknown>;
+      streamCarryoverBody.pending_task_frame_original_prompt =
+        streamCarryoverPrompt;
+      streamCarryoverBody.pending_task_frame_resolution =
+        streamCarryoverResolution as unknown as Record<string, unknown>;
     }
-    const moralGraphPayload = await maybeBuildMoralGraphAskTurnTerminalPayload(req.body as Record<string, unknown>);
+    const moralGraphPayload = await maybeBuildMoralGraphAskTurnTerminalPayload(
+      req.body as Record<string, unknown>,
+    );
     if (moralGraphPayload) {
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload: moralGraphPayload,
@@ -171460,13 +173551,24 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         body: req.body as Record<string, unknown>,
         source: "helix_ask_turn_stream",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: moralGraphPayload, body: req.body as Record<string, unknown> });
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: moralGraphPayload,
+        body: req.body as Record<string, unknown>,
+      });
       const selectedAnswer = String(
-        moralGraphPayload.selected_final_answer ?? moralGraphPayload.assistant_answer ?? moralGraphPayload.answer ?? moralGraphPayload.text ?? "",
+        moralGraphPayload.selected_final_answer ??
+          moralGraphPayload.assistant_answer ??
+          moralGraphPayload.answer ??
+          moralGraphPayload.text ??
+          "",
       );
       const terminalAuthority =
-        moralGraphPayload.terminal_answer_authority && typeof moralGraphPayload.terminal_answer_authority === "object"
-          ? (moralGraphPayload.terminal_answer_authority as Record<string, unknown>)
+        moralGraphPayload.terminal_answer_authority &&
+        typeof moralGraphPayload.terminal_answer_authority === "object"
+          ? (moralGraphPayload.terminal_answer_authority as Record<
+              string,
+              unknown
+            >)
           : null;
       const terminalHash =
         typeof terminalAuthority?.terminal_text_hash === "string"
@@ -171528,7 +173630,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       });
       return res.end();
     }
-    const theoryIdeologyBridgePayload = await maybeBuildTheoryIdeologyBridgeAskTurnTerminalPayload(req.body as Record<string, unknown>);
+    const theoryIdeologyBridgePayload =
+      await maybeBuildTheoryIdeologyBridgeAskTurnTerminalPayload(
+        req.body as Record<string, unknown>,
+      );
     if (theoryIdeologyBridgePayload) {
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload: theoryIdeologyBridgePayload,
@@ -171536,7 +173641,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         body: req.body as Record<string, unknown>,
         source: "helix_ask_turn_stream",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: theoryIdeologyBridgePayload, body: req.body as Record<string, unknown> });
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: theoryIdeologyBridgePayload,
+        body: req.body as Record<string, unknown>,
+      });
       const selectedAnswer = String(
         theoryIdeologyBridgePayload.selected_final_answer ??
           theoryIdeologyBridgePayload.assistant_answer ??
@@ -171547,7 +173655,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       const terminalHash = hashHelixTerminalText(selectedAnswer);
       const terminalEvent = {
         id: `stream:terminal_answer:${String(theoryIdeologyBridgePayload.turn_id ?? theoryIdeologyBridgePayload.trace_id ?? crypto.randomUUID())}`,
-        turn_id: readAskTurnString(theoryIdeologyBridgePayload.turn_id) ?? streamTurnId,
+        turn_id:
+          readAskTurnString(theoryIdeologyBridgePayload.turn_id) ??
+          streamTurnId,
         at_ms: Date.now(),
         source_event_type: "terminal_answer",
         event_source: "live",
@@ -171600,7 +173710,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       });
       return res.end();
     }
-    const civilizationBoundsPayload = await maybeBuildCivilizationBoundsAskTurnTerminalPayload(req.body as Record<string, unknown>);
+    const civilizationBoundsPayload =
+      await maybeBuildCivilizationBoundsAskTurnTerminalPayload(
+        req.body as Record<string, unknown>,
+      );
     if (civilizationBoundsPayload) {
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload: civilizationBoundsPayload,
@@ -171608,7 +173721,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         body: req.body as Record<string, unknown>,
         source: "helix_ask_turn_stream",
       });
-      refreshHelixAskRuntimeMemoryDebugExport({ payload: civilizationBoundsPayload, body: req.body as Record<string, unknown> });
+      refreshHelixAskRuntimeMemoryDebugExport({
+        payload: civilizationBoundsPayload,
+        body: req.body as Record<string, unknown>,
+      });
       const selectedAnswer = String(
         civilizationBoundsPayload.selected_final_answer ??
           civilizationBoundsPayload.assistant_answer ??
@@ -171619,7 +173735,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       const terminalAuthority =
         civilizationBoundsPayload.terminal_answer_authority &&
         typeof civilizationBoundsPayload.terminal_answer_authority === "object"
-          ? (civilizationBoundsPayload.terminal_answer_authority as Record<string, unknown>)
+          ? (civilizationBoundsPayload.terminal_answer_authority as Record<
+              string,
+              unknown
+            >)
           : null;
       const terminalHash =
         typeof terminalAuthority?.terminal_text_hash === "string"
@@ -171628,7 +173747,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       const clientHash = hashHelixTerminalText(selectedAnswer);
       const terminalEvent = {
         id: `stream:terminal_answer:${String(civilizationBoundsPayload.turn_id ?? civilizationBoundsPayload.trace_id ?? crypto.randomUUID())}`,
-        turn_id: readAskTurnString(civilizationBoundsPayload.turn_id) ?? streamTurnId,
+        turn_id:
+          readAskTurnString(civilizationBoundsPayload.turn_id) ?? streamTurnId,
         at_ms: Date.now(),
         source_event_type: "terminal_answer",
         event_source: "live",
@@ -171681,7 +173801,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       });
       return res.end();
     }
-    if (process.env.NODE_ENV === "test" && question.includes("[[TEST_FORCE_STREAM_ERROR]]")) {
+    if (
+      process.env.NODE_ENV === "test" &&
+      question.includes("[[TEST_FORCE_STREAM_ERROR]]")
+    ) {
       throw new Error("forced_stream_error_for_test");
     }
     await handleAskTurnRequest(req, captureRes);
@@ -171706,56 +173829,88 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       body: req.body as Record<string, unknown>,
       source: "helix_ask_turn_stream",
     });
-    refreshHelixAskRuntimeMemoryDebugExport({ payload: body, body: req.body as Record<string, unknown> });
+    refreshHelixAskRuntimeMemoryDebugExport({
+      payload: body,
+      body: req.body as Record<string, unknown>,
+    });
     const bodyDebug =
       body.debug && typeof body.debug === "object"
         ? (body.debug as Record<string, unknown>)
         : null;
     const streamPublicCommentaryTimeline =
-      Array.isArray(body.public_commentary_timeline) && body.public_commentary_timeline.length > 1
+      Array.isArray(body.public_commentary_timeline) &&
+      body.public_commentary_timeline.length > 1
         ? body.public_commentary_timeline
         : buildHelixAskPublicCommentaryTimeline({
             turnId: readAskTurnString(body.turn_id) ?? streamTurnId,
             traceId: readAskTurnString(body.trace_id) ?? streamTraceId,
             prompt: question,
-            turnEvents: Array.isArray(body.turn_events) ? body.turn_events : streamSink.getEvents(),
-            promptInterpretation: body.prompt_interpretation ?? bodyDebug?.prompt_interpretation,
-            compoundPromptContract: body.compound_prompt_contract ?? bodyDebug?.compound_prompt_contract,
-            agentStepDecision: body.agent_step_decision ?? bodyDebug?.agent_step_decision,
-            initialAgentStepDecision: body.initial_agent_step_decision ?? bodyDebug?.initial_agent_step_decision,
+            turnEvents: Array.isArray(body.turn_events)
+              ? body.turn_events
+              : streamSink.getEvents(),
+            promptInterpretation:
+              body.prompt_interpretation ?? bodyDebug?.prompt_interpretation,
+            compoundPromptContract:
+              body.compound_prompt_contract ??
+              bodyDebug?.compound_prompt_contract,
+            agentStepDecision:
+              body.agent_step_decision ?? bodyDebug?.agent_step_decision,
+            initialAgentStepDecision:
+              body.initial_agent_step_decision ??
+              bodyDebug?.initial_agent_step_decision,
             agentStepCommentaries: Array.isArray(body.agent_step_commentaries)
               ? body.agent_step_commentaries
               : Array.isArray(bodyDebug?.agent_step_commentaries)
                 ? bodyDebug.agent_step_commentaries
                 : null,
-            currentTurnArtifactLedger: Array.isArray(body.current_turn_artifact_ledger)
+            currentTurnArtifactLedger: Array.isArray(
+              body.current_turn_artifact_ledger,
+            )
               ? body.current_turn_artifact_ledger
               : Array.isArray(bodyDebug?.current_turn_artifact_ledger)
                 ? bodyDebug.current_turn_artifact_ledger
                 : null,
-            agentRuntimeLoop: body.agent_runtime_loop ?? bodyDebug?.agent_runtime_loop,
-            workstationToolPlan: body.workstation_tool_plan ?? bodyDebug?.workstation_tool_plan,
+            agentRuntimeLoop:
+              body.agent_runtime_loop ?? bodyDebug?.agent_runtime_loop,
+            workstationToolPlan:
+              body.workstation_tool_plan ?? bodyDebug?.workstation_tool_plan,
             workstationAffordances: Array.isArray(body.workstation_affordances)
               ? body.workstation_affordances
               : Array.isArray(body.available_workstation_affordances)
                 ? body.available_workstation_affordances
                 : null,
-            calculatorCompoundPlan: body.calculator_compound_plan ?? bodyDebug?.calculator_compound_plan,
-            calculatorSubgoalReceipts: Array.isArray(body.calculator_subgoal_receipts)
+            calculatorCompoundPlan:
+              body.calculator_compound_plan ??
+              bodyDebug?.calculator_compound_plan,
+            calculatorSubgoalReceipts: Array.isArray(
+              body.calculator_subgoal_receipts,
+            )
               ? body.calculator_subgoal_receipts
               : Array.isArray(bodyDebug?.calculator_subgoal_receipts)
                 ? bodyDebug.calculator_subgoal_receipts
                 : null,
-            calculatorResultValidations: Array.isArray(body.calculator_result_validations)
+            calculatorResultValidations: Array.isArray(
+              body.calculator_result_validations,
+            )
               ? body.calculator_result_validations
               : Array.isArray(bodyDebug?.calculator_result_validations)
                 ? bodyDebug.calculator_result_validations
                 : null,
-            workstationToolEvaluation: body.workstation_tool_evaluation ?? bodyDebug?.workstation_tool_evaluation,
-            toolObservationContinuation: body.tool_observation_continuation ?? bodyDebug?.tool_observation_continuation,
-            reasoningContinuationResult: body.reasoning_continuation_result ?? bodyDebug?.reasoning_continuation_result,
-            goalSatisfactionEvaluation: body.goal_satisfaction_evaluation ?? bodyDebug?.goal_satisfaction_evaluation,
-            terminalAuthority: body.terminal_answer_authority ?? bodyDebug?.terminal_answer_authority,
+            workstationToolEvaluation:
+              body.workstation_tool_evaluation ??
+              bodyDebug?.workstation_tool_evaluation,
+            toolObservationContinuation:
+              body.tool_observation_continuation ??
+              bodyDebug?.tool_observation_continuation,
+            reasoningContinuationResult:
+              body.reasoning_continuation_result ??
+              bodyDebug?.reasoning_continuation_result,
+            goalSatisfactionEvaluation:
+              body.goal_satisfaction_evaluation ??
+              bodyDebug?.goal_satisfaction_evaluation,
+            terminalAuthority:
+              body.terminal_answer_authority ??
+              bodyDebug?.terminal_answer_authority,
             finalStatus: readAskTurnString(body.final_status),
           });
     body.public_commentary_timeline = streamPublicCommentaryTimeline;
@@ -171765,24 +173920,36 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     const alreadyStreamedPublicCommentaryIds = new Set(
       streamSink
         .getEvents()
-        .filter((event): event is Extract<HelixAskTurnEvent, { type: "public_commentary" }> => event.type === "public_commentary")
+        .filter(
+          (
+            event,
+          ): event is Extract<
+            HelixAskTurnEvent,
+            { type: "public_commentary" }
+          > => event.type === "public_commentary",
+        )
         .map((event) => event.event.event_id),
     );
     for (const commentaryEvent of streamPublicCommentaryTimeline) {
       if (!commentaryEvent || typeof commentaryEvent !== "object") continue;
-      const eventId = readAskTurnString((commentaryEvent as Record<string, unknown>).event_id);
+      const eventId = readAskTurnString(
+        (commentaryEvent as Record<string, unknown>).event_id,
+      );
       if (!eventId || alreadyStreamedPublicCommentaryIds.has(eventId)) continue;
-      for (const transcriptEvent of buildAskTurnTranscriptEventsForRuntimeEvent({
-        event: {
-          type: "public_commentary",
-          at_ms: Date.now(),
-          event: commentaryEvent as import("@shared/helix-agent-commentary").HelixAskPublicCommentaryEventV1,
+      for (const transcriptEvent of buildAskTurnTranscriptEventsForRuntimeEvent(
+        {
+          event: {
+            type: "public_commentary",
+            at_ms: Date.now(),
+            event:
+              commentaryEvent as import("@shared/helix-agent-commentary").HelixAskPublicCommentaryEventV1,
+          },
+          eventIndex: streamSink.getTranscriptEvents().length,
+          question: "",
+          eventSource: "reconstructed",
+          turnId: streamTurnId,
         },
-        eventIndex: streamSink.getTranscriptEvents().length,
-        question: "",
-        eventSource: "reconstructed",
-        turnId: streamTurnId,
-      })) {
+      )) {
         streamSink.emitTranscript(transcriptEvent);
       }
       alreadyStreamedPublicCommentaryIds.add(eventId);
@@ -171796,7 +173963,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         eventSource: "reconstructed",
       });
       const streamedIds = new Set(
-        streamSink.getTranscriptEvents().map((event) => readAskTurnString(event.id)).filter(Boolean) as string[],
+        streamSink
+          .getTranscriptEvents()
+          .map((event) => readAskTurnString(event.id))
+          .filter(Boolean) as string[],
       );
       for (const transcriptEvent of scaffoldEvents) {
         const transcriptId = readAskTurnString(transcriptEvent.id);
@@ -171812,20 +173982,31 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         streamedIds.add(transcriptId);
       }
     }
-    const streamTranscriptRowsAfterCommentary = streamSink.getTranscriptEvents();
-    if (hasMeaningfulAskTurnTranscriptRows(streamTranscriptRowsAfterCommentary)) {
+    const streamTranscriptRowsAfterCommentary =
+      streamSink.getTranscriptEvents();
+    if (
+      hasMeaningfulAskTurnTranscriptRows(streamTranscriptRowsAfterCommentary)
+    ) {
       // Codex parity refs above: streamed turn rows must re-enter the terminal payload,
       // otherwise the console debug collapses back to submitted question -> final answer.
       body.turn_transcript_events = streamTranscriptRowsAfterCommentary;
-      body.turn_transcript_event_count = streamTranscriptRowsAfterCommentary.length;
-      body.turn_transcript_source = streamTranscriptRowsAfterCommentary.some((event) => event.event_source === "live")
+      body.turn_transcript_event_count =
+        streamTranscriptRowsAfterCommentary.length;
+      body.turn_transcript_source = streamTranscriptRowsAfterCommentary.some(
+        (event) => event.event_source === "live",
+      )
         ? "live"
-        : streamTranscriptRowsAfterCommentary.some((event) => event.event_source === "reconstructed" || event.reconstructed === true)
+        : streamTranscriptRowsAfterCommentary.some(
+              (event) =>
+                event.event_source === "reconstructed" ||
+                event.reconstructed === true,
+            )
           ? "reconstructed"
           : body.turn_transcript_source;
       if (bodyDebug) {
         bodyDebug.turn_transcript_events = streamTranscriptRowsAfterCommentary;
-        bodyDebug.turn_transcript_event_count = streamTranscriptRowsAfterCommentary.length;
+        bodyDebug.turn_transcript_event_count =
+          streamTranscriptRowsAfterCommentary.length;
         bodyDebug.turn_transcript_source = body.turn_transcript_source;
       }
     }
@@ -171848,43 +174029,74 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       }
     }
     const bodyTerminalPresentation =
-      body.terminal_presentation && typeof body.terminal_presentation === "object"
+      body.terminal_presentation &&
+      typeof body.terminal_presentation === "object"
         ? (body.terminal_presentation as Record<string, unknown>)
         : null;
-    const bodySelectedFinalAnswer = readAskTurnString(body.selected_final_answer) ?? "";
+    const bodySelectedFinalAnswer =
+      readAskTurnString(body.selected_final_answer) ?? "";
     const bodyFinalAnswerDraft =
       body.final_answer_draft && typeof body.final_answer_draft === "object"
         ? (body.final_answer_draft as Record<string, unknown>)
         : null;
-    const bodyFinalDraftText = readAskTurnString(bodyFinalAnswerDraft?.text) ?? "";
+    const bodyFinalDraftText =
+      readAskTurnString(bodyFinalAnswerDraft?.text) ?? "";
     const bodyTerminalArtifactKind =
-      typeof body.terminal_artifact_kind === "string" ? body.terminal_artifact_kind : "";
+      typeof body.terminal_artifact_kind === "string"
+        ? body.terminal_artifact_kind
+        : "";
     const streamFinalAnswerSource =
-      typeof body.final_answer_source === "string" ? body.final_answer_source : "";
+      typeof body.final_answer_source === "string"
+        ? body.final_answer_source
+        : "";
     const streamTerminalAuthorityForProjection =
-      body.terminal_answer_authority && typeof body.terminal_answer_authority === "object" && !Array.isArray(body.terminal_answer_authority)
+      body.terminal_answer_authority &&
+      typeof body.terminal_answer_authority === "object" &&
+      !Array.isArray(body.terminal_answer_authority)
         ? (body.terminal_answer_authority as Record<string, unknown>)
-        : bodyDebug?.terminal_answer_authority && typeof bodyDebug.terminal_answer_authority === "object" && !Array.isArray(bodyDebug.terminal_answer_authority)
+        : bodyDebug?.terminal_answer_authority &&
+            typeof bodyDebug.terminal_answer_authority === "object" &&
+            !Array.isArray(bodyDebug.terminal_answer_authority)
           ? (bodyDebug.terminal_answer_authority as Record<string, unknown>)
           : null;
     const streamTerminalWriterForProjection =
-      body.terminal_authority_single_writer && typeof body.terminal_authority_single_writer === "object" && !Array.isArray(body.terminal_authority_single_writer)
+      body.terminal_authority_single_writer &&
+      typeof body.terminal_authority_single_writer === "object" &&
+      !Array.isArray(body.terminal_authority_single_writer)
         ? (body.terminal_authority_single_writer as Record<string, unknown>)
-        : bodyDebug?.terminal_authority_single_writer && typeof bodyDebug.terminal_authority_single_writer === "object" && !Array.isArray(bodyDebug.terminal_authority_single_writer)
-          ? (bodyDebug.terminal_authority_single_writer as Record<string, unknown>)
+        : bodyDebug?.terminal_authority_single_writer &&
+            typeof bodyDebug.terminal_authority_single_writer === "object" &&
+            !Array.isArray(bodyDebug.terminal_authority_single_writer)
+          ? (bodyDebug.terminal_authority_single_writer as Record<
+              string,
+              unknown
+            >)
           : null;
     const streamResolvedSummaryForProjection =
-      body.resolved_turn_summary && typeof body.resolved_turn_summary === "object" && !Array.isArray(body.resolved_turn_summary)
+      body.resolved_turn_summary &&
+      typeof body.resolved_turn_summary === "object" &&
+      !Array.isArray(body.resolved_turn_summary)
         ? (body.resolved_turn_summary as Record<string, unknown>)
-        : bodyDebug?.resolved_turn_summary && typeof bodyDebug.resolved_turn_summary === "object" && !Array.isArray(bodyDebug.resolved_turn_summary)
+        : bodyDebug?.resolved_turn_summary &&
+            typeof bodyDebug.resolved_turn_summary === "object" &&
+            !Array.isArray(bodyDebug.resolved_turn_summary)
           ? (bodyDebug.resolved_turn_summary as Record<string, unknown>)
           : null;
-    const streamTerminalAuthorityKindForProjection = readAskTurnString(streamTerminalAuthorityForProjection?.terminal_artifact_kind);
-    const streamTerminalAuthoritySourceForProjection = readAskTurnString(streamTerminalAuthorityForProjection?.final_answer_source);
+    const streamTerminalAuthorityKindForProjection = readAskTurnString(
+      streamTerminalAuthorityForProjection?.terminal_artifact_kind,
+    );
+    const streamTerminalAuthoritySourceForProjection = readAskTurnString(
+      streamTerminalAuthorityForProjection?.final_answer_source,
+    );
     const streamProjectionTerminalErrorCode =
       readAskTurnString(body.terminal_error_code) ??
-      readAskTurnString((body.typed_failure as Record<string, unknown> | undefined)?.error_code) ??
-      readAskTurnString((body.typed_failure as Record<string, unknown> | undefined)?.failure_code);
+      readAskTurnString(
+        (body.typed_failure as Record<string, unknown> | undefined)?.error_code,
+      ) ??
+      readAskTurnString(
+        (body.typed_failure as Record<string, unknown> | undefined)
+          ?.failure_code,
+      );
     const streamProjectionIsFailureOrPending =
       body.final_status === "final_failure" ||
       body.response_type === "final_failure" ||
@@ -171894,67 +174106,96 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       bodyTerminalArtifactKind === "typed_failure" ||
       Boolean(streamProjectionTerminalErrorCode);
     const streamTerminalWriterKindForProjection =
-      readAskTurnString(streamTerminalWriterForProjection?.selected_terminal_artifact_kind) ??
-      readAskTurnString(streamTerminalWriterForProjection?.selectedArtifactKind);
-    const streamTerminalWriterSourceForProjection = readAskTurnString(streamTerminalWriterForProjection?.source);
-    const streamResolvedTerminalKindForProjection = readAskTurnString(streamResolvedSummaryForProjection?.terminal_artifact_kind);
-    const streamResolvedFinalAnswerSourceForProjection = readAskTurnString(streamResolvedSummaryForProjection?.final_answer_source);
+      readAskTurnString(
+        streamTerminalWriterForProjection?.selected_terminal_artifact_kind,
+      ) ??
+      readAskTurnString(
+        streamTerminalWriterForProjection?.selectedArtifactKind,
+      );
+    const streamTerminalWriterSourceForProjection = readAskTurnString(
+      streamTerminalWriterForProjection?.source,
+    );
+    const streamResolvedTerminalKindForProjection = readAskTurnString(
+      streamResolvedSummaryForProjection?.terminal_artifact_kind,
+    );
+    const streamResolvedFinalAnswerSourceForProjection = readAskTurnString(
+      streamResolvedSummaryForProjection?.final_answer_source,
+    );
     const streamGoalSatisfactionForProjection =
-      body.goal_satisfaction_evaluation && typeof body.goal_satisfaction_evaluation === "object"
+      body.goal_satisfaction_evaluation &&
+      typeof body.goal_satisfaction_evaluation === "object"
         ? (body.goal_satisfaction_evaluation as Record<string, unknown>)
-        : bodyDebug?.goal_satisfaction_evaluation && typeof bodyDebug.goal_satisfaction_evaluation === "object"
+        : bodyDebug?.goal_satisfaction_evaluation &&
+            typeof bodyDebug.goal_satisfaction_evaluation === "object"
           ? (bodyDebug.goal_satisfaction_evaluation as Record<string, unknown>)
           : null;
     const streamSolverDecisionForProjection =
-      body.solver_controller_decision && typeof body.solver_controller_decision === "object"
+      body.solver_controller_decision &&
+      typeof body.solver_controller_decision === "object"
         ? (body.solver_controller_decision as Record<string, unknown>)
-        : bodyDebug?.solver_controller_decision && typeof bodyDebug.solver_controller_decision === "object"
+        : bodyDebug?.solver_controller_decision &&
+            typeof bodyDebug.solver_controller_decision === "object"
           ? (bodyDebug.solver_controller_decision as Record<string, unknown>)
           : null;
     const streamTerminalProjectionAllowedBySolver =
-      (
-        readAskTurnString(streamGoalSatisfactionForProjection?.satisfaction) === "satisfied" &&
-        readAskTurnString(streamGoalSatisfactionForProjection?.next_decision) === "allow_terminal"
-      ) ||
-      readAskTurnString(streamSolverDecisionForProjection?.decision) === "allow_terminal";
+      (readAskTurnString(streamGoalSatisfactionForProjection?.satisfaction) ===
+        "satisfied" &&
+        readAskTurnString(
+          streamGoalSatisfactionForProjection?.next_decision,
+        ) === "allow_terminal") ||
+      readAskTurnString(streamSolverDecisionForProjection?.decision) ===
+        "allow_terminal";
     const streamAuthorityWorkstationToolTerminal =
-      streamTerminalAuthorityKindForProjection === "workstation_tool_evaluation" &&
-      streamTerminalAuthoritySourceForProjection === "workstation_tool_evaluation" &&
-      (
-        streamTerminalWriterKindForProjection === "workstation_tool_evaluation" ||
-        streamTerminalWriterSourceForProjection === "workstation_tool_evaluation" ||
-        (streamResolvedTerminalKindForProjection === "workstation_tool_evaluation" &&
-          streamResolvedFinalAnswerSourceForProjection === "workstation_tool_evaluation") ||
-        streamTerminalAuthorityForProjection?.server_authoritative === true
-      );
+      streamTerminalAuthorityKindForProjection ===
+        "workstation_tool_evaluation" &&
+      streamTerminalAuthoritySourceForProjection ===
+        "workstation_tool_evaluation" &&
+      (streamTerminalWriterKindForProjection ===
+        "workstation_tool_evaluation" ||
+        streamTerminalWriterSourceForProjection ===
+          "workstation_tool_evaluation" ||
+        (streamResolvedTerminalKindForProjection ===
+          "workstation_tool_evaluation" &&
+          streamResolvedFinalAnswerSourceForProjection ===
+            "workstation_tool_evaluation") ||
+        streamTerminalAuthorityForProjection?.server_authoritative === true);
     const isMoralGraphWorkstationTerminal =
       (readAskTurnString(body.route_reason_code) === "moral_graph_reflection" ||
         readAskTurnString(body.route) === "moral_graph_reflection") &&
       bodyTerminalArtifactKind === "workstation_tool_evaluation" &&
       streamFinalAnswerSource === "workstation_tool_evaluation";
     const isWorkstationToolTerminalAuthority =
-      isMoralGraphWorkstationTerminal ||
-      streamAuthorityWorkstationToolTerminal;
+      isMoralGraphWorkstationTerminal || streamAuthorityWorkstationToolTerminal;
     const streamHasSelectedTerminalAuthority =
       Boolean(streamTerminalAuthorityForProjection) &&
-      Boolean(streamTerminalAuthorityKindForProjection || streamTerminalAuthoritySourceForProjection);
+      Boolean(
+        streamTerminalAuthorityKindForProjection ||
+        streamTerminalAuthoritySourceForProjection,
+      );
     const modelDraftIsTerminalAuthority =
       !isWorkstationToolTerminalAuthority &&
       streamTerminalProjectionAllowedBySolver &&
-      (
-        streamFinalAnswerSource === "final_answer_draft" ||
+      (streamFinalAnswerSource === "final_answer_draft" ||
         bodyTerminalArtifactKind === "model_synthesized_answer" ||
-        readAskTurnString(bodyFinalAnswerDraft?.source) === "model_turn"
-      );
+        readAskTurnString(bodyFinalAnswerDraft?.source) === "model_turn");
     const terminalAuthorityPreview =
-      body.terminal_answer_authority && typeof body.terminal_answer_authority === "object"
-        ? readAskTurnString((body.terminal_answer_authority as Record<string, unknown>).terminal_text_preview) ?? ""
+      body.terminal_answer_authority &&
+      typeof body.terminal_answer_authority === "object"
+        ? (readAskTurnString(
+            (body.terminal_answer_authority as Record<string, unknown>)
+              .terminal_text_preview,
+          ) ?? "")
         : "";
-    const terminalPresentationConciseText = readAskTurnString(bodyTerminalPresentation?.concise_text) ?? "";
+    const terminalPresentationConciseText =
+      readAskTurnString(bodyTerminalPresentation?.concise_text) ?? "";
     const streamTypedFailureForProjection =
-      body.typed_failure && typeof body.typed_failure === "object" && !Array.isArray(body.typed_failure)
+      body.typed_failure &&
+      typeof body.typed_failure === "object" &&
+      !Array.isArray(body.typed_failure)
         ? (body.typed_failure as Record<string, unknown>)
-        : bodyDebug?.typed_failure && typeof bodyDebug.typed_failure === "object" && !Array.isArray(bodyDebug.typed_failure)
+        : bodyDebug?.typed_failure &&
+            typeof bodyDebug.typed_failure === "object" &&
+            !Array.isArray(bodyDebug.typed_failure)
           ? (bodyDebug.typed_failure as Record<string, unknown>)
           : null;
     const streamProjectionFailureTextCandidate =
@@ -171966,60 +174207,89 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       (streamProjectionTerminalErrorCode
         ? `I could not complete this Ask turn.\nCause: ${streamProjectionTerminalErrorCode}.`
         : "");
-    const terminalAuthorityPreviewIsFailure =
-      terminalAuthorityPreview ? classifyAskTurnFinalAnswerShape(terminalAuthorityPreview) === "typed_failure" : false;
+    const terminalAuthorityPreviewIsFailure = terminalAuthorityPreview
+      ? classifyAskTurnFinalAnswerShape(terminalAuthorityPreview) ===
+        "typed_failure"
+      : false;
     const terminalPresentationConciseTextIsFailure =
-      terminalPresentationConciseText ? classifyAskTurnFinalAnswerShape(terminalPresentationConciseText) === "typed_failure" : false;
-    const bodySelectedFinalAnswerIsFailure =
-      bodySelectedFinalAnswer ? classifyAskTurnFinalAnswerShape(bodySelectedFinalAnswer) === "typed_failure" : false;
-    const selectedStreamAnswerCandidate =
-      streamProjectionIsFailureOrPending
-        ? terminalAuthorityPreviewIsFailure
-          ? terminalAuthorityPreview
-          : terminalPresentationConciseTextIsFailure
-            ? terminalPresentationConciseText
-            : streamProjectionFailureTextCandidate
-              ? streamProjectionFailureTextCandidate
-              : bodySelectedFinalAnswerIsFailure
-                ? bodySelectedFinalAnswer
-                : ""
-      : isWorkstationToolTerminalAuthority && (terminalAuthorityPreview || terminalPresentationConciseText || bodySelectedFinalAnswer || bodyFinalDraftText)
-        ? terminalAuthorityPreview || terminalPresentationConciseText || bodySelectedFinalAnswer || bodyFinalDraftText
-        : modelDraftIsTerminalAuthority && (bodySelectedFinalAnswer || bodyFinalDraftText)
+      terminalPresentationConciseText
+        ? classifyAskTurnFinalAnswerShape(terminalPresentationConciseText) ===
+          "typed_failure"
+        : false;
+    const bodySelectedFinalAnswerIsFailure = bodySelectedFinalAnswer
+      ? classifyAskTurnFinalAnswerShape(bodySelectedFinalAnswer) ===
+        "typed_failure"
+      : false;
+    const selectedStreamAnswerCandidate = streamProjectionIsFailureOrPending
+      ? terminalAuthorityPreviewIsFailure
+        ? terminalAuthorityPreview
+        : terminalPresentationConciseTextIsFailure
+          ? terminalPresentationConciseText
+          : streamProjectionFailureTextCandidate
+            ? streamProjectionFailureTextCandidate
+            : bodySelectedFinalAnswerIsFailure
+              ? bodySelectedFinalAnswer
+              : ""
+      : isWorkstationToolTerminalAuthority &&
+          (terminalAuthorityPreview ||
+            terminalPresentationConciseText ||
+            bodySelectedFinalAnswer ||
+            bodyFinalDraftText)
+        ? terminalAuthorityPreview ||
+          terminalPresentationConciseText ||
+          bodySelectedFinalAnswer ||
+          bodyFinalDraftText
+        : modelDraftIsTerminalAuthority &&
+            (bodySelectedFinalAnswer || bodyFinalDraftText)
           ? bodySelectedFinalAnswer || bodyFinalDraftText
           : terminalAuthorityPreview
             ? terminalAuthorityPreview
             : terminalPresentationConciseText
               ? terminalPresentationConciseText
               : bodySelectedFinalAnswer;
-    const streamCanProjectSelectedAnswer =
-      streamProjectionIsFailureOrPending
-        ? Boolean(selectedStreamAnswerCandidate)
-        : streamTerminalProjectionAllowedBySolver ||
-          isWorkstationToolTerminalAuthority ||
-          streamHasSelectedTerminalAuthority;
-    let selectedStreamAnswer = streamCanProjectSelectedAnswer ? selectedStreamAnswerCandidate : "";
-    let normalizedStreamTerminalKind =
-      isWorkstationToolTerminalAuthority ? "workstation_tool_evaluation" :
-      modelDraftIsTerminalAuthority ? "model_synthesized_answer" : bodyTerminalArtifactKind;
-    let normalizedStreamFinalAnswerSource =
-      isWorkstationToolTerminalAuthority ? "workstation_tool_evaluation" :
-      modelDraftIsTerminalAuthority ? "final_answer_draft" : streamFinalAnswerSource;
+    const streamCanProjectSelectedAnswer = streamProjectionIsFailureOrPending
+      ? Boolean(selectedStreamAnswerCandidate)
+      : streamTerminalProjectionAllowedBySolver ||
+        isWorkstationToolTerminalAuthority ||
+        streamHasSelectedTerminalAuthority;
+    let selectedStreamAnswer = streamCanProjectSelectedAnswer
+      ? selectedStreamAnswerCandidate
+      : "";
+    let normalizedStreamTerminalKind = isWorkstationToolTerminalAuthority
+      ? "workstation_tool_evaluation"
+      : modelDraftIsTerminalAuthority
+        ? "model_synthesized_answer"
+        : bodyTerminalArtifactKind;
+    let normalizedStreamFinalAnswerSource = isWorkstationToolTerminalAuthority
+      ? "workstation_tool_evaluation"
+      : modelDraftIsTerminalAuthority
+        ? "final_answer_draft"
+        : streamFinalAnswerSource;
     if (!streamCanProjectSelectedAnswer && selectedStreamAnswerCandidate) {
-      const streamProjectionFailureCode = "stream_projection_without_solver_authority";
+      const streamProjectionFailureCode =
+        "stream_projection_without_solver_authority";
       const streamProjectionFailureText =
         "I could not complete this Ask turn because stream projection lacked solver terminal authority.";
       selectedStreamAnswer = streamProjectionFailureText;
       normalizedStreamTerminalKind = "typed_failure";
       normalizedStreamFinalAnswerSource = "typed_failure";
-      const streamProjectionFailureAuthority = recordHelixTurnTerminalAuthority({
-        thread_id: readAskTurnString(body.session_id) ?? readAskTurnString(body.sessionId) ?? "helix-ask:desktop",
-        turn_id: readAskTurnString(body.turn_id) ?? readAskTurnString(body.turnId) ?? streamTurnId,
-        final_answer_source: "typed_failure",
-        terminal_artifact_kind: "typed_failure",
-        terminal_text: streamProjectionFailureText,
-        route: "stream:typed_failure:stream_projection_without_solver_authority",
-      });
+      const streamProjectionFailureAuthority = recordHelixTurnTerminalAuthority(
+        {
+          thread_id:
+            readAskTurnString(body.session_id) ??
+            readAskTurnString(body.sessionId) ??
+            "helix-ask:desktop",
+          turn_id:
+            readAskTurnString(body.turn_id) ??
+            readAskTurnString(body.turnId) ??
+            streamTurnId,
+          final_answer_source: "typed_failure",
+          terminal_artifact_kind: "typed_failure",
+          terminal_text: streamProjectionFailureText,
+          route:
+            "stream:typed_failure:stream_projection_without_solver_authority",
+        },
+      );
       Object.assign(body, {
         ok: false,
         error: streamProjectionFailureCode,
@@ -172088,9 +174358,13 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       streamSolverFailureCode,
       selectedStreamAnswer,
       readAskTurnString(body.terminal_failure_text),
-    ].filter(Boolean).join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
     const streamSolverFailureRequiresTypedFailure =
-      /solver_path_incomplete_before_terminal|solver authority failed/i.test(streamSolverFailureText);
+      /solver_path_incomplete_before_terminal|solver authority failed/i.test(
+        streamSolverFailureText,
+      );
     if (streamSolverFailureRequiresTypedFailure) {
       body.stream_terminal_repair_suppressed_by_solver_authority = true;
       body.stream_terminal_repair_suppression_reason =
@@ -172101,9 +174375,18 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           "context_resume_memory_must_not_repair_solver_path_incomplete_before_terminal";
       }
     }
-    if (streamSolverFailureRequiresTypedFailure && shouldAttemptContextResumeStreamFailureAnswerRepair()) {
-      const streamRecoveryTurnId = readAskTurnString(body.turn_id) ?? readAskTurnString(body.turnId) ?? streamTurnId;
-      const streamRecoveryTraceId = readAskTurnString(body.trace_id) ?? readAskTurnString(body.traceId) ?? streamTraceId;
+    if (
+      streamSolverFailureRequiresTypedFailure &&
+      shouldAttemptContextResumeStreamFailureAnswerRepair()
+    ) {
+      const streamRecoveryTurnId =
+        readAskTurnString(body.turn_id) ??
+        readAskTurnString(body.turnId) ??
+        streamTurnId;
+      const streamRecoveryTraceId =
+        readAskTurnString(body.trace_id) ??
+        readAskTurnString(body.traceId) ??
+        streamTraceId;
       const streamRecoverySessionId =
         readAskTurnString(body.session_id) ??
         readAskTurnString(body.sessionId) ??
@@ -172111,27 +174394,29 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         readAskTurnString(req.body?.session_id) ??
         null;
       const streamRecoveryThreadId = readHelixAskRuntimeThreadId(body);
-      const streamRecoveryRecall = resolveHelixContextResumeFrameRecallForRuntime({
-        body,
-        promptText: question,
-        currentTurnId: streamRecoveryTurnId,
-        primaryThreadId: streamRecoveryThreadId,
-        sessionId: streamRecoverySessionId,
-        allowsPriorArtifacts: true,
-      });
+      const streamRecoveryRecall =
+        resolveHelixContextResumeFrameRecallForRuntime({
+          body,
+          promptText: question,
+          currentTurnId: streamRecoveryTurnId,
+          primaryThreadId: streamRecoveryThreadId,
+          sessionId: streamRecoverySessionId,
+          allowsPriorArtifacts: true,
+        });
       if (streamRecoveryRecall) {
         const streamRecoveryMemoryPacket = streamRecoveryRecall.packet;
         const streamRecoveryRecallText = streamRecoveryRecall.recallText;
         const streamRecoveryAuthorityThreadId = streamRecoveryRecall.threadId;
         const streamRecoveryEvidenceRef = `${streamRecoveryTurnId}:conversation_memory_packet`;
-        const streamRecoveryTerminalAuthority = recordHelixTurnTerminalAuthority({
-          thread_id: streamRecoveryAuthorityThreadId,
-          turn_id: streamRecoveryTurnId,
-          final_answer_source: "conversation_memory_recall_answer",
-          terminal_artifact_kind: "model_synthesized_answer",
-          terminal_text: streamRecoveryRecallText,
-          route: "conversation_memory_recall / stream_terminal_repair",
-        });
+        const streamRecoveryTerminalAuthority =
+          recordHelixTurnTerminalAuthority({
+            thread_id: streamRecoveryAuthorityThreadId,
+            turn_id: streamRecoveryTurnId,
+            final_answer_source: "conversation_memory_recall_answer",
+            terminal_artifact_kind: "model_synthesized_answer",
+            terminal_text: streamRecoveryRecallText,
+            route: "conversation_memory_recall / stream_terminal_repair",
+          });
         const streamRecoveryRouteAuthorityAudit = {
           schema: "helix.route_authority_audit.v1",
           turn_id: streamRecoveryTurnId,
@@ -172140,7 +174425,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           terminal_artifact_kind: "model_synthesized_answer",
           final_answer_source: "conversation_memory_recall_answer",
           route_authority_ok: true,
-          reason: "context_resume_frame_recall_repaired_solver_terminal_failure",
+          reason:
+            "context_resume_frame_recall_repaired_solver_terminal_failure",
           assistant_answer: false,
           raw_content_included: false,
         };
@@ -172156,20 +174442,25 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
             selected_memory_refs: [streamRecoveryEvidenceRef],
             required_evidence_satisfied: true,
             terminal_ready: true,
-            reason: "context_resume_frame_recall_selected_conversation_memory_packet",
+            reason:
+              "context_resume_frame_recall_selected_conversation_memory_packet",
           },
           final_arbitration: {
-            selected_route: "conversation_memory_recall / stream_terminal_repair",
+            selected_route:
+              "conversation_memory_recall / stream_terminal_repair",
             terminal_artifact_kind: "model_synthesized_answer",
             final_answer_source: "conversation_memory_recall_answer",
-            why_complete: "context resume frame answered exact marker recall after solver terminal failure",
+            why_complete:
+              "context resume frame answered exact marker recall after solver terminal failure",
             remaining_uncertainty: [],
           },
           route_authority_ok: true,
           poison_audit_ok: true,
           terminal_authority_ok: true,
           solver_risk_flags: [],
-          solver_short_circuit_flags: ["stream_terminal_repaired_by_context_resume_frame"],
+          solver_short_circuit_flags: [
+            "stream_terminal_repaired_by_context_resume_frame",
+          ],
           assistant_answer: false,
           raw_content_included: false,
         };
@@ -172212,7 +174503,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           terminal_artifact_id: streamRecoveryEvidenceRef,
           conversation_memory_evidence_ref: streamRecoveryEvidenceRef,
           conversation_memory_packet: streamRecoveryMemoryPacket,
-          conversation_memory_selector: buildHelixConversationMemoryDebug(streamRecoveryMemoryPacket),
+          conversation_memory_selector: buildHelixConversationMemoryDebug(
+            streamRecoveryMemoryPacket,
+          ),
           source_target_intent: {
             schema: "helix.ask_source_target_intent.v1",
             turn_id: streamRecoveryTurnId,
@@ -172223,7 +174516,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
             targetKind: "conversation_memory",
             strength: "hard",
             explicit_cues: ["context_resume_frame_recall"],
-            reasons: ["pending_context_resume_frame_repaired_solver_terminal_failure"],
+            reasons: [
+              "pending_context_resume_frame_repaired_solver_terminal_failure",
+            ],
             requested_outputs: ["conversation_memory_answer"],
             suppressed_routes: [],
             precedence_reason: "context_resume_frame_recall_selected",
@@ -172267,7 +174562,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
                 kind: "conversation_memory_packet",
                 status: "succeeded",
                 supports_goal: true,
-                reason: "pending_context_resume_frame_repaired_solver_terminal_failure",
+                reason:
+                  "pending_context_resume_frame_repaired_solver_terminal_failure",
               },
             ],
             satisfaction: "satisfied",
@@ -172284,7 +174580,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
             selected_evidence_refs: [streamRecoveryEvidenceRef],
             selected_memory_refs: [streamRecoveryEvidenceRef],
             terminal_ready: true,
-            reason: "context_resume_frame_recall_selected_conversation_memory_packet",
+            reason:
+              "context_resume_frame_recall_selected_conversation_memory_packet",
             assistant_answer: false,
             raw_content_included: false,
           },
@@ -172297,7 +174594,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
             terminal_artifact_kind: "model_synthesized_answer",
             final_answer_source: "conversation_memory_recall_answer",
             terminal_text: streamRecoveryRecallText,
-            terminal_text_hash: streamRecoveryTerminalAuthority.terminal_text_hash,
+            terminal_text_hash:
+              streamRecoveryTerminalAuthority.terminal_text_hash,
             terminal_kind: "answer",
             authority_origin: "conversation_memory_recall_answer",
             assistant_answer: false,
@@ -172321,7 +174619,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           resolved_turn_summary: {
             turn_id: streamRecoveryTurnId,
             final_status: "final_answer",
-            resolved_route_label: "conversation_memory_recall / stream_terminal_repair",
+            resolved_route_label:
+              "conversation_memory_recall / stream_terminal_repair",
             terminal_artifact_kind: "model_synthesized_answer",
             terminal_error_code: null,
             pending_server_request_present: false,
@@ -172343,18 +174642,21 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           finalAnswerSource: "conversation_memory_recall_answer",
           payload: body,
         });
-        body.terminal_presentation_coverage_audit = auditTerminalPresentationCoverage({
-          payload: body,
-          turnId: streamRecoveryTurnId,
-          route: "conversation_memory_recall / stream_terminal_repair",
-          terminalArtifactKind: "model_synthesized_answer",
-          selectedFinalAnswer: streamRecoveryRecallText,
-        });
+        body.terminal_presentation_coverage_audit =
+          auditTerminalPresentationCoverage({
+            payload: body,
+            turnId: streamRecoveryTurnId,
+            route: "conversation_memory_recall / stream_terminal_repair",
+            terminalArtifactKind: "model_synthesized_answer",
+            selectedFinalAnswer: streamRecoveryRecallText,
+          });
         if (bodyDebug) {
           Object.assign(bodyDebug, {
             stream_terminal_repaired_by_context_resume_frame: true,
             conversation_memory_packet: streamRecoveryMemoryPacket,
-            conversation_memory_selector: buildHelixConversationMemoryDebug(streamRecoveryMemoryPacket),
+            conversation_memory_selector: buildHelixConversationMemoryDebug(
+              streamRecoveryMemoryPacket,
+            ),
             source_target_intent: body.source_target_intent,
             selected_evidence_pack: body.selected_evidence_pack,
             goal_satisfaction_evaluation: body.goal_satisfaction_evaluation,
@@ -172366,7 +174668,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
             terminal_presentation: body.terminal_presentation,
             poison_audit: body.poison_audit,
             loop_parity_trace: body.loop_parity_trace,
-            terminal_presentation_coverage_audit: body.terminal_presentation_coverage_audit,
+            terminal_presentation_coverage_audit:
+              body.terminal_presentation_coverage_audit,
             ok: true,
             text: streamRecoveryRecallText,
             answer: streamRecoveryRecallText,
@@ -172408,8 +174711,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     const streamGoalSatisfaction = streamGoalSatisfactionForProjection;
     const streamSolverDecision = streamSolverDecisionForProjection;
     const streamDocSummaryTerminalAllowed =
-      readAskTurnString(streamGoalSatisfaction?.satisfaction) === "satisfied" &&
-      readAskTurnString(streamGoalSatisfaction?.next_decision) === "allow_terminal" ||
+      (readAskTurnString(streamGoalSatisfaction?.satisfaction) ===
+        "satisfied" &&
+        readAskTurnString(streamGoalSatisfaction?.next_decision) ===
+          "allow_terminal") ||
       readAskTurnString(streamSolverDecision?.decision) === "allow_terminal";
     if (
       selectedStreamAnswer &&
@@ -172419,7 +174724,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     ) {
       const streamDocSummaryEnvelope = resolveTerminalAnswerEnvelope(body, {
         threadId: readHelixAskRuntimeThreadId(body),
-        turnId: readAskTurnString(body.turn_id) ?? readAskTurnString(body.turnId) ?? streamTurnId,
+        turnId:
+          readAskTurnString(body.turn_id) ??
+          readAskTurnString(body.turnId) ??
+          streamTurnId,
       });
       applyTerminalAnswerEnvelope(body, streamDocSummaryEnvelope);
       if (bodyDebug) {
@@ -172434,7 +174742,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         bodyDebug.terminal_answer_envelope = body.terminal_answer_envelope;
         bodyDebug.terminal_answer_authority = body.terminal_answer_authority;
         bodyDebug.terminal_presentation = body.terminal_presentation;
-        bodyDebug.terminal_presentation_coverage_audit = body.terminal_presentation_coverage_audit;
+        bodyDebug.terminal_presentation_coverage_audit =
+          body.terminal_presentation_coverage_audit;
         bodyDebug.current_turn_events = body.current_turn_events;
         bodyDebug.turn_events = body.turn_events;
         bodyDebug.resolved_turn_summary = body.resolved_turn_summary;
@@ -172444,43 +174753,63 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       }
     }
     const streamTerminalAuthority =
-      body.terminal_answer_authority && typeof body.terminal_answer_authority === "object"
+      body.terminal_answer_authority &&
+      typeof body.terminal_answer_authority === "object"
         ? (body.terminal_answer_authority as Record<string, unknown>)
         : null;
-    const streamTerminalAuthorityKind = readAskTurnString(streamTerminalAuthority?.terminal_artifact_kind);
-    const streamTerminalAuthoritySource = readAskTurnString(streamTerminalAuthority?.final_answer_source);
+    const streamTerminalAuthorityKind = readAskTurnString(
+      streamTerminalAuthority?.terminal_artifact_kind,
+    );
+    const streamTerminalAuthoritySource = readAskTurnString(
+      streamTerminalAuthority?.final_answer_source,
+    );
     if (
       (modelDraftIsTerminalAuthority || isWorkstationToolTerminalAuthority) &&
       selectedStreamAnswer &&
-      (
-        terminalAuthorityPreview !== selectedStreamAnswer ||
-        streamTerminalAuthorityKind !== (normalizedStreamTerminalKind || bodyTerminalArtifactKind || "model_synthesized_answer") ||
-        streamTerminalAuthoritySource !== normalizedStreamFinalAnswerSource
-      )
+      (terminalAuthorityPreview !== selectedStreamAnswer ||
+        streamTerminalAuthorityKind !==
+          (normalizedStreamTerminalKind ||
+            bodyTerminalArtifactKind ||
+            "model_synthesized_answer") ||
+        streamTerminalAuthoritySource !== normalizedStreamFinalAnswerSource)
     ) {
       const streamTerminalAuthorityRecord = recordHelixTurnTerminalAuthority({
-        thread_id: readAskTurnString(body.session_id) ?? readAskTurnString(body.sessionId) ?? "helix-ask:desktop",
-        turn_id: readAskTurnString(body.turn_id) ?? readAskTurnString(body.turnId),
+        thread_id:
+          readAskTurnString(body.session_id) ??
+          readAskTurnString(body.sessionId) ??
+          "helix-ask:desktop",
+        turn_id:
+          readAskTurnString(body.turn_id) ?? readAskTurnString(body.turnId),
         final_answer_source: normalizedStreamFinalAnswerSource,
-        terminal_artifact_kind: normalizedStreamTerminalKind || bodyTerminalArtifactKind || "model_synthesized_answer",
+        terminal_artifact_kind:
+          normalizedStreamTerminalKind ||
+          bodyTerminalArtifactKind ||
+          "model_synthesized_answer",
         terminal_text: selectedStreamAnswer,
-        route: readAskTurnString(body.route_reason_code) ?? readAskTurnString(body.route),
+        route:
+          readAskTurnString(body.route_reason_code) ??
+          readAskTurnString(body.route),
       });
       body.terminal_answer_authority = streamTerminalAuthorityRecord;
-      if (bodyDebug) bodyDebug.terminal_answer_authority = streamTerminalAuthorityRecord;
+      if (bodyDebug)
+        bodyDebug.terminal_answer_authority = streamTerminalAuthorityRecord;
     }
     if (
       modelDraftIsTerminalAuthority &&
       body.solver_controller_decision &&
       typeof body.solver_controller_decision === "object" &&
-      (body.solver_controller_decision as Record<string, unknown>).decision === "allow_terminal"
+      (body.solver_controller_decision as Record<string, unknown>).decision ===
+        "allow_terminal"
     ) {
       body.solver_controller_decision = {
         ...(body.solver_controller_decision as Record<string, unknown>),
-        selected_terminal_artifact_kind: normalizedStreamTerminalKind || "model_synthesized_answer",
-        required_terminal_kind: normalizedStreamTerminalKind || "model_synthesized_answer",
+        selected_terminal_artifact_kind:
+          normalizedStreamTerminalKind || "model_synthesized_answer",
+        required_terminal_kind:
+          normalizedStreamTerminalKind || "model_synthesized_answer",
       };
-      if (bodyDebug) bodyDebug.solver_controller_decision = body.solver_controller_decision;
+      if (bodyDebug)
+        bodyDebug.solver_controller_decision = body.solver_controller_decision;
     }
     if (
       isWorkstationToolTerminalAuthority &&
@@ -172488,18 +174817,24 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       typeof body.solver_controller_decision === "object"
     ) {
       const streamCanonicalGoal =
-        body.canonical_goal_frame && typeof body.canonical_goal_frame === "object" && !Array.isArray(body.canonical_goal_frame)
+        body.canonical_goal_frame &&
+        typeof body.canonical_goal_frame === "object" &&
+        !Array.isArray(body.canonical_goal_frame)
           ? (body.canonical_goal_frame as Record<string, unknown>)
-          : bodyDebug?.canonical_goal_frame && typeof bodyDebug.canonical_goal_frame === "object" && !Array.isArray(bodyDebug.canonical_goal_frame)
+          : bodyDebug?.canonical_goal_frame &&
+              typeof bodyDebug.canonical_goal_frame === "object" &&
+              !Array.isArray(bodyDebug.canonical_goal_frame)
             ? (bodyDebug.canonical_goal_frame as Record<string, unknown>)
             : null;
       body.solver_controller_decision = {
         ...(body.solver_controller_decision as Record<string, unknown>),
-        canonical_goal_kind: readAskTurnString(streamCanonicalGoal?.goal_kind) ?? "panel_control",
+        canonical_goal_kind:
+          readAskTurnString(streamCanonicalGoal?.goal_kind) ?? "panel_control",
         required_terminal_kind: "workstation_tool_evaluation",
         selected_terminal_artifact_kind: "workstation_tool_evaluation",
       };
-      if (bodyDebug) bodyDebug.solver_controller_decision = body.solver_controller_decision;
+      if (bodyDebug)
+        bodyDebug.solver_controller_decision = body.solver_controller_decision;
     }
     if (
       isWorkstationToolTerminalAuthority &&
@@ -172512,10 +174847,12 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         ok: true,
         violations: [],
       };
-      if (bodyDebug) bodyDebug.final_route_reconciliation = body.final_route_reconciliation;
+      if (bodyDebug)
+        bodyDebug.final_route_reconciliation = body.final_route_reconciliation;
     }
     const terminalAuthority =
-      body.terminal_answer_authority && typeof body.terminal_answer_authority === "object"
+      body.terminal_answer_authority &&
+      typeof body.terminal_answer_authority === "object"
         ? (body.terminal_answer_authority as Record<string, unknown>)
         : null;
     const serverTerminalHash =
@@ -172525,34 +174862,43 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     const clientTerminalHash = hashHelixTerminalText(selectedStreamAnswer);
     const streamSuppressedTerminalCount = 1;
     const streamTerminalStatus =
-      body.final_status === "final_failure" || body.response_type === "final_failure"
+      body.final_status === "final_failure" ||
+      body.response_type === "final_failure"
         ? "final_failure"
-        : body.final_status === "pending_input" || body.response_type === "pending_input"
+        : body.final_status === "pending_input" ||
+            body.response_type === "pending_input"
           ? "pending_input"
           : "final_answer";
     const streamTerminalEvent = selectedStreamAnswer
       ? {
-        id: `stream:terminal_answer:${String(body.turn_id ?? body.trace_id ?? crypto.randomUUID())}`,
-        turn_id: readAskTurnString(body.turn_id) ?? streamTurnId,
-        at_ms: Date.now(),
-        source_event_type: "terminal_answer",
-        event_source: "live",
-        role: "final",
-        type: streamTerminalStatus,
-        status: streamTerminalStatus,
-        text: selectedStreamAnswer,
-        final_answer_source: normalizedStreamFinalAnswerSource,
-        terminal_authority_hash: serverTerminalHash,
-        client_visible_terminal_hash: clientTerminalHash,
-        client_server_terminal_match: clientTerminalHash === serverTerminalHash,
-        suppressed_stream_terminal_count: streamSuppressedTerminalCount,
-      }
+          id: `stream:terminal_answer:${String(body.turn_id ?? body.trace_id ?? crypto.randomUUID())}`,
+          turn_id: readAskTurnString(body.turn_id) ?? streamTurnId,
+          at_ms: Date.now(),
+          source_event_type: "terminal_answer",
+          event_source: "live",
+          role: "final",
+          type: streamTerminalStatus,
+          status: streamTerminalStatus,
+          text: selectedStreamAnswer,
+          final_answer_source: normalizedStreamFinalAnswerSource,
+          terminal_authority_hash: serverTerminalHash,
+          client_visible_terminal_hash: clientTerminalHash,
+          client_server_terminal_match:
+            clientTerminalHash === serverTerminalHash,
+          suppressed_stream_terminal_count: streamSuppressedTerminalCount,
+        }
       : null;
     const emittedInterimVoiceHandoffRefs = new Set(
       streamSink
         .getEvents()
-        .filter((event): event is Extract<HelixAskTurnEvent, { type: "interim_voice_callout_handoff" }> =>
-          event.type === "interim_voice_callout_handoff")
+        .filter(
+          (
+            event,
+          ): event is Extract<
+            HelixAskTurnEvent,
+            { type: "interim_voice_callout_handoff" }
+          > => event.type === "interim_voice_callout_handoff",
+        )
         .flatMap((event) => event.artifact_refs),
     );
     writeInterimVoiceCalloutHandoffsFromArtifacts({
@@ -172594,13 +174940,19 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       streamFinalPayload.assistant_answer = selectedStreamAnswer;
       streamFinalPayload.selected_final_answer = selectedStreamAnswer;
       streamFinalPayload.finalAnswer = selectedStreamAnswer;
-      streamFinalPayload.terminal_artifact_kind = normalizedStreamTerminalKind || streamFinalPayload.terminal_artifact_kind;
-      streamFinalPayload.final_answer_source = normalizedStreamFinalAnswerSource || streamFinalPayload.final_answer_source;
+      streamFinalPayload.terminal_artifact_kind =
+        normalizedStreamTerminalKind ||
+        streamFinalPayload.terminal_artifact_kind;
+      streamFinalPayload.final_answer_source =
+        normalizedStreamFinalAnswerSource ||
+        streamFinalPayload.final_answer_source;
       if (body.terminal_answer_authority) {
-        streamFinalPayload.terminal_answer_authority = body.terminal_answer_authority;
+        streamFinalPayload.terminal_answer_authority =
+          body.terminal_answer_authority;
       }
       if (body.solver_controller_decision) {
-        streamFinalPayload.solver_controller_decision = body.solver_controller_decision;
+        streamFinalPayload.solver_controller_decision =
+          body.solver_controller_decision;
       }
       const streamDebug =
         streamFinalPayload.debug && typeof streamFinalPayload.debug === "object"
@@ -172612,51 +174964,85 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         streamDebug.answer = selectedStreamAnswer;
         streamDebug.assistant_answer = selectedStreamAnswer;
         streamDebug.finalAnswer = selectedStreamAnswer;
-        streamDebug.terminal_artifact_kind = normalizedStreamTerminalKind || streamDebug.terminal_artifact_kind;
-        streamDebug.final_answer_source = normalizedStreamFinalAnswerSource || streamDebug.final_answer_source;
+        streamDebug.terminal_artifact_kind =
+          normalizedStreamTerminalKind || streamDebug.terminal_artifact_kind;
+        streamDebug.final_answer_source =
+          normalizedStreamFinalAnswerSource || streamDebug.final_answer_source;
         if (body.terminal_answer_authority) {
-          streamDebug.terminal_answer_authority = body.terminal_answer_authority;
+          streamDebug.terminal_answer_authority =
+            body.terminal_answer_authority;
         }
         if (body.solver_controller_decision) {
-          streamDebug.solver_controller_decision = body.solver_controller_decision;
+          streamDebug.solver_controller_decision =
+            body.solver_controller_decision;
         }
       }
-      for (const key of ["terminal_artifact", "latest_result_artifact"] as const) {
-        if (streamFinalPayload[key] && typeof streamFinalPayload[key] === "object") {
-          (streamFinalPayload[key] as Record<string, unknown>).text = selectedStreamAnswer;
+      for (const key of [
+        "terminal_artifact",
+        "latest_result_artifact",
+      ] as const) {
+        if (
+          streamFinalPayload[key] &&
+          typeof streamFinalPayload[key] === "object"
+        ) {
+          (streamFinalPayload[key] as Record<string, unknown>).text =
+            selectedStreamAnswer;
         }
       }
-      if (streamFinalPayload.turn_contract && typeof streamFinalPayload.turn_contract === "object") {
-        (streamFinalPayload.turn_contract as Record<string, unknown>).terminal_text = selectedStreamAnswer;
+      if (
+        streamFinalPayload.turn_contract &&
+        typeof streamFinalPayload.turn_contract === "object"
+      ) {
+        (
+          streamFinalPayload.turn_contract as Record<string, unknown>
+        ).terminal_text = selectedStreamAnswer;
       }
-      if (streamFinalPayload.turn_runtime && typeof streamFinalPayload.turn_runtime === "object") {
-        const runtime = streamFinalPayload.turn_runtime as Record<string, unknown>;
+      if (
+        streamFinalPayload.turn_runtime &&
+        typeof streamFinalPayload.turn_runtime === "object"
+      ) {
+        const runtime = streamFinalPayload.turn_runtime as Record<
+          string,
+          unknown
+        >;
         runtime.terminal = {
-          ...(runtime.terminal && typeof runtime.terminal === "object" ? (runtime.terminal as Record<string, unknown>) : {}),
+          ...(runtime.terminal && typeof runtime.terminal === "object"
+            ? (runtime.terminal as Record<string, unknown>)
+            : {}),
           text: selectedStreamAnswer,
         };
       }
       if (Array.isArray(streamFinalPayload.turn_transcript_events)) {
-        streamFinalPayload.turn_transcript_events = streamFinalPayload.turn_transcript_events.map((event) => {
-          if (!event || typeof event !== "object") return event;
-          const record = event as Record<string, unknown>;
-          return record.type === "final_answer" ? { ...record, text: selectedStreamAnswer } : record;
-        });
+        streamFinalPayload.turn_transcript_events =
+          streamFinalPayload.turn_transcript_events.map((event) => {
+            if (!event || typeof event !== "object") return event;
+            const record = event as Record<string, unknown>;
+            return record.type === "final_answer"
+              ? { ...record, text: selectedStreamAnswer }
+              : record;
+          });
       }
     }
-    if (streamTerminalStatus === "final_answer" && Array.isArray(streamFinalPayload.turn_transcript_events)) {
-      streamFinalPayload.turn_transcript_events = streamFinalPayload.turn_transcript_events.filter((event) => {
-        if (!event || typeof event !== "object") return true;
-        const record = event as Record<string, unknown>;
-        return !(
-          (record.source_event_type === "turn_completed" &&
-            (record.status === "failed" || record.status === "final_failure")) ||
-          (record.type === "decision" &&
-            (record.status === "failed" || record.status === "final_failure"))
-        );
-      });
+    if (
+      streamTerminalStatus === "final_answer" &&
+      Array.isArray(streamFinalPayload.turn_transcript_events)
+    ) {
+      streamFinalPayload.turn_transcript_events =
+        streamFinalPayload.turn_transcript_events.filter((event) => {
+          if (!event || typeof event !== "object") return true;
+          const record = event as Record<string, unknown>;
+          return !(
+            (record.source_event_type === "turn_completed" &&
+              (record.status === "failed" ||
+                record.status === "final_failure")) ||
+            (record.type === "decision" &&
+              (record.status === "failed" || record.status === "final_failure"))
+          );
+        });
     }
-    const finalStreamTranscriptEventsBase = Array.isArray(streamFinalPayload.turn_transcript_events)
+    const finalStreamTranscriptEventsBase = Array.isArray(
+      streamFinalPayload.turn_transcript_events,
+    )
       ? streamFinalPayload.turn_transcript_events
       : streamSink.getTranscriptEvents();
     const finalStreamTranscriptEvents = [
@@ -172664,44 +175050,75 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       ...(streamTerminalEvent &&
       !finalStreamTranscriptEventsBase.some((event) => {
         if (!event || typeof event !== "object") return false;
-        return readAskTurnString((event as Record<string, unknown>).id) === readAskTurnString(streamTerminalEvent.id);
+        return (
+          readAskTurnString((event as Record<string, unknown>).id) ===
+          readAskTurnString(streamTerminalEvent.id)
+        );
       })
         ? [streamTerminalEvent]
         : []),
     ];
-    const finalStreamLiveTranscriptCount = finalStreamTranscriptEvents.filter((event) =>
-      event && typeof event === "object" && (event as Record<string, unknown>).event_source === "live"
+    const finalStreamLiveTranscriptCount = finalStreamTranscriptEvents.filter(
+      (event) =>
+        event &&
+        typeof event === "object" &&
+        (event as Record<string, unknown>).event_source === "live",
     ).length;
-    const finalStreamReconstructedTranscriptCount = finalStreamTranscriptEvents.filter((event) =>
-      event && typeof event === "object" &&
-      ((event as Record<string, unknown>).event_source === "reconstructed" ||
-        (event as Record<string, unknown>).reconstructed === true)
-    ).length;
+    const finalStreamReconstructedTranscriptCount =
+      finalStreamTranscriptEvents.filter(
+        (event) =>
+          event &&
+          typeof event === "object" &&
+          ((event as Record<string, unknown>).event_source ===
+            "reconstructed" ||
+            (event as Record<string, unknown>).reconstructed === true),
+      ).length;
     streamFinalPayload.turn_transcript_events = finalStreamTranscriptEvents;
-    streamFinalPayload.turn_transcript_event_count = finalStreamTranscriptEvents.length;
+    streamFinalPayload.turn_transcript_event_count =
+      finalStreamTranscriptEvents.length;
     streamFinalPayload.turn_transcript_source =
       finalStreamLiveTranscriptCount > 0
         ? "live"
         : finalStreamReconstructedTranscriptCount > 0
           ? "reconstructed"
           : streamFinalPayload.turn_transcript_source;
-    streamFinalPayload.turn_transcript_live_event_count = finalStreamLiveTranscriptCount;
-    streamFinalPayload.turn_transcript_reconstructed_fallback_count = finalStreamReconstructedTranscriptCount;
-    streamFinalPayload.turn_transcript_reconstructed_fallback = finalStreamReconstructedTranscriptCount > 0;
-    if (streamFinalPayload.debug && typeof streamFinalPayload.debug === "object") {
+    streamFinalPayload.turn_transcript_live_event_count =
+      finalStreamLiveTranscriptCount;
+    streamFinalPayload.turn_transcript_reconstructed_fallback_count =
+      finalStreamReconstructedTranscriptCount;
+    streamFinalPayload.turn_transcript_reconstructed_fallback =
+      finalStreamReconstructedTranscriptCount > 0;
+    if (
+      streamFinalPayload.debug &&
+      typeof streamFinalPayload.debug === "object"
+    ) {
       const streamDebug = streamFinalPayload.debug as Record<string, unknown>;
       streamDebug.turn_transcript_events = finalStreamTranscriptEvents;
-      streamDebug.turn_transcript_event_count = finalStreamTranscriptEvents.length;
-      streamDebug.turn_transcript_source = streamFinalPayload.turn_transcript_source;
-      streamDebug.turn_transcript_live_event_count = finalStreamLiveTranscriptCount;
-      streamDebug.turn_transcript_reconstructed_fallback_count = finalStreamReconstructedTranscriptCount;
-      streamDebug.turn_transcript_reconstructed_fallback = finalStreamReconstructedTranscriptCount > 0;
+      streamDebug.turn_transcript_event_count =
+        finalStreamTranscriptEvents.length;
+      streamDebug.turn_transcript_source =
+        streamFinalPayload.turn_transcript_source;
+      streamDebug.turn_transcript_live_event_count =
+        finalStreamLiveTranscriptCount;
+      streamDebug.turn_transcript_reconstructed_fallback_count =
+        finalStreamReconstructedTranscriptCount;
+      streamDebug.turn_transcript_reconstructed_fallback =
+        finalStreamReconstructedTranscriptCount > 0;
     }
-    if (streamCarryoverBody.language_contract && streamFinalPayload.language_contract === undefined) {
-      streamFinalPayload.language_contract = streamCarryoverBody.language_contract;
+    if (
+      streamCarryoverBody.language_contract &&
+      streamFinalPayload.language_contract === undefined
+    ) {
+      streamFinalPayload.language_contract =
+        streamCarryoverBody.language_contract;
     }
-    const streamLanguageDebug = syncAskLanguageContractDebugMirrors(streamFinalPayload);
-    if (!streamFinalPayload.debug || typeof streamFinalPayload.debug !== "object" || Array.isArray(streamFinalPayload.debug)) {
+    const streamLanguageDebug =
+      syncAskLanguageContractDebugMirrors(streamFinalPayload);
+    if (
+      !streamFinalPayload.debug ||
+      typeof streamFinalPayload.debug !== "object" ||
+      Array.isArray(streamFinalPayload.debug)
+    ) {
       streamFinalPayload.debug = {};
     }
     const streamDebug = streamFinalPayload.debug as Record<string, unknown>;
@@ -172713,7 +175130,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     streamDebug.code_mixed = streamLanguageDebug.code_mixed;
     streamDebug.pivot_confidence = streamLanguageDebug.pivot_confidence;
     streamDebug.translated = streamLanguageDebug.translated;
-    for (const key of ["route_authority_audit", "ask_turn_solver_trace"] as const) {
+    for (const key of [
+      "route_authority_audit",
+      "ask_turn_solver_trace",
+    ] as const) {
       if (
         !streamFinalPayload[key] &&
         streamDebug[key] &&
@@ -172731,24 +175151,41 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         streamDebug[key] = streamFinalPayload[key];
       }
     }
-    for (const key of ["capability_adapter_request", "capability_adapter_result", "capability_lifecycle_ledger"] as const) {
-      if (streamFinalPayload[key] && typeof streamFinalPayload[key] === "object" && !Array.isArray(streamFinalPayload[key])) {
+    for (const key of [
+      "capability_adapter_request",
+      "capability_adapter_result",
+      "capability_lifecycle_ledger",
+    ] as const) {
+      if (
+        streamFinalPayload[key] &&
+        typeof streamFinalPayload[key] === "object" &&
+        !Array.isArray(streamFinalPayload[key])
+      ) {
         streamDebug[key] = streamFinalPayload[key];
       }
     }
     if (selectedStreamAnswer) {
       const existingTruthTable =
-        streamFinalPayload.turn_truth_table && typeof streamFinalPayload.turn_truth_table === "object" && !Array.isArray(streamFinalPayload.turn_truth_table)
+        streamFinalPayload.turn_truth_table &&
+        typeof streamFinalPayload.turn_truth_table === "object" &&
+        !Array.isArray(streamFinalPayload.turn_truth_table)
           ? (streamFinalPayload.turn_truth_table as Record<string, unknown>)
-          : streamDebug.turn_truth_table && typeof streamDebug.turn_truth_table === "object" && !Array.isArray(streamDebug.turn_truth_table)
+          : streamDebug.turn_truth_table &&
+              typeof streamDebug.turn_truth_table === "object" &&
+              !Array.isArray(streamDebug.turn_truth_table)
             ? (streamDebug.turn_truth_table as Record<string, unknown>)
             : {
                 schema: "helix.ask.turn_truth_table.v1",
-                turn_id: readAskTurnString(streamFinalPayload.turn_id) ?? streamTurnId,
-                trace_id: readAskTurnString(streamFinalPayload.trace_id) ?? streamTraceId,
+                turn_id:
+                  readAskTurnString(streamFinalPayload.turn_id) ?? streamTurnId,
+                trace_id:
+                  readAskTurnString(streamFinalPayload.trace_id) ??
+                  streamTraceId,
               };
       const existingTruthTerminal =
-        existingTruthTable.terminal && typeof existingTruthTable.terminal === "object" && !Array.isArray(existingTruthTable.terminal)
+        existingTruthTable.terminal &&
+        typeof existingTruthTable.terminal === "object" &&
+        !Array.isArray(existingTruthTable.terminal)
           ? (existingTruthTable.terminal as Record<string, unknown>)
           : {};
       const streamMirroredTruthTable = {
@@ -172757,8 +175194,14 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           ...existingTruthTerminal,
           kind: streamTerminalStatus,
           text: selectedStreamAnswer,
-          source: normalizedStreamFinalAnswerSource || readAskTurnString(streamFinalPayload.final_answer_source) || null,
-          final_answer_source: normalizedStreamFinalAnswerSource || readAskTurnString(streamFinalPayload.final_answer_source) || null,
+          source:
+            normalizedStreamFinalAnswerSource ||
+            readAskTurnString(streamFinalPayload.final_answer_source) ||
+            null,
+          final_answer_source:
+            normalizedStreamFinalAnswerSource ||
+            readAskTurnString(streamFinalPayload.final_answer_source) ||
+            null,
         },
       };
       streamFinalPayload.turn_truth_table = streamMirroredTruthTable;
@@ -172808,15 +175251,24 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : null;
     const errorName = error instanceof Error ? error.name : typeof error;
-    const body = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
-    const traceId =
-      (typeof body.traceId === "string" && body.traceId.trim()
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const traceId = (
+      typeof body.traceId === "string" && body.traceId.trim()
         ? body.traceId.trim()
         : typeof body.trace_id === "string" && body.trace_id.trim()
           ? body.trace_id.trim()
-          : `ask:${crypto.randomUUID()}`).slice(0, 128);
+          : `ask:${crypto.randomUUID()}`
+    ).slice(0, 128);
     const turnId = resolveHelixAskConversationTurnId({
-      explicitTurnId: typeof body.turnId === "string" ? body.turnId : typeof body.turn_id === "string" ? body.turn_id : undefined,
+      explicitTurnId:
+        typeof body.turnId === "string"
+          ? body.turnId
+          : typeof body.turn_id === "string"
+            ? body.turn_id
+            : undefined,
       traceId,
       prefix: "ask",
     });
@@ -172874,7 +175326,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         terminal_artifact_id: conversationMemoryEvidenceRef,
         conversation_memory_evidence_ref: conversationMemoryEvidenceRef,
         conversation_memory_packet: recoveryMemoryPacket,
-        conversation_memory_selector: buildHelixConversationMemoryDebug(recoveryMemoryPacket),
+        conversation_memory_selector:
+          buildHelixConversationMemoryDebug(recoveryMemoryPacket),
         selected_evidence_pack: {
           schema: "helix.selected_evidence_pack.v1",
           selected_evidence_ids: [conversationMemoryEvidenceRef],
@@ -172898,7 +175351,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           targetKind: "conversation_memory",
           strength: "hard",
           explicit_cues: ["context_resume_frame_recall"],
-          reasons: ["pending_context_resume_frame_recovered_after_stream_failure"],
+          reasons: [
+            "pending_context_resume_frame_recovered_after_stream_failure",
+          ],
           requested_outputs: ["conversation_memory_answer"],
           suppressed_routes: [],
           precedence_reason: "context_resume_frame_recall_selected",
@@ -172938,7 +175393,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
               kind: "conversation_memory_packet",
               status: "succeeded",
               supports_goal: true,
-              reason: "pending_context_resume_frame_recovered_after_stream_failure",
+              reason:
+                "pending_context_resume_frame_recovered_after_stream_failure",
             },
           ],
           satisfaction: "satisfied",
@@ -172980,14 +175436,17 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
             selected_memory_refs: [conversationMemoryEvidenceRef],
             required_evidence_satisfied: true,
             terminal_ready: true,
-            reason: "context_resume_frame_recall_selected_conversation_memory_packet",
+            reason:
+              "context_resume_frame_recall_selected_conversation_memory_packet",
           },
           final_arbitration: {
             why_complete: "context resume frame answered exact marker recall",
             remaining_uncertainty: [],
           },
           solver_risk_flags: [],
-          solver_short_circuit_flags: ["stream_error_recovered_by_context_resume_frame"],
+          solver_short_circuit_flags: [
+            "stream_error_recovered_by_context_resume_frame",
+          ],
           assistant_answer: false,
           raw_content_included: false,
         },
@@ -172997,7 +175456,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           selected_evidence_refs: [conversationMemoryEvidenceRef],
           selected_memory_refs: [conversationMemoryEvidenceRef],
           terminal_ready: true,
-          reason: "context_resume_frame_recall_selected_conversation_memory_packet",
+          reason:
+            "context_resume_frame_recall_selected_conversation_memory_packet",
           assistant_answer: false,
           raw_content_included: false,
         },
@@ -173008,11 +175468,13 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           stream_error_stack: errorStack,
           conversation_memory_packet: recoveryMemoryPacket,
           conversation_memory_admission: {
-            allowed_for_current_goal: recoveryMemoryPacket.allowed_for_current_goal,
+            allowed_for_current_goal:
+              recoveryMemoryPacket.allowed_for_current_goal,
             allowed_reason: recoveryMemoryPacket.allowed_reason,
             allowed_use: recoveryMemoryPacket.allowed_use,
           },
-          conversation_memory_selector: buildHelixConversationMemoryDebug(recoveryMemoryPacket),
+          conversation_memory_selector:
+            buildHelixConversationMemoryDebug(recoveryMemoryPacket),
           raw_history_excluded_from_model_context: true,
         },
         stream_used: true,
@@ -173020,8 +175482,11 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         stream_replay: false,
         suppressed_stream_terminal_count: 1,
         client_visible_terminal_hash: recoveryTerminalHash,
-        server_terminal_hash: recoveryTerminalAuthorityRecord.terminal_text_hash,
-        client_server_terminal_match: recoveryTerminalHash === recoveryTerminalAuthorityRecord.terminal_text_hash,
+        server_terminal_hash:
+          recoveryTerminalAuthorityRecord.terminal_text_hash,
+        client_server_terminal_match:
+          recoveryTerminalHash ===
+          recoveryTerminalAuthorityRecord.terminal_text_hash,
         stream_status_code: 200,
         stream_duration_ms: Math.max(0, Date.now() - startedAtMs),
       };
@@ -173061,7 +175526,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           selected_memory_refs: [conversationMemoryEvidenceRef],
           required_evidence_satisfied: true,
           terminal_ready: true,
-          reason: "context_resume_frame_recall_selected_conversation_memory_packet",
+          reason:
+            "context_resume_frame_recall_selected_conversation_memory_packet",
         },
         final_arbitration: {
           selected_route: "conversation_memory_recall / stream_error_recovery",
@@ -173074,7 +175540,9 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         poison_audit_ok: true,
         terminal_authority_ok: true,
         solver_risk_flags: [],
-        solver_short_circuit_flags: ["stream_error_recovered_by_context_resume_frame"],
+        solver_short_circuit_flags: [
+          "stream_error_recovered_by_context_resume_frame",
+        ],
         assistant_answer: false,
         raw_content_included: false,
       };
@@ -173111,7 +175579,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         terminal_artifact_id: conversationMemoryEvidenceRef,
         conversation_memory_evidence_ref: conversationMemoryEvidenceRef,
         conversation_memory_packet: recoveryMemoryPacket,
-        conversation_memory_selector: buildHelixConversationMemoryDebug(recoveryMemoryPacket),
+        conversation_memory_selector:
+          buildHelixConversationMemoryDebug(recoveryMemoryPacket),
         route_authority_audit: recoveryRouteAuthorityAudit,
         solver_controller_decision: recoverySolverControllerDecision,
         ask_turn_solver_trace: recoverySolverTrace,
@@ -173124,7 +175593,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           terminal_artifact_kind: "model_synthesized_answer",
           final_answer_source: "conversation_memory_recall_answer",
           terminal_text: recoveryRecallText,
-          terminal_text_hash: recoveryTerminalAuthorityRecord.terminal_text_hash,
+          terminal_text_hash:
+            recoveryTerminalAuthorityRecord.terminal_text_hash,
           terminal_kind: "answer",
           authority_origin: "conversation_memory_recall_answer",
           assistant_answer: false,
@@ -173136,7 +175606,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           selected_evidence_refs: [conversationMemoryEvidenceRef],
           selected_memory_refs: [conversationMemoryEvidenceRef],
           terminal_ready: true,
-          reason: "context_resume_frame_recall_selected_conversation_memory_packet",
+          reason:
+            "context_resume_frame_recall_selected_conversation_memory_packet",
           assistant_answer: false,
           raw_content_included: false,
         },
@@ -173172,7 +175643,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         resolved_turn_summary: {
           turn_id: turnId,
           final_status: "final_answer",
-          resolved_route_label: "conversation_memory_recall / stream_error_recovery",
+          resolved_route_label:
+            "conversation_memory_recall / stream_error_recovery",
           terminal_artifact_kind: "model_synthesized_answer",
           terminal_error_code: null,
           pending_server_request_present: false,
@@ -173183,7 +175655,11 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         typeof finalizedRecoveryPayload.terminal_presentation === "object" &&
         !Array.isArray(finalizedRecoveryPayload.terminal_presentation)
       ) {
-        const presentation = finalizedRecoveryPayload.terminal_presentation as Record<string, unknown>;
+        const presentation =
+          finalizedRecoveryPayload.terminal_presentation as Record<
+            string,
+            unknown
+          >;
         presentation.concise_text = recoveryRecallText;
         presentation.terminal_artifact_kind = "model_synthesized_answer";
         presentation.final_answer_source = "conversation_memory_recall_answer";
@@ -173223,13 +175699,14 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         payload: finalizedRecoveryPayload,
       });
       finalizedRecoveryPayload.ask_turn_solver_trace = recoverySolverTrace;
-      finalizedRecoveryPayload.terminal_presentation_coverage_audit = auditTerminalPresentationCoverage({
-        payload: finalizedRecoveryPayload,
-        turnId,
-        route: "conversation_memory_recall / stream_error_recovery",
-        terminalArtifactKind: "model_synthesized_answer",
-        selectedFinalAnswer: recoveryRecallText,
-      });
+      finalizedRecoveryPayload.terminal_presentation_coverage_audit =
+        auditTerminalPresentationCoverage({
+          payload: finalizedRecoveryPayload,
+          turnId,
+          route: "conversation_memory_recall / stream_error_recovery",
+          terminalArtifactKind: "model_synthesized_answer",
+          selectedFinalAnswer: recoveryRecallText,
+        });
       if (
         finalizedRecoveryPayload.debug &&
         typeof finalizedRecoveryPayload.debug === "object" &&
@@ -173238,15 +175715,18 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         const debug = finalizedRecoveryPayload.debug as Record<string, unknown>;
         debug.stream_error_recovered_by_context_resume_frame = true;
         debug.conversation_memory_packet = recoveryMemoryPacket;
-        debug.conversation_memory_selector = buildHelixConversationMemoryDebug(recoveryMemoryPacket);
+        debug.conversation_memory_selector =
+          buildHelixConversationMemoryDebug(recoveryMemoryPacket);
         debug.route_authority_audit = recoveryRouteAuthorityAudit;
         debug.solver_controller_decision = recoverySolverControllerDecision;
         debug.ask_turn_solver_trace = recoverySolverTrace;
         debug.terminal_answer_authority = recoveryTerminalAuthorityRecord;
         debug.poison_audit = finalizedRecoveryPayload.poison_audit;
         debug.loop_parity_trace = finalizedRecoveryPayload.loop_parity_trace;
-        debug.terminal_presentation = finalizedRecoveryPayload.terminal_presentation;
-        debug.terminal_presentation_coverage_audit = finalizedRecoveryPayload.terminal_presentation_coverage_audit;
+        debug.terminal_presentation =
+          finalizedRecoveryPayload.terminal_presentation;
+        debug.terminal_presentation_coverage_audit =
+          finalizedRecoveryPayload.terminal_presentation_coverage_audit;
         delete debug.error;
         delete debug.terminal_error_code;
         delete debug.terminal_failure_text;
@@ -173282,62 +175762,80 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         assistant_answer: false,
         raw_content_included: false,
       };
-      const refreshRecoveryTurnEvents = (value: unknown): Record<string, unknown>[] => [
+      const refreshRecoveryTurnEvents = (
+        value: unknown,
+      ): Record<string, unknown>[] => [
         ...(Array.isArray(value)
           ? value
-            .filter((event) => {
-              if (!event || typeof event !== "object" || Array.isArray(event)) return false;
-              const eventRecord = event as Record<string, unknown>;
-              return (
-                readAskTurnString(eventRecord.type) !== "terminal_answer" &&
-                readAskTurnString(eventRecord.source_event_type) !== "terminal_answer"
-              );
-            })
-            .filter((event): event is Record<string, unknown> => Boolean(event && typeof event === "object" && !Array.isArray(event)))
+              .filter((event) => {
+                if (!event || typeof event !== "object" || Array.isArray(event))
+                  return false;
+                const eventRecord = event as Record<string, unknown>;
+                return (
+                  readAskTurnString(eventRecord.type) !== "terminal_answer" &&
+                  readAskTurnString(eventRecord.source_event_type) !==
+                    "terminal_answer"
+                );
+              })
+              .filter((event): event is Record<string, unknown> =>
+                Boolean(
+                  event && typeof event === "object" && !Array.isArray(event),
+                ),
+              )
           : []),
         recoveryTurnEvent,
       ];
       finalizedRecoveryPayload.current_turn_events = refreshRecoveryTurnEvents(
-        finalizedRecoveryPayload.current_turn_events ?? finalizedRecoveryPayload.turn_events,
+        finalizedRecoveryPayload.current_turn_events ??
+          finalizedRecoveryPayload.turn_events,
       );
       finalizedRecoveryPayload.turn_events = refreshRecoveryTurnEvents(
-        finalizedRecoveryPayload.turn_events ?? finalizedRecoveryPayload.current_turn_events,
+        finalizedRecoveryPayload.turn_events ??
+          finalizedRecoveryPayload.current_turn_events,
       );
       if (Array.isArray(finalizedRecoveryPayload.turn_transcript_events)) {
         finalizedRecoveryPayload.turn_transcript_events = [
           ...finalizedRecoveryPayload.turn_transcript_events.filter((event) => {
-            if (!event || typeof event !== "object" || Array.isArray(event)) return false;
+            if (!event || typeof event !== "object" || Array.isArray(event))
+              return false;
             const eventRecord = event as Record<string, unknown>;
             return (
               readAskTurnString(eventRecord.type) !== "terminal_answer" &&
-              readAskTurnString(eventRecord.source_event_type) !== "terminal_answer"
+              readAskTurnString(eventRecord.source_event_type) !==
+                "terminal_answer"
             );
           }),
           terminalEvent,
         ];
       }
-      finalizedRecoveryPayload.terminal_equivalence_harness_result = buildTerminalEquivalenceHarnessResult({
-        nonStreamResponse: finalizedRecoveryPayload,
-        streamFinal: finalizedRecoveryPayload,
-        streamTerminalEvent: terminalEvent,
-        visibleUiAnswerState: {
-          question: recoveryPrompt,
-          finalAnswer: recoveryRecallText,
-        },
-        requireControllerParity: true,
-      });
-      finalizedRecoveryPayload.terminal_surface_parity_invariant = finalizedRecoveryPayload.terminal_equivalence_harness_result;
+      finalizedRecoveryPayload.terminal_equivalence_harness_result =
+        buildTerminalEquivalenceHarnessResult({
+          nonStreamResponse: finalizedRecoveryPayload,
+          streamFinal: finalizedRecoveryPayload,
+          streamTerminalEvent: terminalEvent,
+          visibleUiAnswerState: {
+            question: recoveryPrompt,
+            finalAnswer: recoveryRecallText,
+          },
+          requireControllerParity: true,
+        });
+      finalizedRecoveryPayload.terminal_surface_parity_invariant =
+        finalizedRecoveryPayload.terminal_equivalence_harness_result;
       if (
         finalizedRecoveryPayload.debug &&
         typeof finalizedRecoveryPayload.debug === "object" &&
         !Array.isArray(finalizedRecoveryPayload.debug)
       ) {
         const debug = finalizedRecoveryPayload.debug as Record<string, unknown>;
-        debug.current_turn_events = finalizedRecoveryPayload.current_turn_events;
+        debug.current_turn_events =
+          finalizedRecoveryPayload.current_turn_events;
         debug.turn_events = finalizedRecoveryPayload.turn_events;
-        debug.turn_transcript_events = finalizedRecoveryPayload.turn_transcript_events;
-        debug.terminal_equivalence_harness_result = finalizedRecoveryPayload.terminal_equivalence_harness_result;
-        debug.terminal_surface_parity_invariant = finalizedRecoveryPayload.terminal_surface_parity_invariant;
+        debug.turn_transcript_events =
+          finalizedRecoveryPayload.turn_transcript_events;
+        debug.terminal_equivalence_harness_result =
+          finalizedRecoveryPayload.terminal_equivalence_harness_result;
+        debug.terminal_surface_parity_invariant =
+          finalizedRecoveryPayload.terminal_surface_parity_invariant;
       }
       recordHelixAskRuntimeTranscriptCheckpoint({
         body,
@@ -173368,152 +175866,180 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       return res.end();
     }
     const docsRecoveryPrompt = recoveryPrompt || question;
-    const docsRuntimeRecoveryDependencies: HelixDocsStreamRuntimeRecoveryDependencies = {
-      isDocsEvidencePrompt: isAskTurnHardDocsEvidenceSourceTargetPrompt,
-      buildToolUseRestatement,
-      buildDocsEvidenceHardRouteMetadata: buildAskTurnDocsEvidenceHardRouteMetadata,
-      buildUniversalGoalFrame: (args) => buildAskTurnUniversalGoalFrame(args),
-      buildCanonicalGoalFrame: (args) =>
-        buildAskTurnCanonicalGoalFrame({
-          turnId: args.turnId,
-          goalFrame: args.goalFrame as HelixAskUniversalGoalFrame,
-          toolChoice: args.toolChoice,
-          pendingServerRequest: args.pendingServerRequest,
-          routeMetadata: args.routeMetadata,
-        }),
-      evaluateTurnSatisfaction: (args) =>
-        evaluateTurnSatisfaction({
-          goalFrame: args.goalFrame as HelixAskUniversalGoalFrame,
-          canonicalGoalFrame: args.canonicalGoalFrame as HelixAskCanonicalGoalFrame,
-          toolChoice: args.toolChoice,
-          currentTurnArtifacts: args.currentTurnArtifacts as HelixTurnArtifact[],
-          workspaceState: args.workspaceState,
-          pendingServerRequest: args.pendingServerRequest,
-        }),
-      runRuntimeLoop: async (args) =>
-        runHelixAgentTurnRuntimeLoop({
-          payload: args.payload,
-          turnId: args.turnId,
-          transcript: args.transcript,
-          goalFrame: args.goalFrame as HelixAskUniversalGoalFrame,
-          canonicalGoalFrame: args.canonicalGoalFrame as HelixAskCanonicalGoalFrame,
-          workspaceSnapshot: args.workspaceSnapshot,
-          planItems: args.planItems as HelixAskTurnPlanStep[],
-          executionTrace: args.executionTrace as HelixAskTurnPlanStep[],
-          stepResults: args.stepResults as ReturnType<typeof buildAskTurnStepResults>,
-          currentTurnArtifacts: args.currentTurnArtifacts as HelixTurnArtifact[],
-          satisfactionReport: args.satisfactionReport as HelixAskTurnSatisfactionReport,
-          selectedAction: args.selectedAction,
-          finalRuntime: args.finalRuntime,
-          eventSink: args.eventSink as HelixAskTurnEventSink | null,
-        }),
-      applyFinalAnswerComposerToPayload: (args) =>
-        helixRuntimeFinalAnswerComposer.applyHelixRuntimeFinalAnswerComposerToPayload({
-          payload: args.payload,
-          turnId: args.turnId,
-          transcript: args.transcript,
-          canonicalGoalFrame: args.canonicalGoalFrame as HelixAskCanonicalGoalFrame,
-          goalSatisfactionEvaluation: args.goalSatisfactionEvaluation as HelixGoalSatisfactionEvaluation,
-          terminalContract: args.terminalContract as HelixGoalSatisfactionEvaluation["terminal_contract"],
-        }),
-      appendRuntimeAuthorityAuditToPayload: (args) =>
-        appendHelixRuntimeAuthorityAuditToPayload({
-          payload: args.payload,
-          turnId: args.turnId,
-          prompt: args.prompt,
-          dependencies: helixRuntimeAuthorityAuditDependencies,
-        }),
-      readTerminalText: readHelixAskRuntimeTerminalText,
-      readString: readAskTurnString,
-    };
+    const docsRuntimeRecoveryDependencies: HelixDocsStreamRuntimeRecoveryDependencies =
+      {
+        isDocsEvidencePrompt: isAskTurnHardDocsEvidenceSourceTargetPrompt,
+        buildToolUseRestatement,
+        buildDocsEvidenceHardRouteMetadata:
+          buildAskTurnDocsEvidenceHardRouteMetadata,
+        buildUniversalGoalFrame: (args) => buildAskTurnUniversalGoalFrame(args),
+        buildCanonicalGoalFrame: (args) =>
+          buildAskTurnCanonicalGoalFrame({
+            turnId: args.turnId,
+            goalFrame: args.goalFrame as HelixAskUniversalGoalFrame,
+            toolChoice: args.toolChoice,
+            pendingServerRequest: args.pendingServerRequest,
+            routeMetadata: args.routeMetadata,
+          }),
+        evaluateTurnSatisfaction: (args) =>
+          evaluateTurnSatisfaction({
+            goalFrame: args.goalFrame as HelixAskUniversalGoalFrame,
+            canonicalGoalFrame:
+              args.canonicalGoalFrame as HelixAskCanonicalGoalFrame,
+            toolChoice: args.toolChoice,
+            currentTurnArtifacts:
+              args.currentTurnArtifacts as HelixTurnArtifact[],
+            workspaceState: args.workspaceState,
+            pendingServerRequest: args.pendingServerRequest,
+          }),
+        runRuntimeLoop: async (args) =>
+          runHelixAgentTurnRuntimeLoop({
+            payload: args.payload,
+            turnId: args.turnId,
+            transcript: args.transcript,
+            goalFrame: args.goalFrame as HelixAskUniversalGoalFrame,
+            canonicalGoalFrame:
+              args.canonicalGoalFrame as HelixAskCanonicalGoalFrame,
+            workspaceSnapshot: args.workspaceSnapshot,
+            planItems: args.planItems as HelixAskTurnPlanStep[],
+            executionTrace: args.executionTrace as HelixAskTurnPlanStep[],
+            stepResults: args.stepResults as ReturnType<
+              typeof buildAskTurnStepResults
+            >,
+            currentTurnArtifacts:
+              args.currentTurnArtifacts as HelixTurnArtifact[],
+            satisfactionReport:
+              args.satisfactionReport as HelixAskTurnSatisfactionReport,
+            selectedAction: args.selectedAction,
+            finalRuntime: args.finalRuntime,
+            eventSink: args.eventSink as HelixAskTurnEventSink | null,
+          }),
+        applyFinalAnswerComposerToPayload: (args) =>
+          helixRuntimeFinalAnswerComposer.applyHelixRuntimeFinalAnswerComposerToPayload(
+            {
+              payload: args.payload,
+              turnId: args.turnId,
+              transcript: args.transcript,
+              canonicalGoalFrame:
+                args.canonicalGoalFrame as HelixAskCanonicalGoalFrame,
+              goalSatisfactionEvaluation:
+                args.goalSatisfactionEvaluation as HelixGoalSatisfactionEvaluation,
+              terminalContract:
+                args.terminalContract as HelixGoalSatisfactionEvaluation["terminal_contract"],
+            },
+          ),
+        appendRuntimeAuthorityAuditToPayload: (args) =>
+          appendHelixRuntimeAuthorityAuditToPayload({
+            payload: args.payload,
+            turnId: args.turnId,
+            prompt: args.prompt,
+            dependencies: helixRuntimeAuthorityAuditDependencies,
+          }),
+        readTerminalText: readHelixAskRuntimeTerminalText,
+        readString: readAskTurnString,
+      };
     const docsRuntimeRecovery = await recoverDocsStreamRuntimeFailure({
       prompt: docsRecoveryPrompt,
       turnId,
       traceId,
       sessionId,
-      threadId: sessionId ?? readHelixAskRuntimeThreadId(body) ?? "helix-ask:desktop",
+      threadId:
+        sessionId ?? readHelixAskRuntimeThreadId(body) ?? "helix-ask:desktop",
       errorMessage,
       errorStack,
       eventSink: streamSink,
       dependencies: docsRuntimeRecoveryDependencies,
     });
     if (docsRuntimeRecovery.status === "recovered") {
-          const finalizedDocsPayload = finalizeHelixAskTurnPayload({
-            payload: docsRuntimeRecovery.payload,
-            threadId: sessionId ?? readHelixAskRuntimeThreadId(body) ?? "helix-ask:desktop",
-            turnId,
-            prompt: docsRecoveryPrompt,
-            sessionId,
-            terminalText: docsRuntimeRecovery.terminalText,
-            finalAnswerSource: docsRuntimeRecovery.finalAnswerSource,
-            terminalArtifactKind: docsRuntimeRecovery.terminalArtifactKind,
-            route: "docs_viewer / stream_error_runtime_recovery",
-            clientVisibleText: docsRuntimeRecovery.terminalText,
-          });
-          finalizedDocsPayload.stream_used = true;
-          finalizedDocsPayload.stream_mode = "live_runtime";
-          finalizedDocsPayload.stream_replay = false;
-          finalizedDocsPayload.stream_error_recovered_by_docs_runtime_loop = true;
-          finalizedDocsPayload.stream_status_code = 200;
-          finalizedDocsPayload.stream_duration_ms = Math.max(0, Date.now() - startedAtMs);
-          const docsTerminalHash = readHelixAskRuntimeTerminalHash(finalizedDocsPayload, docsRuntimeRecovery.terminalText);
-          const terminalEvent = {
-            id: `stream:terminal_answer:${turnId}`,
-            turn_id: turnId,
-            at_ms: Date.now(),
-            source_event_type: "terminal_answer",
-            event_source: "live",
-            role: "final",
-            type: "terminal_answer",
-            status: "final",
-            text: docsRuntimeRecovery.terminalText,
-            final_answer_source: readAskTurnString(finalizedDocsPayload.final_answer_source) ?? "docs_runtime_recovery_answer",
-            terminal_authority_hash: docsTerminalHash,
-            client_visible_terminal_hash: hashHelixTerminalText(docsRuntimeRecovery.terminalText),
-            client_server_terminal_match: true,
-            suppressed_stream_terminal_count: 1,
-          };
-          finalizedDocsPayload.terminal_equivalence_harness_result = buildTerminalEquivalenceHarnessResult({
-            nonStreamResponse: finalizedDocsPayload,
-            streamFinal: finalizedDocsPayload,
-            streamTerminalEvent: terminalEvent,
-            visibleUiAnswerState: {
-              question: docsRecoveryPrompt,
-              finalAnswer: docsRuntimeRecovery.terminalText,
-            },
-            requireControllerParity: true,
-          });
-          finalizedDocsPayload.terminal_surface_parity_invariant = finalizedDocsPayload.terminal_equivalence_harness_result;
-          attachHelixAskRuntimeMemoryGovernorAdmission({
-            payload: finalizedDocsPayload,
-            admission: runtimeAdmission,
-            body: req.body as Record<string, unknown>,
-            source: "helix_ask_turn_stream",
-          });
-          attachHelixAskStreamFinalDebugExport({
-            payload: finalizedDocsPayload,
-            prompt: docsRecoveryPrompt,
-            sessionId,
-          });
-          recordHelixAskRuntimeTerminalCheckpoint({
-            body: req.body as Record<string, unknown>,
-            payload: finalizedDocsPayload,
-            route: "/ask/turn/stream",
-            statusCode: 200,
-            turnId,
-            traceId,
-          });
-          recordHelixAskRuntimeCompletionCheckpoint({
-            body: req.body as Record<string, unknown>,
-            payload: finalizedDocsPayload,
-            route: "/ask/turn/stream",
-            statusCode: 200,
-            turnId,
-            traceId,
-          });
-          writeAskTurnSse(res, "turn_transcript_event", terminalEvent);
-          writeAskTurnSse(res, "turn_final", finalizedDocsPayload);
-          return res.end();
+      const finalizedDocsPayload = finalizeHelixAskTurnPayload({
+        payload: docsRuntimeRecovery.payload,
+        threadId:
+          sessionId ?? readHelixAskRuntimeThreadId(body) ?? "helix-ask:desktop",
+        turnId,
+        prompt: docsRecoveryPrompt,
+        sessionId,
+        terminalText: docsRuntimeRecovery.terminalText,
+        finalAnswerSource: docsRuntimeRecovery.finalAnswerSource,
+        terminalArtifactKind: docsRuntimeRecovery.terminalArtifactKind,
+        route: "docs_viewer / stream_error_runtime_recovery",
+        clientVisibleText: docsRuntimeRecovery.terminalText,
+      });
+      finalizedDocsPayload.stream_used = true;
+      finalizedDocsPayload.stream_mode = "live_runtime";
+      finalizedDocsPayload.stream_replay = false;
+      finalizedDocsPayload.stream_error_recovered_by_docs_runtime_loop = true;
+      finalizedDocsPayload.stream_status_code = 200;
+      finalizedDocsPayload.stream_duration_ms = Math.max(
+        0,
+        Date.now() - startedAtMs,
+      );
+      const docsTerminalHash = readHelixAskRuntimeTerminalHash(
+        finalizedDocsPayload,
+        docsRuntimeRecovery.terminalText,
+      );
+      const terminalEvent = {
+        id: `stream:terminal_answer:${turnId}`,
+        turn_id: turnId,
+        at_ms: Date.now(),
+        source_event_type: "terminal_answer",
+        event_source: "live",
+        role: "final",
+        type: "terminal_answer",
+        status: "final",
+        text: docsRuntimeRecovery.terminalText,
+        final_answer_source:
+          readAskTurnString(finalizedDocsPayload.final_answer_source) ??
+          "docs_runtime_recovery_answer",
+        terminal_authority_hash: docsTerminalHash,
+        client_visible_terminal_hash: hashHelixTerminalText(
+          docsRuntimeRecovery.terminalText,
+        ),
+        client_server_terminal_match: true,
+        suppressed_stream_terminal_count: 1,
+      };
+      finalizedDocsPayload.terminal_equivalence_harness_result =
+        buildTerminalEquivalenceHarnessResult({
+          nonStreamResponse: finalizedDocsPayload,
+          streamFinal: finalizedDocsPayload,
+          streamTerminalEvent: terminalEvent,
+          visibleUiAnswerState: {
+            question: docsRecoveryPrompt,
+            finalAnswer: docsRuntimeRecovery.terminalText,
+          },
+          requireControllerParity: true,
+        });
+      finalizedDocsPayload.terminal_surface_parity_invariant =
+        finalizedDocsPayload.terminal_equivalence_harness_result;
+      attachHelixAskRuntimeMemoryGovernorAdmission({
+        payload: finalizedDocsPayload,
+        admission: runtimeAdmission,
+        body: req.body as Record<string, unknown>,
+        source: "helix_ask_turn_stream",
+      });
+      attachHelixAskStreamFinalDebugExport({
+        payload: finalizedDocsPayload,
+        prompt: docsRecoveryPrompt,
+        sessionId,
+      });
+      recordHelixAskRuntimeTerminalCheckpoint({
+        body: req.body as Record<string, unknown>,
+        payload: finalizedDocsPayload,
+        route: "/ask/turn/stream",
+        statusCode: 200,
+        turnId,
+        traceId,
+      });
+      recordHelixAskRuntimeCompletionCheckpoint({
+        body: req.body as Record<string, unknown>,
+        payload: finalizedDocsPayload,
+        route: "/ask/turn/stream",
+        statusCode: 200,
+        turnId,
+        traceId,
+      });
+      writeAskTurnSse(res, "turn_transcript_event", terminalEvent);
+      writeAskTurnSse(res, "turn_final", finalizedDocsPayload);
+      return res.end();
     }
     if (docsRuntimeRecovery.status === "failed") {
       body.stream_docs_runtime_recovery_error = docsRuntimeRecovery.errorRecord;
@@ -173546,7 +176072,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       message: errorMessage,
       stream_error_name: errorName,
       stream_error_stack: errorStack,
-      stream_docs_runtime_recovery_error: body.stream_docs_runtime_recovery_error ?? null,
+      stream_docs_runtime_recovery_error:
+        body.stream_docs_runtime_recovery_error ?? null,
       terminal_error_code: "ask_turn_stream_failed",
       final_status: "final_failure",
       status: "final_failure",
@@ -173587,7 +176114,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         stream_error_name: errorName,
         stream_error_message: errorMessage,
         stream_error_stack: errorStack,
-        stream_docs_runtime_recovery_error: body.stream_docs_runtime_recovery_error ?? null,
+        stream_docs_runtime_recovery_error:
+          body.stream_docs_runtime_recovery_error ?? null,
         typed_failure: {
           schema: "helix.typed_failure.v1",
           error_code: "ask_turn_stream_failed",
@@ -173606,7 +176134,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           pending_server_request_present: false,
         },
         terminal_answer_authority: terminalAuthorityRecord,
-        codex_turn_completion_invariant: "turn_final emitted after stream error",
+        codex_turn_completion_invariant:
+          "turn_final emitted after stream error",
       },
       stream_used: true,
       stream_mode: "live_runtime",
@@ -173614,7 +176143,8 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       suppressed_stream_terminal_count: 0,
       client_visible_terminal_hash: terminalHash,
       server_terminal_hash: terminalAuthorityRecord.terminal_text_hash,
-      client_server_terminal_match: terminalHash === terminalAuthorityRecord.terminal_text_hash,
+      client_server_terminal_match:
+        terminalHash === terminalAuthorityRecord.terminal_text_hash,
       stream_status_code: 500,
       stream_duration_ms: Math.max(0, Date.now() - startedAtMs),
     };
@@ -173629,22 +176159,33 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       assistant_answer: false,
       raw_content_included: false,
     };
-    const streamFailurePrompt = typeof body.question === "string" ? body.question : typeof body.prompt === "string" ? body.prompt : recoveryPrompt;
-    const streamFailureDocsSourceTargetIntent = resolveAskTurnHardDocsEvidenceSourceTargetIntent({
-      transcript: streamFailurePrompt,
-      turnId,
-      threadId: sessionId ?? readHelixAskRuntimeThreadId(body) ?? "helix-ask:desktop",
-    });
-    const streamFailureNeedsDocsPlan = Boolean(streamFailureDocsSourceTargetIntent);
+    const streamFailurePrompt =
+      typeof body.question === "string"
+        ? body.question
+        : typeof body.prompt === "string"
+          ? body.prompt
+          : recoveryPrompt;
+    const streamFailureDocsSourceTargetIntent =
+      resolveAskTurnHardDocsEvidenceSourceTargetIntent({
+        transcript: streamFailurePrompt,
+        turnId,
+        threadId:
+          sessionId ?? readHelixAskRuntimeThreadId(body) ?? "helix-ask:desktop",
+      });
+    const streamFailureNeedsDocsPlan = Boolean(
+      streamFailureDocsSourceTargetIntent,
+    );
     if (streamFailureNeedsDocsPlan) {
       const docsEvidenceRoute = buildAskTurnDocsEvidenceHardRouteMetadata({
         turnId,
-        threadId: sessionId ?? readHelixAskRuntimeThreadId(body) ?? "helix-ask:desktop",
+        threadId:
+          sessionId ?? readHelixAskRuntimeThreadId(body) ?? "helix-ask:desktop",
         sourceTargetIntent: streamFailureDocsSourceTargetIntent,
       });
       const docsRouteProductContract = buildRouteProductContract({
         turnId,
-        threadId: sessionId ?? readHelixAskRuntimeThreadId(body) ?? "helix-ask:desktop",
+        threadId:
+          sessionId ?? readHelixAskRuntimeThreadId(body) ?? "helix-ask:desktop",
         sourceTargetIntent: docsEvidenceRoute.sourceTargetIntent,
         promptText: streamFailurePrompt,
       });
@@ -173658,26 +176199,37 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         turnId,
         promptText: streamFailurePrompt,
         sourceTargetIntent: docsEvidenceRoute.sourceTargetIntent,
-        routeProductContract: docsRouteProductContract as unknown as Record<string, unknown>,
-        toolCallAdmissionDecision: docsToolAdmissionDecision as unknown as Record<string, unknown>,
-        routeMetadata: docsEvidenceRoute.metadata as unknown as Record<string, unknown>,
+        routeProductContract: docsRouteProductContract as unknown as Record<
+          string,
+          unknown
+        >,
+        toolCallAdmissionDecision:
+          docsToolAdmissionDecision as unknown as Record<string, unknown>,
+        routeMetadata: docsEvidenceRoute.metadata as unknown as Record<
+          string,
+          unknown
+        >,
       });
       Object.assign(streamFailurePayload, {
         source_target_intent: docsEvidenceRoute.sourceTargetIntent,
         route_metadata: docsEvidenceRoute.metadata,
         routeMetadata: docsEvidenceRoute.metadata,
-        mandatory_next_tool: docsEvidenceRoute.sourceTargetIntent.mandatory_next_tool,
+        mandatory_next_tool:
+          docsEvidenceRoute.sourceTargetIntent.mandatory_next_tool,
         route_product_contract: docsRouteProductContract,
         tool_call_admission_decision: docsToolAdmissionDecision,
         capability_plan: docsCapabilityPlan,
         capability_plan_materialized_before_stream_failure: true,
-        capability_plan_materialization_source: "stream_failure_docs_evidence_hard_route",
+        capability_plan_materialization_source:
+          "stream_failure_docs_evidence_hard_route",
       });
       streamFailurePayload.tool_rail_failure_triage = {
         schema: "helix.tool_rail_failure_triage.v1",
         turn_id: turnId,
         route_family: "docs_viewer",
-        selected_capability: docsCapabilityPlan.selected_capability ?? docsCapabilityPlan.requested_action,
+        selected_capability:
+          docsCapabilityPlan.selected_capability ??
+          docsCapabilityPlan.requested_action,
         executed_capability: null,
         observed_artifact_kind: null,
         first_broken_rail: "agent_step_selection",
@@ -173687,17 +176239,24 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         assistant_answer: false,
         raw_content_included: false,
       };
-      if (streamFailurePayload.debug && typeof streamFailurePayload.debug === "object" && !Array.isArray(streamFailurePayload.debug)) {
+      if (
+        streamFailurePayload.debug &&
+        typeof streamFailurePayload.debug === "object" &&
+        !Array.isArray(streamFailurePayload.debug)
+      ) {
         const debug = streamFailurePayload.debug as Record<string, unknown>;
         debug.source_target_intent = docsEvidenceRoute.sourceTargetIntent;
         debug.route_metadata = docsEvidenceRoute.metadata;
-        debug.mandatory_next_tool = docsEvidenceRoute.sourceTargetIntent.mandatory_next_tool;
+        debug.mandatory_next_tool =
+          docsEvidenceRoute.sourceTargetIntent.mandatory_next_tool;
         debug.route_product_contract = docsRouteProductContract;
         debug.tool_call_admission_decision = docsToolAdmissionDecision;
         debug.capability_plan = docsCapabilityPlan;
-        debug.tool_rail_failure_triage = streamFailurePayload.tool_rail_failure_triage;
+        debug.tool_rail_failure_triage =
+          streamFailurePayload.tool_rail_failure_triage;
         debug.capability_plan_materialized_before_stream_failure = true;
-        debug.capability_plan_materialization_source = "stream_failure_docs_evidence_hard_route";
+        debug.capability_plan_materialization_source =
+          "stream_failure_docs_evidence_hard_route";
       }
     }
     streamFailurePayload.goal_satisfaction_evaluation = {
@@ -173758,15 +176317,22 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
       assistant_answer: false,
       raw_content_included: false,
     };
-    streamFailurePayload.terminal_equivalence_harness_result = buildTerminalEquivalenceHarnessResult({
-      nonStreamResponse: streamFailurePayload,
-      visibleUiAnswerState: {
-        question: typeof body.question === "string" ? body.question : typeof body.prompt === "string" ? body.prompt : "",
-        finalAnswer: failureText,
-      },
-      requireControllerParity: true,
-    });
-    streamFailurePayload.terminal_surface_parity_invariant = streamFailurePayload.terminal_equivalence_harness_result;
+    streamFailurePayload.terminal_equivalence_harness_result =
+      buildTerminalEquivalenceHarnessResult({
+        nonStreamResponse: streamFailurePayload,
+        visibleUiAnswerState: {
+          question:
+            typeof body.question === "string"
+              ? body.question
+              : typeof body.prompt === "string"
+                ? body.prompt
+                : "",
+          finalAnswer: failureText,
+        },
+        requireControllerParity: true,
+      });
+    streamFailurePayload.terminal_surface_parity_invariant =
+      streamFailurePayload.terminal_equivalence_harness_result;
     attachHelixAskRuntimeMemoryGovernorAdmission({
       payload: streamFailurePayload,
       admission: runtimeAdmission,
@@ -173775,7 +176341,12 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     });
     attachHelixAskStreamFinalDebugExport({
       payload: streamFailurePayload,
-      prompt: typeof body.question === "string" ? body.question : typeof body.prompt === "string" ? body.prompt : "",
+      prompt:
+        typeof body.question === "string"
+          ? body.question
+          : typeof body.prompt === "string"
+            ? body.prompt
+            : "",
       sessionId,
     });
     recordHelixAskRuntimeTerminalCheckpoint({
@@ -173806,6 +176377,19 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
 planRouter.post("/ask", async (req, res) => {
   if (req.body && typeof req.body === "object") {
     await attachResearchLibraryOwnerContext(req, req.body as Record<string, unknown>);
+    const sharedRoomAskBody = req.body as Record<string, unknown>;
+    const sharedRoomAskGuard = await enforceHelixSharedRoomAskSessionAccess({
+      req,
+      body: sharedRoomAskBody,
+      turnId:
+        readHelixAskRuntimeTurnId(sharedRoomAskBody) ??
+        `ask:${crypto.randomUUID()}`,
+    });
+    if (sharedRoomAskGuard) {
+      return res
+        .status(sharedRoomAskGuard.statusCode)
+        .json(sharedRoomAskGuard.payload);
+    }
   }
   const parsed = LocalAskRequest.safeParse(req.body);
   if (!parsed.success) {
@@ -173845,7 +176429,7 @@ planRouter.post("/ask", async (req, res) => {
   requestData.traceId =
     typeof requestData.traceId === "string" && requestData.traceId.trim()
       ? requestData.traceId.trim().slice(0, 128)
-      : (`ask:${crypto.randomUUID()}`).slice(0, 128);
+      : `ask:${crypto.randomUUID()}`.slice(0, 128);
   requestData.turnId = resolveHelixAskConversationTurnId({
     explicitTurnId: requestData.turnId,
     traceId: requestData.traceId,
@@ -173959,12 +176543,11 @@ planRouter.post("/ask", async (req, res) => {
     codeMixed: requestData.codeMixed === true || interpreterArtifact?.code_mixed === true,
     sourceText: requestSourceSeed || requestQuestionSeed,
   });
-  const interpreterDispatchState =
-    interpreterDispatchEligible
-      ? interpreterArtifact?.dispatch_state === "blocked"
-        ? "confirm"
-        : interpreterArtifact?.dispatch_state ?? null
-      : interpreterStatusForceBlock
+  const interpreterDispatchState = interpreterDispatchEligible
+    ? interpreterArtifact?.dispatch_state === "blocked"
+      ? "confirm"
+      : (interpreterArtifact?.dispatch_state ?? null)
+    : interpreterStatusForceBlock
         ? "blocked"
         : null;
   const interpreterDispatchBlocked = interpreterDispatchState === "blocked";
@@ -174086,7 +176669,10 @@ planRouter.post("/ask", async (req, res) => {
           currentTurnId: askTurnId,
           sessionId: requestMetadata.session_id,
           promptText: requestQuestionSeed || requestData.context || "",
-          allowsPriorArtifacts: false,
+          allowsPriorArtifacts:
+            detectHelixFollowupReferences(
+              requestQuestionSeed || requestData.context || "",
+            ).followup_kind === "previous_evidence",
         });
   const askRollingSessionContextPacket =
     process.env.HELIX_ASK_ROLLING_SESSION_CONTEXT === "0"
@@ -174180,17 +176766,18 @@ planRouter.post("/ask", async (req, res) => {
   const conversationMemoryRecallText =
     currentTurnExplicitlyRequestsCapabilityOverContextResumeRecall(requestQuestionSeed)
       ? null
-      : askContextResumeFrameRecall?.recallText ??
+      : (askContextResumeFrameRecall?.recallText ??
         resolveHelixContextResumeFrameRecallText({
           packet: askConversationMemoryPacket,
           promptText: requestQuestionSeed,
         }) ??
         (askConversationMemoryPacket?.allowed_for_current_goal === true &&
-        askConversationMemoryPacket.allowed_use === "conversational_continuity" &&
+        askConversationMemoryPacket.allowed_use ===
+          "conversational_continuity" &&
         shouldUseConversationMemoryRecallTerminal(requestQuestionSeed) &&
         askConversationMemoryPacket.latest_answer_summary
           ? `The last answer was: ${askConversationMemoryPacket.latest_answer_summary}`
-          : null);
+          : null));
   if (!isAskTurnDocsOpenAndSummarizeIntent(requestQuestionSeed) && isAskTurnDocOpenBestIntent(requestQuestionSeed)) {
     const matches = searchAskTurnDocsForQuery(resolveAskTurnOpenDocSearchQueryArg(requestQuestionSeed) ?? requestQuestionSeed, 8);
     const selectedPath =
@@ -174872,7 +177459,9 @@ planRouter.post("/ask", async (req, res) => {
         typedDebug.interpreter_status = requestData.interpreterStatus ?? null;
         typedDebug.interpreter_error = requestData.interpreterError ?? null;
         typedDebug.interpreter_dispatch_state =
-          requestData.interpreterStatus === "ok" ? requestData.interpreter?.dispatch_state ?? null : null;
+          requestData.interpreterStatus === "ok"
+            ? (requestData.interpreter?.dispatch_state ?? null)
+            : null;
         typedDebug.interpreter_top2_gap = requestData.interpreter?.ambiguity?.top2_gap ?? null;
       }
       if (includeMultilangMetadata && multilangRollout.stage !== "off") {
@@ -176562,12 +179151,11 @@ planRouter.post("/ask/jobs", async (req, res) => {
     codeMixed: request.codeMixed === true || interpreterArtifact?.code_mixed === true,
     sourceText: requestSourceSeed || requestQuestionSeed,
   });
-  const interpreterDispatchState =
-    interpreterDispatchEligible
-      ? interpreterArtifact?.dispatch_state === "blocked"
-        ? "confirm"
-        : interpreterArtifact?.dispatch_state ?? null
-      : interpreterStatusForceBlock
+  const interpreterDispatchState = interpreterDispatchEligible
+    ? interpreterArtifact?.dispatch_state === "blocked"
+      ? "confirm"
+      : (interpreterArtifact?.dispatch_state ?? null)
+    : interpreterStatusForceBlock
         ? "blocked"
         : null;
   const interpreterDispatchBlocked = interpreterDispatchState === "blocked";
@@ -176904,8 +179492,12 @@ planRouter.post("/plan", async (req, res) => {
   const routine: TRoutine | undefined = parsed.data.routine
     ? Routine.parse(parsed.data.routine)
     : parsed.data.routineId
-    ? { id: parsed.data.routineId, name: parsed.data.routineId, version: "1" } as TRoutine
-    : undefined;
+      ? ({
+          id: parsed.data.routineId,
+          name: parsed.data.routineId,
+          version: "1",
+        } as TRoutine)
+      : undefined;
   const manifest = listTools();
   const chooserText = [goal, searchQuery ?? ""]
     .map((value) => (value ?? "").trim())
@@ -177554,10 +180146,14 @@ planRouter.post("/execute", async (req, res) => {
         executorVersion,
         knowledgeContext: safetyOk ? record.knowledgeContext : undefined,
         groundingReport: safetyOk
-          ? record.groundingReport ?? record.taskTrace.grounding_report ?? undefined
+          ? (record.groundingReport ??
+            record.taskTrace.grounding_report ??
+            undefined)
           : undefined,
         knowledgeHash: record.knowledgeHash ?? undefined,
-        resourceHints: hintPassEnabled ? hintPathsUsed ?? [] : record.resourceHints,
+        resourceHints: hintPassEnabled
+          ? (hintPathsUsed ?? [])
+          : record.resourceHints,
         knowledgeProjects: record.knowledgeProjects,
         summary,
         citations,

@@ -1437,7 +1437,7 @@ export function resolveTerminalAnswerEnvelope(
       closureFaithfulnessViolation,
     );
     const retryAttemptsConsumed =
-      visibleAnswerPolicyTerminalRetryAttemptsConsumed(payload);
+      visibleAnswerPolicyTerminalRetryAttemptsConsumed(payload, turnId);
     const retryExhausted =
       repairable &&
       retryAttemptsConsumed >= HELIX_VISIBLE_ANSWER_POLICY_TERMINAL_RETRY_LIMIT;

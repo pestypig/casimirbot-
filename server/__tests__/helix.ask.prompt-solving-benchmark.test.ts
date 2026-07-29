@@ -1,6 +1,6 @@
 import express from "express";
 import request from "supertest";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
 import { resetConversationalAnswerDistillationsForTest } from "../services/helix-ask/conversational-answer-distillation-store";
@@ -54,7 +54,44 @@ const createApp = (): express.Express => {
 
 const TEST_MIB = 1024 * 1024;
 
+const benchmarkLlmEnvKeys = [
+  "LLM_POLICY",
+  "LLM_RUNTIME",
+  "LLM_HTTP_ALLOW_DEFAULT_OPENAI_BASE",
+  "LLM_HTTP_BASE",
+  "ENABLE_LLM_LOCAL_SPAWN",
+  "LLM_LOCAL_CMD",
+  "HELIX_ASK_AGENT_RUNTIME",
+  "CODEX_AGENT_FAKE_STDOUT",
+  "CODEX_AGENT_FAKE_EXIT_CODE",
+] as const;
+const benchmarkPreviousLlmEnv = Object.fromEntries(
+  benchmarkLlmEnvKeys.map((key) => [key, process.env[key]]),
+) as Record<(typeof benchmarkLlmEnvKeys)[number], string | undefined>;
+
+const isolatePromptBenchmarkFromConfiguredLlmBackends = (): void => {
+  process.env.LLM_POLICY = "";
+  process.env.LLM_RUNTIME = "";
+  process.env.LLM_HTTP_ALLOW_DEFAULT_OPENAI_BASE = "0";
+  process.env.LLM_HTTP_BASE = "";
+  process.env.ENABLE_LLM_LOCAL_SPAWN = "0";
+  process.env.LLM_LOCAL_CMD = "";
+  process.env.HELIX_ASK_AGENT_RUNTIME = "codex";
+  process.env.CODEX_AGENT_FAKE_STDOUT =
+    "This is a bounded conceptual answer produced without executing a workstation capability.";
+  process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+};
+
+const restorePromptBenchmarkLlmEnvironment = (): void => {
+  for (const key of benchmarkLlmEnvKeys) {
+    const previous = benchmarkPreviousLlmEnv[key];
+    if (previous === undefined) delete process.env[key];
+    else process.env[key] = previous;
+  }
+};
+
 const resetAll = (): void => {
+  isolatePromptBenchmarkFromConfiguredLlmBackends();
   resetLiveAnswerEnvironments();
   resetLiveSituationRunsForTest();
   resetObservationJournalForTest();
@@ -109,6 +146,7 @@ type BenchmarkCase = {
   forbidArtifacts?: string[];
   requireNoShortCircuit?: boolean;
   requireRouteAuthority?: boolean;
+  requireNoGatewayCalls?: boolean;
 };
 
 const forbiddenControlArtifacts = [
@@ -118,6 +156,69 @@ const forbiddenControlArtifacts = [
 ];
 
 const cases: BenchmarkCase[] = [
+  {
+    id: "contextual_environment_probe_explanation",
+    category: "contextual environment tool mention",
+    prompt:
+      "The connector documentation mentions room.environment.probe; explain what that capability means.",
+    primary: ["general_reasoning", "content_question", "debug_diagnosis"],
+    forbidRoutes: ["workspace_action", "live_pipeline_control"],
+    forbidArtifacts: forbiddenControlArtifacts,
+    requireNoGatewayCalls: true,
+  },
+  {
+    id: "negated_minecraft_inventory_probe",
+    category: "negated environment probe",
+    prompt:
+      "Do not check the Minecraft inventory; just explain what an inventory probe could observe.",
+    primary: ["general_reasoning", "content_question"],
+    negativeConstraints: [/do not check/i],
+    forbidRoutes: ["workspace_action", "live_pipeline_control"],
+    forbidArtifacts: forbiddenControlArtifacts,
+    requireNoGatewayCalls: true,
+  },
+  {
+    id: "future_conditional_environment_probe",
+    category: "future/conditional environment probe",
+    prompt:
+      "If we check the current actor's Minecraft inventory later, what permission and freshness checks should happen first?",
+    primary: ["general_reasoning", "debug_diagnosis"],
+    forbidRoutes: ["workspace_action", "live_pipeline_control"],
+    forbidArtifacts: forbiddenControlArtifacts,
+    requireNoGatewayCalls: true,
+  },
+  {
+    id: "historical_environment_probe",
+    category: "historical environment probe",
+    prompt:
+      "Why did the previous turn mention com.casimirbot.minecraft.inventory.check, and did that prove a probe actually ran?",
+    primary: ["debug_diagnosis", "general_reasoning"],
+    forbidRoutes: ["workspace_action", "live_pipeline_control"],
+    forbidArtifacts: forbiddenControlArtifacts,
+    requireNoGatewayCalls: true,
+  },
+  {
+    id: "quoted_screen_environment_probe",
+    category: "quoted/screen-visible environment probe",
+    prompt:
+      "The screen says 'check inventory now'; explain that label without running the environment probe.",
+    primary: ["content_question", "general_reasoning"],
+    negativeConstraints: [/without running/i],
+    forbidRoutes: ["workspace_action", "live_pipeline_control"],
+    forbidArtifacts: forbiddenControlArtifacts,
+    requireNoGatewayCalls: true,
+  },
+  {
+    id: "mixed_environment_probe_explanation_only",
+    category: "mixed-intent environment probe",
+    prompt:
+      "Help me understand the room state, but do not probe the inventory yet; describe what evidence would be needed.",
+    primary: ["general_reasoning", "debug_diagnosis", "status_question"],
+    negativeConstraints: [/do not probe/i],
+    forbidRoutes: ["workspace_action", "live_pipeline_control"],
+    forbidArtifacts: forbiddenControlArtifacts,
+    requireNoGatewayCalls: true,
+  },
   {
     id: "negated_interval_check_first",
     category: "negated command",
@@ -379,6 +480,7 @@ const cases: BenchmarkCase[] = [
 
 describe("Helix Ask prompt-only adversarial problem-solving benchmark", () => {
   beforeEach(resetAll);
+  afterAll(restorePromptBenchmarkLlmEnvironment);
 
   it("demotes an anaphoric scholarly request with a failure-only antecedent before source admission", async () => {
     const app = createApp();
@@ -535,6 +637,12 @@ describe("Helix Ask prompt-only adversarial problem-solving benchmark", () => {
       }
       if (scenario.requireNoShortCircuit) {
         expectNoShortCircuitFlags(response.body);
+      }
+      if (scenario.requireNoGatewayCalls) {
+        expect(
+          response.body.workstation_gateway_call_results ?? [],
+          "admission failure: contextual environment tool language executed a gateway call",
+        ).toHaveLength(0);
       }
     },
     60_000,

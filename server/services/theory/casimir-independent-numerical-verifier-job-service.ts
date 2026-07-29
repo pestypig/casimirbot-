@@ -41,6 +41,8 @@ export const CASIMIR_INDEPENDENT_NUMERICAL_JOB_RECEIPT_SCHEMA =
   "casimir.independent_numerical_verifier.job_receipt.v1" as const;
 export const CASIMIR_INDEPENDENT_NUMERICAL_RESULT_SCHEMA =
   "casimir.independent_numerical_verifier.result.v1" as const;
+export const CASIMIR_INDEPENDENT_NUMERICAL_RUNTIME_INSPECTION_SCHEMA =
+  "casimir.independent_numerical_verifier.runtime_inspection.v1" as const;
 
 export type { CasimirIndependentNumericalSealedInputV1 } from "./casimir-independent-numerical-execution-catalog";
 
@@ -121,6 +123,17 @@ export type CasimirIndependentNumericalResultV1 = {
   certificate: CasimirIndependentNumericalVerificationCertificateV1 | null;
   issues: string[];
   authority: EvidenceAuthority;
+};
+
+export type CasimirIndependentNumericalRuntimeInspectionV1 = {
+  schema: typeof CASIMIR_INDEPENDENT_NUMERICAL_RUNTIME_INSPECTION_SCHEMA;
+  executionCatalogConfigured: boolean;
+  sandboxExecutorConfigured: boolean;
+  trustedReceiptVerifierConfigured: boolean;
+  durableReplayLedgerConfigured: boolean;
+  readyForConfirmedExecution: boolean;
+  assistantAnswer: false;
+  terminalEligible: false;
 };
 
 type JobRecord = {
@@ -367,6 +380,32 @@ export function createCasimirIndependentNumericalVerifierJobService(
     ),
     now: dependencies.now,
   });
+  const inspectConfiguration =
+    (): CasimirIndependentNumericalRuntimeInspectionV1 => {
+      const executionCatalogConfigured =
+        typeof dependencies.resolveTrustedExecutionCatalogEntry === "function";
+      const sandboxExecutorConfigured =
+        typeof dependencies.resolveSandboxedExecutor === "function";
+      const trustedReceiptVerifierConfigured =
+        typeof dependencies.verifyTrustedRuntimeReceipt === "function";
+      const durableReplayLedgerConfigured = Boolean(
+        dependencies.confirmationReplayLedger,
+      );
+      return {
+        schema: CASIMIR_INDEPENDENT_NUMERICAL_RUNTIME_INSPECTION_SCHEMA,
+        executionCatalogConfigured,
+        sandboxExecutorConfigured,
+        trustedReceiptVerifierConfigured,
+        durableReplayLedgerConfigured,
+        readyForConfirmedExecution:
+          executionCatalogConfigured &&
+          sandboxExecutorConfigured &&
+          trustedReceiptVerifierConfigured &&
+          durableReplayLedgerConfigured,
+        assistantAnswer: false,
+        terminalEligible: false,
+      };
+    };
   const prepareRequest = async (input: {
     accountType: HelixAccountType;
     profileId?: string | null;
@@ -968,6 +1007,7 @@ export function createCasimirIndependentNumericalVerifierJobService(
     };
   };
   return {
+    inspectConfiguration,
     prepareRequest,
     plan,
     start,
@@ -999,6 +1039,8 @@ export const installCasimirIndependentNumericalVerifierDependenciesForServerV1 =
 export const prepareCasimirIndependentNumericalVerifierRequestV1 = (
   input: Parameters<typeof defaultService.prepareRequest>[0],
 ) => defaultService.prepareRequest(input);
+export const inspectCasimirIndependentNumericalVerifierRuntimeV1 = () =>
+  defaultService.inspectConfiguration();
 export const planCasimirIndependentNumericalVerifierJobV1 = (
   input: Parameters<typeof defaultService.plan>[0],
 ) => defaultService.plan(input);

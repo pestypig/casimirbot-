@@ -1,0 +1,248 @@
+{
+  "schema_version": "casimir_dp_cross_scale_metrology_stage4_2d/1",
+  "study_id": "casimir-dp-quantum-foam-study-v1",
+  "campaign_id": "casimir-dp-cross-scale-metrology-stage4-2d-v1",
+  "implementation_version": "stage4.2d-v1",
+  "evidence_cutoff": "2026-07-28T16:00:00.000Z",
+  "evidence_class": "synthetic_fixture",
+  "claim_ceiling": "spectroscopic_field_metrology_and_classical_gravity_recovery_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "authority_manifest": {
+    "path": "configs/research/casimir-dp-stage4-2d-authorities.v1.json",
+    "sha256": "721e0ffbcc26425236d62ba2d368fc8cabec9ba469d5dfac89a707e90d42dcb1"
+  },
+  "upstream_authorities": [
+    {
+      "role": "stage4_2c_config",
+      "path": "configs/research/casimir-dp-identifiability-redesign-stage4-2c.v1.json",
+      "sha256": "81f6109525202f57b6e5958373b37ec18d15dfff0ddc9ad0af274b8a294af6aa",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2c_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-2c-authorities.v1.json",
+      "sha256": "7f3a7fb7bfc748b1e92427da0c649bb73ce99fd4ebf9a20414a5a7fa1b5604e7",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2c_fixture",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2c-campaign.synthetic.v1.json",
+      "sha256": "f576c20c05cee3d29ed0198bfc4056a0540a3f89199d1babb6ebde9dfaa1d45d",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2c_report",
+      "path": "artifacts/research/casimir-dp-identifiability-redesign-stage4-2c/casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z/identifiability-redesign-stage4-2c-report.json",
+      "sha256": "d9237eeb9079e7fab84a86b3eda28b0f14bb83be1a340b3d6f9695dcffb5047c",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2c_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-identifiability-redesign-stage4-2c/casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z/identifiability-redesign-stage4-2c-receipt.json",
+      "sha256": "59cca7ab7f6f6a3d27a83ad8b455fc63fc6db3ca7207cdeff350ed97d497865c",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2c_verification_receipt",
+      "path": "docs/research/casimir-dp-identifiability-redesign-stage4-2c-verification-receipt.json",
+      "sha256": "51c461db1fdaa29162b2c5287a31c01823e5bb23b16a25fe2914841239abba98",
+      "required_at_runtime": true
+    }
+  ],
+  "immutable_stage4_2c": {
+    "campaign_run_id": "casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z",
+    "selected_candidate_id": "silica_high_mass_identifiable",
+    "required_paired_windows": 542,
+    "physical_pilot_readiness": "not_ready",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  },
+  "sources": [
+    {
+      "source_id": "penrose_spinor_1960",
+      "title": "A spinor approach to general relativity",
+      "url": "https://doi.org/10.1016/0003-4916(60)90021-X",
+      "source_class": "primary_research",
+      "supports": "Spinor representation of curvature and source-free electromagnetism; the paper explicitly attempts no quantization.",
+      "does_not_support": "Mass as a spinor, a Maxwell-to-collapse transfer, or objective reduction."
+    },
+    {
+      "source_id": "penrose_or_1996",
+      "title": "On Gravity's role in Quantum State Reduction",
+      "url": "https://doi.org/10.1007/BF02105068",
+      "source_class": "primary_research",
+      "supports": "A proposed lifetime of order hbar over the gravitational self-energy of the difference between two mass distributions.",
+      "does_not_support": "Schwarzschild-horizon formation or a Casimir-boundary modifier."
+    },
+    {
+      "source_id": "diosi_master_equation_1987",
+      "title": "A universal master equation for the gravitational violation of quantum mechanics",
+      "url": "https://doi.org/10.1016/0375-9601(87)90681-5",
+      "source_class": "primary_research",
+      "supports": "A mass-distribution-dependent gravitationally motivated coherence-damping model.",
+      "does_not_support": "A spectroscopic, spinor, blackbody, Jeans, potato-radius, or Schwarzschild transfer into the collapse rate."
+    },
+    {
+      "source_id": "nist_zeeman",
+      "title": "NIST Atomic Spectroscopy: Zeeman Effect",
+      "url": "https://www.nist.gov/pml/atomic-spectroscopy-compendium-basic-ideas-notation-data-and-formulas/atomic-spectroscopy-zeeman",
+      "source_class": "official_reference",
+      "supports": "The weak-field energy shift Delta E equals g M mu_B B and polarization-resolved Zeeman spectroscopy.",
+      "does_not_support": "Gravity-related collapse or a DP response."
+    },
+    {
+      "source_id": "nist_rydberg_stark_2022",
+      "title": "Electromagnetically induced transparency based Rydberg-atom sensor for traceable voltage measurements",
+      "url": "https://doi.org/10.1116/5.0097746",
+      "source_class": "primary_research",
+      "supports": "Stark spectroscopy as an electric-field and voltage calibration method with an uncertainty budget.",
+      "does_not_support": "A universal apparatus coefficient or a transfer from electric-field frequency shifts to collapse."
+    },
+    {
+      "source_id": "blackbody_stark_1997",
+      "title": "Experimental Verification of the Shift of the Cesium Hyperfine Transition Frequency due to Blackbody Radiation",
+      "url": "https://doi.org/10.1103/PhysRevLett.78.622",
+      "source_class": "primary_research",
+      "supports": "A measured dynamic Stark frequency shift caused by blackbody electromagnetic fields.",
+      "does_not_support": "A thermal or blackbody contribution to Gamma_DP."
+    },
+    {
+      "source_id": "potato_radius_2010",
+      "title": "The Potato Radius: a Lower Minimum Size for Dwarf Planets",
+      "url": "https://arxiv.org/abs/1004.1091",
+      "source_class": "primary_research",
+      "supports": "An approximately 200 to 300 km self-gravity versus material-strength shape crossover.",
+      "does_not_support": "A universal gravity-onset density or quantum-collapse threshold."
+    },
+    {
+      "source_id": "jeans_molecular_cloud_2023",
+      "title": "Unravelling the structure of magnetized molecular clouds with SILCC-Zoom",
+      "url": "https://academic.oup.com/mnras/article/525/1/721/7222386",
+      "source_class": "primary_research",
+      "supports": "The thermal Jeans length c_s sqrt(pi over G rho) as a pressure-support versus self-gravity scale, with magnetic extensions.",
+      "does_not_support": "A microscopic collapse law or a density at which gravity begins to exist."
+    },
+    {
+      "source_id": "nasa_schwarzschild",
+      "title": "NASA Imagine the Universe: Black Holes",
+      "url": "https://imagine.gsfc.nasa.gov/science/objects/black_holes2.html",
+      "source_class": "official_reference",
+      "supports": "The nonrotating Schwarzschild radius 2GM over c squared and horizon compactness.",
+      "does_not_support": "The Diósi-Penrose collapse criterion."
+    }
+  ],
+  "constants": {
+    "h_J_s": 6.62607015e-34,
+    "mu_B_J_T": 9.2740100657e-24,
+    "G_m3_kg_s2": 6.6743e-11,
+    "c_m_s": 299792458,
+    "k_B_J_K": 1.380649e-23,
+    "m_u_kg": 1.66053906892e-27,
+    "parsec_m": 30856775814913673,
+    "solar_mass_kg": 1.98847e30,
+    "solar_radius_m": 695700000
+  },
+  "spectroscopic_witness": {
+    "evidence_class": "design_assumption",
+    "measured_response_available": false,
+    "zeeman": {
+      "lande_g": 1,
+      "magnetic_quantum_number": 1,
+      "magnetic_field_T": 0.00005,
+      "magnetic_field_standard_uncertainty_T": 1e-9
+    },
+    "stark": {
+      "differential_polarizability_Hz_per_V2_m2": 0.0002,
+      "electric_field_V_m": 100,
+      "electric_field_standard_uncertainty_V_m": 0.1
+    },
+    "blackbody_dynamic_stark": {
+      "coefficient_Hz_K4": -1.9e-14,
+      "temperature_K": 300,
+      "reference_temperature_K": 0.001,
+      "temperature_standard_uncertainty_K": 0.1
+    },
+    "circular_polarization": {
+      "sigma_plus_delta_m": 1,
+      "sigma_minus_delta_m": -1,
+      "handedness_convention_frozen": true
+    }
+  },
+  "gravitational_recovery": {
+    "compactness_cases": [
+      {
+        "case_id": "sun",
+        "mass_kg": 1.98847e30,
+        "radius_m": 695700000,
+        "expected_compactness_max": 0.000005
+      },
+      {
+        "case_id": "stage4_2c_selected_object",
+        "mass_kg": 1.94385e-16,
+        "radius_m": 2.76302362398029e-7,
+        "expected_compactness_max": 2e-36
+      }
+    ],
+    "potato_crossover": {
+      "density_kg_m3": 2500,
+      "yield_strength_Pa": 50000000,
+      "expected_radius_min_m": 200000,
+      "expected_radius_max_m": 300000,
+      "geometry_coefficient": 2.0943951023931953
+    },
+    "jeans_crossover": {
+      "temperature_K": 10,
+      "molecular_weight_u": 2.33,
+      "number_density_m3": 100000000000,
+      "expected_jeans_length_min_m": 1.5e15,
+      "expected_jeans_length_max_m": 2.5e15
+    }
+  },
+  "hypothesis_policy": {
+    "ordinary_physics_null": "registered_and_profiled",
+    "frozen_mass_density_dp": "registered_nonrelativistic_markovian_mass_density_dp",
+    "registered_dp_generator_mutated": false,
+    "transfer_kernel_registered": false,
+    "spectroscopic_or_gravity_recovery_as_dp_kernel": false,
+    "spinor_as_mass_or_collapse_generator": false
+  },
+  "thresholds": {
+    "maximum_algebraic_relative_error": 1e-12,
+    "minimum_covariance_diagonal": 1e-30,
+    "maximum_covariance_asymmetry": 1e-18
+  },
+  "fixture": {
+    "path": "configs/research/fixtures/casimir-dp-stage4-2d-cross-scale.synthetic.v1.json",
+    "sha256": "9fb2f66f5d454aafde3c65e058c2c94c7279d4a5e821bd4b2c359cae6e12ab85"
+  },
+  "run_order": [
+    "verify_immutable_stage4_2c_authority_tuples",
+    "freeze_primary_and_official_source_support_boundaries",
+    "freeze_constants_units_and_frequency_conventions",
+    "evaluate_weak_field_zeeman_witness",
+    "evaluate_static_stark_witness",
+    "evaluate_blackbody_dynamic_stark_witness",
+    "construct_spectroscopic_response_and_covariance_receipt",
+    "recover_schwarzschild_compactness_limits",
+    "recover_material_strength_gravity_crossover",
+    "recover_jeans_pressure_gravity_crossover",
+    "enforce_spinor_representation_nonbridge",
+    "compare_equations_by_transfer_recovery_and_nonbridge_class",
+    "verify_registered_dp_generator_unchanged",
+    "execute_fail_closed_fixture_matrix",
+    "write_claim_nonclaim_and_empirical_pilot_ledger",
+    "write_content_addressed_report_trace_and_receipt"
+  ],
+  "final_status_policy": {
+    "software_and_recovery_diagnostics": "pass",
+    "spectroscopic_response_authority": "not_ready",
+    "physical_pilot_readiness": "not_ready",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  }
+}

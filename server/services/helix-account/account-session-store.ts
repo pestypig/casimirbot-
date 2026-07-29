@@ -15,6 +15,7 @@ import {
   HELIX_ACCOUNT_SESSION_SCHEMA,
   HELIX_ACCOUNT_SESSION_STATUS_SCHEMA,
 } from "@shared/helix-account-session";
+import { HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS } from "@shared/helix-environment-connector";
 import { ensureDatabase, getPool, resetDbClient } from "../../db/client";
 import { getHelixThreadLedgerEvents } from "../helix-thread/ledger";
 import { listDiscordVoiceSessions } from "../situation-room/discord-session-store";
@@ -149,6 +150,42 @@ export const isGuestSharedRealtimeRoomHostingEnabled = (): boolean =>
   isSharedRealtimeRoomsPublicExperimentEnabled() &&
   envEnabled("HELIX_GUEST_ROOM_CREATION");
 
+export const isGuestSharedRealtimeRoomSourceIngressEnabled = (): boolean =>
+  isGuestSharedRealtimeRoomHostingEnabled() &&
+  (
+    !isProductionRuntime() ||
+    envEnabled("HELIX_GUEST_ROOM_SOURCE_INGRESS")
+  );
+
+const GUEST_ROOM_SOURCE_CAPABILITY_IDS = [
+  "room.evidence.read_bound",
+  ...HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+] as const;
+
+const buildSharedRealtimeRoomsSessionPolicy = (
+  accountType: HelixAccountType,
+  options: { guestSession?: boolean } = {},
+): HelixAccountCapabilityPolicy => {
+  const policy = buildHelixSharedRealtimeRoomsExperimentPolicy(accountType);
+  if (
+    options.guestSession &&
+    isGuestSharedRealtimeRoomSourceIngressEnabled()
+  ) {
+    if (!policy.feature_flags.includes("room_source_ingress")) {
+      policy.feature_flags.push("room_source_ingress");
+    }
+    policy.locked_features = policy.locked_features.filter(
+      (feature) => feature !== "room_source_ingress",
+    );
+    for (const capabilityId of GUEST_ROOM_SOURCE_CAPABILITY_IDS) {
+      if (!policy.allowed_workstation_capabilities.includes(capabilityId)) {
+        policy.allowed_workstation_capabilities.push(capabilityId);
+      }
+    }
+  }
+  return policy;
+};
+
 const GUEST_ROOM_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 const readStoredPolicy = (
@@ -183,6 +220,7 @@ export const resolveEffectiveAccountPolicyFromStoredRow = (
   row: {
     account_type: unknown;
     account_policy: unknown;
+    provider?: unknown;
   },
 ): HelixAccountCapabilityPolicy => {
   const accountType = normalizeAccountType(row.account_type) ?? "user";
@@ -193,7 +231,9 @@ export const resolveEffectiveAccountPolicyFromStoredRow = (
       storedPolicyHasSharedRoomsExperiment(row.account_policy)
     )
   ) {
-    return buildHelixSharedRealtimeRoomsExperimentPolicy(accountType);
+    return buildSharedRealtimeRoomsSessionPolicy(accountType, {
+      guestSession: normalize(row.provider).toLowerCase() === "guest",
+    });
   }
   return policyForAccountType(accountType);
 };
@@ -839,8 +879,9 @@ export async function setSharedRealtimeRoomsExperiment(input: {
   }
 
   if (existingSession) {
-    const experimentalPolicy = buildHelixSharedRealtimeRoomsExperimentPolicy(
+    const experimentalPolicy = buildSharedRealtimeRoomsSessionPolicy(
       existingSession.account_policy.account_type,
+      { guestSession: existingSession.profile.auth_mode === "guest" },
     );
     await ensureDatabase();
     await getPool().query(
@@ -870,7 +911,9 @@ export async function setSharedRealtimeRoomsExperiment(input: {
   });
   const guestSession = await insertSession({
     account: guestAccount,
-    account_policy: buildHelixSharedRealtimeRoomsExperimentPolicy("user"),
+    account_policy: buildSharedRealtimeRoomsSessionPolicy("user", {
+      guestSession: true,
+    }),
     memory_scope: "session_only",
     expires_at: new Date(Date.now() + GUEST_ROOM_SESSION_TTL_MS).toISOString(),
   });

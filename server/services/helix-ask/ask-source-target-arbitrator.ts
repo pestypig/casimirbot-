@@ -6,7 +6,10 @@ import {
   type HelixAskSourceTargetStrength,
 } from "@shared/helix-ask-source-target-intent";
 import type { HelixActiveWorkspaceSourceResolution } from "@shared/helix-active-workspace-source-resolution";
-import { asksForScientificImageTextEvidenceComparison } from "@shared/helix-scientific-image-intent";
+import {
+  asksForScientificImageEvidenceContinuity,
+  asksForScientificImageTextEvidenceComparison,
+} from "@shared/helix-scientific-image-intent";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import {
   isSceneEpochReplayPrompt,
@@ -66,6 +69,10 @@ import {
   isAffirmativeTheoryBadgeGraphReflectionPrompt,
   isTheoryBadgeGraphCurrentContextPrompt,
 } from "./theory-badge-graph-current-context-intent";
+import {
+  isAffirmativeImmediateMinecraftSituationPrompt,
+  isMinecraftSituationSessionSetupPrompt,
+} from "./minecraft-situation-intent";
 
 export {
   isStagePlayCheckpointRequestPrompt,
@@ -112,15 +119,25 @@ const isExplicitModelOnlyPrompt = (prompt: string): boolean => {
     );
   return (
     fullyNegatedSourceExamples ||
-    Boolean(contextualSuppression) &&
-    !(mutatingWriteOnlySuppression && isExplicitEvidenceSourceRequest(prompt)) &&
-    !affirmativeDocsRequirement &&
-    !affirmativeScholarlyRequirement
-  ) ||
-    /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|workstation(?:\s+tools?)?|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
-    /\b(?:do\s+not|don'?t)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|workstation(?:\s+tools?)?|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
-    /\bno\s+(?:workspace|docs?|source|screen|visual)\s+(?:lookup|use|search|context)\b/i.test(prompt) ||
-    /\b(?:background\s+only|background\s+mode|general\s+(?:knowledge|reasoning)|just\s+answer\s+from\s+general\s+reasoning)\b/i.test(prompt);
+    (Boolean(contextualSuppression) &&
+      !(
+        mutatingWriteOnlySuppression && isExplicitEvidenceSourceRequest(prompt)
+      ) &&
+      !affirmativeDocsRequirement &&
+      !affirmativeScholarlyRequirement) ||
+    /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|workstation(?:\s+tools?)?|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(
+      prompt,
+    ) ||
+    /\b(?:do\s+not|don'?t)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|workstation(?:\s+tools?)?|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(
+      prompt,
+    ) ||
+    /\bno\s+(?:workspace|docs?|source|screen|visual)\s+(?:lookup|use|search|context)\b/i.test(
+      prompt,
+    ) ||
+    /\b(?:background\s+only|background\s+mode|general\s+(?:knowledge|reasoning)|just\s+answer\s+from\s+general\s+reasoning)\b/i.test(
+      prompt,
+    )
+  );
 };
 
 const isStructuredDocsViewerPrompt = (prompt: string): boolean => {
@@ -133,8 +150,11 @@ const isStructuredDocsViewerPrompt = (prompt: string): boolean => {
     /\bReturn\s+a\s+short\s+"?Locations:"?\s+list\b/i.test(prompt) ||
     /\banchors?\/sections?\b/i.test(prompt) ||
     /\bevidence\s+snippets?\b/i.test(prompt);
-  return (docsViewerCue && (structuredPathCue || locateQueryCue || locationsListCue)) ||
-    (structuredPathCue && locateQueryCue && locationsListCue);
+  return (
+    (docsViewerCue &&
+      (structuredPathCue || locateQueryCue || locationsListCue)) ||
+    (structuredPathCue && locateQueryCue && locationsListCue)
+  );
 };
 
 const isDocsViewerTopicLabelPrompt = (prompt: string): boolean => {
@@ -179,8 +199,14 @@ const isDocsPanelOpenPrompt = (prompt: string): boolean => {
     .replace(/\s+/g, " ")
     .trim();
   if (!normalized) return false;
-  return /(?:^|[.?!]\s+)(?:(?:can|could|would)\s+you\s+)?(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to)\s+(?:(?:the|a)\s+)?(?:docs?|documents?)(?:\s+(?:viewer|panel|dock))?(?:\s|[.?!,]|$)/i.test(normalized) &&
-    !/\b(?:docs?|documents?)\s+(?:about|on|regarding|for|named|called|matching)\b/i.test(normalized);
+  return (
+    /(?:^|[.?!]\s+)(?:(?:can|could|would)\s+you\s+)?(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to)\s+(?:(?:the|a)\s+)?(?:docs?|documents?)(?:\s+(?:viewer|panel|dock))?(?:\s|[.?!,]|$)/i.test(
+      normalized,
+    ) &&
+    !/\b(?:docs?|documents?)\s+(?:about|on|regarding|for|named|called|matching)\b/i.test(
+      normalized,
+    )
+  );
 };
 
 const isExplicitDocumentAcquisitionPrompt = (prompt: string): boolean =>
@@ -216,7 +242,9 @@ const isAffirmativeLocalDocumentEvidencePrompt = (prompt: string): boolean => {
     /\b(?:check|use|from|in|inside|look\s+in|look\s+at|consult|according\s+to|where|find|locate|reported|stated|specified|listed|table|row|source|cite|citation|evidence|white\s*paper)\b/i.test(prompt);
   const valueCue =
     /\b(?:load[-\s]?bearing|lbs?|pounds?|numeric|value|capacity|spec(?:ification)?s?|engineering|parameter|measurement|reported|stated)\b/i.test(prompt);
-  return evidenceCue && (valueCue || /\b(?:NHM[-\s]?2|casimir|tile)\b/i.test(prompt));
+  return (
+    evidenceCue && (valueCue || /\b(?:NHM[-\s]?2|casimir|tile)\b/i.test(prompt))
+  );
 };
 
 const isAffirmativeDocsSearchPrompt = (prompt: string): boolean => {
@@ -590,8 +618,12 @@ const toSourceTargetIntent = (input: {
   const mustEnterBackendAsk =
     hardSourceTarget &&
     input.allowNoToolDirect !== true;
-  const allowClientShortcut = hardSourceTarget ? false : input.allowClientShortcut ?? !mustEnterBackendAsk;
-  const allowNoToolDirect = hardSourceTarget ? false : input.allowNoToolDirect ?? !mustEnterBackendAsk;
+  const allowClientShortcut = hardSourceTarget
+    ? false
+    : (input.allowClientShortcut ?? !mustEnterBackendAsk);
+  const allowNoToolDirect = hardSourceTarget
+    ? false
+    : (input.allowNoToolDirect ?? !mustEnterBackendAsk);
   return {
     schema: HELIX_ASK_SOURCE_TARGET_INTENT_SCHEMA,
     turn_id: input.turnId,
@@ -689,6 +721,28 @@ export function arbitrateAskSourceTarget(input: {
   activeWorkspaceSourceResolution?: HelixActiveWorkspaceSourceResolution | Record<string, unknown> | null;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
+  if (isMinecraftSituationSessionSetupPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "workspace_panel",
+      targetKind: "workspace_panel",
+      strength: "hard",
+      explicitCues: ["minecraft_situation_session_setup"],
+      reasons: ["minecraft_situation_session_setup_is_action_not_evidence"],
+      requestedOutputs: [],
+      suppressedRoutes: [
+        "world_event_current_state",
+        "live_environment_current_state",
+        "model_only_answer",
+      ],
+      precedenceReason:
+        "minecraft_situation_session_setup_is_action_not_evidence",
+      confidence: 0.98,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   const evidenceTargetArbitration = buildAskEvidenceTargetArbitration({
     turnId: input.turnId,
     threadId: input.threadId,
@@ -697,17 +751,30 @@ export function arbitrateAskSourceTarget(input: {
   const selectedEvidenceCandidate = evidenceTargetArbitration.evidence_target_candidates.find(
     (candidate) => candidate.candidate_id === evidenceTargetArbitration.selected_candidate_id,
   );
-  if (asksForScientificImageTextEvidenceComparison(prompt)) {
+  const scientificImageContinuityRequested =
+    asksForScientificImageEvidenceContinuity(prompt);
+  if (
+    scientificImageContinuityRequested ||
+    asksForScientificImageTextEvidenceComparison(prompt)
+  ) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
       target: "scientific_image_evidence",
       targetKind: "scientific_image_evidence",
       strength: "hard",
-      explicitCues: ["affirmative_scientific_image_text_comparison"],
+      explicitCues: [
+        scientificImageContinuityRequested
+          ? "affirmative_retained_scientific_image_evidence_continuity"
+          : "affirmative_scientific_image_text_comparison",
+      ],
       reasons: [
-        "retained_machine_readable_text_and_image_lens_comparison_requested",
-        "affirmative_comparison_precedes_contextual_non_promotion_clause",
+        scientificImageContinuityRequested
+          ? "retained_scientific_image_evidence_identity_requested"
+          : "retained_machine_readable_text_and_image_lens_comparison_requested",
+        scientificImageContinuityRequested
+          ? "retained_sidecar_reentry_precedes_scholarly_intent"
+          : "affirmative_comparison_precedes_contextual_non_promotion_clause",
       ],
       requestedOutputs: ["current_visual_state", "typed_failure"],
       suppressedRoutes: [
@@ -716,7 +783,9 @@ export function arbitrateAskSourceTarget(input: {
         "fresh_image_lens_capture",
         "client_shortcut",
       ],
-      precedenceReason: "affirmative_scientific_image_text_comparison",
+      precedenceReason: scientificImageContinuityRequested
+        ? "affirmative_retained_scientific_image_evidence_continuity"
+        : "affirmative_scientific_image_text_comparison",
       confidence: 0.99,
       allowClientShortcut: false,
       allowNoToolDirect: false,
@@ -957,7 +1026,9 @@ export function arbitrateAskSourceTarget(input: {
       targetKind: "docs_viewer",
       strength: "hard",
       explicitCues: [
-        namedDocRelationPrompt ? "named_doc_relation" : "natural_docs_topic_summary",
+        namedDocRelationPrompt
+          ? "named_doc_relation"
+          : "natural_docs_topic_summary",
         topicDocSummaryQuery,
       ],
       reasons: [
@@ -969,7 +1040,7 @@ export function arbitrateAskSourceTarget(input: {
       requestedOutputs: [
         "file_path",
         "doc_summary",
-        ...(namedDocRelationPrompt ? ["line_backed_source"] as const : []),
+        ...(namedDocRelationPrompt ? (["line_backed_source"] as const) : []),
         "tool_call_eligibility",
         "typed_failure",
       ],
@@ -1324,9 +1395,24 @@ export function arbitrateAskSourceTarget(input: {
       targetKind: "visual_capture",
       strength: "hard",
       explicitCues: ["live_capture_content"],
-      reasons: ["explicit_live_capture_content_source_target", "live_capture_content"],
-      requestedOutputs: ["current_visual_state", "field_evaluation_refs", "interpretation_refs", "typed_failure"],
-      suppressedRoutes: ["active_doc_identity", "active_doc_summary", "doc_open_best", "live_pipeline_control", "model_only_concept", "no_tool_direct"],
+      reasons: [
+        "explicit_live_capture_content_source_target",
+        "live_capture_content",
+      ],
+      requestedOutputs: [
+        "current_visual_state",
+        "field_evaluation_refs",
+        "interpretation_refs",
+        "typed_failure",
+      ],
+      suppressedRoutes: [
+        "active_doc_identity",
+        "active_doc_summary",
+        "doc_open_best",
+        "live_pipeline_control",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
       precedenceReason: "explicit_live_capture_content_source_target",
       confidence: 0.96,
       allowClientShortcut: false,
@@ -1647,9 +1733,24 @@ export function arbitrateAskSourceTarget(input: {
       targetKind: "visual_capture",
       strength: "hard",
       explicitCues: ["live_capture_content"],
-      reasons: ["explicit_live_capture_content_source_target", "live_capture_content"],
-      requestedOutputs: ["current_visual_state", "field_evaluation_refs", "interpretation_refs", "typed_failure"],
-      suppressedRoutes: ["active_doc_identity", "active_doc_summary", "doc_open_best", "live_pipeline_control", "model_only_concept", "no_tool_direct"],
+      reasons: [
+        "explicit_live_capture_content_source_target",
+        "live_capture_content",
+      ],
+      requestedOutputs: [
+        "current_visual_state",
+        "field_evaluation_refs",
+        "interpretation_refs",
+        "typed_failure",
+      ],
+      suppressedRoutes: [
+        "active_doc_identity",
+        "active_doc_summary",
+        "doc_open_best",
+        "live_pipeline_control",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
       precedenceReason: "explicit_live_capture_content_source_target",
       confidence: 0.96,
       allowClientShortcut: false,
@@ -1761,7 +1862,9 @@ export function arbitrateAskSourceTarget(input: {
     });
   }
   if (isExplicitProcessGraphPrompt(prompt)) {
-    const processGraphRule = rules.find((rule: CueRule) => rule.target === "process_graph");
+    const processGraphRule = rules.find(
+      (rule: CueRule) => rule.target === "process_graph",
+    );
     if (processGraphRule) {
       const explicitCues = matches(prompt, processGraphRule.cues);
       return toSourceTargetIntent({
@@ -1770,8 +1873,12 @@ export function arbitrateAskSourceTarget(input: {
         target: processGraphRule.target,
         targetKind: processGraphRule.targetKind,
         strength: processGraphRule.strength,
-        explicitCues: explicitCues.length > 0 ? explicitCues : ["process_graph"],
-        reasons: [processGraphRule.reason, ...(explicitCues.length > 0 ? explicitCues : ["process_graph"])],
+        explicitCues:
+          explicitCues.length > 0 ? explicitCues : ["process_graph"],
+        reasons: [
+          processGraphRule.reason,
+          ...(explicitCues.length > 0 ? explicitCues : ["process_graph"]),
+        ],
         requestedOutputs: processGraphRule.requestedOutputs,
         suppressedRoutes: processGraphRule.suppressedRoutes,
         precedenceReason: processGraphRule.reason,
@@ -1785,11 +1892,19 @@ export function arbitrateAskSourceTarget(input: {
   if (
     activeWorkspaceResolution &&
     typeof activeWorkspaceResolution === "object" &&
-    (activeWorkspaceResolution as Record<string, unknown>).schema === "helix.active_workspace_source_resolution.v1"
+    (activeWorkspaceResolution as Record<string, unknown>).schema ===
+      "helix.active_workspace_source_resolution.v1"
   ) {
-    const resolvedSourceTarget = (activeWorkspaceResolution as Record<string, unknown>).resolved_source_target;
-    const reason = String((activeWorkspaceResolution as Record<string, unknown>).reason ?? "");
-    if (resolvedSourceTarget === "active_doc" || resolvedSourceTarget === "docs_viewer") {
+    const resolvedSourceTarget = (
+      activeWorkspaceResolution as Record<string, unknown>
+    ).resolved_source_target;
+    const reason = String(
+      (activeWorkspaceResolution as Record<string, unknown>).reason ?? "",
+    );
+    if (
+      resolvedSourceTarget === "active_doc" ||
+      resolvedSourceTarget === "docs_viewer"
+    ) {
       const target = resolvedSourceTarget;
       const evidenceFollowup = reason === "active_doc_evidence_followup";
       return toSourceTargetIntent({
@@ -1799,17 +1914,33 @@ export function arbitrateAskSourceTarget(input: {
         targetKind: target,
         strength: "hard",
         explicitCues: [reason || "active_workspace_source_resolution"],
-        reasons: ["active_workspace_source_resolution", reason || "active_workspace_source_resolution"],
+        reasons: [
+          "active_workspace_source_resolution",
+          reason || "active_workspace_source_resolution",
+        ],
         requestedOutputs: evidenceFollowup
-          ? ["file_path", "line_backed_source", "doc_evidence_synthesis_answer", "typed_failure"]
+          ? [
+              "file_path",
+              "line_backed_source",
+              "doc_evidence_synthesis_answer",
+              "typed_failure",
+            ]
           : ["file_path"],
-        suppressedRoutes: ["situation_context_question", "visual_deictic", "visual_frame_evidence", "model_only_concept"],
+        suppressedRoutes: [
+          "situation_context_question",
+          "visual_deictic",
+          "visual_frame_evidence",
+          "model_only_concept",
+        ],
         precedenceReason: evidenceFollowup
           ? "active_doc_evidence_followup_source_target"
           : "active_workspace_source_resolution",
-        confidence: typeof (activeWorkspaceResolution as Record<string, unknown>).confidence === "number"
-          ? (activeWorkspaceResolution as Record<string, unknown>).confidence as number
-          : 0.9,
+        confidence:
+          typeof (activeWorkspaceResolution as Record<string, unknown>)
+            .confidence === "number"
+            ? ((activeWorkspaceResolution as Record<string, unknown>)
+                .confidence as number)
+            : 0.9,
         allowClientShortcut: false,
         allowNoToolDirect: false,
       });
@@ -1885,7 +2016,9 @@ export function arbitrateAskSourceTarget(input: {
     });
   }
   if (isExplicitProcessGraphPrompt(prompt)) {
-    const processGraphRule = rules.find((rule: CueRule) => rule.target === "process_graph");
+    const processGraphRule = rules.find(
+      (rule: CueRule) => rule.target === "process_graph",
+    );
     if (processGraphRule) {
       const explicitCues = matches(prompt, processGraphRule.cues);
       return toSourceTargetIntent({
@@ -1894,8 +2027,12 @@ export function arbitrateAskSourceTarget(input: {
         target: processGraphRule.target,
         targetKind: processGraphRule.targetKind,
         strength: processGraphRule.strength,
-        explicitCues: explicitCues.length > 0 ? explicitCues : ["process_graph"],
-        reasons: [processGraphRule.reason, ...(explicitCues.length > 0 ? explicitCues : ["process_graph"])],
+        explicitCues:
+          explicitCues.length > 0 ? explicitCues : ["process_graph"],
+        reasons: [
+          processGraphRule.reason,
+          ...(explicitCues.length > 0 ? explicitCues : ["process_graph"]),
+        ],
         requestedOutputs: processGraphRule.requestedOutputs,
         suppressedRoutes: processGraphRule.suppressedRoutes,
         precedenceReason: processGraphRule.reason,
@@ -1980,6 +2117,32 @@ export function arbitrateAskSourceTarget(input: {
         allowNoToolDirect: procedureMemoryRule.allowNoToolDirect,
       });
     }
+  }
+  if (isAffirmativeImmediateMinecraftSituationPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "world_event",
+      targetKind: "world_event",
+      strength: "hard",
+      explicitCues: ["affirmative_immediate_game_situation_observation"],
+      reasons: [
+        "explicit_world_event_source_target",
+        "affirmative_immediate_game_situation_observation",
+      ],
+      requestedOutputs: ["procedure_epoch_replay"],
+      suppressedRoutes: [
+        "active_doc_identity",
+        "active_doc_summary",
+        "situation_context_question",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "affirmative_immediate_game_situation_observation",
+      confidence: 0.94,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
   }
   for (const rule of rules) {
     if (rule.target === "docs_viewer" && isDocsViewerTopicLabelPrompt(prompt)) {

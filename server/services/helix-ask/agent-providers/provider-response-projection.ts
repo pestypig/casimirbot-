@@ -299,6 +299,20 @@ export const buildHelixAgentProviderAskPayload = (input: {
     runtimeSelectionTrace: input.runtimeSelectionTrace,
     gatewayManifest: input.gatewayManifest,
   });
+  const conversationMemoryPacket =
+    input.requestBody?.conversation_memory_packet ?? null;
+  const conversationalReferentResolution =
+    projectionFields.conversational_referent_resolution ??
+    input.requestBody?.conversational_referent_resolution ??
+    null;
+  const docsContinuationContract =
+    input.providerResult.docs_continuation_contract ??
+    input.requestBody?.docs_continuation_contract ??
+    null;
+  const runtimeContinuationHints =
+    input.providerResult.runtime_continuation_hints ??
+    input.requestBody?.runtime_continuation_hints ??
+    [];
 
   const payload = {
     ...input.providerResult,
@@ -307,6 +321,10 @@ export const buildHelixAgentProviderAskPayload = (input: {
     ...routeEvidenceAuthorityProjection,
     ...routeProductContractProjection,
     ...projectionFields,
+    conversation_memory_packet: conversationMemoryPacket,
+    conversational_referent_resolution: conversationalReferentResolution,
+    docs_continuation_contract: docsContinuationContract,
+    runtime_continuation_hints: runtimeContinuationHints,
     debug: {
       ...providerDebug,
       turn_id: input.turnId,
@@ -314,6 +332,10 @@ export const buildHelixAgentProviderAskPayload = (input: {
       ...routeEvidenceAuthorityProjection,
       ...routeProductContractProjection,
       ...projectionFields,
+      conversation_memory_packet: conversationMemoryPacket,
+      conversational_referent_resolution: conversationalReferentResolution,
+      docs_continuation_contract: docsContinuationContract,
+      runtime_continuation_hints: runtimeContinuationHints,
     },
   };
   return sanitizeHelixAgentProviderPublicPayload(payload);

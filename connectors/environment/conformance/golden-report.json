@@ -1,0 +1,23 @@
+{
+  "schema": "helix.environment_connector.conformance_report.v1",
+  "contract_version": "v1",
+  "fixture": "system-clock-and-synthetic",
+  "checks": [
+    "namespaced_capability_identity",
+    "constrained_input_schema",
+    "constrained_output_schema",
+    "read_only_true",
+    "side_effects_allowed_false",
+    "commands_executed_empty",
+    "environment_mutation_performed_false",
+    "generic_lease_transport",
+    "capability_mismatch_rejected",
+    "credential_not_persisted_by_mock",
+    "minecraft_concepts_absent_from_system_clock"
+  ],
+  "verdict": "PASS",
+  "limitations": [
+    "The Java helper requires JDK 21 and is verified in a JDK-capable build environment."
+  ]
+}
+

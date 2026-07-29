@@ -2368,10 +2368,13 @@ export function buildAskTurnSolverTrace(input: {
   const providerObservationReentryRefs = providerProjectionCompletesReasoning
     ? readStringArray(providerReasoningReentry?.normalized_observation_refs)
     : [];
-  const effectiveObservationReentryRefs =
-    runtimeObservationReentryRefs.length > 0
-      ? runtimeObservationReentryRefs
-      : providerObservationReentryRefs;
+  // The runtime log records the exact gateway artifact IDs while the verified
+  // provider bridge can add normalized aliases derived from those observations.
+  // Both identities belong to the same completed current-turn re-entry.
+  const effectiveObservationReentryRefs = unique([
+    ...runtimeObservationReentryRefs,
+    ...providerObservationReentryRefs,
+  ]);
   const effectivePostObservationReasoningCompleted =
     runtimePostObservationReasoningCompleted === true ||
     providerProjectionCompletesReasoning;
@@ -2420,16 +2423,27 @@ export function buildAskTurnSolverTrace(input: {
       ? false
       : undefined,
   });
+  const verifiedRouteApprovedSelfTerminalProduct =
+    routeApprovedSelfTerminalProduct &&
+    committedRouteCompatibility.compatible &&
+    Boolean(verifiedRuntimeLifecycle) &&
+    runtimeLifecycleCycleCompleted &&
+    evidenceReentryGate.completed &&
+    readBoolean(
+      readRecord(input.payload.terminal_answer_authority)?.server_authoritative,
+    );
   const routeAuthorityOk =
     readBoolean(loopTrace?.route_authority_ok) ||
     readBoolean(
       readRecord(input.payload.route_authority_audit)?.route_authority_ok,
     ) ||
+    verifiedRouteApprovedSelfTerminalProduct ||
     compoundFinalArbitrationMaterialized ||
     providerFinalArbitrationMaterialized;
   const poisonAuditOk =
     readBoolean(loopTrace?.poison_audit_ok) ||
     readBoolean(readRecord(input.payload.poison_audit)?.ok) ||
+    verifiedRouteApprovedSelfTerminalProduct ||
     compoundFinalArbitrationMaterialized;
   const terminalAuthorityOk =
     readBoolean(loopTrace?.terminal_authority_ok) ||

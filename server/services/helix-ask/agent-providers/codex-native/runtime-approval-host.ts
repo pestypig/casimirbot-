@@ -15,6 +15,10 @@ import {
   THEORY_INDEPENDENT_NUMERICAL_PLAN_CAPABILITY,
   THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY,
 } from "../../workstation-tool-gateway/theory-independent-numerical-verifier";
+import {
+  THEORY_RUNTIME_CANARY_PLAN_CAPABILITY,
+  THEORY_RUNTIME_CANARY_START_CAPABILITY,
+} from "../../workstation-tool-gateway/theory-runtime-canary";
 
 export const HELIX_CODEX_NATIVE_RUNTIME_APPROVAL_REQUEST_SCHEMA =
   "helix.codex_native_runtime_approval_request.v1" as const;
@@ -25,6 +29,8 @@ const FORMAL_PLAN_OBSERVATION_SCHEMA =
   "casimir.theory_formal_verifier.plan_observation.v1" as const;
 const NUMERICAL_PLAN_OBSERVATION_SCHEMA =
   "casimir.theory_independent_numerical_verifier.plan_observation.v1" as const;
+const RUNTIME_CANARY_PLAN_OBSERVATION_SCHEMA =
+  "casimir.formal_runtime_canary.plan_observation.v1" as const;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
 const MODEL_RUNTIME_APPROVAL_CONTROL_FIELDS = new Set([
@@ -44,7 +50,8 @@ const MODEL_RUNTIME_APPROVAL_CONTROL_FIELDS = new Set([
 
 type RuntimeStartCapabilityId =
   | typeof THEORY_FORMAL_VERIFIER_START_CAPABILITY
-  | typeof THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY;
+  | typeof THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY
+  | typeof THEORY_RUNTIME_CANARY_START_CAPABILITY;
 
 type SharedLiveRoomMutationCapabilityId =
   | typeof HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY
@@ -113,7 +120,8 @@ const isRuntimeStartCapabilityId = (
   value: string,
 ): value is RuntimeStartCapabilityId =>
   value === THEORY_FORMAL_VERIFIER_START_CAPABILITY ||
-  value === THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY;
+  value === THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY ||
+  value === THEORY_RUNTIME_CANARY_START_CAPABILITY;
 
 export const isCodexNativeRuntimeApprovalStartCapability = (
   capabilityId: string,
@@ -146,12 +154,18 @@ const trustedPlanFromGatewayResult = (input: {
 }): CodexNativeTrustedRuntimeStartPlanV1 | null => {
   const formal =
     input.startCapabilityId === THEORY_FORMAL_VERIFIER_START_CAPABILITY;
+  const runtimeCanary =
+    input.startCapabilityId === THEORY_RUNTIME_CANARY_START_CAPABILITY;
   const expectedPlanCapability = formal
     ? THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY
-    : THEORY_INDEPENDENT_NUMERICAL_PLAN_CAPABILITY;
+    : runtimeCanary
+      ? THEORY_RUNTIME_CANARY_PLAN_CAPABILITY
+      : THEORY_INDEPENDENT_NUMERICAL_PLAN_CAPABILITY;
   const expectedObservationSchema = formal
     ? FORMAL_PLAN_OBSERVATION_SCHEMA
-    : NUMERICAL_PLAN_OBSERVATION_SCHEMA;
+    : runtimeCanary
+      ? RUNTIME_CANARY_PLAN_OBSERVATION_SCHEMA
+      : NUMERICAL_PLAN_OBSERVATION_SCHEMA;
   const packet = input.result.observation_packet;
   const observation = readRecord(input.result.observation);
 

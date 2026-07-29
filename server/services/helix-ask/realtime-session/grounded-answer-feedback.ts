@@ -531,6 +531,11 @@ export const createRealtimeGroundedAnswerFeedbackMiddleware = (): RequestHandler
     });
     const originalWrite = res.write.bind(res);
     const originalEnd = res.end.bind(res);
+    const originalJson = res.json.bind(res);
+    res.json = ((body: unknown) => {
+      responseCapture.capturePayload(body);
+      return originalJson(body);
+    }) as typeof res.json;
     res.write = ((chunk: unknown, ...args: unknown[]) => {
       const encoding = typeof args[0] === "string" ? args[0] as BufferEncoding : undefined;
       responseCapture.capture(chunk, encoding);

@@ -13,44 +13,69 @@ afterEach(() => {
 
 describe("Codex native provider bridge availability", () => {
   it("intersects a durable goal allowlist with the narrower current-turn admission", () => {
-    expect(readTurnAdmittedWorkstationTools({
-      runtime_goal_session: {
-        allowed_workstation_tools: [
-          "workspace_os.status",
-          "repo.search",
-          "scientific-calculator.solve_expression",
-        ],
-      },
-      tool_call_admission_decision: {
-        compound_requested_capabilities: [
-          "workspace_os.status",
-          "scientific-calculator.solve_expression",
-          "internet-search.search_web",
-        ],
-      },
-    })).toEqual([
+    expect(
+      readTurnAdmittedWorkstationTools({
+        runtime_goal_session: {
+          allowed_workstation_tools: [
+            "workspace_os.status",
+            "repo.search",
+            "scientific-calculator.solve_expression",
+          ],
+        },
+        tool_call_admission_decision: {
+          compound_requested_capabilities: [
+            "workspace_os.status",
+            "scientific-calculator.solve_expression",
+            "internet-search.search_web",
+          ],
+        },
+      }),
+    ).toEqual([
       "workspace_os.status",
       "scientific-calculator.solve_expression",
     ]);
   });
 
   it("exposes no native tools for a rejected or contextually suppressed admission", () => {
-    expect(readTurnAdmittedWorkstationTools({
-      tool_call_admission_decision: {
-        admission_status: "rejected",
-        requested_capability: "scientific-calculator.solve_expression",
-        selected_capability: "scientific-calculator.solve_expression",
-        tool_admission_suppressed: true,
-        runtime_capability_rejection_reason: "contextual_tool_reference_suppressed",
-      },
-    })).toEqual([]);
+    expect(
+      readTurnAdmittedWorkstationTools({
+        tool_call_admission_decision: {
+          admission_status: "rejected",
+          requested_capability: "scientific-calculator.solve_expression",
+          selected_capability: "scientific-calculator.solve_expression",
+          tool_admission_suppressed: true,
+          runtime_capability_rejection_reason:
+            "contextual_tool_reference_suppressed",
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it("projects an admitted SituationRun family onto the canonical visual gateway", () => {
+    expect(
+      readTurnAdmittedWorkstationTools({
+        tool_call_admission_decision: {
+          admitted_tool_families: ["situation_run"],
+        },
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          turn_id: "ask:test:visual-family",
+          capability_policy: {
+            allowed_tool_families: ["visual_capture"],
+            suppressed_tool_families: [],
+          },
+        },
+      }),
+    ).toEqual(["situation-room.describe_visual_capture"]);
   });
 
   it("projects the complete policy-admitted compound route using canonical gateway ids", () => {
-    expect(readTurnAdmittedWorkstationTools({
-      question:
-        "Use docs.search for docs/research/nhm2-current-status-whitepaper.md with query claim boundary; scientific-calculator.solve_expression with expression 8*9; theory-badge-graph.reflect_discussion_context for NHM2 claim boundary.",
-    })).toEqual([
+    expect(
+      readTurnAdmittedWorkstationTools({
+        question:
+          "Use docs.search for docs/research/nhm2-current-status-whitepaper.md with query claim boundary; scientific-calculator.solve_expression with expression 8*9; theory-badge-graph.reflect_discussion_context for NHM2 claim boundary.",
+      }),
+    ).toEqual([
       "docs.search",
       "scientific-calculator.solve_expression",
       "theory-badge-graph.reflect_discussion_context",
@@ -58,42 +83,50 @@ describe("Codex native provider bridge availability", () => {
   });
 
   it("does not expose a capability that conflicts with the committed hard source route", () => {
-    expect(readTurnAdmittedWorkstationTools({
-      question: "Find the local document about Helix Ask terminal authority.",
-      committed_ask_route: {
-        schema: "helix.committed_ask_route.v1",
-        turn_id: "ask:test:hard-doc-route",
-        capability_policy: {
-          allowed_tool_families: ["docs_viewer"],
-          suppressed_tool_families: [],
+    expect(
+      readTurnAdmittedWorkstationTools({
+        question: "Find the local document about Helix Ask terminal authority.",
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          turn_id: "ask:test:hard-doc-route",
+          capability_policy: {
+            allowed_tool_families: ["docs_viewer"],
+            suppressed_tool_families: [],
+          },
         },
-      },
-      tool_call_admission_decision: {
-        admission_status: "admitted",
-        selected_capability: "repo.search",
-        admitted_capability: "repo.search",
-      },
-    })).toEqual(["docs.search"]);
+        tool_call_admission_decision: {
+          admission_status: "admitted",
+          selected_capability: "repo.search",
+          admitted_capability: "repo.search",
+        },
+      }),
+    ).toEqual(["docs.search"]);
   });
 
   it("distinguishes an omitted goal tool list from an explicit hard-deny list", () => {
     expect(readTurnAdmittedWorkstationTools({})).toBeNull();
-    expect(readTurnAdmittedWorkstationTools({
-      runtime_goal_session: { allowed_workstation_tools: [] },
-    })).toEqual([]);
+    expect(
+      readTurnAdmittedWorkstationTools({
+        runtime_goal_session: { allowed_workstation_tools: [] },
+      }),
+    ).toEqual([]);
   });
 
   it("does not re-expose a capability whose successful observation is already in the prompt", () => {
-    expect(removeSatisfiedNativeWorkstationTools(
-      ["workspace_os.status", "repo.search"],
-      [{
-        ok: true,
-        capability_id: "workspace_os.status",
-        observation_packet: {
-          status: "succeeded",
-        },
-      } as never],
-    )).toEqual(["repo.search"]);
+    expect(
+      removeSatisfiedNativeWorkstationTools(
+        ["workspace_os.status", "repo.search"],
+        [
+          {
+            ok: true,
+            capability_id: "workspace_os.status",
+            observation_packet: {
+              status: "succeeded",
+            },
+          } as never,
+        ],
+      ),
+    ).toEqual(["repo.search"]);
   });
 
   it("does not turn deterministic test suites into live API calls", () => {

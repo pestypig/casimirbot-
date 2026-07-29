@@ -13,6 +13,7 @@ import { buildLoopParityTrace } from "../services/helix-ask/loop-parity-trace";
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { __resetConversationHistoryStore } from "../services/helix-ask/conversation-history";
 import { appendHelixThreadCompletedItemLifecycle } from "../services/helix-ask/runtime/request-context";
+import { createHelixTurnLifecycleRecorder } from "../services/helix-ask/runtime/turn-lifecycle";
 import {
   __resetHelixThreadLedgerStore,
   appendHelixThreadServerRequestEvent,
@@ -21,6 +22,79 @@ import {
 
 let threadId = "thread-memory-test";
 let sessionId = "session-memory-test";
+
+const buildConversationMemoryLifecycle = (
+  turnId: string,
+  evidenceRef: string,
+) => {
+  const recorder = createHelixTurnLifecycleRecorder({
+    turnId,
+    scope: "codex_native_provider_cycle",
+    now: () => 100,
+  });
+  const started = recorder.append({
+    kind: "turn.started",
+    producer: "helix_adapter",
+    status: "started",
+  });
+  const route = recorder.append({
+    kind: "route.committed",
+    producer: "helix_policy",
+    status: "succeeded",
+    causation_id: started.event_id,
+    route_commit_id: `${turnId}:route:memory`,
+    capability_ids: ["conversation_memory.recall"],
+  });
+  recorder.append({
+    kind: "capability.admitted",
+    producer: "helix_policy",
+    status: "succeeded",
+    causation_id: route.event_id,
+    route_commit_id: route.route_commit_id,
+    capability_id: "conversation_memory.recall",
+  });
+  const reentered = recorder.append({
+    kind: "observation.reentered",
+    producer: "helix_adapter",
+    status: "succeeded",
+    causation_id: route.event_id,
+    route_commit_id: route.route_commit_id,
+    capability_id: "conversation_memory.recall",
+    observation_refs: [evidenceRef],
+  });
+  const message = recorder.append({
+    kind: "agent.message.completed",
+    producer: "codex_runtime",
+    status: "succeeded",
+    causation_id: reentered.event_id,
+    native_item_id: `${turnId}:message:1`,
+    message_sha256: "sha256:test",
+  });
+  const runtime = recorder.append({
+    kind: "runtime.turn.completed",
+    producer: "codex_runtime",
+    status: "succeeded",
+    causation_id: message.event_id,
+    native_turn_id: `${turnId}:native`,
+  });
+  const eligibility = recorder.append({
+    kind: "terminal.eligibility.checked",
+    producer: "helix_policy",
+    status: "succeeded",
+    causation_id: runtime.event_id,
+    terminal_kind: "model_synthesized_answer",
+    terminal_eligible: true,
+  });
+  recorder.append({
+    kind: "turn.completed",
+    producer: "helix_adapter",
+    status: "succeeded",
+    causation_id: eligibility.event_id,
+    terminal_kind: "model_synthesized_answer",
+    terminal_eligible: true,
+  });
+  return recorder.snapshot();
+};
 
 const completeTurn = (args: {
   turnId: string;
@@ -452,6 +526,7 @@ describe("Helix Ask conversation memory packet", () => {
       terminal_artifact_kind: "model_synthesized_answer",
       terminal_artifact_id: evidenceRef,
       conversation_memory_evidence_ref: evidenceRef,
+      turn_lifecycle: buildConversationMemoryLifecycle(turnId, evidenceRef),
       source_target_intent: sourceTargetIntent,
       route_product_contract: routeProductContract,
       canonical_goal_frame: {
@@ -634,6 +709,130 @@ describe("Helix Ask conversation memory packet", () => {
     expect(JSON.stringify(packet)).not.toContain("RAW CODE SPAN SHOULD NOT APPEAR");
   });
 
+  it("reuses the exact cited document identity for a same-document continuation", () => {
+    completeTurn({
+      turnId: "turn-1",
+      user: "Find and explain the Casimir-DP study document.",
+      answer: "The cited study describes a bounded scientific proposal.",
+    });
+    const evidenceItemId = appendHelixThreadCompletedItemLifecycle({
+      threadId,
+      turnId: "turn-1",
+      route: "/ask",
+      sessionId,
+      turnKind: "ask",
+      itemType: "retrieval",
+      itemStream: "observation",
+      text: "RAW DOCUMENT TEXT MUST NOT ENTER MEMORY",
+      observationRef: {
+        path: "docs/research/casimir-dp-quantum-foam-study.md",
+        line_start: 120,
+        line_end: 148,
+        note: "Casimir-DP study",
+      },
+    });
+    appendHelixThreadCompletedItemLifecycle({
+      threadId,
+      turnId: "turn-1",
+      route: "/ask",
+      sessionId,
+      turnKind: "ask",
+      itemType: "answer",
+      itemStream: "answer",
+      text: "Cited study summary.",
+      sourceItemIds: [evidenceItemId],
+      claimLinks: [{ claim_id: "claim-doc", source_item_ids: [evidenceItemId] }],
+    });
+
+    const packet = buildHelixConversationMemoryPacket({
+      threadId,
+      currentTurnId: "turn-2",
+      sessionId,
+      promptText:
+        "Now stay with that same document. Identify one equation family and explain its evidence boundary.",
+      allowsPriorArtifacts: true,
+    });
+
+    expect(detectHelixFollowupReferences("Now stay with that same document.")).toMatchObject({
+      is_followup: true,
+      followup_kind: "previous_evidence",
+    });
+    expect(packet.allowed_use).toBe("reuse_prior_evidence_refs");
+    expect(packet.reusable_evidence_refs).toEqual(
+      expect.arrayContaining([
+        "docs/research/casimir-dp-quantum-foam-study.md:120-148",
+      ]),
+    );
+    expect(packet.resolved_references[0]).toMatchObject({
+      refers_to_kind: "prior_evidence",
+    });
+    expect(JSON.stringify(packet)).not.toContain(
+      "RAW DOCUMENT TEXT MUST NOT ENTER MEMORY",
+    );
+  });
+
+  it("uses a prior authoritative answer citation only as a fresh-read locator", () => {
+    completeTurn({
+      turnId: "turn-1",
+      user: "Find the named study.",
+      answer:
+        "The match is [the Casimir-DP study](/docs/research/casimir-dp-quantum-foam-study.md).",
+    });
+
+    const packet = buildHelixConversationMemoryPacket({
+      threadId,
+      currentTurnId: "turn-2",
+      sessionId,
+      promptText: "Stay with that same document and inspect its equations.",
+      allowsPriorArtifacts: true,
+    });
+
+    expect(packet.allowed_use).toBe("reuse_prior_evidence_refs");
+    expect(packet.reusable_evidence_refs).toContain(
+      "docs/research/casimir-dp-quantum-foam-study.md",
+    );
+    expect(packet.terminal_eligible).toBe(false);
+    expect(packet.assistant_answer).toBe(false);
+    expect(packet.raw_content_included).toBe(false);
+  });
+
+  it("recognizes an affirmative current Minecraft observation follow-up as previous evidence", () => {
+    expect(
+      detectHelixFollowupReferences(
+        "Given the current Minecraft observations you just gathered, what should I fix first?",
+      ),
+    ).toMatchObject({
+      is_followup: true,
+      followup_kind: "previous_evidence",
+    });
+  });
+
+  it.each([
+    "Do not use the current Minecraft observations; answer from scratch.",
+    "If I later ask you to use the current Minecraft observations, what should happen?",
+    'The screen says "use the current Minecraft observations."',
+    'Historically, "current observations" meant a different test world.',
+  ])(
+    "does not turn contextual Minecraft observation wording into evidence reuse: %s",
+    (promptText) => {
+      expect(detectHelixFollowupReferences(promptText)).toMatchObject({
+        is_followup: false,
+        followup_kind: "none",
+      });
+    },
+  );
+
+  it("keeps affirmative evidence reuse in a mixed request that rejects only prior advice", () => {
+    expect(
+      detectHelixFollowupReferences(
+        "Use the current Minecraft observations, but do not rely on the earlier advice.",
+      ),
+    ).toMatchObject({
+      is_followup: true,
+      followup_kind: "previous_evidence",
+    });
+  });
+
   it("rejects stale UI projection as evidence authority", () => {
     completeTurn({
       turnId: "turn-1",
@@ -691,9 +890,13 @@ describe("Helix Ask conversation memory packet", () => {
   it("keeps adversarial lexical cues from becoming high-confidence follow-ups", () => {
     const prompts = [
       "Do not continue from the previous answer.",
+      "Do not reuse the previous document.",
       "If I say continue later, what should happen?",
+      "If I later say use that same document, what should happen?",
       "The screenshot says \"continue.\"",
+      "The screen says \"stay with the same document.\"",
       "Historically, \"that\" referred to a different project.",
+      "Historically, the phrase \"same paper\" meant a different source.",
     ];
 
     for (const promptText of prompts) {

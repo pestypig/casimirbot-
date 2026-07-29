@@ -7,6 +7,7 @@ export type HelixAskSharedLiveRoomControlsProps = {
   realtimeSessionId: string | null;
   runtimeActive: boolean;
   realtimeModel: string;
+  onActiveRoomChange?: (roomId: string | null) => void;
   onVisualSourceCaptureRequested?: () => void;
   onSharedTransportChange?: (bound: boolean) => void;
   onHostTransportInvalidated?: () => void;
@@ -17,6 +18,7 @@ export function HelixAskSharedLiveRoomControls({
   realtimeSessionId,
   runtimeActive,
   realtimeModel,
+  onActiveRoomChange,
   onVisualSourceCaptureRequested,
   onSharedTransportChange,
   onHostTransportInvalidated,
@@ -46,6 +48,11 @@ export function HelixAskSharedLiveRoomControls({
     room.runtime.realtime_session_ref_hash,
   );
   const sharedTransportBound = hostTransportReferencePresent && room?.runtime.state !== "closed";
+
+  useEffect(() => {
+    onActiveRoomChange?.(room?.status === "closed" ? null : room?.room_id ?? null);
+    return () => onActiveRoomChange?.(null);
+  }, [onActiveRoomChange, room?.room_id, room?.status]);
 
   useEffect(() => {
     onSharedTransportChange?.(sharedTransportBound);
@@ -97,7 +104,9 @@ export function HelixAskSharedLiveRoomControls({
         aria-haspopup="dialog"
         aria-expanded={dialogOpen}
         aria-label="Open Shared GPT Live Room"
-        title="Create or join a two-person Shared GPT Live Room"
+        title={room
+          ? "This room scopes typed Helix Ask prompts; GPT Live voice can be connected separately"
+          : "Create or join a two-person Shared GPT Live Room"}
         className={`inline-flex h-10 shrink-0 snap-center items-center gap-2 rounded-full border px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-200/70 ${
           room
             ? "border-fuchsia-300/50 bg-fuchsia-400/15 text-fuchsia-100 hover:bg-fuchsia-400/20"

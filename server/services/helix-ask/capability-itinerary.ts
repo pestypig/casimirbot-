@@ -108,7 +108,7 @@ const explicitRepoEvidenceCueAllowedInCompound = (promptText: string): boolean =
 
 const hasAffirmativeLocalDocumentEvidenceRequest = (promptText: string): boolean =>
   /\b(?:check|use|from|in|inside|look\s+in|look\s+at|consult|according\s+to|where|find|locate|reported|stated|specified|listed|table|row|source|cite|citation|evidence)\b/i.test(promptText) &&
-  /\b(?:white\s*paper|whitepaper|paper|document|doc|docs|report|memo|NHM[-\s]?2|casimir|tile|load[-\s]?bearing|lbs?|pounds?|newtons?)\b/i.test(promptText);
+  /\b(?:white\s*paper|whitepaper|paper|document|doc|docs|report|memo)\b/i.test(promptText);
 
 const hasExplicitLocalDocumentScope = (promptText: string): boolean =>
   /\b(?:docs?\s+viewer|documents?\s+viewer|(?:current(?:ly)?|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)|document\s+path\s*:|locate\s+query\s*:|from\s+(?:our|local|the)\s+docs?)\b/i.test(promptText) ||
@@ -446,6 +446,7 @@ export function buildHelixCapabilityItinerary(input: {
       "workspace_action",
       "workspace_diagnostic",
       "calculator_stream",
+      "live_environment",
       "model_only",
     ].includes(admissionSourceTarget);
   const compoundSubgoals = Array.isArray(compoundCapabilityContract?.subgoals)

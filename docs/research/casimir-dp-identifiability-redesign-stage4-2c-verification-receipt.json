@@ -1,0 +1,184 @@
+{
+  "schema_version": "casimir_dp_identifiability_redesign_stage4_2c_verification_receipt/1",
+  "campaign_id": "casimir-dp-identifiability-redesign-stage4-2c-v1",
+  "campaign_run_id": "casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z",
+  "verified_at": "2026-07-28T04:58:26.819Z",
+  "evidence_class": "synthetic_identifiability_first_apparatus_redesign",
+  "claim_ceiling": "bounded_synthetic_apparatus_redesign_and_empirical_input_readiness_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-identifiability-redesign-stage4-2c.v1.json",
+    "config_sha256": "81f6109525202f57b6e5958373b37ec18d15dfff0ddc9ad0af274b8a294af6aa",
+    "authority_manifest_path": "configs/research/casimir-dp-stage4-2c-authorities.v1.json",
+    "authority_manifest_sha256": "7f3a7fb7bfc748b1e92427da0c649bb73ce99fd4ebf9a20414a5a7fa1b5604e7",
+    "fixture_path": "configs/research/fixtures/casimir-dp-stage4-2c-campaign.synthetic.v1.json",
+    "fixture_sha256": "f576c20c05cee3d29ed0198bfc4056a0540a3f89199d1babb6ebde9dfaa1d45d",
+    "report_json_path": "artifacts/research/casimir-dp-identifiability-redesign-stage4-2c/casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z/identifiability-redesign-stage4-2c-report.json",
+    "report_json_sha256": "d9237eeb9079e7fab84a86b3eda28b0f14bb83be1a340b3d6f9695dcffb5047c",
+    "report_markdown_path": "artifacts/research/casimir-dp-identifiability-redesign-stage4-2c/casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z/identifiability-redesign-stage4-2c-report.md",
+    "report_markdown_sha256": "0f01cb550fed502fe8d5fa3920f4517d7931a89761cdb7a68af1b7d901b55f5f",
+    "campaign_trace_path": "artifacts/research/casimir-dp-identifiability-redesign-stage4-2c/casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z/identifiability-redesign-stage4-2c-trace.jsonl",
+    "campaign_trace_sha256": "3ceeaddbdb0e8a78f1038bd3227f8b0ddbac4ac0af24ca7c37a6b026e5fe2b81",
+    "campaign_receipt_path": "artifacts/research/casimir-dp-identifiability-redesign-stage4-2c/casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z/identifiability-redesign-stage4-2c-receipt.json",
+    "campaign_receipt_sha256": "59cca7ab7f6f6a3d27a83ad8b455fc63fc6db3ca7207cdeff350ed97d497865c",
+    "maintained_report_path": "docs/research/casimir-dp-identifiability-redesign-stage4-2c-report.md",
+    "maintained_report_matches_immutable_markdown": true,
+    "git_head": "41d640c4acee2f2a414c4e1ebf1c4bb2f88ead6d",
+    "worktree_state": "dirty_uncommitted_stage4_2c_source_and_content_hashes_authoritative",
+    "authority_mode": "role_path_and_content_hash_tuple"
+  },
+  "immutable_stage4_2b_upstream": {
+    "run_id": "casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z",
+    "campaign_receipt_sha256": "50632b32c4133fe3f0f5eee3cbbb157a983d0a9da69de6239d58563ca88f569c",
+    "downstream_verification_receipt_path": "docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-verification-receipt.json",
+    "downstream_verification_receipt_sha256": "194a58bcfa4cc855c8a50a8a862fac391a01ee55c4dc9feeb1d6e98526b8bf3d",
+    "mutation_detected": false
+  },
+  "verification_inputs": {
+    "explicit_repo_telemetry": {
+      "path": "reports/repo-telemetry-stage4-2c-20260728T045623510Z.json",
+      "sha256": "7bd271d4a3495d4066fbef855ffd992a16f19ff468206b6b85d29e07f889ab34",
+      "auto_merge_used": false
+    },
+    "adapter_request": {
+      "path": "artifacts/casimir-dp-stage4-2c-20260728T045623510Z-adapter-request.json",
+      "sha256": "e912e7de7691290d854774bb9907164295825361f33224887726d0bf24081c61",
+      "auto_telemetry": false,
+      "explicit_hard_inputs": [
+        "build.status",
+        "tests.status",
+        "schema.contracts",
+        "deps.coherence"
+      ],
+      "stale_proxy_carry_forward_allowed": false
+    },
+    "combined_vitest_report": {
+      "path": "reports/vitest-stage4-2c-final.json",
+      "sha256": "5b9d69197adc3648d32a4f8bcb6298c0d6319ed4b4cd30c15b2a308f84080f2e",
+      "test_files_total": 54,
+      "test_suites_total": 116,
+      "test_suites_passed": 116,
+      "tests_total": 503,
+      "tests_passed": 503,
+      "tests_failed": 0,
+      "success": true
+    },
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-2c-20260728T045623510Z-bound-validated.jsonl",
+      "sha256": "3d454ba0cf3e778dc934cae1c0ee33996bb792caa06255a9dfe984a38138bdee",
+      "bytes": 3748,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true,
+      "validated_exporter_path": "scripts/research/export-casimir-dp-stage4-verification-trace.ts"
+    }
+  },
+  "local_gates": {
+    "stage4_2c_runtime_contract_campaign_and_theory": {
+      "files": 9,
+      "tests": 65,
+      "status": "pass"
+    },
+    "receipt_grade_runnable_inherited_and_required_replay": {
+      "files": 54,
+      "suites": 116,
+      "tests": 503,
+      "status": "pass"
+    },
+    "historical_immutable_orchestrator_replay": {
+      "attempted_files": 4,
+      "attempted_tests": 24,
+      "status": "fail_closed_on_frozen_provenance_as_expected",
+      "reason": "The Stage-4, Stage-4.1, Stage-4.2A, and Stage-4.2B campaign configs freeze git head 705759a201ee77313919de906c53dc8565de75bc and the pre-commit tracked-state assumptions. The repository now has those sources committed at 41d640c4acee2f2a414c4e1ebf1c4bb2f88ead6d. Rewriting the immutable configs or receipts was prohibited; their content-addressed receipts remain upstream authority.",
+      "used_as_adapter_pass_evidence": false
+    },
+    "production_build": {
+      "status": "pass_with_warnings",
+      "command": "npm run build",
+      "exit_code": 0,
+      "warnings_present": true,
+      "note": "The production client and server bundles completed. Existing browser-externalization, large-chunk, duplicate-key, and duplicate-case warnings remain outside this campaign's scientific authority."
+    },
+    "dependency_coherence": {
+      "status": "pass",
+      "command": "npm ls --depth=0",
+      "exit_code": 0,
+      "package_lock_sha256": "c85521a758783fa5cea1c8933e3c5ad54d604d596620279fce916e3c2ce42367"
+    },
+    "equation_sidecar": {
+      "paper_markers": 45,
+      "source_entries": 45,
+      "generated_entries": 45,
+      "source_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
+      "source_sha256_before_downstream_receipt_binding": "16eb86a1000ad2c3ca9316de5585f67d1cccfe749aca8780f2710be9c6c0aeed",
+      "generated_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
+      "generated_sha256_before_downstream_receipt_binding": "f4ca0a570cb7c4aaded1a4013323b63df871e63b8d20b3bda966cab8273aacb0",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 28,
+      "edges": 83,
+      "stage4_2c_badges": 1,
+      "calculator_payloads": 0,
+      "observable_bridge_edges": 0,
+      "graph_path": "shared/theory/casimir-dp-study-theory-badges.ts",
+      "graph_sha256_before_downstream_receipt_binding": "2adb39b4a5f1108649328b9d84095840ae5c7142da3ea050d64520af72042c4e",
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 216,
+      "validation": "pass",
+      "strict_congruence_errors": 0,
+      "strict_congruence_warnings": 0,
+      "strict_congruence_infos": 4,
+      "report_json_path": "reports/math-report.json",
+      "report_json_sha256": "8efce72f7b5c6c4e3c8d5e3eeaef276d1eccec9d38a4ec5f75a4c102228027c3",
+      "report_markdown_path": "reports/math-report.md",
+      "report_markdown_sha256": "f3075df876286673316d298a10692128a1f2ced2000bb081debd4d4c9dde53bb"
+    },
+    "physics_root_to_leaf_manifest": {
+      "status": "pass",
+      "manifest_path": "configs/physics-root-leaf-manifest.v1.json",
+      "manifest_sha256": "4c9dd12297ee3b314d521dadfedde317ecf6813921da422ec8c0585976bed1",
+      "readiness_and_scientific_falsifier_rules_separated": true
+    },
+    "warp_required": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    }
+  },
+  "adapter_result": {
+    "trace_id": "casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T045623510Z-final",
+    "run_id": "2332",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate": {
+      "status": "GREEN",
+      "certificate_hash": "38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34",
+      "certificate_id": "constraint-pack:repo-convergence:38b2e69264ac",
+      "integrity_ok": true
+    },
+    "scientific_scope": "none"
+  },
+  "scientific_standing": {
+    "selected_candidate": "silica_high_mass_identifiable",
+    "maximum_absolute_whitened_cosine": 0.7177243227022941,
+    "normalized_gram_condition": 6.531693613125537,
+    "forecast_power": 0.9978580863455258,
+    "required_paired_windows": 542,
+    "physical_pilot_readiness": "not_ready",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "explanation": "The certificate validates the supplied software, test, schema, dependency, graph, sidecar, math, root-to-leaf, and WARP gates. It does not authenticate numerical design assumptions as measurements, demonstrate state preparation, exclude DP, admit a Casimir-to-collapse bridge, identify collapse or manifold dynamics, or establish physical viability."
+  }
+}

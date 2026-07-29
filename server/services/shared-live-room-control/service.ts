@@ -35,7 +35,10 @@ import {
   type HelixSharedLiveRoomSourceCreateReceipt,
   type HelixSharedLiveRoomSourceListReceipt,
 } from "@shared/contracts/helix-shared-live-room-agent.v1";
-import { isGuestSharedRealtimeRoomHostingEnabled } from "../helix-account/account-session-store";
+import {
+  isGuestSharedRealtimeRoomHostingEnabled,
+  isGuestSharedRealtimeRoomSourceIngressEnabled,
+} from "../helix-account/account-session-store";
 import type { HelixAgentApiPrincipal } from "../helix-agent-api/types";
 import {
   HelixAgentRunStore,
@@ -81,6 +84,38 @@ export type SharedLiveRoomControlActor = {
   isGuest: boolean;
   oauthScopes: ReadonlySet<string>;
   idempotencyOwner: HelixAgentRunOwner;
+};
+
+export const sharedLiveRoomActorAllowsSourceIngress = (
+  actor: SharedLiveRoomControlActor,
+): boolean => {
+  const roomFeatureAllowed =
+    actor.accountPolicy.feature_flags.includes("shared_realtime_rooms") &&
+    !actor.accountPolicy.locked_features.includes("shared_realtime_rooms");
+  const sourceFeatureAllowed =
+    actor.accountPolicy.feature_flags.includes("room_source_ingress") &&
+    !actor.accountPolicy.locked_features.includes("room_source_ingress");
+  if (!roomFeatureAllowed || !sourceFeatureAllowed) return false;
+  if (actor.accountType === "developer") return true;
+  return (
+    actor.authKind === "first_party_session" &&
+    actor.isGuest &&
+    isGuestSharedRealtimeRoomSourceIngressEnabled()
+  );
+};
+
+export const MAX_GUEST_ROOM_SOURCE_CREDENTIAL_TTL_MS =
+  24 * 60 * 60 * 1_000;
+
+export const resolveSharedLiveRoomSourceCredentialTtlMs = (
+  actor: SharedLiveRoomControlActor,
+  requestedTtlMs?: number | null,
+): number => {
+  const requested =
+    requestedTtlMs ?? DEFAULT_SHARED_LIVE_ROOM_SOURCE_CREDENTIAL_TTL_MS;
+  return actor.isGuest
+    ? Math.min(requested, MAX_GUEST_ROOM_SOURCE_CREDENTIAL_TTL_MS)
+    : requested;
 };
 
 export type SharedLiveRoomCredentialDeliveryOwner = {
@@ -543,15 +578,11 @@ export class SharedLiveRoomControlService {
   private requireSourceManage(actor: SharedLiveRoomControlActor): void {
     this.requireFeature(actor);
     this.requireOauthScope(actor, HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE);
-    if (
-      actor.accountType !== "developer" ||
-      !actor.accountPolicy.feature_flags.includes("room_source_ingress") ||
-      actor.accountPolicy.locked_features.includes("room_source_ingress")
-    ) {
+    if (!sharedLiveRoomActorAllowsSourceIngress(actor)) {
       throw new SharedLiveRoomControlError(
         403,
         "source_binding_forbidden",
-        "Room source ingress is available to developer room owners only.",
+        "Room source ingress is not enabled for this room owner.",
       );
     }
   }
@@ -1085,8 +1116,10 @@ export class SharedLiveRoomControlService {
         const delivery = await this.issueSourceCredentialDelivery({
           actor: input.actor,
           binding,
-          credentialTtlMs:
-            request.ttl_ms ?? DEFAULT_SHARED_LIVE_ROOM_SOURCE_CREDENTIAL_TTL_MS,
+          credentialTtlMs: resolveSharedLiveRoomSourceCredentialTtlMs(
+            input.actor,
+            request.ttl_ms,
+          ),
         });
         return {
           status: 201,
@@ -1115,8 +1148,10 @@ export class SharedLiveRoomControlService {
       const delivery = await this.issueSourceCredentialDelivery({
         actor: input.actor,
         binding,
-        credentialTtlMs:
-          request.ttl_ms ?? DEFAULT_SHARED_LIVE_ROOM_SOURCE_CREDENTIAL_TTL_MS,
+        credentialTtlMs: resolveSharedLiveRoomSourceCredentialTtlMs(
+          input.actor,
+          request.ttl_ms,
+        ),
       });
       const receipt = this.sourceCreateReceipt({
         roomId,

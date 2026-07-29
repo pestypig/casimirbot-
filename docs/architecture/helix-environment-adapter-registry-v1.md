@@ -55,10 +55,10 @@ before observation admission.
 
 ## First adapters
 
-| Profile                              | Deployment state | Adapter identities                                                               | World identity     | Mechanics                             |
-| ------------------------------------ | ---------------- | -------------------------------------------------------------------------------- | ------------------ | ------------------------------------- |
-| `game.minecraft.readonly.v1`         | enabled          | Paper, Minehut, generic Minecraft v1, and the retained legacy Minecraft identity | `minecraft:*`      | `mechanics.minecraft.java.v1`         |
-| `game.synthetic_fixture.readonly.v1` | fixture-only     | `synthetic_game.fixture.v1`                                                      | `synthetic-game:*` | `mechanics.synthetic_game.fixture.v1` |
+| Profile                              | Deployment state | Adapter identities                                                                                                                | World identity     | Mechanics                                                                                   |
+| ------------------------------------ | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------- |
+| `game.minecraft.readonly.v1`         | enabled          | `minecraft.paper_plugin.v1`, `minecraft.fabric_mod.v1`, Minehut, generic Minecraft v1, and the retained legacy Minecraft identity | `minecraft:*`      | `mechanics.minecraft.java.v1`; Fabric may also admit `mechanics.minecraft.crimson_curse.v1` |
+| `game.synthetic_fixture.readonly.v1` | fixture-only     | `synthetic_game.fixture.v1`                                                                                                       | `synthetic-game:*` | `mechanics.synthetic_game.fixture.v1`                                                       |
 
 Fixture profiles require `HELIX_ENVIRONMENT_ADAPTER_FIXTURES=1` and are always
 disabled in production.

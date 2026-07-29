@@ -18,6 +18,7 @@ import {
   SharedLiveRoomControlError,
   SharedLiveRoomControlService,
   buildSharedLiveRoomControlActorFromAccountContext,
+  sharedLiveRoomActorAllowsSourceIngress,
 } from "./service";
 
 const credentialClaimUrl = (): string =>
@@ -118,16 +119,12 @@ export const claimSharedLiveRoomSourceCredentialForBrowser = async (input: {
   );
   if (
     actor.authKind !== "first_party_session" ||
-    actor.accountType !== "developer" ||
-    !actor.accountPolicy.feature_flags.includes("shared_realtime_rooms") ||
-    actor.accountPolicy.locked_features.includes("shared_realtime_rooms") ||
-    !actor.accountPolicy.feature_flags.includes("room_source_ingress") ||
-    actor.accountPolicy.locked_features.includes("room_source_ingress")
+    !sharedLiveRoomActorAllowsSourceIngress(actor)
   ) {
     throw new SharedLiveRoomControlError(
       403,
       "account_policy_blocked",
-      "Secure room-source credential delivery is available to the signed-in developer owner only.",
+      "Secure room-source credential delivery is not enabled for this room owner.",
     );
   }
 

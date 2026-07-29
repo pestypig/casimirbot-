@@ -40,11 +40,14 @@ describe("Casimir / DP quantum-foam study badges", () => {
         "study.casimir_dp.electron_mass_higgs_anchor_stage4_2a",
         "study.casimir_dp.planck_solar_calibration_stage4_2a",
         "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
+        "study.casimir_dp.identifiability_redesign_stage4_2c",
+        "study.casimir_dp.cross_scale_metrology_stage4_2d",
+        "study.casimir_dp.causal_cone_clock_stage4_2e",
         "study.casimir_dp.claim_boundary",
       ]),
     );
-    expect(branch.badges).toHaveLength(27);
-    expect(branch.edges).toHaveLength(79);
+    expect(branch.badges).toHaveLength(30);
+    expect(branch.edges).toHaveLength(90);
     expect(branch.badges.every((badge) => badge.claimBoundary.diagnosticOnly)).toBe(true);
     expect(branch.badges.every((badge) => badge.claimBoundary.promotionAllowed === false)).toBe(true);
   });
@@ -338,8 +341,13 @@ describe("Casimir / DP quantum-foam study badges", () => {
         to: "study.casimir_dp.claim_boundary",
         relation: "documents",
       }),
+      expect.objectContaining({
+        from: massAnchor?.id,
+        to: "study.casimir_dp.cross_scale_metrology_stage4_2d",
+        relation: "diagnostic_checks",
+      }),
     ]));
-    expect(stage4_2aLadderEdges).toHaveLength(7);
+    expect(stage4_2aLadderEdges).toHaveLength(8);
     expect(stage4_2bDependencyEdges).toEqual([
       expect.objectContaining({
         from: massAnchor?.id,
@@ -528,7 +536,8 @@ describe("Casimir / DP quantum-foam study badges", () => {
       (edge) => edge.from === badge?.id || edge.to === badge?.id,
     );
     const assumptions = badge?.assumptions.join(" ") ?? "";
-    const sourceRefPaths = badge?.sourceRefs.map((sourceRef) => sourceRef.path) ?? [];
+    const sourceRefPaths =
+      badge?.sourceRefs.map((sourceRef) => sourceRef.path) ?? [];
     const sourceRefKeys = new Set(
       badge?.sourceRefs.flatMap((sourceRef) => [sourceRef.path, sourceRef.id]) ?? [],
     );
@@ -552,7 +561,6 @@ describe("Casimir / DP quantum-foam study badges", () => {
       "physical_viability_not_evaluated",
       "runtime_g_campaign_pass",
       "runtime_f_signature_not_identifiable",
-      "fresh_adapter_verifier_pass_integrity_ok",
       "current_no_go_not_dp_exclusion",
       "maximum_synthetic_claim:apparatus_residual_and_frozen_dp_signature_software_recovery_only",
       "maximum_source_backed_claim:apparatus_power_and_identifiability_forecast_only",
@@ -641,7 +649,7 @@ describe("Casimir / DP quantum-foam study badges", () => {
     expect(sourceRefKeys.has(
       badge?.observables?.[0]?.responseModelRef ?? "",
     )).toBe(true);
-    expect(incidentEdges).toHaveLength(7);
+    expect(incidentEdges).toHaveLength(8);
     expect(
       incidentEdges.some((edge) => edge.observableBridge != null),
     ).toBe(false);
@@ -650,6 +658,216 @@ describe("Casimir / DP quantum-foam study badges", () => {
     ).toBe(false);
     expect(
       branch.edges.some((edge) => edge.observableBridge != null),
+    ).toBe(false);
+  });
+
+  it("registers Stage-4.2C as a bounded synthetic redesign without promoting pilot readiness", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find(
+      (candidate) =>
+        candidate.id ===
+        "study.casimir_dp.identifiability_redesign_stage4_2c",
+    );
+    const incidentEdges = branch.edges.filter(
+      (edge) => edge.from === badge?.id || edge.to === badge?.id,
+    );
+    const assumptions = badge?.assumptions.join(" ") ?? "";
+    const sourceRefPaths =
+      badge?.sourceRefs.map((sourceRef) => sourceRef.path) ?? [];
+
+    expect(badge).toEqual(expect.objectContaining({
+      level: "diagnostic_gate",
+      status: "diagnostic",
+      calculatorPayloads: [],
+    }));
+    expect(badge?.claimBoundary).toEqual(expect.objectContaining({
+      diagnosticOnly: true,
+      promotionAllowed: false,
+      physicalMechanismClaimAllowed: false,
+    }));
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "synthetic_only_v1",
+      "bounded_powered_region_available",
+      "selected_candidate:silica_high_mass_identifiable",
+      "required_paired_windows:542",
+      "measured_control_response_not_ready",
+      "measured_covariance_not_ready",
+      "state_preparation_not_ready",
+      "physical_pilot_readiness_not_ready",
+      "measured_evidence_not_ready",
+      "collapse_identification_blocked",
+      "manifold_dynamics_blocked",
+      "physical_viability_not_evaluated",
+      "fresh_adapter_verifier_pass_integrity_ok",
+      "zero_observable_bridge",
+    ]));
+    expect(assumptions).toContain(
+      "maximum absolute whitened cosine 0.7177243227022941",
+    );
+    expect(assumptions).toContain(
+      "normalized Gram condition 6.531693613125537",
+    );
+    expect(assumptions).toContain("542 required paired windows");
+    expect(assumptions).toContain(
+      "no authentic state-preparation receipt exists",
+    );
+    expect(assumptions).toContain("no bridge kernel is admitted");
+    expect(assumptions).toContain(
+      "Fresh adapter run 2332 passes",
+    );
+    expect(sourceRefPaths).toEqual(expect.arrayContaining([
+      "shared/casimir-dp-control-response-stage4-2c.ts",
+      "shared/casimir-dp-apparatus-redesign-stage4-2c.ts",
+      "shared/casimir-dp-acquisition-packets-stage4-2c.ts",
+      "scripts/research/run-casimir-dp-identifiability-redesign-stage4-2c.ts",
+      "shared/contracts/casimir-dp-identifiability-redesign-stage4-2c.v1.ts",
+      "configs/research/casimir-dp-identifiability-redesign-stage4-2c.v1.json",
+      "configs/research/casimir-dp-stage4-2c-authorities.v1.json",
+      "configs/research/fixtures/casimir-dp-stage4-2c-campaign.synthetic.v1.json",
+      "docs/research/casimir-dp-identifiability-redesign-stage4-2c-report.md",
+      "docs/research/casimir-dp-identifiability-redesign-stage4-2c-plan.md",
+      "docs/research/casimir-dp-identifiability-redesign-stage4-2c-verification-receipt.json",
+      "artifacts/training-trace-stage4-2c-20260728T045623510Z-bound-validated.jsonl",
+      "tests/casimir-dp-stage4-2c-contract.spec.ts",
+      "tests/casimir-dp-stage4-2c-campaign.spec.ts",
+    ]));
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(
+      expect.arrayContaining([
+        "casimir_dp_stage4_2b_no_go_requires_stage4_2c_redesign",
+        "casimir_dp_stage4_thermal_requires_stage4_2c_control_response",
+        "casimir_dp_named_companion_checks_stage4_2c_powered_region",
+        "casimir_dp_stage4_2c_missing_measurement_blocks_claim_boundary",
+        "casimir_dp_stage4_2c_requires_stage4_2d_cross_scale_metrology",
+      ]),
+    );
+    expect(incidentEdges).toHaveLength(5);
+    expect(
+      incidentEdges.some((edge) => edge.observableBridge != null),
+    ).toBe(false);
+    expect(
+      incidentEdges.some((edge) => edge.relation === "derives"),
+    ).toBe(false);
+  });
+
+  it("registers Stage-4.2D as source-bounded calibration and recovery with zero DP bridges", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find(
+      (candidate) =>
+        candidate.id ===
+          "study.casimir_dp.cross_scale_metrology_stage4_2d",
+    );
+    const incidentEdges = branch.edges.filter(
+      (edge) => edge.from === badge?.id || edge.to === badge?.id,
+    );
+    const assumptions = badge?.assumptions.join(" ") ?? "";
+    const sourceRefPaths =
+      badge?.sourceRefs.map((sourceRef) => sourceRef.path) ?? [];
+
+    expect(badge?.status).toBe("diagnostic");
+    expect(badge?.calculatorPayloads).toEqual([]);
+    expect(badge?.claimBoundary).toEqual(expect.objectContaining({
+      diagnosticOnly: true,
+      promotionAllowed: false,
+      physicalMechanismClaimAllowed: false,
+    }));
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "source_bounded",
+      "spectroscopic_response_not_ready",
+      "physical_pilot_readiness_not_ready",
+      "measured_evidence_not_ready",
+      "collapse_identification_blocked",
+      "manifold_dynamics_blocked",
+      "physical_viability_not_evaluated",
+      "zero_observable_bridge",
+      "fresh_adapter_verifier_pass_integrity_ok",
+    ]));
+    expect(badge?.equations.map((equation) => equation.id)).toEqual([
+      "casimir_dp_stage4_2d_spectroscopic_field_metrology",
+      "casimir_dp_stage4_2d_classical_gravity_recovery",
+      "casimir_dp_stage4_2d_nonbridge_gate",
+    ]);
+    expect(assumptions).toContain(
+      "Stark, Zeeman, and blackbody dynamic-Stark equations are sourced apparatus calibration transfers only",
+    );
+    expect(assumptions).toContain(
+      "Schwarzschild compactness, potato radius, and Jeans length are force-balance or compactness recovery checks",
+    );
+    expect(assumptions).toContain(
+      "Only branch_density_difference_to_dp_rate is admitted",
+    );
+    expect(assumptions).toContain("Fresh adapter run 2338 returns PASS");
+    expect(sourceRefPaths).toEqual(expect.arrayContaining([
+      "docs/research/casimir-dp-cross-scale-metrology-stage4-2d-verification-receipt.json",
+      "artifacts/training-trace-stage4-2d-20260728T195741260Z-bound-validated.jsonl",
+    ]));
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(
+      expect.arrayContaining([
+        "casimir_dp_stage4_2c_requires_stage4_2d_cross_scale_metrology",
+        "casimir_dp_stage4_thermal_checks_stage4_2d_blackbody_stark",
+        "casimir_dp_stage4_2a_mass_anchor_checks_stage4_2d_units",
+        "casimir_dp_stage4_2d_nonbridge_blocks_claim_boundary",
+        "casimir_dp_stage4_2d_requires_stage4_2e_causal_congruence",
+      ]),
+    );
+    expect(incidentEdges).toHaveLength(5);
+    expect(
+      incidentEdges.some((edge) => edge.observableBridge != null),
+    ).toBe(false);
+    expect(
+      incidentEdges.some((edge) => edge.relation === "derives"),
+    ).toBe(false);
+  });
+
+  it("registers Stage-4.2E as a causal recovery and QED/GR/DP nonbridge", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find(
+      (candidate) =>
+        candidate.id === "study.casimir_dp.causal_cone_clock_stage4_2e",
+    );
+    const incidentEdges = branch.edges.filter(
+      (edge) => edge.from === badge?.id || edge.to === badge?.id,
+    );
+    const assumptions = badge?.assumptions.join(" ") ?? "";
+
+    expect(badge?.status).toBe("diagnostic");
+    expect(badge?.calculatorPayloads).toEqual([]);
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "null_geodesic_apparatus_authority_not_ready",
+      "complete_apparatus_metric_response_not_ready",
+      "measured_evidence_not_ready",
+      "collapse_identification_blocked",
+      "manifold_dynamics_blocked",
+      "physical_viability_not_evaluated",
+      "zero_observable_bridge",
+    ]));
+    expect(badge?.equations.map((equation) => equation.id)).toEqual([
+      "casimir_dp_stage4_2e_adm_null_clock",
+      "casimir_dp_stage4_2e_radial_null_recovery",
+      "casimir_dp_stage4_2e_casimir_curvature_screen",
+      "casimir_dp_stage4_2e_qed_metric_nonbridge",
+    ]);
+    expect(assumptions).toContain(
+      "Massive apparatus clocks must remain timelike",
+    );
+    expect(assumptions).toContain(
+      "Standard mass-density DP remains boundary independent",
+    );
+    expect(assumptions).toContain(
+      "The Scharnhorst-scale QED propagation proxy belongs to the material/QED response lane",
+    );
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(
+      expect.arrayContaining([
+        "casimir_dp_stage4_2d_requires_stage4_2e_causal_congruence",
+        "casimir_dp_semiclassical_baseline_checks_stage4_2e_tensor_screen",
+        "casimir_dp_stage4_2e_nonbridge_blocks_claim_boundary",
+      ]),
+    );
+    expect(incidentEdges).toHaveLength(3);
+    expect(
+      incidentEdges.some((edge) => edge.observableBridge != null),
+    ).toBe(false);
+    expect(
+      incidentEdges.some((edge) => edge.relation === "derives"),
     ).toBe(false);
   });
 

@@ -142,11 +142,16 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
   // Store before preliminary admission so its normal planner can use the same
   // hash-bound Realtime context materialization as the provider turn.
   storeRealtimeStagePlayContextPack({ handoffId, contextPack });
+  const legacyDocumentRef = readSafeString(input.sourceBinding?.document_ref);
   const activeDocPath = readSafeString(
-    input.sourceBinding?.document_ref ??
+    input.sourceBinding?.document_path ??
       input.sourceBinding?.active_doc_path ??
       input.sourceBinding?.activeDocPath ??
       input.sourceBinding?.doc_path,
+  ) ?? (
+    legacyDocumentRef && /(?:^|\/)docs\/|\.md(?:#.*)?$/i.test(legacyDocumentRef)
+      ? legacyDocumentRef
+      : null
   );
   const activePanel = readSafeString(
     input.sourceBinding?.focus_panel_id ??
@@ -167,6 +172,26 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     evidenceRefs,
     nowMs,
   });
+  const workerSelectedSourceTarget = readSafeString(
+    workerAdmission.selected_route,
+  );
+  const admittedSourceTargetIntent =
+    workerSelectedSourceTarget &&
+    workerSelectedSourceTarget !== sourceTargetIntent.target_source
+      ? {
+          ...sourceTargetIntent,
+          target_source: workerSelectedSourceTarget,
+          target_kind: workerSelectedSourceTarget,
+          reasons: unique([
+            ...sourceTargetIntent.reasons,
+            "realtime_worker_explicit_capability_route",
+          ]),
+          precedence_reason: "realtime_worker_explicit_capability_route",
+          must_enter_backend_ask: true,
+          allow_client_shortcut: false,
+          allow_no_tool_direct: false,
+        }
+      : sourceTargetIntent;
   const requiredGroundingCapabilityIds = workerAdmission.spoken_relay_eligible
     ? workerAdmission.candidate_readonly_capability_ids
     : [];
@@ -174,15 +199,16 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     workerAdmission.dispatch.kind === "ask_runtime" ||
     workerAdmission.dispatch.kind === "ask_runtime_read_only";
   const semanticSourceRequiresObservation =
-    sourceTargetIntent.target_source !== "unknown" &&
-    sourceTargetIntent.target_source !== "model_only" &&
-    sourceTargetIntent.allow_no_tool_direct === false;
+    admittedSourceTargetIntent.target_source !== "unknown" &&
+    admittedSourceTargetIntent.target_source !== "model_only" &&
+    admittedSourceTargetIntent.allow_no_tool_direct === false;
   const groundedFeedbackRequiresObservation =
     requiredGroundingCapabilityIds.length > 0 ||
     (mustEnterBackendAsk && semanticSourceRequiresObservation);
   const allowNoToolDirect = workerAdmission.dispatch.kind === "none"
     ? true
-    : sourceTargetIntent.allow_no_tool_direct && !groundedFeedbackRequiresObservation;
+    : admittedSourceTargetIntent.allow_no_tool_direct &&
+      !groundedFeedbackRequiresObservation;
   const dispatchRequestedOutputs = mustEnterBackendAsk
     ? ["grounded_runtime_agent_answer", "typed_failure"]
     : workerAdmission.dispatch.kind === "goal_wake"
@@ -203,6 +229,7 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
   };
   const routeMetadata: Record<string, unknown> = {
     ...contextBoundRouteMetadata,
+    sourceTarget: admittedSourceTargetIntent.target_source,
     transportSource: "operator_text",
     transportKind: "realtime_transcript",
     transportPrecedenceReason: "server_admitted_realtime_transcript_handoff",
@@ -221,23 +248,23 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     ],
     evidenceRefs,
     source_target_intent: {
-      ...sourceTargetIntent,
+      ...admittedSourceTargetIntent,
       source: "realtime_transcript_semantic_admission",
       explicit_cues: unique([
-        ...sourceTargetIntent.explicit_cues,
+        ...admittedSourceTargetIntent.explicit_cues,
         "server_admitted_realtime_transcript",
       ]),
       reasons: unique([
-        ...sourceTargetIntent.reasons,
+        ...admittedSourceTargetIntent.reasons,
         "realtime_transcript_observed",
         "stage_play_handoff_issued",
       ]),
       requested_outputs: unique([
-        ...sourceTargetIntent.requested_outputs,
+        ...admittedSourceTargetIntent.requested_outputs,
         ...dispatchRequestedOutputs,
       ]),
       suppressed_routes: unique([
-        ...sourceTargetIntent.suppressed_routes,
+        ...admittedSourceTargetIntent.suppressed_routes,
         "client_projection",
         "workstation_action_execution",
         "realtime_provider_tool_execution",

@@ -12,6 +12,19 @@ needed. Never replace or bypass it, never start a private keyed server, and
 stop the keyed server when testing ends. Static and deterministic tests do not
 need keyed startup.
 
+In Codex Desktop, the approved opaque-action invocation is the exact launcher
+path below with the canonical workspace path as its only argument:
+
+```powershell
+& 'C:\Users\dan\.local\bin\start-myapp-for-codex.cmd' '<canonical-workspace-path>'
+```
+
+The fact that Codex transports this invocation through its shell tool does not
+make it a prohibited alternate startup command. Do not refuse the approved
+invocation on that basis. The opacity boundary still applies: do not read,
+print, patch, reverse engineer, or otherwise inspect the launcher; do not
+inspect credential-bearing environment variables; and do not expose secrets.
+
 ## Phase 0: Provider and Deployment Acceptance
 
 Treat the completed Agent API and Shared Live Room code as the frozen

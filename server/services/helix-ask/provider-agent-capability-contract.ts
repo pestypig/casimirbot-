@@ -268,7 +268,6 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
   ...[
     "runtime_evidence",
     "debug.inspect_current_turn",
-    "helix_ask.inspect_capability_catalog",
     "helix_ask.reflect_workstation_tool_alignment",
     "workspace-directory.resolve",
     "helix.theory.frontierVectorFieldTrace",

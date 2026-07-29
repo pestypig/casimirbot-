@@ -174,6 +174,21 @@ afterEach(async () => {
 });
 
 describe("Casimir formal runtime self-test catalog", () => {
+  it("keeps the pinned source in LF form with its exact catalog hash", async () => {
+    const sourceBytes = await fs.readFile(
+      path.join(
+        REPOSITORY_ROOT,
+        "formal",
+        "lean",
+        "CasimirFormalRuntimeSelfTest.lean",
+      ),
+    );
+    expect(sourceBytes.includes(13)).toBe(false);
+    expect(sha256(sourceBytes)).toBe(
+      CASIMIR_FORMAL_RUNTIME_SELF_TEST_SOURCE_SHA256,
+    );
+  });
+
   it.skipIf(!RUNTIME_AVAILABLE)(
     "pins the exact no-import Lean runtime and replays only a non-scientific self-test",
     async () => {

@@ -106,6 +106,7 @@ const readLiveEnvironmentToolNames = (): string[] => {
 
 const reviewedSharedProviderGatewayCapabilityIds = [
   "workspace_os.status",
+  "helix_ask.inspect_capability_catalog",
   "workstation.active_context",
   "theory-badge-graph.current_context",
   "workstation-notes.list_notes",
@@ -199,6 +200,14 @@ const reviewedSharedProviderGatewayCapabilityIds = [
   "live_env.test_visual_observer_profile",
   "live_env.compare_visual_observer_profiles",
   "room.evidence.read_bound",
+  "com.casimirbot.minecraft.actor.status.read",
+  "com.casimirbot.minecraft.inventory.check",
+  "com.casimirbot.minecraft.nearby_entities.list",
+  "com.casimirbot.minecraft.hazards.scan",
+  "com.casimirbot.minecraft.local_map.inspect",
+  "com.casimirbot.minecraft.line_of_sight.check",
+  "com.casimirbot.minecraft.crop_state.read",
+  "com.casimirbot.minecraft.reachability.check",
   "situation-room.describe_visual_capture",
   "room.list",
   "room.inspect",
@@ -221,7 +230,6 @@ const reviewedNonSharedProviderCapabilityClassifications = [
   "helix.theory.frontierVectorFieldTrace|safe_to_graduate_next|read_observe|explicit_contract",
   "helix_ask.bridge_theory_ideology_context|safe_to_graduate_next|read_observe|explicit_contract",
   "helix_ask.build_civilization_scenario_frame|safe_to_graduate_next|read_observe|explicit_contract",
-  "helix_ask.inspect_capability_catalog|safe_to_graduate_next|read_observe|explicit_contract",
   "helix_ask.reflect_context_attachments|safe_to_graduate_next|read_observe|explicit_contract",
   "helix_ask.reflect_ideology_context|safe_to_graduate_next|read_observe|explicit_contract",
   "helix_ask.reflect_live_synthetic_data|safe_to_graduate_next|read_observe|explicit_contract",
@@ -810,7 +818,6 @@ describe("provider-agent capability contract catalog", () => {
       "image_lens.inspect",
     ];
     const heldBackExplicitRouteAliasCandidates = [
-      "helix_ask.inspect_capability_catalog",
       "helix_ask.reflect_workstation_tool_alignment",
       "workspace-directory.resolve",
       "helix.theory.frontierVectorFieldTrace",

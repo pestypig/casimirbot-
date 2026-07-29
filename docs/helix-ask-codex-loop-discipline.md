@@ -348,11 +348,12 @@ npm run helix:ask:api-parity
 
 ### Localhost Server And Secret Boundary
 
-Live agent/LLM-path parity must use the operator's already-configured localhost
-server. Do not start a new development server solely to validate agent behavior
-unless the user explicitly asks for that process.
+Live agent/LLM-path parity must use the already-configured keyed localhost
+server. It may be operator-started or, with explicit authorization, started by
+Codex Desktop through only the configured opaque `start-myapp-for-codex`
+launcher. Do not start an ad hoc development server to validate agent behavior.
 
-Reason: a server started from an agent shell may lack provider keys, tenant
+Reason: an ad hoc server started from an agent shell may lack provider keys, tenant
 headers, auth state, browser/workstation bindings, or the exact environment that
 the operator uses when Helix Ask can reliably call model-backed steps. That
 creates false confidence: the route may be tested under a non-representative

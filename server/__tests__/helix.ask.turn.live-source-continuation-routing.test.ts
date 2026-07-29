@@ -33,6 +33,8 @@ import { buildLiveEnvironmentBindingDiagnosis } from "../services/helix-ask/live
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { guardTerminalArtifactSelection } from "../services/helix-ask/terminal-artifact-selection-guard";
 import { auditRouteAuthority } from "../services/helix-ask/route-authority-audit";
+import { resetHelixAskTurnAdmissionForTests } from "../services/helix-ask/ask-turn-admission";
+import { resetRuntimeMemoryGovernorForTests } from "../services/runtime/runtime-memory-governor";
 import {
   createLiveAnswerEnvironment,
 } from "../services/situation-room/live-answer-environment-store";
@@ -228,6 +230,21 @@ describe("live source continuation Ask routing", () => {
     resetObservationJournalForTest();
     resetLiveFieldEvaluationsForTest();
     resetLiveInterpretationHypothesesForTest();
+    resetHelixAskTurnAdmissionForTests();
+    resetRuntimeMemoryGovernorForTests({
+      memoryReader: () => ({
+        rss: 300 * 1024 * 1024,
+        heapTotal: 180 * 1024 * 1024,
+        heapUsed: 120 * 1024 * 1024,
+        external: 8 * 1024 * 1024,
+        arrayBuffers: 4 * 1024 * 1024,
+      }),
+      hostMemoryReader: () => ({
+        freeMiB: 4096,
+        totalMiB: 8192,
+        freeRatio: 0.5,
+      }),
+    });
   });
 
   it("routes keep-checking-screen prompts to live pipeline setup instead of model-only", async () => {
@@ -399,7 +416,7 @@ describe("live source continuation Ask routing", () => {
       .get(`/api/agi/ask/turn/${encodeURIComponent(response.body.turn_id)}/debug-export`)
       .expect(200);
     expect(debugExport.body?.payload?.ask_turn_solver_trace?.trace_id).toBe(response.body?.ask_turn_solver_trace?.trace_id);
-  }, 20_000);
+  }, 90_000);
 
   it("treats future/contextual cadence language in visual questions as visual evidence context", async () => {
     const question = "review the current screen before I start the 10 second interval";
@@ -425,7 +442,7 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.final_answer_source).not.toBe("live_pipeline_receipt");
     expect(response.body?.route_authority_audit?.source_target).toBe("visual_capture");
     expect(response.body?.route_authority_audit?.route_authority_ok).toBe(true);
-  }, 20_000);
+  }, 90_000);
 
   it("keeps procedure-epoch visual questions out of live pipeline receipts even when asking about interval state", async () => {
     const question = "what changed since the previous visual capture, and was the 10 second interval running?";

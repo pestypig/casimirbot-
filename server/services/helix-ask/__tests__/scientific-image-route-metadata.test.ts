@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { buildCommittedAskRoute } from "../committed-ask-route";
+import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
 import { readHardToolBackendEntrypointRouteMetadata } from "../hard-tool-route-metadata";
 import { interpretHelixAskPrompt } from "../prompt-interpretation";
 import {
   buildAskTurnScientificImageComparisonRouteMetadata,
+  isAskTurnScientificImageEvidencePrompt,
   isAskTurnScientificImageTextComparisonPrompt,
 } from "../scientific-image-route-metadata";
 
@@ -90,6 +92,97 @@ describe("scientific Image Lens comparison route metadata", () => {
       required_terminal_product: "scholarly_research_answer",
       evidence_reentry_required: true,
       followup_reasoning_required: true,
+    });
+  });
+});
+
+describe("retained scientific evidence continuity route", () => {
+  const prompt =
+    "For that extraction, report the exact sidecar id, source id, page, crop reference, evidence depth, and promoted equation. Use retained evidence; do not fetch, render, or crop.";
+
+  it("takes scientific-evidence precedence over a scholarly interpretation", () => {
+    expect(isAskTurnScientificImageEvidencePrompt(prompt)).toBe(true);
+    expect(isAskTurnScientificImageTextComparisonPrompt(prompt)).toBe(false);
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: "ask:scientific-continuity",
+      threadId: "thread:scientific-continuity",
+      promptText: prompt,
+    });
+    expect(sourceTarget).toMatchObject({
+      target_source: "scientific_image_evidence",
+      strength: "hard",
+      precedence_reason:
+        "affirmative_retained_scientific_image_evidence_continuity",
+    });
+    expect(sourceTarget.suppressed_routes).toEqual(
+      expect.arrayContaining([
+        "fresh_image_lens_capture",
+        "model_only_concept",
+      ]),
+    );
+  });
+
+  it("repairs a stale scholarly route and requires current-turn sidecar re-entry", () => {
+    const stale = buildCommittedAskRoute({
+      turnId: "ask:scientific-continuity",
+      promptText: "Look up papers about retained scientific evidence.",
+      selectedRoute: "/ask/turn",
+      payload: {
+        source_target_intent: {
+          target_source: "scholarly_research",
+          target_kind: "scholarly_research",
+          strength: "hard",
+        },
+        canonical_goal_frame: {
+          goal_kind: "scholarly_research_lookup",
+          required_terminal_kind: "scholarly_research_answer",
+        },
+        route_product_contract: {
+          source_target: "scholarly_research",
+          allowed_terminal_artifact_kinds: [
+            "scholarly_research_answer",
+            "typed_failure",
+          ],
+        },
+      },
+    });
+    const repaired = buildCommittedAskRoute({
+      turnId: "ask:scientific-continuity",
+      promptText: prompt,
+      selectedRoute: "/ask/turn",
+      payload: {
+        committed_ask_route: stale,
+        source_target_intent: {
+          target_source: "scientific_image_evidence",
+          target_kind: "scientific_image_evidence_sidecar",
+          strength: "hard",
+          reuse_retained_scientific_image_sidecar: true,
+        },
+      },
+    });
+
+    expect(repaired.route).toMatchObject({
+      source_target: "scientific_image_evidence",
+      target_kind: "scientific_image_evidence_sidecar",
+      route_reason: "retained_scientific_image_evidence_continuity",
+    });
+    expect(repaired.canonical_goal).toMatchObject({
+      goal_kind: "scientific_image_evidence_continuity",
+      required_terminal_kind:
+        "scientific_image_evidence_continuity_summary",
+      allowed_terminal_artifact_kinds: expect.arrayContaining([
+        "scientific_image_evidence_continuity_summary",
+        "typed_failure",
+      ]),
+    });
+    expect(repaired.capability_policy.required_capability_families).not.toEqual(
+      expect.arrayContaining(["scholarly_research", "visual_analysis"]),
+    );
+    expect(repaired.terminal_product).toMatchObject({
+      required_terminal_product:
+        "scientific_image_evidence_continuity_summary",
+      evidence_reentry_required: true,
+      followup_reasoning_required: false,
     });
   });
 });

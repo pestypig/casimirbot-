@@ -98,12 +98,16 @@ codex_workstation=false
 future_provider=false
 ```
 
+`helix_ask.inspect_capability_catalog` has graduated as an exact read-only
+shared workstation gateway capability. It emits a bounded
+`helix.capability_catalog_observation.v1` packet and remains nonterminal until
+that current-turn catalog observation re-enters provider reasoning.
+
 Explicit read/observe candidates:
 
 ```txt
 runtime_evidence
 debug.inspect_current_turn
-helix_ask.inspect_capability_catalog
 helix_ask.reflect_workstation_tool_alignment
 repo-code.search_concept
 workspace-directory.resolve

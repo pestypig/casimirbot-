@@ -9,9 +9,7 @@ import type {
   HelixWorkstationTypedAffordance,
   HelixWorkstationTypedAffordanceKind,
 } from "@shared/helix-agent-step-observation-packet";
-import type {
-  HelixWorkstationGatewayAccountContext,
-} from "./account-policy";
+import type { HelixWorkstationGatewayAccountContext } from "./account-policy";
 
 export type HelixWorkstationGatewayMode = "read" | "observe" | "act" | "verify";
 
@@ -74,7 +72,22 @@ export type HelixWorkstationGatewayCallInput = {
   approvalReceipt?: unknown;
   approvalToken?: string | null;
   sessionId?: string | null;
+  /**
+   * Server-owned conversation identity used by context-bound read tools.
+   * It must not be accepted from model-authored tool arguments.
+   */
+  conversationThreadId?: string | null;
   turnId?: string | null;
+  /**
+   * Provider-issued tool call identity supplied by the trusted runtime host.
+   * It is never accepted from model arguments.
+   */
+  toolCallId?: string | null;
+  /**
+   * Server-owned provider execution identity. Connector arguments cannot
+   * select or override it.
+   */
+  providerExecutionId?: string | null;
   iteration?: number | null;
   accountType?: HelixAccountType | null;
   profileId?: string | null;

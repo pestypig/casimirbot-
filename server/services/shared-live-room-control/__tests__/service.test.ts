@@ -50,6 +50,7 @@ const createPool = async (): Promise<Pool> => {
 };
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(pools.splice(0).map((pool) => pool.end()));
 });
 
@@ -501,6 +502,64 @@ describe("SharedLiveRoomControlService", () => {
           accountType: "user",
           accountPolicy: buildHelixSharedRealtimeRoomsExperimentPolicy("user"),
         }),
+        roomId: ROOM_ID,
+      }),
+      403,
+      "source_binding_forbidden",
+    );
+  });
+
+  it("admits only a first-party experimental guest and caps its source credential lifetime", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
+    vi.stubEnv("HELIX_GUEST_ROOM_CREATION", "1");
+    const harness = await createHarness({ listedBindings: [] });
+    const guestPolicy = buildHelixSharedRealtimeRoomsExperimentPolicy("user");
+    guestPolicy.feature_flags.push("room_source_ingress");
+    guestPolicy.locked_features = guestPolicy.locked_features.filter(
+      (feature) => feature !== "room_source_ingress",
+    );
+    const guestActor = actor({
+      authKind: "first_party_session",
+      accountType: "user",
+      accountPolicy: guestPolicy,
+      isGuest: true,
+      oauthScopes: new Set(),
+    });
+
+    await expect(
+      harness.service.listSourceBindings({
+        actor: guestActor,
+        roomId: ROOM_ID,
+      }),
+    ).resolves.toMatchObject({ bindings: [] });
+
+    await harness.service.createSourceBinding({
+      actor: guestActor,
+      roomId: ROOM_ID,
+      idempotencyKey: "guest-source-create-key-0001",
+      request: {
+        world_id: "minecraft:paper-local-test",
+        domain_adapter: "minecraft.paper_plugin.v1",
+        ttl_ms: 30 * 24 * 60 * 60 * 1_000,
+      },
+    });
+    expect(harness.credentialDelivery?.issue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentialTtlMs: 24 * 60 * 60 * 1_000,
+      }),
+    );
+
+    await expectControlError(
+      harness.service.listSourceBindings({
+        actor: {
+          ...guestActor,
+          authKind: "external_oauth",
+          isGuest: true,
+          oauthScopes: new Set([
+            HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+          ]),
+        },
         roomId: ROOM_ID,
       }),
       403,

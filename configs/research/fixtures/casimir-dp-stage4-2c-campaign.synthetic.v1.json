@@ -1,0 +1,158 @@
+{
+  "schema_version": "casimir_dp_stage4_2c_synthetic_campaign/1",
+  "campaign_id": "casimir-dp-identifiability-redesign-stage4-2c-v1",
+  "evidence_class": "synthetic_fixture",
+  "generated_at": "2026-07-28T00:00:00.000Z",
+  "measured_evidence": "not_ready",
+  "collapse_identification": "blocked",
+  "manifold_dynamics": "blocked",
+  "physical_viability": "not_evaluated",
+  "cases": [
+    {
+      "case_id": "stage4_2b_no_go_recovery",
+      "target_runtime": "M",
+      "expected_gate": "pass",
+      "expected_status": "signature_not_identifiable",
+      "mutation": {},
+      "scientific_interpretation": "The certified Stage-4.2B signature degeneracy must be recovered before redesign evidence is admitted."
+    },
+    {
+      "case_id": "control_response_round_trip",
+      "target_runtime": "H",
+      "expected_gate": "pass",
+      "expected_status": "response_and_whitening_round_trip_recovered",
+      "mutation": {},
+      "scientific_interpretation": "Raw complex control responses must round-trip through the registered block covariance and whitening transform."
+    },
+    {
+      "case_id": "thermal_intercept_decorrelation",
+      "target_runtime": "J",
+      "expected_gate": "pass",
+      "expected_status": "thermal_intercept_below_preregistered_cosine",
+      "mutation": {},
+      "scientific_interpretation": "The added temperature contrast must resolve the Stage-4.2B thermal/intercept degeneracy without changing the DP generator."
+    },
+    {
+      "case_id": "shared_calibration_covariance_recovery",
+      "target_runtime": "H",
+      "expected_gate": "pass",
+      "expected_status": "shared_calibration_covariance_present",
+      "mutation": {},
+      "scientific_interpretation": "Axis-shared calibration ancestry must appear as off-diagonal covariance rather than independent error bars."
+    },
+    {
+      "case_id": "sensor_self_noise_covariance_only",
+      "target_runtime": "H",
+      "expected_gate": "pass",
+      "expected_status": "sensor_noise_not_physical_decoherence",
+      "mutation": {},
+      "scientific_interpretation": "Sensor self-noise may widen covariance but must not become a physical coherence-loss signature."
+    },
+    {
+      "case_id": "cross_axis_leakage_stress",
+      "target_runtime": "J",
+      "expected_gate": "blocked",
+      "expected_status": "signature_not_identifiable",
+      "mutation": {
+        "cross_axis_leakage_fraction": 0.99
+      },
+      "scientific_interpretation": "Severe response leakage must fail closed rather than be interpreted as nuisance closure."
+    },
+    {
+      "case_id": "candidate_powered_region_recovery",
+      "target_runtime": "J",
+      "expected_gate": "pass",
+      "expected_status": "powered_parameter_region_available",
+      "mutation": {
+        "candidate_id": "silica_high_mass_identifiable"
+      },
+      "scientific_interpretation": "The preregistered high-mass candidate should recover the bounded synthetic powered region."
+    },
+    {
+      "case_id": "underpowered_candidate",
+      "target_runtime": "J",
+      "expected_gate": "blocked",
+      "expected_status": "apparatus_not_powered_for_dp",
+      "mutation": {
+        "candidate_id": "silica_control_only"
+      },
+      "scientific_interpretation": "Control identifiability alone must not be promoted to DP sensitivity."
+    },
+    {
+      "case_id": "out_of_bounds_candidate_rejected",
+      "target_runtime": "I",
+      "expected_gate": "blocked",
+      "expected_status": "candidate_outside_registered_bounds",
+      "mutation": {
+        "candidate_id": "silica_very_high_mass_out_of_bounds"
+      },
+      "scientific_interpretation": "A numerically powerful configuration outside frozen bounds cannot win the confirmatory design search."
+    },
+    {
+      "case_id": "missing_material_response_authority_rejected",
+      "target_runtime": "I",
+      "expected_gate": "blocked",
+      "expected_status": "material_response_authority_not_admitted",
+      "mutation": {
+        "candidate_id": "diamond_contextual_only"
+      },
+      "scientific_interpretation": "A candidate with contextual-only material response may not be selected as apparatus authority."
+    },
+    {
+      "case_id": "post_hoc_dp_retuning_rejected",
+      "target_runtime": "M",
+      "expected_gate": "blocked",
+      "expected_status": "registered_dp_manifest_mutation_rejected",
+      "mutation": {
+        "r0_m": 1e-08
+      },
+      "scientific_interpretation": "The DP regularization may not be changed to manufacture power."
+    },
+    {
+      "case_id": "confirmatory_leakage_rejected",
+      "target_runtime": "L",
+      "expected_gate": "blocked",
+      "expected_status": "confirmatory_ingestion_before_freeze_rejected",
+      "mutation": {
+        "confirmatory_data_available": true
+      },
+      "scientific_interpretation": "Confirmatory observations cannot enter response fitting, candidate selection, covariance construction, or exclusion rules."
+    },
+    {
+      "case_id": "bridge_without_kernel_rejected",
+      "target_runtime": "M",
+      "expected_gate": "blocked",
+      "expected_status": "unregistered_bridge_rejected",
+      "mutation": {
+        "admit_boundary_bridge": true
+      },
+      "scientific_interpretation": "Boundary correlation cannot become a collapse-transfer mechanism without a separately registered kernel."
+    },
+    {
+      "case_id": "cross_scale_nonbridge_rejected",
+      "target_runtime": "M",
+      "expected_gate": "blocked",
+      "expected_status": "cross_scale_identity_transfer_rejected",
+      "mutation": {
+        "use_compton_higgs_qed_blackbody_transfer": true
+      },
+      "scientific_interpretation": "Shared energy or frequency units cannot be used as a Casimir-to-collapse transfer kernel."
+    },
+    {
+      "case_id": "state_preparation_not_promoted",
+      "target_runtime": "I",
+      "expected_gate": "pass",
+      "expected_status": "design_assumption_only",
+      "mutation": {},
+      "scientific_interpretation": "A powered synthetic candidate does not demonstrate preparation of its mass-separation-time superposition."
+    },
+    {
+      "case_id": "physical_pilot_readiness_fail_closed",
+      "target_runtime": "M",
+      "expected_gate": "pass",
+      "expected_status": "not_ready",
+      "mutation": {},
+      "scientific_interpretation": "Physical pilot readiness remains not-ready until authentic control-response, covariance, and state-preparation receipts exist."
+    }
+  ]
+}

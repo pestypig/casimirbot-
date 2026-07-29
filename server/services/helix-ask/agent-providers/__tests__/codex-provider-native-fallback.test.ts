@@ -129,6 +129,96 @@ describe("Codex native compatibility fallback", () => {
     expect(JSON.stringify(artifact)).not.toContain("terminal_eligible");
   });
 
+  it("bounds repeated conformed-document evidence before post-tool reasoning", () => {
+    const repeatedLedger = "Stage-4 ledger evidence. ".repeat(2_000);
+    const artifacts = buildCodexModelVisibleObservationArtifacts([
+      {
+        schema: "helix.current_turn_artifact.v1",
+        artifact_id: "ask:test:docs-search",
+        kind: "doc_search_results",
+        status: "succeeded",
+        capability_key: "docs.search",
+        provider_gateway_observation_ref: "ask:test:docs-search:observation",
+        payload: {
+          schema: "helix.docs_search_results.v1",
+          kind: "doc_search_results",
+          query: "response functions noncomputable",
+          paths: ["docs/research/conformed-study.md"],
+          hits: Array.from({ length: 30 }, (_, index) => ({
+            path: "docs/research/conformed-study.md",
+            term: "response",
+            occurrence_index: index,
+            line: 400 + index,
+            heading: "Reproducibility and status ledger",
+            sentence: repeatedLedger,
+          })),
+          matches: Array.from({ length: 20 }, (_, index) => ({
+            path: "docs/research/conformed-study.md",
+            score: 100 - index,
+            canonical: true,
+            best_snippets: [{ sentence: repeatedLedger }],
+          })),
+          document_candidates: Array.from({ length: 20 }, (_, index) => ({
+            path: "docs/research/conformed-study.md",
+            score: 100 - index,
+            canonical: true,
+            best_snippets: [{ sentence: repeatedLedger }],
+          })),
+          section_observations: Array.from({ length: 20 }, () => ({
+            path: "docs/research/conformed-study.md",
+            heading: "Model registration",
+            section_excerpt: repeatedLedger,
+          })),
+          capability_key: "docs.search",
+          source_capability_id: "docs.search",
+          provider_gateway_observation_ref: "ask:test:docs-search:observation",
+          observation_role: "evidence_not_assistant_answer",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        schema: "helix.current_turn_artifact.v1",
+        artifact_id: "ask:test:retrieval-context",
+        kind: "retrieval_context",
+        status: "succeeded",
+        capability_key: "docs.search",
+        payload: {
+          schema: "helix.retrieval_context.v1",
+          kind: "retrieval_context",
+          path: "docs/research/conformed-study.md",
+          excerpt: repeatedLedger,
+          excerpt_char_count: repeatedLedger.length,
+          capability_key: "docs.search",
+          source_capability_id: "docs.search",
+          provider_gateway_observation_ref: "ask:test:docs-search:observation",
+          observation_role: "evidence_not_assistant_answer",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ]);
+    const serialized = JSON.stringify(artifacts);
+
+    expect(serialized.length).toBeLessThan(150_000);
+    expect(serialized).toContain("docs/research/conformed-study.md");
+    expect(serialized).toContain("response functions noncomputable");
+    expect(serialized).toContain("model-visible document text truncated");
+    expect(
+      (artifacts[0].payload as Record<string, any>).hits,
+    ).toHaveLength(12);
+    expect(
+      (artifacts[0].payload as Record<string, any>).document_candidates,
+    ).toHaveLength(8);
+    expect(artifacts[0]).toMatchObject({
+      artifact_id: "ask:test:docs-search",
+      capability_key: "docs.search",
+      provider_gateway_observation_ref: "ask:test:docs-search:observation",
+    });
+  });
+
   it("distinguishes materialized Image Lens evidence from a missing-input packet", () => {
     const missingInputPacket = {
       capability_key: "visual_analysis.inspect_image_region",

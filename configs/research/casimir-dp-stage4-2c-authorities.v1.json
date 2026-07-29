@@ -1,0 +1,106 @@
+{
+  "schema_version": "casimir_dp_stage4_2c_authority_manifest/1",
+  "manifest_id": "casimir-dp-stage4-2c-authorities-v1",
+  "study_id": "casimir-dp-quantum-foam-study-v1",
+  "campaign_id": "casimir-dp-identifiability-redesign-stage4-2c-v1",
+  "generated_at": "2026-07-28T00:00:00.000Z",
+  "evidence_cutoff": "2026-07-28T00:00:00.000Z",
+  "evidence_class": "synthetic_fixture",
+  "claim_ceiling": "bounded_synthetic_apparatus_redesign_and_empirical_input_readiness_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "authority_mode": "role_path_and_content_hash_tuple",
+  "mutable_aliases_are_authority": false,
+  "upstream_authorities": [
+    {
+      "role": "stage4_2b_config",
+      "path": "configs/research/casimir-dp-apparatus-coherence-residual-stage4-2b.v1.json",
+      "sha256": "2abf8808fe73f6099d3e9e93e1bed2c8ca33d1094b6a93e9ad926f5fd900fa3e",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2b_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-2b-authorities.v1.json",
+      "sha256": "dd3e423c02fdb16481c91c7ff3ee8583aa740efc71e5a04902ce32cf10754d35",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2b_fixture",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2b-campaign.synthetic.v1.json",
+      "sha256": "ca89c5385bd55290b1cda8084b3d067cbd76420c810164fc958f310de11d1b8c",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2b_immutable_report_json",
+      "path": "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-report.json",
+      "sha256": "2ebd9971bacc393842dc71bfd80063d7b244231947074bc70b3be25bd7ad5b67",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2b_immutable_report_markdown",
+      "path": "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-report.md",
+      "sha256": "e29564c6cedcace388233f6006b98683fab54f9326b96ab9bbaf3334f33adcbe",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2b_campaign_trace",
+      "path": "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-trace.jsonl",
+      "sha256": "727d78249462f0b4171532af37db97be5500a3a7a870cc56b2e533cae0ae0df7",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2b_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-receipt.json",
+      "sha256": "50632b32c4133fe3f0f5eee3cbbb157a983d0a9da69de6239d58563ca88f569c",
+      "tracked": false,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2b_downstream_verification_receipt",
+      "path": "docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-verification-receipt.json",
+      "sha256": "194a58bcfa4cc855c8a50a8a862fac391a01ee55c4dc9feeb1d6e98526b8bf3d",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2b_identifiability_evaluator",
+      "path": "shared/casimir-dp-apparatus-identifiability-stage4-2b.ts",
+      "sha256": "d4a2cecd3238bae15de020568f2b1f659559d269470fd5c4015f495ab8fc0b12",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "registered_dp_companion_generator",
+      "path": "shared/casimir-dp-dp-companion.ts",
+      "sha256": "6432f931dd465624291c4cd7c33eda6a780d4b9687f89f6e76a2794d8708b5ac",
+      "tracked": true,
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2b_strict_contract",
+      "path": "shared/contracts/casimir-dp-apparatus-coherence-residual-stage4-2b.v1.ts",
+      "sha256": "def634e201fcb761d31d40112d89a776fd6c0f24b8300034058c8741a3ef6473",
+      "tracked": true,
+      "required_at_runtime": true
+    }
+  ],
+  "scientific_boundaries": {
+    "stage4_2b_is_immutable_upstream": true,
+    "numeric_control_responses_are_design_assumptions": true,
+    "measured_control_response_authority": "not_ready",
+    "measured_block_covariance": "not_ready",
+    "state_preparation_evidence": "not_ready",
+    "ordinary_dp_and_bridge_hypotheses_separate": true,
+    "cross_scale_identity_is_transfer_kernel": false,
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  }
+}

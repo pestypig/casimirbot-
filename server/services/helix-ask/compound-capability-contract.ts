@@ -12,6 +12,12 @@ import {
   THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
   buildTheoryExperimentProcedurePromptArguments,
 } from "./theory-experiment-procedure-intent";
+import {
+  HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY,
+  HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+} from "@shared/helix-environment-connector";
 
 type RecordLike = Record<string, unknown>;
 
@@ -41,6 +47,9 @@ const THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY =
   "theory-independent-numerical-verifier.start" as const;
 const THEORY_INDEPENDENT_NUMERICAL_READ_RESULT_CAPABILITY =
   "theory-independent-numerical-verifier.read_result" as const;
+const minecraftSituationCapabilities = new Set<string>(
+  HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+);
 
 export const HELIX_COMPOUND_CAPABILITY_CONTRACT_SCHEMA =
   "helix.compound_capability_contract.v1" as const;
@@ -400,6 +409,28 @@ const theoryStructuredEvidenceBindingHint = (
   authority: "current_turn_evidence_only",
 });
 
+const minecraftPositionFromPrompt = (
+  promptText: string,
+): { x: number; y: number; z: number } | null => {
+  const match = promptText.match(
+    /\bx\s*[:=]?\s*(-?\d+(?:\.\d+)?)\s*[,;]?\s*y\s*[:=]?\s*(-?\d+(?:\.\d+)?)\s*[,;]?\s*z\s*[:=]?\s*(-?\d+(?:\.\d+)?)/i,
+  );
+  if (!match) return null;
+  const [x, y, z] = match.slice(1).map(Number);
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(z) ||
+    Math.abs(x) > 30_000_000 ||
+    y < -2_048 ||
+    y > 2_048 ||
+    Math.abs(z) > 30_000_000
+  ) {
+    return null;
+  }
+  return { x, y, z };
+};
+
 const argsHintForSubgoal = (input: {
   turnId: string;
   promptText: string;
@@ -418,6 +449,21 @@ const argsHintForSubgoal = (input: {
     return expression
       ? { latex: expression, expression }
       : {};
+  }
+  if (minecraftSituationCapabilities.has(capability)) {
+    const position = minecraftPositionFromPrompt(input.promptText);
+    if (
+      capability === HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY ||
+      capability === HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY
+    ) {
+      return position ? { target: "position", position } : {};
+    }
+    if (capability === HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY) {
+      return position
+        ? { target: "position", position }
+        : { target: "current_focus" };
+    }
+    return { target: "current_actor" };
   }
   if (capability === "workspace_os.status") return {};
   if (capability === "helix_ask.inspect_capability_catalog") return {};

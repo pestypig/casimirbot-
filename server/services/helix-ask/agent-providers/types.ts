@@ -4,6 +4,7 @@ import type {
   HelixAgentRuntimeId,
 } from "@shared/helix-agent-runtime";
 import type { HelixWorkstationGatewayAccountContext } from "../workstation-tool-gateway/account-policy";
+import type { CodexNativeRuntimeApprovalContextV1 } from "./codex-native/runtime-approval-host";
 
 export type HelixAgentRunRoute = "/ask/turn" | "/ask/turn/stream" | "/ask";
 
@@ -15,6 +16,11 @@ export type HelixAgentRunRequest = {
   signal?: AbortSignal;
   onTranscriptEvent?: (event: Record<string, unknown>) => void;
   workstationAccountContext?: HelixWorkstationGatewayAccountContext | null;
+  /**
+   * Trusted server-composition input only. It is never read from the public
+   * request body and therefore cannot be supplied by the model or client.
+   */
+  runtimeApproval?: CodexNativeRuntimeApprovalContextV1;
 };
 
 export type HelixAgentRuntimeEvent = {

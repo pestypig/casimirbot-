@@ -71,7 +71,7 @@
       "expected_answer_patterns": [
         "unsupported|ineligible|not registered|blocked",
         "two.dimensional|2D|adaptive",
-        "not run|not executed|cannot"
+        "not run|not executed|cannot|procedure.only|not an answer or validation"
       ],
       "expected_minimum_answer_chars": 140
     },

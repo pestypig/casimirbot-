@@ -1,550 +1,210 @@
-# Helix Minecraft Minehut World-Event Bridge Runbook
+# HelixPaperSensor Minehut Handoff Runbook
 
-Date: 2026-05-05
+Status: operator handoff for the current read-only Paper connector.
 
-Status: legacy local-dev tunnel milestone plus first-party hosted room-source path.
+## Canonical Path
 
-## Hosted Production Pipeline
+Use only:
 
-The production replacement for the temporary tunnel is:
+```txt
+minecraft/helix-paper-sensor
+```
+
+Do not package or upload the older `HelixMinecraftBridge`. The supported path is:
 
 ```txt
 Minehut Paper server
-  -> HelixPaperSensor plugin
-  -> https://casimirbot.com/api/room-ingress/v1/bindings/<opaque-binding-id>
-  -> durable Shared Live Room source binding
-  -> exact room/source/world admission
-  -> canonical Situation Room world-event and environment-source services
-  -> optional Helix thread toolObservation when explicitly bound
+  -> HelixPaperSensor
+  -> HTTPS room-source binding
+  -> manifest admission
+  -> heartbeat and environment snapshots
+  -> durable read-only probe polling
+  -> correlated probe result
+  -> current-turn observation re-entry
+  -> Codex follow-up synthesis
+  -> Helix terminal authority
 ```
 
-Generate the link as the developer owner of a Shared Live Room, then paste the
-returned `plugin_config` into the Paper sensor configuration. The bearer is
-shown once, stored hashed, scoped to that room/source/world, expiring,
-rotatable, replay-protected, and read-only. See
-`docs/minecraft-room-source-ingress.md`.
+The connector observes Minecraft state. It does not execute commands or mutate
+the world.
 
-The published domain replaces Cloudflare only when it serves the full Express
-API. It does not make a private `localhost` server public.
+## Requirements
 
-## Verified Legacy Local Pipeline
+- A Minehut server using the Paper server type.
+- A Paper/Minecraft version compatible with Paper API `1.21.8`.
+- Java 21 for the server and local plugin build.
+- A running CasimirBot origin reachable by Minehut over HTTPS.
+- A developer-owned Shared Live Room and one-time room-source configuration.
+- The JAR and SHA-256 recorded in
+  `minecraft/helix-paper-sensor/helix-paper-sensor-build-receipt.json`.
 
-The verified path is:
+Paper's current Java requirements are documented at
+<https://docs.papermc.io/paper/getting-started/>. Minehut server-type selection
+is documented at
+<https://support.minehut.com/hc/en-us/articles/27163124075795-How-do-I-change-my-server-type>.
 
-```txt
-Minehut Paper server
-  -> HelixMinecraftBridge plugin
-  -> Cloudflare Quick Tunnel
-  -> local Casimirbot on localhost:5050
-  -> /api/agi/situation/world-event
-  -> Situation Room world-event ingest
-  -> state projection
-  -> goal hypotheses
-  -> salience receipt
-  -> interjection proposal
-  -> optional Helix thread toolObservation when explicitly bound
-```
+## Build
 
-This is an observe-only bridge. Minecraft events enter Helix, but Helix does not modify the Minecraft world.
-
-## Verified Milestone
-
-The bridge has been verified with:
-
-```txt
-world_id: minecraft:minehut
-room_id: room:minecraft-minehut
-source_id: source:minecraft-server
-actor: DatDamPig
-event_count: 100
-recent events: player_location_sample
-goal hypotheses:
-  - collect string
-  - collect oak log
-  - collect dirt
-```
-
-A simulated damage event produced:
-
-```txt
-reason: risk_detected
-priority: warn
-summary: DatDamPig is in danger at 4 health.
-should_notify_helix: true
-should_speak: false
-```
-
-It also produced an interjection proposal:
-
-```txt
-mode: game_master
-text: DatDamPig is in danger at 4 health.
-voice_output: off
-requires_confirmation: true
-```
-
-After explicit thread binding, a live Minehut event was verified as a durable Helix thread observation:
-
-```txt
-thread_id: helix-ask:desktop
-item_type: toolObservation
-schema: helix.standby_thread_observation.v1
-event_type: player_damage
-actor: DatDamPig
-reason: risk_detected
-summary: DatDamPig is in danger at 4 health.
-source_id: source:minecraft-server
-room_id: room:minecraft-minehut
-evidence_ref: minecraft:minecraft:minehut:event:7
-```
-
-## Important Boundary
-
-Without an explicit Situation Room thread binding, the expected ingest response is:
-
-```txt
-appended: false
-reason: no_thread_context
-```
-
-This is not a transport failure. It means the event was ingested into Situation Room runtime state, but it was not appended to a Helix Ask thread because no explicit room/source/graph/thread binding exists yet.
-
-With an explicit binding:
-
-```txt
-Before explicit attachment:
-  Minecraft event -> projection/salience -> appended=false
-
-After explicit attachment:
-  Minecraft event -> projection/salience -> helix-thread toolObservation -> appended=true
-```
-
-The current safe binding mode is still observation-only:
-
-```txt
-mode: standby_receipts
-append_policy: salient_only
-context_policy: explicit_attachment_only
-command_lane_enabled: false
-```
-
-## Local Components
-
-### Casimirbot
-
-Run the local server on port `5050`:
+From the repository root:
 
 ```powershell
-$env:HELIX_WORLD_EVENT_REQUIRE_TOKEN="1"
-$env:HELIX_WORLD_EVENT_DEV_TOKEN="dev-local-token"
-npm run dev:agi:5050
+.\minecraft\helix-paper-sensor\gradlew.bat `
+  -p minecraft/helix-paper-sensor `
+  --no-daemon clean test jar
 ```
 
-Health check:
-
-```powershell
-Invoke-RestMethod `
-  -Uri "http://127.0.0.1:5050/api/agi/situation/world-event/health" `
-  -Headers @{ Authorization = "Bearer dev-local-token" }
-```
-
-Expected:
-
-```json
-{
-  "ok": true,
-  "service": "helix-world-event-ingest",
-  "schema": "helix.world_event_ingest_health.v1"
-}
-```
-
-### Cloudflare Quick Tunnel (local-development fallback only)
-
-Minehut cannot call `127.0.0.1:5050` on the local PC. If testing against a
-private local server instead of the published CasimirBot API, a public HTTPS
-tunnel is still required.
-
-Start a tunnel:
-
-```powershell
-cloudflared tunnel --url http://localhost:5050
-```
-
-The tunnel prints a temporary URL:
+The upload artifact is:
 
 ```txt
-https://example-name.trycloudflare.com
+minecraft/helix-paper-sensor/build/libs/HelixPaperSensor-0.2.0.jar
 ```
 
-Use this endpoint in the Minehut plugin config:
+The checked-in wrapper is authoritative. Do not substitute a globally installed
+Gradle version.
 
-```txt
-https://example-name.trycloudflare.com/api/agi/situation/world-event
-```
+## Minehut Installation
 
-Tunnel health check:
+1. Create or start the Minehut server.
+2. Select the Paper server type and a compatible Minecraft version.
+3. Stop the server before changing plugin files.
+4. Upload `HelixPaperSensor-0.2.0.jar` to `plugins/`.
+5. Start the server once so Paper creates
+   `plugins/HelixPaperSensor/config.yml`.
+6. Stop the server again before adding the room-source configuration.
 
-```powershell
-Invoke-RestMethod `
-  -Uri "https://example-name.trycloudflare.com/api/agi/situation/world-event/health" `
-  -Headers @{ Authorization = "Bearer dev-local-token" }
-```
+Do not upload the build receipt, local test files, credentials, or any legacy
+bridge JAR.
 
-### Tunnel Lifetime
+## Obtain Room-Source Configuration
 
-```txt
-Restart Minehut: no new tunnel URL needed.
-Restart local Casimirbot on 5050: usually no new tunnel URL needed.
-Restart Cloudflare tunnel: new trycloudflare.com URL needed.
-Restart PC: new trycloudflare.com URL needed.
-```
-
-Quick Tunnel URLs are temporary and should not be treated as stable or
-production infrastructure. A published first-party room-source link does not
-change on Minehut, local-PC, or tunnel restarts; it changes only when the room
-owner rotates or revokes the binding.
-
-## Plugin Build
-
-The plugin source used for the working JAR was:
-
-```txt
-C:\Users\dan\Downloads\helix-minecraft-bridge-observe-only\helix-minecraft-bridge
-```
-
-Build from the folder containing `build.gradle.kts`:
-
-```powershell
-gradle clean build `
-  "-PpaperApiVersion=1.21.10-R0.1-SNAPSHOT" `
-  "-PjavaToolchain=21"
-```
-
-The generated JAR is:
-
-```txt
-build\libs\helix-minecraft-bridge-0.1.0.jar
-```
-
-Upload that JAR to Minehut:
-
-```txt
-plugins/helix-minecraft-bridge-0.1.0.jar
-```
-
-## Minehut Plugin Config
-
-After the first Minehut restart, edit:
-
-```txt
-plugins/HelixMinecraftBridge/config.yml
-```
-
-Use:
+As the developer owner of the target Shared Live Room, create a Minecraft Paper
+source binding. The response supplies a one-time `plugin_config` containing:
 
 ```yaml
 helix:
-  endpoint: "https://YOUR-TUNNEL-HOST/api/agi/situation/world-event"
-  auth_token: "dev-local-token"
-  room_id: "room:minecraft-minehut"
-  source_id: "source:minecraft-server"
-  world_id: "minecraft:minehut"
-  mode: "observe"
-  include_chat_text: true
-  record_jsonl: true
-  max_events_per_flush: 25
-  flush_period_ticks: 20
-  http_timeout_seconds: 4
-  enable_location_samples: false
-  location_sample_ticks: 600
+  endpoint: "<PUBLIC_HTTPS_ROOM_SOURCE_BASE_URL>"
+  bearer_token: "<ONE_TIME_SOURCE_BEARER>"
+  source_id: "<BOUND_SOURCE_ID>"
+  room_id: "<BOUND_ROOM_ID>"
+  world_id: "<BOUND_WORLD_ID>"
+  domain_adapter: "minecraft.paper_plugin.v1"
 ```
 
-Keep:
+Treat the bearer as a secret:
 
-```yaml
-mode: "observe"
-```
+- paste it only into the Minehut plugin configuration;
+- never put it in Git, chat transcripts, screenshots, logs, or the worksheet;
+- rotate the binding if it may have been exposed;
+- do not reuse it for another room, source, world, or server.
 
-There are no Minecraft world-changing actions in the current plugin milestone.
+Retain the generated identity fields exactly. Do not invent or normalize them.
 
-Location samples are useful for projection debugging, but they can be noisy. The confirmed live test showed repeated `player_location_sample` events producing repeated `goal_blocked` observations. For normal testing, keep `enable_location_samples: false`. If projection testing needs location samples, use a slower interval such as `location_sample_ticks: 600` instead of `100`.
+## Required Safe Settings
 
-## Minehut Load Confirmation
-
-On a successful server restart, the Minehut console should show:
-
-```txt
-[PluginInitializerManager] Bukkit plugins (4):
- - HelixMinecraftBridge (0.1.0), MinehutCosmetics, MinehutFilter, ViaVersion
-
-[HelixMinecraftBridge] Enabling HelixMinecraftBridge v0.1.0
-[HelixMinecraftBridge] HelixMinecraftBridge enabled in mode=observe endpoint=https://...
-```
-
-## In-Game Test Commands
-
-Run:
-
-```txt
-/helix status
-/helix ping
-/helix flush
-/helix eventtest damage
-/helix eventtest goal
-/helix eventtest inventory
-```
-
-Expected chat responses:
-
-```txt
-Queued Helix bridge ping.
-Flushing Helix queue.
-Queued simulated damage event.
-Queued simulated goal event.
-Queued simulated inventory event.
-```
-
-If commands are not recognized, confirm the rebuilt JAR is uploaded. The working JAR removes the top-level command permission so normal players can use:
-
-```txt
-/helix status
-/helix ping
-/helix flush
-/helix eventtest ...
-```
-
-Config-changing commands remain admin-protected:
-
-```txt
-/helix room ...
-/helix source ...
-/helix mode ...
-```
-
-## Direct Ingest Test
-
-Use this to verify the endpoint independently of Minehut:
-
-```powershell
-$body = @{
-  schema = "helix.world_event.v1"
-  world_id = "minecraft:minehut"
-  room_id = "room:minecraft-minehut"
-  source_id = "source:minecraft-server"
-  ts = (Get-Date).ToUniversalTime().ToString("o")
-  actor_id = "manual-test"
-  actor_label = "Manual Test"
-  event_type = "bridge_ping"
-  text = "manual bridge ping"
-  evidence_refs = @("manual:test")
-  meta = @{ manual_test = $true }
-} | ConvertTo-Json -Depth 8
-
-Invoke-RestMethod `
-  -Uri "https://YOUR-TUNNEL-HOST/api/agi/situation/world-event" `
-  -Method Post `
-  -ContentType "application/json" `
-  -Body $body
-```
-
-Expected response:
-
-```txt
-ok: true
-schema: helix.world_event_ingest_response.v1
-event_type: bridge_ping
-projection.active_sources includes source:minecraft-server
-```
-
-If no thread binding exists, `appended: false` with `reason: no_thread_context` is expected.
-
-## Create Thread Binding
-
-Use this only after the tunnel health check and direct ingest checks pass. It binds the Minehut room/source/world to a Helix Ask thread so salient standby receipts become durable `toolObservation` items.
-
-```powershell
-$body = @{
-  room_id = "room:minecraft-minehut"
-  source_id = "source:minecraft-server"
-  world_id = "minecraft:minehut"
-  thread_id = "helix-ask:desktop"
-  mode = "standby_receipts"
-  append_policy = "salient_only"
-} | ConvertTo-Json -Depth 8
-
-Invoke-RestMethod `
-  -Uri "http://127.0.0.1:5050/api/agi/situation/thread-binding" `
-  -Method Post `
-  -ContentType "application/json" `
-  -Headers @{ Authorization = "Bearer dev-local-token" } `
-  -Body $body
-```
-
-Expected response:
-
-```txt
-schema: helix.situation_thread_binding_receipt.v1
-ok: true
-binding.mode: standby_receipts
-binding.append_policy: salient_only
-binding.thread_id: helix-ask:desktop
-```
-
-List active bindings:
-
-```powershell
-Invoke-RestMethod `
-  -Uri "http://127.0.0.1:5050/api/agi/situation/thread-binding/list" `
-  -Headers @{ Authorization = "Bearer dev-local-token" }
-```
-
-## Direct Risk-Salience Test
-
-Use this to verify the risk salience gate:
-
-```powershell
-$body = @{
-  schema = "helix.world_event.v1"
-  world_id = "minecraft:minehut"
-  room_id = "room:minecraft-minehut"
-  source_id = "source:minecraft-server"
-  ts = (Get-Date).ToUniversalTime().ToString("o")
-  actor_id = "datdampig"
-  actor_label = "DatDamPig"
-  event_type = "player_damage"
-  text = "simulated low health near hostile"
-  health_delta = @{
-    current_health = 4
-    previous_health = 10
-    damage = 6
-    cause = "test"
-  }
-  evidence_refs = @("manual:direct-risk-check")
-  meta = @{
-    simulated = $true
-    hostile_nearby = $true
-  }
-} | ConvertTo-Json -Depth 8
-
-Invoke-RestMethod `
-  -Uri "https://YOUR-TUNNEL-HOST/api/agi/situation/world-event" `
-  -Method Post `
-  -ContentType "application/json" `
-  -Body $body
-```
-
-Expected response:
-
-```txt
-salience_receipt.reason: risk_detected
-salience_receipt.priority: warn
-salience_receipt.summary: DatDamPig is in danger at 4 health.
-interjection_proposal.requires_confirmation: true
-```
-
-If the thread binding exists and the event is salient, the response should also show:
-
-```txt
-appended: true
-thread_id: helix-ask:desktop
-```
-
-The Helix thread ledger should contain a compact observation, not a generated answer turn:
-
-```txt
-item_type: toolObservation
-item_stream: observation
-observation_ref.schema: helix.standby_thread_observation.v1
-```
-
-## Troubleshooting
-
-### Plugin Missing From Server
-
-If Minehut logs show only:
-
-```txt
-MinehutCosmetics, MinehutFilter, ViaVersion
-```
-
-then the JAR is not in the correct folder. Confirm:
-
-```txt
-plugins/helix-minecraft-bridge-0.1.0.jar
-```
-
-### Endpoint Still Says 127.0.0.1
-
-If Minehut logs show:
-
-```txt
-endpoint=http://127.0.0.1:5050/api/agi/situation/world-event
-```
-
-then the config was not updated or the server was not restarted after editing it.
-
-### Endpoint Says YOUR-TUNNEL-HOST
-
-If Minehut logs show:
-
-```txt
-endpoint=https://YOUR-TUNNEL-HOST/api/agi/situation/world-event
-```
-
-then the placeholder was pasted literally. Replace it with the actual `trycloudflare.com` host.
-
-### POST Failed
-
-If Minehut logs show:
-
-```txt
-Helix world-event POST failed
-```
-
-check:
-
-```txt
-1. Local Casimirbot is running on port 5050.
-2. The Cloudflare tunnel process is still running.
-3. The tunnel health URL returns OK.
-4. auth_token matches HELIX_WORLD_EVENT_DEV_TOKEN if token enforcement is enabled.
-```
-
-### No Thread Append
-
-If responses show:
-
-```txt
-appended: false
-reason: no_thread_context
-```
-
-that is expected until a Minecraft room/source/graph is explicitly bound to a Helix Ask thread.
-
-### Repeated Goal Blocked Observations
-
-If the ledger fills with repeated `player_location_sample` events and `goal_blocked` summaries, reduce the location signal volume:
+Keep these values:
 
 ```yaml
 helix:
-  enable_location_samples: false
+  enabled: true
+  read_only_probes_enabled: true
+  execution_enabled: false
 ```
 
-or slow it down:
+`execution_enabled: true` is rejected by the plugin. Command requests remain
+unsupported and must return `command_execution_not_enabled`.
 
-```yaml
-helix:
-  enable_location_samples: true
-  location_sample_ticks: 600
-```
+## Public Origin And Tunnel
 
-The server-side salience gate should eventually treat routine location samples as projection-only unless risk or objective context exists.
+Use the published CasimirBot HTTPS origin when it exposes the complete Express
+API and room-source routes.
 
-## Current Non-Goals
+Minehut cannot reach `localhost`. For a local CasimirBot test, create a
+Cloudflare tunnel to the local server and use the tunnel's HTTPS origin in the
+generated room-source endpoint. A Quick Tunnel URL is temporary and changes
+when the tunnel process is recreated. Restarting Minehut or CasimirBot does not
+usually change the URL while the same tunnel process remains alive.
+
+Never point Minehut at `127.0.0.1`, `localhost`, plain HTTP, or a placeholder
+binding.
+
+## First Connected Start
+
+Start the Minehut server and inspect the console for:
 
 ```txt
-Do not start answer turns from Minecraft events.
-Do not inject raw audio/transcripts.
-Do not add Minecraft world-changing actions.
-Do not bypass manual-only / explicit-context-only policies.
+HelixPaperSensor enabled in read-only mode; waiting for manifest admission.
+Helix manifest admitted; heartbeat, snapshot, and probe loops started.
 ```
+
+Then run as a server operator:
+
+```txt
+/helixsensor status
+```
+
+Expected evidence:
+
+- manifest admitted for the exact room/source/world;
+- heartbeat succeeds;
+- snapshots are accepted;
+- probe polling is active;
+- `execution_enabled: false`;
+- no authentication pause or receipt-identity mismatch.
+
+The manifest must be admitted before heartbeat, snapshot, and probe loops start.
+
+## Probe Acceptance
+
+A complete read-only inventory probe must show:
+
+1. Agent API request admitted for the exact room and source.
+2. Durable probe lease returned by `/probes/pending`.
+3. The plugin validates the probe as read-only.
+4. The probe runs on Paper's main server thread.
+5. `/probes/result` receives the same request, correlation, room, source, world,
+   and producer-epoch identities.
+6. Helix creates a current-turn observation.
+7. Codex receives the observation and produces the follow-up answer.
+8. Helix terminal authority publishes only that completed answer or a typed
+   failure.
+
+Do not claim live completion from a manifest or heartbeat alone.
+
+## Restart And Sleep Behavior
+
+- Each plugin process start creates a new producer epoch.
+- A new epoch must register a fresh manifest before sending observations.
+- Server sleep or shutdown stops heartbeats and makes source freshness decay.
+- Server restart must restore manifest admission before loops resume.
+- Retryable transport/5xx failures reuse the same request ID, producer epoch,
+  sequence, timestamp, and digest.
+- Authentication, identity, replay, or receipt-validation failures pause or
+  reject delivery; they are not converted into success.
+- Rotate/reissue the source binding if credentials are revoked or the exact
+  room/source/world identity changes.
+
+## Cleanup
+
+After testing:
+
+1. Revoke the connector device and source binding.
+2. Close the test room if it is no longer needed.
+3. Stop the Minehut server or remove the plugin.
+4. Delete any temporary tunnel configuration.
+5. Confirm the source no longer appears healthy.
+6. Rotate the source bearer if its handling is uncertain.
+
+## Completion Boundary
+
+The software preflight is not a live Minecraft acceptance.
+
+Live completion requires:
+
+- a real Minehut producer;
+- the final JAR uploaded and loaded;
+- manifest, heartbeat, and current-state evidence from that producer;
+- an authenticated Agent API run;
+- exact run-room-source-world binding;
+- a fresh inventory result returned by the plugin;
+- current-turn observation re-entry and a terminal Codex synthesis;
+- cleanup or an explicitly retained production binding.

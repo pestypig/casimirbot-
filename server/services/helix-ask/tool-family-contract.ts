@@ -4,6 +4,7 @@ import {
 } from "@shared/helix-scholarly-research-observation";
 import { HELIX_RESEARCH_LIBRARY_READ_CAPABILITY } from "@shared/helix-research-library";
 import { HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY } from "@shared/helix-paper-evidence-enrichment";
+import { HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS } from "@shared/helix-environment-connector";
 
 import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "./workstation-context-feed-query-tool-contracts";
 
@@ -523,6 +524,23 @@ const liveEnvExactContract = (input: {
 
 export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
   ...Object.values(TOOL_FAMILY_DEFAULT_CONTRACTS),
+  ...HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS.map((toolName) =>
+    contract({
+      toolName,
+      toolFamily: "live_environment",
+      authority: "evidence_only",
+      mutating: false,
+      requiredObservationKinds: [
+        "helix.environment_connector.probe_observation.v1",
+        "helix.agent_step_observation_packet.v1",
+        "provider_gateway_observation_packet",
+      ],
+      allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+      requiredReentry: true,
+      requiresGoalSatisfaction: true,
+      aliases: [toolName.replace(/^com\.casimirbot\./, "").replaceAll(".", " ")],
+    }),
+  ),
   liveEnvExactContract({
     toolName: "live_pipeline",
     authority: "control_receipt",
@@ -1756,6 +1774,7 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
   if (/workspace[-.:]?directory|workspace-directory\.resolve|workspace[-.:]?directory[-.:]?resolution/.test(normalized)) return "workspace_directory";
   if (/docs?[-.:]?viewer|active[-.:]?doc|document/.test(normalized)) return "docs_viewer";
   if (/visual[-.:]?capture|image[-.:]?lens|situation-room\.describe-visual-capture/.test(normalized)) return "visual_capture";
+  if (/com\.casimirbot\.minecraft\.inventory\.check|minecraft[-.:]?inventory[-.:]?check/.test(normalized)) return "live_environment";
   if (/workstation|workspace[-.:]?action|workspace[-.:]?panel|panel-control|click-or-activate-control/.test(normalized)) return "workstation";
   if (/live[-.:]?environment|live[-.:]?env|live[-.:]?answer[-.:]?environment|live[-.:]?source[-.:]?set[-.:]?rate|set[-.:]?rate|stage[-.:]?play[-.:]?reflection[-.:]?result/.test(normalized)) return "live_environment";
   if (/live[-.:]?source[-.:]?mail|mailbox|read-processed-live-source-mail|process-live-source-mail|reflect-live-source-mail-loop|mail-loop-causality|processed-mail-loop/.test(normalized)) return "live_source_mail";

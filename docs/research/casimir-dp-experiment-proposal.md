@@ -7,7 +7,7 @@
 **Claim tier:** diagnostic protocol  
 **Proposal package:** pass  
 **Commissioning entry:** conditional pass  
-**Apparatus-DP sensitivity forecast:** `signature_not_identifiable`; redesign/calibration required; no DP exclusion<br>
+**Apparatus-DP sensitivity forecast:** one bounded Stage-4.2C synthetic region passes design gates; physical pilot inputs absent; no DP exclusion<br>
 **Measured evidence:** not ready  
 **Collapse identification:** blocked pending a source-backed dynamics signature  
 **Manifold dynamics:** blocked pending a complete causal model  
@@ -27,6 +27,14 @@
 **Stage-4.2B maintained report:** `docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-report.md`
 **Stage-4.2B verification receipt:** `docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-verification-receipt.json`
 **Stage-4.2B authoritative synthetic run:** `artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/` (downstream software verification pass)
+**Stage-4.2C plan/report:** `docs/research/casimir-dp-identifiability-redesign-stage4-2c-plan.md`; `docs/research/casimir-dp-identifiability-redesign-stage4-2c-report.md`
+**Stage-4.2C config/runner:** `configs/research/casimir-dp-identifiability-redesign-stage4-2c.v1.json`; `scripts/research/run-casimir-dp-identifiability-redesign-stage4-2c.ts`
+**Stage-4.2C verification receipt:** `docs/research/casimir-dp-identifiability-redesign-stage4-2c-verification-receipt.json`
+**Stage-4.2C authoritative synthetic run:** `artifacts/research/casimir-dp-identifiability-redesign-stage4-2c/casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z/` (bounded redesign forecast; downstream software verification pass; physical pilot not ready)
+**Stage-4.2D cross-scale/metrology plan/report:** `docs/research/casimir-dp-cross-scale-metrology-stage4-2d-plan.md`; `docs/research/casimir-dp-cross-scale-metrology-stage4-2d-report.md`
+**Stage-4.2D config/runner:** `configs/research/casimir-dp-cross-scale-metrology-stage4-2d.v1.json`; `scripts/research/run-casimir-dp-cross-scale-metrology-stage4-2d.ts`
+**Stage-4.2D verification receipt:** `docs/research/casimir-dp-cross-scale-metrology-stage4-2d-verification-receipt.json`
+**Stage-4.2D authoritative synthetic run:** `artifacts/research/casimir-dp-cross-scale-metrology-stage4-2d/casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z/` (calibration/recovery diagnostics only; spectroscopic response and physical pilot not ready)
 
 ## Executive summary
 
@@ -59,6 +67,24 @@ physical signature matrix is `signature_not_identifiable`; required windows
 and DP power are not estimable until numerical control-response vectors and
 their block covariance are calibrated. This is a redesign/commissioning gate,
 not a DP exclusion.
+
+Stage 4.2C resolves the corresponding synthetic redesign question. It compiles
+numerical design-assumption control responses and block covariance, transports
+a frozen candidate catalogue through the unchanged registered DP law, and
+finds one bounded silica candidate that clears the preregistered numerical
+gates with 542 required paired windows. That does not close commissioning:
+measured response, covariance, and state-preparation receipts are absent, so
+physical pilot readiness remains `not_ready`.
+
+Stage 4.2D closes the remaining equation-language audit without promoting an
+analogy into a mechanism. Stark, Zeeman, circular-polarization, and blackbody
+dynamic-Stark relations define candidate electric, magnetic, polarization,
+and thermal field witnesses. Schwarzschild compactness, material-yield
+crossover, and Jeans instability recover conventional gravity in their own
+domains. Penrose spinors remain a representation of fields and curvature, not
+mass variables or collapse generators. These lanes can qualify calibration
+and dimensional consistency, but they add no transfer edge into the frozen
+DP rate.
 
 ## Scientific premise
 
@@ -801,6 +827,103 @@ certificate integrity `OK`; downstream receipt SHA-256 is
 Its scientific scope is `none`: it certifies the explicitly supplied software,
 test, schema, and dependency gates, not the experiment or DP.
 
+### Implemented Stage-4.2C bounded redesign and empirical-input gate
+
+Stage 4.2C consumes the complete content-addressed Stage-4.2B no-go without
+modifying it. Seven numerical control axes—temperature, pressure, vibration,
+charge, distance, polarization, and readout power—produce 30 complex response
+rows and a full block covariance with shared-calibration ancestry. Sensor
+self-noise remains covariance-only. These values are design assumptions whose
+purpose is to test whether a physically parameterized control pack can rescue
+identifiability; they are not apparatus measurements.
+
+Every bounded candidate is then evaluated in the Stage-4.2B whitened
+complex-coherence space through the unchanged Gaussian-regularized,
+nonrelativistic mass-density DP generator. The frozen gates are:
+maximum signature cosine \(\leq0.97\), augmented condition number \(\leq100\),
+power \(\geq0.80\), false-positive rate \(\leq0.05\), and companion SNR
+\(\geq5\). The selected synthetic candidate,
+`silica_high_mass_identifiable`, has mass
+\(1.94385\times10^{-16}\ {\rm kg}\), radius
+\(2.76302362398029\times10^{-7}\ {\rm m}\), maximum whitened cosine
+\(0.7177243227022941\), condition \(6.531693613125537\), power
+\(0.9978580863455258\), and a forecast of 542 paired windows.
+
+This is an identifiability-first commissioning target, not an experimental
+result. The more powerful mass-scale-80 point is rejected because it exceeds
+the frozen mass bound, and the diamond point is rejected because its material
+response authority is not admitted. No authentic superposition-preparation
+receipt exists. Before WP3 or WP4 can use the 542-window number, commissioning
+must replace the numerical response and covariance assumptions with
+provenance-bound empirical packets and demonstrate the selected branch
+preparation.
+
+Runtime L has already frozen the schemas for calibration, pilot, confirmatory,
+and independent replication. Calibration and pilot may estimate response and
+covariance; confirmatory and replication forbid response, covariance,
+candidate, DP, or exclusion refitting and require separate custody and
+authorized unblinding. The ordinary-physics null, named DP mass/separation law,
+and any future Casimir-to-collapse transfer kernel remain separate hypotheses.
+
+The authoritative run
+`casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z`
+executes 16/16 fixtures. Its report JSON, Markdown, trace, and receipt hashes
+are
+`d9237eeb9079e7fab84a86b3eda28b0f14bb83be1a340b3d6f9695dcffb5047c`,
+`0f01cb550fed502fe8d5fa3920f4517d7931a89761cdb7a68af1b7d901b55f5f`,
+`3ceeaddbdb0e8a78f1038bd3227f8b0ddbac4ac0af24ca7c37a6b026e5fe2b81`,
+and
+`59cca7ab7f6f6a3d27a83ad8b455fc63fc6db3ca7207cdeff350ed97d497865c`.
+Fresh adapter run `2332` returns `PASS`, no first failure, no deltas,
+certificate integrity `OK`, and certificate hash
+`38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34`.
+The validated one-record trace and downstream receipt hashes are
+`3d454ba0cf3e778dc934cae1c0ee33996bb792caa06255a9dfe984a38138bdee`
+and
+`51c461db1fdaa29162b2c5287a31c01823e5bb23b16a25fe2914841239abba98`.
+This certifies repository execution only. Scientific status remains: physical pilot
+and measured evidence `not_ready`, collapse identification and manifold
+dynamics `blocked`, and physical viability `not_evaluated`.
+
+### Implemented Stage-4.2D cross-scale recovery and field-metrology gate
+
+Stage 4.2D defines the final pre-pilot witness and equation-congruence
+campaign. It keeps four relation classes separate:
+
+1. sourced field-to-frequency calibration through Stark, Zeeman,
+   circular-polarization, and blackbody dynamic-Stark responses;
+2. classical-gravity recovery through compactness, material-strength
+   crossover, and Jeans instability;
+3. spinor/tensor representation equivalence, with explicit rejection of
+   `mass_is_a_spinor` and `maxwell_spinor_is_collapse_generator`; and
+4. the unchanged registered DP hypothesis
+   \(\Delta\rho\rightarrow E_G/\hbar\).
+
+The authoritative synthetic run
+`casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z`
+passes 10/10 baseline and fail-closed fixtures. It recovers the conventional
+limits, preserves the Stage-4.2C standing, and adds zero observable bridge
+edges. Its maximum claim is
+`spectroscopic_field_metrology_and_classical_gravity_recovery_only`.
+
+This campaign improves the experiment by specifying what the pilot must
+measure: selected witness transitions, response derivatives, polarization
+convention, drift and sensor noise, full covariance, and the empirical
+witness-to-complex-coherence response in sham, detuned, active, and reference
+sequences. Until those packets exist, spectroscopic-response authority,
+physical pilot readiness, and measured evidence remain `not_ready`; collapse
+identification and manifold dynamics remain `blocked`; physical viability
+remains `not_evaluated`.
+
+Fresh adapter run `2338` returns `PASS`, no first failure, no deltas,
+certificate integrity `OK`, and certificate SHA-256
+`38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34`.
+Validated trace SHA-256
+`bb4f53cf48f7cf0726822e53dbacd369485c638636df1e6f5078027d36f91d38`
+and downstream receipt SHA-256
+`d96430684379dd5408d8099ae49a05ca0eaf4042a0ea64b09e23d0a4156a0556`
+bind that software verification. Its scientific scope is `none`.
+
 ## Work plan and milestones
 
 | Work package | Indicative interval | Exit artifact |
@@ -810,6 +933,7 @@ test, schema, and dependency gates, not the experiment or DP.
 | WP1 force calibrator and finite geometry | months 4-12 | validated boundary-contrast report |
 | WP2 classical particle integration | months 9-18 | transfer-function and distance-ladder pack |
 | WP2C numerical control identifiability | months 12-22 | source-backed/measured control response vectors, block covariance, and passing rank/cosine/conditioning receipt |
+| WP2D cross-scale field metrology | months 12-22 | selected Stark/Zeeman witness transitions, polarization convention, response/covariance calibration, conventional-gravity recovery receipt, and a measured witness-to-coherence transfer or explicit no-go |
 | WP3 transverse coherence pilot | months 16-24 | branch-provenance and baseline-coherence receipt |
 | WP4 blinded 400-window pilot | months 22-30 | frozen-analysis and pilot integrity report |
 | WP5 powered main run, contingent on all gates and a fresh identifiable forecast | months 30-36 | reproduced decision-table result |
@@ -867,6 +991,13 @@ one-record trace
 and downstream receipt
 `194a58bcfa4cc855c8a50a8a862fac391a01ee55c4dc9feeb1d6e98526b8bf3d`.
 It does not change any scientific status above.
+
+Stage 4.2C narrows the remaining engineering question further: a bounded
+synthetic candidate is numerically identifiable and powered under the frozen
+design-assumption response/covariance model, but the response, covariance, and
+branch preparation have not been measured. The 542-window forecast therefore
+cannot authorize WP4/WP5 acquisition or a DP exclusion until empirical pilot
+packets reproduce the preregistered gates without confirmatory refitting.
 
 The OR/phase Stage-2 runtime passes its upstream-hash, DP algebra,
 pairwise/potential equivalence, branch-sampling, fixed-branch null, and

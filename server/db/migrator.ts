@@ -37,6 +37,8 @@ import { migration035 } from "./migrations/035_helix_agent_account_links";
 import { migration036 } from "./migrations/036_shared_live_room_binding_consent";
 import { migration037 } from "./migrations/037_shared_live_room_binding_consent_enforcement";
 import { migration038 } from "./migrations/038_environment_adapter_registry";
+import { migration039 } from "./migrations/039_environment_connector_platform";
+import { migration040 } from "./migrations/040_environment_probe_execution_authority";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -78,6 +80,8 @@ const MIGRATIONS = [
   migration036,
   migration037,
   migration038,
+  migration039,
+  migration040,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

@@ -10,9 +10,7 @@ import nerdamer from "nerdamer";
 import "nerdamer/Algebra.js";
 import "nerdamer/Calculus.js";
 import "nerdamer/Solve.js";
-import {
-  HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
-} from "../workspace-os-status-intent";
+import { HELIX_WORKSPACE_OS_STATUS_CAPABILITY } from "../workspace-os-status-intent";
 import {
   HELIX_WORKSPACE_OS_STATUS_OBSERVATION_SCHEMA,
   executeWorkspaceOsStatusTool,
@@ -133,6 +131,10 @@ import {
   HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY,
 } from "./bound-room-evidence";
 import {
+  environmentProbeMinecraftManifests,
+  executeEnvironmentProbeGatewayCapability,
+} from "./environment-probe";
+import {
   executeVisualSituationObservationCapability,
   visualSituationObservationManifest,
   VISUAL_SITUATION_OBSERVATION_CAPABILITY,
@@ -213,69 +215,120 @@ import type {
 const DEFAULT_MODE: HelixWorkstationGatewayMode = "observe";
 const WORKSTATION_GATEWAY_SCHEMA = "helix.workstation_tool_gateway.v1" as const;
 const WORKSTATION_GATEWAY_MANIFEST_VERSION = "read-observe-act.v1" as const;
-const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context" as const;
-const WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA = "helix.workstation_active_context_observation.v1" as const;
-const WORKSTATION_NOTES_LIST_NOTES_CAPABILITY = "workstation-notes.list_notes" as const;
-const WORKSTATION_NOTES_LIST_OBSERVATION_SCHEMA = "helix.workstation_notes_list_observation.v1" as const;
-const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression" as const;
-const CALCULATOR_SOLVE_OBSERVATION_SCHEMA = "helix.calculator_solve_observation.v1" as const;
-const CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY = "scientific-calculator.solve_scalar_expression" as const;
-const CALCULATOR_SOLVE_SCALAR_OBSERVATION_SCHEMA = "helix.calculator_scalar_solve_observation.v1" as const;
-const CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY = "scientific-calculator.classify_expression" as const;
-const CALCULATOR_CLASSIFY_OBSERVATION_SCHEMA = "helix.calculator_expression_classification_observation.v1" as const;
-const CALCULATOR_BIND_VARIABLES_CAPABILITY = "scientific-calculator.bind_variables" as const;
-const CALCULATOR_BIND_VARIABLES_OBSERVATION_SCHEMA = "helix.calculator_variable_binding_observation.v1" as const;
-const CALCULATOR_PREFILL_EXPRESSION_CAPABILITY = "scientific-calculator.prefill_expression" as const;
-const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context" as const;
-const CALCULATOR_ACTIVE_CONTEXT_OBSERVATION_SCHEMA = "helix.calculator_active_context_observation.v1" as const;
-const READABLE_SURFACE_OBSERVE_CAPABILITY = "workstation.readable_surface.observe" as const;
-const READABLE_SURFACE_OBSERVATION_SCHEMA = "helix.workstation_readable_surface_observation.v1" as const;
-const DOCS_READ_VISIBLE_SURFACE_CAPABILITY = "docs-viewer.read_visible_surface" as const;
-const DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY = "docs-viewer.read_active_translation" as const;
-const CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY = "scientific-calculator.read_visible_result" as const;
-const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel" as const;
-const CALCULATOR_FOCUS_PANEL_CAPABILITY = "scientific-calculator.focus_panel" as const;
-const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gateway_solve" as const;
+const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY =
+  "workstation.active_context" as const;
+const WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA =
+  "helix.workstation_active_context_observation.v1" as const;
+const HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY =
+  "helix_ask.inspect_capability_catalog" as const;
+const HELIX_ASK_CAPABILITY_CATALOG_OBSERVATION_SCHEMA =
+  "helix.capability_catalog_observation.v1" as const;
+const WORKSTATION_NOTES_LIST_NOTES_CAPABILITY =
+  "workstation-notes.list_notes" as const;
+const WORKSTATION_NOTES_LIST_OBSERVATION_SCHEMA =
+  "helix.workstation_notes_list_observation.v1" as const;
+const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY =
+  "scientific-calculator.solve_expression" as const;
+const CALCULATOR_SOLVE_OBSERVATION_SCHEMA =
+  "helix.calculator_solve_observation.v1" as const;
+const CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY =
+  "scientific-calculator.solve_scalar_expression" as const;
+const CALCULATOR_SOLVE_SCALAR_OBSERVATION_SCHEMA =
+  "helix.calculator_scalar_solve_observation.v1" as const;
+const CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY =
+  "scientific-calculator.classify_expression" as const;
+const CALCULATOR_CLASSIFY_OBSERVATION_SCHEMA =
+  "helix.calculator_expression_classification_observation.v1" as const;
+const CALCULATOR_BIND_VARIABLES_CAPABILITY =
+  "scientific-calculator.bind_variables" as const;
+const CALCULATOR_BIND_VARIABLES_OBSERVATION_SCHEMA =
+  "helix.calculator_variable_binding_observation.v1" as const;
+const CALCULATOR_PREFILL_EXPRESSION_CAPABILITY =
+  "scientific-calculator.prefill_expression" as const;
+const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY =
+  "scientific-calculator.active_context" as const;
+const CALCULATOR_ACTIVE_CONTEXT_OBSERVATION_SCHEMA =
+  "helix.calculator_active_context_observation.v1" as const;
+const READABLE_SURFACE_OBSERVE_CAPABILITY =
+  "workstation.readable_surface.observe" as const;
+const READABLE_SURFACE_OBSERVATION_SCHEMA =
+  "helix.workstation_readable_surface_observation.v1" as const;
+const DOCS_READ_VISIBLE_SURFACE_CAPABILITY =
+  "docs-viewer.read_visible_surface" as const;
+const DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY =
+  "docs-viewer.read_active_translation" as const;
+const CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY =
+  "scientific-calculator.read_visible_result" as const;
+const CALCULATOR_OPEN_PANEL_CAPABILITY =
+  "scientific-calculator.open_panel" as const;
+const CALCULATOR_FOCUS_PANEL_CAPABILITY =
+  "scientific-calculator.focus_panel" as const;
+const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY =
+  "scientific-calculator.show_gateway_solve" as const;
 const WORKSTATION_OPEN_PANEL_CAPABILITY = "workstation.open_panel" as const;
 const WORKSTATION_FOCUS_PANEL_CAPABILITY = "workstation.focus_panel" as const;
-const ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY = "account_session.set_interface_language" as const;
-const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA = "helix.workstation_ui_action_receipt.v1" as const;
+const ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY =
+  "account_session.set_interface_language" as const;
+const WORKSTATION_UI_ACTION_RECEIPT_SCHEMA =
+  "helix.workstation_ui_action_receipt.v1" as const;
 const REPO_SEARCH_CAPABILITY = "repo.search" as const;
-const REPO_SEARCH_OBSERVATION_SCHEMA = "helix.repo_search_observation.v1" as const;
+const REPO_SEARCH_OBSERVATION_SCHEMA =
+  "helix.repo_search_observation.v1" as const;
 const DOCS_SEARCH_CAPABILITY = "docs.search" as const;
-const DOCS_SEARCH_OBSERVATION_SCHEMA = "helix.docs_search_observation.v1" as const;
+const DOCS_SEARCH_OBSERVATION_SCHEMA =
+  "helix.docs_search_observation.v1" as const;
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc" as const;
 const INTERNET_SEARCH_CAPABILITY = HELIX_INTERNET_SEARCH_CAPABILITY;
-const INTERNET_SEARCH_OBSERVATION_SCHEMA = HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA;
-const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
-const SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA = HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA;
+const INTERNET_SEARCH_OBSERVATION_SCHEMA =
+  HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA;
+const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY =
+  HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
+const SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA =
+  HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA;
 const RESEARCH_LIBRARY_READ_CAPABILITY = HELIX_RESEARCH_LIBRARY_READ_CAPABILITY;
-const RESEARCH_LIBRARY_OBSERVATION_SCHEMA = HELIX_RESEARCH_LIBRARY_OBSERVATION_SCHEMA;
+const RESEARCH_LIBRARY_OBSERVATION_SCHEMA =
+  HELIX_RESEARCH_LIBRARY_OBSERVATION_SCHEMA;
 const RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY =
   HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY;
 const PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA =
   HELIX_PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA;
-const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY;
-const SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA = HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA;
-const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY;
-const SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA = HELIX_SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA;
-const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds" as const;
+const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY =
+  HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY;
+const SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA =
+  HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA;
+const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY =
+  HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY;
+const SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA =
+  HELIX_SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA;
+const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY =
+  "civilization-bounds.reflect_system_bounds" as const;
 const CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA =
   "helix.civilization_bounds_reflection_observation.v1" as const;
-const THEORY_CONTEXT_REFLECTION_CAPABILITY = HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY;
-const THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA = "helix.theory_context_reflection_observation.v1" as const;
-const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY = "theory-badge-graph.current_context" as const;
+const THEORY_CONTEXT_REFLECTION_CAPABILITY =
+  HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY;
+const THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA =
+  "helix.theory_context_reflection_observation.v1" as const;
+const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY =
+  "theory-badge-graph.current_context" as const;
 const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_OBSERVATION_SCHEMA =
   "helix.theory_badge_graph_current_context_observation.v1" as const;
-const THEORY_FRONTIER_CONJECTURE_CAPABILITY = "theory-badge-graph.propose_frontier_conjectures" as const;
+const THEORY_FRONTIER_CONJECTURE_CAPABILITY =
+  "theory-badge-graph.propose_frontier_conjectures" as const;
 const THEORY_FRONTIER_CONJECTURE_OBSERVATION_SCHEMA =
   "helix.theory_frontier_conjecture_observation.v1" as const;
-const VOICE_INTERIM_CALLOUT_CAPABILITY = "live_env.request_interim_voice_callout" as const;
+const VOICE_INTERIM_CALLOUT_CAPABILITY =
+  "live_env.request_interim_voice_callout" as const;
 const VOICE_NARRATOR_SAY_CAPABILITY = "live_env.narrator_say" as const;
-const TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY = "text_to_speech.speak_text" as const;
-const VOICE_INTERIM_TOOL_RESULT_SCHEMA = "helix.interim_voice_callout_tool_result.v1" as const;
+const TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY =
+  "text_to_speech.speak_text" as const;
+const VOICE_INTERIM_TOOL_RESULT_SCHEMA =
+  "helix.interim_voice_callout_tool_result.v1" as const;
 const hashShort = (value: unknown, size = 18): string =>
-  crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
+  crypto
+    .createHash("sha256")
+    .update(JSON.stringify(value))
+    .digest("hex")
+    .slice(0, size);
 const SHARED_CONTEXT_FEED_QUERY_CAPABILITIES = new Set<string>([
   "live_env.query_visual_summaries",
   "live_env.query_trace_memory",
@@ -290,8 +343,16 @@ const SHARED_CONTEXT_FEED_QUERY_CAPABILITIES = new Set<string>([
   "live_env.query_source_health",
 ] as const);
 const LIVE_SOURCE_STATE_READ_CAPABILITIES = [
-  ["live_env.query_live_source_quality", "query_live_source_quality", "Query live-source quality"],
-  ["live_env.query_workstation_goal_context", "query_workstation_goal_context", "Query workstation goal context"],
+  [
+    "live_env.query_live_source_quality",
+    "query_live_source_quality",
+    "Query live-source quality",
+  ],
+  [
+    "live_env.query_workstation_goal_context",
+    "query_workstation_goal_context",
+    "Query workstation goal context",
+  ],
   [
     "live_env.summarize_live_source_current_state",
     "summarize_live_source_current_state",
@@ -304,18 +365,43 @@ const SHARED_LIVE_SOURCE_STATE_READ_CAPABILITIES = new Set<string>(
 const SITUATION_STAGE_STATE_READ_CAPABILITIES = [
   ["live_env.query_event_log", "query_event_log", "Query live event log"],
   ["live_env.query_world_events", "query_world_events", "Query world events"],
-  ["live_env.query_navigation_state", "query_navigation_state", "Query navigation state"],
-  ["live_env.query_stage_sources", "query_stage_sources", "Query stage sources"],
-  ["live_env.query_constructs", "query_constructs", "Query situation constructs"],
-  ["live_env.query_job_evidence", "query_job_evidence", "Query live job evidence"],
+  [
+    "live_env.query_navigation_state",
+    "query_navigation_state",
+    "Query navigation state",
+  ],
+  [
+    "live_env.query_stage_sources",
+    "query_stage_sources",
+    "Query stage sources",
+  ],
+  [
+    "live_env.query_constructs",
+    "query_constructs",
+    "Query situation constructs",
+  ],
+  [
+    "live_env.query_job_evidence",
+    "query_job_evidence",
+    "Query live job evidence",
+  ],
 ] as const;
 const SHARED_SITUATION_STAGE_STATE_READ_CAPABILITIES = new Set<string>(
   SITUATION_STAGE_STATE_READ_CAPABILITIES.map(([capabilityId]) => capabilityId),
 );
-const LIVE_SOURCE_LOOP_HEALTH_CAPABILITY = "live_env.query_live_source_loop_health" as const;
+const LIVE_SOURCE_LOOP_HEALTH_CAPABILITY =
+  "live_env.query_live_source_loop_health" as const;
 const LIVE_SOURCE_MAILBOX_READ_CAPABILITIES = [
-  ["live_env.check_live_source_mail", "check_live_source_mail", "Check live-source mail"],
-  ["live_env.read_live_source_mail", "read_live_source_mail", "Read live-source mail"],
+  [
+    "live_env.check_live_source_mail",
+    "check_live_source_mail",
+    "Check live-source mail",
+  ],
+  [
+    "live_env.read_live_source_mail",
+    "read_live_source_mail",
+    "Read live-source mail",
+  ],
   [
     "live_env.read_processed_live_source_mail",
     "read_processed_live_source_mail",
@@ -352,36 +438,66 @@ const LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES = [
     "Compare live-source prediction",
   ],
 ] as const;
-const SHARED_LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES = new Set<string>(
-  LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.map(([capabilityId]) => capabilityId),
-);
+const SHARED_LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES =
+  new Set<string>(
+    LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.map(
+      ([capabilityId]) => capabilityId,
+    ),
+  );
 const STAGE_PLAY_BUILDER_READ_CAPABILITIES = [
-  ["live_env.describe_stage_builder", "describe_stage_builder", "Describe Stage Builder"],
-  ["live_env.validate_stage_play_graph", "validate_stage_play_graph", "Validate Stage Play graph"],
-  ["live_env.plan_stage_play_job", "plan_stage_play_job", "Plan Stage Play job"],
+  [
+    "live_env.describe_stage_builder",
+    "describe_stage_builder",
+    "Describe Stage Builder",
+  ],
+  [
+    "live_env.validate_stage_play_graph",
+    "validate_stage_play_graph",
+    "Validate Stage Play graph",
+  ],
+  [
+    "live_env.plan_stage_play_job",
+    "plan_stage_play_job",
+    "Plan Stage Play job",
+  ],
 ] as const;
 const SHARED_STAGE_PLAY_BUILDER_READ_CAPABILITIES = new Set<string>(
   STAGE_PLAY_BUILDER_READ_CAPABILITIES.map(([capabilityId]) => capabilityId),
 );
-const MICRO_REASONER_QUERY_PRESETS_CAPABILITY = "live_env.query_micro_reasoner_presets" as const;
-const MICRO_REASONER_QUERY_PROMPTS_CAPABILITY = "live_env.query_micro_reasoner_prompts" as const;
-const MICRO_REASONER_TEST_PROMPT_CAPABILITY = "live_env.test_micro_reasoner_prompt" as const;
+const MICRO_REASONER_QUERY_PRESETS_CAPABILITY =
+  "live_env.query_micro_reasoner_presets" as const;
+const MICRO_REASONER_QUERY_PROMPTS_CAPABILITY =
+  "live_env.query_micro_reasoner_prompts" as const;
+const MICRO_REASONER_TEST_PROMPT_CAPABILITY =
+  "live_env.test_micro_reasoner_prompt" as const;
 const SHARED_MICRO_REASONER_READ_CAPABILITIES = new Set<string>([
   MICRO_REASONER_QUERY_PRESETS_CAPABILITY,
   MICRO_REASONER_QUERY_PROMPTS_CAPABILITY,
   MICRO_REASONER_TEST_PROMPT_CAPABILITY,
 ] as const);
-const VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY = "live_env.query_visual_observer_profiles" as const;
-const VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY = "live_env.test_visual_observer_profile" as const;
-const VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY = "live_env.compare_visual_observer_profiles" as const;
+const VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY =
+  "live_env.query_visual_observer_profiles" as const;
+const VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY =
+  "live_env.test_visual_observer_profile" as const;
+const VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY =
+  "live_env.compare_visual_observer_profiles" as const;
 const SHARED_VISUAL_OBSERVER_READ_CAPABILITIES = new Set<string>([
   VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY,
   VISUAL_OBSERVER_TEST_PROFILE_CAPABILITY,
   VISUAL_OBSERVER_COMPARE_PROFILES_CAPABILITY,
 ] as const);
-const REPO_SEARCH_DEFAULT_PATHS = ["server", "shared", "client/src", "docs"] as const;
+const REPO_SEARCH_DEFAULT_PATHS = [
+  "server",
+  "shared",
+  "client/src",
+  "docs",
+] as const;
 const DOCS_SEARCH_DEFAULT_PATHS = ["docs"] as const;
-const INTERNET_SEARCH_PROVIDERS = ["tavily", "exa", "google_custom_search"] as const;
+const INTERNET_SEARCH_PROVIDERS = [
+  "tavily",
+  "exa",
+  "google_custom_search",
+] as const;
 const SCHOLARLY_RESEARCH_PROVIDERS = [
   "pubmed",
   "arxiv",
@@ -422,14 +538,29 @@ const DOCS_SEARCH_ALLOWED_PATH_PREFIXES = ["docs"] as const;
 const uniqueAffordanceKinds = (
   values: Array<HelixWorkstationTypedAffordanceKind | null | undefined>,
 ): HelixWorkstationTypedAffordanceKind[] =>
-  Array.from(new Set(values.filter((entry): entry is HelixWorkstationTypedAffordanceKind => Boolean(entry))));
+  Array.from(
+    new Set(
+      values.filter((entry): entry is HelixWorkstationTypedAffordanceKind =>
+        Boolean(entry),
+      ),
+    ),
+  );
 
-const manifestProducesAffordances = (capabilityId: string): HelixWorkstationTypedAffordanceKind[] => {
-  if (capabilityId === HELIX_WORKSPACE_OS_STATUS_CAPABILITY) return ["system_status", "source_ref"];
+const manifestProducesAffordances = (
+  capabilityId: string,
+): HelixWorkstationTypedAffordanceKind[] => {
+  if (capabilityId === HELIX_WORKSPACE_OS_STATUS_CAPABILITY)
+    return ["system_status", "source_ref"];
+  if (capabilityId === HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY) {
+    return ["source_ref", "text_evidence"];
+  }
   if (capabilityId === HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY) {
     return ["source_ref", "text_evidence"];
   }
-  if (capabilityId === WORKSTATION_ACTIVE_CONTEXT_CAPABILITY || capabilityId === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY) {
+  if (
+    capabilityId === WORKSTATION_ACTIVE_CONTEXT_CAPABILITY ||
+    capabilityId === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY
+  ) {
     return ["active_surface_ref", "source_ref"];
   }
   if (capabilityId === WORKSTATION_NOTES_LIST_NOTES_CAPABILITY) {
@@ -440,40 +571,78 @@ const manifestProducesAffordances = (capabilityId: string): HelixWorkstationType
     capabilityId === DOCS_READ_VISIBLE_SURFACE_CAPABILITY ||
     capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY
   ) {
-    return ["active_surface_ref", "text_evidence", "numeric_value_evidence", "source_ref"];
+    return [
+      "active_surface_ref",
+      "text_evidence",
+      "numeric_value_evidence",
+      "source_ref",
+    ];
   }
   if (capabilityId === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY) {
-    return ["active_surface_ref", "calculator_result", "numeric_value_evidence", "source_ref"];
+    return [
+      "active_surface_ref",
+      "calculator_result",
+      "numeric_value_evidence",
+      "source_ref",
+    ];
   }
   if (capabilityId === CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY) {
     return ["calculator_expression_template", "source_ref"];
   }
   if (capabilityId === CALCULATOR_BIND_VARIABLES_CAPABILITY) {
-    return ["bound_calculator_expression", "calculator_expression_template", "source_ref"];
+    return [
+      "bound_calculator_expression",
+      "calculator_expression_template",
+      "source_ref",
+    ];
   }
   if (capabilityId === REPO_SEARCH_CAPABILITY) {
     return ["source_ref", "text_evidence", "citation_evidence"];
   }
   if (capabilityId === DOCS_SEARCH_CAPABILITY) {
-    return ["source_ref", "text_evidence", "citation_evidence", "numeric_value_evidence"];
+    return [
+      "source_ref",
+      "text_evidence",
+      "citation_evidence",
+      "numeric_value_evidence",
+    ];
   }
-  if (capabilityId === INTERNET_SEARCH_CAPABILITY || capabilityId === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) {
+  if (
+    capabilityId === INTERNET_SEARCH_CAPABILITY ||
+    capabilityId === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY
+  ) {
     return ["source_ref", "text_evidence", "citation_evidence"];
   }
   if (capabilityId === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) {
     return ["source_ref", "text_evidence", "citation_evidence"];
   }
   if (capabilityId === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY) {
-    return ["source_ref", "text_evidence", "citation_evidence", "numeric_value_evidence"];
+    return [
+      "source_ref",
+      "text_evidence",
+      "citation_evidence",
+      "numeric_value_evidence",
+    ];
   }
   if (capabilityId === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
-    return ["theory_context", "scientific_evidence", "calculator_expression_template", "claim_boundary", "source_ref"];
+    return [
+      "theory_context",
+      "scientific_evidence",
+      "calculator_expression_template",
+      "claim_boundary",
+      "source_ref",
+    ];
   }
   if (capabilityId === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY) {
     return ["theory_context", "claim_boundary", "source_ref"];
   }
   if (capabilityId === THEORY_FRONTIER_CONJECTURE_CAPABILITY) {
-    return ["theory_context", "frontier_candidate", "claim_boundary", "source_ref"];
+    return [
+      "theory_context",
+      "frontier_candidate",
+      "claim_boundary",
+      "source_ref",
+    ];
   }
   if (capabilityId === CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY) {
     return ["theory_context", "claim_boundary", "source_ref"];
@@ -496,39 +665,73 @@ const manifestProducesAffordances = (capabilityId: string): HelixWorkstationType
   ) {
     return ["ui_projection_receipt", "source_ref"];
   }
-  if (capabilityId === VOICE_INTERIM_CALLOUT_CAPABILITY || capabilityId === VOICE_NARRATOR_SAY_CAPABILITY) {
+  if (
+    capabilityId === VOICE_INTERIM_CALLOUT_CAPABILITY ||
+    capabilityId === VOICE_NARRATOR_SAY_CAPABILITY
+  ) {
     return ["ui_projection_receipt", "source_ref"];
   }
-  if (SHARED_LIVE_SOURCE_MAILBOX_READ_CAPABILITIES.has(capabilityId)) return ["mail_packet_ref", "source_ref", "text_evidence"];
-  if (SHARED_LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.has(capabilityId)) return ["prediction_evidence", "source_ref", "text_evidence"];
-  if (SHARED_STAGE_PLAY_BUILDER_READ_CAPABILITIES.has(capabilityId)) return ["stage_plan", "source_ref", "text_evidence"];
-  if (SHARED_MICRO_REASONER_READ_CAPABILITIES.has(capabilityId)) return ["micro_reasoner_eval", "source_ref", "text_evidence"];
-  if (SHARED_VISUAL_OBSERVER_READ_CAPABILITIES.has(capabilityId)) return ["visual_observer_eval", "source_ref", "text_evidence"];
-  if (capabilityId === LIVE_SOURCE_LOOP_HEALTH_CAPABILITY || SHARED_LIVE_SOURCE_STATE_READ_CAPABILITIES.has(capabilityId)) {
+  if (SHARED_LIVE_SOURCE_MAILBOX_READ_CAPABILITIES.has(capabilityId))
+    return ["mail_packet_ref", "source_ref", "text_evidence"];
+  if (
+    SHARED_LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.has(
+      capabilityId,
+    )
+  )
+    return ["prediction_evidence", "source_ref", "text_evidence"];
+  if (SHARED_STAGE_PLAY_BUILDER_READ_CAPABILITIES.has(capabilityId))
+    return ["stage_plan", "source_ref", "text_evidence"];
+  if (SHARED_MICRO_REASONER_READ_CAPABILITIES.has(capabilityId))
+    return ["micro_reasoner_eval", "source_ref", "text_evidence"];
+  if (SHARED_VISUAL_OBSERVER_READ_CAPABILITIES.has(capabilityId))
+    return ["visual_observer_eval", "source_ref", "text_evidence"];
+  if (
+    capabilityId === LIVE_SOURCE_LOOP_HEALTH_CAPABILITY ||
+    SHARED_LIVE_SOURCE_STATE_READ_CAPABILITIES.has(capabilityId)
+  ) {
     return ["loop_health_evidence", "source_ref", "text_evidence"];
   }
-  if (SHARED_CONTEXT_FEED_QUERY_CAPABILITIES.has(capabilityId) || SHARED_SITUATION_STAGE_STATE_READ_CAPABILITIES.has(capabilityId)) {
+  if (
+    SHARED_CONTEXT_FEED_QUERY_CAPABILITIES.has(capabilityId) ||
+    SHARED_SITUATION_STAGE_STATE_READ_CAPABILITIES.has(capabilityId)
+  ) {
     return ["source_ref", "text_evidence", "active_surface_ref"];
   }
   return ["source_ref"];
 };
 
-const manifestConsumesAffordances = (capabilityId: string): HelixWorkstationTypedAffordanceKind[] => {
+const manifestConsumesAffordances = (
+  capabilityId: string,
+): HelixWorkstationTypedAffordanceKind[] => {
   if (
     capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY ||
     capabilityId === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY
   ) {
-    return ["bound_calculator_expression", "calculator_expression_template", "numeric_value_evidence"];
+    return [
+      "bound_calculator_expression",
+      "calculator_expression_template",
+      "numeric_value_evidence",
+    ];
   }
-  if (capabilityId === CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY) return ["text_evidence", "source_ref"];
+  if (capabilityId === CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY)
+    return ["text_evidence", "source_ref"];
   if (capabilityId === CALCULATOR_BIND_VARIABLES_CAPABILITY) {
-    return ["calculator_expression_template", "numeric_value_evidence", "source_ref"];
+    return [
+      "calculator_expression_template",
+      "numeric_value_evidence",
+      "source_ref",
+    ];
   }
-  if (capabilityId === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) return ["source_ref"];
-  if (capabilityId === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY) return ["text_evidence", "citation_evidence"];
-  if (capabilityId === CALCULATOR_PREFILL_EXPRESSION_CAPABILITY) return ["calculator_expression_template", "source_ref"];
-  if (capabilityId === CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY) return ["calculator_result"];
-  if (capabilityId === DOCS_OPEN_DOC_CAPABILITY) return ["doc_path_ref", "source_ref"];
+  if (capabilityId === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY)
+    return ["source_ref"];
+  if (capabilityId === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY)
+    return ["text_evidence", "citation_evidence"];
+  if (capabilityId === CALCULATOR_PREFILL_EXPRESSION_CAPABILITY)
+    return ["calculator_expression_template", "source_ref"];
+  if (capabilityId === CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY)
+    return ["calculator_result"];
+  if (capabilityId === DOCS_OPEN_DOC_CAPABILITY)
+    return ["doc_path_ref", "source_ref"];
   if (
     capabilityId === CALCULATOR_OPEN_PANEL_CAPABILITY ||
     capabilityId === CALCULATOR_FOCUS_PANEL_CAPABILITY ||
@@ -537,7 +740,10 @@ const manifestConsumesAffordances = (capabilityId: string): HelixWorkstationType
   ) {
     return ["active_surface_ref"];
   }
-  if (capabilityId === VOICE_INTERIM_CALLOUT_CAPABILITY || capabilityId === VOICE_NARRATOR_SAY_CAPABILITY) {
+  if (
+    capabilityId === VOICE_INTERIM_CALLOUT_CAPABILITY ||
+    capabilityId === VOICE_NARRATOR_SAY_CAPABILITY
+  ) {
     return ["voice_text_evidence", "text_evidence", "source_ref"];
   }
   if (capabilityId === CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY) {
@@ -549,19 +755,24 @@ const manifestConsumesAffordances = (capabilityId: string): HelixWorkstationType
 const attachManifestAffordanceContract = (
   manifest: HelixWorkstationCapabilityManifest,
 ): HelixWorkstationCapabilityManifest => {
-  const produces = uniqueAffordanceKinds(manifestProducesAffordances(manifest.capability_id));
-  const consumes = uniqueAffordanceKinds(manifestConsumesAffordances(manifest.capability_id));
+  const produces = uniqueAffordanceKinds(
+    manifestProducesAffordances(manifest.capability_id),
+  );
+  const consumes = uniqueAffordanceKinds(
+    manifestConsumesAffordances(manifest.capability_id),
+  );
   return {
     ...manifest,
     produces_affordances: produces,
     consumes_affordances: consumes,
-    typed_handoff_role: produces.length > 0 && consumes.length > 0
-      ? "producer_consumer"
-      : produces.length > 0
-        ? "producer"
-        : consumes.length > 0
-          ? "consumer"
-          : "none",
+    typed_handoff_role:
+      produces.length > 0 && consumes.length > 0
+        ? "producer_consumer"
+        : produces.length > 0
+          ? "producer"
+          : consumes.length > 0
+            ? "consumer"
+            : "none",
   };
 };
 
@@ -578,10 +789,14 @@ const optionalString = (value: unknown): string | null => {
 
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value)
-    ? value.map((entry) => cleanString(entry)).filter(Boolean).slice(0, 32)
+    ? value
+        .map((entry) => cleanString(entry))
+        .filter(Boolean)
+        .slice(0, 32)
     : [];
 
-const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+const readArray = (value: unknown): unknown[] =>
+  Array.isArray(value) ? value : [];
 
 const readBoolean = (value: unknown, fallback = false): boolean => {
   if (typeof value === "boolean") return value;
@@ -593,19 +808,30 @@ const readBoolean = (value: unknown, fallback = false): boolean => {
 };
 
 const readFiniteNumber = (value: unknown): number | null => {
-  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : NaN;
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const readInterfaceLanguageCode = (value: unknown): SharedInterfaceLanguageCode | null => {
+const readInterfaceLanguageCode = (
+  value: unknown,
+): SharedInterfaceLanguageCode | null => {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase().replace("_", "-").split("-")[0];
-  return (SHARED_INTERFACE_LANGUAGE_CODES as readonly string[]).includes(normalized)
+  return (SHARED_INTERFACE_LANGUAGE_CODES as readonly string[]).includes(
+    normalized,
+  )
     ? (normalized as SharedInterfaceLanguageCode)
     : null;
 };
 
-const readCivilizationLayerMode = (value: unknown): CivilizationLayerModeV1 | undefined => {
+const readCivilizationLayerMode = (
+  value: unknown,
+): CivilizationLayerModeV1 | undefined => {
   const cleaned = cleanString(value);
   return (CIVILIZATION_LAYER_MODES as readonly string[]).includes(cleaned)
     ? (cleaned as CivilizationLayerModeV1)
@@ -614,7 +840,13 @@ const readCivilizationLayerMode = (value: unknown): CivilizationLayerModeV1 | un
 
 const normalizeMode = (value: unknown): HelixWorkstationGatewayMode => {
   const mode = cleanString(value, DEFAULT_MODE).toLowerCase();
-  if (mode === "read" || mode === "observe" || mode === "act" || mode === "verify") return mode;
+  if (
+    mode === "read" ||
+    mode === "observe" ||
+    mode === "act" ||
+    mode === "verify"
+  )
+    return mode;
   return DEFAULT_MODE;
 };
 
@@ -625,7 +857,10 @@ const gatewayModeRank: Record<HelixWorkstationGatewayMode, number> = {
   act: 3,
 };
 
-const permissionProfileRank: Record<HelixWorkstationCapabilityManifest["permission_profile_required"], number> = {
+const permissionProfileRank: Record<
+  HelixWorkstationCapabilityManifest["permission_profile_required"],
+  number
+> = {
   observe: 1,
   read: 2,
   act: 3,
@@ -636,12 +871,19 @@ const permissionProfileRank: Record<HelixWorkstationCapabilityManifest["permissi
 const modeAllowsManifest = (
   mode: HelixWorkstationGatewayMode,
   manifest: HelixWorkstationCapabilityManifest,
-): boolean => gatewayModeRank[mode] >= permissionProfileRank[manifest.permission_profile_required];
+): boolean =>
+  gatewayModeRank[mode] >=
+  permissionProfileRank[manifest.permission_profile_required];
 
 const normalizeGatewayCapabilityId = (value: string): string => {
-  const theoryCapability = canonicalizeHelixTheoryContextReflectionCapability(value);
+  const theoryCapability =
+    canonicalizeHelixTheoryContextReflectionCapability(value);
   if (theoryCapability !== value) return theoryCapability;
-  if (value === "internet.search" || value === "web.search" || value === "internet_search.web_research") {
+  if (
+    value === "internet.search" ||
+    value === "web.search" ||
+    value === "internet_search.web_research"
+  ) {
     return INTERNET_SEARCH_CAPABILITY;
   }
   if (
@@ -655,14 +897,20 @@ const normalizeGatewayCapabilityId = (value: string): string => {
 };
 
 const readArguments = (value: unknown): Record<string, unknown> =>
-  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 
 const readRecordArray = (value: unknown): Array<Record<string, unknown>> =>
   Array.isArray(value)
-    ? value.map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    ? value
+        .map(readRecord)
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry))
     : [];
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] => {
@@ -679,59 +927,67 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] => {
   return result;
 };
 
-const readWorkstationNotesContextRecord = (args: Record<string, unknown>): Record<string, unknown> | null => {
+const readWorkstationNotesContextRecord = (
+  args: Record<string, unknown>,
+): Record<string, unknown> | null => {
   const input = readRecord(args.input);
   const explicitNotesState = readRecord(
     args.notes_state ??
-    args.notesState ??
-    input?.notes_state ??
-    input?.notesState,
+      args.notesState ??
+      input?.notes_state ??
+      input?.notesState,
   );
   if (explicitNotesState) return explicitNotesState;
   const workspaceContext = readRecord(
     args.workspace_context ??
-    args.workspaceContext ??
-    input?.workspace_context ??
-    input?.workspaceContext,
+      args.workspaceContext ??
+      input?.workspace_context ??
+      input?.workspaceContext,
   );
   if (!workspaceContext) return null;
   return readRecord(
     workspaceContext.notes_context ??
-    workspaceContext.notesContext ??
-    workspaceContext.workstation_notes ??
-    workspaceContext.workstationNotes ??
-    workspaceContext.notes_state ??
-    workspaceContext.notesState,
+      workspaceContext.notesContext ??
+      workspaceContext.workstation_notes ??
+      workspaceContext.workstationNotes ??
+      workspaceContext.notes_state ??
+      workspaceContext.notesState,
   );
 };
 
-const readBoundedWorkstationNotesList = (args: Record<string, unknown>): Record<string, unknown> => {
+const readBoundedWorkstationNotesList = (
+  args: Record<string, unknown>,
+): Record<string, unknown> => {
   const notesContext = readWorkstationNotesContextRecord(args);
-  const rawNotes = readRecordArray(args.notes).length > 0
-    ? readRecordArray(args.notes)
-    : readRecordArray(notesContext?.notes);
+  const rawNotes =
+    readRecordArray(args.notes).length > 0
+      ? readRecordArray(args.notes)
+      : readRecordArray(notesContext?.notes);
   const activeNoteId = optionalString(
     args.active_note_id ??
-    args.activeNoteId ??
-    notesContext?.active_note_id ??
-    notesContext?.activeNoteId,
+      args.activeNoteId ??
+      notesContext?.active_note_id ??
+      notesContext?.activeNoteId,
   );
   const activeNoteTitle = optionalString(
     args.active_note_title ??
-    args.activeNoteTitle ??
-    notesContext?.active_note_title ??
-    notesContext?.activeNoteTitle,
+      args.activeNoteTitle ??
+      notesContext?.active_note_title ??
+      notesContext?.activeNoteTitle,
   );
   const requestedNoteId = optionalString(args.note_id ?? args.noteId);
   const requestedTitle = optionalString(args.title);
   const normalizedRequestedTitle = requestedTitle?.toLowerCase() ?? null;
   const normalizedRequestedId = requestedNoteId?.toLowerCase() ?? null;
-  const synthesizedActiveNote = rawNotes.length === 0 && (activeNoteId || activeNoteTitle)
-    ? [{
-        id: activeNoteId,
-        title: activeNoteTitle,
-      }]
-    : [];
+  const synthesizedActiveNote =
+    rawNotes.length === 0 && (activeNoteId || activeNoteTitle)
+      ? [
+          {
+            id: activeNoteId,
+            title: activeNoteTitle,
+          },
+        ]
+      : [];
   const sanitized = [...rawNotes, ...synthesizedActiveNote]
     .slice(0, 50)
     .map((note, index) => {
@@ -747,8 +1003,15 @@ const readBoundedWorkstationNotesList = (args: Record<string, unknown>): Record<
         ...(updatedAt ? { updated_at: updatedAt } : {}),
         ...(createdAt ? { created_at: createdAt } : {}),
         ...(tags.length ? { tags } : {}),
-        active: Boolean((id && activeNoteId && id === activeNoteId) || (title && activeNoteTitle && title === activeNoteTitle)),
-        source_ref: id ? `workstation-notes:${id}` : title ? `workstation-notes:title:${title}` : `workstation-notes:index:${index}`,
+        active: Boolean(
+          (id && activeNoteId && id === activeNoteId) ||
+          (title && activeNoteTitle && title === activeNoteTitle),
+        ),
+        source_ref: id
+          ? `workstation-notes:${id}`
+          : title
+            ? `workstation-notes:title:${title}`
+            : `workstation-notes:index:${index}`,
         raw_content_included: false,
         assistant_answer: false,
         terminal_eligible: false,
@@ -756,8 +1019,16 @@ const readBoundedWorkstationNotesList = (args: Record<string, unknown>): Record<
     })
     .filter((note) => Boolean(note.id || note.title));
   const filtered = sanitized.filter((note) => {
-    if (normalizedRequestedId && String(note.id ?? "").toLowerCase() !== normalizedRequestedId) return false;
-    if (normalizedRequestedTitle && String(note.title ?? "").toLowerCase() !== normalizedRequestedTitle) return false;
+    if (
+      normalizedRequestedId &&
+      String(note.id ?? "").toLowerCase() !== normalizedRequestedId
+    )
+      return false;
+    if (
+      normalizedRequestedTitle &&
+      String(note.title ?? "").toLowerCase() !== normalizedRequestedTitle
+    )
+      return false;
     return true;
   });
   const notes = filtered.slice(0, 20);
@@ -772,11 +1043,15 @@ const readBoundedWorkstationNotesList = (args: Record<string, unknown>): Record<
     requested_title: requestedTitle,
     source_refs: notes.map((note) => String(note.source_ref)).filter(Boolean),
     omitted_body_fields: ["body", "content", "html", "text", "markdown"],
-    has_context: rawNotes.length > 0 || Boolean(activeNoteId || activeNoteTitle || notesContext),
+    has_context:
+      rawNotes.length > 0 ||
+      Boolean(activeNoteId || activeNoteTitle || notesContext),
   };
 };
 
-const readVariableSourcePlanEntries = (value: unknown): Array<Record<string, unknown>> =>
+const readVariableSourcePlanEntries = (
+  value: unknown,
+): Array<Record<string, unknown>> =>
   readRecordArray(readRecord(value)?.entries);
 
 const buildScholarlyNumericRecoveryAffordance = (input: {
@@ -792,24 +1067,34 @@ const buildScholarlyNumericRecoveryAffordance = (input: {
   if (input.missingVariables.length === 0 && !input.blockedReason) return null;
   const entries = readVariableSourcePlanEntries(input.variableSourcePlan);
   const entryForVariable = (variable: string): Record<string, unknown> | null =>
-    entries.find((entry) => cleanString(entry.variable).toLowerCase() === variable.toLowerCase()) ?? null;
+    entries.find(
+      (entry) =>
+        cleanString(entry.variable).toLowerCase() === variable.toLowerCase(),
+    ) ?? null;
   const expectedSourceClasses = uniqueStrings(
     input.missingVariables.flatMap((variable) =>
-      readStringArray(entryForVariable(variable)?.source_classes)
+      readStringArray(entryForVariable(variable)?.source_classes),
     ),
   );
   const extractionAliases = uniqueStrings(
     input.missingVariables.flatMap((variable) =>
-      readStringArray(entryForVariable(variable)?.extraction_aliases)
+      readStringArray(entryForVariable(variable)?.extraction_aliases),
     ),
   );
   const searchTerms = uniqueStrings([
-    ...input.missingVariables.flatMap((variable) => readStringArray(entryForVariable(variable)?.search_terms)),
+    ...input.missingVariables.flatMap((variable) =>
+      readStringArray(entryForVariable(variable)?.search_terms),
+    ),
     ...readStringArray(input.variableSourcePlan?.query_terms),
     cleanString(input.sourceTargetIntent?.target_kind),
   ]);
-  const likelyFusionRate = input.missingVariables.some((variable) => /^(?:n1_m3|n2_m3|sigma_m2|v_m_s)$/i.test(variable)) ||
-    searchTerms.some((term) => /\b(?:fusion|thermonuclear|reaction rate|cross section)\b/i.test(term));
+  const likelyFusionRate =
+    input.missingVariables.some((variable) =>
+      /^(?:n1_m3|n2_m3|sigma_m2|v_m_s)$/i.test(variable),
+    ) ||
+    searchTerms.some((term) =>
+      /\b(?:fusion|thermonuclear|reaction rate|cross section)\b/i.test(term),
+    );
   const recoveryQueries = uniqueStrings([
     likelyFusionRate
       ? "D-T fusion plasma deuterium tritium number density cross section relative velocity thermonuclear reaction rate"
@@ -818,7 +1103,9 @@ const buildScholarlyNumericRecoveryAffordance = (input: {
       ? "deuterium tritium fusion Maxwellian averaged reactivity sigma v cross section table ion density plasma temperature"
       : null,
     searchTerms.length ? searchTerms.slice(0, 12).join(" ") : null,
-    input.missingVariables.length ? `${input.missingVariables.join(" ")} cited values units paper table` : null,
+    input.missingVariables.length
+      ? `${input.missingVariables.join(" ")} cited values units paper table`
+      : null,
   ]).slice(0, 4);
   return {
     schema: "helix.scholarly_numeric_recovery_affordance.v1",
@@ -831,8 +1118,13 @@ const buildScholarlyNumericRecoveryAffordance = (input: {
       ? {
           title: optionalString(input.paper.title),
           url: optionalString(input.paper.url),
-          doi: optionalString(readRecord(input.paper.identifiers)?.doi ?? input.paper.doi),
-          arxiv_id: optionalString(readRecord(input.paper.identifiers)?.arxiv_id ?? input.paper.arxiv_id),
+          doi: optionalString(
+            readRecord(input.paper.identifiers)?.doi ?? input.paper.doi,
+          ),
+          arxiv_id: optionalString(
+            readRecord(input.paper.identifiers)?.arxiv_id ??
+              input.paper.arxiv_id,
+          ),
         }
       : null,
     requested_variables: input.requestedVariables,
@@ -841,7 +1133,8 @@ const buildScholarlyNumericRecoveryAffordance = (input: {
       const entry = entryForVariable(variable);
       return {
         variable,
-        canonical_quantity: optionalString(entry?.canonical_quantity) ?? variable,
+        canonical_quantity:
+          optionalString(entry?.canonical_quantity) ?? variable,
         expected_unit: optionalString(entry?.expected_unit),
         source_classes: readStringArray(entry?.source_classes),
         search_terms: readStringArray(entry?.search_terms),
@@ -869,8 +1162,9 @@ const buildScholarlyFullTextRecoveryAffordance = (input: {
   sourceTargetIntent: Record<string, unknown> | null;
 }): Record<string, unknown> => {
   const entries = readVariableSourcePlanEntries(input.variableSourcePlan);
-  const sourceClasses = uniqueStrings(entries
-    .flatMap((entry) => readStringArray(entry.source_classes)));
+  const sourceClasses = uniqueStrings(
+    entries.flatMap((entry) => readStringArray(entry.source_classes)),
+  );
   const queryTerms = uniqueStrings([
     ...readStringArray(input.variableSourcePlan?.query_terms),
     ...entries.flatMap((entry) => readStringArray(entry.search_terms)),
@@ -878,7 +1172,9 @@ const buildScholarlyFullTextRecoveryAffordance = (input: {
     input.query,
   ]);
   const likelyFusionRate = queryTerms.some((term) =>
-    /\b(?:fusion|thermonuclear|reaction rate|cross section|sigma\s*v|reactivity)\b/i.test(term)
+    /\b(?:fusion|thermonuclear|reaction rate|cross section|sigma\s*v|reactivity)\b/i.test(
+      term,
+    ),
   );
   const candidateTitles = uniqueStrings([
     optionalString(input.paper?.title),
@@ -907,8 +1203,13 @@ const buildScholarlyFullTextRecoveryAffordance = (input: {
       ? {
           title: optionalString(input.paper.title),
           url: optionalString(input.paper.url),
-          doi: optionalString(readRecord(input.paper.identifiers)?.doi ?? input.paper.doi),
-          arxiv_id: optionalString(readRecord(input.paper.identifiers)?.arxiv_id ?? input.paper.arxiv_id),
+          doi: optionalString(
+            readRecord(input.paper.identifiers)?.doi ?? input.paper.doi,
+          ),
+          arxiv_id: optionalString(
+            readRecord(input.paper.identifiers)?.arxiv_id ??
+              input.paper.arxiv_id,
+          ),
         }
       : null,
     candidate_titles: candidateTitles,
@@ -924,35 +1225,54 @@ const buildScholarlyFullTextRecoveryAffordance = (input: {
 
 const isLikelyScholarlyFullTextUrl = (value: unknown): boolean => {
   const url = optionalString(value);
-  return Boolean(url && /^https?:\/\//i.test(url) && (/\.(?:pdf|html?|txt)(?:[?#].*)?$/i.test(url) || /arxiv\.org\/(?:pdf|abs)\//i.test(url)));
+  return Boolean(
+    url &&
+    /^https?:\/\//i.test(url) &&
+    (/\.(?:pdf|html?|txt)(?:[?#].*)?$/i.test(url) ||
+      /arxiv\.org\/(?:pdf|abs)\//i.test(url)),
+  );
 };
 
-const hasFetchableScholarlyPaperIdentity = (paper: Record<string, unknown> | null): boolean => {
+const hasFetchableScholarlyPaperIdentity = (
+  paper: Record<string, unknown> | null,
+): boolean => {
   if (!paper) return false;
   const identifiers = readRecord(paper.identifiers);
   return Boolean(
     isLikelyScholarlyFullTextUrl(identifiers?.pdf_url) ||
-      isLikelyScholarlyFullTextUrl(identifiers?.full_text_url) ||
-      isLikelyScholarlyFullTextUrl(identifiers?.url) ||
-      optionalString(identifiers?.arxiv_id) ||
-      optionalString(identifiers?.doi),
+    isLikelyScholarlyFullTextUrl(identifiers?.full_text_url) ||
+    isLikelyScholarlyFullTextUrl(identifiers?.url) ||
+    optionalString(identifiers?.arxiv_id) ||
+    optionalString(identifiers?.doi),
   );
 };
 
 const readSafeWorkstationPanelId = (value: unknown): string | null => {
-  const panelId = cleanString(value).replace(/[^a-z0-9_-]/gi, "").trim();
-  return SAFE_WORKSTATION_PANEL_ACTION_IDS.some((allowed) => allowed === panelId) ? panelId : null;
+  const panelId = cleanString(value)
+    .replace(/[^a-z0-9_-]/gi, "")
+    .trim();
+  return SAFE_WORKSTATION_PANEL_ACTION_IDS.some(
+    (allowed) => allowed === panelId,
+  )
+    ? panelId
+    : null;
 };
 
 const readBoundedPanelIdArray = (value: unknown): string[] =>
   Array.isArray(value)
     ? value
-        .map((entry) => cleanString(entry).replace(/[^a-z0-9_-]/gi, "").trim())
+        .map((entry) =>
+          cleanString(entry)
+            .replace(/[^a-z0-9_-]/gi, "")
+            .trim(),
+        )
         .filter(Boolean)
         .slice(0, 24)
     : [];
 
-const readBoundedWorkspaceActiveContext = (value: unknown): {
+const readBoundedWorkspaceActiveContext = (
+  value: unknown,
+): {
   active_panel: string | null;
   active_group_id: string | null;
   group_count: number | null;
@@ -961,71 +1281,126 @@ const readBoundedWorkspaceActiveContext = (value: unknown): {
   const record = readRecord(value) ?? {};
   const groupCount = Number(record.groupCount ?? record.group_count);
   return {
-    active_panel: cleanString(record.activePanel ?? record.active_panel) || null,
-    active_group_id: cleanString(record.activeGroupId ?? record.active_group_id) || null,
-    group_count: Number.isFinite(groupCount) ? Math.max(0, Math.min(Math.floor(groupCount), 32)) : null,
-    open_panels: readBoundedPanelIdArray(record.openPanels ?? record.open_panels),
+    active_panel:
+      cleanString(record.activePanel ?? record.active_panel) || null,
+    active_group_id:
+      cleanString(record.activeGroupId ?? record.active_group_id) || null,
+    group_count: Number.isFinite(groupCount)
+      ? Math.max(0, Math.min(Math.floor(groupCount), 32))
+      : null,
+    open_panels: readBoundedPanelIdArray(
+      record.openPanels ?? record.open_panels,
+    ),
   };
 };
 
-const readBoundedTheoryBadgeGraphCurrentContext = (value: unknown): Record<string, unknown> => {
+const readBoundedTheoryBadgeGraphCurrentContext = (
+  value: unknown,
+): Record<string, unknown> => {
   const record = readRecord(value) ?? {};
-  const combination = readRecord(record.combination_reader ?? record.combinationReader) ?? {};
+  const combination =
+    readRecord(record.combination_reader ?? record.combinationReader) ?? {};
   const boundedText = (entry: unknown, max = 320): string | null => {
     const text = cleanString(entry);
     return text ? text.slice(0, max) : null;
   };
-  const boundedBadges = (entry: unknown, limit = 64): Array<Record<string, unknown>> =>
-    readRecordArray(entry).slice(0, limit).flatMap((badge) => {
-      const id = boundedText(badge.id, 200);
-      if (!id) return [];
-      return [{
-        id,
-        title: boundedText(badge.title, 240),
-        level: boundedText(badge.level, 80),
-        status: boundedText(badge.status, 80),
-      }];
-    });
-  const selectedBadges = boundedBadges(combination.selectedBadges ?? combination.selected_badges, 32);
-  const selectedBadgeIds = readStringArray(record.selected_badge_ids ?? record.selectedBadgeIds);
-  const normalizedSelectedBadgeIds = selectedBadgeIds.length > 0
-    ? selectedBadgeIds
-    : selectedBadges.map((badge) => cleanString(badge.id)).filter(Boolean);
-  const tracePathBadges = boundedBadges(combination.tracePathBadges ?? combination.trace_path_badges, 96);
-  const intermediateBadges = boundedBadges(combination.intermediateBadges ?? combination.intermediate_badges, 64);
-  const availableNextBadges = boundedBadges(combination.availableNextBadges ?? combination.available_next_badges, 96);
-  const disconnectedSelectedBadges = boundedBadges(
-    combination.disconnectedSelectedBadges ?? combination.disconnected_selected_badges,
+  const boundedBadges = (
+    entry: unknown,
+    limit = 64,
+  ): Array<Record<string, unknown>> =>
+    readRecordArray(entry)
+      .slice(0, limit)
+      .flatMap((badge) => {
+        const id = boundedText(badge.id, 200);
+        if (!id) return [];
+        return [
+          {
+            id,
+            title: boundedText(badge.title, 240),
+            level: boundedText(badge.level, 80),
+            status: boundedText(badge.status, 80),
+          },
+        ];
+      });
+  const selectedBadges = boundedBadges(
+    combination.selectedBadges ?? combination.selected_badges,
     32,
   );
-  const boundary = readRecord(combination.boundaryContext ?? combination.boundary_context) ?? {};
-  const traceEdges = readRecordArray(combination.traceEdges ?? combination.trace_edges).slice(0, 128).flatMap((edge) => {
-    const id = boundedText(edge.id, 200);
-    const from = boundedText(edge.from, 200);
-    const to = boundedText(edge.to, 200);
-    if (!id || !from || !to) return [];
-    return [{
-      id,
-      from,
-      to,
-      relation: boundedText(edge.relation, 80),
-      line_style: boundedText(edge.lineStyle ?? edge.line_style, 32),
-      implication: boundedText(edge.implication, 320),
-    }];
-  });
+  const selectedBadgeIds = readStringArray(
+    record.selected_badge_ids ?? record.selectedBadgeIds,
+  );
+  const normalizedSelectedBadgeIds =
+    selectedBadgeIds.length > 0
+      ? selectedBadgeIds
+      : selectedBadges.map((badge) => cleanString(badge.id)).filter(Boolean);
+  const tracePathBadges = boundedBadges(
+    combination.tracePathBadges ?? combination.trace_path_badges,
+    96,
+  );
+  const intermediateBadges = boundedBadges(
+    combination.intermediateBadges ?? combination.intermediate_badges,
+    64,
+  );
+  const availableNextBadges = boundedBadges(
+    combination.availableNextBadges ?? combination.available_next_badges,
+    96,
+  );
+  const disconnectedSelectedBadges = boundedBadges(
+    combination.disconnectedSelectedBadges ??
+      combination.disconnected_selected_badges,
+    32,
+  );
+  const boundary =
+    readRecord(combination.boundaryContext ?? combination.boundary_context) ??
+    {};
+  const traceEdges = readRecordArray(
+    combination.traceEdges ?? combination.trace_edges,
+  )
+    .slice(0, 128)
+    .flatMap((edge) => {
+      const id = boundedText(edge.id, 200);
+      const from = boundedText(edge.from, 200);
+      const to = boundedText(edge.to, 200);
+      if (!id || !from || !to) return [];
+      return [
+        {
+          id,
+          from,
+          to,
+          relation: boundedText(edge.relation, 80),
+          line_style: boundedText(edge.lineStyle ?? edge.line_style, 32),
+          implication: boundedText(edge.implication, 320),
+        },
+      ];
+    });
   const semanticSelections = readRecordArray(
     record.semantic_selections ?? record.semanticSelections,
-  ).slice(0, 16).flatMap((selection) => {
-    const domain = boundedText(selection.domain, 120);
-    if (!domain) return [];
-    return [{
-      domain,
-      selection_kind: boundedText(selection.selection_kind ?? selection.selectionKind, 120),
-      selection_id: boundedText(selection.selection_id ?? selection.selectionId, 200),
-      object_binding_id: boundedText(selection.object_binding_id ?? selection.objectBindingId, 240),
-    }];
-  });
-  const capturedAt = readFiniteNumber(record.captured_at_ms ?? record.capturedAtMs);
+  )
+    .slice(0, 16)
+    .flatMap((selection) => {
+      const domain = boundedText(selection.domain, 120);
+      if (!domain) return [];
+      return [
+        {
+          domain,
+          selection_kind: boundedText(
+            selection.selection_kind ?? selection.selectionKind,
+            120,
+          ),
+          selection_id: boundedText(
+            selection.selection_id ?? selection.selectionId,
+            200,
+          ),
+          object_binding_id: boundedText(
+            selection.object_binding_id ?? selection.objectBindingId,
+            240,
+          ),
+        },
+      ];
+    });
+  const capturedAt = readFiniteNumber(
+    record.captured_at_ms ?? record.capturedAtMs,
+  );
   const graphId = boundedText(record.graph_id ?? record.graphId, 240);
   const contextRef = `theory_badge_graph_context:${hashShort({
     graphId,
@@ -1039,9 +1414,15 @@ const readBoundedTheoryBadgeGraphCurrentContext = (value: unknown): Record<strin
     context_ref: contextRef,
     panel_id: "theory-badge-graph",
     graph_id: graphId,
-    active_badge_id: boundedText(record.active_badge_id ?? record.activeBadgeId, 200),
+    active_badge_id: boundedText(
+      record.active_badge_id ?? record.activeBadgeId,
+      200,
+    ),
     selected_badge_ids: normalizedSelectedBadgeIds,
-    active_atlas_lens_id: boundedText(record.active_atlas_lens_id ?? record.activeAtlasLensId, 160),
+    active_atlas_lens_id: boundedText(
+      record.active_atlas_lens_id ?? record.activeAtlasLensId,
+      160,
+    ),
     semantic_selections: semanticSelections,
     combination_reader: {
       schema: boundedText(combination.schema, 160),
@@ -1050,28 +1431,46 @@ const readBoundedTheoryBadgeGraphCurrentContext = (value: unknown): Record<strin
       intermediate_badges: intermediateBadges,
       available_next_badges: availableNextBadges,
       disconnected_selected_badges: disconnectedSelectedBadges,
-      unavailable_badge_count: Math.max(0, Math.min(10_000, Math.floor(readFiniteNumber(
-        combination.unavailableBadgeCount ?? combination.unavailable_badge_count,
-      ) ?? 0))),
+      unavailable_badge_count: Math.max(
+        0,
+        Math.min(
+          10_000,
+          Math.floor(
+            readFiniteNumber(
+              combination.unavailableBadgeCount ??
+                combination.unavailable_badge_count,
+            ) ?? 0,
+          ),
+        ),
+      ),
       boundary_context: {
         badges: boundedBadges(boundary.badges, 32),
-        notes: readStringArray(boundary.notes).map((note) => note.slice(0, 500)),
+        notes: readStringArray(boundary.notes).map((note) =>
+          note.slice(0, 500),
+        ),
       },
       trace_edges: traceEdges,
-      shared_subjects: readStringArray(combination.sharedSubjects ?? combination.shared_subjects),
-      shared_symbols: readStringArray(combination.sharedSymbols ?? combination.shared_symbols),
+      shared_subjects: readStringArray(
+        combination.sharedSubjects ?? combination.shared_subjects,
+      ),
+      shared_symbols: readStringArray(
+        combination.sharedSymbols ?? combination.shared_symbols,
+      ),
       shared_unit_signatures: readStringArray(
         combination.sharedUnitSignatures ?? combination.shared_unit_signatures,
       ),
       calculator_payload_ids: readStringArray(
         combination.calculatorPayloadIds ?? combination.calculator_payload_ids,
       ),
-      warnings: readStringArray(combination.warnings).map((warning) => warning.slice(0, 500)),
+      warnings: readStringArray(combination.warnings).map((warning) =>
+        warning.slice(0, 500),
+      ),
       implication_summary: readStringArray(
         combination.implicationSummary ?? combination.implication_summary,
       ).map((summary) => summary.slice(0, 500)),
       suggested_next_badge_ids: readStringArray(
-        combination.suggestedNextBadgeIds ?? combination.suggested_next_badge_ids,
+        combination.suggestedNextBadgeIds ??
+          combination.suggested_next_badge_ids,
       ),
     },
     captured_at_ms: capturedAt,
@@ -1086,16 +1485,17 @@ const normalizeNumberText = (value: number): string => {
   if (value !== 0 && (Math.abs(value) >= 1e6 || Math.abs(value) < 1e-3)) {
     return value.toExponential(6).replace(/\.?0+e/, "e");
   }
-  return Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(12)));
+  return Number.isInteger(value)
+    ? String(value)
+    : String(Number(value.toPrecision(12)));
 };
 
-const normalizeCalculatorExpressionForGateway = (expression: string): string => {
+const normalizeCalculatorExpressionForGateway = (
+  expression: string,
+): string => {
   const trimmed = expression.trim();
   if (!trimmed) return "";
-  const phrase = trimmed
-    .replace(/[?]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const phrase = trimmed.replace(/[?]/g, " ").replace(/\s+/g, " ").trim();
   const percentOf = phrase.match(
     /^(?:what\s+is\s+)?(-?\d+(?:\.\d+)?)\s*(?:%|percent)\s+of\s+(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)$/i,
   );
@@ -1139,7 +1539,8 @@ const rewriteCalculatorDefiniteIntegrals = (expression: string): string => {
   let output = "";
   for (let index = 0; index < expression.length;) {
     if (
-      expression.slice(index, index + "integrate(".length).toLowerCase() === "integrate(" &&
+      expression.slice(index, index + "integrate(".length).toLowerCase() ===
+        "integrate(" &&
       (index === 0 || !/[A-Za-z0-9_]/.test(expression[index - 1] ?? ""))
     ) {
       const openIndex = index + "integrate".length;
@@ -1149,7 +1550,9 @@ const rewriteCalculatorDefiniteIntegrals = (expression: string): string => {
         break;
       }
       const inner = expression.slice(openIndex + 1, closeIndex);
-      const args = splitTopLevelCalculatorArgs(inner).map((arg) => rewriteCalculatorDefiniteIntegrals(arg));
+      const args = splitTopLevelCalculatorArgs(inner).map((arg) =>
+        rewriteCalculatorDefiniteIntegrals(arg),
+      );
       if (args.length === 4 && args.every((arg) => arg.length > 0)) {
         output += `defint(${args[0]},${args[2]},${args[3]},${args[1]})`;
       } else {
@@ -1164,28 +1567,40 @@ const rewriteCalculatorDefiniteIntegrals = (expression: string): string => {
   return output;
 };
 
-const solveSafeArithmeticExpression = (expression: string, options?: { allowSymbolicResult?: boolean }): {
+const solveSafeArithmeticExpression = (
+  expression: string,
+  options?: { allowSymbolicResult?: boolean },
+): {
   ok: boolean;
   result?: string;
   normalized_expression?: string;
   blocked_reason?: string;
 } => {
-  const normalizedExpression = rewriteCalculatorDefiniteIntegrals(normalizeCalculatorExpressionForGateway(expression));
+  const normalizedExpression = rewriteCalculatorDefiniteIntegrals(
+    normalizeCalculatorExpressionForGateway(expression),
+  );
   const normalized = normalizedExpression.replace(/\s+/g, "");
   if (!normalized) return { ok: false, blocked_reason: "missing_expression" };
-  if (normalized.length > 240) return { ok: false, blocked_reason: "expression_too_long" };
+  if (normalized.length > 240)
+    return { ok: false, blocked_reason: "expression_too_long" };
   if (!/^[\dA-Za-z_.,+\-*/^%()[\]]+$/.test(normalized)) {
     return { ok: false, blocked_reason: "unsupported_expression_syntax" };
   }
   if (/[A-Za-z_]\.[A-Za-z_]/.test(normalized)) {
     return { ok: false, blocked_reason: "unsupported_expression_syntax" };
   }
-  if (!/[+\-*/^%]|\b(?:diff|differentiate|derivative|integrate|integral|defint|sqrt|ln|log|exp|sin|cos|tan|abs)\s*\(/i.test(normalized)) {
+  if (
+    !/[+\-*/^%]|\b(?:diff|differentiate|derivative|integrate|integral|defint|sqrt|ln|log|exp|sin|cos|tan|abs)\s*\(/i.test(
+      normalized,
+    )
+  ) {
     return { ok: false, blocked_reason: "expression_has_no_operator" };
   }
   try {
     if (/^[\deE.+\-*/^()%]+$/.test(normalized)) {
-      const value = Function(`"use strict"; return (${normalized.replace(/\^/g, "**")});`)();
+      const value = Function(
+        `"use strict"; return (${normalized.replace(/\^/g, "**")});`,
+      )();
       if (typeof value !== "number" || !Number.isFinite(value)) {
         return { ok: false, blocked_reason: "expression_result_not_finite" };
       }
@@ -1210,7 +1625,9 @@ const solveSafeArithmeticExpression = (expression: string, options?: { allowSymb
   }
 };
 
-const extractScalarSolveTarget = (expression: string): {
+const extractScalarSolveTarget = (
+  expression: string,
+): {
   expression: string;
   scalar_expression: string;
   result_symbol: string | null;
@@ -1261,24 +1678,37 @@ const extractScalarSolveTarget = (expression: string): {
 const CALCULATOR_TEMPLATE_CONSTANTS = new Set(["e_charge", "mu0", "pi", "e"]);
 
 const extractCalculatorTemplateVariables = (expression: string): string[] => {
-  const rightHandSide = expression.includes("=") ? expression.split("=").slice(1).join("=") : expression;
-  return Array.from(new Set(
-    Array.from(rightHandSide.matchAll(/\b[A-Za-z_][A-Za-z0-9_]*\b/g))
-      .map((match) => match[0])
-      .filter((symbol) => !CALCULATOR_TEMPLATE_CONSTANTS.has(symbol))
-      .filter((symbol) => !["sqrt", "ln", "log", "sin", "cos", "tan"].includes(symbol)),
-  ));
+  const rightHandSide = expression.includes("=")
+    ? expression.split("=").slice(1).join("=")
+    : expression;
+  return Array.from(
+    new Set(
+      Array.from(rightHandSide.matchAll(/\b[A-Za-z_][A-Za-z0-9_]*\b/g))
+        .map((match) => match[0])
+        .filter((symbol) => !CALCULATOR_TEMPLATE_CONSTANTS.has(symbol))
+        .filter(
+          (symbol) =>
+            !["sqrt", "ln", "log", "sin", "cos", "tan"].includes(symbol),
+        ),
+    ),
+  );
 };
 
-const readScientificEvidencePacket = (value: unknown): ScientificEvidencePacketV1 | null => {
+const readScientificEvidencePacket = (
+  value: unknown,
+): ScientificEvidencePacketV1 | null => {
   const record = readRecord(value);
-  if (!record || record.schema !== SCIENTIFIC_EVIDENCE_PACKET_SCHEMA) return null;
+  if (!record || record.schema !== SCIENTIFIC_EVIDENCE_PACKET_SCHEMA)
+    return null;
   return record as unknown as ScientificEvidencePacketV1;
 };
 
-const readScientificImageEvidenceSidecar = (value: unknown): ScientificImageEvidenceSidecarV1 | null => {
+const readScientificImageEvidenceSidecar = (
+  value: unknown,
+): ScientificImageEvidenceSidecarV1 | null => {
   const record = readRecord(value);
-  if (!record || record.schema !== SCIENTIFIC_IMAGE_EVIDENCE_SIDECAR_SCHEMA) return null;
+  if (!record || record.schema !== SCIENTIFIC_IMAGE_EVIDENCE_SIDECAR_SCHEMA)
+    return null;
   return record as unknown as ScientificImageEvidenceSidecarV1;
 };
 
@@ -1300,24 +1730,36 @@ const selectScientificEvidencePacketFromSidecar = (
     if (byRef) return byRef;
   }
   const rank = (packet: ScientificEvidencePacketV1): number => {
-    const admissibility = packet.admissibility.status === "admissible_observation"
-      ? 3
-      : packet.admissibility.status === "unverified_math_observation"
-        ? 2
-        : 1;
-    const exactEquation = packet.exact_equation_admissibility === "admissible_for_exact_equation"
-      ? 3
-      : packet.exact_equation_admissibility === "partial_candidate"
-        ? 2
-        : 1;
-    const extraction = packet.extraction_status === "extracted"
-      ? 3
-      : packet.extraction_status === "partial"
-        ? 2
-        : 1;
-    return exactEquation * 1000 + admissibility * 100 + extraction * 10 + packet.confidence;
+    const admissibility =
+      packet.admissibility.status === "admissible_observation"
+        ? 3
+        : packet.admissibility.status === "unverified_math_observation"
+          ? 2
+          : 1;
+    const exactEquation =
+      packet.exact_equation_admissibility === "admissible_for_exact_equation"
+        ? 3
+        : packet.exact_equation_admissibility === "partial_candidate"
+          ? 2
+          : 1;
+    const extraction =
+      packet.extraction_status === "extracted"
+        ? 3
+        : packet.extraction_status === "partial"
+          ? 2
+          : 1;
+    return (
+      exactEquation * 1000 +
+      admissibility * 100 +
+      extraction * 10 +
+      packet.confidence
+    );
   };
-  return sidecar.packets.slice().sort((left, right) => rank(right) - rank(left))[0] ?? null;
+  return (
+    sidecar.packets
+      .slice()
+      .sort((left, right) => rank(right) - rank(left))[0] ?? null
+  );
 };
 
 const buildTheoryReflectionScientificEvidenceInput = (
@@ -1332,7 +1774,9 @@ const buildTheoryReflectionScientificEvidenceInput = (
   const explicitSidecar =
     readScientificImageEvidenceSidecar(args.scientific_evidence_sidecar) ??
     readScientificImageEvidenceSidecar(args.scientificEvidenceSidecar) ??
-    readScientificImageEvidenceSidecar(args.image_lens_scientific_evidence_sidecar) ??
+    readScientificImageEvidenceSidecar(
+      args.image_lens_scientific_evidence_sidecar,
+    ) ??
     readScientificImageEvidenceSidecar(args.imageLensScientificEvidenceSidecar);
   if (explicitSidecar) {
     return {
@@ -1368,7 +1812,12 @@ const buildTheoryReflectionScientificEvidenceInput = (
     ...readStringArray(args.mentioned_domains ?? args.mentionedDomains),
   ].filter(Boolean);
   if (!textCandidates.length) {
-    return { packet: null, sidecar: null, source: "none", requireAdmissibleEvidence: false };
+    return {
+      packet: null,
+      sidecar: null,
+      source: "none",
+      requireAdmissibleEvidence: false,
+    };
   }
   const packet = buildScientificEvidencePacket({
     cropRegionId: "theory_reflection_prompt_context",
@@ -1377,11 +1826,18 @@ const buildTheoryReflectionScientificEvidenceInput = (
     bboxPx: { x: 0, y: 0, width: 1, height: 1 },
     textCandidate: textCandidates.join("\n"),
     latexCandidate: null,
-    uncertainty: ["Prompt-context scientific branch gate; not a direct Image Lens crop receipt."],
+    uncertainty: [
+      "Prompt-context scientific branch gate; not a direct Image Lens crop receipt.",
+    ],
     extractionStatus: "partial",
   });
   if (packet.primary_domain === "unknown_math") {
-    return { packet: null, sidecar: null, source: "none", requireAdmissibleEvidence: false };
+    return {
+      packet: null,
+      sidecar: null,
+      source: "none",
+      requireAdmissibleEvidence: false,
+    };
   }
   return {
     packet,
@@ -1410,13 +1866,21 @@ const typedAffordance = (input: {
   role: input.role,
   source_capability: input.capabilityId,
   ...(input.expression ? { expression: input.expression } : {}),
-  ...(input.normalizedExpression ? { normalized_expression: input.normalizedExpression } : {}),
+  ...(input.normalizedExpression
+    ? { normalized_expression: input.normalizedExpression }
+    : {}),
   ...(input.result !== undefined ? { result: input.result } : {}),
   ...(input.variables?.length ? { variables: input.variables } : {}),
-  ...(input.requiredInputs?.length ? { required_inputs: input.requiredInputs } : {}),
-  ...(input.missingInputs?.length ? { missing_inputs: input.missingInputs } : {}),
+  ...(input.requiredInputs?.length
+    ? { required_inputs: input.requiredInputs }
+    : {}),
+  ...(input.missingInputs?.length
+    ? { missing_inputs: input.missingInputs }
+    : {}),
   ...(input.sourceRefs?.length ? { source_refs: input.sourceRefs } : {}),
-  ...(input.claimBoundary !== undefined ? { claim_boundary: input.claimBoundary } : {}),
+  ...(input.claimBoundary !== undefined
+    ? { claim_boundary: input.claimBoundary }
+    : {}),
   status: input.status ?? "available",
   assistant_answer: false,
   raw_content_included: false,
@@ -1427,12 +1891,17 @@ const buildGatewayProducedAffordances = (input: {
   observation: Record<string, unknown>;
 }): HelixWorkstationTypedAffordance[] => {
   const status = cleanString(input.observation.status);
-  const available = status !== "blocked" && status !== "failed" && status !== "missing_input";
-  const baseStatus: HelixWorkstationTypedAffordance["status"] = available ? "available" : "blocked";
+  const available =
+    status !== "blocked" && status !== "failed" && status !== "missing_input";
+  const baseStatus: HelixWorkstationTypedAffordance["status"] = available
+    ? "available"
+    : "blocked";
   if (input.capabilityId === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY) {
     const combination = readRecord(input.observation.combination_reader);
     const boundary = readRecord(combination?.boundary_context);
-    const selectedBadgeIds = readStringArray(input.observation.selected_badge_ids).slice(0, 32);
+    const selectedBadgeIds = readStringArray(
+      input.observation.selected_badge_ids,
+    ).slice(0, 32);
     const traceBadgeIds = readRecordArray(combination?.trace_path_badges)
       .map((badge) => cleanString(badge.id))
       .filter(Boolean)
@@ -1444,53 +1913,78 @@ const buildGatewayProducedAffordances = (input: {
         role: "producer",
         capabilityId: input.capabilityId,
         status: baseStatus,
-        sourceRefs: Array.from(new Set([...selectedBadgeIds, ...traceBadgeIds])),
-        claimBoundary: boundaryNotes[0] ?? "Manual graph selection is operator-declared context, not proof or physical validation.",
+        sourceRefs: Array.from(
+          new Set([...selectedBadgeIds, ...traceBadgeIds]),
+        ),
+        claimBoundary:
+          boundaryNotes[0] ??
+          "Manual graph selection is operator-declared context, not proof or physical validation.",
       }),
       ...(boundaryNotes.length > 0
-        ? [typedAffordance({
-          kind: "claim_boundary",
-          role: "producer",
-          capabilityId: input.capabilityId,
-          status: baseStatus,
-          sourceRefs: selectedBadgeIds,
-          claimBoundary: boundaryNotes.join(" ").slice(0, 1200),
-        })]
+        ? [
+            typedAffordance({
+              kind: "claim_boundary",
+              role: "producer",
+              capabilityId: input.capabilityId,
+              status: baseStatus,
+              sourceRefs: selectedBadgeIds,
+              claimBoundary: boundaryNotes.join(" ").slice(0, 1200),
+            }),
+          ]
         : []),
     ];
   }
   if (input.capabilityId === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
-    const payloads = readRecordArray(input.observation.calculator_payloads).slice(0, 12);
+    const payloads = readRecordArray(
+      input.observation.calculator_payloads,
+    ).slice(0, 12);
     const branchGate = readRecord(input.observation.scientific_branch_gate);
-    const scientificRunTrace = readRecord(input.observation.scientific_run_trace);
-    const scientificSidecar = readRecord(input.observation.scientific_evidence_sidecar);
+    const scientificRunTrace = readRecord(
+      input.observation.scientific_run_trace,
+    );
+    const scientificSidecar = readRecord(
+      input.observation.scientific_evidence_sidecar,
+    );
     const gateStatus = cleanString(branchGate?.status);
     const gateDomain = cleanString(branchGate?.primary_domain);
-    const rejectedPayloadIds = readStringArray(branchGate?.rejected_calculator_payload_ids);
+    const rejectedPayloadIds = readStringArray(
+      branchGate?.rejected_calculator_payload_ids,
+    );
     const runTraceRef = cleanString(scientificRunTrace?.trace_id);
     const sidecarRef = cleanString(scientificSidecar?.sidecar_id);
-    const scientificClaimBoundary =
-      gateStatus
-        ? `scientific_branch_gate=${gateStatus}${gateDomain ? ` domain=${gateDomain}` : ""}${rejectedPayloadIds.length ? ` rejected_calculator_payloads=${rejectedPayloadIds.join(",")}` : ""}`
-        : null;
+    const scientificClaimBoundary = gateStatus
+      ? `scientific_branch_gate=${gateStatus}${gateDomain ? ` domain=${gateDomain}` : ""}${rejectedPayloadIds.length ? ` rejected_calculator_payloads=${rejectedPayloadIds.join(",")}` : ""}`
+      : null;
     return [
       typedAffordance({
         kind: "theory_context",
         role: "producer",
         capabilityId: input.capabilityId,
         status: baseStatus,
-        sourceRefs: readStringArray(input.observation.exact_badge_ids).slice(0, 12),
-        claimBoundary: scientificClaimBoundary ?? readStringArray(input.observation.claim_boundary_notes)[0] ?? null,
+        sourceRefs: readStringArray(input.observation.exact_badge_ids).slice(
+          0,
+          12,
+        ),
+        claimBoundary:
+          scientificClaimBoundary ??
+          readStringArray(input.observation.claim_boundary_notes)[0] ??
+          null,
       }),
       ...(branchGate || scientificRunTrace
-        ? [typedAffordance({
-            kind: "scientific_evidence",
-            role: "producer",
-            capabilityId: input.capabilityId,
-            status: gateStatus === "blocked" ? "blocked" : "available",
-            sourceRefs: [sidecarRef, runTraceRef, ...rejectedPayloadIds].filter(Boolean),
-            claimBoundary: scientificClaimBoundary,
-          })]
+        ? [
+            typedAffordance({
+              kind: "scientific_evidence",
+              role: "producer",
+              capabilityId: input.capabilityId,
+              status: gateStatus === "blocked" ? "blocked" : "available",
+              sourceRefs: [
+                sidecarRef,
+                runTraceRef,
+                ...rejectedPayloadIds,
+              ].filter(Boolean),
+              claimBoundary: scientificClaimBoundary,
+            }),
+          ]
         : []),
       ...payloads.map((payload): HelixWorkstationTypedAffordance => {
         const expression = cleanString(payload.expression);
@@ -1507,25 +2001,42 @@ const buildGatewayProducedAffordances = (input: {
             cleanString(payload.badge_id),
             cleanString(payload.payload_id),
           ].filter(Boolean),
-          claimBoundary: readStringArray(payload.claim_boundary_notes)[0] ?? null,
+          claimBoundary:
+            readStringArray(payload.claim_boundary_notes)[0] ?? null,
         });
       }),
       ...(readStringArray(input.observation.claim_boundary_notes).length > 0
-        ? [typedAffordance({
-            kind: "claim_boundary",
-            role: "producer",
-            capabilityId: input.capabilityId,
-            status: "available",
-            sourceRefs: readStringArray(input.observation.claim_boundary_notes).slice(0, 8),
-            claimBoundary: readStringArray(input.observation.claim_boundary_notes)[0] ?? null,
-          })]
+        ? [
+            typedAffordance({
+              kind: "claim_boundary",
+              role: "producer",
+              capabilityId: input.capabilityId,
+              status: "available",
+              sourceRefs: readStringArray(
+                input.observation.claim_boundary_notes,
+              ).slice(0, 8),
+              claimBoundary:
+                readStringArray(input.observation.claim_boundary_notes)[0] ??
+                null,
+            }),
+          ]
         : []),
     ];
   }
   if (input.capabilityId === THEORY_FRONTIER_CONJECTURE_CAPABILITY) {
     return [
-      typedAffordance({ kind: "frontier_candidate", role: "producer", capabilityId: input.capabilityId, status: baseStatus }),
-      typedAffordance({ kind: "claim_boundary", role: "producer", capabilityId: input.capabilityId, status: baseStatus }),
+      typedAffordance({
+        kind: "frontier_candidate",
+        role: "producer",
+        capabilityId: input.capabilityId,
+        status: baseStatus,
+      }),
+      typedAffordance({
+        kind: "claim_boundary",
+        role: "producer",
+        capabilityId: input.capabilityId,
+        status: baseStatus,
+      }),
     ];
   }
   if (
@@ -1533,7 +2044,9 @@ const buildGatewayProducedAffordances = (input: {
     input.capabilityId === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY
   ) {
     const expression = cleanString(input.observation.expression);
-    const normalizedExpression = cleanString(input.observation.normalized_expression);
+    const normalizedExpression = cleanString(
+      input.observation.normalized_expression,
+    );
     const result = cleanString(input.observation.result);
     return [
       typedAffordance({
@@ -1546,20 +2059,24 @@ const buildGatewayProducedAffordances = (input: {
         result: result || null,
       }),
       ...(available
-        ? [typedAffordance({
-            kind: "numeric_value_evidence",
-            role: "producer",
-            capabilityId: input.capabilityId,
-            expression,
-            normalizedExpression,
-            result,
-          })]
+        ? [
+            typedAffordance({
+              kind: "numeric_value_evidence",
+              role: "producer",
+              capabilityId: input.capabilityId,
+              expression,
+              normalizedExpression,
+              result,
+            }),
+          ]
         : []),
     ];
   }
   if (input.capabilityId === CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY) {
     const expression = cleanString(input.observation.expression);
-    const normalizedExpression = cleanString(input.observation.normalized_expression);
+    const normalizedExpression = cleanString(
+      input.observation.normalized_expression,
+    );
     const variables = readStringArray(input.observation.detected_symbols);
     return [
       typedAffordance({
@@ -1583,7 +2100,10 @@ const buildGatewayProducedAffordances = (input: {
   }
   if (input.capabilityId === CALCULATOR_BIND_VARIABLES_CAPABILITY) {
     const expression = cleanString(input.observation.expression);
-    const normalizedExpression = cleanString(input.observation.bound_expression ?? input.observation.normalized_expression);
+    const normalizedExpression = cleanString(
+      input.observation.bound_expression ??
+        input.observation.normalized_expression,
+    );
     const missingInputs = readStringArray(input.observation.missing_variables);
     const requiredInputs = readStringArray(input.observation.required_symbols);
     return [
@@ -1604,7 +2124,9 @@ const buildGatewayProducedAffordances = (input: {
         capabilityId: input.capabilityId,
         status: "available",
         expression,
-        normalizedExpression: cleanString(input.observation.normalized_expression),
+        normalizedExpression: cleanString(
+          input.observation.normalized_expression,
+        ),
         variables: requiredInputs,
         requiredInputs,
         missingInputs,
@@ -1632,33 +2154,43 @@ const buildGatewayConsumedAffordances = (input: {
   observation: Record<string, unknown>;
 }): HelixWorkstationTypedAffordance[] => {
   const status = cleanString(input.observation.status);
-  const blocked = status === "blocked" || status === "failed" || status === "missing_input";
+  const blocked =
+    status === "blocked" || status === "failed" || status === "missing_input";
   const consumes = manifestConsumesAffordances(input.capabilityId);
   if (
     input.capabilityId === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY ||
     input.capabilityId === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY
   ) {
     const expression = cleanString(input.observation.expression);
-    const requiredKinds = input.capabilityId === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY || /[A-Za-z_]/.test(expression)
-      ? ["bound_calculator_expression" as const]
-      : [];
+    const requiredKinds =
+      input.capabilityId === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY ||
+      /[A-Za-z_]/.test(expression)
+        ? ["bound_calculator_expression" as const]
+        : [];
     return [
-      ...requiredKinds.map((kind) => typedAffordance({
-        kind,
-        role: "consumer",
-        capabilityId: input.capabilityId,
-        status: blocked ? "missing" : "available",
-        expression,
-        missingInputs: blocked ? [kind] : [],
-      })),
-      ...consumes
-        .filter((kind) => !requiredKinds.includes(kind as "bound_calculator_expression"))
-        .map((kind) => typedAffordance({
+      ...requiredKinds.map((kind) =>
+        typedAffordance({
           kind,
           role: "consumer",
           capabilityId: input.capabilityId,
-          status: "required",
-        })),
+          status: blocked ? "missing" : "available",
+          expression,
+          missingInputs: blocked ? [kind] : [],
+        }),
+      ),
+      ...consumes
+        .filter(
+          (kind) =>
+            !requiredKinds.includes(kind as "bound_calculator_expression"),
+        )
+        .map((kind) =>
+          typedAffordance({
+            kind,
+            role: "consumer",
+            capabilityId: input.capabilityId,
+            status: "required",
+          }),
+        ),
     ];
   }
   return consumes.map((kind) =>
@@ -1681,28 +2213,36 @@ const normalizeExternalSearchQuery = (value: unknown): string => {
   return query.length > 260 ? query.slice(0, 260).trim() : query;
 };
 
-const readInternetSearchProviders = (value: unknown): HelixInternetSearchProvider[] =>
+const readInternetSearchProviders = (
+  value: unknown,
+): HelixInternetSearchProvider[] =>
   readStringArray(value)
     .filter((entry): entry is HelixInternetSearchProvider =>
       (INTERNET_SEARCH_PROVIDERS as readonly string[]).includes(entry),
     )
     .slice(0, 3);
 
-const readScholarlyResearchProviders = (value: unknown): HelixScholarlyResearchProvider[] =>
+const readScholarlyResearchProviders = (
+  value: unknown,
+): HelixScholarlyResearchProvider[] =>
   readStringArray(value)
     .filter((entry): entry is HelixScholarlyResearchProvider =>
       (SCHOLARLY_RESEARCH_PROVIDERS as readonly string[]).includes(entry),
     )
     .slice(0, 6);
 
-const readScholarlyResearchMode = (value: unknown): HelixScholarlyResearchIntentMode | undefined => {
+const readScholarlyResearchMode = (
+  value: unknown,
+): HelixScholarlyResearchIntentMode | undefined => {
   const mode = cleanString(value);
   return (SCHOLARLY_RESEARCH_MODES as readonly string[]).includes(mode)
     ? (mode as HelixScholarlyResearchIntentMode)
     : undefined;
 };
 
-const readCalculatorNumericBindingEvidence = (value: unknown): Array<{
+const readCalculatorNumericBindingEvidence = (
+  value: unknown,
+): Array<{
   symbol: string;
   value: string | number;
   unit?: string | null;
@@ -1710,48 +2250,75 @@ const readCalculatorNumericBindingEvidence = (value: unknown): Array<{
   source_refs?: string[];
   meaning?: string | null;
 }> =>
-  readRecordArray(value).map((record) => {
-    const kind = cleanString(record.kind ?? record.affordance_kind ?? record.type);
-    if (kind && kind !== "numeric_value_evidence") return null;
-    return {
-      symbol: cleanString(record.symbol ?? record.variable ?? record.name),
-      value: typeof record.value === "number" ? record.value : cleanString(record.value ?? record.numeric_value ?? record.result),
-      unit: optionalString(record.unit),
-      dimension_signature: optionalString(record.dimension_signature ?? record.dimension),
-      source_refs: readStringArray(record.source_refs ?? record.sourceRefs ?? record.refs),
-      meaning: optionalString(record.meaning ?? record.quantity),
-    };
-  }).filter((entry): entry is {
-    symbol: string;
-    value: string | number;
-    unit?: string | null;
-    dimension_signature?: string | null;
-    source_refs?: string[];
-    meaning?: string | null;
-  } => Boolean(entry?.symbol));
+  readRecordArray(value)
+    .map((record) => {
+      const kind = cleanString(
+        record.kind ?? record.affordance_kind ?? record.type,
+      );
+      if (kind && kind !== "numeric_value_evidence") return null;
+      return {
+        symbol: cleanString(record.symbol ?? record.variable ?? record.name),
+        value:
+          typeof record.value === "number"
+            ? record.value
+            : cleanString(
+                record.value ?? record.numeric_value ?? record.result,
+              ),
+        unit: optionalString(record.unit),
+        dimension_signature: optionalString(
+          record.dimension_signature ?? record.dimension,
+        ),
+        source_refs: readStringArray(
+          record.source_refs ?? record.sourceRefs ?? record.refs,
+        ),
+        meaning: optionalString(record.meaning ?? record.quantity),
+      };
+    })
+    .filter(
+      (
+        entry,
+      ): entry is {
+        symbol: string;
+        value: string | number;
+        unit?: string | null;
+        dimension_signature?: string | null;
+        source_refs?: string[];
+        meaning?: string | null;
+      } => Boolean(entry?.symbol),
+    );
 
 const readStringRecord = (value: unknown): Record<string, string | null> => {
   const record = readRecord(value);
   if (!record) return {};
   return Object.fromEntries(
-    Object.entries(record)
-      .map(([key, entry]) => [key, optionalString(entry)] as const),
+    Object.entries(record).map(
+      ([key, entry]) => [key, optionalString(entry)] as const,
+    ),
   );
 };
 
 const readExternalSearchLimit = (value: unknown): number => {
   const limit = Number(value);
-  return Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 10)) : 5;
+  return Number.isFinite(limit)
+    ? Math.max(1, Math.min(Math.floor(limit), 10))
+    : 5;
 };
 
 const readInternetSearchRecencyDays = (value: unknown): number | null => {
   const days = Number(value);
-  return Number.isFinite(days) && days > 0 ? Math.max(1, Math.min(Math.floor(days), 365)) : null;
+  return Number.isFinite(days) && days > 0
+    ? Math.max(1, Math.min(Math.floor(days), 365))
+    : null;
 };
 
 const readInternetSearchDomains = (value: unknown): string[] =>
   readStringArray(value)
-    .map((entry) => entry.toLowerCase().replace(/^site:/i, "").trim())
+    .map((entry) =>
+      entry
+        .toLowerCase()
+        .replace(/^site:/i, "")
+        .trim(),
+    )
     .filter((entry) => /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(entry))
     .slice(0, 8);
 
@@ -1775,7 +2342,9 @@ const readRepoSearchPaths = (value: unknown): string[] => {
 
 const readRepoSearchMaxHits = (value: unknown): number => {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.max(1, Math.min(Math.floor(parsed), 20)) : 8;
+  return Number.isFinite(parsed)
+    ? Math.max(1, Math.min(Math.floor(parsed), 20))
+    : 8;
 };
 
 const isSafeRelativeDocsPath = (value: string): boolean => {
@@ -1797,12 +2366,17 @@ const readDocsSearchPaths = (value: unknown): string[] => {
 };
 
 const readDocsActionPath = (value: unknown): string | null => {
-  const path = cleanString(value).replace(/\\/g, "/").replace(/^\/+/, "").trim();
+  const path = cleanString(value)
+    .replace(/\\/g, "/")
+    .replace(/^\/+/, "")
+    .trim();
   return isSafeRelativeDocsPath(path) ? path : null;
 };
 
 const readDocsActionAnchor = (value: unknown): string | null => {
-  const anchor = cleanString(value).replace(/[\r\n]/g, " ").trim();
+  const anchor = cleanString(value)
+    .replace(/[\r\n]/g, " ")
+    .trim();
   return anchor ? anchor.slice(0, 180) : null;
 };
 
@@ -1811,7 +2385,9 @@ const clipObservationText = (value: unknown, maxChars = 800): string | null => {
   return text ? text.slice(0, maxChars).trim() : null;
 };
 
-const readBoundedCalculatorActiveContext = (value: unknown): {
+const readBoundedCalculatorActiveContext = (
+  value: unknown,
+): {
   current_latex: string | null;
   last_result_text: string | null;
   last_normalized_expression: string | null;
@@ -1822,7 +2398,8 @@ const readBoundedCalculatorActiveContext = (value: unknown): {
 } => {
   const record = readRecord(value) ?? {};
   const stepCount = Number(record.step_count ?? record.stepCount);
-  const recentDebugEventsValue = record.recent_debug_events ?? record.recentDebugEvents;
+  const recentDebugEventsValue =
+    record.recent_debug_events ?? record.recentDebugEvents;
   const recentDebugEvents = Array.isArray(recentDebugEventsValue)
     ? recentDebugEventsValue
         .map(readRecord)
@@ -1833,18 +2410,37 @@ const readBoundedCalculatorActiveContext = (value: unknown): {
           ok: typeof entry.ok === "boolean" ? entry.ok : null,
           input_latex: clipObservationText(entry.input_latex, 400),
           result_text: clipObservationText(entry.result_text, 400),
-          normalized_expression: clipObservationText(entry.normalized_expression, 400),
+          normalized_expression: clipObservationText(
+            entry.normalized_expression,
+            400,
+          ),
           message: clipObservationText(entry.message, 240),
           ts: clipObservationText(entry.ts, 120),
         }))
     : [];
   return {
-    current_latex: clipObservationText(record.current_latex ?? record.currentLatex),
-    last_result_text: clipObservationText(record.last_result_text ?? record.lastResultText),
-    last_normalized_expression: clipObservationText(record.last_normalized_expression ?? record.lastNormalizedExpression),
-    last_trace_id: clipObservationText(record.last_trace_id ?? record.lastTraceId, 240),
-    last_ok: typeof record.last_ok === "boolean" ? record.last_ok : typeof record.lastOk === "boolean" ? record.lastOk : null,
-    step_count: Number.isFinite(stepCount) ? Math.max(0, Math.min(Math.floor(stepCount), 200)) : null,
+    current_latex: clipObservationText(
+      record.current_latex ?? record.currentLatex,
+    ),
+    last_result_text: clipObservationText(
+      record.last_result_text ?? record.lastResultText,
+    ),
+    last_normalized_expression: clipObservationText(
+      record.last_normalized_expression ?? record.lastNormalizedExpression,
+    ),
+    last_trace_id: clipObservationText(
+      record.last_trace_id ?? record.lastTraceId,
+      240,
+    ),
+    last_ok:
+      typeof record.last_ok === "boolean"
+        ? record.last_ok
+        : typeof record.lastOk === "boolean"
+          ? record.lastOk
+          : null,
+    step_count: Number.isFinite(stepCount)
+      ? Math.max(0, Math.min(Math.floor(stepCount), 200))
+      : null,
     recent_debug_events: recentDebugEvents,
   };
 };
@@ -1872,7 +2468,10 @@ const normalizeDocsObservationLine = (line: string): string => {
     }
     deduped = deduped.replace(full, "");
   }
-  return deduped.replace(/\s{2,}/g, " ").replace(/\s+([,.;:])/g, "$1").trimEnd();
+  return deduped
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([,.;:])/g, "$1")
+    .trimEnd();
 };
 
 export const normalizeDocsObservationExcerptText = (text: string): string => {
@@ -1885,7 +2484,9 @@ export const normalizeDocsObservationExcerptText = (text: string): string => {
   return normalizedLines.join("\n").trim();
 };
 
-const readBoundedDocsExcerpt = (paths: string[]): {
+const readBoundedDocsExcerpt = (
+  paths: string[],
+): {
   path: string;
   excerpt: string;
   excerpt_char_count: number;
@@ -1896,7 +2497,11 @@ const readBoundedDocsExcerpt = (paths: string[]): {
   const workspaceRoot = process.cwd();
   const absolutePath = path.resolve(workspaceRoot, exactPath);
   const docsRoot = path.resolve(workspaceRoot, "docs");
-  if (absolutePath !== docsRoot && !absolutePath.startsWith(`${docsRoot}${path.sep}`)) return null;
+  if (
+    absolutePath !== docsRoot &&
+    !absolutePath.startsWith(`${docsRoot}${path.sep}`)
+  )
+    return null;
   let text = "";
   try {
     text = readFileSync(absolutePath, "utf8");
@@ -1910,7 +2515,8 @@ const readBoundedDocsExcerpt = (paths: string[]): {
     .trim();
   if (!cleaned) return null;
   const maxChars = 3200;
-  const excerpt = cleaned.length > maxChars ? cleaned.slice(0, maxChars).trimEnd() : cleaned;
+  const excerpt =
+    cleaned.length > maxChars ? cleaned.slice(0, maxChars).trimEnd() : cleaned;
   return {
     path: exactPath,
     excerpt,
@@ -1941,20 +2547,31 @@ type DocsSectionObservation = {
   section_lines: Array<{ line: number; text: string }>;
   contains_terms: string[];
   match_unit: "line" | "sentence" | "paragraph";
-  contains_matches: Array<{ term: string; line: number; source_line: string; sentence: string }>;
+  contains_matches: Array<{
+    term: string;
+    line: number;
+    source_line: string;
+    sentence: string;
+  }>;
   contains_match_count: number;
   truncated: boolean;
 };
 
 const readDocsExactTerms = (value: unknown): string[] =>
   Array.isArray(value)
-    ? Array.from(new Set(value
-        .map((entry) => typeof entry === "string" ? entry.trim() : "")
-        .filter((entry) => entry.length > 0 && entry.length <= 200)))
-        .slice(0, 8)
+    ? Array.from(
+        new Set(
+          value
+            .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+            .filter((entry) => entry.length > 0 && entry.length <= 200),
+        ),
+      ).slice(0, 8)
     : [];
 
-const sentenceContainingOffset = (paragraph: string, offset: number): string => {
+const sentenceContainingOffset = (
+  paragraph: string,
+  offset: number,
+): string => {
   const segmenter = new Intl.Segmenter("en", { granularity: "sentence" });
   for (const segment of segmenter.segment(paragraph)) {
     const start = segment.index;
@@ -1982,7 +2599,11 @@ const readBoundedDocsSection = (
   const workspaceRoot = process.cwd();
   const absolutePath = path.resolve(workspaceRoot, exactPath);
   const docsRoot = path.resolve(workspaceRoot, "docs");
-  if (absolutePath !== docsRoot && !absolutePath.startsWith(`${docsRoot}${path.sep}`)) return null;
+  if (
+    absolutePath !== docsRoot &&
+    !absolutePath.startsWith(`${docsRoot}${path.sep}`)
+  )
+    return null;
 
   let text = "";
   try {
@@ -1997,7 +2618,8 @@ const readBoundedDocsSection = (
   let matchedHeading = "";
   for (let index = 0; index < lines.length; index += 1) {
     const match = lines[index]?.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*$/);
-    if (!match || normalizeDocsHeading(match[2] ?? "") !== requestedKey) continue;
+    if (!match || normalizeDocsHeading(match[2] ?? "") !== requestedKey)
+      continue;
     headingIndex = index;
     headingLevel = match[1]?.length ?? 0;
     matchedHeading = match[2]?.trim() ?? requestedHeading;
@@ -2019,7 +2641,11 @@ const readBoundedDocsSection = (
   const availableLines = lines.slice(headingIndex, endIndexExclusive);
   const boundedLines: Array<{ line: number; text: string }> = [];
   let usedChars = 0;
-  for (let index = 0; index < availableLines.length && boundedLines.length < maxLines; index += 1) {
+  for (
+    let index = 0;
+    index < availableLines.length && boundedLines.length < maxLines;
+    index += 1
+  ) {
     const sourceLine = availableLines[index] ?? "";
     const addedChars = sourceLine.length + (boundedLines.length > 0 ? 1 : 0);
     if (usedChars + addedChars > maxChars) break;
@@ -2035,9 +2661,11 @@ const readBoundedDocsSection = (
         const offset = entry.text.indexOf(term, searchFrom);
         if (offset < 0) break;
         const sentence = sentenceContainingOffset(entry.text, offset);
-        const duplicate = containsMatches.some((match) =>
-          match.term === term && match.line === entry.line &&
-          (matchUnit === "line" || match.sentence === sentence),
+        const duplicate = containsMatches.some(
+          (match) =>
+            match.term === term &&
+            match.line === entry.line &&
+            (matchUnit === "line" || match.sentence === sentence),
         );
         if (!duplicate) {
           containsMatches.push({
@@ -2071,13 +2699,20 @@ const readBoundedDocsSection = (
   };
 };
 
-const readDocsExactLocationMatches = (paths: string[], exactTerms: string[]): DocsExactLocationMatch[] => {
+const readDocsExactLocationMatches = (
+  paths: string[],
+  exactTerms: string[],
+): DocsExactLocationMatch[] => {
   const exactPath = paths.find((entry) => /^docs\/.+\.md$/i.test(entry));
   if (!exactPath || exactTerms.length === 0) return [];
   const workspaceRoot = process.cwd();
   const absolutePath = path.resolve(workspaceRoot, exactPath);
   const docsRoot = path.resolve(workspaceRoot, "docs");
-  if (absolutePath !== docsRoot && !absolutePath.startsWith(`${docsRoot}${path.sep}`)) return [];
+  if (
+    absolutePath !== docsRoot &&
+    !absolutePath.startsWith(`${docsRoot}${path.sep}`)
+  )
+    return [];
 
   let text = "";
   try {
@@ -2094,7 +2729,9 @@ const readDocsExactLocationMatches = (paths: string[], exactTerms: string[]): Do
   }
   const headingForLine = (lineIndex: number): string | null => {
     for (let index = lineIndex; index >= 0; index -= 1) {
-      const heading = lines[index]?.match(/^\s{0,3}#{1,6}\s+(.+?)\s*$/)?.[1]?.trim();
+      const heading = lines[index]
+        ?.match(/^\s{0,3}#{1,6}\s+(.+?)\s*$/)?.[1]
+        ?.trim();
       if (heading) return heading;
     }
     return null;
@@ -2118,10 +2755,15 @@ const readDocsExactLocationMatches = (paths: string[], exactTerms: string[]): Do
       const offset = text.indexOf(term, searchFrom);
       if (offset < 0) break;
       const paragraphStartMarker = text.lastIndexOf("\n\n", offset);
-      const paragraphStart = paragraphStartMarker < 0 ? 0 : paragraphStartMarker + 2;
+      const paragraphStart =
+        paragraphStartMarker < 0 ? 0 : paragraphStartMarker + 2;
       const paragraphEndMarker = text.indexOf("\n\n", offset + term.length);
-      const paragraphEnd = paragraphEndMarker < 0 ? text.length : paragraphEndMarker;
-      const paragraph = text.slice(paragraphStart, paragraphEnd).replace(/\n+/g, " ").trim();
+      const paragraphEnd =
+        paragraphEndMarker < 0 ? text.length : paragraphEndMarker;
+      const paragraph = text
+        .slice(paragraphStart, paragraphEnd)
+        .replace(/\n+/g, " ")
+        .trim();
       const lineIndex = lineForOffset(offset);
       const sourceLine = lines[lineIndex]?.trim() ?? "";
       matches.push({
@@ -2141,7 +2783,9 @@ const readDocsExactLocationMatches = (paths: string[], exactTerms: string[]): Do
   return matches;
 };
 
-const readBoundedTranslationBlocks = (value: unknown): Array<Record<string, unknown>> => {
+const readBoundedTranslationBlocks = (
+  value: unknown,
+): Array<Record<string, unknown>> => {
   const entries = Array.isArray(value) ? value : [];
   return entries
     .map(readRecord)
@@ -2149,16 +2793,33 @@ const readBoundedTranslationBlocks = (value: unknown): Array<Record<string, unkn
     .slice(0, 12)
     .map((entry) => ({
       unit_id: clipObservationText(entry.unit_id ?? entry.unitId, 160),
-      source_unit_id: clipObservationText(entry.source_unit_id ?? entry.sourceUnitId ?? entry.unit_id ?? entry.unitId, 160),
-      source_text: clipObservationText(entry.source_text ?? entry.sourceText, 700),
-      translated_text: clipObservationText(entry.translated_text ?? entry.translatedText ?? entry.text, 900),
-      locale: clipObservationText(entry.locale ?? entry.target_locale ?? entry.targetLocale, 80),
+      source_unit_id: clipObservationText(
+        entry.source_unit_id ??
+          entry.sourceUnitId ??
+          entry.unit_id ??
+          entry.unitId,
+        160,
+      ),
+      source_text: clipObservationText(
+        entry.source_text ?? entry.sourceText,
+        700,
+      ),
+      translated_text: clipObservationText(
+        entry.translated_text ?? entry.translatedText ?? entry.text,
+        900,
+      ),
+      locale: clipObservationText(
+        entry.locale ?? entry.target_locale ?? entry.targetLocale,
+        80,
+      ),
       status: clipObservationText(entry.status, 80),
     }))
     .filter((entry) => Boolean(entry.translated_text));
 };
 
-const readSurfaceTextFromArgs = (args: Record<string, unknown>): string | null =>
+const readSurfaceTextFromArgs = (
+  args: Record<string, unknown>,
+): string | null =>
   clipObservationText(
     args.text ??
       args.surface_text ??
@@ -2188,9 +2849,17 @@ const buildReadableSurfacePayload = (input: {
   actionId: string;
 } => {
   const args = input.args;
-  const requestedSurface = cleanString(args.surface ?? args.surface_id ?? args.surfaceId ?? args.label);
-  const panelId = cleanString(args.panel_id ?? args.panelId, input.fallbackPanelId);
-  const actionId = cleanString(args.action_id ?? args.actionId, input.fallbackActionId);
+  const requestedSurface = cleanString(
+    args.surface ?? args.surface_id ?? args.surfaceId ?? args.label,
+  );
+  const panelId = cleanString(
+    args.panel_id ?? args.panelId,
+    input.fallbackPanelId,
+  );
+  const actionId = cleanString(
+    args.action_id ?? args.actionId,
+    input.fallbackActionId,
+  );
   const selectionRef = optionalString(
     args.selection_ref ??
       args.selectionRef ??
@@ -2199,22 +2868,32 @@ const buildReadableSurfacePayload = (input: {
       args.source_id ??
       args.sourceId,
   );
-  const selectionKind = cleanString(args.selection_kind ?? args.selectionKind).toLowerCase();
+  const selectionKind = cleanString(
+    args.selection_kind ?? args.selectionKind,
+  ).toLowerCase();
   const selectedOrHoveredRequested = Boolean(
     args.selected_text ??
-      args.selectedText ??
-      args.hovered_text ??
-      args.hoveredText ??
-      (
-        /\b(?:selected|hovered|highlighted|narrator[-_\s]?source)\b/i.test(requestedSurface) ||
-        selectionKind === "selected" ||
-        selectionKind === "hovered"
-      ),
+    args.selectedText ??
+    args.hovered_text ??
+    args.hoveredText ??
+    (/\b(?:selected|hovered|highlighted|narrator[-_\s]?source)\b/i.test(
+      requestedSurface,
+    ) ||
+      selectionKind === "selected" ||
+      selectionKind === "hovered"),
   );
-  const sourceDocPath = readDocsActionPath(args.source_doc_path ?? args.sourceDocPath ?? args.path);
-  const activeDocExcerpt = sourceDocPath ? readBoundedDocsExcerpt([sourceDocPath]) : null;
-  const translationBlocks = readBoundedTranslationBlocks(args.translation_blocks ?? args.translationBlocks);
-  const activeContext = readBoundedCalculatorActiveContext(args.active_context ?? args.activeContext);
+  const sourceDocPath = readDocsActionPath(
+    args.source_doc_path ?? args.sourceDocPath ?? args.path,
+  );
+  const activeDocExcerpt = sourceDocPath
+    ? readBoundedDocsExcerpt([sourceDocPath])
+    : null;
+  const translationBlocks = readBoundedTranslationBlocks(
+    args.translation_blocks ?? args.translationBlocks,
+  );
+  const activeContext = readBoundedCalculatorActiveContext(
+    args.active_context ?? args.activeContext,
+  );
   const visibleResult = clipObservationText(
     args.result ??
       args.visible_result ??
@@ -2235,29 +2914,46 @@ const buildReadableSurfacePayload = (input: {
     .filter(Boolean)
     .join("\n")
     .trim();
-  const translatedText = readSurfaceTextFromArgs(args) ?? (translatedBlocksText || null);
+  const translatedText =
+    readSurfaceTextFromArgs(args) ?? (translatedBlocksText || null);
   const surfaceText =
     input.capabilityId === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY
       ? visibleResult
       : input.capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY
         ? translatedText
-        : readSurfaceTextFromArgs(args) ?? activeDocExcerpt?.excerpt ?? translatedText ?? visibleResult;
+        : (readSurfaceTextFromArgs(args) ??
+          activeDocExcerpt?.excerpt ??
+          translatedText ??
+          visibleResult);
   const missingReason =
-    input.capabilityId === DOCS_READ_VISIBLE_SURFACE_CAPABILITY && selectedOrHoveredRequested && !selectionRef
+    input.capabilityId === DOCS_READ_VISIBLE_SURFACE_CAPABILITY &&
+    selectedOrHoveredRequested &&
+    !selectionRef
       ? "registered_surface_ref_missing"
-      : input.capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY && !surfaceText
-      ? "translation_surface_missing"
-      : input.capabilityId === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY && !visibleResult
-        ? "calculator_visible_result_missing"
-        : !surfaceText
-          ? "registered_surface_text_missing"
-          : null;
+      : input.capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY &&
+          !surfaceText
+        ? "translation_surface_missing"
+        : input.capabilityId === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY &&
+            !visibleResult
+          ? "calculator_visible_result_missing"
+          : !surfaceText
+            ? "registered_surface_text_missing"
+            : null;
   const sourceRefs = readStringArray(args.source_refs ?? args.sourceRefs);
   const unitRefs = readStringArray(args.unit_refs ?? args.unitRefs);
   const lineRefs = readStringArray(args.line_refs ?? args.lineRefs);
-  const locale = clipObservationText(args.locale ?? args.target_locale ?? args.targetLocale, 80);
-  const accountLocale = clipObservationText(args.account_locale ?? args.accountLocale ?? locale, 80);
-  const targetLanguage = clipObservationText(args.target_language ?? args.targetLanguage ?? locale, 80);
+  const locale = clipObservationText(
+    args.locale ?? args.target_locale ?? args.targetLocale,
+    80,
+  );
+  const accountLocale = clipObservationText(
+    args.account_locale ?? args.accountLocale ?? locale,
+    80,
+  );
+  const targetLanguage = clipObservationText(
+    args.target_language ?? args.targetLanguage ?? locale,
+    80,
+  );
   const observation = {
     schema: READABLE_SURFACE_OBSERVATION_SCHEMA,
     capability_key: input.capabilityId,
@@ -2276,28 +2972,36 @@ const buildReadableSurfacePayload = (input: {
     line_refs: lineRefs,
     unit_refs: unitRefs,
     selection_ref: selectionRef,
-    selection_kind: selectedOrHoveredRequested ? selectionKind || "selected_or_hovered" : null,
+    selection_kind: selectedOrHoveredRequested
+      ? selectionKind || "selected_or_hovered"
+      : null,
     source_doc_path: sourceDocPath ?? activeDocExcerpt?.path ?? null,
     source_excerpt_available: Boolean(activeDocExcerpt),
-    translation: input.capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY
-      ? {
-          locale,
-          account_locale: accountLocale,
-          target_language: targetLanguage,
-          status: missingReason ? "missing" : "ready",
-          blocks: translationBlocks,
-          missing_unit_info: readStringArray(args.missing_unit_info ?? args.missingUnitInfo),
-          source_unit_ids: translationBlocks.map((entry) => optionalString(entry.source_unit_id)).filter(Boolean),
-        }
-      : null,
-    calculator: input.capabilityId === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY
-      ? {
-          expression,
-          result: visibleResult,
-          result_source: visibleResult ? "visible_result_region" : null,
-          draft_input_distinguished: true,
-        }
-      : null,
+    translation:
+      input.capabilityId === DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY
+        ? {
+            locale,
+            account_locale: accountLocale,
+            target_language: targetLanguage,
+            status: missingReason ? "missing" : "ready",
+            blocks: translationBlocks,
+            missing_unit_info: readStringArray(
+              args.missing_unit_info ?? args.missingUnitInfo,
+            ),
+            source_unit_ids: translationBlocks
+              .map((entry) => optionalString(entry.source_unit_id))
+              .filter(Boolean),
+          }
+        : null,
+    calculator:
+      input.capabilityId === CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY
+        ? {
+            expression,
+            result: visibleResult,
+            result_source: visibleResult ? "visible_result_region" : null,
+            draft_input_distinguished: true,
+          }
+        : null,
     sensitive_blocked: false,
     observation_role: "evidence_not_assistant_answer",
     terminal_eligible: false,
@@ -2322,7 +3026,11 @@ const readCompoundReadAloudResolvedDocsPath = (
   documentCandidates: Array<{ path?: string }>,
 ): string | null => {
   const intent = readRecord(sourceTargetIntent);
-  if (intent?.compound_outcome !== "read_aloud_doc_excerpt" && intent?.compound_outcome !== "read_aloud_surface") return null;
+  if (
+    intent?.compound_outcome !== "read_aloud_doc_excerpt" &&
+    intent?.compound_outcome !== "read_aloud_surface"
+  )
+    return null;
   const pathCandidate = documentCandidates
     .map((candidate) => cleanString(candidate.path))
     .find((candidate) => /^docs\/.+\.md$/i.test(candidate));
@@ -2371,14 +3079,19 @@ const repoSearchQueryTokens = (query: string): string[] =>
         .replace(/([a-z])([A-Z])/g, "$1 $2")
         .split(/[^a-z0-9_.:/-]+/i)
         .map((token) => token.trim().replace(/^[._:/-]+|[._:/-]+$/g, ""))
-        .filter((token) => token.length >= 3 && !REPO_SEARCH_QUERY_STOPWORDS.has(token)),
+        .filter(
+          (token) =>
+            token.length >= 3 && !REPO_SEARCH_QUERY_STOPWORDS.has(token),
+        ),
     ),
   ).slice(0, 12);
 
 const repoSearchHasCodeIdentifierSignal = (query: string): boolean =>
   /[._:/-]/.test(query) || /[a-z][A-Z]/.test(query);
 
-const buildRepoSearchQueryQuality = (query: string): {
+const buildRepoSearchQueryQuality = (
+  query: string,
+): {
   schema: "helix.repo_search_query_quality.v1";
   status: "accepted" | "blocked";
   code: string | null;
@@ -2391,8 +3104,13 @@ const buildRepoSearchQueryQuality = (query: string): {
 } => {
   const meaningfulTerms = repoSearchQueryTokens(query);
   const hasCodeSignal = repoSearchHasCodeIdentifierSignal(query);
-  const accepted = meaningfulTerms.length >= 2 || (meaningfulTerms.length === 1 && hasCodeSignal);
-  const score = Math.min(1, (meaningfulTerms.length / 4) + (hasCodeSignal ? 0.35 : 0));
+  const accepted =
+    meaningfulTerms.length >= 2 ||
+    (meaningfulTerms.length === 1 && hasCodeSignal);
+  const score = Math.min(
+    1,
+    meaningfulTerms.length / 4 + (hasCodeSignal ? 0.35 : 0),
+  );
   return {
     schema: "helix.repo_search_query_quality.v1",
     status: accepted ? "accepted" : "blocked",
@@ -2471,12 +3189,18 @@ const buildRepoSearchRelevanceGate = (input: {
     return terms.some((term) => haystack.includes(term));
   }).length;
   const requiredMatches = Math.min(2, Math.max(1, terms.length));
-  const relevanceScore = terms.length > 0 ? matchedTerms.length / terms.length : 0;
-  const passed = input.hits.length > 0 && matchedTerms.length >= requiredMatches;
+  const relevanceScore =
+    terms.length > 0 ? matchedTerms.length / terms.length : 0;
+  const passed =
+    input.hits.length > 0 && matchedTerms.length >= requiredMatches;
   return {
     schema: "helix.repo_search_relevance_gate.v1",
     status: passed ? "passed" : "blocked",
-    code: passed ? null : input.hits.length === 0 ? "no_repo_search_hits" : "repo_search_low_relevance",
+    code: passed
+      ? null
+      : input.hits.length === 0
+        ? "no_repo_search_hits"
+        : "repo_search_low_relevance",
     query: input.query,
     query_quality_score: input.queryQuality.score,
     meaningful_terms: terms,
@@ -2490,18 +3214,31 @@ const buildRepoSearchRelevanceGate = (input: {
   };
 };
 
-const rankRepoSearchHitForQuery = (hit: RepoSearchHit, meaningfulTerms: string[]): number => {
+const rankRepoSearchHitForQuery = (
+  hit: RepoSearchHit,
+  meaningfulTerms: string[],
+): number => {
   const normalizedPath = hit.filePath.replace(/\\/g, "/").toLowerCase();
   const haystack = `${normalizedPath} ${hit.text} ${hit.term}`.toLowerCase();
-  const matchedTerms = meaningfulTerms.filter((term) => haystack.includes(term));
-  const pathMatchedTerms = meaningfulTerms.filter((term) => normalizedPath.includes(term));
-  const exactPathPhrase = meaningfulTerms.length > 1 && normalizedPath.includes(meaningfulTerms.join("-"));
+  const matchedTerms = meaningfulTerms.filter((term) =>
+    haystack.includes(term),
+  );
+  const pathMatchedTerms = meaningfulTerms.filter((term) =>
+    normalizedPath.includes(term),
+  );
+  const exactPathPhrase =
+    meaningfulTerms.length > 1 &&
+    normalizedPath.includes(meaningfulTerms.join("-"));
   return (
     matchedTerms.length * 10 +
     pathMatchedTerms.length * 6 +
     (exactPathPhrase ? 12 : 0) +
     (normalizedPath.startsWith("shared/theory/") ? 16 : 0) +
-    (normalizedPath.startsWith("server/services/helix-ask/workstation-tool-gateway/") ? 14 : 0) +
+    (normalizedPath.startsWith(
+      "server/services/helix-ask/workstation-tool-gateway/",
+    )
+      ? 14
+      : 0) +
     (normalizedPath.startsWith("server/services/helix-ask/") ? 10 : 0) +
     (normalizedPath.startsWith("shared/contracts/") ? -4 : 0) +
     (/\b(?:shared|server|client|docs)\//.test(normalizedPath) ? 1 : 0)
@@ -2536,9 +3273,12 @@ const selectRepoSearchHitsForQuery = (
   };
   for (const term of priorityTerms) {
     const normalizedTerm = term.toLowerCase();
-    const hit = rankedHits.find((candidate) =>
-      candidate.term.toLowerCase() === normalizedTerm ||
-      `${candidate.filePath} ${candidate.text}`.toLowerCase().includes(normalizedTerm),
+    const hit = rankedHits.find(
+      (candidate) =>
+        candidate.term.toLowerCase() === normalizedTerm ||
+        `${candidate.filePath} ${candidate.text}`
+          .toLowerCase()
+          .includes(normalizedTerm),
     );
     if (hit) addHit(hit);
     if (selected.length >= maxHits) return selected;
@@ -2559,9 +3299,13 @@ const readRepoSearchTermHints = (value: unknown): string[] =>
 const repoSearchTheoryBadgeGraphExecutionTerms = (query: string): string[] => {
   const normalized = query.toLowerCase();
   const mentionsTheoryBadgeGraph =
-    /\btheory\b/.test(normalized) && /\bbadge\b/.test(normalized) && /\bgraph\b/.test(normalized);
+    /\btheory\b/.test(normalized) &&
+    /\bbadge\b/.test(normalized) &&
+    /\bgraph\b/.test(normalized);
   const mentionsLocator =
-    /\blocator|locate|located|match|reflection|reflect_discussion_context\b/.test(normalized);
+    /\blocator|locate|located|match|reflection|reflect_discussion_context\b/.test(
+      normalized,
+    );
   if (!mentionsTheoryBadgeGraph || !mentionsLocator) return [];
   return [
     "Theory Badge Graph reflection produced",
@@ -2580,19 +3324,25 @@ const buildRepoSearchExecutionTerms = (input: {
   queryQuality: ReturnType<typeof buildRepoSearchQueryQuality> | null;
   termHints: string[];
 }): string[] =>
-  Array.from(new Set([
-    input.query,
-    ...repoSearchTheoryBadgeGraphExecutionTerms(input.query),
-    ...input.termHints,
-    ...(input.queryQuality?.meaningful_terms ?? []).sort((a, b) => b.length - a.length),
-  ])).slice(0, 12);
+  Array.from(
+    new Set([
+      input.query,
+      ...repoSearchTheoryBadgeGraphExecutionTerms(input.query),
+      ...input.termHints,
+      ...(input.queryQuality?.meaningful_terms ?? []).sort(
+        (a, b) => b.length - a.length,
+      ),
+    ]),
+  ).slice(0, 12);
 
 const buildRepoSearchSupportRefs = (hits: RepoSearchHit[]): string[] =>
-  Array.from(new Set(
-    hits
-      .map((hit) => `${hit.filePath.replace(/\\/g, "/")}:L${hit.line}`)
-      .filter(Boolean),
-  )).slice(0, 24);
+  Array.from(
+    new Set(
+      hits
+        .map((hit) => `${hit.filePath.replace(/\\/g, "/")}:L${hit.line}`)
+        .filter(Boolean),
+    ),
+  ).slice(0, 24);
 
 const buildAdmission = (input: {
   capabilityId: string;
@@ -2630,7 +3380,9 @@ const buildGatewayTrace = (input: {
   const status = input.observationPacket.status;
   const completed = status === "succeeded";
   const failed = status === "failed";
-  const blocked = !failed && (status === "blocked" || input.admission.admission_status === "blocked");
+  const blocked =
+    !failed &&
+    (status === "blocked" || input.admission.admission_status === "blocked");
   const terminalEligible = input.terminalEligible === true && completed;
   const traceRef = `${input.turnId}:workstation_gateway:${input.capabilityId}:tool_lifecycle_trace`;
   const observationRefs = input.observationPacket.produced_artifact_refs;
@@ -2642,20 +3394,35 @@ const buildGatewayTrace = (input: {
   const nextAction = terminalEligible
     ? "terminal_answer"
     : blocked
-    ? "ask_user"
-    : failed
-      ? "retry"
-      : "continue_reasoning";
+      ? "ask_user"
+      : failed
+        ? "retry"
+        : "continue_reasoning";
   const lifecycleTrace: HelixToolLifecycleTrace = {
     schema: HELIX_TOOL_LIFECYCLE_TRACE_SCHEMA,
     turn_id: input.turnId,
     tool_call_id: input.observationPacket.call_id,
     tool_family: "workstation_tool_gateway",
     requested_capability: input.admission.requested_capability,
-    admitted_capability: input.admission.admission_status === "admitted" ? input.capabilityId : null,
+    admitted_capability:
+      input.admission.admission_status === "admitted"
+        ? input.capabilityId
+        : null,
     executed_capability: blocked ? null : input.capabilityId,
-    lifecycle_stage: blocked ? "blocked" : completed ? "completed" : failed ? "failed" : "started",
-    status: blocked ? "blocked" : completed ? "completed" : failed ? "failed" : "running",
+    lifecycle_stage: blocked
+      ? "blocked"
+      : completed
+        ? "completed"
+        : failed
+          ? "failed"
+          : "started",
+    status: blocked
+      ? "blocked"
+      : completed
+        ? "completed"
+        : failed
+          ? "failed"
+          : "running",
     session_ref: input.agentRuntime,
     process_ref: null,
     observation_refs: observationRefs,
@@ -2678,12 +3445,14 @@ const buildGatewayTrace = (input: {
     reason: terminalEligible
       ? "gateway_receipt_satisfies_control_action"
       : blocked
-      ? input.admission.blocked_reason ?? "gateway_call_blocked"
-      : failed
-        ? input.error ?? "gateway_call_failed"
-        : "gateway_observation_requires_provider_reasoning_reentry",
+        ? (input.admission.blocked_reason ?? "gateway_call_blocked")
+        : failed
+          ? (input.error ?? "gateway_call_failed")
+          : "gateway_observation_requires_provider_reasoning_reentry",
     external_change_required: false,
-    terminal_blockers: terminalEligible ? [] : ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+    terminal_blockers: terminalEligible
+      ? []
+      : ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
     required_surface_satisfied: completed,
     evidence_reentered: false,
     assistant_answer: false,
@@ -2723,7 +3492,51 @@ const workspaceOsStatusManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: HELIX_WORKSPACE_OS_STATUS_OBSERVATION_SCHEMA,
   observation_schema: HELIX_WORKSPACE_OS_STATUS_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "diagnostic_only", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "read_or_observe",
+    "diagnostic_only",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
+const capabilityCatalogManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY,
+  label: "Inspect runtime capability catalog",
+  description:
+    "Reads the current governed workstation capability manifest across document, evidence, calculator, theory, runtime, and presentation families. The catalog is reusable across conformed scientific sources and does not execute another tool or answer by itself.",
+  panel_id: "agent-access",
+  action_id: "inspect_capability_catalog",
+  mode: "observe",
+  mutating: false,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: false,
+  terminal_eligible: false,
+  permission_profile_required: "observe",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      query: { type: "string" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: HELIX_ASK_CAPABILITY_CATALOG_OBSERVATION_SCHEMA,
+  observation_schema: HELIX_ASK_CAPABILITY_CATALOG_OBSERVATION_SCHEMA,
+  safety_tags: [
+    "read_or_observe",
+    "capability_catalog",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -2754,42 +3567,9 @@ const workstationActiveContextManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
   observation_schema: WORKSTATION_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "workstation_context", "active_context", "non_terminal", "no_shell", "no_code_mutation"],
-  assistant_answer: false,
-  raw_content_included: false,
-};
-
-const theoryBadgeGraphCurrentContextManifest: HelixWorkstationCapabilityManifest = {
-  schema: "helix.workstation_tool_gateway.capability.v1",
-  capability_id: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
-  label: "Theory Badge Graph current context",
-  description:
-    "Reads the bounded semantic Theory Badge Graph selection supplied by the Ask turn workspace snapshot, including its trace, intermediate badges, available next badges, boundaries, and active lens. It is observation-only and cannot mutate or answer.",
-  panel_id: "theory-badge-graph",
-  action_id: "current_context",
-  mode: "read",
-  mutating: false,
-  code_mutation: false,
-  shell_access: false,
-  requires_confirmation: false,
-  requires_source: true,
-  terminal_eligible: false,
-  permission_profile_required: "read",
-  post_tool_model_step_required: true,
-  input_schema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["current_context"],
-    properties: {
-      current_context: { type: "object" },
-      source_target_intent: { type: "object" },
-    },
-  },
-  output_observation_schema: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_OBSERVATION_SCHEMA,
-  observation_schema: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_OBSERVATION_SCHEMA,
   safety_tags: [
     "read_or_observe",
-    "theory_badge_graph",
+    "workstation_context",
     "active_context",
     "non_terminal",
     "no_shell",
@@ -2798,6 +3578,48 @@ const theoryBadgeGraphCurrentContextManifest: HelixWorkstationCapabilityManifest
   assistant_answer: false,
   raw_content_included: false,
 };
+
+const theoryBadgeGraphCurrentContextManifest: HelixWorkstationCapabilityManifest =
+  {
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY,
+    label: "Theory Badge Graph current context",
+    description:
+      "Reads the bounded semantic Theory Badge Graph selection supplied by the Ask turn workspace snapshot, including its trace, intermediate badges, available next badges, boundaries, and active lens. It is observation-only and cannot mutate or answer.",
+    panel_id: "theory-badge-graph",
+    action_id: "current_context",
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: true,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["current_context"],
+      properties: {
+        current_context: { type: "object" },
+        source_target_intent: { type: "object" },
+      },
+    },
+    output_observation_schema:
+      THEORY_BADGE_GRAPH_CURRENT_CONTEXT_OBSERVATION_SCHEMA,
+    observation_schema: THEORY_BADGE_GRAPH_CURRENT_CONTEXT_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "read_or_observe",
+      "theory_badge_graph",
+      "active_context",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 
 const workstationNotesListManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
@@ -2832,7 +3654,15 @@ const workstationNotesListManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: WORKSTATION_NOTES_LIST_OBSERVATION_SCHEMA,
   observation_schema: WORKSTATION_NOTES_LIST_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "workstation_notes", "note_index", "body_redacted", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "read_or_observe",
+    "workstation_notes",
+    "note_index",
+    "body_redacted",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -2864,44 +3694,9 @@ const calculatorSolveExpressionManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: CALCULATOR_SOLVE_OBSERVATION_SCHEMA,
   observation_schema: CALCULATOR_SOLVE_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "calculator", "non_terminal", "no_shell", "no_code_mutation"],
-  assistant_answer: false,
-  raw_content_included: false,
-};
-
-const calculatorSolveScalarExpressionManifest: HelixWorkstationCapabilityManifest = {
-  schema: "helix.workstation_tool_gateway.capability.v1",
-  capability_id: CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
-  label: "Scientific Calculator solve scalar expression",
-  description:
-    "Evaluates a fully numeric or already-bound scalar expression as read-only calculator evidence. Symbolic variables must be bound before this capability can produce result evidence.",
-  panel_id: "scientific-calculator",
-  action_id: "solve_scalar_expression",
-  mode: "read",
-  mutating: false,
-  code_mutation: false,
-  shell_access: false,
-  requires_confirmation: false,
-  requires_source: true,
-  terminal_eligible: false,
-  permission_profile_required: "read",
-  post_tool_model_step_required: true,
-  input_schema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["expression"],
-    properties: {
-      expression: { type: "string" },
-      bound_expression: { type: "string" },
-      source_refs: { type: "array", items: { type: "string" } },
-    },
-  },
-  output_observation_schema: CALCULATOR_SOLVE_SCALAR_OBSERVATION_SCHEMA,
-  observation_schema: CALCULATOR_SOLVE_SCALAR_OBSERVATION_SCHEMA,
   safety_tags: [
     "read_or_observe",
     "calculator",
-    "bound_scalar_expression",
     "non_terminal",
     "no_shell",
     "no_code_mutation",
@@ -2910,42 +3705,92 @@ const calculatorSolveScalarExpressionManifest: HelixWorkstationCapabilityManifes
   raw_content_included: false,
 };
 
-const calculatorClassifyExpressionManifest: HelixWorkstationCapabilityManifest = {
-  schema: "helix.workstation_tool_gateway.capability.v1",
-  capability_id: CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY,
-  label: "Scientific Calculator classify expression",
-  description:
-    "Classifies calculator input for the workbench without solving it. It reports parse status, symbols, routes, assumptions, and blocked reasons as non-terminal observation evidence.",
-  panel_id: "scientific-calculator",
-  action_id: "classify_expression",
-  mode: "read",
-  mutating: false,
-  code_mutation: false,
-  shell_access: false,
-  requires_confirmation: false,
-  requires_source: false,
-  terminal_eligible: false,
-  permission_profile_required: "read",
-  post_tool_model_step_required: true,
-  input_schema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["expression"],
-    properties: {
-      expression: { type: "string" },
-      latex: { type: "string" },
-      text: { type: "string" },
-      source_refs: { type: "array", items: { type: "string" } },
-      paper_context: { type: "object" },
-      source_target_intent: { type: "object" },
+const calculatorSolveScalarExpressionManifest: HelixWorkstationCapabilityManifest =
+  {
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
+    label: "Scientific Calculator solve scalar expression",
+    description:
+      "Evaluates a fully numeric or already-bound scalar expression as read-only calculator evidence. Symbolic variables must be bound before this capability can produce result evidence.",
+    panel_id: "scientific-calculator",
+    action_id: "solve_scalar_expression",
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: true,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["expression"],
+      properties: {
+        expression: { type: "string" },
+        bound_expression: { type: "string" },
+        source_refs: { type: "array", items: { type: "string" } },
+      },
     },
-  },
-  output_observation_schema: CALCULATOR_CLASSIFY_OBSERVATION_SCHEMA,
-  observation_schema: CALCULATOR_CLASSIFY_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "calculator", "classification", "non_terminal", "no_shell", "no_code_mutation"],
-  assistant_answer: false,
-  raw_content_included: false,
-};
+    output_observation_schema: CALCULATOR_SOLVE_SCALAR_OBSERVATION_SCHEMA,
+    observation_schema: CALCULATOR_SOLVE_SCALAR_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "read_or_observe",
+      "calculator",
+      "bound_scalar_expression",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+
+const calculatorClassifyExpressionManifest: HelixWorkstationCapabilityManifest =
+  {
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY,
+    label: "Scientific Calculator classify expression",
+    description:
+      "Classifies calculator input for the workbench without solving it. It reports parse status, symbols, routes, assumptions, and blocked reasons as non-terminal observation evidence.",
+    panel_id: "scientific-calculator",
+    action_id: "classify_expression",
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: false,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["expression"],
+      properties: {
+        expression: { type: "string" },
+        latex: { type: "string" },
+        text: { type: "string" },
+        source_refs: { type: "array", items: { type: "string" } },
+        paper_context: { type: "object" },
+        source_target_intent: { type: "object" },
+      },
+    },
+    output_observation_schema: CALCULATOR_CLASSIFY_OBSERVATION_SCHEMA,
+    observation_schema: CALCULATOR_CLASSIFY_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "read_or_observe",
+      "calculator",
+      "classification",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 
 const calculatorBindVariablesManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
@@ -2981,7 +3826,15 @@ const calculatorBindVariablesManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: CALCULATOR_BIND_VARIABLES_OBSERVATION_SCHEMA,
   observation_schema: CALCULATOR_BIND_VARIABLES_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "calculator", "variable_binding", "typed_affordance", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "read_or_observe",
+    "calculator",
+    "variable_binding",
+    "typed_affordance",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -3012,16 +3865,24 @@ const calculatorActiveContextManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: CALCULATOR_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
   observation_schema: CALCULATOR_ACTIVE_CONTEXT_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "calculator", "active_context", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "read_or_observe",
+    "calculator",
+    "active_context",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
 
 const makeReadableSurfaceManifest = (input: {
-  capabilityId: typeof READABLE_SURFACE_OBSERVE_CAPABILITY |
-    typeof DOCS_READ_VISIBLE_SURFACE_CAPABILITY |
-    typeof DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY |
-    typeof CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY;
+  capabilityId:
+    | typeof READABLE_SURFACE_OBSERVE_CAPABILITY
+    | typeof DOCS_READ_VISIBLE_SURFACE_CAPABILITY
+    | typeof DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY
+    | typeof CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY;
   label: string;
   description: string;
   panelId: string | null;
@@ -3129,12 +3990,17 @@ const calculatorReadVisibleResultManifest = makeReadableSurfaceManifest({
 });
 
 const makeCalculatorPanelActionManifest = (
-  capabilityId: typeof CALCULATOR_OPEN_PANEL_CAPABILITY | typeof CALCULATOR_FOCUS_PANEL_CAPABILITY,
+  capabilityId:
+    | typeof CALCULATOR_OPEN_PANEL_CAPABILITY
+    | typeof CALCULATOR_FOCUS_PANEL_CAPABILITY,
   action: "open_panel" | "focus_panel",
 ): HelixWorkstationCapabilityManifest => ({
   schema: "helix.workstation_tool_gateway.capability.v1",
   capability_id: capabilityId,
-  label: action === "open_panel" ? "Scientific Calculator open panel" : "Scientific Calculator focus panel",
+  label:
+    action === "open_panel"
+      ? "Scientific Calculator open panel"
+      : "Scientific Calculator focus panel",
   description:
     "Requests a governed, non-mutating workstation UI action for the Scientific Calculator panel. It is a non-terminal action receipt and cannot answer the user.",
   panel_id: "scientific-calculator",
@@ -3157,7 +4023,15 @@ const makeCalculatorPanelActionManifest = (
   },
   output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
   observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
-  safety_tags: ["non_mutating_ui_action", "calculator", "panel_action", "action_receipt", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "non_mutating_ui_action",
+    "calculator",
+    "panel_action",
+    "action_receipt",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 });
@@ -3203,56 +4077,78 @@ const calculatorShowGatewaySolveManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
   observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
-  safety_tags: ["non_mutating_ui_action", "calculator", "gateway_projection", "action_receipt", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "non_mutating_ui_action",
+    "calculator",
+    "gateway_projection",
+    "action_receipt",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
 
-const calculatorPrefillExpressionManifest: HelixWorkstationCapabilityManifest = {
-  schema: "helix.workstation_tool_gateway.capability.v1",
-  capability_id: CALCULATOR_PREFILL_EXPRESSION_CAPABILITY,
-  label: "Scientific Calculator prefill expression",
-  description:
-    "Projects a symbolic, incomplete, or numeric expression into the Scientific Calculator workbench input as a governed UI action receipt. It does not solve and cannot produce calculator result evidence.",
-  panel_id: "scientific-calculator",
-  action_id: "prefill_expression",
-  mode: "act",
-  mutating: false,
-  code_mutation: false,
-  shell_access: false,
-  requires_confirmation: false,
-  requires_source: false,
-  terminal_eligible: false,
-  permission_profile_required: "act",
-  post_tool_model_step_required: true,
-  input_schema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["expression"],
-    properties: {
-      expression: { type: "string" },
-      latex: { type: "string" },
-      text: { type: "string" },
-      source_refs: { type: "array", items: { type: "string" } },
-      source_path: { type: "string" },
-      anchor: { type: "string" },
-      source_target_intent: { type: "object" },
+const calculatorPrefillExpressionManifest: HelixWorkstationCapabilityManifest =
+  {
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: CALCULATOR_PREFILL_EXPRESSION_CAPABILITY,
+    label: "Scientific Calculator prefill expression",
+    description:
+      "Projects a symbolic, incomplete, or numeric expression into the Scientific Calculator workbench input as a governed UI action receipt. It does not solve and cannot produce calculator result evidence.",
+    panel_id: "scientific-calculator",
+    action_id: "prefill_expression",
+    mode: "act",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: false,
+    terminal_eligible: false,
+    permission_profile_required: "act",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["expression"],
+      properties: {
+        expression: { type: "string" },
+        latex: { type: "string" },
+        text: { type: "string" },
+        source_refs: { type: "array", items: { type: "string" } },
+        source_path: { type: "string" },
+        anchor: { type: "string" },
+        source_target_intent: { type: "object" },
+      },
     },
-  },
-  output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
-  observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
-  safety_tags: ["non_mutating_ui_action", "calculator", "expression_prefill", "action_receipt", "non_terminal", "no_shell", "no_code_mutation"],
-  assistant_answer: false,
-  raw_content_included: false,
-};
+    output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+    observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+    safety_tags: [
+      "non_mutating_ui_action",
+      "calculator",
+      "expression_prefill",
+      "action_receipt",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 
 const makeWorkstationPanelActionManifest = (
-  capabilityId: typeof WORKSTATION_OPEN_PANEL_CAPABILITY | typeof WORKSTATION_FOCUS_PANEL_CAPABILITY,
+  capabilityId:
+    | typeof WORKSTATION_OPEN_PANEL_CAPABILITY
+    | typeof WORKSTATION_FOCUS_PANEL_CAPABILITY,
   action: "open_panel" | "focus_panel",
 ): HelixWorkstationCapabilityManifest => ({
   schema: "helix.workstation_tool_gateway.capability.v1",
   capability_id: capabilityId,
-  label: action === "open_panel" ? "Workstation open panel" : "Workstation focus panel",
+  label:
+    action === "open_panel"
+      ? "Workstation open panel"
+      : "Workstation focus panel",
   description:
     "Requests a governed, non-mutating workstation UI action for a safe read/observe panel allowlist. It is a non-terminal action receipt and cannot answer the user.",
   panel_id: null,
@@ -3279,7 +4175,15 @@ const makeWorkstationPanelActionManifest = (
   },
   output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
   observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
-  safety_tags: ["non_mutating_ui_action", "workstation_panel", "panel_action", "action_receipt", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "non_mutating_ui_action",
+    "workstation_panel",
+    "panel_action",
+    "action_receipt",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 });
@@ -3293,49 +4197,59 @@ const workstationFocusPanelManifest = makeWorkstationPanelActionManifest(
   "focus_panel",
 );
 
-const accountSessionSetInterfaceLanguageManifest: HelixWorkstationCapabilityManifest = {
-  schema: "helix.workstation_tool_gateway.capability.v1",
-  capability_id: ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY,
-  label: "Account Session set interface language",
-  description:
-    "Requests a governed workstation preference action to change the interface language through the Account & Sessions panel. It only writes the browser/workstation language preference.",
-  panel_id: "account-session",
-  action_id: "set_interface_language",
-  mode: "act",
-  mutating: true,
-  code_mutation: false,
-  shell_access: false,
-  requires_confirmation: false,
-  requires_source: false,
-  terminal_eligible: true,
-  permission_profile_required: "act",
-  post_tool_model_step_required: true,
-  input_schema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["language"],
-    properties: {
-      language: { type: "string", enum: [...SHARED_INTERFACE_LANGUAGE_CODES] },
-      interface_language: { type: "string", enum: [...SHARED_INTERFACE_LANGUAGE_CODES] },
-      interfaceLanguage: { type: "string", enum: [...SHARED_INTERFACE_LANGUAGE_CODES] },
-      reason: { type: "string" },
-      source_target_intent: { type: "object" },
+const accountSessionSetInterfaceLanguageManifest: HelixWorkstationCapabilityManifest =
+  {
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY,
+    label: "Account Session set interface language",
+    description:
+      "Requests a governed workstation preference action to change the interface language through the Account & Sessions panel. It only writes the browser/workstation language preference.",
+    panel_id: "account-session",
+    action_id: "set_interface_language",
+    mode: "act",
+    mutating: true,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: false,
+    terminal_eligible: true,
+    permission_profile_required: "act",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["language"],
+      properties: {
+        language: {
+          type: "string",
+          enum: [...SHARED_INTERFACE_LANGUAGE_CODES],
+        },
+        interface_language: {
+          type: "string",
+          enum: [...SHARED_INTERFACE_LANGUAGE_CODES],
+        },
+        interfaceLanguage: {
+          type: "string",
+          enum: [...SHARED_INTERFACE_LANGUAGE_CODES],
+        },
+        reason: { type: "string" },
+        source_target_intent: { type: "object" },
+      },
     },
-  },
-  output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
-  observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
-  safety_tags: [
-    "mutating_preference_action",
-    "account_session",
-    "interface_language",
-    "workspace_action_receipt",
-    "no_external_transmission",
-    "no_shell",
-    "no_code_mutation",
-  ],
-  assistant_answer: false,
-  raw_content_included: false,
-};
+    output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+    observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
+    safety_tags: [
+      "mutating_preference_action",
+      "account_session",
+      "interface_language",
+      "workspace_action_receipt",
+      "no_external_transmission",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 
 const docsOpenDocManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
@@ -3366,7 +4280,15 @@ const docsOpenDocManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
   observation_schema: WORKSTATION_UI_ACTION_RECEIPT_SCHEMA,
-  safety_tags: ["non_mutating_ui_action", "docs_viewer", "open_doc", "action_receipt", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "non_mutating_ui_action",
+    "docs_viewer",
+    "open_doc",
+    "action_receipt",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -3405,7 +4327,13 @@ const repoSearchManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: REPO_SEARCH_OBSERVATION_SCHEMA,
   observation_schema: REPO_SEARCH_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "repo_evidence", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "read_or_observe",
+    "repo_evidence",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -3439,7 +4367,13 @@ const docsSearchManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: DOCS_SEARCH_OBSERVATION_SCHEMA,
   observation_schema: DOCS_SEARCH_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "docs_evidence", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "read_or_observe",
+    "docs_evidence",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -3476,7 +4410,14 @@ const internetSearchManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: INTERNET_SEARCH_OBSERVATION_SCHEMA,
   observation_schema: INTERNET_SEARCH_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "internet_search", "external_web_evidence", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "read_or_observe",
+    "internet_search",
+    "external_web_evidence",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -3519,49 +4460,12 @@ const researchLibraryReadManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: RESEARCH_LIBRARY_OBSERVATION_SCHEMA,
   observation_schema: RESEARCH_LIBRARY_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "profile_scoped", "saved_research", "page_evidence", "non_terminal", "no_network", "no_shell", "no_code_mutation"],
-  assistant_answer: false,
-  raw_content_included: false,
-};
-
-const researchLibraryApplyEvidenceEnrichmentManifest: HelixWorkstationCapabilityManifest = {
-  schema: "helix.workstation_tool_gateway.capability.v1",
-  capability_id: RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
-  label: "Apply paper evidence enrichment",
-  description:
-    "Validates and persists an agent-authored equation enrichment proposal to one profile-scoped Research Library sidecar. It cannot choose bindings, run the Calculator, promote Theory Graph evidence, or answer by itself.",
-  panel_id: "docs-viewer",
-  action_id: "apply_paper_evidence_enrichment",
-  mode: "act",
-  mutating: true,
-  code_mutation: false,
-  shell_access: false,
-  requires_confirmation: false,
-  requires_source: true,
-  terminal_eligible: false,
-  permission_profile_required: "act",
-  post_tool_model_step_required: true,
-  input_schema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["document_id", "proposal"],
-    properties: {
-      document_id: { type: "string" },
-      proposal: HELIX_PAPER_EVIDENCE_ENRICHMENT_PROPOSAL_JSON_SCHEMA,
-      source_target_intent: { type: "object" },
-    },
-  },
-  output_observation_schema: PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA,
-  observation_schema: PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA,
   safety_tags: [
-    "mutating",
+    "read_or_observe",
     "profile_scoped",
     "saved_research",
-    "agent_authored_proposal_required",
-    "optimistic_revision",
+    "page_evidence",
     "non_terminal",
-    "no_calculator_auto_run",
-    "no_theory_graph_mutation",
     "no_network",
     "no_shell",
     "no_code_mutation",
@@ -3569,6 +4473,53 @@ const researchLibraryApplyEvidenceEnrichmentManifest: HelixWorkstationCapability
   assistant_answer: false,
   raw_content_included: false,
 };
+
+const researchLibraryApplyEvidenceEnrichmentManifest: HelixWorkstationCapabilityManifest =
+  {
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY,
+    label: "Apply paper evidence enrichment",
+    description:
+      "Validates and persists an agent-authored equation enrichment proposal to one profile-scoped Research Library sidecar. It cannot choose bindings, run the Calculator, promote Theory Graph evidence, or answer by itself.",
+    panel_id: "docs-viewer",
+    action_id: "apply_paper_evidence_enrichment",
+    mode: "act",
+    mutating: true,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: true,
+    terminal_eligible: false,
+    permission_profile_required: "act",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["document_id", "proposal"],
+      properties: {
+        document_id: { type: "string" },
+        proposal: HELIX_PAPER_EVIDENCE_ENRICHMENT_PROPOSAL_JSON_SCHEMA,
+        source_target_intent: { type: "object" },
+      },
+    },
+    output_observation_schema: PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA,
+    observation_schema: PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "mutating",
+      "profile_scoped",
+      "saved_research",
+      "agent_authored_proposal_required",
+      "optimistic_revision",
+      "non_terminal",
+      "no_calculator_auto_run",
+      "no_theory_graph_mutation",
+      "no_network",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 
 const scholarlyResearchSearchManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
@@ -3601,7 +4552,14 @@ const scholarlyResearchSearchManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA,
   observation_schema: SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "scholarly_research", "paper_evidence", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "read_or_observe",
+    "scholarly_research",
+    "paper_evidence",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -3641,91 +4599,117 @@ const scholarlyFullTextFetchManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA,
   observation_schema: SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "scholarly_research", "paper_full_text", "compact_context", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "read_or_observe",
+    "scholarly_research",
+    "paper_full_text",
+    "compact_context",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
 
-const scholarlyNumericParameterExtractManifest: HelixWorkstationCapabilityManifest = {
-  schema: "helix.workstation_tool_gateway.capability.v1",
-  capability_id: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
-  label: "Scholarly numeric parameter extraction",
-  description:
-    "Extracts cited numeric values with units from bounded scholarly text evidence. It returns typed numeric affordances and fail-closed diagnostics for missing, ambiguous, uncited, or incompatible values.",
-  panel_id: "scholarly-research",
-  action_id: "extract_numeric_parameters",
-  mode: "read",
-  mutating: false,
-  code_mutation: false,
-  shell_access: false,
-  requires_confirmation: false,
-  requires_source: true,
-  terminal_eligible: false,
-  permission_profile_required: "read",
-  post_tool_model_step_required: true,
-  input_schema: {
-    type: "object",
-    additionalProperties: false,
-    required: [],
-    properties: {
-      requested_variables: { type: "array", items: { type: "string" } },
-      variables: { type: "array", items: { type: "string" } },
-      extraction_mode: { type: "string" },
-      full_text_observation: { type: "object" },
-      text_evidence: { type: "string" },
-      source_ref: { type: "string" },
-      paper: { type: "object" },
-      source_target_intent: { type: "object" },
+const scholarlyNumericParameterExtractManifest: HelixWorkstationCapabilityManifest =
+  {
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY,
+    label: "Scholarly numeric parameter extraction",
+    description:
+      "Extracts cited numeric values with units from bounded scholarly text evidence. It returns typed numeric affordances and fail-closed diagnostics for missing, ambiguous, uncited, or incompatible values.",
+    panel_id: "scholarly-research",
+    action_id: "extract_numeric_parameters",
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: true,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        requested_variables: { type: "array", items: { type: "string" } },
+        variables: { type: "array", items: { type: "string" } },
+        extraction_mode: { type: "string" },
+        full_text_observation: { type: "object" },
+        text_evidence: { type: "string" },
+        source_ref: { type: "string" },
+        paper: { type: "object" },
+        source_target_intent: { type: "object" },
+      },
     },
-  },
-  output_observation_schema: SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA,
-  observation_schema: SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "scholarly_research", "numeric_value_evidence", "typed_affordance", "non_terminal", "no_shell", "no_code_mutation"],
-  assistant_answer: false,
-  raw_content_included: false,
-};
+    output_observation_schema: SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA,
+    observation_schema: SCHOLARLY_NUMERIC_PARAMETER_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "read_or_observe",
+      "scholarly_research",
+      "numeric_value_evidence",
+      "typed_affordance",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 
-const civilizationBoundsReflectionManifest: HelixWorkstationCapabilityManifest = {
-  schema: "helix.workstation_tool_gateway.capability.v1",
-  capability_id: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
-  label: "Civilization Bounds reflect system bounds",
-  description:
-    "Reflects the prompt through the existing Civilization Bounds Roadmap as bounded, evidence-only situational context. It does not write files, run shell commands, authorize actions, or become a final answer.",
-  panel_id: "civilization-bounds-roadmap",
-  action_id: "reflect_system_bounds",
-  mode: "read",
-  mutating: false,
-  code_mutation: false,
-  shell_access: false,
-  requires_confirmation: false,
-  requires_source: true,
-  terminal_eligible: false,
-  permission_profile_required: "read",
-  post_tool_model_step_required: true,
-  input_schema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["prompt"],
-    properties: {
-      prompt: { type: "string" },
-      scenario_id: { type: "string" },
-      phase_id: { type: "string" },
-      layer_mode: { type: "string" },
-      selected_system_ids: { type: "array", items: { type: "string" } },
-      selected_badge_ids: { type: "array", items: { type: "string" } },
-      theory_reflection_ref: { type: "string" },
-      ideology_reflection_ref: { type: "string" },
-      include_bridge_context: { type: "boolean" },
-      include_collaboration_bounds: { type: "boolean" },
-      include_falsification_hooks: { type: "boolean" },
+const civilizationBoundsReflectionManifest: HelixWorkstationCapabilityManifest =
+  {
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
+    label: "Civilization Bounds reflect system bounds",
+    description:
+      "Reflects the prompt through the existing Civilization Bounds Roadmap as bounded, evidence-only situational context. It does not write files, run shell commands, authorize actions, or become a final answer.",
+    panel_id: "civilization-bounds-roadmap",
+    action_id: "reflect_system_bounds",
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: true,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["prompt"],
+      properties: {
+        prompt: { type: "string" },
+        scenario_id: { type: "string" },
+        phase_id: { type: "string" },
+        layer_mode: { type: "string" },
+        selected_system_ids: { type: "array", items: { type: "string" } },
+        selected_badge_ids: { type: "array", items: { type: "string" } },
+        theory_reflection_ref: { type: "string" },
+        ideology_reflection_ref: { type: "string" },
+        include_bridge_context: { type: "boolean" },
+        include_collaboration_bounds: { type: "boolean" },
+        include_falsification_hooks: { type: "boolean" },
+      },
     },
-  },
-  output_observation_schema: CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA,
-  observation_schema: CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "civilization_bounds", "reflection", "non_terminal", "no_shell", "no_code_mutation"],
-  assistant_answer: false,
-  raw_content_included: false,
-};
+    output_observation_schema:
+      CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA,
+    observation_schema: CIVILIZATION_BOUNDS_REFLECTION_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "read_or_observe",
+      "civilization_bounds",
+      "reflection",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 
 const theoryContextReflectionManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
@@ -3761,7 +4745,14 @@ const theoryContextReflectionManifest: HelixWorkstationCapabilityManifest = {
   },
   output_observation_schema: THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA,
   observation_schema: THEORY_CONTEXT_REFLECTION_OBSERVATION_SCHEMA,
-  safety_tags: ["read_or_observe", "theory_badge_graph", "reflection", "non_terminal", "no_shell", "no_code_mutation"],
+  safety_tags: [
+    "read_or_observe",
+    "theory_badge_graph",
+    "reflection",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
   assistant_answer: false,
   raw_content_included: false,
 };
@@ -3823,19 +4814,21 @@ const makeVoiceGatewayManifest = (
 ): HelixWorkstationCapabilityManifest => ({
   schema: "helix.workstation_tool_gateway.capability.v1",
   capability_id: capabilityId,
-  label: capabilityId === VOICE_NARRATOR_SAY_CAPABILITY
-    ? "Narrator say request"
-    : capabilityId === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY
-      ? "Text to speech request"
-      : "Interim voice callout request",
+  label:
+    capabilityId === VOICE_NARRATOR_SAY_CAPABILITY
+      ? "Narrator say request"
+      : capabilityId === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY
+        ? "Text to speech request"
+        : "Interim voice callout request",
   description:
     "Creates a structured, non-terminal voice request/receipt for host-side playback projection. It wraps the existing voice service lane, does not prove heard audio without a client receipt, scrape final prose, mutate files, run shell commands, or become a final answer.",
   panel_id: "voice-delivery",
-  action_id: capabilityId === VOICE_NARRATOR_SAY_CAPABILITY
-    ? "narrator_say"
-    : capabilityId === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY
-      ? "speak_text"
-      : "request_interim_voice_callout",
+  action_id:
+    capabilityId === VOICE_NARRATOR_SAY_CAPABILITY
+      ? "narrator_say"
+      : capabilityId === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY
+        ? "speak_text"
+        : "request_interim_voice_callout",
   mode: "act",
   mutating: false,
   code_mutation: false,
@@ -3891,9 +4884,15 @@ const makeVoiceGatewayManifest = (
   raw_content_included: false,
 });
 
-const voiceInterimCalloutManifest = makeVoiceGatewayManifest(VOICE_INTERIM_CALLOUT_CAPABILITY);
-const voiceNarratorSayManifest = makeVoiceGatewayManifest(VOICE_NARRATOR_SAY_CAPABILITY);
-const textToSpeechSpeakTextManifest = makeVoiceGatewayManifest(TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY);
+const voiceInterimCalloutManifest = makeVoiceGatewayManifest(
+  VOICE_INTERIM_CALLOUT_CAPABILITY,
+);
+const voiceNarratorSayManifest = makeVoiceGatewayManifest(
+  VOICE_NARRATOR_SAY_CAPABILITY,
+);
+const textToSpeechSpeakTextManifest = makeVoiceGatewayManifest(
+  TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY,
+);
 
 const makeContextFeedQueryGatewayManifest = (
   spec: WorkstationContextFeedQueryToolContractSpec,
@@ -3951,9 +4950,10 @@ const makeContextFeedQueryGatewayManifest = (
   raw_content_included: false,
 });
 
-const contextFeedQueryGatewayManifests = WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS
-  .filter((spec) => SHARED_CONTEXT_FEED_QUERY_CAPABILITIES.has(spec.capability))
-  .map(makeContextFeedQueryGatewayManifest);
+const contextFeedQueryGatewayManifests =
+  WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS.filter((spec) =>
+    SHARED_CONTEXT_FEED_QUERY_CAPABILITIES.has(spec.capability),
+  ).map(makeContextFeedQueryGatewayManifest);
 
 const liveSourceLoopHealthManifest: HelixWorkstationCapabilityManifest = {
   schema: "helix.workstation_tool_gateway.capability.v1",
@@ -4004,296 +5004,306 @@ const liveSourceLoopHealthManifest: HelixWorkstationCapabilityManifest = {
 };
 
 const liveSourceStateReadManifests: HelixWorkstationCapabilityManifest[] =
-  LIVE_SOURCE_STATE_READ_CAPABILITIES.map(([capabilityId, actionId, label]) => ({
-    schema: "helix.workstation_tool_gateway.capability.v1",
-    capability_id: capabilityId,
-    label,
-    description:
-      "Runs an existing Helix live-source state read as bounded workstation evidence. It returns an observation packet only and cannot configure, repair, pause, resume, bind, unbind, or mutate any live-source loop.",
-    panel_id: "live-answer-environment",
-    action_id: actionId,
-    mode: "read",
-    mutating: false,
-    code_mutation: false,
-    shell_access: false,
-    requires_confirmation: false,
-    requires_source: false,
-    terminal_eligible: false,
-    permission_profile_required: "read",
-    post_tool_model_step_required: true,
-    input_schema: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        thread_id: { type: "string" },
-        environment_id: { type: "string" },
-        room_id: { type: "string" },
-        source_id: { type: "string" },
-        sourceId: { type: "string" },
-        source_ref: { type: "string" },
-        sourceRef: { type: "string" },
-        goal_id: { type: "string" },
-        goalId: { type: "string" },
-        limit: { type: "number" },
-        mail_limit: { type: "number" },
-        mailLimit: { type: "number" },
-        include_sessions: { type: "boolean" },
-        includeSessions: { type: "boolean" },
-        include_updates: { type: "boolean" },
-        includeUpdates: { type: "boolean" },
-        freshness_status: { type: "string" },
-        freshnessStatus: { type: "string" },
-        expected_cadence_ms: { type: "number" },
-        expectedCadenceMs: { type: "number" },
-        source_target_intent: { type: "object" },
+  LIVE_SOURCE_STATE_READ_CAPABILITIES.map(
+    ([capabilityId, actionId, label]) => ({
+      schema: "helix.workstation_tool_gateway.capability.v1",
+      capability_id: capabilityId,
+      label,
+      description:
+        "Runs an existing Helix live-source state read as bounded workstation evidence. It returns an observation packet only and cannot configure, repair, pause, resume, bind, unbind, or mutate any live-source loop.",
+      panel_id: "live-answer-environment",
+      action_id: actionId,
+      mode: "read",
+      mutating: false,
+      code_mutation: false,
+      shell_access: false,
+      requires_confirmation: false,
+      requires_source: false,
+      terminal_eligible: false,
+      permission_profile_required: "read",
+      post_tool_model_step_required: true,
+      input_schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          thread_id: { type: "string" },
+          environment_id: { type: "string" },
+          room_id: { type: "string" },
+          source_id: { type: "string" },
+          sourceId: { type: "string" },
+          source_ref: { type: "string" },
+          sourceRef: { type: "string" },
+          goal_id: { type: "string" },
+          goalId: { type: "string" },
+          limit: { type: "number" },
+          mail_limit: { type: "number" },
+          mailLimit: { type: "number" },
+          include_sessions: { type: "boolean" },
+          includeSessions: { type: "boolean" },
+          include_updates: { type: "boolean" },
+          includeUpdates: { type: "boolean" },
+          freshness_status: { type: "string" },
+          freshnessStatus: { type: "string" },
+          expected_cadence_ms: { type: "number" },
+          expectedCadenceMs: { type: "number" },
+          source_target_intent: { type: "object" },
+        },
       },
-    },
-    output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
-    observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
-    safety_tags: [
-      "read_or_observe",
-      "live_environment",
-      "live_source_state",
-      "non_terminal",
-      "no_shell",
-      "no_code_mutation",
-    ],
-    assistant_answer: false,
-    raw_content_included: false,
-  }));
+      output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+      observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+      safety_tags: [
+        "read_or_observe",
+        "live_environment",
+        "live_source_state",
+        "non_terminal",
+        "no_shell",
+        "no_code_mutation",
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    }),
+  );
 
 const situationStageStateReadManifests: HelixWorkstationCapabilityManifest[] =
-  SITUATION_STAGE_STATE_READ_CAPABILITIES.map(([capabilityId, actionId, label]) => ({
-    schema: "helix.workstation_tool_gateway.capability.v1",
-    capability_id: capabilityId,
-    label,
-    description:
-      "Runs an existing Helix situation/stage state read as bounded workstation evidence. It returns an observation packet only and cannot configure watches, enqueue jobs, process mail, or mutate live workstation state.",
-    panel_id: "live-answer-environment",
-    action_id: actionId,
-    mode: "read",
-    mutating: false,
-    code_mutation: false,
-    shell_access: false,
-    requires_confirmation: false,
-    requires_source: false,
-    terminal_eligible: false,
-    permission_profile_required: "read",
-    post_tool_model_step_required: true,
-    input_schema: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        thread_id: { type: "string" },
-        environment_id: { type: "string" },
-        room_id: { type: "string" },
-        source_id: { type: "string" },
-        sourceId: { type: "string" },
-        source_ref: { type: "string" },
-        sourceRef: { type: "string" },
-        route_id: { type: "string" },
-        routeId: { type: "string" },
-        job_id: { type: "string" },
-        jobId: { type: "string" },
-        stage_id: { type: "string" },
-        stageId: { type: "string" },
-        construct_id: { type: "string" },
-        constructId: { type: "string" },
-        since_ms: { type: "number" },
-        sinceMs: { type: "number" },
-        limit: { type: "number" },
-        source_target_intent: { type: "object" },
+  SITUATION_STAGE_STATE_READ_CAPABILITIES.map(
+    ([capabilityId, actionId, label]) => ({
+      schema: "helix.workstation_tool_gateway.capability.v1",
+      capability_id: capabilityId,
+      label,
+      description:
+        "Runs an existing Helix situation/stage state read as bounded workstation evidence. It returns an observation packet only and cannot configure watches, enqueue jobs, process mail, or mutate live workstation state.",
+      panel_id: "live-answer-environment",
+      action_id: actionId,
+      mode: "read",
+      mutating: false,
+      code_mutation: false,
+      shell_access: false,
+      requires_confirmation: false,
+      requires_source: false,
+      terminal_eligible: false,
+      permission_profile_required: "read",
+      post_tool_model_step_required: true,
+      input_schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          thread_id: { type: "string" },
+          environment_id: { type: "string" },
+          room_id: { type: "string" },
+          source_id: { type: "string" },
+          sourceId: { type: "string" },
+          source_ref: { type: "string" },
+          sourceRef: { type: "string" },
+          route_id: { type: "string" },
+          routeId: { type: "string" },
+          job_id: { type: "string" },
+          jobId: { type: "string" },
+          stage_id: { type: "string" },
+          stageId: { type: "string" },
+          construct_id: { type: "string" },
+          constructId: { type: "string" },
+          since_ms: { type: "number" },
+          sinceMs: { type: "number" },
+          limit: { type: "number" },
+          source_target_intent: { type: "object" },
+        },
       },
-    },
-    output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
-    observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
-    safety_tags: [
-      "read_or_observe",
-      "live_environment",
-      "situation_stage_state",
-      "non_terminal",
-      "no_shell",
-      "no_code_mutation",
-    ],
-    assistant_answer: false,
-    raw_content_included: false,
-  }));
+      output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+      observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+      safety_tags: [
+        "read_or_observe",
+        "live_environment",
+        "situation_stage_state",
+        "non_terminal",
+        "no_shell",
+        "no_code_mutation",
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    }),
+  );
 
 const liveSourceMailboxReadManifests: HelixWorkstationCapabilityManifest[] =
-  LIVE_SOURCE_MAILBOX_READ_CAPABILITIES.map(([capabilityId, actionId, label]) => ({
-    schema: "helix.workstation_tool_gateway.capability.v1",
-    capability_id: capabilityId,
-    label,
-    description:
-      "Reads existing Helix live-source mailbox state as bounded workstation evidence. It returns an observation packet only and cannot process new mail, mutate live-source state, speak aloud, or become a final answer.",
-    panel_id: "live-answer-environment",
-    action_id: actionId,
-    mode: "read",
-    mutating: false,
-    code_mutation: false,
-    shell_access: false,
-    requires_confirmation: false,
-    requires_source: false,
-    terminal_eligible: false,
-    permission_profile_required: "read",
-    post_tool_model_step_required: true,
-    input_schema: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        thread_id: { type: "string" },
-        environment_id: { type: "string" },
-        room_id: { type: "string" },
-        ui_thread_id: { type: "string" },
-        uiThreadId: { type: "string" },
-        source_id: { type: "string" },
-        sourceId: { type: "string" },
-        source_ref: { type: "string" },
-        sourceRef: { type: "string" },
-        source_kind: { type: "string" },
-        sourceKind: { type: "string" },
-        mail_ids: { type: "array", items: { type: "string" } },
-        mailIds: { type: "array", items: { type: "string" } },
-        limit: { type: "number" },
-        batch_cap: { type: "number" },
-        batchCap: { type: "number" },
-        include_read: { type: "boolean" },
-        includeRead: { type: "boolean" },
-        read_only: { type: "boolean" },
-        readOnly: { type: "boolean" },
-        source_target_intent: { type: "object" },
+  LIVE_SOURCE_MAILBOX_READ_CAPABILITIES.map(
+    ([capabilityId, actionId, label]) => ({
+      schema: "helix.workstation_tool_gateway.capability.v1",
+      capability_id: capabilityId,
+      label,
+      description:
+        "Reads existing Helix live-source mailbox state as bounded workstation evidence. It returns an observation packet only and cannot process new mail, mutate live-source state, speak aloud, or become a final answer.",
+      panel_id: "live-answer-environment",
+      action_id: actionId,
+      mode: "read",
+      mutating: false,
+      code_mutation: false,
+      shell_access: false,
+      requires_confirmation: false,
+      requires_source: false,
+      terminal_eligible: false,
+      permission_profile_required: "read",
+      post_tool_model_step_required: true,
+      input_schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          thread_id: { type: "string" },
+          environment_id: { type: "string" },
+          room_id: { type: "string" },
+          ui_thread_id: { type: "string" },
+          uiThreadId: { type: "string" },
+          source_id: { type: "string" },
+          sourceId: { type: "string" },
+          source_ref: { type: "string" },
+          sourceRef: { type: "string" },
+          source_kind: { type: "string" },
+          sourceKind: { type: "string" },
+          mail_ids: { type: "array", items: { type: "string" } },
+          mailIds: { type: "array", items: { type: "string" } },
+          limit: { type: "number" },
+          batch_cap: { type: "number" },
+          batchCap: { type: "number" },
+          include_read: { type: "boolean" },
+          includeRead: { type: "boolean" },
+          read_only: { type: "boolean" },
+          readOnly: { type: "boolean" },
+          source_target_intent: { type: "object" },
+        },
       },
-    },
-    output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
-    observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
-    safety_tags: [
-      "read_or_observe",
-      "live_environment",
-      "live_source_mailbox",
-      "non_terminal",
-      "no_shell",
-      "no_code_mutation",
-    ],
-    assistant_answer: false,
-    raw_content_included: false,
-  }));
+      output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+      observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+      safety_tags: [
+        "read_or_observe",
+        "live_environment",
+        "live_source_mailbox",
+        "non_terminal",
+        "no_shell",
+        "no_code_mutation",
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    }),
+  );
 
 const liveSourceInterpreterPredictionReadManifests: HelixWorkstationCapabilityManifest[] =
-  LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.map(([capabilityId, actionId, label]) => ({
-    schema: "helix.workstation_tool_gateway.capability.v1",
-    capability_id: capabilityId,
-    label,
-    description:
-      "Reads or compares existing live-source interpreter/prediction evidence as a bounded workstation observation. It cannot configure interpreter profiles, record mailbox decisions, project narrative state, mutate live-source state, or become a final answer.",
-    panel_id: "live-answer-environment",
-    action_id: actionId,
-    mode: "read",
-    mutating: false,
-    code_mutation: false,
-    shell_access: false,
-    requires_confirmation: false,
-    requires_source: false,
-    terminal_eligible: false,
-    permission_profile_required: "read",
-    post_tool_model_step_required: true,
-    input_schema: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        thread_id: { type: "string" },
-        environment_id: { type: "string" },
-        room_id: { type: "string" },
-        ui_thread_id: { type: "string" },
-        uiThreadId: { type: "string" },
-        source_id: { type: "string" },
-        sourceId: { type: "string" },
-        source_ref: { type: "string" },
-        sourceRef: { type: "string" },
-        source_kind: { type: "string" },
-        sourceKind: { type: "string" },
-        mailbox_thread_id: { type: "string" },
-        mailboxThreadId: { type: "string" },
-        mail_ids: { type: "array", items: { type: "string" } },
-        mailIds: { type: "array", items: { type: "string" } },
-        profile_id: { type: "string" },
-        profileId: { type: "string" },
-        job_id: { type: "string" },
-        jobId: { type: "string" },
-        policy_id: { type: "string" },
-        policyId: { type: "string" },
-        current_scene_summary: { type: "string" },
-        currentSceneSummary: { type: "string" },
-        running_story_summary: { type: "string" },
-        runningStorySummary: { type: "string" },
-        limit: { type: "number" },
-        read_only: { type: "boolean" },
-        readOnly: { type: "boolean" },
-        source_target_intent: { type: "object" },
+  LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.map(
+    ([capabilityId, actionId, label]) => ({
+      schema: "helix.workstation_tool_gateway.capability.v1",
+      capability_id: capabilityId,
+      label,
+      description:
+        "Reads or compares existing live-source interpreter/prediction evidence as a bounded workstation observation. It cannot configure interpreter profiles, record mailbox decisions, project narrative state, mutate live-source state, or become a final answer.",
+      panel_id: "live-answer-environment",
+      action_id: actionId,
+      mode: "read",
+      mutating: false,
+      code_mutation: false,
+      shell_access: false,
+      requires_confirmation: false,
+      requires_source: false,
+      terminal_eligible: false,
+      permission_profile_required: "read",
+      post_tool_model_step_required: true,
+      input_schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          thread_id: { type: "string" },
+          environment_id: { type: "string" },
+          room_id: { type: "string" },
+          ui_thread_id: { type: "string" },
+          uiThreadId: { type: "string" },
+          source_id: { type: "string" },
+          sourceId: { type: "string" },
+          source_ref: { type: "string" },
+          sourceRef: { type: "string" },
+          source_kind: { type: "string" },
+          sourceKind: { type: "string" },
+          mailbox_thread_id: { type: "string" },
+          mailboxThreadId: { type: "string" },
+          mail_ids: { type: "array", items: { type: "string" } },
+          mailIds: { type: "array", items: { type: "string" } },
+          profile_id: { type: "string" },
+          profileId: { type: "string" },
+          job_id: { type: "string" },
+          jobId: { type: "string" },
+          policy_id: { type: "string" },
+          policyId: { type: "string" },
+          current_scene_summary: { type: "string" },
+          currentSceneSummary: { type: "string" },
+          running_story_summary: { type: "string" },
+          runningStorySummary: { type: "string" },
+          limit: { type: "number" },
+          read_only: { type: "boolean" },
+          readOnly: { type: "boolean" },
+          source_target_intent: { type: "object" },
+        },
       },
-    },
-    output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
-    observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
-    safety_tags: [
-      "read_or_observe",
-      "live_environment",
-      "live_source_interpreter_prediction",
-      "non_terminal",
-      "no_shell",
-      "no_code_mutation",
-    ],
-    assistant_answer: false,
-    raw_content_included: false,
-  }));
+      output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+      observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+      safety_tags: [
+        "read_or_observe",
+        "live_environment",
+        "live_source_interpreter_prediction",
+        "non_terminal",
+        "no_shell",
+        "no_code_mutation",
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    }),
+  );
 
 const stagePlayBuilderReadManifests: HelixWorkstationCapabilityManifest[] =
-  STAGE_PLAY_BUILDER_READ_CAPABILITIES.map(([capabilityId, actionId, label]) => ({
-    schema: "helix.workstation_tool_gateway.capability.v1",
-    capability_id: capabilityId,
-    label,
-    description:
-      "Reads, validates, or plans Stage Play builder structure as bounded workstation evidence. It cannot queue checkpoints, mutate live-source state, update live answer projections, or become a final answer.",
-    panel_id: "stage-play-badge-graph",
-    action_id: actionId,
-    mode: "read",
-    mutating: false,
-    code_mutation: false,
-    shell_access: false,
-    requires_confirmation: false,
-    requires_source: false,
-    terminal_eligible: false,
-    permission_profile_required: "read",
-    post_tool_model_step_required: true,
-    input_schema: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        thread_id: { type: "string" },
-        environment_id: { type: "string" },
-        room_id: { type: "string" },
-        source_id: { type: "string" },
-        sourceId: { type: "string" },
-        source_ref: { type: "string" },
-        sourceRef: { type: "string" },
-        objective: { type: "string" },
-        user_intent: { type: "string" },
-        intent: { type: "string" },
-        draft: { type: "object" },
-        source_target_intent: { type: "object" },
+  STAGE_PLAY_BUILDER_READ_CAPABILITIES.map(
+    ([capabilityId, actionId, label]) => ({
+      schema: "helix.workstation_tool_gateway.capability.v1",
+      capability_id: capabilityId,
+      label,
+      description:
+        "Reads, validates, or plans Stage Play builder structure as bounded workstation evidence. It cannot queue checkpoints, mutate live-source state, update live answer projections, or become a final answer.",
+      panel_id: "stage-play-badge-graph",
+      action_id: actionId,
+      mode: "read",
+      mutating: false,
+      code_mutation: false,
+      shell_access: false,
+      requires_confirmation: false,
+      requires_source: false,
+      terminal_eligible: false,
+      permission_profile_required: "read",
+      post_tool_model_step_required: true,
+      input_schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          thread_id: { type: "string" },
+          environment_id: { type: "string" },
+          room_id: { type: "string" },
+          source_id: { type: "string" },
+          sourceId: { type: "string" },
+          source_ref: { type: "string" },
+          sourceRef: { type: "string" },
+          objective: { type: "string" },
+          user_intent: { type: "string" },
+          intent: { type: "string" },
+          draft: { type: "object" },
+          source_target_intent: { type: "object" },
+        },
       },
-    },
-    output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
-    observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
-    safety_tags: [
-      "read_or_observe",
-      "live_environment",
-      "stage_play_builder",
-      "non_terminal",
-      "no_shell",
-      "no_code_mutation",
-    ],
-    assistant_answer: false,
-    raw_content_included: false,
-  }));
+      output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+      observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+      safety_tags: [
+        "read_or_observe",
+        "live_environment",
+        "stage_play_builder",
+        "non_terminal",
+        "no_shell",
+        "no_code_mutation",
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    }),
+  );
 
 const makeMicroReasonerReadManifest = (
   capabilityId:
@@ -4357,7 +5367,9 @@ const makeMicroReasonerReadManifest = (
       "live_environment",
       "micro_reasoner",
       "microdeck",
-      capabilityId === MICRO_REASONER_TEST_PROMPT_CAPABILITY ? "dry_run_evaluation" : "catalog_read",
+      capabilityId === MICRO_REASONER_TEST_PROMPT_CAPABILITY
+        ? "dry_run_evaluation"
+        : "catalog_read",
       "non_terminal",
       "no_shell",
       "no_code_mutation",
@@ -4444,7 +5456,9 @@ const makeVisualObserverReadManifest = (
       "read_or_observe",
       "live_environment",
       "visual_observer",
-      capabilityId === VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY ? "catalog_read" : "dry_run_evaluation",
+      capabilityId === VISUAL_OBSERVER_QUERY_PROFILES_CAPABILITY
+        ? "catalog_read"
+        : "dry_run_evaluation",
       "non_terminal",
       "no_shell",
       "no_code_mutation",
@@ -4462,85 +5476,167 @@ const visualObserverReadManifests = [
 
 const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   [workspaceOsStatusManifest.capability_id, workspaceOsStatusManifest],
-  [workstationActiveContextManifest.capability_id, workstationActiveContextManifest],
-  [theoryBadgeGraphCurrentContextManifest.capability_id, theoryBadgeGraphCurrentContextManifest],
+  [capabilityCatalogManifest.capability_id, capabilityCatalogManifest],
+  [
+    workstationActiveContextManifest.capability_id,
+    workstationActiveContextManifest,
+  ],
+  [
+    theoryBadgeGraphCurrentContextManifest.capability_id,
+    theoryBadgeGraphCurrentContextManifest,
+  ],
   [workstationNotesListManifest.capability_id, workstationNotesListManifest],
-  [calculatorSolveExpressionManifest.capability_id, calculatorSolveExpressionManifest],
-  [calculatorSolveScalarExpressionManifest.capability_id, calculatorSolveScalarExpressionManifest],
-  [calculatorClassifyExpressionManifest.capability_id, calculatorClassifyExpressionManifest],
-  [calculatorBindVariablesManifest.capability_id, calculatorBindVariablesManifest],
-  [calculatorActiveContextManifest.capability_id, calculatorActiveContextManifest],
-  [readableSurfaceObserveManifest.capability_id, readableSurfaceObserveManifest],
-  [docsReadVisibleSurfaceManifest.capability_id, docsReadVisibleSurfaceManifest],
-  [docsReadActiveTranslationManifest.capability_id, docsReadActiveTranslationManifest],
-  [calculatorReadVisibleResultManifest.capability_id, calculatorReadVisibleResultManifest],
-  [scientificCalculatorTheoryRunContextManifest.capability_id, scientificCalculatorTheoryRunContextManifest],
+  [
+    calculatorSolveExpressionManifest.capability_id,
+    calculatorSolveExpressionManifest,
+  ],
+  [
+    calculatorSolveScalarExpressionManifest.capability_id,
+    calculatorSolveScalarExpressionManifest,
+  ],
+  [
+    calculatorClassifyExpressionManifest.capability_id,
+    calculatorClassifyExpressionManifest,
+  ],
+  [
+    calculatorBindVariablesManifest.capability_id,
+    calculatorBindVariablesManifest,
+  ],
+  [
+    calculatorActiveContextManifest.capability_id,
+    calculatorActiveContextManifest,
+  ],
+  [
+    readableSurfaceObserveManifest.capability_id,
+    readableSurfaceObserveManifest,
+  ],
+  [
+    docsReadVisibleSurfaceManifest.capability_id,
+    docsReadVisibleSurfaceManifest,
+  ],
+  [
+    docsReadActiveTranslationManifest.capability_id,
+    docsReadActiveTranslationManifest,
+  ],
+  [
+    calculatorReadVisibleResultManifest.capability_id,
+    calculatorReadVisibleResultManifest,
+  ],
+  [
+    scientificCalculatorTheoryRunContextManifest.capability_id,
+    scientificCalculatorTheoryRunContextManifest,
+  ],
   [calculatorOpenPanelManifest.capability_id, calculatorOpenPanelManifest],
   [calculatorFocusPanelManifest.capability_id, calculatorFocusPanelManifest],
-  [calculatorShowGatewaySolveManifest.capability_id, calculatorShowGatewaySolveManifest],
-  [calculatorPrefillExpressionManifest.capability_id, calculatorPrefillExpressionManifest],
+  [
+    calculatorShowGatewaySolveManifest.capability_id,
+    calculatorShowGatewaySolveManifest,
+  ],
+  [
+    calculatorPrefillExpressionManifest.capability_id,
+    calculatorPrefillExpressionManifest,
+  ],
   [workstationOpenPanelManifest.capability_id, workstationOpenPanelManifest],
   [workstationFocusPanelManifest.capability_id, workstationFocusPanelManifest],
-  [accountSessionSetInterfaceLanguageManifest.capability_id, accountSessionSetInterfaceLanguageManifest],
+  [
+    accountSessionSetInterfaceLanguageManifest.capability_id,
+    accountSessionSetInterfaceLanguageManifest,
+  ],
   [docsOpenDocManifest.capability_id, docsOpenDocManifest],
   [repoSearchManifest.capability_id, repoSearchManifest],
   [docsSearchManifest.capability_id, docsSearchManifest],
   [internetSearchManifest.capability_id, internetSearchManifest],
   [researchLibraryReadManifest.capability_id, researchLibraryReadManifest],
-  [researchLibraryApplyEvidenceEnrichmentManifest.capability_id, researchLibraryApplyEvidenceEnrichmentManifest],
-  [scholarlyResearchSearchManifest.capability_id, scholarlyResearchSearchManifest],
-  [scholarlyFullTextFetchManifest.capability_id, scholarlyFullTextFetchManifest],
-  [scholarlyNumericParameterExtractManifest.capability_id, scholarlyNumericParameterExtractManifest],
-  [civilizationBoundsReflectionManifest.capability_id, civilizationBoundsReflectionManifest],
-  [theoryContextReflectionManifest.capability_id, theoryContextReflectionManifest],
-  [theoryFrontierConjectureManifest.capability_id, theoryFrontierConjectureManifest],
-  ...theoryFormalVerifierManifests.map((manifest) => [
-    manifest.capability_id,
-    manifest,
-  ] as const),
-  ...theoryRuntimeCanaryManifests.map((manifest) => [
-    manifest.capability_id,
-    manifest,
-  ] as const),
-  ...theoryArtifactProducerManifests.map((manifest) => [
-    manifest.capability_id,
-    manifest,
-  ] as const),
-  ...theorySemanticAdmitterManifests.map((manifest) => [
-    manifest.capability_id,
-    manifest,
-  ] as const),
-  ...theoryIndependentNumericalManifests.map((manifest) => [
-    manifest.capability_id,
-    manifest,
-  ] as const),
-  ...theoryExperimentProcedureManifests.map((manifest) => [
-    manifest.capability_id,
-    manifest,
-  ] as const),
+  [
+    researchLibraryApplyEvidenceEnrichmentManifest.capability_id,
+    researchLibraryApplyEvidenceEnrichmentManifest,
+  ],
+  [
+    scholarlyResearchSearchManifest.capability_id,
+    scholarlyResearchSearchManifest,
+  ],
+  [
+    scholarlyFullTextFetchManifest.capability_id,
+    scholarlyFullTextFetchManifest,
+  ],
+  [
+    scholarlyNumericParameterExtractManifest.capability_id,
+    scholarlyNumericParameterExtractManifest,
+  ],
+  [
+    civilizationBoundsReflectionManifest.capability_id,
+    civilizationBoundsReflectionManifest,
+  ],
+  [
+    theoryContextReflectionManifest.capability_id,
+    theoryContextReflectionManifest,
+  ],
+  [
+    theoryFrontierConjectureManifest.capability_id,
+    theoryFrontierConjectureManifest,
+  ],
+  ...theoryFormalVerifierManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  ...theoryRuntimeCanaryManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  ...theoryArtifactProducerManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  ...theorySemanticAdmitterManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  ...theoryIndependentNumericalManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  ...theoryExperimentProcedureManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
   [moralGraphReflectionManifest.capability_id, moralGraphReflectionManifest],
-  [moralLivingSubstrateReflectionManifest.capability_id, moralLivingSubstrateReflectionManifest],
+  [
+    moralLivingSubstrateReflectionManifest.capability_id,
+    moralLivingSubstrateReflectionManifest,
+  ],
   [textToSpeechSpeakTextManifest.capability_id, textToSpeechSpeakTextManifest],
   [voiceInterimCalloutManifest.capability_id, voiceInterimCalloutManifest],
   [voiceNarratorSayManifest.capability_id, voiceNarratorSayManifest],
-  ...contextFeedQueryGatewayManifests.map((manifest) => [manifest.capability_id, manifest] as const),
+  ...contextFeedQueryGatewayManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
   [liveSourceLoopHealthManifest.capability_id, liveSourceLoopHealthManifest],
-  ...liveSourceStateReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
-  ...situationStageStateReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
-  ...liveSourceMailboxReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
-  ...liveSourceInterpreterPredictionReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
-  ...stagePlayBuilderReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
-  ...microReasonerReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
-  ...visualObserverReadManifests.map((manifest) => [manifest.capability_id, manifest] as const),
+  ...liveSourceStateReadManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  ...situationStageStateReadManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  ...liveSourceMailboxReadManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  ...liveSourceInterpreterPredictionReadManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  ...stagePlayBuilderReadManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  ...microReasonerReadManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  ...visualObserverReadManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
   [boundRoomEvidenceManifest.capability_id, boundRoomEvidenceManifest],
+  ...environmentProbeMinecraftManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
   [
     visualSituationObservationManifest.capability_id,
     visualSituationObservationManifest,
   ],
-  ...sharedLiveRoomGatewayManifests.map((manifest) => [
-    manifest.capability_id,
-    manifest,
-  ] as const),
+  ...sharedLiveRoomGatewayManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
 ]);
 
 const capabilities = new Map<string, HelixWorkstationCapabilityManifest>(
@@ -4553,14 +5649,19 @@ const capabilities = new Map<string, HelixWorkstationCapabilityManifest>(
 export const listWorkstationGatewayCapabilities = (
   input: HelixWorkstationGatewayListInput = {},
 ): HelixWorkstationGatewayListResult => {
-  const internetSearchConfigured = listConfiguredInternetSearchProviders().length > 0;
+  const internetSearchConfigured =
+    listConfiguredInternetSearchProviders().length > 0;
   return {
     schema: WORKSTATION_GATEWAY_SCHEMA,
     manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
     agent_runtime: cleanString(input.agentRuntime, "codex"),
     mode: normalizeMode(input.mode),
     capabilities: Array.from(capabilities.values())
-      .filter((manifest) => manifest.capability_id !== INTERNET_SEARCH_CAPABILITY || internetSearchConfigured)
+      .filter(
+        (manifest) =>
+          manifest.capability_id !== INTERNET_SEARCH_CAPABILITY ||
+          internetSearchConfigured,
+      )
       .filter((manifest) => {
         const policy = currentHelixExternalCapabilityPolicy();
         return (
@@ -4578,7 +5679,8 @@ export const listWorkstationGatewayCapabilities = (
       .map((manifest) => {
         if (
           input.accountType === "user" &&
-          manifest.capability_id === ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY
+          manifest.capability_id ===
+            ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY
         ) {
           return {
             ...manifest,
@@ -4586,9 +5688,18 @@ export const listWorkstationGatewayCapabilities = (
               ...manifest.input_schema,
               properties: {
                 ...readRecord(manifest.input_schema.properties),
-                language: { type: "string", enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES] },
-                interface_language: { type: "string", enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES] },
-                interfaceLanguage: { type: "string", enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES] },
+                language: {
+                  type: "string",
+                  enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES],
+                },
+                interface_language: {
+                  type: "string",
+                  enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES],
+                },
+                interfaceLanguage: {
+                  type: "string",
+                  enum: [...PUBLIC_INTERFACE_LANGUAGE_CODES],
+                },
               },
             },
           };
@@ -4597,11 +5708,13 @@ export const listWorkstationGatewayCapabilities = (
       }),
     ...(!internetSearchConfigured
       ? {
-          unavailable_capabilities: [{
-            capability_id: INTERNET_SEARCH_CAPABILITY,
-            availability: "unavailable" as const,
-            reason: "provider_not_configured" as const,
-          }],
+          unavailable_capabilities: [
+            {
+              capability_id: INTERNET_SEARCH_CAPABILITY,
+              availability: "unavailable" as const,
+              reason: "provider_not_configured" as const,
+            },
+          ],
         }
       : {}),
     assistant_answer: false,
@@ -4689,10 +5802,13 @@ export const callWorkstationGatewayCapability = async (
   const mode = normalizeMode(input.mode);
   const agentRuntime = cleanString(input.agentRuntime, "codex");
   const turnId = cleanString(input.turnId, `workstation-gateway:${Date.now()}`);
-  const iteration = typeof input.iteration === "number" && Number.isFinite(input.iteration)
-    ? Math.max(0, Math.floor(input.iteration))
-    : 0;
-  const capabilityId = normalizeGatewayCapabilityId(cleanString(input.capabilityId));
+  const iteration =
+    typeof input.iteration === "number" && Number.isFinite(input.iteration)
+      ? Math.max(0, Math.floor(input.iteration))
+      : 0;
+  const capabilityId = normalizeGatewayCapabilityId(
+    cleanString(input.capabilityId),
+  );
   const manifest = capabilities.get(capabilityId);
 
   if (!manifest) {
@@ -4761,9 +5877,7 @@ export const callWorkstationGatewayCapability = async (
     );
     const disallowedByReadOnly =
       manifest.mutating ||
-      ["act", "write", "danger"].includes(
-        manifest.permission_profile_required,
-      );
+      ["act", "write", "danger"].includes(manifest.permission_profile_required);
     if (disallowedByScope || disallowedByReadOnly) {
       return buildExternalCapabilityPolicyBlockedResult({
         manifest,
@@ -4812,11 +5926,13 @@ export const callWorkstationGatewayCapability = async (
       status: "blocked",
       summary: `Workstation gateway blocked ${manifest.capability_id}: ${blockedReason}.`,
       observation,
-      missingRequirements: [{
-        code: blockedReason,
-        message: `Capability ${manifest.capability_id} requires ${manifest.permission_profile_required} permission.`,
-        repair_action: "ask_user",
-      }],
+      missingRequirements: [
+        {
+          code: blockedReason,
+          message: `Capability ${manifest.capability_id} requires ${manifest.permission_profile_required} permission.`,
+          repair_action: "ask_user",
+        },
+      ],
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -4876,13 +5992,16 @@ export const callWorkstationGatewayCapability = async (
       observation: gatewayResult.observation,
       ...(gatewayResult.error
         ? {
-            missingRequirements: [{
-              code: gatewayResult.error,
-              message: gatewayResult.summary,
-              repair_action: gatewayResult.observation.retryable === true
-                ? "retry"
-                : "ask_user",
-            }],
+            missingRequirements: [
+              {
+                code: gatewayResult.error,
+                message: gatewayResult.summary,
+                repair_action:
+                  gatewayResult.observation.retryable === true
+                    ? "retry"
+                    : "ask_user",
+              },
+            ],
           }
         : {}),
     });
@@ -4917,9 +6036,95 @@ export const callWorkstationGatewayCapability = async (
   }
 
   if (
-    manifest.capability_id === VISUAL_SITUATION_OBSERVATION_CAPABILITY
+    environmentProbeMinecraftManifests.some(
+      (entry) => entry.capability_id === manifest.capability_id,
+    )
   ) {
-    const args = readArguments(input.arguments);
+    const gatewayResult = await executeEnvironmentProbeGatewayCapability({
+      capabilityId: manifest.capability_id,
+      turnId,
+      toolCallId: input.toolCallId,
+      providerExecutionId: input.providerExecutionId,
+      arguments: readArguments(input.arguments),
+      policy: externalPolicy,
+      accountContext: input.accountContext,
+      conversationThreadId: input.conversationThreadId,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.ok ? "admitted" : "blocked",
+      reason: gatewayResult.ok
+        ? "authenticated_environment_probe_admitted"
+        : "authenticated_environment_probe_blocked",
+      blockedReason: gatewayResult.error,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "workstation-gateway",
+      action: manifest.action_id,
+      status:
+        gatewayResult.status === "completed"
+          ? "succeeded"
+          : gatewayResult.status,
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      ...(gatewayResult.error
+        ? {
+            missingRequirements: [
+              {
+                code: gatewayResult.error,
+                message: gatewayResult.summary,
+                repair_action:
+                  gatewayResult.error === "connector_offline" ||
+                  gatewayResult.error === "probe_timeout"
+                    ? "retry"
+                    : "ask_user",
+              },
+            ],
+          }
+        : {}),
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: gatewayResult.error,
+      terminalEligible: false,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
+    };
+  }
+
+  if (manifest.capability_id === VISUAL_SITUATION_OBSERVATION_CAPABILITY) {
+    const args = {
+      ...readArguments(input.arguments),
+      ...(cleanString(input.conversationThreadId)
+        ? { thread_id: cleanString(input.conversationThreadId) }
+        : {}),
+    };
     const gatewayResult = executeVisualSituationObservationCapability({
       turnId,
       args,
@@ -5018,11 +6223,13 @@ export const callWorkstationGatewayCapability = async (
       observation: gatewayResult.observation,
       ...(gatewayResult.error
         ? {
-            missingRequirements: [{
-              code: gatewayResult.error,
-              message: gatewayResult.summary,
-              repair_action: "ask_user" as const,
-            }],
+            missingRequirements: [
+              {
+                code: gatewayResult.error,
+                message: gatewayResult.summary,
+                repair_action: "ask_user" as const,
+              },
+            ],
           }
         : {}),
     });
@@ -5062,15 +6269,13 @@ export const callWorkstationGatewayCapability = async (
     )
   ) {
     const args = readArguments(input.arguments);
-    const gatewayResult =
-      await executeTheorySemanticAdmitterGatewayCapability({
-        capabilityId: manifest.capability_id,
-        args,
-        accountType: input.accountType ?? "user",
-        turnId,
-        authoritativeEvidenceArtifacts:
-          input.authoritativeEvidenceArtifacts,
-      });
+    const gatewayResult = await executeTheorySemanticAdmitterGatewayCapability({
+      capabilityId: manifest.capability_id,
+      args,
+      accountType: input.accountType ?? "user",
+      turnId,
+      authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
+    });
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
@@ -5199,8 +6404,7 @@ export const callWorkstationGatewayCapability = async (
       accountType: input.accountType ?? "user",
       profileId: input.profileId,
       turnId,
-      authoritativeEvidenceArtifacts:
-        input.authoritativeEvidenceArtifacts,
+      authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
     });
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
@@ -5266,8 +6470,7 @@ export const callWorkstationGatewayCapability = async (
         profileId: input.profileId,
         sessionId: input.sessionId,
         turnId,
-        authoritativeEvidenceArtifacts:
-          input.authoritativeEvidenceArtifacts,
+        authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
         approvalReceipt: input.approvalReceipt,
         approvalToken: input.approvalToken,
       });
@@ -5400,8 +6603,7 @@ export const callWorkstationGatewayCapability = async (
       profileId: input.profileId,
       sessionId: input.sessionId,
       turnId,
-      authoritativeEvidenceArtifacts:
-        input.authoritativeEvidenceArtifacts,
+      authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
       approvalReceipt: input.approvalReceipt,
       approvalToken: input.approvalToken,
     });
@@ -5455,9 +6657,13 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
-  if (manifest.capability_id === scientificCalculatorTheoryRunContextManifest.capability_id) {
+  if (
+    manifest.capability_id ===
+    scientificCalculatorTheoryRunContextManifest.capability_id
+  ) {
     const args = readArguments(input.arguments);
-    const gatewayResult = buildScientificCalculatorTheoryRunContextGatewayObservation(args);
+    const gatewayResult =
+      buildScientificCalculatorTheoryRunContextGatewayObservation(args);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
@@ -5517,15 +6723,23 @@ export const callWorkstationGatewayCapability = async (
 
   if (manifest.capability_id === WORKSTATION_ACTIVE_CONTEXT_CAPABILITY) {
     const args = readArguments(input.arguments);
-    const activeContext = readBoundedWorkspaceActiveContext(args.workspace_context ?? args.workspaceContext);
-    const hasContext = Boolean(activeContext.active_panel || activeContext.open_panels.length > 0);
+    const activeContext = readBoundedWorkspaceActiveContext(
+      args.workspace_context ?? args.workspaceContext,
+    );
+    const hasContext = Boolean(
+      activeContext.active_panel || activeContext.open_panels.length > 0,
+    );
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: hasContext ? "admitted" : "blocked",
-      reason: hasContext ? "read_only_gateway_capability" : "workstation_active_context_missing",
-      blockedReason: hasContext ? undefined : "workstation_active_context_missing",
+      reason: hasContext
+        ? "read_only_gateway_capability"
+        : "workstation_active_context_missing",
+      blockedReason: hasContext
+        ? undefined
+        : "workstation_active_context_missing",
       sourceTargetIntent: args.source_target_intent,
     });
     const observation = {
@@ -5559,11 +6773,16 @@ export const callWorkstationGatewayCapability = async (
       status: hasContext ? "succeeded" : "blocked",
       summary,
       observation,
-      missingRequirements: hasContext ? [] : [{
-        code: "workstation_active_context_missing",
-        message: "Attach workspace context with active/open panel identity before asking about the current workstation layout.",
-        repair_action: "ask_user",
-      }],
+      missingRequirements: hasContext
+        ? []
+        : [
+            {
+              code: "workstation_active_context_missing",
+              message:
+                "Attach workspace context with active/open panel identity before asking about the current workstation layout.",
+              repair_action: "ask_user",
+            },
+          ],
       producedAffordances,
       consumedAffordances,
       requiredAffordanceKinds: manifest.consumes_affordances,
@@ -5601,12 +6820,19 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
-  if (manifest.capability_id === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY) {
+  if (
+    manifest.capability_id === THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY
+  ) {
     const args = readArguments(input.arguments);
-    const sourceContext = readRecord(args.current_context ?? args.currentContext);
-    const currentContext = readBoundedTheoryBadgeGraphCurrentContext(sourceContext);
+    const sourceContext = readRecord(
+      args.current_context ?? args.currentContext,
+    );
+    const currentContext =
+      readBoundedTheoryBadgeGraphCurrentContext(sourceContext);
     const selectedBadgeIds = readStringArray(currentContext.selected_badge_ids);
-    const hasContext = Boolean(sourceContext && cleanString(currentContext.graph_id));
+    const hasContext = Boolean(
+      sourceContext && cleanString(currentContext.graph_id),
+    );
     const hasSelection = selectedBadgeIds.length > 0;
     const ok = hasContext && hasSelection;
     const error = !hasContext
@@ -5619,13 +6845,17 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: ok ? "admitted" : "blocked",
-      reason: ok ? "read_only_gateway_capability" : error ?? "theory_badge_graph_current_context_missing",
+      reason: ok
+        ? "read_only_gateway_capability"
+        : (error ?? "theory_badge_graph_current_context_missing"),
       blockedReason: error,
       sourceTargetIntent: args.source_target_intent,
     });
     const combination = readRecord(currentContext.combination_reader) ?? {};
     const traceCount = readRecordArray(combination.trace_path_badges).length;
-    const availableCount = readRecordArray(combination.available_next_badges).length;
+    const availableCount = readRecordArray(
+      combination.available_next_badges,
+    ).length;
     const summary = ok
       ? `Observed ${selectedBadgeIds.length} user-selected Theory Badge Graph badge(s), a ${traceCount}-badge trace, and ${availableCount} available next badge(s).`
       : error === "theory_badge_graph_selection_missing"
@@ -5659,13 +6889,18 @@ export const callWorkstationGatewayCapability = async (
       status: ok ? "succeeded" : "blocked",
       summary,
       observation,
-      missingRequirements: ok ? [] : [{
-        code: error ?? "theory_badge_graph_current_context_missing",
-        message: error === "theory_badge_graph_selection_missing"
-          ? "Select one or more Theory Badge Graph badges before referring to the current combination."
-          : "Attach a current Theory Badge Graph workspace context before referring to its selected badges.",
-        repair_action: "ask_user",
-      }],
+      missingRequirements: ok
+        ? []
+        : [
+            {
+              code: error ?? "theory_badge_graph_current_context_missing",
+              message:
+                error === "theory_badge_graph_selection_missing"
+                  ? "Select one or more Theory Badge Graph badges before referring to the current combination."
+                  : "Attach a current Theory Badge Graph workspace context before referring to its selected badges.",
+              repair_action: "ask_user",
+            },
+          ],
       producedAffordances,
       producedAffordanceKinds: manifest.produces_affordances,
       requiredAffordanceKinds: manifest.consumes_affordances,
@@ -5710,8 +6945,12 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: hasContext ? "admitted" : "blocked",
-      reason: hasContext ? "read_only_gateway_capability" : "workstation_notes_context_missing",
-      blockedReason: hasContext ? undefined : "workstation_notes_context_missing",
+      reason: hasContext
+        ? "read_only_gateway_capability"
+        : "workstation_notes_context_missing",
+      blockedReason: hasContext
+        ? undefined
+        : "workstation_notes_context_missing",
       sourceTargetIntent: args.source_target_intent,
     });
     const observation = {
@@ -5747,11 +6986,16 @@ export const callWorkstationGatewayCapability = async (
       status: hasContext ? "succeeded" : "blocked",
       summary,
       observation,
-      missingRequirements: hasContext ? [] : [{
-        code: "workstation_notes_context_missing",
-        message: "Attach bounded Workstation Notes context or provide a redacted notes index before listing notes.",
-        repair_action: "ask_user",
-      }],
+      missingRequirements: hasContext
+        ? []
+        : [
+            {
+              code: "workstation_notes_context_missing",
+              message:
+                "Attach bounded Workstation Notes context or provide a redacted notes index before listing notes.",
+              repair_action: "ask_user",
+            },
+          ],
       producedAffordances,
       consumedAffordances,
       requiredAffordanceKinds: manifest.consumes_affordances,
@@ -5844,6 +7088,118 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
+  if (manifest.capability_id === HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const catalog = listWorkstationGatewayCapabilities({
+      agentRuntime,
+      mode: "observe",
+      accountType: input.accountType ?? undefined,
+      profileId: input.profileId,
+    });
+    const catalogCapabilities = catalog.capabilities.map((capability) => ({
+      capability_id: capability.capability_id,
+      label: capability.label,
+      description: capability.description,
+      panel_id: capability.panel_id,
+      action_id: capability.action_id,
+      mode: capability.mode,
+      mutating: capability.mutating,
+      requires_confirmation: capability.requires_confirmation,
+      requires_source: capability.requires_source,
+      terminal_eligible: capability.terminal_eligible,
+      permission_profile_required: capability.permission_profile_required,
+      post_tool_model_step_required:
+        capability.post_tool_model_step_required,
+      output_observation_schema: capability.output_observation_schema,
+      produces_affordances: capability.produces_affordances ?? [],
+      consumes_affordances: capability.consumes_affordances ?? [],
+      safety_tags: capability.safety_tags,
+    }));
+    const capabilityFamilies = Array.from(
+      new Set(
+        catalogCapabilities.map((capability) => {
+          const separator = capability.capability_id.search(/[._]/);
+          return separator > 0
+            ? capability.capability_id.slice(0, separator)
+            : capability.capability_id;
+        }),
+      ),
+    ).sort();
+    const observation = {
+      schema: HELIX_ASK_CAPABILITY_CATALOG_OBSERVATION_SCHEMA,
+      capability_key: HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY,
+      manifest_version: catalog.manifest_version,
+      query: optionalString(args.query) ?? null,
+      available_capability_count: catalogCapabilities.length,
+      capability_families: capabilityFamilies,
+      capabilities: catalogCapabilities,
+      unavailable_capabilities: catalog.unavailable_capabilities ?? [],
+      status: "succeeded",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: "admitted",
+      reason: "read_only_gateway_capability",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const producedAffordances = buildGatewayProducedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const consumedAffordances = buildGatewayConsumedAffordances({
+      capabilityId: manifest.capability_id,
+      observation,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "agent-access",
+      action: "inspect_capability_catalog",
+      status: "succeeded",
+      summary: `Capability catalog returned ${catalogCapabilities.length} governed capability record(s) across ${capabilityFamilies.length} family prefix(es).`,
+      observation,
+      stateDelta: {
+        capability_catalog_observation: observation,
+      },
+      producedAffordances,
+      consumedAffordances,
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: true,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      produced_affordances: producedAffordances,
+      consumed_affordances: consumedAffordances,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
   if (manifest.capability_id === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY) {
     const args = readArguments(input.arguments);
     const expression = cleanString(args.expression);
@@ -5853,7 +7209,9 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: solved.ok ? "admitted" : "blocked",
-      reason: solved.ok ? "read_only_gateway_capability" : "calculator_expression_blocked",
+      reason: solved.ok
+        ? "read_only_gateway_capability"
+        : "calculator_expression_blocked",
       blockedReason: solved.blocked_reason,
       sourceTargetIntent: args.source_target_intent,
     });
@@ -5861,7 +7219,8 @@ export const callWorkstationGatewayCapability = async (
       schema: CALCULATOR_SOLVE_OBSERVATION_SCHEMA,
       capability_key: manifest.capability_id,
       expression: expression || null,
-      normalized_expression: solved.normalized_expression ?? (expression || null),
+      normalized_expression:
+        solved.normalized_expression ?? (expression || null),
       rejected_expression: solved.ok ? null : expression || null,
       result: solved.result ?? null,
       status: solved.ok ? "succeeded" : "blocked",
@@ -5890,21 +7249,31 @@ export const callWorkstationGatewayCapability = async (
         ? `Calculator evaluated ${expression} = ${solved.result}.`
         : `Calculator gateway blocked expression: ${solved.blocked_reason}.`,
       observation,
-      missingRequirements: solved.ok ? [] : [{
-        code: solved.blocked_reason ?? "calculator_expression_blocked",
-        message: "Provide a simple arithmetic expression using numbers and arithmetic operators only.",
-        repair_action: "ask_user",
-        rejected_expression: expression || null,
-        normalized_expression: solved.normalized_expression ?? (expression || null),
-        required_affordance_kind: /[A-Za-z_]/.test(expression) ? "bound_calculator_expression" : null,
-      }],
+      missingRequirements: solved.ok
+        ? []
+        : [
+            {
+              code: solved.blocked_reason ?? "calculator_expression_blocked",
+              message:
+                "Provide a simple arithmetic expression using numbers and arithmetic operators only.",
+              repair_action: "ask_user",
+              rejected_expression: expression || null,
+              normalized_expression:
+                solved.normalized_expression ?? (expression || null),
+              required_affordance_kind: /[A-Za-z_]/.test(expression)
+                ? "bound_calculator_expression"
+                : null,
+            },
+          ],
       producedAffordances,
       consumedAffordances,
       requiredAffordanceKinds: manifest.consumes_affordances,
       producedAffordanceKinds: manifest.produces_affordances,
-      missingAffordanceKinds: solved.ok ? [] : consumedAffordances
-        .filter((affordance) => affordance.status === "missing")
-        .map((affordance) => affordance.kind),
+      missingAffordanceKinds: solved.ok
+        ? []
+        : consumedAffordances
+            .filter((affordance) => affordance.status === "missing")
+            .map((affordance) => affordance.kind),
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -5937,25 +7306,31 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
-  if (manifest.capability_id === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY) {
+  if (
+    manifest.capability_id === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY
+  ) {
     const args = readArguments(input.arguments);
     const expression = cleanString(args.bound_expression ?? args.expression);
     const sourceRefs = readStringArray(args.source_refs);
     const scalarTarget = extractScalarSolveTarget(expression);
     const solved = scalarTarget.blocked_reason
       ? { ok: false as const, blocked_reason: scalarTarget.blocked_reason }
-      : solveSafeArithmeticExpression(scalarTarget.scalar_expression, { allowSymbolicResult: false });
+      : solveSafeArithmeticExpression(scalarTarget.scalar_expression, {
+          allowSymbolicResult: false,
+        });
     const missingSourceRefs = sourceRefs.length === 0;
     const ok = solved.ok && !missingSourceRefs;
     const primaryBlockedReason = missingSourceRefs
       ? "missing_source_refs"
-      : solved.blocked_reason ?? "calculator_scalar_expression_blocked";
+      : (solved.blocked_reason ?? "calculator_scalar_expression_blocked");
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: ok ? "admitted" : "blocked",
-      reason: ok ? "read_only_gateway_capability" : "calculator_scalar_expression_blocked",
+      reason: ok
+        ? "read_only_gateway_capability"
+        : "calculator_scalar_expression_blocked",
       blockedReason: ok ? undefined : primaryBlockedReason,
       sourceTargetIntent: args.source_target_intent,
     });
@@ -5965,9 +7340,11 @@ export const callWorkstationGatewayCapability = async (
       expression: expression || null,
       scalar_expression: scalarTarget.scalar_expression || null,
       result_symbol: scalarTarget.result_symbol,
-      normalized_expression: solved.normalized_expression ?? (scalarTarget.scalar_expression || expression || null),
+      normalized_expression:
+        solved.normalized_expression ??
+        (scalarTarget.scalar_expression || expression || null),
       rejected_expression: ok ? null : expression || null,
-      result: ok ? solved.result ?? null : null,
+      result: ok ? (solved.result ?? null) : null,
       source_refs: sourceRefs,
       status: ok ? "succeeded" : "blocked",
       blocked_reason: ok ? null : primaryBlockedReason,
@@ -5996,25 +7373,38 @@ export const callWorkstationGatewayCapability = async (
         ? `Calculator evaluated bound scalar ${expression} = ${solved.result}.`
         : `Calculator scalar solve blocked: ${primaryBlockedReason}.`,
       observation,
-      missingRequirements: ok ? [] : [{
-        code: primaryBlockedReason,
-        message: primaryBlockedReason === "missing_source_refs"
-          ? "Provide source refs for the bound scalar expression before producing result evidence."
-          : "Provide a fully numeric bound scalar expression using numbers and arithmetic operators only.",
-        repair_action: primaryBlockedReason === "missing_source_refs" ? "provide_source_ref" : "bind_variables",
-        rejected_expression: expression || null,
-        normalized_expression: solved.normalized_expression ?? (scalarTarget.scalar_expression || expression || null),
-        required_affordance_kind: primaryBlockedReason === "missing_source_refs"
-          ? "source_ref"
-          : "bound_calculator_expression",
-      }],
+      missingRequirements: ok
+        ? []
+        : [
+            {
+              code: primaryBlockedReason,
+              message:
+                primaryBlockedReason === "missing_source_refs"
+                  ? "Provide source refs for the bound scalar expression before producing result evidence."
+                  : "Provide a fully numeric bound scalar expression using numbers and arithmetic operators only.",
+              repair_action:
+                primaryBlockedReason === "missing_source_refs"
+                  ? "provide_source_ref"
+                  : "bind_variables",
+              rejected_expression: expression || null,
+              normalized_expression:
+                solved.normalized_expression ??
+                (scalarTarget.scalar_expression || expression || null),
+              required_affordance_kind:
+                primaryBlockedReason === "missing_source_refs"
+                  ? "source_ref"
+                  : "bound_calculator_expression",
+            },
+          ],
       producedAffordances,
       consumedAffordances,
       requiredAffordanceKinds: manifest.consumes_affordances,
       producedAffordanceKinds: manifest.produces_affordances,
-      missingAffordanceKinds: ok ? [] : consumedAffordances
-        .filter((affordance) => affordance.status === "missing")
-        .map((affordance) => affordance.kind),
+      missingAffordanceKinds: ok
+        ? []
+        : consumedAffordances
+            .filter((affordance) => affordance.status === "missing")
+            .map((affordance) => affordance.kind),
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -6057,14 +7447,22 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: ok ? "admitted" : "blocked",
-      reason: ok ? "read_only_gateway_capability" : "calculator_expression_classification_blocked",
-      blockedReason: ok ? undefined : classification.blocked_reasons[0] ?? "calculator_expression_classification_blocked",
+      reason: ok
+        ? "read_only_gateway_capability"
+        : "calculator_expression_classification_blocked",
+      blockedReason: ok
+        ? undefined
+        : (classification.blocked_reasons[0] ??
+          "calculator_expression_classification_blocked"),
       sourceTargetIntent: args.source_target_intent,
     });
     const observation = {
       capability_key: manifest.capability_id,
       status: ok ? "succeeded" : "blocked",
-      blocked_reason: ok ? null : classification.blocked_reasons[0] ?? "calculator_expression_classification_blocked",
+      blocked_reason: ok
+        ? null
+        : (classification.blocked_reasons[0] ??
+          "calculator_expression_classification_blocked"),
       ...classification,
       schema: CALCULATOR_CLASSIFY_OBSERVATION_SCHEMA,
       source_refs: readStringArray(args.source_refs),
@@ -6093,11 +7491,15 @@ export const callWorkstationGatewayCapability = async (
         ? `Calculator classified ${classification.expression} as ${classification.calculation_type}; routes: ${classification.possible_routes.join(", ")}.`
         : "Calculator classification was blocked because no expression was supplied.",
       observation,
-      missingRequirements: ok ? [] : [{
-        code: classification.blocked_reasons[0] ?? "missing_expression",
-        message: "Provide a calculator expression to classify.",
-        repair_action: "ask_user",
-      }],
+      missingRequirements: ok
+        ? []
+        : [
+            {
+              code: classification.blocked_reasons[0] ?? "missing_expression",
+              message: "Provide a calculator expression to classify.",
+              repair_action: "ask_user",
+            },
+          ],
       producedAffordances,
       consumedAffordances,
       requiredAffordanceKinds: manifest.consumes_affordances,
@@ -6110,7 +7512,9 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       admission,
       observationPacket,
-      error: ok ? undefined : classification.blocked_reasons[0] ?? "missing_expression",
+      error: ok
+        ? undefined
+        : (classification.blocked_reasons[0] ?? "missing_expression"),
     });
     return {
       schema: "helix.workstation_tool_gateway.call_result.v1",
@@ -6131,7 +7535,9 @@ export const callWorkstationGatewayCapability = async (
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
-      error: ok ? undefined : classification.blocked_reasons[0] ?? "missing_expression",
+      error: ok
+        ? undefined
+        : (classification.blocked_reasons[0] ?? "missing_expression"),
     };
   }
 
@@ -6149,13 +7555,17 @@ export const callWorkstationGatewayCapability = async (
       expectedDimensions: readStringRecord(args.expected_dimensions),
     });
     const ok = binding.status === "succeeded";
-    const primaryBlockedReason = binding.blocked_reasons[0] ?? (expression ? "missing_variables" : "missing_expression");
+    const primaryBlockedReason =
+      binding.blocked_reasons[0] ??
+      (expression ? "missing_variables" : "missing_expression");
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: ok ? "admitted" : "blocked",
-      reason: ok ? "read_only_gateway_capability" : "calculator_variable_binding_blocked",
+      reason: ok
+        ? "read_only_gateway_capability"
+        : "calculator_variable_binding_blocked",
       blockedReason: ok ? undefined : primaryBlockedReason,
       sourceTargetIntent: args.source_target_intent,
     });
@@ -6190,12 +7600,14 @@ export const callWorkstationGatewayCapability = async (
         ? `Calculator bound ${binding.required_symbols.length} variable(s) for ${binding.expression}.`
         : `Calculator variable binding blocked: ${binding.blocked_reasons.join(", ") || primaryBlockedReason}.`,
       observation,
-      missingRequirements: ok ? [] : binding.missing_variables.map((variable) => ({
-        code: primaryBlockedReason,
-        message: `Provide numeric evidence with units and source refs for ${variable}.`,
-        repair_action: "provide_numeric_value_evidence",
-        required_affordance_kind: "numeric_value_evidence",
-      })),
+      missingRequirements: ok
+        ? []
+        : binding.missing_variables.map((variable) => ({
+            code: primaryBlockedReason,
+            message: `Provide numeric evidence with units and source refs for ${variable}.`,
+            repair_action: "provide_numeric_value_evidence",
+            required_affordance_kind: "numeric_value_evidence",
+          })),
       producedAffordances,
       consumedAffordances,
       requiredAffordanceKinds: manifest.consumes_affordances,
@@ -6235,20 +7647,26 @@ export const callWorkstationGatewayCapability = async (
 
   if (manifest.capability_id === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY) {
     const args = readArguments(input.arguments);
-    const activeContext = readBoundedCalculatorActiveContext(args.active_context ?? args.activeContext);
+    const activeContext = readBoundedCalculatorActiveContext(
+      args.active_context ?? args.activeContext,
+    );
     const hasContext = Boolean(
       activeContext.current_latex ||
       activeContext.last_result_text ||
       activeContext.last_normalized_expression ||
-      activeContext.recent_debug_events.length > 0
+      activeContext.recent_debug_events.length > 0,
     );
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: hasContext ? "admitted" : "blocked",
-      reason: hasContext ? "read_only_gateway_capability" : "calculator_active_context_missing",
-      blockedReason: hasContext ? undefined : "calculator_active_context_missing",
+      reason: hasContext
+        ? "read_only_gateway_capability"
+        : "calculator_active_context_missing",
+      blockedReason: hasContext
+        ? undefined
+        : "calculator_active_context_missing",
       sourceTargetIntent: args.source_target_intent,
     });
     const observation = {
@@ -6283,11 +7701,16 @@ export const callWorkstationGatewayCapability = async (
       status: hasContext ? "succeeded" : "blocked",
       summary,
       observation,
-      missingRequirements: hasContext ? [] : [{
-        code: "calculator_active_context_missing",
-        message: "Focus the Scientific Calculator panel with an active expression or result before asking about the current calculation.",
-        repair_action: "ask_user",
-      }],
+      missingRequirements: hasContext
+        ? []
+        : [
+            {
+              code: "calculator_active_context_missing",
+              message:
+                "Focus the Scientific Calculator panel with an active expression or result before asking about the current calculation.",
+              repair_action: "ask_user",
+            },
+          ],
       producedAffordances,
       consumedAffordances,
       requiredAffordanceKinds: manifest.consumes_affordances,
@@ -6343,7 +7766,9 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: surface.ok ? "admitted" : "blocked",
-      reason: surface.ok ? "read_only_gateway_capability" : "readable_surface_missing",
+      reason: surface.ok
+        ? "read_only_gateway_capability"
+        : "readable_surface_missing",
       blockedReason: surface.blockedReason,
       sourceTargetIntent: args.source_target_intent,
     });
@@ -6356,11 +7781,16 @@ export const callWorkstationGatewayCapability = async (
       status: surface.ok ? "succeeded" : "blocked",
       summary: surface.summaryText,
       observation: surface.observation,
-      missingRequirements: surface.ok ? [] : [{
-        code: surface.blockedReason ?? "registered_surface_text_missing",
-        message: "Provide a registered readable surface reference with bounded visible text or surface state.",
-        repair_action: "ask_user",
-      }],
+      missingRequirements: surface.ok
+        ? []
+        : [
+            {
+              code: surface.blockedReason ?? "registered_surface_text_missing",
+              message:
+                "Provide a registered readable surface reference with bounded visible text or surface state.",
+              repair_action: "ask_user",
+            },
+          ],
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -6396,7 +7826,10 @@ export const callWorkstationGatewayCapability = async (
     manifest.capability_id === CALCULATOR_FOCUS_PANEL_CAPABILITY
   ) {
     const args = readArguments(input.arguments);
-    const action = manifest.capability_id === CALCULATOR_OPEN_PANEL_CAPABILITY ? "open_panel" : "focus_panel";
+    const action =
+      manifest.capability_id === CALCULATOR_OPEN_PANEL_CAPABILITY
+        ? "open_panel"
+        : "focus_panel";
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
@@ -6470,8 +7903,12 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: hasExpression ? "admitted" : "blocked",
-      reason: hasExpression ? "non_mutating_workstation_ui_action" : "calculator_prefill_expression_missing",
-      blockedReason: hasExpression ? undefined : "calculator_prefill_expression_missing",
+      reason: hasExpression
+        ? "non_mutating_workstation_ui_action"
+        : "calculator_prefill_expression_missing",
+      blockedReason: hasExpression
+        ? undefined
+        : "calculator_prefill_expression_missing",
       sourceTargetIntent: args.source_target_intent,
     });
     const workstationAction = hasExpression
@@ -6482,7 +7919,8 @@ export const callWorkstationGatewayCapability = async (
           action_id: "prefill_expression",
           args: {
             expression,
-            source_path: cleanString(args.source_path ?? args.path ?? args.source) || null,
+            source_path:
+              cleanString(args.source_path ?? args.path ?? args.source) || null,
             anchor: cleanString(args.anchor) || null,
             source_refs: readStringArray(args.source_refs),
             classification,
@@ -6526,16 +7964,23 @@ export const callWorkstationGatewayCapability = async (
         ? `Admitted Scientific Calculator expression prefill for ${expression}. No calculation receipt was produced.`
         : "Scientific Calculator expression prefill was blocked because no expression was supplied.",
       observation,
-      missingRequirements: hasExpression ? [] : [{
-        code: "calculator_prefill_expression_missing",
-        message: "Provide a calculator expression to load into the workbench.",
-        repair_action: "ask_user",
-      }],
+      missingRequirements: hasExpression
+        ? []
+        : [
+            {
+              code: "calculator_prefill_expression_missing",
+              message:
+                "Provide a calculator expression to load into the workbench.",
+              repair_action: "ask_user",
+            },
+          ],
       producedAffordances,
       consumedAffordances,
       requiredAffordanceKinds: manifest.consumes_affordances,
       producedAffordanceKinds: manifest.produces_affordances,
-      missingAffordanceKinds: hasExpression ? [] : manifest.consumes_affordances,
+      missingAffordanceKinds: hasExpression
+        ? []
+        : manifest.consumes_affordances,
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -6543,7 +7988,9 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       admission,
       observationPacket,
-      error: hasExpression ? undefined : "calculator_prefill_expression_missing",
+      error: hasExpression
+        ? undefined
+        : "calculator_prefill_expression_missing",
     });
     return {
       schema: "helix.workstation_tool_gateway.call_result.v1",
@@ -6564,7 +8011,9 @@ export const callWorkstationGatewayCapability = async (
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
-      error: hasExpression ? undefined : "calculator_prefill_expression_missing",
+      error: hasExpression
+        ? undefined
+        : "calculator_prefill_expression_missing",
     };
   }
 
@@ -6572,15 +8021,22 @@ export const callWorkstationGatewayCapability = async (
     const args = readArguments(input.arguments);
     const expression = cleanString(args.expression);
     const resultText = cleanString(args.result);
-    const normalizedExpression = cleanString(args.normalized_expression ?? args.normalizedExpression, expression);
+    const normalizedExpression = cleanString(
+      args.normalized_expression ?? args.normalizedExpression,
+      expression,
+    );
     const hasSolveObservation = Boolean(expression && resultText);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: hasSolveObservation ? "admitted" : "blocked",
-      reason: hasSolveObservation ? "non_mutating_workstation_ui_action" : "calculator_gateway_solve_observation_missing",
-      blockedReason: hasSolveObservation ? undefined : "calculator_gateway_solve_observation_missing",
+      reason: hasSolveObservation
+        ? "non_mutating_workstation_ui_action"
+        : "calculator_gateway_solve_observation_missing",
+      blockedReason: hasSolveObservation
+        ? undefined
+        : "calculator_gateway_solve_observation_missing",
       sourceTargetIntent: args.source_target_intent,
     });
     const workstationAction = hasSolveObservation
@@ -6593,8 +8049,14 @@ export const callWorkstationGatewayCapability = async (
             expression,
             normalized_expression: normalizedExpression,
             result: resultText,
-            source_capability: cleanString(args.source_capability, CALCULATOR_SOLVE_EXPRESSION_CAPABILITY),
-            observation_ref: cleanString(args.observation_ref, `${turnId}:${CALCULATOR_SOLVE_EXPRESSION_CAPABILITY}`),
+            source_capability: cleanString(
+              args.source_capability,
+              CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+            ),
+            observation_ref: cleanString(
+              args.observation_ref,
+              `${turnId}:${CALCULATOR_SOLVE_EXPRESSION_CAPABILITY}`,
+            ),
           },
         }
       : null;
@@ -6624,11 +8086,16 @@ export const callWorkstationGatewayCapability = async (
         ? `Admitted non-mutating Scientific Calculator gateway solve projection for ${expression} = ${resultText}.`
         : "Scientific Calculator gateway solve projection was blocked because no solve observation was supplied.",
       observation,
-      missingRequirements: hasSolveObservation ? [] : [{
-        code: "calculator_gateway_solve_observation_missing",
-        message: "Provide an observed calculator expression and result from scientific-calculator.solve_expression.",
-        repair_action: "run_required_tool",
-      }],
+      missingRequirements: hasSolveObservation
+        ? []
+        : [
+            {
+              code: "calculator_gateway_solve_observation_missing",
+              message:
+                "Provide an observed calculator expression and result from scientific-calculator.solve_expression.",
+              repair_action: "run_required_tool",
+            },
+          ],
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -6636,7 +8103,9 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       admission,
       observationPacket,
-      error: hasSolveObservation ? undefined : "calculator_gateway_solve_observation_missing",
+      error: hasSolveObservation
+        ? undefined
+        : "calculator_gateway_solve_observation_missing",
     });
     return {
       schema: "helix.workstation_tool_gateway.call_result.v1",
@@ -6655,7 +8124,9 @@ export const callWorkstationGatewayCapability = async (
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
-      error: hasSolveObservation ? undefined : "calculator_gateway_solve_observation_missing",
+      error: hasSolveObservation
+        ? undefined
+        : "calculator_gateway_solve_observation_missing",
     };
   }
 
@@ -6664,16 +8135,28 @@ export const callWorkstationGatewayCapability = async (
     manifest.capability_id === WORKSTATION_FOCUS_PANEL_CAPABILITY
   ) {
     const args = readArguments(input.arguments);
-    const action = manifest.capability_id === WORKSTATION_OPEN_PANEL_CAPABILITY ? "open_panel" : "focus_panel";
-    const panelId = readSafeWorkstationPanelId(args.panel_id ?? args.panelId ?? args.target_panel_id ?? args.targetPanelId);
+    const action =
+      manifest.capability_id === WORKSTATION_OPEN_PANEL_CAPABILITY
+        ? "open_panel"
+        : "focus_panel";
+    const panelId = readSafeWorkstationPanelId(
+      args.panel_id ??
+        args.panelId ??
+        args.target_panel_id ??
+        args.targetPanelId,
+    );
     const hasPanel = Boolean(panelId);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: hasPanel ? "admitted" : "blocked",
-      reason: hasPanel ? "non_mutating_workstation_ui_action" : "workstation_panel_not_in_safe_allowlist",
-      blockedReason: hasPanel ? undefined : "workstation_panel_not_in_safe_allowlist",
+      reason: hasPanel
+        ? "non_mutating_workstation_ui_action"
+        : "workstation_panel_not_in_safe_allowlist",
+      blockedReason: hasPanel
+        ? undefined
+        : "workstation_panel_not_in_safe_allowlist",
       sourceTargetIntent: args.source_target_intent,
     });
     const workstationAction = hasPanel
@@ -6708,11 +8191,15 @@ export const callWorkstationGatewayCapability = async (
         ? `Admitted non-mutating workstation ${action.replace(/_/g, " ")} action for ${panelId}.`
         : "Workstation panel action was blocked because the panel is not in the safe allowlist.",
       observation,
-      missingRequirements: hasPanel ? [] : [{
-        code: "workstation_panel_not_in_safe_allowlist",
-        message: "Provide a safe read/observe workstation panel id.",
-        repair_action: "ask_user",
-      }],
+      missingRequirements: hasPanel
+        ? []
+        : [
+            {
+              code: "workstation_panel_not_in_safe_allowlist",
+              message: "Provide a safe read/observe workstation panel id.",
+              repair_action: "ask_user",
+            },
+          ],
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -6743,12 +8230,17 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
-  if (manifest.capability_id === ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY) {
+  if (
+    manifest.capability_id === ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY
+  ) {
     const args = readArguments(input.arguments);
-    const requestedLanguage = args.language ?? args.interface_language ?? args.interfaceLanguage;
+    const requestedLanguage =
+      args.language ?? args.interface_language ?? args.interfaceLanguage;
     const language = readInterfaceLanguageCode(requestedLanguage);
     const previewLocked = Boolean(
-      language && input.accountType === "user" && !isPublicInterfaceLanguageCode(language),
+      language &&
+      input.accountType === "user" &&
+      !isPublicInterfaceLanguageCode(language),
     );
     const hasLanguage = Boolean(language) && !previewLocked;
     const blockedReason = previewLocked
@@ -6759,7 +8251,9 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: hasLanguage ? "admitted" : "blocked",
-      reason: hasLanguage ? "mutating_workstation_preference_action" : blockedReason,
+      reason: hasLanguage
+        ? "mutating_workstation_preference_action"
+        : blockedReason,
       blockedReason: hasLanguage ? undefined : blockedReason,
       sourceTargetIntent: args.source_target_intent,
     });
@@ -6784,10 +8278,12 @@ export const callWorkstationGatewayCapability = async (
       dispatch_status: hasLanguage ? "admitted" : "blocked",
       preference_key: "interfaceLanguage",
       language,
-      requested_language: typeof requestedLanguage === "string" ? requestedLanguage : null,
-      supported_language_codes: input.accountType === "user"
-        ? [...PUBLIC_INTERFACE_LANGUAGE_CODES]
-        : [...SHARED_INTERFACE_LANGUAGE_CODES],
+      requested_language:
+        typeof requestedLanguage === "string" ? requestedLanguage : null,
+      supported_language_codes:
+        input.accountType === "user"
+          ? [...PUBLIC_INTERFACE_LANGUAGE_CODES]
+          : [...SHARED_INTERFACE_LANGUAGE_CODES],
       workstation_action: workstationAction,
       terminal_artifact_kind: "workspace_action_receipt",
       terminal_eligible: hasLanguage,
@@ -6808,14 +8304,21 @@ export const callWorkstationGatewayCapability = async (
           ? "Account Session interface language action was blocked because the catalog is developer preview only."
           : "Account Session interface language action was blocked because the language code is unsupported.",
       observation,
-      missingRequirements: hasLanguage ? [] : [{
-        code: blockedReason,
-        message: previewLocked
-          ? "Choose a public-release interface language or use a developer account for preview catalogs."
-          : "Provide a supported interface language code.",
-        repair_action: "ask_user",
-        rejected_expression: typeof requestedLanguage === "string" ? requestedLanguage : null,
-      }],
+      missingRequirements: hasLanguage
+        ? []
+        : [
+            {
+              code: blockedReason,
+              message: previewLocked
+                ? "Choose a public-release interface language or use a developer account for preview catalogs."
+                : "Provide a supported interface language code.",
+              repair_action: "ask_user",
+              rejected_expression:
+                typeof requestedLanguage === "string"
+                  ? requestedLanguage
+                  : null,
+            },
+          ],
       producedAffordances: buildGatewayProducedAffordances({
         capabilityId: manifest.capability_id,
         observation,
@@ -6866,8 +8369,12 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: hasPath ? "admitted" : "blocked",
-      reason: hasPath ? "non_mutating_workstation_ui_action" : "docs_open_doc_path_missing_or_unsafe",
-      blockedReason: hasPath ? undefined : "docs_open_doc_path_missing_or_unsafe",
+      reason: hasPath
+        ? "non_mutating_workstation_ui_action"
+        : "docs_open_doc_path_missing_or_unsafe",
+      blockedReason: hasPath
+        ? undefined
+        : "docs_open_doc_path_missing_or_unsafe",
       sourceTargetIntent: args.source_target_intent,
     });
     const workstationAction = hasPath
@@ -6908,11 +8415,16 @@ export const callWorkstationGatewayCapability = async (
         ? `Docs Viewer open document action admitted for ${path}.`
         : "Docs Viewer open document action was blocked because no safe docs path was supplied.",
       observation,
-      missingRequirements: hasPath ? [] : [{
-        code: "docs_open_doc_path_missing_or_unsafe",
-        message: "Provide a relative docs/ path to open in the Docs Viewer.",
-        repair_action: "ask_user",
-      }],
+      missingRequirements: hasPath
+        ? []
+        : [
+            {
+              code: "docs_open_doc_path_missing_or_unsafe",
+              message:
+                "Provide a relative docs/ path to open in the Docs Viewer.",
+              repair_action: "ask_user",
+            },
+          ],
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -6950,34 +8462,39 @@ export const callWorkstationGatewayCapability = async (
     const maxHits = readRepoSearchMaxHits(args.max_hits ?? args.maxHits);
     const sourceTargetIntent = readRecord(args.source_target_intent);
     const queryDerivation = readRecord(sourceTargetIntent?.query_derivation);
-    const termHints = readRepoSearchTermHints(args.query_terms ?? args.terms ?? sourceTargetIntent?.query_terms);
+    const termHints = readRepoSearchTermHints(
+      args.query_terms ?? args.terms ?? sourceTargetIntent?.query_terms,
+    );
     const queryQuality = query ? buildRepoSearchQueryQuality(query) : null;
     const blockedReason = !query
       ? "missing_query"
       : queryQuality?.status === "blocked"
-        ? queryQuality.code ?? "query_too_broad"
+        ? (queryQuality.code ?? "query_too_broad")
         : query.length < 3 || !/[a-z0-9_./-]/i.test(query)
           ? "query_too_broad"
-        : null;
+          : null;
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: blockedReason ? "blocked" : "admitted",
-      reason: blockedReason ? "repo_search_query_blocked" : "read_only_gateway_capability",
+      reason: blockedReason
+        ? "repo_search_query_blocked"
+        : "read_only_gateway_capability",
       blockedReason: blockedReason ?? undefined,
       sourceTargetIntent: args.source_target_intent,
     });
 
     if (blockedReason) {
-      const blockedRelevanceGate = query && queryQuality
-        ? buildRepoSearchRelevanceGate({
-            query,
-            queryQuality,
-            hits: [],
-            resultError: blockedReason,
-          })
-        : null;
+      const blockedRelevanceGate =
+        query && queryQuality
+          ? buildRepoSearchRelevanceGate({
+              query,
+              queryQuality,
+              hits: [],
+              resultError: blockedReason,
+            })
+          : null;
       const observation = {
         schema: REPO_SEARCH_OBSERVATION_SCHEMA,
         capability_key: manifest.capability_id,
@@ -6996,18 +8513,28 @@ export const callWorkstationGatewayCapability = async (
         repo_relevance_gate: blockedRelevanceGate,
         evidence_state: "repo_query_blocked",
         selected_for_answer: false,
-        repair_attempts: [{
-          status: "blocked",
-          reason: blockedReason,
-          repair_queries: blockedRelevanceGate?.repair_queries ?? queryQuality?.repair_queries ?? [],
-        }],
+        repair_attempts: [
+          {
+            status: "blocked",
+            reason: blockedReason,
+            repair_queries:
+              blockedRelevanceGate?.repair_queries ??
+              queryQuality?.repair_queries ??
+              [],
+          },
+        ],
         support_refs: [],
-        next_affordances: [{
-          capability: manifest.capability_id,
-          reason: blockedReason,
-          ...(query ? { query } : {}),
-          repair_queries: blockedRelevanceGate?.repair_queries ?? queryQuality?.repair_queries ?? [],
-        }],
+        next_affordances: [
+          {
+            capability: manifest.capability_id,
+            reason: blockedReason,
+            ...(query ? { query } : {}),
+            repair_queries:
+              blockedRelevanceGate?.repair_queries ??
+              queryQuality?.repair_queries ??
+              [],
+          },
+        ],
         missing_requirements: [blockedReason],
         terminal_eligible: false,
         post_tool_model_step_required: true,
@@ -7023,28 +8550,34 @@ export const callWorkstationGatewayCapability = async (
         status: "blocked",
         summary: `Repo search gateway blocked query: ${blockedReason}.`,
         observation,
-        missingRequirements: [{
-          code: blockedReason,
-          message: "Provide a specific repo/code/documentation search query.",
-          repair_action: "ask_user",
-        }],
+        missingRequirements: [
+          {
+            code: blockedReason,
+            message: "Provide a specific repo/code/documentation search query.",
+            repair_action: "ask_user",
+          },
+        ],
       });
       observationPacket.state_delta = {
         ...observationPacket.state_delta,
         ...(queryDerivation ? { query_derivation: queryDerivation } : {}),
         query_quality: queryQuality,
-        ...(blockedRelevanceGate ? { repo_relevance_gate: blockedRelevanceGate } : {}),
+        ...(blockedRelevanceGate
+          ? { repo_relevance_gate: blockedRelevanceGate }
+          : {}),
         evidence_state: observation.evidence_state,
         selected_for_answer: observation.selected_for_answer,
         repair_attempts: observation.repair_attempts,
         support_refs: observation.support_refs,
         next_affordances: observation.next_affordances,
       };
-      observationPacket.suggested_next_steps = Array.from(new Set([
-        ...observationPacket.suggested_next_steps,
-        "repair",
-        "ask_user",
-      ]));
+      observationPacket.suggested_next_steps = Array.from(
+        new Set([
+          ...observationPacket.suggested_next_steps,
+          "repair",
+          "ask_user",
+        ]),
+      );
       const trace = buildGatewayTrace({
         turnId,
         capabilityId: manifest.capability_id,
@@ -7089,11 +8622,12 @@ export const callWorkstationGatewayCapability = async (
       intentDomain: "repo",
       topicTags: [],
     });
-    const rankedHits = rankRepoSearchHitsForQuery(
-      result.hits,
+    const rankedHits = rankRepoSearchHitsForQuery(result.hits, searchTerms);
+    const hits = selectRepoSearchHitsForQuery(
+      rankedHits,
+      maxHits,
       searchTerms,
-    );
-    const hits = selectRepoSearchHitsForQuery(rankedHits, maxHits, searchTerms).map(clipRepoSearchHit);
+    ).map(clipRepoSearchHit);
     const truncated = result.truncated || result.hits.length > hits.length;
     const repoRelevanceGate = buildRepoSearchRelevanceGate({
       query,
@@ -7103,17 +8637,25 @@ export const callWorkstationGatewayCapability = async (
     });
     const repoEvidenceUsable = repoRelevanceGate.status === "passed";
     const supportRefs = buildRepoSearchSupportRefs(hits);
-    const repairAttempts = repoEvidenceUsable ? [] : [{
-      status: "retry_recommended",
-      reason: repoRelevanceGate.code ?? "repo_search_low_relevance",
-      repair_queries: repoRelevanceGate.repair_queries,
-    }];
-    const nextAffordances = repoEvidenceUsable ? [] : [{
-      capability: manifest.capability_id,
-      reason: repoRelevanceGate.code ?? "repo_search_low_relevance",
-      query,
-      repair_queries: repoRelevanceGate.repair_queries,
-    }];
+    const repairAttempts = repoEvidenceUsable
+      ? []
+      : [
+          {
+            status: "retry_recommended",
+            reason: repoRelevanceGate.code ?? "repo_search_low_relevance",
+            repair_queries: repoRelevanceGate.repair_queries,
+          },
+        ];
+    const nextAffordances = repoEvidenceUsable
+      ? []
+      : [
+          {
+            capability: manifest.capability_id,
+            reason: repoRelevanceGate.code ?? "repo_search_low_relevance",
+            query,
+            repair_queries: repoRelevanceGate.repair_queries,
+          },
+        ];
     const evidence = formatRepoSearchEvidence(
       {
         ...result,
@@ -7145,12 +8687,16 @@ export const callWorkstationGatewayCapability = async (
       ...(queryDerivation ? { query_derivation: queryDerivation } : {}),
       query_quality: queryQuality,
       repo_relevance_gate: repoRelevanceGate,
-      evidence_state: repoEvidenceUsable ? "repo_evidence_usable" : "repo_evidence_low_relevance",
+      evidence_state: repoEvidenceUsable
+        ? "repo_evidence_usable"
+        : "repo_evidence_low_relevance",
       selected_for_answer: repoEvidenceUsable,
       repair_attempts: repairAttempts,
       support_refs: supportRefs,
       next_affordances: nextAffordances,
-      missing_requirements: repoEvidenceUsable ? [] : [repoRelevanceGate.code ?? "repo_search_low_relevance"],
+      missing_requirements: repoEvidenceUsable
+        ? []
+        : [repoRelevanceGate.code ?? "repo_search_low_relevance"],
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,
@@ -7168,18 +8714,24 @@ export const callWorkstationGatewayCapability = async (
         : `Repo search returned ${hits.length} evidence hit(s) for ${query}.`,
       observation,
       missingRequirements: result.error
-        ? [{
-            code: result.error,
-            message: "Repo search could not complete; retry with a narrower query or available repo path.",
-            repair_action: "repair",
-          }]
+        ? [
+            {
+              code: result.error,
+              message:
+                "Repo search could not complete; retry with a narrower query or available repo path.",
+              repair_action: "repair",
+            },
+          ]
         : repoEvidenceUsable
           ? []
-          : [{
-              code: repoRelevanceGate.code ?? "repo_search_low_relevance",
-              message: "Repo search completed, but the returned hits were not relevant enough to support the answer.",
-              repair_action: "repair",
-            }]
+          : [
+              {
+                code: repoRelevanceGate.code ?? "repo_search_low_relevance",
+                message:
+                  "Repo search completed, but the returned hits were not relevant enough to support the answer.",
+                repair_action: "repair",
+              },
+            ],
     });
     observationPacket.state_delta = {
       ...observationPacket.state_delta,
@@ -7190,14 +8742,18 @@ export const callWorkstationGatewayCapability = async (
       selected_for_answer: observation.selected_for_answer,
       repair_attempts: repairAttempts,
       support_refs: supportRefs,
-      ...(nextAffordances.length > 0 ? { next_affordances: nextAffordances } : {}),
+      ...(nextAffordances.length > 0
+        ? { next_affordances: nextAffordances }
+        : {}),
     };
     if (!repoEvidenceUsable) {
-      observationPacket.suggested_next_steps = Array.from(new Set([
-        ...observationPacket.suggested_next_steps,
-        "use_another_tool",
-        "repair",
-      ]));
+      observationPacket.suggested_next_steps = Array.from(
+        new Set([
+          ...observationPacket.suggested_next_steps,
+          "use_another_tool",
+          "repair",
+        ]),
+      );
     }
     const trace = buildGatewayTrace({
       turnId,
@@ -7238,9 +8794,9 @@ export const callWorkstationGatewayCapability = async (
       args.adapter_profile_id ?? args.adapterProfileId,
       256,
     );
-    let mechanicsScope:
-      | ReturnType<typeof resolveEnvironmentMechanicsSearchScope>
-      | null = null;
+    let mechanicsScope: ReturnType<
+      typeof resolveEnvironmentMechanicsSearchScope
+    > | null = null;
     let mechanicsScopeError: EnvironmentMechanicsRegistryError | null = null;
     if (requestedMechanicsCollectionIds.length > 0) {
       try {
@@ -7269,30 +8825,47 @@ export const callWorkstationGatewayCapability = async (
       ? mechanicsScope.documentPaths
       : readDocsSearchPaths(args.paths);
     const exactTerms = readDocsExactTerms(args.exact_terms ?? args.exactTerms);
-    const sectionHeading = clipObservationText(args.section_heading ?? args.sectionHeading, 240);
-    const requestedSectionHeadings = readDocsExactTerms(args.section_headings ?? args.sectionHeadings);
-    const sectionHeadings = Array.from(new Set([
-      ...requestedSectionHeadings,
-      ...(sectionHeading ? [sectionHeading] : []),
-    ])).slice(0, 4);
-    const sectionContainsTerms = readDocsExactTerms(args.section_contains_terms ?? args.sectionContainsTerms);
-    const requestedSectionMatchUnit = clipObservationText(args.section_match_unit ?? args.sectionMatchUnit, 20);
+    const sectionHeading = clipObservationText(
+      args.section_heading ?? args.sectionHeading,
+      240,
+    );
+    const requestedSectionHeadings = readDocsExactTerms(
+      args.section_headings ?? args.sectionHeadings,
+    );
+    const sectionHeadings = Array.from(
+      new Set([
+        ...requestedSectionHeadings,
+        ...(sectionHeading ? [sectionHeading] : []),
+      ]),
+    ).slice(0, 4);
+    const sectionContainsTerms = readDocsExactTerms(
+      args.section_contains_terms ?? args.sectionContainsTerms,
+    );
+    const requestedSectionMatchUnit = clipObservationText(
+      args.section_match_unit ?? args.sectionMatchUnit,
+      20,
+    );
     const sectionMatchUnit: "line" | "sentence" | "paragraph" =
-      requestedSectionMatchUnit === "line" || requestedSectionMatchUnit === "paragraph"
+      requestedSectionMatchUnit === "line" ||
+      requestedSectionMatchUnit === "paragraph"
         ? requestedSectionMatchUnit
         : "sentence";
     const maxHits = readRepoSearchMaxHits(args.max_hits ?? args.maxHits);
-    const blockedReason = mechanicsScopeError?.code ?? (!query
-      ? "missing_query"
-      : query.length < 3 || !/[a-z0-9_./-]/i.test(query)
-        ? "query_too_broad"
-        : null);
+    const blockedReason =
+      mechanicsScopeError?.code ??
+      (!query
+        ? "missing_query"
+        : query.length < 3 || !/[a-z0-9_./-]/i.test(query)
+          ? "query_too_broad"
+          : null);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: blockedReason ? "blocked" : "admitted",
-      reason: blockedReason ? "docs_search_query_blocked" : "read_only_gateway_capability",
+      reason: blockedReason
+        ? "docs_search_query_blocked"
+        : "read_only_gateway_capability",
       blockedReason: blockedReason ?? undefined,
       sourceTargetIntent: args.source_target_intent,
     });
@@ -7329,11 +8902,13 @@ export const callWorkstationGatewayCapability = async (
         status: "blocked",
         summary: `Docs search gateway blocked query: ${blockedReason}.`,
         observation,
-        missingRequirements: [{
-          code: blockedReason,
-          message: "Provide a specific documentation search query.",
-          repair_action: "ask_user",
-        }],
+        missingRequirements: [
+          {
+            code: blockedReason,
+            message: "Provide a specific documentation search query.",
+            repair_action: "ask_user",
+          },
+        ],
       });
       const trace = buildGatewayTrace({
         turnId,
@@ -7378,33 +8953,53 @@ export const callWorkstationGatewayCapability = async (
     const docsHits = mergeDocsSearchPathCandidates(result.hits, paths, query);
     const rankedHits = rankDocsSearchHits(docsHits, query);
     const hits = rankedHits.slice(0, maxHits).map(clipRepoSearchHit);
-    const documentCandidates = buildDocsSearchDocumentCandidates(rankedHits, query, maxHits);
+    const documentCandidates = buildDocsSearchDocumentCandidates(
+      rankedHits,
+      query,
+      maxHits,
+    );
     const truncated = result.truncated || rankedHits.length > hits.length;
     const compoundReadAloudResolvedPath = readCompoundReadAloudResolvedDocsPath(
       args.source_target_intent,
       documentCandidates,
     );
-    const activeDocumentObservation = readBoundedDocsExcerpt(paths) ??
-      (compoundReadAloudResolvedPath ? readBoundedDocsExcerpt([compoundReadAloudResolvedPath]) : null);
-    const exactLocationMatches = readDocsExactLocationMatches(paths, exactTerms);
+    const activeDocumentObservation =
+      readBoundedDocsExcerpt(paths) ??
+      (compoundReadAloudResolvedPath
+        ? readBoundedDocsExcerpt([compoundReadAloudResolvedPath])
+        : null);
+    const exactLocationMatches = readDocsExactLocationMatches(
+      paths,
+      exactTerms,
+    );
     const sectionObservations = sectionHeadings
-      .map((heading) => readBoundedDocsSection(paths, heading, sectionContainsTerms, sectionMatchUnit))
+      .map((heading) =>
+        readBoundedDocsSection(
+          paths,
+          heading,
+          sectionContainsTerms,
+          sectionMatchUnit,
+        ),
+      )
       .filter((entry): entry is DocsSectionObservation => Boolean(entry));
     const sectionLookups = sectionHeadings.map((heading) => {
-      const found = sectionObservations.find((entry) => entry.requested_heading === heading) ?? null;
+      const found =
+        sectionObservations.find(
+          (entry) => entry.requested_heading === heading,
+        ) ?? null;
       return {
-          schema: "helix.docs_section_lookup.v1",
-          path: paths.find((entry) => /^docs\/.+\.md$/i.test(entry)) ?? null,
-          requested_heading: heading,
-          heading_found: Boolean(found),
-          status: found ? "found" : "not_found",
-          contains_terms: sectionContainsTerms,
-          match_unit: sectionMatchUnit,
-          observation_role: "evidence_not_assistant_answer",
-          terminal_eligible: false,
-          assistant_answer: false,
-          raw_content_included: false,
-        };
+        schema: "helix.docs_section_lookup.v1",
+        path: paths.find((entry) => /^docs\/.+\.md$/i.test(entry)) ?? null,
+        requested_heading: heading,
+        heading_found: Boolean(found),
+        status: found ? "found" : "not_found",
+        contains_terms: sectionContainsTerms,
+        match_unit: sectionMatchUnit,
+        observation_role: "evidence_not_assistant_answer",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
     });
     const sectionObservation = sectionObservations[0] ?? null;
     const sectionLookup = sectionLookups[0] ?? null;
@@ -7487,11 +9082,14 @@ export const callWorkstationGatewayCapability = async (
           : `Docs search returned ${documentCandidates.length} document candidate(s) and ${hits.length} evidence hit(s) for ${query}.`,
       observation,
       missingRequirements: result.error
-        ? [{
-            code: result.error,
-            message: "Docs search could not complete; retry with a narrower query or available docs path.",
-            repair_action: "repair",
-          }]
+        ? [
+            {
+              code: result.error,
+              message:
+                "Docs search could not complete; retry with a narrower query or available docs path.",
+              repair_action: "repair",
+            },
+          ]
         : [],
     });
     const trace = buildGatewayTrace({
@@ -7525,28 +9123,41 @@ export const callWorkstationGatewayCapability = async (
 
   if (manifest.capability_id === INTERNET_SEARCH_CAPABILITY) {
     const args = readArguments(input.arguments);
-    const query = normalizeExternalSearchQuery(args.query ?? args.search_query ?? args.prompt);
+    const query = normalizeExternalSearchQuery(
+      args.query ?? args.search_query ?? args.prompt,
+    );
     const requestedProviders = readInternetSearchProviders(args.providers);
     const configuredProviders = listConfiguredInternetSearchProviders();
-    const providers = requestedProviders.length > 0
-      ? requestedProviders.filter((provider) => configuredProviders.includes(provider))
-      : configuredProviders;
+    const providers =
+      requestedProviders.length > 0
+        ? requestedProviders.filter((provider) =>
+            configuredProviders.includes(provider),
+          )
+        : configuredProviders;
     const domains = readInternetSearchDomains(args.domains);
-    const recencyDays = readInternetSearchRecencyDays(args.recency_days ?? args.recencyDays);
-    const limit = readExternalSearchLimit(args.limit ?? args.max_results ?? args.maxResults);
-    const blockedReason = configuredProviders.length === 0 || (requestedProviders.length > 0 && providers.length === 0)
-      ? "provider_not_configured"
-      : !query
-        ? "missing_query"
-      : query.length < 3 || !/[a-z0-9]/i.test(query)
-        ? "query_too_broad"
-        : null;
+    const recencyDays = readInternetSearchRecencyDays(
+      args.recency_days ?? args.recencyDays,
+    );
+    const limit = readExternalSearchLimit(
+      args.limit ?? args.max_results ?? args.maxResults,
+    );
+    const blockedReason =
+      configuredProviders.length === 0 ||
+      (requestedProviders.length > 0 && providers.length === 0)
+        ? "provider_not_configured"
+        : !query
+          ? "missing_query"
+          : query.length < 3 || !/[a-z0-9]/i.test(query)
+            ? "query_too_broad"
+            : null;
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: blockedReason ? "blocked" : "admitted",
-      reason: blockedReason ? "internet_search_query_blocked" : "read_only_gateway_capability",
+      reason: blockedReason
+        ? "internet_search_query_blocked"
+        : "read_only_gateway_capability",
       blockedReason: blockedReason ?? undefined,
       sourceTargetIntent: args.source_target_intent,
     });
@@ -7581,13 +9192,19 @@ export const callWorkstationGatewayCapability = async (
         status: "blocked",
         summary: `Internet search gateway blocked query: ${blockedReason}.`,
         observation,
-        missingRequirements: [{
-          code: blockedReason,
-          message: blockedReason === "provider_not_configured"
-            ? "Configure Tavily, Exa, or Google Custom Search before using internet search."
-            : "Provide a specific internet search query.",
-          repair_action: blockedReason === "provider_not_configured" ? "configure_provider" : "ask_user",
-        }],
+        missingRequirements: [
+          {
+            code: blockedReason,
+            message:
+              blockedReason === "provider_not_configured"
+                ? "Configure Tavily, Exa, or Google Custom Search before using internet search."
+                : "Provide a specific internet search query.",
+            repair_action:
+              blockedReason === "provider_not_configured"
+                ? "configure_provider"
+                : "ask_user",
+          },
+        ],
       });
       const trace = buildGatewayTrace({
         turnId,
@@ -7651,13 +9268,15 @@ export const callWorkstationGatewayCapability = async (
         ? []
         : searchObservation.missing_requirements.map((code) => ({
             code,
-            message: "Internet search could not produce usable bounded evidence for this query.",
+            message:
+              "Internet search could not produce usable bounded evidence for this query.",
             repair_action: "repair" as const,
           })),
     });
     const error = searchObservation.selected_for_answer
       ? undefined
-      : searchObservation.missing_requirements[0] ?? "no_internet_search_results_returned";
+      : (searchObservation.missing_requirements[0] ??
+        "no_internet_search_results_returned");
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,
@@ -7696,21 +9315,33 @@ export const callWorkstationGatewayCapability = async (
     const text = cleanString(args.text ?? args.message);
     const explicitThreadId = cleanString(args.thread_id ?? args.threadId);
     const effectiveThreadId = explicitThreadId || "helix-ask:desktop";
-    const requiresConfirmation = readBoolean(args.requires_confirmation ?? args.requiresConfirmation, false);
-    const sourceObservationRef = optionalString(args.source_observation_ref ?? args.sourceObservationRef);
+    const requiresConfirmation = readBoolean(
+      args.requires_confirmation ?? args.requiresConfirmation,
+      false,
+    );
+    const sourceObservationRef = optionalString(
+      args.source_observation_ref ?? args.sourceObservationRef,
+    );
     const result = recordInterimVoiceCalloutRequest({
       turnId: cleanString(args.turn_id ?? args.turnId, turnId),
       threadId: effectiveThreadId,
       source: cleanString(args.source, "ask_tool_loop"),
-      kind: manifest.capability_id === VOICE_NARRATOR_SAY_CAPABILITY
-        ? "narrator_read"
-        : cleanString(args.kind, manifest.capability_id === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY ? "tool_result" : "tool_progress"),
+      kind:
+        manifest.capability_id === VOICE_NARRATOR_SAY_CAPABILITY
+          ? "narrator_read"
+          : cleanString(
+              args.kind,
+              manifest.capability_id === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY
+                ? "tool_result"
+                : "tool_progress",
+            ),
       text,
       maxChars: readFiniteNumber(args.max_chars ?? args.maxChars),
       timingHintMs: readFiniteNumber(args.timing_hint_ms ?? args.timingHintMs),
-      voicePlaybackKind: manifest.capability_id === VOICE_NARRATOR_SAY_CAPABILITY
-        ? "narrator_read"
-        : cleanString(args.voice_playback_kind ?? args.voicePlaybackKind),
+      voicePlaybackKind:
+        manifest.capability_id === VOICE_NARRATOR_SAY_CAPABILITY
+          ? "narrator_read"
+          : cleanString(args.voice_playback_kind ?? args.voicePlaybackKind),
       requiresConfirmation,
       evidenceRefs: [
         ...readStringArray(args.evidence_refs),
@@ -7719,23 +9350,32 @@ export const callWorkstationGatewayCapability = async (
       ],
       reasonCodes: [
         "provider_gateway_voice_request",
-        ...(manifest.capability_id === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY ? ["text_to_speech_speak_text_lane"] : []),
+        ...(manifest.capability_id === TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY
+          ? ["text_to_speech_speak_text_lane"]
+          : []),
         ...readStringArray(args.reason_codes ?? args.reasonCodes),
       ],
     });
     const ok = isVoiceClientHandoffReceipt(result.receipt);
     const blockedReason = ok ? null : result.receipt.status;
-    const voiceModelId = cleanString(process.env.ELEVENLABS_MODEL_ID, "eleven_multilingual_v2");
+    const voiceModelId = cleanString(
+      process.env.ELEVENLABS_MODEL_ID,
+      "eleven_multilingual_v2",
+    );
     const sourceTextHash = hashShort(text ?? "");
-    const audioBytesObserved = result.receipt.delivery?.playbackStatus === "client_confirmed";
+    const audioBytesObserved =
+      result.receipt.delivery?.playbackStatus === "client_confirmed";
     const audioRef = result.receipt.delivery?.utteranceId ?? null;
-    const normalizedPlaybackStatus = mapInterimVoiceReceiptToGatewayPlaybackStatus(result.receipt);
+    const normalizedPlaybackStatus =
+      mapInterimVoiceReceiptToGatewayPlaybackStatus(result.receipt);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: ok ? "admitted" : "blocked",
-      reason: ok ? "voice_gateway_receipt_created" : "voice_gateway_receipt_blocked",
+      reason: ok
+        ? "voice_gateway_receipt_created"
+        : "voice_gateway_receipt_blocked",
       blockedReason: blockedReason ?? undefined,
       sourceTargetIntent: args.source_target_intent,
     });
@@ -7758,7 +9398,8 @@ export const callWorkstationGatewayCapability = async (
         audio_ref: audioRef,
         audio_url: null,
         audio_bytes_observed: audioBytesObserved,
-        delivered_at_ms: result.receipt.status === "delivered" ? Date.now() : null,
+        delivered_at_ms:
+          result.receipt.status === "delivered" ? Date.now() : null,
         source_text_hash: sourceTextHash,
         backend_provider: "existing_voice_service",
         selected_model_or_service: voiceModelId,
@@ -7804,11 +9445,20 @@ export const callWorkstationGatewayCapability = async (
         ? `Voice gateway created ${result.receipt.status} receipt ${result.receipt.receiptId}.`
         : `Voice gateway blocked request: ${blockedReason ?? "unknown"}.`,
       observation,
-      missingRequirements: ok ? [] : [{
-        code: blockedReason ?? "voice_gateway_blocked",
-        message: result.receipt.delivery?.message ?? "Voice request did not produce a playable receipt.",
-        repair_action: blockedReason === "blocked_missing_text" ? "ask_user" : "repair",
-      }],
+      missingRequirements: ok
+        ? []
+        : [
+            {
+              code: blockedReason ?? "voice_gateway_blocked",
+              message:
+                result.receipt.delivery?.message ??
+                "Voice request did not produce a playable receipt.",
+              repair_action:
+                blockedReason === "blocked_missing_text"
+                  ? "ask_user"
+                  : "repair",
+            },
+          ],
     });
     observationPacket.state_delta = {
       ...observationPacket.state_delta,
@@ -7843,8 +9493,13 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
-  const contextFeedQuerySpec = workstationContextFeedQuerySpecForCapability(manifest.capability_id);
-  if (contextFeedQuerySpec && SHARED_CONTEXT_FEED_QUERY_CAPABILITIES.has(manifest.capability_id)) {
+  const contextFeedQuerySpec = workstationContextFeedQuerySpecForCapability(
+    manifest.capability_id,
+  );
+  if (
+    contextFeedQuerySpec &&
+    SHARED_CONTEXT_FEED_QUERY_CAPABILITIES.has(manifest.capability_id)
+  ) {
     const args = readArguments(input.arguments);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
@@ -7874,7 +9529,8 @@ export const callWorkstationGatewayCapability = async (
     });
     const nestedObservation = readRecord(liveObservation.observation);
     const missingRequirements = readStringArray(
-      nestedObservation?.missing_requirements ?? nestedObservation?.missingRequirements,
+      nestedObservation?.missing_requirements ??
+        nestedObservation?.missingRequirements,
     ).map((requirement) => ({
       code: requirement,
       message: `Context feed query ${manifest.capability_id} requires ${requirement}.`,
@@ -7891,7 +9547,9 @@ export const callWorkstationGatewayCapability = async (
       observation: liveObservation,
       missingRequirements,
     });
-    const error = liveObservation.ok ? undefined : "context_feed_query_unavailable";
+    const error = liveObservation.ok
+      ? undefined
+      : "context_feed_query_unavailable";
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,
@@ -7944,7 +9602,8 @@ export const callWorkstationGatewayCapability = async (
           source_ref: `workstation_gateway:${threadIdForTool}:${manifest.capability_id}`,
         };
     const liveObservation = executeLiveEnvironmentTool({
-      tool_name: LIVE_SOURCE_LOOP_HEALTH_CAPABILITY as HelixLiveEnvironmentToolName,
+      tool_name:
+        LIVE_SOURCE_LOOP_HEALTH_CAPABILITY as HelixLiveEnvironmentToolName,
       thread_id: threadIdForTool,
       environment_id: optionalString(args.environment_id),
       args: toolArgs,
@@ -7959,7 +9618,9 @@ export const callWorkstationGatewayCapability = async (
       summary: liveObservation.summary,
       observation: liveObservation,
     });
-    const error = liveObservation.ok ? undefined : "live_source_loop_health_unavailable";
+    const error = liveObservation.ok
+      ? undefined
+      : "live_source_loop_health_unavailable";
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,
@@ -8027,7 +9688,9 @@ export const callWorkstationGatewayCapability = async (
       summary: liveObservation.summary,
       observation: liveObservation,
     });
-    const error = liveObservation.ok ? undefined : "live_source_state_read_unavailable";
+    const error = liveObservation.ok
+      ? undefined
+      : "live_source_state_read_unavailable";
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,
@@ -8057,7 +9720,9 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
-  if (SHARED_SITUATION_STAGE_STATE_READ_CAPABILITIES.has(manifest.capability_id)) {
+  if (
+    SHARED_SITUATION_STAGE_STATE_READ_CAPABILITIES.has(manifest.capability_id)
+  ) {
     const args = readArguments(input.arguments);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
@@ -8095,7 +9760,9 @@ export const callWorkstationGatewayCapability = async (
       summary: liveObservation.summary,
       observation: liveObservation,
     });
-    const error = liveObservation.ok ? undefined : "situation_stage_state_read_unavailable";
+    const error = liveObservation.ok
+      ? undefined
+      : "situation_stage_state_read_unavailable";
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,
@@ -8125,7 +9792,9 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
-  if (SHARED_LIVE_SOURCE_MAILBOX_READ_CAPABILITIES.has(manifest.capability_id)) {
+  if (
+    SHARED_LIVE_SOURCE_MAILBOX_READ_CAPABILITIES.has(manifest.capability_id)
+  ) {
     const args = readArguments(input.arguments);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
@@ -8169,7 +9838,9 @@ export const callWorkstationGatewayCapability = async (
       summary: liveObservation.summary,
       observation: liveObservation,
     });
-    const error = liveObservation.ok ? undefined : "live_source_mailbox_read_unavailable";
+    const error = liveObservation.ok
+      ? undefined
+      : "live_source_mailbox_read_unavailable";
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,
@@ -8199,7 +9870,11 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
-  if (SHARED_LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.has(manifest.capability_id)) {
+  if (
+    SHARED_LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.has(
+      manifest.capability_id,
+    )
+  ) {
     const args = readArguments(input.arguments);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
@@ -8243,7 +9918,9 @@ export const callWorkstationGatewayCapability = async (
       summary: liveObservation.summary,
       observation: liveObservation,
     });
-    const error = liveObservation.ok ? undefined : "live_source_interpreter_prediction_read_unavailable";
+    const error = liveObservation.ok
+      ? undefined
+      : "live_source_interpreter_prediction_read_unavailable";
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,
@@ -8317,7 +9994,9 @@ export const callWorkstationGatewayCapability = async (
       summary: liveObservation.summary,
       observation: liveObservation,
     });
-    const error = liveObservation.ok ? undefined : "stage_play_builder_read_unavailable";
+    const error = liveObservation.ok
+      ? undefined
+      : "stage_play_builder_read_unavailable";
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,
@@ -8385,7 +10064,9 @@ export const callWorkstationGatewayCapability = async (
       summary: liveObservation.summary,
       observation: liveObservation,
     });
-    const error = liveObservation.ok ? undefined : "micro_reasoner_read_unavailable";
+    const error = liveObservation.ok
+      ? undefined
+      : "micro_reasoner_read_unavailable";
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,
@@ -8453,7 +10134,9 @@ export const callWorkstationGatewayCapability = async (
       summary: liveObservation.summary,
       observation: liveObservation,
     });
-    const error = liveObservation.ok ? undefined : "visual_observer_read_unavailable";
+    const error = liveObservation.ok
+      ? undefined
+      : "visual_observer_read_unavailable";
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,
@@ -8483,12 +10166,17 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
-  if (manifest.capability_id === RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY) {
+  if (
+    manifest.capability_id ===
+    RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY
+  ) {
     const args = readArguments(input.arguments);
     const profileId = cleanString(input.profileId);
     const documentId = optionalString(args.document_id ?? args.documentId);
     const proposal = args.proposal;
-    let result: Awaited<ReturnType<typeof applyResearchLibraryEvidenceEnrichment>> | null = null;
+    let result: Awaited<
+      ReturnType<typeof applyResearchLibraryEvidenceEnrichment>
+    > | null = null;
     let error: string | undefined;
     if (!profileId) {
       error = "profile_session_required";
@@ -8505,11 +10193,14 @@ export const callWorkstationGatewayCapability = async (
         });
         if (!result.ok) error = result.failure_code;
       } catch (caught) {
-        error = caught instanceof Error ? caught.message : "paper_evidence_enrichment_persist_failed";
+        error =
+          caught instanceof Error
+            ? caught.message
+            : "paper_evidence_enrichment_persist_failed";
       }
     }
     const succeeded = Boolean(result?.ok);
-    const status = succeeded ? "succeeded" as const : "blocked" as const;
+    const status = succeeded ? ("succeeded" as const) : ("blocked" as const);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
@@ -8521,9 +10212,8 @@ export const callWorkstationGatewayCapability = async (
       blockedReason: error,
       sourceTargetIntent: args.source_target_intent,
     });
-    const missingRequirements = result && !result.ok
-      ? result.missing_requirements
-      : error ? [error] : [];
+    const missingRequirements =
+      result && !result.ok ? result.missing_requirements : error ? [error] : [];
     const observation = {
       schema: PAPER_EVIDENCE_ENRICHMENT_OBSERVATION_SCHEMA,
       artifact_id: `${turnId}:paper_evidence_enrichment_observation:${iteration}`,
@@ -8538,7 +10228,9 @@ export const callWorkstationGatewayCapability = async (
       to_revision: result?.ok ? result.to_revision : null,
       updated_equation_ids: result?.ok ? result.updated_equation_ids : [],
       idempotent: result?.ok ? result.status === "idempotent" : false,
-      evidence_state: result?.ok ? "enrichment_persisted" : "enrichment_blocked",
+      evidence_state: result?.ok
+        ? "enrichment_persisted"
+        : "enrichment_blocked",
       missing_requirements: missingRequirements,
       authority: {
         validates_paper_claims: false,
@@ -8566,10 +10258,14 @@ export const callWorkstationGatewayCapability = async (
       observation,
       missingRequirements: missingRequirements.map((code) => ({
         code,
-        message: code === "profile_session_required"
-          ? "Sign in before updating private Research Library evidence."
-          : `Paper-evidence enrichment requires repair: ${code}.`,
-        repair_action: code === "profile_session_required" ? "ask_user" as const : "repair" as const,
+        message:
+          code === "profile_session_required"
+            ? "Sign in before updating private Research Library evidence."
+            : `Paper-evidence enrichment requires repair: ${code}.`,
+        repair_action:
+          code === "profile_session_required"
+            ? ("ask_user" as const)
+            : ("repair" as const),
       })),
     });
     const trace = buildGatewayTrace({
@@ -8606,72 +10302,107 @@ export const callWorkstationGatewayCapability = async (
     const profileId = cleanString(input.profileId);
     const documentId = optionalString(args.document_id ?? args.documentId);
     const sourceUrl = optionalString(args.source_url ?? args.sourceUrl);
-    const sourceIntegrityHash = optionalString(args.source_integrity_hash ?? args.sourceIntegrityHash);
+    const sourceIntegrityHash = optionalString(
+      args.source_integrity_hash ?? args.sourceIntegrityHash,
+    );
     const resolveSingleProfileDocument =
-      args.resolve_single_profile_document === true || args.resolveSingleProfileDocument === true;
+      args.resolve_single_profile_document === true ||
+      args.resolveSingleProfileDocument === true;
     const query = optionalString(args.query ?? args.prompt);
     const searchTerm = optionalString(args.search_term ?? args.searchTerm);
     const rawPageNumbers = args.page_numbers ?? args.pageNumbers;
     const pageNumbers = Array.isArray(rawPageNumbers)
-      ? Array.from(new Set(rawPageNumbers
-          .map((page) => readFiniteNumber(page))
-          .filter((page): page is number => page != null && page > 0)
-          .map((page) => Math.floor(page))))
-        .slice(0, 40)
+      ? Array.from(
+          new Set(
+            rawPageNumbers
+              .map((page) => readFiniteNumber(page))
+              .filter((page): page is number => page != null && page > 0)
+              .map((page) => Math.floor(page)),
+          ),
+        ).slice(0, 40)
       : [];
     const pageNumberSet = new Set(pageNumbers);
     const pageStart = readFiniteNumber(args.page_start ?? args.pageStart);
     const pageEnd = readFiniteNumber(args.page_end ?? args.pageEnd);
-    const requestedMaxPages = Math.floor(readFiniteNumber(args.max_pages ?? args.maxPages) ?? 4);
-    const maxPages = Math.max(1, Math.min(40, pageNumbers.length > 0
-      ? Math.max(requestedMaxPages, pageNumbers.length)
-      : requestedMaxPages));
-    const caseSensitive = args.case_sensitive === true || args.caseSensitive === true;
-    const pageBoundaryMode = optionalString(args.page_boundary_mode ?? args.pageBoundaryMode);
-    const pageBoundarySentencesRequested = pageBoundaryMode === "first_last_nonblank_sentence";
+    const requestedMaxPages = Math.floor(
+      readFiniteNumber(args.max_pages ?? args.maxPages) ?? 4,
+    );
+    const maxPages = Math.max(
+      1,
+      Math.min(
+        40,
+        pageNumbers.length > 0
+          ? Math.max(requestedMaxPages, pageNumbers.length)
+          : requestedMaxPages,
+      ),
+    );
+    const caseSensitive =
+      args.case_sensitive === true || args.caseSensitive === true;
+    const pageBoundaryMode = optionalString(
+      args.page_boundary_mode ?? args.pageBoundaryMode,
+    );
+    const pageBoundarySentencesRequested =
+      pageBoundaryMode === "first_last_nonblank_sentence";
     const noExactSource = !documentId && !sourceUrl && !sourceIntegrityHash;
     const missingSource = noExactSource && !resolveSingleProfileDocument;
-    const profileDocuments = profileId && noExactSource && resolveSingleProfileDocument
-      ? (await listResearchLibraryDocuments(profileId)).documents
-      : [];
-    const ambiguousSavedReferent = noExactSource && resolveSingleProfileDocument && profileDocuments.length > 1;
-    const resolvedDocumentId = documentId ?? (
-      noExactSource && resolveSingleProfileDocument && profileDocuments.length === 1
-        ? profileDocuments[0]?.document_id ?? null
-        : null
-    );
-    const document = profileId && !missingSource && !ambiguousSavedReferent && (!noExactSource || resolvedDocumentId)
-      ? await findResearchLibraryDocument({
-          profile_id: profileId,
-          document_id: resolvedDocumentId,
-          source_url: sourceUrl,
-          source_integrity_hash: sourceIntegrityHash,
-        })
-      : null;
+    const profileDocuments =
+      profileId && noExactSource && resolveSingleProfileDocument
+        ? (await listResearchLibraryDocuments(profileId)).documents
+        : [];
+    const ambiguousSavedReferent =
+      noExactSource &&
+      resolveSingleProfileDocument &&
+      profileDocuments.length > 1;
+    const resolvedDocumentId =
+      documentId ??
+      (noExactSource &&
+      resolveSingleProfileDocument &&
+      profileDocuments.length === 1
+        ? (profileDocuments[0]?.document_id ?? null)
+        : null);
+    const document =
+      profileId &&
+      !missingSource &&
+      !ambiguousSavedReferent &&
+      (!noExactSource || resolvedDocumentId)
+        ? await findResearchLibraryDocument({
+            profile_id: profileId,
+            document_id: resolvedDocumentId,
+            source_url: sourceUrl,
+            source_integrity_hash: sourceIntegrityHash,
+          })
+        : null;
     const blockedReason = !profileId
       ? "profile_session_required"
       : missingSource
         ? "saved_research_source_required"
         : ambiguousSavedReferent
           ? "saved_research_referent_ambiguous"
-        : !document
-          ? "saved_research_document_not_found"
-          : null;
+          : !document
+            ? "saved_research_document_not_found"
+            : null;
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: blockedReason ? "blocked" : "admitted",
-      reason: blockedReason ? "research_library_read_blocked" : "profile_scoped_read_only_gateway_capability",
+      reason: blockedReason
+        ? "research_library_read_blocked"
+        : "profile_scoped_read_only_gateway_capability",
       blockedReason: blockedReason ?? undefined,
       sourceTargetIntent: args.source_target_intent,
     });
     const allPages = document?.pages ?? [];
-    const rangePages = allPages.filter((page) => pageNumbers.length > 0
-      ? pageNumberSet.has(page.page)
-      : (pageStart == null || page.page >= pageStart) && (pageEnd == null || page.page <= pageEnd));
+    const rangePages = allPages.filter((page) =>
+      pageNumbers.length > 0
+        ? pageNumberSet.has(page.page)
+        : (pageStart == null || page.page >= pageStart) &&
+          (pageEnd == null || page.page <= pageEnd),
+    );
     const normalizedSearchTerm = searchTerm
-      ? (caseSensitive ? searchTerm : searchTerm.toLowerCase()).replace(/\s+/g, " ").trim()
+      ? (caseSensitive ? searchTerm : searchTerm.toLowerCase())
+          .replace(/\s+/g, " ")
+          .trim()
       : null;
     const matchCounts = searchTerm
       ? rangePages.map((page) => {
@@ -8679,7 +10410,10 @@ export const callWorkstationGatewayCapability = async (
           const haystack = caseSensitive ? pageText : pageText.toLowerCase();
           let count = 0;
           let cursor = 0;
-          while (normalizedSearchTerm && (cursor = haystack.indexOf(normalizedSearchTerm, cursor)) >= 0) {
+          while (
+            normalizedSearchTerm &&
+            (cursor = haystack.indexOf(normalizedSearchTerm, cursor)) >= 0
+          ) {
             count += 1;
             cursor += Math.max(1, normalizedSearchTerm.length);
           }
@@ -8691,29 +10425,66 @@ export const callWorkstationGatewayCapability = async (
       .replace(/https?:\/\/\S+/g, " ")
       .split(/[^a-z0-9]+/)
       .filter((term) => term.length >= 4)
-      .filter((term) => !["using", "existing", "full", "text", "evidence", "report", "include", "page", "grounded", "references", "from", "this", "that"].includes(term));
+      .filter(
+        (term) =>
+          ![
+            "using",
+            "existing",
+            "full",
+            "text",
+            "evidence",
+            "report",
+            "include",
+            "page",
+            "grounded",
+            "references",
+            "from",
+            "this",
+            "that",
+          ].includes(term),
+      );
     const rankedPages = rangePages
       .map((page) => ({
         page,
-        score: queryTerms.reduce((score, term) => score + (page.text.toLowerCase().includes(term) ? 1 : 0), 0),
+        score: queryTerms.reduce(
+          (score, term) =>
+            score + (page.text.toLowerCase().includes(term) ? 1 : 0),
+          0,
+        ),
       }))
-      .sort((left, right) => right.score - left.score || left.page.page - right.page.page);
-    const metadataRequested = /\b(?:title|authors?|abstract|metadata)\b/i.test(query ?? "");
+      .sort(
+        (left, right) =>
+          right.score - left.score || left.page.page - right.page.page,
+      );
+    const metadataRequested = /\b(?:title|authors?|abstract|metadata)\b/i.test(
+      query ?? "",
+    );
     const selectedPageNumbers = new Set<number>();
     if (searchTerm) {
-      matchCounts.filter((entry) => entry.count > 0).slice(0, maxPages).forEach((entry) => selectedPageNumbers.add(entry.page));
+      matchCounts
+        .filter((entry) => entry.count > 0)
+        .slice(0, maxPages)
+        .forEach((entry) => selectedPageNumbers.add(entry.page));
     } else {
-      if (metadataRequested && rangePages.some((page) => page.page === 1)) selectedPageNumbers.add(1);
-      rankedPages.slice(0, maxPages).forEach(({ page }) => selectedPageNumbers.add(page.page));
+      if (metadataRequested && rangePages.some((page) => page.page === 1))
+        selectedPageNumbers.add(1);
+      rankedPages
+        .slice(0, maxPages)
+        .forEach(({ page }) => selectedPageNumbers.add(page.page));
     }
     const selectedPages = rangePages
       .filter((page) => selectedPageNumbers.has(page.page))
       .slice(0, maxPages)
       .map((page) => {
         const compactPageText = page.text.replace(/\s+/g, " ").trim();
-        const searchablePageText = caseSensitive ? compactPageText : compactPageText.toLowerCase();
-        const matchIndex = normalizedSearchTerm ? searchablePageText.indexOf(normalizedSearchTerm) : -1;
-        const excerptStart = matchIndex >= 0 ? Math.max(0, matchIndex - 300) : 0;
+        const searchablePageText = caseSensitive
+          ? compactPageText
+          : compactPageText.toLowerCase();
+        const matchIndex = normalizedSearchTerm
+          ? searchablePageText.indexOf(normalizedSearchTerm)
+          : -1;
+        const excerptStart =
+          matchIndex >= 0 ? Math.max(0, matchIndex - 300) : 0;
         const textualSentences = pageBoundarySentencesRequested
           ? Array.from(page.text.matchAll(/[^.!?]+[.!?]+(?:["'’”\)\]]*)/gu))
               .map((match) => match[0].trim())
@@ -8729,21 +10500,31 @@ export const callWorkstationGatewayCapability = async (
         );
         return {
           page: page.page,
-          text_excerpt: compactPageText.slice(excerptStart, excerptStart + (searchTerm ? 1200 : 5000)),
+          text_excerpt: compactPageText.slice(
+            excerptStart,
+            excerptStart + (searchTerm ? 1200 : 5000),
+          ),
           source_text_ref: page.source_text_ref,
           text_char_count: page.text_char_count,
           ...(textualSentences.length > 0
             ? {
                 first_nonblank_sentence: firstBoundarySentence,
-                last_nonblank_sentence: textualSentences[textualSentences.length - 1],
+                last_nonblank_sentence:
+                  textualSentences[textualSentences.length - 1],
               }
             : {}),
         };
       });
     const completedSearch = Boolean(document && !blockedReason && searchTerm);
-    const selectedForAnswer = Boolean(document && (selectedPages.length > 0 || completedSearch));
-    const selectedEvidencePageSet = new Set(selectedPages.map((page) => page.page));
-    const boundedPaperEvidenceSidecars = (document?.paper_evidence_sidecars ?? [])
+    const selectedForAnswer = Boolean(
+      document && (selectedPages.length > 0 || completedSearch),
+    );
+    const selectedEvidencePageSet = new Set(
+      selectedPages.map((page) => page.page),
+    );
+    const boundedPaperEvidenceSidecars = (
+      document?.paper_evidence_sidecars ?? []
+    )
       .slice(0, 4)
       .map((sidecar) => ({
         schema: sidecar.schema,
@@ -8758,7 +10539,11 @@ export const callWorkstationGatewayCapability = async (
         enrichment_status: sidecar.enrichment.agent_enrichment_status,
         last_proposal_id: sidecar.enrichment.last_proposal_id ?? null,
         equation_candidates: sidecar.equation_candidates
-          .filter((candidate) => selectedEvidencePageSet.size === 0 || selectedEvidencePageSet.has(candidate.page))
+          .filter(
+            (candidate) =>
+              selectedEvidencePageSet.size === 0 ||
+              selectedEvidencePageSet.has(candidate.page),
+          )
           .slice(0, 40)
           .map((candidate) => ({
             equation_id: candidate.equation_id,
@@ -8788,10 +10573,18 @@ export const callWorkstationGatewayCapability = async (
       artifact_id: `${turnId}:research_library_observation:${iteration}`,
       turn_id: turnId,
       capability: RESEARCH_LIBRARY_READ_CAPABILITY,
-      ...(document ? { document: (() => {
-        const { pages: _pages, paper_evidence_sidecars: _sidecars, ...summary } = document;
-        return { ...summary, raw_content_included: false };
-      })() } : {}),
+      ...(document
+        ? {
+            document: (() => {
+              const {
+                pages: _pages,
+                paper_evidence_sidecars: _sidecars,
+                ...summary
+              } = document;
+              return { ...summary, raw_content_included: false };
+            })(),
+          }
+        : {}),
       selected_pages: selectedPages,
       paper_evidence_sidecars: boundedPaperEvidenceSidecars,
       requested_source_url: sourceUrl,
@@ -8801,17 +10594,36 @@ export const callWorkstationGatewayCapability = async (
       page_numbers: pageNumbers.length > 0 ? pageNumbers : null,
       page_start: pageStart,
       page_end: pageEnd,
-      page_boundary_mode: pageBoundarySentencesRequested ? pageBoundaryMode : null,
-      ...(searchTerm ? {
-        search_term: searchTerm,
-        match_count: matchCounts.reduce((sum, entry) => sum + entry.count, 0),
-        match_pages: matchCounts.filter((entry) => entry.count > 0).map((entry) => entry.page),
-      } : {}),
-      evidence_state: selectedForAnswer ? "full_text_usable" : "saved_full_text_missing",
+      page_boundary_mode: pageBoundarySentencesRequested
+        ? pageBoundaryMode
+        : null,
+      ...(searchTerm
+        ? {
+            search_term: searchTerm,
+            match_count: matchCounts.reduce(
+              (sum, entry) => sum + entry.count,
+              0,
+            ),
+            match_pages: matchCounts
+              .filter((entry) => entry.count > 0)
+              .map((entry) => entry.page),
+          }
+        : {}),
+      evidence_state: selectedForAnswer
+        ? "full_text_usable"
+        : "saved_full_text_missing",
       evidence_origin: "profile_research_library",
       selected_for_answer: selectedForAnswer,
-      missing_requirements: blockedReason ? [blockedReason] : selectedForAnswer ? [] : ["saved_research_page_evidence_missing"],
-      status: selectedForAnswer ? "succeeded" : blockedReason ? "blocked" : "failed",
+      missing_requirements: blockedReason
+        ? [blockedReason]
+        : selectedForAnswer
+          ? []
+          : ["saved_research_page_evidence_missing"],
+      status: selectedForAnswer
+        ? "succeeded"
+        : blockedReason
+          ? "blocked"
+          : "failed",
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,
@@ -8823,7 +10635,11 @@ export const callWorkstationGatewayCapability = async (
       capabilityId: manifest.capability_id,
       panelId: "docs-viewer",
       action: "read_research_library_document",
-      status: selectedForAnswer ? "succeeded" : blockedReason ? "blocked" : "failed",
+      status: selectedForAnswer
+        ? "succeeded"
+        : blockedReason
+          ? "blocked"
+          : "failed",
       summary: selectedForAnswer
         ? searchTerm
           ? `Completed a private Research Library scan with ${matchCounts.reduce((sum, entry) => sum + entry.count, 0)} match(es) across ${matchCounts.filter((entry) => entry.count > 0).length} page(s).`
@@ -8832,14 +10648,27 @@ export const callWorkstationGatewayCapability = async (
       observation,
       missingRequirements: observation.missing_requirements.map((code) => ({
         code,
-        message: code === "profile_session_required"
-          ? "Sign in before reading private saved research evidence."
-          : "The requested saved research source or page evidence was not found.",
-        repair_action: code === "profile_session_required" ? "ask_user" as const : "repair" as const,
+        message:
+          code === "profile_session_required"
+            ? "Sign in before reading private saved research evidence."
+            : "The requested saved research source or page evidence was not found.",
+        repair_action:
+          code === "profile_session_required"
+            ? ("ask_user" as const)
+            : ("repair" as const),
       })),
     });
-    const error = blockedReason ?? (selectedForAnswer ? undefined : "saved_research_page_evidence_missing");
-    const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error });
+    const error =
+      blockedReason ??
+      (selectedForAnswer ? undefined : "saved_research_page_evidence_missing");
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
     return {
       schema: "helix.workstation_tool_gateway.call_result.v1",
       manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
@@ -8863,12 +10692,22 @@ export const callWorkstationGatewayCapability = async (
 
   if (manifest.capability_id === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) {
     const args = readArguments(input.arguments);
-    const query = normalizeExternalSearchQuery(args.query ?? args.search_query ?? args.prompt ?? args.doi ?? args.arxiv_id);
+    const query = normalizeExternalSearchQuery(
+      args.query ??
+        args.search_query ??
+        args.prompt ??
+        args.doi ??
+        args.arxiv_id,
+    );
     const providers = readScholarlyResearchProviders(args.providers);
     const scholarlyMode = readScholarlyResearchMode(args.mode);
-    const limit = readExternalSearchLimit(args.limit ?? args.max_results ?? args.maxResults);
+    const limit = readExternalSearchLimit(
+      args.limit ?? args.max_results ?? args.maxResults,
+    );
     const scholarlyIntent = readRecord(args.scholarly_intent);
-    const plannedScholarlyCapabilityChain = readRecord(args.planned_scholarly_capability_chain);
+    const plannedScholarlyCapabilityChain = readRecord(
+      args.planned_scholarly_capability_chain,
+    );
     const blockedReason = !query
       ? "missing_query"
       : query.length < 3 || !/[a-z0-9]/i.test(query)
@@ -8879,7 +10718,9 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: blockedReason ? "blocked" : "admitted",
-      reason: blockedReason ? "scholarly_research_query_blocked" : "read_only_gateway_capability",
+      reason: blockedReason
+        ? "scholarly_research_query_blocked"
+        : "read_only_gateway_capability",
       blockedReason: blockedReason ?? undefined,
       sourceTargetIntent: args.source_target_intent,
     });
@@ -8892,7 +10733,12 @@ export const callWorkstationGatewayCapability = async (
         query: query || null,
         intent: scholarlyMode ?? "paper_search",
         ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
-        ...(plannedScholarlyCapabilityChain ? { planned_scholarly_capability_chain: plannedScholarlyCapabilityChain } : {}),
+        ...(plannedScholarlyCapabilityChain
+          ? {
+              planned_scholarly_capability_chain:
+                plannedScholarlyCapabilityChain,
+            }
+          : {}),
         providers_considered: providers,
         providers_called: [],
         provider_record_count: 0,
@@ -8905,11 +10751,13 @@ export const callWorkstationGatewayCapability = async (
         evidence_refs: [],
         papers: [],
         evidence_state: "lookup_blocked",
-        next_affordances: [{
-          capability: manifest.capability_id,
-          reason: blockedReason,
-          query: query || undefined,
-        }],
+        next_affordances: [
+          {
+            capability: manifest.capability_id,
+            reason: blockedReason,
+            query: query || undefined,
+          },
+        ],
         missing_requirements: [blockedReason],
         selected_for_answer: false,
         status: "blocked",
@@ -8928,11 +10776,14 @@ export const callWorkstationGatewayCapability = async (
         status: "blocked",
         summary: `Scholarly research gateway blocked query: ${blockedReason}.`,
         observation,
-        missingRequirements: [{
-          code: blockedReason,
-          message: "Provide a specific scholarly search query, DOI, or arXiv id.",
-          repair_action: "ask_user",
-        }],
+        missingRequirements: [
+          {
+            code: blockedReason,
+            message:
+              "Provide a specific scholarly search query, DOI, or arXiv id.",
+            repair_action: "ask_user",
+          },
+        ],
       });
       const trace = buildGatewayTrace({
         turnId,
@@ -8975,7 +10826,11 @@ export const callWorkstationGatewayCapability = async (
       ...searchObservation,
       capability_key: manifest.capability_id,
       ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
-      ...(plannedScholarlyCapabilityChain ? { planned_scholarly_capability_chain: plannedScholarlyCapabilityChain } : {}),
+      ...(plannedScholarlyCapabilityChain
+        ? {
+            planned_scholarly_capability_chain: plannedScholarlyCapabilityChain,
+          }
+        : {}),
       status: searchObservation.selected_for_answer ? "succeeded" : "failed",
       terminal_eligible: false,
       post_tool_model_step_required: true,
@@ -8997,7 +10852,8 @@ export const callWorkstationGatewayCapability = async (
         ? []
         : searchObservation.missing_requirements.map((code) => ({
             code,
-            message: "Scholarly research lookup could not produce usable bounded paper evidence for this query.",
+            message:
+              "Scholarly research lookup could not produce usable bounded paper evidence for this query.",
             repair_action: "repair" as const,
           })),
     });
@@ -9005,27 +10861,44 @@ export const callWorkstationGatewayCapability = async (
       ...observationPacket.state_delta,
       evidence_state: searchObservation.evidence_state,
       ...(scholarlyIntent ? { scholarly_intent: scholarlyIntent } : {}),
-      ...(plannedScholarlyCapabilityChain ? { planned_scholarly_capability_chain: plannedScholarlyCapabilityChain } : {}),
-      ...(searchObservation.recovery_query_basis ? { recovery_query_basis: searchObservation.recovery_query_basis } : {}),
-      ...(searchObservation.next_affordances.length > 0 ? { next_affordances: searchObservation.next_affordances } : {}),
-      ...(searchObservation.scholarly_lookup_recovery_affordance ? {
-        scholarly_lookup_recovery_affordance: searchObservation.scholarly_lookup_recovery_affordance,
-        recovery_affordances: [
-          ...readArray(observationPacket.state_delta?.recovery_affordances),
-          searchObservation.scholarly_lookup_recovery_affordance,
-        ],
-      } : {}),
+      ...(plannedScholarlyCapabilityChain
+        ? {
+            planned_scholarly_capability_chain: plannedScholarlyCapabilityChain,
+          }
+        : {}),
+      ...(searchObservation.recovery_query_basis
+        ? { recovery_query_basis: searchObservation.recovery_query_basis }
+        : {}),
+      ...(searchObservation.next_affordances.length > 0
+        ? { next_affordances: searchObservation.next_affordances }
+        : {}),
+      ...(searchObservation.scholarly_lookup_recovery_affordance
+        ? {
+            scholarly_lookup_recovery_affordance:
+              searchObservation.scholarly_lookup_recovery_affordance,
+            recovery_affordances: [
+              ...readArray(observationPacket.state_delta?.recovery_affordances),
+              searchObservation.scholarly_lookup_recovery_affordance,
+            ],
+          }
+        : {}),
     };
-    if (!searchObservation.selected_for_answer && searchObservation.next_affordances.length > 0) {
-      observationPacket.suggested_next_steps = Array.from(new Set([
-        ...observationPacket.suggested_next_steps,
-        "use_another_tool",
-        "repair",
-      ]));
+    if (
+      !searchObservation.selected_for_answer &&
+      searchObservation.next_affordances.length > 0
+    ) {
+      observationPacket.suggested_next_steps = Array.from(
+        new Set([
+          ...observationPacket.suggested_next_steps,
+          "use_another_tool",
+          "repair",
+        ]),
+      );
     }
     const error = searchObservation.selected_for_answer
       ? undefined
-      : searchObservation.missing_requirements[0] ?? "no_scholarly_results_returned";
+      : (searchObservation.missing_requirements[0] ??
+        "no_scholarly_results_returned");
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,
@@ -9057,8 +10930,19 @@ export const callWorkstationGatewayCapability = async (
 
   if (manifest.capability_id === SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY) {
     const args = readArguments(input.arguments);
-    const query = normalizeExternalSearchQuery(args.query ?? args.prompt ?? args.paper_result_id ?? args.source_url ?? "paper full text");
-    const paperResultId = optionalString(args.paper_result_id ?? args.paperResultId ?? args.source_ref ?? args.sourceRef);
+    const query = normalizeExternalSearchQuery(
+      args.query ??
+        args.prompt ??
+        args.paper_result_id ??
+        args.source_url ??
+        "paper full text",
+    );
+    const paperResultId = optionalString(
+      args.paper_result_id ??
+        args.paperResultId ??
+        args.source_ref ??
+        args.sourceRef,
+    );
     const explicitArxivId = optionalString(args.arxiv_id ?? args.arxivId);
     const arxivId = extractScholarlyArxivId(
       explicitArxivId
@@ -9072,7 +10956,9 @@ export const callWorkstationGatewayCapability = async (
         (arxivId ? `https://arxiv.org/abs/${arxivId}` : null),
     );
     const paper = readRecord(args.paper);
-    const papers = readArray(args.papers).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+    const papers = readArray(args.papers)
+      .map(readRecord)
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry));
     const hasFetchableSource =
       Boolean(sourceUrl) ||
       hasFetchableScholarlyPaperIdentity(paper) ||
@@ -9096,40 +10982,51 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: blockedReason ? "blocked" : "admitted",
-      reason: blockedReason ? "scholarly_full_text_blocked" : "read_only_gateway_capability",
+      reason: blockedReason
+        ? "scholarly_full_text_blocked"
+        : "read_only_gateway_capability",
       blockedReason: blockedReason ?? undefined,
       sourceTargetIntent: args.source_target_intent,
     });
     if (blockedReason) {
-      const variableSourcePlan = readRecord(args.variable_source_plan ?? args.variableSourcePlan);
-      const sourceTargetIntent = readRecord(args.source_target_intent ?? args.sourceTargetIntent);
-      const fullTextRecoveryAffordance = buildScholarlyFullTextRecoveryAffordance({
-        query,
-        blockedReason,
-        paperResultId,
-        paper,
-        papers,
-        variableSourcePlan,
-        sourceTargetIntent,
-      });
+      const variableSourcePlan = readRecord(
+        args.variable_source_plan ?? args.variableSourcePlan,
+      );
+      const sourceTargetIntent = readRecord(
+        args.source_target_intent ?? args.sourceTargetIntent,
+      );
+      const fullTextRecoveryAffordance =
+        buildScholarlyFullTextRecoveryAffordance({
+          query,
+          blockedReason,
+          paperResultId,
+          paper,
+          papers,
+          variableSourcePlan,
+          sourceTargetIntent,
+        });
       const observation = {
         schema: SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA,
         capability_key: manifest.capability_id,
         capability: manifest.capability_id,
         query,
-        ...(variableSourcePlan ? { variable_source_plan: variableSourcePlan } : {}),
+        ...(variableSourcePlan
+          ? { variable_source_plan: variableSourcePlan }
+          : {}),
         source_kind: "unknown",
         pages_parsed: 0,
         page_text_refs: [],
         selected_chunks: [],
         visual_candidates: [],
         evidence_state: "full_text_unavailable",
-        next_affordances: [{
-          capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
-          reason: blockedReason,
-          query,
-          paper_result_id: paperResultId ?? undefined,
-        }],
+        next_affordances: [
+          {
+            capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+            reason: blockedReason,
+            query,
+            paper_result_id: paperResultId ?? undefined,
+          },
+        ],
         missing_requirements: [blockedReason],
         scholarly_full_text_recovery_affordance: fullTextRecoveryAffordance,
         recovery_affordances: [fullTextRecoveryAffordance],
@@ -9149,17 +11046,21 @@ export const callWorkstationGatewayCapability = async (
         panelId: "scholarly-research",
         action: "fetch_full_text",
         status: "blocked",
-        summary: blockedReason === "fetchable_paper_identity_required"
-          ? "Scholarly full-text fetch was blocked because the paper identity was not fetchable from the current turn evidence."
-          : "Scholarly full-text fetch was blocked because no paper ref or source URL was supplied.",
+        summary:
+          blockedReason === "fetchable_paper_identity_required"
+            ? "Scholarly full-text fetch was blocked because the paper identity was not fetchable from the current turn evidence."
+            : "Scholarly full-text fetch was blocked because no paper ref or source URL was supplied.",
         observation,
-        missingRequirements: [{
-          code: blockedReason,
-          message: blockedReason === "fetchable_paper_identity_required"
-            ? "Provide a paper result or source_ref from a lookup observation that includes a DOI/arXiv/PDF/full-text URL, or run lookup_papers again for the target title."
-            : "Provide a paper result, paper_result_id with papers, or an accessible source_url.",
-          repair_action: "ask_user",
-        }],
+        missingRequirements: [
+          {
+            code: blockedReason,
+            message:
+              blockedReason === "fetchable_paper_identity_required"
+                ? "Provide a paper result or source_ref from a lookup observation that includes a DOI/arXiv/PDF/full-text URL, or run lookup_papers again for the target title."
+                : "Provide a paper result, paper_result_id with papers, or an accessible source_url.",
+            repair_action: "ask_user",
+          },
+        ],
       });
       observationPacket.state_delta = {
         ...observationPacket.state_delta,
@@ -9171,13 +11072,22 @@ export const callWorkstationGatewayCapability = async (
           fullTextRecoveryAffordance,
         ],
       };
-      observationPacket.suggested_next_steps = Array.from(new Set([
-        ...observationPacket.suggested_next_steps,
-        "use_another_tool",
-        "repair",
-        "ask_user",
-      ]));
-      const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error: blockedReason });
+      observationPacket.suggested_next_steps = Array.from(
+        new Set([
+          ...observationPacket.suggested_next_steps,
+          "use_another_tool",
+          "repair",
+          "ask_user",
+        ]),
+      );
+      const trace = buildGatewayTrace({
+        turnId,
+        capabilityId: manifest.capability_id,
+        agentRuntime,
+        admission,
+        observationPacket,
+        error: blockedReason,
+      });
       return {
         schema: "helix.workstation_tool_gateway.call_result.v1",
         manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
@@ -9234,28 +11144,52 @@ export const callWorkstationGatewayCapability = async (
         ? []
         : fullTextObservation.missing_requirements.map((code) => ({
             code,
-            message: "Scholarly full text could not be fetched or parsed into bounded text evidence.",
+            message:
+              "Scholarly full text could not be fetched or parsed into bounded text evidence.",
             repair_action: "repair" as const,
           })),
-      producedAffordances: buildGatewayProducedAffordances({ capabilityId: manifest.capability_id, observation }),
-      consumedAffordances: buildGatewayConsumedAffordances({ capabilityId: manifest.capability_id, observation }),
+      producedAffordances: buildGatewayProducedAffordances({
+        capabilityId: manifest.capability_id,
+        observation,
+      }),
+      consumedAffordances: buildGatewayConsumedAffordances({
+        capabilityId: manifest.capability_id,
+        observation,
+      }),
       requiredAffordanceKinds: manifest.consumes_affordances,
       producedAffordanceKinds: manifest.produces_affordances,
     });
     observationPacket.state_delta = {
       ...observationPacket.state_delta,
       evidence_state: fullTextObservation.evidence_state,
-      ...(fullTextObservation.next_affordances.length > 0 ? { next_affordances: fullTextObservation.next_affordances } : {}),
+      ...(fullTextObservation.next_affordances.length > 0
+        ? { next_affordances: fullTextObservation.next_affordances }
+        : {}),
     };
-    if (!fullTextObservation.selected_for_answer && fullTextObservation.next_affordances.length > 0) {
-      observationPacket.suggested_next_steps = Array.from(new Set([
-        ...observationPacket.suggested_next_steps,
-        "use_another_tool",
-        "repair",
-      ]));
+    if (
+      !fullTextObservation.selected_for_answer &&
+      fullTextObservation.next_affordances.length > 0
+    ) {
+      observationPacket.suggested_next_steps = Array.from(
+        new Set([
+          ...observationPacket.suggested_next_steps,
+          "use_another_tool",
+          "repair",
+        ]),
+      );
     }
-    const error = fullTextObservation.selected_for_answer ? undefined : fullTextObservation.missing_requirements[0] ?? "scholarly_full_text_unavailable";
-    const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error });
+    const error = fullTextObservation.selected_for_answer
+      ? undefined
+      : (fullTextObservation.missing_requirements[0] ??
+        "scholarly_full_text_unavailable");
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
     return {
       schema: "helix.workstation_tool_gateway.call_result.v1",
       manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
@@ -9279,26 +11213,41 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
-  if (manifest.capability_id === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY) {
+  if (
+    manifest.capability_id === SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY
+  ) {
     const args = readArguments(input.arguments);
-    const requestedVariables = readStringArray(args.requested_variables ?? args.requestedVariables ?? args.variables);
-    const extractionMode = cleanString(args.extraction_mode ?? args.extractionMode) === "open_supported_parameters" || requestedVariables.length === 0
-      ? "open_supported_parameters"
-      : "requested_variables";
-    const fullTextObservation = readRecord(args.full_text_observation ?? args.fullTextObservation);
-    const textEvidence = optionalString(args.text_evidence ?? args.textEvidence ?? args.text);
+    const requestedVariables = readStringArray(
+      args.requested_variables ?? args.requestedVariables ?? args.variables,
+    );
+    const extractionMode =
+      cleanString(args.extraction_mode ?? args.extractionMode) ===
+        "open_supported_parameters" || requestedVariables.length === 0
+        ? "open_supported_parameters"
+        : "requested_variables";
+    const fullTextObservation = readRecord(
+      args.full_text_observation ?? args.fullTextObservation,
+    );
+    const textEvidence = optionalString(
+      args.text_evidence ?? args.textEvidence ?? args.text,
+    );
     const sourceRef = optionalString(args.source_ref ?? args.sourceRef);
-    const variableSourcePlan = readRecord(args.variable_source_plan ?? args.variableSourcePlan);
-    const sourceTargetIntent = readRecord(args.source_target_intent ?? args.sourceTargetIntent);
-    const blockedReason = !fullTextObservation && !textEvidence
-        ? "text_evidence_required"
-        : null;
+    const variableSourcePlan = readRecord(
+      args.variable_source_plan ?? args.variableSourcePlan,
+    );
+    const sourceTargetIntent = readRecord(
+      args.source_target_intent ?? args.sourceTargetIntent,
+    );
+    const blockedReason =
+      !fullTextObservation && !textEvidence ? "text_evidence_required" : null;
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: blockedReason ? "blocked" : "admitted",
-      reason: blockedReason ? "scholarly_numeric_parameter_blocked" : "read_only_gateway_capability",
+      reason: blockedReason
+        ? "scholarly_numeric_parameter_blocked"
+        : "read_only_gateway_capability",
       blockedReason: blockedReason ?? undefined,
       sourceTargetIntent: args.source_target_intent,
     });
@@ -9313,15 +11262,20 @@ export const callWorkstationGatewayCapability = async (
           paper: {},
           requested_variables: requestedVariables,
           parameters: [],
-          missing_variables: extractionMode === "open_supported_parameters" ? [] : requestedVariables,
+          missing_variables:
+            extractionMode === "open_supported_parameters"
+              ? []
+              : requestedVariables,
           rejected_candidates: [],
           evidence_state: "numeric_evidence_missing",
-          next_affordances: [{
-            capability: manifest.capability_id,
-            reason: blockedReason,
-            source_ref: sourceRef ?? undefined,
-            variables: requestedVariables,
-          }],
+          next_affordances: [
+            {
+              capability: manifest.capability_id,
+              reason: blockedReason,
+              source_ref: sourceRef ?? undefined,
+              variables: requestedVariables,
+            },
+          ],
           missing_requirements: [blockedReason],
           variable_source_plan: variableSourcePlan,
           selected_for_answer: false,
@@ -9357,21 +11311,36 @@ export const callWorkstationGatewayCapability = async (
     });
     const observation = {
       ...numericObservation,
-      ...(variableSourcePlan ? { variable_source_plan: variableSourcePlan } : {}),
-      ...(numericRecoveryAffordance ? {
-        scholarly_numeric_recovery_affordance: numericRecoveryAffordance,
-        recovery_affordances: [
-          ...readArray((numericObservation as Record<string, unknown>).recovery_affordances),
-          numericRecoveryAffordance,
-        ],
-      } : {}),
-      status: numericObservation.selected_for_answer ? "succeeded" : blockedReason ? "blocked" : "failed",
+      ...(variableSourcePlan
+        ? { variable_source_plan: variableSourcePlan }
+        : {}),
+      ...(numericRecoveryAffordance
+        ? {
+            scholarly_numeric_recovery_affordance: numericRecoveryAffordance,
+            recovery_affordances: [
+              ...readArray(
+                (numericObservation as Record<string, unknown>)
+                  .recovery_affordances,
+              ),
+              numericRecoveryAffordance,
+            ],
+          }
+        : {}),
+      status: numericObservation.selected_for_answer
+        ? "succeeded"
+        : blockedReason
+          ? "blocked"
+          : "failed",
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
     };
-    const status = numericObservation.selected_for_answer ? "succeeded" : blockedReason ? "blocked" : "failed";
+    const status = numericObservation.selected_for_answer
+      ? "succeeded"
+      : blockedReason
+        ? "blocked"
+        : "failed";
     const observationPacket = buildWorkstationGatewayObservationPacket({
       turnId,
       iteration,
@@ -9387,11 +11356,20 @@ export const callWorkstationGatewayCapability = async (
         ? []
         : numericObservation.missing_requirements.map((code) => ({
             code,
-            message: "Required numeric paper evidence is missing, ambiguous, uncited, or unit-incompatible.",
-            repair_action: blockedReason ? "ask_user" as const : "repair" as const,
+            message:
+              "Required numeric paper evidence is missing, ambiguous, uncited, or unit-incompatible.",
+            repair_action: blockedReason
+              ? ("ask_user" as const)
+              : ("repair" as const),
           })),
-      producedAffordances: buildGatewayProducedAffordances({ capabilityId: manifest.capability_id, observation }),
-      consumedAffordances: buildGatewayConsumedAffordances({ capabilityId: manifest.capability_id, observation }),
+      producedAffordances: buildGatewayProducedAffordances({
+        capabilityId: manifest.capability_id,
+        observation,
+      }),
+      consumedAffordances: buildGatewayConsumedAffordances({
+        capabilityId: manifest.capability_id,
+        observation,
+      }),
       requiredAffordanceKinds: manifest.consumes_affordances,
       producedAffordanceKinds: manifest.produces_affordances,
     });
@@ -9399,26 +11377,40 @@ export const callWorkstationGatewayCapability = async (
       observationPacket.state_delta = {
         ...observationPacket.state_delta,
         evidence_state: numericObservation.evidence_state,
-        next_affordances: readArray((numericObservation as Record<string, unknown>).next_affordances),
+        next_affordances: readArray(
+          (numericObservation as Record<string, unknown>).next_affordances,
+        ),
         scholarly_numeric_recovery_affordance: numericRecoveryAffordance,
         recovery_affordances: [
           ...readArray(observationPacket.state_delta?.recovery_affordances),
           numericRecoveryAffordance,
         ],
       };
-      observationPacket.suggested_next_steps = Array.from(new Set([
-        ...observationPacket.suggested_next_steps,
-        "use_another_tool",
-        "ask_user",
-      ]));
+      observationPacket.suggested_next_steps = Array.from(
+        new Set([
+          ...observationPacket.suggested_next_steps,
+          "use_another_tool",
+          "ask_user",
+        ]),
+      );
     } else {
       observationPacket.state_delta = {
         ...observationPacket.state_delta,
         evidence_state: numericObservation.evidence_state,
       };
     }
-    const error = numericObservation.selected_for_answer ? undefined : numericObservation.missing_requirements[0] ?? "missing_requested_numeric_variables";
-    const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error });
+    const error = numericObservation.selected_for_answer
+      ? undefined
+      : (numericObservation.missing_requirements[0] ??
+        "missing_requested_numeric_variables");
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
     return {
       schema: "helix.workstation_tool_gateway.call_result.v1",
       manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
@@ -9451,8 +11443,12 @@ export const callWorkstationGatewayCapability = async (
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: hasPrompt ? "admitted" : "blocked",
-      reason: hasPrompt ? "read_only_gateway_capability" : "civilization_bounds_prompt_missing",
-      blockedReason: hasPrompt ? undefined : "civilization_bounds_prompt_missing",
+      reason: hasPrompt
+        ? "read_only_gateway_capability"
+        : "civilization_bounds_prompt_missing",
+      blockedReason: hasPrompt
+        ? undefined
+        : "civilization_bounds_prompt_missing",
       sourceTargetIntent: args.source_target_intent,
     });
     if (!hasPrompt) {
@@ -9473,13 +11469,17 @@ export const callWorkstationGatewayCapability = async (
         panelId: "civilization-bounds-roadmap",
         action: "reflect_system_bounds",
         status: "blocked",
-        summary: "Civilization Bounds reflection was blocked because no prompt was supplied.",
+        summary:
+          "Civilization Bounds reflection was blocked because no prompt was supplied.",
         observation,
-        missingRequirements: [{
-          code: "civilization_bounds_prompt_missing",
-          message: "Provide a prompt or scenario context to reflect through Civilization Bounds.",
-          repair_action: "ask_user",
-        }],
+        missingRequirements: [
+          {
+            code: "civilization_bounds_prompt_missing",
+            message:
+              "Provide a prompt or scenario context to reflect through Civilization Bounds.",
+            repair_action: "ask_user",
+          },
+        ],
       });
       const trace = buildGatewayTrace({
         turnId,
@@ -9512,23 +11512,43 @@ export const callWorkstationGatewayCapability = async (
 
     const output = await runHelixAskCivilizationBoundsTool({
       prompt,
-      scenarioId: optionalString(args.scenario_id ?? args.scenarioId) ?? undefined,
+      scenarioId:
+        optionalString(args.scenario_id ?? args.scenarioId) ?? undefined,
       phaseId: optionalString(args.phase_id ?? args.phaseId) ?? undefined,
       layerMode: readCivilizationLayerMode(args.layer_mode ?? args.layerMode),
-      selectedSystemIds: readStringArray(args.selected_system_ids ?? args.selectedSystemIds),
-      selectedBadgeIds: readStringArray(args.selected_badge_ids ?? args.selectedBadgeIds),
-      theoryReflectionRef: optionalString(args.theory_reflection_ref ?? args.theoryReflectionRef) ?? undefined,
-      ideologyReflectionRef: optionalString(args.ideology_reflection_ref ?? args.ideologyReflectionRef) ?? undefined,
+      selectedSystemIds: readStringArray(
+        args.selected_system_ids ?? args.selectedSystemIds,
+      ),
+      selectedBadgeIds: readStringArray(
+        args.selected_badge_ids ?? args.selectedBadgeIds,
+      ),
+      theoryReflectionRef:
+        optionalString(
+          args.theory_reflection_ref ?? args.theoryReflectionRef,
+        ) ?? undefined,
+      ideologyReflectionRef:
+        optionalString(
+          args.ideology_reflection_ref ?? args.ideologyReflectionRef,
+        ) ?? undefined,
       options: {
-        includeBridgeContext: args.include_bridge_context === true || args.includeBridgeContext === true,
+        includeBridgeContext:
+          args.include_bridge_context === true ||
+          args.includeBridgeContext === true,
         includeCollaborationBounds:
-          args.include_collaboration_bounds === true || args.includeCollaborationBounds === true,
-        includeFalsificationHooks: args.include_falsification_hooks === true || args.includeFalsificationHooks === true,
+          args.include_collaboration_bounds === true ||
+          args.includeCollaborationBounds === true,
+        includeFalsificationHooks:
+          args.include_falsification_hooks === true ||
+          args.includeFalsificationHooks === true,
       },
     });
     const roadmap = output.roadmap;
-    const parameterScopeKinds = output.parameterScopes.map((scope) => scope.kind).slice(0, 12);
-    const actionChannelKinds = output.actionChannels.map((channel) => channel.kind).slice(0, 12);
+    const parameterScopeKinds = output.parameterScopes
+      .map((scope) => scope.kind)
+      .slice(0, 12);
+    const actionChannelKinds = output.actionChannels
+      .map((channel) => channel.kind)
+      .slice(0, 12);
     const missingEvidence = (output.bridgeContext?.missingEvidence ?? [])
       .map((entry) => cleanString(entry))
       .filter(Boolean)
@@ -9596,31 +11616,47 @@ export const callWorkstationGatewayCapability = async (
   if (manifest.capability_id === THEORY_CONTEXT_REFLECTION_CAPABILITY) {
     const args = readArguments(input.arguments);
     const prompt = cleanString(args.prompt ?? args.query ?? args.text);
-    const conversationContext = optionalString(args.conversation_context ?? args.conversationContext);
-    const scientificEvidenceInput = buildTheoryReflectionScientificEvidenceInput(args, prompt);
+    const conversationContext = optionalString(
+      args.conversation_context ?? args.conversationContext,
+    );
+    const scientificEvidenceInput =
+      buildTheoryReflectionScientificEvidenceInput(args, prompt);
     const scientificEvidencePacket = scientificEvidenceInput.packet;
     const scientificEvidenceSidecar = scientificEvidenceInput.sidecar;
-    const requestedMentionedDomains = readStringArray(args.mentioned_domains ?? args.mentionedDomains);
+    const requestedMentionedDomains = readStringArray(
+      args.mentioned_domains ?? args.mentionedDomains,
+    );
     const hasObservedScientificDomain =
       scientificEvidenceInput.source === "sidecar" ||
       scientificEvidenceInput.source === "explicit_packet";
     // Prompt-context classification is a branch hypothesis, not observed
     // evidence. It must not broaden badge admission or manufacture exact hits.
-    const gatedMentionedDomains = scientificEvidencePacket && hasObservedScientificDomain
-      ? Array.from(new Set([
-          ...requestedMentionedDomains,
-          ...scientificEvidencePacket.admissibility.allowed_branch_hints.slice(0, 8),
-        ]))
-      : requestedMentionedDomains;
+    const gatedMentionedDomains =
+      scientificEvidencePacket && hasObservedScientificDomain
+        ? Array.from(
+            new Set([
+              ...requestedMentionedDomains,
+              ...scientificEvidencePacket.admissibility.allowed_branch_hints.slice(
+                0,
+                8,
+              ),
+            ]),
+          )
+        : requestedMentionedDomains;
     const limitRaw = Number(args.limit);
-    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 12) : undefined;
+    const limit =
+      Number.isFinite(limitRaw) && limitRaw > 0
+        ? Math.min(Math.floor(limitRaw), 12)
+        : undefined;
     const hasPrompt = Boolean(prompt);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: hasPrompt ? "admitted" : "blocked",
-      reason: hasPrompt ? "read_only_gateway_capability" : "theory_reflection_prompt_missing",
+      reason: hasPrompt
+        ? "read_only_gateway_capability"
+        : "theory_reflection_prompt_missing",
       blockedReason: hasPrompt ? undefined : "theory_reflection_prompt_missing",
       sourceTargetIntent: args.source_target_intent,
     });
@@ -9642,13 +11678,17 @@ export const callWorkstationGatewayCapability = async (
         panelId: "theory-badge-graph",
         action: "reflect_discussion_context",
         status: "blocked",
-        summary: "Theory Badge Graph reflection was blocked because no prompt was supplied.",
+        summary:
+          "Theory Badge Graph reflection was blocked because no prompt was supplied.",
         observation,
-        missingRequirements: [{
-          code: "theory_reflection_prompt_missing",
-          message: "Provide a prompt or discussion context to reflect against the Theory Badge Graph.",
-          repair_action: "ask_user",
-        }],
+        missingRequirements: [
+          {
+            code: "theory_reflection_prompt_missing",
+            message:
+              "Provide a prompt or discussion context to reflect against the Theory Badge Graph.",
+            repair_action: "ask_user",
+          },
+        ],
       });
       const trace = buildGatewayTrace({
         turnId,
@@ -9684,26 +11724,34 @@ export const callWorkstationGatewayCapability = async (
       threadId: optionalString(args.thread_id ?? args.threadId),
       prompt,
       conversationContext,
-      mentionedEquations: readStringArray(args.mentioned_equations ?? args.mentionedEquations),
-      mentionedSymbols: readStringArray(args.mentioned_symbols ?? args.mentionedSymbols),
+      mentionedEquations: readStringArray(
+        args.mentioned_equations ?? args.mentionedEquations,
+      ),
+      mentionedSymbols: readStringArray(
+        args.mentioned_symbols ?? args.mentionedSymbols,
+      ),
       mentionedDomains: gatedMentionedDomains,
       limit,
-      buildExplanationPlan: args.build_explanation_plan === true || args.buildExplanationPlan === true,
+      buildExplanationPlan:
+        args.build_explanation_plan === true ||
+        args.buildExplanationPlan === true,
       syncPanel: false,
       openPanel: false,
       panelOverlayMode: "none",
       derivationRequest: parseTheoryDerivationRequestArgs(args, prompt),
     });
     const reflection = receipt.reflectionV1;
-    const rawCalculatorPayloads = reflection.evidenceForAsk.calculatorPayloads.slice(0, 12).map((payload) => ({
-      badge_id: payload.badgeId,
-      badge_title: payload.badgeTitle,
-      payload_id: payload.payloadId,
-      expression: payload.expression,
-      display_latex: payload.displayLatex,
-      target_variable: payload.targetVariable,
-      claim_boundary_notes: payload.claimBoundaryNotes.slice(0, 4),
-    }));
+    const rawCalculatorPayloads = reflection.evidenceForAsk.calculatorPayloads
+      .slice(0, 12)
+      .map((payload) => ({
+        badge_id: payload.badgeId,
+        badge_title: payload.badgeTitle,
+        payload_id: payload.payloadId,
+        expression: payload.expression,
+        display_latex: payload.displayLatex,
+        target_variable: payload.targetVariable,
+        claim_boundary_notes: payload.claimBoundaryNotes.slice(0, 4),
+      }));
     const branchGate = buildScientificBranchGate({
       evidence: scientificEvidencePacket,
       sidecar: scientificEvidenceSidecar,
@@ -9714,10 +11762,14 @@ export const callWorkstationGatewayCapability = async (
         ...reflection.overlay.likelyBadgeIds,
       ],
       calculatorPayloads: rawCalculatorPayloads,
-      requireAdmissibleEvidence: scientificEvidenceInput.requireAdmissibleEvidence,
+      requireAdmissibleEvidence:
+        scientificEvidenceInput.requireAdmissibleEvidence,
     });
     const calculatorPayloads = rawCalculatorPayloads.filter(
-      (payload) => !branchGate.rejected_calculator_payload_ids.includes(payload.payload_id),
+      (payload) =>
+        !branchGate.rejected_calculator_payload_ids.includes(
+          payload.payload_id,
+        ),
     );
     const scientificRunTrace = buildScientificRunTrace({
       turnId,
@@ -9731,37 +11783,40 @@ export const callWorkstationGatewayCapability = async (
         .map((payload) => payload.payload_id)
         .filter(Boolean),
     });
-    const scientificEvidenceGraphReflection = buildScientificEvidenceGraphReflection({
-      turnId,
-      evidence: scientificEvidencePacket,
-      sidecar: scientificEvidenceSidecar,
-      branchGate,
-      reflectedBadgeIds: [
-        ...reflection.overlay.exactBadgeIds,
-        ...reflection.overlay.likelyBadgeIds,
-      ],
-      calculatorPayloads,
-      provenanceRefs: [
-        reflection.reflectionId,
-        ...(scientificEvidencePacket
-          ? [
-              scientificEvidencePacket.source_ref_hash,
-              scientificEvidencePacket.crop_region_id,
-            ]
-          : []),
-        ...(scientificEvidenceSidecar
-          ? [
-              scientificEvidenceSidecar.sidecar_id,
-              ...scientificEvidenceSidecar.packet_refs,
-            ]
-          : []),
-      ],
-    });
+    const scientificEvidenceGraphReflection =
+      buildScientificEvidenceGraphReflection({
+        turnId,
+        evidence: scientificEvidencePacket,
+        sidecar: scientificEvidenceSidecar,
+        branchGate,
+        reflectedBadgeIds: [
+          ...reflection.overlay.exactBadgeIds,
+          ...reflection.overlay.likelyBadgeIds,
+        ],
+        calculatorPayloads,
+        provenanceRefs: [
+          reflection.reflectionId,
+          ...(scientificEvidencePacket
+            ? [
+                scientificEvidencePacket.source_ref_hash,
+                scientificEvidencePacket.crop_region_id,
+              ]
+            : []),
+          ...(scientificEvidenceSidecar
+            ? [
+                scientificEvidenceSidecar.sidecar_id,
+                ...scientificEvidenceSidecar.packet_refs,
+              ]
+            : []),
+        ],
+      });
     const scientificClaimBoundaryNotes = [
       `scientific_branch_gate=${branchGate.status}; domain=${branchGate.primary_domain}; congruence_floor=${branchGate.congruence_grade_floor}`,
       `scientific_evidence_graph_reflection=${scientificEvidenceGraphReflection.evidence_depth}; object=${scientificEvidenceGraphReflection.evidence_object_class}`,
       ...(branchGate.rejected_calculator_payload_ids.length
-        ? [`rejected_calculator_payloads=${branchGate.rejected_calculator_payload_ids.join(",")}`]
+        ? [
+            `rejected_calculator_payloads=${branchGate.rejected_calculator_payload_ids.join(",")}`,
+          ]
         : []),
       ...(branchGate.rejected_badge_ids.length
         ? [`rejected_badges=${branchGate.rejected_badge_ids.join(",")}`]
@@ -9772,7 +11827,9 @@ export const callWorkstationGatewayCapability = async (
             `exact_equation_rows=admissible:${scientificEvidenceSidecar.exact_equation_summary.admissible_row_count}; partial:${scientificEvidenceSidecar.exact_equation_summary.partial_row_count}; rejected:${scientificEvidenceSidecar.exact_equation_summary.rejected_row_count}`,
             `exact_equation_blocks=admissible:${scientificEvidenceSidecar.exact_equation_summary.admissible_block_count ?? 0}; partial:${scientificEvidenceSidecar.exact_equation_summary.partial_block_count ?? 0}; rejected:${scientificEvidenceSidecar.exact_equation_summary.rejected_block_count ?? 0}`,
           ]
-        : [`scientific_image_sidecar=missing; evidence_source=${scientificEvidenceInput.source}`]),
+        : [
+            `scientific_image_sidecar=missing; evidence_source=${scientificEvidenceInput.source}`,
+          ]),
       "calculator_template_boundary=admitted calculator payloads are diagnostic templates unless variables, units, assumptions, and source refs are bound.",
       "final_answer_guard=OCR candidates, graph matches, calculator templates, calculation-ready handoffs, and proof/validation must remain separate.",
     ];
@@ -9789,7 +11846,10 @@ export const callWorkstationGatewayCapability = async (
       exact_badge_ids: reflection.overlay.exactBadgeIds.slice(0, 12),
       likely_badge_ids: reflection.overlay.likelyBadgeIds.slice(0, 12),
       rejected_badge_ids: branchGate.rejected_badge_ids.slice(0, 12),
-      highlighted_badge_ids: reflection.overlay.highlightedBadgeIds.slice(0, 12),
+      highlighted_badge_ids: reflection.overlay.highlightedBadgeIds.slice(
+        0,
+        12,
+      ),
       claim_boundary_notes: [
         ...scientificClaimBoundaryNotes,
         ...reflection.evidenceForAsk.claimBoundaries,
@@ -9798,9 +11858,11 @@ export const callWorkstationGatewayCapability = async (
       calculator_template_payloads: calculatorPayloads,
       calculator_template_admissibility: {
         schema: "helix.calculator_template_admissibility.v1",
-        status: calculatorPayloads.length > 0 ? "template_admissible" : "no_template",
+        status:
+          calculatorPayloads.length > 0 ? "template_admissible" : "no_template",
         admitted_template_count: calculatorPayloads.length,
-        rejected_template_count: branchGate.rejected_calculator_payload_ids.length,
+        rejected_template_count:
+          branchGate.rejected_calculator_payload_ids.length,
         calculation_ready_count: 0,
         binding_status: "unbound_variables_units_assumptions",
         claim_boundary: "templates_only_not_calculator_solve_authority",
@@ -9808,7 +11870,8 @@ export const callWorkstationGatewayCapability = async (
         assistant_answer: false,
         raw_content_included: false,
       },
-      rejected_calculator_payload_ids: branchGate.rejected_calculator_payload_ids,
+      rejected_calculator_payload_ids:
+        branchGate.rejected_calculator_payload_ids,
       scientific_evidence_packet: scientificEvidencePacket,
       scientific_evidence_sidecar: scientificEvidenceSidecar,
       selected_scientific_evidence_object:
@@ -9825,8 +11888,12 @@ export const callWorkstationGatewayCapability = async (
       scientific_run_trace: scientificRunTrace,
       scientific_evidence_graph_reflection: scientificEvidenceGraphReflection,
       congruence_grade_floor: branchGate.congruence_grade_floor,
-      recommended_action_ids: receipt.recommendedNextActions.map((action) => action.actionId).slice(0, 12),
-      recommended_actions_solve: receipt.recommendedNextActions.some((action) => action.solves === true),
+      recommended_action_ids: receipt.recommendedNextActions
+        .map((action) => action.actionId)
+        .slice(0, 12),
+      recommended_actions_solve: receipt.recommendedNextActions.some(
+        (action) => action.solves === true,
+      ),
       receipt_schema: receipt.schemaVersion,
       reflection_terminal_eligible: reflection.terminal_eligible,
       authority: receipt.authority,
@@ -9849,10 +11916,14 @@ export const callWorkstationGatewayCapability = async (
         axes_are_independent: true,
       },
       theory_congruence_trace_v1: receipt.theoryCongruenceTraceV1 ?? null,
-      master_problem_v1: receipt.theoryCongruenceTraceV1?.master_problem ?? null,
-      derivation_program_v1: receipt.theoryCongruenceTraceV1?.derivation_program ?? null,
+      master_problem_v1:
+        receipt.theoryCongruenceTraceV1?.master_problem ?? null,
+      derivation_program_v1:
+        receipt.theoryCongruenceTraceV1?.derivation_program ?? null,
       canonical_capability_id: THEORY_CONTEXT_REFLECTION_CAPABILITY,
-      legacy_alias_capability_ids: [...HELIX_THEORY_CONTEXT_REFLECTION_LEGACY_ALIASES],
+      legacy_alias_capability_ids: [
+        ...HELIX_THEORY_CONTEXT_REFLECTION_LEGACY_ALIASES,
+      ],
       terminal_eligible: false,
       post_tool_model_step_required: true,
       assistant_answer: false,
@@ -9909,7 +11980,10 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
-  if (manifest.capability_id === moralLivingSubstrateReflectionManifest.capability_id) {
+  if (
+    manifest.capability_id ===
+    moralLivingSubstrateReflectionManifest.capability_id
+  ) {
     const args = readArguments(input.arguments);
     const gatewayResult = buildMoralSubstrateReflectionGatewayObservation(args);
     const admission = buildAdmission({
@@ -9977,7 +12051,8 @@ export const callWorkstationGatewayCapability = async (
 
   if (manifest.capability_id === moralGraphReflectionManifest.capability_id) {
     const args = readArguments(input.arguments);
-    const gatewayResult = await buildMoralGraphReflectionGatewayObservation(args);
+    const gatewayResult =
+      await buildMoralGraphReflectionGatewayObservation(args);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
@@ -10044,17 +12119,26 @@ export const callWorkstationGatewayCapability = async (
   if (manifest.capability_id === THEORY_FRONTIER_CONJECTURE_CAPABILITY) {
     const args = readArguments(input.arguments);
     const prompt = cleanString(args.prompt ?? args.query ?? args.text);
-    const conversationContext = optionalString(args.conversation_context ?? args.conversationContext);
+    const conversationContext = optionalString(
+      args.conversation_context ?? args.conversationContext,
+    );
     const limitRaw = Number(args.limit);
-    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 12) : undefined;
+    const limit =
+      Number.isFinite(limitRaw) && limitRaw > 0
+        ? Math.min(Math.floor(limitRaw), 12)
+        : undefined;
     const hasPrompt = Boolean(prompt);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
       status: hasPrompt ? "admitted" : "blocked",
-      reason: hasPrompt ? "read_only_gateway_capability" : "theory_frontier_conjecture_prompt_missing",
-      blockedReason: hasPrompt ? undefined : "theory_frontier_conjecture_prompt_missing",
+      reason: hasPrompt
+        ? "read_only_gateway_capability"
+        : "theory_frontier_conjecture_prompt_missing",
+      blockedReason: hasPrompt
+        ? undefined
+        : "theory_frontier_conjecture_prompt_missing",
       sourceTargetIntent: args.source_target_intent,
     });
     if (!hasPrompt) {
@@ -10075,13 +12159,17 @@ export const callWorkstationGatewayCapability = async (
         panelId: "theory-badge-graph",
         action: "propose_frontier_conjectures",
         status: "blocked",
-        summary: "Theory Badge Graph conjecture workbench was blocked because no prompt was supplied.",
+        summary:
+          "Theory Badge Graph conjecture workbench was blocked because no prompt was supplied.",
         observation,
-        missingRequirements: [{
-          code: "theory_frontier_conjecture_prompt_missing",
-          message: "Provide a prompt or discussion context before proposing frontier conjecture candidates.",
-          repair_action: "ask_user",
-        }],
+        missingRequirements: [
+          {
+            code: "theory_frontier_conjecture_prompt_missing",
+            message:
+              "Provide a prompt or discussion context before proposing frontier conjecture candidates.",
+            repair_action: "ask_user",
+          },
+        ],
       });
       const trace = buildGatewayTrace({
         turnId,
@@ -10118,13 +12206,23 @@ export const callWorkstationGatewayCapability = async (
       threadId: optionalString(args.thread_id ?? args.threadId),
       prompt,
       conversationContext,
-      mentionedEquations: readStringArray(args.mentioned_equations ?? args.mentionedEquations),
-      mentionedSymbols: readStringArray(args.mentioned_symbols ?? args.mentionedSymbols),
-      mentionedDomains: readStringArray(args.mentioned_domains ?? args.mentionedDomains),
+      mentionedEquations: readStringArray(
+        args.mentioned_equations ?? args.mentionedEquations,
+      ),
+      mentionedSymbols: readStringArray(
+        args.mentioned_symbols ?? args.mentionedSymbols,
+      ),
+      mentionedDomains: readStringArray(
+        args.mentioned_domains ?? args.mentionedDomains,
+      ),
       limit,
-      buildExplanationPlan: args.build_explanation_plan !== false && args.buildExplanationPlan !== false,
+      buildExplanationPlan:
+        args.build_explanation_plan !== false &&
+        args.buildExplanationPlan !== false,
       buildFrontierSearch: true,
-      frontierSearchSeed: optionalString(args.frontier_search_seed ?? args.frontierSearchSeed),
+      frontierSearchSeed: optionalString(
+        args.frontier_search_seed ?? args.frontierSearchSeed,
+      ),
       panelSync: {
         requested: false,
         applied: false,
@@ -10133,9 +12231,14 @@ export const callWorkstationGatewayCapability = async (
       },
     });
     const frontierSearch = receipt.frontierSearchV1;
-    const forbiddenClaimNotes = theoryFrontierConjectureForbiddenClaimNotes(prompt);
+    const forbiddenClaimNotes =
+      theoryFrontierConjectureForbiddenClaimNotes(prompt);
     const workbench = frontierSearch
-      ? buildTheoryFrontierConjectureWorkbenchV1(frontierSearch, receipt.recommendedNextActions, forbiddenClaimNotes)
+      ? buildTheoryFrontierConjectureWorkbenchV1(
+          frontierSearch,
+          receipt.recommendedNextActions,
+          forbiddenClaimNotes,
+        )
       : null;
     const observation = {
       schema: THEORY_FRONTIER_CONJECTURE_OBSERVATION_SCHEMA,
@@ -10152,12 +12255,17 @@ export const callWorkstationGatewayCapability = async (
       candidates: workbench?.candidates ?? [],
       candidate_status_counts: workbench?.candidate_status_counts ?? {},
       top_candidate_id: workbench?.top_candidate_id ?? null,
-      scholarly_lookup_request_count: workbench?.scholarly_lookup_request_count ?? 0,
-      exact_verification_result_count: receipt.frontierExactVerificationResultsV1.length,
+      scholarly_lookup_request_count:
+        workbench?.scholarly_lookup_request_count ?? 0,
+      exact_verification_result_count:
+        receipt.frontierExactVerificationResultsV1.length,
       probability_terrain: workbench?.probability_terrain ?? null,
-      claim_boundary_notes: receipt.reflectionV1.evidenceForAsk.claimBoundaries.slice(0, 12),
+      claim_boundary_notes:
+        receipt.reflectionV1.evidenceForAsk.claimBoundaries.slice(0, 12),
       forbidden_claim_scan_notes: forbiddenClaimNotes,
-      recommended_action_ids: receipt.recommendedNextActions.map((action) => action.actionId).slice(0, 12),
+      recommended_action_ids: receipt.recommendedNextActions
+        .map((action) => action.actionId)
+        .slice(0, 12),
       recommended_actions_solve: false,
       receipt_schema: receipt.schemaVersion,
       authority: receipt.authority,
@@ -10179,11 +12287,14 @@ export const callWorkstationGatewayCapability = async (
       observation,
       missingRequirements: workbench
         ? undefined
-        : [{
-            code: "theory_frontier_conjecture_no_candidates",
-            message: "No frontier conjecture candidates were produced for the prompt.",
-            repair_action: "ask_user",
-          }],
+        : [
+            {
+              code: "theory_frontier_conjecture_no_candidates",
+              message:
+                "No frontier conjecture candidates were produced for the prompt.",
+              repair_action: "ask_user",
+            },
+          ],
     });
     const trace = buildGatewayTrace({
       turnId,
@@ -10210,9 +12321,13 @@ export const callWorkstationGatewayCapability = async (
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
-      ...(workbench ? {} : { error: "theory_frontier_conjecture_no_candidates" }),
+      ...(workbench
+        ? {}
+        : { error: "theory_frontier_conjecture_no_candidates" }),
     };
   }
 
-  throw new Error(`unhandled_workstation_gateway_capability:${manifest.capability_id}`);
+  throw new Error(
+    `unhandled_workstation_gateway_capability:${manifest.capability_id}`,
+  );
 };

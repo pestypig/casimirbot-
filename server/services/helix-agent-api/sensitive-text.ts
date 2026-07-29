@@ -4,6 +4,8 @@ const SECRET_PATTERNS: readonly RegExp[] = [
   /\bhelix_room_src_[A-Za-z0-9_-]+/gu,
   /\broom_source_claim_[A-Za-z0-9:._~-]+/gu,
   /\bagent_chat_claim_[A-Za-z0-9:._~-]+/gu,
+  /\bhelix_env_device_[A-Za-z0-9_-]{24,}/gu,
+  /\bhelix_probe_lease_[A-Za-z0-9_-]{24,}/gu,
   /\bAuthorization\s*:\s*Bearer\s+[^\s,;"']+/giu,
   /\bBearer\s+[A-Za-z0-9._~+/-]{12,}={0,2}/giu,
   /\b(?:access_token|refresh_token|bearer_token|token_value|claim_handle)\s*[=:]\s*["']?[^"'\s,;}&]+/giu,

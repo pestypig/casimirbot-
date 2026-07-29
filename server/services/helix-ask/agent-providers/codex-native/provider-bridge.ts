@@ -39,6 +39,25 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const readThreadId = (body: Record<string, unknown>): string => {
+  const sourceTargetIntent = readRecord(
+    body.source_target_intent ?? body.sourceTargetIntent,
+  );
+  const routeProductContract = readRecord(
+    body.route_product_contract ?? body.routeProductContract,
+  );
+  return (
+    readString(sourceTargetIntent?.thread_id ?? sourceTargetIntent?.threadId) ??
+    readString(
+      routeProductContract?.thread_id ?? routeProductContract?.threadId,
+    ) ??
+    readString(body.session_id ?? body.sessionId) ??
+    readString(body.conversation_id ?? body.conversationId) ??
+    readString(body.thread_id ?? body.threadId) ??
+    "helix-agent-provider"
+  );
+};
+
 const readStringArray = (value: unknown): string[] | null => {
   if (!Array.isArray(value)) return null;
   return Array.from(
@@ -72,6 +91,16 @@ const normalizeGatewayCapabilityId = (capabilityId: string): string =>
 const normalizeGatewayCapabilityIds = (capabilityIds: string[]): string[] =>
   Array.from(new Set(capabilityIds.map(normalizeGatewayCapabilityId)));
 
+const gatewayCapabilitiesForAdmittedFamily = (family: string): string[] => {
+  switch (family.trim().toLowerCase()) {
+    case "situation_run":
+    case "visual_capture":
+      return ["situation-room.describe_visual_capture"];
+    default:
+      return [];
+  }
+};
+
 export const readTurnAdmittedWorkstationTools = (
   body: Record<string, unknown>,
 ): string[] | null => {
@@ -101,6 +130,9 @@ export const readTurnAdmittedWorkstationTools = (
                 ...(readStringArray(
                   admission.compound_requested_capabilities,
                 ) ?? []),
+                ...(
+                  readStringArray(admission.admitted_tool_families) ?? []
+                ).flatMap(gatewayCapabilitiesForAdmittedFamily),
                 readString(admission.admitted_capability),
                 readString(admission.selected_capability),
                 readString(routeArbitration?.selected_capability),
@@ -244,6 +276,7 @@ export const runCodexNativeProviderBridge = async (input: {
   eligible: boolean;
   prompt: string;
   turnId: string;
+  conversationThreadId?: string | null;
   body: Record<string, unknown>;
   headers?: IncomingHttpHeaders;
   accountContext?: HelixWorkstationGatewayAccountContext;
@@ -321,6 +354,8 @@ export const runCodexNativeProviderBridge = async (input: {
   const result = await runCodexNativeWorkstationTurn({
     prompt: input.prompt,
     turnId: input.turnId,
+    conversationThreadId:
+      readString(input.conversationThreadId) ?? readThreadId(input.body),
     cwd: process.cwd(),
     accountContext,
     requestedMode: "act",

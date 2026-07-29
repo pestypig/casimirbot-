@@ -169,7 +169,13 @@ const terminalReceiptAllowed = (input: {
 };
 
 const resultRefs = (result: HelixCapabilityResult | null): string[] =>
-  result ? unique([result.capability_plan_id, ...result.receipt_refs, ...result.evidence_refs]) : [];
+  result
+    ? unique([
+        result.capability_plan_id,
+        ...readStringArray(result.receipt_refs),
+        ...readStringArray(result.evidence_refs),
+      ])
+    : [];
 
 export const buildCapabilityLifecycleLedger = (input: {
   turnId: string;
@@ -206,10 +212,24 @@ export const buildCapabilityLifecycleLedger = (input: {
   const resultObserved = satisfiedWorkstationEvaluation || Boolean(result && !resultNotRun) || admissibleExplicitNotRun;
   const validated =
     satisfiedWorkstationEvaluation ||
-    Boolean(result && (result.status === "succeeded" || (result.status === "partial" && result.evidence_refs.length > 0))) ||
+    Boolean(
+      result &&
+        (
+          result.status === "succeeded" ||
+          (
+            result.status === "partial" &&
+            readStringArray(result.evidence_refs).length > 0
+          )
+        ),
+    ) ||
     admissibleExplicitNotRun;
   const reentryCandidateRefs = unique([
-    ...(result ? [...result.receipt_refs, ...result.evidence_refs] : []),
+    ...(result
+      ? [
+          ...readStringArray(result.receipt_refs),
+          ...readStringArray(result.evidence_refs),
+        ]
+      : []),
     ...derivedWorkstationRefs,
   ]);
   const reentry = resolveHelixRuntimeObservationReentry({

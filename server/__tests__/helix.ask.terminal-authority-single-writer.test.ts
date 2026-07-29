@@ -1544,7 +1544,7 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.typed_failure).toBeUndefined();
   });
 
-  it("preserves a current-turn authorized provider bridge when a later typed failure overwrites top-level terminal fields", () => {
+  it("prefers a persisted current-turn authorized provider bridge over a later unauthorized recovery projection", () => {
     const turnId = "ask:test:docs-provider-bridge-recovery";
     const observationRef = `${turnId}:workstation_gateway:docs.search:1`;
     const providerCandidateRef = `${turnId}:agent_provider_terminal_candidate:codex:docs`;
@@ -1618,7 +1618,27 @@ describe("Helix terminal authority single writer", () => {
       solver_continuation_observation: { required_next_step: "model.direct_answer" },
     };
     const persistedBridge = payload.provider_terminal_authority_bridge as Record<string, unknown>;
-    delete payload.provider_terminal_authority_bridge;
+    payload.provider_terminal_authority_bridge = {
+      schema: "helix.provider_terminal_authority_bridge.v1",
+      turn_id: turnId,
+      terminal_authority_granted: false,
+      final_visible_answer_authorized: false,
+      terminal_authority_status: "blocked_by_missing_normalized_observations",
+      provider_terminal_candidate: {
+        candidate_id: `${turnId}:agent_provider_terminal_candidate:codex:unauthorized-recovery`,
+        candidate_text: "A later unauthorized recovery projection.",
+        grounded_in_observation_refs: [],
+        normalized_observation_refs: [],
+        evidence_reentry_required: false,
+      },
+    };
+    payload.provider_terminal_candidate = {
+      candidate_id: `${turnId}:agent_provider_terminal_candidate:codex:unauthorized-recovery`,
+      candidate_text: "A later unauthorized recovery projection.",
+      grounded_in_observation_refs: [],
+      normalized_observation_refs: [],
+      evidence_reentry_required: false,
+    };
     artifacts.push({
       artifact_id: `${turnId}:provider_terminal_authority_bridge:terminal_recovery`,
       kind: "provider_terminal_authority_bridge",
@@ -1755,6 +1775,167 @@ describe("Helix terminal authority single writer", () => {
       current_turn_support_ref_count: 1,
       rejection_reason: null,
     });
+  });
+
+  it("admits only exact current-turn revalidated environment evidence as provider support", () => {
+    const turnId = "ask:test:prior-environment-route-product";
+    const observationRef = `${turnId}:prior_environment_probe_evidence:verified`;
+    const providerCandidateRef = `${turnId}:agent_provider_terminal_candidate:codex:environment`;
+    const answerText =
+      "Line of sight and range are established, but a navigable path is not.";
+    const terminalAuthority = {
+      schema: "helix.turn_terminal_authority.v1",
+      thread_id: "helix-ask:room:room:test",
+      turn_id: turnId,
+      route: "/ask/turn",
+      terminal_kind: "answer",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      terminal_item_id: providerCandidateRef,
+      server_authoritative: true,
+    };
+    const terminalPresentation = {
+      schema: "helix.terminal_presentation.v1",
+      turn_id: turnId,
+      concise_text: answerText,
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_authority_ref: providerCandidateRef,
+      selected_observation_refs: [observationRef],
+    };
+    const verifiedArtifact = {
+      artifact_id: observationRef,
+      kind: "prior_environment_probe_evidence",
+      turn_id: turnId,
+      source_scope: "prior_turn_context",
+      producer_item_id: "conversation_memory_environment_evidence_reentry",
+      status: "succeeded",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      payload: {
+        schema: "helix.environment_connector.prior_probe_evidence.v1",
+        prior_turn_id: "ask:test:prior-environment-source",
+        probe_request_ref: "environment_probe_request:verified",
+        room_id: "room:test",
+        source_id: "source:test",
+        world_id: "minecraft:test",
+        capability_id: "com.casimirbot.minecraft.reachability.check",
+        observation: {
+          schema: "helix.environment_connector.probe_observation.v1",
+          outcome: "succeeded",
+          provenance_valid: true,
+          eligible_for_current_turn_reentry: true,
+          content_role:
+            "environment_probe_observation_not_assistant_answer",
+          reentry_required: true,
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        content_role:
+          "prior_environment_probe_evidence_not_assistant_answer",
+        reentry_required: true,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    };
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      provider_terminal_candidate: {
+        candidate_id: providerCandidateRef,
+        candidate_text: answerText,
+        grounded_in_observation_refs: [observationRef],
+        normalized_observation_refs: [observationRef],
+        evidence_reentry_required: true,
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+        evidence_reentry_required: true,
+        terminal_answer_authority: terminalAuthority,
+        terminal_presentation: terminalPresentation,
+      },
+      terminal_answer_authority: terminalAuthority,
+      terminal_presentation: terminalPresentation,
+    };
+    const inspect = (artifact: typeof verifiedArtifact) =>
+      inspectAgentProviderRouteProductEligibility({
+        payload,
+        artifacts: [artifact],
+        turnId,
+        requiredTerminalKind: "model_synthesized_answer",
+        routeAllowsTerminalKind: (kind) =>
+          kind === "model_synthesized_answer",
+      });
+
+    expect(inspect(verifiedArtifact)).toMatchObject({
+      current_turn_support_ref_count: 1,
+      rejection_reason: null,
+    });
+    expect(
+      materializeAgentProviderRouteProductTerminal({
+        payload,
+        artifacts: [verifiedArtifact],
+        turnId,
+        requiredTerminalKind: "model_synthesized_answer",
+        routeAllowsTerminalKind: (kind) =>
+          kind === "model_synthesized_answer",
+      }),
+    ).toMatchObject({
+      kind: "model_synthesized_answer",
+      text: answerText,
+      supportRefs: [observationRef],
+    });
+    for (const forged of [
+      {
+        ...verifiedArtifact,
+        payload: {
+          ...verifiedArtifact.payload,
+          observation: {
+            ...verifiedArtifact.payload.observation,
+            provenance_valid: false,
+          },
+        },
+      },
+      {
+        ...verifiedArtifact,
+        payload: {
+          ...verifiedArtifact.payload,
+          observation: {
+            ...verifiedArtifact.payload.observation,
+            outcome: "failed",
+          },
+        },
+      },
+      {
+        ...verifiedArtifact,
+        payload: {
+          ...verifiedArtifact.payload,
+          answer_authority: true,
+        },
+      },
+    ]) {
+      expect(inspect(forged)).toMatchObject({
+        current_turn_support_ref_count: 0,
+        rejection_reason: "current_turn_support_refs_missing",
+      });
+      expect(
+        materializeAgentProviderRouteProductTerminal({
+          payload,
+          artifacts: [forged],
+          turnId,
+          requiredTerminalKind: "model_synthesized_answer",
+          routeAllowsTerminalKind: (kind) =>
+            kind === "model_synthesized_answer",
+        }),
+      ).toBeNull();
+    }
   });
 
   it("materializes an authorized provider candidate as route-required direct answer text", () => {
@@ -5675,6 +5856,186 @@ describe("Helix terminal authority single writer", () => {
     });
   });
 
+  it("surfaces a typed environment connector refusal instead of masking it as a missing itinerary observation", () => {
+    const turnId = "ask:test:environment-connector-permission-revoked";
+    const capability = "com.casimirbot.minecraft.inventory.check";
+    const failureText =
+      "Environment probes require an authenticated external Agent API continuation.";
+    const genericContinuationText =
+      "I could not complete this turn yet because solver continuation is required before terminal answer selection.";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "solver_continuation_pending",
+      terminal_failure_text: genericContinuationText,
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "solver_continuation_pending",
+        message: genericContinuationText,
+        text: genericContinuationText,
+        answer_text: genericContinuationText,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "live_environment",
+        allowed_terminal_artifact_kinds: [
+          "model_synthesized_answer",
+          "typed_failure",
+        ],
+      },
+      canonical_goal_frame: {
+        goal_kind: "live_environment",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "single_tool",
+        relevant_tool_families: ["live_environment"],
+        terminal_success_criteria: {
+          required_observation_families: ["live_environment"],
+          required_capabilities: [capability],
+          requires_post_observation_synthesis: true,
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      workstation_gateway_call_results: [
+        {
+          schema: "helix.workstation_tool_gateway.call_result.v1",
+          ok: false,
+          capability_id: capability,
+          error: "permission_revoked",
+          gateway_admission: {
+            requested_capability: capability,
+            admission_status: "blocked",
+            admission_reason: "authenticated_environment_probe_blocked",
+            blocked_reason: "permission_revoked",
+          },
+          observation: {
+            schema: "helix.environment_connector.probe_observation.v1",
+            capability_id: capability,
+            outcome: "permission_revoked",
+            summary: failureText,
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+      current_turn_artifact_ledger: [],
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("permission_revoked");
+    expect(payload.selected_final_answer).toBe(failureText);
+    expect(payload.selected_final_answer).not.toContain(
+      "required itinerary observations are missing",
+    );
+    expect(payload.typed_failure).toMatchObject({
+      error_code: "permission_revoked",
+      first_broken_rail: "tool_admission",
+      repair_target: "external_agent_api_authentication",
+      selected_capability: capability,
+    });
+    expect(payload.terminal_answer_authority).toMatchObject({
+      terminal_kind: "failure",
+      terminal_artifact_kind: "typed_failure",
+      server_authoritative: true,
+    });
+  });
+
+  it("turns an exact capability absent from the governed model tool surface into an actionable typed limitation", () => {
+    const turnId = "ask:test:environment-capability-unavailable";
+    const capability =
+      "com.casimirbot.minecraft.container_contents.read";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "live_environment",
+        allowed_terminal_artifact_kinds: [
+          "model_synthesized_answer",
+          "typed_failure",
+        ],
+      },
+      canonical_goal_frame: {
+        goal_kind: "live_environment",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: capability,
+        mandatory_next_tool_name: capability,
+        selected_capability: capability,
+        executed_capability: null,
+      },
+      codex_native_provider_bridge: {
+        schema: "helix.codex_native_provider_bridge.v1",
+        status: "fallback_required",
+        fallback_reason: "native_admitted_capability_set_empty",
+        native_workstation_turn: {
+          model_visible_tools: [],
+          executed_tools: [],
+          account_locked_tools: [],
+          compatibility_fallback_reason:
+            "native_admitted_capability_set_empty",
+        },
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "single_tool",
+        relevant_tool_families: ["live_environment"],
+        terminal_success_criteria: {
+          required_observation_families: ["live_environment"],
+          required_capabilities: [capability],
+          requires_post_observation_synthesis: true,
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [],
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("capability_unavailable");
+    expect(payload.selected_final_answer).toContain(capability);
+    expect(payload.selected_final_answer).toContain("not available");
+    expect(payload.selected_final_answer).toContain(
+      "connector implementation",
+    );
+    expect(payload.typed_failure).toMatchObject({
+      error_code: "capability_unavailable",
+      requested_capability: capability,
+      first_broken_rail: "capability_execution",
+      repair_target: "connector_capability_implementation",
+    });
+  });
+
   it("rejects stale no-context model fallbacks after live-source observations exist", () => {
     const turnId = "ask:test:stale-live-source-fallback";
     const staleText = "I am unable to provide context because no observations are available.";
@@ -8127,6 +8488,81 @@ describe("Helix terminal authority single writer", () => {
           reason: "visible_answer_policy_repair_required",
         }),
       ]),
+    );
+  });
+
+  it("preserves a current-turn authoritative typed blocker after required observations re-enter", () => {
+    const turnId = "ask:test:authoritative-observation-blocker";
+    const blockerText =
+      "The scientific image evidence re-entered, but no promoted exact equation row exists yet.";
+    const artifacts = [makePostToolObservation(turnId)];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      ok: false,
+      response_type: "final_failure",
+      final_status: "final_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "scientific_image_exact_row_promotion_missing",
+      terminal_failure_text: blockerText,
+      selected_final_answer: blockerText,
+      answer: blockerText,
+      text: blockerText,
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "scientific_image_exact_row_promotion_missing",
+        message: blockerText,
+        text: blockerText,
+        answer_text: blockerText,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        thread_id: "thread:test",
+        turn_id: turnId,
+        route: "/ask/turn",
+        terminal_kind: "failure",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_item_id: `${turnId}:typed_failure:scientific_image_exact_row_promotion_missing`,
+        terminal_text_preview: blockerText,
+        server_authoritative: true,
+        terminal_eligible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: [
+          "model_synthesized_answer",
+          "typed_failure",
+        ],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "scientific_image_theory_reflection",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe(
+      "scientific_image_exact_row_promotion_missing",
+    );
+    expect(payload.selected_final_answer).toBe(blockerText);
+    expect(payload.selected_final_answer).not.toMatch(
+      /post-tool model step|itinerary observations|solver continuation/i,
     );
   });
 });

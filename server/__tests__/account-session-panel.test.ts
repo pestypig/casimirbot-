@@ -107,8 +107,18 @@ describe("account session panel API", () => {
           memory_scope: "session_only",
           account_policy: {
             account_type: "user",
-            feature_flags: expect.arrayContaining(["shared_realtime_rooms"]),
-            locked_features: expect.not.arrayContaining(["shared_realtime_rooms"]),
+            feature_flags: expect.arrayContaining([
+              "shared_realtime_rooms",
+              "room_source_ingress",
+            ]),
+            locked_features: expect.not.arrayContaining([
+              "shared_realtime_rooms",
+              "room_source_ingress",
+            ]),
+            allowed_workstation_capabilities: expect.arrayContaining([
+              "room.evidence.read_bound",
+              "com.casimirbot.minecraft.inventory.check",
+            ]),
           },
         },
         experimental_features: {
@@ -161,6 +171,37 @@ describe("account session panel API", () => {
           locked_features: expect.arrayContaining(["shared_realtime_rooms"]),
         },
       },
+    });
+  });
+
+  it("requires an explicit production flag before granting guest room-source ingress", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
+    vi.stubEnv("HELIX_GUEST_ROOM_CREATION", "1");
+    vi.stubEnv("HELIX_GUEST_ROOM_SOURCE_INGRESS", "0");
+    const blockedAgent = request.agent(createApp());
+    const blocked = await blockedAgent
+      .post("/api/account/session/experimental-rooms")
+      .send({ enabled: true })
+      .expect(200);
+    expect(blocked.body.status.account_policy).toMatchObject({
+      feature_flags: expect.not.arrayContaining(["room_source_ingress"]),
+      locked_features: expect.arrayContaining(["room_source_ingress"]),
+    });
+
+    vi.stubEnv("HELIX_GUEST_ROOM_SOURCE_INGRESS", "1");
+    const admittedAgent = request.agent(createApp());
+    const admitted = await admittedAgent
+      .post("/api/account/session/experimental-rooms")
+      .send({ enabled: true })
+      .expect(200);
+    expect(admitted.body.status.account_policy).toMatchObject({
+      feature_flags: expect.arrayContaining(["room_source_ingress"]),
+      locked_features: expect.not.arrayContaining(["room_source_ingress"]),
+      allowed_workstation_capabilities: expect.arrayContaining([
+        "room.evidence.read_bound",
+        "com.casimirbot.minecraft.inventory.check",
+      ]),
     });
   });
 

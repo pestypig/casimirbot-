@@ -9,6 +9,17 @@ import type { HelixToolCallAdmissionFamily } from "@shared/helix-tool-call-admis
 import { HELIX_RESEARCH_LIBRARY_READ_CAPABILITY } from "@shared/helix-research-library";
 import { HELIX_RESEARCH_LIBRARY_APPLY_EVIDENCE_ENRICHMENT_CAPABILITY } from "@shared/helix-paper-evidence-enrichment";
 import {
+  HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+  HELIX_MINECRAFT_CONTAINER_CONTENTS_READ_CAPABILITY,
+  HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY,
+  HELIX_MINECRAFT_HAZARDS_SCAN_CAPABILITY,
+  HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
+  HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+  HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+} from "@shared/helix-environment-connector";
+import {
   askCapabilityCatalogPromptMatchIndex,
   isAskCapabilityCatalogPrompt,
 } from "./capability-catalog-intent";
@@ -26,6 +37,7 @@ import {
   theoryExperimentProcedurePromptMatch,
 } from "./theory-experiment-procedure-intent";
 import { isAffirmativeReadAloudPrompt } from "./referent-resolution";
+import { isAffirmativeImmediateMinecraftSituationPrompt } from "./minecraft-situation-intent";
 
 const THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY =
   "theory-experiment-procedure.evaluate_closure" as const;
@@ -152,6 +164,8 @@ const liveEnvironmentEvidenceContract = (input: {
   aliases?: string[];
   requiredObservationKinds?: string[];
   requiredTerminalKind?: string;
+  requiredArgs?: string[];
+  optionalArgs?: string[];
 }): ExplicitCapabilityContractDefinition => ({
   schema: "helix.explicit_capability_contract.v1",
   capability: input.capability,
@@ -166,6 +180,8 @@ const liveEnvironmentEvidenceContract = (input: {
   ],
   required_terminal_kind:
     input.requiredTerminalKind ?? "model_synthesized_answer",
+  ...(input.requiredArgs ? { required_args: input.requiredArgs } : {}),
+  ...(input.optionalArgs ? { optional_args: input.optionalArgs } : {}),
   allowed_substitutions: [],
   forbidden_nearby_capabilities: [
     "live_env.read_processed_live_source_mail",
@@ -710,7 +726,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       ],
       capability_family: "capability_catalog",
       plan_family: "capability_catalog",
-      source_target: "runtime_evidence",
+      source_target: "capability_catalog",
       admission_families: ["capability_catalog", "runtime_evidence"],
       required_observation_kinds: ["capability_registry"],
       required_terminal_kind: "capability_help_summary",
@@ -1812,6 +1828,39 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       capability: "live_env.request_probe",
       aliases: ["request_probe", "bounded live evidence probe"],
     }),
+    ...HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS.map((capability) =>
+      liveEnvironmentEvidenceContract({
+        capability,
+        aliases: [
+          capability.replace(/^com\.casimirbot\./, "").replaceAll(".", " "),
+        ],
+        requiredObservationKinds: [
+          "helix.environment_connector.probe_observation.v1",
+          "helix.agent_step_observation_packet.v1",
+          "provider_gateway_observation_packet",
+        ],
+        requiredArgs:
+          capability === HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY ||
+          capability === HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY
+            ? ["target", "position"]
+            : ["target"],
+        optionalArgs:
+          capability === HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY
+            ? ["position", "freshness_requirement_ms"]
+            : ["freshness_requirement_ms"],
+      }),
+    ),
+    liveEnvironmentEvidenceContract({
+      capability: HELIX_MINECRAFT_CONTAINER_CONTENTS_READ_CAPABILITY,
+      aliases: ["minecraft closed container contents"],
+      requiredObservationKinds: [
+        "helix.environment_connector.probe_observation.v1",
+        "helix.agent_step_observation_packet.v1",
+        "provider_gateway_observation_packet",
+      ],
+      requiredArgs: [],
+      optionalArgs: ["freshness_requirement_ms"],
+    }),
     liveEnvironmentEvidenceContract({
       capability: "live_env.record_commentary",
       aliases: ["record_commentary", "live evidence commentary"],
@@ -2604,10 +2653,10 @@ const capabilityMentionIsExplanatoryQuestionAt = (
       clause,
     );
   const namesToolOrWorkflowInClause =
-    /\b(?:your|the|this|that)\s+(?:(?:research[-\s]?paper|scholarly|paper)\s+)?(?:tool|agent|workflow|capabilit(?:y|ies))\b/i.test(
+    /\b(?:your|the|this|that)\s+(?:(?:research[-\s]?paper|scholarly|paper)\s+)?(?:tool|agent|workflow|connector|adapt(?:e|o)r|capabilit(?:y|ies))\b/i.test(
       clause,
     ) ||
-    /\b(?:tool|agent|workflow)\s+for\s+(?:research|scholarly)\s+papers?\b/i.test(
+    /\b(?:tool|agent|workflow|connector|adapt(?:e|o)r)\s+for\s+(?:research|scholarly)\s+papers?\b/i.test(
       clause,
     );
   const continuesPriorCapabilityQuestion = /^\s*or\s+do\s+you\b/i.test(clause);
@@ -2616,10 +2665,10 @@ const capabilityMentionIsExplanatoryQuestionAt = (
     boundaryIndex + 1,
   );
   const priorQuestionNamesToolOrWorkflow =
-    /\b(?:your|the|this|that)\s+(?:(?:research[-\s]?paper|scholarly|paper)\s+)?(?:tool|agent|workflow|capabilit(?:y|ies))\b/i.test(
+    /\b(?:your|the|this|that)\s+(?:(?:research[-\s]?paper|scholarly|paper)\s+)?(?:tool|agent|workflow|connector|adapt(?:e|o)r|capabilit(?:y|ies))\b/i.test(
       priorQuestionContext,
     ) ||
-    /\b(?:tool|agent|workflow)\s+for\s+(?:research|scholarly)\s+papers?\b/i.test(
+    /\b(?:tool|agent|workflow|connector|adapt(?:e|o)r)\s+for\s+(?:research|scholarly)\s+papers?\b/i.test(
       priorQuestionContext,
     );
   const historicalCapabilityReference =
@@ -2756,6 +2805,227 @@ const naturalNotesListPromptMatch = (
   };
 };
 
+const naturalMinecraftInventoryProbePromptMatch = (
+  prompt: string,
+): {
+  matched_text: string;
+  match_index: number;
+  match_end_index: number;
+} | null => {
+  if (
+    /\bwhy\s+did\b[\s\S]{0,80}\b(?:previous|earlier|last)\s+turn\b/i.test(
+      prompt,
+    ) ||
+    /\bcan\s+(?:the|this|our|a)\s+(?:minecraft\s+)?connector\b[\s\S]{0,100}\b(?:check|inspect|read|show)\b/i.test(
+      prompt,
+    )
+  ) {
+    return null;
+  }
+  const match =
+    prompt.match(
+      /\b(?:check|inspect|show|read|review|look\s+at|tell\s+me\s+(?:what(?:'s|\s+is)?|which))\b[\s\S]{0,120}\b(?:current\s+|my\s+|the\s+)?minecraft\s+inventory\b/i,
+    ) ??
+    prompt.match(
+      /\b(?:what(?:'s|\s+is)?|which\s+items?\s+are)\b[\s\S]{0,100}\b(?:my\s+|the\s+)?minecraft\s+inventory\b/i,
+    ) ??
+    prompt.match(
+      /\b(?:what(?:'s|\s+is)?|show\s+me|tell\s+me)\b[\s\S]{0,80}\b(?:the\s+)?(?:player|current\s+actor)\b[\s\S]{0,40}\b(?:carrying|holding)\b[\s\S]{0,60}\bminecraft\b/i,
+    ) ??
+    (/\bminecraft\b/i.test(prompt)
+      ? prompt.match(
+          /\b(?:check|inspect|show|read|review|look\s+at|tell\s+me)\b[\s\S]{0,160}\b(?:my\s+|the\s+player'?s?\s+|current\s+actor'?s?\s+)?(?:armor|gear|equipment|hotbar|items?|inventory)(?:\s*(?:,|and|or)\s*(?:armor|gear|equipment|hotbar|items?|inventory))*\b/i,
+        )
+      : null);
+  if (!match || typeof match.index !== "number") return null;
+  const inventoryPhrase = prompt.match(
+    /\b(?:current\s+|my\s+|the\s+)?minecraft\s+inventory\b/i,
+  );
+  if (
+    inventoryPhrase &&
+    typeof inventoryPhrase.index === "number" &&
+    inventoryPhrase.index >= match.index &&
+    inventoryPhrase.index + inventoryPhrase[0].length <=
+      match.index + match[0].length
+  ) {
+    return {
+      matched_text: inventoryPhrase[0],
+      match_index: inventoryPhrase.index,
+      match_end_index: inventoryPhrase.index + inventoryPhrase[0].length,
+    };
+  }
+  const inventoryWord = prompt
+    .slice(match.index, match.index + match[0].length)
+    .match(/\binventory\b/i);
+  if (inventoryWord && typeof inventoryWord.index === "number") {
+    const matchIndex = match.index + inventoryWord.index;
+    return {
+      matched_text: inventoryWord[0],
+      match_index: matchIndex,
+      match_end_index: matchIndex + inventoryWord[0].length,
+    };
+  }
+  return {
+    matched_text: match[0],
+    match_index: match.index,
+    match_end_index: match.index + match[0].length,
+  };
+};
+
+const naturalMinecraftSituationProbePromptMatches = (
+  prompt: string,
+): Array<{
+  capability: string;
+  matched_text: string;
+  match_index: number;
+  match_end_index: number;
+}> => {
+  if (
+    !/\bminecraft\b/i.test(prompt) &&
+    !isAffirmativeImmediateMinecraftSituationPrompt(prompt)
+  ) {
+    return [];
+  }
+  if (
+    /\bwhy\s+did\b[\s\S]{0,100}\b(?:previous|earlier|last)\s+turn\b/i.test(
+      prompt,
+    ) ||
+    /\bcan\s+(?:the|this|our|a)\s+(?:minecraft\s+)?connector\b[\s\S]{0,100}\b(?:check|inspect|read|show)\b/i.test(
+      prompt,
+    )
+  ) {
+    return [];
+  }
+  const specifications: Array<{
+    capability: string;
+    patterns: RegExp[];
+  }> = [
+    {
+      capability: HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+      patterns: [
+        /\b(?:check|read|show|inspect|tell\s+me)\b[\s\S]{0,50}\b(?:my|the\s+player'?s?|current\s+actor'?s?)\s+(?:current\s+)?(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position)\b/i,
+        /\b(?:my|the\s+player'?s?|current\s+actor'?s?)\s+(?:current\s+)?(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position)\b/i,
+        /\b(?:check|read|show|inspect|tell\s+me|what(?:'s|\s+is))\b[\s\S]{0,70}\b(?:crimson\s+curse|infection)\b[\s\S]{0,40}\b(?:phase|mass|points?|state|status)\b/i,
+      ],
+    },
+    {
+      capability: HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+      patterns: [
+        /\b(?:what|which|list|show|check|inspect)\b[\s\S]{0,50}\b(?:mobs?|entities|players?|animals?)\b[\s\S]{0,35}\b(?:nearby|near\s+me|around\s+me|close\s+by)\b/i,
+        /\b(?:nearby|near\s+me|around\s+me|close\s+by)\s+(?:hostile\s+)?(?:mobs?|entities|players?|animals?)\b/i,
+      ],
+    },
+    {
+      capability: HELIX_MINECRAFT_HAZARDS_SCAN_CAPABILITY,
+      patterns: [
+        /\bimmediate\s+(?:hazards?|threats?)\b[\s\S]{0,35}\b(?:now|right\s+now|current(?:ly)?)\b/i,
+        /\b(?:am\s+i|is\s+the\s+player)\b[\s\S]{0,30}\b(?:safe|in\s+danger|threatened)\b/i,
+        /\b(?:hostile\s+mobs?|monsters?|immediate\s+threats?|immediate\s+hazards?|hazards?)\b[\s\S]{0,35}\b(?:nearby|near\s+me|around\s+me|now|right\s+now|current(?:ly)?)\b/i,
+      ],
+    },
+    {
+      capability: HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
+      patterns: [
+        /\b(?:check|inspect|show|describe|what(?:'s|\s+is))\b[\s\S]{0,50}\b(?:terrain|ground|floor|area|surroundings)\b[\s\S]{0,35}\b(?:nearby|near\s+me|around\s+me|local)\b/i,
+        /\b(?:local\s+(?:map|terrain)|terrain|ground|floor|surroundings)\b[\s\S]{0,35}\b(?:nearby|near\s+me|around\s+me|current)\b/i,
+      ],
+    },
+    {
+      capability: HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
+      patterns: [
+        /\b(?:check|do\s+i\s+have|is\s+there)\b[\s\S]{0,40}\b(?:line\s+of\s+sight|clear\s+(?:view|sight))\b/i,
+        /\bcan\s+i\s+see\b[\s\S]{0,50}\b(?:position|block|target|coordinates?)\b/i,
+      ],
+    },
+    {
+      capability: HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY,
+      patterns: [
+        /\b(?:check|inspect|is|are)\b[\s\S]{0,40}\b(?:crop|wheat|carrots?|potatoes?|beetroots?|nether\s+wart)\b[\s\S]{0,40}\b(?:mature|ready|fully\s+grown|harvestable)\b/i,
+        /\b(?:crop|wheat|carrots?|potatoes?|beetroots?|nether\s+wart)\b[\s\S]{0,40}\b(?:mature|ready|fully\s+grown|harvestable)\b/i,
+      ],
+    },
+    {
+      capability: HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+      patterns: [
+        /\b(?:check|can\s+i|am\s+i)\b[\s\S]{0,90}\b(?:reach(?:ability)?|interact\s+with|within\s+range)\b/i,
+        /\b(?:how\s+far|distance\s+to)\b[\s\S]{0,50}\b(?:position|block|target|coordinates?)\b/i,
+      ],
+    },
+    {
+      capability: HELIX_MINECRAFT_CONTAINER_CONTENTS_READ_CAPABILITY,
+      patterns: [
+        /\b(?:inspect|read|check|show|list|tell\s+me)\b[\s\S]{0,90}\b(?:contents?|items?|what(?:'s|\s+is)\s+inside)\b[\s\S]{0,80}\b(?:closed\s+|unopened\s+)?(?:chest|barrel|container|shulker\s+box)\b/i,
+        /\b(?:inspect|read|check|show|list|tell\s+me)\b[\s\S]{0,90}\b(?:closed\s+|unopened\s+)?(?:chest|barrel|container|shulker\s+box)\b[\s\S]{0,80}\b(?:contents?|items?|what(?:'s|\s+is)\s+inside|inside)\b/i,
+      ],
+    },
+  ];
+  const matches: Array<{
+    capability: string;
+    matched_text: string;
+    match_index: number;
+    match_end_index: number;
+  }> = [];
+  const semanticAnchorPatterns = new Map<string, RegExp>([
+    [
+      HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+      /\b(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position|crimson\s+curse|infection)\b/i,
+    ],
+    [
+      HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+      /\b(?:mobs?|entities|players?|animals?)\b/i,
+    ],
+    [
+      HELIX_MINECRAFT_HAZARDS_SCAN_CAPABILITY,
+      /\b(?:safe|danger|threatened|hostile\s+mobs?|monsters?|immediate\s+threats?|hazards?)\b/i,
+    ],
+    [
+      HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
+      /\b(?:local\s+(?:map|terrain)|terrain|ground|floor|area|surroundings)\b/i,
+    ],
+    [
+      HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
+      /\b(?:line\s+of\s+sight|clear\s+(?:view|sight)|see)\b/i,
+    ],
+    [
+      HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY,
+      /\b(?:crop|wheat|carrots?|potatoes?|beetroots?|nether\s+wart)\b/i,
+    ],
+    [
+      HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+      /\b(?:reach(?:ability)?|interact\s+with|within\s+range|how\s+far|distance)\b/i,
+    ],
+    [
+      HELIX_MINECRAFT_CONTAINER_CONTENTS_READ_CAPABILITY,
+      /\b(?:contents?|items?|inside|chest|barrel|container|shulker\s+box)\b/i,
+    ],
+  ]);
+  for (const specification of specifications) {
+    const match = specification.patterns
+      .map((pattern) => prompt.match(pattern))
+      .find(
+        (candidate): candidate is RegExpMatchArray =>
+          Boolean(candidate && typeof candidate.index === "number"),
+      );
+    if (!match || typeof match.index !== "number") continue;
+    const semanticAnchor = match[0].match(
+      semanticAnchorPatterns.get(specification.capability) ?? /[\s\S]+/,
+    );
+    const semanticOffset =
+      semanticAnchor && typeof semanticAnchor.index === "number"
+        ? semanticAnchor.index
+        : 0;
+    const matchedText = semanticAnchor?.[0] ?? match[0];
+    const matchIndex = match.index + semanticOffset;
+    matches.push({
+      capability: specification.capability,
+      matched_text: matchedText,
+      match_index: matchIndex,
+      match_end_index: matchIndex + matchedText.length,
+    });
+  }
+  return matches;
+};
+
 export const explicitCapabilityContractForCapability = (
   capability: string | null | undefined,
 ): ExplicitCapabilityContract | null => {
@@ -2807,6 +3077,38 @@ export const extractExplicitCapabilityContracts = (
       source: "capability_catalog_prompt",
     });
   }
+  for (const minecraftSituationMatch of
+    naturalMinecraftSituationProbePromptMatches(prompt)) {
+    const minecraftSituationContract = explicitCapabilityContractForCapability(
+      minecraftSituationMatch.capability,
+    );
+    if (
+      !minecraftSituationContract ||
+      negatedCommandMentionsCapabilityAt(
+        prompt,
+        minecraftSituationMatch.match_index,
+      ) ||
+      capabilityMentionIsNonExecutableContextAt(
+        prompt,
+        minecraftSituationMatch.match_index,
+      ) ||
+      capabilityMentionIsExplanatoryQuestionAt(
+        prompt,
+        minecraftSituationMatch.match_index,
+      ) ||
+      familySuppressed(prompt, minecraftSituationContract)
+    ) {
+      continue;
+    }
+    matches.push({
+      contract: minecraftSituationContract,
+      capability: minecraftSituationContract.capability,
+      matched_name: minecraftSituationMatch.matched_text,
+      match_index: minecraftSituationMatch.match_index,
+      match_end_index: minecraftSituationMatch.match_end_index,
+      source: "natural_capability_intent",
+    });
+  }
   const notesListContract = explicitCapabilityContractForCapability(
     "workstation-notes.list_notes",
   );
@@ -2824,6 +3126,37 @@ export const extractExplicitCapabilityContracts = (
       matched_name: notesListMatch.matched_text,
       match_index: notesListMatch.match_index,
       match_end_index: notesListMatch.match_end_index,
+      source: "natural_capability_intent",
+    });
+  }
+  const minecraftInventoryContract = explicitCapabilityContractForCapability(
+    "com.casimirbot.minecraft.inventory.check",
+  );
+  const minecraftInventoryMatch =
+    naturalMinecraftInventoryProbePromptMatch(prompt);
+  if (
+    minecraftInventoryContract &&
+    minecraftInventoryMatch &&
+    !negatedCommandMentionsCapabilityAt(
+      prompt,
+      minecraftInventoryMatch.match_index,
+    ) &&
+    !capabilityMentionIsNonExecutableContextAt(
+      prompt,
+      minecraftInventoryMatch.match_index,
+    ) &&
+    !capabilityMentionIsExplanatoryQuestionAt(
+      prompt,
+      minecraftInventoryMatch.match_index,
+    ) &&
+    !familySuppressed(prompt, minecraftInventoryContract)
+  ) {
+    matches.push({
+      contract: minecraftInventoryContract,
+      capability: minecraftInventoryContract.capability,
+      matched_name: minecraftInventoryMatch.matched_text,
+      match_index: minecraftInventoryMatch.match_index,
+      match_end_index: minecraftInventoryMatch.match_end_index,
       source: "natural_capability_intent",
     });
   }

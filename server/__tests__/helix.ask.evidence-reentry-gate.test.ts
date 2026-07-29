@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildAskTurnSolverTrace } from "../services/helix-ask/ask-turn-solver";
 import { buildEvidenceReentryGate } from "../services/helix-ask/evidence-reentry-gate";
 import { buildFollowupReasoningGate } from "../services/helix-ask/followup-reasoning-gate";
+import { createHelixTurnLifecycleRecorder } from "../services/helix-ask/runtime/turn-lifecycle";
 
 const authorityPayload = (input: {
   sourceTarget: string;
@@ -29,6 +30,107 @@ const authorityPayload = (input: {
     server_authoritative: true,
   },
 });
+
+const verifiedLifecycle = (input: {
+  turnId: string;
+  terminalKind: string;
+  calls: Array<{
+    capabilityId: string;
+    callId: string;
+    observationRefs: string[];
+  }>;
+}) => {
+  const recorder = createHelixTurnLifecycleRecorder({
+    turnId: input.turnId,
+    scope: "helix_ask_turn",
+    now: () => 100,
+  });
+  const started = recorder.append({
+    kind: "turn.started",
+    producer: "helix_adapter",
+    status: "started",
+  });
+  const route = recorder.append({
+    kind: "route.committed",
+    producer: "helix_policy",
+    status: "succeeded",
+    causation_id: started.event_id,
+    route_commit_id: `${input.turnId}:route`,
+    capability_ids: input.calls.map((call) => call.capabilityId),
+  });
+  let priorEventId = route.event_id;
+  for (const call of input.calls) {
+    recorder.append({
+      kind: "capability.admitted",
+      producer: "helix_policy",
+      status: "succeeded",
+      causation_id: route.event_id,
+      route_commit_id: route.route_commit_id,
+      capability_id: call.capabilityId,
+    });
+    const callStarted = recorder.append({
+      kind: "tool.call.started",
+      producer: "codex_runtime",
+      status: "started",
+      route_commit_id: route.route_commit_id,
+      call_id: call.callId,
+      capability_id: call.capabilityId,
+    });
+    const callCompleted = recorder.append({
+      kind: "tool.call.completed",
+      producer: "helix_adapter",
+      status: "succeeded",
+      causation_id: callStarted.event_id,
+      route_commit_id: route.route_commit_id,
+      call_id: call.callId,
+      capability_id: call.capabilityId,
+      observation_refs: call.observationRefs,
+    });
+    const reentered = recorder.append({
+      kind: "observation.reentered",
+      producer: "helix_adapter",
+      status: "succeeded",
+      causation_id: callCompleted.event_id,
+      route_commit_id: route.route_commit_id,
+      call_id: call.callId,
+      capability_id: call.capabilityId,
+      observation_refs: call.observationRefs,
+    });
+    priorEventId = reentered.event_id;
+  }
+  const message = recorder.append({
+    kind: "agent.message.completed",
+    producer: "codex_runtime",
+    status: "succeeded",
+    causation_id: priorEventId,
+    native_item_id: `${input.turnId}:message`,
+    message_sha256: "sha256:test",
+  });
+  const runtime = recorder.append({
+    kind: "runtime.turn.completed",
+    producer: "codex_runtime",
+    status: "succeeded",
+    causation_id: message.event_id,
+    native_turn_id: `${input.turnId}:native`,
+  });
+  const eligible = recorder.append({
+    kind: "terminal.eligibility.checked",
+    producer: "helix_policy",
+    status: "succeeded",
+    causation_id: runtime.event_id,
+    terminal_kind: input.terminalKind,
+    terminal_eligible: true,
+  });
+  recorder.append({
+    kind: "turn.completed",
+    producer: "helix_adapter",
+    status: "succeeded",
+    causation_id: eligible.event_id,
+    terminal_kind: input.terminalKind,
+    terminal_eligible: true,
+  });
+  return recorder.snapshot();
+};
 
 describe("Helix Ask evidence re-entry and follow-up gates", () => {
   it("uses factual post-observation completion ahead of inferred finalization", () => {
@@ -194,6 +296,7 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
         },
         provider_reasoning_reentry: {
           schema: "helix.provider_reasoning_reentry.v1",
+          turn_id: turnId,
           status: "completed",
           provider_terminal_candidate_ref: candidateRef,
           evidence_reentered: true,
@@ -327,6 +430,7 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
         },
         provider_reasoning_reentry: {
           schema: "helix.provider_reasoning_reentry.v1",
+          turn_id: turnId,
           status: "completed",
           provider_terminal_candidate_ref: candidateRef,
           evidence_reentry_required: false,
@@ -595,6 +699,15 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
       terminalArtifactKind: "doc_open_receipt",
       finalAnswerSource: "doc_open_receipt",
       payload: {
+        turn_lifecycle: verifiedLifecycle({
+          turnId: "turn:docs-open-receipt",
+          terminalKind: "doc_open_receipt",
+          calls: [{
+            capabilityId: "docs-viewer.open_doc_by_path",
+            callId: "turn:docs-open-receipt:call",
+            observationRefs: ["ask:docs-open-receipt:doc_open_receipt"],
+          }],
+        }),
         canonical_goal_frame: {
           schema: "helix.canonical_goal_frame.v1",
           goal_kind: "doc_open_best",
@@ -661,6 +774,22 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
       terminalArtifactKind: "compound_evidence_synthesis_answer",
       finalAnswerSource: "compound_evidence_synthesis_answer",
       payload: {
+        turn_lifecycle: verifiedLifecycle({
+          turnId: "turn:compound",
+          terminalKind: "compound_evidence_synthesis_answer",
+          calls: [
+            {
+              capabilityId: "theory-badge-graph.reflect_discussion_context",
+              callId: "turn:compound:theory-call",
+              observationRefs: [theoryRef],
+            },
+            {
+              capabilityId: "repo.search",
+              callId: "turn:compound:repo-call",
+              observationRefs: [repoRef],
+            },
+          ],
+        }),
         canonical_goal_frame: {
           schema: "helix.canonical_goal_frame.v1",
           goal_kind: "agent_provider_gateway_turn",
@@ -1006,6 +1135,15 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
         sourceTarget: "docs_viewer",
         allowed: ["model_synthesized_answer", "typed_failure"],
       }),
+      turn_lifecycle: verifiedLifecycle({
+        turnId,
+        terminalKind: "agent_provider_terminal_candidate",
+        calls: [{
+          capabilityId: "docs.search",
+          callId: `${turnId}:docs-call`,
+          observationRefs: [docsRef],
+        }],
+      }),
       terminal_artifact_kind: "workstation_tool_evaluation",
       final_answer_source: "workstation_tool_evaluation",
       terminal_answer_authority: {
@@ -1186,11 +1324,22 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
       selectedRoute: "situation_context_question",
       terminalArtifactKind: "situation_context_pack",
       finalAnswerSource: "situation_context_pack",
-      payload: authorityPayload({
-        sourceTarget: "visual_capture",
-        allowed: ["situation_context_pack", "typed_failure", "request_user_input"],
-        forbidden: ["live_pipeline_receipt"],
-      }),
+      payload: {
+        ...authorityPayload({
+          sourceTarget: "visual_capture",
+          allowed: ["situation_context_pack", "typed_failure", "request_user_input"],
+          forbidden: ["live_pipeline_receipt"],
+        }),
+        turn_lifecycle: verifiedLifecycle({
+          turnId: "turn:negated-cadence",
+          terminalKind: "situation_context_pack",
+          calls: [{
+            capabilityId: "visual-analysis.describe_image",
+            callId: "turn:negated-cadence:visual-call",
+            observationRefs: ["obs:visual"],
+          }],
+        }),
+      },
       loopParityTrace: {
         actual_tool_calls: [],
         observations_created: [{ observation_id: "obs:visual", source_kind: "visual_frame" }],

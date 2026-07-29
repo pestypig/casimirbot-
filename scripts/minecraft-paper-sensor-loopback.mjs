@@ -77,9 +77,22 @@ async function main() {
   let paperOutput = "";
   let paperExitCode = null;
   try {
-    const gradle = process.platform === "win32" ? "gradle.bat" : "gradle";
-    await run(gradle, ["-p", "minecraft/helix-paper-sensor", "build"]);
-    const jar = path.join(pluginDir, "build", "libs", "HelixPaperSensor-0.1.0.jar");
+    const gradleWrapperJar = path.join(
+      pluginDir,
+      "gradle",
+      "wrapper",
+      "gradle-wrapper.jar",
+    );
+    await run(process.env.JAVA ?? "java", [
+      "-classpath",
+      gradleWrapperJar,
+      "org.gradle.wrapper.GradleWrapperMain",
+      "-p",
+      pluginDir,
+      "--no-daemon",
+      "build",
+    ]);
+    const jar = path.join(pluginDir, "build", "libs", "HelixPaperSensor-0.2.0.jar");
     const paperJar = process.env.PAPER_SERVER_JAR;
     if (!paperJar) {
       const status = await fetchJson(`${mockUrl}/__helix_mock/status`);
@@ -96,7 +109,7 @@ async function main() {
     }
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "helix-paper-loopback-"));
     await fs.mkdir(path.join(tempDir, "plugins", "HelixPaperSensor"), { recursive: true });
-    await fs.copyFile(jar, path.join(tempDir, "plugins", "HelixPaperSensor-0.1.0.jar"));
+    await fs.copyFile(jar, path.join(tempDir, "plugins", "HelixPaperSensor-0.2.0.jar"));
     await fs.writeFile(path.join(tempDir, "eula.txt"), "eula=true\n");
     await fs.writeFile(path.join(tempDir, "server.properties"), "online-mode=false\nlevel-name=loopback-world\nspawn-protection=0\n");
     await fs.writeFile(path.join(tempDir, "plugins", "HelixPaperSensor", "config.yml"), `helix:

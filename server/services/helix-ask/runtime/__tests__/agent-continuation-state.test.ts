@@ -168,6 +168,54 @@ describe("agent continuation state", () => {
     expect(state.allowed_decisions).not.toContain("answer");
   });
 
+  it("does not mark a provider answer satisfied while a required capability itinerary is incomplete", () => {
+    const state = buildHelixAgentContinuationState({
+      payload: {
+        final_status: "final_answer",
+        goal_satisfaction_evaluation: {
+          satisfaction: "satisfied",
+        },
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          required_observation_families: ["visual_capture"],
+          observed_families: [],
+          missing_observation_families: ["visual_capture"],
+          complete: false,
+        },
+        runtime_continuation_hints: [
+          {
+            hint_id: "ask:continuation:required_visual_capture",
+            capability_id: "situation-room.describe_visual_capture",
+            lane_request: {
+              capability: "situation-room.describe_visual_capture",
+              thread_id: "helix-ask:continuation",
+              prompt: "What is happening in the current visual capture?",
+            },
+            reason:
+              "The hard visual route requires a current-turn observation.",
+          },
+        ],
+        current_turn_artifact_ledger: [],
+      },
+      turnId: "ask:continuation",
+      trigger: "final_review",
+    });
+
+    expect(state.goal).toEqual({
+      status: "in_progress",
+      satisfied: false,
+      terminal_product_allowed: false,
+    });
+    expect(state.next_admissible_affordances[0]).toMatchObject({
+      capability_id: "situation-room.describe_visual_capture",
+      admissible: true,
+      tried: false,
+    });
+    expect(state.allowed_decisions).toContain("act");
+    expect(state.allowed_decisions).not.toContain("answer");
+  });
+
   it("marks new observations and resolved requirements as progress after an attempt", () => {
     const firstPayload: Record<string, unknown> = {
       goal_satisfaction_evaluation: {
@@ -907,6 +955,84 @@ describe("agent continuation state", () => {
       ]),
     );
     expect(second.allowed_decisions).toEqual(expect.arrayContaining(["act", "answer"]));
+  });
+
+  it("offers the next admitted pending compound subgoal after an observation re-enters", () => {
+    const actorObservation = artifact({
+      id: "ask:continuation:minecraft:actor",
+      kind: "provider_gateway_observation_packet",
+    });
+    const payload: Record<string, unknown> = {
+      capability_itinerary_execution_state: {
+        schema: "helix.capability_itinerary_execution_state.v1",
+        required_observation_families: ["live_environment"],
+        required_capabilities: [
+          "com.casimirbot.minecraft.actor.status.read",
+          "com.casimirbot.minecraft.inventory.check",
+        ],
+        missing_required_capabilities: [
+          "com.casimirbot.minecraft.inventory.check",
+        ],
+        missing_compound_subgoal_ids: ["minecraft:inventory"],
+        compound_subgoal_ledger: [
+          {
+            subgoal_id: "minecraft:actor",
+            requested_capability:
+              "com.casimirbot.minecraft.actor.status.read",
+            runtime_capability:
+              "com.casimirbot.minecraft.actor.status.read",
+            satisfaction: "satisfied",
+            rail_failure_code: null,
+          },
+          {
+            subgoal_id: "minecraft:inventory",
+            requested_capability:
+              "com.casimirbot.minecraft.inventory.check",
+            runtime_capability:
+              "com.casimirbot.minecraft.inventory.check",
+            selected_args: {},
+            satisfaction: "pending",
+            rail_failure_code: "subgoal_observation_missing",
+          },
+        ],
+        complete: false,
+      },
+      current_turn_artifact_ledger: [actorObservation],
+    };
+
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: {
+        capability_id: "com.casimirbot.minecraft.actor.status.read",
+        status: "succeeded",
+      },
+      capabilityProposal: {
+        allowed: false,
+        admittedCapabilityIds: [
+          "com.casimirbot.minecraft.actor.status.read",
+          "com.casimirbot.minecraft.inventory.check",
+        ],
+      },
+    });
+
+    expect(state.missing_requirement_ids).toEqual(
+      expect.arrayContaining([
+        "com.casimirbot.minecraft.inventory.check",
+        "minecraft:inventory",
+      ]),
+    );
+    expect(state.next_admissible_affordances).toEqual([
+      expect.objectContaining({
+        capability_id: "com.casimirbot.minecraft.inventory.check",
+        tried: false,
+        lane_request: {
+          capability: "com.casimirbot.minecraft.inventory.check",
+        },
+      }),
+    ]);
+    expect(state.allowed_decisions).toEqual(["act"]);
   });
 
   it("exposes permission failures for user input or grounded failure instead of blind retry", () => {

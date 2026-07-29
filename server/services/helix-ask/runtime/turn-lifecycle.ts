@@ -218,18 +218,37 @@ export const readVerifiedHelixRuntimeLifecycleFromPayload = (input: {
     debug?.native_provider_turn_lifecycle,
     nativeWorkstationTurn?.turn_lifecycle,
   ];
+  const verifiedCandidates: HelixTurnLifecycle[] = [];
   for (const value of nativeCandidates) {
     const lifecycle = readVerifiedHelixTurnLifecycle({
       value,
       turnId: input.turnId,
       requiredScope: "codex_native_provider_cycle",
     });
-    if (lifecycle) return lifecycle;
+    if (lifecycle) verifiedCandidates.push(lifecycle);
   }
-  return readVerifiedHelixTurnLifecycleFromPayload({
+  const canonicalLifecycle = readVerifiedHelixTurnLifecycleFromPayload({
     payload: input.payload,
     turnId: input.turnId,
   });
+  if (canonicalLifecycle) verifiedCandidates.push(canonicalLifecycle);
+  if (verifiedCandidates.length === 0) return null;
+
+  // The native Codex lifecycle is authoritative for its own transport cycle,
+  // but adapter gateway execution may occur immediately outside that cycle.
+  // Prefer whichever verified log carries the most complete current-turn
+  // observation -> re-entry -> reasoning sequence. Stable ordering keeps the
+  // native log preferred when both logs carry equivalent facts.
+  const lifecycleCompletenessScore = (lifecycle: HelixTurnLifecycle): number =>
+    (lifecycle.reduction.complete ? 32 : 0) +
+    (lifecycle.reduction.post_observation_reasoning_completed ? 16 : 0) +
+    Math.min(lifecycle.reduction.observation_reentry_refs.length, 8) * 2 +
+    (lifecycle.reduction.runtime_turn_completed ? 1 : 0);
+  return verifiedCandidates.reduce((selected, candidate) =>
+    lifecycleCompletenessScore(candidate) > lifecycleCompletenessScore(selected)
+      ? candidate
+      : selected,
+  );
 };
 
 export type HelixRuntimeObservationReentryResolution = {

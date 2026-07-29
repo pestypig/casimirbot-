@@ -6415,6 +6415,8 @@ export function HelixAskPill({
   }
   const askImageInputRef = useRef<HTMLInputElement | null>(null);
   const [agentRuntimeMenuOpen, setAgentRuntimeMenuOpen] = useState(false);
+  const [activeSharedRoomIdForAsk, setActiveSharedRoomIdForAsk] =
+    useState<string | null>(null);
   const [agentRuntimeProviders, setAgentRuntimeProviders] = useState<HelixAgentRuntimeDescriptor[]>(
     DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
   );
@@ -19553,6 +19555,9 @@ export function HelixAskPill({
       });
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
       const sessionIdForTurn = getHelixAskSessionId();
+      const backendThreadIdForTurn = activeSharedRoomIdForAsk
+        ? `helix-ask:room:${activeSharedRoomIdForAsk}`
+        : sessionIdForTurn ?? runAskTurnId;
       const pendingWorkflowQte = workflowQteBridge.takePending(runAskInputSource === "manual");
       workflowQteBridge.recordSubmitted({
         workflowQte: pendingWorkflowQte,
@@ -19564,7 +19569,7 @@ export function HelixAskPill({
         question: trimmed,
         baseRunOptions: options,
         turnId: runAskTurnId,
-        threadId: sessionIdForTurn ?? runAskTurnId,
+        threadId: backendThreadIdForTurn,
         manualCanaryEnabled: HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG,
         backendOwnedPastedTextResumeRecall: isHelixAskPastedTextResumeRecallPrompt(trimmed),
       });
@@ -20164,7 +20169,9 @@ export function HelixAskPill({
       cancelMoodHint();
       updateMoodFromText(trimmed);
       requestMoodHint(trimmed, { force: true });
-      const sessionId = sessionIdForTurn, traceId = runAskTurnId;
+      const sessionId = sessionIdForTurn;
+      const backendSessionId = backendThreadIdForTurn;
+      const traceId = runAskTurnId;
       const routeMetadataForTurn = backendEntrypointRoutePlan.routeMetadata;
       const useBackendAskTurnEntrypoint = backendEntrypointRoutePlan.useBackendAskTurnEntrypoint;
       let backendAskCallAttempted = false;
@@ -20436,7 +20443,7 @@ export function HelixAskPill({
               : null;
             const askTurnPayload = {
               ...buildHelixAskConsoleBackendTurnPayloadCore({
-                sessionId,
+                sessionId: backendSessionId,
                 agentRuntime: selectedAgentRuntime,
                 traceId,
                 turnId: runAskTurnId,
@@ -20610,7 +20617,7 @@ export function HelixAskPill({
           } else {
             backendAskCallPath = "askLocal";
             const askResult = await askLocalWithPreflightScopeFallback(undefined, {
-              sessionId: sessionId ?? undefined,
+              sessionId: backendSessionId,
               traceId,
               maxTokens: HELIX_ASK_OUTPUT_TOKENS,
               question: trimmed,
@@ -21948,6 +21955,7 @@ export function HelixAskPill({
       addMessage,
       applyGovernedActionEnvelope,
       applyWorkstationActionsFromPayload,
+      activeSharedRoomIdForAsk,
       appendSyntheticLiveEvent,
       askBusy,
       bumpVoiceTurnRevision,
@@ -23005,7 +23013,9 @@ export function HelixAskPill({
     runtimePickerModel: agentRuntimePickerModel,
     runtimeMenuOpen: agentRuntimeMenuOpen,
     onRuntimePrimaryClick: handleAgentRuntimeButtonClick,
-    onRuntimeSelect: handleAgentRuntimeSelect, accountPolicy: accountCapabilityPolicy,
+    onRuntimeSelect: handleAgentRuntimeSelect,
+    onActiveSharedRoomChange: setActiveSharedRoomIdForAsk,
+    accountPolicy: accountCapabilityPolicy,
     submitViewModel: composerViewModel,
     onSubmitIntent: () => triggerAskActionHaptic(),
     onStop: () => {

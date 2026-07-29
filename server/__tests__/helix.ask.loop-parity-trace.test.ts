@@ -78,8 +78,19 @@ describe("Helix Ask loop parity trace", () => {
       route_authority_ok: true,
       terminal_authority_ok: true,
     });
-    expect(trace.short_circuit_risk_flags).not.toContain("terminal_selected_before_observation_finalizer");
-    expect(trace.short_circuit_risk_flags).not.toContain("route_authority_missing");
+    expect(trace.evidence_selected_for_answer).toEqual([
+      observationRef,
+      normalizedRef,
+    ]);
+    expect(trace.short_circuit_risk_flags).not.toContain(
+      "classifier_selected_terminal_without_evidence",
+    );
+    expect(trace.short_circuit_risk_flags).not.toContain(
+      "terminal_selected_before_observation_finalizer",
+    );
+    expect(trace.short_circuit_risk_flags).not.toContain(
+      "route_authority_missing",
+    );
 
     const missingModelStepTrace = buildLoopParityTrace({
       turnId,
@@ -98,7 +109,9 @@ describe("Helix Ask loop parity trace", () => {
         },
       },
     });
-    expect(missingModelStepTrace.terminal_selection_ran_after_observations).toBe(false);
+    expect(
+      missingModelStepTrace.terminal_selection_ran_after_observations,
+    ).toBe(false);
     expect(missingModelStepTrace.short_circuit_risk_flags).toContain(
       "terminal_selected_before_observation_finalizer",
     );
@@ -113,11 +126,15 @@ describe("Helix Ask loop parity trace", () => {
         ...payload,
         terminal_presentation: {
           ...payload.terminal_presentation,
-          selected_observation_refs: ["ask:prior-turn:workstation.active_context:1"],
+          selected_observation_refs: [
+            "ask:prior-turn:workstation.active_context:1",
+          ],
         },
       },
     });
-    expect(staleSupportTrace.terminal_selection_ran_after_observations).toBe(false);
+    expect(staleSupportTrace.terminal_selection_ran_after_observations).toBe(
+      false,
+    );
     expect(staleSupportTrace.route_authority_ok).toBe(false);
   });
 
@@ -125,7 +142,8 @@ describe("Helix Ask loop parity trace", () => {
     const turnId = "ask:test:calculator-alias";
     const trace = buildLoopParityTrace({
       turnId,
-      promptText: "Call scientific-calculator.solve_expression with expression 2 + 2.",
+      promptText:
+        "Call scientific-calculator.solve_expression with expression 2 + 2.",
       selectedRoute: "calculator_solve",
       terminalArtifactKind: "workstation_tool_evaluation",
       finalAnswerSource: "workstation_tool_evaluation",
@@ -186,6 +204,85 @@ describe("Helix Ask loop parity trace", () => {
       }),
     ]);
     expect(trace.unexpected_tool_calls).toEqual([]);
-    expect(trace.short_circuit_risk_flags).not.toContain("tool_called_without_admission");
+    expect(trace.short_circuit_risk_flags).not.toContain(
+      "tool_called_without_admission",
+    );
+  });
+
+  it("recognizes the canonical visual gateway as an admitted SituationRun call", () => {
+    const turnId = "ask:test:visual-situation-run";
+    const trace = buildLoopParityTrace({
+      turnId,
+      promptText: "What is happening right now in the visual screen capture?",
+      selectedRoute: "/ask",
+      terminalArtifactKind: "typed_failure",
+      finalAnswerSource: "typed_failure",
+      payload: {
+        tool_call_admission_decision: {
+          admitted_tool_families: ["situation_run"],
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: `${turnId}:gateway:visual`,
+            kind: "provider_gateway_observation_packet",
+            payload: {
+              capability_key: "situation-room.describe_visual_capture",
+              call_id: `${turnId}:gateway:visual:call`,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(trace.actual_tool_calls).toEqual([
+      expect.objectContaining({
+        tool_id: "situation-room.describe_visual_capture",
+        family: "situation_run",
+        admitted: true,
+      }),
+    ]);
+    expect(trace.unexpected_tool_calls).toEqual([]);
+    expect(trace.short_circuit_risk_flags).not.toContain(
+      "tool_called_without_admission",
+    );
+  });
+
+  it("classifies the Minecraft connector capability as live-environment evidence", () => {
+    const turnId = "ask:test:minecraft-environment-connector";
+    const capability = "com.casimirbot.minecraft.inventory.check";
+    const trace = buildLoopParityTrace({
+      turnId,
+      promptText: "Check my current Minecraft inventory now.",
+      selectedRoute: "/ask",
+      terminalArtifactKind: "typed_failure",
+      finalAnswerSource: "typed_failure",
+      payload: {
+        tool_call_admission_decision: {
+          admitted_tool_families: ["live_environment"],
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: `${turnId}:gateway:minecraft`,
+            kind: "provider_gateway_observation_packet",
+            payload: {
+              capability_key: capability,
+              call_id: `${turnId}:gateway:minecraft:call`,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(trace.actual_tool_calls).toEqual([
+      expect.objectContaining({
+        tool_id: capability,
+        family: "live_environment",
+        admitted: true,
+      }),
+    ]);
+    expect(trace.unexpected_tool_calls).toEqual([]);
+    expect(trace.short_circuit_risk_flags).not.toContain(
+      "tool_called_without_admission",
+    );
   });
 });

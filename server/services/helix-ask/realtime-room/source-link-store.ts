@@ -8,7 +8,10 @@ import {
 } from "@shared/helix-room-source-ingress";
 import { HELIX_DEVELOPER_ACCOUNT_POLICY } from "@shared/helix-account-session";
 import { resolveCasimirPublicBaseUrl } from "../../public-base-url";
-import { resolveEffectiveAccountPolicyFromStoredRow } from "../../helix-account/account-session-store";
+import {
+  isGuestSharedRealtimeRoomSourceIngressEnabled,
+  resolveEffectiveAccountPolicyFromStoredRow,
+} from "../../helix-account/account-session-store";
 import { invalidateRoomSourceRuntimeState } from "../../situation-room/room-source-runtime-state";
 import {
   containsProtectedRoomSourceSecret,
@@ -275,7 +278,10 @@ const parseReceipt = (value: unknown): HelixRoomSourceIngressReceipt | null => {
   return value as HelixRoomSourceIngressReceipt;
 };
 
-const policyAllowsRoomSourceIngress = (value: unknown): boolean => {
+const policyAllowsRoomSourceIngress = (
+  value: unknown,
+  options: { guestAccount: boolean; activeSession: boolean },
+): boolean => {
   const policy =
     value && typeof value === "object"
       ? (value as {
@@ -284,12 +290,18 @@ const policyAllowsRoomSourceIngress = (value: unknown): boolean => {
           locked_features?: unknown;
         })
       : null;
-  return Boolean(
-    policy?.account_type === "developer" &&
-    Array.isArray(policy.feature_flags) &&
-    policy.feature_flags.includes("room_source_ingress") &&
-    Array.isArray(policy.locked_features) &&
-    !policy.locked_features.includes("room_source_ingress"),
+  const featureAllowed = Boolean(
+    Array.isArray(policy?.feature_flags) &&
+      policy.feature_flags.includes("room_source_ingress") &&
+      Array.isArray(policy?.locked_features) &&
+      !policy.locked_features.includes("room_source_ingress"),
+  );
+  if (!featureAllowed) return false;
+  if (policy?.account_type === "developer") return true;
+  return (
+    options.guestAccount &&
+    options.activeSession &&
+    isGuestSharedRealtimeRoomSourceIngressEnabled()
   );
 };
 
@@ -297,9 +309,12 @@ const bindingOwnerPolicyAllowsIngress = async (
   db: Queryable,
   ownerProfileId: string,
 ): Promise<boolean> => {
-  const { rows: accountRows } = await db.query<{ account_type: string }>(
+  const { rows: accountRows } = await db.query<{
+    account_type: string;
+    provider: string | null;
+  }>(
     `
-      SELECT account_type
+      SELECT account_type, provider
       FROM helix_accounts
       WHERE profile_id = $1 AND deleted_at IS NULL
       LIMIT 1;
@@ -321,10 +336,13 @@ const bindingOwnerPolicyAllowsIngress = async (
   );
   const effectivePolicy = resolveEffectiveAccountPolicyFromStoredRow({
     account_type: accountRows[0]?.account_type ?? "user",
-    account_policy:
-      sessionRows[0]?.account_policy ?? HELIX_DEVELOPER_ACCOUNT_POLICY,
+    account_policy: sessionRows[0]?.account_policy ?? HELIX_DEVELOPER_ACCOUNT_POLICY,
+    provider: accountRows[0]?.provider ?? null,
   });
-  return policyAllowsRoomSourceIngress(effectivePolicy);
+  return policyAllowsRoomSourceIngress(effectivePolicy, {
+    guestAccount: accountRows[0]?.provider === "guest",
+    activeSession: sessionRows.length > 0,
+  });
 };
 
 const bindingUrl = (bindingId: string): string =>

@@ -1,0 +1,49 @@
+{
+  "schema": "helix.paper_sensor_build_receipt.v1",
+  "created_at": "2026-07-29T21:28:51.564Z",
+  "plugin": {
+    "name": "HelixPaperSensor",
+    "version": "0.2.0",
+    "paper_api_version": "1.21",
+    "verified_paper_version": "1.21.8",
+    "java_version": 21,
+    "gradle_version": "8.14.3"
+  },
+  "source": {
+    "commit": "41d640c4acee2f2a414c4e1ebf1c4bb2f88ead6d",
+    "worktree_clean": false,
+    "tree_sha256": "c09aec23c056b57a5e356afb29947d9ff9e08b16dd5d09ba7890c0462e01556c",
+    "tree_hash_algorithm": "sha256(sorted utf8 relative-path + tab + file-sha256 + lf)",
+    "file_count": 48,
+    "tree_hash_excludes": [
+      "build/",
+      ".gradle/",
+      "helix-paper-sensor-build-receipt.json"
+    ]
+  },
+  "artifact": {
+    "path": "minecraft/helix-paper-sensor/build/libs/HelixPaperSensor-0.2.0.jar",
+    "size_bytes": 139169,
+    "sha256": "4ac9d4f6cb2fa1964485d4b0e4e39cdc31eeb86578647b10137bed18b23770a2"
+  },
+  "defaults": {
+    "enabled": false,
+    "read_only_probes_enabled": true,
+    "execution_enabled": false
+  },
+  "verification": {
+    "gradle_clean_build": "pass",
+    "gradle_tests": "pass",
+    "paper_loopback": "pass",
+    "disabled_diagnostics": "pass",
+    "manifest_received": true,
+    "heartbeat_received": true,
+    "snapshot_received": true,
+    "read_only_probe_completed": true,
+    "forbidden_probe_blocked": true,
+    "raw_nbt_seen": false,
+    "side_effects_seen": false,
+    "java_connector_compile": "pass",
+    "secret_and_private_route_scan": "pass"
+  }
+}

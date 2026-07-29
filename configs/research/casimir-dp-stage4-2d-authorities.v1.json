@@ -1,0 +1,43 @@
+{
+  "schema_version": "casimir_dp_stage4_2d_authorities/1",
+  "campaign_id": "casimir-dp-cross-scale-metrology-stage4-2d-v1",
+  "authority_mode": "role_path_and_content_hash_tuple",
+  "immutable_upstream": [
+    {
+      "role": "stage4_2c_config",
+      "path": "configs/research/casimir-dp-identifiability-redesign-stage4-2c.v1.json",
+      "sha256": "81f6109525202f57b6e5958373b37ec18d15dfff0ddc9ad0af274b8a294af6aa",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2c_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-2c-authorities.v1.json",
+      "sha256": "7f3a7fb7bfc748b1e92427da0c649bb73ce99fd4ebf9a20414a5a7fa1b5604e7",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2c_fixture",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2c-campaign.synthetic.v1.json",
+      "sha256": "f576c20c05cee3d29ed0198bfc4056a0540a3f89199d1babb6ebde9dfaa1d45d",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2c_report",
+      "path": "artifacts/research/casimir-dp-identifiability-redesign-stage4-2c/casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z/identifiability-redesign-stage4-2c-report.json",
+      "sha256": "d9237eeb9079e7fab84a86b3eda28b0f14bb83be1a340b3d6f9695dcffb5047c",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2c_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-identifiability-redesign-stage4-2c/casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z/identifiability-redesign-stage4-2c-receipt.json",
+      "sha256": "59cca7ab7f6f6a3d27a83ad8b455fc63fc6db3ca7207cdeff350ed97d497865c",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2c_verification_receipt",
+      "path": "docs/research/casimir-dp-identifiability-redesign-stage4-2c-verification-receipt.json",
+      "sha256": "51c461db1fdaa29162b2c5287a31c01823e5bb23b16a25fe2914841239abba98",
+      "required_at_runtime": true
+    }
+  ]
+}

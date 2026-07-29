@@ -846,6 +846,8 @@ export class HelixRuntimeGoalSessionStore {
             ...body,
             turn_id: wakeEvent.turn_id,
           },
+          conversationThreadId: session.thread_id,
+          accountContext: input.accountContext,
           env: process.env,
         })
       : null;

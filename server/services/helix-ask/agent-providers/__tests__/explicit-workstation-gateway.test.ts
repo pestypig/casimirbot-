@@ -9,6 +9,7 @@ import {
   buildPromptDerivedVoiceGatewayCallRequests,
   buildPromptDerivedWorkspaceStatusGatewayCallRequests,
   readWorkstationGatewayCallRequestsForTurn,
+  resolveExplicitGatewayConversationThreadId,
   runExplicitWorkstationGatewayCalls,
   selectScholarlyPortfolioDependencySeedResult,
   shouldAutoExecuteDependentCompoundRequest,
@@ -34,6 +35,29 @@ const docSnapshot = {
 
 const capabilities = (requests: Record<string, unknown>[]): string[] =>
   requests.map((request) => String(request.capability_id));
+
+describe("explicit gateway conversation identity", () => {
+  it("uses the Ask API sessionId as the trusted conversation thread", () => {
+    expect(
+      resolveExplicitGatewayConversationThreadId({
+        thread_id: "ask:test:current-turn",
+        sessionId: "helix-ask:test:camel-session",
+      }),
+    ).toBe("helix-ask:test:camel-session");
+  });
+
+  it("prefers the admitted source thread over conflicting envelope aliases", () => {
+    expect(
+      resolveExplicitGatewayConversationThreadId({
+        thread_id: "ask:test:current-turn",
+        sessionId: "helix-ask:test:stale-session",
+        source_target_intent: {
+          thread_id: "helix-ask:test:admitted-source",
+        },
+      }),
+    ).toBe("helix-ask:test:admitted-source");
+  });
+});
 
 const buildTestProvider = (id: "helix" | "codex"): HelixAgentProvider => ({
   id,
@@ -159,28 +183,40 @@ describe("explicit workstation gateway derived calls", () => {
       includePlannerDerived: true,
       body: {
         agent_runtime: "codex",
-        question: "Use scholarly-research.lookup_papers for quantum inequality sampling constraints.",
+        question:
+          "Use scholarly-research.lookup_papers for quantum inequality sampling constraints.",
         workstation_gateway_calls: [
           {
             capability_id: "scholarly-research.lookup_papers",
             mode: "read",
-            arguments: { query: "quantum inequality sampling constraints", limit: 3 },
+            arguments: {
+              query: "quantum inequality sampling constraints",
+              limit: 3,
+            },
           },
           {
             capability_id: "scholarly-research.lookup_papers",
             mode: "read",
-            arguments: { query: "quantum inequality sampling constraints", limit: 3 },
+            arguments: {
+              query: "quantum inequality sampling constraints",
+              limit: 3,
+            },
           },
           {
             capability_id: "scholarly-research.lookup_papers",
             mode: "read",
-            arguments: { query: "quantum inequality sampling constraints", limit: 3 },
+            arguments: {
+              query: "quantum inequality sampling constraints",
+              limit: 3,
+            },
           },
         ],
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
   });
 
   it("preserves distinct scholarly claim queries while deduplicating exact repeats", () => {
@@ -188,39 +224,59 @@ describe("explicit workstation gateway derived calls", () => {
       includePlannerDerived: true,
       body: {
         agent_runtime: "codex",
-        question: "Search the four claims separately and fetch the best three accessible sources.",
+        question:
+          "Search the four claims separately and fetch the best three accessible sources.",
         workstation_gateway_calls: [
           {
             capability_id: "scholarly-research.lookup_papers",
             mode: "read",
-            arguments: { query: "worldline quantum inequalities sampling functions", limit: 3 },
+            arguments: {
+              query: "worldline quantum inequalities sampling functions",
+              limit: 3,
+            },
           },
           {
             capability_id: "scholarly-research.lookup_papers",
             mode: "read",
-            arguments: { query: "negative energy magnitude duration scaling", limit: 3 },
+            arguments: {
+              query: "negative energy magnitude duration scaling",
+              limit: 3,
+            },
           },
           {
             capability_id: "scholarly-research.lookup_papers",
             mode: "read",
-            arguments: { query: "quantum interest positive energy overcompensation", limit: 3 },
+            arguments: {
+              query: "quantum interest positive energy overcompensation",
+              limit: 3,
+            },
           },
           {
             capability_id: "scholarly-research.lookup_papers",
             mode: "read",
-            arguments: { query: "quantum inequalities wormholes warp drives", limit: 3 },
+            arguments: {
+              query: "quantum inequalities wormholes warp drives",
+              limit: 3,
+            },
           },
           {
             capability_id: "scholarly-research.lookup_papers",
             mode: "read",
-            arguments: { query: "worldline quantum inequalities sampling functions", limit: 3 },
+            arguments: {
+              query: "worldline quantum inequalities sampling functions",
+              limit: 3,
+            },
           },
         ],
       },
     });
 
     expect(requests).toHaveLength(4);
-    expect(requests.map((request) => (request.arguments as Record<string, unknown>).query)).toEqual([
+    expect(
+      requests.map(
+        (request) => (request.arguments as Record<string, unknown>).query,
+      ),
+    ).toEqual([
       "worldline quantum inequalities sampling functions",
       "negative energy magnitude duration scaling",
       "quantum interest positive energy overcompensation",
@@ -249,7 +305,11 @@ describe("explicit workstation gateway derived calls", () => {
     });
 
     expect(requests).toHaveLength(10);
-    expect(requests.slice(0, -1).every((request) => request.compound_outcome === undefined)).toBe(true);
+    expect(
+      requests
+        .slice(0, -1)
+        .every((request) => request.compound_outcome === undefined),
+    ).toBe(true);
     expect(requests.at(-1)).toMatchObject({
       capability_id: "scholarly-research.lookup_papers",
       compound_outcome: "scholarly_research_workflow",
@@ -279,11 +339,16 @@ describe("explicit workstation gateway derived calls", () => {
       body: {
         agent_runtime: "codex",
         question: promptText,
-        workstation_gateway_calls: [{
-          capability_id: "scholarly-research.lookup_papers",
-          mode: "read",
-          arguments: { query: "quantum inequalities wormholes warp drives", limit: 6 },
-        }],
+        workstation_gateway_calls: [
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            mode: "read",
+            arguments: {
+              query: "quantum inequalities wormholes warp drives",
+              limit: 6,
+            },
+          },
+        ],
       },
     });
 
@@ -317,12 +382,18 @@ describe("explicit workstation gateway derived calls", () => {
     });
 
     expect(requests).toHaveLength(3);
-    expect(requests.map((request) => (request.arguments as any).query)).toEqual([
-      "quantum-inequality constraints on negative energy",
-      "quantum-inequality constraints on traversable wormholes",
-      "quantum-inequality constraints on warp drives",
-    ]);
-    expect(requests.slice(0, -1).every((request) => request.compound_outcome === undefined)).toBe(true);
+    expect(requests.map((request) => (request.arguments as any).query)).toEqual(
+      [
+        "quantum-inequality constraints on negative energy",
+        "quantum-inequality constraints on traversable wormholes",
+        "quantum-inequality constraints on warp drives",
+      ],
+    );
+    expect(
+      requests
+        .slice(0, -1)
+        .every((request) => request.compound_outcome === undefined),
+    ).toBe(true);
     expect(requests.at(-1)).toMatchObject({
       capability_id: "scholarly-research.lookup_papers",
       compound_outcome: "scholarly_research_workflow",
@@ -352,8 +423,11 @@ describe("explicit workstation gateway derived calls", () => {
       "Do not count duplicate provider records as separate papers and do not search for unrelated papers.",
     ].join(" ");
 
-    expect(capabilities(buildPromptNamedCapabilityGatewayCallRequests({ question: promptText })))
-      .not.toContain("scholarly-research.fetch_full_text");
+    expect(
+      capabilities(
+        buildPromptNamedCapabilityGatewayCallRequests({ question: promptText }),
+      ),
+    ).not.toContain("scholarly-research.fetch_full_text");
 
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
@@ -366,7 +440,9 @@ describe("explicit workstation gateway derived calls", () => {
     const scholarlyRequests = requests.filter((request) =>
       String(request.capability_id).startsWith("scholarly-research."),
     );
-    expect(capabilities(scholarlyRequests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(capabilities(scholarlyRequests)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
     expect(scholarlyRequests[0]).toMatchObject({
       capability_id: "scholarly-research.lookup_papers",
       compound_outcome: "scholarly_research_workflow",
@@ -396,7 +472,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scholarly-research.fetch_full_text"]);
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.fetch_full_text",
+    ]);
   });
 
   it("routes DOI full-text requests through metadata resolution before dependent fetch", () => {
@@ -412,7 +490,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
     expect(requests[0]).toMatchObject({
       compound_outcome: "scholarly_research_workflow",
       dependent_capability_id: "scholarly-research.fetch_full_text",
@@ -448,9 +528,16 @@ describe("explicit workstation gateway derived calls", () => {
       "scholarly-research.lookup_papers",
       "scholarly-research.fetch_full_text",
     ]);
-    expect(requests.map((request) => (request.arguments as Record<string, any>).source_target_intent.source_portfolio_index))
-      .toEqual([0, 1, 2]);
-    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+    expect(
+      requests.map(
+        (request) =>
+          (request.arguments as Record<string, any>).source_target_intent
+            .source_portfolio_index,
+      ),
+    ).toEqual([0, 1, 2]);
+    expect(capabilities(requests)).not.toContain(
+      "scientific-calculator.solve_expression",
+    );
   });
 
   it("does not execute tools for fully negated scholarly URL examples", () => {
@@ -471,29 +558,57 @@ describe("explicit workstation gateway derived calls", () => {
   });
 
   it("does not infer a provider-record audit from an explicitly negated provider-search clause", () => {
-    expect(hasExplicitScholarlyProviderRecordAuditIntent([
-      "Do not search scholarly providers or collect provider records.",
-      "Fetch and parse the full text for arXiv gr-qc/9510071 only.",
-    ].join(" "))).toBe(false);
+    expect(
+      hasExplicitScholarlyProviderRecordAuditIntent(
+        [
+          "Do not search scholarly providers or collect provider records.",
+          "Fetch and parse the full text for arXiv gr-qc/9510071 only.",
+        ].join(" "),
+      ),
+    ).toBe(false);
   });
 
   it.each([
-    ["quoted", 'Explain the instruction "Search scholarly providers and report provider-record count."'],
-    ["historical", "Earlier I searched scholarly providers and reported the provider-record count."],
-    ["future", "Later, search scholarly providers and report the provider-record count."],
-    ["conditional", "If needed, search scholarly providers and report the provider-record count."],
-    ["screen-visible", "The screen says Search scholarly providers and report the provider-record count."],
-  ])("does not infer a provider-record audit from %s text", (_label, promptText) => {
-    expect(hasExplicitScholarlyProviderRecordAuditIntent(promptText)).toBe(false);
-  });
+    [
+      "quoted",
+      'Explain the instruction "Search scholarly providers and report provider-record count."',
+    ],
+    [
+      "historical",
+      "Earlier I searched scholarly providers and reported the provider-record count.",
+    ],
+    [
+      "future",
+      "Later, search scholarly providers and report the provider-record count.",
+    ],
+    [
+      "conditional",
+      "If needed, search scholarly providers and report the provider-record count.",
+    ],
+    [
+      "screen-visible",
+      "The screen says Search scholarly providers and report the provider-record count.",
+    ],
+  ])(
+    "does not infer a provider-record audit from %s text",
+    (_label, promptText) => {
+      expect(hasExplicitScholarlyProviderRecordAuditIntent(promptText)).toBe(
+        false,
+      );
+    },
+  );
 
   it("preserves a current provider-record audit beside historical and negative constraints", () => {
-    expect(hasExplicitScholarlyProviderRecordAuditIntent([
-      "Earlier I fetched this arXiv paper directly.",
-      "Now search scholarly providers for DOI 10.1103/PhysRevD.53.5496.",
-      "Report provider-record count and unique-paper count.",
-      "Do not count duplicate provider records as separate papers.",
-    ].join(" "))).toBe(true);
+    expect(
+      hasExplicitScholarlyProviderRecordAuditIntent(
+        [
+          "Earlier I fetched this arXiv paper directly.",
+          "Now search scholarly providers for DOI 10.1103/PhysRevD.53.5496.",
+          "Report provider-record count and unique-paper count.",
+          "Do not count duplicate provider records as separate papers.",
+        ].join(" "),
+      ),
+    ).toBe(true);
   });
 
   it("does not infer a full-text chain for negated explicit scholarly lookup calls", () => {
@@ -501,19 +616,24 @@ describe("explicit workstation gateway derived calls", () => {
       includePlannerDerived: true,
       body: {
         agent_runtime: "codex",
-        question: "Search scholarly metadata for quantum inequalities, but do not fetch, open, or parse full text.",
-        workstation_gateway_calls: [{
-          capability_id: "scholarly-research.lookup_papers",
-          mode: "read",
-          arguments: { query: "quantum inequalities" },
-        }],
+        question:
+          "Search scholarly metadata for quantum inequalities, but do not fetch, open, or parse full text.",
+        workstation_gateway_calls: [
+          {
+            capability_id: "scholarly-research.lookup_papers",
+            mode: "read",
+            arguments: { query: "quantum inequalities" },
+          },
+        ],
       },
     });
 
     expect(requests).toHaveLength(1);
     expect(requests[0]).not.toHaveProperty("compound_outcome");
     expect(requests[0]).not.toHaveProperty("dependent_capability_id");
-    expect(requests[0].arguments).not.toHaveProperty("allow_scholarly_dependent_chain");
+    expect(requests[0].arguments).not.toHaveProperty(
+      "allow_scholarly_dependent_chain",
+    );
   });
 
   it("executes metadata lookup when only downstream full-text work is negated", () => {
@@ -535,10 +655,12 @@ describe("explicit workstation gateway derived calls", () => {
       capability_id: "scholarly-research.lookup_papers",
       mode: "read",
       arguments: {
-        query: "Quantum Field Theory Constrains Traversable Wormhole Geometries",
+        query:
+          "Quantum Field Theory Constrains Traversable Wormhole Geometries",
         mode: "paper_search",
         scholarly_intent: {
-          scholarly_query: "Quantum Field Theory Constrains Traversable Wormhole Geometries",
+          scholarly_query:
+            "Quantum Field Theory Constrains Traversable Wormhole Geometries",
           query_normalization_reasons: ["quoted_topic_selected"],
           requested_workflow: "metadata_search",
           requires_full_text: false,
@@ -552,7 +674,9 @@ describe("explicit workstation gateway derived calls", () => {
     });
     expect(requests[0]).not.toHaveProperty("compound_outcome");
     expect(requests[0]).not.toHaveProperty("dependent_capability_id");
-    expect(requests[0].arguments).not.toHaveProperty("allow_scholarly_dependent_chain");
+    expect(requests[0].arguments).not.toHaveProperty(
+      "allow_scholarly_dependent_chain",
+    );
   });
 
   it("does not execute lookup from negated, quoted, historical, or future-only scholarly text", () => {
@@ -564,10 +688,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(readWorkstationGatewayCallRequestsForTurn({
-        includePlannerDerived: true,
-        body: { agent_runtime: "codex", question },
-      })).toEqual([]);
+      expect(
+        readWorkstationGatewayCallRequestsForTurn({
+          includePlannerDerived: true,
+          body: { agent_runtime: "codex", question },
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -581,14 +707,18 @@ describe("explicit workstation gateway derived calls", () => {
       ok: false,
     } as any;
 
-    expect(selectScholarlyPortfolioDependencySeedResult(
-      [success, failedCloser],
-      failedCloser,
-    )).toBe(success);
-    expect(selectScholarlyPortfolioDependencySeedResult(
-      [failedCloser],
-      failedCloser,
-    )).toBe(failedCloser);
+    expect(
+      selectScholarlyPortfolioDependencySeedResult(
+        [success, failedCloser],
+        failedCloser,
+      ),
+    ).toBe(success);
+    expect(
+      selectScholarlyPortfolioDependencySeedResult(
+        [failedCloser],
+        failedCloser,
+      ),
+    ).toBe(failedCloser);
   });
 
   it("keeps a quoted search identifier out of a calculator-only itinerary", () => {
@@ -601,7 +731,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scientific-calculator.solve_expression"]);
+    expect(capabilities(requests)).toEqual([
+      "scientific-calculator.solve_expression",
+    ]);
     expect(requests[0]).toMatchObject({
       arguments: {
         expression: "(8*9)+1",
@@ -627,7 +759,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scientific-calculator.solve_expression"]);
+    expect(capabilities(requests)).toEqual([
+      "scientific-calculator.solve_expression",
+    ]);
     expect(requests[0]).toMatchObject({
       arguments: {
         expression: "4/2",
@@ -637,8 +771,14 @@ describe("explicit workstation gateway derived calls", () => {
 
   it("preserves calculator constants and common operator glyphs in natural prompts", () => {
     const cases = [
-      ["Calculate 2*pi*3 and show the result in the scientific calculator.", "2*pi*3"],
-      ["Calculate 2π*3 and show the result in the scientific calculator.", "2pi*3"],
+      [
+        "Calculate 2*pi*3 and show the result in the scientific calculator.",
+        "2*pi*3",
+      ],
+      [
+        "Calculate 2π*3 and show the result in the scientific calculator.",
+        "2pi*3",
+      ],
       ["Use the scientific calculator to calculate sqrt(9) + 2.", "sqrt(9)+2"],
       ["Calculate 6 ÷ 3 × 4 in the calculator.", "6/3*4"],
     ] as const;
@@ -648,10 +788,15 @@ describe("explicit workstation gateway derived calls", () => {
         includePlannerDerived: true,
         body: { agent_runtime: "codex", question },
       });
-      expect(capabilities(requests)).toContain("scientific-calculator.solve_expression");
-      expect(requests.find(
-        (request) => request.capability_id === "scientific-calculator.solve_expression",
-      )).toMatchObject({
+      expect(capabilities(requests)).toContain(
+        "scientific-calculator.solve_expression",
+      );
+      expect(
+        requests.find(
+          (request) =>
+            request.capability_id === "scientific-calculator.solve_expression",
+        ),
+      ).toMatchObject({
         arguments: { expression },
       });
     }
@@ -662,7 +807,8 @@ describe("explicit workstation gateway derived calls", () => {
       includePlannerDerived: true,
       body: {
         agent_runtime: "codex",
-        question: "Calculate 2*pi*3 and show the result in the scientific calculator.",
+        question:
+          "Calculate 2*pi*3 and show the result in the scientific calculator.",
         source_target_intent: {
           selected_capability: "scientific-calculator.solve_expression",
           args: {
@@ -673,7 +819,8 @@ describe("explicit workstation gateway derived calls", () => {
     });
 
     const calculatorRequests = requests.filter(
-      (request) => request.capability_id === "scientific-calculator.solve_expression",
+      (request) =>
+        request.capability_id === "scientific-calculator.solve_expression",
     );
     expect(calculatorRequests).toHaveLength(1);
     expect(calculatorRequests[0]).toMatchObject({
@@ -691,10 +838,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(readWorkstationGatewayCallRequestsForTurn({
-        includePlannerDerived: true,
-        body: { agent_runtime: "codex", question },
-      })).toEqual([]);
+      expect(
+        readWorkstationGatewayCallRequestsForTurn({
+          includePlannerDerived: true,
+          body: { agent_runtime: "codex", question },
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -715,7 +864,11 @@ describe("explicit workstation gateway derived calls", () => {
             required_terminal_kind: "workstation_tool_evaluation",
           },
           capability_policy: {
-            allowed_tool_families: ["scientific_calculator", "calculator", "workstation_action"],
+            allowed_tool_families: [
+              "scientific_calculator",
+              "calculator",
+              "workstation_action",
+            ],
             suppressed_tool_families: [],
           },
           terminal_product: {
@@ -727,7 +880,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scientific-calculator.solve_expression"]);
+    expect(capabilities(requests)).toEqual([
+      "scientific-calculator.solve_expression",
+    ]);
   });
 
   it("filters an ambient docs request out of a committed Theory-only route", () => {
@@ -758,11 +913,16 @@ describe("explicit workstation gateway derived calls", () => {
             required_terminal_kind: "theory_context_reflection_answer",
           },
           capability_policy: {
-            allowed_tool_families: ["workstation_tool_gateway", "theory_locator"],
+            allowed_tool_families: [
+              "workstation_tool_gateway",
+              "theory_locator",
+            ],
             suppressed_tool_families: [],
           },
           terminal_product: {
-            allowed_terminal_artifact_kinds: ["theory_context_reflection_answer"],
+            allowed_terminal_artifact_kinds: [
+              "theory_context_reflection_answer",
+            ],
             forbidden_terminal_artifact_kinds: [],
             evidence_reentry_required: true,
           },
@@ -791,7 +951,9 @@ describe("explicit workstation gateway derived calls", () => {
         canonical_goal: {
           goal_kind: "docs_viewer",
           required_terminal_kind: "compound_evidence_synthesis_answer",
-          allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer"],
+          allowed_terminal_artifact_kinds: [
+            "compound_evidence_synthesis_answer",
+          ],
           forbidden_terminal_artifact_kinds: [],
         },
         capability_policy: {
@@ -800,7 +962,9 @@ describe("explicit workstation gateway derived calls", () => {
           required_capability_families: ["docs_viewer"],
         },
         terminal_product: {
-          allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer"],
+          allowed_terminal_artifact_kinds: [
+            "compound_evidence_synthesis_answer",
+          ],
           forbidden_terminal_artifact_kinds: [],
           evidence_reentry_required: true,
           required_terminal_product: "compound_evidence_synthesis_answer",
@@ -808,12 +972,16 @@ describe("explicit workstation gateway derived calls", () => {
       },
       capability_itinerary: {
         terminal_success_criteria: {
-          compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          compound_terminal_policy:
+            "synthesize_from_satisfied_subgoal_observations",
           required_terminal_kind: "compound_evidence_synthesis_answer",
         },
         compound_capability_contract: {
           subgoals: [
-            { capability_family: "docs_viewer", requested_capability: "docs.search" },
+            {
+              capability_family: "docs_viewer",
+              requested_capability: "docs.search",
+            },
             {
               capability_family: "theory_locator",
               requested_capability: "helix_ask.reflect_theory_context",
@@ -969,7 +1137,9 @@ describe("explicit workstation gateway derived calls", () => {
       must_enter_backend_ask: true,
       allow_no_tool_direct: false,
     });
-    expect(capabilities(requests)).toContain("scholarly-research.lookup_papers");
+    expect(capabilities(requests)).toContain(
+      "scholarly-research.lookup_papers",
+    );
     expect(capabilities(requests)).not.toContain("docs.search");
     expect(body.committed_ask_route).toMatchObject({
       route: {
@@ -1070,12 +1240,16 @@ describe("explicit workstation gateway derived calls", () => {
       goal_kind: "scholarly_research_followup",
       required_terminal_kind: "scholarly_research_answer",
       evidence_reentry_required: true,
-      forbidden_terminal_artifact_kinds: expect.arrayContaining(["direct_answer_text"]),
+      forbidden_terminal_artifact_kinds: expect.arrayContaining([
+        "direct_answer_text",
+      ]),
     });
     expect(body.canonical_goal_frame).toMatchObject({
       goal_kind: "scholarly_research_followup",
       required_terminal_kind: "scholarly_research_answer",
-      forbidden_terminal_artifact_kinds: expect.arrayContaining(["direct_answer_text"]),
+      forbidden_terminal_artifact_kinds: expect.arrayContaining([
+        "direct_answer_text",
+      ]),
     });
     expect(body.tool_call_admission_decision).toMatchObject({
       required: true,
@@ -1159,13 +1333,15 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(readWorkstationGatewayCallRequestsForTurn({
-        includePlannerDerived: true,
-        body: {
-          agent_runtime: "codex",
-          question,
-        },
-      })).toEqual([]);
+      expect(
+        readWorkstationGatewayCallRequestsForTurn({
+          includePlannerDerived: true,
+          body: {
+            agent_runtime: "codex",
+            question,
+          },
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -1174,7 +1350,8 @@ describe("explicit workstation gateway derived calls", () => {
       includePlannerDerived: true,
       body: {
         agent_runtime: "codex",
-        question: "Use the workstation agent to verify which panel is active, tell me you're checking, then give me the verified result when it returns.",
+        question:
+          "Use the workstation agent to verify which panel is active, tell me you're checking, then give me the verified result when it returns.",
         workspace_context_snapshot: {
           activePanel: "account-session",
           openPanels: ["account-session"],
@@ -1221,7 +1398,8 @@ describe("explicit workstation gateway derived calls", () => {
 
   it("materializes retained current-document context even when another panel is focused", () => {
     const requests = buildActiveDocsContextWorkstationGatewayCallRequests({
-      question: "From this current document, summarize the main claim boundary.",
+      question:
+        "From this current document, summarize the main claim boundary.",
       workspace_context_snapshot: docSnapshot,
     });
 
@@ -1257,8 +1435,7 @@ describe("explicit workstation gateway derived calls", () => {
         ...docSnapshot,
         chat_referent_context: {
           previous_assistant_final_answer: {
-            text:
-              "The NHM2 whitepaper audits the lapse, shift, clocking interpretation, and profile-scoped trip comparisons.",
+            text: "The NHM2 whitepaper audits the lapse, shift, clocking interpretation, and profile-scoped trip comparisons.",
             source_ref: "chat.final_answer:nhm2-summary",
           },
         },
@@ -1282,12 +1459,15 @@ describe("explicit workstation gateway derived calls", () => {
         }),
       }),
     ]);
-    expect((requests[0]?.arguments as Record<string, unknown>)?.exact_terms).toBeUndefined();
+    expect(
+      (requests[0]?.arguments as Record<string, unknown>)?.exact_terms,
+    ).toBeUndefined();
   });
 
   it("materializes a named local document summary request without requiring active document context", () => {
     const requests = buildActiveDocsContextWorkstationGatewayCallRequests({
-      question: 'Ok we have a doc called "Casimir Dp Quantum Foam Study" what this about?',
+      question:
+        'Ok we have a doc called "Casimir Dp Quantum Foam Study" what this about?',
     });
 
     expect(requests).toEqual([
@@ -1309,9 +1489,12 @@ describe("explicit workstation gateway derived calls", () => {
   });
 
   it("materializes a natural local topic-document lookup without model-dependent tool selection", () => {
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({
-      question: "Find the local document about Helix Ask terminal authority and tell me which document you used.",
-    })).toEqual([
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({
+        question:
+          "Find the local document about Helix Ask terminal authority and tell me which document you used.",
+      }),
+    ).toEqual([
       expect.objectContaining({
         derivation_source: "helix_topic_doc_lookup_query",
         capability_id: "docs.search",
@@ -1359,9 +1542,11 @@ describe("explicit workstation gateway derived calls", () => {
     'The screen says "Search our docs for NHM2"; explain that visible text.',
     '"Search our docs for NHM2" was my previous prompt; do not search now.',
   ])("does not materialize contextual our-docs language: %s", (question) => {
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({
-      question,
-    })).toEqual([]);
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({
+        question,
+      }),
+    ).toEqual([]);
   });
 
   it("keeps affirmative our-docs retrieval when an unrelated web route is negated", () => {
@@ -1386,7 +1571,9 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([]);
+      expect(
+        buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+      ).toEqual([]);
     }
   });
 
@@ -1395,15 +1582,17 @@ describe("explicit workstation gateway derived calls", () => {
       "I am not asking about this current document; explain what document observations are.",
       "Before I summarize the current document, explain what evidence would be needed.",
       "The previous answer mentioned the current document; explain why that was not enough.",
-      "The screen shows text that says \"summarize this current document\"; explain the wording.",
+      'The screen shows text that says "summarize this current document"; explain the wording.',
       "If we later use the open document, explain what observation would be required.",
     ];
 
     for (const question of prompts) {
-      expect(buildActiveDocsContextWorkstationGatewayCallRequests({
-        question,
-        workspace_context_snapshot: docSnapshot,
-      })).toEqual([]);
+      expect(
+        buildActiveDocsContextWorkstationGatewayCallRequests({
+          question,
+          workspace_context_snapshot: docSnapshot,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -1412,12 +1601,14 @@ describe("explicit workstation gateway derived calls", () => {
       "Do not open or summarize docs/research/nhm2-current-status-whitepaper.md; explain what that request would do.",
       "In the future, open docs/research/nhm2-current-status-whitepaper.md and summarize it, but not now.",
       "Before I summarize docs/research/nhm2-current-status-whitepaper.md, explain what evidence would be required.",
-      "The screen says \"Open docs/research/nhm2-current-status-whitepaper.md and summarize it\"; explain the wording only.",
-      "Earlier I asked, \"Open docs/research/nhm2-current-status-whitepaper.md and summarize it\"; explain why that needed evidence.",
+      'The screen says "Open docs/research/nhm2-current-status-whitepaper.md and summarize it"; explain the wording only.',
+      'Earlier I asked, "Open docs/research/nhm2-current-status-whitepaper.md and summarize it"; explain why that needed evidence.',
     ];
 
     for (const question of prompts) {
-      expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([]);
+      expect(
+        buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+      ).toEqual([]);
     }
   });
 
@@ -1440,7 +1631,9 @@ describe("explicit workstation gateway derived calls", () => {
   it("binds an explicit docs locator prompt to its file and exact terms despite a no-summary constraint", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Find every occurrence of alpha = 0.7 and alpha = 0.995. For each occurrence, provide the enclosing sentence and its nearest section heading. Do not summarize or infer.";
-    const requests = buildActiveDocsContextWorkstationGatewayCallRequests({ question });
+    const requests = buildActiveDocsContextWorkstationGatewayCallRequests({
+      question,
+    });
 
     expect(requests).toEqual([
       expect.objectContaining({
@@ -1459,7 +1652,9 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Find every occurrence of alpha = 0.123456. Return only the occurrence count and evidence locations. Do not infer alternatives.";
 
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+    ).toEqual([
       expect.objectContaining({
         capability_id: "docs.search",
         arguments: expect.objectContaining({
@@ -1475,7 +1670,9 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Under section \u201c6.7 Twin Paradox trip clocking interpretation,\u201d extract every sentence containing alpha. Preserve the original wording and line numbers. Do not summarize.";
 
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+    ).toEqual([
       expect.objectContaining({
         capability_id: "docs.search",
         arguments: expect.objectContaining({
@@ -1492,7 +1689,9 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Within section \u201c6.7 Twin Paradox trip clocking interpretation,\u201d return only complete prose sentences containing the literal lowercase token alpha. Exclude display equations, headings, identifiers, and sentence fragments. Preserve original wording and line numbers. Do not summarize.";
 
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+    ).toEqual([
       expect.objectContaining({
         capability_id: "docs.search",
         arguments: expect.objectContaining({
@@ -1509,7 +1708,9 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Within section \u201c6.7 Twin Paradox trip clocking interpretation,\u201d find source lines containing alpha and source lines containing Alpha. Group results by the exact case-sensitive term and preserve line numbers. Do not summarize.";
 
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+    ).toEqual([
       expect.objectContaining({
         capability_id: "docs.search",
         arguments: expect.objectContaining({
@@ -1524,7 +1725,9 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Return the heading line number, first nonblank content line, and last nonblank content line belonging only to section \u201c6.7 Twin Paradox trip clocking interpretation.\u201d Do not include anything from section 6.8.";
 
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+    ).toEqual([
       expect.objectContaining({
         capability_id: "docs.search",
         arguments: expect.objectContaining({
@@ -1541,7 +1744,9 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Under section \u201c99.9 Deliberately Missing Section,\u201d find every source line containing alpha. Return only: heading found or not found, match count, and evidence locations. Do not substitute another section or search outside the named section.";
 
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+    ).toEqual([
       expect.objectContaining({
         capability_id: "docs.search",
         arguments: expect.objectContaining({
@@ -1558,7 +1763,9 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Within section \u201c6.8 Profile-scoped trip clocking index,\u201d return every source line containing the exact case-sensitive term alpha. Preserve complete lines and line numbers. Do not include evidence from other sections.";
 
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+    ).toEqual([
       expect.objectContaining({
         capability_id: "docs.search",
         arguments: expect.objectContaining({
@@ -1574,7 +1781,9 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Within section \u201c6.8 Profile-scoped trip clocking index,\u201d return only source lines containing the exact case-sensitive term alpha. Output exactly the matching line number and complete source line. Do not output the section heading, explanatory text, or any nonmatching line.";
 
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+    ).toEqual([
       expect.objectContaining({
         capability_id: "docs.search",
         arguments: expect.objectContaining({
@@ -1589,7 +1798,9 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Compare only sections \u201c6.7 Twin Paradox trip clocking interpretation\u201d and \u201c6.8 Profile-scoped trip clocking index.\u201d For each section, list every source line containing the exact case-sensitive term alpha, preserving complete lines and line numbers. Keep results separated by section and use no evidence from elsewhere.";
 
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+    ).toEqual([
       expect.objectContaining({
         capability_id: "docs.search",
         arguments: expect.objectContaining({
@@ -1609,7 +1820,9 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Compare only sections \u201c6.7 Twin Paradox trip clocking interpretation\u201d and \u201c99.9 Deliberately Missing Section.\u201d For each section, report whether its heading was found, then list every source line containing the exact case-sensitive term `alpha` with complete lines and line numbers. Report zero matches explicitly. Do not substitute another section or use evidence from elsewhere.";
 
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+    ).toEqual([
       expect.objectContaining({
         arguments: expect.objectContaining({
           section_headings: [
@@ -1627,7 +1840,9 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Compare only sections \u201c6.7 Twin Paradox trip clocking interpretation\u201d and \u201c99.9 Deliberately Missing Section.\u201d For each section, report whether its heading was found, then list every source line containing the exact case-sensitive term alpha with complete lines and line numbers. Report zero matches explicitly. Do not substitute another section or use evidence from elsewhere.";
 
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })[0]).toMatchObject({
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({ question })[0],
+    ).toMatchObject({
       arguments: {
         section_contains_terms: ["alpha"],
         section_match_unit: "line",
@@ -1639,7 +1854,9 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Check sections \u201c6.7 Twin Paradox trip clocking interpretation,\u201d \u201c6.8 Profile-scoped trip clocking index,\u201d \u201c98.8 Missing Section A,\u201d and \u201c99.9 Missing Section B.\u201d For each section, report heading found or not found and the count of source lines containing alpha. Do not substitute headings or use evidence from another section.";
 
-    expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })[0]).toMatchObject({
+    expect(
+      buildActiveDocsContextWorkstationGatewayCallRequests({ question })[0],
+    ).toMatchObject({
       arguments: {
         section_headings: [
           "6.7 Twin Paradox trip clocking interpretation",
@@ -1659,11 +1876,13 @@ describe("explicit workstation gateway derived calls", () => {
       "Later, find every occurrence of alpha = 0.7 in docs/research/nhm2-current-status-whitepaper.md, but not now.",
       "If we find alpha = 0.7 in docs/research/nhm2-current-status-whitepaper.md, explain the workflow first.",
       "Earlier I asked to find alpha = 0.7 in docs/research/nhm2-current-status-whitepaper.md; explain why that needed evidence.",
-      "The screen says \"find alpha = 0.7 in docs/research/nhm2-current-status-whitepaper.md\"; explain the text only.",
+      'The screen says "find alpha = 0.7 in docs/research/nhm2-current-status-whitepaper.md"; explain the text only.',
     ];
 
     for (const question of prompts) {
-      expect(buildActiveDocsContextWorkstationGatewayCallRequests({ question })).toEqual([]);
+      expect(
+        buildActiveDocsContextWorkstationGatewayCallRequests({ question }),
+      ).toEqual([]);
     }
   });
 
@@ -1730,12 +1949,19 @@ describe("explicit workstation gateway derived calls", () => {
       "scientific-calculator.solve_expression",
       "repo.search",
     ]);
-    expect(requests.find((request) => request.capability_id === "scientific-calculator.solve_expression")).toMatchObject({
+    expect(
+      requests.find(
+        (request) =>
+          request.capability_id === "scientific-calculator.solve_expression",
+      ),
+    ).toMatchObject({
       arguments: {
         expression: "6*7",
       },
     });
-    expect(requests.find((request) => request.capability_id === "repo.search")).toMatchObject({
+    expect(
+      requests.find((request) => request.capability_id === "repo.search"),
+    ).toMatchObject({
       arguments: {
         query: "workstation_gateway",
       },
@@ -1754,8 +1980,15 @@ describe("explicit workstation gateway derived calls", () => {
     });
 
     expect(capabilities(requests)).toContain("docs.search");
-    expect(capabilities(requests)).toContain("scientific-calculator.solve_expression");
-    expect(requests.find((request) => request.capability_id === "scientific-calculator.solve_expression")).toMatchObject({
+    expect(capabilities(requests)).toContain(
+      "scientific-calculator.solve_expression",
+    );
+    expect(
+      requests.find(
+        (request) =>
+          request.capability_id === "scientific-calculator.solve_expression",
+      ),
+    ).toMatchObject({
       arguments: {
         expression: "8*9",
       },
@@ -1766,11 +1999,12 @@ describe("explicit workstation gateway derived calls", () => {
     const expression = "2.26e18*164.8*1.602176634e-19";
     const requests = buildPromptNamedCapabilityGatewayCallRequests({
       agent_runtime: "codex",
-      question:
-        `Use scientific-calculator.solve_expression with expression: ${expression}. Report only from the calculator receipt.`,
+      question: `Use scientific-calculator.solve_expression with expression: ${expression}. Report only from the calculator receipt.`,
     });
 
-    expect(capabilities(requests)).toEqual(["scientific-calculator.solve_expression"]);
+    expect(capabilities(requests)).toEqual([
+      "scientific-calculator.solve_expression",
+    ]);
     expect(requests[0]).toMatchObject({
       capability_id: "scientific-calculator.solve_expression",
       arguments: {
@@ -1788,11 +2022,12 @@ describe("explicit workstation gateway derived calls", () => {
     const expression = "integrate(x^2+3*x,x)";
     const requests = buildPromptNamedCapabilityGatewayCallRequests({
       agent_runtime: "codex",
-      question:
-        `Call scientific-calculator.solve_expression with this exact expression: ${expression}. Wait for calculator_receipt and answer from workstation_tool_evaluation.`,
+      question: `Call scientific-calculator.solve_expression with this exact expression: ${expression}. Wait for calculator_receipt and answer from workstation_tool_evaluation.`,
     });
 
-    expect(capabilities(requests)).toEqual(["scientific-calculator.solve_expression"]);
+    expect(capabilities(requests)).toEqual([
+      "scientific-calculator.solve_expression",
+    ]);
     expect(requests[0]).toMatchObject({
       capability_id: "scientific-calculator.solve_expression",
       arguments: {
@@ -1875,7 +2110,10 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["docs.search", "docs-viewer.open_doc"]);
+    expect(capabilities(requests)).toEqual([
+      "docs.search",
+      "docs-viewer.open_doc",
+    ]);
     expect(requests[0]).toMatchObject({
       capability_id: "docs.search",
       arguments: {
@@ -1906,7 +2144,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["helix_ask.inspect_capability_catalog"]);
+    expect(capabilities(requests)).toEqual([
+      "helix_ask.inspect_capability_catalog",
+    ]);
     expect(requests[0]).toMatchObject({
       capability_id: "helix_ask.inspect_capability_catalog",
       mode: "observe",
@@ -1970,7 +2210,12 @@ describe("explicit workstation gateway derived calls", () => {
         includePlannerDerived: true,
         body: { question, agent_runtime: "codex" },
       });
-      expect(requests.some((request) => request.capability_id === "helix_ask.inspect_capability_catalog")).toBe(false);
+      expect(
+        requests.some(
+          (request) =>
+            request.capability_id === "helix_ask.inspect_capability_catalog",
+        ),
+      ).toBe(false);
     }
   });
 
@@ -1985,10 +2230,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -2081,10 +2328,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -2131,7 +2380,9 @@ describe("explicit workstation gateway derived calls", () => {
         "Use propose_frontier_conjectures for missing badge bridges between QEI margin and source residual.",
     });
 
-    expect(capabilities(requests)).toEqual(["theory-badge-graph.propose_frontier_conjectures"]);
+    expect(capabilities(requests)).toEqual([
+      "theory-badge-graph.propose_frontier_conjectures",
+    ]);
     expect(requests[0]).toMatchObject({
       capability_id: "theory-badge-graph.propose_frontier_conjectures",
       mode: "read",
@@ -2192,7 +2443,8 @@ describe("explicit workstation gateway derived calls", () => {
 
   it("maps structured Moral Graph substrate admission onto the living-substrate gateway", () => {
     const requests = buildStructuredAdmissionWorkstationGatewayCallRequests({
-      question: "Use the Moral Graph to reason from organism boundary, sensing, and homeostasis.",
+      question:
+        "Use the Moral Graph to reason from organism boundary, sensing, and homeostasis.",
       source_target_intent: {
         selected_capability: "moral-graph.reflect_living_substrate_context",
         args: {
@@ -2201,7 +2453,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["moral-graph.reflect_living_substrate_context"]);
+    expect(capabilities(requests)).toEqual([
+      "moral-graph.reflect_living_substrate_context",
+    ]);
     expect(requests[0]).toMatchObject({
       schema: "helix.workstation_gateway.structured_admission_call_request.v1",
       derivation_source: "helix_structured_source_target_admission",
@@ -2232,10 +2486,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -2248,10 +2504,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -2262,7 +2520,9 @@ describe("explicit workstation gateway derived calls", () => {
         "Use scientific-calculator.solve_with_steps for 8*9, then explain the observed result.",
     });
 
-    expect(capabilities(requests)).toEqual(["scientific-calculator.solve_expression"]);
+    expect(capabilities(requests)).toEqual([
+      "scientific-calculator.solve_expression",
+    ]);
     expect(requests[0]).toMatchObject({
       derivation_source: "helix_prompt_named_capability",
       capability_id: "scientific-calculator.solve_expression",
@@ -2290,7 +2550,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scientific-calculator.solve_expression"]);
+    expect(capabilities(requests)).toEqual([
+      "scientific-calculator.solve_expression",
+    ]);
     expect(requests[0]).toMatchObject({
       capability_id: "scientific-calculator.solve_expression",
       mode: "read",
@@ -2313,10 +2575,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -2335,19 +2599,31 @@ describe("explicit workstation gateway derived calls", () => {
       "docs.search",
       "scientific-calculator.solve_expression",
     ]);
-    expect(requests.find((request) => request.capability_id === "docs.search")).toMatchObject({
+    expect(
+      requests.find((request) => request.capability_id === "docs.search"),
+    ).toMatchObject({
       derivation_source: "helix_prompt_named_capability",
       arguments: {
         query: "claim boundary",
         paths: ["docs/research/nhm2-current-status-whitepaper.md"],
       },
     });
-    expect(requests.find((request) => request.capability_id === "scientific-calculator.solve_expression")).toMatchObject({
+    expect(
+      requests.find(
+        (request) =>
+          request.capability_id === "scientific-calculator.solve_expression",
+      ),
+    ).toMatchObject({
       arguments: {
         expression: "8*9",
       },
     });
-    expect(requests.find((request) => request.capability_id === "helix_ask.reflect_theory_context")).toBeUndefined();
+    expect(
+      requests.find(
+        (request) =>
+          request.capability_id === "helix_ask.reflect_theory_context",
+      ),
+    ).toBeUndefined();
   });
 
   it("admits prompt-named Moral Graph living-substrate reflection as a gateway observation", () => {
@@ -2360,15 +2636,20 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["moral-graph.reflect_living_substrate_context"]);
+    expect(capabilities(requests)).toEqual([
+      "moral-graph.reflect_living_substrate_context",
+    ]);
     expect(requests[0]).toMatchObject({
-      schema: "helix.workstation_gateway.prompt_named_capability_call_request.v1",
+      schema:
+        "helix.workstation_gateway.prompt_named_capability_call_request.v1",
       derivation_source: "helix_prompt_named_capability",
       capability_id: "moral-graph.reflect_living_substrate_context",
       mode: "read",
       arguments: {
         prompt: expect.stringContaining("organism boundary"),
-        conversation_context: expect.stringContaining("moral-graph.reflect_living_substrate_context"),
+        conversation_context: expect.stringContaining(
+          "moral-graph.reflect_living_substrate_context",
+        ),
         include_theory_bridge: true,
         include_recommended_actions: true,
         source_target_intent: expect.objectContaining({
@@ -2393,13 +2674,16 @@ describe("explicit workstation gateway derived calls", () => {
 
     expect(capabilities(requests)).toEqual(["moral-graph.reflect_context"]);
     expect(requests[0]).toMatchObject({
-      schema: "helix.workstation_gateway.prompt_named_capability_call_request.v1",
+      schema:
+        "helix.workstation_gateway.prompt_named_capability_call_request.v1",
       derivation_source: "helix_prompt_named_capability",
       capability_id: "moral-graph.reflect_context",
       mode: "read",
       arguments: {
         prompt: expect.stringContaining("inherited conditioning"),
-        conversation_context: expect.stringContaining("moral-graph.reflect_context"),
+        conversation_context: expect.stringContaining(
+          "moral-graph.reflect_context",
+        ),
         include_locator: true,
         include_fruition: true,
         include_procedural_classification: true,
@@ -2488,8 +2772,12 @@ describe("explicit workstation gateway derived calls", () => {
 
     expect(capabilities(requests)).toEqual(["moral-graph.reflect_context"]);
     expect(capabilities(requests)).not.toContain("internet-search.search_web");
-    expect(capabilities(requests)).not.toContain("theory-badge-graph.reflect_discussion_context");
-    expect(capabilities(requests)).not.toContain("civilization-bounds.reflect_system_bounds");
+    expect(capabilities(requests)).not.toContain(
+      "theory-badge-graph.reflect_discussion_context",
+    );
+    expect(capabilities(requests)).not.toContain(
+      "civilization-bounds.reflect_system_bounds",
+    );
     expect(requests[0]).toMatchObject({
       derivation_source: "helix_prompt_derived_moral_graph_reflection",
       capability_id: "moral-graph.reflect_context",
@@ -2516,7 +2804,9 @@ describe("explicit workstation gateway derived calls", () => {
       "moral-graph.reflect_context",
       "internet-search.search_web",
     ]);
-    expect((requests[0].arguments as Record<string, any>).next_affordances).toBeUndefined();
+    expect(
+      (requests[0].arguments as Record<string, any>).next_affordances,
+    ).toBeUndefined();
   });
 
   it("does not execute contextual or screen-visible general Moral Graph mentions", () => {
@@ -2538,7 +2828,8 @@ describe("explicit workstation gateway derived calls", () => {
       includePlannerDerived: true,
       body: {
         agent_runtime: "codex",
-        question: "What is the Moral Graph reflection tool? Explain conceptually. Do not run it.",
+        question:
+          "What is the Moral Graph reflection tool? Explain conceptually. Do not run it.",
       },
     });
 
@@ -2607,7 +2898,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["moral-graph.reflect_living_substrate_context"]);
+    expect(capabilities(requests)).toEqual([
+      "moral-graph.reflect_living_substrate_context",
+    ]);
     expect(capabilities(requests)).not.toContain("internet-search.search_web");
   });
 
@@ -2621,7 +2914,8 @@ describe("explicit workstation gateway derived calls", () => {
         source_target_intent: {
           selected_capability: "moral-graph.reflect_living_substrate_context",
           args: {
-            query: "organism boundary, sensing, homeostasis, personhood, law, civilization",
+            query:
+              "organism boundary, sensing, homeostasis, personhood, law, civilization",
           },
         },
         route_metadata: {
@@ -2635,7 +2929,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["moral-graph.reflect_living_substrate_context"]);
+    expect(capabilities(requests)).toEqual([
+      "moral-graph.reflect_living_substrate_context",
+    ]);
     const args = requests[0].arguments as Record<string, any>;
     expect(args.next_affordances).toEqual([
       expect.objectContaining({
@@ -2649,7 +2945,9 @@ describe("explicit workstation gateway derived calls", () => {
         raw_content_included: false,
       }),
     ]);
-    expect(args.source_target_intent.next_affordances).toEqual(args.next_affordances);
+    expect(args.source_target_intent.next_affordances).toEqual(
+      args.next_affordances,
+    );
   });
 
   it("keeps explicitly requested external research adjacent to Moral Graph substrate reflection", () => {
@@ -2680,7 +2978,9 @@ describe("explicit workstation gateway derived calls", () => {
       "moral-graph.reflect_living_substrate_context",
       "internet-search.search_web",
     ]);
-    expect((requests[0].arguments as Record<string, any>).next_affordances).toBeUndefined();
+    expect(
+      (requests[0].arguments as Record<string, any>).next_affordances,
+    ).toBeUndefined();
   });
 
   it("keeps explicit Moral Graph reflection primary when adjacent evidence families are negated", () => {
@@ -2693,7 +2993,11 @@ describe("explicit workstation gateway derived calls", () => {
         workspace_context_snapshot: {
           activePanel: "image-lens",
           focusedPanel: "image-lens",
-          openPanels: ["image-lens", "postulate-board", "scientific-calculator"],
+          openPanels: [
+            "image-lens",
+            "postulate-board",
+            "scientific-calculator",
+          ],
           activeCalculatorContext: {
             expression: "8*9",
             result: 72,
@@ -2711,9 +3015,13 @@ describe("explicit workstation gateway derived calls", () => {
     });
 
     expect(capabilities(requests)).toEqual(["moral-graph.reflect_context"]);
-    expect(capabilities(requests)).not.toContain("scholarly-research.lookup_papers");
+    expect(capabilities(requests)).not.toContain(
+      "scholarly-research.lookup_papers",
+    );
     expect(capabilities(requests)).not.toContain("internet-search.search_web");
-    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+    expect(capabilities(requests)).not.toContain(
+      "scientific-calculator.solve_expression",
+    );
     const args = requests[0].arguments as Record<string, any>;
     expect(args.next_affordances).toBeUndefined();
     expect(args.source_target_intent).toMatchObject({
@@ -2725,7 +3033,10 @@ describe("explicit workstation gateway derived calls", () => {
         expect.objectContaining({
           capability: "scholarly-research.lookup_papers",
           reason: "negative_evidence_constraint",
-          forbidden_families: expect.arrayContaining(["external_evidence", "page_evidence"]),
+          forbidden_families: expect.arrayContaining([
+            "external_evidence",
+            "page_evidence",
+          ]),
           terminal_eligible: false,
           assistant_answer: false,
         }),
@@ -2749,7 +3060,12 @@ describe("explicit workstation gateway derived calls", () => {
       "scientific-calculator.solve_expression",
     ]);
     expect(capabilities(requests)).not.toContain("internet-search.search_web");
-    expect(requests.find((request) => request.capability_id === "helix_ask.reflect_theory_context")).toBeUndefined();
+    expect(
+      requests.find(
+        (request) =>
+          request.capability_id === "helix_ask.reflect_theory_context",
+      ),
+    ).toBeUndefined();
   });
 
   it("does not admit internet search from scientific Image Lens exact-row retry wording", () => {
@@ -2763,7 +3079,9 @@ describe("explicit workstation gateway derived calls", () => {
     });
 
     expect(capabilities(requests)).not.toContain("internet-search.search_web");
-    expect(capabilities(requests)).not.toContain("scholarly-research.lookup_papers");
+    expect(capabilities(requests)).not.toContain(
+      "scholarly-research.lookup_papers",
+    );
   });
 
   it("defers affirmative natural-language theory reflection fetch prompts to the runtime", () => {
@@ -2783,19 +3101,21 @@ describe("explicit workstation gateway derived calls", () => {
       "Do not fetch the theory reflection for fusion; explain what that would do.",
       "In the future we might fetch the theory reflection for fusion.",
       "The UI label says theory reflection for fusion.",
-      "The phrase is \"fetch the theory reflection for fusion\"; explain it only.",
+      'The phrase is "fetch the theory reflection for fusion"; explain it only.',
       "I am not asking you to fetch the theory reflection for fusion, just define the phrase.",
       "After you fetch the theory reflection for fusion, what would happen?",
     ];
 
     for (const question of prompts) {
-      expect(readWorkstationGatewayCallRequestsForTurn({
-        includePlannerDerived: true,
-        body: {
-          agent_runtime: "codex",
-          question,
-        },
-      })).toEqual([]);
+      expect(
+        readWorkstationGatewayCallRequestsForTurn({
+          includePlannerDerived: true,
+          body: {
+            agent_runtime: "codex",
+            question,
+          },
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -2831,8 +3151,12 @@ describe("explicit workstation gateway derived calls", () => {
     const prompt =
       "Use scholarly-research.fetch_full_text directly on https://arxiv.org/pdf/2401.12345. Report only whether machine-readable full text was obtained. Do not run scholarly-research.lookup_papers or use Image Lens.";
 
-    const namedRequests = buildPromptNamedCapabilityGatewayCallRequests({ question: prompt });
-    expect(capabilities(namedRequests)).toEqual(["scholarly-research.fetch_full_text"]);
+    const namedRequests = buildPromptNamedCapabilityGatewayCallRequests({
+      question: prompt,
+    });
+    expect(capabilities(namedRequests)).toEqual([
+      "scholarly-research.fetch_full_text",
+    ]);
     expect(namedRequests[0]).toMatchObject({
       derivation_source: "helix_prompt_named_capability",
       arguments: {
@@ -2849,15 +3173,21 @@ describe("explicit workstation gateway derived calls", () => {
       includePlannerDerived: true,
       body: { agent_runtime: "codex", question: prompt },
     });
-    expect(capabilities(requests)).toEqual(["scholarly-research.fetch_full_text"]);
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.fetch_full_text",
+    ]);
   });
 
   it("routes a natural-language old-style arXiv fetch despite narrower search negation", () => {
     const prompt =
       "FULLTEXT_SMOKE_01 — Fetch and parse the full text for arXiv gr-qc/9510071. Return the title, parsed page count, and one page-numbered equation. Do not search for other papers.";
 
-    const namedRequests = buildPromptNamedCapabilityGatewayCallRequests({ question: prompt });
-    expect(capabilities(namedRequests)).toEqual(["scholarly-research.fetch_full_text"]);
+    const namedRequests = buildPromptNamedCapabilityGatewayCallRequests({
+      question: prompt,
+    });
+    expect(capabilities(namedRequests)).toEqual([
+      "scholarly-research.fetch_full_text",
+    ]);
     expect(namedRequests[0]).toMatchObject({
       arguments: {
         source_url: "https://arxiv.org/pdf/gr-qc/9510071.pdf",
@@ -2873,7 +3203,9 @@ describe("explicit workstation gateway derived calls", () => {
       includePlannerDerived: true,
       body: { agent_runtime: "codex", question: prompt },
     });
-    expect(capabilities(requests)).toEqual(["scholarly-research.fetch_full_text"]);
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.fetch_full_text",
+    ]);
   });
 
   it("keeps lookup-first routing when the operator explicitly requests lookup then full text", () => {
@@ -2886,7 +3218,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
     expect(requests[0]).toMatchObject({
       derivation_source: "helix_scholarly_workflow_planner",
       dependent_capability_id: "scholarly-research.fetch_full_text",
@@ -2917,7 +3251,8 @@ describe("explicit workstation gateway derived calls", () => {
     const papers = [1, 2, 3].map((ordinal) => ({
       result_id: `paper:qei-${ordinal}`,
       title: `Quantum inequality sampling constraints in curved spacetime ${ordinal}`,
-      abstract: "Quantum inequality sampling constraints bound negative energy in curved spacetime.",
+      abstract:
+        "Quantum inequality sampling constraints bound negative energy in curved spacetime.",
       identifiers: {
         arxiv_id: `2607.0000${ordinal}`,
         pdf_url: `https://arxiv.org/pdf/2607.0000${ordinal}.pdf`,
@@ -2955,12 +3290,19 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    const makeFetchResult = (paperResultId: string) => ({
-      capability_id: "scholarly-research.fetch_full_text",
-      ok: true,
-      observation: { evidence_state: "full_text_usable", paper_result_id: paperResultId },
-      observation_packet: { produced_artifact_refs: [`observation:${paperResultId}`], state_delta: {} },
-    } as any);
+    const makeFetchResult = (paperResultId: string) =>
+      ({
+        capability_id: "scholarly-research.fetch_full_text",
+        ok: true,
+        observation: {
+          evidence_state: "full_text_usable",
+          paper_result_id: paperResultId,
+        },
+        observation_packet: {
+          produced_artifact_refs: [`observation:${paperResultId}`],
+          state_delta: {},
+        },
+      }) as any;
     const fetchOneResult = makeFetchResult("paper:qei-1");
     const fetchTwo = buildDependentCompoundCapabilityGatewayCallRequest({
       request: fetchOne!,
@@ -2989,21 +3331,33 @@ describe("explicit workstation gateway derived calls", () => {
       arguments: {
         paper_result_id: "paper:qei-3",
         full_text_fetch_index: 3,
-        selected_full_text_paper_ids: ["paper:qei-1", "paper:qei-2", "paper:qei-3"],
+        selected_full_text_paper_ids: [
+          "paper:qei-1",
+          "paper:qei-2",
+          "paper:qei-3",
+        ],
       },
     });
 
     const fetchThreeResult = makeFetchResult("paper:qei-3");
-    expect(buildDependentCompoundCapabilityGatewayCallRequest({
-      request: fetchThree!,
-      result: fetchThreeResult,
-      results: [lookupResult, fetchOneResult, fetchTwoResult, fetchThreeResult],
-      turnId: "turn:three-full-texts",
-    })).toBeNull();
+    expect(
+      buildDependentCompoundCapabilityGatewayCallRequest({
+        request: fetchThree!,
+        result: fetchThreeResult,
+        results: [
+          lookupResult,
+          fetchOneResult,
+          fetchTwoResult,
+          fetchThreeResult,
+        ],
+        turnId: "turn:three-full-texts",
+      }),
+    ).toBeNull();
   });
 
   it("does not spend the three-source budget on a cross-provider duplicate paper", () => {
-    const title = "Quantum Field Theory Constrains Traversable Wormhole Geometries";
+    const title =
+      "Quantum Field Theory Constrains Traversable Wormhole Geometries";
     const lookupRequest = {
       compound_outcome: "scholarly_research_workflow",
       dependent_capability_id: "scholarly-research.fetch_full_text",
@@ -3020,7 +3374,8 @@ describe("explicit workstation gateway derived calls", () => {
       {
         result_id: "arxiv:ford-roman",
         title,
-        abstract: "Quantum inequalities bound sampled negative energy and constrain wormholes.",
+        abstract:
+          "Quantum inequalities bound sampled negative energy and constrain wormholes.",
         identifiers: {
           arxiv_id: "gr-qc/9510071",
           pdf_url: "https://arxiv.org/pdf/gr-qc/9510071.pdf",
@@ -3029,7 +3384,8 @@ describe("explicit workstation gateway derived calls", () => {
       {
         result_id: "semantic:ford-roman",
         title,
-        abstract: "Quantum inequalities bound sampled negative energy and constrain wormholes.",
+        abstract:
+          "Quantum inequalities bound sampled negative energy and constrain wormholes.",
         identifiers: {
           doi: "10.1103/PhysRevD.53.5496",
           pdf_url: "https://arxiv.org/pdf/gr-qc/9510071",
@@ -3037,8 +3393,10 @@ describe("explicit workstation gateway derived calls", () => {
       },
       {
         result_id: "arxiv:fewster-roman",
-        title: "Problems with Wormholes Which Involve Arbitrarily Small Amounts of Exotic Matter",
-        abstract: "A null-contracted quantum inequality constrains negative energy in traversable wormholes.",
+        title:
+          "Problems with Wormholes Which Involve Arbitrarily Small Amounts of Exotic Matter",
+        abstract:
+          "A null-contracted quantum inequality constrains negative energy in traversable wormholes.",
         identifiers: {
           arxiv_id: "gr-qc/0510079",
           pdf_url: "https://arxiv.org/pdf/gr-qc/0510079.pdf",
@@ -3060,12 +3418,19 @@ describe("explicit workstation gateway derived calls", () => {
         suggested_next_steps: [],
       },
     } as any;
-    const makeFetchResult = (paperResultId: string) => ({
-      capability_id: "scholarly-research.fetch_full_text",
-      ok: true,
-      observation: { evidence_state: "full_text_usable", paper_result_id: paperResultId },
-      observation_packet: { produced_artifact_refs: [`observation:${paperResultId}`], state_delta: {} },
-    } as any);
+    const makeFetchResult = (paperResultId: string) =>
+      ({
+        capability_id: "scholarly-research.fetch_full_text",
+        ok: true,
+        observation: {
+          evidence_state: "full_text_usable",
+          paper_result_id: paperResultId,
+        },
+        observation_packet: {
+          produced_artifact_refs: [`observation:${paperResultId}`],
+          state_delta: {},
+        },
+      }) as any;
 
     const fetchOne = buildDependentCompoundCapabilityGatewayCallRequest({
       request: lookupRequest,
@@ -3074,7 +3439,9 @@ describe("explicit workstation gateway derived calls", () => {
       turnId: "turn:cross-provider-full-text-dedupe",
     })!;
     expect((fetchOne.arguments as any).papers).toHaveLength(2);
-    expect((fetchOne.arguments as any).paper_result_id).toBe("arxiv:ford-roman");
+    expect((fetchOne.arguments as any).paper_result_id).toBe(
+      "arxiv:ford-roman",
+    );
 
     const fetchOneResult = makeFetchResult("arxiv:ford-roman");
     const fetchTwo = buildDependentCompoundCapabilityGatewayCallRequest({
@@ -3083,15 +3450,19 @@ describe("explicit workstation gateway derived calls", () => {
       results: [lookupResult, fetchOneResult],
       turnId: "turn:cross-provider-full-text-dedupe",
     })!;
-    expect((fetchTwo.arguments as any).paper_result_id).toBe("arxiv:fewster-roman");
+    expect((fetchTwo.arguments as any).paper_result_id).toBe(
+      "arxiv:fewster-roman",
+    );
 
     const fetchTwoResult = makeFetchResult("arxiv:fewster-roman");
-    expect(buildDependentCompoundCapabilityGatewayCallRequest({
-      request: fetchTwo,
-      result: fetchTwoResult,
-      results: [lookupResult, fetchOneResult, fetchTwoResult],
-      turnId: "turn:cross-provider-full-text-dedupe",
-    })).toBeNull();
+    expect(
+      buildDependentCompoundCapabilityGatewayCallRequest({
+        request: fetchTwo,
+        result: fetchTwoResult,
+        results: [lookupResult, fetchOneResult, fetchTwoResult],
+        turnId: "turn:cross-provider-full-text-dedupe",
+      }),
+    ).toBeNull();
   });
 
   it("aggregates resolved claim lookups before choosing three accessible full-text sources", () => {
@@ -3124,7 +3495,9 @@ describe("explicit workstation gateway derived calls", () => {
     const lookups = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,
       body,
-    }).filter((request) => request.capability_id === "scholarly-research.lookup_papers");
+    }).filter(
+      (request) => request.capability_id === "scholarly-research.lookup_papers",
+    );
 
     expect(lookups).toHaveLength(4);
     const portfolioCloser = lookups.at(-1)!;
@@ -3142,20 +3515,24 @@ describe("explicit workstation gateway derived calls", () => {
       return {
         capability_id: "scholarly-research.lookup_papers",
         ok: true,
-        gateway_admission: { source_target_intent: request.arguments.source_target_intent },
+        gateway_admission: {
+          source_target_intent: request.arguments.source_target_intent,
+        },
         observation: {
           schema: "helix.scholarly_research_observation.v1",
           query: request.arguments.query,
-          papers: [{
-            result_id: resultId,
-            title: request.arguments.query,
-            abstract: request.arguments.query,
-            provider: "arxiv",
-            identifiers: {
-              arxiv_id: `2607.1000${index + 1}`,
-              pdf_url: `https://arxiv.org/pdf/2607.1000${index + 1}.pdf`,
+          papers: [
+            {
+              result_id: resultId,
+              title: request.arguments.query,
+              abstract: request.arguments.query,
+              provider: "arxiv",
+              identifiers: {
+                arxiv_id: `2607.1000${index + 1}`,
+                pdf_url: `https://arxiv.org/pdf/2607.1000${index + 1}.pdf`,
+              },
             },
-          }],
+          ],
         },
         observation_packet: {
           produced_artifact_refs: [`observation:claim-${index + 1}`],
@@ -3181,13 +3558,17 @@ describe("explicit workstation gateway derived calls", () => {
         selected_full_text_paper_ids: ["paper:claim-1"],
       },
     });
-    expect((firstFetch as any).arguments.papers.map((paper: any) => paper.result_id)).toEqual([
+    expect(
+      (firstFetch as any).arguments.papers.map((paper: any) => paper.result_id),
+    ).toEqual([
       "paper:claim-1",
       "paper:claim-2",
       "paper:claim-3",
       "paper:claim-4",
     ]);
-    expect((firstFetch as any).arguments.source_target_intent.source_refs).toEqual([
+    expect(
+      (firstFetch as any).arguments.source_target_intent.source_refs,
+    ).toEqual([
       "observation:claim-1",
       "observation:claim-2",
       "observation:claim-3",
@@ -3202,7 +3583,12 @@ describe("explicit workstation gateway derived calls", () => {
       "Quantum interest requires compensating positive-energy pulses.",
       "Quantum inequalities constrain traversable wormhole and warp-drive geometries.",
     ];
-    const makePaper = (resultId: string, title: string, abstract: string, arxivId: string) => ({
+    const makePaper = (
+      resultId: string,
+      title: string,
+      abstract: string,
+      arxivId: string,
+    ) => ({
       result_id: resultId,
       title,
       abstract,
@@ -3227,18 +3613,22 @@ describe("explicit workstation gateway derived calls", () => {
           "gr-qc/9510071",
         ),
       ],
-      [makePaper(
-        "paper:marginal-bounds",
-        "New Quantum Bounds for Inequalities involving Marginal Expectations",
-        "Bounds on marginal expectations in quantum information and Bell scenarios.",
-        "2607.20002",
-      )],
-      [makePaper(
-        "paper:ford-review",
-        "Negative Energy Densities in Quantum Field Theory",
-        "Quantum inequalities limit the magnitude and duration of negative energy and describe quantum interest.",
-        "0911.3597",
-      )],
+      [
+        makePaper(
+          "paper:marginal-bounds",
+          "New Quantum Bounds for Inequalities involving Marginal Expectations",
+          "Bounds on marginal expectations in quantum information and Bell scenarios.",
+          "2607.20002",
+        ),
+      ],
+      [
+        makePaper(
+          "paper:ford-review",
+          "Negative Energy Densities in Quantum Field Theory",
+          "Quantum inequalities limit the magnitude and duration of negative energy and describe quantum interest.",
+          "0911.3597",
+        ),
+      ],
       [
         makePaper(
           "paper:contextuality",
@@ -3300,8 +3690,14 @@ describe("explicit workstation gateway derived calls", () => {
       const fetchResult = {
         capability_id: "scholarly-research.fetch_full_text",
         ok: true,
-        observation: { evidence_state: "full_text_usable", paper_result_id: fetchedId },
-        observation_packet: { produced_artifact_refs: [`observation:${fetchedId}`], state_delta: {} },
+        observation: {
+          evidence_state: "full_text_usable",
+          paper_result_id: fetchedId,
+        },
+        observation_packet: {
+          produced_artifact_refs: [`observation:${fetchedId}`],
+          state_delta: {},
+        },
       } as any;
       nextRequest = buildDependentCompoundCapabilityGatewayCallRequest({
         request: nextRequest,
@@ -3341,7 +3737,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scholarly-research.fetch_full_text"]);
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.fetch_full_text",
+    ]);
     expect(requests[0]).toMatchObject({
       derivation_source: "helix_prompt_named_capability",
       arguments: {
@@ -3353,7 +3751,9 @@ describe("explicit workstation gateway derived calls", () => {
         }),
       },
     });
-    expect(JSON.stringify(requests)).not.toContain("scholarly-research.extract_numeric_parameters");
+    expect(JSON.stringify(requests)).not.toContain(
+      "scholarly-research.extract_numeric_parameters",
+    );
   });
 
   it("does not let sentence-leading words leak into mixed prompt calculator expressions", () => {
@@ -3371,7 +3771,12 @@ describe("explicit workstation gateway derived calls", () => {
       "docs.search",
       "scientific-calculator.solve_expression",
     ]);
-    expect(requests.find((request) => request.capability_id === "scientific-calculator.solve_expression")).toMatchObject({
+    expect(
+      requests.find(
+        (request) =>
+          request.capability_id === "scientific-calculator.solve_expression",
+      ),
+    ).toMatchObject({
       arguments: {
         expression: "8*9",
       },
@@ -3393,7 +3798,8 @@ describe("explicit workstation gateway derived calls", () => {
         source_target_intent: {
           selected_capability: "theory-badge-graph.reflect_discussion_context",
           args: {
-            query: "Reflect QEI margin and claim boundary against the theory graph.",
+            query:
+              "Reflect QEI margin and claim boundary against the theory graph.",
           },
         },
       },
@@ -3415,7 +3821,8 @@ describe("explicit workstation gateway derived calls", () => {
       capability_id: "helix_ask.reflect_theory_context",
       mode: "read",
       arguments: {
-        prompt: "Reflect QEI margin and claim boundary against the theory graph.",
+        prompt:
+          "Reflect QEI margin and claim boundary against the theory graph.",
       },
     });
   });
@@ -3479,10 +3886,13 @@ describe("explicit workstation gateway derived calls", () => {
   it("maps theory reflection planner steps into the workstation gateway", () => {
     const requests = buildPlannerDerivedWorkstationGatewayCallRequests({
       agent_runtime: "codex",
-      question: "Reflect QEI margin and source residual against the theory badge graph, then explain the claim boundary.",
+      question:
+        "Reflect QEI margin and source residual against the theory badge graph, then explain the claim boundary.",
     });
 
-    expect(capabilities(requests)).toEqual(["helix_ask.reflect_theory_context"]);
+    expect(capabilities(requests)).toEqual([
+      "helix_ask.reflect_theory_context",
+    ]);
     expect(requests[0]).toMatchObject({
       capability_id: "helix_ask.reflect_theory_context",
       mode: "read",
@@ -3499,7 +3909,9 @@ describe("explicit workstation gateway derived calls", () => {
         "Use the Moral Graph to derive moral relevance from organism boundary, sensing, homeostasis, entropy pressure, and non-human living systems.",
     });
 
-    expect(capabilities(requests)).toEqual(["moral-graph.reflect_living_substrate_context"]);
+    expect(capabilities(requests)).toEqual([
+      "moral-graph.reflect_living_substrate_context",
+    ]);
     expect(requests[0]).toMatchObject({
       capability_id: "moral-graph.reflect_living_substrate_context",
       mode: "read",
@@ -3539,14 +3951,18 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
     const args = requests[0].arguments as Record<string, any>;
-    expect(args.next_affordances).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        capability: "helix_ask.reflect_theory_context",
-        purpose: "codex_selected_followup_tool",
-        reason: "available_after_observation_reentry",
-      }),
-    ]));
-    expect(args.source_target_intent.next_affordances).toEqual(args.next_affordances);
+    expect(args.next_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          capability: "helix_ask.reflect_theory_context",
+          purpose: "codex_selected_followup_tool",
+          reason: "available_after_observation_reentry",
+        }),
+      ]),
+    );
+    expect(args.source_target_intent.next_affordances).toEqual(
+      args.next_affordances,
+    );
   });
 
   it("keeps planner-derived theory plus calculator chains to a primary reflection request", () => {
@@ -3556,23 +3972,29 @@ describe("explicit workstation gateway derived calls", () => {
         "Reflect photon energy through the theory badge graph and calculate 6.626e-34 * 5e14.",
     });
 
-    expect(capabilities(requests)).toEqual(["helix_ask.reflect_theory_context"]);
+    expect(capabilities(requests)).toEqual([
+      "helix_ask.reflect_theory_context",
+    ]);
     const args = requests[0].arguments as Record<string, any>;
-    expect(args.next_affordances).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        capability: "scientific-calculator.solve_expression",
-        purpose: "codex_selected_followup_tool",
-        expression: "6.626e-34*5e14",
-      }),
-    ]));
-    expect(args.source_target_intent.next_affordances).toEqual(args.next_affordances);
+    expect(args.next_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          capability: "scientific-calculator.solve_expression",
+          purpose: "codex_selected_followup_tool",
+          expression: "6.626e-34*5e14",
+        }),
+      ]),
+    );
+    expect(args.source_target_intent.next_affordances).toEqual(
+      args.next_affordances,
+    );
   });
 
   it("does not turn unrelated workstation panel action plans into gateway calls", () => {
     const requests = buildPlannerDerivedWorkstationGatewayCallRequests({
       agent_runtime: "codex",
       question:
-        "Run panel action panel_id=narrator action_id=narrator.debug_auto_speak_probe text=\"probe\".",
+        'Run panel action panel_id=narrator action_id=narrator.debug_auto_speak_probe text="probe".',
     });
 
     expect(requests).toEqual([]);
@@ -3581,10 +4003,13 @@ describe("explicit workstation gateway derived calls", () => {
   it("maps civilization bounds planner steps into the workstation gateway", () => {
     const requests = buildPlannerDerivedWorkstationGatewayCallRequests({
       agent_runtime: "codex",
-      question: "Reflect the civilization bounds and collaboration constraints for this system.",
+      question:
+        "Reflect the civilization bounds and collaboration constraints for this system.",
     });
 
-    expect(capabilities(requests)).toEqual(["civilization-bounds.reflect_system_bounds"]);
+    expect(capabilities(requests)).toEqual([
+      "civilization-bounds.reflect_system_bounds",
+    ]);
     expect(requests[0]).toMatchObject({
       capability_id: "civilization-bounds.reflect_system_bounds",
       mode: "read",
@@ -3594,7 +4019,8 @@ describe("explicit workstation gateway derived calls", () => {
   it("does not derive repo search from negated repo-search wording", () => {
     const requests = buildPromptDerivedRepoSearchGatewayCallRequests({
       agent_runtime: "codex",
-      question: "Do not search the repo for workstation_gateway; just explain what evidence would be needed.",
+      question:
+        "Do not search the repo for workstation_gateway; just explain what evidence would be needed.",
     });
 
     expect(requests).toEqual([]);
@@ -3666,11 +4092,14 @@ describe("explicit workstation gateway derived calls", () => {
       includePlannerDerived: true,
       body: {
         agent_runtime: "codex",
-        question: "Look up PMID 2813384 and report its metadata. Do not fetch full text.",
+        question:
+          "Look up PMID 2813384 and report its metadata. Do not fetch full text.",
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
     expect(requests[0]).toMatchObject({
       arguments: {
         query: "PMID:2813384",
@@ -3697,7 +4126,8 @@ describe("explicit workstation gateway derived calls", () => {
       includePlannerDerived: true,
       body: {
         agent_runtime: "codex",
-        question: "Search the web for current OpenAI API status and cite the sources you use.",
+        question:
+          "Search the web for current OpenAI API status and cite the sources you use.",
       },
     });
 
@@ -3714,7 +4144,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scholarly-research.fetch_full_text"]);
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.fetch_full_text",
+    ]);
   });
 
   it("maps natural repo search variants named in the contract", () => {
@@ -3724,10 +4156,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptDerivedRepoSearchGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([
+      expect(
+        buildPromptDerivedRepoSearchGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([
         expect.objectContaining({
           capability_id: "repo.search",
           mode: "read",
@@ -3742,7 +4176,8 @@ describe("explicit workstation gateway derived calls", () => {
   it("derives a focused repo query for implementation how-questions", () => {
     const requests = buildPromptDerivedRepoSearchGatewayCallRequests({
       agent_runtime: "codex",
-      question: "how tell me from the code repo search, how does the locator work for theory badge graph?",
+      question:
+        "how tell me from the code repo search, how does the locator work for theory badge graph?",
     });
 
     expect(requests).toEqual([
@@ -3798,7 +4233,9 @@ describe("explicit workstation gateway derived calls", () => {
         }),
       }),
     ]);
-    expect((requests[0].arguments as Record<string, unknown>).query).toBeUndefined();
+    expect(
+      (requests[0].arguments as Record<string, unknown>).query,
+    ).toBeUndefined();
   });
 
   it("turns underspecified repo search into a typed gateway block instead of silently dropping it", async () => {
@@ -3853,7 +4290,8 @@ describe("explicit workstation gateway derived calls", () => {
   it("maps workspace status prompts to workspace_os.status observations", () => {
     const requests = buildPromptDerivedWorkspaceStatusGatewayCallRequests({
       agent_runtime: "codex",
-      question: "Check the workspace OS status and tell me which capabilities are available.",
+      question:
+        "Check the workspace OS status and tell me which capabilities are available.",
     });
 
     expect(requests).toEqual([
@@ -3922,10 +4360,12 @@ describe("explicit workstation gateway derived calls", () => {
     const question =
       "Live browser voice-tool test: use the governed text_to_speech.speak_text voice lane to say exactly 'browser voice receipt check'. After the receipt re-enters, answer in one sentence with the receipt playback_status.";
 
-    expect(buildPromptNamedCapabilityGatewayCallRequests({
-      agent_runtime: "codex",
-      question,
-    })).toEqual([
+    expect(
+      buildPromptNamedCapabilityGatewayCallRequests({
+        agent_runtime: "codex",
+        question,
+      }),
+    ).toEqual([
       expect.objectContaining({
         capability_id: "text_to_speech.speak_text",
         mode: "act",
@@ -3939,16 +4379,20 @@ describe("explicit workstation gateway derived calls", () => {
         }),
       }),
     ]);
-    expect(buildPromptDerivedVoiceGatewayCallRequests({
-      agent_runtime: "codex",
-      question,
-    })).toEqual([]);
+    expect(
+      buildPromptDerivedVoiceGatewayCallRequests({
+        agent_runtime: "codex",
+        question,
+      }),
+    ).toEqual([]);
 
-    expect(buildPromptDerivedVoiceGatewayCallRequests({
-      agent_runtime: "codex",
-      question:
-        "Live browser voice-tool test: use the governed voice lane to say exactly 'browser voice receipt check'. After the receipt re-enters, answer in one sentence with the receipt playback_status.",
-    })).toEqual([
+    expect(
+      buildPromptDerivedVoiceGatewayCallRequests({
+        agent_runtime: "codex",
+        question:
+          "Live browser voice-tool test: use the governed voice lane to say exactly 'browser voice receipt check'. After the receipt re-enters, answer in one sentence with the receipt playback_status.",
+      }),
+    ).toEqual([
       expect.objectContaining({
         capability_id: "text_to_speech.speak_text",
         arguments: expect.objectContaining({
@@ -3961,7 +4405,8 @@ describe("explicit workstation gateway derived calls", () => {
   it("does not map quoted voice tool mentions to voice gateway requests", () => {
     const requests = buildPromptDerivedVoiceGatewayCallRequests({
       agent_runtime: "codex",
-      question: "The text says live_env.request_interim_voice_callout; explain it only.",
+      question:
+        "The text says live_env.request_interim_voice_callout; explain it only.",
     });
 
     expect(requests).toEqual([]);
@@ -3984,14 +4429,18 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptDerivedVoiceGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptDerivedVoiceGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -4018,15 +4467,19 @@ describe("explicit workstation gateway derived calls", () => {
             activeDocPath: "docs/helix-ask-flow.md",
             activeTranslationAccountLocale: "es-MX",
             activeTranslationTargetLanguage: "es",
-            activeTranslationBlocks: [{
-              unit_id: "doc-unit:1",
-              translated_text: "Translated sentence.",
-            }],
+            activeTranslationBlocks: [
+              {
+                unit_id: "doc-unit:1",
+                translated_text: "Translated sentence.",
+              },
+            ],
           },
         },
       });
 
-      expect(capabilities(requests)).not.toContain("docs-viewer.read_active_translation");
+      expect(capabilities(requests)).not.toContain(
+        "docs-viewer.read_active_translation",
+      );
     }
   });
 
@@ -4050,17 +4503,24 @@ describe("explicit workstation gateway derived calls", () => {
             activeDocPath: "docs/helix-ask-flow.md",
             activeTranslationAccountLocale: "es-MX",
             activeTranslationTargetLanguage: "es",
-            activeTranslationBlocks: [{
-              unit_id: "doc-unit:1",
-              translated_text: "Translated sentence.",
-              status: "ready",
-            }],
+            activeTranslationBlocks: [
+              {
+                unit_id: "doc-unit:1",
+                translated_text: "Translated sentence.",
+                status: "ready",
+              },
+            ],
           },
         },
       });
 
-      expect(capabilities(requests)).toContain("docs-viewer.read_active_translation");
-      const translationRequest = requests.find((request) => request.capability_id === "docs-viewer.read_active_translation");
+      expect(capabilities(requests)).toContain(
+        "docs-viewer.read_active_translation",
+      );
+      const translationRequest = requests.find(
+        (request) =>
+          request.capability_id === "docs-viewer.read_active_translation",
+      );
       expect(translationRequest?.arguments).toMatchObject({
         account_locale: "es-MX",
         target_language: "es",
@@ -4076,7 +4536,8 @@ describe("explicit workstation gateway derived calls", () => {
     const body = {
       turn_id: "ask:test:structured-live-translation-lane",
       agent_runtime: "codex",
-      question: "Use the structured lane call result, not the docs translation surface.",
+      question:
+        "Use the structured lane call result, not the docs translation surface.",
       capability_lane_call: {
         capability: "live_translation.translate_text",
         text: "thank you",
@@ -4102,7 +4563,9 @@ describe("explicit workstation gateway derived calls", () => {
       includePlannerDerived: true,
     });
 
-    expect(capabilities(requests)).not.toContain("docs-viewer.read_active_translation");
+    expect(capabilities(requests)).not.toContain(
+      "docs-viewer.read_active_translation",
+    );
     expect(lane.call_results).toHaveLength(1);
     expect(lane.call_results[0]).toMatchObject({
       ok: true,
@@ -4128,13 +4591,15 @@ describe("explicit workstation gateway derived calls", () => {
         activeDocPath: "docs/helix-ask-flow.md",
         activeTranslationAccountLocale: "es-MX",
         activeTranslationTargetLanguage: "es",
-        activeTranslationBlocks: [{
-          unit_id: "doc-unit:1",
-          source_text: "Helix Ask flow",
-          translated_text: "Flujo de Helix Ask",
-          locale: "es",
-          status: "ready",
-        }],
+        activeTranslationBlocks: [
+          {
+            unit_id: "doc-unit:1",
+            source_text: "Helix Ask flow",
+            translated_text: "Flujo de Helix Ask",
+            locale: "es",
+            status: "ready",
+          },
+        ],
       },
     };
     const planned = buildCompoundCapabilityDependencyGatewayCallRequests(body);
@@ -4150,7 +4615,9 @@ describe("explicit workstation gateway derived calls", () => {
       body,
     });
 
-    expect(results.map((result) => result.capability_id)).toEqual(["docs-viewer.read_active_translation"]);
+    expect(results.map((result) => result.capability_id)).toEqual([
+      "docs-viewer.read_active_translation",
+    ]);
     expect(results[0]).toMatchObject({
       ok: true,
       observation: {
@@ -4297,7 +4764,8 @@ describe("explicit workstation gateway derived calls", () => {
   it("maps named workspace_os.status capability prompts to observations", () => {
     const requests = buildPromptNamedCapabilityGatewayCallRequests({
       agent_runtime: "codex",
-      question: "Use workspace_os.status to inspect workstation status. Answer only from that observation.",
+      question:
+        "Use workspace_os.status to inspect workstation status. Answer only from that observation.",
     });
 
     expect(requests).toEqual([
@@ -4318,7 +4786,8 @@ describe("explicit workstation gateway derived calls", () => {
   it("does not map negated named workspace_os.status capability prompts", () => {
     const requests = buildPromptNamedCapabilityGatewayCallRequests({
       agent_runtime: "codex",
-      question: "Do not use workspace_os.status; explain what that capability would observe later.",
+      question:
+        "Do not use workspace_os.status; explain what that capability would observe later.",
     });
 
     expect(requests).toEqual([]);
@@ -4360,10 +4829,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -4401,10 +4872,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -4445,10 +4918,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -4487,10 +4962,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -4529,10 +5006,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -4570,10 +5049,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -4620,10 +5101,12 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(buildPromptNamedCapabilityGatewayCallRequests({
-        agent_runtime: "codex",
-        question,
-      })).toEqual([]);
+      expect(
+        buildPromptNamedCapabilityGatewayCallRequests({
+          agent_runtime: "codex",
+          question,
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -4641,13 +5124,15 @@ describe("explicit workstation gateway derived calls", () => {
     ];
 
     for (const question of prompts) {
-      expect(readWorkstationGatewayCallRequestsForTurn({
-        includePlannerDerived: true,
-        body: {
-          agent_runtime: "codex",
-          question,
-        },
-      })).toEqual([]);
+      expect(
+        readWorkstationGatewayCallRequestsForTurn({
+          includePlannerDerived: true,
+          body: {
+            agent_runtime: "codex",
+            question,
+          },
+        }),
+      ).toEqual([]);
     }
   });
 
@@ -4664,7 +5149,10 @@ describe("explicit workstation gateway derived calls", () => {
         },
       });
 
-      expect(capabilities(requests), classification.capability_id).not.toContain(classification.capability_id);
+      expect(
+        capabilities(requests),
+        classification.capability_id,
+      ).not.toContain(classification.capability_id);
       if (canonicalVoiceAliases.has(classification.capability_id)) {
         expect(capabilities(requests)).toEqual(["text_to_speech.speak_text"]);
       } else {
@@ -4702,10 +5190,10 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual([
-      "repo.search",
-    ]);
-    expect(capabilities(requests)).not.toContain("helix_ask.reflect_theory_context");
+    expect(capabilities(requests)).toEqual(["repo.search"]);
+    expect(capabilities(requests)).not.toContain(
+      "helix_ask.reflect_theory_context",
+    );
     expect(requests[0]).toMatchObject({
       capability_id: "repo.search",
       arguments: {
@@ -4770,7 +5258,9 @@ describe("explicit workstation gateway derived calls", () => {
       "civilization-bounds.reflect_system_bounds",
       "scholarly-research.lookup_papers",
     ]);
-    expect(requests.find((request) => request.capability_id === "docs.search")).toMatchObject({
+    expect(
+      requests.find((request) => request.capability_id === "docs.search"),
+    ).toMatchObject({
       arguments: {
         paths: ["docs/research/nhm2-current-status-whitepaper.md"],
         source_target_intent: expect.objectContaining({
@@ -4778,7 +5268,12 @@ describe("explicit workstation gateway derived calls", () => {
         }),
       },
     });
-    expect(requests.find((request) => request.capability_id === "scientific-calculator.solve_expression")).toMatchObject({
+    expect(
+      requests.find(
+        (request) =>
+          request.capability_id === "scientific-calculator.solve_expression",
+      ),
+    ).toMatchObject({
       arguments: {
         expression: "6*7",
       },
@@ -4808,12 +5303,19 @@ describe("explicit workstation gateway derived calls", () => {
       "civilization-bounds.reflect_system_bounds",
       "scholarly-research.lookup_papers",
     ]);
-    expect(requests.find((request) => request.capability_id === "docs.search")).toMatchObject({
+    expect(
+      requests.find((request) => request.capability_id === "docs.search"),
+    ).toMatchObject({
       arguments: {
         paths: ["docs/research/nhm2-current-status-whitepaper.md"],
       },
     });
-    expect(requests.find((request) => request.capability_id === "scholarly-research.lookup_papers")).toMatchObject({
+    expect(
+      requests.find(
+        (request) =>
+          request.capability_id === "scholarly-research.lookup_papers",
+      ),
+    ).toMatchObject({
       arguments: {
         source_target_intent: expect.objectContaining({
           target_kind: "research_paper_search",
@@ -4838,20 +5340,28 @@ describe("explicit workstation gateway derived calls", () => {
             reflection_id: "reflection:fusion",
             summary:
               "Theory Badge Graph reflection found physics.nuclear.reaction.thermonuclear_rate_context as a fusion-adjacent calculator template.",
-            calculator_payloads: [{
-              badge_id: "physics.nuclear.reaction.thermonuclear_rate_context",
-              badge_title: "Thermonuclear Rate Context",
-              payload_id: "thermonuclear-rate-context",
-              expression: "rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s",
-              target_variable: "rate_proxy_m3_s",
-              claim_boundary_notes: ["diagnostic/proxy only"],
-            }],
-            matched_badges: [{
-              badge_id: "physics.nuclear.reaction.thermonuclear_rate_context",
-              title: "Thermonuclear Rate Context",
-              matched_equation_families: ["thermonuclear reaction rate", "fusion cross section"],
-              matched_symbols: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
-            }],
+            calculator_payloads: [
+              {
+                badge_id: "physics.nuclear.reaction.thermonuclear_rate_context",
+                badge_title: "Thermonuclear Rate Context",
+                payload_id: "thermonuclear-rate-context",
+                expression:
+                  "rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s",
+                target_variable: "rate_proxy_m3_s",
+                claim_boundary_notes: ["diagnostic/proxy only"],
+              },
+            ],
+            matched_badges: [
+              {
+                badge_id: "physics.nuclear.reaction.thermonuclear_rate_context",
+                title: "Thermonuclear Rate Context",
+                matched_equation_families: [
+                  "thermonuclear reaction rate",
+                  "fusion cross section",
+                ],
+                matched_symbols: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
+              },
+            ],
             assistant_answer: false,
             raw_content_included: false,
             terminal_eligible: false,
@@ -4862,7 +5372,9 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    const scholarlyRequest = requests.find((request) => request.capability_id === "scholarly-research.lookup_papers");
+    const scholarlyRequest = requests.find(
+      (request) => request.capability_id === "scholarly-research.lookup_papers",
+    );
     expect(scholarlyRequest).toMatchObject({
       derivation_source: "helix_compound_capability_dependency_planner",
       compound_outcome: "research_quantify_reflect",
@@ -4874,7 +5386,9 @@ describe("explicit workstation gateway derived calls", () => {
     const args = scholarlyRequest?.arguments as Record<string, unknown>;
     expect(String(args.query)).toMatch(/thermonuclear reaction rate/i);
     expect(String(args.query)).toMatch(/fusion cross section/i);
-    expect(String(args.query)).not.toMatch(/genome|sign-language|deformable-object/i);
+    expect(String(args.query)).not.toMatch(
+      /genome|sign-language|deformable-object/i,
+    );
     expect(args.variable_source_plan).toMatchObject({
       formula_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
       prior_theory_formula_context: {
@@ -4887,7 +5401,9 @@ describe("explicit workstation gateway derived calls", () => {
         terminal_eligible: false,
       },
     });
-    expect((args.source_target_intent as Record<string, any>).query_plan).toMatchObject({
+    expect(
+      (args.source_target_intent as Record<string, any>).query_plan,
+    ).toMatchObject({
       schema: "helix.scholarly_variable_source_query_plan.v1",
       prior_theory_formula_context: {
         formulas: ["rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s"],
@@ -4909,9 +5425,15 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
-    expect(capabilities(requests)).toContain("scholarly-research.lookup_papers");
-    const scholarlyRequest = requests.find((request) => request.capability_id === "scholarly-research.lookup_papers");
+    expect(capabilities(requests)).not.toContain(
+      "scientific-calculator.solve_expression",
+    );
+    expect(capabilities(requests)).toContain(
+      "scholarly-research.lookup_papers",
+    );
+    const scholarlyRequest = requests.find(
+      (request) => request.capability_id === "scholarly-research.lookup_papers",
+    );
     expect(scholarlyRequest).toMatchObject({
       derivation_source: "helix_compound_capability_dependency_planner",
       compound_outcome: "research_quantify_reflect",
@@ -4920,7 +5442,9 @@ describe("explicit workstation gateway derived calls", () => {
         allow_scholarly_dependent_chain: true,
       },
     });
-    expect(JSON.stringify(scholarlyRequest)).toMatch(/source[-_ ]?bound|calculator binding|unit/i);
+    expect(JSON.stringify(scholarlyRequest)).toMatch(
+      /source[-_ ]?bound|calculator binding|unit/i,
+    );
   });
 
   it("routes paper-backed theory formula binding to scholarly lookup instead of docs search", () => {
@@ -4937,9 +5461,13 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
     expect(capabilities(requests)).not.toContain("docs.search");
-    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+    expect(capabilities(requests)).not.toContain(
+      "scientific-calculator.solve_expression",
+    );
     const scholarlyRequest = requests[0] as Record<string, any>;
     expect(scholarlyRequest).toMatchObject({
       derivation_source: "helix_compound_capability_dependency_planner",
@@ -4948,14 +5476,18 @@ describe("explicit workstation gateway derived calls", () => {
         allow_scholarly_dependent_chain: true,
       },
     });
-    expect(scholarlyRequest.arguments.source_target_intent.next_affordances).toEqual(
+    expect(
+      scholarlyRequest.arguments.source_target_intent.next_affordances,
+    ).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           capability: "helix_ask.reflect_theory_context",
         }),
       ]),
     );
-    expect(JSON.stringify(scholarlyRequest.arguments.source_requirement_plan)).toMatch(/calculator_requires_bound_expression/);
+    expect(
+      JSON.stringify(scholarlyRequest.arguments.source_requirement_plan),
+    ).toMatch(/calculator_requires_bound_expression/);
   });
 
   it("does not let planner-derived calculator execution override a negated calculator instruction", () => {
@@ -4972,9 +5504,13 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
-    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
-    expect(JSON.stringify(requests)).not.toContain("\"expression\":\"-178301-\"");
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
+    expect(capabilities(requests)).not.toContain(
+      "scientific-calculator.solve_expression",
+    );
+    expect(JSON.stringify(requests)).not.toContain('"expression":"-178301-"');
   });
 
   it("defers theory-only formula discovery without pre-running research or calculator", () => {
@@ -4992,8 +5528,12 @@ describe("explicit workstation gateway derived calls", () => {
     });
 
     expect(capabilities(requests)).toEqual([]);
-    expect(capabilities(requests)).not.toContain("scholarly-research.lookup_papers");
-    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+    expect(capabilities(requests)).not.toContain(
+      "scholarly-research.lookup_papers",
+    );
+    expect(capabilities(requests)).not.toContain(
+      "scientific-calculator.solve_expression",
+    );
   });
 
   it("honors negated scholarly research cues even when research papers are mentioned", () => {
@@ -5011,7 +5551,9 @@ describe("explicit workstation gateway derived calls", () => {
     });
 
     expect(capabilities(requests)).toEqual([]);
-    expect(JSON.stringify(requests)).not.toMatch(/scholarly-research\.lookup_papers|scientific-calculator\.solve_expression/);
+    expect(JSON.stringify(requests)).not.toMatch(
+      /scholarly-research\.lookup_papers|scientific-calculator\.solve_expression/,
+    );
   });
 
   it("does not treat Postulate Board Image Lens evidence refs as a fresh scholarly lookup request", () => {
@@ -5029,8 +5571,12 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).not.toContain("scholarly-research.lookup_papers");
-    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+    expect(capabilities(requests)).not.toContain(
+      "scholarly-research.lookup_papers",
+    );
+    expect(capabilities(requests)).not.toContain(
+      "scientific-calculator.solve_expression",
+    );
   });
 
   it("routes paper-backed numeric binding for a prior formula to scholarly research without docs or calculator", () => {
@@ -5048,9 +5594,13 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
     expect(capabilities(requests)).not.toContain("docs.search");
-    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+    expect(capabilities(requests)).not.toContain(
+      "scientific-calculator.solve_expression",
+    );
   });
 
   it("does not admit tools for conditional prior-evidence calculator follow-up without a bound expression", () => {
@@ -5084,8 +5634,15 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toContain("scientific-calculator.solve_expression");
-    expect(requests.find((request) => request.capability_id === "scientific-calculator.solve_expression")).toMatchObject({
+    expect(capabilities(requests)).toContain(
+      "scientific-calculator.solve_expression",
+    );
+    expect(
+      requests.find(
+        (request) =>
+          request.capability_id === "scientific-calculator.solve_expression",
+      ),
+    ).toMatchObject({
       arguments: {
         expression: "6.626e-34*5e14",
       },
@@ -5106,8 +5663,12 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toContain("scholarly-research.lookup_papers");
-    expect(capabilities(requests)).not.toContain("scientific-calculator.solve_expression");
+    expect(capabilities(requests)).toContain(
+      "scholarly-research.lookup_papers",
+    );
+    expect(capabilities(requests)).not.toContain(
+      "scientific-calculator.solve_expression",
+    );
   });
 
   it("keeps formula research compound planning to one primary request with next affordances", () => {
@@ -5121,43 +5682,65 @@ describe("explicit workstation gateway derived calls", () => {
       },
     });
 
-    expect(capabilities(requests)).toEqual(["scholarly-research.lookup_papers"]);
+    expect(capabilities(requests)).toEqual([
+      "scholarly-research.lookup_papers",
+    ]);
     const args = requests[0].arguments as Record<string, any>;
-    expect(args.next_affordances).toEqual(expect.arrayContaining([
-      expect.objectContaining({ capability: "internet-search.search_web" }),
-      expect.objectContaining({ capability: "helix_ask.reflect_theory_context" }),
-      expect.objectContaining({ capability: "civilization-bounds.reflect_system_bounds" }),
-    ]));
-    expect(JSON.stringify(args.next_affordances)).not.toMatch(/scientific-calculator\.solve_expression/);
-    expect(args.source_target_intent.next_affordances).toEqual(args.next_affordances);
+    expect(args.next_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ capability: "internet-search.search_web" }),
+        expect.objectContaining({
+          capability: "helix_ask.reflect_theory_context",
+        }),
+        expect.objectContaining({
+          capability: "civilization-bounds.reflect_system_bounds",
+        }),
+      ]),
+    );
+    expect(JSON.stringify(args.next_affordances)).not.toMatch(
+      /scientific-calculator\.solve_expression/,
+    );
+    expect(args.source_target_intent.next_affordances).toEqual(
+      args.next_affordances,
+    );
   });
 
   it("does not auto-execute research-chain dependent requests that Codex should choose after re-entry", () => {
-    expect(shouldAutoExecuteDependentCompoundRequest({
-      compound_outcome: "research_quantify_reflect",
-      capability_id: "scholarly-research.fetch_full_text",
-      mode: "read",
-    })).toBe(false);
-    expect(shouldAutoExecuteDependentCompoundRequest({
-      compound_outcome: "research_quantify_reflect",
-      capability_id: "scholarly-research.extract_numeric_parameters",
-      mode: "read",
-    })).toBe(false);
-    expect(shouldAutoExecuteDependentCompoundRequest({
-      compound_outcome: "research_quantify_reflect",
-      capability_id: "scientific-calculator.solve_expression",
-      mode: "read",
-    })).toBe(false);
-    expect(shouldAutoExecuteDependentCompoundRequest({
-      compound_outcome: "read_aloud_surface",
-      capability_id: "live_env.narrator_say",
-      mode: "act",
-    })).toBe(false);
-    expect(shouldAutoExecuteDependentCompoundRequest({
-      compound_outcome: "unrelated_direct_actuator",
-      capability_id: "live_env.narrator_say",
-      mode: "act",
-    })).toBe(true);
+    expect(
+      shouldAutoExecuteDependentCompoundRequest({
+        compound_outcome: "research_quantify_reflect",
+        capability_id: "scholarly-research.fetch_full_text",
+        mode: "read",
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoExecuteDependentCompoundRequest({
+        compound_outcome: "research_quantify_reflect",
+        capability_id: "scholarly-research.extract_numeric_parameters",
+        mode: "read",
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoExecuteDependentCompoundRequest({
+        compound_outcome: "research_quantify_reflect",
+        capability_id: "scientific-calculator.solve_expression",
+        mode: "read",
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoExecuteDependentCompoundRequest({
+        compound_outcome: "read_aloud_surface",
+        capability_id: "live_env.narrator_say",
+        mode: "act",
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoExecuteDependentCompoundRequest({
+        compound_outcome: "unrelated_direct_actuator",
+        capability_id: "live_env.narrator_say",
+        mode: "act",
+      }),
+    ).toBe(true);
   });
 
   it("emits a scholarly recovery affordance instead of fetching full text for irrelevant formula-bound lookup results", () => {
@@ -5168,14 +5751,28 @@ describe("explicit workstation gateway derived calls", () => {
       entries: [
         {
           variable: "n1_m3",
-          source_classes: ["fusion plasma parameter table", "reactant density diagnostic"],
-          search_terms: ["reactant number density", "ion density", "fusion plasma parameters"],
+          source_classes: [
+            "fusion plasma parameter table",
+            "reactant density diagnostic",
+          ],
+          search_terms: [
+            "reactant number density",
+            "ion density",
+            "fusion plasma parameters",
+          ],
           extraction_aliases: ["n1", "reactant density"],
         },
         {
           variable: "sigma_m2",
-          source_classes: ["fusion cross-section data", "Maxwellian-averaged reactivity table"],
-          search_terms: ["fusion cross section", "Maxwellian averaged reactivity", "sigma v"],
+          source_classes: [
+            "fusion cross-section data",
+            "Maxwellian-averaged reactivity table",
+          ],
+          search_terms: [
+            "fusion cross section",
+            "Maxwellian averaged reactivity",
+            "sigma v",
+          ],
           extraction_aliases: ["sigma", "cross section"],
         },
       ],
@@ -5198,7 +5795,8 @@ describe("explicit workstation gateway derived calls", () => {
       subgoal_id: "research_quantify_reflect:scholarly_evidence",
       capability_id: "scholarly-research.lookup_papers",
       arguments: {
-        query: "fusion thermonuclear reaction rate parameter table fusion cross section n1_m3 n2_m3 sigma_m2 v_m_s",
+        query:
+          "fusion thermonuclear reaction rate parameter table fusion cross section n1_m3 n2_m3 sigma_m2 v_m_s",
         allow_scholarly_dependent_chain: true,
         requested_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
         variable_source_plan: variableSourcePlan,
@@ -5235,12 +5833,16 @@ describe("explicit workstation gateway derived calls", () => {
       },
       observation: {
         schema: "helix.scholarly_research_observation.v1",
-        query: "fusion thermonuclear reaction rate parameter table fusion cross section n1_m3 n2_m3 sigma_m2 v_m_s",
-        papers: [{
-          result_id: "paper:genome-remapping",
-          title: "Fast genome remapping with sampling optimization",
-          abstract: "We present a genome assembly polishing method for sequence remapping.",
-        }],
+        query:
+          "fusion thermonuclear reaction rate parameter table fusion cross section n1_m3 n2_m3 sigma_m2 v_m_s",
+        papers: [
+          {
+            result_id: "paper:genome-remapping",
+            title: "Fast genome remapping with sampling optimization",
+            abstract:
+              "We present a genome assembly polishing method for sequence remapping.",
+          },
+        ],
         assistant_answer: false,
         raw_content_included: false,
         terminal_eligible: false,
@@ -5284,12 +5886,19 @@ describe("explicit workstation gateway derived calls", () => {
     expect(result.observation.lookup_relevance_gate).toMatchObject({
       status: "blocked",
       code: "lookup_result_irrelevant",
-      rejected_results: [{
-        result_id: "paper:genome-remapping",
-        reasons: expect.arrayContaining(["missing_required_topic_terms", "missing_formula_source_terms"]),
-      }],
+      rejected_results: [
+        {
+          result_id: "paper:genome-remapping",
+          reasons: expect.arrayContaining([
+            "missing_required_topic_terms",
+            "missing_formula_source_terms",
+          ]),
+        },
+      ],
     });
-    expect(result.observation.scholarly_lookup_recovery_affordance).toMatchObject({
+    expect(
+      result.observation.scholarly_lookup_recovery_affordance,
+    ).toMatchObject({
       schema: "helix.scholarly_lookup_recovery_affordance.v1",
       status: "available",
       recommended_next_capability: "scholarly-research.lookup_papers",
@@ -5308,11 +5917,16 @@ describe("explicit workstation gateway derived calls", () => {
       assistant_answer: false,
       terminal_eligible: false,
     });
-    expect(JSON.stringify(result.observation.scholarly_lookup_recovery_affordance)).toMatch(/deuterium tritium fusion/i);
-    expect(JSON.stringify(result.observation.scholarly_lookup_recovery_affordance)).toMatch(/sigma v/i);
-    expect(result.observation_packet.state_delta.scholarly_lookup_recovery_affordance).toBe(
-      result.observation.scholarly_lookup_recovery_affordance,
-    );
+    expect(
+      JSON.stringify(result.observation.scholarly_lookup_recovery_affordance),
+    ).toMatch(/deuterium tritium fusion/i);
+    expect(
+      JSON.stringify(result.observation.scholarly_lookup_recovery_affordance),
+    ).toMatch(/sigma v/i);
+    expect(
+      result.observation_packet.state_delta
+        .scholarly_lookup_recovery_affordance,
+    ).toBe(result.observation.scholarly_lookup_recovery_affordance);
     expect(result.observation_packet.suggested_next_steps).toEqual(
       expect.arrayContaining(["use_another_tool", "repair", "fail_closed"]),
     );
@@ -5404,12 +6018,20 @@ describe("explicit workstation gateway derived calls", () => {
         },
         {
           variable: "v_m_s",
-          source_classes: ["relative velocity model", "Maxwellian-averaged reactivity table"],
+          source_classes: [
+            "relative velocity model",
+            "Maxwellian-averaged reactivity table",
+          ],
           search_terms: ["relative velocity", "Maxwellian averaged reactivity"],
           extraction_aliases: ["v", "relative velocity"],
         },
       ],
-      query_terms: ["fusion", "thermonuclear reaction rate", "fusion cross section", "sigma v"],
+      query_terms: [
+        "fusion",
+        "thermonuclear reaction rate",
+        "fusion cross section",
+        "sigma v",
+      ],
       retrieval_intent:
         "Find papers that report unit-bearing physical quantities needed to bind the formula variables.",
       assistant_answer: false,
@@ -5422,11 +6044,13 @@ describe("explicit workstation gateway derived calls", () => {
         requested_capability: "theory-badge-graph.reflect_discussion_context",
       },
       observation: {
-        calculator_payloads: [{
-          expression: "rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s",
-          badge_id: "physics.nuclear.reaction.thermonuclear_rate_context",
-          payload_id: "thermonuclear-rate-context",
-        }],
+        calculator_payloads: [
+          {
+            expression: "rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s",
+            badge_id: "physics.nuclear.reaction.thermonuclear_rate_context",
+            payload_id: "thermonuclear-rate-context",
+          },
+        ],
       },
       observation_packet: {
         produced_artifact_refs: ["observation:theory"],
@@ -5492,7 +6116,8 @@ describe("explicit workstation gateway derived calls", () => {
       arguments: {
         variable_source_plan: variableSourcePlan,
         source_target_intent: {
-          required_observation_kind: "helix.scholarly_numeric_parameter_observation.v1",
+          required_observation_kind:
+            "helix.scholarly_numeric_parameter_observation.v1",
           subgoal_ordinal: 3,
         },
       },
@@ -5519,16 +6144,25 @@ describe("explicit workstation gateway derived calls", () => {
         status: "blocked",
         reason: "missing_numeric_value_evidence",
         missing_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
-        rejected_expression: "rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s",
+        rejected_expression:
+          "rate_proxy_m3_s = n1_m3 * n2_m3 * sigma_m2 * v_m_s",
       },
       first_broken_rail: {
         capability_id: "scholarly-research.extract_numeric_parameters",
         reason: "missing_requested_numeric_variables",
       },
     });
-    expect(JSON.stringify(railStatus)).toMatch(/scientific-calculator\.solve_expression/);
-    expect(JSON.stringify(railStatus)).toMatch(/missing_numeric_value_evidence/);
-    expect(JSON.stringify(numericResult.observation.scholarly_numeric_recovery_affordance)).toMatch(/D-T fusion plasma/i);
+    expect(JSON.stringify(railStatus)).toMatch(
+      /scientific-calculator\.solve_expression/,
+    );
+    expect(JSON.stringify(railStatus)).toMatch(
+      /missing_numeric_value_evidence/,
+    );
+    expect(
+      JSON.stringify(
+        numericResult.observation.scholarly_numeric_recovery_affordance,
+      ),
+    ).toMatch(/D-T fusion plasma/i);
   });
 
   it("blocks mutating live_env controls embedded in otherwise safe compound prompts", () => {
@@ -5553,8 +6187,12 @@ describe("explicit workstation gateway derived calls", () => {
       "scientific-calculator.solve_expression",
       "scholarly-research.lookup_papers",
     ]);
-    expect(capabilities(requests)).not.toContain("live_env.pause_workstation_loop");
-    expect(capabilities(requests)).not.toContain("live_env.repair_workstation_source");
+    expect(capabilities(requests)).not.toContain(
+      "live_env.pause_workstation_loop",
+    );
+    expect(capabilities(requests)).not.toContain(
+      "live_env.repair_workstation_source",
+    );
   });
 
   it("keeps read-only live_env context queries available inside mixed compound prompts", () => {
@@ -5581,13 +6219,17 @@ describe("explicit workstation gateway derived calls", () => {
       "live_env.query_trace_memory",
       "live_env.query_narrator_events",
     ]);
-    expect(capabilities(requests)).not.toContain("live_env.pause_workstation_loop");
+    expect(capabilities(requests)).not.toContain(
+      "live_env.pause_workstation_loop",
+    );
     for (const capabilityId of [
       "live_env.query_trace_memory",
       "live_env.query_narrator_events",
       "live_env.query_audio_transcripts",
     ]) {
-      expect(requests.find((request) => request.capability_id === capabilityId)).toMatchObject({
+      expect(
+        requests.find((request) => request.capability_id === capabilityId),
+      ).toMatchObject({
         mode: "read",
         arguments: {
           source_target_intent: expect.objectContaining({

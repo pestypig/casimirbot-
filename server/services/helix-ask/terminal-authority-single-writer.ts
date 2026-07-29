@@ -309,6 +309,7 @@ type TerminalBlockingToolRailFailure = {
   repairTarget: string | null;
   selectedCapability: string | null;
   executedCapability: string | null;
+  terminalText?: string | null;
   missingVariables?: string[];
   requiredAffordanceKinds?: string[];
   rejectedExpression?: string | null;
@@ -481,12 +482,81 @@ const readProfileSessionRequiredToolRailFailure = (
   return null;
 };
 
+const readEnvironmentConnectorGatewayFailure = (
+  payload: Record<string, unknown>,
+): TerminalBlockingToolRailFailure | null => {
+  const debug = readRecord(payload.debug);
+  const gatewayResults = [
+    ...readArray(payload.workstation_gateway_call_results),
+    ...readArray(debug?.workstation_gateway_call_results),
+  ];
+  for (const result of gatewayResults) {
+    const record = readRecord(result);
+    const observation = readRecord(record?.observation);
+    const admission = readRecord(record?.gateway_admission);
+    if (
+      !record ||
+      readString(observation?.schema) !==
+        "helix.environment_connector.probe_observation.v1" ||
+      observation?.reentry_required !== true ||
+      observation?.answer_authority !== false ||
+      observation?.assistant_answer !== false ||
+      observation?.terminal_eligible !== false
+    ) {
+      continue;
+    }
+    const capability =
+      readString(record.capability_id) ??
+      readString(observation.capability_id) ??
+      readString(admission?.requested_capability);
+    const failureCode =
+      readString(record.error) ??
+      readString(observation.outcome) ??
+      readString(admission?.blocked_reason);
+    const terminalText = readString(observation.summary);
+    if (
+      record.ok !== false ||
+      !capability ||
+      !failureCode ||
+      !terminalText ||
+      /^(?:ok|success|succeeded|completed)$/i.test(failureCode)
+    ) {
+      continue;
+    }
+    const admissionBlocked =
+      readString(admission?.admission_status) === "blocked";
+    const repairTarget =
+      failureCode === "permission_revoked"
+        ? "external_agent_api_authentication"
+        : failureCode === "not_found"
+          ? "environment_connector_binding"
+          : failureCode === "timeout"
+            ? "environment_probe_lifecycle"
+            : "environment_connector";
+    return {
+      railStatus: "fail_closed",
+      railFailureCode: failureCode,
+      firstBrokenRail: admissionBlocked
+        ? "tool_admission"
+        : "observation_artifact",
+      repairTarget,
+      selectedCapability: capability,
+      executedCapability: null,
+      terminalText,
+    };
+  }
+  return null;
+};
+
 const readTerminalBlockingToolRailFailure = (
   payload: Record<string, unknown>,
 ): TerminalBlockingToolRailFailure | null => {
   const profileSessionFailure =
     readProfileSessionRequiredToolRailFailure(payload);
   if (profileSessionFailure) return profileSessionFailure;
+  const environmentConnectorFailure =
+    readEnvironmentConnectorGatewayFailure(payload);
+  if (environmentConnectorFailure) return environmentConnectorFailure;
   const blockedTypedAffordanceFailure =
     readBlockedTypedAffordanceRailFailure(payload);
   if (blockedTypedAffordanceFailure) return blockedTypedAffordanceFailure;
@@ -724,6 +794,10 @@ const toolRailFailureTerminalText = (
   payload: Record<string, unknown>,
   failure: TerminalBlockingToolRailFailure,
 ): string => {
+  // A current-turn governed tool observation is the most specific failure
+  // evidence. Preserve its actionable summary instead of a generic
+  // continuation placeholder written earlier in the same solver pass.
+  if (failure.terminalText) return failure.terminalText;
   const typedFailure = readRecord(payload.typed_failure);
   const existingTypedFailureText =
     readString(typedFailure?.text) ??
@@ -6227,6 +6301,40 @@ export const shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal = (input: {
   });
 };
 
+const unavailableRequestedCapabilityFailureForPayload = (
+  payload: Record<string, unknown>,
+): { errorCode: "capability_unavailable"; text: string } | null => {
+  const admission = readRecord(payload.tool_call_admission_decision);
+  const requestedCapability =
+    readString(admission?.requested_capability) ??
+    readString(admission?.mandatory_next_tool_name);
+  if (!requestedCapability) return null;
+
+  const providerBridge = readRecord(payload.codex_native_provider_bridge);
+  const nativeTurn = readRecord(providerBridge?.native_workstation_turn);
+  const fallbackReason =
+    readString(providerBridge?.fallback_reason) ??
+    readString(nativeTurn?.compatibility_fallback_reason);
+  if (fallbackReason !== "native_admitted_capability_set_empty") return null;
+
+  const lockedTools = readStringArray(nativeTurn?.account_locked_tools);
+  if (lockedTools.includes(requestedCapability)) return null;
+
+  const modelVisibleTools = readStringArray(nativeTurn?.model_visible_tools);
+  const executedTools = readStringArray(nativeTurn?.executed_tools);
+  if (
+    modelVisibleTools.includes(requestedCapability) ||
+    executedTools.includes(requestedCapability)
+  ) {
+    return null;
+  }
+
+  return {
+    errorCode: "capability_unavailable",
+    text: `The requested capability ${requestedCapability} is not available in the current environment connector, so I cannot determine the requested environment state. Install or enable a connector implementation for that capability, or provide an observation from a source that can expose it.`,
+  };
+};
+
 export function applyHelixTerminalAuthoritySingleWriter(
   input: SingleWriterInput,
 ): HelixTerminalAuthoritySingleWriterResult {
@@ -7102,27 +7210,28 @@ export function applyHelixTerminalAuthoritySingleWriter(
     scholarlyFollowupEvidenceLookup?.followup_reference_detected === true,
   );
   const solverContinuationPending =
-    agentContinuationDecisionPending ||
-    (legacySolverContinuationPending &&
-      !(
-        (repoTerminalMaterialized && goalAllowsTerminal) ||
-        (docsTerminalMaterialized && goalAllowsTerminal) ||
-        docsTerminalMatchesRequiredGoal ||
-        (scholarlyTerminalMaterialized && goalAllowsTerminal) ||
-        (stagePlayTerminalMaterialized && goalAllowsTerminal) ||
-        compoundMaterializedDraftCanSatisfyTerminal ||
-        workstationTerminalMaterialized ||
-        goalArtifactTerminalMaterialized ||
-        Boolean(selectedReceiptTerminal && goalAllowsTerminal) ||
-        earlyDeterministicReceiptFallbackCanSurface ||
-        noteMutationTerminalMaterialized ||
-        Boolean(selectedImageLensObservationReport) ||
-        Boolean(selectedImageLensNamedReceiptEvaluation) ||
-        Boolean(selectedProviderTerminalCandidate) ||
-        currentScholarlyTerminalCanSurface ||
-        providerRouteProductCanSurface ||
-        providerRouteProductQualityRejected
-      ));
+    !authoritativeInitialTypedFailureReady &&
+    (agentContinuationDecisionPending ||
+      (legacySolverContinuationPending &&
+        !(
+          (repoTerminalMaterialized && goalAllowsTerminal) ||
+          (docsTerminalMaterialized && goalAllowsTerminal) ||
+          docsTerminalMatchesRequiredGoal ||
+          (scholarlyTerminalMaterialized && goalAllowsTerminal) ||
+          (stagePlayTerminalMaterialized && goalAllowsTerminal) ||
+          compoundMaterializedDraftCanSatisfyTerminal ||
+          workstationTerminalMaterialized ||
+          goalArtifactTerminalMaterialized ||
+          Boolean(selectedReceiptTerminal && goalAllowsTerminal) ||
+          earlyDeterministicReceiptFallbackCanSurface ||
+          noteMutationTerminalMaterialized ||
+          Boolean(selectedImageLensObservationReport) ||
+          Boolean(selectedImageLensNamedReceiptEvaluation) ||
+          Boolean(selectedProviderTerminalCandidate) ||
+          currentScholarlyTerminalCanSurface ||
+          providerRouteProductCanSurface ||
+          providerRouteProductQualityRejected
+        )));
   if (solverContinuationPending) {
     const pendingText =
       "I could not complete this turn yet because solver continuation is required before terminal answer selection.";
@@ -8632,8 +8741,14 @@ export function applyHelixTerminalAuthoritySingleWriter(
     !itineraryObservationCriteriaSatisfied &&
     !repoDraftMaterializationMatchesRequiredGoal
   ) {
-    const terminalErrorCode = "capability_itinerary_observations_missing";
-    const terminalErrorText = `I could not complete this turn because required itinerary observations are missing: ${missingItineraryFamilies.join(", ")}.`;
+    const unavailableCapabilityFailure =
+      unavailableRequestedCapabilityFailureForPayload(input.payload);
+    const terminalErrorCode =
+      unavailableCapabilityFailure?.errorCode ??
+      "capability_itinerary_observations_missing";
+    const terminalErrorText =
+      unavailableCapabilityFailure?.text ??
+      `I could not complete this turn because required itinerary observations are missing: ${missingItineraryFamilies.join(", ")}.`;
     const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
     if (latestDraft) {
       rejectedCandidates.push({
@@ -8659,6 +8774,17 @@ export function applyHelixTerminalAuthoritySingleWriter(
       text: terminalErrorText,
       answer_text: terminalErrorText,
       missing_itinerary_observation_families: missingItineraryFamilies,
+      ...(unavailableCapabilityFailure
+        ? {
+            requested_capability:
+              readString(
+                readRecord(input.payload.tool_call_admission_decision)
+                  ?.requested_capability,
+              ) ?? null,
+            first_broken_rail: "capability_execution",
+            repair_target: "connector_capability_implementation",
+          }
+        : {}),
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -9273,6 +9399,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     });
   } else if (
     !solverContinuationPending &&
+    !authoritativeInitialTypedFailureReady &&
     latestRequiredObservationSequence >= 0
   ) {
     const scientificGuard = extractScientificTheoryAnswerGuard(

@@ -27,6 +27,50 @@ const buildAdmission = (
 });
 
 describe("Realtime transcript worker admission", () => {
+  it("binds a natural Minecraft inventory probe to the exact read-only connector capability", () => {
+    const capability = "com.casimirbot.minecraft.inventory.check";
+    const admission = buildAdmission(
+      "Check my current Minecraft inventory now using the connected environment.",
+      "minecraft-inventory",
+    );
+
+    expect(admission).toMatchObject({
+      outcome: "worker_grounded",
+      interaction_mode: "worker_required",
+      selected_route: "live_environment",
+      candidate_readonly_capability_ids: [capability],
+      action_candidate_capability_ids: [],
+      dispatch: {
+        kind: "ask_runtime",
+        requested: true,
+        read_only: true,
+      },
+    });
+    expect(admission.reason_codes).toContain(
+      "explicit_readonly_capability_contract",
+    );
+  });
+
+  it.each([
+    "Do not check my Minecraft inventory.",
+    "Later, I may ask you to check my Minecraft inventory.",
+    'The screen says "check my Minecraft inventory".',
+    "Why did the previous turn say it checked my Minecraft inventory?",
+    "Can the connector check my Minecraft inventory?",
+  ])(
+    "does not bind contextual Minecraft inventory wording to a Realtime probe: %s",
+    (prompt) => {
+      const admission = buildAdmission(
+        prompt,
+        `minecraft-contextual:${prompt.length}`,
+      );
+
+      expect(admission.candidate_readonly_capability_ids).not.toContain(
+        "com.casimirbot.minecraft.inventory.check",
+      );
+    },
+  );
+
   it("routes a natural named-doc explanation through the read-only Docs worker", () => {
     const transcriptText = "Okay, can you look at the NHM tube doc and explain what it's about?";
     const sourceTargetIntent = resolveRealtimeTranscriptSourceTargetIntent({

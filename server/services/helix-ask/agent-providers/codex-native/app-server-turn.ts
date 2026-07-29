@@ -91,6 +91,8 @@ export type RunCodexNativeAppServerTurnInput = {
     capabilityId: string;
     arguments: RecordLike;
     iteration: number;
+    callId: string;
+    providerExecutionId: string;
   }) => Promise<CodexNativeCapabilityExecutionResult>;
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -471,6 +473,9 @@ export const runCodexNativeAppServerTurnWithTransport = async (
       capabilityId,
       arguments: args,
       iteration: executedTools.length + 1,
+      callId,
+      providerExecutionId:
+        nativeTurnId ?? nativeThreadId ?? `codex_native_execution:${input.turnId}`,
     });
     executedTools.push(capabilityId);
     if (execution.ok) successfulTools.push(capabilityId);

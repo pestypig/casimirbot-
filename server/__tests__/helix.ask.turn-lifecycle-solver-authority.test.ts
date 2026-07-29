@@ -11,6 +11,7 @@ const buildProviderLifecycle = (
   turnId: string,
   observationRef: string,
   capabilityId = "docs.search",
+  terminalKind = "agent_provider_terminal_candidate",
 ) => {
   const recorder = createHelixTurnLifecycleRecorder({
     turnId,
@@ -86,7 +87,7 @@ const buildProviderLifecycle = (
     producer: "helix_policy",
     status: "succeeded",
     causation_id: runtime.event_id,
-    terminal_kind: "agent_provider_terminal_candidate",
+    terminal_kind: terminalKind,
     terminal_eligible: true,
   });
   recorder.append({
@@ -94,7 +95,7 @@ const buildProviderLifecycle = (
     producer: "helix_adapter",
     status: "succeeded",
     causation_id: eligibility.event_id,
-    terminal_kind: "agent_provider_terminal_candidate",
+    terminal_kind: terminalKind,
     terminal_eligible: true,
   });
   return recorder.snapshot();
@@ -174,6 +175,102 @@ describe("Helix Ask solver runtime lifecycle authority", () => {
     expect(trace.followup_reasoning.completed).toBe(true);
     expect(trace.route_authority_ok).toBe(true);
     expect(trace.terminal_authority_ok).toBe(true);
+  });
+
+  it("accepts an allowed self-terminal evidence summary only after verified current-turn re-entry", () => {
+    const turnId = "turn:scientific-evidence-continuity";
+    const terminalKind = "scientific_image_evidence_continuity_summary";
+    const observationRef = `${turnId}:prior_scientific_image_evidence_sidecar`;
+    const lifecycle = buildProviderLifecycle(
+      turnId,
+      observationRef,
+      "scientific-image-evidence.prior_sidecar_recall",
+      terminalKind,
+    );
+    const trace = buildAskTurnSolverTrace({
+      turnId,
+      promptText:
+        "For that extraction, report the exact sidecar id, source id, page, crop reference, evidence depth, and promoted equation. Use retained evidence; do not fetch, render, or crop.",
+      selectedRoute: "agent_provider_gateway_turn",
+      terminalArtifactKind: terminalKind,
+      finalAnswerSource: terminalKind,
+      payload: {
+        turn_lifecycle: lifecycle,
+        source_target_intent: {
+          target_source: "scientific_image_evidence",
+          target_kind: "scientific_image_evidence_sidecar",
+          strength: "hard",
+          reuse_retained_scientific_image_sidecar: true,
+        },
+        canonical_goal_frame: {
+          schema: "helix.canonical_goal_frame.v1",
+          goal_kind: "scientific_image_evidence_continuity",
+          required_terminal_kind: terminalKind,
+        },
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          source_target: "scientific_image_evidence",
+          required_terminal_kind: terminalKind,
+          allowed_terminal_artifact_kinds: [terminalKind, "typed_failure"],
+          evidence_reentry_required: true,
+          followup_reasoning_required: false,
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          turn_id: turnId,
+          terminal_artifact_kind: terminalKind,
+          final_answer_source: terminalKind,
+          server_authoritative: true,
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          turn_id: turnId,
+          terminal_artifact_kind: terminalKind,
+          final_answer_source: terminalKind,
+          selected_observation_refs: [observationRef],
+        },
+        current_turn_artifact_ledger: [{
+          artifact_id: observationRef,
+          kind: "scientific_image_evidence_sidecar",
+          capability_key: "scientific-image-evidence.prior_sidecar_recall",
+          source_scope: "current_turn",
+          payload: {
+            artifact_id: observationRef,
+            selected_for_answer: true,
+          },
+        }],
+      },
+      loopParityTrace: {
+        actual_tool_calls: [],
+        observations_created: [{
+          observation_id: observationRef,
+          source_kind: "scientific_image_evidence_sidecar",
+        }],
+        evidence_selected_for_answer: [observationRef],
+        evidence_rejected_for_answer: [],
+        terminal_selection_ran_after_observations: true,
+      },
+    });
+
+    expect(trace.committed_route_compatibility).toMatchObject({
+      compatible: true,
+      violations: [],
+    });
+    expect(trace.runtime_lifecycle_facts).toMatchObject({
+      integrity: "verified",
+      runtime_turn_completed: true,
+      observation_reentry_refs: [observationRef],
+      post_observation_reasoning_completed: true,
+    });
+    expect(trace.evidence_reentry_gate).toMatchObject({
+      completed: true,
+      runtime_lifecycle_verified: true,
+      violation_codes: [],
+    });
+    expect(trace.route_authority_ok).toBe(true);
+    expect(trace.poison_audit_ok).toBe(true);
+    expect(trace.terminal_authority_ok).toBe(true);
+    expect(trace.completed_solver_path).toBe(true);
   });
 
   it("uses runtime completion when a legacy provider solver flag is stale", () => {

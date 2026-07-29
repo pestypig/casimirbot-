@@ -2255,6 +2255,11 @@ const providerTerminalBridgeProvesRuntimeAuthority = (
   ]
     .map(readString)
     .filter((entry): entry is string => Boolean(entry));
+  const priorEvidenceObservationRefs = readArray(
+    bridge?.prior_evidence_observation_refs,
+  )
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
   const currentAuthority = readRecord(payload.terminal_answer_authority);
   const currentPresentation = readRecord(payload.terminal_presentation);
   const selectedObservationRefs = readArray(
@@ -2269,6 +2274,7 @@ const providerTerminalBridgeProvesRuntimeAuthority = (
     .filter((entry): entry is string => Boolean(entry));
   const providerSupportedObservationRefs = new Set([
     ...successfulObservationRefs,
+    ...priorEvidenceObservationRefs,
     ...normalizedObservationRefs,
   ]);
   const committedRoute = readCommittedAskRoute(payload);
@@ -2280,6 +2286,7 @@ const providerTerminalBridgeProvesRuntimeAuthority = (
     .filter((entry): entry is string => Boolean(entry));
   const supportRefsSatisfyContract =
     successfulObservationRefs.length > 0 ||
+    priorEvidenceObservationRefs.length > 0 ||
     (bridge?.model_only_direct_answer_allowed === true &&
       bridge?.evidence_reentry_required === false);
   const directProviderCandidateAuthority = Boolean(

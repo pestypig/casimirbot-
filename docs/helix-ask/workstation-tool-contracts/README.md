@@ -230,6 +230,7 @@ Each capability contract should define:
 | Capability                                              | Contract                                                                                                 | Maturity    |
 | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------- |
 | `workspace_os.status`                                   | [workspace_os.status.md](workspace_os.status.md)                                                         | `draft`     |
+| `helix_ask.inspect_capability_catalog`                  | [helix_ask.inspect_capability_catalog.md](helix_ask.inspect_capability_catalog.md)                       | `draft`     |
 | `workstation.active_context`                            | [workstation.active_context.md](workstation.active_context.md)                                           | `draft`     |
 | `theory-badge-graph.current_context`                    | [theory-badge-graph.current_context.md](theory-badge-graph.current_context.md)                           | `draft`     |
 | `workstation-notes.list_notes`                          | [workstation-notes.list_notes.md](workstation-notes.list_notes.md)                                       | `draft`     |
@@ -324,6 +325,14 @@ Each capability contract should define:
 | `live_env.test_visual_observer_profile`                 | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md)                         | `draft`     |
 | `live_env.compare_visual_observer_profiles`             | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md)                         | `draft`     |
 | `room.evidence.read_bound`                              | [shared-live-room-control.md](shared-live-room-control.md)                                               | `draft`     |
+| `com.casimirbot.minecraft.actor.status.read`            | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
+| `com.casimirbot.minecraft.inventory.check`              | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
+| `com.casimirbot.minecraft.nearby_entities.list`         | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
+| `com.casimirbot.minecraft.hazards.scan`                 | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
+| `com.casimirbot.minecraft.local_map.inspect`            | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
+| `com.casimirbot.minecraft.line_of_sight.check`          | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
+| `com.casimirbot.minecraft.crop_state.read`              | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
+| `com.casimirbot.minecraft.reachability.check`           | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
 | `situation-room.describe_visual_capture`                | [situation-room.describe_visual_capture.md](situation-room.describe_visual_capture.md)                   | `draft`     |
 | `room.list`                                             | [shared-live-room-control.md](shared-live-room-control.md)                                               | `draft`     |
 | `room.inspect`                                          | [shared-live-room-control.md](shared-live-room-control.md)                                               | `draft`     |
@@ -405,5 +414,6 @@ npm run helix:ask:discipline:quick
 git diff --check
 ```
 
-Live UI/API validation must use the user-started keyed server. Do not start or
-restart that server from an agent shell.
+Live UI/API validation must use the normal keyed server. Codex Desktop may
+start or restart it only through an explicitly authorized configured opaque
+`start-myapp-for-codex` launcher; an ad hoc agent-shell server is prohibited.

@@ -1,0 +1,43 @@
+{
+  "schema_version": "casimir_dp_stage4_2e_authorities/1",
+  "campaign_id": "casimir-dp-causal-cone-clock-stage4-2e-v1",
+  "authority_mode": "role_path_and_content_hash_tuple",
+  "immutable_upstream": [
+    {
+      "role": "stage4_2d_config",
+      "path": "configs/research/casimir-dp-cross-scale-metrology-stage4-2d.v1.json",
+      "sha256": "614f5b6de4176ffda7fc49ce794592aa50a56ecb56d4accf7df3cae6b0bcc41e",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2d_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-2d-authorities.v1.json",
+      "sha256": "721e0ffbcc26425236d62ba2d368fc8cabec9ba469d5dfac89a707e90d42dcb1",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2d_fixture",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2d-cross-scale.synthetic.v1.json",
+      "sha256": "9fb2f66f5d454aafde3c65e058c2c94c7279d4a5e821bd4b2c359cae6e12ab85",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2d_report",
+      "path": "artifacts/research/casimir-dp-cross-scale-metrology-stage4-2d/casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z/cross-scale-metrology-stage4-2d-report.json",
+      "sha256": "5e16c28a32ab77d0ca7ee44483824ca6ddedfb09657a77340df4b4f892c74229",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2d_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-cross-scale-metrology-stage4-2d/casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z/cross-scale-metrology-stage4-2d-receipt.json",
+      "sha256": "e602cb12250c2560b1f71502ae93c17e754cacbbe69b6f0acfbb4a5a55a6809c",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2d_verification_receipt",
+      "path": "docs/research/casimir-dp-cross-scale-metrology-stage4-2d-verification-receipt.json",
+      "sha256": "d96430684379dd5408d8099ae49a05ca0eaf4042a0ea64b09e23d0a4156a0556",
+      "required_at_runtime": true
+    }
+  ]
+}

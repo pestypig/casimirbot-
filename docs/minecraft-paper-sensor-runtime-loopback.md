@@ -9,7 +9,7 @@ avoid raw NBT or side effects.
 1. Build the plugin:
    `gradle -p minecraft/helix-paper-sensor build`
 2. Configure `plugins/HelixPaperSensor/config.yml` with the generated room-source endpoint and show-once bearer token, then set `helix.enabled: true`. The bundled configuration is deliberately disabled.
-3. Copy `minecraft/helix-paper-sensor/build/libs/HelixPaperSensor-0.1.0.jar` to the Paper server `plugins/` directory.
+3. Copy `minecraft/helix-paper-sensor/build/libs/HelixPaperSensor-0.2.0.jar` to the Paper server `plugins/` directory.
 4. Start the Paper server.
 5. Run `/helixsensor status`.
 6. Verify the manifest in Helix with `GET /api/agi/environment/sources/source:minecraft-paper-plugin/status`.

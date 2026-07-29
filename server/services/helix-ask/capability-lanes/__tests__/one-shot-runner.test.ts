@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
-import { listWorkstationGatewayCapabilities } from "../../workstation-tool-gateway/registry";
+import {
+  callWorkstationGatewayCapability,
+  listWorkstationGatewayCapabilities,
+} from "../../workstation-tool-gateway/registry";
 import { buildHelixAgentRuntimeSelectionTrace } from "../../agent-providers/runtime-debug";
 import { buildHelixAgentProviderAskPayload } from "../../agent-providers/provider-response-projection";
 import type { HelixAgentProvider } from "../../agent-providers/types";
@@ -8,6 +11,7 @@ import { runHelixCapabilityLaneOneShotRequests } from "../one-shot-runner";
 import { resolveHelixCapabilityLaneOneShotDispatch } from "../one-shot-runner";
 import { HELIX_USER_ACCOUNT_POLICY } from "../../../../../shared/helix-account-session";
 import { listAccountAuthorizedWorkstationGatewayCapabilities } from "../../workstation-tool-gateway/account-policy";
+import type { HelixWorkstationGatewayAccountContext } from "../../workstation-tool-gateway/account-policy";
 import { buildScientificEvidencePacket } from "../../../../../shared/scientific-evidence-adaptor";
 import { resetStagePlayLiveSourceMailboxForTest } from "../../../stage-play/stage-play-live-source-mailbox-store";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../../../stage-play/stage-play-live-source-mail-wake-store";
@@ -62,7 +66,9 @@ const body = {
   },
 };
 
-const withRuntimeMemoryGuardDisabled = async <T>(callback: () => Promise<T>): Promise<T> => {
+const withRuntimeMemoryGuardDisabled = async <T>(
+  callback: () => Promise<T>,
+): Promise<T> => {
   const previous = process.env.RUNTIME_MEMORY_GUARD;
   process.env.RUNTIME_MEMORY_GUARD = "0";
   try {
@@ -76,7 +82,10 @@ const withRuntimeMemoryGuardDisabled = async <T>(callback: () => Promise<T>): Pr
   }
 };
 
-const projectPayload = (provider: HelixAgentProvider, debugProjection: Record<string, unknown>) => {
+const projectPayload = (
+  provider: HelixAgentProvider,
+  debugProjection: Record<string, unknown>,
+) => {
   const gatewayManifest = listWorkstationGatewayCapabilities({
     agentRuntime: provider.id,
     mode: "act",
@@ -131,9 +140,15 @@ describe("provider-neutral capability lane one-shot runner", () => {
     }));
 
     expect(rows).not.toHaveLength(0);
-    expect(rows.filter((row) => !row.handler || row.dispatchKind === "blocked")).toEqual([]);
-    expect(rows.some((row) => row.dispatchKind === "governed_gateway")).toBe(true);
-    expect(rows.some((row) => row.dispatchKind === "specialized_lane")).toBe(true);
+    expect(
+      rows.filter((row) => !row.handler || row.dispatchKind === "blocked"),
+    ).toEqual([]);
+    expect(rows.some((row) => row.dispatchKind === "governed_gateway")).toBe(
+      true,
+    );
+    expect(rows.some((row) => row.dispatchKind === "specialized_lane")).toBe(
+      true,
+    );
   });
   it("lets Helix and Codex request the same one-shot translation lane through the same body contract", async () => {
     const helix = await runHelixCapabilityLaneOneShotRequests({
@@ -164,8 +179,12 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(codex.call_results).toHaveLength(1);
     expect(helix.call_results[0]?.translated_text).toBe("hola");
     expect(codex.call_results[0]?.translated_text).toBe("hola");
-    expect(helix.call_results[0]?.selected_runtime_agent_provider).toBe("helix");
-    expect(codex.call_results[0]?.selected_runtime_agent_provider).toBe("codex");
+    expect(helix.call_results[0]?.selected_runtime_agent_provider).toBe(
+      "helix",
+    );
+    expect(codex.call_results[0]?.selected_runtime_agent_provider).toBe(
+      "codex",
+    );
     expect(helix.resolve_traces[0]).toMatchObject({
       requested_lane: "live_translation",
       requested_backend_provider: "google_gemini",
@@ -200,7 +219,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
         schema: "helix.capability_lane.backend_selection_decision.v1",
         owner: "helix",
         outcome: "fallback_selected",
-        reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+        reason:
+          "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
         requested_backend_provider: "google_gemini",
         requested_backend_provider_known: true,
         selected_backend_provider: "live_translation.local_runtime",
@@ -214,7 +234,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
         assistant_answer: false,
         raw_content_included: false,
       },
-      selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+      selection_reason:
+        "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
       availability_status: "dry_run",
       permission_status: "admitted",
       cost_class: "free_local",
@@ -226,7 +247,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
-    expect(helix.backend_selections[0]?.receipt_ref).toBe(helix.resolve_traces[0]?.receipt_ref);
+    expect(helix.backend_selections[0]?.receipt_ref).toBe(
+      helix.resolve_traces[0]?.receipt_ref,
+    );
     expect(codex.backend_selections[0]).toMatchObject({
       schema: "helix.capability_lane.backend_selection_summary.v1",
       selected_runtime_agent_provider: "codex",
@@ -244,7 +267,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
-    expect(codex.backend_selections[0]?.receipt_ref).toBe(codex.resolve_traces[0]?.receipt_ref);
+    expect(codex.backend_selections[0]?.receipt_ref).toBe(
+      codex.resolve_traces[0]?.receipt_ref,
+    );
     expect(codex.resolve_traces[0]).toMatchObject({
       requested_lane: "live_translation",
       requested_backend_provider: "google_gemini",
@@ -262,8 +287,12 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(codex.resolve_traces[0]?.receipt_ref).toContain(
       `${codex.resolve_traces[0]?.observation_ref}:projection:`,
     );
-    expect(helix.observation_packets[0]?.capability_key).toBe("live_translation.translate_text");
-    expect(codex.observation_packets[0]?.capability_key).toBe("live_translation.translate_text");
+    expect(helix.observation_packets[0]?.capability_key).toBe(
+      "live_translation.translate_text",
+    );
+    expect(codex.observation_packets[0]?.capability_key).toBe(
+      "live_translation.translate_text",
+    );
     expect(codex.call_results[0]?.observation).toMatchObject({
       source_id: "document_markdown:docs/example.md",
       source_hash: "fnv1a32:example",
@@ -315,7 +344,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
       requested_backend_permission_status: "configuration_missing",
       requested_backend_fallback_provider: "live_translation.local_runtime",
       selected_backend_provider: "live_translation.local_runtime",
-      selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+      selection_reason:
+        "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
       availability_status: "dry_run",
       permission_status: "admitted",
       cost_class: "free_local",
@@ -369,7 +399,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
-    expect(codex.debug_events[2]?.receipt_ref).toBe(codex.resolve_traces[0]?.receipt_ref);
+    expect(codex.debug_events[2]?.receipt_ref).toBe(
+      codex.resolve_traces[0]?.receipt_ref,
+    );
     expect(codex.debug_events[3]).toMatchObject({
       stage: "lane_reentered",
       lane_id: "live_translation",
@@ -381,7 +413,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
       result_ref: codex.resolve_traces[0]?.result_ref,
       reentry_status: "observation_packet_required_for_provider_reentry",
     });
-    expect(codex.debug_events[3]?.receipt_ref).toBe(codex.resolve_traces[0]?.receipt_ref);
+    expect(codex.debug_events[3]?.receipt_ref).toBe(
+      codex.resolve_traces[0]?.receipt_ref,
+    );
   });
 
   it("projects lane call results through the same provider debug/export envelope", async () => {
@@ -396,17 +430,33 @@ describe("provider-neutral capability lane one-shot runner", () => {
 
     expect(payload.agent_runtime).toBe("codex");
     expect(payload.capability_lane_call_results).toEqual(runner.call_results);
-    expect(payload.capability_lane_observation_packets).toEqual(runner.observation_packets);
-    expect(payload.capability_lane_resolve_traces).toEqual(runner.resolve_traces);
-    expect(payload.capability_lane_backend_selections).toEqual(runner.backend_selections);
+    expect(payload.capability_lane_observation_packets).toEqual(
+      runner.observation_packets,
+    );
+    expect(payload.capability_lane_resolve_traces).toEqual(
+      runner.resolve_traces,
+    );
+    expect(payload.capability_lane_backend_selections).toEqual(
+      runner.backend_selections,
+    );
     expect(payload.capability_lane_debug_events).toEqual(runner.debug_events);
     expect(debug.capability_lane_call_results).toEqual(runner.call_results);
-    expect(debug.capability_lane_observation_packets).toEqual(runner.observation_packets);
+    expect(debug.capability_lane_observation_packets).toEqual(
+      runner.observation_packets,
+    );
     expect(debug.capability_lane_resolve_traces).toEqual(runner.resolve_traces);
-    expect(debug.capability_lane_backend_selections).toEqual(runner.backend_selections);
+    expect(debug.capability_lane_backend_selections).toEqual(
+      runner.backend_selections,
+    );
     expect(debug.capability_lane_debug_events).toEqual(runner.debug_events);
-    expect(debug.capability_lane_reentry_status).toBe("observation_packet_required_for_provider_reentry");
-    expect((payload.capability_lane_call_results as Array<Record<string, unknown>>)[0]).toMatchObject({
+    expect(debug.capability_lane_reentry_status).toBe(
+      "observation_packet_required_for_provider_reentry",
+    );
+    expect(
+      (
+        payload.capability_lane_call_results as Array<Record<string, unknown>>
+      )[0],
+    ).toMatchObject({
       capability: "live_translation.translate_text",
       terminal_eligible: false,
       assistant_answer: false,
@@ -420,7 +470,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
       body: {
         turn_id: "turn-visible-context-collector",
         capability_lane_call: {
-          capability: "workstation_tool_reference.collect_visible_translation_targets",
+          capability:
+            "workstation_tool_reference.collect_visible_translation_targets",
           active_doc_visible_translation_context: {
             schema: "helix.ask.active_doc_visible_translation_context.v1",
             panel_id: "docs-viewer",
@@ -445,7 +496,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
                 visible_text: "# Visible title",
                 chunk_id: "u0001",
                 chunk_index: 1,
-                dedupe_key: "document_markdown:docs/research/visible.md::sha256:visible-title::u0001::es-US::es",
+                dedupe_key:
+                  "document_markdown:docs/research/visible.md::sha256:visible-title::u0001::es-US::es",
                 region_id: "docs-viewer:u0001",
                 projection_target: "docs_chunk",
                 account_locale: "es-US",
@@ -471,7 +523,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(codex.call_results).toHaveLength(1);
     expect(codex.call_results[0]).toMatchObject({
       ok: true,
-      capability: "workstation_tool_reference.collect_visible_translation_targets",
+      capability:
+        "workstation_tool_reference.collect_visible_translation_targets",
       selected_runtime_agent_provider: "codex",
       target_count: 1,
       terminal_eligible: false,
@@ -508,7 +561,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
       },
     });
     expect(codex.observation_packets[0]).toMatchObject({
-      capability_key: "workstation_tool_reference.collect_visible_translation_targets",
+      capability_key:
+        "workstation_tool_reference.collect_visible_translation_targets",
       state_delta: {
         visible_translation_target_batch: expect.objectContaining({
           target_count: 1,
@@ -539,13 +593,15 @@ describe("provider-neutral capability lane one-shot runner", () => {
           target_language: "es",
           visible_only: true,
           max_chunks: 1,
-          visible_text_chunks: [{
-            source_kind: "docs_viewer",
-            visible_text: "# Visible title",
-            chunk_id: "u0001",
-            chunk_index: 1,
-            region_id: "docs-viewer:u0001",
-          }],
+          visible_text_chunks: [
+            {
+              source_kind: "docs_viewer",
+              visible_text: "# Visible title",
+              chunk_id: "u0001",
+              chunk_index: 1,
+              region_id: "docs-viewer:u0001",
+            },
+          ],
         },
       },
       env: {} as NodeJS.ProcessEnv,
@@ -561,7 +617,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(codex.call_results[0]).toMatchObject({
       ok: true,
       lane_id: "workstation_tool_reference",
-      capability: "workstation_tool_reference.collect_visible_translation_targets",
+      capability:
+        "workstation_tool_reference.collect_visible_translation_targets",
       selected_runtime_agent_provider: "codex",
       target_count: 1,
       terminal_eligible: false,
@@ -569,8 +626,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
       raw_content_included: false,
       observation: {
         target_batch: {
-          requested_collector_capability: "workstation.visible_text.collect_translation_targets",
-          collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+          requested_collector_capability:
+            "workstation.visible_text.collect_translation_targets",
+          collector_capability:
+            "workstation_tool_reference.collect_visible_translation_targets",
           translation_capability_required: "live_translation.translate_text",
           target_count: 1,
           targets: [
@@ -596,11 +655,14 @@ describe("provider-neutral capability lane one-shot runner", () => {
       },
     });
     expect(codex.observation_packets[0]).toMatchObject({
-      capability_key: "workstation_tool_reference.collect_visible_translation_targets",
+      capability_key:
+        "workstation_tool_reference.collect_visible_translation_targets",
       state_delta: {
         visible_translation_target_batch: expect.objectContaining({
-          requested_collector_capability: "workstation.visible_text.collect_translation_targets",
-          collector_capability: "workstation_tool_reference.collect_visible_translation_targets",
+          requested_collector_capability:
+            "workstation.visible_text.collect_translation_targets",
+          collector_capability:
+            "workstation_tool_reference.collect_visible_translation_targets",
           terminal_eligible: false,
           assistant_answer: false,
           answer_authority: false,
@@ -649,7 +711,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(codex.call_results[0]).toMatchObject({
       ok: true,
       lane_id: "workstation_tool_reference",
-      capability: "workstation_tool_reference.collect_visible_translation_targets",
+      capability:
+        "workstation_tool_reference.collect_visible_translation_targets",
       target_count: 1,
       observation: {
         target_batch: {
@@ -658,7 +721,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
             expect.objectContaining({
               source_kind: "selection",
               doc_path: "docs/research/visible.md",
-              source_id: "document_markdown:docs/research/visible.md#docs-viewer:selection:u0042",
+              source_id:
+                "document_markdown:docs/research/visible.md#docs-viewer:selection:u0042",
               visible_text: "Selected text from the current document.",
               chunk_id: "docs-viewer:selection:u0042",
               region_id: "docs-viewer:selection:u0042",
@@ -715,7 +779,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(codex.call_results[0]).toMatchObject({
       ok: true,
       lane_id: "workstation_tool_reference",
-      capability: "workstation_tool_reference.collect_visible_translation_targets",
+      capability:
+        "workstation_tool_reference.collect_visible_translation_targets",
       target_count: 1,
       observation: {
         target_batch: {
@@ -724,7 +789,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
             expect.objectContaining({
               source_kind: "hover_region",
               doc_path: "docs/research/visible.md",
-              source_id: "document_markdown:docs/research/visible.md#docs-viewer:hover:u0043",
+              source_id:
+                "document_markdown:docs/research/visible.md#docs-viewer:hover:u0043",
               visible_text: "Hovered text from the current document.",
               chunk_id: "docs-viewer:hover:u0043",
               region_id: "docs-viewer:hover:u0043",
@@ -792,7 +858,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(codex.call_results[0]).toMatchObject({
       ok: true,
       lane_id: "workstation_tool_reference",
-      capability: "workstation_tool_reference.collect_visible_translation_targets",
+      capability:
+        "workstation_tool_reference.collect_visible_translation_targets",
       target_count: 2,
       observation: {
         target_batch: {
@@ -884,7 +951,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
       requested_lane: "utility_text",
       requested_backend_provider: "utility_text.openai_compatible",
       selected_backend_provider: "utility_text.local_runtime",
-      selection_reason: "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
+      selection_reason:
+        "requested_backend_unconfigured_default_backend_selected_by_helix_policy",
       execution_status: "executed_observation_only",
       terminal_eligible: false,
       assistant_answer: false,
@@ -956,7 +1024,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
     });
     expect(helix.resolve_traces[0]).toMatchObject({
       requested_lane: "workstation_tool_reference",
-      selected_backend_provider: "workstation_tool_reference.helix_workstation_gateway",
+      selected_backend_provider:
+        "workstation_tool_reference.helix_workstation_gateway",
       execution_status: "executed_observation_only",
       terminal_eligible: false,
       assistant_answer: false,
@@ -964,7 +1033,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
     });
     expect(codex.resolve_traces[0]).toMatchObject({
       requested_lane: "workstation_tool_reference",
-      selected_backend_provider: "workstation_tool_reference.helix_workstation_gateway",
+      selected_backend_provider:
+        "workstation_tool_reference.helix_workstation_gateway",
       execution_status: "executed_observation_only",
       terminal_eligible: false,
       assistant_answer: false,
@@ -1143,24 +1213,29 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
-    expect(codex.observation_packets[0]?.produced_affordances).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        kind: "image_lens_region_evidence",
-        source_capability: "visual_analysis.inspect_image_region",
-        status: "available",
-        assistant_answer: false,
-        raw_content_included: false,
-      }),
-      expect.objectContaining({
-        kind: "scientific_evidence",
-        source_capability: "visual_analysis.inspect_image_region",
-        status: "available",
-        assistant_answer: false,
-        raw_content_included: false,
-      }),
-    ]));
+    expect(codex.observation_packets[0]?.produced_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "image_lens_region_evidence",
+          source_capability: "visual_analysis.inspect_image_region",
+          status: "available",
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+        expect.objectContaining({
+          kind: "scientific_evidence",
+          source_capability: "visual_analysis.inspect_image_region",
+          status: "available",
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      ]),
+    );
     expect(codex.observation_packets[0]?.typed_handoff_contract).toMatchObject({
-      produced_affordance_kinds: expect.arrayContaining(["image_lens_region_evidence", "scientific_evidence"]),
+      produced_affordance_kinds: expect.arrayContaining([
+        "image_lens_region_evidence",
+        "scientific_evidence",
+      ]),
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -1180,7 +1255,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
   });
 
   it("mounts a rendered PDF page source without running OCR or creating a scientific sidecar", async () => {
-    const sourceImageRef = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+    const sourceImageRef =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
     const result = await runHelixCapabilityLaneOneShotRequests({
       provider: buildProvider("codex"),
       body: {
@@ -1196,7 +1272,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
           source_dimensions_px: { width: 1224, height: 1584 },
           source_mount_only: true,
           bbox_px: { x: 0, y: 0, width: 1224, height: 1584 },
-          question: "Mount page 8 as the active Image Lens source without OCR or crop analysis.",
+          question:
+            "Mount page 8 as the active Image Lens source without OCR or crop analysis.",
           assistant_answer: false,
           terminal_eligible: false,
         },
@@ -1210,7 +1287,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
         admission_status: "admitted_shadow_only",
         lane_status: "dry_run",
         selected_backend_provider: "visual_analysis.local_pdf_page_mount",
-        selection_reason: "source_mount_only_local_pdf_renderer_selected_without_external_visual_backend",
+        selection_reason:
+          "source_mount_only_local_pdf_renderer_selected_without_external_visual_backend",
         permission_status: "admitted",
         privacy_class: "local_only",
         resolved_backend_provider: "none",
@@ -1224,7 +1302,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
         page_number: 8,
         source_dimensions_px: { width: 1224, height: 1584 },
         extraction_status: "not_run",
-        summary: "Rendered scholarly PDF page 8 mounted in Image Lens without OCR or visual analysis.",
+        summary:
+          "Rendered scholarly PDF page 8 mounted in Image Lens without OCR or visual analysis.",
       },
     });
     const receipt = (result.call_results[0] as any).receipt;
@@ -1242,7 +1321,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
           source_id: "pdf-page-render:arxiv-1902.10712:page-2",
           source_kind: "pdf_page_render",
           page_image_ref: "artifact://scholarly-pdf/missing-paper.pdf/page/2",
-          scholarly_source_pdf_ref: "artifact://scholarly-pdf/missing-paper.pdf",
+          scholarly_source_pdf_ref:
+            "artifact://scholarly-pdf/missing-paper.pdf",
           page_number: 2,
           source_mount_only: false,
           bbox_px: { x: 0, y: 0, width: 1600, height: 2200 },
@@ -1259,10 +1339,12 @@ describe("provider-neutral capability lane one-shot runner", () => {
       error: "scholarly_pdf_cache_unavailable",
       observation_packet: {
         status: "missing_input",
-        missing_requirements: [{
-          code: "scholarly_pdf_cache_unavailable",
-          repair_action: "fetch_full_text_before_pdf_page_navigation",
-        }],
+        missing_requirements: [
+          {
+            code: "scholarly_pdf_cache_unavailable",
+            repair_action: "fetch_full_text_before_pdf_page_navigation",
+          },
+        ],
       },
       reentry_required: true,
       terminal_eligible: false,
@@ -1271,7 +1353,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
   });
 
   it("does not bypass an unconfigured visual backend for OCR or inspection", async () => {
-    const sourceImageRef = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+    const sourceImageRef =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
     const result = await runHelixCapabilityLaneOneShotRequests({
       provider: buildProvider("codex"),
       body: {
@@ -1309,7 +1392,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
   });
 
   it("does not bypass an explicitly disabled visual lane for a local page mount", async () => {
-    const sourceImageRef = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+    const sourceImageRef =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
     const result = await runHelixCapabilityLaneOneShotRequests({
       provider: buildProvider("codex"),
       body: {
@@ -1328,7 +1412,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
           terminal_eligible: false,
         },
       },
-      env: { HELIX_CAPABILITY_LANE_VISUAL_ANALYSIS_ENABLED: "0" } as NodeJS.ProcessEnv,
+      env: {
+        HELIX_CAPABILITY_LANE_VISUAL_ANALYSIS_ENABLED: "0",
+      } as NodeJS.ProcessEnv,
     });
 
     expect(result.call_results[0]).toMatchObject({
@@ -1360,8 +1446,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
           bbox_px: { x: 80, y: 120, width: 1060, height: 300 },
           source_width_px: 1224,
           source_height_px: 1584,
-          question: "Inspect and capture the complete multi-line displayed equation block labeled (47), including every displayed line and label, excluding equation (48).",
-          reason_for_crop: "Capture equation block (47) and exclude equation (48).",
+          question:
+            "Inspect and capture the complete multi-line displayed equation block labeled (47), including every displayed line and label, excluding equation (48).",
+          reason_for_crop:
+            "Capture equation block (47) and exclude equation (48).",
           region_label: "equation_47_block",
           region_kind: "equation",
           text_candidate: [
@@ -1410,10 +1498,14 @@ describe("provider-neutral capability lane one-shot runner", () => {
           "Tr[R + Rhat - 2(Rhat^1/2 R Rhat^1/2)^1/2] <= epsilon_0^2 (47)",
           "R >= 0, R_x > 0 (47)",
         ],
-        notes: expect.arrayContaining(["displayed_lines_recovered_from_bounded_ocr_block"]),
+        notes: expect.arrayContaining([
+          "displayed_lines_recovered_from_bounded_ocr_block",
+        ]),
       }),
       exact_equation_admissibility: "admissible_for_exact_equation",
-      exact_row_promotion: expect.objectContaining({ status: "not_applicable" }),
+      exact_row_promotion: expect.objectContaining({
+        status: "not_applicable",
+      }),
       exact_block_promotion: expect.objectContaining({
         status: "promoted",
         reasons: expect.arrayContaining(["complete_multi_line_equation_block"]),
@@ -1421,7 +1513,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
       scientific_evidence_packet: expect.objectContaining({
         equation_capture_mode: "exact_block",
         exact_block_promotion: expect.objectContaining({ status: "promoted" }),
-        block_quality_diagnostics: expect.objectContaining({ complete_block_candidate: true }),
+        block_quality_diagnostics: expect.objectContaining({
+          complete_block_candidate: true,
+        }),
       }),
     });
     expect(result.observation_packets[0]).toMatchObject({
@@ -1430,7 +1524,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
       state_delta: {
         visual_analysis_region_inspection: expect.objectContaining({
           equation_capture_mode: "exact_block",
-          exact_block_promotion: expect.objectContaining({ status: "promoted" }),
+          exact_block_promotion: expect.objectContaining({
+            status: "promoted",
+          }),
         }),
       },
       terminal_eligible: false,
@@ -1451,10 +1547,19 @@ describe("provider-neutral capability lane one-shot runner", () => {
           source_image_ref: "artifact://scholarly-pdf/example.pdf#page=8&image",
           page_number: 8,
           bbox_px: { x: 80, y: 120, width: 1060, height: 300 },
-          question: "Capture the complete equation block labeled (47), excluding equation (48).",
+          question:
+            "Capture the complete equation block labeled (47), excluding equation (48).",
           reason_for_crop: "The bounded crop must exclude (48).",
           region_kind: "equation",
-          text_candidate: ["max_R", "objective", "s.t.", "constraint", "(47)", "", "Problem (47) follows."].join("\n"),
+          text_candidate: [
+            "max_R",
+            "objective",
+            "s.t.",
+            "constraint",
+            "(47)",
+            "",
+            "Problem (47) follows.",
+          ].join("\n"),
           latex_candidate: "\\max_R objective \\\\ s.t. constraint \\tag{47}",
           visual_layout_candidate: {
             displayed_line_count: 6,
@@ -1500,13 +1605,17 @@ describe("provider-neutral capability lane one-shot runner", () => {
           bbox_px: { x: 120, y: 205, width: 500, height: 120 },
           source_width_px: 1224,
           source_height_px: 1584,
-          question: "Compare the OCR symbols row by row. Do not promote exact-block evidence unless all rows and label (47) agree.",
-          reason_for_crop: "Compare the bounded equation context with saved page text.",
+          question:
+            "Compare the OCR symbols row by row. Do not promote exact-block evidence unless all rows and label (47) agree.",
+          reason_for_crop:
+            "Compare the bounded equation context with saved page text.",
           region_label: "scholarly_pdf_page_8_equation_pass",
           region_kind: "equation",
           equation_capture_mode: "context",
-          text_candidate: "max R Tr [− R^h_s R^−1_x R_xs + R_s] s.t. Tr [R + Rhat − 2(Rhat^1/2 R Rhat^1/2)^1/2] <= epsilon^2_0 (47) R >= 0, R_x > 0.",
-          latex_candidate: "max R \\ Tr [-R_h R_x^{-1} R_{xs} + R_s] \\ \\mathrm{s.t.} \\ Tr [R + \\hat{R} - 2(\\hat{R}^{1/2} R \\hat{R}^{1/2})^{1/2}] \\leq \\epsilon_0^2 (47) \\ R \\succeq 0, R_x \\succ 0.",
+          text_candidate:
+            "max R Tr [− R^h_s R^−1_x R_xs + R_s] s.t. Tr [R + Rhat − 2(Rhat^1/2 R Rhat^1/2)^1/2] <= epsilon^2_0 (47) R >= 0, R_x > 0.",
+          latex_candidate:
+            "max R \\ Tr [-R_h R_x^{-1} R_{xs} + R_s] \\ \\mathrm{s.t.} \\ Tr [R + \\hat{R} - 2(\\hat{R}^{1/2} R \\hat{R}^{1/2})^{1/2}] \\leq \\epsilon_0^2 (47) \\ R \\succeq 0, R_x \\succ 0.",
           visual_layout_candidate: {
             displayed_line_count: 5,
             displayed_lines: [],
@@ -1534,11 +1643,15 @@ describe("provider-neutral capability lane one-shot runner", () => {
           "Tr [R + \\hat{R} - 2(\\hat{R}^{1/2} R \\hat{R}^{1/2})^{1/2}] \\leq \\epsilon_0^2 (47)",
           "R \\succeq 0, R_x \\succ 0.",
         ],
-        notes: expect.arrayContaining(["displayed_lines_recovered_from_bounded_latex_structure"]),
+        notes: expect.arrayContaining([
+          "displayed_lines_recovered_from_bounded_latex_structure",
+        ]),
       }),
       exact_block_promotion: expect.objectContaining({
         status: "not_applicable",
-        reasons: expect.arrayContaining(["not_an_exact_equation_block_request"]),
+        reasons: expect.arrayContaining([
+          "not_an_exact_equation_block_request",
+        ]),
       }),
       evidence_role: "context_only",
     });
@@ -1559,7 +1672,13 @@ describe("provider-neutral capability lane one-shot runner", () => {
           question: "Compare the bounded OCR context row by row.",
           region_kind: "equation",
           equation_capture_mode: "context",
-          text_candidate: ["max R", "objective", "s.t.", "constraint (47)", "domain"].join("\n"),
+          text_candidate: [
+            "max R",
+            "objective",
+            "s.t.",
+            "constraint (47)",
+            "domain",
+          ].join("\n"),
           latex_candidate: "max R \\ objective \\ constraint (47) \\ domain",
           visual_layout_candidate: {
             displayed_line_count: 4,
@@ -1583,17 +1702,21 @@ describe("provider-neutral capability lane one-shot runner", () => {
         displayed_lines: [],
         notes: [],
       }),
-      exact_block_promotion: expect.objectContaining({ status: "not_applicable" }),
+      exact_block_promotion: expect.objectContaining({
+        status: "not_applicable",
+      }),
       evidence_role: "context_only",
     });
   });
 
   it("implicitly runs Image Lens for natural scientific image sidecar prompts without bbox wording", async () => {
-    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    const previousExtractionFixtures =
+      process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
     process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
       {
         region_label: "scientific_page",
-        text_candidate: "Bianchi identities as field equations for the Weyl tensor.",
+        text_candidate:
+          "Bianchi identities as field equations for the Weyl tensor.",
         latex_candidate: "\\nabla^{AA'}\\psi_{ABCD}=0",
         extraction_status: "extracted",
         uncertainty: ["fixture-backed OCR/math candidate"],
@@ -1619,7 +1742,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
         provider: buildProvider("codex"),
         body: {
           turn_id: "turn-provider-neutral-scientific-image-implicit",
-          question: "Here is a scientific document image. Extract the equations and compare them to the theory badge graph.",
+          question:
+            "Here is a scientific document image. Extract the equations and compare them to the theory badge graph.",
           source_target_intent: {
             schema: "helix.ask_source_target_intent.v1",
             target_source: "scientific_image_evidence",
@@ -1655,13 +1779,16 @@ describe("provider-neutral capability lane one-shot runner", () => {
         },
         env: {
           OPENAI_API_KEY: "test-openai",
-          HELIX_IMAGE_LENS_EXTRACTION_FIXTURES: process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES,
+          HELIX_IMAGE_LENS_EXTRACTION_FIXTURES:
+            process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES,
         } as NodeJS.ProcessEnv,
       });
 
       expect(result.requested).toBe(true);
       expect(result.call_results).toHaveLength(8);
-      const receipts = result.call_results.map((entry) => entry.receipt as Record<string, unknown>);
+      const receipts = result.call_results.map(
+        (entry) => entry.receipt as Record<string, unknown>,
+      );
       expect(receipts.map((receipt) => receipt.region_label)).toEqual([
         "scientific_page",
         "header_caption",
@@ -1693,10 +1820,13 @@ describe("provider-neutral capability lane one-shot runner", () => {
         capability: "visual_analysis.inspect_image_region",
         receipt: expect.objectContaining({
           source_kind: "image_lens_source",
-          source_refs: expect.arrayContaining(["visual_evidence:scientific-page"]),
+          source_refs: expect.arrayContaining([
+            "visual_evidence:scientific-page",
+          ]),
           bbox_px: { x: 0, y: 0, width: 346, height: 372 },
           region_label: "scientific_page",
-          text_candidate: "Bianchi identities as field equations for the Weyl tensor.",
+          text_candidate:
+            "Bianchi identities as field equations for the Weyl tensor.",
           latex_candidate: "\\nabla^{AA'}\\psi_{ABCD}=0",
           extraction_status: "extracted",
           scientific_evidence_packet: expect.objectContaining({
@@ -1728,25 +1858,32 @@ describe("provider-neutral capability lane one-shot runner", () => {
             scientific_evidence_sidecar: expect.objectContaining({
               memory_classification: expect.objectContaining({
                 memory_kind: "transient_scientific_image_evidence",
-                retrieval_tags: expect.arrayContaining(["scientific_image", "image_lens", "weyl_bianchi"]),
+                retrieval_tags: expect.arrayContaining([
+                  "scientific_image",
+                  "image_lens",
+                  "weyl_bianchi",
+                ]),
               }),
             }),
           },
         },
       });
-      expect(result.debug_projection.capability_lane_reentry_status)
-        .toBe("observation_packet_required_for_provider_reentry");
+      expect(result.debug_projection.capability_lane_reentry_status).toBe(
+        "observation_packet_required_for_provider_reentry",
+      );
     } finally {
       if (previousExtractionFixtures === undefined) {
         delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
       } else {
-        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES =
+          previousExtractionFixtures;
       }
     }
   });
 
   it("adds planned scientific image companion crops when an explicit whole-page Image Lens call exists", async () => {
-    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    const previousExtractionFixtures =
+      process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
     process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
       ...[
         "scientific_page",
@@ -1770,7 +1907,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
         provider: buildProvider("codex"),
         body: {
           turn_id: "turn-provider-neutral-scientific-image-explicit-plus-plan",
-          question: "Here is a scientific document image. Extract the visible equations as evidence only.",
+          question:
+            "Here is a scientific document image. Extract the visible equations as evidence only.",
           source_target_intent: {
             schema: "helix.ask_source_target_intent.v1",
             target_source: "scientific_image_evidence",
@@ -1808,12 +1946,15 @@ describe("provider-neutral capability lane one-shot runner", () => {
         },
         env: {
           OPENAI_API_KEY: "test-openai",
-          HELIX_IMAGE_LENS_EXTRACTION_FIXTURES: process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES,
+          HELIX_IMAGE_LENS_EXTRACTION_FIXTURES:
+            process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES,
         } as NodeJS.ProcessEnv,
       });
 
       expect(result.call_results).toHaveLength(8);
-      expect(result.call_results.map((entry) => entry.receipt?.region_label)).toEqual([
+      expect(
+        result.call_results.map((entry) => entry.receipt?.region_label),
+      ).toEqual([
         "scientific_page",
         "header_caption",
         "equation_block",
@@ -1832,7 +1973,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
       if (previousExtractionFixtures === undefined) {
         delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
       } else {
-        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES =
+          previousExtractionFixtures;
       }
     }
   });
@@ -1872,8 +2014,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
       sourceKind: "image_lens_source",
       bboxPx: { x: 150, y: 258, width: 440, height: 36 },
       regionLabel: "equation_row_search_5",
-      textCandidate: "s.t. Tr[R + R - 2(R^{1/2}RR^{1/2})^{1/2}] <= epsilon_0^2 (4)",
-      latexCandidate: "\\mathrm{s.t.}\\;\\operatorname{Tr}[R + R - 2(R^{1/2}RR^{1/2})^{1/2}] \\leq \\epsilon_0^2 (4)",
+      textCandidate:
+        "s.t. Tr[R + R - 2(R^{1/2}RR^{1/2})^{1/2}] <= epsilon_0^2 (4)",
+      latexCandidate:
+        "\\mathrm{s.t.}\\;\\operatorname{Tr}[R + R - 2(R^{1/2}RR^{1/2})^{1/2}] \\leq \\epsilon_0^2 (4)",
       extractionStatus: "extracted",
       uncertainty: [],
     });
@@ -1884,9 +2028,13 @@ describe("provider-neutral capability lane one-shot runner", () => {
       exact_equation_admissibility: "partial_candidate",
       exact_row_promotion: expect.objectContaining({
         status: "partial",
-        reasons: expect.arrayContaining(["observed_equation_label_without_requested_binding"]),
+        reasons: expect.arrayContaining([
+          "observed_equation_label_without_requested_binding",
+        ]),
       }),
-      quality_flags: expect.arrayContaining(["observed_equation_label_without_requested_binding"]),
+      quality_flags: expect.arrayContaining([
+        "observed_equation_label_without_requested_binding",
+      ]),
     });
 
     const mismatched = buildScientificEvidencePacket({
@@ -1896,7 +2044,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
       bboxPx: { x: 0, y: 128, width: 346, height: 59 },
       requestedEquationLabel: "3.52",
       regionLabel: "equation_3.52",
-      textCandidate: "As in Chapter 2 the invented formalism may be written: \\Delta\\psi = 0 (2.52)",
+      textCandidate:
+        "As in Chapter 2 the invented formalism may be written: \\Delta\\psi = 0 (2.52)",
       latexCandidate: "\\Delta\\psi = 0 \\tag{2.52}",
       extractionStatus: "extracted",
       uncertainty: [],
@@ -1909,8 +2058,13 @@ describe("provider-neutral capability lane one-shot runner", () => {
         status: "rejected",
         reasons: expect.arrayContaining(["label_match_status:mismatched"]),
       }),
-      admissibility: expect.objectContaining({ status: "inadmissible_for_exact_mapping" }),
-      quality_flags: expect.arrayContaining(["mismatched_equation_label", "row_crop_contains_page_prose_or_invented_formalism"]),
+      admissibility: expect.objectContaining({
+        status: "inadmissible_for_exact_mapping",
+      }),
+      quality_flags: expect.arrayContaining([
+        "mismatched_equation_label",
+        "row_crop_contains_page_prose_or_invented_formalism",
+      ]),
       retry_debug: expect.objectContaining({ retry_count: 1 }),
     });
     expect(mismatched.uncertainty.join("\n")).toContain("local_quality_gate");
@@ -1931,7 +2085,11 @@ describe("provider-neutral capability lane one-shot runner", () => {
       label_match_status: "matched",
       exact_equation_admissibility: "partial_candidate",
       exact_row_promotion: expect.objectContaining({ status: "partial" }),
-      quality_flags: expect.arrayContaining(["mojibake_or_corrupted_symbol_text", "ellipsized_or_truncated_equation", "malformed_latex_candidate"]),
+      quality_flags: expect.arrayContaining([
+        "mojibake_or_corrupted_symbol_text",
+        "ellipsized_or_truncated_equation",
+        "malformed_latex_candidate",
+      ]),
     });
     expect(corrupted.uncertainty.join("\n")).toContain("corrupted symbols");
 
@@ -1942,8 +2100,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
       bboxPx: { x: 0, y: 128, width: 346, height: 59 },
       requestedEquationLabel: "3.52",
       regionLabel: "equation_3.52",
-      textCandidate: "36 \\gamma_1 + 7\\phi_2 (3.52)\n3(\\delta\\phi_1 - \\delta\\phi_2) = 0",
-      latexCandidate: "36 \\gamma_1 + 7\\phi_2 \\tag{3.52}\n3(\\delta\\phi_1 - \\delta\\phi_2) = 0",
+      textCandidate:
+        "36 \\gamma_1 + 7\\phi_2 (3.52)\n3(\\delta\\phi_1 - \\delta\\phi_2) = 0",
+      latexCandidate:
+        "36 \\gamma_1 + 7\\phi_2 \\tag{3.52}\n3(\\delta\\phi_1 - \\delta\\phi_2) = 0",
       extractionStatus: "extracted",
       uncertainty: [],
     });
@@ -1952,13 +2112,19 @@ describe("provider-neutral capability lane one-shot runner", () => {
       exact_equation_admissibility: "partial_candidate",
       exact_row_promotion: expect.objectContaining({
         status: "partial",
-        reasons: expect.arrayContaining(["row_crop_contains_multiple_equation_lines"]),
+        reasons: expect.arrayContaining([
+          "row_crop_contains_multiple_equation_lines",
+        ]),
       }),
       row_quality_diagnostics: expect.objectContaining({
         row_contains_multiple_equation_like_lines: true,
       }),
-      admissibility: expect.objectContaining({ status: "unverified_math_observation" }),
-      quality_flags: expect.arrayContaining(["row_crop_contains_multiple_equation_lines"]),
+      admissibility: expect.objectContaining({
+        status: "unverified_math_observation",
+      }),
+      quality_flags: expect.arrayContaining([
+        "row_crop_contains_multiple_equation_lines",
+      ]),
     });
 
     const textOnlyLabel = buildScientificEvidencePacket({
@@ -1977,7 +2143,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
       label_match_status: "matched",
       exact_equation_admissibility: "partial_candidate",
       exact_row_promotion: expect.objectContaining({ status: "partial" }),
-      quality_flags: expect.arrayContaining(["requested_label_missing_from_latex_candidate"]),
+      quality_flags: expect.arrayContaining([
+        "requested_label_missing_from_latex_candidate",
+      ]),
     });
 
     const contextFormalism = buildScientificEvidencePacket({
@@ -1993,21 +2161,31 @@ describe("provider-neutral capability lane one-shot runner", () => {
     });
     expect(contextFormalism).toMatchObject({
       evidence_role: "context_only",
-      admissibility: expect.objectContaining({ status: "unverified_math_observation" }),
-      quality_flags: expect.arrayContaining(["context_crop_contains_unverified_formalism_prose", "partial_extraction_status"]),
+      admissibility: expect.objectContaining({
+        status: "unverified_math_observation",
+      }),
+      quality_flags: expect.arrayContaining([
+        "context_crop_contains_unverified_formalism_prose",
+        "partial_extraction_status",
+      ]),
     });
   });
 
   it("derives planned scientific image crop dimensions from attached image bytes when width metadata is missing", async () => {
-    const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
-    const sourcePng = (await sharp({
-      create: {
-        width: 20,
-        height: 100,
-        channels: 4,
-        background: { r: 255, g: 255, b: 255, alpha: 1 },
-      },
-    }).png().toBuffer()).toString("base64");
+    const previousExtractionFixtures =
+      process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
+    const sourcePng = (
+      await sharp({
+        create: {
+          width: 20,
+          height: 100,
+          channels: 4,
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        },
+      })
+        .png()
+        .toBuffer()
+    ).toString("base64");
     process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
       ...[
         "scientific_page",
@@ -2030,7 +2208,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
         provider: buildProvider("codex"),
         body: {
           turn_id: "turn-provider-neutral-scientific-image-byte-dimensions",
-          question: "Here is a scientific document image. Extract the visible equations as evidence only.",
+          question:
+            "Here is a scientific document image. Extract the visible equations as evidence only.",
           source_target_intent: {
             schema: "helix.ask_source_target_intent.v1",
             target_source: "scientific_image_evidence",
@@ -2066,7 +2245,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
         },
         env: {
           OPENAI_API_KEY: "test-openai",
-          HELIX_IMAGE_LENS_EXTRACTION_FIXTURES: process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES,
+          HELIX_IMAGE_LENS_EXTRACTION_FIXTURES:
+            process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES,
         } as NodeJS.ProcessEnv,
       });
 
@@ -2083,7 +2263,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
       if (previousExtractionFixtures === undefined) {
         delete process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
       } else {
-        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = previousExtractionFixtures;
+        process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES =
+          previousExtractionFixtures;
       }
     }
   });
@@ -2159,7 +2340,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
       const result = await runHelixCapabilityLaneOneShotRequests({
         provider: buildProvider("codex"),
         body: {
-          turn_id: "turn-provider-neutral-image-lens-source-materialization-missing",
+          turn_id:
+            "turn-provider-neutral-image-lens-source-materialization-missing",
           capability_lane_call: {
             capability: "visual_analysis.inspect_image_region",
             source_id: "image-lens-source:missing-bytes",
@@ -2188,7 +2370,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
       });
       expect(result.observation_packets[0]).toMatchObject({
         status: "missing_input",
-        observation_summary: expect.stringContaining("could not materialize source image data"),
+        observation_summary: expect.stringContaining(
+          "could not materialize source image data",
+        ),
         missing_requirements: [
           expect.objectContaining({
             code: "missing_inline_crop_or_source_image_data",
@@ -2200,14 +2384,18 @@ describe("provider-neutral capability lane one-shot runner", () => {
         assistant_answer: false,
         raw_content_included: false,
       });
-      expect(JSON.stringify(result.observation_packets[0])).not.toContain("scientific_image_sidecar");
+      expect(JSON.stringify(result.observation_packets[0])).not.toContain(
+        "scientific_image_sidecar",
+      );
     } finally {
       vi.unstubAllGlobals();
       if (previousVisionBase === undefined) delete process.env.VISION_HTTP_BASE;
       else process.env.VISION_HTTP_BASE = previousVisionBase;
-      if (previousVisionKey === undefined) delete process.env.VISION_HTTP_API_KEY;
+      if (previousVisionKey === undefined)
+        delete process.env.VISION_HTTP_API_KEY;
       else process.env.VISION_HTTP_API_KEY = previousVisionKey;
-      if (previousVisionModel === undefined) delete process.env.VISION_HTTP_MODEL;
+      if (previousVisionModel === undefined)
+        delete process.env.VISION_HTTP_MODEL;
       else process.env.VISION_HTTP_MODEL = previousVisionModel;
     }
   });
@@ -2224,15 +2412,17 @@ describe("provider-neutral capability lane one-shot runner", () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                text_candidate: "delta psi minus nabla psi",
-                latex_candidate: "\\delta\\psi - \\nabla\\psi",
-                uncertainty: ["low source resolution"],
-              }),
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  text_candidate: "delta psi minus nabla psi",
+                  latex_candidate: "\\delta\\psi - \\nabla\\psi",
+                  uncertainty: ["low source resolution"],
+                }),
+              },
             },
-          }],
+          ],
         }),
         {
           status: 200,
@@ -2264,10 +2454,18 @@ describe("provider-neutral capability lane one-shot runner", () => {
       });
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      const fetchBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body ?? "{}"));
-      expect(fetchBody.messages[0].content[0].text).toContain("requested_equation_label: 3.51");
-      expect(fetchBody.messages[0].content[0].text).toContain("bbox_px: 0,0,2,2");
-      expect(fetchBody.messages[0].content[1].image_url.url).toContain("data:image/png;base64,");
+      const fetchBody = JSON.parse(
+        String(fetchMock.mock.calls[0]?.[1]?.body ?? "{}"),
+      );
+      expect(fetchBody.messages[0].content[0].text).toContain(
+        "requested_equation_label: 3.51",
+      );
+      expect(fetchBody.messages[0].content[0].text).toContain(
+        "bbox_px: 0,0,2,2",
+      );
+      expect(fetchBody.messages[0].content[1].image_url.url).toContain(
+        "data:image/png;base64,",
+      );
       expect(result.call_results[0]).toMatchObject({
         ok: true,
         receipt: {
@@ -2275,7 +2473,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
           text_candidate: "delta psi minus nabla psi",
           latex_candidate: "\\delta\\psi - \\nabla\\psi",
           extraction_status: "extracted",
-          uncertainty: expect.arrayContaining(["low source resolution", expect.stringContaining("local_quality_gate")]),
+          uncertainty: expect.arrayContaining([
+            "low source resolution",
+            expect.stringContaining("local_quality_gate"),
+          ]),
           document_region_receipt: {
             extraction: {
               textCandidate: "delta psi minus nabla psi",
@@ -2288,7 +2489,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
           text_candidate: "delta psi minus nabla psi",
           latex_candidate: "\\delta\\psi - \\nabla\\psi",
           extraction_status: "extracted",
-          uncertainty: expect.arrayContaining(["low source resolution", expect.stringContaining("local_quality_gate")]),
+          uncertainty: expect.arrayContaining([
+            "low source resolution",
+            expect.stringContaining("local_quality_gate"),
+          ]),
         },
       });
       expect(result.observation_packets[0]).toMatchObject({
@@ -2299,7 +2503,10 @@ describe("provider-neutral capability lane one-shot runner", () => {
             text_candidate: "delta psi minus nabla psi",
             latex_candidate: "\\delta\\psi - \\nabla\\psi",
             extraction_status: "extracted",
-            uncertainty: expect.arrayContaining(["low source resolution", expect.stringContaining("local_quality_gate")]),
+            uncertainty: expect.arrayContaining([
+              "low source resolution",
+              expect.stringContaining("local_quality_gate"),
+            ]),
           },
         },
         terminal_eligible: false,
@@ -2309,9 +2516,11 @@ describe("provider-neutral capability lane one-shot runner", () => {
       vi.unstubAllGlobals();
       if (previousVisionBase === undefined) delete process.env.VISION_HTTP_BASE;
       else process.env.VISION_HTTP_BASE = previousVisionBase;
-      if (previousVisionKey === undefined) delete process.env.VISION_HTTP_API_KEY;
+      if (previousVisionKey === undefined)
+        delete process.env.VISION_HTTP_API_KEY;
       else process.env.VISION_HTTP_API_KEY = previousVisionKey;
-      if (previousVisionModel === undefined) delete process.env.VISION_HTTP_MODEL;
+      if (previousVisionModel === undefined)
+        delete process.env.VISION_HTTP_MODEL;
       else process.env.VISION_HTTP_MODEL = previousVisionModel;
     }
   });
@@ -2373,11 +2582,13 @@ describe("provider-neutral capability lane one-shot runner", () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          choices: [{
-            message: {
-              content: malformedExtraction,
+          choices: [
+            {
+              message: {
+                content: malformedExtraction,
+              },
             },
-          }],
+          ],
         }),
         {
           status: 200,
@@ -2422,9 +2633,11 @@ describe("provider-neutral capability lane one-shot runner", () => {
       vi.unstubAllGlobals();
       if (previousVisionBase === undefined) delete process.env.VISION_HTTP_BASE;
       else process.env.VISION_HTTP_BASE = previousVisionBase;
-      if (previousVisionKey === undefined) delete process.env.VISION_HTTP_API_KEY;
+      if (previousVisionKey === undefined)
+        delete process.env.VISION_HTTP_API_KEY;
       else process.env.VISION_HTTP_API_KEY = previousVisionKey;
-      if (previousVisionModel === undefined) delete process.env.VISION_HTTP_MODEL;
+      if (previousVisionModel === undefined)
+        delete process.env.VISION_HTTP_MODEL;
       else process.env.VISION_HTTP_MODEL = previousVisionModel;
     }
   });
@@ -2496,31 +2709,33 @@ describe("provider-neutral capability lane one-shot runner", () => {
   });
 
   it("projects future lane calls and governed TTS receipts as non-terminal observations", async () => {
-    const result = await withRuntimeMemoryGuardDisabled(() => runHelixCapabilityLaneOneShotRequests({
-      provider: buildProvider("codex"),
-      body: {
-        turn_id: "turn-provider-neutral-shadow-lanes",
-        capability_lane_call: [
-          {
-            capability: "visual_analysis.inspect_frame",
-            requested_backend_provider: "openai_compatible",
-            frame_ref: "frame:test",
-          },
-          {
-            capability: "text_to_speech.speak_text",
-            requested_backend_provider: "elevenlabs",
-            text: "checking now",
-            voice: "dottie_default",
-            locale: "en-US",
-            source_observation_ref: "obs:test:voice-source",
-          },
-        ],
-      },
-      env: {
-        OPENAI_API_KEY: "test-openai",
-        ELEVENLABS_API_KEY: "test-eleven",
-      } as NodeJS.ProcessEnv,
-    }));
+    const result = await withRuntimeMemoryGuardDisabled(() =>
+      runHelixCapabilityLaneOneShotRequests({
+        provider: buildProvider("codex"),
+        body: {
+          turn_id: "turn-provider-neutral-shadow-lanes",
+          capability_lane_call: [
+            {
+              capability: "visual_analysis.inspect_frame",
+              requested_backend_provider: "openai_compatible",
+              frame_ref: "frame:test",
+            },
+            {
+              capability: "text_to_speech.speak_text",
+              requested_backend_provider: "elevenlabs",
+              text: "checking now",
+              voice: "dottie_default",
+              locale: "en-US",
+              source_observation_ref: "obs:test:voice-source",
+            },
+          ],
+        },
+        env: {
+          OPENAI_API_KEY: "test-openai",
+          ELEVENLABS_API_KEY: "test-eleven",
+        } as NodeJS.ProcessEnv,
+      }),
+    );
 
     expect(result).toMatchObject({
       requested: true,
@@ -2579,19 +2794,24 @@ describe("provider-neutral capability lane one-shot runner", () => {
       requested_lane: "text_to_speech",
       requested_backend_provider: "elevenlabs",
       requested_backend_provider_known: true,
-      requested_backend_fallback_provider: "text_to_speech.existing_voice_service",
+      requested_backend_fallback_provider:
+        "text_to_speech.existing_voice_service",
       selected_backend_provider: "text_to_speech.existing_voice_service",
       execution_status: "executed_observation_only",
       blocked_reason: null,
     });
-    expect(result.observation_packets.map((packet) => packet.status)).toEqual(["blocked", "client_pending"]);
+    expect(result.observation_packets.map((packet) => packet.status)).toEqual([
+      "blocked",
+      "client_pending",
+    ]);
     expect(result.observation_packets[0]?.state_delta).toMatchObject({
       capability_lane_shadow_execution: {
         lane_id: "visual_analysis",
         capability: "visual_analysis.inspect_frame",
         requested_backend_provider: "openai_compatible",
         selected_backend_provider: "visual_analysis.openai_compatible",
-        selection_reason: "selected_requested_backend_provider_for_shadow_manifest",
+        selection_reason:
+          "selected_requested_backend_provider_for_shadow_manifest",
         availability_status: "dry_run",
         permission_status: "admitted",
         cost_class: "standard",
@@ -2604,7 +2824,9 @@ describe("provider-neutral capability lane one-shot runner", () => {
         raw_content_included: false,
       },
     });
-    expect(result.observation_packets[0]?.backend_selection_decision).toMatchObject({
+    expect(
+      result.observation_packets[0]?.backend_selection_decision,
+    ).toMatchObject({
       outcome: "requested_selected",
       requested_backend_provider: "openai_compatible",
       selected_backend_provider: "visual_analysis.openai_compatible",
@@ -2637,12 +2859,14 @@ describe("provider-neutral capability lane one-shot runner", () => {
         raw_content_included: false,
       }),
     ]);
-    expect(result.observation_packets[1]?.typed_handoff_contract).toMatchObject({
-      produced_affordance_kinds: ["voice_playback_receipt"],
-      terminal_eligible: false,
-      assistant_answer: false,
-      raw_content_included: false,
-    });
+    expect(result.observation_packets[1]?.typed_handoff_contract).toMatchObject(
+      {
+        produced_affordance_kinds: ["voice_playback_receipt"],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    );
     expect(result.debug_events.map((event) => event.stage)).toEqual([
       "lane_requested",
       "lane_backend_selected",
@@ -2688,46 +2912,51 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
-    expect(result.debug_projection.capability_lane_reentry_status).toBe("observation_packet_required_for_provider_reentry");
+    expect(result.debug_projection.capability_lane_reentry_status).toBe(
+      "observation_packet_required_for_provider_reentry",
+    );
   });
 
   it("composes STT, translation, and TTS lane calls as re-entered non-terminal observations", async () => {
-    const result = await withRuntimeMemoryGuardDisabled(() => runHelixCapabilityLaneOneShotRequests({
-      provider: buildProvider("codex"),
-      body: {
-        turn_id: "turn-provider-neutral-stt-compose",
-        capability_lane_call: [
-          {
-            capability: "speech_to_text.transcribe_audio",
-            audio_ref: "voice:audio:compose",
-            audio_hash: "audio-hash-compose",
-            transcript_text: "hello workstation",
-            language: "en",
-            source_id: "audio_transcript:helix-ask:desktop",
-            thread_id: "helix-ask:desktop",
-            capture_session_id: "capture:compose",
-            chunk_index: 0,
-          },
-          {
-            capability: "live_translation.translate_text",
-            text: "hello workstation",
-            source_language: "en",
-            target_language: "es",
-            source_id: "audio_transcript:helix-ask:desktop",
-            projection_target: "audio_chunk",
-          },
-          {
-            capability: "text_to_speech.speak_text",
-            text: "hola estacion de trabajo",
-            source_observation_ref: "turn-provider-neutral-stt-compose:translation",
-          },
-        ],
-      },
-      env: {
-        OPENAI_API_KEY: "test-openai",
-        HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED: "0",
-      } as NodeJS.ProcessEnv,
-    }));
+    const result = await withRuntimeMemoryGuardDisabled(() =>
+      runHelixCapabilityLaneOneShotRequests({
+        provider: buildProvider("codex"),
+        body: {
+          turn_id: "turn-provider-neutral-stt-compose",
+          capability_lane_call: [
+            {
+              capability: "speech_to_text.transcribe_audio",
+              audio_ref: "voice:audio:compose",
+              audio_hash: "audio-hash-compose",
+              transcript_text: "hello workstation",
+              language: "en",
+              source_id: "audio_transcript:helix-ask:desktop",
+              thread_id: "helix-ask:desktop",
+              capture_session_id: "capture:compose",
+              chunk_index: 0,
+            },
+            {
+              capability: "live_translation.translate_text",
+              text: "hello workstation",
+              source_language: "en",
+              target_language: "es",
+              source_id: "audio_transcript:helix-ask:desktop",
+              projection_target: "audio_chunk",
+            },
+            {
+              capability: "text_to_speech.speak_text",
+              text: "hola estacion de trabajo",
+              source_observation_ref:
+                "turn-provider-neutral-stt-compose:translation",
+            },
+          ],
+        },
+        env: {
+          OPENAI_API_KEY: "test-openai",
+          HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED: "0",
+        } as NodeJS.ProcessEnv,
+      }),
+    );
 
     expect(result.call_results.map((entry) => entry.capability)).toEqual([
       "speech_to_text.transcribe_audio",
@@ -2735,20 +2964,32 @@ describe("provider-neutral capability lane one-shot runner", () => {
       "text_to_speech.speak_text",
     ]);
     expect(result.observation_packets).toHaveLength(3);
-    expect(result.observation_packets.map((packet) => packet.capability_key)).toEqual([
+    expect(
+      result.observation_packets.map((packet) => packet.capability_key),
+    ).toEqual([
       "speech_to_text.transcribe_audio",
       "live_translation.translate_text",
       "text_to_speech.speak_text",
     ]);
-    expect(result.observation_packets.every((packet) => packet.terminal_eligible === false)).toBe(true);
-    expect(result.observation_packets.every((packet) => packet.assistant_answer === false)).toBe(true);
+    expect(
+      result.observation_packets.every(
+        (packet) => packet.terminal_eligible === false,
+      ),
+    ).toBe(true);
+    expect(
+      result.observation_packets.every(
+        (packet) => packet.assistant_answer === false,
+      ),
+    ).toBe(true);
     expect(result.observation_packets[0]).toMatchObject({
       status: "succeeded",
       state_delta: {
         speech_to_text_observation: expect.objectContaining({
           schema: "helix.speech_to_text.observation.v1",
           source_kind: "audio_transcript",
-          stage_play_mail_id: expect.stringMatching(/^stage_play_live_source_mail:/),
+          stage_play_mail_id: expect.stringMatching(
+            /^stage_play_live_source_mail:/,
+          ),
           terminal_eligible: false,
           assistant_answer: false,
           raw_audio_included: false,
@@ -2787,12 +3028,18 @@ describe("provider-neutral capability lane one-shot runner", () => {
         }),
       },
     });
-    expect(result.debug_events.filter((event) => event.stage === "lane_observation").map((event) => event.capability)).toEqual([
+    expect(
+      result.debug_events
+        .filter((event) => event.stage === "lane_observation")
+        .map((event) => event.capability),
+    ).toEqual([
       "speech_to_text.transcribe_audio",
       "live_translation.translate_text",
       "text_to_speech.speak_text",
     ]);
-    expect(result.debug_projection.capability_lane_reentry_status).toBe("observation_packet_required_for_provider_reentry");
+    expect(result.debug_projection.capability_lane_reentry_status).toBe(
+      "observation_packet_required_for_provider_reentry",
+    );
   });
 
   it("bridges scholarly recovery lane requests through the governed gateway", async () => {
@@ -2939,11 +3186,15 @@ describe("provider-neutral capability lane one-shot runner", () => {
       assistant_answer: false,
     });
     expect(result.observation_packets[0].capability_key).toBe("docs.search");
-    expect(result.observation_packets[0].post_tool_model_step_required).toBe(true);
+    expect(result.observation_packets[0].post_tool_model_step_required).toBe(
+      true,
+    );
   });
 
   it("bridges any account-authorized gateway capability not covered by a specialized lane handler", async () => {
-    const repoSearch = listWorkstationGatewayCapabilities({ mode: "act" }).capabilities.find(
+    const repoSearch = listWorkstationGatewayCapabilities({
+      mode: "act",
+    }).capabilities.find(
       (capability) => capability.capability_id === "repo.search",
     );
     expect(repoSearch).toBeDefined();
@@ -2981,6 +3232,83 @@ describe("provider-neutral capability lane one-shot runner", () => {
       requested_lane: "workstation_tool_reference",
       execution_status: "executed_observation_only",
     });
+  });
+
+  it("forwards trusted account and conversation context through a governed lane", async () => {
+    const workspaceStatus = listWorkstationGatewayCapabilities({
+      mode: "act",
+    }).capabilities.find(
+      (capability) => capability.capability_id === "workspace_os.status",
+    );
+    expect(workspaceStatus).toBeDefined();
+    const timestamp = "2026-07-29T00:00:00.000Z";
+    const accountContext = {
+      session_id: "account_session:capability-lane-context",
+      profile_id: "profile:capability-lane-context",
+      trusted_account_session: true,
+      account_session: {
+        schema: "helix.account_session.v1",
+        session_id: "account_session:capability-lane-context",
+        profile: {
+          profile_id: "profile:capability-lane-context",
+          display_name: "Room Operator",
+          auth_mode: "guest",
+          account_type: "user",
+          provider: "guest",
+          created_at: timestamp,
+          updated_at: timestamp,
+        },
+        account_policy: HELIX_USER_ACCOUNT_POLICY,
+        status: "active",
+        memory_scope: "session_only",
+        created_at: timestamp,
+        updated_at: timestamp,
+        expires_at: "2026-07-30T00:00:00.000Z",
+      },
+      account_policy: HELIX_USER_ACCOUNT_POLICY,
+    } satisfies HelixWorkstationGatewayAccountContext;
+    const gatewayCaller = vi.fn(
+      async (
+        input: Parameters<typeof callWorkstationGatewayCapability>[0],
+      ) => callWorkstationGatewayCapability(input),
+    );
+
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "ask:test:trusted-gateway-context",
+        capability_lane_call: {
+          capability: "workspace_os.status",
+          thread_id: "ask:test:model-supplied-turn",
+        },
+      },
+      conversationThreadId: "helix-ask:test:visual-conversation",
+      authorizedGatewayCapabilities: workspaceStatus ? [workspaceStatus] : [],
+      accountType: "developer",
+      accountContext,
+      gatewayCaller,
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(result.call_results[0]).toMatchObject({
+      schema: "helix.workstation_tool_reference.gateway_bridge_result.v1",
+      capability: "workspace_os.status",
+      delegated_gateway_call_result: {
+        capability_id: "workspace_os.status",
+      },
+    });
+    expect(gatewayCaller).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationThreadId: "helix-ask:test:visual-conversation",
+        accountContext,
+        providerExecutionId: expect.stringMatching(
+          /^capability_lane_execution:[a-f0-9]{16}$/,
+        ),
+        toolCallId: expect.stringMatching(
+          /^capability_lane_tool_call:[a-f0-9]{16}$/,
+        ),
+      }),
+    );
   });
 
   it("does not execute a registered gateway capability when it is absent from the account-authorized manifest", async () => {
@@ -3105,7 +3433,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
     const result = await runHelixCapabilityLaneOneShotRequests({
       provider: buildProvider("codex"),
       body: {
-        question: "Please translate hello to Spanish, then inspect the crop in the image lens.",
+        question:
+          "Please translate hello to Spanish, then inspect the crop in the image lens.",
       },
       env: {} as NodeJS.ProcessEnv,
     });
@@ -3115,6 +3444,8 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(result.observation_packets).toEqual([]);
     expect(result.resolve_traces).toEqual([]);
     expect(result.debug_events).toEqual([]);
-    expect(result.debug_projection.capability_lane_reentry_status).toBe("not_requested");
+    expect(result.debug_projection.capability_lane_reentry_status).toBe(
+      "not_requested",
+    );
   });
 });

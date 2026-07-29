@@ -57,6 +57,9 @@ The four nonterminal observation schemas are:
 - `casimir.formal_runtime_canary.plan_observation.v1`
 - `casimir.formal_runtime_canary.start_observation.v1`
 - `casimir.formal_runtime_canary.result_observation.v1`
+- completed results contain only
+  `casimir.formal_runtime_canary.replay_report.v1`, never a reusable
+  scientific formal-verification certificate
 
 All observations preserve the following authority boundary:
 

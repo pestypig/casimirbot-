@@ -160,10 +160,12 @@ export function buildHelixAskLiveRuntimeControlsModel(args: {
 export function HelixAskLiveRuntimeControls({
   model,
   onToolbarBridgeChange,
+  onActiveSharedRoomChange,
   onVisualInputEnableRequested,
 }: {
   model: HelixAskLiveRuntimeControlsModel;
   onToolbarBridgeChange?: (bridge: HelixAskLiveRuntimeToolbarBridge | null) => void;
+  onActiveSharedRoomChange?: (roomId: string | null) => void;
   onVisualInputEnableRequested?: () => void;
 }) {
   if (!model.visible) return null;
@@ -171,6 +173,7 @@ export function HelixAskLiveRuntimeControls({
     <HelixAskVisibleLiveRuntimeControls
       model={model}
       onToolbarBridgeChange={onToolbarBridgeChange}
+      onActiveSharedRoomChange={onActiveSharedRoomChange}
       onVisualInputEnableRequested={onVisualInputEnableRequested}
     />
   );
@@ -179,10 +182,12 @@ export function HelixAskLiveRuntimeControls({
 function HelixAskVisibleLiveRuntimeControls({
   model,
   onToolbarBridgeChange,
+  onActiveSharedRoomChange,
   onVisualInputEnableRequested,
 }: {
   model: HelixAskLiveRuntimeControlsModel;
   onToolbarBridgeChange?: (bridge: HelixAskLiveRuntimeToolbarBridge | null) => void;
+  onActiveSharedRoomChange?: (roomId: string | null) => void;
   onVisualInputEnableRequested?: () => void;
 }) {
   const [mode, setMode] = useState<HelixLiveRuntimeAgentMode>(
@@ -302,6 +307,7 @@ function HelixAskVisibleLiveRuntimeControls({
           realtimeSessionId={runtime.realtimeSessionId}
           runtimeActive={runtime.active}
           realtimeModel={mode === "live_voice_mini" ? "gpt-realtime-2.1-mini" : "gpt-realtime-2.1"}
+          onActiveRoomChange={onActiveSharedRoomChange}
           onVisualSourceCaptureRequested={onVisualInputEnableRequested}
           onSharedTransportChange={setSharedRoomTransportBound}
           onHostTransportInvalidated={() => {

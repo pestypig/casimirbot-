@@ -12,7 +12,6 @@ import {
   type HelixRoomSourceBindingReceipt,
 } from "@shared/helix-room-source-ingress";
 import { helixSharedLiveRoomSourceCreateRequestSchema } from "@shared/contracts/helix-shared-live-room-agent.v1";
-import { getAccountSessionById } from "../../services/helix-account/account-session-store";
 import {
   isRoomSourceIngressError,
   listSharedRealtimeRoomSourceBindings,
@@ -22,6 +21,8 @@ import {
 import {
   SharedLiveRoomControlError,
   buildSharedLiveRoomControlActorFromAccountContext,
+  resolveSharedLiveRoomSourceCredentialTtlMs,
+  sharedLiveRoomActorAllowsSourceIngress,
 } from "../../services/shared-live-room-control/service";
 import {
   claimSharedLiveRoomSourceCredentialForBrowser,
@@ -223,42 +224,17 @@ const sourceLinkRoute =
     });
   };
 
-const requireSourceLinkDeveloper = async (
-  req: Request,
-  res: Response,
-): Promise<SharedRoomRequestAccount> => {
-  const account = await requireSharedRoomAccount(req);
-  const session = await getAccountSessionById(account.sessionId);
-  if (
-    !session ||
-    session.account_policy.account_type !== "developer" ||
-    !session.account_policy.feature_flags.includes("room_source_ingress") ||
-    session.account_policy.locked_features.includes("room_source_ingress")
-  ) {
-    throw new RoomSourceIngressError(
-      "room_source_binding_forbidden",
-      403,
-      "Room source ingress is available to developer room owners only.",
-    );
-  }
-  sourceCookieBoundary.enforceAccountRateLimit(res, account.profileId);
-  return account;
-};
-
-const requireSourceLinkDeveloperContext = async (
+const requireSourceLinkManagerContext = async (
   req: Request,
   res: Response,
 ) => {
   const context = await requireSharedRoomAccountContext(req);
-  if (
-    context.account_policy.account_type !== "developer" ||
-    !context.account_policy.feature_flags.includes("room_source_ingress") ||
-    context.account_policy.locked_features.includes("room_source_ingress")
-  ) {
+  const actor = buildSharedLiveRoomControlActorFromAccountContext(context);
+  if (!sharedLiveRoomActorAllowsSourceIngress(actor)) {
     throw new RoomSourceIngressError(
       "room_source_binding_forbidden",
       403,
-      "Room source ingress is available to developer room owners only.",
+      "Room source ingress is not enabled for this room owner.",
     );
   }
   sourceCookieBoundary.enforceAccountRateLimit(res, context.profile_id!);
@@ -268,11 +244,15 @@ const requireSourceLinkDeveloperContext = async (
 const requireManagingOwner = async (
   req: Request,
   res: Response,
-): Promise<SharedRoomRequestAccount> => {
-  const account = await requireSourceLinkDeveloper(req, res);
+): Promise<{
+  account: SharedRoomRequestAccount;
+  context: Awaited<ReturnType<typeof requireSharedRoomAccountContext>>;
+}> => {
+  const context = await requireSourceLinkManagerContext(req, res);
+  const account = await requireSharedRoomAccount(req);
   const membership = await readMembership(req.params.roomId, account);
   requireOwner(membership);
-  return account;
+  return { account, context };
 };
 
 const requireSourceCreateIdempotencyKey = (req: Request): string => {
@@ -310,7 +290,7 @@ sharedRealtimeRoomSourceLinkRouter.use(
 sharedRealtimeRoomSourceLinkRouter.get(
   "/realtime/rooms/:roomId/source-bindings",
   sourceLinkRoute(async (req: Request, res: Response) => {
-    const context = await requireSourceLinkDeveloperContext(req, res);
+    const context = await requireSourceLinkManagerContext(req, res);
     const receipt = await sharedLiveRoomControlService.listSourceBindings({
       actor: buildSharedLiveRoomControlActorFromAccountContext(context),
       roomId: req.params.roomId,
@@ -325,7 +305,7 @@ sharedRealtimeRoomSourceLinkRouter.get(
 sharedRealtimeRoomSourceLinkRouter.post(
   "/realtime/rooms/:roomId/source-bindings",
   sourceLinkRoute(async (req: Request, res: Response) => {
-    const context = await requireSourceLinkDeveloperContext(req, res);
+    const context = await requireSourceLinkManagerContext(req, res);
     const parsed = createBindingSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       res.status(400).json(
@@ -355,7 +335,7 @@ sharedRealtimeRoomSourceLinkRouter.post(
 sharedRealtimeRoomSourceLinkRouter.post(
   "/realtime/rooms/:roomId/source-bindings/:bindingId/rotate",
   sourceLinkRoute(async (req: Request, res: Response) => {
-    const account = await requireManagingOwner(req, res);
+    const { account, context } = await requireManagingOwner(req, res);
     const parsed = rotateCredentialSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       res.status(400).json(
@@ -386,7 +366,10 @@ sharedRealtimeRoomSourceLinkRouter.post(
       binding,
       ownerProfileId: account.profileId,
       purpose: "rotate",
-      credentialTtlMs: parsed.data.ttl_ms ?? 7 * 24 * 60 * 60 * 1_000,
+      credentialTtlMs: resolveSharedLiveRoomSourceCredentialTtlMs(
+        buildSharedLiveRoomControlActorFromAccountContext(context),
+        parsed.data.ttl_ms,
+      ),
     });
     res.json({
       schema: "helix.room_source_credential_delivery_receipt.v1",
@@ -419,7 +402,7 @@ sharedRealtimeRoomSourceCredentialClaimRouter.use(
 sharedRealtimeRoomSourceCredentialClaimRouter.post(
   "/realtime/room-source-credential-deliveries/claim",
   sourceLinkRoute(async (req: Request, res: Response) => {
-    const context = await requireSourceLinkDeveloperContext(req, res);
+    const context = await requireSourceLinkManagerContext(req, res);
     const parsed = claimCredentialSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       res.status(400).json(
@@ -456,7 +439,7 @@ sharedRealtimeRoomSourceCredentialClaimRouter.use(
 );
 
 const revokeHandler = sourceLinkRoute(async (req: Request, res: Response) => {
-  const account = await requireManagingOwner(req, res);
+    const { account } = await requireManagingOwner(req, res);
   const binding = await revokeSharedRealtimeRoomSourceBinding({
     roomId: req.params.roomId,
     bindingId: req.params.bindingId,

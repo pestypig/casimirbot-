@@ -115,8 +115,13 @@ const LIVE_ENVIRONMENT_OPERATOR_CAPABILITIES = new Set([
   "live_env.evaluate_goal_satisfaction",
 ]);
 
-const isLiveEnvironmentOperatorCapability = (capability: string | null | undefined): boolean =>
-  LIVE_ENVIRONMENT_OPERATOR_CAPABILITIES.has(String(capability ?? "").trim());
+const isLiveEnvironmentOperatorCapability = (capability: string | null | undefined): boolean => {
+  const normalized = String(capability ?? "").trim();
+  return (
+    LIVE_ENVIRONMENT_OPERATOR_CAPABILITIES.has(normalized) ||
+    normalized.startsWith("com.casimirbot.minecraft.")
+  );
+};
 
 const liveSourceMailboxGoalKindFromRouteMetadata = (
   routeMetadata: RecordLike | null,

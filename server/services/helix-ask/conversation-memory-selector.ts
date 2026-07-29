@@ -108,6 +108,24 @@ const unique = (values: string[], limit: number): string[] => {
   return result;
 };
 
+const extractWorkspaceDocumentLocators = (value: unknown): string[] => {
+  const text = String(value ?? "");
+  const locators: string[] = [];
+  const pattern =
+    /(?:^|[\s[(])\/?((?:[A-Za-z0-9._()-]+\/)+[A-Za-z0-9._() -]+\.(?:md|mdx|txt|tex|pdf|json|ya?ml|csv|tsv))(?:[:#?][^\s)\]]*)?/gi;
+  for (const match of text.matchAll(pattern)) {
+    const path = normalizeText(match[1]).replace(/\\/g, "/");
+    if (
+      path &&
+      !path.split("/").some((segment) => segment === "..") &&
+      !/^[a-z]:\//i.test(path)
+    ) {
+      locators.push(path);
+    }
+  }
+  return unique(locators, 12);
+};
+
 const uniqueTaskFrames = (
   values: HelixUnresolvedTaskFrame[],
   limit: number,
@@ -157,13 +175,16 @@ const uniqueTaskFrames = (
 
 const hasExplicitMemoryRejection = (text: string): boolean =>
   /\b(do not|don't|dont|without|no)\s+(use|reuse|continue from|continue|rely on)\s+(the\s+)?(previous|prior|last)\b/.test(text) ||
+  /\b(do not|don't|dont|without|no)\s+(use|reuse|rely on)\s+(the\s+)?(?:(?:current|just[-\s]?gathered)\s+)?(?:minecraft\s+|game\s+|environment\s+)?observations?\b/.test(text) ||
   /\bfrom scratch\b/.test(text) && /\b(previous|prior|last)\b/.test(text) ||
   /\bdo not reuse\b/.test(text);
 
 const hasQuotedOrHypotheticalCue = (text: string): boolean =>
   /\b(if|when)\s+i\s+(later\s+)?say\s+["']?(continue|that|this|it)/.test(text) ||
   /\b(if|when)\s+.*\bcontinue\s+later\b/.test(text) ||
-  /\b(screenshot|screen|quote|quoted|someone said|historically)\b.*\b(continue|that|this|it|previous answer|previous result)\b/.test(text);
+  /\b(if|when)\s+i\s+(later\s+)?say\b.*\b(same document|same paper|same source|that document|that paper)\b/.test(text) ||
+  /\b(if|when)\s+.*\b(?:(?:current|just[-\s]?gathered)\s+)?(?:minecraft\s+|game\s+|environment\s+)?observations?\b/.test(text) ||
+  /\b(screenshot|screen|quote|quoted|someone said|historically)\b.*\b(continue|that|this|it|previous answer|previous result|same document|same paper|same source|current observations|current minecraft observations|observations you just gathered)\b/.test(text);
 
 const addPhrase = (phrases: string[], text: string, phrase: string): void => {
   if (text.includes(phrase)) phrases.push(phrase);
@@ -186,9 +207,29 @@ export function detectHelixFollowupReferences(promptText: string): HelixFollowup
     "previous result",
     "last result",
     "use the previous repo result",
+    "same document",
+    "that same document",
+    "same paper",
+    "that same paper",
+    "that document",
+    "that paper",
+    "same source",
+    "that same source",
+    "current observations",
+    "current minecraft observations",
+    "current game observations",
+    "current environment observations",
+    "observations you just gathered",
+    "just gathered observations",
   ];
   const previousFailure = ["why did it fail", "what failed", "why it failed", "last failure"];
-  const previousAnswer = ["previous answer", "last answer", "what was the last answer"];
+  const previousAnswer = [
+    "previous answer",
+    "last answer",
+    "preceding answer",
+    "immediately preceding answer",
+    "what was the last answer",
+  ];
   const sameTransform = ["same thing", "do the same", "do that same", "same but"];
   const continuePhrases = ["continue", "keep going", "expand on that"];
   const pronouns = ["explain that more simply", "make that shorter", "fix that", "that", "this", "it", "those", "them"];
@@ -966,10 +1007,29 @@ export function buildHelixConversationMemoryPacket(
         evidenceRefs.push(`${entry.path}${line}`);
       }
       evidenceRefs.push(...(citation?.source_item_ids ?? []).map((itemId) => `thread_item:${itemId}`));
+      // A completed answer is not evidence authority. Its workspace-document
+      // citations may only act as locators for a fresh, current-turn read.
+      evidenceRefs.push(
+        ...extractWorkspaceDocumentLocators(
+          turn.latest_answer_summary ?? turn.assistant_text,
+        ),
+      );
     }
   }
 
-  const reusableEvidenceRefs = unique(evidenceRefs, maxRefs);
+  // Evidence is collected while walking prior turns oldest-to-newest. Apply
+  // the bounded memory budget from the newest edge so a busy thread cannot
+  // evict the observations that an immediate follow-up actually refers to.
+  // Exact artifact/document refs outrank their thread-item aliases; aliases
+  // remain a fallback when a source has no more specific locator.
+  const newestEvidenceRefs = [...evidenceRefs].reverse();
+  const reusableEvidenceRefs = unique(
+    [
+      ...newestEvidenceRefs.filter((ref) => !ref.startsWith("thread_item:")),
+      ...newestEvidenceRefs.filter((ref) => ref.startsWith("thread_item:")),
+    ],
+    maxRefs,
+  );
   const forbiddenOrStaleRefs = unique(staleRefs, maxRefs);
   const resolvedReferences: HelixConversationMemoryReference[] = [];
   if (memoryAllowedForCurrentGoal && (followup.is_followup || pendingSlotFillCue) && latestPrior) {

@@ -79,10 +79,9 @@ const adapterAdmission: HelixEnvironmentAdapterAdmissionProjection = {
   manifest_hash: `sha256:${"a".repeat(64)}`,
   producer_epoch_ref: "adapter_epoch:bound-evidence",
   source_family: adapterRecord.profile.source_family,
-  mechanics_collection_ids:
-    adapterRecord.profile.mechanics_collections.map(
-      (collection) => collection.collection_id,
-    ),
+  mechanics_collection_ids: adapterRecord.profile.mechanics_collections.map(
+    (collection) => collection.collection_id,
+  ),
   admitted_at: "2026-07-26T19:59:45.000Z",
   content_role: "adapter_admission_not_assistant_answer",
   reentry_required: true,
@@ -231,10 +230,8 @@ const sourceCandidate: BoundRoomEvidenceSourceCandidate = {
   domain: adapterRecord.profile.domain,
   requestFreshnessMaxAgeMs:
     adapterRecord.profile.freshness.ingress_request_max_age_ms,
-  freshnessMaxAgeMs:
-    adapterRecord.profile.freshness.observation_max_age_ms,
-  mechanicsCollectionIds:
-    adapterAdmission.mechanics_collection_ids,
+  freshnessMaxAgeMs: adapterRecord.profile.freshness.observation_max_age_ms,
+  mechanicsCollectionIds: adapterAdmission.mechanics_collection_ids,
   admission,
 };
 
@@ -365,6 +362,7 @@ describe("authenticated bound-room evidence gateway", () => {
         },
         execution_enabled: false,
         may_execute_live_actions: false,
+        may_perform_read_only_probes: false,
         reentry_required: true,
         answer_authority: false,
         assistant_answer: false,
@@ -388,11 +386,9 @@ describe("authenticated bound-room evidence gateway", () => {
     const syntheticAdapterAdmission: HelixEnvironmentAdapterAdmissionProjection =
       {
         ...adapterAdmission,
-        admission_id:
-          "environment_adapter_admission:synthetic-bound-evidence",
+        admission_id: "environment_adapter_admission:synthetic-bound-evidence",
         adapter_profile_id: syntheticRecord.profile.profile_id,
-        adapter_profile_version:
-          syntheticRecord.profile.profile_version,
+        adapter_profile_version: syntheticRecord.profile.profile_version,
         adapter_contract_hash: syntheticRecord.contract_hash,
         manifest_id: "manifest:synthetic-bound-evidence",
         manifest_hash: `sha256:${"b".repeat(64)}`,
@@ -457,9 +453,7 @@ describe("authenticated bound-room evidence gateway", () => {
           profile_id: "game.synthetic_fixture.readonly.v1",
           source_family: "synthetic_game",
           domain: "game",
-          mechanics_collection_ids: [
-            "mechanics.synthetic_game.fixture.v1",
-          ],
+          mechanics_collection_ids: ["mechanics.synthetic_game.fixture.v1"],
         },
         environment_observations: {
           events: [
@@ -473,9 +467,7 @@ describe("authenticated bound-room evidence gateway", () => {
         assistant_answer: false,
       },
     });
-    expect(result.observation).not.toHaveProperty(
-      "minecraft_observations",
-    );
+    expect(result.observation).not.toHaveProperty("minecraft_observations");
   });
 
   it("redacts source bearer and claim patterns from every compact model-visible field", async () => {

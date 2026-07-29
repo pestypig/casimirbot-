@@ -8,6 +8,8 @@ import type {
 import type { HelixAgentProvider } from "../agent-providers/types";
 import type { HelixAccountType } from "@shared/helix-account-session";
 import type { HelixWorkstationCapabilityManifest } from "../workstation-tool-gateway/types";
+import type { HelixWorkstationGatewayAccountContext } from "../workstation-tool-gateway/account-policy";
+import type { callWorkstationGatewayCapability } from "../workstation-tool-gateway/registry";
 import {
   buildUnknownHelixCapabilityLaneOneShotResult,
   governedWorkstationGatewayBridgeHandler,
@@ -32,7 +34,8 @@ export type HelixCapabilityLaneOneShotRunnerResult = {
     capability_lane_resolve_traces: HelixCapabilityLaneResolveTrace[];
     capability_lane_backend_selections: HelixCapabilityLaneBackendSelectionSummary[];
     capability_lane_debug_events: HelixCapabilityLaneDebugEvent[];
-    capability_lane_reentry_status: "not_requested" | "observation_packet_required_for_provider_reentry";
+    capability_lane_reentry_status:
+      "not_requested" | "observation_packet_required_for_provider_reentry";
   };
   terminal_eligible: false;
   assistant_answer: false;
@@ -47,10 +50,13 @@ export const resolveHelixCapabilityLaneOneShotDispatch = (input: {
   authorizedGatewayCapability: HelixWorkstationCapabilityManifest | null;
   dispatchKind: "specialized_lane" | "governed_gateway" | "blocked";
 } => {
-  const authorizedGatewayCapability = input.authorizedGatewayCapabilities?.find(
-    (entry) => entry.capability_id === input.capability,
-  ) ?? null;
-  const specializedHandler = resolveHelixCapabilityLaneOneShotHandler(input.capability);
+  const authorizedGatewayCapability =
+    input.authorizedGatewayCapabilities?.find(
+      (entry) => entry.capability_id === input.capability,
+    ) ?? null;
+  const specializedHandler = resolveHelixCapabilityLaneOneShotHandler(
+    input.capability,
+  );
   if (specializedHandler) {
     return {
       handler: specializedHandler,
@@ -73,7 +79,9 @@ export const resolveHelixCapabilityLaneOneShotDispatch = (input: {
 };
 
 const readRecord = (value: unknown): RecordLike | null =>
-  value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as RecordLike)
+    : null;
 
 const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
@@ -84,8 +92,9 @@ const readNumber = (value: unknown): number | null =>
 const readBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
-const readCapabilityFromResult = (result: HelixCapabilityLaneOneShotCallResult): string =>
-  readString(result.capability);
+const readCapabilityFromResult = (
+  result: HelixCapabilityLaneOneShotCallResult,
+): string => readString(result.capability);
 
 const readRecordArray = (value: unknown): RecordLike[] =>
   Array.isArray(value)
@@ -95,7 +104,9 @@ const readRecordArray = (value: unknown): RecordLike[] =>
     : [];
 
 const hasCapabilityCall = (calls: RecordLike[], capability: string): boolean =>
-  calls.some((call) => readHelixCapabilityLaneCallCapability(call) === capability);
+  calls.some(
+    (call) => readHelixCapabilityLaneCallCapability(call) === capability,
+  );
 
 const callRegionLabel = (call: RecordLike): string =>
   readString(call.region_label ?? call.regionLabel);
@@ -104,7 +115,8 @@ const callEquationLabel = (call: RecordLike): string =>
   readString(call.requested_equation_label ?? call.requestedEquationLabel);
 
 const plannedCropKey = (call: RecordLike): string =>
-  callRegionLabel(call) || (callEquationLabel(call) ? `equation:${callEquationLabel(call)}` : "");
+  callRegionLabel(call) ||
+  (callEquationLabel(call) ? `equation:${callEquationLabel(call)}` : "");
 
 const firstText = (...values: unknown[]): string | null => {
   for (const value of values) {
@@ -142,9 +154,16 @@ const buildOneShotDebugSourceMetadata = (
     readRecord(packetState?.visible_translation_target_batch);
   const firstTarget = readRecordArray(targetBatch?.targets)[0] ?? null;
   const translationChunk = readRecord(packetState?.live_translation_chunk);
-  const projectionReceipt = readRecord(packetState?.live_translation_projection_receipt);
-  const sources = [firstTarget, translationChunk, projectionReceipt, observation, resultRecord]
-    .filter((entry): entry is RecordLike => Boolean(entry));
+  const projectionReceipt = readRecord(
+    packetState?.live_translation_projection_receipt,
+  );
+  const sources = [
+    firstTarget,
+    translationChunk,
+    projectionReceipt,
+    observation,
+    resultRecord,
+  ].filter((entry): entry is RecordLike => Boolean(entry));
   const readFromSources = (key: string, fallbackKey?: string): unknown[] =>
     sources.flatMap((source) => [
       source[key],
@@ -156,7 +175,9 @@ const buildOneShotDebugSourceMetadata = (
     source_hash: firstText(...readFromSources("source_hash")),
     source_kind: firstText(...readFromSources("source_kind")),
     source_text_hash: firstText(...readFromSources("source_text_hash")),
-    source_text_char_count: firstNumber(...readFromSources("source_text_char_count")),
+    source_text_char_count: firstNumber(
+      ...readFromSources("source_text_char_count"),
+    ),
     source_projection_target:
       firstText(...readFromSources("projection_target")) ??
       firstText(...readFromSources("source_projection_target")),
@@ -171,12 +192,18 @@ const buildOneShotDebugSourceMetadata = (
     latest_freshness_status:
       firstText(...readFromSources("freshness_status")) ??
       firstText(...readFromSources("projection_status")),
-    latest_cancel_requested: firstBoolean(...readFromSources("cancel_requested")),
+    latest_cancel_requested: firstBoolean(
+      ...readFromSources("cancel_requested"),
+    ),
   };
 };
 
-const readReceiptRefFromPacket = (packet: HelixAgentStepObservationPacket | undefined): string | null => {
-  const receipt = packet?.receipts.find((entry) => readString(entry.receipt_ref));
+const readReceiptRefFromPacket = (
+  packet: HelixAgentStepObservationPacket | undefined,
+): string | null => {
+  const receipt = packet?.receipts.find((entry) =>
+    readString(entry.receipt_ref),
+  );
   return receipt ? readString(receipt.receipt_ref) : null;
 };
 
@@ -187,7 +214,11 @@ const statusForLaneResult = (
   const packetStatus = readString(packet?.status).toLowerCase();
   if (packetStatus === "client_pending") return "pending";
   if (result.ok === true) return "completed";
-  if (packetStatus === "blocked" || packetStatus === "missing_input" || packetStatus === "needs_confirmation") {
+  if (
+    packetStatus === "blocked" ||
+    packetStatus === "missing_input" ||
+    packetStatus === "needs_confirmation"
+  ) {
     return "blocked";
   }
   return "failed";
@@ -209,14 +240,26 @@ const readStructuredLaneCalls = (body: RecordLike): RecordLike[] => {
 };
 
 const readTurnInputItems = (body: RecordLike): RecordLike[] =>
-  readRecordArray(body.turn_input_items ?? body.turnInputItems ?? body.input_items ?? body.inputItems);
+  readRecordArray(
+    body.turn_input_items ??
+      body.turnInputItems ??
+      body.input_items ??
+      body.inputItems,
+  );
 
 const readFirstImageTurnInputItem = (body: RecordLike): RecordLike | null =>
   readTurnInputItems(body).find((item) => {
     const type = readString(item.type).toLowerCase();
     return (
       type === "image" ||
-      Boolean(readString(item.image_base64 ?? item.imageBase64 ?? item.image_ref ?? item.imageRef)) ||
+      Boolean(
+        readString(
+          item.image_base64 ??
+            item.imageBase64 ??
+            item.image_ref ??
+            item.imageRef,
+        ),
+      ) ||
       /^image\//i.test(readString(item.mime_type ?? item.mimeType))
     );
   }) ?? null;
@@ -231,15 +274,23 @@ const readScientificImageSourceKind = (item: RecordLike): string => {
   ) {
     return sourceKind;
   }
-  const imageRef = readString(item.image_ref ?? item.imageRef ?? item.evidence_id ?? item.evidenceId);
-  if (/^(?:visual_source|image_lens):/i.test(imageRef)) return "image_lens_source";
+  const imageRef = readString(
+    item.image_ref ?? item.imageRef ?? item.evidence_id ?? item.evidenceId,
+  );
+  if (/^(?:visual_source|image_lens):/i.test(imageRef))
+    return "image_lens_source";
   return "image_attachment";
 };
 
-const readImageDimensionsFromBase64 = async (base64: string): Promise<{ width: number; height: number } | null> => {
+const readImageDimensionsFromBase64 = async (
+  base64: string,
+): Promise<{ width: number; height: number } | null> => {
   if (!base64.trim()) return null;
   try {
-    const metadata = await sharp(Buffer.from(base64.replace(/\s+/g, ""), "base64"), { failOn: "none" }).metadata();
+    const metadata = await sharp(
+      Buffer.from(base64.replace(/\s+/g, ""), "base64"),
+      { failOn: "none" },
+    ).metadata();
     const width = metadata.width ?? 0;
     const height = metadata.height ?? 0;
     return width > 1 && height > 1 ? { width, height } : null;
@@ -248,7 +299,10 @@ const readImageDimensionsFromBase64 = async (base64: string): Promise<{ width: n
   }
 };
 
-const scientificImageCropPlan = (width: number, height: number): Array<{
+const scientificImageCropPlan = (
+  width: number,
+  height: number,
+): Array<{
   region_label: string;
   requested_equation_label?: string;
   bbox_px: { x: number; y: number; width: number; height: number };
@@ -256,7 +310,10 @@ const scientificImageCropPlan = (width: number, height: number): Array<{
 }> => {
   const safeWidth = Math.max(1, Math.floor(width));
   const safeHeight = Math.max(1, Math.floor(height));
-  const headerHeight = Math.min(safeHeight, Math.max(1, Math.max(40, Math.min(90, Math.round(safeHeight * 0.19)))));
+  const headerHeight = Math.min(
+    safeHeight,
+    Math.max(1, Math.max(40, Math.min(90, Math.round(safeHeight * 0.19)))),
+  );
   const equationTop = Math.min(safeHeight - 1, headerHeight);
   const equationHeight = Math.max(1, safeHeight - equationTop);
   const bandCount = 5;
@@ -277,7 +334,8 @@ const scientificImageCropPlan = (width: number, height: number): Array<{
     {
       region_label: "scientific_page",
       bbox_px: { x: 0, y: 0, width: safeWidth, height: safeHeight },
-      reason_for_crop: "Whole-page pass for scientific image layout and sidecar context.",
+      reason_for_crop:
+        "Whole-page pass for scientific image layout and sidecar context.",
     },
     {
       region_label: "header_caption",
@@ -286,26 +344,47 @@ const scientificImageCropPlan = (width: number, height: number): Array<{
     },
     {
       region_label: "equation_block",
-      bbox_px: { x: 0, y: equationTop, width: safeWidth, height: equationHeight },
-      reason_for_crop: "Equation block crop for full symbolic context before row-level extraction.",
+      bbox_px: {
+        x: 0,
+        y: equationTop,
+        width: safeWidth,
+        height: equationHeight,
+      },
+      reason_for_crop:
+        "Equation block crop for full symbolic context before row-level extraction.",
     },
     ...bands,
   ];
 };
 
-const buildImplicitScientificImageLensCalls = async (body: RecordLike): Promise<RecordLike[]> => {
-  const sourceTargetIntent = readRecord(body.source_target_intent ?? body.sourceTargetIntent);
-  const mandatoryNextTool = readRecord(body.mandatory_next_tool ?? body.mandatoryNextTool);
+const buildImplicitScientificImageLensCalls = async (
+  body: RecordLike,
+): Promise<RecordLike[]> => {
+  const sourceTargetIntent = readRecord(
+    body.source_target_intent ?? body.sourceTargetIntent,
+  );
+  const mandatoryNextTool = readRecord(
+    body.mandatory_next_tool ?? body.mandatoryNextTool,
+  );
   const requestedOutputs = Array.isArray(sourceTargetIntent?.requested_outputs)
-    ? (sourceTargetIntent?.requested_outputs as unknown[]).map(readString).filter(Boolean)
+    ? (sourceTargetIntent?.requested_outputs as unknown[])
+        .map(readString)
+        .filter(Boolean)
     : [];
   const requiresScientificImageEvidence =
-    readString(sourceTargetIntent?.target_source) === "scientific_image_evidence" ||
-    readString(sourceTargetIntent?.target_kind) === "scientific_image_evidence_sidecar" ||
+    readString(sourceTargetIntent?.target_source) ===
+      "scientific_image_evidence" ||
+    readString(sourceTargetIntent?.target_kind) ===
+      "scientific_image_evidence_sidecar" ||
     requestedOutputs.includes("scientific_evidence_sidecar") ||
-    readString(mandatoryNextTool?.missing_required_evidence) === "scientific_evidence_sidecar";
+    readString(mandatoryNextTool?.missing_required_evidence) ===
+      "scientific_evidence_sidecar";
   if (!requiresScientificImageEvidence) return [];
-  if (readString(mandatoryNextTool?.tool_name) && readString(mandatoryNextTool?.tool_name) !== "visual_analysis.inspect_image_region") {
+  if (
+    readString(mandatoryNextTool?.tool_name) &&
+    readString(mandatoryNextTool?.tool_name) !==
+      "visual_analysis.inspect_image_region"
+  ) {
     return [];
   }
 
@@ -314,12 +393,32 @@ const buildImplicitScientificImageLensCalls = async (body: RecordLike): Promise<
 
   const imageBase64 = readString(image.image_base64 ?? image.imageBase64);
   const imageDimensions = await readImageDimensionsFromBase64(imageBase64);
-  const width = Math.max(1, Math.floor(firstNumber(image.width_px, image.widthPx, image.width) ?? imageDimensions?.width ?? 1));
-  const height = Math.max(1, Math.floor(firstNumber(image.height_px, image.heightPx, image.height) ?? imageDimensions?.height ?? 1));
+  const width = Math.max(
+    1,
+    Math.floor(
+      firstNumber(image.width_px, image.widthPx, image.width) ??
+        imageDimensions?.width ??
+        1,
+    ),
+  );
+  const height = Math.max(
+    1,
+    Math.floor(
+      firstNumber(image.height_px, image.heightPx, image.height) ??
+        imageDimensions?.height ??
+        1,
+    ),
+  );
   const mimeType = readString(image.mime_type ?? image.mimeType) || "image/png";
   const imageRef =
-    readString(image.image_ref ?? image.imageRef ?? image.evidence_id ?? image.evidenceId ?? image.file_name ?? image.fileName) ||
-    "scientific-image-attachment";
+    readString(
+      image.image_ref ??
+        image.imageRef ??
+        image.evidence_id ??
+        image.evidenceId ??
+        image.file_name ??
+        image.fileName,
+    ) || "scientific-image-attachment";
   const sourceKind = readScientificImageSourceKind(image);
   const sourceImageRef = imageBase64
     ? `data:${mimeType};base64,${imageBase64}`
@@ -327,11 +426,16 @@ const buildImplicitScientificImageLensCalls = async (body: RecordLike): Promise<
 
   const baseCall = {
     capability: "visual_analysis.inspect_image_region",
-    source_id: readString(image.evidence_id ?? image.evidenceId) || `visual_source:${imageRef}`,
-    source_attachment_id: readString(image.evidence_id ?? image.evidenceId) || imageRef,
+    source_id:
+      readString(image.evidence_id ?? image.evidenceId) ||
+      `visual_source:${imageRef}`,
+    source_attachment_id:
+      readString(image.evidence_id ?? image.evidenceId) || imageRef,
     source_image_ref: sourceImageRef,
     source_kind: sourceKind,
-    question: readString(body.question) || "Extract observation-only scientific image evidence.",
+    question:
+      readString(body.question) ||
+      "Extract observation-only scientific image evidence.",
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -352,8 +456,14 @@ const buildCapabilityLaneDebugEvents = (input: {
   input.results.forEach((result, index) => {
     const trace = input.resolveTraces[index] ?? result.lane_resolve_trace;
     const packet = input.observationPackets[index] ?? result.observation_packet;
-    const capability = readCapabilityFromResult(result) || readString(packet?.capability_key) || "unknown";
-    const laneId = readString(result.lane_id) || readString(trace?.requested_lane) || "unknown";
+    const capability =
+      readCapabilityFromResult(result) ||
+      readString(packet?.capability_key) ||
+      "unknown";
+    const laneId =
+      readString(result.lane_id) ||
+      readString(trace?.requested_lane) ||
+      "unknown";
     const status = statusForLaneResult(result, packet);
     const receiptRef = readReceiptRefFromPacket(packet);
     const sourceMetadata = buildOneShotDebugSourceMetadata(result, packet);
@@ -362,14 +472,21 @@ const buildCapabilityLaneDebugEvents = (input: {
       lane_id: laneId,
       capability,
       requested_backend_provider: trace?.requested_backend_provider ?? null,
-      requested_backend_provider_known: trace?.requested_backend_provider_known ?? null,
-      requested_backend_configuration_status: trace?.requested_backend_configuration_status ?? null,
-      requested_backend_availability_status: trace?.requested_backend_availability_status ?? null,
-      requested_backend_permission_status: trace?.requested_backend_permission_status ?? null,
+      requested_backend_provider_known:
+        trace?.requested_backend_provider_known ?? null,
+      requested_backend_configuration_status:
+        trace?.requested_backend_configuration_status ?? null,
+      requested_backend_availability_status:
+        trace?.requested_backend_availability_status ?? null,
+      requested_backend_permission_status:
+        trace?.requested_backend_permission_status ?? null,
       requested_backend_cost_class: trace?.requested_backend_cost_class ?? null,
-      requested_backend_latency_class: trace?.requested_backend_latency_class ?? null,
-      requested_backend_privacy_class: trace?.requested_backend_privacy_class ?? null,
-      requested_backend_fallback_provider: trace?.requested_backend_fallback_provider ?? null,
+      requested_backend_latency_class:
+        trace?.requested_backend_latency_class ?? null,
+      requested_backend_privacy_class:
+        trace?.requested_backend_privacy_class ?? null,
+      requested_backend_fallback_provider:
+        trace?.requested_backend_fallback_provider ?? null,
       selected_backend_provider: trace?.selected_backend_provider ?? null,
       selection_reason: trace?.selection_reason ?? null,
       backend_selection_decision: trace?.backend_selection_decision ?? null,
@@ -408,12 +525,24 @@ const buildCapabilityLaneDebugEvents = (input: {
     append("lane_requested", "completed", "not_applicable");
     append(
       "lane_backend_selected",
-      trace?.admission_status === "admitted_shadow_only" ? "completed" : "blocked",
+      trace?.admission_status === "admitted_shadow_only"
+        ? "completed"
+        : "blocked",
       "not_applicable",
     );
-    append("lane_observation", status, result.ok === true ? "observation_packet_required_for_provider_reentry" : "not_applicable");
+    append(
+      "lane_observation",
+      status,
+      result.ok === true
+        ? "observation_packet_required_for_provider_reentry"
+        : "not_applicable",
+    );
     if (packet) {
-      append("lane_reentered", "pending", "observation_packet_required_for_provider_reentry");
+      append(
+        "lane_reentered",
+        "pending",
+        "observation_packet_required_for_provider_reentry",
+      );
     }
   });
   return events;
@@ -428,7 +557,10 @@ const buildCapabilityLaneBackendSelections = (input: {
     const result = input.results[index];
     const packet = result?.observation_packet ?? undefined;
     const capability = result ? readCapabilityFromResult(result) : "unknown";
-    const laneId = readString(result?.lane_id) || readString(trace.requested_lane) || "unknown";
+    const laneId =
+      readString(result?.lane_id) ||
+      readString(trace.requested_lane) ||
+      "unknown";
     return {
       schema: "helix.capability_lane.backend_selection_summary.v1",
       selected_runtime_agent_provider: input.provider.id,
@@ -437,13 +569,17 @@ const buildCapabilityLaneBackendSelections = (input: {
       requested_lane: trace.requested_lane,
       requested_backend_provider: trace.requested_backend_provider,
       requested_backend_provider_known: trace.requested_backend_provider_known,
-      requested_backend_configuration_status: trace.requested_backend_configuration_status,
-      requested_backend_availability_status: trace.requested_backend_availability_status,
-      requested_backend_permission_status: trace.requested_backend_permission_status,
+      requested_backend_configuration_status:
+        trace.requested_backend_configuration_status,
+      requested_backend_availability_status:
+        trace.requested_backend_availability_status,
+      requested_backend_permission_status:
+        trace.requested_backend_permission_status,
       requested_backend_cost_class: trace.requested_backend_cost_class,
       requested_backend_latency_class: trace.requested_backend_latency_class,
       requested_backend_privacy_class: trace.requested_backend_privacy_class,
-      requested_backend_fallback_provider: trace.requested_backend_fallback_provider,
+      requested_backend_fallback_provider:
+        trace.requested_backend_fallback_provider,
       selected_backend_provider: trace.selected_backend_provider,
       backend_selection_decision: trace.backend_selection_decision,
       selection_reason: trace.selection_reason,
@@ -469,24 +605,35 @@ export const runHelixCapabilityLaneOneShotRequests = async (input: {
   provider: HelixAgentProvider;
   body: Record<string, unknown>;
   turnId?: string | null;
+  conversationThreadId?: string | null;
   iteration?: number | null;
   env?: NodeJS.ProcessEnv;
   authorizedGatewayCapabilities?: HelixWorkstationCapabilityManifest[];
   accountType?: HelixAccountType | null;
   profileId?: string | null;
+  accountContext?: HelixWorkstationGatewayAccountContext | null;
+  gatewayCaller?: typeof callWorkstationGatewayCapability;
   authoritativeEvidenceArtifacts?: unknown[];
 }): Promise<HelixCapabilityLaneOneShotRunnerResult> => {
-  const turnId = readString(input.turnId) || readString(input.body.turn_id ?? input.body.turnId) || null;
+  const turnId =
+    readString(input.turnId) ||
+    readString(input.body.turn_id ?? input.body.turnId) ||
+    null;
   const calls = readStructuredLaneCalls(input.body);
-  const implicitScientificImageLensCalls = await buildImplicitScientificImageLensCalls(input.body);
+  const implicitScientificImageLensCalls =
+    await buildImplicitScientificImageLensCalls(input.body);
   if (implicitScientificImageLensCalls.length > 0) {
     const existingImageLensCalls = calls.filter(
-      (call) => readHelixCapabilityLaneCallCapability(call) === "visual_analysis.inspect_image_region",
+      (call) =>
+        readHelixCapabilityLaneCallCapability(call) ===
+        "visual_analysis.inspect_image_region",
     );
     if (existingImageLensCalls.length === 0) {
       calls.push(...implicitScientificImageLensCalls);
     } else {
-      const existingKeys = new Set(existingImageLensCalls.map(plannedCropKey).filter(Boolean));
+      const existingKeys = new Set(
+        existingImageLensCalls.map(plannedCropKey).filter(Boolean),
+      );
       const companionCalls = implicitScientificImageLensCalls.filter((call) => {
         const key = plannedCropKey(call);
         return key && !existingKeys.has(key);
@@ -505,26 +652,33 @@ export const runHelixCapabilityLaneOneShotRequests = async (input: {
       : { handler: null, authorizedGatewayCapability: null };
     const { handler, authorizedGatewayCapability } = dispatch;
     if (!handler) {
-      results.push(buildUnknownHelixCapabilityLaneOneShotResult({
+      results.push(
+        buildUnknownHelixCapabilityLaneOneShotResult({
+          provider: input.provider,
+          call,
+          turnId,
+          iteration: input.iteration,
+          env: input.env,
+        }),
+      );
+      continue;
+    }
+    results.push(
+      await handler.run({
         provider: input.provider,
         call,
         turnId,
+        conversationThreadId: input.conversationThreadId,
         iteration: input.iteration,
         env: input.env,
-      }));
-      continue;
-    }
-    results.push(await handler.run({
-      provider: input.provider,
-      call,
-      turnId,
-      iteration: input.iteration,
-      env: input.env,
-      authorizedGatewayCapability,
-      accountType: input.accountType,
-      profileId: input.profileId,
-      authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
-    }));
+        authorizedGatewayCapability,
+        accountType: input.accountType,
+        profileId: input.profileId,
+        accountContext: input.accountContext,
+        gatewayCaller: input.gatewayCaller,
+        authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
+      }),
+    );
   }
 
   const observationPackets = results.map((result) => result.observation_packet);

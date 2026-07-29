@@ -72,7 +72,9 @@ const hasLocalWorkspaceScopeCue = (promptText: string): boolean =>
 
 const hasLocalObservationScopeCue = (promptText: string): boolean =>
   /\b(?:screen\s+capture|screenshot|screen|visual|frame|capture|camera|live\s+(?:source|environment|answer|card|pipeline)|current\s+(?:screen|visual|frame|capture|live\s+source|live\s+environment)|what\s+is\s+happening\s+right\s+now\s+in\s+the\s+screen)\b/i.test(promptText) ||
-  /\b(?:image\s*lens|pdf\s+page|page\s+\d+|current\s+page|crop(?:ped|ping)?|bbox|bounding\s+box|equation\s+row|exact\s+row|crop\s+ref|source\s+image\s+hash|page[-\s]?grounded|scientific\s+image\s+evidence|visual_analysis\.inspect_image_region)\b/i.test(promptText);
+  /\b(?:image\s*lens|pdf\s+page|page\s+\d+|current\s+page|crop(?:ped|ping)?|bbox|bounding\s+box|equation\s+row|exact\s+row|crop\s+ref|source\s+image\s+hash|page[-\s]?grounded|scientific\s+image\s+evidence|visual_analysis\.inspect_image_region)\b/i.test(promptText) ||
+  /\b(?:minecraft|game)\s+(?:room|world)\b/i.test(promptText) ||
+  /\b(?:(?:current|prior|earlier|previous|just[-\s]?gathered)\s+)?(?:minecraft\s+|game\s+|environment\s+)?observations?\b/i.test(promptText);
 
 const hasScholarlyScopeCue = (promptText: string): boolean =>
   /\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|journal|peer[-\s]?reviewed|citations?|references?|bibliograph(?:y|ies)|research\s+papers?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText) ||

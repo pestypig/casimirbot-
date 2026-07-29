@@ -1,0 +1,1273 @@
+import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  HELIX_ENVIRONMENT_ADAPTER_ADMISSION_SCHEMA,
+  type HelixEnvironmentAdapterAdmissionProjection,
+} from "@shared/helix-environment-adapter-profile";
+import {
+  HELIX_ENVIRONMENT_PROBE_RESULT_V1_SCHEMA,
+  HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+  HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+  type HelixEnvironmentConnectorProbeResult,
+  type HelixEnvironmentProbeOutcome,
+} from "@shared/helix-environment-connector";
+import {
+  HELIX_ENVIRONMENT_PROBE_RESULT_SCHEMA,
+  type HelixEnvironmentProbeResult,
+} from "@shared/helix-environment-probe";
+import {
+  HELIX_ROOM_SOURCE_BINDING_SCHEMA,
+  HELIX_ROOM_SOURCE_INGRESS_SCOPES,
+  type HelixRoomSourceBinding,
+} from "@shared/helix-room-source-ingress";
+import { ensureDatabase, getPool, resetDbClient } from "../../../../db/client";
+import { materializeLegacyRoomSourceConnector } from "../../bindings";
+import {
+  listEnvironmentConnectorCapabilityDescriptors,
+  readEnvironmentConnectorCapabilityDescriptor,
+} from "../../catalog";
+import { projectEnvironmentAdapterProducerEpoch } from "../../../situation-room/environment-adapter-admission-store";
+import { resolveEnvironmentAdapterProfile } from "../../../situation-room/environment-adapter-registry";
+import type { RoomSourceIngressRequestClaim } from "../../../helix-ask/realtime-room/source-link-store";
+import {
+  cancelDurableEnvironmentProbe,
+  dispatchDurableEnvironmentProbe,
+  expireDurableEnvironmentProbe,
+  leaseDurableEnvironmentProbesForClaim,
+  readDurableEnvironmentProbeContinuationEvidence,
+  readDurableEnvironmentProbeObservation,
+  submitDurableEnvironmentProbeResult,
+  supersedeDurableEnvironmentProbe,
+} from "../durable-broker";
+
+const NOW = new Date("2026-07-27T13:00:00.000Z");
+const PROFILE_ID = "profile:durable-environment-probe";
+const ROOM_ID = "shared_realtime_room:durable-environment-probe";
+const BINDING_ID = "room_source_binding:durable-environment-probe";
+const CREDENTIAL_ID = "room_source_credential:durable-environment-probe";
+const SOURCE_ID = "source:room-ingress:durable-environment-probe";
+const WORLD_ID = "minecraft:minehut:durable-environment-probe";
+const RUN_ID = "agent_run:durable-environment-probe";
+const PRODUCER_EPOCH = "producer-epoch-durable-environment-probe";
+const PARTICIPANT_ID = "room_participant:durable-environment-probe";
+const CONSENT_VERSION = 1;
+const CONSENT_RECEIPT_REF = "room_consent:durable-environment-probe:1";
+const adapterRecord = resolveEnvironmentAdapterProfile({
+  domainAdapter: "minecraft.minehut.v1",
+  worldId: WORLD_ID,
+});
+const producerEpochRef = projectEnvironmentAdapterProducerEpoch({
+  bindingId: BINDING_ID,
+  producerEpoch: PRODUCER_EPOCH,
+});
+const admission: HelixEnvironmentAdapterAdmissionProjection = {
+  schema: HELIX_ENVIRONMENT_ADAPTER_ADMISSION_SCHEMA,
+  admission_id: "environment_adapter_admission:durable-environment-probe",
+  adapter_profile_id: adapterRecord.profile.profile_id,
+  adapter_profile_version: adapterRecord.profile.profile_version,
+  adapter_contract_hash: adapterRecord.contract_hash,
+  manifest_id: "manifest:durable-environment-probe",
+  manifest_hash: `sha256:${"a".repeat(64)}`,
+  producer_epoch_ref: producerEpochRef,
+  source_family: adapterRecord.profile.source_family,
+  mechanics_collection_ids: adapterRecord.profile.mechanics_collections.map(
+    (entry) => entry.collection_id,
+  ),
+  admitted_at: NOW.toISOString(),
+  content_role: "adapter_admission_not_assistant_answer",
+  reentry_required: true,
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+};
+
+const binding: HelixRoomSourceBinding = {
+  schema: HELIX_ROOM_SOURCE_BINDING_SCHEMA,
+  binding_id: BINDING_ID,
+  room_id: ROOM_ID,
+  owner_profile_id: PROFILE_ID,
+  source_id: SOURCE_ID,
+  world_id: WORLD_ID,
+  domain_adapter: "minecraft.minehut.v1",
+  source_label: "Durable Minecraft connector",
+  scopes: [...HELIX_ROOM_SOURCE_INGRESS_SCOPES],
+  status: "active",
+  public_ingress_base_url: "https://connector.invalid",
+  credential_id: CREDENTIAL_ID,
+  token_prefix: null,
+  created_at: NOW.toISOString(),
+  updated_at: NOW.toISOString(),
+  expires_at: null,
+  revoked_at: null,
+  last_used_at: NOW.toISOString(),
+  request_count: 1,
+  execution_policy: {
+    may_execute_live_actions: false,
+    may_perform_read_only_probes: true,
+  },
+  content_role: "source_binding_not_assistant_answer",
+  reentry_required: true,
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+};
+
+const claim: RoomSourceIngressRequestClaim = {
+  binding,
+  credentialId: CREDENTIAL_ID,
+  requestProjectionId: "room_source_request_projection:durable-probe",
+  producerEpoch: PRODUCER_EPOCH,
+  sequence: 2,
+  routeKey: "probes/pending",
+  bodyDigest: `sha256:${"b".repeat(64)}`,
+  replay: null,
+};
+
+const resultFor = (
+  requestId: string,
+  summary = "The bound actor has four inventory stacks.",
+  createdAt = new Date(NOW.getTime() + 500).toISOString(),
+): HelixEnvironmentProbeResult => ({
+  schema: HELIX_ENVIRONMENT_PROBE_RESULT_SCHEMA,
+  probe_result_id: `environment_probe_result:wire:${crypto.randomUUID()}`,
+  probe_request_id: requestId,
+  source_id: SOURCE_ID,
+  room_id: ROOM_ID,
+  domain: "minecraft",
+  probe_type: "inventory_check",
+  status: "succeeded",
+  result_summary: summary,
+  result: {
+    details: {
+      stack_count: 4,
+      slots: [
+        { slot: 0, item: "minecraft:diamond", count: 3 },
+        { slot: 1, item: "minecraft:bread", count: 5 },
+      ],
+    },
+  },
+  sensor_scope: "privileged_server_state",
+  requires_caveat: true,
+  side_effects_performed: false,
+  commands_executed: [],
+  world_mutation_performed: false,
+  evidence_refs: [BINDING_ID, admission.admission_id],
+  deterministic: true,
+  model_invoked: false,
+  assistant_answer: false,
+  raw_content_included: false,
+  context_policy: "compact_context_pack_only",
+  created_at: createdAt,
+});
+
+const connectorResultFor = (
+  requestId: string,
+  outcome: HelixEnvironmentProbeOutcome,
+): HelixEnvironmentConnectorProbeResult => {
+  const summary = `The connector reported ${outcome}.`;
+  return {
+    schema: HELIX_ENVIRONMENT_PROBE_RESULT_V1_SCHEMA,
+    probe_request_id: requestId,
+    capability_id: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+    capability_version: 1,
+    outcome,
+    summary,
+    result: {
+      result_summary: summary,
+    },
+    side_effects_performed: false,
+    commands_executed: [],
+    environment_mutation_performed: false,
+    deterministic: true,
+    model_invoked: false,
+    assistant_answer: false,
+    raw_content_included: false,
+    created_at: new Date(NOW.getTime() + 500).toISOString(),
+  };
+};
+
+const seed = async (): Promise<
+  Awaited<ReturnType<typeof materializeLegacyRoomSourceConnector>>
+> => {
+  await ensureDatabase();
+  const db = getPool();
+  await db.query(
+    `
+      INSERT INTO helix_accounts (
+        profile_id, display_name, account_type, provider
+      ) VALUES ($1, 'Durable probe operator', 'developer', 'local');
+    `,
+    [PROFILE_ID],
+  );
+  await db.query(
+    `
+      INSERT INTO helix_shared_realtime_rooms (
+        room_id, owner_profile_id, title, status
+      ) VALUES ($1, $2, 'Durable environment probe', 'active');
+    `,
+    [ROOM_ID, PROFILE_ID],
+  );
+  await db.query(
+    `
+      INSERT INTO helix_shared_realtime_room_members (
+        room_id,
+        slot_number,
+        profile_id,
+        participant_id,
+        member_role,
+        presence,
+        consent,
+        joined_at,
+        last_seen_at,
+        updated_at
+      ) VALUES (
+        $1, 1, $2, $3, 'owner', 'present', $4::jsonb, $5, $5, $5
+      );
+    `,
+    [
+      ROOM_ID,
+      PROFILE_ID,
+      PARTICIPANT_ID,
+      JSON.stringify({
+        consent_version: CONSENT_VERSION,
+        consent_receipt_ref: CONSENT_RECEIPT_REF,
+      }),
+      NOW.toISOString(),
+    ],
+  );
+  await db.query(
+    `
+      INSERT INTO helix_room_source_bindings (
+        binding_id, room_id, owner_profile_id, source_id, world_id,
+        domain_adapter, source_label, scopes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb);
+    `,
+    [
+      BINDING_ID,
+      ROOM_ID,
+      PROFILE_ID,
+      SOURCE_ID,
+      WORLD_ID,
+      binding.domain_adapter,
+      binding.source_label,
+      JSON.stringify(binding.scopes),
+    ],
+  );
+  await db.query(
+    `
+      INSERT INTO helix_room_source_credentials (
+        credential_id, binding_id, token_hash, token_prefix, expires_at
+      ) VALUES ($1, $2, $3, 'test-prefix', $4);
+    `,
+    [
+      CREDENTIAL_ID,
+      BINDING_ID,
+      crypto.createHash("sha256").update("credential").digest("hex"),
+      new Date(NOW.getTime() + 60_000).toISOString(),
+    ],
+  );
+  await db.query(
+    `
+      INSERT INTO helix_environment_adapter_admissions (
+        admission_id, binding_id, credential_id, producer_epoch, room_id,
+        source_id, world_id, domain_adapter, adapter_profile_id,
+        adapter_profile_version, adapter_contract_hash, manifest_id,
+        manifest_hash, source_family, mechanics_collection_ids, admitted_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+        $15::jsonb, $16
+      );
+    `,
+    [
+      admission.admission_id,
+      BINDING_ID,
+      CREDENTIAL_ID,
+      PRODUCER_EPOCH,
+      ROOM_ID,
+      SOURCE_ID,
+      WORLD_ID,
+      binding.domain_adapter,
+      admission.adapter_profile_id,
+      admission.adapter_profile_version,
+      admission.adapter_contract_hash,
+      admission.manifest_id,
+      admission.manifest_hash,
+      admission.source_family,
+      JSON.stringify(admission.mechanics_collection_ids),
+      admission.admitted_at,
+    ],
+  );
+  await db.query(
+    `
+      INSERT INTO helix_agent_runs (
+        run_id, schema_version, tenant_id, issuer, subject_id,
+        account_profile_id, objective, objective_hash, runtime_provider,
+        provider_goal_id, provider_thread_id, provider_session_id,
+        lifecycle_status, completion_status, terminal_authority_status,
+        configuration, evidence_bundle, max_steps, active_operation_id,
+        operation_started_at, expires_at, created_at, updated_at
+      ) VALUES (
+        $1, 'helix.agent_run.v1', 'tenant:durable-probe',
+        'https://issuer.example.test', 'subject:durable-probe', $2,
+        'Inspect the bound actor inventory.', $3, 'codex',
+        'provider_goal:durable-probe', 'provider_thread:durable-probe',
+        'provider_session:durable-probe', 'running', 'in_progress',
+        'pending', '{}'::jsonb, '{}'::jsonb, 8,
+        'agent_operation:durable-probe', $5, $4, $5, $5
+      );
+    `,
+    [
+      RUN_ID,
+      PROFILE_ID,
+      `sha256:${"c".repeat(64)}`,
+      new Date(NOW.getTime() + 60_000).toISOString(),
+      NOW.toISOString(),
+    ],
+  );
+  await db.query(
+    `
+      INSERT INTO helix_agent_run_room_bindings (
+        binding_id,
+        run_id,
+        tenant_id,
+        issuer,
+        subject_id,
+        account_profile_id,
+        room_id,
+        authorized_by_profile_id,
+        participant_id_at_bind,
+        member_role_at_bind,
+        consent_version_at_bind,
+        consent_receipt_ref_at_bind,
+        status,
+        created_at,
+        updated_at
+      ) VALUES (
+        'agent_run_room_binding:durable-environment-probe',
+        $1,
+        'tenant:durable-probe',
+        'https://issuer.example.test',
+        'subject:durable-probe',
+        $2,
+        $3,
+        $2,
+        $4,
+        'owner',
+        $5,
+        $6,
+        'active',
+        $7,
+        $7
+      );
+    `,
+    [
+      RUN_ID,
+      PROFILE_ID,
+      ROOM_ID,
+      PARTICIPANT_ID,
+      CONSENT_VERSION,
+      CONSENT_RECEIPT_REF,
+      NOW.toISOString(),
+    ],
+  );
+  return materializeLegacyRoomSourceConnector({
+    ownerProfileId: PROFILE_ID,
+    roomSourceBindingId: BINDING_ID,
+    credentialId: CREDENTIAL_ID,
+    roomId: ROOM_ID,
+    sourceId: SOURCE_ID,
+    worldId: WORLD_ID,
+    producerEpochRef,
+    adapterAdmission: admission,
+    capabilityDescriptors: listEnvironmentConnectorCapabilityDescriptors({
+      adapterProfileId: admission.adapter_profile_id,
+    }),
+  });
+};
+
+const dispatch = async (
+  connector: Awaited<ReturnType<typeof materializeLegacyRoomSourceConnector>>,
+  suffix: string,
+) =>
+  dispatchDurableEnvironmentProbe({
+    tenantId: "tenant:durable-probe",
+    ownerSubjectId: "subject:durable-probe",
+    ownerProfileId: PROFILE_ID,
+    executionAuthorityKind: "external_agent_run",
+    runId: RUN_ID,
+    turnId: `ask:durable-probe:${suffix}`,
+    providerExecutionId: `provider_execution:durable-probe:${suffix}`,
+    toolCallId: `tool_call:durable-probe:${suffix}`,
+    roomId: ROOM_ID,
+    sourceId: SOURCE_ID,
+    producerEpochRef,
+    adapterAdmission: admission,
+    connector,
+    descriptor: readEnvironmentConnectorCapabilityDescriptor(
+      HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+    )!,
+    arguments: {
+      target: "current_actor",
+      freshness_requirement_ms: 5_000,
+    },
+    freshnessRequirementMs: 5_000,
+    timeoutMs: 10_000,
+    idempotencyKey: `idempotency:durable-probe:${suffix}`,
+    now: NOW,
+  });
+
+describe("durable environment probe broker", () => {
+  beforeEach(async () => {
+    vi.stubEnv(
+      "DATABASE_URL",
+      `pg-mem://durable-environment-probe-${crypto.randomUUID()}`,
+    );
+    vi.stubEnv("HELIX_LOCAL_PG_MEM_PERSIST", "0");
+    await resetDbClient();
+  });
+
+  afterEach(async () => {
+    await resetDbClient();
+    vi.unstubAllEnvs();
+  });
+
+  it("persists exact correlation, leases once, hashes the lease token, and normalizes an idempotent result", async () => {
+    const connector = await seed();
+    const dispatched = await dispatch(connector, "success");
+    expect(dispatched.replayed).toBe(false);
+
+    const wrongDeviceLeases = await leaseDurableEnvironmentProbesForClaim({
+      claim,
+      adapterAdmission: admission,
+      expectedDeviceId: "connector_device:wrong-device",
+      expectedEnvironmentBindingId: connector.environmentBindingId,
+      limit: 8,
+      leaseMs: 4_000,
+      now: new Date(NOW.getTime() + 50),
+    });
+    expect(wrongDeviceLeases).toEqual([]);
+
+    const leases = await leaseDurableEnvironmentProbesForClaim({
+      claim,
+      adapterAdmission: admission,
+      expectedDeviceId: connector.deviceId,
+      expectedEnvironmentBindingId: connector.environmentBindingId,
+      limit: 8,
+      leaseMs: 4_000,
+      now: new Date(NOW.getTime() + 100),
+    });
+    expect(leases).toHaveLength(1);
+    expect(leases[0]).toMatchObject({
+      capability_id: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+      capability_version: 1,
+      request: {
+        probe_request_id: dispatched.requestId,
+        probe_type: "inventory_check",
+        constraints: {
+          read_only: true,
+          side_effects_allowed: false,
+        },
+      },
+    });
+
+    const persisted = await getPool().query<{
+      run_id: string;
+      turn_id: string;
+      tool_call_id: string;
+      lease_token_hash: string;
+    }>(
+      `
+        SELECT r.run_id, r.turn_id, r.tool_call_id, a.lease_token_hash
+        FROM helix_environment_probe_requests r
+        JOIN helix_environment_probe_attempts a
+          ON a.probe_request_id = r.probe_request_id
+        WHERE r.probe_request_id = $1;
+      `,
+      [dispatched.requestId],
+    );
+    expect(persisted.rows[0]).toMatchObject({
+      run_id: RUN_ID,
+      turn_id: "ask:durable-probe:success",
+      tool_call_id: "tool_call:durable-probe:success",
+    });
+    expect(persisted.rows[0].lease_token_hash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(JSON.stringify(persisted.rows[0])).not.toContain(
+      leases[0].lease_token,
+    );
+
+    const submission = {
+      schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+      probe_attempt_id: leases[0].probe_attempt_id,
+      lease_token: leases[0].lease_token,
+      result: resultFor(dispatched.requestId),
+      submitted_at: new Date(NOW.getTime() + 500).toISOString(),
+    } as const;
+    await expect(
+      submitDurableEnvironmentProbeResult({
+        claim,
+        adapterAdmission: admission,
+        expectedDeviceId: "connector_device:wrong-device",
+        expectedEnvironmentBindingId: connector.environmentBindingId,
+        submission,
+        now: new Date(NOW.getTime() + 450),
+      }),
+    ).rejects.toMatchObject({ code: "binding_revoked" });
+    const accepted = await submitDurableEnvironmentProbeResult({
+      claim,
+      adapterAdmission: admission,
+      expectedDeviceId: connector.deviceId,
+      expectedEnvironmentBindingId: connector.environmentBindingId,
+      submission,
+      now: new Date(NOW.getTime() + 500),
+    });
+    expect(accepted).toMatchObject({
+      replayed: false,
+      observation: {
+        outcome: "succeeded",
+        capability_id: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+        provenance_valid: true,
+        eligible_for_current_turn_reentry: true,
+        late_result_disposition: null,
+        answer_authority: false,
+        terminal_eligible: false,
+        result: {
+          item_count: 4,
+          slots: [
+            { slot: 0, item: "minecraft:diamond", count: 3 },
+            { slot: 1, item: "minecraft:bread", count: 5 },
+          ],
+        },
+      },
+    });
+    const replayed = await submitDurableEnvironmentProbeResult({
+      claim,
+      adapterAdmission: admission,
+      expectedDeviceId: connector.deviceId,
+      expectedEnvironmentBindingId: connector.environmentBindingId,
+      submission,
+      now: new Date(NOW.getTime() + 600),
+    });
+    expect(replayed.replayed).toBe(true);
+    expect(replayed.observation.evidence_ref).toBe(
+      accepted.observation.evidence_ref,
+    );
+    expect(
+      await readDurableEnvironmentProbeObservation(dispatched.requestId),
+    ).toEqual(accepted.observation);
+  });
+
+  it("commits an audit record while rejecting a conflicting duplicate", async () => {
+    const connector = await seed();
+    const dispatched = await dispatch(connector, "conflict");
+    const [lease] = await leaseDurableEnvironmentProbesForClaim({
+      claim,
+      adapterAdmission: admission,
+      limit: 1,
+      now: new Date(NOW.getTime() + 100),
+    });
+    const submission = {
+      schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+      probe_attempt_id: lease.probe_attempt_id,
+      lease_token: lease.lease_token,
+      result: resultFor(dispatched.requestId),
+      submitted_at: new Date(NOW.getTime() + 500).toISOString(),
+    } as const;
+    await submitDurableEnvironmentProbeResult({
+      claim,
+      adapterAdmission: admission,
+      submission,
+      now: new Date(NOW.getTime() + 500),
+    });
+
+    await expect(
+      submitDurableEnvironmentProbeResult({
+        claim,
+        adapterAdmission: admission,
+        submission: {
+          ...submission,
+          result: resultFor(
+            dispatched.requestId,
+            "A conflicting connector result.",
+          ),
+        },
+        now: new Date(NOW.getTime() + 600),
+      }),
+    ).rejects.toMatchObject({
+      code: "probe_result_conflict",
+      statusCode: 409,
+    });
+    const audit = (await getPool().query(
+      `
+        SELECT a.status, e.event_type
+        FROM helix_environment_probe_attempts a
+        JOIN helix_environment_probe_events e
+          ON e.probe_request_id = a.probe_request_id
+        WHERE a.probe_attempt_id = $1
+          AND e.event_type = 'probe_result_conflict';
+      `,
+      [lease.probe_attempt_id],
+    )) as {
+      rows: Array<{
+        status: string;
+        event_type: string;
+      }>;
+    };
+    expect(audit.rows[0]).toEqual({
+      status: "conflict",
+      event_type: "probe_result_conflict",
+    });
+  });
+
+  it("rehydrates only fresh exact prior-turn room evidence without credentials", async () => {
+    const connector = await seed();
+    const dispatched = await dispatch(connector, "continuation-evidence");
+    const [lease] = await leaseDurableEnvironmentProbesForClaim({
+      claim,
+      adapterAdmission: admission,
+      expectedDeviceId: connector.deviceId,
+      expectedEnvironmentBindingId: connector.environmentBindingId,
+      limit: 1,
+      now: new Date(NOW.getTime() + 100),
+    });
+    await submitDurableEnvironmentProbeResult({
+      claim,
+      adapterAdmission: admission,
+      expectedDeviceId: connector.deviceId,
+      expectedEnvironmentBindingId: connector.environmentBindingId,
+      submission: {
+        schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+        probe_attempt_id: lease.probe_attempt_id,
+        lease_token: lease.lease_token,
+        result: resultFor(dispatched.requestId),
+        submitted_at: new Date(NOW.getTime() + 500).toISOString(),
+      },
+      now: new Date(NOW.getTime() + 500),
+    });
+
+    const evidence =
+      await readDurableEnvironmentProbeContinuationEvidence({
+        requestId: dispatched.requestId,
+        expectedPriorTurnId:
+          "ask:durable-probe:continuation-evidence",
+        expectedRoomId: ROOM_ID,
+        expectedCapabilityId:
+          HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+        now: new Date(NOW.getTime() + 1_000),
+      });
+
+    expect(evidence).toMatchObject({
+      schema:
+        "helix.environment_connector.prior_probe_evidence.v1",
+      probe_request_ref: dispatched.requestId,
+      prior_turn_id:
+        "ask:durable-probe:continuation-evidence",
+      room_id: ROOM_ID,
+      source_id: SOURCE_ID,
+      world_id: WORLD_ID,
+      environment_binding_ref: connector.environmentBindingId,
+      capability_id:
+        HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+      semantic_arguments: { target: "current_actor" },
+      observation: {
+        outcome: "succeeded",
+        provenance_valid: true,
+        eligible_for_current_turn_reentry: true,
+      },
+      evidence_age_ms: 500,
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    expect(JSON.stringify(evidence)).not.toContain(lease.lease_token);
+    expect(JSON.stringify(evidence)).not.toContain("credential");
+
+    await expect(
+      readDurableEnvironmentProbeContinuationEvidence({
+        requestId: dispatched.requestId,
+        expectedPriorTurnId: "ask:wrong-turn",
+        expectedRoomId: ROOM_ID,
+        expectedCapabilityId:
+          HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+        now: new Date(NOW.getTime() + 1_000),
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      readDurableEnvironmentProbeContinuationEvidence({
+        requestId: dispatched.requestId,
+        expectedPriorTurnId:
+          "ask:durable-probe:continuation-evidence",
+        expectedRoomId: "shared_realtime_room:wrong",
+        expectedCapabilityId:
+          HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+        now: new Date(NOW.getTime() + 1_000),
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      readDurableEnvironmentProbeContinuationEvidence({
+        requestId: dispatched.requestId,
+        expectedPriorTurnId:
+          "ask:durable-probe:continuation-evidence",
+        expectedRoomId: ROOM_ID,
+        expectedCapabilityId:
+          HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+        maxAgeMs: 5_000,
+        now: new Date(NOW.getTime() + 10_000),
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it.each([
+    "capability_unavailable",
+    "target_unavailable",
+    "target_ambiguous",
+  ] as const)(
+    "normalizes the connector-reported %s outcome as current-turn nonterminal evidence",
+    async (outcome) => {
+      const connector = await seed();
+      const dispatched = await dispatch(connector, outcome);
+      const [lease] = await leaseDurableEnvironmentProbesForClaim({
+        claim,
+        adapterAdmission: admission,
+        expectedDeviceId: connector.deviceId,
+        expectedEnvironmentBindingId: connector.environmentBindingId,
+        limit: 1,
+        now: new Date(NOW.getTime() + 100),
+      });
+      const accepted = await submitDurableEnvironmentProbeResult({
+        claim,
+        adapterAdmission: admission,
+        expectedDeviceId: connector.deviceId,
+        expectedEnvironmentBindingId: connector.environmentBindingId,
+        submission: {
+          schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+          probe_attempt_id: lease.probe_attempt_id,
+          lease_token: lease.lease_token,
+          result: connectorResultFor(dispatched.requestId, outcome),
+          submitted_at: new Date(NOW.getTime() + 500).toISOString(),
+        },
+        now: new Date(NOW.getTime() + 500),
+      });
+
+      expect(accepted.observation).toMatchObject({
+        outcome,
+        provenance_valid: true,
+        eligible_for_current_turn_reentry: true,
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+    },
+  );
+
+  it("rechecks post-dispatch consent, account, binding, credential, catalog, and producer authority", async () => {
+    const connector = await seed();
+    const dispatchAndLease = async (suffix: string) => {
+      const dispatched = await dispatch(connector, suffix);
+      const [lease] = await leaseDurableEnvironmentProbesForClaim({
+        claim,
+        adapterAdmission: admission,
+        expectedDeviceId: connector.deviceId,
+        expectedEnvironmentBindingId: connector.environmentBindingId,
+        limit: 1,
+        now: new Date(NOW.getTime() + 100),
+      });
+      return { dispatched, lease };
+    };
+    const submit = (
+      dispatched: { requestId: string },
+      lease: {
+        probe_attempt_id: string;
+        lease_token: string;
+      },
+    ) =>
+      submitDurableEnvironmentProbeResult({
+        claim,
+        adapterAdmission: admission,
+        expectedDeviceId: connector.deviceId,
+        expectedEnvironmentBindingId: connector.environmentBindingId,
+        submission: {
+          schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+          probe_attempt_id: lease.probe_attempt_id,
+          lease_token: lease.lease_token,
+          result: resultFor(dispatched.requestId),
+          submitted_at: new Date(NOW.getTime() + 500).toISOString(),
+        },
+        now: new Date(NOW.getTime() + 500),
+      });
+
+    const consent = await dispatchAndLease("consent-revoked");
+    await getPool().query(
+      `
+        UPDATE helix_shared_realtime_room_members
+        SET consent = $2::jsonb
+        WHERE room_id = $1 AND profile_id = $3;
+      `,
+      [
+        ROOM_ID,
+        JSON.stringify({
+          consent_version: CONSENT_VERSION + 1,
+          consent_receipt_ref: "room_consent:durable-environment-probe:2",
+        }),
+        PROFILE_ID,
+      ],
+    );
+    expect(await submit(consent.dispatched, consent.lease)).toMatchObject({
+      observation: {
+        outcome: "permission_revoked",
+        provenance_valid: true,
+        eligible_for_current_turn_reentry: false,
+      },
+    });
+    await getPool().query(
+      `
+        UPDATE helix_shared_realtime_room_members
+        SET consent = $2::jsonb
+        WHERE room_id = $1 AND profile_id = $3;
+      `,
+      [
+        ROOM_ID,
+        JSON.stringify({
+          consent_version: CONSENT_VERSION,
+          consent_receipt_ref: CONSENT_RECEIPT_REF,
+        }),
+        PROFILE_ID,
+      ],
+    );
+
+    const account = await dispatchAndLease("account-revoked");
+    await getPool().query(
+      "UPDATE helix_accounts SET account_type = 'user' WHERE profile_id = $1;",
+      [PROFILE_ID],
+    );
+    expect(await submit(account.dispatched, account.lease)).toMatchObject({
+      observation: {
+        outcome: "permission_revoked",
+        eligible_for_current_turn_reentry: false,
+      },
+    });
+    await getPool().query(
+      "UPDATE helix_accounts SET account_type = 'developer' WHERE profile_id = $1;",
+      [PROFILE_ID],
+    );
+
+    const environmentBinding = await dispatchAndLease("binding-revoked");
+    await getPool().query(
+      `
+        UPDATE helix_environment_connector_bindings
+        SET status = 'revoked', revoked_at = $2
+        WHERE environment_binding_id = $1;
+      `,
+      [connector.environmentBindingId, NOW.toISOString()],
+    );
+    expect(
+      await submit(environmentBinding.dispatched, environmentBinding.lease),
+    ).toMatchObject({
+      observation: {
+        outcome: "binding_revoked",
+        eligible_for_current_turn_reentry: false,
+      },
+    });
+    await getPool().query(
+      `
+        UPDATE helix_environment_connector_bindings
+        SET status = 'active', revoked_at = NULL
+        WHERE environment_binding_id = $1;
+      `,
+      [connector.environmentBindingId],
+    );
+
+    const credential = await dispatchAndLease("credential-revoked");
+    await getPool().query(
+      `
+        UPDATE helix_room_source_credentials
+        SET status = 'revoked', revoked_at = $2
+        WHERE credential_id = $1;
+      `,
+      [CREDENTIAL_ID, NOW.toISOString()],
+    );
+    expect(await submit(credential.dispatched, credential.lease)).toMatchObject(
+      {
+        observation: {
+          outcome: "binding_revoked",
+          eligible_for_current_turn_reentry: false,
+        },
+      },
+    );
+    await getPool().query(
+      `
+        UPDATE helix_room_source_credentials
+        SET status = 'active', revoked_at = NULL
+        WHERE credential_id = $1;
+      `,
+      [CREDENTIAL_ID],
+    );
+
+    const catalog = await dispatchAndLease("catalog-expired");
+    await getPool().query(
+      `
+        UPDATE helix_environment_capability_catalog_snapshots
+        SET expires_at = $2
+        WHERE catalog_snapshot_id = $1;
+      `,
+      [
+        connector.catalogSnapshot.catalog_snapshot_id,
+        new Date(NOW.getTime() + 200).toISOString(),
+      ],
+    );
+    expect(await submit(catalog.dispatched, catalog.lease)).toMatchObject({
+      observation: {
+        outcome: "capability_version_changed",
+        eligible_for_current_turn_reentry: false,
+      },
+    });
+    await getPool().query(
+      `
+        UPDATE helix_environment_capability_catalog_snapshots
+        SET expires_at = NULL
+        WHERE catalog_snapshot_id = $1;
+      `,
+      [connector.catalogSnapshot.catalog_snapshot_id],
+    );
+
+    const epoch = await dispatchAndLease("producer-epoch-changed");
+    await getPool().query(
+      `
+        UPDATE helix_environment_connector_devices
+        SET producer_epoch_ref = 'adapter_epoch:changed'
+        WHERE device_id = $1;
+      `,
+      [connector.deviceId],
+    );
+    await expect(submit(epoch.dispatched, epoch.lease)).rejects.toMatchObject({
+      code: "producer_epoch_mismatch",
+      statusCode: 409,
+    });
+  });
+
+  it("normalizes cancellation, supersession, timeout, stale results, and connector-offline exhaustion", async () => {
+    const connector = await seed();
+
+    const canceled = await dispatch(connector, "canceled");
+    const [canceledLease] = await leaseDurableEnvironmentProbesForClaim({
+      claim,
+      adapterAdmission: admission,
+      limit: 1,
+      now: new Date(NOW.getTime() + 100),
+    });
+    expect(
+      await cancelDurableEnvironmentProbe({
+        requestId: canceled.requestId,
+        reason: "user_interrupted",
+      }),
+    ).toBe(true);
+    expect(
+      await readDurableEnvironmentProbeObservation(canceled.requestId),
+    ).toMatchObject({
+      outcome: "request_canceled",
+      eligible_for_current_turn_reentry: false,
+    });
+    const lateCanceled = await submitDurableEnvironmentProbeResult({
+      claim,
+      adapterAdmission: admission,
+      submission: {
+        schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+        probe_attempt_id: canceledLease.probe_attempt_id,
+        lease_token: canceledLease.lease_token,
+        result: resultFor(canceled.requestId),
+        submitted_at: new Date(NOW.getTime() + 500).toISOString(),
+      },
+      now: new Date(NOW.getTime() + 500),
+    });
+    expect(lateCanceled.observation).toMatchObject({
+      provenance_valid: true,
+      eligible_for_current_turn_reentry: false,
+      late_result_disposition: "late_after_cancellation",
+    });
+
+    const superseded = await dispatch(connector, "superseded");
+    const [supersededLease] = await leaseDurableEnvironmentProbesForClaim({
+      claim,
+      adapterAdmission: admission,
+      limit: 1,
+      now: new Date(NOW.getTime() + 100),
+    });
+    expect(
+      await supersedeDurableEnvironmentProbe({
+        requestId: superseded.requestId,
+        supersededByRequestId: "environment_probe_request:replacement",
+        reason: "newer_exact_request",
+      }),
+    ).toBe(true);
+    expect(
+      await readDurableEnvironmentProbeObservation(superseded.requestId),
+    ).toMatchObject({
+      outcome: "request_superseded",
+      eligible_for_current_turn_reentry: false,
+    });
+    const lateSuperseded = await submitDurableEnvironmentProbeResult({
+      claim,
+      adapterAdmission: admission,
+      submission: {
+        schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+        probe_attempt_id: supersededLease.probe_attempt_id,
+        lease_token: supersededLease.lease_token,
+        result: resultFor(superseded.requestId),
+        submitted_at: new Date(NOW.getTime() + 500).toISOString(),
+      },
+      now: new Date(NOW.getTime() + 500),
+    });
+    expect(lateSuperseded.observation).toMatchObject({
+      provenance_valid: true,
+      eligible_for_current_turn_reentry: false,
+      late_result_disposition: "late_after_supersession",
+    });
+
+    const timedOut = await dispatch(connector, "timed-out");
+    expect(await expireDurableEnvironmentProbe(timedOut.requestId)).toBe(true);
+    expect(
+      await readDurableEnvironmentProbeObservation(timedOut.requestId),
+    ).toMatchObject({
+      outcome: "probe_timeout",
+      eligible_for_current_turn_reentry: true,
+    });
+
+    const stale = await dispatch(connector, "stale");
+    const [staleLease] = await leaseDurableEnvironmentProbesForClaim({
+      claim,
+      adapterAdmission: admission,
+      limit: 1,
+      now: new Date(NOW.getTime() + 100),
+    });
+    const staleAccepted = await submitDurableEnvironmentProbeResult({
+      claim,
+      adapterAdmission: admission,
+      submission: {
+        schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+        probe_attempt_id: staleLease.probe_attempt_id,
+        lease_token: staleLease.lease_token,
+        result: resultFor(
+          stale.requestId,
+          "This connector result is too old for the request.",
+          new Date(NOW.getTime() - 6_000).toISOString(),
+        ),
+        submitted_at: new Date(NOW.getTime() + 500).toISOString(),
+      },
+      now: new Date(NOW.getTime() + 500),
+    });
+    expect(staleAccepted.observation).toMatchObject({
+      outcome: "result_stale",
+      provenance_valid: true,
+      eligible_for_current_turn_reentry: false,
+    });
+
+    const offline = await dispatch(connector, "offline");
+    expect(
+      await leaseDurableEnvironmentProbesForClaim({
+        claim,
+        adapterAdmission: admission,
+        limit: 1,
+        leaseMs: 1_000,
+        now: new Date(NOW.getTime() + 100),
+      }),
+    ).toHaveLength(1);
+    expect(
+      await leaseDurableEnvironmentProbesForClaim({
+        claim,
+        adapterAdmission: admission,
+        limit: 1,
+        leaseMs: 1_000,
+        now: new Date(NOW.getTime() + 1_200),
+      }),
+    ).toHaveLength(1);
+    expect(
+      await leaseDurableEnvironmentProbesForClaim({
+        claim,
+        adapterAdmission: admission,
+        limit: 1,
+        leaseMs: 1_000,
+        now: new Date(NOW.getTime() + 2_300),
+      }),
+    ).toHaveLength(1);
+    expect(
+      await leaseDurableEnvironmentProbesForClaim({
+        claim,
+        adapterAdmission: admission,
+        limit: 1,
+        leaseMs: 1_000,
+        now: new Date(NOW.getTime() + 3_400),
+      }),
+    ).toEqual([]);
+    expect(
+      await readDurableEnvironmentProbeObservation(offline.requestId),
+    ).toMatchObject({
+      outcome: "connector_offline",
+      eligible_for_current_turn_reentry: true,
+    });
+  });
+
+  it("keeps a late authentic result as evidence but makes it ineligible for the completed turn", async () => {
+    const connector = await seed();
+    const dispatched = await dispatch(connector, "late");
+    const [lease] = await leaseDurableEnvironmentProbesForClaim({
+      claim,
+      adapterAdmission: admission,
+      limit: 1,
+      now: new Date(NOW.getTime() + 100),
+    });
+    await getPool().query(
+      `
+        UPDATE helix_agent_runs
+        SET lifecycle_status = 'completed',
+            completion_status = 'completed'
+        WHERE run_id = $1;
+      `,
+      [RUN_ID],
+    );
+    const accepted = await submitDurableEnvironmentProbeResult({
+      claim,
+      adapterAdmission: admission,
+      submission: {
+        schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+        probe_attempt_id: lease.probe_attempt_id,
+        lease_token: lease.lease_token,
+        result: resultFor(dispatched.requestId),
+        submitted_at: new Date(NOW.getTime() + 500).toISOString(),
+      },
+      now: new Date(NOW.getTime() + 500),
+    });
+    expect(accepted.observation).toMatchObject({
+      provenance_valid: true,
+      eligible_for_current_turn_reentry: false,
+      late_result_disposition: "late_after_turn_closed",
+    });
+  });
+
+  it("accepts a timely first-party shared-room result without inventing an external Agent API run", async () => {
+    const connector = await seed();
+    const dispatched = await dispatchDurableEnvironmentProbe({
+      tenantId: "first_party_browser_session",
+      ownerSubjectId: "first_party_subject:durable-environment-probe",
+      ownerProfileId: PROFILE_ID,
+      executionAuthorityKind: "first_party_shared_room",
+      runId: "first_party_shared_room:durable-environment-probe",
+      turnId: "ask:first-party-room:success",
+      providerExecutionId: "provider_execution:first-party-room:success",
+      toolCallId: "tool_call:first-party-room:success",
+      roomId: ROOM_ID,
+      sourceId: SOURCE_ID,
+      producerEpochRef,
+      adapterAdmission: admission,
+      connector,
+      descriptor: readEnvironmentConnectorCapabilityDescriptor(
+        HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+      )!,
+      arguments: {
+        target: "current_actor",
+        freshness_requirement_ms: 5_000,
+      },
+      freshnessRequirementMs: 5_000,
+      timeoutMs: 10_000,
+      idempotencyKey: "idempotency:first-party-room:success",
+      now: NOW,
+    });
+    const [lease] = await leaseDurableEnvironmentProbesForClaim({
+      claim,
+      adapterAdmission: admission,
+      limit: 1,
+      now: new Date(NOW.getTime() + 100),
+    });
+
+    const accepted = await submitDurableEnvironmentProbeResult({
+      claim,
+      adapterAdmission: admission,
+      submission: {
+        schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+        probe_attempt_id: lease.probe_attempt_id,
+        lease_token: lease.lease_token,
+        result: resultFor(dispatched.requestId),
+        submitted_at: new Date(NOW.getTime() + 500).toISOString(),
+      },
+      now: new Date(NOW.getTime() + 500),
+    });
+
+    expect(accepted.observation).toMatchObject({
+      outcome: "succeeded",
+      provenance_valid: true,
+      eligible_for_current_turn_reentry: true,
+      late_result_disposition: null,
+    });
+  });
+
+  it("recovers the frozen request and lease across a local server restart without persisting the raw lease token", async () => {
+    const tempRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "helix-environment-probe-restart-"),
+    );
+    const snapshotPath = path.join(tempRoot, "helix-db.json");
+    try {
+      vi.stubEnv("NODE_ENV", "test");
+      vi.stubEnv("DATABASE_URL", "");
+      vi.stubEnv("HELIX_LOCAL_PG_MEM_PERSIST", "1");
+      vi.stubEnv("HELIX_LOCAL_DB_PATH", snapshotPath);
+      await resetDbClient();
+
+      const connector = await seed();
+      const dispatched = await dispatch(connector, "restart");
+      const [lease] = await leaseDurableEnvironmentProbesForClaim({
+        claim,
+        adapterAdmission: admission,
+        limit: 1,
+        leaseMs: 4_000,
+        now: new Date(NOW.getTime() + 100),
+      });
+      await resetDbClient();
+      await ensureDatabase();
+
+      const restored = await getPool().query<{
+        request_status: string;
+        attempt_status: string;
+        lease_token_hash: string;
+      }>(
+        `
+          SELECT
+            r.status AS request_status,
+            a.status AS attempt_status,
+            a.lease_token_hash
+          FROM helix_environment_probe_requests r
+          JOIN helix_environment_probe_attempts a
+            ON a.probe_request_id = r.probe_request_id
+          WHERE r.probe_request_id = $1;
+        `,
+        [dispatched.requestId],
+      );
+      expect(restored.rows[0]).toMatchObject({
+        request_status: "leased",
+        attempt_status: "leased",
+      });
+      expect(JSON.stringify(restored.rows[0])).not.toContain(lease.lease_token);
+
+      const accepted = await submitDurableEnvironmentProbeResult({
+        claim,
+        adapterAdmission: admission,
+        submission: {
+          schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+          probe_attempt_id: lease.probe_attempt_id,
+          lease_token: lease.lease_token,
+          result: resultFor(dispatched.requestId),
+          submitted_at: new Date(NOW.getTime() + 500).toISOString(),
+        },
+        now: new Date(NOW.getTime() + 500),
+      });
+      expect(accepted.observation).toMatchObject({
+        outcome: "succeeded",
+        provenance_valid: true,
+        eligible_for_current_turn_reentry: true,
+      });
+    } finally {
+      await resetDbClient();
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+});

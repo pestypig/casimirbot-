@@ -88,7 +88,11 @@ type CommandRule = {
 };
 
 const hashShort = (value: unknown): string =>
-  crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
+  crypto
+    .createHash("sha256")
+    .update(JSON.stringify(value))
+    .digest("hex")
+    .slice(0, 16);
 
 const uniqueBy = <T>(entries: T[], keyFor: (entry: T) => string): T[] => {
   const seen = new Set<string>();
@@ -140,6 +144,7 @@ const implementationPatterns = [
 const negativeConstraintPatterns = [
   /\bopen\s+nothing\b/i,
   /\brun\s+nothing\b/i,
+  /\b(?:do\s+not|don't|dont|without|never|not\s+now|not\s+yet|no\s+need\s+to|avoid)\b[^.!?;\n]{0,40}\b(?:check|probe|inspect|observe|run|call|use|request|perform)\b[^.!?;\n]{0,100}\b(?:room\.environment\.probe|environment\s+probe|connector\s+probe|minecraft\s+inventory|inventory)\b/i,
   /\bwithout\s+click(?:ing)?\b/i,
   /\bwithout\s+open(?:ing)?\b/i,
   /\bwithout\s+run(?:ning)?\b/i,
@@ -154,77 +159,92 @@ const contextualRules: ContextualRule[] = [
   {
     verb_or_cue: "voice_delivery",
     reason: "future",
-    pattern: /\b(?:later|eventually|hypothetically|would|could|might|if|when|before|after|earlier|previously|historically)\b[\s\S]{0,160}\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,80}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)\b/i,
+    pattern:
+      /\b(?:later|eventually|hypothetically|would|could|might|if|when|before|after|earlier|previously|historically)\b[\s\S]{0,160}\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,80}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)\b/i,
   },
   {
     verb_or_cue: "voice_delivery",
     reason: "negated",
-    pattern: /\b(?:do\s+not|don't|dont|without|never|not\s+now|no\s+need\s+to|avoid|stop)\b[\s\S]{0,120}\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,80}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)?\b/i,
+    pattern:
+      /\b(?:do\s+not|don't|dont|without|never|not\s+now|no\s+need\s+to|avoid|stop)\b[\s\S]{0,120}\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,80}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)?\b/i,
   },
   {
     verb_or_cue: "interval_cadence",
     reason: "negated",
-    pattern: /\b(?:haven't|have not|didn't|did not|not)\b[\s\S]{0,90}\b(?:started|set|changed|updated)?\b[\s\S]{0,40}\b(?:interval|cadence|rate|every\s+\d{1,3}\s*(?:seconds?|sec|s)?)\b/i,
+    pattern:
+      /\b(?:haven't|have not|didn't|did not|not)\b[\s\S]{0,90}\b(?:started|set|changed|updated)?\b[\s\S]{0,40}\b(?:interval|cadence|rate|every\s+\d{1,3}\s*(?:seconds?|sec|s)?)\b/i,
   },
   {
     verb_or_cue: "click",
     reason: "future",
-    pattern: /\b(?:before\s+i|without)\b[\s\S]{0,60}\bclick(?:ed|ing)?\b[\s\S]{0,40}\b(?:start|button|it|that)?\b/i,
+    pattern:
+      /\b(?:before\s+i|without)\b[\s\S]{0,60}\bclick(?:ed|ing)?\b[\s\S]{0,40}\b(?:start|button|it|that)?\b/i,
   },
   {
     verb_or_cue: "click",
     reason: "negated",
-    pattern: /\b(?:did\s+not|didn't|not)\b[\s\S]{0,40}\bclick(?:ed|ing)?\b[\s\S]{0,40}\b(?:start|button|it|that)?\b/i,
+    pattern:
+      /\b(?:did\s+not|didn't|not)\b[\s\S]{0,40}\bclick(?:ed|ing)?\b[\s\S]{0,40}\b(?:start|button|it|that)?\b/i,
   },
   {
     verb_or_cue: "start",
     reason: "screen_visible_text",
-    pattern: /\b(?:screen|capture|frame|window|tab)\b[\s\S]{0,80}\b(?:shows|says|displays|contains|visible|labeled|labelled)\b[\s\S]{0,60}\bstart(?:\s+button)?\b/i,
+    pattern:
+      /\b(?:screen|capture|frame|window|tab)\b[\s\S]{0,80}\b(?:shows|says|displays|contains|visible|labeled|labelled)\b[\s\S]{0,60}\bstart(?:\s+button)?\b/i,
   },
   {
     verb_or_cue: "refresh",
     reason: "historical",
-    pattern: /\bafter\b[\s\S]{0,70}\b(?:source|capture|screen|producer|pipeline)\b[\s\S]{0,40}\brefresh(?:ed|ing)?\b/i,
+    pattern:
+      /\bafter\b[\s\S]{0,70}\b(?:source|capture|screen|producer|pipeline)\b[\s\S]{0,40}\brefresh(?:ed|ing)?\b/i,
   },
   {
     verb_or_cue: "run_repair",
     reason: "conditional",
-    pattern: /\bif\b[\s\S]{0,40}\b(?:we|i|you)?\b[\s\S]{0,40}\b(?:later\s+)?run\b[\s\S]{0,30}\brepair\b/i,
+    pattern:
+      /\bif\b[\s\S]{0,40}\b(?:we|i|you)?\b[\s\S]{0,40}\b(?:later\s+)?run\b[\s\S]{0,30}\brepair\b/i,
   },
   {
     verb_or_cue: "capture",
     reason: "status_question",
-    pattern: /\b(?:was|is|whether|think)\b[\s\S]{0,80}\bcapture\b[\s\S]{0,60}\b(?:running|stale|fresh|active)\b/i,
+    pattern:
+      /\b(?:was|is|whether|think)\b[\s\S]{0,80}\bcapture\b[\s\S]{0,60}\b(?:running|stale|fresh|active)\b/i,
   },
   {
     verb_or_cue: "set_rate",
     reason: "historical",
-    pattern: /\b(?:why\s+did|last\s+turn|previous\s+(?:turn|answer)|what\s+called)\b[\s\S]{0,100}\bset_rate\b/i,
+    pattern:
+      /\b(?:why\s+did|last\s+turn|previous\s+(?:turn|answer)|what\s+called)\b[\s\S]{0,100}\bset_rate\b/i,
   },
   {
     verb_or_cue: "quoted_tool_text",
     reason: "quoted",
-    pattern: /["'`][^"'`]*(?:click|open|start|run|repair|refresh|set_rate|interval|cadence)[^"'`]*["'`]/i,
+    pattern:
+      /["'`][^"'`]*(?:click|open|start|run|repair|refresh|set_rate|interval|cadence)[^"'`]*["'`]/i,
   },
   {
     verb_or_cue: "calculator",
     reason: "negated",
-    pattern: /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[\s\S]{0,120}\b(?:open|opening|show|view|use|run|call|put|feed|load|calculate|compute|solve|evaluate)\b[\s\S]{0,120}\b(?:scientific\s+calculator|calculator|equation|expression|scientific-calculator\.)\b/i,
+    pattern:
+      /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[\s\S]{0,120}\b(?:open|opening|show|view|use|run|call|put|feed|load|calculate|compute|solve|evaluate)\b[\s\S]{0,120}\b(?:scientific\s+calculator|calculator|equation|expression|scientific-calculator\.)\b/i,
   },
   {
     verb_or_cue: "calculator",
     reason: "future",
-    pattern: /\b(?:if|when|before|after|would|could|might|hypothetically|may\s+ask|next\s+time|later)\b[\s\S]{0,140}\b(?:open|opening|show|view|use|run|call|put|feed|load|calculate|compute|solve|evaluate)\b[\s\S]{0,140}\b(?:scientific\s+calculator|calculator|equation|expression|scientific-calculator\.)\b/i,
+    pattern:
+      /\b(?:if|when|before|after|would|could|might|hypothetically|may\s+ask|next\s+time|later)\b[\s\S]{0,140}\b(?:open|opening|show|view|use|run|call|put|feed|load|calculate|compute|solve|evaluate)\b[\s\S]{0,140}\b(?:scientific\s+calculator|calculator|equation|expression|scientific-calculator\.)\b/i,
   },
   {
     verb_or_cue: "scientific-calculator.solve_expression",
     reason: "historical",
-    pattern: /\b(?:why\s+did|why\s+was|last\s+turn|previous\s+(?:turn|answer)|what\s+called|histor(?:y|ical))\b[\s\S]{0,140}\bscientific-calculator\.solve_expression\b/i,
+    pattern:
+      /\b(?:why\s+did|why\s+was|last\s+turn|previous\s+(?:turn|answer)|what\s+called|histor(?:y|ical))\b[\s\S]{0,140}\bscientific-calculator\.solve_expression\b/i,
   },
   {
     verb_or_cue: "calculator",
     reason: "historical",
-    pattern: /\b(?:why\s+did|why\s+was|last\s+turn|previous\s+(?:turn|answer)|what\s+called|histor(?:y|ical)|earlier|previously|already)\b[\s\S]{0,140}\b(?:scientific\s+calculator|calculator|equation|expression|scientific-calculator\.)\b/i,
+    pattern:
+      /\b(?:why\s+did|why\s+was|last\s+turn|previous\s+(?:turn|answer)|what\s+called|histor(?:y|ical)|earlier|previously|already)\b[\s\S]{0,140}\b(?:scientific\s+calculator|calculator|equation|expression|scientific-calculator\.)\b/i,
   },
   {
     verb_or_cue: "open_run",
@@ -239,26 +259,30 @@ const contextualRules: ContextualRule[] = [
   {
     verb_or_cue: "repair",
     reason: "historical",
-    pattern: /\b(?:last\s+turn|previous\s+(?:turn|answer)|mentioned)\b[\s\S]{0,80}\brepair\s+tool\b/i,
+    pattern:
+      /\b(?:last\s+turn|previous\s+(?:turn|answer)|mentioned)\b[\s\S]{0,80}\brepair\s+tool\b/i,
   },
 ];
 
 const commandRules: CommandRule[] = [
   {
     action_family: "voice_delivery",
-    pattern: /\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,120}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)\b/i,
+    pattern:
+      /\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,120}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)\b/i,
     confidence: 0.9,
     reason: "affirmative voice or text-to-speech delivery command",
   },
   {
     action_family: "live_env.start_agent_goal_session",
-    pattern: /\b(?:call\s+live_env\.start_agent_goal_session|(?:start|create|begin|set\s+up|setup|launch)\s+(?:an?\s+)?(?:agent\s+)?goal(?:\s+session)?\b[\s\S]{0,80}\b(?:objective|to|for|with\s+objective|work\s+until|monitor|track|refactor|implement|test|debug|fix|wire|build)\b)/i,
+    pattern:
+      /\b(?:call\s+live_env\.start_agent_goal_session|(?:start|create|begin|set\s+up|setup|launch)\s+(?:an?\s+)?(?:agent\s+)?goal(?:\s+session)?\b[\s\S]{0,80}\b(?:objective|to|for|with\s+objective|work\s+until|monitor|track|refactor|implement|test|debug|fix|wire|build)\b)/i,
     confidence: 0.9,
     reason: "affirmative workstation goal-session command",
   },
   {
     action_family: "live_pipeline.set_rate",
-    pattern: /\b(?:set|change|update)\b[\s\S]{0,60}\b(?:visual\s+capture\s+)?(?:interval|cadence|rate)\b[\s\S]{0,60}\b(?:\d{1,3}\s*(?:seconds?|sec|s)|every\s+\d{1,3})\b/i,
+    pattern:
+      /\b(?:set|change|update)\b[\s\S]{0,60}\b(?:visual\s+capture\s+)?(?:interval|cadence|rate)\b[\s\S]{0,60}\b(?:\d{1,3}\s*(?:seconds?|sec|s)|every\s+\d{1,3})\b/i,
     confidence: 0.91,
     reason: "affirmative visual capture cadence command",
   },
@@ -270,7 +294,8 @@ const commandRules: CommandRule[] = [
   },
   {
     action_family: "live_pipeline.repair",
-    pattern: /\b(?:fix|repair|recover)\b[\s\S]{0,80}\b(?:live\s+)?(?:screen|visual|capture|frame|source|producer)\b/i,
+    pattern:
+      /\b(?:fix|repair|recover)\b[\s\S]{0,80}\b(?:live\s+)?(?:screen|visual|capture|frame|source|producer)\b/i,
     confidence: 0.82,
     reason: "affirmative live source repair command",
   },
@@ -283,10 +308,16 @@ const contextualMentionOverlapsCommand = (
   const normalized = commandText.toLowerCase();
   return mentions.some((mention) => {
     const cue = mention.verb_or_cue.toLowerCase();
-    return normalized.includes(cue) ||
-      (cue === "interval_cadence" && /\b(?:interval|cadence|rate|every\s+\d)/i.test(commandText)) ||
-      (cue === "voice_delivery" && /\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,120}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)\b/i.test(commandText)) ||
-      (cue === "open_run" && /\b(?:open|run)\b/i.test(commandText));
+    return (
+      normalized.includes(cue) ||
+      (cue === "interval_cadence" &&
+        /\b(?:interval|cadence|rate|every\s+\d)/i.test(commandText)) ||
+      (cue === "voice_delivery" &&
+        /\b(?:read|speak|say|play|narrat(?:e|or)|voice)\b[\s\S]{0,120}\b(?:aloud|out\s*loud|outload|outloud|to\s+me)\b/i.test(
+          commandText,
+        )) ||
+      (cue === "open_run" && /\b(?:open|run)\b/i.test(commandText))
+    );
   });
 };
 
@@ -297,7 +328,8 @@ const summarizeTask = (input: {
   debug: boolean;
   implementation: boolean;
 }): string => {
-  if (input.control && !input.content && !input.status && !input.debug) return "Execute an explicit operator command.";
+  if (input.control && !input.content && !input.status && !input.debug)
+    return "Execute an explicit operator command.";
   if (input.content) return "Answer the user's content question.";
   if (input.status) return "Answer the user's status question.";
   if (input.debug) return "Explain historical or debug behavior.";
@@ -312,7 +344,8 @@ const requestedOutput = (input: {
   debug: boolean;
   implementation: boolean;
 }): string => {
-  if (input.control && !input.content && !input.status && !input.debug) return "operator receipt";
+  if (input.control && !input.content && !input.status && !input.debug)
+    return "operator receipt";
   if (input.content) return "content answer";
   if (input.status) return "status answer";
   if (input.debug) return "debug explanation";
@@ -320,13 +353,31 @@ const requestedOutput = (input: {
   return "reasoned answer";
 };
 
-const classifyCompoundRequirementKind = (text: string): HelixCompoundPromptContract["requirements"][number]["kind"] => {
+const classifyCompoundRequirementKind = (
+  text: string,
+): HelixCompoundPromptContract["requirements"][number]["kind"] => {
   if (/\b(?:compare|contrast|versus|vs\.?)\b/i.test(text)) return "comparison";
-  if (/\b(?:implementation|code|patch|repo|function|module|file)\b/i.test(text)) return "implementation_request";
-  if (/\b(?:debug|trace|error|failure|why|diagnos|root cause)\b/i.test(text)) return "diagnostic_request";
-  if (/\b(?:format|include|bullet|table|checklist|final answer|output)\b/i.test(text)) return "output_format";
-  if (/\b(?:do not|don't|without|must|should|need to|required|constraint)\b/i.test(text)) return "constraint";
-  if (/[?？]\s*$/.test(text) || /^(?:what|why|how|when|where|can|could|should|does|do|is|are)\b/i.test(text)) return "question";
+  if (/\b(?:implementation|code|patch|repo|function|module|file)\b/i.test(text))
+    return "implementation_request";
+  if (/\b(?:debug|trace|error|failure|why|diagnos|root cause)\b/i.test(text))
+    return "diagnostic_request";
+  if (
+    /\b(?:format|include|bullet|table|checklist|final answer|output)\b/i.test(
+      text,
+    )
+  )
+    return "output_format";
+  if (
+    /\b(?:do not|don't|without|must|should|need to|required|constraint)\b/i.test(
+      text,
+    )
+  )
+    return "constraint";
+  if (
+    /[?？]\s*$/.test(text) ||
+    /^(?:what|why|how|when|where|can|could|should|does|do|is|are)\b/i.test(text)
+  )
+    return "question";
   return "instruction";
 };
 
@@ -338,7 +389,10 @@ const negativeOnlyRequirementPattern =
 
 const cleanCompoundRequirementText = (text: string): string =>
   text
-    .replace(/\s+(?:do\s+not|don't|never)\s+(?:write|create|update|modify|mutate)\b[\s\S]*$/i, "")
+    .replace(
+      /\s+(?:do\s+not|don't|never)\s+(?:write|create|update|modify|mutate)\b[\s\S]*$/i,
+      "",
+    )
     .trim()
     .replace(/^[,;]\s*/, "")
     .replace(/[,;]\s*$/, "")
@@ -370,20 +424,38 @@ const extractCompoundRequirementTexts = (prompt: string): string[] => {
   if (coordinatedRequirements.length > 1) return coordinatedRequirements;
   const lineRequirements = lines
     .map((line) => {
-      const labeled = line.match(/^(?:question|task|goal|requirement|acceptance|instruction|context)\s*:\s*(.+)$/i)?.[1]?.trim();
+      const labeled = line
+        .match(
+          /^(?:question|task|goal|requirement|acceptance|instruction|context)\s*:\s*(.+)$/i,
+        )?.[1]
+        ?.trim();
       const listed = line.match(/^(?:[-*•]|\d+[.)])\s+(.+)$/)?.[1]?.trim();
-      return labeled ?? listed ?? (
-        /[?？]\s*$/.test(line) || /\b(?:explain|compare|identify|include|propose|write|implement|test|diagnose|analyze|analyse)\b/i.test(line)
+      return (
+        labeled ??
+        listed ??
+        (/[?？]\s*$/.test(line) ||
+        /\b(?:explain|compare|identify|include|propose|write|implement|test|diagnose|analyze|analyse)\b/i.test(
+          line,
+        )
           ? line
-          : ""
+          : "")
       );
     })
     .filter(Boolean);
-  if (lineRequirements.length > 1) return uniqueBy(lineRequirements, (entry) => entry.toLowerCase());
+  if (lineRequirements.length > 1)
+    return uniqueBy(lineRequirements, (entry) => entry.toLowerCase());
   const sentenceRequirements = prompt
-    .split(/(?<=[.?])\s+(?=(?:Then|Explain|Compare|Identify|Include|Propose|Write|Implement|Test|Diagnose|Analyze|Analyse|What|Why|How|Can|Should)\b)/i)
+    .split(
+      /(?<=[.?])\s+(?=(?:Then|Explain|Compare|Identify|Include|Propose|Write|Implement|Test|Diagnose|Analyze|Analyse|What|Why|How|Can|Should)\b)/i,
+    )
     .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0 && /\b(?:then|give|explain|compare|identify|include|propose|write|implement|test|diagnose|analyze|analyse|what|why|how|can|should)\b/i.test(entry));
+    .filter(
+      (entry) =>
+        entry.length > 0 &&
+        /\b(?:then|give|explain|compare|identify|include|propose|write|implement|test|diagnose|analyze|analyse|what|why|how|can|should)\b/i.test(
+          entry,
+        ),
+    );
   return uniqueBy(sentenceRequirements, (entry) => entry.toLowerCase());
 };
 
@@ -404,12 +476,18 @@ export const buildHelixCompoundPromptContract = (
       ...(start >= 0 ? { span: { start, end: start + text.length } } : {}),
       kind: classifyCompoundRequirementKind(text),
       required: !/\b(?:optional|if useful|if needed|if relevant)\b/i.test(text),
-      depends_on: index > 0 && /\b(?:then|after|based on|from that|therefore)\b/i.test(text) ? [`R${index}`] : [],
+      depends_on:
+        index > 0 &&
+        /\b(?:then|after|based on|from that|therefore)\b/i.test(text)
+          ? [`R${index}`]
+          : [],
       status: "pending" as const,
     };
   });
   const globalConstraints = requirementTexts.filter((text) =>
-    /\b(?:must|should|do not|don't|without|never|include|avoid|make sure|ensure|final answer|format)\b/i.test(text),
+    /\b(?:must|should|do not|don't|without|never|include|avoid|make sure|ensure|final answer|format)\b/i.test(
+      text,
+    ),
   );
   return {
     schema: "helix.compound_prompt_contract.v1",
@@ -418,57 +496,89 @@ export const buildHelixCompoundPromptContract = (
     raw_prompt_chars: prompt.length,
     root_objective: requirementTexts[0],
     requirements,
-    global_constraints: uniqueBy(globalConstraints, (entry) => entry.toLowerCase()),
+    global_constraints: uniqueBy(globalConstraints, (entry) =>
+      entry.toLowerCase(),
+    ),
     negative_constraints: negativeConstraints,
     evidence_requirements: requirementTexts.filter((text) =>
-      /\b(?:evidence|source|debug|trace|receipt|artifact|line|cite|verify|test)\b/i.test(text),
+      /\b(?:evidence|source|debug|trace|receipt|artifact|line|cite|verify|test)\b/i.test(
+        text,
+      ),
     ),
     output_contract: {
-      requested_format: /\btable\b/i.test(prompt) ? "table" : /\b(?:bullet|list)\b/i.test(prompt) ? "list" : undefined,
-      must_include_coverage_ledger: /\b(?:coverage|checklist|ledger|all requirements|each requirement)\b/i.test(prompt),
-      allow_partial_answer: /\b(?:partial|best effort|if possible)\b/i.test(prompt),
+      requested_format: /\btable\b/i.test(prompt)
+        ? "table"
+        : /\b(?:bullet|list)\b/i.test(prompt)
+          ? "list"
+          : undefined,
+      must_include_coverage_ledger:
+        /\b(?:coverage|checklist|ledger|all requirements|each requirement)\b/i.test(
+          prompt,
+        ),
+      allow_partial_answer: /\b(?:partial|best effort|if possible)\b/i.test(
+        prompt,
+      ),
     },
     assistant_answer: false,
     raw_content_included: false,
   };
 };
 
-export function interpretHelixAskPrompt(promptText: string): HelixPromptInterpretation {
+export function interpretHelixAskPrompt(
+  promptText: string,
+): HelixPromptInterpretation {
   const prompt = promptText.trim();
-  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  const contextualSuppression =
+    detectContextualToolAdmissionSuppression(prompt);
   const contextualMentions = uniqueBy(
     [
       ...contextualRules
-      .map((rule) => {
-        const text = prompt.match(rule.pattern)?.[0]?.trim();
-        return text
-          ? {
-              text,
-              verb_or_cue: rule.verb_or_cue,
-              reason: rule.reason,
-            }
-          : null;
-      })
-      .filter((entry): entry is HelixPromptInterpretation["contextual_tool_mentions"][number] => Boolean(entry)),
+        .map((rule) => {
+          const text = prompt.match(rule.pattern)?.[0]?.trim();
+          return text
+            ? {
+                text,
+                verb_or_cue: rule.verb_or_cue,
+                reason: rule.reason,
+              }
+            : null;
+        })
+        .filter(
+          (
+            entry,
+          ): entry is HelixPromptInterpretation["contextual_tool_mentions"][number] =>
+            Boolean(entry),
+        ),
       ...(contextualSuppression
-        ? [{
-            text: contextualSuppression.text,
-            verb_or_cue: contextualSuppression.verb_or_cue,
-            reason: contextualSuppression.suppression_reason === "negated_tool_instruction"
-              ? "negated" as const
-              : contextualSuppression.suppression_reason === "quoted_tool_command"
-                ? "quoted" as const
-                : contextualSuppression.suppression_reason === "historical_tool_reference"
-                  ? "historical" as const
-                  : contextualSuppression.suppression_reason === "hypothetical_tool_reference"
-                    ? "conditional" as const
-                    : "background_context" as const,
-          }]
+        ? [
+            {
+              text: contextualSuppression.text,
+              verb_or_cue: contextualSuppression.verb_or_cue,
+              reason:
+                contextualSuppression.suppression_reason ===
+                "negated_tool_instruction"
+                  ? ("negated" as const)
+                  : contextualSuppression.suppression_reason ===
+                      "quoted_tool_command"
+                    ? ("quoted" as const)
+                    : contextualSuppression.suppression_reason ===
+                        "historical_tool_reference"
+                      ? ("historical" as const)
+                      : contextualSuppression.suppression_reason ===
+                          "hypothetical_tool_reference"
+                        ? ("conditional" as const)
+                        : ("background_context" as const),
+            },
+          ]
         : []),
     ],
-    (entry) => `${entry.verb_or_cue}:${entry.reason}:${entry.text.toLowerCase()}`,
+    (entry) =>
+      `${entry.verb_or_cue}:${entry.reason}:${entry.text.toLowerCase()}`,
   );
-  const negativeConstraints = uniqueBy(matchTexts(prompt, negativeConstraintPatterns), (entry) => entry.toLowerCase());
+  const negativeConstraints = uniqueBy(
+    matchTexts(prompt, negativeConstraintPatterns),
+    (entry) => entry.toLowerCase(),
+  );
   const executableCommands = uniqueBy(
     commandRules
       .map((rule) => {
@@ -482,9 +592,24 @@ export function interpretHelixAskPrompt(promptText: string): HelixPromptInterpre
             }
           : null;
       })
-      .filter((entry): entry is HelixPromptInterpretation["executable_operator_commands"][number] => Boolean(entry))
-      .filter((entry) => !contextualMentionOverlapsCommand(entry.text, contextualMentions))
-      .filter((entry) => !negativeConstraints.some((constraint) => constraint.toLowerCase().includes(entry.text.toLowerCase()) || entry.text.toLowerCase().includes(constraint.toLowerCase()))),
+      .filter(
+        (
+          entry,
+        ): entry is HelixPromptInterpretation["executable_operator_commands"][number] =>
+          Boolean(entry),
+      )
+      .filter(
+        (entry) =>
+          !contextualMentionOverlapsCommand(entry.text, contextualMentions),
+      )
+      .filter(
+        (entry) =>
+          !negativeConstraints.some(
+            (constraint) =>
+              constraint.toLowerCase().includes(entry.text.toLowerCase()) ||
+              entry.text.toLowerCase().includes(constraint.toLowerCase()),
+          ),
+      ),
     (entry) => `${entry.action_family}:${entry.text.toLowerCase()}`,
   );
   const contentDetected = hasAny(prompt, contentQuestionPatterns);
@@ -493,11 +618,18 @@ export function interpretHelixAskPrompt(promptText: string): HelixPromptInterpre
   const implementationDetected = hasAny(prompt, implementationPatterns);
   const controlDetected = executableCommands.length > 0;
   const ambiguityNotes = [
-    contentDetected && statusDetected ? "content_question_with_status_subquestion" : "",
-    contextualMentions.length > 0 && executableCommands.length > 0 ? "contextual_and_executable_control_language_present" : "",
+    contentDetected && statusDetected
+      ? "content_question_with_status_subquestion"
+      : "",
+    contextualMentions.length > 0 && executableCommands.length > 0
+      ? "contextual_and_executable_control_language_present"
+      : "",
     negativeConstraints.length > 0 ? "negative_constraints_present" : "",
   ].filter(Boolean);
-  const compoundContract = buildHelixCompoundPromptContract(prompt, negativeConstraints);
+  const compoundContract = buildHelixCompoundPromptContract(
+    prompt,
+    negativeConstraints,
+  );
 
   return {
     schema: "helix.prompt_interpretation.v1",

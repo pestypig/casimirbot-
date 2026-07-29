@@ -137,6 +137,47 @@ describe("Realtime transcript Stage Play handoff", () => {
     });
   });
 
+  it("carries the exact Minecraft connector probe across the Realtime handoff", () => {
+    const transcriptText =
+      "Check my current Minecraft inventory now using the connected environment.";
+    const capability = "com.casimirbot.minecraft.inventory.check";
+    const observation = buildRealtimeTranscriptObservation({
+      realtimeSessionId: "realtime:minecraft-connector",
+      nowMs: 320,
+      body: {
+        event_type: "transcript.final",
+        event_ref: "provider-event:minecraft-connector",
+        transcript_text: transcriptText,
+      },
+    })!;
+    const handoff = bridgeRealtimeTranscriptToStagePlay({
+      realtimeSessionId: "realtime:minecraft-connector",
+      threadId: "helix-ask:desktop",
+      providerEventRef: "provider-event:minecraft-connector",
+      transcriptText,
+      observation,
+      selectedRuntimeAgentProvider: "codex",
+      nowMs: 320,
+    });
+
+    expect(handoff.worker_admission).toMatchObject({
+      selected_route: "live_environment",
+      candidate_readonly_capability_ids: [capability],
+      action_candidate_capability_ids: [],
+      workstation_action_execution_allowed: false,
+      realtime_provider_tool_execution_allowed: false,
+    });
+    expect(handoff.required_grounding_capability_ids).toEqual([capability]);
+    expect(handoff.route_metadata).toMatchObject({
+      sourceTarget: "live_environment",
+      requiredGroundingCapabilityIds: [capability],
+      source_target_intent: {
+        target_source: "live_environment",
+        required_grounding_capability_ids: [capability],
+      },
+    });
+  });
+
   it("preserves a natural scholarly source route across the Realtime transport boundary", () => {
     const transcriptText = "Okay, can you look for papers about a magnetar?";
     const observation = buildRealtimeTranscriptObservation({
@@ -231,6 +272,49 @@ describe("Realtime transcript Stage Play handoff", () => {
         required_grounding_capability_ids: ["docs.search"],
       },
     });
+  });
+
+  it("keeps document identity and document path distinct across the Realtime handoff", () => {
+    const transcriptText =
+      "What exact evidence in the current document says this applies beyond one paper?";
+    const observation = buildRealtimeTranscriptObservation({
+      realtimeSessionId: "realtime:active-doc-identity",
+      nowMs: 342,
+      body: {
+        event_type: "transcript.final",
+        event_ref: "provider-event:active-doc-identity",
+        transcript_text: transcriptText,
+      },
+    })!;
+    const documentPath =
+      "docs/helix-ask/workstation-tool-contracts/helix_ask.inspect_capability_catalog.md";
+    const handoff = bridgeRealtimeTranscriptToStagePlay({
+      realtimeSessionId: "realtime:active-doc-identity",
+      threadId: "helix-ask:desktop",
+      providerEventRef: "provider-event:active-doc-identity",
+      transcriptText,
+      observation,
+      selectedRuntimeAgentProvider: "codex",
+      sourceBinding: {
+        focus_panel_id: "docs-viewer",
+        document_ref: "doc:capability-catalog-contract",
+        document_path: documentPath,
+      },
+      nowMs: 342,
+    });
+
+    expect(handoff.route_metadata).toMatchObject({
+      sourceTarget: "active_doc",
+      source_target_intent: {
+        target_source: "active_doc",
+        active_doc_path: documentPath,
+        active_panel: "docs-viewer",
+      },
+    });
+    expect(
+      (handoff.route_metadata.source_target_intent as Record<string, unknown>)
+        .active_doc_path,
+    ).not.toBe("doc:capability-catalog-contract");
   });
 
   it("requires docs.search for a current-status whitepaper comparison", () => {

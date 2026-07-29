@@ -856,6 +856,7 @@ revocation takes effect on the next turn.
 | `repository_evidence` | `helix.data.repository_evidence.read` | `repository_evidence`       | code, repository, and documentation search/read tools              |
 | `theory_registry`     | `helix.data.theory_registry.read`     | `theory_registry_evidence`  | theory-context reflection tools                                    |
 | `bound_room_evidence` | `helix.rooms.read`                    | `shared_live_room_evidence` | `room.evidence.read_bound` for the run's exact active room binding |
+| `bound_room_environment_probe` | `helix.rooms.read` | `shared_live_room_environment_probe` | `com.casimirbot.minecraft.inventory.check` for the run's exact active room and paired read-only connector |
 
 An empty deployment allowlist admits no logical data scopes. A run may still be
 created with an empty `database_scope`; its external turn receives no admitted

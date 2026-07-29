@@ -175,7 +175,7 @@ export const listAccountAuthorizedWorkstationGatewayCapabilities = (input: {
       effective_mode: effectiveMode,
       requested_agent_runtime: requestedRuntime,
       effective_agent_runtime: runtimeAvailable
-        ? effectiveRuntime ?? requestedList.agent_runtime
+        ? (effectiveRuntime ?? requestedList.agent_runtime)
         : null,
       capped:
         effectiveMode !== requestedList.mode ||
@@ -350,6 +350,9 @@ export const callAccountAuthorizedWorkstationGatewayCapability = async (input: {
   approvalReceipt?: unknown;
   approvalToken?: string | null;
   turnId?: string | null;
+  conversationThreadId?: string | null;
+  toolCallId?: string | null;
+  providerExecutionId?: string | null;
   iteration?: number | null;
   authoritativeEvidenceArtifacts?: unknown[];
 }): Promise<HelixGovernedWorkstationGatewayCallResult> => {
@@ -377,7 +380,10 @@ export const callAccountAuthorizedWorkstationGatewayCapability = async (input: {
     approvalReceipt: input.approvalReceipt,
     approvalToken: cleanString(input.approvalToken),
     sessionId: input.accountContext.session_id,
+    conversationThreadId: cleanString(input.conversationThreadId),
     turnId: cleanString(input.turnId),
+    toolCallId: cleanString(input.toolCallId),
+    providerExecutionId: cleanString(input.providerExecutionId),
     iteration: input.iteration,
     accountType: input.accountContext.account_policy.account_type,
     profileId: input.accountContext.profile_id,
@@ -413,10 +419,12 @@ const buildProviderPolicyBlockedCallResult = (input: {
 }): HelixWorkstationGatewayCallResult => {
   const capabilityId = cleanString(input.capabilityId) ?? "unknown";
   const agentRuntime = cleanString(input.requestedRuntime) ?? "codex";
-  const turnId = cleanString(input.turnId) ?? `workstation-gateway-policy:${Date.now()}`;
-  const iteration = typeof input.iteration === "number" && Number.isFinite(input.iteration)
-    ? Math.max(0, Math.floor(input.iteration))
-    : 0;
+  const turnId =
+    cleanString(input.turnId) ?? `workstation-gateway-policy:${Date.now()}`;
+  const iteration =
+    typeof input.iteration === "number" && Number.isFinite(input.iteration)
+      ? Math.max(0, Math.floor(input.iteration))
+      : 0;
   const capability = findGatewayCapability(capabilityId);
   const admission = {
     schema: "helix.workstation_tool_gateway.admission.v1" as const,
@@ -430,7 +438,8 @@ const buildProviderPolicyBlockedCallResult = (input: {
     raw_content_included: false as const,
   };
   const observation = {
-    schema: "helix.workstation_tool_gateway.account_policy_observation.v1" as const,
+    schema:
+      "helix.workstation_tool_gateway.account_policy_observation.v1" as const,
     capability_key: capabilityId,
     status: "blocked" as const,
     blocked_reason: input.block.blocked_reason,
@@ -449,11 +458,13 @@ const buildProviderPolicyBlockedCallResult = (input: {
     status: "blocked",
     summary: `Workstation gateway blocked ${capabilityId}: ${input.block.blocked_reason}.`,
     observation,
-    missingRequirements: [{
-      code: input.block.blocked_reason,
-      message: `Capability ${capabilityId} is outside the active account policy.`,
-      repair_action: "ask_user",
-    }],
+    missingRequirements: [
+      {
+        code: input.block.blocked_reason,
+        message: `Capability ${capabilityId} is outside the active account policy.`,
+        repair_action: "ask_user",
+      },
+    ],
   });
   const traceRef = `${turnId}:workstation_gateway:${capabilityId}:tool_lifecycle_trace`;
 
@@ -516,18 +527,24 @@ const buildProviderPolicyBlockedCallResult = (input: {
   };
 };
 
-export const callAccountAuthorizedWorkstationGatewayCapabilityForProvider = async (
-  input: Parameters<typeof callAccountAuthorizedWorkstationGatewayCapability>[0],
-): Promise<HelixWorkstationGatewayCallResult> => {
-  const governed = await callAccountAuthorizedWorkstationGatewayCapability(input);
-  if (governed.body.schema === "helix.workstation_tool_gateway.call_result.v1") {
-    return governed.body;
-  }
-  return buildProviderPolicyBlockedCallResult({
-    block: governed.body,
-    requestedRuntime: input.requestedRuntime,
-    capabilityId: input.capabilityId,
-    turnId: input.turnId,
-    iteration: input.iteration,
-  });
-};
+export const callAccountAuthorizedWorkstationGatewayCapabilityForProvider =
+  async (
+    input: Parameters<
+      typeof callAccountAuthorizedWorkstationGatewayCapability
+    >[0],
+  ): Promise<HelixWorkstationGatewayCallResult> => {
+    const governed =
+      await callAccountAuthorizedWorkstationGatewayCapability(input);
+    if (
+      governed.body.schema === "helix.workstation_tool_gateway.call_result.v1"
+    ) {
+      return governed.body;
+    }
+    return buildProviderPolicyBlockedCallResult({
+      block: governed.body,
+      requestedRuntime: input.requestedRuntime,
+      capabilityId: input.capabilityId,
+      turnId: input.turnId,
+      iteration: input.iteration,
+    });
+  };

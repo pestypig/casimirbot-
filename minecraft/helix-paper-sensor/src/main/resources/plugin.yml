@@ -1,5 +1,5 @@
 name: HelixPaperSensor
-version: 0.1.0
+version: 0.2.0
 main: com.casimirbot.helixsensor.HelixPaperSensorPlugin
 api-version: "1.21"
 description: Read-only Helix environment sensor for Minecraft Paper servers.

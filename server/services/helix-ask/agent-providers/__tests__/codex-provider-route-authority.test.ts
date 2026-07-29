@@ -120,6 +120,66 @@ describe("Codex provider pre-gateway route authority", () => {
     });
   });
 
+  it("lets a hard named-document summary override an unrelated theory goal frame", () => {
+    const body: Record<string, unknown> = {
+      question:
+        'Find the document called "Casimir Dp Quantum Foam Study", read the best matching result, and explain what it is about in a short paragraph.',
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "docs_viewer",
+        target_kind: "docs_viewer",
+        strength: "hard",
+        requested_outputs: [
+          "file_path",
+          "doc_summary",
+          "tool_call_eligibility",
+          "typed_failure",
+        ],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "theory_context_reflection",
+        required_terminal_kind: "workstation_tool_evaluation",
+        classifier_reasons: [
+          "workstation_tool_plan:theory_context_reflection",
+        ],
+      },
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:hard-doc-summary-over-theory-frame",
+      selectedRoute: "/ask/turn",
+    });
+
+    expect(body.canonical_goal_frame).toMatchObject({
+      goal_kind: "doc_summary",
+      answer_scope: "current_turn_doc",
+      required_terminal_kind: "doc_summary",
+      source: "hard_source_target_contract_repair",
+    });
+    expect(body.route_product_contract).toMatchObject({
+      source_target: "docs_viewer",
+      goal_kind: "doc_summary",
+      required_terminal_kind: "doc_summary",
+      evidence_reentry_required: true,
+      followup_reasoning_required: true,
+    });
+    expect(body.committed_ask_route).toMatchObject({
+      route: {
+        source_target: "docs_viewer",
+      },
+      canonical_goal: {
+        goal_kind: "doc_summary",
+        required_terminal_kind: "doc_summary",
+      },
+      terminal_product: {
+        required_terminal_product: "doc_summary",
+        evidence_reentry_required: true,
+      },
+    });
+  });
+
   it("does not promote quoted, negated, or future Docs language without a hard source contract", () => {
     for (const question of [
       'The screen says "find the document and summarize it." Explain that label.',
@@ -234,6 +294,65 @@ describe("Codex provider pre-gateway route authority", () => {
       },
       terminal_product: {
         evidence_reentry_required: true,
+      },
+    });
+  });
+
+  it("repairs a stale scholarly projection from affirmative retained scientific evidence", () => {
+    const body: Record<string, unknown> = {
+      question:
+        "For that extraction, report the exact sidecar id, source id, page, crop reference, evidence depth, and promoted equation. Use retained evidence; do not fetch, render, or crop.",
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "scholarly_research",
+        target_kind: "scholarly_research_followup",
+        strength: "hard",
+        requested_outputs: ["scholarly_paper_refs", "typed_failure"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "scholarly_research_followup",
+        required_terminal_kind: "scholarly_research_answer",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "visual_capture",
+        allowed_terminal_artifact_kinds: [
+          "scientific_image_evidence_continuity_summary",
+          "typed_failure",
+        ],
+      },
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:retained-scientific-evidence-followup",
+      selectedRoute: "/ask/turn",
+    });
+
+    expect(body.source_target_intent).toMatchObject({
+      target_source: "scientific_image_evidence",
+      target_kind: "scientific_image_evidence",
+      strength: "hard",
+    });
+    expect(body.committed_ask_route).toMatchObject({
+      route: {
+        source_target: "scientific_image_evidence",
+        target_kind: "scientific_image_evidence_sidecar",
+      },
+      canonical_goal: {
+        goal_kind: "scientific_image_evidence_continuity",
+        required_terminal_kind:
+          "scientific_image_evidence_continuity_summary",
+      },
+      capability_policy: {
+        required_capability_families: [],
+      },
+      terminal_product: {
+        required_terminal_product:
+          "scientific_image_evidence_continuity_summary",
+        evidence_reentry_required: true,
+        followup_reasoning_required: false,
       },
     });
   });

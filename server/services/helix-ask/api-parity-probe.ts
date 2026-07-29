@@ -1,4 +1,7 @@
-import type { HelixApiParityExpected, HelixApiParityScenario } from "./api-parity-matrix";
+import type {
+  HelixApiParityExpected,
+  HelixApiParityScenario,
+} from "./api-parity-matrix";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
   CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
@@ -154,24 +157,38 @@ export type HelixApiParityProbeResult = {
 };
 
 const readRecord = (value: unknown): RecordLike | null =>
-  value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as RecordLike)
+    : null;
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
 const readStringArray = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0) : [];
+  Array.isArray(value)
+    ? value.filter(
+        (entry: unknown): entry is string =>
+          typeof entry === "string" && entry.trim().length > 0,
+      )
+    : [];
 
 const readRecordArray = (value: unknown): RecordLike[] =>
   Array.isArray(value)
-    ? value.map((entry: unknown) => readRecord(entry)).filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry))
+    ? value
+        .map((entry: unknown) => readRecord(entry))
+        .filter((entry: RecordLike | null): entry is RecordLike =>
+          Boolean(entry),
+        )
     : [];
 
 const isNonEmptyStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((entry) => typeof entry === "string" && entry.trim().length > 0);
+  Array.isArray(value) &&
+  value.every((entry) => typeof entry === "string" && entry.trim().length > 0);
 
 const readNonNegativeInteger = (value: unknown): number | null =>
-  typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+  typeof value === "number" && Number.isInteger(value) && value >= 0
+    ? value
+    : null;
 
 const getPath = (value: unknown, pathParts: string[]): unknown =>
   pathParts.reduce<unknown>((current: unknown, key: string) => {
@@ -179,59 +196,102 @@ const getPath = (value: unknown, pathParts: string[]): unknown =>
     return (current as RecordLike)[key];
   }, value);
 
-export const extractHelixDebugPayload = (debugExport: unknown): RecordLike | null => {
+export const extractHelixDebugPayload = (
+  debugExport: unknown,
+): RecordLike | null => {
   const debugRecord = readRecord(debugExport);
   const payload = readRecord(debugRecord?.payload);
   return payload ?? debugRecord;
 };
 
-const readSourceTarget = (ask: RecordLike, debug: RecordLike | null): RecordLike | null => {
+const readSourceTarget = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+): RecordLike | null => {
   const candidates = [
     readRecord(ask.capability_contract_arbitration)
       ? {
-          target_source: readString(readRecord(ask.capability_contract_arbitration)?.selected_source_target),
-          target_kind: readString(readRecord(ask.capability_contract_arbitration)?.selected_source_target),
-          precedence_reason: readString(readRecord(ask.capability_contract_arbitration)?.contract_state),
+          target_source: readString(
+            readRecord(ask.capability_contract_arbitration)
+              ?.selected_source_target,
+          ),
+          target_kind: readString(
+            readRecord(ask.capability_contract_arbitration)
+              ?.selected_source_target,
+          ),
+          precedence_reason: readString(
+            readRecord(ask.capability_contract_arbitration)?.contract_state,
+          ),
         }
       : null,
     readRecord(debug?.capability_contract_arbitration)
       ? {
-          target_source: readString(readRecord(debug?.capability_contract_arbitration)?.selected_source_target),
-          target_kind: readString(readRecord(debug?.capability_contract_arbitration)?.selected_source_target),
-          precedence_reason: readString(readRecord(debug?.capability_contract_arbitration)?.contract_state),
+          target_source: readString(
+            readRecord(debug?.capability_contract_arbitration)
+              ?.selected_source_target,
+          ),
+          target_kind: readString(
+            readRecord(debug?.capability_contract_arbitration)
+              ?.selected_source_target,
+          ),
+          precedence_reason: readString(
+            readRecord(debug?.capability_contract_arbitration)?.contract_state,
+          ),
         }
       : null,
     readRecord(ask.capability_plan)
       ? {
-          target_source: readString(readRecord(ask.capability_plan)?.source_target),
-          target_kind: readString(readRecord(ask.capability_plan)?.source_target),
+          target_source: readString(
+            readRecord(ask.capability_plan)?.source_target,
+          ),
+          target_kind: readString(
+            readRecord(ask.capability_plan)?.source_target,
+          ),
           precedence_reason: "capability_plan",
         }
       : null,
     readRecord(debug?.capability_plan)
       ? {
-          target_source: readString(readRecord(debug?.capability_plan)?.source_target),
-          target_kind: readString(readRecord(debug?.capability_plan)?.source_target),
+          target_source: readString(
+            readRecord(debug?.capability_plan)?.source_target,
+          ),
+          target_kind: readString(
+            readRecord(debug?.capability_plan)?.source_target,
+          ),
           precedence_reason: "capability_plan",
         }
       : null,
     readRecord(ask.tool_call_admission_decision)
       ? {
-          target_source: readString(readRecord(ask.tool_call_admission_decision)?.source_target),
-          target_kind: readString(readRecord(ask.tool_call_admission_decision)?.source_target),
-          precedence_reason: readString(readRecord(ask.tool_call_admission_decision)?.reason),
+          target_source: readString(
+            readRecord(ask.tool_call_admission_decision)?.source_target,
+          ),
+          target_kind: readString(
+            readRecord(ask.tool_call_admission_decision)?.source_target,
+          ),
+          precedence_reason: readString(
+            readRecord(ask.tool_call_admission_decision)?.reason,
+          ),
         }
       : null,
     readRecord(debug?.tool_call_admission_decision)
       ? {
-          target_source: readString(readRecord(debug?.tool_call_admission_decision)?.source_target),
-          target_kind: readString(readRecord(debug?.tool_call_admission_decision)?.source_target),
-          precedence_reason: readString(readRecord(debug?.tool_call_admission_decision)?.reason),
+          target_source: readString(
+            readRecord(debug?.tool_call_admission_decision)?.source_target,
+          ),
+          target_kind: readString(
+            readRecord(debug?.tool_call_admission_decision)?.source_target,
+          ),
+          precedence_reason: readString(
+            readRecord(debug?.tool_call_admission_decision)?.reason,
+          ),
         }
       : null,
     readRecord(ask.source_target_intent),
     readRecord(debug?.source_target_intent),
-    readRecord(getPath(debug, ["ask_turn_preflight_context", "source_target_intent"])),
+    readRecord(
+      getPath(debug, ["ask_turn_preflight_context", "source_target_intent"]),
+    ),
   ];
   return (
     candidates.find((candidate) => {
@@ -243,83 +303,172 @@ const readSourceTarget = (ask: RecordLike, debug: RecordLike | null): RecordLike
   );
 };
 
-const readLoopTrace = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
+const readLoopTrace = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+): RecordLike | null =>
   readRecord(ask.loop_parity_trace) ?? readRecord(debug?.loop_parity_trace);
 
-const readSolverTrace = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
-  readRecord(ask.ask_turn_solver_trace) ?? readRecord(debug?.ask_turn_solver_trace);
+const readSolverTrace = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+): RecordLike | null =>
+  readRecord(ask.ask_turn_solver_trace) ??
+  readRecord(debug?.ask_turn_solver_trace);
 
-const readLiveSourceIdentityAudit = (ask: RecordLike, debug: RecordLike | null, solverTrace: RecordLike | null): RecordLike | null =>
+const readLiveSourceIdentityAudit = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+  solverTrace: RecordLike | null,
+): RecordLike | null =>
   readRecord(ask.live_source_identity_audit) ??
   readRecord(debug?.live_source_identity_audit) ??
   readRecord(solverTrace?.live_source_identity_audit);
 
-const readRouteAuthority = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
-  readRecord(ask.route_authority_audit) ?? readRecord(debug?.route_authority_audit);
+const readRouteAuthority = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+): RecordLike | null =>
+  readRecord(ask.route_authority_audit) ??
+  readRecord(debug?.route_authority_audit);
 
-const readPoisonAudit = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
+const readPoisonAudit = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+): RecordLike | null =>
   readRecord(ask.poison_audit) ?? readRecord(debug?.poison_audit);
 
-const readTerminalAuthority = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
-  readRecord(ask.terminal_answer_authority) ?? readRecord(debug?.terminal_answer_authority);
+const readTerminalAuthority = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+): RecordLike | null =>
+  readRecord(ask.terminal_answer_authority) ??
+  readRecord(debug?.terminal_answer_authority);
 
-const readTerminalFailureReconciliationRuntime = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
+const readTerminalFailureReconciliationRuntime = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+): RecordLike | null =>
   readRecord(ask.tool_rail_terminal_failure_reconciliation_runtime) ??
   readRecord(debug?.tool_rail_terminal_failure_reconciliation_runtime) ??
-  readRecord(getPath(debug, ["debug", "tool_rail_terminal_failure_reconciliation_runtime"]));
+  readRecord(
+    getPath(debug, [
+      "debug",
+      "tool_rail_terminal_failure_reconciliation_runtime",
+    ]),
+  );
 
-const readCapabilitySelectionResult = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
-  readRecord(ask.capability_selection_result) ?? readRecord(debug?.capability_selection_result);
+const readCapabilitySelectionResult = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+): RecordLike | null =>
+  readRecord(ask.capability_selection_result) ??
+  readRecord(debug?.capability_selection_result);
 
-const readSolverContinuationObservation = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
-  readRecord(ask.solver_continuation_observation) ?? readRecord(debug?.solver_continuation_observation);
+const readSolverContinuationObservation = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+): RecordLike | null =>
+  readRecord(ask.solver_continuation_observation) ??
+  readRecord(debug?.solver_continuation_observation);
 
-const readCapabilitySelectionTrace = (ask: RecordLike, debug: RecordLike | null): RecordLike[] =>
+const readCapabilitySelectionTrace = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+): RecordLike[] =>
   (Array.isArray(ask.capability_selection_trace)
     ? ask.capability_selection_trace
     : Array.isArray(debug?.capability_selection_trace)
       ? debug?.capability_selection_trace
-      : [])
+      : []
+  )
     .map((entry: unknown) => readRecord(entry))
     .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
 
 const readActualToolIds = (loopTrace: RecordLike | null): string[] =>
-  (Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [])
+  (Array.isArray(loopTrace?.actual_tool_calls)
+    ? loopTrace.actual_tool_calls
+    : []
+  )
     .map((entry: unknown) => readRecord(entry))
     .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry))
     .map((entry: RecordLike) => readString(entry.tool_id))
     .filter((entry: string | null): entry is string => Boolean(entry));
 
 const actualToolCalls = (loopTrace: RecordLike | null): RecordLike[] =>
-  (Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [])
+  (Array.isArray(loopTrace?.actual_tool_calls)
+    ? loopTrace.actual_tool_calls
+    : []
+  )
     .map((entry: unknown) => readRecord(entry))
     .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
 
-const readContextualToolMentionCues = (solverTrace: RecordLike | null): string[] =>
-  (Array.isArray(getPath(solverTrace, ["prompt_interpretation", "contextual_tool_mentions"]))
-    ? (getPath(solverTrace, ["prompt_interpretation", "contextual_tool_mentions"]) as unknown[])
-    : [])
+const readContextualToolMentionCues = (
+  solverTrace: RecordLike | null,
+): string[] =>
+  (Array.isArray(
+    getPath(solverTrace, ["prompt_interpretation", "contextual_tool_mentions"]),
+  )
+    ? (getPath(solverTrace, [
+        "prompt_interpretation",
+        "contextual_tool_mentions",
+      ]) as unknown[])
+    : []
+  )
     .map((entry: unknown) => readRecord(entry))
     .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry))
-    .map((entry: RecordLike) => `${readString(entry.verb_or_cue) ?? ""} ${readString(entry.text) ?? ""}`.trim())
+    .map((entry: RecordLike) =>
+      `${readString(entry.verb_or_cue) ?? ""} ${readString(entry.text) ?? ""}`.trim(),
+    )
     .filter(Boolean);
 
-const readRailTables = (ask: RecordLike, debug: RecordLike | null, rawDebugExport?: unknown): RecordLike[] => {
+const readRailTables = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+  rawDebugExport?: unknown,
+): RecordLike[] => {
   const rawDebug = readRecord(rawDebugExport);
-  return (
-  [
+  return [
     readRecord(ask.codex_parity_agent_spine_rail_table),
     readRecord(debug?.codex_parity_agent_spine_rail_table),
-    readRecord(getPath(debug, ["debug", "codex_parity_agent_spine_rail_table"])),
-    readRecord(getPath(debug, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])),
-    readRecord(getPath(debug, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+    readRecord(
+      getPath(debug, ["debug", "codex_parity_agent_spine_rail_table"]),
+    ),
+    readRecord(
+      getPath(debug, [
+        "artifact_query_index",
+        "codex_parity_agent_spine_rail_table",
+      ]),
+    ),
+    readRecord(
+      getPath(debug, [
+        "debug",
+        "artifact_query_index",
+        "codex_parity_agent_spine_rail_table",
+      ]),
+    ),
     readRecord(rawDebug?.codex_parity_agent_spine_rail_table),
-    readRecord(getPath(rawDebug, ["payload", "codex_parity_agent_spine_rail_table"])),
-    readRecord(getPath(rawDebug, ["payload", "debug", "codex_parity_agent_spine_rail_table"])),
-    readRecord(getPath(rawDebug, ["payload", "artifact_query_index", "codex_parity_agent_spine_rail_table"])),
-    readRecord(getPath(rawDebug, ["debug", "codex_parity_agent_spine_rail_table"])),
-  ].filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry))
-  );
+    readRecord(
+      getPath(rawDebug, ["payload", "codex_parity_agent_spine_rail_table"]),
+    ),
+    readRecord(
+      getPath(rawDebug, [
+        "payload",
+        "debug",
+        "codex_parity_agent_spine_rail_table",
+      ]),
+    ),
+    readRecord(
+      getPath(rawDebug, [
+        "payload",
+        "artifact_query_index",
+        "codex_parity_agent_spine_rail_table",
+      ]),
+    ),
+    readRecord(
+      getPath(rawDebug, ["debug", "codex_parity_agent_spine_rail_table"]),
+    ),
+  ].filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
 };
 
 const readCompoundSubgoalRailStatuses = (
@@ -333,12 +482,25 @@ const readCompoundSubgoalRailStatuses = (
     debug?.compound_subgoal_rail_statuses,
     getPath(debug, ["debug", "compound_subgoal_rail_statuses"]),
     getPath(debug, ["artifact_query_index", "compound_subgoal_rail_statuses"]),
-    getPath(debug, ["debug", "artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(debug, [
+      "debug",
+      "artifact_query_index",
+      "compound_subgoal_rail_statuses",
+    ]),
     getPath(rawDebug, ["compound_subgoal_rail_statuses"]),
     getPath(rawDebug, ["payload", "compound_subgoal_rail_statuses"]),
     getPath(rawDebug, ["payload", "debug", "compound_subgoal_rail_statuses"]),
-    getPath(rawDebug, ["payload", "artifact_query_index", "compound_subgoal_rail_statuses"]),
-    getPath(rawDebug, ["payload", "debug", "artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(rawDebug, [
+      "payload",
+      "artifact_query_index",
+      "compound_subgoal_rail_statuses",
+    ]),
+    getPath(rawDebug, [
+      "payload",
+      "debug",
+      "artifact_query_index",
+      "compound_subgoal_rail_statuses",
+    ]),
     getPath(rawDebug, ["debug", "compound_subgoal_rail_statuses"]),
   ]) {
     const records = readRecordArray(candidate);
@@ -389,7 +551,8 @@ const RAIL_MIRROR_COMPARISON_FIELDS = [
   "raw_content_included",
 ] as const;
 
-const railMirrorComparableValue = (value: unknown): unknown => value === undefined ? null : value;
+const railMirrorComparableValue = (value: unknown): unknown =>
+  value === undefined ? null : value;
 
 const readFiniteNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -427,7 +590,9 @@ const addRailMirrorFailures = (input: {
       const baseValue = railMirrorComparableValue(base[key]);
       const railValue = railMirrorComparableValue(railTable[key]);
       if (JSON.stringify(baseValue) !== JSON.stringify(railValue)) {
-        failures.push(`rail_mirror_${index}_${key}_mismatch:${String(railValue ?? "null")}!=${String(baseValue ?? "null")}`);
+        failures.push(
+          `rail_mirror_${index}_${key}_mismatch:${String(railValue ?? "null")}!=${String(baseValue ?? "null")}`,
+        );
       }
     }
   }
@@ -443,22 +608,37 @@ const buildRailTableSummary = (
   requested_capability: readString(railTable?.requested_capability),
   visible_tool_surface: readStringArray(railTable?.visible_tool_surface),
   visible_tool_surface_original_count:
-    typeof railTable?.visible_tool_surface_original_count === "number" && Number.isFinite(railTable.visible_tool_surface_original_count)
+    typeof railTable?.visible_tool_surface_original_count === "number" &&
+    Number.isFinite(railTable.visible_tool_surface_original_count)
       ? railTable.visible_tool_surface_original_count
       : null,
   visible_tool_surface_truncated:
-    typeof railTable?.visible_tool_surface_truncated === "boolean" ? railTable.visible_tool_surface_truncated : null,
+    typeof railTable?.visible_tool_surface_truncated === "boolean"
+      ? railTable.visible_tool_surface_truncated
+      : null,
   selected_capability: readString(railTable?.selected_capability),
   admitted_capability: readString(railTable?.admitted_capability),
   admission_proof_source: readString(railTable?.admission_proof_source),
   admission_proven: railTable?.admission_proven === true,
   executed_capability: readString(railTable?.executed_capability),
-  compound_subgoal_count: readNonNegativeInteger(railTable?.compound_subgoal_count),
-  first_incomplete_compound_subgoal_id: readString(railTable?.first_incomplete_compound_subgoal_id),
-  first_incomplete_compound_requested_capability: readString(railTable?.first_incomplete_compound_requested_capability),
-  first_incomplete_compound_runtime_capability: readString(railTable?.first_incomplete_compound_runtime_capability),
-  first_incomplete_compound_selected_capability: readString(railTable?.first_incomplete_compound_selected_capability),
-  first_incomplete_compound_executed_capability: readString(railTable?.first_incomplete_compound_executed_capability),
+  compound_subgoal_count: readNonNegativeInteger(
+    railTable?.compound_subgoal_count,
+  ),
+  first_incomplete_compound_subgoal_id: readString(
+    railTable?.first_incomplete_compound_subgoal_id,
+  ),
+  first_incomplete_compound_requested_capability: readString(
+    railTable?.first_incomplete_compound_requested_capability,
+  ),
+  first_incomplete_compound_runtime_capability: readString(
+    railTable?.first_incomplete_compound_runtime_capability,
+  ),
+  first_incomplete_compound_selected_capability: readString(
+    railTable?.first_incomplete_compound_selected_capability,
+  ),
+  first_incomplete_compound_executed_capability: readString(
+    railTable?.first_incomplete_compound_executed_capability,
+  ),
   compound_first_broken_rail: readString(railTable?.compound_first_broken_rail),
   compound_rail_failure_code: readString(railTable?.compound_rail_failure_code),
   compound_repair_target: readString(railTable?.compound_repair_target),
@@ -466,12 +646,17 @@ const buildRailTableSummary = (
     typeof railTable?.compound_incomplete_subgoal_did_tool_run === "boolean"
       ? railTable.compound_incomplete_subgoal_did_tool_run
       : null,
-  compound_subgoal_rails: compoundSubgoalRailStatuses.map(buildCompoundSubgoalRailSummary),
+  compound_subgoal_rails: compoundSubgoalRailStatuses.map(
+    buildCompoundSubgoalRailSummary,
+  ),
   observation_kind: readString(railTable?.observation_kind),
   observation_ref: readString(railTable?.observation_ref),
-  required_observation_kinds_for_requested_capability: readStringArray(railTable?.required_observation_kinds_for_requested_capability),
+  required_observation_kinds_for_requested_capability: readStringArray(
+    railTable?.required_observation_kinds_for_requested_capability,
+  ),
   observed_artifact_supports_requested_capability:
-    typeof railTable?.observed_artifact_supports_requested_capability === "boolean"
+    typeof railTable?.observed_artifact_supports_requested_capability ===
+    "boolean"
       ? railTable.observed_artifact_supports_requested_capability
       : null,
   reentry_status: readString(railTable?.reentry_status),
@@ -480,7 +665,9 @@ const buildRailTableSummary = (
   goal_satisfaction: readString(railTable?.goal_satisfaction),
   required_terminal_kind: readString(railTable?.required_terminal_kind),
   selected_terminal_kind: readString(railTable?.selected_terminal_kind),
-  terminal_authority_proof_source: readString(railTable?.terminal_authority_proof_source),
+  terminal_authority_proof_source: readString(
+    railTable?.terminal_authority_proof_source,
+  ),
   terminal_authority_proven: railTable?.terminal_authority_proven === true,
   visible_terminal_kind: readString(railTable?.visible_terminal_kind),
   visible_projection_source: readString(railTable?.visible_projection_source),
@@ -488,12 +675,23 @@ const buildRailTableSummary = (
   first_broken_rail: readString(railTable?.first_broken_rail),
   repair_target: readString(railTable?.repair_target),
   codex_parity_class: readString(railTable?.codex_parity_class),
-  normalized_codex_parity_classes: readStringArray(railTable?.normalized_codex_parity_classes),
+  normalized_codex_parity_classes: readStringArray(
+    railTable?.normalized_codex_parity_classes,
+  ),
   rail_status: readString(railTable?.rail_status),
   rail_failure_code: readString(railTable?.rail_failure_code),
-  assistant_answer: typeof railTable?.assistant_answer === "boolean" ? railTable.assistant_answer : null,
-  terminal_eligible: typeof railTable?.terminal_eligible === "boolean" ? railTable.terminal_eligible : null,
-  raw_content_included: typeof railTable?.raw_content_included === "boolean" ? railTable.raw_content_included : null,
+  assistant_answer:
+    typeof railTable?.assistant_answer === "boolean"
+      ? railTable.assistant_answer
+      : null,
+  terminal_eligible:
+    typeof railTable?.terminal_eligible === "boolean"
+      ? railTable.terminal_eligible
+      : null,
+  raw_content_included:
+    typeof railTable?.raw_content_included === "boolean"
+      ? railTable.raw_content_included
+      : null,
 });
 
 const addRailTableFailures = (input: {
@@ -510,46 +708,78 @@ const addRailTableFailures = (input: {
     return;
   }
   if (railTable.schema !== CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA) {
-    failures.push(`rail_table_schema_mismatch:${readString(railTable.schema) ?? "missing"}`);
+    failures.push(
+      `rail_table_schema_mismatch:${readString(railTable.schema) ?? "missing"}`,
+    );
   }
   if (turnId && readString(railTable.turn_id) !== turnId) {
-    failures.push(`rail_turn_id_mismatch:${readString(railTable.turn_id) ?? "missing"}!=${turnId}`);
+    failures.push(
+      `rail_turn_id_mismatch:${readString(railTable.turn_id) ?? "missing"}!=${turnId}`,
+    );
   }
   if (prompt && readString(railTable.prompt) !== prompt) {
     failures.push("rail_prompt_mismatch");
   }
-  if (railTable.assistant_answer !== false) failures.push("rail_assistant_answer_not_false");
-  if (railTable.terminal_eligible !== false) failures.push("rail_terminal_eligible_not_false");
-  if (railTable.raw_content_included !== false) failures.push("rail_raw_content_included_not_false");
+  if (railTable.assistant_answer !== false)
+    failures.push("rail_assistant_answer_not_false");
+  if (railTable.terminal_eligible !== false)
+    failures.push("rail_terminal_eligible_not_false");
+  if (railTable.raw_content_included !== false)
+    failures.push("rail_raw_content_included_not_false");
   if (!Array.isArray(railTable.visible_tool_surface)) {
     failures.push("rail_visible_tool_surface_missing");
   } else if (!isNonEmptyStringArray(railTable.visible_tool_surface)) {
     failures.push("rail_visible_tool_surface_entries_invalid");
   }
-  const visibleSurfaceCount = readNonNegativeInteger(railTable.visible_tool_surface_original_count);
+  const visibleSurfaceCount = readNonNegativeInteger(
+    railTable.visible_tool_surface_original_count,
+  );
   const visibleSurfaceTruncated =
-    typeof railTable.visible_tool_surface_truncated === "boolean" ? railTable.visible_tool_surface_truncated : null;
+    typeof railTable.visible_tool_surface_truncated === "boolean"
+      ? railTable.visible_tool_surface_truncated
+      : null;
   if (visibleSurfaceCount === null) {
     failures.push("rail_visible_tool_surface_original_count_invalid");
   }
   if (visibleSurfaceTruncated === null) {
     failures.push("rail_visible_tool_surface_truncated_invalid");
   }
-  if (Array.isArray(railTable.visible_tool_surface) && visibleSurfaceCount !== null) {
+  if (
+    Array.isArray(railTable.visible_tool_surface) &&
+    visibleSurfaceCount !== null
+  ) {
     const visibleSurfaceLength = railTable.visible_tool_surface.length;
     if (visibleSurfaceCount < visibleSurfaceLength) {
-      failures.push("rail_visible_tool_surface_original_count_less_than_surface");
+      failures.push(
+        "rail_visible_tool_surface_original_count_less_than_surface",
+      );
     }
-    if (visibleSurfaceTruncated === true && visibleSurfaceCount <= visibleSurfaceLength) {
-      failures.push("rail_visible_tool_surface_truncated_without_hidden_entries");
+    if (
+      visibleSurfaceTruncated === true &&
+      visibleSurfaceCount <= visibleSurfaceLength
+    ) {
+      failures.push(
+        "rail_visible_tool_surface_truncated_without_hidden_entries",
+      );
     }
-    if (visibleSurfaceTruncated === false && visibleSurfaceCount !== visibleSurfaceLength) {
+    if (
+      visibleSurfaceTruncated === false &&
+      visibleSurfaceCount !== visibleSurfaceLength
+    ) {
       failures.push("rail_visible_tool_surface_untruncated_count_mismatch");
     }
   }
-  if (!Array.isArray(railTable.required_observation_kinds_for_requested_capability)) {
+  if (
+    !Array.isArray(
+      railTable.required_observation_kinds_for_requested_capability,
+    )
+  ) {
     failures.push("rail_required_observation_kinds_missing");
-  } else if (!isNonEmptyStringArray(railTable.required_observation_kinds_for_requested_capability)) {
+  } else if (
+    !isNonEmptyStringArray(
+      railTable.required_observation_kinds_for_requested_capability,
+    )
+  ) {
     failures.push("rail_required_observation_kinds_entries_invalid");
   }
   if (!isNonEmptyStringArray(railTable.normalized_codex_parity_classes)) {
@@ -557,13 +787,26 @@ const addRailTableFailures = (input: {
   }
   for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
     const value = railTable[key];
-    if (value !== null && typeof value !== "string") failures.push(`rail_string_or_null_field_invalid:${key}`);
+    if (value !== null && typeof value !== "string")
+      failures.push(`rail_string_or_null_field_invalid:${key}`);
   }
-  if (!CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES.includes(railTable.reentry_status as never)) {
-    failures.push(`rail_reentry_status_invalid:${readString(railTable.reentry_status) ?? "missing"}`);
+  if (
+    !CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES.includes(
+      railTable.reentry_status as never,
+    )
+  ) {
+    failures.push(
+      `rail_reentry_status_invalid:${readString(railTable.reentry_status) ?? "missing"}`,
+    );
   }
-  if (!CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES.includes(railTable.rail_status as never)) {
-    failures.push(`rail_status_invalid:${readString(railTable.rail_status) ?? "missing"}`);
+  if (
+    !CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES.includes(
+      railTable.rail_status as never,
+    )
+  ) {
+    failures.push(
+      `rail_status_invalid:${readString(railTable.rail_status) ?? "missing"}`,
+    );
   }
   const firstBrokenRail = readString(railTable.first_broken_rail);
   if (
@@ -583,12 +826,24 @@ const addRailTableFailures = (input: {
   ) {
     failures.push(`rail_repair_target_invalid:${repairTarget}`);
   }
-  const compoundSubgoalCount = readNonNegativeInteger(railTable.compound_subgoal_count);
-  const firstIncompleteCompoundSubgoalId = readString(railTable.first_incomplete_compound_subgoal_id);
-  const firstIncompleteCompoundRequestedCapability = readString(railTable.first_incomplete_compound_requested_capability);
-  const firstIncompleteCompoundRuntimeCapability = readString(railTable.first_incomplete_compound_runtime_capability);
-  const compoundFirstBrokenRail = readString(railTable.compound_first_broken_rail);
-  const compoundRailFailureCode = readString(railTable.compound_rail_failure_code);
+  const compoundSubgoalCount = readNonNegativeInteger(
+    railTable.compound_subgoal_count,
+  );
+  const firstIncompleteCompoundSubgoalId = readString(
+    railTable.first_incomplete_compound_subgoal_id,
+  );
+  const firstIncompleteCompoundRequestedCapability = readString(
+    railTable.first_incomplete_compound_requested_capability,
+  );
+  const firstIncompleteCompoundRuntimeCapability = readString(
+    railTable.first_incomplete_compound_runtime_capability,
+  );
+  const compoundFirstBrokenRail = readString(
+    railTable.compound_first_broken_rail,
+  );
+  const compoundRailFailureCode = readString(
+    railTable.compound_rail_failure_code,
+  );
   const compoundRepairTarget = readString(railTable.compound_repair_target);
   const compoundDidToolRun =
     typeof railTable.compound_incomplete_subgoal_did_tool_run === "boolean"
@@ -616,22 +871,38 @@ const addRailTableFailures = (input: {
     }
   }
   if (compoundSubgoalCount === 0) {
-    if (firstIncompleteCompoundSubgoalId) failures.push("rail_noncompound_first_incomplete_subgoal_present");
-    if (compoundFirstBrokenRail) failures.push("rail_noncompound_first_broken_rail_present");
-    if (compoundRailFailureCode) failures.push("rail_noncompound_rail_failure_code_present");
-    if (compoundRepairTarget) failures.push("rail_noncompound_repair_target_present");
-    if (compoundDidToolRun !== null) failures.push("rail_noncompound_did_tool_run_present");
+    if (firstIncompleteCompoundSubgoalId)
+      failures.push("rail_noncompound_first_incomplete_subgoal_present");
+    if (compoundFirstBrokenRail)
+      failures.push("rail_noncompound_first_broken_rail_present");
+    if (compoundRailFailureCode)
+      failures.push("rail_noncompound_rail_failure_code_present");
+    if (compoundRepairTarget)
+      failures.push("rail_noncompound_repair_target_present");
+    if (compoundDidToolRun !== null)
+      failures.push("rail_noncompound_did_tool_run_present");
   }
-  if (compoundSubgoalCount !== null && compoundSubgoalCount > 0 && railStatus === "complete") {
-    if (firstIncompleteCompoundSubgoalId) failures.push("rail_complete_compound_first_incomplete_subgoal_present");
-    if (compoundFirstBrokenRail) failures.push("rail_complete_compound_first_broken_rail_present");
-    if (compoundRailFailureCode) failures.push("rail_complete_compound_rail_failure_code_present");
-    if (compoundRepairTarget) failures.push("rail_complete_compound_repair_target_present");
-    if (compoundDidToolRun !== null) failures.push("rail_complete_compound_did_tool_run_present");
+  if (
+    compoundSubgoalCount !== null &&
+    compoundSubgoalCount > 0 &&
+    railStatus === "complete"
+  ) {
+    if (firstIncompleteCompoundSubgoalId)
+      failures.push("rail_complete_compound_first_incomplete_subgoal_present");
+    if (compoundFirstBrokenRail)
+      failures.push("rail_complete_compound_first_broken_rail_present");
+    if (compoundRailFailureCode)
+      failures.push("rail_complete_compound_rail_failure_code_present");
+    if (compoundRepairTarget)
+      failures.push("rail_complete_compound_repair_target_present");
+    if (compoundDidToolRun !== null)
+      failures.push("rail_complete_compound_did_tool_run_present");
   }
   if (compoundSubgoalCount !== null && compoundSubgoalCount > 0) {
     if (compoundSubgoalRailStatuses.length < compoundSubgoalCount) {
-      failures.push(`rail_compound_subgoal_rail_statuses_dropped:${compoundSubgoalRailStatuses.length}<${compoundSubgoalCount}`);
+      failures.push(
+        `rail_compound_subgoal_rail_statuses_dropped:${compoundSubgoalRailStatuses.length}<${compoundSubgoalCount}`,
+      );
     }
     for (const [index, subgoalRail] of compoundSubgoalRailStatuses.entries()) {
       const prefix = `rail_compound_subgoal_${index + 1}`;
@@ -641,41 +912,68 @@ const addRailTableFailures = (input: {
       const subgoalRepairTarget = readString(subgoalRail.repair_target);
       const subgoalObservationRef = readString(subgoalRail.observation_ref);
       const subgoalSatisfaction = readString(subgoalRail.satisfaction);
-      if (!readString(subgoalRail.subgoal_id)) failures.push(`${prefix}_subgoal_id_missing`);
-      if (readNonNegativeInteger(subgoalRail.order) === null) failures.push(`${prefix}_order_invalid`);
-      if (!readString(subgoalRail.requested_capability)) failures.push(`${prefix}_requested_capability_missing`);
-      if (!readString(subgoalRail.runtime_capability)) failures.push(`${prefix}_runtime_capability_missing`);
-      if (!readString(subgoalRail.selected_capability)) failures.push(`${prefix}_selected_capability_missing`);
+      if (!readString(subgoalRail.subgoal_id))
+        failures.push(`${prefix}_subgoal_id_missing`);
+      if (readNonNegativeInteger(subgoalRail.order) === null)
+        failures.push(`${prefix}_order_invalid`);
+      if (!readString(subgoalRail.requested_capability))
+        failures.push(`${prefix}_requested_capability_missing`);
+      if (!readString(subgoalRail.runtime_capability))
+        failures.push(`${prefix}_runtime_capability_missing`);
+      if (!readString(subgoalRail.selected_capability))
+        failures.push(`${prefix}_selected_capability_missing`);
       if (!Object.prototype.hasOwnProperty.call(subgoalRail, "args")) {
         failures.push(`${prefix}_args_field_missing`);
       }
-      if (!Object.prototype.hasOwnProperty.call(subgoalRail, "executed_capability")) {
+      if (
+        !Object.prototype.hasOwnProperty.call(
+          subgoalRail,
+          "executed_capability",
+        )
+      ) {
         failures.push(`${prefix}_executed_capability_field_missing`);
       }
-      if (!Object.prototype.hasOwnProperty.call(subgoalRail, "observation_kind")) {
+      if (
+        !Object.prototype.hasOwnProperty.call(subgoalRail, "observation_kind")
+      ) {
         failures.push(`${prefix}_observation_kind_field_missing`);
       }
-      if (!Object.prototype.hasOwnProperty.call(subgoalRail, "observation_ref")) {
+      if (
+        !Object.prototype.hasOwnProperty.call(subgoalRail, "observation_ref")
+      ) {
         failures.push(`${prefix}_observation_ref_field_missing`);
       }
       if (!subgoalSatisfaction) failures.push(`${prefix}_satisfaction_missing`);
       if (!subgoalRailStatus) failures.push(`${prefix}_rail_status_missing`);
-      if (subgoalRailStatus && !CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES.includes(subgoalRailStatus as never)) {
+      if (
+        subgoalRailStatus &&
+        !CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES.includes(
+          subgoalRailStatus as never,
+        )
+      ) {
         failures.push(`${prefix}_rail_status_invalid:${subgoalRailStatus}`);
       }
       if (subgoalSatisfaction === "satisfied" && !subgoalObservationRef) {
         failures.push(`${prefix}_satisfied_observation_ref_missing`);
       }
       if (subgoalRailStatus === "complete") {
-        if (subgoalSatisfaction !== "satisfied") failures.push(`${prefix}_complete_satisfaction_not_satisfied`);
-        if (!subgoalObservationRef) failures.push(`${prefix}_complete_observation_ref_missing`);
-        if (subgoalFirstBrokenRail) failures.push(`${prefix}_complete_first_broken_rail_present`);
-        if (subgoalRailFailureCode) failures.push(`${prefix}_complete_rail_failure_code_present`);
-        if (subgoalRepairTarget) failures.push(`${prefix}_complete_repair_target_present`);
+        if (subgoalSatisfaction !== "satisfied")
+          failures.push(`${prefix}_complete_satisfaction_not_satisfied`);
+        if (!subgoalObservationRef)
+          failures.push(`${prefix}_complete_observation_ref_missing`);
+        if (subgoalFirstBrokenRail)
+          failures.push(`${prefix}_complete_first_broken_rail_present`);
+        if (subgoalRailFailureCode)
+          failures.push(`${prefix}_complete_rail_failure_code_present`);
+        if (subgoalRepairTarget)
+          failures.push(`${prefix}_complete_repair_target_present`);
       } else if (subgoalRailStatus) {
-        if (!subgoalFirstBrokenRail) failures.push(`${prefix}_first_broken_rail_missing`);
-        if (!subgoalRailFailureCode) failures.push(`${prefix}_rail_failure_code_missing`);
-        if (!subgoalRepairTarget) failures.push(`${prefix}_repair_target_missing`);
+        if (!subgoalFirstBrokenRail)
+          failures.push(`${prefix}_first_broken_rail_missing`);
+        if (!subgoalRailFailureCode)
+          failures.push(`${prefix}_rail_failure_code_missing`);
+        if (!subgoalRepairTarget)
+          failures.push(`${prefix}_repair_target_missing`);
       }
       if (
         subgoalFirstBrokenRail &&
@@ -683,7 +981,9 @@ const addRailTableFailures = (input: {
           subgoalFirstBrokenRail as (typeof CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS)[number],
         )
       ) {
-        failures.push(`${prefix}_first_broken_rail_invalid:${subgoalFirstBrokenRail}`);
+        failures.push(
+          `${prefix}_first_broken_rail_invalid:${subgoalFirstBrokenRail}`,
+        );
       }
       if (
         subgoalRepairTarget &&
@@ -693,19 +993,37 @@ const addRailTableFailures = (input: {
       ) {
         failures.push(`${prefix}_repair_target_invalid:${subgoalRepairTarget}`);
       }
-      if (subgoalRailFailureCode && !isCodexParityAgentSpineRailFailureCode(subgoalRailFailureCode)) {
-        failures.push(`${prefix}_rail_failure_code_invalid:${subgoalRailFailureCode}`);
+      if (
+        subgoalRailFailureCode &&
+        !isCodexParityAgentSpineRailFailureCode(subgoalRailFailureCode)
+      ) {
+        failures.push(
+          `${prefix}_rail_failure_code_invalid:${subgoalRailFailureCode}`,
+        );
       }
     }
   }
-  if (compoundSubgoalCount !== null && compoundSubgoalCount > 0 && railStatus !== "complete") {
-    if (!firstIncompleteCompoundSubgoalId) failures.push("rail_incomplete_compound_first_incomplete_subgoal_missing");
-    if (!firstIncompleteCompoundRequestedCapability) failures.push("rail_incomplete_compound_requested_capability_missing");
-    if (!firstIncompleteCompoundRuntimeCapability) failures.push("rail_incomplete_compound_runtime_capability_missing");
-    if (!compoundFirstBrokenRail) failures.push("rail_incomplete_compound_first_broken_rail_missing");
-    if (!compoundRailFailureCode) failures.push("rail_incomplete_compound_rail_failure_code_missing");
-    if (!compoundRepairTarget) failures.push("rail_incomplete_compound_repair_target_missing");
-    if (compoundDidToolRun === null) failures.push("rail_incomplete_compound_did_tool_run_missing");
+  if (
+    compoundSubgoalCount !== null &&
+    compoundSubgoalCount > 0 &&
+    railStatus !== "complete"
+  ) {
+    if (!firstIncompleteCompoundSubgoalId)
+      failures.push(
+        "rail_incomplete_compound_first_incomplete_subgoal_missing",
+      );
+    if (!firstIncompleteCompoundRequestedCapability)
+      failures.push("rail_incomplete_compound_requested_capability_missing");
+    if (!firstIncompleteCompoundRuntimeCapability)
+      failures.push("rail_incomplete_compound_runtime_capability_missing");
+    if (!compoundFirstBrokenRail)
+      failures.push("rail_incomplete_compound_first_broken_rail_missing");
+    if (!compoundRailFailureCode)
+      failures.push("rail_incomplete_compound_rail_failure_code_missing");
+    if (!compoundRepairTarget)
+      failures.push("rail_incomplete_compound_repair_target_missing");
+    if (compoundDidToolRun === null)
+      failures.push("rail_incomplete_compound_did_tool_run_missing");
   }
   if (
     compoundFirstBrokenRail &&
@@ -713,7 +1031,9 @@ const addRailTableFailures = (input: {
       compoundFirstBrokenRail as (typeof CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS)[number],
     )
   ) {
-    failures.push(`rail_compound_first_broken_rail_invalid:${compoundFirstBrokenRail}`);
+    failures.push(
+      `rail_compound_first_broken_rail_invalid:${compoundFirstBrokenRail}`,
+    );
   }
   if (
     compoundRepairTarget &&
@@ -721,20 +1041,39 @@ const addRailTableFailures = (input: {
       compoundRepairTarget as (typeof CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS)[number],
     )
   ) {
-    failures.push(`rail_compound_repair_target_invalid:${compoundRepairTarget}`);
+    failures.push(
+      `rail_compound_repair_target_invalid:${compoundRepairTarget}`,
+    );
   }
-  if (compoundRailFailureCode && !isCodexParityAgentSpineRailFailureCode(compoundRailFailureCode)) {
-    failures.push(`rail_compound_rail_failure_code_invalid:${compoundRailFailureCode}`);
+  if (
+    compoundRailFailureCode &&
+    !isCodexParityAgentSpineRailFailureCode(compoundRailFailureCode)
+  ) {
+    failures.push(
+      `rail_compound_rail_failure_code_invalid:${compoundRailFailureCode}`,
+    );
   }
   const railFailureCode = readString(railTable.rail_failure_code);
-  if (railFailureCode && !isCodexParityAgentSpineRailFailureCode(railFailureCode)) {
+  if (
+    railFailureCode &&
+    !isCodexParityAgentSpineRailFailureCode(railFailureCode)
+  ) {
     failures.push(`rail_failure_code_invalid:${railFailureCode}`);
   }
   const parityClass = readString(railTable.codex_parity_class);
-  if (!CODEX_PARITY_AGENT_SPINE_CLASSES.includes(parityClass as (typeof CODEX_PARITY_AGENT_SPINE_CLASSES)[number])) {
-    failures.push(`rail_codex_parity_class_invalid:${parityClass ?? "missing"}`);
+  if (
+    !CODEX_PARITY_AGENT_SPINE_CLASSES.includes(
+      parityClass as (typeof CODEX_PARITY_AGENT_SPINE_CLASSES)[number],
+    )
+  ) {
+    failures.push(
+      `rail_codex_parity_class_invalid:${parityClass ?? "missing"}`,
+    );
   }
-  if (JSON.stringify(railTable.normalized_codex_parity_classes) !== JSON.stringify(CODEX_PARITY_AGENT_SPINE_CLASSES)) {
+  if (
+    JSON.stringify(railTable.normalized_codex_parity_classes) !==
+    JSON.stringify(CODEX_PARITY_AGENT_SPINE_CLASSES)
+  ) {
     failures.push("rail_normalized_codex_parity_classes_mismatch");
   }
   const selectedCapability = readString(railTable.selected_capability);
@@ -745,8 +1084,11 @@ const addRailTableFailures = (input: {
   const reentryStatus = readString(railTable.reentry_status);
   const reentryProofSource = readString(railTable.reentry_proof_source);
   const reentryProven = railTable.reentry_proven === true;
-  const requiredObservationKinds = readStringArray(railTable.required_observation_kinds_for_requested_capability);
-  const observationSupportsRequested = railTable.observed_artifact_supports_requested_capability;
+  const requiredObservationKinds = readStringArray(
+    railTable.required_observation_kinds_for_requested_capability,
+  );
+  const observationSupportsRequested =
+    railTable.observed_artifact_supports_requested_capability;
   const admissionProofSource = readString(railTable.admission_proof_source);
   const admissionProven = railTable.admission_proven === true;
   if ((selectedCapability || executedCapability) && !admittedCapability) {
@@ -764,21 +1106,33 @@ const addRailTableFailures = (input: {
   if (reentryStatus === "reentered" && !reentryProven) {
     failures.push("rail_reentry_not_proven");
   }
-  if ((railStatus === "complete" || parityClass === "complete") && reentryStatus !== "reentered") {
-    failures.push(`rail_complete_without_reentry:${reentryStatus ?? "missing"}`);
+  if (
+    (railStatus === "complete" || parityClass === "complete") &&
+    reentryStatus !== "reentered"
+  ) {
+    failures.push(
+      `rail_complete_without_reentry:${reentryStatus ?? "missing"}`,
+    );
   }
   if ((railStatus === "complete") !== (parityClass === "complete")) {
-    failures.push(`rail_completion_status_class_mismatch:${railStatus ?? "missing"}/${parityClass ?? "missing"}`);
+    failures.push(
+      `rail_completion_status_class_mismatch:${railStatus ?? "missing"}/${parityClass ?? "missing"}`,
+    );
   }
   if (requestedCapability && requiredObservationKinds.length === 0) {
     failures.push("rail_requested_observation_kinds_empty");
   }
-  if (requestedCapability && typeof observationSupportsRequested !== "boolean") {
+  if (
+    requestedCapability &&
+    typeof observationSupportsRequested !== "boolean"
+  ) {
     failures.push("rail_observation_support_verdict_missing");
   }
   if (
     requestedCapability &&
-    (goalSatisfaction === "satisfied" || railStatus === "complete" || parityClass === "complete") &&
+    (goalSatisfaction === "satisfied" ||
+      railStatus === "complete" ||
+      parityClass === "complete") &&
     requiredObservationKinds.length > 0 &&
     observationSupportsRequested !== true
   ) {
@@ -798,9 +1152,13 @@ const addRailTableFailures = (input: {
   }
   const selectedTerminalKind = readString(railTable.selected_terminal_kind);
   const visibleTerminalKind = readString(railTable.visible_terminal_kind);
-  const terminalAuthorityProofSource = readString(railTable.terminal_authority_proof_source);
+  const terminalAuthorityProofSource = readString(
+    railTable.terminal_authority_proof_source,
+  );
   const terminalAuthorityProven = railTable.terminal_authority_proven === true;
-  const visibleProjectionSource = readString(railTable.visible_projection_source);
+  const visibleProjectionSource = readString(
+    railTable.visible_projection_source,
+  );
   const visibleProjectionProven = railTable.visible_projection_proven === true;
   if (selectedTerminalKind && !terminalAuthorityProofSource) {
     failures.push("rail_terminal_authority_proof_source_missing");
@@ -814,14 +1172,26 @@ const addRailTableFailures = (input: {
   if (visibleTerminalKind && !visibleProjectionProven) {
     failures.push("rail_visible_projection_not_proven");
   }
-  if ((railStatus === "complete" || parityClass === "complete") && !selectedTerminalKind) {
+  if (
+    (railStatus === "complete" || parityClass === "complete") &&
+    !selectedTerminalKind
+  ) {
     failures.push("rail_complete_without_terminal_authority");
   }
-  if ((railStatus === "complete" || parityClass === "complete") && !visibleTerminalKind) {
+  if (
+    (railStatus === "complete" || parityClass === "complete") &&
+    !visibleTerminalKind
+  ) {
     failures.push("rail_complete_without_visible_projection");
   }
-  if (selectedTerminalKind && visibleTerminalKind && selectedTerminalKind !== visibleTerminalKind) {
-    failures.push(`rail_terminal_projection_mismatch:${selectedTerminalKind}!=${visibleTerminalKind}`);
+  if (
+    selectedTerminalKind &&
+    visibleTerminalKind &&
+    selectedTerminalKind !== visibleTerminalKind
+  ) {
+    failures.push(
+      `rail_terminal_projection_mismatch:${selectedTerminalKind}!=${visibleTerminalKind}`,
+    );
   }
 };
 
@@ -839,17 +1209,32 @@ const addCompleteRailEnvelopeFailures = (input: {
   const terminalErrorCode =
     readString(input.ask.terminal_error_code) ??
     readString(input.debug?.terminal_error_code) ??
-    readString(getPath(input.debug, ["resolved_turn_summary", "terminal_error_code"]));
-  const finalStatus = readString(input.ask.final_status) ?? readString(input.debug?.final_status);
-  const responseType = readString(input.ask.response_type) ?? readString(input.debug?.response_type);
+    readString(
+      getPath(input.debug, ["resolved_turn_summary", "terminal_error_code"]),
+    );
+  const finalStatus =
+    readString(input.ask.final_status) ?? readString(input.debug?.final_status);
+  const responseType =
+    readString(input.ask.response_type) ??
+    readString(input.debug?.response_type);
   const finalAnswerSource =
     readString(input.ask.final_answer_source) ??
     readString(input.debug?.final_answer_source) ??
-    readString(getPath(input.debug, ["terminal_answer_authority", "final_answer_source"]));
+    readString(
+      getPath(input.debug, [
+        "terminal_answer_authority",
+        "final_answer_source",
+      ]),
+    );
   const terminalArtifactKind =
     readString(input.ask.terminal_artifact_kind) ??
     readString(input.debug?.terminal_artifact_kind) ??
-    readString(getPath(input.debug, ["terminal_answer_authority", "terminal_artifact_kind"]));
+    readString(
+      getPath(input.debug, [
+        "terminal_answer_authority",
+        "terminal_artifact_kind",
+      ]),
+    );
   const selectedText =
     readString(input.ask.selected_final_answer) ??
     readString(input.ask.answer) ??
@@ -858,14 +1243,24 @@ const addCompleteRailEnvelopeFailures = (input: {
     readString(input.debug?.answer) ??
     "";
 
-  if (terminalErrorCode) input.failures.push(`complete_rail_terminal_error:${terminalErrorCode}`);
-  if (finalAnswerSource === "typed_failure" || terminalArtifactKind === "typed_failure") {
+  if (terminalErrorCode)
+    input.failures.push(`complete_rail_terminal_error:${terminalErrorCode}`);
+  if (
+    finalAnswerSource === "typed_failure" ||
+    terminalArtifactKind === "typed_failure"
+  ) {
     input.failures.push("complete_rail_typed_failure_terminal");
   }
-  if ((finalStatus && finalStatus !== "final_answer") || (responseType && responseType !== "final_answer")) {
-    input.failures.push(`complete_rail_non_final_response:${finalStatus ?? "missing"}/${responseType ?? "missing"}`);
+  if (
+    (finalStatus && finalStatus !== "final_answer") ||
+    (responseType && responseType !== "final_answer")
+  ) {
+    input.failures.push(
+      `complete_rail_non_final_response:${finalStatus ?? "missing"}/${responseType ?? "missing"}`,
+    );
   }
-  if (!selectedText) input.failures.push("complete_rail_missing_final_answer_text");
+  if (!selectedText)
+    input.failures.push("complete_rail_missing_final_answer_text");
 };
 
 const addFailClosedRailEnvelopeFailures = (input: {
@@ -887,17 +1282,32 @@ const addFailClosedRailEnvelopeFailures = (input: {
   const terminalErrorCode =
     readString(input.ask.terminal_error_code) ??
     readString(input.debug?.terminal_error_code) ??
-    readString(getPath(input.debug, ["resolved_turn_summary", "terminal_error_code"]));
-  const finalStatus = readString(input.ask.final_status) ?? readString(input.debug?.final_status);
-  const responseType = readString(input.ask.response_type) ?? readString(input.debug?.response_type);
+    readString(
+      getPath(input.debug, ["resolved_turn_summary", "terminal_error_code"]),
+    );
+  const finalStatus =
+    readString(input.ask.final_status) ?? readString(input.debug?.final_status);
+  const responseType =
+    readString(input.ask.response_type) ??
+    readString(input.debug?.response_type);
   const finalAnswerSource =
     readString(input.ask.final_answer_source) ??
     readString(input.debug?.final_answer_source) ??
-    readString(getPath(input.debug, ["terminal_answer_authority", "final_answer_source"]));
+    readString(
+      getPath(input.debug, [
+        "terminal_answer_authority",
+        "final_answer_source",
+      ]),
+    );
   const terminalArtifactKind =
     readString(input.ask.terminal_artifact_kind) ??
     readString(input.debug?.terminal_artifact_kind) ??
-    readString(getPath(input.debug, ["terminal_answer_authority", "terminal_artifact_kind"]));
+    readString(
+      getPath(input.debug, [
+        "terminal_answer_authority",
+        "terminal_artifact_kind",
+      ]),
+    );
   const selectedText =
     readString(input.ask.selected_final_answer) ??
     readString(input.ask.answer) ??
@@ -906,17 +1316,34 @@ const addFailClosedRailEnvelopeFailures = (input: {
     readString(input.debug?.answer) ??
     "";
 
-  if (!terminalErrorCode) input.failures.push("fail_closed_rail_missing_terminal_error_code");
-  if (finalAnswerSource !== "typed_failure" && terminalArtifactKind !== "typed_failure") {
-    input.failures.push(`fail_closed_rail_not_typed_failure:${finalAnswerSource ?? "missing"}/${terminalArtifactKind ?? "missing"}`);
+  if (!terminalErrorCode)
+    input.failures.push("fail_closed_rail_missing_terminal_error_code");
+  if (
+    finalAnswerSource !== "typed_failure" &&
+    terminalArtifactKind !== "typed_failure"
+  ) {
+    input.failures.push(
+      `fail_closed_rail_not_typed_failure:${finalAnswerSource ?? "missing"}/${terminalArtifactKind ?? "missing"}`,
+    );
   }
-  if ((finalStatus && finalStatus !== "final_failure") || (responseType && responseType !== "final_failure")) {
-    input.failures.push(`fail_closed_rail_non_failure_response:${finalStatus ?? "missing"}/${responseType ?? "missing"}`);
+  if (
+    (finalStatus && finalStatus !== "final_failure") ||
+    (responseType && responseType !== "final_failure")
+  ) {
+    input.failures.push(
+      `fail_closed_rail_non_failure_response:${finalStatus ?? "missing"}/${responseType ?? "missing"}`,
+    );
   }
-  if (!selectedText) input.failures.push("fail_closed_rail_missing_failure_text");
+  if (!selectedText)
+    input.failures.push("fail_closed_rail_missing_failure_text");
 
-  if (terminalErrorCode === "agent_loop_budget_exhausted" || terminalErrorCode === "max_tool_calls_budget_exhausted") {
-    input.failures.push(`fail_closed_rail_stale_budget_exhaustion:${terminalErrorCode}`);
+  if (
+    terminalErrorCode === "agent_loop_budget_exhausted" ||
+    terminalErrorCode === "max_tool_calls_budget_exhausted"
+  ) {
+    input.failures.push(
+      `fail_closed_rail_stale_budget_exhaustion:${terminalErrorCode}`,
+    );
   }
 };
 
@@ -926,19 +1353,43 @@ const addRailEnvelopeProjectionFailures = (input: {
   terminalArtifactKind: string | null;
 }): void => {
   if (!input.railTable || !input.terminalArtifactKind) return;
-  const selectedTerminalKind = readString(input.railTable.selected_terminal_kind);
+  const selectedTerminalKind = readString(
+    input.railTable.selected_terminal_kind,
+  );
   const visibleTerminalKind = readString(input.railTable.visible_terminal_kind);
-  if (selectedTerminalKind && selectedTerminalKind !== input.terminalArtifactKind) {
-    input.failures.push(`rail_selected_terminal_response_mismatch:${selectedTerminalKind}!=${input.terminalArtifactKind}`);
+  if (
+    selectedTerminalKind &&
+    selectedTerminalKind !== input.terminalArtifactKind
+  ) {
+    input.failures.push(
+      `rail_selected_terminal_response_mismatch:${selectedTerminalKind}!=${input.terminalArtifactKind}`,
+    );
   }
-  if (visibleTerminalKind && visibleTerminalKind !== input.terminalArtifactKind) {
-    input.failures.push(`rail_visible_terminal_response_mismatch:${visibleTerminalKind}!=${input.terminalArtifactKind}`);
+  if (
+    visibleTerminalKind &&
+    visibleTerminalKind !== input.terminalArtifactKind
+  ) {
+    input.failures.push(
+      `rail_visible_terminal_response_mismatch:${visibleTerminalKind}!=${input.terminalArtifactKind}`,
+    );
   }
 };
 
-const readExecutableOperatorCommandCount = (solverTrace: RecordLike | null): number =>
-  Array.isArray(getPath(solverTrace, ["prompt_interpretation", "executable_operator_commands"]))
-    ? (getPath(solverTrace, ["prompt_interpretation", "executable_operator_commands"]) as unknown[]).length
+const readExecutableOperatorCommandCount = (
+  solverTrace: RecordLike | null,
+): number =>
+  Array.isArray(
+    getPath(solverTrace, [
+      "prompt_interpretation",
+      "executable_operator_commands",
+    ]),
+  )
+    ? (
+        getPath(solverTrace, [
+          "prompt_interpretation",
+          "executable_operator_commands",
+        ]) as unknown[]
+      ).length
     : 0;
 
 const addExpectationFailures = (input: {
@@ -966,16 +1417,37 @@ const addExpectationFailures = (input: {
     selectedCapabilities,
   } = input;
   if (expected.source_target && sourceTarget !== expected.source_target) {
-    failures.push(`source_target_mismatch:${sourceTarget ?? "missing"}!=${expected.source_target}`);
+    failures.push(
+      `source_target_mismatch:${sourceTarget ?? "missing"}!=${expected.source_target}`,
+    );
   }
   if (expected.target_kind && targetKind !== expected.target_kind) {
-    failures.push(`target_kind_mismatch:${targetKind ?? "missing"}!=${expected.target_kind}`);
+    failures.push(
+      `target_kind_mismatch:${targetKind ?? "missing"}!=${expected.target_kind}`,
+    );
   }
-  if (expected.terminal_artifact_kind && terminalArtifactKind !== expected.terminal_artifact_kind && terminalArtifactKind !== "typed_failure") {
-    failures.push(`terminal_artifact_mismatch:${terminalArtifactKind ?? "missing"}!=${expected.terminal_artifact_kind}`);
+  if (
+    expected.terminal_artifact_kind &&
+    terminalArtifactKind !== expected.terminal_artifact_kind &&
+    terminalArtifactKind !== "typed_failure"
+  ) {
+    failures.push(
+      `terminal_artifact_mismatch:${terminalArtifactKind ?? "missing"}!=${expected.terminal_artifact_kind}`,
+    );
+  }
+  if (
+    expected.allowed_terminal_artifact_kinds?.length &&
+    terminalArtifactKind !== "typed_failure" &&
+    (!terminalArtifactKind ||
+      !expected.allowed_terminal_artifact_kinds.includes(terminalArtifactKind))
+  ) {
+    failures.push(
+      `terminal_artifact_not_allowed:${terminalArtifactKind ?? "missing"}!in:${expected.allowed_terminal_artifact_kinds.join(",")}`,
+    );
   }
   for (const route of expected.forbidden_routes ?? []) {
-    if (selectedRoute === route) failures.push(`forbidden_route_selected:${route}`);
+    if (selectedRoute === route)
+      failures.push(`forbidden_route_selected:${route}`);
   }
   for (const artifact of expected.forbidden_terminal_artifacts ?? []) {
     if (terminalArtifactKind === artifact || finalAnswerSource === artifact) {
@@ -985,37 +1457,61 @@ const addExpectationFailures = (input: {
   const actualIds = readActualToolIds(loopTrace);
   const actualJson = JSON.stringify(actualToolCalls(loopTrace));
   for (const tool of expected.forbidden_tool_calls ?? []) {
-    if (actualIds.includes(tool) || actualJson.includes(tool)) failures.push(`forbidden_tool_call:${tool}`);
+    if (actualIds.includes(tool) || actualJson.includes(tool))
+      failures.push(`forbidden_tool_call:${tool}`);
   }
   for (const tool of expected.allowed_tool_calls ?? []) {
-    if (!actualIds.includes(tool) && !actualJson.includes(tool)) failures.push(`required_allowed_tool_call_missing:${tool}`);
+    if (!actualIds.includes(tool) && !actualJson.includes(tool))
+      failures.push(`required_allowed_tool_call_missing:${tool}`);
   }
   for (const family of expected.forbidden_tool_families ?? []) {
-    if (actualToolCalls(loopTrace).some((call: RecordLike) => readString(call.family) === family)) {
+    if (
+      actualToolCalls(loopTrace).some(
+        (call: RecordLike) => readString(call.family) === family,
+      )
+    ) {
       failures.push(`forbidden_tool_family:${family}`);
     }
   }
   for (const capabilityId of expected.forbidden_capability_ids ?? []) {
-    if (selectedCapabilities.includes(capabilityId)) failures.push(`forbidden_capability_selected:${capabilityId}`);
+    if (selectedCapabilities.includes(capabilityId))
+      failures.push(`forbidden_capability_selected:${capabilityId}`);
   }
-  const selectedPrimaryIntent = readString(solverTrace?.selected_primary_intent);
-  if (expected.selected_primary_intent && selectedPrimaryIntent !== expected.selected_primary_intent) {
-    failures.push(`selected_primary_intent_mismatch:${selectedPrimaryIntent ?? "missing"}!=${expected.selected_primary_intent}`);
+  const selectedPrimaryIntent = readString(
+    solverTrace?.selected_primary_intent,
+  );
+  if (
+    expected.selected_primary_intent &&
+    selectedPrimaryIntent !== expected.selected_primary_intent
+  ) {
+    failures.push(
+      `selected_primary_intent_mismatch:${selectedPrimaryIntent ?? "missing"}!=${expected.selected_primary_intent}`,
+    );
   }
   const contextualMentions = readContextualToolMentionCues(solverTrace);
   for (const cue of expected.required_contextual_tool_mentions ?? []) {
-    if (!contextualMentions.some((mention) => mention.toLowerCase().includes(cue.toLowerCase()))) {
+    if (
+      !contextualMentions.some((mention) =>
+        mention.toLowerCase().includes(cue.toLowerCase()),
+      )
+    ) {
       failures.push(`contextual_tool_mention_missing:${cue}`);
     }
   }
   if (
     typeof expected.executable_operator_commands_count === "number" &&
-    readExecutableOperatorCommandCount(solverTrace) !== expected.executable_operator_commands_count
+    readExecutableOperatorCommandCount(solverTrace) !==
+      expected.executable_operator_commands_count
   ) {
-    failures.push(`executable_operator_commands_count_mismatch:${readExecutableOperatorCommandCount(solverTrace)}!=${expected.executable_operator_commands_count}`);
+    failures.push(
+      `executable_operator_commands_count_mismatch:${readExecutableOperatorCommandCount(solverTrace)}!=${expected.executable_operator_commands_count}`,
+    );
   }
   const flags = readStringArray(loopTrace?.short_circuit_risk_flags);
-  for (const flag of [...(expected.required_trace_flags_absent ?? []), ...(expected.forbidden_trace_flags ?? [])]) {
+  for (const flag of [
+    ...(expected.required_trace_flags_absent ?? []),
+    ...(expected.forbidden_trace_flags ?? []),
+  ]) {
     if (flags.includes(flag)) failures.push(`forbidden_trace_flag:${flag}`);
   }
 };
@@ -1032,63 +1528,96 @@ export function buildApiParityProbeResult(input: {
   const debug = extractHelixDebugPayload(input.debugExport);
   const loopTrace = readLoopTrace(ask, debug);
   const solverTrace = readSolverTrace(ask, debug);
-  const liveSourceIdentityAudit = readLiveSourceIdentityAudit(ask, debug, solverTrace);
+  const liveSourceIdentityAudit = readLiveSourceIdentityAudit(
+    ask,
+    debug,
+    solverTrace,
+  );
   const routeAuthority = readRouteAuthority(ask, debug);
   const poisonAudit = readPoisonAudit(ask, debug);
   const terminalAuthority = readTerminalAuthority(ask, debug);
-  const terminalFailureReconciliationRuntime = readTerminalFailureReconciliationRuntime(ask, debug);
-  const terminalFailureReconciliationRuntimeVersion = readString(terminalFailureReconciliationRuntime?.version);
+  const terminalFailureReconciliationRuntime =
+    readTerminalFailureReconciliationRuntime(ask, debug);
+  const terminalFailureReconciliationRuntimeVersion = readString(
+    terminalFailureReconciliationRuntime?.version,
+  );
   const terminalFailureReconciliationRuntimeCurrent =
     terminalFailureReconciliationRuntime?.available === true &&
-    terminalFailureReconciliationRuntimeVersion === HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION;
+    terminalFailureReconciliationRuntimeVersion ===
+      HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION;
   const railTables = readRailTables(ask, debug, input.debugExport);
   const railTable = railTables[0] ?? null;
-  const compoundSubgoalRailStatuses = readCompoundSubgoalRailStatuses(ask, debug, input.debugExport);
+  const compoundSubgoalRailStatuses = readCompoundSubgoalRailStatuses(
+    ask,
+    debug,
+    input.debugExport,
+  );
   const capabilitySelectionResult = readCapabilitySelectionResult(ask, debug);
   const selectedCapabilities = [
     readString(capabilitySelectionResult?.capability_id),
-    ...readCapabilitySelectionTrace(ask, debug).map((entry) => readString(entry.selected_capability)),
+    ...readCapabilitySelectionTrace(ask, debug).map((entry) =>
+      readString(entry.selected_capability),
+    ),
   ].filter((entry: string | null): entry is string => Boolean(entry));
   const sourceTargetIntent = readSourceTarget(ask, debug);
   const terminalArtifactKind =
     readString(ask.terminal_artifact_kind) ??
     readString(debug?.terminal_artifact_kind) ??
-    readString(getPath(debug, ["terminal_answer_authority", "terminal_artifact_kind"]));
+    readString(
+      getPath(debug, ["terminal_answer_authority", "terminal_artifact_kind"]),
+    );
   const finalAnswerSource =
     readString(ask.final_answer_source) ??
     readString(debug?.final_answer_source) ??
-    readString(getPath(debug, ["terminal_answer_authority", "final_answer_source"]));
+    readString(
+      getPath(debug, ["terminal_answer_authority", "final_answer_source"]),
+    );
   const selectedRoute =
     readString(ask.route_reason_code) ??
     readString(debug?.route_reason_code) ??
     readString(loopTrace?.selected_route) ??
-    readString(getPath(debug, ["resolved_turn_summary", "resolved_route_label"]));
-  const sourceTarget = readString(sourceTargetIntent?.target_source) ?? readString(routeAuthority?.source_target);
+    readString(
+      getPath(debug, ["resolved_turn_summary", "resolved_route_label"]),
+    );
+  const sourceTarget =
+    readString(sourceTargetIntent?.target_source) ??
+    readString(routeAuthority?.source_target);
   const targetKind = readString(sourceTargetIntent?.target_kind) ?? null;
   const poisonAuditOk = poisonAudit?.ok === true;
-  const routeAuthorityOk = routeAuthority?.route_authority_ok === true;
+  const routeAuthorityOk =
+    routeAuthority?.route_authority_ok === true ||
+    loopTrace?.route_authority_ok === true;
   const terminalAuthorityOk = terminalAuthority?.server_authoritative === true;
   const unexpectedToolCalls = readStringArray(loopTrace?.unexpected_tool_calls);
-  const shortCircuitRiskFlags = readStringArray(loopTrace?.short_circuit_risk_flags);
-  const solverShortCircuitFlags = readStringArray(solverTrace?.solver_short_circuit_flags);
+  const shortCircuitRiskFlags = readStringArray(
+    loopTrace?.short_circuit_risk_flags,
+  );
+  const solverShortCircuitFlags = readStringArray(
+    solverTrace?.solver_short_circuit_flags,
+  );
   const solverContinuation = readSolverContinuationObservation(ask, debug);
   const solverContinuationReason = readString(solverContinuation?.reason);
-  const solverContinuationNextStep = readString(solverContinuation?.required_next_step);
+  const solverContinuationNextStep = readString(
+    solverContinuation?.required_next_step,
+  );
   const validSolverContinuation =
-    readString(solverContinuation?.schema) === "helix.solver_continuation_observation.v1" &&
+    readString(solverContinuation?.schema) ===
+      "helix.solver_continuation_observation.v1" &&
     Boolean(solverContinuationReason) &&
-    (
-      terminalArtifactKind === "typed_failure" ||
+    (terminalArtifactKind === "typed_failure" ||
       finalAnswerSource === "typed_failure" ||
-      solverContinuationNextStep !== "typed_failure"
-    );
+      solverContinuationNextStep !== "typed_failure");
   const failures: string[] = [];
-  const expectedIdentityDiagnosis = typeof input.scenario.expected.live_source_identity_ok === "boolean" && input.scenario.expected.live_source_identity_ok === false;
+  const expectedIdentityDiagnosis =
+    typeof input.scenario.expected.live_source_identity_ok === "boolean" &&
+    input.scenario.expected.live_source_identity_ok === false;
   const nonStreamTurnId = readString(ask.turn_id) ?? "missing";
 
   if (!debug) failures.push("debug_export_missing");
   if (!terminalFailureReconciliationRuntime) {
-    failures.push("debug_mirror_stale:tool_rail_terminal_failure_reconciliation_runtime_missing");
+    failures.push(
+      "debug_mirror_stale:tool_rail_terminal_failure_reconciliation_runtime_missing",
+    );
   } else if (!terminalFailureReconciliationRuntimeCurrent) {
     failures.push(
       `debug_mirror_stale:tool_rail_terminal_failure_reconciliation_runtime_version:${terminalFailureReconciliationRuntimeVersion ?? "missing"}!=${HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION}`,
@@ -1104,32 +1633,75 @@ export function buildApiParityProbeResult(input: {
   addRailMirrorFailures({ failures, railTables });
   addCompleteRailEnvelopeFailures({ failures, railTable, ask, debug });
   addFailClosedRailEnvelopeFailures({ failures, railTable, ask, debug });
-  addRailEnvelopeProjectionFailures({ failures, railTable, terminalArtifactKind });
+  addRailEnvelopeProjectionFailures({
+    failures,
+    railTable,
+    terminalArtifactKind,
+  });
   if (!solverTrace) failures.push("ask_turn_solver_trace_missing");
   if (solverTrace) {
-    const expectedSolverCompleted = input.scenario.expected.solver_completed ?? true;
-    if (solverTrace.completed_solver_path !== expectedSolverCompleted && !validSolverContinuation) {
-      failures.push(`ask_turn_solver_path_${solverTrace.completed_solver_path === true ? "complete" : "incomplete"}_unexpected`);
+    const expectedSolverCompleted =
+      input.scenario.expected.solver_completed ?? true;
+    if (
+      solverTrace.completed_solver_path !== expectedSolverCompleted &&
+      !validSolverContinuation
+    ) {
+      failures.push(
+        `ask_turn_solver_path_${solverTrace.completed_solver_path === true ? "complete" : "incomplete"}_unexpected`,
+      );
     }
   }
-  if (!input.terminalEventSeen && input.terminalEventSeen !== undefined) failures.push("terminal_event_missing");
+  if (!input.terminalEventSeen && input.terminalEventSeen !== undefined)
+    failures.push("terminal_event_missing");
   if (!terminalAuthorityOk) failures.push("terminal_authority_not_ok");
-  if (!routeAuthorityOk && !expectedIdentityDiagnosis && !validSolverContinuation) failures.push("route_authority_not_ok");
-  if (unexpectedToolCalls.length > 0) failures.push(`unexpected_tool_calls:${unexpectedToolCalls.join(",")}`);
-  if (shortCircuitRiskFlags.length > 0 && !expectedIdentityDiagnosis && !validSolverContinuation) failures.push(`short_circuit_risk_flags:${shortCircuitRiskFlags.join(",")}`);
-  if (solverShortCircuitFlags.length > 0 && !expectedIdentityDiagnosis && !validSolverContinuation) failures.push(`solver_short_circuit_flags:${solverShortCircuitFlags.join(",")}`);
-  if (poisonAuditOk && !routeAuthorityOk && !expectedIdentityDiagnosis && !validSolverContinuation) failures.push("poison_clean_but_authority_failed");
+  if (
+    !routeAuthorityOk &&
+    !expectedIdentityDiagnosis &&
+    !validSolverContinuation
+  )
+    failures.push("route_authority_not_ok");
+  if (unexpectedToolCalls.length > 0)
+    failures.push(`unexpected_tool_calls:${unexpectedToolCalls.join(",")}`);
+  if (
+    shortCircuitRiskFlags.length > 0 &&
+    !expectedIdentityDiagnosis &&
+    !validSolverContinuation
+  )
+    failures.push(
+      `short_circuit_risk_flags:${shortCircuitRiskFlags.join(",")}`,
+    );
+  if (
+    solverShortCircuitFlags.length > 0 &&
+    !expectedIdentityDiagnosis &&
+    !validSolverContinuation
+  )
+    failures.push(
+      `solver_short_circuit_flags:${solverShortCircuitFlags.join(",")}`,
+    );
+  if (
+    poisonAuditOk &&
+    !routeAuthorityOk &&
+    !expectedIdentityDiagnosis &&
+    !validSolverContinuation
+  )
+    failures.push("poison_clean_but_authority_failed");
   if (
     input.scenario.expected.live_source_identity_diagnosis &&
-    readString(liveSourceIdentityAudit?.diagnosis) !== input.scenario.expected.live_source_identity_diagnosis
+    readString(liveSourceIdentityAudit?.diagnosis) !==
+      input.scenario.expected.live_source_identity_diagnosis
   ) {
-    failures.push(`live_source_identity_diagnosis_mismatch:${readString(liveSourceIdentityAudit?.diagnosis) ?? "missing"}!=${input.scenario.expected.live_source_identity_diagnosis}`);
+    failures.push(
+      `live_source_identity_diagnosis_mismatch:${readString(liveSourceIdentityAudit?.diagnosis) ?? "missing"}!=${input.scenario.expected.live_source_identity_diagnosis}`,
+    );
   }
   if (
     typeof input.scenario.expected.live_source_identity_ok === "boolean" &&
-    liveSourceIdentityAudit?.identity_ok !== input.scenario.expected.live_source_identity_ok
+    liveSourceIdentityAudit?.identity_ok !==
+      input.scenario.expected.live_source_identity_ok
   ) {
-    failures.push(`live_source_identity_ok_mismatch:${String(liveSourceIdentityAudit?.identity_ok)}!=${String(input.scenario.expected.live_source_identity_ok)}`);
+    failures.push(
+      `live_source_identity_ok_mismatch:${String(liveSourceIdentityAudit?.identity_ok)}!=${String(input.scenario.expected.live_source_identity_ok)}`,
+    );
   }
 
   addExpectationFailures({
@@ -1150,7 +1722,8 @@ export function buildApiParityProbeResult(input: {
     scenario_id: input.scenario.id,
     prompt: input.scenario.prompt,
     non_stream_turn_id: nonStreamTurnId,
-    stream_turn_id: readString(readRecord(input.streamTurn)?.turn_id) ?? undefined,
+    stream_turn_id:
+      readString(readRecord(input.streamTurn)?.turn_id) ?? undefined,
     debug_export_available: Boolean(debug),
     terminal_event_seen: input.terminalEventSeen ?? true,
     stream_closed_after_terminal: input.streamClosedAfterTerminal ?? true,
@@ -1160,24 +1733,42 @@ export function buildApiParityProbeResult(input: {
     terminal_artifact_kind: terminalArtifactKind,
     final_answer_source: finalAnswerSource,
     loop_parity_trace: {
-      admitted_tool_families: readStringArray(loopTrace?.admitted_tool_families),
+      admitted_tool_families: readStringArray(
+        loopTrace?.admitted_tool_families,
+      ),
       actual_tool_calls: readActualToolIds(loopTrace),
       unexpected_tool_calls: unexpectedToolCalls,
-      observations_created_count: Array.isArray(loopTrace?.observations_created) ? loopTrace.observations_created.length : 0,
-      evidence_selected_for_answer_count: Array.isArray(loopTrace?.evidence_selected_for_answer) ? loopTrace.evidence_selected_for_answer.length : 0,
+      observations_created_count: Array.isArray(loopTrace?.observations_created)
+        ? loopTrace.observations_created.length
+        : 0,
+      evidence_selected_for_answer_count: Array.isArray(
+        loopTrace?.evidence_selected_for_answer,
+      )
+        ? loopTrace.evidence_selected_for_answer.length
+        : 0,
       short_circuit_risk_flags: shortCircuitRiskFlags,
     },
     ask_turn_solver_trace: {
       present: Boolean(solverTrace),
       completed_solver_path: solverTrace?.completed_solver_path === true,
-      prompt_shape: readString(getPath(solverTrace, ["prompt_interpretation", "prompt_shape"])),
+      prompt_shape: readString(
+        getPath(solverTrace, ["prompt_interpretation", "prompt_shape"]),
+      ),
       selected_primary_intent: readString(solverTrace?.selected_primary_intent),
-      primary_intent_route: readString(getPath(solverTrace, ["primary_intent", "route"])),
+      primary_intent_route: readString(
+        getPath(solverTrace, ["primary_intent", "route"]),
+      ),
       contextual_tool_mentions: readContextualToolMentionCues(solverTrace),
-      executable_operator_commands_count: readExecutableOperatorCommandCount(solverTrace),
+      executable_operator_commands_count:
+        readExecutableOperatorCommandCount(solverTrace),
       solver_short_circuit_flags: solverShortCircuitFlags,
-      live_source_identity_diagnosis: readString(liveSourceIdentityAudit?.diagnosis),
-      live_source_identity_ok: typeof liveSourceIdentityAudit?.identity_ok === "boolean" ? liveSourceIdentityAudit.identity_ok : null,
+      live_source_identity_diagnosis: readString(
+        liveSourceIdentityAudit?.diagnosis,
+      ),
+      live_source_identity_ok:
+        typeof liveSourceIdentityAudit?.identity_ok === "boolean"
+          ? liveSourceIdentityAudit.identity_ok
+          : null,
     },
     capability_selection: {
       capability_id: readString(capabilitySelectionResult?.capability_id),
@@ -1185,7 +1776,9 @@ export function buildApiParityProbeResult(input: {
     },
     route_authority: {
       ok: routeAuthorityOk,
-      primary_violation_code: readString(routeAuthority?.primary_violation_code),
+      primary_violation_code: readString(
+        routeAuthority?.primary_violation_code,
+      ),
       violation_codes: readStringArray(routeAuthority?.violation_codes),
     },
     poison_audit_ok: poisonAuditOk,
@@ -1196,7 +1789,9 @@ export function buildApiParityProbeResult(input: {
       current: terminalFailureReconciliationRuntimeCurrent,
     },
     rail_table: buildRailTableSummary(railTable, compoundSubgoalRailStatuses),
-    solver_continuation_count: Number(ask.solver_continuation_count ?? debug?.solver_continuation_count ?? 0),
+    solver_continuation_count: Number(
+      ask.solver_continuation_count ?? debug?.solver_continuation_count ?? 0,
+    ),
     solver_continuation_observation: solverContinuation
       ? {
           reason: solverContinuationReason,

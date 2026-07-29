@@ -30,6 +30,8 @@ export type HelixEnvironmentSnapshotSection =
   | "domain_specific";
 
 export type HelixEnvironmentManifestProbeType =
+  | "actor_status"
+  | "nearby_entities"
   | "route_feasibility"
   | "reachability"
   | "line_of_sight"
@@ -168,6 +170,8 @@ export const helixEnvironmentSourceManifestSchema = z.object({
     "domain_specific",
   ])).max(32),
   supported_probe_types: z.array(z.enum([
+    "actor_status",
+    "nearby_entities",
     "route_feasibility",
     "reachability",
     "line_of_sight",

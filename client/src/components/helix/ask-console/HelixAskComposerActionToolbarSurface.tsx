@@ -59,6 +59,7 @@ export type HelixAskComposerActionToolbarSurfaceProps = {
   onRuntimePrimaryClick: () => void;
   onRuntimeSelect: (value: HelixAgentRuntimeId) => void;
   liveRuntimeControlsModel?: HelixAskLiveRuntimeControlsModel | null;
+  onActiveSharedRoomChange?: (roomId: string | null) => void;
   submitViewModel: HelixAskComposerViewModel;
   onSubmitIntent: () => void;
   onStop: () => void;
@@ -93,6 +94,7 @@ export function HelixAskComposerActionToolbarSurface({
   onRuntimePrimaryClick,
   onRuntimeSelect,
   liveRuntimeControlsModel = null,
+  onActiveSharedRoomChange,
   submitViewModel,
   onSubmitIntent,
   onStop,
@@ -193,6 +195,7 @@ export function HelixAskComposerActionToolbarSurface({
           <HelixAskLiveRuntimeControls
             model={liveRuntimeControlsModel}
             onToolbarBridgeChange={handleLiveRuntimeBridgeChange}
+            onActiveSharedRoomChange={onActiveSharedRoomChange}
             onVisualInputEnableRequested={ensureVisualSourceCapture}
           />
         ) : null

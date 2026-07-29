@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-26T12:53:54.964Z",
-  "registryCount": 213,
+  "generatedAt": "2026-07-28T20:28:33.946Z",
+  "registryCount": 217,
   "coverage": {
     "exploratory": {
       "count": 21,
@@ -79,7 +79,7 @@
       ]
     },
     "diagnostic": {
-      "count": 140,
+      "count": 144,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -215,6 +215,10 @@
         "shared/casimir-dp-dp-scaling-forecast-stage4-2b.ts",
         "shared/casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
         "shared/casimir-dp-apparatus-identifiability-stage4-2b.ts",
+        "shared/casimir-dp-control-response-stage4-2c.ts",
+        "shared/casimir-dp-apparatus-redesign-stage4-2c.ts",
+        "shared/casimir-dp-acquisition-packets-stage4-2c.ts",
+        "shared/casimir-dp-cross-scale-metrology-stage4-2d.ts",
         "server/modules/halobank-solar/ephemeris-core.ts",
         "server/modules/halobank-solar/derived.ts",
         "server/routes/halobank-solar.ts",
@@ -309,7 +313,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 213,
+    "entriesWithUnits": 217,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -323,8 +327,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 140,
-        "withUnits": 140,
+        "total": 144,
+        "withUnits": 144,
         "missing": []
       },
       "certified": {
@@ -345,8 +349,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 2738,
-    "edgeCount": 6484
+    "nodeCount": 2846,
+    "edgeCount": 6926
   },
   "evidenceProfiles": [
     {

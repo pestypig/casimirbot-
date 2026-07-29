@@ -1,0 +1,59 @@
+{
+  "schema": "helix.fabric_sensor_build_receipt.v1",
+  "created_at": "2026-07-29T21:28:51.564Z",
+  "mod": {
+    "name": "HelixFabricSensor",
+    "version": "0.1.0",
+    "minecraft_version": "1.21.8",
+    "fabric_loader_minimum": "0.18.4",
+    "fabric_api_minimum": "0.136.1+1.21.8",
+    "java_version": 21,
+    "gradle_version": "8.14.3",
+    "loom_version": "1.11.8"
+  },
+  "source": {
+    "commit": "41d640c4acee2f2a414c4e1ebf1c4bb2f88ead6d",
+    "worktree_clean": false,
+    "tree_sha256": "98210a9355f8938c65124018cfdfaeaeb18af434d8909872467b70f0a9acd232",
+    "tree_hash_algorithm": "sha256(sorted utf8 relative-path + tab + file-sha256 + lf)",
+    "file_count": 16,
+    "tree_hash_excludes": [
+      "build/",
+      ".gradle/",
+      "run/",
+      "helix-fabric-sensor-build-receipt.json"
+    ]
+  },
+  "artifact": {
+    "path": "minecraft/helix-fabric-sensor/build/libs/HelixFabricSensor-0.1.0.jar",
+    "size_bytes": 95888,
+    "sha256": "a646fbe3a800684bf334df916043401a76f63b37dc36cc25e324ece2a679897e"
+  },
+  "defaults": {
+    "enabled": false,
+    "read_only_probes_enabled": true,
+    "execution_enabled": false
+  },
+  "verification": {
+    "gradle_clean_build": "pass",
+    "gradle_tests": "pass",
+    "fabric_1_21_8_local_runtime": "pass",
+    "manifest_received": true,
+    "heartbeat_received": true,
+    "snapshot_received": true,
+    "eight_read_only_probe_capabilities_completed": true,
+    "stale_source_failed_closed": true,
+    "wrong_player_failed_closed": true,
+    "permission_isolation_passed": true,
+    "raw_nbt_seen": false,
+    "side_effects_seen": false,
+    "java_connector_core_compile": "pass",
+    "secret_and_private_route_scan": "pass"
+  },
+  "evidence_refs": [
+    "artifacts/minecraft-situation-live/fabric-1.21.8-2026-07-29-user-battery",
+    "artifacts/minecraft-situation-live/fabric-1.21.8-2026-07-29-user-battery-v6",
+    "artifacts/minecraft-situation-live/fabric-1.21.8-2026-07-29-reentry-v8",
+    "artifacts/minecraft-situation-live/fabric-1.21.8-2026-07-29-recovery"
+  ]
+}

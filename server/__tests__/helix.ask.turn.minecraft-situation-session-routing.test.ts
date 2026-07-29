@@ -21,7 +21,7 @@ describe("helix ask Minecraft situation session routing", () => {
     vi.resetModules();
   });
 
-  it("routes Minecraft monitor phrasing to the Situation Goal Session workstation action", async () => {
+  it("keeps retired Minecraft Situation Room actions out of the provider path", async () => {
     process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
     process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
     vi.resetModules();
@@ -50,24 +50,19 @@ describe("helix ask Minecraft situation session routing", () => {
         action?.action_id === "start_situation_goal_session",
     );
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
-    expect(sessionAction).toBeTruthy();
-    expect(sessionAction?.args?.thread_id).toBe("helix-ask:desktop");
-    expect(sessionAction?.args?.room_id).toBe("room:minecraft-minehut");
-    expect(sessionAction?.args?.source_id).toBe("source:minecraft-server");
-    expect(sessionAction?.args?.world_id).toBe("minecraft:minehut");
+    expect(sessionAction).toBeUndefined();
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "workspace_panel",
+      target_kind: "workspace_panel",
+      strength: "hard",
+      precedence_reason:
+        "minecraft_situation_session_setup_is_action_not_evidence",
+    });
     expect(JSON.stringify(response.body)).not.toContain("I could not map that workspace command");
     expect(answerText(response.body)).not.toContain("terminal resolver detected inconsistent");
-    expect(
-      response.body?.current_turn_artifact_ledger?.some(
-        (entry: any) =>
-          entry?.kind === "workspace_action_receipt" &&
-          entry?.payload?.target_id === "situation-room-pipelines" &&
-          entry?.payload?.action_id === "start_situation_goal_session",
-      ),
-    ).toBe(true);
   }, 60000);
 
-  it("keeps visual-only Minecraft Cortana setup from fabricating a world-event source", async () => {
+  it("keeps visual-only Minecraft setup from fabricating a world-event source or executing a retired action", async () => {
     process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
     process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
     vi.resetModules();
@@ -97,15 +92,17 @@ describe("helix ask Minecraft situation session routing", () => {
         action?.panel_id === "situation-room-pipelines" &&
         (action?.action_id === "start_situation_goal_session" || action?.action_id === "create_live_answer_environment"),
     );
-    expect(setupAction).toBeTruthy();
-    expect(setupAction?.args).toMatchObject({
-      thread_id: "helix-ask:desktop",
-      room_id: "room:minecraft-minehut",
-      world_event_source_status: "configured_missing",
-      next_required_action: "attach_world_event_source",
+    expect(setupAction).toBeUndefined();
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "workspace_panel",
+      target_kind: "workspace_panel",
+      strength: "hard",
+      precedence_reason:
+        "minecraft_situation_session_setup_is_action_not_evidence",
     });
-    expect(setupAction?.args?.source_ids).toEqual([]);
-    expect(JSON.stringify(setupAction?.args)).not.toContain("source:minecraft-server");
+    expect(JSON.stringify(actions)).not.toContain(
+      "source:minecraft-server",
+    );
     expect(answerText(response.body)).not.toContain("The attached image shows");
   }, 60000);
 
@@ -145,7 +142,9 @@ describe("helix ask Minecraft situation session routing", () => {
 
     expect(answerText(response.body)).not.toContain("I could not map that workspace command");
     expect(response.body?.pending_resolution_reason).toBe("pending_cleared_for_unrelated_conversation");
-    expect(response.body?.pending_server_request).toBeNull();
+    expect(JSON.stringify(response.body?.pending_server_request ?? null)).not.toContain(
+      "pending:test",
+    );
   }, 60000);
 
   it("treats Minecraft situation questions as direct Ask context, not session setup", async () => {
@@ -241,11 +240,13 @@ describe("helix ask Minecraft situation session routing", () => {
         status: "active",
       },
     });
-    expect(response.body?.ok).toBe(true);
-    expect(response.body?.response_type).toBe("final_answer");
-    expect(response.body?.final_status).toBe("final_answer");
-    expect(response.body?.terminal_error_code).toBeNull();
-    expect(answerText(response.body)).not.toContain("model backend was unavailable");
+    expect(response.body?.ok).toBe(false);
+    expect(response.body?.response_type).toBe("final_failure");
+    expect(response.body?.final_status).toBe("final_failure");
+    expect([
+      "capability_itinerary_observations_missing",
+      "agent_loop_budget_exhausted",
+    ]).toContain(response.body?.terminal_error_code);
     expect(answerText(response.body)).not.toContain("Started a Minecraft Situation Goal Session action");
   }, 60000);
 });

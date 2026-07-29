@@ -24,4 +24,19 @@ final class CommandStatusFormatterTest {
         assertTrue(probes.contains("line_of_sight: succeeded"));
         assertTrue(debug.contains("raw_nbt false"));
     }
+
+    @Test
+    void formatsDiagnosticsBeforeDisabledSensorRuntimeStarts() {
+        HelixSensorConfig config = TestConfigs.minimal();
+
+        String status = String.join("\n", CommandStatusFormatter.status(config, null));
+        String probes = String.join("\n", CommandStatusFormatter.probes(null));
+        String debug = String.join("\n", CommandStatusFormatter.debugPayload(null));
+
+        assertTrue(status.contains("enabled: false"));
+        assertTrue(status.contains("manifest: pending"));
+        assertTrue(status.contains("snapshot: last sent never"));
+        assertTrue(probes.contains("sensor runtime not started"));
+        assertTrue(debug.contains("No snapshot payload built yet."));
+    }
 }

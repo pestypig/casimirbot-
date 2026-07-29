@@ -38,6 +38,26 @@ describe("Codex capability-lane request parsing", () => {
     });
   });
 
+  it("unwraps a continuation affordance envelope to its lane request", () => {
+    const request =
+      "HELIX_CAPABILITY_LANE_REQUEST_JSON: " +
+      JSON.stringify({
+        affordance_id: "turn:procedure:evaluate-closure",
+        reason: "Evaluate the prepared procedure.",
+        lane_request: {
+          capability: "theory-experiment-procedure.evaluate_closure",
+          procedure_id: "turn:procedure",
+          procedure_sha256: "sha256:procedure",
+        },
+      });
+
+    expect(extractCodexCapabilityLaneRequestCandidate(request)).toEqual({
+      capability: "theory-experiment-procedure.evaluate_closure",
+      procedure_id: "turn:procedure",
+      procedure_sha256: "sha256:procedure",
+    });
+  });
+
   it("translates the legacy workstation marker without exposing it as answer text", () => {
     const request =
       "HELIX_WORKSTATION_TOOL_REQUEST_JSON: " +

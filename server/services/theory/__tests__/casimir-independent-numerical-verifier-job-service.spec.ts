@@ -369,6 +369,39 @@ async function fixture(input: { includeReplayLedger?: boolean } = {}) {
 }
 
 describe("Casimir independent numerical verifier jobs", () => {
+  it("reports server-owned numerical runtime readiness without accepting caller claims", () => {
+    const unconfigured =
+      createCasimirIndependentNumericalVerifierJobService();
+    expect(unconfigured.inspectConfiguration()).toEqual({
+      schema:
+        "casimir.independent_numerical_verifier.runtime_inspection.v1",
+      executionCatalogConfigured: false,
+      sandboxExecutorConfigured: false,
+      trustedReceiptVerifierConfigured: false,
+      durableReplayLedgerConfigured: false,
+      readyForConfirmedExecution: false,
+      assistantAnswer: false,
+      terminalEligible: false,
+    });
+
+    const configured =
+      createCasimirIndependentNumericalVerifierJobService({
+        resolveTrustedExecutionCatalogEntry: async () => null,
+        resolveSandboxedExecutor: async () => null,
+        verifyTrustedRuntimeReceipt: verifyTrustedRuntimeTestReceipt,
+        confirmationReplayLedger: createTrustedRuntimeTestReplayLedger(),
+      });
+    expect(configured.inspectConfiguration()).toMatchObject({
+      executionCatalogConfigured: true,
+      sandboxExecutorConfigured: true,
+      trustedReceiptVerifierConfigured: true,
+      durableReplayLedgerConfigured: true,
+      readyForConfirmedExecution: true,
+      assistantAnswer: false,
+      terminalEligible: false,
+    });
+  });
+
   it("rejects missing, copied, stale-turn, ambiguous, and invalid procedure evidence before catalog resolution", async () => {
     const {
       procedure,

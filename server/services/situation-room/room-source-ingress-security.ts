@@ -8,6 +8,8 @@ const protectedSecretPatterns = [
   /room_source_claim_[A-Za-z0-9_-]{16,}/giu,
   /agent_chat_claim_[A-Za-z0-9_-]{16,}/giu,
   /claim_handle_[A-Za-z0-9_-]{8,}/giu,
+  /helix_env_device_[A-Za-z0-9_-]{24,}/giu,
+  /helix_probe_lease_[A-Za-z0-9_-]{24,}/giu,
   /Bearer\s+[A-Za-z0-9._~+/-]{16,}={0,2}(?![A-Za-z0-9._~+/-])/giu,
 ] as const;
 

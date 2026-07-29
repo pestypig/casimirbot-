@@ -83,7 +83,7 @@ public final class ProbePoller {
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 try {
                     Map<String, Object> result = executor.executeOnMainThread(probe);
-                    publisher.publishAsync(result).whenComplete((response, error) -> {
+                    publisher.publishAsync(ProbeSubmissionEnvelope.forProbe(probe, result)).whenComplete((response, error) -> {
                         markProbeComplete();
                         if (error == null) completion.complete(null);
                         else completion.completeExceptionally(error);

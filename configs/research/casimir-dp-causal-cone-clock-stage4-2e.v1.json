@@ -1,0 +1,253 @@
+{
+  "schema_version": "casimir_dp_causal_cone_clock_stage4_2e/1",
+  "study_id": "casimir-dp-quantum-foam-study-v1",
+  "campaign_id": "casimir-dp-causal-cone-clock-stage4-2e-v1",
+  "implementation_version": "stage4.2e-v1",
+  "evidence_cutoff": "2026-07-29T19:30:00.000Z",
+  "evidence_class": "synthetic_causal_geometry_recovery_and_screening_bound",
+  "claim_ceiling": "causal_geometry_consistency_and_propagation_control_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "authority_manifest": {
+    "path": "configs/research/casimir-dp-stage4-2e-authorities.v1.json",
+    "sha256": "cba9c8b40dc153cda0bb9683834df953c9de09a0c4d1a2bb9aa32ac5167b91f2"
+  },
+  "upstream_authorities": [
+    {
+      "role": "stage4_2d_config",
+      "path": "configs/research/casimir-dp-cross-scale-metrology-stage4-2d.v1.json",
+      "sha256": "614f5b6de4176ffda7fc49ce794592aa50a56ecb56d4accf7df3cae6b0bcc41e",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2d_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-2d-authorities.v1.json",
+      "sha256": "721e0ffbcc26425236d62ba2d368fc8cabec9ba469d5dfac89a707e90d42dcb1",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2d_fixture",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2d-cross-scale.synthetic.v1.json",
+      "sha256": "9fb2f66f5d454aafde3c65e058c2c94c7279d4a5e821bd4b2c359cae6e12ab85",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2d_report",
+      "path": "artifacts/research/casimir-dp-cross-scale-metrology-stage4-2d/casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z/cross-scale-metrology-stage4-2d-report.json",
+      "sha256": "5e16c28a32ab77d0ca7ee44483824ca6ddedfb09657a77340df4b4f892c74229",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2d_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-cross-scale-metrology-stage4-2d/casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z/cross-scale-metrology-stage4-2d-receipt.json",
+      "sha256": "e602cb12250c2560b1f71502ae93c17e754cacbbe69b6f0acfbb4a5a55a6809c",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2d_verification_receipt",
+      "path": "docs/research/casimir-dp-cross-scale-metrology-stage4-2d-verification-receipt.json",
+      "sha256": "d96430684379dd5408d8099ae49a05ca0eaf4042a0ea64b09e23d0a4156a0556",
+      "required_at_runtime": true
+    }
+  ],
+  "immutable_stage4_2d": {
+    "campaign_run_id": "casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z",
+    "software_and_recovery_diagnostics": "pass",
+    "spectroscopic_response_authority": "not_ready",
+    "physical_pilot_readiness": "not_ready",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  },
+  "sources": [
+    {
+      "source_id": "gourgoulhon_3plus1_2007",
+      "title": "3+1 Formalism and Bases of Numerical Relativity",
+      "url": "https://arxiv.org/abs/gr-qc/0703035",
+      "source_class": "primary_research",
+      "supports": "ADM lapse, shift, spatial metric, observers, and causal decomposition used for local cone and proper-clock reconstruction.",
+      "does_not_support": "NHM2 physical viability, a Casimir metric response, or objective collapse."
+    },
+    {
+      "source_id": "ehlers_pirani_schild_1972",
+      "title": "The geometry of free fall and light propagation",
+      "url": "https://doi.org/10.1007/s10714-012-1353-4",
+      "source_class": "primary_research",
+      "supports": "Compatible light-ray and freely falling-particle structures as operational foundations for Lorentzian geometry and standard clocks.",
+      "does_not_support": "A quantum collapse mechanism or a cavity-to-metric transfer."
+    },
+    {
+      "source_id": "penrose_causal_spaces_1967",
+      "title": "On the structure of causal spaces",
+      "url": "https://doi.org/10.1017/S030500410004144X",
+      "source_class": "primary_research",
+      "supports": "Causal and chronological order as geometric structure built from observer histories and signal relations.",
+      "does_not_support": "A DP master equation or measured manifold superposition."
+    },
+    {
+      "source_id": "hawking_king_mccarthy_1976",
+      "title": "A new topology for curved space-time which incorporates the causal, differential, and conformal structures",
+      "url": "https://doi.org/10.1063/1.522874",
+      "source_class": "primary_research",
+      "supports": "The relation between causal structure and the conformal spacetime geometry under stated causality assumptions.",
+      "does_not_support": "The conformal scale, a complete stress-energy solve, or collapse dynamics."
+    },
+    {
+      "source_id": "penrose_nobel_2020",
+      "title": "Black Holes, Cosmology, and Space-Time Singularities",
+      "url": "https://www.nobelprize.org/uploads/2024/02/penrose-lecture.pdf",
+      "source_class": "official_reference",
+      "supports": "The distinction between an individual photon history, local null cones, and null-geodesic causal structure in curved spacetime.",
+      "does_not_support": "A Casimir-conditioned collapse rate."
+    },
+    {
+      "source_id": "penrose_or_1996",
+      "title": "On Gravity's role in Quantum State Reduction",
+      "url": "https://doi.org/10.1007/BF02105068",
+      "source_class": "primary_research",
+      "supports": "The proposed lifetime of order hbar over branch-relative gravitational self-energy and its time-translation motivation.",
+      "does_not_support": "A standard-DP boundary modifier or a solved branch-dependent null cone."
+    },
+    {
+      "source_id": "fulling_milton_casimir_gravity_2007",
+      "title": "How Does Casimir Energy Fall?",
+      "url": "https://doi.org/10.1103/PhysRevD.76.025004",
+      "source_class": "primary_research",
+      "supports": "Finite Casimir interaction energy contributes to inertial and gravitational mass within a complete apparatus treatment.",
+      "does_not_support": "Using negative interaction energy density alone as a solved spacetime geometry or collapse trigger."
+    },
+    {
+      "source_id": "scharnhorst_1990",
+      "title": "On propagation of light in the vacuum between plates",
+      "url": "https://doi.org/10.1016/0370-2693(90)90997-K",
+      "source_class": "primary_research",
+      "supports": "An ideal low-frequency QED vacuum-polarization propagation correction between parallel conducting plates.",
+      "does_not_support": "A measurable gravitational cone shift, causal signalling beyond the relativistic front, or DP collapse."
+    },
+    {
+      "source_id": "barton_1990",
+      "title": "Faster-than-c light between parallel mirrors: The Scharnhorst effect rederived",
+      "url": "https://doi.org/10.1016/0370-2693(90)91224-Y",
+      "source_class": "primary_research",
+      "supports": "The ideal QED effective-index correction and its extreme smallness as a propagation-control benchmark.",
+      "does_not_support": "A universal metric response or an experimentally accessible cavity-to-collapse transfer."
+    }
+  ],
+  "constants": {
+    "hbar_J_s": 1.054571817e-34,
+    "G_m3_kg_s2": 6.6743e-11,
+    "c_m_s": 299792458,
+    "fine_structure_constant": 0.0072973525643,
+    "electron_reduced_compton_wavelength_m": 3.8615926744e-13
+  },
+  "adm_benchmarks": [
+    {
+      "case_id": "minkowski",
+      "authority": "analytic_recovery",
+      "lapse": 1,
+      "shift": [0, 0, 0],
+      "spatial_metric": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      "direction": [1, 0, 0],
+      "timelike_coordinate_velocity_over_c": [0, 0, 0],
+      "segment_length_m": 1,
+      "expected_clock_rate": 1
+    },
+    {
+      "case_id": "nhm2_centerline_lapse_reference",
+      "authority": "synthetic_same_equation_recovery",
+      "lapse": 0.7,
+      "shift": [0, 0, 0],
+      "spatial_metric": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      "direction": [1, 0, 0],
+      "timelike_coordinate_velocity_over_c": [0, 0, 0],
+      "segment_length_m": 1006.9200553445334,
+      "expected_clock_rate": 0.7
+    },
+    {
+      "case_id": "shifted_anisotropic_chart",
+      "authority": "synthetic_adm_recovery",
+      "lapse": 0.95,
+      "shift": [0.1, -0.02, 0.01],
+      "spatial_metric": [[1.02, 0.01, 0], [0.01, 1.01, 0], [0, 0, 0.98]],
+      "direction": [1, 0, 0],
+      "timelike_coordinate_velocity_over_c": [-0.1, 0.02, -0.01],
+      "segment_length_m": 2,
+      "expected_clock_rate": 0.95
+    }
+  ],
+  "weak_field_radial_null_recovery": {
+    "central_mass_kg": 1.98847e30,
+    "emitter_radius_m": 695700000,
+    "reflector_radius_m": 705700000,
+    "coordinate_system": "schwarzschild_areal_radius",
+    "expected_maximum_relative_error": 1e-12
+  },
+  "casimir_semiclassical_screen": {
+    "gap_m": 1e-7,
+    "plate_area_m2": 1e-8,
+    "ideal_parallel_conductors": true,
+    "complete_apparatus_tensor_available": false,
+    "conserved_total_stress_verified": false,
+    "metric_boundary_conditions_registered": false
+  },
+  "qed_effective_propagation_control": {
+    "model": "ideal_low_frequency_scharnhorst_scaling",
+    "coefficient_11_pi2_over_2700": 0.040209499411845526,
+    "probe_frequency_Hz": 194400000000000,
+    "sigma_plus_weight": 1,
+    "sigma_minus_weight": 1,
+    "material_dispersion_measured": false,
+    "polarization_response_measured": false,
+    "front_velocity_claim_allowed": false
+  },
+  "hypothesis_policy": {
+    "ordinary_qed_and_material_propagation": "registered_control_lane",
+    "ordinary_gr_complete_apparatus_response": "screening_bound_only",
+    "frozen_mass_density_dp": "registered_nonrelativistic_markovian_mass_density_dp",
+    "standard_dp_boundary_modifier": false,
+    "branch_metric_kernel_registered": false,
+    "metric_to_coherence_kernel_registered": false,
+    "registered_dp_generator_mutated": false
+  },
+  "thresholds": {
+    "maximum_null_constraint_absolute_error": 1e-12,
+    "maximum_clock_identity_absolute_error": 1e-12,
+    "minimum_spatial_metric_leading_minor": 1e-12,
+    "maximum_weak_field_recovery_relative_error": 1e-12,
+    "maximum_direct_gravitational_fractional_light_time_bound": 1e-40,
+    "minimum_qed_to_gravity_scale_separation": 1e10
+  },
+  "fixture": {
+    "path": "configs/research/fixtures/casimir-dp-stage4-2e-causal-cone.synthetic.v1.json",
+    "sha256": "16245e73a70acee3a429a6beaee6ec5b18b66863a357c60918d602920ef9bab8"
+  },
+  "run_order": [
+    "verify_immutable_stage4_2d_authority_tuples",
+    "freeze_causal_geometry_source_support_boundaries",
+    "freeze_adm_units_chart_and_time_orientation",
+    "recover_minkowski_local_null_cone_and_clock",
+    "recover_nhm2_same_equation_cone_boundary_without_promoting_l_over_c",
+    "recover_shifted_anisotropic_adm_cone",
+    "integrate_bounded_schwarzschild_radial_null_and_radar_clock",
+    "compute_ideal_casimir_interaction_stress_screening_bound",
+    "block_geometry_promotion_without_complete_apparatus_tensor",
+    "compute_qed_effective_propagation_control",
+    "separate_metric_qed_material_and_polarization_signatures",
+    "verify_standard_dp_boundary_independence",
+    "block_branch_metric_and_metric_to_coherence_edges",
+    "execute_fail_closed_fixture_matrix",
+    "write_claim_nonclaim_and_pilot_ledger",
+    "write_content_addressed_report_trace_and_receipt"
+  ],
+  "final_status_policy": {
+    "software_and_causal_recovery_diagnostics": "pass",
+    "null_geodesic_apparatus_authority": "not_ready",
+    "complete_apparatus_metric_response": "not_ready",
+    "physical_pilot_readiness": "not_ready",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  }
+}

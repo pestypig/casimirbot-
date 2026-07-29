@@ -8,6 +8,11 @@ import {
   HELIX_ROOM_SOURCE_ADMISSION_SCHEMA,
   type HelixRoomSourceAdmission,
 } from "@shared/helix-room-source-ingress";
+import {
+  HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+  HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+} from "@shared/helix-environment-connector";
+import type { HelixEnvironmentAdapterAdmissionProjection } from "@shared/helix-environment-adapter-profile";
 import { accountSessionRouter } from "../../../../routes/account-session";
 import { sharedRealtimeRoomRouter } from "../../../../routes/agi.realtime-room/index";
 import {
@@ -35,7 +40,19 @@ import { resetWorldEventIngestState } from "../../../situation-room/world-event-
 import { readLatestBoundRoomSourceCandidate } from "../../workstation-tool-gateway/bound-room-evidence";
 import { resetSharedRealtimeRoomStore } from "../room-store";
 import { resetRoomSourceIngressStoreForTest } from "../source-link-store";
-import { getSharedLiveRoomControlService } from "../../../shared-live-room-control/default-service";
+import {
+  getSharedLiveRoomBindingStore,
+  getSharedLiveRoomControlService,
+} from "../../../shared-live-room-control/default-service";
+import { materializeLegacyRoomSourceConnector } from "../../../environment-connectors/bindings";
+import {
+  listEnvironmentConnectorCapabilityDescriptors,
+  readEnvironmentConnectorCapabilityDescriptor,
+} from "../../../environment-connectors/catalog";
+import {
+  dispatchDurableEnvironmentProbe,
+  readDurableEnvironmentProbeObservation,
+} from "../../../environment-connectors/probe";
 
 type SignedHeaders = Record<string, string>;
 const SAME_ORIGIN_HEADERS = {
@@ -145,8 +162,7 @@ const createBinding = async (
     .set("Idempotency-Key", `source-create:${crypto.randomUUID()}`)
     .send({
       world_id: source.world_id ?? "minecraft:minehut:room-a",
-      domain_adapter:
-        source.domain_adapter ?? "minecraft.paper_plugin.v1",
+      domain_adapter: source.domain_adapter ?? "minecraft.paper_plugin.v1",
       source_label: source.source_label ?? "Minehut Room A",
     })
     .expect(201);
@@ -248,7 +264,7 @@ describe("Shared Realtime room source ingress", () => {
     vi.unstubAllEnvs();
   });
 
-  it("lets only a developer room owner mint, list, rotate, and revoke a show-once source credential", async () => {
+  it("lets only an admitted room owner mint, list, rotate, and revoke a show-once source credential", async () => {
     const app = createApp();
     const anonymousRoomId = "shared_realtime_room:not-visible";
     await request(app)
@@ -426,6 +442,43 @@ describe("Shared Realtime room source ingress", () => {
     expect(JSON.stringify(revoked.body)).not.toContain(
       rotated.body.token_value,
     );
+  });
+
+  it("lets a local experimental guest owner claim a session-bound read-only source link", async () => {
+    vi.stubEnv("HELIX_GUEST_ROOM_CREATION", "1");
+    const app = createApp();
+    const guest = request.agent(app);
+    const enabled = await guest
+      .post("/api/account/session/experimental-rooms")
+      .send({ enabled: true })
+      .expect(200);
+    expect(enabled.body.status.session.profile.auth_mode).toBe("guest");
+    expect(enabled.body.status.account_policy).toMatchObject({
+      feature_flags: expect.arrayContaining(["room_source_ingress"]),
+      locked_features: expect.not.arrayContaining(["room_source_ingress"]),
+    });
+
+    const roomId = await createRoom(guest, "Guest local Minecraft room");
+    const created = await createBinding(guest, roomId, {
+      world_id: "minecraft:paper-local-test",
+      domain_adapter: "minecraft.paper_plugin.v1",
+      source_label: "Local Paper test",
+    });
+    expect(created.binding).toMatchObject({
+      room_id: roomId,
+      world_id: "minecraft:paper-local-test",
+      domain_adapter: "minecraft.paper_plugin.v1",
+    });
+    expect(created.token).toMatch(/^helix_room_src_/);
+    expect(created.body).toMatchObject({
+      plugin_config: {
+        execution_enabled: false,
+      },
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
   });
 
   it("keeps the first-party source manager and credential claim ahead of global bearer auth", async () => {
@@ -638,7 +691,14 @@ describe("Shared Realtime room source ingress", () => {
           event_type: "location_sample",
           location: { x: 12, y: 64, z: -4, dimension: "minecraft:overworld" },
           evidence_refs: [],
-          meta: { domain_adapter: created.binding.domain_adapter },
+          meta: {
+            domain_adapter: created.binding.domain_adapter,
+            snapshot: {
+              model_invoked: false,
+              assistant_answer: false,
+              terminal_eligible: false,
+            },
+          },
         },
       ],
     });
@@ -770,9 +830,7 @@ describe("Shared Realtime room source ingress", () => {
         source_label: "Synthetic fixture",
       })
       .expect(409);
-    expect(disabledFixture.body.error).toBe(
-      "environment_adapter_disabled",
-    );
+    expect(disabledFixture.body.error).toBe("environment_adapter_disabled");
 
     const unknownAdapter = await owner
       .post(
@@ -785,9 +843,7 @@ describe("Shared Realtime room source ingress", () => {
         domain_adapter: "unknown_game.plugin.v1",
       })
       .expect(400);
-    expect(unknownAdapter.body.error).toBe(
-      "environment_adapter_unknown",
-    );
+    expect(unknownAdapter.body.error).toBe("environment_adapter_unknown");
 
     const crossedIdentity = await owner
       .post(
@@ -896,9 +952,7 @@ describe("Shared Realtime room source ingress", () => {
         schema: "helix.environment_adapter_admission.v1",
         adapter_profile_id: "game.synthetic_fixture.readonly.v1",
         source_family: "synthetic_game",
-        mechanics_collection_ids: [
-          "mechanics.synthetic_game.fixture.v1",
-        ],
+        mechanics_collection_ids: ["mechanics.synthetic_game.fixture.v1"],
         assistant_answer: false,
         terminal_eligible: false,
       },
@@ -942,14 +996,43 @@ describe("Shared Realtime room source ingress", () => {
         source_family: "synthetic_game",
       },
     });
+    const admittedContractHash = manifestResponse.body.observation_ref
+      .adapter_admission.adapter_contract_hash as string;
+    await getPool().query(
+      `
+        UPDATE helix_environment_adapter_admissions
+        SET adapter_contract_hash = $2
+        WHERE binding_id = $1
+          AND status = 'active';
+      `,
+      [created.binding.binding_id, `sha256:${"0".repeat(64)}`],
+    );
+    const changedContract = await request(app)
+      .post(sourcePath(created.binding.binding_id, "world-events/batch"))
+      .set(nextHeaders(eventBatch))
+      .send(eventBatch)
+      .expect(409);
+    expect(changedContract.body).toMatchObject({
+      error: "environment_adapter_contract_changed",
+      accepted: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    await getPool().query(
+      `
+        UPDATE helix_environment_adapter_admissions
+        SET adapter_contract_hash = $2
+        WHERE binding_id = $1
+          AND status = 'active';
+      `,
+      [created.binding.binding_id, admittedContractHash],
+    );
     const candidate = await readLatestBoundRoomSourceCandidate(roomId);
     expect(candidate).toMatchObject({
       bindingId: created.binding.binding_id,
       sourceFamily: "synthetic_game",
       domain: "game",
-      mechanicsCollectionIds: [
-        "mechanics.synthetic_game.fixture.v1",
-      ],
+      mechanicsCollectionIds: ["mechanics.synthetic_game.fixture.v1"],
       adapterAdmission: {
         adapter_profile_id: "game.synthetic_fixture.readonly.v1",
       },
@@ -959,15 +1042,11 @@ describe("Shared Realtime room source ingress", () => {
       .get(sourcePath(created.binding.binding_id, "status"))
       .set(
         nextHeaders("", {
-          "X-Helix-Sent-At": new Date(
-            Date.now() - 90_000,
-          ).toISOString(),
+          "X-Helix-Sent-At": new Date(Date.now() - 90_000).toISOString(),
         }),
       )
       .expect(408);
-    expect(profileStale.body.error).toBe(
-      "room_source_request_stale",
-    );
+    expect(profileStale.body.error).toBe("room_source_request_stale");
 
     const replacementEpoch = crypto.randomUUID();
     const beforeEpochManifest = await request(app)
@@ -1020,8 +1099,7 @@ describe("Shared Realtime room source ingress", () => {
       .post("/api/agi/realtime/room-source-credential-deliveries/claim")
       .set(SAME_ORIGIN_HEADERS)
       .send({
-        claim_handle:
-          rotationDelivery.body.credential_delivery.claim_handle,
+        claim_handle: rotationDelivery.body.credential_delivery.claim_handle,
       })
       .expect(200);
     const admissionState = await getPool().query<{ status: string }>(
@@ -1035,9 +1113,7 @@ describe("Shared Realtime room source ingress", () => {
       [created.binding.binding_id],
     );
     expect(admissionState.rows[0]?.status).toBe("revoked");
-    expect(
-      await readLatestBoundRoomSourceCandidate(roomId),
-    ).toBeNull();
+    expect(await readLatestBoundRoomSourceCandidate(roomId)).toBeNull();
   });
 
   it("rejects actual bearer and claim values before request or journal persistence", async () => {
@@ -1782,6 +1858,262 @@ describe("Shared Realtime room source ingress", () => {
       accepted: true,
       assistant_answer: false,
       terminal_eligible: false,
+    });
+  });
+
+  it("delivers a durable one-time lease to the authenticated connector while persisting only its hash", async () => {
+    const app = createApp();
+    const owner = await signIn(
+      app,
+      "profile:durable-probe-route",
+      "Durable Probe Route",
+    );
+    const roomId = await createRoom(owner);
+    const created = await createBinding(owner, roomId);
+    const nextHeaders = ingressHeaderFactory(created.token);
+    const manifest = JSON.stringify({
+      ...manifestFixture,
+      manifest_id: `manifest:${created.binding.source_id}:durable`,
+      source_id: created.binding.source_id,
+      room_id: created.binding.room_id,
+      domain_adapter: created.binding.domain_adapter,
+      created_at: new Date().toISOString(),
+    });
+    const manifestResponse = await request(app)
+      .post(sourcePath(created.binding.binding_id, "manifest"))
+      .set(nextHeaders(manifest))
+      .send(manifest)
+      .expect(200);
+    const adapterAdmission = manifestResponse.body.observation_ref
+      .adapter_admission as HelixEnvironmentAdapterAdmissionProjection;
+    await ensureDatabase();
+    const credential = await getPool().query<{ credential_id: string }>(
+      `
+        SELECT credential_id
+        FROM helix_room_source_credentials
+        WHERE binding_id = $1 AND status = 'active'
+        LIMIT 1;
+      `,
+      [created.binding.binding_id],
+    );
+    const connector = await materializeLegacyRoomSourceConnector({
+      ownerProfileId: "profile:durable-probe-route",
+      roomSourceBindingId: created.binding.binding_id,
+      credentialId: credential.rows[0].credential_id,
+      roomId: created.binding.room_id,
+      sourceId: created.binding.source_id,
+      worldId: created.binding.world_id,
+      producerEpochRef: adapterAdmission.producer_epoch_ref,
+      adapterAdmission,
+      capabilityDescriptors: listEnvironmentConnectorCapabilityDescriptors({
+        adapterProfileId: adapterAdmission.adapter_profile_id,
+      }),
+    });
+    const now = new Date();
+    await getPool().query(
+      `
+        INSERT INTO helix_agent_runs (
+          run_id, schema_version, tenant_id, issuer, subject_id,
+          account_profile_id, objective, objective_hash, runtime_provider,
+          provider_goal_id, provider_thread_id, provider_session_id,
+          lifecycle_status, completion_status, terminal_authority_status,
+          configuration, evidence_bundle, max_steps, active_operation_id,
+          operation_started_at, expires_at, created_at, updated_at
+        ) VALUES (
+          $1, 'helix.agent_run.v1', 'tenant:durable-probe-route',
+          'https://issuer.example.test', 'subject:durable-probe-route', $2,
+          'Inspect the bound actor inventory.', $3, 'codex', $4, $5, $6,
+          'running', 'in_progress', 'pending', '{}'::jsonb, '{}'::jsonb, 8,
+          'agent_operation:durable-probe-route', $8, $7, $8, $8
+        );
+      `,
+      [
+        "agent_run:durable-probe-route",
+        "profile:durable-probe-route",
+        `sha256:${"c".repeat(64)}`,
+        "provider_goal:durable-probe-route",
+        "provider_thread:durable-probe-route",
+        "provider_session:durable-probe-route",
+        new Date(now.getTime() + 60_000).toISOString(),
+        now.toISOString(),
+      ],
+    );
+    await getSharedLiveRoomBindingStore().bindRunToRoom({
+      owner: {
+        tenantId: "tenant:durable-probe-route",
+        issuer: "https://issuer.example.test",
+        subjectId: "subject:durable-probe-route",
+        accountProfileId: "profile:durable-probe-route",
+      },
+      runId: "agent_run:durable-probe-route",
+      roomId: created.binding.room_id,
+      now: now.toISOString(),
+    });
+    const dispatched = await dispatchDurableEnvironmentProbe({
+      tenantId: "tenant:durable-probe-route",
+      ownerSubjectId: "subject:durable-probe-route",
+      ownerProfileId: "profile:durable-probe-route",
+      executionAuthorityKind: "external_agent_run",
+      runId: "agent_run:durable-probe-route",
+      turnId: "ask:durable-probe-route",
+      providerExecutionId: "provider_execution:durable-probe-route",
+      toolCallId: "tool_call:durable-probe-route",
+      roomId: created.binding.room_id,
+      sourceId: created.binding.source_id,
+      producerEpochRef: adapterAdmission.producer_epoch_ref,
+      adapterAdmission,
+      connector,
+      descriptor: readEnvironmentConnectorCapabilityDescriptor(
+        HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+      )!,
+      arguments: {
+        target: "current_actor",
+        freshness_requirement_ms: 5_000,
+      },
+      freshnessRequirementMs: 5_000,
+      timeoutMs: 10_000,
+      idempotencyKey: "idempotency:durable-probe-route",
+      now,
+    });
+
+    const refreshedManifest = await request(app)
+      .post(sourcePath(created.binding.binding_id, "manifest"))
+      .set(nextHeaders(manifest))
+      .send(manifest)
+      .expect(200);
+    expect(
+      refreshedManifest.body.observation_ref.adapter_admission.admission_id,
+    ).toBe(adapterAdmission.admission_id);
+
+    const pendingHeaders = nextHeaders("");
+    const pending = await request(app)
+      .get(
+        `${sourcePath(created.binding.binding_id, "probes/pending")}?limit=8`,
+      )
+      .set(pendingHeaders)
+      .expect(200);
+    const leasedRequest = pending.body.probe_requests.find(
+      (entry: { probe_request_id?: string }) =>
+        entry.probe_request_id === dispatched.requestId,
+    ) as {
+      probe_request_id: string;
+      connector_transport: {
+        schema: string;
+        probe_attempt_id: string;
+        lease_token: string;
+      };
+    };
+    expect(leasedRequest).toMatchObject({
+      probe_request_id: dispatched.requestId,
+      connector_transport: {
+        schema: "helix.environment_connector.probe_lease.v1",
+      },
+    });
+    expect(leasedRequest.connector_transport.lease_token).toMatch(
+      /^helix_probe_lease_/,
+    );
+
+    const persistedReceipt = await getPool().query<{
+      response_receipt: unknown;
+    }>(
+      `
+        SELECT response_receipt
+        FROM helix_room_source_ingress_requests
+        WHERE binding_id = $1 AND request_id = $2
+        LIMIT 1;
+      `,
+      [created.binding.binding_id, pendingHeaders["X-Helix-Request-Id"]],
+    );
+    expect(
+      JSON.stringify(persistedReceipt.rows[0].response_receipt),
+    ).not.toContain(leasedRequest.connector_transport.lease_token);
+    expect(persistedReceipt.rows[0].response_receipt).toMatchObject({
+      probe_requests: [
+        expect.objectContaining({
+          connector_transport: expect.objectContaining({
+            lease_token_included: false,
+          }),
+        }),
+      ],
+    });
+
+    const result = {
+      schema: "helix.environment_probe_result.v1",
+      probe_result_id: `probe_result:${crypto.randomUUID()}`,
+      probe_request_id: dispatched.requestId,
+      source_id: created.binding.source_id,
+      room_id: created.binding.room_id,
+      domain: "minecraft",
+      probe_type: "inventory_check",
+      status: "succeeded",
+      result_summary: "The bound actor has four inventory stacks.",
+      result: { details: { stack_count: 4 } },
+      sensor_scope: "privileged_server_state",
+      requires_caveat: true,
+      side_effects_performed: false,
+      commands_executed: [],
+      world_mutation_performed: false,
+      evidence_refs: [created.binding.binding_id],
+      deterministic: true,
+      model_invoked: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_policy: "compact_context_pack_only",
+      created_at: new Date().toISOString(),
+    };
+    const toxicSubmission = JSON.stringify({
+      schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+      probe_attempt_id: leasedRequest.connector_transport.probe_attempt_id,
+      lease_token: leasedRequest.connector_transport.lease_token,
+      result: {
+        ...result,
+        result_summary: "helix_env_device_secret_value_1234567890_abcdef",
+      },
+      submitted_at: new Date().toISOString(),
+    });
+    const rejectedSecret = await request(app)
+      .post(sourcePath(created.binding.binding_id, "probes/result"))
+      .set(nextHeaders(toxicSubmission))
+      .send(toxicSubmission)
+      .expect(400);
+    expect(rejectedSecret.body).toMatchObject({
+      error: "room_source_secret_exposure_rejected",
+      accepted: false,
+    });
+    expect(JSON.stringify(rejectedSecret.body)).not.toContain(
+      "helix_env_device_secret_value_1234567890_abcdef",
+    );
+
+    const submission = JSON.stringify({
+      schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+      probe_attempt_id: leasedRequest.connector_transport.probe_attempt_id,
+      lease_token: leasedRequest.connector_transport.lease_token,
+      result,
+      submitted_at: new Date().toISOString(),
+    });
+    const recorded = await request(app)
+      .post(sourcePath(created.binding.binding_id, "probes/result"))
+      .set(nextHeaders(submission))
+      .send(submission)
+      .expect(200);
+    expect(recorded.body).toMatchObject({
+      ok: true,
+      accepted: true,
+      observation_ref: {
+        probe_request_ref: dispatched.requestId,
+        outcome: "succeeded",
+        provenance_valid: true,
+        eligible_for_current_turn_reentry: true,
+        terminal_eligible: false,
+      },
+    });
+    expect(
+      await readDurableEnvironmentProbeObservation(dispatched.requestId),
+    ).toMatchObject({
+      outcome: "succeeded",
+      result: {
+        item_count: 4,
+      },
     });
   });
 });

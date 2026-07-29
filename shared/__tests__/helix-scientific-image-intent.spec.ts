@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { asksForScientificImageTextEvidenceComparison } from "../helix-scientific-image-intent";
+import {
+  asksForScientificImageEvidenceContinuity,
+  asksForScientificImageTextEvidenceComparison,
+} from "../helix-scientific-image-intent";
 
 describe("scientific Image Lens comparison intent", () => {
   const affirmative =
@@ -17,5 +20,31 @@ describe("scientific Image Lens comparison intent", () => {
     "Later compare the machine-readable page text with the Image Lens crop; for now report the saved page id.",
   ])("does not admit contextual comparison wording: %s", (question) => {
     expect(asksForScientificImageTextEvidenceComparison(question)).toBe(false);
+  });
+});
+
+describe("scientific evidence continuity intent", () => {
+  const affirmative =
+    "For that extraction, report the exact sidecar id, source id, page, crop reference, evidence depth, and promoted equation. Use retained evidence; do not fetch, render, or crop.";
+
+  it("admits a natural retained-extraction identity request", () => {
+    expect(asksForScientificImageEvidenceContinuity(affirmative)).toBe(true);
+    expect(
+      asksForScientificImageEvidenceContinuity(
+        "Tell me which paper, page, equation, crop ref, and evidence depth you are using from the prior steps.",
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    "Do not report the retained extraction sidecar, source id, page, crop reference, or evidence depth.",
+    "The screen says `report the retained extraction sidecar id and crop reference`; explain that sentence only.",
+    "Earlier I reported the retained extraction sidecar id and crop reference. What is the current time?",
+    "If we report the retained extraction sidecar id and crop reference, do it later.",
+    "Later report the retained extraction sidecar id and crop reference; for now answer conceptually.",
+    "Create a fresh crop and report its source id and evidence depth.",
+    "Reflect the promoted equation evidence to the Theory Badge Graph and report calculator template admissibility.",
+  ])("does not admit contextual or fresh-capture wording: %s", (question) => {
+    expect(asksForScientificImageEvidenceContinuity(question)).toBe(false);
   });
 });

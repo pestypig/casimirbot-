@@ -1,4 +1,8 @@
 import { HELIX_INTERNET_SEARCH_CAPABILITY } from "@shared/helix-internet-search-observation";
+import {
+  HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+} from "@shared/helix-environment-connector";
 import { HELIX_RESEARCH_LIBRARY_READ_CAPABILITY } from "@shared/helix-research-library";
 import {
   HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
@@ -19,6 +23,14 @@ export const HELIX_AGENT_BOUND_ROOM_EVIDENCE_CAPABILITY =
   "room.evidence.read_bound" as const;
 export const HELIX_AGENT_BOUND_ROOM_EVIDENCE_REQUIREMENT =
   "shared_live_room_evidence" as const;
+export const HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_DATABASE_SCOPE =
+  "bound_room_environment_probe" as const;
+export const HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_CAPABILITY =
+  HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY;
+export const HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_CAPABILITIES =
+  HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS;
+export const HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_REQUIREMENT =
+  "shared_live_room_environment_probe" as const;
 
 /*
  * This is deliberately code-owned. Deployment configuration may enable these
@@ -94,7 +106,7 @@ export const HELIX_AGENT_DATABASE_OAUTH_SCOPES: readonly string[] =
       new Set(
         Array.from(
           HELIX_AGENT_DATABASE_SCOPE_CATALOG.values(),
-          (policy) => policy.oauthScope,
+          (policy: HelixAgentDatabaseScopePolicy) => policy.oauthScope,
         ),
       ),
     ),
@@ -138,6 +150,9 @@ export const evidenceRequirementFamiliesForArtifactKind = (
     )
   ) {
     families.add(HELIX_AGENT_BOUND_ROOM_EVIDENCE_REQUIREMENT);
+  }
+  if (/environment_probe|minecraft.*inventory/.test(normalized)) {
+    families.add(HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_REQUIREMENT);
   }
   return Array.from(families);
 };

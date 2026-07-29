@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "helix_fabric_sensor",
+  "version": "${version}",
+  "name": "Helix Fabric Sensor",
+  "description": "Read-only, room-bound Minecraft environment observations for Helix.",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.casimirbot.helixsensor.fabric.HelixFabricSensorMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "minecraft": "~1.21.8",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

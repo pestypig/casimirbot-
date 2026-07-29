@@ -87,6 +87,14 @@ const providerTerminalSupportRefsRequired = (
   candidate?.evidence_reentry_required === false
 );
 
+const providerBridgeAuthorizesCurrentTurnCandidate = (
+  bridge: Record<string, unknown> | null,
+  turnId: string,
+): boolean =>
+  readString(bridge?.turn_id) === turnId &&
+  bridge?.terminal_authority_granted === true &&
+  bridge?.final_visible_answer_authorized === true;
+
 const withOutputRole = (
   result: HelixTerminalProductMaterializerResult,
 ): HelixTerminalProductMaterializerResult => ({
@@ -127,6 +135,89 @@ const artifactObservationSucceeded = (artifact: HelixTerminalProductArtifactLike
   return statuses.every((status) => !/^(?:failed|blocked|missing_input|needs_confirmation|error)$/i.test(status));
 };
 
+const isCurrentTurnReenteredPriorEnvironmentEvidenceArtifact = (
+  artifact: HelixTerminalProductArtifactLike,
+  turnId: string,
+): boolean => {
+  const record = artifact as Record<string, unknown>;
+  const payload = artifactPayload(artifact);
+  const observation = readRecord(payload?.observation);
+  const ref = artifactId(artifact);
+  return (
+    artifactKind(artifact) === "prior_environment_probe_evidence" &&
+    artifactSchema(artifact) ===
+      "helix.environment_connector.prior_probe_evidence.v1" &&
+    readString(record.turn_id) === turnId &&
+    readString(record.source_scope) === "prior_turn_context" &&
+    readString(record.producer_item_id) ===
+      "conversation_memory_environment_evidence_reentry" &&
+    readString(record.status) === "succeeded" &&
+    Boolean(ref?.startsWith(`${turnId}:prior_environment_probe_evidence:`)) &&
+    readString(payload?.prior_turn_id) !== null &&
+    readString(payload?.prior_turn_id) !== turnId &&
+    readString(payload?.probe_request_ref) !== null &&
+    readString(payload?.room_id) !== null &&
+    readString(payload?.source_id) !== null &&
+    readString(payload?.world_id) !== null &&
+    readString(payload?.capability_id) !== null &&
+    observation?.schema ===
+      "helix.environment_connector.probe_observation.v1" &&
+    observation?.outcome === "succeeded" &&
+    observation?.provenance_valid === true &&
+    observation?.eligible_for_current_turn_reentry === true &&
+    observation?.content_role ===
+      "environment_probe_observation_not_assistant_answer" &&
+    observation?.reentry_required === true &&
+    observation?.answer_authority === false &&
+    observation?.assistant_answer === false &&
+    observation?.terminal_eligible === false &&
+    observation?.raw_content_included === false &&
+    payload?.content_role ===
+      "prior_environment_probe_evidence_not_assistant_answer" &&
+    payload?.reentry_required === true &&
+    payload?.answer_authority === false &&
+    payload?.assistant_answer === false &&
+    payload?.terminal_eligible === false &&
+    payload?.raw_content_included === false &&
+    record.assistant_answer === false &&
+    record.terminal_eligible === false &&
+    record.raw_content_included === false
+  );
+};
+
+const currentTurnProviderSupportArtifactRefs = (
+  artifactLedger: HelixTerminalProductArtifactLike[],
+  turnId: string,
+): Set<string> =>
+  new Set(
+    artifactLedger
+      .filter((artifact) => {
+        if (
+          isCurrentTurnReenteredPriorEnvironmentEvidenceArtifact(
+            artifact,
+            turnId,
+          )
+        ) {
+          return true;
+        }
+        const record = artifact as Record<string, unknown>;
+        const payload = artifactPayload(artifact);
+        const sourceScope =
+          readString(payload?.source_scope) ??
+          readString(record.source_scope);
+        const artifactTurnId =
+          readString(payload?.turn_id) ?? readString(record.turn_id);
+        return (
+          !/prior_context|prior_turn_context|prior_artifact/i.test(
+            sourceScope ?? "",
+          ) &&
+          (!artifactTurnId || artifactTurnId === turnId)
+        );
+      })
+      .map(artifactId)
+      .filter((ref): ref is string => Boolean(ref)),
+  );
+
 export const inspectAgentProviderRouteProductEligibility = (input: {
   payload: Record<string, unknown>;
   artifacts?: HelixTerminalProductArtifactLike[] | null;
@@ -140,25 +231,45 @@ export const inspectAgentProviderRouteProductEligibility = (input: {
   const providerAuthoredTargetKind = Boolean(targetKind && PROVIDER_AUTHORED_ROUTE_PRODUCT_KINDS.has(targetKind));
   const topLevelAuthority = readRecord(input.payload.terminal_answer_authority);
   const topLevelPresentation = readRecord(input.payload.terminal_presentation);
-  const persistedProviderBridge = (input.artifacts ?? [])
+  const persistedProviderBridges = (input.artifacts ?? [])
     .slice()
     .reverse()
     .map((artifact) => ({ artifact, payload: artifactPayload(artifact) }))
-    .find(({ artifact, payload }) =>
-      artifactKind(artifact) === "provider_terminal_authority_bridge" &&
-      readString(payload?.turn_id) === input.turnId,
-    )?.payload ?? null;
+    .filter(
+      ({ artifact, payload }) =>
+        artifactKind(artifact) === "provider_terminal_authority_bridge" &&
+        readString(payload?.turn_id) === input.turnId,
+    )
+    .map(({ payload }) => payload)
+    .filter((payload): payload is Record<string, unknown> => Boolean(payload));
+  const authorizedPersistedProviderBridge =
+    persistedProviderBridges.find((bridge) =>
+      providerBridgeAuthorizesCurrentTurnCandidate(bridge, input.turnId),
+    ) ?? null;
+  const latestPersistedProviderBridge =
+    persistedProviderBridges[0] ?? null;
   const topLevelProviderBridge = readRecord(input.payload.provider_terminal_authority_bridge);
-  const providerBridge = topLevelProviderBridge ?? persistedProviderBridge;
-  const bridgeSource: HelixProviderRouteProductEligibility["provider_bridge_source"] = topLevelProviderBridge
-    ? "top_level"
-    : persistedProviderBridge
+  const topLevelBridgeAuthorized =
+    providerBridgeAuthorizesCurrentTurnCandidate(
+      topLevelProviderBridge,
+      input.turnId,
+    );
+  const providerBridge = topLevelBridgeAuthorized
+    ? topLevelProviderBridge
+    : authorizedPersistedProviderBridge ??
+      topLevelProviderBridge ??
+      latestPersistedProviderBridge;
+  const bridgeSource: HelixProviderRouteProductEligibility["provider_bridge_source"] =
+    providerBridge === topLevelProviderBridge && topLevelProviderBridge
+      ? "top_level"
+      : providerBridge
       ? "current_turn_artifact"
       : "none";
   const bridgeAuthorizesCandidate =
-    readString(providerBridge?.turn_id) === input.turnId &&
-    providerBridge?.terminal_authority_granted === true &&
-    providerBridge?.final_visible_answer_authorized === true;
+    providerBridgeAuthorizesCurrentTurnCandidate(
+      providerBridge,
+      input.turnId,
+    );
   const authority = bridgeAuthorizesCandidate
     ? readRecord(providerBridge?.terminal_answer_authority) ?? topLevelAuthority
     : topLevelAuthority;
@@ -166,9 +277,15 @@ export const inspectAgentProviderRouteProductEligibility = (input: {
     ? readRecord(providerBridge?.terminal_presentation) ?? topLevelPresentation
     : topLevelPresentation;
   const debug = readRecord(input.payload.debug);
-  const candidate =
+  const topLevelCandidate =
     readRecord(input.payload.provider_terminal_candidate) ??
     readRecord(debug?.provider_terminal_candidate) ??
+    null;
+  const candidate =
+    (bridgeAuthorizesCandidate
+      ? readRecord(providerBridge?.provider_terminal_candidate)
+      : null) ??
+    topLevelCandidate ??
     readRecord(providerBridge?.provider_terminal_candidate);
   const authorityRef =
     readString(authority?.terminal_item_id) ??
@@ -194,19 +311,9 @@ export const inspectAgentProviderRouteProductEligibility = (input: {
     readString(input.payload.text);
   const usableTextPresent = Boolean(text && !input.invalidText?.(text));
   const artifactLedger = input.artifacts ?? [];
-  const currentTurnArtifactRefs = new Set(
-    artifactLedger
-      .filter((artifact) => {
-        const payload = artifactPayload(artifact);
-        const sourceScope = artifactFieldString(artifact, "source_scope");
-        const artifactTurnId = readString(payload?.turn_id);
-        return (
-          !/prior_context|prior_turn_context|prior_artifact/i.test(sourceScope ?? "") &&
-          (!artifactTurnId || artifactTurnId === input.turnId)
-        );
-      })
-      .map(artifactId)
-      .filter((ref): ref is string => Boolean(ref)),
+  const currentTurnArtifactRefs = currentTurnProviderSupportArtifactRefs(
+    artifactLedger,
+    input.turnId,
   );
   const requestedSupportRefs = uniqueStrings([
     ...readArray(presentation?.selected_observation_refs).map(readString),
@@ -692,32 +799,55 @@ export const materializeAgentProviderRouteProductTerminal = (input: {
 
   const topLevelAuthority = readRecord(input.payload.terminal_answer_authority);
   const topLevelPresentation = readRecord(input.payload.terminal_presentation);
-  const persistedProviderBridge = (input.artifacts ?? [])
+  const persistedProviderBridges = (input.artifacts ?? [])
     .slice()
     .reverse()
     .map((artifact) => ({ artifact, payload: artifactPayload(artifact) }))
-    .find(({ artifact, payload }) =>
-      artifactKind(artifact) === "provider_terminal_authority_bridge" &&
-      readString(payload?.turn_id) === input.turnId,
-    )?.payload ?? null;
+    .filter(
+      ({ artifact, payload }) =>
+        artifactKind(artifact) === "provider_terminal_authority_bridge" &&
+        readString(payload?.turn_id) === input.turnId,
+    )
+    .map(({ payload }) => payload)
+    .filter((payload): payload is Record<string, unknown> => Boolean(payload));
+  const topLevelProviderBridge = readRecord(
+    input.payload.provider_terminal_authority_bridge,
+  );
   const providerBridge =
-    readRecord(input.payload.provider_terminal_authority_bridge) ??
-    persistedProviderBridge;
+    (providerBridgeAuthorizesCurrentTurnCandidate(
+      topLevelProviderBridge,
+      input.turnId,
+    )
+      ? topLevelProviderBridge
+      : null) ??
+    persistedProviderBridges.find((bridge) =>
+      providerBridgeAuthorizesCurrentTurnCandidate(bridge, input.turnId),
+    ) ??
+    topLevelProviderBridge ??
+    persistedProviderBridges[0] ??
+    null;
   const bridgeAuthority = readRecord(providerBridge?.terminal_answer_authority);
   const bridgePresentation = readRecord(providerBridge?.terminal_presentation);
   // A later writer pass can replace mutable top-level fields with a typed
   // failure. A matching bridge is retained only when it explicitly records a
   // current-turn provider authorization.
   const bridgeAuthorizesCandidate =
-    readString(providerBridge?.turn_id) === input.turnId &&
-    providerBridge?.terminal_authority_granted === true &&
-    providerBridge?.final_visible_answer_authorized === true;
+    providerBridgeAuthorizesCurrentTurnCandidate(
+      providerBridge,
+      input.turnId,
+    );
   const authority = bridgeAuthorizesCandidate ? bridgeAuthority ?? topLevelAuthority : topLevelAuthority;
   const presentation = bridgeAuthorizesCandidate ? bridgePresentation ?? topLevelPresentation : topLevelPresentation;
   const debug = readRecord(input.payload.debug);
-  const candidate =
+  const topLevelCandidate =
     readRecord(input.payload.provider_terminal_candidate) ??
     readRecord(debug?.provider_terminal_candidate) ??
+    null;
+  const candidate =
+    (bridgeAuthorizesCandidate
+      ? readRecord(providerBridge?.provider_terminal_candidate)
+      : null) ??
+    topLevelCandidate ??
     readRecord(providerBridge?.provider_terminal_candidate);
   const authorityRef =
     readString(authority?.terminal_item_id) ??
@@ -749,19 +879,9 @@ export const materializeAgentProviderRouteProductTerminal = (input: {
   if (!text || input.invalidText?.(text)) return null;
 
   const artifactLedger = input.artifacts ?? [];
-  const currentTurnArtifactRefs = new Set(
-    artifactLedger
-      .filter((artifact) => {
-        const payload = artifactPayload(artifact);
-        const sourceScope = artifactFieldString(artifact, "source_scope");
-        const artifactTurnId = readString(payload?.turn_id);
-        return (
-          !/prior_context|prior_turn_context|prior_artifact/i.test(sourceScope ?? "") &&
-          (!artifactTurnId || artifactTurnId === input.turnId)
-        );
-      })
-      .map(artifactId)
-      .filter((ref): ref is string => Boolean(ref)),
+  const currentTurnArtifactRefs = currentTurnProviderSupportArtifactRefs(
+    artifactLedger,
+    input.turnId,
   );
   const requestedSupportRefs = uniqueStrings([
     ...readArray(presentation?.selected_observation_refs).map(readString),

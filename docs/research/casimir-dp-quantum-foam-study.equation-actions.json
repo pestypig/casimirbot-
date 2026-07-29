@@ -1420,6 +1420,281 @@
         "Runtime F has rank 7 but fails the frozen pairwise-cosine and augmented-condition thresholds.",
         "Numeric control-response vectors and block-bound control covariance must be registered before a new power forecast."
       ]
+    },
+    {
+      "equationId": "cdp-stage4-2c-control-response-whitening",
+      "label": "Stage-4.2C numerical control-response and covariance whitening",
+      "sectionAnchor": "515-implemented-stage-42c-identifiability-first-redesign",
+      "latex": "\\widetilde{\\mathbf s}_j=L^{-1}\\mathbf s_j,\\qquad LL^{\\mathsf T}=C_{\\rm control},\\qquad \\left\\|L\\widetilde{\\mathbf s}_j-\\mathbf s_j\\right\\|_\\infty \\leq\\epsilon_{\\rm roundtrip}.",
+      "aliases": [
+        "s_tilde_j=L^-1 s_j; L L^T=C_control"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2c-control-response-whitening",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-4.2C control-response and covariance evidence",
+          "badgeIds": [
+            "study.casimir_dp.thermal_radiative_closure",
+            "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
+            "study.casimir_dp.identifiability_redesign_stage4_2c",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.identifiability_redesign_stage4_2c",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2c",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Runtime H supplies numerical design-assumption response and block covariance in the frozen complex-coherence space; it does not supply measured apparatus response or covariance."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The seven control axes and 30 rows have frozen numeric values and covariance ancestry.",
+        "Sensor self-noise enters covariance and dark-channel accounting rather than a physical-decoherence signature."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2c-registered-dp-candidate-transport",
+      "label": "Stage-4.2C registered-DP bounded-candidate transport",
+      "sectionAnchor": "515-implemented-stage-42c-identifiability-first-redesign",
+      "latex": "\\Gamma_{\\rm DP}^{(q)} =\\frac{E_G[\\Delta\\rho_q;r_0]}{\\hbar},\\qquad \\chi_{\\rm DP}^{(q)}=\\Gamma_{\\rm DP}^{(q)}t_q,\\qquad \\{r_0,\\mathcal M_{\\rm DP},\\text{normalization}\\}_q =\\{r_0,\\mathcal M_{\\rm DP},\\text{normalization}\\}_{4.2B}.",
+      "aliases": [
+        "Gamma_DP^(q)=E_G[Delta rho_q;r0]/hbar"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2c-registered-dp-candidate-transport",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-4.2C bounded candidate and DP transport evidence",
+          "badgeIds": [
+            "study.casimir_dp.dp_companion_signature",
+            "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
+            "study.casimir_dp.identifiability_redesign_stage4_2c",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.identifiability_redesign_stage4_2c",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2c",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Every admitted candidate uses the unchanged Stage-4.2B registered DP generator. Candidate bounds, DP amplitude, r0, and confirmatory data cannot be retuned."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "An out-of-bounds candidate is rejected even when its synthetic power is higher.",
+        "A contextual material source is not admitted as apparatus-response authority."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2c-identifiability-power-gates",
+      "label": "Stage-4.2C preregistered identifiability and power gates",
+      "sectionAnchor": "515-implemented-stage-42c-identifiability-first-redesign",
+      "latex": "G_{4.2C}= \\left[\\max_{a\\ne b}|\\cos(\\widetilde{\\mathbf s}_a,\\widetilde{\\mathbf s}_b)| \\leq0.97\\right]\\land \\left[\\kappa(\\widetilde X^{\\mathsf T}\\widetilde X)\\leq100\\right]\\land \\left[\\pi\\geq0.80\\right]\\land \\left[\\mathrm{FPR}\\leq0.05\\right]\\land \\left[\\mathrm{SNR}_{\\rm companion}\\geq5\\right].",
+      "aliases": [
+        "max cosine<=0.97; condition<=100; power>=0.80; FPR<=0.05; companion SNR>=5"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2c-identifiability-power-gates",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-4.2C bounded powered-region result",
+          "badgeIds": [
+            "study.casimir_dp.blinded_model_comparison",
+            "study.casimir_dp.dp_companion_signature",
+            "study.casimir_dp.identifiability_redesign_stage4_2c",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.identifiability_redesign_stage4_2c",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2c",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "One bounded synthetic candidate clears all design gates and yields a 542-window forecast, but authentic response, covariance, and state-preparation evidence remain absent."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The passing result is a synthetic apparatus-design forecast, not achieved sensitivity.",
+        "It excludes no DP parameter region and identifies no collapse or manifold dynamics."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2c-blinded-acquisition-freeze",
+      "label": "Stage-4.2C blinded acquisition packet freeze",
+      "sectionAnchor": "515-implemented-stage-42c-identifiability-first-redesign",
+      "latex": "\\mathcal P_{\\rm confirm},\\mathcal P_{\\rm replication} =\\operatorname{Freeze}\\!\\left( \\mathcal E,\\ C,\\ \\mathbf s_{\\rm ordinary},\\ \\mathbf s_{\\rm DP}, \\ \\mathcal B_{\\rm candidate},\\ \\mathcal X_{\\rm exclusion}, \\ \\mathcal R_{\\rm custody}\\right), \\qquad \\operatorname{AutoUnblind}=0.",
+      "aliases": [
+        "P_confirm,P_replication=Freeze(code,C,signatures,bounds,exclusions,custody)"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2c-blinded-acquisition-freeze",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-4.2C calibration, pilot, confirmatory, and replication packet schemas",
+          "badgeIds": [
+            "study.casimir_dp.blinded_model_comparison",
+            "study.casimir_dp.identifiability_redesign_stage4_2c",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.identifiability_redesign_stage4_2c",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2c",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The generated objects are packet schemas and freeze contracts, not acquired data. Automatic unblinding and confirmatory refitting are prohibited."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Calibration and pilot may estimate response and covariance before freeze.",
+        "Confirmatory and independent replication require separate custody and authorized unblinding."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2d-spectroscopic-witness",
+      "label": "Stage-4.2D Stark, Zeeman, polarization, and blackbody witnesses",
+      "sectionAnchor": "stark-zeeman-polarization-and-blackbody-witnesses",
+      "latex": "\\Delta\\nu_Z=\\frac{g_Jm_J\\mu_BB}{h},\\qquad \\Delta\\nu_S=-\\frac12\\alpha_\\nu E^2,\\qquad \\Delta\\nu_{\\rm BBR}=k_{\\rm BBR}(T^4-T_{\\rm ref}^4).",
+      "aliases": [
+        "Delta nu_Z=g_J m_J mu_B B/h; Delta nu_S=-alpha_nu E^2/2; Delta nu_BBR=k_BBR(T^4-T_ref^4)"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2d-spectroscopic-witness",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-4.2D field-to-frequency witness diagnostics",
+          "badgeIds": [
+            "study.casimir_dp.polarization_qed_control",
+            "study.casimir_dp.thermal_radiative_closure",
+            "study.casimir_dp.cross_scale_metrology_stage4_2d",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.cross_scale_metrology_stage4_2d",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2d",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "These sourced equations define candidate electric, magnetic, polarization, and thermal field witnesses. A measured witness-to-complex-coherence transfer remains absent."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "A shared frequency unit does not connect a spectroscopic shift to a DP collapse rate.",
+        "The pilot must freeze transition identity, polarization convention, response derivatives, covariance, drift, and sensor-noise ancestry."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2d-classical-gravity-recovery",
+      "label": "Stage-4.2D compactness, material-yield, and Jeans recoveries",
+      "sectionAnchor": "schwarzschild-material-strength-and-jeans-recoveries",
+      "latex": "\\mathcal C=\\frac{2GM}{Rc^2},\\qquad R_{\\rm yield}= \\sqrt{\\frac{\\sigma_y}{k_{\\rm geom}G\\rho^2}},\\qquad \\lambda_J=c_s\\sqrt{\\frac{\\pi}{G\\rho}}.",
+      "aliases": [
+        "C=2GM/(Rc^2); R_yield=sqrt(sigma_y/(k_geom G rho^2)); lambda_J=c_s sqrt(pi/(G rho))"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2d-classical-gravity-recovery",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-4.2D conventional-gravity recovery diagnostics",
+          "badgeIds": [
+            "study.casimir_dp.cross_scale_metrology_stage4_2d",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.cross_scale_metrology_stage4_2d",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2d",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Compactness, potato-radius material-yield crossover, and Jeans instability are separate conventional-gravity recoveries, not DP thresholds."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Each benchmark compares gravity with a different competing support mechanism in its own domain.",
+        "None provides evidence for objective collapse, a Casimir-to-collapse bridge, or manifold dynamics."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2d-spinor-nonbridge",
+      "label": "Stage-4.2D spinor representation non-bridge",
+      "sectionAnchor": "spinors-are-representation-not-mass",
+      "latex": "\\phi_{AB}\\ {\\rm represents\\ a\\ Maxwell\\ field},\\qquad \\Psi_{ABCD}\\ {\\rm represents\\ vacuum\\ Weyl\\ curvature},\\qquad \\{\\phi_{AB},\\Psi_{ABCD}\\}\\not\\Rightarrow m\\ {\\rm or}\\ \\Gamma_{\\rm DP}.",
+      "aliases": [
+        "{phi_AB,Psi_ABCD} does not imply mass or Gamma_DP"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2d-spinor-nonbridge",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-4.2D spinor semantic fail-closed gate",
+          "badgeIds": [
+            "study.casimir_dp.cross_scale_metrology_stage4_2d",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.cross_scale_metrology_stage4_2d",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2d",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Penrose spinors represent electromagnetic fields and spacetime curvature. They are not mass variables and do not generate objective reduction without a separately sourced dynamics law."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Representation equivalence preserves tensor content; it does not add a causal transfer.",
+        "The runtime rejects mass_is_a_spinor and maxwell_spinor_is_collapse_generator."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2d-equation-congruence",
+      "label": "Stage-4.2D equation-congruence and zero-bridge gate",
+      "sectionAnchor": "congruence-gate",
+      "latex": "G_{4.2D} =G_{\\rm source}\\land G_{\\rm units}\\land G_{\\rm recovery} \\land G_{\\rm spinor\\neq mass}\\land G_{\\rm DP\\ unchanged} \\land(N_{\\rm bridge}=0).",
+      "aliases": [
+        "G_4.2D=G_source AND G_units AND G_recovery AND G_spinor_not_mass AND G_DP_unchanged AND N_bridge=0"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2d-equation-congruence",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-4.2D source, recovery, and non-bridge receipt",
+          "badgeIds": [
+            "study.casimir_dp.dp_companion_signature",
+            "study.casimir_dp.identifiability_redesign_stage4_2c",
+            "study.casimir_dp.cross_scale_metrology_stage4_2d",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.cross_scale_metrology_stage4_2d",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2d",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The campaign passes only when sources, units, conventional recoveries, spinor semantics, and immutable DP authority all pass while observable bridge count remains zero."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The only admitted collapse-rate transfer remains the registered branch-density-difference to DP-rate relation.",
+        "Synthetic recovery success cannot promote measured evidence, collapse identification, manifold dynamics, or physical viability."
+      ]
     }
   ]
 }

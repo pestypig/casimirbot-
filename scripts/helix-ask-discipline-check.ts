@@ -99,11 +99,12 @@ function normalizePath(value: string): string {
 }
 
 function commandName(name: string): string {
-  return process.platform === "win32" ? `${name}.cmd` : name;
+  if (process.platform !== "win32") return name;
+  return name === "npm" || name === "npx" ? `${name}.cmd` : name;
 }
 
 function runText(command: string, commandArgs: string[], cwd = repoRoot): string {
-  const result = spawnSync(command, commandArgs, {
+  const result = spawnSync(commandName(command), commandArgs, {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

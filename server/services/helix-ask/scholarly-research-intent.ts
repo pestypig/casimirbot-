@@ -322,8 +322,8 @@ const hasExplicitInternetSearchScopeCue = (promptText: string): boolean =>
   /\b(?:search|browse|look\s*up|lookup|check|verify)\s+(?:(?:the|on)\s+)?(?:web|internet|online)\b|\b(?:google\s+(?:it|search)|web\s+search|internet\s+search)\b/i.test(promptText);
 
 const hasScholarlyExecutionActionAndTarget = (promptText: string): boolean =>
-  /\b(?:find|search|look\s+for|look\s*up|lookup|fetch|retrieve|read|open|inspect|query|resolve|collect|recommend|suggest|identify|use)\b[^.!?;\n]{0,120}\b(?:scholarly|research\s+papers?|papers?|articles?|sources?|arxiv|doi|pubmed|pmc|citations?|references?|bibliograph(?:y|ies)|full[-\s]?text|pdfs?|abstracts?|metadata)\b/i.test(promptText) ||
-  /\b(?:scholarly|research\s+papers?|papers?|articles?|sources?|arxiv|doi|pubmed|pmc|citations?|references?|bibliograph(?:y|ies)|full[-\s]?text|pdfs?|abstracts?|metadata)\b[^.!?;\n]{0,120}\b(?:find|search|look\s+for|look\s*up|lookup|fetch|retrieve|read|open|inspect|query|resolve|collect|recommend|suggest|identify|use)\b/i.test(promptText);
+  /\b(?:find|search|look\s+for|look\s*up|lookup|fetch|retrieve|read|open|load|mount|render|materialize|inspect|parse|ocr|crop|query|resolve|collect|recommend|suggest|identify|use)\b[^.!?;\n]{0,120}\b(?:scholarly|research\s+papers?|papers?|articles?|sources?|arxiv|doi|pubmed|pmc|citations?|references?|bibliograph(?:y|ies)|full[-\s]?text|pdfs?|abstracts?|metadata)\b/i.test(promptText) ||
+  /\b(?:scholarly|research\s+papers?|papers?|articles?|sources?|arxiv|doi|pubmed|pmc|citations?|references?|bibliograph(?:y|ies)|full[-\s]?text|pdfs?|abstracts?|metadata)\b[^.!?;\n]{0,120}\b(?:find|search|look\s+for|look\s*up|lookup|fetch|retrieve|read|open|load|mount|render|materialize|inspect|parse|ocr|crop|query|resolve|collect|recommend|suggest|identify|use)\b/i.test(promptText);
 
 export const hasFullyNegatedScholarlyResearchInstruction = (promptText: string): boolean => {
   const unquoted = stripQuotedPromptSegments(promptText);

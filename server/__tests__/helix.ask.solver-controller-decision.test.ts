@@ -501,6 +501,108 @@ describe("helix ask solver controller decision", () => {
     expect(decision.blocking_reasons).toEqual([]);
   });
 
+  it("does not require model re-entry for a route-authorized self-terminal live pipeline receipt", () => {
+    const turnId = "ask:live-source-self-terminal-receipt";
+    const payload = {
+      active_prompt: "Keep checking my screen as a live answer.",
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "live_source_continuation",
+        required_terminal_kind: "live_pipeline_receipt",
+      },
+      source_target_intent: {
+        target_source: "live_pipeline",
+        allow_no_tool_direct: false,
+        allow_client_shortcut: false,
+      },
+      route_reason_code: "live_source_continuation",
+      terminal_artifact_kind: "live_pipeline_receipt",
+      final_answer_source: "live_pipeline_receipt",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        route: "live_source_continuation",
+        terminal_artifact_kind: "live_pipeline_receipt",
+        final_answer_source: "live_pipeline_receipt",
+        server_authoritative: true,
+      },
+      live_pipeline_turn_receipt: {
+        schema: "helix.live_pipeline_turn_receipt.v1",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      route_product_contract: {
+        source_target: "live_pipeline",
+        allowed_terminal_artifact_kinds: ["live_pipeline_receipt"],
+        forbidden_terminal_artifact_kinds: [],
+      },
+      terminal_artifact_selection_guard: {
+        terminal_artifact_kind: "live_pipeline_receipt",
+        allowed: true,
+      },
+      product_authority_guard: {
+        terminal_artifact_kind: "live_pipeline_receipt",
+        allowed: true,
+      },
+      tool_call_admission_decision: {
+        source_target: "live_pipeline",
+        required: true,
+        admitted_tool_families: ["live_pipeline"],
+      },
+      tool_trace_disclosure: {
+        schema: "helix.ask_tool_trace_disclosure.v1",
+        items: [{ tool: "situation-room.pipeline.execute" }],
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      poison_audit: {
+        schema: "helix.turn_poison_audit.v1",
+        ok: true,
+        violations: [],
+      },
+      route_authority_audit: {
+        schema: "helix.route_authority_audit.v1",
+        route_authority_ok: true,
+      },
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        turn_id: turnId,
+        completed_solver_path: true,
+        evidence_reentry_gate: {
+          schema: "helix.evidence_reentry_gate.v1",
+          turn_id: turnId,
+          required: true,
+          completed: false,
+          violation_codes: ["evidence_selected_but_finalizer_missing"],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      goal_satisfaction_evaluation: satisfiedGoal(
+        "live_source_continuation",
+        "live_pipeline_receipt",
+      ),
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId,
+      finalRoute: "live_source_continuation",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId, payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({
+        turnId,
+        finalRoute: "live_source_continuation",
+        payload,
+      }),
+    });
+
+    expect(decision.decision).toBe("allow_terminal");
+    expect(decision.blocking_reasons).not.toContain(
+      "post_observation_model_decision_missing",
+    );
+  });
+
   it("blocks satisfied tool terminals when prompt requirement coverage is incomplete", () => {
     const turnId = "ask:prompt-coverage";
     const payload = {

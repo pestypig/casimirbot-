@@ -11,6 +11,11 @@ import {
   type HelixEnvironmentProbeResult,
 } from "@shared/helix-environment-probe";
 import {
+  HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+  helixEnvironmentProbeSubmissionSchema,
+  type HelixEnvironmentProbeSubmission,
+} from "@shared/helix-environment-connector";
+import {
   HELIX_ROOM_SOURCE_ADMISSION_SCHEMA,
   HELIX_ROOM_SOURCE_INGRESS_RECEIPT_SCHEMA,
   type HelixRoomSourceBinding,
@@ -60,6 +65,11 @@ import {
   isEnvironmentAdapterRegistryError,
   resolveEnvironmentAdapterProfile,
 } from "../services/situation-room/environment-adapter-registry";
+import {
+  DurableEnvironmentProbeError,
+  leaseDurableEnvironmentProbesForClaim,
+  submitDurableEnvironmentProbeResult,
+} from "../services/environment-connectors/probe";
 
 type RequestWithRawBody = Request & { rawBody?: Buffer };
 
@@ -106,6 +116,14 @@ const FORBIDDEN_SOURCE_AUTHORITY_KEYS = new Set([
   "turn_id",
   "user_id",
 ]);
+const SAFE_NEGATED_SOURCE_AUTHORITY_KEYS = new Set([
+  "answer_authority",
+  "assistant_answer",
+  "invoke_model",
+  "model_invoked",
+  "reasoning_requested",
+  "terminal_eligible",
+]);
 
 const normalize = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
@@ -127,19 +145,24 @@ const rawBody = (req: RequestWithRawBody): Buffer => {
 const bodyDigest = (req: RequestWithRawBody): string =>
   `sha-256=${crypto.createHash("sha256").update(rawBody(req)).digest("base64")}`;
 
-const receipt = (input: {
-  kind: HelixRoomSourceIngressKind;
-  ok: boolean;
-  error?: string | null;
-  message: string;
-  binding?: HelixRoomSourceBinding | null;
-  requestId?: string | null;
-  accepted?: boolean;
-  replayed?: boolean;
-  observationRef?: Record<string, unknown> | null;
-  probeRequests?: unknown[];
-}): HelixRoomSourceIngressReceipt =>
-  redactProtectedRoomSourceSecrets({
+const receipt = (
+  input: {
+    kind: HelixRoomSourceIngressKind;
+    ok: boolean;
+    error?: string | null;
+    message: string;
+    binding?: HelixRoomSourceBinding | null;
+    requestId?: string | null;
+    accepted?: boolean;
+    replayed?: boolean;
+    observationRef?: Record<string, unknown> | null;
+    probeRequests?: unknown[];
+  },
+  options: {
+    redactSecrets?: boolean;
+  } = {},
+): HelixRoomSourceIngressReceipt => {
+  const projectedReceipt = {
     schema: HELIX_ROOM_SOURCE_INGRESS_RECEIPT_SCHEMA,
     ok: input.ok,
     error: input.error ?? null,
@@ -164,13 +187,49 @@ const receipt = (input: {
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
-  });
+  } satisfies HelixRoomSourceIngressReceipt;
+  return options.redactSecrets === false
+    ? projectedReceipt
+    : redactProtectedRoomSourceSecrets(projectedReceipt);
+};
 
 const header = (req: Request, name: string): string | null =>
   normalize(req.get(name)) || null;
 
+const payloadForSecretScan = (
+  req: RequestWithRawBody,
+  kind: HelixRoomSourceIngressKind,
+): unknown[] => {
+  const rawPayload = rawBody(req).toString("utf8");
+  if (
+    kind !== "probe_result" ||
+    !req.body ||
+    typeof req.body !== "object" ||
+    Array.isArray(req.body)
+  ) {
+    return [rawPayload, req.body ?? null];
+  }
+  const body = req.body as Record<string, unknown>;
+  const leaseToken =
+    body.schema === HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA &&
+    typeof body.lease_token === "string" &&
+    /^helix_probe_lease_[A-Za-z0-9_-]{24,}$/u.test(body.lease_token)
+      ? body.lease_token
+      : null;
+  if (!leaseToken) return [rawPayload, body];
+  const marker = "[authenticated_probe_lease_token]";
+  return [
+    rawPayload.split(leaseToken).join(marker),
+    {
+      ...body,
+      lease_token: marker,
+    },
+  ];
+};
+
 const claim = (
   req: RequestWithRawBody,
+  kind: HelixRoomSourceIngressKind,
   requiredScope: HelixRoomSourceIngressScope,
   routeKey: string,
 ) =>
@@ -186,7 +245,7 @@ const claim = (
     sentAt: header(req, "x-helix-sent-at"),
     digest: header(req, "digest"),
     computedBodyDigest: bodyDigest(req),
-    payloadForSecretScan: [rawBody(req).toString("utf8"), req.body ?? null],
+    payloadForSecretScan: payloadForSecretScan(req, kind),
   });
 
 const payloadError = (
@@ -327,7 +386,14 @@ const findForbiddenSourceAuthorityPath = (
   for (const [key, nested] of Object.entries(
     value as Record<string, unknown>,
   )) {
-    if (FORBIDDEN_SOURCE_AUTHORITY_KEYS.has(key.toLowerCase())) {
+    const normalizedKey = key.toLowerCase();
+    if (
+      FORBIDDEN_SOURCE_AUTHORITY_KEYS.has(normalizedKey) &&
+      !(
+        SAFE_NEGATED_SOURCE_AUTHORITY_KEYS.has(normalizedKey) &&
+        nested === false
+      )
+    ) {
       return `${path}.${key}`;
     }
     const found = findForbiddenSourceAuthorityPath(
@@ -380,15 +446,25 @@ const sourceAdmission = (
 });
 
 const errorStatus = (error: unknown): number =>
-  isRoomSourceIngressError(error) ? error.statusCode : 503;
+  isRoomSourceIngressError(error)
+    ? error.statusCode
+    : error instanceof DurableEnvironmentProbeError
+      ? error.statusCode
+      : 503;
 
 const errorCode = (error: unknown): string =>
-  isRoomSourceIngressError(error) ? error.code : "room_source_unavailable";
+  isRoomSourceIngressError(error)
+    ? error.code
+    : error instanceof DurableEnvironmentProbeError
+      ? error.code
+      : "room_source_unavailable";
 
 const errorMessage = (error: unknown): string =>
   isRoomSourceIngressError(error)
     ? error.message
-    : "Room source ingress is temporarily unavailable.";
+    : error instanceof DurableEnvironmentProbeError
+      ? error.message
+      : "Room source ingress is temporarily unavailable.";
 
 const route =
   (
@@ -404,6 +480,7 @@ const route =
       message: string;
       observationRef?: Record<string, unknown> | null;
       probeRequests?: unknown[];
+      responseProbeRequests?: unknown[];
     }>,
   ) =>
   (req: Request, res: Response): void => {
@@ -413,6 +490,7 @@ const route =
       try {
         activeClaim = await claim(
           req as RequestWithRawBody,
+          kind,
           requiredScope,
           routeKey(req),
         );
@@ -445,6 +523,27 @@ const route =
           observationRef: result.observationRef,
           probeRequests: result.probeRequests,
         });
+        const responseReceipt =
+          result.responseProbeRequests === undefined
+            ? acceptedReceipt
+            : receipt(
+                {
+                  kind,
+                  ok: true,
+                  message: result.message,
+                  binding: activeClaim.binding,
+                  requestId: activeClaim.requestProjectionId,
+                  accepted: true,
+                  observationRef: result.observationRef,
+                  probeRequests: result.responseProbeRequests,
+                },
+                {
+                  // This is the one authenticated delivery of the raw lease token.
+                  // The separately completed durable receipt remains redacted and
+                  // the broker persists only the token hash.
+                  redactSecrets: false,
+                },
+              );
         const statusCode = result.statusCode ?? 200;
         try {
           await completeRoomSourceIngressRequest({
@@ -465,10 +564,12 @@ const route =
             "The ingress operation completed, but its durable receipt could not be confirmed. Do not assume failure; send a fresh current-state observation with a new request ID and sequence.",
           );
         }
-        res.status(statusCode).json(acceptedReceipt);
+        res.status(statusCode).json(responseReceipt);
       } catch (error) {
         const responseError =
-          activeClaim && !isRoomSourceIngressError(error)
+          activeClaim &&
+          !isRoomSourceIngressError(error) &&
+          !(error instanceof DurableEnvironmentProbeError)
             ? new RoomSourceIngressError(
                 "room_source_request_outcome_unknown",
                 503,
@@ -499,7 +600,8 @@ const route =
           activeClaim &&
           !activeClaim.replay &&
           !handlerCompleted &&
-          isRoomSourceIngressError(error)
+          (isRoomSourceIngressError(error) ||
+            error instanceof DurableEnvironmentProbeError)
         ) {
           await completeRoomSourceIngressRequest({
             claim: activeClaim,
@@ -507,7 +609,10 @@ const route =
             receipt: rejectedReceipt,
           }).catch(() => undefined);
         }
-        if (!isRoomSourceIngressError(error)) {
+        if (
+          !isRoomSourceIngressError(error) &&
+          !(error instanceof DurableEnvironmentProbeError)
+        ) {
           console.warn(
             "[room-source-ingress] request failed",
             redactProtectedRoomSourceSecrets(
@@ -844,7 +949,12 @@ roomSourceIngressRouter.get(
       const limit = Number.isFinite(parsed)
         ? Math.max(1, Math.min(16, parsed))
         : 8;
-      const requests = listPendingEnvironmentProbeRequests({
+      const durableLeases = await leaseDurableEnvironmentProbesForClaim({
+        claim: activeClaim,
+        adapterAdmission,
+        limit,
+      });
+      const legacyRequests = listPendingEnvironmentProbeRequests({
         sourceId: activeClaim.binding.source_id,
         limit: 16,
         sourceAdmission: admission,
@@ -857,14 +967,58 @@ roomSourceIngressRouter.get(
         .filter(
           (request: { room_id: string }) =>
             request.room_id === activeClaim.binding.room_id,
-        )
-        .slice(0, limit);
+        );
+      const durableLegacyLeases = durableLeases.filter(
+        (
+          lease,
+        ): lease is typeof lease & {
+          request: NonNullable<typeof lease.request>;
+        } => lease.request !== null,
+      );
+      const durableWireRequests = durableLegacyLeases.map((lease) => ({
+        ...lease.request,
+        connector_transport: {
+          schema: lease.schema,
+          probe_attempt_id: lease.probe_attempt_id,
+          lease_token: lease.lease_token,
+          lease_expires_at: lease.lease_expires_at,
+          capability_id: lease.capability_id,
+          capability_version: lease.capability_version,
+          catalog_snapshot_id: lease.catalog_snapshot_id,
+        },
+      }));
+      const persistedDurableRequests = durableLegacyLeases.map((lease) => ({
+        ...lease.request,
+        connector_transport: {
+          schema: lease.schema,
+          probe_attempt_id: lease.probe_attempt_id,
+          lease_token_included: false,
+          lease_expires_at: lease.lease_expires_at,
+          capability_id: lease.capability_id,
+          capability_version: lease.capability_version,
+          catalog_snapshot_id: lease.catalog_snapshot_id,
+        },
+      }));
+      const responseRequests = [
+        ...durableWireRequests,
+        ...legacyRequests,
+      ].slice(0, limit);
+      const persistedRequests = [
+        ...persistedDurableRequests,
+        ...legacyRequests,
+      ].slice(0, limit);
       return {
         message: "Pending read-only probe requests listed.",
-        probeRequests: requests,
+        probeRequests: persistedRequests,
+        responseProbeRequests: responseRequests,
         observationRef: {
           schema: "helix.room_source_probe_queue_observation.v1",
-          pending_count: requests.length,
+          pending_count: responseRequests.length,
+          durable_lease_count: Math.min(
+            durableWireRequests.length,
+            responseRequests.length,
+          ),
+          lease_token_persisted: false,
           source_id: activeClaim.binding.source_id,
           room_id: activeClaim.binding.room_id,
           content_role: "observation_not_assistant_answer",
@@ -905,6 +1059,52 @@ roomSourceIngressRouter.post(
           adapterRecord.profile.payload_policy.max_snapshot_bytes,
         ),
       );
+      const durableSubmission = helixEnvironmentProbeSubmissionSchema.safeParse(
+        req.body,
+      );
+      if (durableSubmission.success) {
+        const parsedDurableResult = helixEnvironmentProbeResultSchema.safeParse(
+          durableSubmission.data.result,
+        );
+        if (!parsedDurableResult.success) {
+          throw new DurableEnvironmentProbeError(
+            "schema_validation_failed",
+            400,
+            `Environment probe result does not match ${adapterRecord.profile.observation_schemas.probe_result}.`,
+          );
+        }
+        const result = parsedDurableResult.data as HelixEnvironmentProbeResult;
+        assertBindingIdentity(activeClaim.binding, {
+          roomId: result.room_id,
+          sourceId: result.source_id,
+        });
+        if (
+          result.side_effects_performed !== false ||
+          result.world_mutation_performed !== false ||
+          result.commands_executed.length !== 0
+        ) {
+          payloadError(
+            "room_source_execution_denied",
+            403,
+            "Probe results that report commands or world mutation are not admitted.",
+          );
+        }
+        const recorded = await submitDurableEnvironmentProbeResult({
+          claim: activeClaim,
+          adapterAdmission,
+          submission: durableSubmission.data as HelixEnvironmentProbeSubmission,
+        });
+        return {
+          message: recorded.replayed
+            ? "Duplicate read-only environment probe result accepted idempotently."
+            : "Durable read-only environment probe result recorded.",
+          observationRef: {
+            ...recorded.observation,
+            replayed: recorded.replayed,
+            audit_ok: recorded.observation.provenance_valid,
+          },
+        };
+      }
       const parsed = helixEnvironmentProbeResultSchema.safeParse(req.body);
       if (!parsed.success) {
         throw new RoomSourceIngressError(

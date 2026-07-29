@@ -47,6 +47,7 @@ export type HelixTerminalCandidateSource =
   | "image_lens_observation_report"
   | "provider_image_lens_observation_report"
   | "image_lens_named_receipt_evaluation"
+  | "scientific_image_evidence_continuity_summary"
   | "postulate_runtime_review"
   | "agent_step_observation_packet"
   | "client_projection"
@@ -63,6 +64,7 @@ export type HelixToolOutputRole =
 const HELIX_SELF_TERMINAL_ARTIFACT_KINDS = new Set([
   "image_lens_observation_report",
   "image_lens_named_receipt_evaluation",
+  "scientific_image_evidence_continuity_summary",
   "note_update_receipt",
   "workspace_action_receipt",
   "workstation_tool_evaluation",
@@ -196,6 +198,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     | "image_lens_observation_report"
     | "provider_image_lens_observation_report"
     | "image_lens_named_receipt_evaluation"
+    | "scientific_image_evidence_continuity_summary"
     | "postulate_runtime_review"
     | "agent_provider_terminal_candidate"
     | "live_environment_binding_diagnosis"
@@ -258,6 +261,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     | "image_lens_observation_report"
     | "provider_image_lens_observation_report"
     | "image_lens_named_receipt_evaluation"
+    | "scientific_image_evidence_continuity_summary"
     | "postulate_runtime_review"
     | "live_environment_binding_diagnosis"
     | "capability_help_summary"

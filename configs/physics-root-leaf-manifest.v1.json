@@ -679,12 +679,20 @@
         "bridge-stage4-2b-full-covariance-to-complex-residual",
         "bridge-stage4-2b-dp-scaling-to-identifiability-power",
         "bridge-stage4-2b-complete-equivalence-to-conditional-dp-null",
-        "bridge-stage4-2b-missing-kernel-to-manifold-nonclaim"
+        "bridge-stage4-2b-missing-kernel-to-manifold-nonclaim",
+        "bridge-stage4-2c-no-go-recovery-to-bounded-redesign",
+        "bridge-stage4-2c-control-response-covariance-to-identifiability",
+        "bridge-stage4-2c-registered-dp-transport-to-powered-region",
+        "bridge-stage4-2c-missing-empirical-inputs-to-pilot-nonclaim",
+        "bridge-stage4-2d-spectroscopic-witness-to-ordinary-null",
+        "bridge-stage4-2d-gravity-recovery-to-conventional-limit",
+        "bridge-stage4-2d-spinor-representation-to-semantic-nonbridge",
+        "bridge-stage4-2d-missing-empirical-transfer-to-pilot-nonclaim"
       ],
       "falsifier": {
-        "observable": "preregistered complex boundary-conditioned coherence and companion-observable signature with immutable authority, measured-preparation-class complete joint-system branch equivalence, response-corrected apparatus spectral thermometry, sensor-self-noise-separated ordinary-physics covariance, a pilot-frozen likelihood and prediction vector, Stage-4 polarization and thermal/FDT closure, tensor/dimensional/semantic congruence, source-backed electron-mass/Higgs-tree and solar-radiometric calibration with explicit dependency nonbridges, a verified custodian receipt and authorized powered measured comparison for the confirmatory lane, held-out model discrimination, and a separately registered numerical boundary-to-coherence kernel for any bridge claim",
-        "readiness_block_rule": "upstreamAuthorityIntegrity != true OR preregistrationFrozen != true OR syntheticBlindingContractPass != true OR stage4_2bForecastContractReady != true OR apparatusScaleTransportReady != true OR responseCorrectedSpectralThermometryReady != true OR physicalSensorNoiseSeparated != true OR fullCrossSpectralCovarianceReady != true OR frozenDpSignatureReady != true OR completeJointSystemEquivalenceReady != true OR residualLikelihoodFrozen != true OR signatureIdentifiabilityReady != true OR apparatusDpPowerReady != true OR stage4_2bMeasuredEvidenceCampaignVersioned != true OR measuredEvidenceReady != true OR measuredComparisonAuthorized != true OR custodianReceiptVerified != true OR unblindingAuthorized != true OR fixedDeltaRhoMatched != true OR complexCoherenceIdentifiable != true OR ordinaryDecoherenceClosure != true OR polarizationQEDControlReady != true OR thermalFdtControlReady != true OR tensorDimensionalCongruence != true OR qedScaleHierarchyCalibration != true OR electronMassHiggsAnchorCalibration != true OR planckSolarCalibration != true OR crossScaleDpNonbridgePreserved != true OR namedDpManifestUnchanged != true OR phaseResidualReplayDeterministic != true OR collapseDiscriminatorPresent != true OR heldOutModelComparisonReady != true OR boundaryToCoherenceTransferKernelRegistered != true OR (bridgeCompared == true AND registeredNumericBridgeKernel != true)",
-        "reject_rule": "measuredComparisonAuthorized == true AND heldOutReplicationReady == true AND apparatusDpPowerReady == true AND ordinaryDecoherenceClosure == true AND (registeredNonunitarySignatureMatch != true OR frozenDpScalingMatch != true OR (boundaryExtensionClaimed == true AND registeredNumericBridgeKernelMatch != true))",
+        "observable": "preregistered complex boundary-conditioned coherence and companion-observable signature with immutable authority, measured-preparation-class complete joint-system branch equivalence, response-corrected apparatus spectral thermometry, sensor-self-noise-separated ordinary-physics covariance, Stage-4.2C empirical control-response and covariance receipts reproducing the bounded redesign gates, Stage-4.2D selected Stark/Zeeman/polarization/blackbody witness response and covariance receipts, conventional-gravity recovery and spinor-semantic nonbridge, an authentic selected-candidate state-preparation receipt, a measured witness-to-complex-coherence transfer, a pilot-frozen likelihood and prediction vector, Stage-4 polarization and thermal/FDT closure, tensor/dimensional/semantic congruence, source-backed electron-mass/Higgs-tree and solar-radiometric calibration with explicit dependency nonbridges, a verified custodian receipt and authorized powered measured comparison for the confirmatory lane, held-out model discrimination, and a separately registered numerical boundary-to-coherence kernel for any bridge claim",
+        "readiness_block_rule": "upstreamAuthorityIntegrity != true OR preregistrationFrozen != true OR syntheticBlindingContractPass != true OR stage4_2bForecastContractReady != true OR stage4_2cNoGoRecoveryReady != true OR stage4_2cBoundedRedesignReady != true OR stage4_2cPacketSchemasReady != true OR stage4_2cMeasuredControlResponseReady != true OR stage4_2cMeasuredCovarianceReady != true OR stage4_2cStatePreparationReady != true OR stage4_2dRecoveryReady != true OR stage4_2dSpectroscopicResponseReady != true OR stage4_2dWitnessToCoherenceReady != true OR stage4_2dZeroBridgePreserved != true OR apparatusScaleTransportReady != true OR responseCorrectedSpectralThermometryReady != true OR physicalSensorNoiseSeparated != true OR fullCrossSpectralCovarianceReady != true OR frozenDpSignatureReady != true OR completeJointSystemEquivalenceReady != true OR residualLikelihoodFrozen != true OR signatureIdentifiabilityReady != true OR apparatusDpPowerReady != true OR stage4_2bMeasuredEvidenceCampaignVersioned != true OR measuredEvidenceReady != true OR measuredComparisonAuthorized != true OR custodianReceiptVerified != true OR unblindingAuthorized != true OR fixedDeltaRhoMatched != true OR complexCoherenceIdentifiable != true OR ordinaryDecoherenceClosure != true OR polarizationQEDControlReady != true OR thermalFdtControlReady != true OR tensorDimensionalCongruence != true OR qedScaleHierarchyCalibration != true OR electronMassHiggsAnchorCalibration != true OR planckSolarCalibration != true OR crossScaleDpNonbridgePreserved != true OR namedDpManifestUnchanged != true OR phaseResidualReplayDeterministic != true OR collapseDiscriminatorPresent != true OR heldOutModelComparisonReady != true OR boundaryToCoherenceTransferKernelRegistered != true OR (bridgeCompared == true AND registeredNumericBridgeKernel != true)",
+        "reject_rule": "measuredComparisonAuthorized == true AND heldOutReplicationReady == true AND stage4_2cMeasuredControlResponseReady == true AND stage4_2cMeasuredCovarianceReady == true AND stage4_2cStatePreparationReady == true AND apparatusDpPowerReady == true AND ordinaryDecoherenceClosure == true AND (registeredNonunitarySignatureMatch != true OR frozenDpScalingMatch != true OR (boundaryExtensionClaimed == true AND registeredNumericBridgeKernelMatch != true))",
         "uncertainty_model": "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true,replay_window=session)",
         "test_refs": [
           "tests/casimir-dp-data-readiness.spec.ts",
@@ -714,6 +722,13 @@
           "tests/casimir-dp-apparatus-identifiability-stage4-2b.spec.ts",
           "tests/casimir-dp-stage4-2b-contract.spec.ts",
           "tests/casimir-dp-stage4-2b-campaign.spec.ts",
+          "tests/casimir-dp-stage4-2c-contract.spec.ts",
+          "tests/casimir-dp-control-response-stage4-2c.spec.ts",
+          "tests/casimir-dp-apparatus-redesign-stage4-2c.spec.ts",
+          "tests/casimir-dp-acquisition-packets-stage4-2c.spec.ts",
+          "tests/casimir-dp-stage4-2c-campaign.spec.ts",
+          "tests/casimir-dp-cross-scale-metrology-stage4-2d.spec.ts",
+          "tests/casimir-dp-stage4-2d-campaign.spec.ts",
           "tests/physics-root-leaf-manifest.spec.ts"
         ]
       },
@@ -878,7 +893,7 @@
     },
     {
       "id": "casimir-dp.or-boundary-coherence",
-      "summary": "Diagnostic Casimir-boundary coherence test that keeps ordinary QED phase and decoherence, Stage-4 polarization and thermal/FDT controls, Stage-4.2B apparatus scale transport, response-corrected thermometry, sensor-noise-separated covariance, frozen Diósi-Penrose scale forecasts, complex-residual identifiability and power, tensor/dimensional/semantic congruence, Penrose/Diósi-Penrose branch-instability diagnostics, and the unregistered numerical boundary-to-coherence bridge as separately gated lanes.",
+      "summary": "Diagnostic Casimir-boundary coherence test that keeps ordinary QED phase and decoherence, Stage-4 polarization and thermal/FDT controls, Stage-4.2B apparatus scale transport, response-corrected thermometry, sensor-noise-separated covariance, frozen Diósi-Penrose scale forecasts, complex-residual identifiability and power, Stage-4.2C bounded synthetic redesign, empirical-input readiness, and blinded acquisition packets, Stage-4.2D Stark/Zeeman/polarization/blackbody witness metrology, conventional-gravity recovery, and spinor semantic nonbridge, tensor/dimensional/semantic congruence, Penrose/Diósi-Penrose branch-instability diagnostics, and the unregistered numerical boundary-to-coherence bridge as separately gated lanes.",
       "claim_scope": "cross_domain",
       "max_claim_tier": "diagnostic",
       "path_ids": [

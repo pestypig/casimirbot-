@@ -4970,6 +4970,116 @@ export const mathStageRegistry: MathStageEntry[] = [
     },
   },
   {
+    tag: "CASIMIR_DP_IDENTIFIABILITY_REDESIGN_STAGE4_2C",
+    module: "shared/casimir-dp-control-response-stage4-2c.ts",
+    stage: "diagnostic",
+    notes:
+      "Runtime H compiles physical-axis numerical design assumptions into 30 raw complex control responses, real/imaginary block covariance, shared-calibration ancestry, sensor-self-noise covariance, Cholesky whitening, and an explicit round-trip receipt. These values are not measured apparatus response or covariance.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-control-response-stage4-2c.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-stage4-2c-campaign.spec.ts",
+      },
+    ],
+    units: {
+      raw_complex_control_response: "1",
+      response_standard_uncertainty: "1",
+      block_covariance: "1",
+      whitened_signature: "1",
+      covariance_roundtrip_residual: "1",
+      control_response_gate: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_IDENTIFIABILITY_REDESIGN_STAGE4_2C",
+    module: "shared/casimir-dp-apparatus-redesign-stage4-2c.ts",
+    stage: "diagnostic",
+    notes:
+      "Runtimes I/J transport a preregistered bounded apparatus catalogue through the unchanged Stage-4.2B DP generator, append covariance-whitened control contrasts, enforce authority and design bounds, and select the minimum-burden candidate only after cosine, conditioning, power, false-positive, and companion-SNR gates pass. No confirmatory fit or Casimir-to-collapse bridge is admitted.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-apparatus-redesign-stage4-2c.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-stage4-2c-campaign.spec.ts",
+      },
+    ],
+    units: {
+      candidate_mass_kg: "M",
+      candidate_radius_m: "L",
+      branch_separation_m: "L",
+      hold_time_s: "T",
+      Gamma_DP_s: "T^-1",
+      maximum_signature_cosine: "1",
+      normalized_gram_condition: "1",
+      achieved_power: "1",
+      false_positive_rate: "1",
+      companion_snr: "1",
+      required_windows: "1",
+      redesign_gate: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_IDENTIFIABILITY_REDESIGN_STAGE4_2C",
+    module: "shared/casimir-dp-acquisition-packets-stage4-2c.ts",
+    stage: "diagnostic",
+    notes:
+      "Runtime L emits calibration, pilot, confirmatory, and independent-replication packet schemas with frozen exclusions, covariance ancestry, custody, and unblinding rules. Confirmatory ingestion before freeze and post-freeze response, covariance, candidate, DP, or exclusion refitting fail closed; no packet contains acquired data.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-acquisition-packets-stage4-2c.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-stage4-2c-campaign.spec.ts",
+      },
+    ],
+    units: {
+      packet_schema_gate: "1",
+      freeze_gate: "1",
+      custody_gate: "1",
+      automatic_unblinding_allowed: "1",
+      physical_pilot_readiness: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_CROSS_SCALE_METROLOGY_STAGE4_2D",
+    module: "shared/casimir-dp-cross-scale-metrology-stage4-2d.ts",
+    stage: "diagnostic",
+    notes:
+      "Source-bounded Stark, Zeeman, circular-polarization, and blackbody dynamic-Stark calibration projections with propagated synthetic covariance, plus Schwarzschild compactness, material-yield crossover, and Jeans pressure-support recovery. Spinor representation remains distinct from mass and collapse; only the unchanged registered branch-density relation is admitted to Gamma_DP.",
+    checks: [
+      {
+        type: "test",
+        path: "tests/casimir-dp-cross-scale-metrology-stage4-2d.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "tests/casimir-dp-stage4-2d-campaign.spec.ts",
+      },
+    ],
+    units: {
+      electric_field_V_m: "M L T^-3 I^-1",
+      magnetic_flux_density_T: "M T^-2 I^-1",
+      spectroscopic_shift_Hz: "T^-1",
+      spectroscopic_covariance_Hz2: "T^-2",
+      schwarzschild_radius_m: "L",
+      compactness: "1",
+      yield_crossover_radius_m: "L",
+      jeans_length_m: "L",
+      jeans_mass_kg: "M",
+      free_fall_time_s: "T",
+      observable_bridge_edges_added: "1",
+    },
+  },
+  {
     tag: "PROOF_MATH",
     module: "shared/curvature-proxy.ts",
     stage: "reduced-order",

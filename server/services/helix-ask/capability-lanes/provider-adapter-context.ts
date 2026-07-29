@@ -8,6 +8,7 @@ import type {
 import type { HelixAgentProvider } from "../agent-providers/types";
 import type { HelixAccountType } from "@shared/helix-account-session";
 import type { HelixWorkstationCapabilityManifest } from "../workstation-tool-gateway/types";
+import type { HelixWorkstationGatewayAccountContext } from "../workstation-tool-gateway/account-policy";
 import type { HelixAgentModelVisibleCapabilityLaneManifest } from "../agent-providers/runtime-adapter-contract";
 import { buildModelVisibleCapabilityLaneManifest } from "../agent-providers/runtime-adapter-contract";
 import { listHelixCapabilityLanes } from "./registry";
@@ -185,16 +186,19 @@ const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 
 const readStringArray = (value: unknown): string[] =>
-  Array.isArray(value)
-    ? value.map(readString).filter(Boolean)
-    : [];
+  Array.isArray(value) ? value.map(readString).filter(Boolean) : [];
 
 const MODEL_VISIBLE_STRING_LIMIT = 16_000;
 
-export const compactCapabilityLaneModelValue = (value: unknown, depth = 0): unknown => {
+export const compactCapabilityLaneModelValue = (
+  value: unknown,
+  depth = 0,
+): unknown => {
   if (depth > 16 || value === null || value === undefined) return value;
   if (typeof value === "string") {
     if (/^(?:data:image\/|blob:)/i.test(value.trim())) {
@@ -205,12 +209,16 @@ export const compactCapabilityLaneModelValue = (value: unknown, depth = 0): unkn
       : `${value.slice(0, MODEL_VISIBLE_STRING_LIMIT)}...[model-visible value truncated]`;
   }
   if (Array.isArray(value)) {
-    return value.map((entry) => compactCapabilityLaneModelValue(entry, depth + 1));
+    return value.map((entry) =>
+      compactCapabilityLaneModelValue(entry, depth + 1),
+    );
   }
   if (typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .map(([key, entry]) => [key, compactCapabilityLaneModelValue(entry, depth + 1)]),
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        compactCapabilityLaneModelValue(entry, depth + 1),
+      ]),
     );
   }
   return value;
@@ -220,15 +228,23 @@ const readScientificImageEvidenceSidecarFromPacket = (
   packet: HelixAgentStepObservationPacket,
 ): Record<string, unknown> | null => {
   const stateDelta = readRecord(packet.state_delta);
-  const regionInspection = readRecord(stateDelta?.visual_analysis_region_inspection);
+  const regionInspection = readRecord(
+    stateDelta?.visual_analysis_region_inspection,
+  );
   const receipt = readRecord(regionInspection?.receipt);
   const candidates = [
     regionInspection?.scientific_evidence_sidecar,
     receipt?.scientific_evidence_sidecar,
   ];
-  return candidates
-    .map(readRecord)
-    .find((sidecar) => readString(sidecar?.schema) === "helix.scientific_image_evidence_sidecar.v1") ?? null;
+  return (
+    candidates
+      .map(readRecord)
+      .find(
+        (sidecar) =>
+          readString(sidecar?.schema) ===
+          "helix.scientific_image_evidence_sidecar.v1",
+      ) ?? null
+  );
 };
 
 const readRankedReceiptRef = (...values: unknown[]): string | null => {
@@ -251,12 +267,18 @@ const readRankedReceiptRef = (...values: unknown[]): string | null => {
   return null;
 };
 
-const isObservedTextToSpeechReceiptResult = (result: Record<string, unknown>): boolean => {
-  const capability = readString(result.capability ?? result.capability_id ?? result.capabilityId);
+const isObservedTextToSpeechReceiptResult = (
+  result: Record<string, unknown>,
+): boolean => {
+  const capability = readString(
+    result.capability ?? result.capability_id ?? result.capabilityId,
+  );
   if (capability !== "text_to_speech.speak_text") return false;
   const packet = readRecord(result.observation_packet);
   const stateDelta = readRecord(packet?.state_delta);
-  const receipt = readRecord(result.receipt) ?? readRecord(stateDelta?.text_to_speech_receipt);
+  const receipt =
+    readRecord(result.receipt) ??
+    readRecord(stateDelta?.text_to_speech_receipt);
   const playbackStatus = readString(receipt?.playback_status);
   return ["pending", "played", "blocked", "failed"].includes(playbackStatus);
 };
@@ -275,18 +297,27 @@ export const buildCapabilityLaneArtifactLedger = (input: {
 }): Array<Record<string, unknown>> =>
   input.packets.flatMap((packet, index) => {
     const stateDelta = readRecord(packet.state_delta);
-    const shadowExecution = readRecord(stateDelta?.capability_lane_shadow_execution);
-    const inferredLaneId = readString(shadowExecution?.lane_id) ||
+    const shadowExecution = readRecord(
+      stateDelta?.capability_lane_shadow_execution,
+    );
+    const inferredLaneId =
+      readString(shadowExecution?.lane_id) ||
       readString(packet.capability_key).split(".")[0] ||
       null;
     const selectedBackendProvider =
       readString(shadowExecution?.selected_backend_provider) ||
-      readString(packet.backend_selection_decision?.selected_backend_provider) ||
+      readString(
+        packet.backend_selection_decision?.selected_backend_provider,
+      ) ||
       null;
     const laneExecutionStatus =
       readString(shadowExecution?.execution_status) ||
-      (packet.status === "succeeded" ? "executed_observation_only" : "not_executed_shadow_only");
-    const firstProducedRef = packet.produced_artifact_refs.find((ref) => ref.trim().length > 0);
+      (packet.status === "succeeded"
+        ? "executed_observation_only"
+        : "not_executed_shadow_only");
+    const firstProducedRef = packet.produced_artifact_refs.find(
+      (ref) => ref.trim().length > 0,
+    );
     const artifactId =
       firstProducedRef ??
       `${input.turnId}:capability_lane_observation:${packet.capability_key}:${index + 1}`;
@@ -302,12 +333,15 @@ export const buildCapabilityLaneArtifactLedger = (input: {
       selected_backend_provider: selectedBackendProvider,
       backend_selection_decision: packet.backend_selection_decision ?? null,
       lane_execution_status: laneExecutionStatus,
-      lane_availability_status: readString(shadowExecution?.availability_status) || null,
-      lane_permission_status: readString(shadowExecution?.permission_status) || null,
+      lane_availability_status:
+        readString(shadowExecution?.availability_status) || null,
+      lane_permission_status:
+        readString(shadowExecution?.permission_status) || null,
       lane_cost_class: readString(shadowExecution?.cost_class) || null,
       lane_latency_class: readString(shadowExecution?.latency_class) || null,
       lane_privacy_class: readString(shadowExecution?.privacy_class) || null,
-      lane_fallback_backend_provider: readString(shadowExecution?.fallback_backend_provider) || null,
+      lane_fallback_backend_provider:
+        readString(shadowExecution?.fallback_backend_provider) || null,
       produced_artifact_refs: packet.produced_artifact_refs,
       payload: packet,
       assistant_answer: false,
@@ -315,13 +349,16 @@ export const buildCapabilityLaneArtifactLedger = (input: {
       raw_content_included: false,
     };
 
-    const scientificSidecar = readScientificImageEvidenceSidecarFromPacket(packet);
+    const scientificSidecar =
+      readScientificImageEvidenceSidecarFromPacket(packet);
     if (!scientificSidecar) return [packetArtifact];
 
     const sidecarId =
       readString(scientificSidecar.sidecar_id) ||
       `${input.turnId}:scientific_image_evidence_sidecar:${index + 1}`;
-    const memoryClassification = readRecord(scientificSidecar.memory_classification);
+    const memoryClassification = readRecord(
+      scientificSidecar.memory_classification,
+    );
     const admissibility = readRecord(scientificSidecar.admissibility);
     const sourceRefs = readStringArray(scientificSidecar.packet_refs);
 
@@ -340,22 +377,36 @@ export const buildCapabilityLaneArtifactLedger = (input: {
         backend_selection_decision: packet.backend_selection_decision ?? null,
         lane_execution_status: laneExecutionStatus,
         sidecar_id: sidecarId,
-        sidecar_kind: readString(scientificSidecar.sidecar_kind) || "transient_scientific_image_evidence",
-        memory_kind: readString(memoryClassification?.memory_kind) || "transient_scientific_image_evidence",
+        sidecar_kind:
+          readString(scientificSidecar.sidecar_kind) ||
+          "transient_scientific_image_evidence",
+        memory_kind:
+          readString(memoryClassification?.memory_kind) ||
+          "transient_scientific_image_evidence",
         retrieval_tags: readStringArray(memoryClassification?.retrieval_tags),
-        suggested_consumers: readStringArray(memoryClassification?.suggested_consumers),
+        suggested_consumers: readStringArray(
+          memoryClassification?.suggested_consumers,
+        ),
         source_ref_hash: readString(scientificSidecar.source_ref_hash) || null,
         source_kind: readString(scientificSidecar.source_kind) || null,
-        packet_count: typeof scientificSidecar.packet_count === "number" ? scientificSidecar.packet_count : null,
+        packet_count:
+          typeof scientificSidecar.packet_count === "number"
+            ? scientificSidecar.packet_count
+            : null,
         packet_refs: sourceRefs,
-        crop_regions: Array.isArray(scientificSidecar.crop_regions) ? scientificSidecar.crop_regions : [],
-        primary_packet_ref: readString(scientificSidecar.primary_packet_ref) || null,
+        crop_regions: Array.isArray(scientificSidecar.crop_regions)
+          ? scientificSidecar.crop_regions
+          : [],
+        primary_packet_ref:
+          readString(scientificSidecar.primary_packet_ref) || null,
         primary_domain: readString(scientificSidecar.primary_domain) || null,
         primary_domains: readStringArray(scientificSidecar.primary_domains),
         extraction_summary: readRecord(scientificSidecar.extraction_summary),
         admissibility_status: readString(admissibility?.status) || null,
         admissibility_reasons: readStringArray(admissibility?.reasons),
-        compound_route_stages: Array.isArray(scientificSidecar.compound_route_stages)
+        compound_route_stages: Array.isArray(
+          scientificSidecar.compound_route_stages,
+        )
           ? scientificSidecar.compound_route_stages
           : [],
         produced_artifact_refs: [sidecarId, ...sourceRefs],
@@ -372,7 +423,9 @@ export const buildCapabilityLaneProviderAdapterReceipts = (input: {
 }): HelixCapabilityLaneProviderAdapterReceipt[] =>
   input.packets.flatMap((packet) => {
     const stateDelta = readRecord(packet.state_delta);
-    const liveTranslationReceipt = readRecord(stateDelta?.live_translation_projection_receipt);
+    const liveTranslationReceipt = readRecord(
+      stateDelta?.live_translation_projection_receipt,
+    );
     return packet.receipts
       .map((receipt) => {
         const receiptRef = readString(receipt.receipt_ref);
@@ -389,16 +442,19 @@ export const buildCapabilityLaneProviderAdapterReceipts = (input: {
           turn_id: packet.turn_id,
           capability_key: packet.capability_key,
           observation_ref: observationRef,
-          payload: liveTranslationReceipt?.receipt_ref === receiptRef
-            ? liveTranslationReceipt
-            : receipt,
+          payload:
+            liveTranslationReceipt?.receipt_ref === receiptRef
+              ? liveTranslationReceipt
+              : receipt,
           reentry_required: true as const,
           terminal_eligible: false as const,
           assistant_answer: false as const,
           raw_content_included: false as const,
         };
       })
-      .filter((entry): entry is HelixCapabilityLaneProviderAdapterReceipt => Boolean(entry));
+      .filter((entry): entry is HelixCapabilityLaneProviderAdapterReceipt =>
+        Boolean(entry),
+      );
   });
 
 const buildCapabilityLaneMailLoopDebugSummaries = (
@@ -406,21 +462,28 @@ const buildCapabilityLaneMailLoopDebugSummaries = (
 ): HelixCapabilityLaneMailLoopDebugSummary[] =>
   goalBindingSummaries
     .map((summary) => summary.latest_mail_loop_summary)
-    .filter((summary): summary is HelixCapabilityLaneMailLoopDebugSummary => Boolean(summary));
+    .filter((summary): summary is HelixCapabilityLaneMailLoopDebugSummary =>
+      Boolean(summary),
+    );
 
 const buildCapabilityLaneGoalDispatchPlans = (
   goalBindingSummaries: HelixCapabilityLaneGoalBindingRunnerResult["goal_binding_debug_summaries"],
 ): HelixCapabilityLaneGoalDispatchPlan[] =>
   goalBindingSummaries
     .map((summary) => summary.dispatch_plan)
-    .filter((plan): plan is HelixCapabilityLaneGoalDispatchPlan => Boolean(plan));
+    .filter((plan): plan is HelixCapabilityLaneGoalDispatchPlan =>
+      Boolean(plan),
+    );
 
 const buildCapabilityLaneGoalDispatchAdmissions = (
   goalBindingSummaries: HelixCapabilityLaneGoalBindingRunnerResult["goal_binding_debug_summaries"],
 ): HelixCapabilityLaneGoalDispatchAdmission[] =>
   goalBindingSummaries
     .map((summary) => summary.dispatch_admission)
-    .filter((admission): admission is HelixCapabilityLaneGoalDispatchAdmission => Boolean(admission));
+    .filter(
+      (admission): admission is HelixCapabilityLaneGoalDispatchAdmission =>
+        Boolean(admission),
+    );
 
 const readGoalDispatchReadinessTimelineStatus = (
   readiness: HelixCapabilityLaneGoalDispatchReadiness,
@@ -436,9 +499,7 @@ export const reconcileCapabilityLaneProviderTimelineReentry = (input: {
   reenteredObservationRefs: string[];
 }): HelixCapabilityLaneProviderTimelineEvent[] => {
   const reenteredRefs = new Set(
-    input.reenteredObservationRefs
-      .map((ref) => ref.trim())
-      .filter(Boolean),
+    input.reenteredObservationRefs.map((ref) => ref.trim()).filter(Boolean),
   );
   return input.timeline.map((event) => {
     if (event.stage !== "lane_reentered") return event;
@@ -466,7 +527,12 @@ export const buildCapabilityLaneProviderTimeline = (input: {
   goalDispatchReadiness: HelixCapabilityLaneGoalDispatchReadiness | null;
 }): HelixCapabilityLaneProviderTimelineEvent[] => {
   const rows: HelixCapabilityLaneProviderTimelineEvent[] = [];
-  const push = (row: Omit<HelixCapabilityLaneProviderTimelineEvent, "schema" | "seq" | "adapter_boundary">) => {
+  const push = (
+    row: Omit<
+      HelixCapabilityLaneProviderTimelineEvent,
+      "schema" | "seq" | "adapter_boundary"
+    >,
+  ) => {
     rows.push({
       schema: "helix.capability_lane.provider_timeline_event.v1",
       seq: rows.length,
@@ -554,14 +620,18 @@ export const buildCapabilityLaneProviderTimeline = (input: {
     push({
       stage: "lane_projection_receipt",
       selected_runtime_agent_provider: input.provider.id,
-      lane_id: readString(payload?.lane_id) || receipt.capability_key.split(".")[0] || "capability_lane",
+      lane_id:
+        readString(payload?.lane_id) ||
+        receipt.capability_key.split(".")[0] ||
+        "capability_lane",
       capability_id: receipt.capability_key,
       status: receipt.status,
       lane_visible: false,
       lane_requested: true,
       lane_executed: true,
       observation_reentered: false,
-      selected_backend_provider: readString(payload?.selected_backend_provider) || null,
+      selected_backend_provider:
+        readString(payload?.selected_backend_provider) || null,
       observation_ref: receipt.observation_ref,
       receipt_ref: receipt.receipt_ref,
       latest_event_id: readString(payload?.source_event_id) || null,
@@ -579,23 +649,37 @@ export const buildCapabilityLaneProviderTimeline = (input: {
       source_projection_target: readString(payload?.projection_target) || null,
       account_locale: readString(payload?.account_locale) || null,
       latest_chunk_id: readString(payload?.chunk_id) || null,
-      latest_chunk_index: typeof payload?.chunk_index === "number" ? payload.chunk_index : null,
+      latest_chunk_index:
+        typeof payload?.chunk_index === "number" ? payload.chunk_index : null,
       latest_source_id: readString(payload?.source_id) || null,
       latest_source_hash: readString(payload?.source_hash) || null,
       latest_source_kind: readString(payload?.source_kind) || null,
       latest_target_language: readString(payload?.target_language) || null,
       latest_dedupe_key: readString(payload?.dedupe_key) || null,
       latest_source_event_id: readString(payload?.source_event_id) || null,
-      latest_source_event_ms: typeof payload?.source_event_ms === "number" ? payload.source_event_ms : null,
-      latest_observed_at_ms: typeof payload?.observed_at_ms === "number" ? payload.observed_at_ms : null,
-      latest_freshness_status: readString(payload?.projection_status) || readString(payload?.freshness_status) || null,
+      latest_source_event_ms:
+        typeof payload?.source_event_ms === "number"
+          ? payload.source_event_ms
+          : null,
+      latest_observed_at_ms:
+        typeof payload?.observed_at_ms === "number"
+          ? payload.observed_at_ms
+          : null,
+      latest_freshness_status:
+        readString(payload?.projection_status) ||
+        readString(payload?.freshness_status) ||
+        null,
       source_text_hash: readString(payload?.source_text_hash) || null,
-      source_text_char_count: typeof payload?.source_text_char_count === "number"
-        ? payload.source_text_char_count
-        : null,
+      source_text_char_count:
+        typeof payload?.source_text_char_count === "number"
+          ? payload.source_text_char_count
+          : null,
       latest_projection_target: readString(payload?.projection_target) || null,
       target_language: readString(payload?.target_language) || null,
-      latest_cancel_requested: typeof payload?.cancel_requested === "boolean" ? payload.cancel_requested : null,
+      latest_cancel_requested:
+        typeof payload?.cancel_requested === "boolean"
+          ? payload.cancel_requested
+          : null,
       terminal_authority_status: "not_terminal_authority",
       reentry_required: true,
       terminal_eligible: false,
@@ -604,8 +688,15 @@ export const buildCapabilityLaneProviderTimeline = (input: {
     });
   });
 
-  buildHelixCapabilityLaneSessionListTimeline(input.sessions.session_debug_summaries).forEach((sessionRow) => {
-    const { schema: _schema, seq: _seq, adapter_boundary: _adapterBoundary, ...row } = sessionRow;
+  buildHelixCapabilityLaneSessionListTimeline(
+    input.sessions.session_debug_summaries,
+  ).forEach((sessionRow) => {
+    const {
+      schema: _schema,
+      seq: _seq,
+      adapter_boundary: _adapterBoundary,
+      ...row
+    } = sessionRow;
     push(row);
   });
 
@@ -616,10 +707,18 @@ export const buildCapabilityLaneProviderTimeline = (input: {
       readString(summary.mail_loop_observation_key);
     const materializedMailLoopEvidence =
       summary.materialized_mail_loop_evidence === true ||
-      Boolean(!summary.blocked_reason && summary.stage_play_mail_id && mailLoopEvidenceRef);
+      Boolean(
+        !summary.blocked_reason &&
+        summary.stage_play_mail_id &&
+        mailLoopEvidenceRef,
+      );
     const mailDeliveryStatus =
       readString(summary.stage_play_mail_delivery_status) ||
-      (summary.blocked_reason ? "blocked" : summary.stage_play_mail_id ? "created" : "blocked");
+      (summary.blocked_reason
+        ? "blocked"
+        : summary.stage_play_mail_id
+          ? "created"
+          : "blocked");
     const sourceBindingKey =
       readString(summary.lane_session_source_binding_key) ||
       compactKey([
@@ -712,7 +811,10 @@ export const buildCapabilityLaneProviderTimeline = (input: {
       latest_mail_loop_wake_kind: summary.stage_play_wake_kind,
       mailbox_wake_expected: summary.mailbox_wake_expected,
       decision_wake_expected: summary.decision_wake_expected,
-      report_action: summary.stage_play_wake_kind === "mailbox_wake" ? "mailbox_wake" : "record_only",
+      report_action:
+        summary.stage_play_wake_kind === "mailbox_wake"
+          ? "mailbox_wake"
+          : "record_only",
       report_reason: summary.blocked_reason ?? mailDeliveryStatus,
       report_summary_text: materializedMailLoopEvidence
         ? "lane mail loop materialized observation evidence"
@@ -752,10 +854,14 @@ export const buildCapabilityLaneProviderTimeline = (input: {
       status: summary.binding_status,
       lane_visible: false,
       lane_requested: true,
-      lane_executed: summary.has_observation === true || Boolean(goalBindingEvidenceRef),
+      lane_executed:
+        summary.has_observation === true || Boolean(goalBindingEvidenceRef),
       observation_reentered: Boolean(summary.latest_mail_loop_summary),
       selected_backend_provider: summary.selected_backend_provider,
-      observation_ref: summary.last_observation_ref ?? mailLoopSummary?.observation_ref ?? null,
+      observation_ref:
+        summary.last_observation_ref ??
+        mailLoopSummary?.observation_ref ??
+        null,
       receipt_ref: latestReceiptRef,
       latest_receipt_ref: latestReceiptRef,
       latest_event_id: summary.latest_event_id,
@@ -769,37 +875,57 @@ export const buildCapabilityLaneProviderTimeline = (input: {
       source_binding_key: summary.source_binding_key,
       source_identity_key: summary.source_identity_key,
       latest_observation_key:
-        summary.latest_observation_key ?? summary.latest_mail_loop_observation_key ?? mailLoopSummary?.mail_loop_observation_key ?? null,
-      has_observation: summary.has_observation === true || Boolean(goalBindingEvidenceRef),
+        summary.latest_observation_key ??
+        summary.latest_mail_loop_observation_key ??
+        mailLoopSummary?.mail_loop_observation_key ??
+        null,
+      has_observation:
+        summary.has_observation === true || Boolean(goalBindingEvidenceRef),
       source_id: mailLoopSummary?.source_id ?? summary.source_id,
       source_hash: mailLoopSummary?.source_hash ?? summary.source_hash,
       source_kind: mailLoopSummary?.source_kind ?? summary.source_kind,
       source_projection_target: summary.source_projection_target,
       account_locale: summary.account_locale,
       latest_chunk_id: mailLoopSummary?.chunk_id ?? summary.latest_chunk_id,
-      latest_chunk_index: mailLoopSummary?.chunk_index ?? summary.latest_chunk_index,
+      latest_chunk_index:
+        mailLoopSummary?.chunk_index ?? summary.latest_chunk_index,
       latest_source_id: mailLoopSummary?.source_id ?? summary.latest_source_id,
-      latest_source_hash: mailLoopSummary?.source_hash ?? summary.latest_source_hash,
-      latest_source_kind: mailLoopSummary?.source_kind ?? summary.latest_source_kind,
-      latest_target_language: mailLoopSummary?.target_language ?? summary.latest_target_language,
-      latest_dedupe_key: mailLoopSummary?.dedupe_key ?? summary.latest_dedupe_key,
-      latest_source_event_id: mailLoopSummary?.source_event_id ?? summary.latest_source_event_id,
-      latest_source_event_ms: mailLoopSummary?.source_event_ms ?? summary.latest_source_event_ms,
-      latest_observed_at_ms: mailLoopSummary?.observed_at_ms ?? summary.latest_observed_at_ms,
-      latest_freshness_status: mailLoopSummary?.freshness_status ?? summary.latest_freshness_status,
+      latest_source_hash:
+        mailLoopSummary?.source_hash ?? summary.latest_source_hash,
+      latest_source_kind:
+        mailLoopSummary?.source_kind ?? summary.latest_source_kind,
+      latest_target_language:
+        mailLoopSummary?.target_language ?? summary.latest_target_language,
+      latest_dedupe_key:
+        mailLoopSummary?.dedupe_key ?? summary.latest_dedupe_key,
+      latest_source_event_id:
+        mailLoopSummary?.source_event_id ?? summary.latest_source_event_id,
+      latest_source_event_ms:
+        mailLoopSummary?.source_event_ms ?? summary.latest_source_event_ms,
+      latest_observed_at_ms:
+        mailLoopSummary?.observed_at_ms ?? summary.latest_observed_at_ms,
+      latest_freshness_status:
+        mailLoopSummary?.freshness_status ?? summary.latest_freshness_status,
       source_text_hash: summary.source_text_hash,
       source_text_char_count: summary.source_text_char_count,
-      latest_projection_target: mailLoopSummary?.projection_target ?? summary.latest_projection_target,
-      target_language: mailLoopSummary?.target_language ?? summary.target_language,
-      latest_cancel_requested: mailLoopSummary?.cancel_requested ?? summary.latest_cancel_requested,
-      latest_mail_loop_wake_kind: mailLoopSummary?.stage_play_wake_kind ?? summary.latest_mail_loop_wake_kind,
+      latest_projection_target:
+        mailLoopSummary?.projection_target ?? summary.latest_projection_target,
+      target_language:
+        mailLoopSummary?.target_language ?? summary.target_language,
+      latest_cancel_requested:
+        mailLoopSummary?.cancel_requested ?? summary.latest_cancel_requested,
+      latest_mail_loop_wake_kind:
+        mailLoopSummary?.stage_play_wake_kind ??
+        summary.latest_mail_loop_wake_kind,
       report_action: readString(reportDecision?.action) || null,
       report_reason: readString(reportDecision?.reason) || null,
       quiet_behavior_applied: reportDecision?.quiet_behavior_applied === true,
       wake_expected: reportDecision?.wake_expected === true,
       surface_badge_expected: reportDecision?.surface_badge_expected === true,
-      terminal_report_requested: reportDecision?.terminal_report_requested === true,
-      terminal_report_authorized: reportDecision?.terminal_report_authorized === true,
+      terminal_report_requested:
+        reportDecision?.terminal_report_requested === true,
+      terminal_report_authorized:
+        reportDecision?.terminal_report_authorized === true,
       report_summary_text: reportSummaryText,
       terminal_authority_status: summary.terminal_authority_status,
       reentry_required: true,
@@ -879,7 +1005,8 @@ export const buildCapabilityLaneProviderTimeline = (input: {
   input.goalDispatchAdmissions.forEach((admission) => {
     push({
       stage: "lane_goal_dispatch_admission",
-      selected_runtime_agent_provider: admission.selected_runtime_agent_provider,
+      selected_runtime_agent_provider:
+        admission.selected_runtime_agent_provider,
       lane_id: admission.lane_id,
       capability_id: null,
       status: admission.status,
@@ -945,60 +1072,105 @@ export const buildCapabilityLaneProviderTimeline = (input: {
   });
 
   if (input.goalDispatchReadiness) {
-    const readinessStatus = readGoalDispatchReadinessTimelineStatus(input.goalDispatchReadiness);
+    const readinessStatus = readGoalDispatchReadinessTimelineStatus(
+      input.goalDispatchReadiness,
+    );
     push({
       stage: "lane_goal_dispatch_readiness",
-      selected_runtime_agent_provider: input.goalDispatchReadiness.next_runtime_agent_providers?.[0] ?? input.provider.id,
-      lane_id: input.goalDispatchReadiness.next_lane_ids[0] ?? "capability_lane_goal_dispatch",
+      selected_runtime_agent_provider:
+        input.goalDispatchReadiness.next_runtime_agent_providers?.[0] ??
+        input.provider.id,
+      lane_id:
+        input.goalDispatchReadiness.next_lane_ids[0] ??
+        "capability_lane_goal_dispatch",
       capability_id: null,
       status: readinessStatus,
       lane_visible: false,
       lane_requested: input.goalDispatchReadiness.total_plans > 0,
       lane_executed: false,
-      observation_reentered: input.goalDispatchReadiness.next_evidence_refs.length > 0,
-      requested_backend_provider: input.goalDispatchReadiness.next_requested_backend_providers?.[0] ?? null,
-      selected_backend_provider: input.goalDispatchReadiness.next_selected_backend_providers?.[0] ?? null,
-      fallback_backend_provider: input.goalDispatchReadiness.next_fallback_backend_providers?.[0] ?? null,
-      selection_reason: input.goalDispatchReadiness.next_backend_selection_reasons?.[0] ?? null,
+      observation_reentered:
+        input.goalDispatchReadiness.next_evidence_refs.length > 0,
+      requested_backend_provider:
+        input.goalDispatchReadiness.next_requested_backend_providers?.[0] ??
+        null,
+      selected_backend_provider:
+        input.goalDispatchReadiness.next_selected_backend_providers?.[0] ??
+        null,
+      fallback_backend_provider:
+        input.goalDispatchReadiness.next_fallback_backend_providers?.[0] ??
+        null,
+      selection_reason:
+        input.goalDispatchReadiness.next_backend_selection_reasons?.[0] ?? null,
       cost_class: input.goalDispatchReadiness.next_cost_classes?.[0] ?? null,
-      latency_class: input.goalDispatchReadiness.next_latency_classes?.[0] ?? null,
-      privacy_class: input.goalDispatchReadiness.next_privacy_classes?.[0] ?? null,
-      observation_ref: input.goalDispatchReadiness.next_evidence_refs[0] ?? null,
+      latency_class:
+        input.goalDispatchReadiness.next_latency_classes?.[0] ?? null,
+      privacy_class:
+        input.goalDispatchReadiness.next_privacy_classes?.[0] ?? null,
+      observation_ref:
+        input.goalDispatchReadiness.next_evidence_refs[0] ?? null,
       receipt_ref: input.goalDispatchReadiness.next_receipt_refs[0] ?? null,
-      latest_event_id: input.goalDispatchReadiness.next_latest_event_ids[0] ?? null,
-      session_control_key: input.goalDispatchReadiness.next_session_control_keys[0] ?? null,
-      source_binding_key: input.goalDispatchReadiness.next_source_binding_keys[0] ?? null,
-      source_identity_key: input.goalDispatchReadiness.next_source_identity_keys?.[0] ?? null,
-      latest_observation_key: input.goalDispatchReadiness.next_mail_loop_observation_keys[0] ?? null,
+      latest_event_id:
+        input.goalDispatchReadiness.next_latest_event_ids[0] ?? null,
+      session_control_key:
+        input.goalDispatchReadiness.next_session_control_keys[0] ?? null,
+      source_binding_key:
+        input.goalDispatchReadiness.next_source_binding_keys[0] ?? null,
+      source_identity_key:
+        input.goalDispatchReadiness.next_source_identity_keys?.[0] ?? null,
+      latest_observation_key:
+        input.goalDispatchReadiness.next_mail_loop_observation_keys[0] ?? null,
       has_observation: input.goalDispatchReadiness.next_has_observation,
       source_id: input.goalDispatchReadiness.next_source_ids[0] ?? null,
       source_hash: input.goalDispatchReadiness.next_source_hashes[0] ?? null,
       source_kind: input.goalDispatchReadiness.next_source_kinds[0] ?? null,
-      source_projection_target: input.goalDispatchReadiness.next_source_projection_targets[0] ?? null,
-      account_locale: input.goalDispatchReadiness.next_account_locales[0] ?? null,
+      source_projection_target:
+        input.goalDispatchReadiness.next_source_projection_targets[0] ?? null,
+      account_locale:
+        input.goalDispatchReadiness.next_account_locales[0] ?? null,
       latest_chunk_id: input.goalDispatchReadiness.next_chunk_ids[0] ?? null,
-      latest_chunk_index: input.goalDispatchReadiness.next_chunk_indexes[0] ?? null,
-      latest_source_id: input.goalDispatchReadiness.next_latest_source_ids[0] ?? null,
-      latest_source_hash: input.goalDispatchReadiness.next_latest_source_hashes[0] ?? null,
-      latest_source_kind: input.goalDispatchReadiness.next_latest_source_kinds[0] ?? null,
-      latest_target_language: input.goalDispatchReadiness.next_latest_target_languages[0] ?? null,
-      latest_dedupe_key: input.goalDispatchReadiness.next_dedupe_keys[0] ?? null,
-      latest_source_event_id: input.goalDispatchReadiness.next_source_event_ids[0] ?? null,
-      latest_source_event_ms: input.goalDispatchReadiness.next_source_event_mses[0] ?? null,
-      latest_observed_at_ms: input.goalDispatchReadiness.next_observed_at_mses[0] ?? null,
-      latest_freshness_status: input.goalDispatchReadiness.next_freshness_statuses[0] ?? null,
-      source_text_hash: input.goalDispatchReadiness.next_source_text_hashes[0] ?? null,
-      source_text_char_count: input.goalDispatchReadiness.next_source_text_char_counts[0] ?? null,
-      latest_projection_target: input.goalDispatchReadiness.next_projection_targets[0] ?? null,
-      target_language: input.goalDispatchReadiness.next_target_languages[0] ?? null,
-      latest_cancel_requested: input.goalDispatchReadiness.next_cancel_requested,
-      latest_mail_loop_wake_kind: input.goalDispatchReadiness.next_mail_loop_wake_kinds[0] ?? null,
-      goal_binding_id: input.goalDispatchReadiness.next_goal_binding_ids[0] ?? null,
-      lane_session_id: input.goalDispatchReadiness.next_lane_session_ids[0] ?? null,
-      dispatch_target: input.goalDispatchReadiness.next_dispatch_targets[0] ?? null,
+      latest_chunk_index:
+        input.goalDispatchReadiness.next_chunk_indexes[0] ?? null,
+      latest_source_id:
+        input.goalDispatchReadiness.next_latest_source_ids[0] ?? null,
+      latest_source_hash:
+        input.goalDispatchReadiness.next_latest_source_hashes[0] ?? null,
+      latest_source_kind:
+        input.goalDispatchReadiness.next_latest_source_kinds[0] ?? null,
+      latest_target_language:
+        input.goalDispatchReadiness.next_latest_target_languages[0] ?? null,
+      latest_dedupe_key:
+        input.goalDispatchReadiness.next_dedupe_keys[0] ?? null,
+      latest_source_event_id:
+        input.goalDispatchReadiness.next_source_event_ids[0] ?? null,
+      latest_source_event_ms:
+        input.goalDispatchReadiness.next_source_event_mses[0] ?? null,
+      latest_observed_at_ms:
+        input.goalDispatchReadiness.next_observed_at_mses[0] ?? null,
+      latest_freshness_status:
+        input.goalDispatchReadiness.next_freshness_statuses[0] ?? null,
+      source_text_hash:
+        input.goalDispatchReadiness.next_source_text_hashes[0] ?? null,
+      source_text_char_count:
+        input.goalDispatchReadiness.next_source_text_char_counts[0] ?? null,
+      latest_projection_target:
+        input.goalDispatchReadiness.next_projection_targets[0] ?? null,
+      target_language:
+        input.goalDispatchReadiness.next_target_languages[0] ?? null,
+      latest_cancel_requested:
+        input.goalDispatchReadiness.next_cancel_requested,
+      latest_mail_loop_wake_kind:
+        input.goalDispatchReadiness.next_mail_loop_wake_kinds[0] ?? null,
+      goal_binding_id:
+        input.goalDispatchReadiness.next_goal_binding_ids[0] ?? null,
+      lane_session_id:
+        input.goalDispatchReadiness.next_lane_session_ids[0] ?? null,
+      dispatch_target:
+        input.goalDispatchReadiness.next_dispatch_targets[0] ?? null,
       dispatch_admission_status: readinessStatus,
-      dispatch_blocked_reason: input.goalDispatchReadiness.blocked_reasons[0] ?? null,
-      materialized_mail_loop_evidence: input.goalDispatchReadiness.next_mail_loop_observation_keys.length > 0,
+      dispatch_blocked_reason:
+        input.goalDispatchReadiness.blocked_reasons[0] ?? null,
+      materialized_mail_loop_evidence:
+        input.goalDispatchReadiness.next_mail_loop_observation_keys.length > 0,
       wake_dispatch_allowed: input.goalDispatchReadiness.wake_dispatch_allowed,
       side_effects_allowed: input.goalDispatchReadiness.side_effects_allowed,
       terminal_authority_status: "not_terminal_authority",
@@ -1016,6 +1188,7 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
   provider: HelixAgentProvider;
   body: Record<string, unknown>;
   turnId?: string | null;
+  conversationThreadId?: string | null;
   iteration?: number | null;
   env?: NodeJS.ProcessEnv;
   sessionStore?: HelixCapabilityLaneSessionStore;
@@ -1023,18 +1196,24 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
   authorizedGatewayCapabilities?: HelixWorkstationCapabilityManifest[];
   accountType?: HelixAccountType | null;
   profileId?: string | null;
+  accountContext?: HelixWorkstationGatewayAccountContext | null;
   authoritativeEvidenceArtifacts?: unknown[];
 }): Promise<HelixCapabilityLaneProviderAdapterContext> => {
-  const turnId = readString(input.turnId) || readString(input.body.turn_id ?? input.body.turnId) || "ask:capability-lane";
+  const turnId =
+    readString(input.turnId) ||
+    readString(input.body.turn_id ?? input.body.turnId) ||
+    "ask:capability-lane";
   const oneShot = await runHelixCapabilityLaneOneShotRequests({
     provider: input.provider,
     body: input.body,
     turnId,
+    conversationThreadId: input.conversationThreadId,
     iteration: input.iteration,
     env: input.env,
     authorizedGatewayCapabilities: input.authorizedGatewayCapabilities,
     accountType: input.accountType,
     profileId: input.profileId,
+    accountContext: input.accountContext,
     authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
   });
   const sessions = runHelixCapabilityLaneSessionRequests({
@@ -1048,10 +1227,13 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
     store: input.goalBindingStore,
     sessionStore: input.sessionStore,
   });
-  const modelVisibleCapabilityLaneManifest = buildModelVisibleCapabilityLaneManifest(listHelixCapabilityLanes({
-    provider: input.provider,
-    env: input.env,
-  }));
+  const modelVisibleCapabilityLaneManifest =
+    buildModelVisibleCapabilityLaneManifest(
+      listHelixCapabilityLanes({
+        provider: input.provider,
+        env: input.env,
+      }),
+    );
   const artifactLedger = buildCapabilityLaneArtifactLedger({
     turnId,
     packets: oneShot.observation_packets,
@@ -1068,12 +1250,13 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
   const goalDispatchAdmissions = buildCapabilityLaneGoalDispatchAdmissions(
     goalBindings.goal_binding_debug_summaries,
   );
-  const goalDispatchReadiness = goalDispatchPlans.length > 0 || goalDispatchAdmissions.length > 0
-    ? buildHelixCapabilityLaneGoalDispatchReadiness({
-      plans: goalDispatchPlans,
-      admissions: goalDispatchAdmissions,
-    })
-    : null;
+  const goalDispatchReadiness =
+    goalDispatchPlans.length > 0 || goalDispatchAdmissions.length > 0
+      ? buildHelixCapabilityLaneGoalDispatchReadiness({
+          plans: goalDispatchPlans,
+          admissions: goalDispatchAdmissions,
+        })
+      : null;
   const timeline = buildCapabilityLaneProviderTimeline({
     provider: input.provider,
     manifest: modelVisibleCapabilityLaneManifest,
@@ -1091,18 +1274,23 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
     const observation = readRecord(record.observation);
     const receipt = readRecord(record.receipt);
     const resultValues = Object.fromEntries(
-      Object.entries(record).filter(([key]) => ![
-        "lane_resolve_trace",
-        "observation",
-        "observation_packet",
-        "receipt",
-      ].includes(key)),
+      Object.entries(record).filter(
+        ([key]) =>
+          ![
+            "lane_resolve_trace",
+            "observation",
+            "observation_packet",
+            "receipt",
+          ].includes(key),
+      ),
     );
     return {
       ...resultValues,
       capability: readString(record.capability),
       ok: record.ok === true,
-      status: readString(record.status) || (record.ok === true ? "succeeded" : "failed"),
+      status:
+        readString(record.status) ||
+        (record.ok === true ? "succeeded" : "failed"),
       observation_ref:
         readString(record.observation_ref) ||
         readString(observation?.observation_ref) ||
@@ -1111,7 +1299,8 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
         readString(record.receipt_ref) ||
         readString(receipt?.receipt_ref) ||
         null,
-      selected_backend_provider: readString(record.selected_backend_provider) || null,
+      selected_backend_provider:
+        readString(record.selected_backend_provider) || null,
       error: readString(record.error) || null,
       terminal_eligible: false,
       assistant_answer: false,
@@ -1125,14 +1314,16 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
     model_visible_capability_lane_manifest: modelVisibleCapabilityLaneManifest,
     debug_projection: {
       ...oneShot.debug_projection,
-      model_visible_capability_lane_manifest: modelVisibleCapabilityLaneManifest,
+      model_visible_capability_lane_manifest:
+        modelVisibleCapabilityLaneManifest,
       capability_lane_projection_receipts: projectionReceipts,
       capability_lane_turn_timeline: timeline,
       capability_lane_session_results: sessions.session_results,
       capability_lane_session_debug_summaries: sessions.session_debug_summaries,
       capability_lane_mail_loop_debug_summaries: mailLoopDebugSummaries,
       capability_lane_goal_binding_results: goalBindings.goal_binding_results,
-      capability_lane_goal_binding_debug_summaries: goalBindings.goal_binding_debug_summaries,
+      capability_lane_goal_binding_debug_summaries:
+        goalBindings.goal_binding_debug_summaries,
       capability_lane_goal_dispatch_plans: goalDispatchPlans,
       capability_lane_goal_dispatch_admissions: goalDispatchAdmissions,
       capability_lane_goal_dispatch_readiness: goalDispatchReadiness,
@@ -1141,38 +1332,55 @@ export const buildHelixCapabilityLaneProviderAdapterContext = async (input: {
     projection_receipts: projectionReceipts,
     capability_lane_turn_timeline: timeline,
     artifact_ledger: artifactLedger,
-    prompt_observation_block: JSON.stringify(compactCapabilityLaneModelValue({
-      model_visible_capability_lane_manifest: modelVisibleCapabilityLaneManifest,
-      capability_lane_call_results: oneShot.call_results,
-      capability_lane_observation_packets: oneShot.observation_packets,
-      capability_lane_backend_selections: oneShot.backend_selections,
-      capability_lane_projection_receipts: projectionReceipts,
-      capability_lane_turn_timeline: timeline,
-      capability_lane_session_results: sessions.session_results,
-      capability_lane_session_debug_summaries: sessions.session_debug_summaries,
-      capability_lane_mail_loop_debug_summaries: mailLoopDebugSummaries,
-      capability_lane_goal_binding_results: goalBindings.goal_binding_results,
-      capability_lane_goal_binding_debug_summaries: goalBindings.goal_binding_debug_summaries,
-      capability_lane_goal_dispatch_plans: goalDispatchPlans,
-      capability_lane_goal_dispatch_admissions: goalDispatchAdmissions,
-      capability_lane_goal_dispatch_readiness: goalDispatchReadiness,
-      capability_lane_reentry_status: oneShot.debug_projection.capability_lane_reentry_status,
-    }), null, 2),
-    reentry_observation_block: JSON.stringify(compactCapabilityLaneModelValue({
-      capability_lane_call_summaries: reentryCallSummaries,
-      capability_lane_observation_packets: oneShot.observation_packets,
-      capability_lane_projection_receipts: projectionReceipts,
-      capability_lane_session_results: sessions.session_results,
-      capability_lane_goal_binding_results: goalBindings.goal_binding_results,
-      capability_lane_goal_dispatch_plans: goalDispatchPlans,
-      capability_lane_goal_dispatch_admissions: goalDispatchAdmissions,
-      capability_lane_goal_dispatch_readiness: goalDispatchReadiness,
-      capability_lane_reentry_status: oneShot.debug_projection.capability_lane_reentry_status,
-    }), null, 2),
+    prompt_observation_block: JSON.stringify(
+      compactCapabilityLaneModelValue({
+        model_visible_capability_lane_manifest:
+          modelVisibleCapabilityLaneManifest,
+        capability_lane_call_results: oneShot.call_results,
+        capability_lane_observation_packets: oneShot.observation_packets,
+        capability_lane_backend_selections: oneShot.backend_selections,
+        capability_lane_projection_receipts: projectionReceipts,
+        capability_lane_turn_timeline: timeline,
+        capability_lane_session_results: sessions.session_results,
+        capability_lane_session_debug_summaries:
+          sessions.session_debug_summaries,
+        capability_lane_mail_loop_debug_summaries: mailLoopDebugSummaries,
+        capability_lane_goal_binding_results: goalBindings.goal_binding_results,
+        capability_lane_goal_binding_debug_summaries:
+          goalBindings.goal_binding_debug_summaries,
+        capability_lane_goal_dispatch_plans: goalDispatchPlans,
+        capability_lane_goal_dispatch_admissions: goalDispatchAdmissions,
+        capability_lane_goal_dispatch_readiness: goalDispatchReadiness,
+        capability_lane_reentry_status:
+          oneShot.debug_projection.capability_lane_reentry_status,
+      }),
+      null,
+      2,
+    ),
+    reentry_observation_block: JSON.stringify(
+      compactCapabilityLaneModelValue({
+        capability_lane_call_summaries: reentryCallSummaries,
+        capability_lane_observation_packets: oneShot.observation_packets,
+        capability_lane_projection_receipts: projectionReceipts,
+        capability_lane_session_results: sessions.session_results,
+        capability_lane_goal_binding_results: goalBindings.goal_binding_results,
+        capability_lane_goal_dispatch_plans: goalDispatchPlans,
+        capability_lane_goal_dispatch_admissions: goalDispatchAdmissions,
+        capability_lane_goal_dispatch_readiness: goalDispatchReadiness,
+        capability_lane_reentry_status:
+          oneShot.debug_projection.capability_lane_reentry_status,
+      }),
+      null,
+      2,
+    ),
     calls_succeeded:
       (oneShot.call_results.length === 0 ||
-        oneShot.call_results.every((result) =>
-          result.ok === true || isObservedTextToSpeechReceiptResult(result as Record<string, unknown>)
+        oneShot.call_results.every(
+          (result) =>
+            result.ok === true ||
+            isObservedTextToSpeechReceiptResult(
+              result as Record<string, unknown>,
+            ),
         )) &&
       sessions.session_results.every((result) => result.ok === true) &&
       goalBindings.goal_binding_results.every((result) => result.ok === true),

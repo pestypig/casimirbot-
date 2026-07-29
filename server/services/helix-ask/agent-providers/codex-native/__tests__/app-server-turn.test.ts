@@ -413,6 +413,8 @@ describe("Codex native app-server turn", () => {
       capabilityId: "workspace_os.status",
       arguments: {},
       iteration: 1,
+      callId: "call:capability",
+      providerExecutionId: "turn:fake",
     });
     const lifecycle = result.debug.turn_lifecycle;
     const lifecycleKinds = lifecycle.events.map((event) => event.kind);
@@ -550,6 +552,8 @@ describe("Codex native app-server turn", () => {
         paths: ["docs"],
       },
       iteration: 1,
+      callId: "call:capability",
+      providerExecutionId: "turn:fake",
     });
   });
 

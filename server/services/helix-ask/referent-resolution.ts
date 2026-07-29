@@ -353,7 +353,7 @@ const conversationalReferentPhrase = (prompt: string): string | null => {
     return "deictic_previous_assistant_answer";
   }
   if (
-    /\b(?:the|your)\s+(?:immediately\s+)?(?:previous|last|prior)\s+(?:assistant\s+)?(?:answer|response|reply|explanation|statement|summary)\b/i.test(unquoted)
+    /\b(?:the|your)\s+(?:immediately\s+)?(?:previous|last|prior|preceding)\s+(?:assistant\s+)?(?:answer|response|reply|explanation|statement|summary)\b/i.test(unquoted)
   ) {
     return "previous_assistant_final_answer";
   }

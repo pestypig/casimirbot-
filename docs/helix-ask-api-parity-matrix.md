@@ -90,12 +90,12 @@ not yet eligible to answer from capture evidence.
 
 ## Running Against A Live Server
 
-Use the operator's normal keyed localhost server with the test harness enabled.
-Do not start a new development server from an agent shell solely to test
-agent/LLM-backed behavior unless the user explicitly asks for that process. The
-agent shell may not have the provider keys, tenant headers, auth state, browser
-state, or workstation bindings needed to exercise the same model path as the
-user's normal session.
+Use the normal keyed localhost server with the test harness enabled. It may be
+started by the operator or, with explicit authorization, by Codex Desktop using
+only the configured opaque `start-myapp-for-codex` launcher. Never substitute
+an ad hoc `npm run dev:*` process: it may lack provider keys, tenant headers,
+auth state, browser state, or workstation bindings needed to exercise the same
+model path.
 
 Operator-started server examples:
 
@@ -197,9 +197,11 @@ status, or no visible final answer text. This catches regressions where debug
 mirrors look complete while the user-visible/API terminal answer still says the
 turn failed.
 
-If no suitable keyed server is already running, report live parity as blocked and
-ask the user to start the normal localhost server. Static and unit parity tests
-may still run without a live server when they do not require provider secrets.
+If no suitable keyed server is running, use the configured opaque launcher only
+when the user or active repository contract explicitly authorizes it. Otherwise,
+report live parity as blocked and ask the user to start the normal localhost
+server. Static and unit parity tests may still run without a live server when
+they do not require provider secrets.
 
 Useful environment variables:
 

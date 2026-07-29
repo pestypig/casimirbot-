@@ -49,6 +49,7 @@ export const createRealtimeGroundedFinalResponseCapture = (input: {
   let overflowed = false;
   let collectingTerminal = !input.streaming;
   let searchTail = "";
+  let structuredPayload: RecordLike | null = null;
 
   const append = (buffer: Buffer): void => {
     if (overflowed || buffer.length === 0) return;
@@ -61,7 +62,12 @@ export const createRealtimeGroundedFinalResponseCapture = (input: {
   };
 
   const capture = (chunk: unknown, encoding?: BufferEncoding): void => {
-    if (chunk === undefined || chunk === null || overflowed) return;
+    if (
+      structuredPayload ||
+      chunk === undefined ||
+      chunk === null ||
+      overflowed
+    ) return;
     const buffer = Buffer.isBuffer(chunk)
       ? chunk
       : Buffer.from(String(chunk), encoding ?? "utf8");
@@ -80,7 +86,18 @@ export const createRealtimeGroundedFinalResponseCapture = (input: {
     append(Buffer.from(combined.slice(header.index), "utf8"));
   };
 
+  const capturePayload = (payload: unknown): void => {
+    structuredPayload = readRecord(payload);
+  };
+
   const finish = (): RealtimeGroundedFinalResponseCaptureResult => {
+    if (structuredPayload) {
+      return {
+        payload: structuredPayload,
+        failureCode: null,
+        capturedBytes,
+      };
+    }
     if (overflowed) {
       return {
         payload: null,
@@ -99,5 +116,5 @@ export const createRealtimeGroundedFinalResponseCapture = (input: {
     };
   };
 
-  return { capture, finish };
+  return { capture, capturePayload, finish };
 };

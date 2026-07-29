@@ -48,7 +48,8 @@ export type HelixLoopParityTrace = {
     source_id: string;
     provenance: string;
     freshness_ms?: number;
-    content_role: "evidence_not_assistant_answer" | "observation_not_assistant_answer";
+    content_role:
+      "evidence_not_assistant_answer" | "observation_not_assistant_answer";
   }>;
   evidence_selected_for_answer: string[];
   evidence_rejected_for_answer: Array<{
@@ -71,10 +72,16 @@ export type HelixLoopParityTrace = {
 };
 
 const hashShort = (value: unknown): string =>
-  crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
+  crypto
+    .createHash("sha256")
+    .update(JSON.stringify(value))
+    .digest("hex")
+    .slice(0, 16);
 
 const readRecord = (value: unknown): RecordLike | null =>
-  value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as RecordLike)
+    : null;
 
 const readString = (value: unknown): string =>
   typeof value === "string" && value.trim() ? value.trim() : "";
@@ -82,36 +89,78 @@ const readString = (value: unknown): string =>
 const readBoolean = (value: unknown): boolean => value === true;
 
 const readStringArray = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0) : [];
+  Array.isArray(value)
+    ? value.filter(
+        (entry): entry is string =>
+          typeof entry === "string" && entry.trim().length > 0,
+      )
+    : [];
 
 const unique = <T>(entries: T[]): T[] => Array.from(new Set(entries));
 
 const inferToolFamily = (toolId: string): string => {
-  if (/helix_ask\.inspect_capability_catalog|inspect_capability_catalog|capability[_-]?catalog|capability[_-]?registry/i.test(toolId)) return "capability_catalog";
-  if (/scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(toolId)) return "scholarly_research";
-  if (/theory[-_.]?locator|reflect[_-]?theory[_-]?context|theory[_-]?context[_-]?reflection|badge[_-]?graph|frontierVectorFieldTrace|frontier[_-]?vector[_-]?field|relation[_-]?tensor/i.test(toolId)) return "theory_locator";
-  if (/internet[-_.]?search|web[-_.]?research|web\.search/i.test(toolId)) return "internet_search";
+  if (
+    /helix_ask\.inspect_capability_catalog|inspect_capability_catalog|capability[_-]?catalog|capability[_-]?registry/i.test(
+      toolId,
+    )
+  )
+    return "capability_catalog";
+  if (
+    /scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(
+      toolId,
+    )
+  )
+    return "scholarly_research";
+  if (
+    /theory[-_.]?locator|reflect[_-]?theory[_-]?context|theory[_-]?context[_-]?reflection|badge[_-]?graph|frontierVectorFieldTrace|frontier[_-]?vector[_-]?field|relation[_-]?tensor/i.test(
+      toolId,
+    )
+  )
+    return "theory_locator";
+  if (/internet[-_.]?search|web[-_.]?research|web\.search/i.test(toolId))
+    return "internet_search";
+  if (/^com\.casimirbot\.minecraft\.inventory\.check$/i.test(toolId))
+    return "live_environment";
   if (/^live_env\./i.test(toolId)) return "live_environment";
-  if (/^situation-room\.live-source\.|^situation-room\.pipeline\./i.test(toolId)) return "live_pipeline";
-  if (/workspace[_-]?os|workspace_diagnostic/i.test(toolId)) return "workspace_diagnostic";
+  if (
+    /^situation-room\.live-source\.|^situation-room\.pipeline\./i.test(toolId)
+  )
+    return "live_pipeline";
+  if (/workspace[_-]?os|workspace_diagnostic/i.test(toolId))
+    return "workspace_diagnostic";
   if (/workspace[-_.]?directory/i.test(toolId)) return "workspace_directory";
-  if (/situation[-_. ]?run|situation-room\.(?:attach|repair|replay|source-binding)/i.test(toolId)) return "situation_run";
-  if (/^docs-viewer\.|doc[_-]?viewer|docs_viewer/i.test(toolId)) return "docs_viewer";
+  if (
+    /situation[-_. ]?run|situation-room\.(?:attach|repair|replay|source-binding|describe_visual_capture)/i.test(
+      toolId,
+    )
+  )
+    return "situation_run";
+  if (/^docs-viewer\.|doc[_-]?viewer|docs_viewer/i.test(toolId))
+    return "docs_viewer";
   if (/calculator|^solve_expression$/i.test(toolId)) return "calculator";
   if (/workstation-notes|note/i.test(toolId)) return "notes";
-  if (/process[-_. ]?graph|workstation\.process/i.test(toolId)) return "process_graph";
+  if (/process[-_. ]?graph|workstation\.process/i.test(toolId))
+    return "process_graph";
   if (/repo|code|source-tree/i.test(toolId)) return "repo_code";
   if (/minecraft|world/i.test(toolId)) return "world_event";
-  if (/click|open|close|panel|workspace-action|workspace_action/i.test(toolId)) return "workstation_action";
+  if (/click|open|close|panel|workspace-action|workspace_action/i.test(toolId))
+    return "workstation_action";
   return "unknown";
 };
 
 const isMutatingTool = (toolId: string): boolean =>
-  /(?:^|[-_.:])(?:set|start|stop|open|close|click|repair|attach|adopt|refresh|run|write|create|delete|update)(?:$|[-_.:])/i.test(toolId);
+  /(?:^|[-_.:])(?:set|start|stop|open|close|click|repair|attach|adopt|refresh|run|write|create|delete|update)(?:$|[-_.:])/i.test(
+    toolId,
+  );
 
-const collectRouteCandidates = (payload: RecordLike, selectedRoute: string): HelixLoopParityTrace["route_candidates"] => {
+const collectRouteCandidates = (
+  payload: RecordLike,
+  selectedRoute: string,
+): HelixLoopParityTrace["route_candidates"] => {
   const preflight = readRecord(payload.ask_turn_preflight_context);
-  const routeCandidates = Array.isArray(preflight?.route_candidates) ? preflight.route_candidates : [];
+  const routeCandidates = Array.isArray(preflight?.route_candidates)
+    ? preflight.route_candidates
+    : [];
   const admitted = routeCandidates
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry))
@@ -121,7 +170,9 @@ const collectRouteCandidates = (payload: RecordLike, selectedRoute: string): Hel
       admitted: (readString(entry.route) || "unknown") === selectedRoute,
     }));
   const routeHistory = readRecord(payload.route_history_debug);
-  const rejected = Array.isArray(routeHistory?.rejected_route_candidates) ? routeHistory.rejected_route_candidates : [];
+  const rejected = Array.isArray(routeHistory?.rejected_route_candidates)
+    ? routeHistory.rejected_route_candidates
+    : [];
   return [
     ...admitted,
     ...rejected
@@ -156,11 +207,15 @@ const pushToolCall = (
   });
 };
 
-const isAdmissionDeniedValidation = (validation: RecordLike | null): boolean => {
+const isAdmissionDeniedValidation = (
+  validation: RecordLike | null,
+): boolean => {
   if (!validation || validation.valid === true) return false;
   const errors = readStringArray(validation.errors);
   return errors.some((error) =>
-    /forbidden_capability_for_goal|runtime_capability_not_admitted_by_tool_policy|runtime_tool_forbidden_by_tool_policy|contextual_tool_reference_suppressed|capability_permission_denied|capability_not_available/i.test(error),
+    /forbidden_capability_for_goal|runtime_capability_not_admitted_by_tool_policy|runtime_tool_forbidden_by_tool_policy|contextual_tool_reference_suppressed|capability_permission_denied|capability_not_available/i.test(
+      error,
+    ),
   );
 };
 
@@ -182,30 +237,47 @@ const canonicalToolIdForArtifactContext = (
     readString(artifactPayload?.receipt_id),
     readString(artifactPayload?.result_ref),
   ].join(" ");
-  if (/^solve_expression$/i.test(normalized) && /calculator|scientific[-_.:]calculator/i.test(haystack)) {
+  if (
+    /^solve_expression$/i.test(normalized) &&
+    /calculator|scientific[-_.:]calculator/i.test(haystack)
+  ) {
     return "scientific-calculator.solve_expression";
   }
   return normalized;
 };
 
-const collectRejectedToolCalls = (payload: RecordLike): HelixLoopParityTrace["rejected_tool_calls"] => {
-  const rejected = new Map<string, HelixLoopParityTrace["rejected_tool_calls"][number]>();
-  const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
+const collectRejectedToolCalls = (
+  payload: RecordLike,
+): HelixLoopParityTrace["rejected_tool_calls"] => {
+  const rejected = new Map<
+    string,
+    HelixLoopParityTrace["rejected_tool_calls"][number]
+  >();
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger)
+    ? payload.current_turn_artifact_ledger
+    : [];
   for (const artifact of ledger) {
     const artifactRecord = readRecord(artifact);
-    if (readString(artifactRecord?.kind) !== "runtime_tool_call_validation") continue;
+    if (readString(artifactRecord?.kind) !== "runtime_tool_call_validation")
+      continue;
     const artifactPayload = readRecord(artifactRecord?.payload);
     if (!isAdmissionDeniedValidation(artifactPayload)) continue;
     const toolId = readString(artifactPayload?.capability_key);
-    const callId = readString(artifactPayload?.call_id) || toolId || readString(artifactRecord?.artifact_id);
+    const callId =
+      readString(artifactPayload?.call_id) ||
+      toolId ||
+      readString(artifactRecord?.artifact_id);
     if (!toolId || !callId) continue;
-    const reason = readStringArray(artifactPayload?.errors).join("; ") || "admission_denied";
+    const reason =
+      readStringArray(artifactPayload?.errors).join("; ") || "admission_denied";
     rejected.set(`${callId}:${toolId}`, {
       tool_id: toolId,
       family: inferToolFamily(toolId),
       call_id: callId,
       reason,
-      result_ref: readString(artifactRecord?.artifact_id) || `${callId}:runtime_tool_call_validation`,
+      result_ref:
+        readString(artifactRecord?.artifact_id) ||
+        `${callId}:runtime_tool_call_validation`,
     });
   }
   return Array.from(rejected.values());
@@ -217,17 +289,46 @@ const collectActualToolCalls = (
   rejectedToolCalls: HelixLoopParityTrace["rejected_tool_calls"],
 ): HelixLoopParityTrace["actual_tool_calls"] => {
   const admittedFamilies = new Set(admittedToolFamilies);
-  const rejectedCallIds = new Set(rejectedToolCalls.map((call) => call.call_id).filter(Boolean));
-  const rejectedToolIds = new Set(rejectedToolCalls.map((call) => call.tool_id).filter(Boolean));
-  const calls = new Map<string, HelixLoopParityTrace["actual_tool_calls"][number]>();
+  const rejectedCallIds = new Set(
+    rejectedToolCalls.map((call) => call.call_id).filter(Boolean),
+  );
+  const rejectedToolIds = new Set(
+    rejectedToolCalls.map((call) => call.tool_id).filter(Boolean),
+  );
+  const calls = new Map<
+    string,
+    HelixLoopParityTrace["actual_tool_calls"][number]
+  >();
   const workspaceReceipt = readRecord(payload.workspace_action_receipt);
-  pushToolCall(calls, readString(workspaceReceipt?.action_id) || readString(workspaceReceipt?.action_key), admittedFamilies, readString(workspaceReceipt?.receipt_id));
-  const liveReceipt = readRecord(payload.live_pipeline_turn_receipt) ?? readRecord(payload.live_source_pipeline_receipt);
-  pushToolCall(calls, readString(liveReceipt?.action_id), admittedFamilies, readString(liveReceipt?.pipeline_receipt_id) || readString(liveReceipt?.receipt_id));
+  pushToolCall(
+    calls,
+    readString(workspaceReceipt?.action_id) ||
+      readString(workspaceReceipt?.action_key),
+    admittedFamilies,
+    readString(workspaceReceipt?.receipt_id),
+  );
+  const liveReceipt =
+    readRecord(payload.live_pipeline_turn_receipt) ??
+    readRecord(payload.live_source_pipeline_receipt);
+  pushToolCall(
+    calls,
+    readString(liveReceipt?.action_id),
+    admittedFamilies,
+    readString(liveReceipt?.pipeline_receipt_id) ||
+      readString(liveReceipt?.receipt_id),
+  );
   for (const action of readStringArray(liveReceipt?.actions)) {
-    pushToolCall(calls, action, admittedFamilies, readString(liveReceipt?.pipeline_receipt_id) || readString(liveReceipt?.receipt_id));
+    pushToolCall(
+      calls,
+      action,
+      admittedFamilies,
+      readString(liveReceipt?.pipeline_receipt_id) ||
+        readString(liveReceipt?.receipt_id),
+    );
   }
-  const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger)
+    ? payload.current_turn_artifact_ledger
+    : [];
   for (const artifact of ledger) {
     const artifactRecord = readRecord(artifact);
     const artifactPayload = readRecord(artifactRecord?.payload);
@@ -235,31 +336,57 @@ const collectActualToolCalls = (
     const capabilityKey = readString(artifactPayload?.capability_key);
     if (
       rejectedCallIds.has(callId) ||
-      (capabilityKey && rejectedToolIds.has(capabilityKey) && /runtime_tool_call|runtime_tool_call_validation|runtime_tool_observation/i.test(readString(artifactRecord?.kind)))
+      (capabilityKey &&
+        rejectedToolIds.has(capabilityKey) &&
+        /runtime_tool_call|runtime_tool_call_validation|runtime_tool_observation/i.test(
+          readString(artifactRecord?.kind),
+        ))
     ) {
       continue;
     }
-    const resultRef = readString(artifactRecord?.artifact_id) || readString(artifactPayload?.receipt_id);
+    const resultRef =
+      readString(artifactRecord?.artifact_id) ||
+      readString(artifactPayload?.receipt_id);
     if (artifactRecord?.kind === "dynamic_tool_call") {
       for (const toolId of readStringArray(artifactPayload?.tool_ids)) {
         pushToolCall(calls, toolId, admittedFamilies, resultRef);
       }
     }
-    pushToolCall(calls, readString(artifactPayload?.capability_key), admittedFamilies, resultRef);
+    pushToolCall(
+      calls,
+      readString(artifactPayload?.capability_key),
+      admittedFamilies,
+      resultRef,
+    );
     const artifactActionToolId = canonicalToolIdForArtifactContext(
-      readString(artifactPayload?.action_id) || readString(artifactPayload?.action_key),
+      readString(artifactPayload?.action_id) ||
+        readString(artifactPayload?.action_key),
       artifactRecord,
       artifactPayload,
     );
     pushToolCall(calls, artifactActionToolId, admittedFamilies, resultRef);
     for (const action of readStringArray(artifactPayload?.actions)) {
-      pushToolCall(calls, canonicalToolIdForArtifactContext(action, artifactRecord, artifactPayload), admittedFamilies, resultRef);
+      pushToolCall(
+        calls,
+        canonicalToolIdForArtifactContext(
+          action,
+          artifactRecord,
+          artifactPayload,
+        ),
+        admittedFamilies,
+        resultRef,
+      );
     }
   }
   return Array.from(calls.values());
 };
 
-const collectObservationRefs = (selection: RecordLike | null): { selected: string[]; rejected: HelixLoopParityTrace["evidence_rejected_for_answer"] } => {
+const collectObservationRefs = (
+  selection: RecordLike | null,
+): {
+  selected: string[];
+  rejected: HelixLoopParityTrace["evidence_rejected_for_answer"];
+} => {
   if (!selection) return { selected: [], rejected: [] };
   const selected = unique([
     ...readStringArray(selection.selected_observation_refs),
@@ -272,27 +399,57 @@ const collectObservationRefs = (selection: RecordLike | null): { selected: strin
     ...readStringArray(selection.selected_epoch_closure_refs),
     ...readStringArray(selection.selected_source_descriptor_refs),
   ]);
-  const rejected = readStringArray(selection.rejected_unbound_source_refs).map((ref) => ({
-    ref,
-    reason: "rejected_unbound_source",
-  }));
+  const rejected = readStringArray(selection.rejected_unbound_source_refs).map(
+    (ref) => ({
+      ref,
+      reason: "rejected_unbound_source",
+    }),
+  );
   return { selected, rejected };
 };
 
 const collectSelectedEvidencePackRefs = (payload: RecordLike): string[] => {
   const pack = readRecord(payload.selected_evidence_pack);
+  const presentation = readRecord(payload.terminal_presentation);
+  const materialization = readRecord(
+    payload.provider_route_product_materialization,
+  );
+  const writer = readRecord(payload.terminal_authority_single_writer);
+  const providerReentry = readRecord(payload.provider_reasoning_reentry);
+  const providerBridge = readRecord(payload.provider_terminal_authority_bridge);
   return unique([
     ...readStringArray(pack?.selected_evidence_ids),
     ...readStringArray(pack?.selected_validation_refs),
     ...readStringArray(pack?.selected_tool_receipts),
     ...readStringArray(pack?.selected_memory_refs),
     ...readStringArray(pack?.conversation_memory_refs),
+    ...readStringArray(presentation?.selected_observation_refs),
+    ...readStringArray(materialization?.selected_observation_refs),
+    ...readStringArray(writer?.selected_terminal_support_refs),
+    ...readStringArray(
+      providerReentry?.reentered_capability_lane_observation_refs,
+    ),
+    ...readStringArray(providerReentry?.normalized_observation_refs),
+    ...readStringArray(
+      providerBridge?.reentered_capability_lane_observation_refs,
+    ),
+    ...readStringArray(providerBridge?.normalized_observation_refs),
   ]);
 };
 
-const collectObservationsCreated = (payload: RecordLike): HelixLoopParityTrace["observations_created"] => {
-  const observations = new Map<string, HelixLoopParityTrace["observations_created"][number]>();
-  const addObservation = (ref: string, sourceKind = "unknown", sourceId = "unknown", provenance = "payload"): void => {
+const collectObservationsCreated = (
+  payload: RecordLike,
+): HelixLoopParityTrace["observations_created"] => {
+  const observations = new Map<
+    string,
+    HelixLoopParityTrace["observations_created"][number]
+  >();
+  const addObservation = (
+    ref: string,
+    sourceKind = "unknown",
+    sourceId = "unknown",
+    provenance = "payload",
+  ): void => {
     const observationId = ref.trim();
     if (!observationId || observations.has(observationId)) return;
     observations.set(observationId, {
@@ -305,13 +462,25 @@ const collectObservationsCreated = (payload: RecordLike): HelixLoopParityTrace["
   };
   const activeContext = readRecord(payload.active_situation_context);
   for (const ref of readStringArray(activeContext?.latest_observation_refs)) {
-    addObservation(ref, readString(activeContext?.active_modalities) || "visual_frame", readString(activeContext?.environment_id) || "unknown", "active_situation_context");
+    addObservation(
+      ref,
+      readString(activeContext?.active_modalities) || "visual_frame",
+      readString(activeContext?.environment_id) || "unknown",
+      "active_situation_context",
+    );
   }
   const selection = readRecord(payload.situation_evidence_selection);
   for (const ref of readStringArray(selection?.selected_observation_refs)) {
-    addObservation(ref, "selected_observation", readString(selection?.situation_run_id) || "unknown", "situation_evidence_selection");
+    addObservation(
+      ref,
+      "selected_observation",
+      readString(selection?.situation_run_id) || "unknown",
+      "situation_evidence_selection",
+    );
   }
-  const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger)
+    ? payload.current_turn_artifact_ledger
+    : [];
   for (const artifact of ledger) {
     const artifactRecord = readRecord(artifact);
     const artifactPayload = readRecord(artifactRecord?.payload);
@@ -320,10 +489,16 @@ const collectObservationsCreated = (payload: RecordLike): HelixLoopParityTrace["
       readString(artifactPayload?.kind) ||
       readString(artifactPayload?.artifactId) ||
       readString(artifactPayload?.artifact_id);
-    const artifactSchema = readString(artifactPayload?.schema) || readString(artifactPayload?.schemaVersion);
-    const artifactText = [artifactKind, artifactSchema].filter(Boolean).join(" ");
+    const artifactSchema =
+      readString(artifactPayload?.schema) ||
+      readString(artifactPayload?.schemaVersion);
+    const artifactText = [artifactKind, artifactSchema]
+      .filter(Boolean)
+      .join(" ");
     const observationLike =
-      /observation|receipt|search_results|candidate_validation|open_receipt|latest_doc_selection|active_doc_path/i.test(artifactText);
+      /observation|receipt|search_results|candidate_validation|open_receipt|latest_doc_selection|active_doc_path/i.test(
+        artifactText,
+      );
     if (observationLike) {
       const ref =
         readString(artifactRecord?.artifact_id) ||
@@ -336,25 +511,52 @@ const collectObservationsCreated = (payload: RecordLike): HelixLoopParityTrace["
       addObservation(
         ref,
         artifactKind || "artifact_observation",
-        readString(artifactPayload?.source_id) || readString(artifactPayload?.call_id) || "current_turn",
+        readString(artifactPayload?.source_id) ||
+          readString(artifactPayload?.call_id) ||
+          "current_turn",
         "artifact_ledger",
       );
     }
-    for (const ref of readStringArray(artifactPayload?.latest_observation_refs)) {
-      addObservation(ref, readString(artifactPayload?.source_kind) || "unknown", readString(artifactPayload?.source_id) || "unknown", "artifact_ledger");
+    for (const ref of readStringArray(
+      artifactPayload?.latest_observation_refs,
+    )) {
+      addObservation(
+        ref,
+        readString(artifactPayload?.source_kind) || "unknown",
+        readString(artifactPayload?.source_id) || "unknown",
+        "artifact_ledger",
+      );
     }
-    for (const ref of readStringArray(artifactPayload?.included_observation_refs)) {
-      addObservation(ref, readString(artifactPayload?.source_kind) || "unknown", readString(artifactPayload?.source_id) || "unknown", "artifact_ledger");
+    for (const ref of readStringArray(
+      artifactPayload?.included_observation_refs,
+    )) {
+      addObservation(
+        ref,
+        readString(artifactPayload?.source_kind) || "unknown",
+        readString(artifactPayload?.source_id) || "unknown",
+        "artifact_ledger",
+      );
     }
   }
   return Array.from(observations.values());
 };
 
-const toolResultsReturnedToTurn = (payload: RecordLike, actualToolCalls: HelixLoopParityTrace["actual_tool_calls"], observationsCreated: HelixLoopParityTrace["observations_created"]): boolean => {
+const toolResultsReturnedToTurn = (
+  payload: RecordLike,
+  actualToolCalls: HelixLoopParityTrace["actual_tool_calls"],
+  observationsCreated: HelixLoopParityTrace["observations_created"],
+): boolean => {
   if (actualToolCalls.length === 0) return true;
   if (observationsCreated.length > 0) return true;
-  if (readRecord(payload.workspace_action_receipt) || readRecord(payload.live_pipeline_turn_receipt) || readRecord(payload.live_source_pipeline_receipt)) return true;
-  const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
+  if (
+    readRecord(payload.workspace_action_receipt) ||
+    readRecord(payload.live_pipeline_turn_receipt) ||
+    readRecord(payload.live_source_pipeline_receipt)
+  )
+    return true;
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger)
+    ? payload.current_turn_artifact_ledger
+    : [];
   return ledger
     .map((entry) => readRecord(entry))
     .some((entry) => {
@@ -364,43 +566,70 @@ const toolResultsReturnedToTurn = (payload: RecordLike, actualToolCalls: HelixLo
         readString(payloadRecord?.kind),
         readString(payloadRecord?.schema),
         readString(payloadRecord?.schemaVersion),
-      ].filter(Boolean).join(" ");
-      return /runtime_tool_observation|agent_step_observation_packet|receipt|search_results|candidate_validation|open_receipt/i.test(kindText);
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return /runtime_tool_observation|agent_step_observation_packet|receipt|search_results|candidate_validation|open_receipt/i.test(
+        kindText,
+      );
     });
 };
 
-const collectRejectedEvidence = (payload: RecordLike, selectionRejected: HelixLoopParityTrace["evidence_rejected_for_answer"]): HelixLoopParityTrace["evidence_rejected_for_answer"] => {
+const collectRejectedEvidence = (
+  payload: RecordLike,
+  selectionRejected: HelixLoopParityTrace["evidence_rejected_for_answer"],
+): HelixLoopParityTrace["evidence_rejected_for_answer"] => {
   const rejected = [...selectionRejected];
   const liveWindow = readRecord(payload.live_context_window_binding);
-  const excluded = Array.isArray(liveWindow?.excluded_observation_refs) ? liveWindow.excluded_observation_refs : [];
+  const excluded = Array.isArray(liveWindow?.excluded_observation_refs)
+    ? liveWindow.excluded_observation_refs
+    : [];
   for (const entry of excluded) {
     if (typeof entry === "string") {
       rejected.push({ ref: entry, reason: "excluded_observation" });
       continue;
     }
     const record = readRecord(entry);
-    if (record) rejected.push({ ref: readString(record.ref) || "unknown", reason: readString(record.reason) || "excluded_observation" });
+    if (record)
+      rejected.push({
+        ref: readString(record.ref) || "unknown",
+        reason: readString(record.reason) || "excluded_observation",
+      });
   }
   return rejected;
 };
 
 const collectHelixOwnedTouched = (payload: RecordLike): string[] =>
-  unique([
-    readRecord(payload.source_target_intent) ? "source_target_admission" : "",
-    readRecord(payload.situation_evidence_selection) || readRecord(payload.active_situation_context) ? "evidence_normalization" : "",
-    readRecord(payload.route_product_contract) ? "route_product_contract" : "",
-    readRecord(payload.product_authority_guard) ? "proof_gate" : "",
-    readRecord(payload.route_authority_audit) ? "route_authority_audit" : "",
-    readRecord(payload.terminal_artifact_selection_guard) || readRecord(payload.product_authority_guard) ? "terminal_eligibility" : "",
-    readRecord(payload.terminal_presentation) ? "presentation" : "",
-  ].filter(Boolean));
+  unique(
+    [
+      readRecord(payload.source_target_intent) ? "source_target_admission" : "",
+      readRecord(payload.situation_evidence_selection) ||
+      readRecord(payload.active_situation_context)
+        ? "evidence_normalization"
+        : "",
+      readRecord(payload.route_product_contract)
+        ? "route_product_contract"
+        : "",
+      readRecord(payload.product_authority_guard) ? "proof_gate" : "",
+      readRecord(payload.route_authority_audit) ? "route_authority_audit" : "",
+      readRecord(payload.terminal_artifact_selection_guard) ||
+      readRecord(payload.product_authority_guard)
+        ? "terminal_eligibility"
+        : "",
+      readRecord(payload.terminal_presentation) ? "presentation" : "",
+    ].filter(Boolean),
+  );
 
-const collectCodexOwnedTouched = (actualToolCalls: HelixLoopParityTrace["actual_tool_calls"]): string[] =>
-  unique([
-    actualToolCalls.length > 0 ? "tool_execution" : "",
-    actualToolCalls.length > 0 ? "tool_result_events" : "",
-    "terminal_completion",
-  ].filter(Boolean));
+const collectCodexOwnedTouched = (
+  actualToolCalls: HelixLoopParityTrace["actual_tool_calls"],
+): string[] =>
+  unique(
+    [
+      actualToolCalls.length > 0 ? "tool_execution" : "",
+      actualToolCalls.length > 0 ? "tool_result_events" : "",
+      "terminal_completion",
+    ].filter(Boolean),
+  );
 
 export function buildLoopParityTrace(input: {
   turnId: string;
@@ -414,53 +643,88 @@ export function buildLoopParityTrace(input: {
   const sourceTargetIntentRecord = readRecord(payload.source_target_intent);
   const sourceTargetIntent = sourceTargetIntentRecord
     ? {
-        target_source: readString(sourceTargetIntentRecord.target_source) || "unknown",
-        target_kind: readString(sourceTargetIntentRecord.target_kind) || "unknown",
+        target_source:
+          readString(sourceTargetIntentRecord.target_source) || "unknown",
+        target_kind:
+          readString(sourceTargetIntentRecord.target_kind) || "unknown",
         strength: readString(sourceTargetIntentRecord.strength) || "unknown",
-        must_enter_backend_ask: readBoolean(sourceTargetIntentRecord.must_enter_backend_ask),
-        allow_client_shortcut: readBoolean(sourceTargetIntentRecord.allow_client_shortcut),
-        allow_no_tool_direct: readBoolean(sourceTargetIntentRecord.allow_no_tool_direct),
+        must_enter_backend_ask: readBoolean(
+          sourceTargetIntentRecord.must_enter_backend_ask,
+        ),
+        allow_client_shortcut: readBoolean(
+          sourceTargetIntentRecord.allow_client_shortcut,
+        ),
+        allow_no_tool_direct: readBoolean(
+          sourceTargetIntentRecord.allow_no_tool_direct,
+        ),
       }
     : null;
   const admission = readRecord(payload.tool_call_admission_decision);
   const operationalTrace = readRecord(payload.operational_capability_trace);
-  const policyAdmittedCapability = readString(operationalTrace?.policy_admitted_capability);
-  const admittedToolFamilies = unique([
-    ...readStringArray(admission?.admitted_tool_families),
-    policyAdmittedCapability ? inferToolFamily(policyAdmittedCapability) : "",
-  ].filter(Boolean));
+  const policyAdmittedCapability = readString(
+    operationalTrace?.policy_admitted_capability,
+  );
+  const admittedToolFamilies = unique(
+    [
+      ...readStringArray(admission?.admitted_tool_families),
+      policyAdmittedCapability ? inferToolFamily(policyAdmittedCapability) : "",
+    ].filter(Boolean),
+  );
   const rejectedToolCalls = collectRejectedToolCalls(payload);
-  const actualToolCalls = collectActualToolCalls(payload, admittedToolFamilies, rejectedToolCalls);
-  const unexpectedToolCalls = actualToolCalls.filter((call) => !call.admitted).map((call) => call.tool_id);
+  const actualToolCalls = collectActualToolCalls(
+    payload,
+    admittedToolFamilies,
+    rejectedToolCalls,
+  );
+  const unexpectedToolCalls = actualToolCalls
+    .filter((call) => !call.admitted)
+    .map((call) => call.tool_id);
   const selection = readRecord(payload.situation_evidence_selection);
   const evidence = collectObservationRefs(selection);
   const selectedEvidencePackRefs = collectSelectedEvidencePackRefs(payload);
-  const evidenceRejectedForAnswer = collectRejectedEvidence(payload, evidence.rejected);
+  const evidenceSelectedForAnswer = unique([
+    ...evidence.selected,
+    ...selectedEvidencePackRefs,
+  ]);
+  const evidenceRejectedForAnswer = collectRejectedEvidence(
+    payload,
+    evidence.rejected,
+  );
   const observationsCreated = collectObservationsCreated(payload);
-  const terminalArtifactKind = readString(input.terminalArtifactKind) || "unknown";
+  const terminalArtifactKind =
+    readString(input.terminalArtifactKind) || "unknown";
   const finalAnswerSource = readString(input.finalAnswerSource) || "unknown";
   const routeAuthorityAudit = readRecord(payload.route_authority_audit);
   const routeProductContract = readRecord(payload.route_product_contract);
-  const terminalSelectionGuard = readRecord(payload.terminal_artifact_selection_guard);
+  const terminalSelectionGuard = readRecord(
+    payload.terminal_artifact_selection_guard,
+  );
   const productAuthorityGuard = readRecord(payload.product_authority_guard);
   const poisonAudit = readRecord(payload.poison_audit);
   const terminalAuthority = readRecord(payload.terminal_answer_authority);
-  const allowedTerminalKinds = readStringArray(routeProductContract?.allowed_terminal_artifact_kinds);
-  const forbiddenTerminalKinds = readStringArray(routeProductContract?.forbidden_terminal_artifact_kinds);
+  const allowedTerminalKinds = readStringArray(
+    routeProductContract?.allowed_terminal_artifact_kinds,
+  );
+  const forbiddenTerminalKinds = readStringArray(
+    routeProductContract?.forbidden_terminal_artifact_kinds,
+  );
   const calculatorContractAuthorityOk =
     !routeAuthorityAudit &&
     sourceTargetIntent?.target_source === "calculator_stream" &&
-    readString(routeProductContract?.schema) === "helix.route_product_contract.v1" &&
+    readString(routeProductContract?.schema) ===
+      "helix.route_product_contract.v1" &&
     terminalSelectionGuard?.allowed !== false &&
     productAuthorityGuard?.allowed !== false &&
     !forbiddenTerminalKinds.includes(terminalArtifactKind) &&
-    (allowedTerminalKinds.length === 0 || allowedTerminalKinds.includes(terminalArtifactKind));
-  const providerCompletionMaterialized = providerPostObservationCompletionMaterialized({
-    payload,
-    turnId: input.turnId,
-    terminalArtifactKind,
-    finalAnswerSource,
-  });
+    (allowedTerminalKinds.length === 0 ||
+      allowedTerminalKinds.includes(terminalArtifactKind));
+  const providerCompletionMaterialized =
+    providerPostObservationCompletionMaterialized({
+      payload,
+      turnId: input.turnId,
+      terminalArtifactKind,
+      finalAnswerSource,
+    });
   const routeAuthorityOk =
     routeAuthorityAudit?.route_authority_ok === true ||
     calculatorContractAuthorityOk ||
@@ -473,7 +737,11 @@ export function buildLoopParityTrace(input: {
     : [];
   const onlyStaleContractPoison =
     poisonViolations.length > 0 &&
-    poisonViolations.every((entry) => readString(entry.kind) === "terminal_artifact_forbidden_by_route_contract");
+    poisonViolations.every(
+      (entry) =>
+        readString(entry.kind) ===
+        "terminal_artifact_forbidden_by_route_contract",
+    );
   const poisonAuditOk =
     poisonAudit?.ok === true ||
     (routeAuthorityOk && terminalAuthorityOk && onlyStaleContractPoison);
@@ -481,35 +749,67 @@ export function buildLoopParityTrace(input: {
     readRecord(payload.terminal_artifact_selection_guard) ||
     readRecord(payload.product_authority_guard) ||
     routeAuthorityAudit ||
-    providerCompletionMaterialized
+    providerCompletionMaterialized,
   );
-  const postObservationFinalizerRan = Boolean(readRecord(payload.terminal_presentation) || terminalSelectionRan);
+  const postObservationFinalizerRan = Boolean(
+    readRecord(payload.terminal_presentation) || terminalSelectionRan,
+  );
   const modelOnlySourceTarget =
     sourceTargetIntent?.target_source === "model_only" ||
     sourceTargetIntent?.target_kind === "general_background" ||
-    readString(readRecord(payload.canonical_goal_frame)?.goal_kind) === "model_only_concept";
+    readString(readRecord(payload.canonical_goal_frame)?.goal_kind) ===
+      "model_only_concept";
   const routeContractMissing =
-    Boolean(sourceTargetIntent && sourceTargetIntent.strength === "hard" && !modelOnlySourceTarget) &&
-    !readRecord(payload.route_product_contract);
+    Boolean(
+      sourceTargetIntent &&
+      sourceTargetIntent.strength === "hard" &&
+      !modelOnlySourceTarget,
+    ) && !readRecord(payload.route_product_contract);
   const violationCodes = readStringArray(routeAuthorityAudit?.violation_codes);
-  const shortCircuitRiskFlags = unique([
-    sourceTargetIntent && sourceTargetIntent.strength === "hard" && !modelOnlySourceTarget && evidence.selected.length === 0 && !/typed_failure|receipt|tool_evaluation|workstation_tool_evaluation/i.test(terminalArtifactKind)
-      ? "classifier_selected_terminal_without_evidence"
-      : "",
-    violationCodes.includes("receipt_used_as_content_answer") ? "receipt_promoted_to_answer" : "",
-    /client_projection|panel_generated_answer|live_card_projection/i.test(`${terminalArtifactKind} ${finalAnswerSource}`) ? "projection_promoted_to_answer" : "",
-    unexpectedToolCalls.length > 0 ? "tool_called_without_admission" : "",
-    sourceTargetIntent && sourceTargetIntent.strength === "hard" && !modelOnlySourceTarget && (sourceTargetIntent.allow_no_tool_direct || terminalArtifactKind === "no_tool_direct")
-      ? "hard_source_target_allowed_no_tool_direct"
-      : "",
-    routeContractMissing ? "route_contract_missing" : "",
-    !routeAuthorityAudit && !calculatorContractAuthorityOk && !providerCompletionMaterialized
-      ? "route_authority_missing"
-      : "",
-    poisonAuditOk && routeAuthorityAudit && !routeAuthorityOk ? "poison_clean_but_authority_failed" : "",
-    observationsCreated.length > 0 && !postObservationFinalizerRan ? "observations_created_but_not_reentered" : "",
-    terminalArtifactKind !== "unknown" && !terminalSelectionRan ? "terminal_selected_before_observation_finalizer" : "",
-  ].filter(Boolean));
+  const shortCircuitRiskFlags = unique(
+    [
+      sourceTargetIntent &&
+      sourceTargetIntent.strength === "hard" &&
+      !modelOnlySourceTarget &&
+      evidenceSelectedForAnswer.length === 0 &&
+      !/typed_failure|receipt|tool_evaluation|workstation_tool_evaluation/i.test(
+        terminalArtifactKind,
+      )
+        ? "classifier_selected_terminal_without_evidence"
+        : "",
+      violationCodes.includes("receipt_used_as_content_answer")
+        ? "receipt_promoted_to_answer"
+        : "",
+      /client_projection|panel_generated_answer|live_card_projection/i.test(
+        `${terminalArtifactKind} ${finalAnswerSource}`,
+      )
+        ? "projection_promoted_to_answer"
+        : "",
+      unexpectedToolCalls.length > 0 ? "tool_called_without_admission" : "",
+      sourceTargetIntent &&
+      sourceTargetIntent.strength === "hard" &&
+      !modelOnlySourceTarget &&
+      (sourceTargetIntent.allow_no_tool_direct ||
+        terminalArtifactKind === "no_tool_direct")
+        ? "hard_source_target_allowed_no_tool_direct"
+        : "",
+      routeContractMissing ? "route_contract_missing" : "",
+      !routeAuthorityAudit &&
+      !calculatorContractAuthorityOk &&
+      !providerCompletionMaterialized
+        ? "route_authority_missing"
+        : "",
+      poisonAuditOk && routeAuthorityAudit && !routeAuthorityOk
+        ? "poison_clean_but_authority_failed"
+        : "",
+      observationsCreated.length > 0 && !postObservationFinalizerRan
+        ? "observations_created_but_not_reentered"
+        : "",
+      terminalArtifactKind !== "unknown" && !terminalSelectionRan
+        ? "terminal_selected_before_observation_finalizer"
+        : "",
+    ].filter(Boolean),
+  );
 
   return {
     schema: "helix.loop_parity_trace.v1",
@@ -526,20 +826,27 @@ export function buildLoopParityTrace(input: {
     rejected_tool_calls: rejectedToolCalls,
     unexpected_tool_calls: unexpectedToolCalls,
     observations_created: observationsCreated,
-    evidence_selected_for_answer: unique([...evidence.selected, ...selectedEvidencePackRefs]),
+    evidence_selected_for_answer: evidenceSelectedForAnswer,
     evidence_rejected_for_answer: evidenceRejectedForAnswer,
-    tool_results_returned_to_turn: toolResultsReturnedToTurn(payload, actualToolCalls, observationsCreated),
+    tool_results_returned_to_turn: toolResultsReturnedToTurn(
+      payload,
+      actualToolCalls,
+      observationsCreated,
+    ),
     post_observation_finalizer_ran: postObservationFinalizerRan,
-    followup_reasoning_ran: providerCompletionMaterialized || (
-      Array.isArray(payload.current_turn_artifact_ledger) &&
-      payload.current_turn_artifact_ledger.some((artifact) => readRecord(artifact)?.kind === "reasoning_context")
-    )
-      ? true
-      : "not_applicable",
+    followup_reasoning_ran:
+      providerCompletionMaterialized ||
+      (Array.isArray(payload.current_turn_artifact_ledger) &&
+        payload.current_turn_artifact_ledger.some(
+          (artifact) => readRecord(artifact)?.kind === "reasoning_context",
+        ))
+        ? true
+        : "not_applicable",
     terminal_selection_ran_after_observations: terminalSelectionRan,
     terminal_artifact_kind: terminalArtifactKind,
     final_answer_source: finalAnswerSource,
-    route_authority_audit_ref: readString(routeAuthorityAudit?.audit_id) || null,
+    route_authority_audit_ref:
+      readString(routeAuthorityAudit?.audit_id) || null,
     route_authority_ok: routeAuthorityOk,
     poison_audit_ok: poisonAuditOk,
     terminal_authority_ok: terminalAuthorityOk,

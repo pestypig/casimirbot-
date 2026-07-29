@@ -188,6 +188,55 @@ not only as retrieval metadata.
   41/41/41 paper/source/generated parity, 27 study badges with 79 graph edges,
   and 213 math-registry entries. Those counts establish navigation and
   provenance integrity only.
+- Stage 4.2C consumes the immutable Stage-4.2B no-go rather than overwriting it.
+  Runtime H supplies numerical design-assumption response vectors and block
+  covariance for the 30 frozen controls; Runtimes I/J transport a bounded
+  apparatus catalogue through the unchanged registered DP generator; Runtime
+  L emits blinded acquisition-packet schemas; and Runtime M binds the
+  authority, fixtures, report, trace, and receipt.
+- The authoritative Stage-4.2C run is
+  `casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z`.
+  It selects `silica_high_mass_identifiable` with maximum whitened cosine
+  `0.7177243227022941`, normalized Gram condition `6.531693613125537`,
+  forecast power `0.9978580863455258`, and 542 required paired windows. The
+  mass-scale-80 point is rejected as out of bounds and the diamond point is
+  rejected for missing admitted material-response authority.
+- The Stage-4.2C config, authority-manifest, and fixture hashes are
+  `81f6109525202f57b6e5958373b37ec18d15dfff0ddc9ad0af274b8a294af6aa`,
+  `7f3a7fb7bfc748b1e92427da0c649bb73ce99fd4ebf9a20414a5a7fa1b5604e7`,
+  and
+  `f576c20c05cee3d29ed0198bfc4056a0540a3f89199d1babb6ebde9dfaa1d45d`.
+  Its immutable JSON, Markdown, trace, and campaign receipt hashes are
+  `d9237eeb9079e7fab84a86b3eda28b0f14bb83be1a340b3d6f9695dcffb5047c`,
+  `0f01cb550fed502fe8d5fa3920f4517d7931a89761cdb7a68af1b7d901b55f5f`,
+  `3ceeaddbdb0e8a78f1038bd3227f8b0ddbac4ac0af24ca7c37a6b026e5fe2b81`,
+  and
+  `59cca7ab7f6f6a3d27a83ad8b455fc63fc6db3ca7207cdeff350ed97d497865c`.
+- Its numeric response, covariance, and selected superposition remain
+  design-assumption class. An authentic response pack, covariance pack, and
+  state-preparation receipt are required before the physical pilot gate may
+  open. Therefore `physical_pilot_readiness` and `measured_evidence` remain
+  `not_ready`, `collapse_identification` and `manifold_dynamics` remain
+  `blocked`, and `physical_viability` remains `not_evaluated`.
+- The four `bridge-stage4-2c-*` path labels make the redesign dependency and
+  empirical-input blockers visible. They are not Theory Badge observable
+  bridges. The Stage-4.2C badge is non-promotable, has no calculator payload,
+  and preserves the ordinary null, frozen DP prediction, and speculative
+  Casimir-to-collapse bridge as separate hypotheses.
+- Stage-4.2C document synchronization requires four additional equation
+  actions, 45/45/45 paper/source/generated parity, 28 study badges with 83
+  graph edges, and 216 math-registry entries. Those counts establish
+  navigation and provenance integrity only.
+- Fresh Stage-4.2C adapter run `2332` returns `PASS`, first failure null,
+  deltas empty, certificate status `GREEN`, certificate integrity `OK`, and
+  certificate hash
+  `38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34`.
+  Its validated one-record trace hash is
+  `3d454ba0cf3e778dc934cae1c0ee33996bb792caa06255a9dfe984a38138bdee`;
+  downstream receipt hash is
+  `51c461db1fdaa29162b2c5287a31c01823e5bb23b16a25fe2914841239abba98`.
+  The certificate has scientific scope `none` and does not alter any physical
+  readiness or mechanism status.
 - The current Stage-4 blinding lane is `synthetic_contract_only`. Its passing
   gate means the fail-closed contract correctly records that no custodian
   receipt, mapping, measured comparison, or unblinding exists or is

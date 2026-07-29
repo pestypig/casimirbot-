@@ -29,7 +29,7 @@ public final class HelixPaperSensorPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        this.sensorConfig = HelixSensorConfig.from(getConfig());
+        this.sensorConfig = PaperSensorConfigLoader.from(getConfig());
         if (!sensorConfig.enabled()) {
             getLogger().info("HelixPaperSensor disabled by config.");
             return;

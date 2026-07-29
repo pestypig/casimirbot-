@@ -33,23 +33,37 @@ import {
 import { SHARED_INTERFACE_LANGUAGE_CODES } from "@shared/interface-language-codes";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context";
-const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY = "theory-badge-graph.current_context";
+const HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY =
+  "helix_ask.inspect_capability_catalog";
+const THEORY_BADGE_GRAPH_CURRENT_CONTEXT_CAPABILITY =
+  "theory-badge-graph.current_context";
 const WORKSTATION_NOTES_LIST_NOTES_CAPABILITY = "workstation-notes.list_notes";
-const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY = "scientific-calculator.solve_expression";
-const CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY = "scientific-calculator.solve_scalar_expression";
-const CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY = "scientific-calculator.classify_expression";
-const CALCULATOR_BIND_VARIABLES_CAPABILITY = "scientific-calculator.bind_variables";
-const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY = "scientific-calculator.active_context";
-const READABLE_SURFACE_OBSERVE_CAPABILITY = "workstation.readable_surface.observe";
+const CALCULATOR_SOLVE_EXPRESSION_CAPABILITY =
+  "scientific-calculator.solve_expression";
+const CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY =
+  "scientific-calculator.solve_scalar_expression";
+const CALCULATOR_CLASSIFY_EXPRESSION_CAPABILITY =
+  "scientific-calculator.classify_expression";
+const CALCULATOR_BIND_VARIABLES_CAPABILITY =
+  "scientific-calculator.bind_variables";
+const CALCULATOR_ACTIVE_CONTEXT_CAPABILITY =
+  "scientific-calculator.active_context";
+const READABLE_SURFACE_OBSERVE_CAPABILITY =
+  "workstation.readable_surface.observe";
 const DOCS_READ_VISIBLE_SURFACE_CAPABILITY = "docs-viewer.read_visible_surface";
-const DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY = "docs-viewer.read_active_translation";
-const CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY = "scientific-calculator.read_visible_result";
+const DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY =
+  "docs-viewer.read_active_translation";
+const CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY =
+  "scientific-calculator.read_visible_result";
 const CALCULATOR_OPEN_PANEL_CAPABILITY = "scientific-calculator.open_panel";
-const CALCULATOR_PREFILL_EXPRESSION_CAPABILITY = "scientific-calculator.prefill_expression";
-const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY = "scientific-calculator.show_gateway_solve";
+const CALCULATOR_PREFILL_EXPRESSION_CAPABILITY =
+  "scientific-calculator.prefill_expression";
+const CALCULATOR_SHOW_GATEWAY_SOLVE_CAPABILITY =
+  "scientific-calculator.show_gateway_solve";
 const WORKSTATION_OPEN_PANEL_CAPABILITY = "workstation.open_panel";
 const WORKSTATION_FOCUS_PANEL_CAPABILITY = "workstation.focus_panel";
-const ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY = "account_session.set_interface_language";
+const ACCOUNT_SESSION_SET_INTERFACE_LANGUAGE_CAPABILITY =
+  "account_session.set_interface_language";
 const DOCS_OPEN_DOC_CAPABILITY = "docs-viewer.open_doc";
 const REPO_SEARCH_CAPABILITY = "repo.search";
 const DOCS_SEARCH_CAPABILITY = "docs.search";
@@ -57,15 +71,22 @@ const INTERNET_SEARCH_CAPABILITY = "internet-search.search_web";
 const VISUAL_SITUATION_OBSERVATION_CAPABILITY =
   "situation-room.describe_visual_capture";
 const SCHOLARLY_RESEARCH_SEARCH_CAPABILITY = "scholarly-research.lookup_papers";
-const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY = "scholarly-research.fetch_full_text";
-const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY = "scholarly-research.extract_numeric_parameters";
-const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY = "civilization-bounds.reflect_system_bounds";
-const THEORY_CONTEXT_REFLECTION_CAPABILITY = HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY;
+const SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY =
+  "scholarly-research.fetch_full_text";
+const SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY =
+  "scholarly-research.extract_numeric_parameters";
+const CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY =
+  "civilization-bounds.reflect_system_bounds";
+const THEORY_CONTEXT_REFLECTION_CAPABILITY =
+  HELIX_THEORY_CONTEXT_REFLECTION_CAPABILITY;
 const MORAL_GRAPH_REFLECTION_CAPABILITY = "moral-graph.reflect_context";
-const MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY = "moral-graph.reflect_living_substrate_context";
-const THEORY_FRONTIER_CONJECTURE_CAPABILITY = "theory-badge-graph.propose_frontier_conjectures";
+const MORAL_LIVING_SUBSTRATE_REFLECTION_CAPABILITY =
+  "moral-graph.reflect_living_substrate_context";
+const THEORY_FRONTIER_CONJECTURE_CAPABILITY =
+  "theory-badge-graph.propose_frontier_conjectures";
 const TEXT_TO_SPEECH_SPEAK_TEXT_CAPABILITY = "text_to_speech.speak_text";
-const VOICE_INTERIM_CALLOUT_CAPABILITY = "live_env.request_interim_voice_callout";
+const VOICE_INTERIM_CALLOUT_CAPABILITY =
+  "live_env.request_interim_voice_callout";
 const VOICE_NARRATOR_SAY_CAPABILITY = "live_env.narrator_say";
 const CONTEXT_FEED_QUERY_CAPABILITIES = [
   ["live_env.query_visual_summaries", "query_visual_summaries"],
@@ -80,11 +101,15 @@ const CONTEXT_FEED_QUERY_CAPABILITIES = [
   ["live_env.query_automation_policies", "query_automation_policies"],
   ["live_env.query_source_health", "query_source_health"],
 ] as const;
-const LIVE_SOURCE_LOOP_HEALTH_CAPABILITY = "live_env.query_live_source_loop_health";
+const LIVE_SOURCE_LOOP_HEALTH_CAPABILITY =
+  "live_env.query_live_source_loop_health";
 const LIVE_SOURCE_STATE_READ_CAPABILITIES = [
   ["live_env.query_live_source_quality", "query_live_source_quality"],
   ["live_env.query_workstation_goal_context", "query_workstation_goal_context"],
-  ["live_env.summarize_live_source_current_state", "summarize_live_source_current_state"],
+  [
+    "live_env.summarize_live_source_current_state",
+    "summarize_live_source_current_state",
+  ],
 ] as const;
 const SITUATION_STAGE_STATE_READ_CAPABILITIES = [
   ["live_env.query_event_log", "query_event_log"],
@@ -102,7 +127,10 @@ const MICRO_REASONER_READ_CAPABILITIES = [
 const VISUAL_OBSERVER_READ_CAPABILITIES = [
   ["live_env.query_visual_observer_profiles", "query_visual_observer_profiles"],
   ["live_env.test_visual_observer_profile", "test_visual_observer_profile"],
-  ["live_env.compare_visual_observer_profiles", "compare_visual_observer_profiles"],
+  [
+    "live_env.compare_visual_observer_profiles",
+    "compare_visual_observer_profiles",
+  ],
 ] as const;
 
 describe("Helix workstation tool gateway", () => {
@@ -214,6 +242,24 @@ describe("Helix workstation tool gateway", () => {
     );
     expect(manifest.capabilities).toContainEqual(
       expect.objectContaining({
+        capability_id: HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY,
+        panel_id: "agent-access",
+        action_id: "inspect_capability_catalog",
+        mode: "observe",
+        mutating: false,
+        code_mutation: false,
+        shell_access: false,
+        permission_profile_required: "observe",
+        output_observation_schema:
+          "helix.capability_catalog_observation.v1",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    );
+    expect(manifest.capabilities).toContainEqual(
+      expect.objectContaining({
         capability_id: WORKSTATION_ACTIVE_CONTEXT_CAPABILITY,
         panel_id: "workstation",
         action_id: "active_context",
@@ -222,7 +268,8 @@ describe("Helix workstation tool gateway", () => {
         code_mutation: false,
         shell_access: false,
         permission_profile_required: "read",
-        output_observation_schema: "helix.workstation_active_context_observation.v1",
+        output_observation_schema:
+          "helix.workstation_active_context_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -239,7 +286,8 @@ describe("Helix workstation tool gateway", () => {
         shell_access: false,
         requires_source: true,
         permission_profile_required: "read",
-        output_observation_schema: "helix.workstation_notes_list_observation.v1",
+        output_observation_schema:
+          "helix.workstation_notes_list_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -272,7 +320,8 @@ describe("Helix workstation tool gateway", () => {
         shell_access: false,
         requires_source: true,
         permission_profile_required: "read",
-        output_observation_schema: "helix.calculator_scalar_solve_observation.v1",
+        output_observation_schema:
+          "helix.calculator_scalar_solve_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -288,7 +337,8 @@ describe("Helix workstation tool gateway", () => {
         code_mutation: false,
         shell_access: false,
         permission_profile_required: "read",
-        output_observation_schema: "helix.calculator_expression_classification_observation.v1",
+        output_observation_schema:
+          "helix.calculator_expression_classification_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -304,7 +354,8 @@ describe("Helix workstation tool gateway", () => {
         code_mutation: false,
         shell_access: false,
         permission_profile_required: "read",
-        output_observation_schema: "helix.calculator_variable_binding_observation.v1",
+        output_observation_schema:
+          "helix.calculator_variable_binding_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -320,7 +371,8 @@ describe("Helix workstation tool gateway", () => {
         code_mutation: false,
         shell_access: false,
         permission_profile_required: "read",
-        output_observation_schema: "helix.calculator_active_context_observation.v1",
+        output_observation_schema:
+          "helix.calculator_active_context_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -328,9 +380,21 @@ describe("Helix workstation tool gateway", () => {
     );
     for (const [capabilityId, panelId, actionId] of [
       [READABLE_SURFACE_OBSERVE_CAPABILITY, null, "observe"],
-      [DOCS_READ_VISIBLE_SURFACE_CAPABILITY, "docs-viewer", "read_visible_surface"],
-      [DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY, "docs-viewer", "read_active_translation"],
-      [CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY, "scientific-calculator", "read_visible_result"],
+      [
+        DOCS_READ_VISIBLE_SURFACE_CAPABILITY,
+        "docs-viewer",
+        "read_visible_surface",
+      ],
+      [
+        DOCS_READ_ACTIVE_TRANSLATION_CAPABILITY,
+        "docs-viewer",
+        "read_active_translation",
+      ],
+      [
+        CALCULATOR_READ_VISIBLE_RESULT_CAPABILITY,
+        "scientific-calculator",
+        "read_visible_result",
+      ],
     ] as const) {
       expect(manifest.capabilities).toContainEqual(
         expect.objectContaining({
@@ -343,7 +407,8 @@ describe("Helix workstation tool gateway", () => {
           shell_access: false,
           requires_source: true,
           permission_profile_required: "read",
-          output_observation_schema: "helix.workstation_readable_surface_observation.v1",
+          output_observation_schema:
+            "helix.workstation_readable_surface_observation.v1",
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -439,7 +504,11 @@ describe("Helix workstation tool gateway", () => {
         panel_id: null,
         action_id: "open_panel",
         dynamic_panel_id_arg: "panel_id",
-        allowed_panel_ids: expect.arrayContaining(["docs-viewer", "scientific-calculator", "workstation-process-graph"]),
+        allowed_panel_ids: expect.arrayContaining([
+          "docs-viewer",
+          "scientific-calculator",
+          "workstation-process-graph",
+        ]),
         mode: "act",
         mutating: false,
         code_mutation: false,
@@ -522,7 +591,8 @@ describe("Helix workstation tool gateway", () => {
         action_id: "extract_numeric_parameters",
         mode: "read",
         permission_profile_required: "read",
-        output_observation_schema: "helix.scholarly_numeric_parameter_observation.v1",
+        output_observation_schema:
+          "helix.scholarly_numeric_parameter_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -539,7 +609,8 @@ describe("Helix workstation tool gateway", () => {
         shell_access: false,
         requires_source: true,
         permission_profile_required: "read",
-        output_observation_schema: "helix.theory_context_reflection_observation.v1",
+        output_observation_schema:
+          "helix.theory_context_reflection_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -556,7 +627,8 @@ describe("Helix workstation tool gateway", () => {
         shell_access: false,
         requires_source: true,
         permission_profile_required: "read",
-        output_observation_schema: "helix.moral_living_substrate_reflection_observation.v1",
+        output_observation_schema:
+          "helix.moral_living_substrate_reflection_observation.v1",
         terminal_eligible: false,
         post_tool_model_step_required: true,
         assistant_answer: false,
@@ -574,7 +646,8 @@ describe("Helix workstation tool gateway", () => {
         shell_access: false,
         requires_source: true,
         permission_profile_required: "read",
-        output_observation_schema: "helix.theory_frontier_conjecture_observation.v1",
+        output_observation_schema:
+          "helix.theory_frontier_conjecture_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -591,7 +664,8 @@ describe("Helix workstation tool gateway", () => {
         shell_access: false,
         requires_source: true,
         permission_profile_required: "read",
-        output_observation_schema: "helix.civilization_bounds_reflection_observation.v1",
+        output_observation_schema:
+          "helix.civilization_bounds_reflection_observation.v1",
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -609,7 +683,8 @@ describe("Helix workstation tool gateway", () => {
           shell_access: false,
           requires_source: false,
           permission_profile_required: "read",
-          output_observation_schema: "helix.live_environment_tool_observation.v1",
+          output_observation_schema:
+            "helix.live_environment_tool_observation.v1",
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -633,7 +708,10 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       }),
     );
-    for (const [capabilityId, actionId] of LIVE_SOURCE_STATE_READ_CAPABILITIES) {
+    for (const [
+      capabilityId,
+      actionId,
+    ] of LIVE_SOURCE_STATE_READ_CAPABILITIES) {
       expect(manifest.capabilities).toContainEqual(
         expect.objectContaining({
           capability_id: capabilityId,
@@ -645,14 +723,18 @@ describe("Helix workstation tool gateway", () => {
           shell_access: false,
           requires_source: false,
           permission_profile_required: "read",
-          output_observation_schema: "helix.live_environment_tool_observation.v1",
+          output_observation_schema:
+            "helix.live_environment_tool_observation.v1",
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
         }),
       );
     }
-    for (const [capabilityId, actionId] of SITUATION_STAGE_STATE_READ_CAPABILITIES) {
+    for (const [
+      capabilityId,
+      actionId,
+    ] of SITUATION_STAGE_STATE_READ_CAPABILITIES) {
       expect(manifest.capabilities).toContainEqual(
         expect.objectContaining({
           capability_id: capabilityId,
@@ -664,7 +746,8 @@ describe("Helix workstation tool gateway", () => {
           shell_access: false,
           requires_source: false,
           permission_profile_required: "read",
-          output_observation_schema: "helix.live_environment_tool_observation.v1",
+          output_observation_schema:
+            "helix.live_environment_tool_observation.v1",
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -683,7 +766,8 @@ describe("Helix workstation tool gateway", () => {
           shell_access: false,
           requires_source: false,
           permission_profile_required: "read",
-          output_observation_schema: "helix.live_environment_tool_observation.v1",
+          output_observation_schema:
+            "helix.live_environment_tool_observation.v1",
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -702,7 +786,8 @@ describe("Helix workstation tool gateway", () => {
           shell_access: false,
           requires_source: false,
           permission_profile_required: "read",
-          output_observation_schema: "helix.live_environment_tool_observation.v1",
+          output_observation_schema:
+            "helix.live_environment_tool_observation.v1",
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -759,7 +844,10 @@ describe("Helix workstation tool gateway", () => {
         schema: "helix.tool_followup_decision.v1",
         turn_id: "ask:test:gateway",
         next_action: "continue_reasoning",
-        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        terminal_blockers: [
+          "post_tool_model_step_required",
+          "terminal_authority_not_evaluated",
+        ],
         required_surface_satisfied: true,
         evidence_reentered: false,
         assistant_answer: false,
@@ -795,6 +883,85 @@ describe("Helix workstation tool gateway", () => {
     });
   });
 
+  it("calls the reusable capability catalog as current-turn evidence, not an answer", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "observe",
+      capabilityId: HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY,
+      arguments: {
+        query: "What can this workstation do with scientific documents?",
+        source_target_intent: {
+          target_source: "capability_catalog",
+          target_kind: "capability_catalog_runtime",
+        },
+      },
+      accountType: "user",
+      turnId: "ask:test:capability-catalog-gateway",
+      iteration: 1,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY,
+      gateway_admission: {
+        admission_status: "admitted",
+        admission_reason: "read_only_gateway_capability",
+      },
+      observation: {
+        schema: "helix.capability_catalog_observation.v1",
+        capability_key: HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY,
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        turn_id: "ask:test:capability-catalog-gateway",
+        capability_key: HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY,
+        panel_id: "agent-access",
+        action: "inspect_capability_catalog",
+        status: "succeeded",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    const observation = result.observation as Record<string, unknown>;
+    expect(observation.available_capability_count).toBeGreaterThan(20);
+    expect(observation.capability_families).toEqual(
+      expect.arrayContaining([
+        "docs-viewer",
+        "scientific-calculator",
+        "theory-badge-graph",
+      ]),
+    );
+    expect(observation.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          capability_id: "docs-viewer.read_visible_surface",
+        }),
+        expect.objectContaining({
+          capability_id: "scientific-calculator.solve_expression",
+        }),
+        expect.objectContaining({
+          capability_id: HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY,
+        }),
+      ]),
+    );
+    expect(result.produced_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "source_ref", role: "producer" }),
+        expect.objectContaining({ kind: "text_evidence", role: "producer" }),
+      ]),
+    );
+  });
+
   it("lists and calls account_session.set_interface_language as a governed preference action", async () => {
     const manifest = listWorkstationGatewayCapabilities({
       agentRuntime: "codex",
@@ -817,7 +984,10 @@ describe("Helix workstation tool gateway", () => {
         input_schema: expect.objectContaining({
           required: ["language"],
           properties: expect.objectContaining({
-            language: { type: "string", enum: [...SHARED_INTERFACE_LANGUAGE_CODES] },
+            language: {
+              type: "string",
+              enum: [...SHARED_INTERFACE_LANGUAGE_CODES],
+            },
           }),
         }),
         assistant_answer: false,
@@ -925,7 +1095,11 @@ describe("Helix workstation tool gateway", () => {
           activePanel: "docs-viewer",
           activeGroupId: "main",
           groupCount: 2,
-          openPanels: ["docs-viewer", "scientific-calculator", "workstation-process-graph"],
+          openPanels: [
+            "docs-viewer",
+            "scientific-calculator",
+            "workstation-process-graph",
+          ],
         },
       },
       turnId: "ask:test:gateway-workstation-active-context",
@@ -963,7 +1137,11 @@ describe("Helix workstation tool gateway", () => {
         active_panel: "docs-viewer",
         active_group_id: "main",
         group_count: 2,
-        open_panels: ["docs-viewer", "scientific-calculator", "workstation-process-graph"],
+        open_panels: [
+          "docs-viewer",
+          "scientific-calculator",
+          "workstation-process-graph",
+        ],
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -1024,32 +1202,53 @@ describe("Helix workstation tool gateway", () => {
           schema: "helix.theory_badge_graph_current_context.v1",
           graph_id: "helix-theory-badge-graph/v1",
           active_badge_id: "physics.quantum.energy_frequency",
-          selected_badge_ids: ["element.h.origin", "physics.quantum.energy_frequency"],
+          selected_badge_ids: [
+            "element.h.origin",
+            "physics.quantum.energy_frequency",
+          ],
           active_atlas_lens_id: "atomic_radiation_state",
-          semantic_selections: [{
-            domain: "solar_surface_spectrum",
-            selection_kind: "observation_group",
-            selection_id: "hydrogen_lines",
-            object_binding_id: "solar-spectrum:hydrogen-lines",
-          }],
+          semantic_selections: [
+            {
+              domain: "solar_surface_spectrum",
+              selection_kind: "observation_group",
+              selection_id: "hydrogen_lines",
+              object_binding_id: "solar-spectrum:hydrogen-lines",
+            },
+          ],
           combination_reader: {
             schema: "theory_badge_graph_combination_reader/v1",
             selectedBadges: [
               { id: "element.h.origin", title: "Hydrogen" },
-              { id: "physics.quantum.energy_frequency", title: "Quantum Energy-Frequency Relation" },
+              {
+                id: "physics.quantum.energy_frequency",
+                title: "Quantum Energy-Frequency Relation",
+              },
             ],
             tracePathBadges: [
               { id: "element.h.origin", title: "Hydrogen" },
-              { id: "physics.atomic.transition_gap_frequency_context", title: "Transition Gap" },
-              { id: "physics.quantum.energy_frequency", title: "Quantum Energy-Frequency Relation" },
+              {
+                id: "physics.atomic.transition_gap_frequency_context",
+                title: "Transition Gap",
+              },
+              {
+                id: "physics.quantum.energy_frequency",
+                title: "Quantum Energy-Frequency Relation",
+              },
             ],
             intermediateBadges: [
-              { id: "physics.atomic.transition_gap_frequency_context", title: "Transition Gap" },
+              {
+                id: "physics.atomic.transition_gap_frequency_context",
+                title: "Transition Gap",
+              },
             ],
             availableNextBadges: [
               { id: "physics.radiation.mode_context", title: "Radiation Mode" },
             ],
-            boundaryContext: { notes: ["A graph path is compatibility context, not proof of a transition."] },
+            boundaryContext: {
+              notes: [
+                "A graph path is compatibility context, not proof of a transition.",
+              ],
+            },
           },
           captured_at_ms: 1_750_000_000_000,
           active_panel: true,
@@ -1073,7 +1272,10 @@ describe("Helix workstation tool gateway", () => {
       },
       observation: {
         schema: "helix.theory_badge_graph_current_context_observation.v1",
-        selected_badge_ids: ["element.h.origin", "physics.quantum.energy_frequency"],
+        selected_badge_ids: [
+          "element.h.origin",
+          "physics.quantum.energy_frequency",
+        ],
         active_atlas_lens_id: "atomic_radiation_state",
         context_role: "tool_evidence",
         answer_authority: false,
@@ -1082,7 +1284,9 @@ describe("Helix workstation tool gateway", () => {
         assistant_answer: false,
         combination_reader: {
           intermediate_badges: [
-            expect.objectContaining({ id: "physics.atomic.transition_gap_frequency_context" }),
+            expect.objectContaining({
+              id: "physics.atomic.transition_gap_frequency_context",
+            }),
           ],
           available_next_badges: [
             expect.objectContaining({ id: "physics.radiation.mode_context" }),
@@ -1188,7 +1392,10 @@ describe("Helix workstation tool gateway", () => {
       }),
       tool_followup_decision: expect.objectContaining({
         next_action: "continue_reasoning",
-        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        terminal_blockers: [
+          "post_tool_model_step_required",
+          "terminal_authority_not_evaluated",
+        ],
         evidence_reentered: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -1346,7 +1553,10 @@ describe("Helix workstation tool gateway", () => {
       },
       tool_followup_decision: {
         next_action: "continue_reasoning",
-        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        terminal_blockers: [
+          "post_tool_model_step_required",
+          "terminal_authority_not_evaluated",
+        ],
         required_surface_satisfied: true,
         evidence_reentered: false,
         assistant_answer: false,
@@ -1439,7 +1649,10 @@ describe("Helix workstation tool gateway", () => {
       },
       tool_followup_decision: {
         next_action: "continue_reasoning",
-        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        terminal_blockers: [
+          "post_tool_model_step_required",
+          "terminal_authority_not_evaluated",
+        ],
         assistant_answer: false,
         raw_content_included: false,
       },
@@ -1695,7 +1908,10 @@ describe("Helix workstation tool gateway", () => {
       },
       tool_followup_decision: {
         next_action: "continue_reasoning",
-        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        terminal_blockers: [
+          "post_tool_model_step_required",
+          "terminal_authority_not_evaluated",
+        ],
         assistant_answer: false,
         raw_content_included: false,
       },
@@ -1819,7 +2035,10 @@ describe("Helix workstation tool gateway", () => {
       },
       tool_followup_decision: {
         next_action: "continue_reasoning",
-        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        terminal_blockers: [
+          "post_tool_model_step_required",
+          "terminal_authority_not_evaluated",
+        ],
         assistant_answer: false,
         raw_content_included: false,
       },
@@ -1839,8 +2058,8 @@ describe("Helix workstation tool gateway", () => {
         thread_id: "helix-ask:test-visual-observer-test",
         source_id: "workstation-source:visual-observer-test",
         profile_id: "stage_play_visual_observer_profile:generic:v1",
-        generic_summary: "{\"summary\":\"generic frame summary\"}",
-        profile_summary: "{\"summary\":\"profile frame summary\"}",
+        generic_summary: '{"summary":"generic frame summary"}',
+        profile_summary: '{"summary":"profile frame summary"}',
       },
       turnId: "ask:test:gateway-visual-observer-test",
       iteration: 10,
@@ -2133,8 +2352,9 @@ describe("Helix workstation tool gateway", () => {
       mode: "observe",
     });
 
-    expect(manifest.capabilities.map((capability) => capability.capability_id))
-      .not.toContain(INTERNET_SEARCH_CAPABILITY);
+    expect(
+      manifest.capabilities.map((capability) => capability.capability_id),
+    ).not.toContain(INTERNET_SEARCH_CAPABILITY);
     expect(manifest.unavailable_capabilities).toContainEqual({
       capability_id: INTERNET_SEARCH_CAPABILITY,
       availability: "unavailable",
@@ -2335,7 +2555,10 @@ describe("Helix workstation tool gateway", () => {
         calculation_type: "symbolic_equation",
         detected_symbols: ["f"],
         missing_variables: ["f"],
-        possible_routes: expect.arrayContaining(["symbolic_solver", "paper_equation_binder"]),
+        possible_routes: expect.arrayContaining([
+          "symbolic_solver",
+          "paper_equation_binder",
+        ]),
         blocked_reasons: ["missing_variable_bindings"],
         terminal_eligible: false,
         post_tool_model_step_required: true,
@@ -2527,7 +2750,10 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(result.consumed_affordances).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ kind: "numeric_value_evidence", status: "required" }),
+        expect.objectContaining({
+          kind: "numeric_value_evidence",
+          status: "required",
+        }),
       ]),
     );
     expect(result.produced_affordances).toEqual(
@@ -2688,15 +2914,17 @@ describe("Helix workstation tool gateway", () => {
           last_normalized_expression: "8*9",
           last_ok: true,
           step_count: 1,
-          recent_debug_events: [{
-            action_id: "solve_expression",
-            ok: true,
-            input_latex: "8 * 9",
-            result_text: "72",
-            normalized_expression: "8*9",
-            message: "solve_completed",
-            ts: "2026-06-28T00:00:00.000Z",
-          }],
+          recent_debug_events: [
+            {
+              action_id: "solve_expression",
+              ok: true,
+              input_latex: "8 * 9",
+              result_text: "72",
+              normalized_expression: "8*9",
+              message: "solve_completed",
+              ts: "2026-06-28T00:00:00.000Z",
+            },
+          ],
         },
       },
       turnId: "ask:test:gateway-calculator-active-context",
@@ -2896,7 +3124,8 @@ describe("Helix workstation tool gateway", () => {
         normalized_expression: "(18+6)*3",
         result: "72",
         source_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
-        observation_ref: "ask:test:calculator-projection:scientific-calculator.solve_expression",
+        observation_ref:
+          "ask:test:calculator-projection:scientific-calculator.solve_expression",
       },
       turnId: "ask:test:gateway-calculator-projection",
       iteration: 6,
@@ -2946,7 +3175,8 @@ describe("Helix workstation tool gateway", () => {
             normalized_expression: "(18+6)*3",
             result: "72",
             source_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
-            observation_ref: "ask:test:calculator-projection:scientific-calculator.solve_expression",
+            observation_ref:
+              "ask:test:calculator-projection:scientific-calculator.solve_expression",
           },
         },
         source_capability: CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
@@ -3002,7 +3232,11 @@ describe("Helix workstation tool gateway", () => {
           action: "open_panel",
           panel_id: "workstation-process-graph",
         },
-        allowed_panel_ids: expect.arrayContaining(["docs-viewer", "scientific-calculator", "workstation-process-graph"]),
+        allowed_panel_ids: expect.arrayContaining([
+          "docs-viewer",
+          "scientific-calculator",
+          "workstation-process-graph",
+        ]),
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -3053,7 +3287,10 @@ describe("Helix workstation tool gateway", () => {
         status: "blocked",
         dispatch_status: "blocked",
         workstation_action: null,
-        allowed_panel_ids: expect.not.arrayContaining(["workstation-clipboard-history", "workstation-notes"]),
+        allowed_panel_ids: expect.not.arrayContaining([
+          "workstation-clipboard-history",
+          "workstation-notes",
+        ]),
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
@@ -3210,7 +3447,10 @@ describe("Helix workstation tool gateway", () => {
           }),
         ],
         produced_affordances: expect.arrayContaining([
-          expect.objectContaining({ kind: "calculator_result", status: "blocked" }),
+          expect.objectContaining({
+            kind: "calculator_result",
+            status: "blocked",
+          }),
         ]),
         consumed_affordances: expect.arrayContaining([
           expect.objectContaining({
@@ -3238,7 +3478,10 @@ describe("Helix workstation tool gateway", () => {
       tool_followup_decision: {
         schema: "helix.tool_followup_decision.v1",
         next_action: "ask_user",
-        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        terminal_blockers: [
+          "post_tool_model_step_required",
+          "terminal_authority_not_evaluated",
+        ],
         required_surface_satisfied: false,
         evidence_reentered: false,
         assistant_answer: false,
@@ -3304,7 +3547,9 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
-    expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
+    expect(
+      (result.observation as { hit_count?: number }).hit_count,
+    ).toBeGreaterThan(0);
   });
 
   it("finds Theory Badge Graph locator code with a focused repo.search query", async () => {
@@ -3358,8 +3603,12 @@ describe("Helix workstation tool gateway", () => {
             rejected_terms: ["how"],
           }),
           support_refs: expect.arrayContaining([
-            expect.stringMatching(/shared\/theory\/theory-badge-overlap-locator\.ts:L\d+/),
-            expect.stringMatching(/shared\/theory\/theory-context-reflection-tool\.ts:L\d+/),
+            expect.stringMatching(
+              /shared\/theory\/theory-badge-overlap-locator\.ts:L\d+/,
+            ),
+            expect.stringMatching(
+              /shared\/theory\/theory-context-reflection-tool\.ts:L\d+/,
+            ),
           ]),
         }),
       },
@@ -3375,7 +3624,12 @@ describe("Helix workstation tool gateway", () => {
         ]),
         query_quality: expect.objectContaining({
           status: "accepted",
-          meaningful_terms: expect.arrayContaining(["theory", "badge", "graph", "locator"]),
+          meaningful_terms: expect.arrayContaining([
+            "theory",
+            "badge",
+            "graph",
+            "locator",
+          ]),
         }),
         query_derivation: expect.objectContaining({
           schema: "helix.repo_search_query_derivation.v1",
@@ -3391,20 +3645,28 @@ describe("Helix workstation tool gateway", () => {
         selected_for_answer: true,
         repair_attempts: [],
         support_refs: expect.arrayContaining([
-          expect.stringMatching(/shared\/theory\/theory-badge-overlap-locator\.ts:L\d+/),
-          expect.stringMatching(/shared\/theory\/theory-context-reflection-tool\.ts:L\d+/),
+          expect.stringMatching(
+            /shared\/theory\/theory-badge-overlap-locator\.ts:L\d+/,
+          ),
+          expect.stringMatching(
+            /shared\/theory\/theory-context-reflection-tool\.ts:L\d+/,
+          ),
         ]),
         terminal_eligible: false,
         assistant_answer: false,
         raw_content_included: false,
       },
     });
-    const filePaths = (result.observation as { file_paths?: string[] }).file_paths ?? [];
-    expect(filePaths).toEqual(expect.arrayContaining([
-      "shared/theory/theory-badge-overlap-locator.ts",
-      "shared/theory/theory-context-reflection-tool.ts",
-    ]));
-    const hits = (result.observation as { hits?: Array<{ text?: string }> }).hits ?? [];
+    const filePaths =
+      (result.observation as { file_paths?: string[] }).file_paths ?? [];
+    expect(filePaths).toEqual(
+      expect.arrayContaining([
+        "shared/theory/theory-badge-overlap-locator.ts",
+        "shared/theory/theory-context-reflection-tool.ts",
+      ]),
+    );
+    const hits =
+      (result.observation as { hits?: Array<{ text?: string }> }).hits ?? [];
     expect(hits.some((hit) => (hit.text ?? "").length > 180)).toBe(true);
   });
 
@@ -3444,7 +3706,9 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
-    expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
+    expect(
+      (result.observation as { hit_count?: number }).hit_count,
+    ).toBeGreaterThan(0);
   });
 
   it("falls back to bounded Node repo search when ripgrep execution fails", async () => {
@@ -3481,7 +3745,9 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
-    expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
+    expect(
+      (result.observation as { hit_count?: number }).hit_count,
+    ).toBeGreaterThan(0);
   });
 
   it("blocks missing repo.search query as a non-terminal observation", async () => {
@@ -3696,7 +3962,9 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
-    expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
+    expect(
+      (result.observation as { hit_count?: number }).hit_count,
+    ).toBeGreaterThan(0);
   });
 
   it("searches an adapter-admitted mechanics collection without requiring its document title", async () => {
@@ -3720,9 +3988,7 @@ describe("Helix workstation tool gateway", () => {
       observation: {
         mechanics_scope: {
           adapter_profile_id: "game.minecraft.readonly.v1",
-          document_paths: [
-            "docs/game-mechanics/minecraft-java-v1.md",
-          ],
+          document_paths: ["docs/game-mechanics/minecraft-java-v1.md"],
           content_role: "mechanics_reference_not_live_observation",
           assistant_answer: false,
           terminal_eligible: false,
@@ -3732,15 +3998,16 @@ describe("Helix workstation tool gateway", () => {
         assistant_answer: false,
       },
     });
-    const hits = (result.observation as {
-      hits?: Array<{ filePath?: string }>;
-    }).hits ?? [];
+    const hits =
+      (
+        result.observation as {
+          hits?: Array<{ filePath?: string }>;
+        }
+      ).hits ?? [];
     expect(hits.length).toBeGreaterThan(0);
     expect(
       hits.every(
-        (hit) =>
-          hit.filePath ===
-          "docs/game-mechanics/minecraft-java-v1.md",
+        (hit) => hit.filePath === "docs/game-mechanics/minecraft-java-v1.md",
       ),
     ).toBe(true);
   });
@@ -3752,9 +4019,7 @@ describe("Helix workstation tool gateway", () => {
       capabilityId: DOCS_SEARCH_CAPABILITY,
       arguments: {
         query: "how does reachability work",
-        mechanics_collection_ids: [
-          "mechanics.synthetic_game.fixture.v1",
-        ],
+        mechanics_collection_ids: ["mechanics.synthetic_game.fixture.v1"],
         adapter_profile_id: "game.minecraft.readonly.v1",
       },
       turnId: "ask:test:gateway-docs-mechanics-cross-profile",
@@ -3807,13 +4072,22 @@ describe("Helix workstation tool gateway", () => {
     const candidates = observation.document_candidates ?? [];
     expect(result.ok).toBe(true);
     expect(observation.terms).toContain("whitepaper");
-    expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
-    expect(hits.some((hit) =>
-      hit.filePath === "docs/research/nhm2-current-status-whitepaper.md",
-    )).toBe(true);
+    expect(
+      (result.observation as { hit_count?: number }).hit_count,
+    ).toBeGreaterThan(0);
+    expect(
+      hits.some(
+        (hit) =>
+          hit.filePath === "docs/research/nhm2-current-status-whitepaper.md",
+      ),
+    ).toBe(true);
     expect(observation.unique_document_count).toBeGreaterThan(0);
-    expect(candidates[0]?.path).toBe("docs/research/nhm2-current-status-whitepaper.md");
-    expect(candidates[0]?.matched_terms).toEqual(expect.arrayContaining(["nhm2", "whitepaper"]));
+    expect(candidates[0]?.path).toBe(
+      "docs/research/nhm2-current-status-whitepaper.md",
+    );
+    expect(candidates[0]?.matched_terms).toEqual(
+      expect.arrayContaining(["nhm2", "whitepaper"]),
+    );
     expect(candidates[0]).toMatchObject({
       doc_class: "canonical-research",
       bundle_kind: "equation-action-whitepaper",
@@ -3860,23 +4134,29 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.exact_terms).toEqual(["alpha = 0.7", "alpha = 0.995"]);
     expect(observation.exact_location_match_count).toBe(matches.length);
     expect(matches).toHaveLength(3);
-    expect(matches).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        path: "docs/research/nhm2-current-status-whitepaper.md",
-        term: "alpha = 0.7",
-        line: 5,
-        heading: "Abstract",
-        sentence: expect.stringContaining("`alpha = 0.7`"),
-      }),
-      expect.objectContaining({
-        path: "docs/research/nhm2-current-status-whitepaper.md",
-        term: "alpha = 0.995",
-        line: 1053,
-        heading: "6.7 Twin Paradox trip clocking interpretation",
-        sentence: expect.stringContaining("For `alpha = 0.995`"),
-      }),
-    ]));
-    expect(matches.every((match) => Boolean(match.heading) && Boolean(match.sentence))).toBe(true);
+    expect(matches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "docs/research/nhm2-current-status-whitepaper.md",
+          term: "alpha = 0.7",
+          line: 5,
+          heading: "Abstract",
+          sentence: expect.stringContaining("`alpha = 0.7`"),
+        }),
+        expect.objectContaining({
+          path: "docs/research/nhm2-current-status-whitepaper.md",
+          term: "alpha = 0.995",
+          line: 1053,
+          heading: "6.7 Twin Paradox trip clocking interpretation",
+          sentence: expect.stringContaining("For `alpha = 0.995`"),
+        }),
+      ]),
+    );
+    expect(
+      matches.every(
+        (match) => Boolean(match.heading) && Boolean(match.sentence),
+      ),
+    ).toBe(true);
   });
 
   it("materializes a grounded zero-result exact docs observation", async () => {
@@ -3937,17 +4217,23 @@ describe("Helix workstation tool gateway", () => {
       contains_terms: ["alpha"],
       truncated: false,
     });
-    expect(section.section_excerpt).toContain("For `alpha = 0.995`, this gives about `0.099875`.");
-    expect(section.section_lines).toEqual(expect.arrayContaining([
-      { line: 1053, text: expect.stringContaining("For `alpha = 0.995`") },
-    ]));
-    expect(section.contains_matches).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        term: "alpha",
-        line: 1053,
-        sentence: "For `alpha = 0.995`, this gives about `0.099875`.",
-      }),
-    ]));
+    expect(section.section_excerpt).toContain(
+      "For `alpha = 0.995`, this gives about `0.099875`.",
+    );
+    expect(section.section_lines).toEqual(
+      expect.arrayContaining([
+        { line: 1053, text: expect.stringContaining("For `alpha = 0.995`") },
+      ]),
+    );
+    expect(section.contains_matches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          term: "alpha",
+          line: 1053,
+          sentence: "For `alpha = 0.995`, this gives about `0.099875`.",
+        }),
+      ]),
+    );
   });
 
   it("keeps case-sensitive section terms and their line matches separate", async () => {
@@ -3967,12 +4253,16 @@ describe("Helix workstation tool gateway", () => {
 
     const section = (result.observation as any).section_observation;
     expect(section.contains_terms).toEqual(["alpha", "Alpha"]);
-    expect(section.contains_matches.filter((entry: any) => entry.term === "alpha").map((entry: any) => entry.line)).toEqual([
-      1007, 1012, 1021, 1050, 1053,
-    ]);
-    expect(section.contains_matches.filter((entry: any) => entry.term === "Alpha").map((entry: any) => entry.line)).toEqual([
-      1024, 1061, 1073,
-    ]);
+    expect(
+      section.contains_matches
+        .filter((entry: any) => entry.term === "alpha")
+        .map((entry: any) => entry.line),
+    ).toEqual([1007, 1012, 1021, 1050, 1053]);
+    expect(
+      section.contains_matches
+        .filter((entry: any) => entry.term === "Alpha")
+        .map((entry: any) => entry.line),
+    ).toEqual([1024, 1061, 1073]);
   });
 
   it("materializes a typed not-found lookup for an absent named section", async () => {
@@ -4044,7 +4334,8 @@ describe("Helix workstation tool gateway", () => {
       mode: "read",
       capabilityId: DOCS_SEARCH_CAPABILITY,
       arguments: {
-        query: "6.7 Twin Paradox trip clocking interpretation 6.8 Profile-scoped trip clocking index",
+        query:
+          "6.7 Twin Paradox trip clocking interpretation 6.8 Profile-scoped trip clocking index",
         paths: ["docs/research/nhm2-current-status-whitepaper.md"],
         section_headings: [
           "6.7 Twin Paradox trip clocking interpretation",
@@ -4059,8 +4350,14 @@ describe("Helix workstation tool gateway", () => {
 
     const observation = result.observation as any;
     expect(observation.section_lookups).toEqual([
-      expect.objectContaining({ requested_heading: "6.7 Twin Paradox trip clocking interpretation", status: "found" }),
-      expect.objectContaining({ requested_heading: "6.8 Profile-scoped trip clocking index", status: "found" }),
+      expect.objectContaining({
+        requested_heading: "6.7 Twin Paradox trip clocking interpretation",
+        status: "found",
+      }),
+      expect.objectContaining({
+        requested_heading: "6.8 Profile-scoped trip clocking index",
+        status: "found",
+      }),
     ]);
     expect(observation.section_observations).toEqual([
       expect.objectContaining({
@@ -4103,13 +4400,23 @@ describe("Helix workstation tool gateway", () => {
     });
 
     const observation = result.observation as any;
-    expect(observation.section_lookups.map((entry: any) => [entry.requested_heading, entry.status])).toEqual([
+    expect(
+      observation.section_lookups.map((entry: any) => [
+        entry.requested_heading,
+        entry.status,
+      ]),
+    ).toEqual([
       [headings[0], "found"],
       [headings[1], "found"],
       [headings[2], "not_found"],
       [headings[3], "not_found"],
     ]);
-    expect(observation.section_observations.map((entry: any) => [entry.matched_heading, entry.contains_match_count])).toEqual([
+    expect(
+      observation.section_observations.map((entry: any) => [
+        entry.matched_heading,
+        entry.contains_match_count,
+      ]),
+    ).toEqual([
       [headings[0], 5],
       [headings[1], 3],
     ]);
@@ -4140,7 +4447,9 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.document_candidates?.[0]).toMatchObject({
       path: "docs/architecture/halobank-paper-definition-congruence-plan.md",
     });
-    expect(observation.document_candidates?.[0]?.line_hit_count).toBeGreaterThan(0);
+    expect(
+      observation.document_candidates?.[0]?.line_hit_count,
+    ).toBeGreaterThan(0);
   });
 
   it("ranks markdown documents ahead of sidecar docs search matches", async () => {
@@ -4157,12 +4466,19 @@ describe("Helix workstation tool gateway", () => {
       iteration: 4,
     });
 
-    const candidates = (result.observation as {
-      document_candidates?: Array<{ path?: string }>;
-    }).document_candidates ?? [];
+    const candidates =
+      (
+        result.observation as {
+          document_candidates?: Array<{ path?: string }>;
+        }
+      ).document_candidates ?? [];
     expect(result.ok).toBe(true);
-    expect(candidates[0]?.path).toBe("docs/research/nhm2-current-status-whitepaper.md");
-    const sidecarIndex = candidates.findIndex((candidate) => candidate.path?.endsWith(".equation-actions.json"));
+    expect(candidates[0]?.path).toBe(
+      "docs/research/nhm2-current-status-whitepaper.md",
+    );
+    const sidecarIndex = candidates.findIndex((candidate) =>
+      candidate.path?.endsWith(".equation-actions.json"),
+    );
     expect(sidecarIndex === -1 || sidecarIndex > 0).toBe(true);
   });
 
@@ -4202,7 +4518,9 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
-    expect((result.observation as { hit_count?: number }).hit_count).toBeGreaterThan(0);
+    expect(
+      (result.observation as { hit_count?: number }).hit_count,
+    ).toBeGreaterThan(0);
   });
 
   it("blocks missing docs.search query as a non-terminal observation", async () => {
@@ -4239,12 +4557,15 @@ describe("Helix workstation tool gateway", () => {
       ok: true,
       status: 200,
       json: async () => ({
-        results: [{
-          title: "Quantum inequalities constrain warp metrics",
-          url: "https://example.com/qei-warp",
-          content: "Quantum inequality margins are diagnostic evidence, not physical validation.",
-          published_date: "2026-06-01",
-        }],
+        results: [
+          {
+            title: "Quantum inequalities constrain warp metrics",
+            url: "https://example.com/qei-warp",
+            content:
+              "Quantum inequality margins are diagnostic evidence, not physical validation.",
+            published_date: "2026-06-01",
+          },
+        ],
       }),
     })) as typeof fetch;
 
@@ -4318,11 +4639,13 @@ describe("Helix workstation tool gateway", () => {
       ok: true,
       status: 200,
       json: async () => ({
-        results: [{
-          title: "Current QEI discussion",
-          url: "https://example.com/current-qei",
-          content: "Current web source about QEI margins.",
-        }],
+        results: [
+          {
+            title: "Current QEI discussion",
+            url: "https://example.com/current-qei",
+            content: "Current web source about QEI margins.",
+          },
+        ],
       }),
     })) as typeof fetch;
 
@@ -4359,18 +4682,19 @@ describe("Helix workstation tool gateway", () => {
       return {
         ok: true,
         status: 200,
-        text: async () => [
-          "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-          "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
-          "<entry>",
-          "<id>https://arxiv.org/abs/2606.00001</id>",
-          "<title>Quantum inequalities for warp constraints</title>",
-          "<summary>Bounded abstract about quantum inequality margins and warp metrics.</summary>",
-          "<published>2026-06-01T00:00:00Z</published>",
-          "<author><name>A. Researcher</name></author>",
-          "</entry>",
-          "</feed>",
-        ].join(""),
+        text: async () =>
+          [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<feed xmlns="http://www.w3.org/2005/Atom">',
+            "<entry>",
+            "<id>https://arxiv.org/abs/2606.00001</id>",
+            "<title>Quantum inequalities for warp constraints</title>",
+            "<summary>Bounded abstract about quantum inequality margins and warp metrics.</summary>",
+            "<published>2026-06-01T00:00:00Z</published>",
+            "<author><name>A. Researcher</name></author>",
+            "</entry>",
+            "</feed>",
+          ].join(""),
       };
     }) as typeof fetch;
 
@@ -4420,7 +4744,7 @@ describe("Helix workstation tool gateway", () => {
           unique_paper_count: 1,
           duplicate_record_count: 0,
         },
-         evidence_state: "lookup_usable",
+        evidence_state: "lookup_usable",
         next_affordances: [],
         selected_for_answer: true,
         status: "succeeded",
@@ -4445,31 +4769,38 @@ describe("Helix workstation tool gateway", () => {
       title: "Quantum inequalities for warp constraints",
       identifiers: { arxiv_id: "2606.00001" },
     });
-    expect(observation.papers?.[0]?.abstract).toContain("quantum inequality margins");
+    expect(observation.papers?.[0]?.abstract).toContain(
+      "quantum inequality margins",
+    );
     expect(observation.evidence_refs?.[0]).toMatchObject({
       provider: "arxiv",
       url: "https://arxiv.org/abs/2606.00001",
     });
     expect(calledUrls).toHaveLength(1);
-    expect(calledUrls.some((url) => /internet-search|search_web|tavily|serpapi|google/i.test(url))).toBe(false);
+    expect(
+      calledUrls.some((url) =>
+        /internet-search|search_web|tavily|serpapi|google/i.test(url),
+      ),
+    ).toBe(false);
   });
 
   it("marks weak scholarly lookup results as recovery evidence instead of selected answer evidence", async () => {
     globalThis.fetch = vi.fn(async () => ({
       ok: true,
       status: 200,
-      text: async () => [
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
-        "<entry>",
-        "<id>https://arxiv.org/abs/2606.00009</id>",
-        "<title>SChuBERT: Scholarly Document Chunks with BERT-encoding boost Citation Count Prediction</title>",
-        "<summary>This paper studies scholarly document quality and citation prediction with BERT.</summary>",
-        "<published>2026-06-01T00:00:00Z</published>",
-        "<author><name>A. Bibliometrics Researcher</name></author>",
-        "</entry>",
-        "</feed>",
-      ].join(""),
+      text: async () =>
+        [
+          '<?xml version="1.0" encoding="UTF-8"?>',
+          '<feed xmlns="http://www.w3.org/2005/Atom">',
+          "<entry>",
+          "<id>https://arxiv.org/abs/2606.00009</id>",
+          "<title>SChuBERT: Scholarly Document Chunks with BERT-encoding boost Citation Count Prediction</title>",
+          "<summary>This paper studies scholarly document quality and citation prediction with BERT.</summary>",
+          "<published>2026-06-01T00:00:00Z</published>",
+          "<author><name>A. Bibliometrics Researcher</name></author>",
+          "</entry>",
+          "</feed>",
+        ].join(""),
     })) as typeof fetch;
 
     const result = await callWorkstationGatewayCapability({
@@ -4536,18 +4867,28 @@ describe("Helix workstation tool gateway", () => {
       error: "lookup_weak_match",
     });
     const observation = result.observation as {
-      next_affordances?: Array<{ capability?: string; query?: string; reason?: string }>;
+      next_affordances?: Array<{
+        capability?: string;
+        query?: string;
+        reason?: string;
+      }>;
       scholarly_lookup_recovery_affordance?: { recovery_queries?: string[] };
     };
-    expect(observation.next_affordances).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
-        reason: "lookup_weak_match",
-        query: expect.stringMatching(/Weyl tensor|weyl curvature/i),
-      }),
-    ]));
-    expect(observation.scholarly_lookup_recovery_affordance?.recovery_queries).toEqual(
-      expect.arrayContaining([expect.stringMatching(/Weyl tensor conformal curvature/i)]),
+    expect(observation.next_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+          reason: "lookup_weak_match",
+          query: expect.stringMatching(/Weyl tensor|weyl curvature/i),
+        }),
+      ]),
+    );
+    expect(
+      observation.scholarly_lookup_recovery_affordance?.recovery_queries,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/Weyl tensor conformal curvature/i),
+      ]),
     );
   });
 
@@ -4612,7 +4953,10 @@ describe("Helix workstation tool gateway", () => {
             reason: "lookup_blocked",
           }),
         ]),
-        missing_requirements: ["arxiv_http_429", "no_scholarly_results_returned"],
+        missing_requirements: [
+          "arxiv_http_429",
+          "no_scholarly_results_returned",
+        ],
         selected_for_answer: false,
         status: "failed",
         terminal_eligible: false,
@@ -4631,14 +4975,20 @@ describe("Helix workstation tool gateway", () => {
     globalThis.fetch = vi.fn(async () => ({
       ok: true,
       status: 200,
-      headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
-      arrayBuffer: async () => new TextEncoder().encode([
-        "<html><body>",
-        "<h1>Tokamak beta evidence</h1>",
-        "<p>Table 1 reports electron density n = 1.0e20 m^-3 [12] and electron temperature Te = 5000 eV [12].</p>",
-        "<p>The toroidal magnetic field B = 5 T is listed in the experimental setup [12].</p>",
-        "</body></html>",
-      ].join(" ")).buffer,
+      headers: {
+        get: (name: string) =>
+          name.toLowerCase() === "content-type" ? "text/html" : null,
+      },
+      arrayBuffer: async () =>
+        new TextEncoder().encode(
+          [
+            "<html><body>",
+            "<h1>Tokamak beta evidence</h1>",
+            "<p>Table 1 reports electron density n = 1.0e20 m^-3 [12] and electron temperature Te = 5000 eV [12].</p>",
+            "<p>The toroidal magnetic field B = 5 T is listed in the experimental setup [12].</p>",
+            "</body></html>",
+          ].join(" "),
+        ).buffer,
     })) as typeof fetch;
 
     const result = await callWorkstationGatewayCapability({
@@ -4681,8 +5031,12 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
-    const observation = result.observation as { selected_chunks?: Array<{ text_excerpt?: string; citation_ref?: string }> };
-    expect(observation.selected_chunks?.[0]?.text_excerpt).toContain("electron density");
+    const observation = result.observation as {
+      selected_chunks?: Array<{ text_excerpt?: string; citation_ref?: string }>;
+    };
+    expect(observation.selected_chunks?.[0]?.text_excerpt).toContain(
+      "electron density",
+    );
     expect(observation.selected_chunks?.[0]?.citation_ref).toBe("paper#page=1");
   });
 
@@ -4693,12 +5047,18 @@ describe("Helix workstation tool gateway", () => {
       return {
         ok: true,
         status: 200,
-        headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
-        arrayBuffer: async () => new TextEncoder().encode([
-          "<html><body>",
-          "<p>The magnetar analysis reports a bounded field-strength estimate and its observational assumptions.</p>",
-          "</body></html>",
-        ].join(" ")).buffer,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === "content-type" ? "text/html" : null,
+        },
+        arrayBuffer: async () =>
+          new TextEncoder().encode(
+            [
+              "<html><body>",
+              "<p>The magnetar analysis reports a bounded field-strength estimate and its observational assumptions.</p>",
+              "</body></html>",
+            ].join(" "),
+          ).buffer,
       };
     }) as typeof fetch;
 
@@ -4714,7 +5074,9 @@ describe("Helix workstation tool gateway", () => {
       iteration: 8,
     });
 
-    expect(requestedUrls).toContain("https://arxiv.org/pdf/astro-ph/0503030v1.pdf");
+    expect(requestedUrls).toContain(
+      "https://arxiv.org/pdf/astro-ph/0503030v1.pdf",
+    );
     expect(result).toMatchObject({
       ok: true,
       capability_id: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
@@ -4740,13 +5102,19 @@ describe("Helix workstation tool gateway", () => {
       return {
         ok: true,
         status: 200,
-        headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
-        arrayBuffer: async () => new TextEncoder().encode([
-          "<html><body>",
-          "<p>The Casimir effect between conducting plates has pressure P = - pi^2 hbar c / (240 a^4).</p>",
-          "<p>The force between conducting plates is F = P A for plate area A.</p>",
-          "</body></html>",
-        ].join(" ")).buffer,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === "content-type" ? "text/html" : null,
+        },
+        arrayBuffer: async () =>
+          new TextEncoder().encode(
+            [
+              "<html><body>",
+              "<p>The Casimir effect between conducting plates has pressure P = - pi^2 hbar c / (240 a^4).</p>",
+              "<p>The force between conducting plates is F = P A for plate area A.</p>",
+              "</body></html>",
+            ].join(" "),
+          ).buffer,
       };
     }) as typeof fetch;
 
@@ -4826,7 +5194,9 @@ describe("Helix workstation tool gateway", () => {
           expect.objectContaining({
             paper_result_id: "openalex:blocked",
             evidence_state: "full_text_unavailable",
-            missing_requirements: expect.arrayContaining(["full_text_http_403"]),
+            missing_requirements: expect.arrayContaining([
+              "full_text_http_403",
+            ]),
           }),
           expect.objectContaining({
             paper_result_id: "arxiv:2606.00011v1",
@@ -4852,30 +5222,37 @@ describe("Helix workstation tool gateway", () => {
         return {
           ok: true,
           status: 200,
-          text: async () => [
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-            "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
-            "<entry>",
-            "<id>https://arxiv.org/abs/2606.00012</id>",
-            "<title>Casimir effect parallel conducting plates open access evidence</title>",
-            "<summary>This paper studies the Casimir effect between parallel conducting plates.</summary>",
-            "<published>2026-06-12T00:00:00Z</published>",
-            "<author><name>A. Recovery</name></author>",
-            "</entry>",
-            "</feed>",
-          ].join(""),
+          text: async () =>
+            [
+              '<?xml version="1.0" encoding="UTF-8"?>',
+              '<feed xmlns="http://www.w3.org/2005/Atom">',
+              "<entry>",
+              "<id>https://arxiv.org/abs/2606.00012</id>",
+              "<title>Casimir effect parallel conducting plates open access evidence</title>",
+              "<summary>This paper studies the Casimir effect between parallel conducting plates.</summary>",
+              "<published>2026-06-12T00:00:00Z</published>",
+              "<author><name>A. Recovery</name></author>",
+              "</entry>",
+              "</feed>",
+            ].join(""),
         };
       }
       return {
         ok: true,
         status: 200,
-        headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
-        arrayBuffer: async () => new TextEncoder().encode([
-          "<html><body>",
-          "<p>The Casimir effect between parallel conducting plates has pressure P = - pi^2 hbar c / (240 a^4).</p>",
-          "<p>The result is a bounded open-access recovery page for equation extraction.</p>",
-          "</body></html>",
-        ].join(" ")).buffer,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === "content-type" ? "text/html" : null,
+        },
+        arrayBuffer: async () =>
+          new TextEncoder().encode(
+            [
+              "<html><body>",
+              "<p>The Casimir effect between parallel conducting plates has pressure P = - pi^2 hbar c / (240 a^4).</p>",
+              "<p>The result is a bounded open-access recovery page for equation extraction.</p>",
+              "</body></html>",
+            ].join(" "),
+          ).buffer,
       };
     }) as typeof fetch;
 
@@ -4923,7 +5300,9 @@ describe("Helix workstation tool gateway", () => {
           expect.objectContaining({
             paper_result_id: "openalex:blocked",
             evidence_state: "full_text_unavailable",
-            missing_requirements: expect.arrayContaining(["full_text_http_403"]),
+            missing_requirements: expect.arrayContaining([
+              "full_text_http_403",
+            ]),
           }),
           expect.objectContaining({
             paper_result_id: expect.stringMatching(/^arxiv:/),
@@ -4949,30 +5328,37 @@ describe("Helix workstation tool gateway", () => {
         return {
           ok: true,
           status: 200,
-          text: async () => [
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-            "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
-            "<entry>",
-            "<id>https://arxiv.org/abs/2606.00013</id>",
-            "<title>Casimir effect parallel plates source URL recovery</title>",
-            "<summary>This paper studies the Casimir effect between parallel conducting plates.</summary>",
-            "<published>2026-06-13T00:00:00Z</published>",
-            "<author><name>A. Source Recovery</name></author>",
-            "</entry>",
-            "</feed>",
-          ].join(""),
+          text: async () =>
+            [
+              '<?xml version="1.0" encoding="UTF-8"?>',
+              '<feed xmlns="http://www.w3.org/2005/Atom">',
+              "<entry>",
+              "<id>https://arxiv.org/abs/2606.00013</id>",
+              "<title>Casimir effect parallel plates source URL recovery</title>",
+              "<summary>This paper studies the Casimir effect between parallel conducting plates.</summary>",
+              "<published>2026-06-13T00:00:00Z</published>",
+              "<author><name>A. Source Recovery</name></author>",
+              "</entry>",
+              "</feed>",
+            ].join(""),
         };
       }
       return {
         ok: true,
         status: 200,
-        headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
-        arrayBuffer: async () => new TextEncoder().encode([
-          "<html><body>",
-          "<p>The Casimir pressure for parallel conducting plates is P = - pi^2 hbar c / (240 a^4).</p>",
-          "<p>This recovery text is enough to become bounded full-text evidence.</p>",
-          "</body></html>",
-        ].join(" ")).buffer,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === "content-type" ? "text/html" : null,
+        },
+        arrayBuffer: async () =>
+          new TextEncoder().encode(
+            [
+              "<html><body>",
+              "<p>The Casimir pressure for parallel conducting plates is P = - pi^2 hbar c / (240 a^4).</p>",
+              "<p>This recovery text is enough to become bounded full-text evidence.</p>",
+              "</body></html>",
+            ].join(" "),
+          ).buffer,
       };
     }) as typeof fetch;
 
@@ -5001,7 +5387,9 @@ describe("Helix workstation tool gateway", () => {
           expect.objectContaining({
             source_url: "https://blocked.example/casimir",
             evidence_state: "full_text_unavailable",
-            missing_requirements: expect.arrayContaining(["full_text_http_403"]),
+            missing_requirements: expect.arrayContaining([
+              "full_text_http_403",
+            ]),
           }),
           expect.objectContaining({
             paper_result_id: expect.stringMatching(/^arxiv:/),
@@ -5016,8 +5404,12 @@ describe("Helix workstation tool gateway", () => {
     globalThis.fetch = vi.fn(async () => ({
       ok: true,
       status: 200,
-      headers: { get: (name: string) => name.toLowerCase() === "content-type" ? "text/html" : null },
-      arrayBuffer: async () => new TextEncoder().encode("<html><body>Fig. 1</body></html>").buffer,
+      headers: {
+        get: (name: string) =>
+          name.toLowerCase() === "content-type" ? "text/html" : null,
+      },
+      arrayBuffer: async () =>
+        new TextEncoder().encode("<html><body>Fig. 1</body></html>").buffer,
     })) as typeof fetch;
 
     const result = await callWorkstationGatewayCapability({
@@ -5055,7 +5447,9 @@ describe("Helix workstation tool gateway", () => {
         source_kind: "html",
         evidence_state: "page_image_parse_required",
         selected_for_answer: false,
-        missing_requirements: expect.arrayContaining(["page_image_parse_required"]),
+        missing_requirements: expect.arrayContaining([
+          "page_image_parse_required",
+        ]),
         visual_candidates: [
           expect.objectContaining({
             page: 1,
@@ -5067,18 +5461,26 @@ describe("Helix workstation tool gateway", () => {
         assistant_answer: false,
         raw_content_included: false,
       },
-      error: expect.stringMatching(/no_relevant_full_text_chunks_selected|page_image_parse_required/),
+      error: expect.stringMatching(
+        /no_relevant_full_text_chunks_selected|page_image_parse_required/,
+      ),
     });
     const observation = result.observation as {
-      next_affordances?: Array<{ capability?: string; source_ref?: string; reason?: string }>;
+      next_affordances?: Array<{
+        capability?: string;
+        source_ref?: string;
+        reason?: string;
+      }>;
     };
-    expect(observation.next_affordances).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        capability: "visual_analysis.inspect_image_region",
-        reason: "low_text_pdf_page_needs_visual_or_ocr_pass",
-        source_ref: expect.stringContaining("/page/1"),
-      }),
-    ]));
+    expect(observation.next_affordances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          capability: "visual_analysis.inspect_image_region",
+          reason: "low_text_pdf_page_needs_visual_or_ocr_pass",
+          source_ref: expect.stringContaining("/page/1"),
+        }),
+      ]),
+    );
   });
 
   it("blocks scholarly full-text fetch when the paper identity has no fetchable source", async () => {
@@ -5087,12 +5489,19 @@ describe("Helix workstation tool gateway", () => {
       mode: "read",
       capabilityId: SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
       arguments: {
-        query: "Correlation of the L-mode density limit with edge collisionality",
-        source_ref: "Correlation of the L-mode density limit with edge collisionality",
+        query:
+          "Correlation of the L-mode density limit with edge collisionality",
+        source_ref:
+          "Correlation of the L-mode density limit with edge collisionality",
         variable_source_plan: {
           schema: "helix.variable_source_plan.v1",
           formula_variables: ["n1_m3", "n2_m3", "sigma_m2", "v_m_s"],
-          query_terms: ["fusion", "thermonuclear reaction rate", "fusion cross section", "sigma v"],
+          query_terms: [
+            "fusion",
+            "thermonuclear reaction rate",
+            "fusion cross section",
+            "sigma v",
+          ],
         },
       },
       turnId: "ask:test:gateway-scholarly-full-text-missing-source",
@@ -5133,7 +5542,9 @@ describe("Helix workstation tool gateway", () => {
         reason: "fetchable_paper_identity_required",
       },
     });
-    expect(JSON.stringify(result.observation)).toMatch(/accessible pdf|full text|sigma v/i);
+    expect(JSON.stringify(result.observation)).toMatch(
+      /accessible pdf|full text|sigma v/i,
+    );
   });
 
   it("extracts cited numeric parameters with units and rejects missing variables", async () => {
@@ -5157,8 +5568,15 @@ describe("Helix workstation tool gateway", () => {
               canonical_quantity: "toroidal magnetic field",
               expected_unit: "T",
               source_classes: ["tokamak operating parameter table"],
-              search_terms: ["toroidal magnetic field", "magnetic field strength"],
-              extraction_aliases: ["B_T", "toroidal magnetic field", "magnetic field"],
+              search_terms: [
+                "toroidal magnetic field",
+                "magnetic field strength",
+              ],
+              extraction_aliases: [
+                "B_T",
+                "toroidal magnetic field",
+                "magnetic field",
+              ],
             },
           ],
           query_terms: ["tokamak plasma beta operating parameter table"],
@@ -5224,31 +5642,44 @@ describe("Helix workstation tool gateway", () => {
       error: "missing_requested_numeric_variables",
     });
     const observation = result.observation as {
-      parameters?: Array<{ variable?: string; normalized_value?: number; normalized_unit?: string; evidence_ref?: string }>;
+      parameters?: Array<{
+        variable?: string;
+        normalized_value?: number;
+        normalized_unit?: string;
+        evidence_ref?: string;
+      }>;
       rejected_candidates?: Array<{ variable?: string; reason?: string }>;
       scholarly_numeric_recovery_affordance?: {
         recovery_queries?: string[];
         variable_source_plan?: Record<string, unknown>;
       };
     };
-    expect(observation.parameters).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        variable: "n_m3",
-        normalized_value: 1.0e20,
-        normalized_unit: "m^-3",
-        evidence_ref: expect.stringContaining("scholarly-numeric:"),
-      }),
-      expect.objectContaining({
-        variable: "T_eV",
-        normalized_value: 5000,
-        normalized_unit: "eV",
-      }),
-    ]));
-    expect(observation.rejected_candidates ?? []).toEqual(expect.any(Array));
-    expect(observation.scholarly_numeric_recovery_affordance?.recovery_queries).toEqual(
-      expect.arrayContaining([expect.stringMatching(/B_T|toroidal magnetic field|cited values/i)]),
+    expect(observation.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          variable: "n_m3",
+          normalized_value: 1.0e20,
+          normalized_unit: "m^-3",
+          evidence_ref: expect.stringContaining("scholarly-numeric:"),
+        }),
+        expect.objectContaining({
+          variable: "T_eV",
+          normalized_value: 5000,
+          normalized_unit: "eV",
+        }),
+      ]),
     );
-    expect(observation.scholarly_numeric_recovery_affordance?.variable_source_plan).toMatchObject({
+    expect(observation.rejected_candidates ?? []).toEqual(expect.any(Array));
+    expect(
+      observation.scholarly_numeric_recovery_affordance?.recovery_queries,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/B_T|toroidal magnetic field|cited values/i),
+      ]),
+    );
+    expect(
+      observation.scholarly_numeric_recovery_affordance?.variable_source_plan,
+    ).toMatchObject({
       schema: "helix.variable_source_plan.v1",
     });
     expect(result.observation_packet.state_delta).toMatchObject({
@@ -5265,7 +5696,9 @@ describe("Helix workstation tool gateway", () => {
         missing_variables: ["B_T"],
       }),
     });
-    expect(result.observation_packet.suggested_next_steps).toEqual(expect.arrayContaining(["use_another_tool", "ask_user"]));
+    expect(result.observation_packet.suggested_next_steps).toEqual(
+      expect.arrayContaining(["use_another_tool", "ask_user"]),
+    );
   });
 
   it("extracts alias-matched numeric parameters from table-like scholarly evidence", async () => {
@@ -5328,38 +5761,44 @@ describe("Helix workstation tool gateway", () => {
         confidence?: string;
       }>;
     };
-    expect(observation.parameters).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        variable: "n_m3",
-        normalized_value: 1.2e20,
-        normalized_unit: "m^-3",
-        evidence_ref: expect.stringContaining("scholarly-numeric:"),
-        confidence: "medium",
-      }),
-      expect.objectContaining({
-        variable: "T_eV",
-        normalized_value: 4500,
-        normalized_unit: "eV",
-      }),
-      expect.objectContaining({
-        variable: "B_T",
-        normalized_value: 2.1,
-        normalized_unit: "T",
-      }),
-      expect.objectContaining({
-        variable: "e_charge",
-        normalized_value: 1.602176634e-19,
-        normalized_unit: "C",
-      }),
-      expect.objectContaining({
-        variable: "mu0",
-        normalized_value: expect.closeTo(4 * Math.PI * 1e-7, 16),
-        normalized_unit: "H/m",
-      }),
-    ]));
-    expect(observation.parameters?.every((parameter) =>
-      Boolean(parameter.source_snippet && parameter.evidence_ref && parameter.table)
-    )).toBe(true);
+    expect(observation.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          variable: "n_m3",
+          normalized_value: 1.2e20,
+          normalized_unit: "m^-3",
+          evidence_ref: expect.stringContaining("scholarly-numeric:"),
+          confidence: "medium",
+        }),
+        expect.objectContaining({
+          variable: "T_eV",
+          normalized_value: 4500,
+          normalized_unit: "eV",
+        }),
+        expect.objectContaining({
+          variable: "B_T",
+          normalized_value: 2.1,
+          normalized_unit: "T",
+        }),
+        expect.objectContaining({
+          variable: "e_charge",
+          normalized_value: 1.602176634e-19,
+          normalized_unit: "C",
+        }),
+        expect.objectContaining({
+          variable: "mu0",
+          normalized_value: expect.closeTo(4 * Math.PI * 1e-7, 16),
+          normalized_unit: "H/m",
+        }),
+      ]),
+    );
+    expect(
+      observation.parameters?.every((parameter) =>
+        Boolean(
+          parameter.source_snippet && parameter.evidence_ref && parameter.table,
+        ),
+      ),
+    ).toBe(true);
   });
 
   it("does not treat bare B in particle-physics prose as B_T magnetic-field evidence", async () => {
@@ -5374,7 +5813,8 @@ describe("Helix workstation tool gateway", () => {
           title: "B meson branching fraction evidence",
           url: "https://example.test/b-physics",
         },
-        text_evidence: "Table 1 reports B = 2.1 T [8] for a branching-fraction fit label, not a magnetic field.",
+        text_evidence:
+          "Table 1 reports B = 2.1 T [8] for a branching-fraction fit label, not a magnetic field.",
       },
       turnId: "ask:test:gateway-scholarly-numeric-bare-b-not-field",
       iteration: 10,
@@ -5429,20 +5869,26 @@ describe("Helix workstation tool gateway", () => {
       },
     });
     const observation = result.observation as {
-      parameters?: Array<{ variable?: string; normalized_value?: number; normalized_unit?: string }>;
+      parameters?: Array<{
+        variable?: string;
+        normalized_value?: number;
+        normalized_unit?: string;
+      }>;
     };
-    expect(observation.parameters).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        variable: "n_m3",
-        normalized_value: 2.0e19,
-        normalized_unit: "m^-3",
-      }),
-      expect.objectContaining({
-        variable: "T_eV",
-        normalized_value: 1500,
-        normalized_unit: "eV",
-      }),
-    ]));
+    expect(observation.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          variable: "n_m3",
+          normalized_value: 2.0e19,
+          normalized_unit: "m^-3",
+        }),
+        expect.objectContaining({
+          variable: "T_eV",
+          normalized_value: 1500,
+          normalized_unit: "eV",
+        }),
+      ]),
+    );
   });
 
   it("fails closed for uncited, missing-unit, and unsupported numeric candidates", async () => {
@@ -5474,7 +5920,10 @@ describe("Helix workstation tool gateway", () => {
         parameters: [],
         missing_variables: ["n_m3", "T_eV", "B_T"],
         selected_for_answer: false,
-        missing_requirements: ["text_evidence_required", "missing_requested_numeric_variables"],
+        missing_requirements: [
+          "text_evidence_required",
+          "missing_requested_numeric_variables",
+        ],
       },
       error: "text_evidence_required",
     });
@@ -5491,7 +5940,9 @@ describe("Helix workstation tool gateway", () => {
         text_evidence: [
           "Table 3 reports electron density n_e = 8.0e19 cm^-3 [4].",
           "Table 3 reports electron temperature T_e = 3 T [4].",
-          "This intervening sentence is deliberately long enough to keep the previous citation outside the bounded source snippet used for the field candidate. ".repeat(4),
+          "This intervening sentence is deliberately long enough to keep the previous citation outside the bounded source snippet used for the field candidate. ".repeat(
+            4,
+          ),
           "The toroidal magnetic field B_t = 2.7 T was used in the discharge.",
         ].join(" "),
       },
@@ -5514,38 +5965,54 @@ describe("Helix workstation tool gateway", () => {
       error: "missing_requested_numeric_variables",
     });
     const observation = result.observation as {
-      parameters?: Array<{ variable?: string; normalized_value?: number; normalized_unit?: string }>;
-      rejected_candidates?: Array<{ variable?: string; reason?: string; text?: string }>;
+      parameters?: Array<{
+        variable?: string;
+        normalized_value?: number;
+        normalized_unit?: string;
+      }>;
+      rejected_candidates?: Array<{
+        variable?: string;
+        reason?: string;
+        text?: string;
+      }>;
     };
-    expect(observation.parameters).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        variable: "n_m3",
-        normalized_value: 8.0e25,
-        normalized_unit: "m^-3",
-      }),
-    ]));
-    expect(observation.rejected_candidates).toEqual(expect.arrayContaining([
-      expect.objectContaining({ variable: "T_eV", reason: "unsupported_unit" }),
-      expect.objectContaining({ variable: "B_T", reason: "uncited_value" }),
-    ]));
+    expect(observation.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          variable: "n_m3",
+          normalized_value: 8.0e25,
+          normalized_unit: "m^-3",
+        }),
+      ]),
+    );
+    expect(observation.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          variable: "T_eV",
+          reason: "unsupported_unit",
+        }),
+        expect.objectContaining({ variable: "B_T", reason: "uncited_value" }),
+      ]),
+    );
   });
 
   it("accepts research-papers.search as an explicit alias for the canonical scholarly gateway capability", async () => {
     globalThis.fetch = vi.fn(async () => ({
       ok: true,
       status: 200,
-      text: async () => [
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-        "<feed xmlns=\"http://www.w3.org/2005/Atom\">",
-        "<entry>",
-        "<id>https://arxiv.org/abs/2606.00002</id>",
-        "<title>Paper evidence for QEI boundaries</title>",
-        "<summary>Bounded abstract about QEI boundary evidence.</summary>",
-        "<published>2026-06-02T00:00:00Z</published>",
-        "<author><name>B. Researcher</name></author>",
-        "</entry>",
-        "</feed>",
-      ].join(""),
+      text: async () =>
+        [
+          '<?xml version="1.0" encoding="UTF-8"?>',
+          '<feed xmlns="http://www.w3.org/2005/Atom">',
+          "<entry>",
+          "<id>https://arxiv.org/abs/2606.00002</id>",
+          "<title>Paper evidence for QEI boundaries</title>",
+          "<summary>Bounded abstract about QEI boundary evidence.</summary>",
+          "<published>2026-06-02T00:00:00Z</published>",
+          "<author><name>B. Researcher</name></author>",
+          "</entry>",
+          "</feed>",
+        ].join(""),
     })) as typeof fetch;
 
     const result = await callWorkstationGatewayCapability({
@@ -5578,7 +6045,8 @@ describe("Helix workstation tool gateway", () => {
       mode: "read",
       capabilityId: CIVILIZATION_BOUNDS_REFLECTION_CAPABILITY,
       arguments: {
-        prompt: "Reflect planetary trade through civilization bounds with material inventory and governance review.",
+        prompt:
+          "Reflect planetary trade through civilization bounds with material inventory and governance review.",
         include_bridge_context: true,
         include_collaboration_bounds: true,
         include_falsification_hooks: true,
@@ -5619,7 +6087,8 @@ describe("Helix workstation tool gateway", () => {
         panel_id: "civilization-bounds-roadmap",
         action_id: "reflect_system_bounds",
         status: "succeeded",
-        prompt: "Reflect planetary trade through civilization bounds with material inventory and governance review.",
+        prompt:
+          "Reflect planetary trade through civilization bounds with material inventory and governance review.",
         bridge_context_included: true,
         procedural_scaffold_id: "spore_civilization_stage_procedural_scaffold",
         terminal_eligible: false,
@@ -5639,12 +6108,21 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
-    expect(String((result.observation as { roadmap_id?: string }).roadmap_id ?? ""))
-      .toMatch(/^civilization-bounds:/);
-    expect((result.observation as { parameter_scope_kinds?: string[] }).parameter_scope_kinds)
-      .toEqual(expect.arrayContaining(["material_base", "governance_institutional_capacity"]));
-    expect((result.observation as { missing_evidence?: string[] }).missing_evidence)
-      .toContain("source_backed_capacity_measurements");
+    expect(
+      String((result.observation as { roadmap_id?: string }).roadmap_id ?? ""),
+    ).toMatch(/^civilization-bounds:/);
+    expect(
+      (result.observation as { parameter_scope_kinds?: string[] })
+        .parameter_scope_kinds,
+    ).toEqual(
+      expect.arrayContaining([
+        "material_base",
+        "governance_institutional_capacity",
+      ]),
+    );
+    expect(
+      (result.observation as { missing_evidence?: string[] }).missing_evidence,
+    ).toContain("source_backed_capacity_measurements");
   });
 
   it("blocks civilization-bounds reflection without prompt as a missing observation", async () => {
@@ -5694,7 +6172,8 @@ describe("Helix workstation tool gateway", () => {
       mode: "read",
       capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
       arguments: {
-        prompt: "Reflect QEI margin and source residual against the theory badge graph.",
+        prompt:
+          "Reflect QEI margin and source residual against the theory badge graph.",
         mentioned_symbols: ["QEI", "source residual"],
         mentioned_domains: ["warp metrics", "claim boundaries"],
         build_explanation_plan: true,
@@ -5736,7 +6215,8 @@ describe("Helix workstation tool gateway", () => {
         panel_id: "theory-badge-graph",
         action_id: "reflect_discussion_context",
         status: "succeeded",
-        prompt: "Reflect QEI margin and source residual against the theory badge graph.",
+        prompt:
+          "Reflect QEI margin and source residual against the theory badge graph.",
         conversation_context_included: false,
         receipt_schema: "helix_theory_context_reflection_tool_receipt/v1",
         reflection_terminal_eligible: false,
@@ -5757,11 +6237,22 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
-    expect(String((result.observation as { reflection_id?: string }).reflection_id ?? "")).toMatch(/^theory-context-reflection:/);
-    expect(String((result.observation as { summary?: string }).summary ?? "")).not.toHaveLength(0);
-    expect((result.observation as { claim_boundary_notes?: string[] }).claim_boundary_notes?.length ?? 0)
-      .toBeGreaterThan(0);
-    expect((result.observation as { recommended_actions_solve?: boolean }).recommended_actions_solve).toBe(false);
+    expect(
+      String(
+        (result.observation as { reflection_id?: string }).reflection_id ?? "",
+      ),
+    ).toMatch(/^theory-context-reflection:/);
+    expect(
+      String((result.observation as { summary?: string }).summary ?? ""),
+    ).not.toHaveLength(0);
+    expect(
+      (result.observation as { claim_boundary_notes?: string[] })
+        .claim_boundary_notes?.length ?? 0,
+    ).toBeGreaterThan(0);
+    expect(
+      (result.observation as { recommended_actions_solve?: boolean })
+        .recommended_actions_solve,
+    ).toBe(false);
   });
 
   it("includes calculator payload expressions in theory badge reflection observations", async () => {
@@ -5771,8 +6262,10 @@ describe("Helix workstation tool gateway", () => {
       bboxPx: { x: 0, y: 0, width: 300, height: 80 },
       requestedEquationLabel: "3.1",
       regionLabel: "equation_3.1",
-      textCandidate: "Tokamak plasma thermal pressure p_Pa = n_m3*T_eV*e_charge and W_th = P_loss*tau_E. (3.1)",
-      latexCandidate: "p_{Pa}=n_{m3}T_{eV}e,\\quad W_{th}=P_{loss}\\tau_E \\tag{3.1}",
+      textCandidate:
+        "Tokamak plasma thermal pressure p_Pa = n_m3*T_eV*e_charge and W_th = P_loss*tau_E. (3.1)",
+      latexCandidate:
+        "p_{Pa}=n_{m3}T_{eV}e,\\quad W_{th}=P_{loss}\\tau_E \\tag{3.1}",
       uncertainty: [],
       extractionStatus: "extracted",
     });
@@ -5818,7 +6311,9 @@ describe("Helix workstation tool gateway", () => {
         }),
       ]),
     );
-    expect(observation.calculator_template_payloads).toEqual(observation.calculator_payloads);
+    expect(observation.calculator_template_payloads).toEqual(
+      observation.calculator_payloads,
+    );
     expect(observation.calculator_template_admissibility).toMatchObject({
       schema: "helix.calculator_template_admissibility.v1",
       status: "template_admissible",
@@ -5830,10 +6325,12 @@ describe("Helix workstation tool gateway", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
-    expect(observation.claim_boundary_notes).toEqual(expect.arrayContaining([
-      "calculator_template_boundary=admitted calculator payloads are diagnostic templates unless variables, units, assumptions, and source refs are bound.",
-      "final_answer_guard=OCR candidates, graph matches, calculator templates, calculation-ready handoffs, and proof/validation must remain separate.",
-    ]));
+    expect(observation.claim_boundary_notes).toEqual(
+      expect.arrayContaining([
+        "calculator_template_boundary=admitted calculator payloads are diagnostic templates unless variables, units, assumptions, and source refs are bound.",
+        "final_answer_guard=OCR candidates, graph matches, calculator templates, calculation-ready handoffs, and proof/validation must remain separate.",
+      ]),
+    );
     expect(observation.recommended_actions_solve).toBe(false);
     expect(observation.terminal_eligible).toBe(false);
     expect(observation.assistant_answer).toBe(false);
@@ -5873,8 +6370,7 @@ describe("Helix workstation tool gateway", () => {
       bboxPx: { x: 0, y: 0, width: 346, height: 255 },
       textCandidate:
         "As in Chapter 2 we use the Bianchi identities as field equations for the Weyl tensor.",
-      latexCandidate:
-        "\\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0",
+      latexCandidate: "\\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0",
       uncertainty: ["OCR symbols are uncertain; observation only."],
       extractionStatus: "partial",
     });
@@ -5917,7 +6413,8 @@ describe("Helix workstation tool gateway", () => {
         bbox_px: { x: 0, y: 0, width: 346, height: 255 },
         source_ref_hash: "sha256:test-bianchi",
       }),
-      ocr_text_candidate: "As in Chapter 2 we use the Bianchi identities as field equations for the Weyl tensor.",
+      ocr_text_candidate:
+        "As in Chapter 2 we use the Bianchi identities as field equations for the Weyl tensor.",
       assistant_answer: false,
       terminal_eligible: false,
     });
@@ -5966,13 +6463,19 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.claim_boundary_notes).toEqual(
       expect.arrayContaining([
         expect.stringContaining("scientific_branch_gate=blocked"),
-        expect.stringContaining("rejected_calculator_payloads=tokamak_thermal_pressure_payload"),
+        expect.stringContaining(
+          "rejected_calculator_payloads=tokamak_thermal_pressure_payload",
+        ),
       ]),
     );
     expect(observation.calculator_payloads ?? []).not.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
-        expect.objectContaining({ payload_id: "tokamak_confinement_energy_payload" }),
+        expect.objectContaining({
+          payload_id: "tokamak_thermal_pressure_payload",
+        }),
+        expect.objectContaining({
+          payload_id: "tokamak_confinement_energy_payload",
+        }),
       ]),
     );
     expect(result.observation_packet.produced_affordances ?? []).not.toEqual(
@@ -5987,11 +6490,15 @@ describe("Helix workstation tool gateway", () => {
       expect.arrayContaining([
         expect.objectContaining({
           kind: "scientific_evidence",
-          claim_boundary: expect.stringContaining("scientific_branch_gate=blocked"),
+          claim_boundary: expect.stringContaining(
+            "scientific_branch_gate=blocked",
+          ),
         }),
       ]),
     );
-    expect(result.observation_packet.observation_summary).toContain("Scientific branch gate: blocked");
+    expect(result.observation_packet.observation_summary).toContain(
+      "Scientific branch gate: blocked",
+    );
   });
 
   it("blocks calculator handoff when explicit Image Lens evidence failed exact mapping", async () => {
@@ -6001,7 +6508,9 @@ describe("Helix workstation tool gateway", () => {
       bboxPx: { x: 10, y: 8, width: 326, height: 238 },
       textCandidate: null,
       latexCandidate: null,
-      uncertainty: ["Image Lens OCR/math extraction backend returned no inline crop or source image data."],
+      uncertainty: [
+        "Image Lens OCR/math extraction backend returned no inline crop or source image data.",
+      ],
       extractionStatus: "failed",
     });
 
@@ -6089,22 +6598,40 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(observation.scientific_run_trace?.stages).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ stage: "image_extraction", status: "observed" }),
-        expect.objectContaining({ stage: "scientific_evidence_sidecar", status: "blocked" }),
-        expect.objectContaining({ stage: "theory_reflection", status: "blocked" }),
-        expect.objectContaining({ stage: "calculator_payload_filter", status: "blocked" }),
+        expect.objectContaining({
+          stage: "image_extraction",
+          status: "observed",
+        }),
+        expect.objectContaining({
+          stage: "scientific_evidence_sidecar",
+          status: "blocked",
+        }),
+        expect.objectContaining({
+          stage: "theory_reflection",
+          status: "blocked",
+        }),
+        expect.objectContaining({
+          stage: "calculator_payload_filter",
+          status: "blocked",
+        }),
       ]),
     );
     expect(observation.claim_boundary_notes).toEqual(
       expect.arrayContaining([
         expect.stringContaining("scientific_branch_gate=blocked"),
-        expect.stringContaining("rejected_calculator_payloads=tokamak_thermal_pressure_payload"),
+        expect.stringContaining(
+          "rejected_calculator_payloads=tokamak_thermal_pressure_payload",
+        ),
       ]),
     );
     expect(observation.calculator_payloads ?? []).not.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
-        expect.objectContaining({ payload_id: "tokamak_confinement_energy_payload" }),
+        expect.objectContaining({
+          payload_id: "tokamak_thermal_pressure_payload",
+        }),
+        expect.objectContaining({
+          payload_id: "tokamak_confinement_energy_payload",
+        }),
       ]),
     );
     expect(result.observation_packet.produced_affordances ?? []).not.toEqual(
@@ -6120,7 +6647,9 @@ describe("Helix workstation tool gateway", () => {
         expect.objectContaining({
           kind: "scientific_evidence",
           status: "blocked",
-          claim_boundary: expect.stringContaining("scientific_branch_gate=blocked"),
+          claim_boundary: expect.stringContaining(
+            "scientific_branch_gate=blocked",
+          ),
         }),
       ]),
     );
@@ -6176,7 +6705,9 @@ describe("Helix workstation tool gateway", () => {
     expect(observation.scientific_evidence_sidecar).toMatchObject({
       schema: "helix.scientific_image_evidence_sidecar.v1",
       sidecar_id: "scientific_image_sidecar:test-sidecar-bianchi",
-      admissibility: expect.objectContaining({ status: "admissible_observation" }),
+      admissibility: expect.objectContaining({
+        status: "admissible_observation",
+      }),
     });
     expect(observation.scientific_evidence_packet).toMatchObject({
       crop_region_id: "equation_3.51",
@@ -6217,8 +6748,12 @@ describe("Helix workstation tool gateway", () => {
         "Extract derived stress-energy, energy-density, force, or pressure equations if present.",
       ]),
       next_tool_affordances: expect.arrayContaining([
-        expect.objectContaining({ capability: "visual_analysis.inspect_image_region" }),
-        expect.objectContaining({ capability: "scientific-calculator.bind_variables" }),
+        expect.objectContaining({
+          capability: "visual_analysis.inspect_image_region",
+        }),
+        expect.objectContaining({
+          capability: "scientific-calculator.bind_variables",
+        }),
       ]),
       provenance_refs: expect.arrayContaining([
         "scientific_image_sidecar:test-sidecar-bianchi",
@@ -6226,12 +6761,16 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(observation.calculator_payloads ?? []).not.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
+        expect.objectContaining({
+          payload_id: "tokamak_thermal_pressure_payload",
+        }),
       ]),
     );
     expect(observation.claim_boundary_notes).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("scientific_image_sidecar=scientific_image_sidecar:test-sidecar-bianchi"),
+        expect.stringContaining(
+          "scientific_image_sidecar=scientific_image_sidecar:test-sidecar-bianchi",
+        ),
         expect.stringContaining("evidence_source=sidecar"),
       ]),
     );
@@ -6278,7 +6817,11 @@ describe("Helix workstation tool gateway", () => {
         prompt:
           "Reflect this promoted page 2 equation row to the Theory Badge Graph, preserving diagnostic-only boundaries.",
         scientific_evidence_sidecar: sidecar,
-        mentioned_domains: ["curved spacetime", "scalar field", "curvature coupling"],
+        mentioned_domains: [
+          "curved spacetime",
+          "scalar field",
+          "curvature coupling",
+        ],
         limit: 8,
       },
       turnId: "ask:test:gateway-theory-reflection-curved-action-row",
@@ -6337,13 +6880,20 @@ describe("Helix workstation tool gateway", () => {
       exact_evidence_latex:
         "S[\\varphi, g] = - \\frac{1}{2} \\int_{M} d^D x \\sqrt{-g} \\varphi [ \\square + \\xi R] \\varphi",
     });
-    expect(observation.scientific_evidence_graph_reflection?.exact_evidence_latex).not.toContain("where R denotes");
-    expect(observation.scientific_evidence_graph_reflection?.selected_evidence_object?.latex_candidate).not.toContain("where R denotes");
+    expect(
+      observation.scientific_evidence_graph_reflection?.exact_evidence_latex,
+    ).not.toContain("where R denotes");
+    expect(
+      observation.scientific_evidence_graph_reflection?.selected_evidence_object
+        ?.latex_candidate,
+    ).not.toContain("where R denotes");
     expect(observation.selected_scientific_evidence_object).toMatchObject({
       schema: "helix.promoted_scientific_image_evidence.v1",
       crop_ref: "sha256:test-curved-action-row#crop=73,697,1078,87",
     });
-    expect(observation.promoted_equation_row_ref).toBe("sha256:test-curved-action-row#crop=73,697,1078,87");
+    expect(observation.promoted_equation_row_ref).toBe(
+      "sha256:test-curved-action-row#crop=73,697,1078,87",
+    );
     expect(observation.calculator_template_admissibility).toMatchObject({
       status: "no_template",
       calculation_ready_count: 0,
@@ -6360,8 +6910,7 @@ describe("Helix workstation tool gateway", () => {
       regionLabel: "scientific_page",
       textCandidate:
         "As in Chapter 2 we use the Bianchi identities as field equations for the Weyl tensor.",
-      latexCandidate:
-        "\\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0",
+      latexCandidate: "\\nabla^\\mu \\psi_\\nu - D_\\nu S_\\phi = 0",
       uncertainty: [],
       extractionStatus: "extracted",
     });
@@ -6394,7 +6943,8 @@ describe("Helix workstation tool gateway", () => {
         mentioned_domains: ["weyl bianchi"],
         limit: 8,
       },
-      turnId: "ask:test:gateway-theory-reflection-scientific-image-sidecar-no-exact-row",
+      turnId:
+        "ask:test:gateway-theory-reflection-scientific-image-sidecar-no-exact-row",
       iteration: 16,
     });
     const observation = result.observation as {
@@ -6434,8 +6984,12 @@ describe("Helix workstation tool gateway", () => {
         expect.stringContaining("Scientific branch gate blocked"),
       ]),
       next_tool_affordances: expect.arrayContaining([
-        expect.objectContaining({ capability: "visual_analysis.inspect_image_region" }),
-        expect.objectContaining({ capability: "scientific-calculator.bind_variables" }),
+        expect.objectContaining({
+          capability: "visual_analysis.inspect_image_region",
+        }),
+        expect.objectContaining({
+          capability: "scientific-calculator.bind_variables",
+        }),
       ]),
     });
     expect(observation.calculator_payloads ?? []).toEqual([]);
@@ -6454,7 +7008,9 @@ describe("Helix workstation tool gateway", () => {
       bboxPx: { x: 0, y: 0, width: 346, height: 72 },
       textCandidate: null,
       latexCandidate: null,
-      uncertainty: ["Image Lens OCR/math extraction backend returned no payload."],
+      uncertainty: [
+        "Image Lens OCR/math extraction backend returned no payload.",
+      ],
       extractionStatus: "failed",
     });
     const sidecar = buildScientificImageEvidenceSidecar({
@@ -6474,7 +7030,8 @@ describe("Helix workstation tool gateway", () => {
         mentioned_domains: ["tokamak plasma"],
         limit: 12,
       },
-      turnId: "ask:test:gateway-theory-reflection-scientific-image-sidecar-failed",
+      turnId:
+        "ask:test:gateway-theory-reflection-scientific-image-sidecar-failed",
       iteration: 11,
     });
     const observation = result.observation as {
@@ -6505,13 +7062,21 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(observation.scientific_run_trace?.stages).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ stage: "theory_reflection", status: "blocked" }),
-        expect.objectContaining({ stage: "calculator_payload_filter", status: "blocked" }),
+        expect.objectContaining({
+          stage: "theory_reflection",
+          status: "blocked",
+        }),
+        expect.objectContaining({
+          stage: "calculator_payload_filter",
+          status: "blocked",
+        }),
       ]),
     );
     expect(observation.calculator_payloads ?? []).not.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
+        expect.objectContaining({
+          payload_id: "tokamak_thermal_pressure_payload",
+        }),
       ]),
     );
   });
@@ -6544,7 +7109,8 @@ describe("Helix workstation tool gateway", () => {
         mentioned_domains: ["tokamak plasma"],
         limit: 12,
       },
-      turnId: "ask:test:gateway-theory-reflection-scientific-image-sidecar-low-confidence",
+      turnId:
+        "ask:test:gateway-theory-reflection-scientific-image-sidecar-low-confidence",
       iteration: 13,
     });
     const observation = result.observation as {
@@ -6583,14 +7149,25 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(observation.scientific_run_trace?.stages).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ stage: "scientific_evidence_sidecar", status: "restricted" }),
-        expect.objectContaining({ stage: "theory_reflection", status: "blocked" }),
-        expect.objectContaining({ stage: "calculator_payload_filter", status: "blocked" }),
+        expect.objectContaining({
+          stage: "scientific_evidence_sidecar",
+          status: "restricted",
+        }),
+        expect.objectContaining({
+          stage: "theory_reflection",
+          status: "blocked",
+        }),
+        expect.objectContaining({
+          stage: "calculator_payload_filter",
+          status: "blocked",
+        }),
       ]),
     );
     expect(observation.calculator_payloads ?? []).not.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
+        expect.objectContaining({
+          payload_id: "tokamak_thermal_pressure_payload",
+        }),
       ]),
     );
   });
@@ -6637,7 +7214,9 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(observation.calculator_payloads ?? []).not.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
+        expect.objectContaining({
+          payload_id: "tokamak_thermal_pressure_payload",
+        }),
       ]),
     );
   });
@@ -6649,8 +7228,10 @@ describe("Helix workstation tool gateway", () => {
       bboxPx: { x: 0, y: 0, width: 300, height: 80 },
       requestedEquationLabel: "3.1",
       regionLabel: "equation_3.1",
-      textCandidate: "Tokamak plasma beta uses p_Pa = n_m3*T_eV*e_charge and W_th = P_loss*tau_E. (3.1)",
-      latexCandidate: "p_{Pa}=n_{m3}T_{eV}e,\\quad W_{th}=P_{loss}\\tau_E \\tag{3.1}",
+      textCandidate:
+        "Tokamak plasma beta uses p_Pa = n_m3*T_eV*e_charge and W_th = P_loss*tau_E. (3.1)",
+      latexCandidate:
+        "p_{Pa}=n_{m3}T_{eV}e,\\quad W_{th}=P_{loss}\\tau_E \\tag{3.1}",
       uncertainty: [],
       extractionStatus: "extracted",
     });
@@ -6660,7 +7241,8 @@ describe("Helix workstation tool gateway", () => {
       mode: "read",
       capabilityId: THEORY_CONTEXT_REFLECTION_CAPABILITY,
       arguments: {
-        prompt: "Reflect tokamak thermal pressure and confinement time formulas against the theory badge graph.",
+        prompt:
+          "Reflect tokamak thermal pressure and confinement time formulas against the theory badge graph.",
         scientific_evidence_packet: scientificEvidence,
         mentioned_symbols: ["p_Pa", "n_m3", "T_eV", "W_th", "P_loss", "tau_E"],
         mentioned_domains: ["tokamak plasma"],
@@ -6706,8 +7288,12 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(observation.calculator_payloads).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
-        expect.objectContaining({ payload_id: "tokamak_confinement_energy_payload" }),
+        expect.objectContaining({
+          payload_id: "tokamak_thermal_pressure_payload",
+        }),
+        expect.objectContaining({
+          payload_id: "tokamak_confinement_energy_payload",
+        }),
       ]),
     );
   });
@@ -6724,7 +7310,8 @@ describe("Helix workstation tool gateway", () => {
         mentioned_domains: ["tokamak plasma"],
         limit: 8,
       },
-      turnId: "ask:test:gateway-theory-reflection-prompt-context-image-lens-block",
+      turnId:
+        "ask:test:gateway-theory-reflection-prompt-context-image-lens-block",
       iteration: 10,
     });
     const observation = result.observation as {
@@ -6769,14 +7356,24 @@ describe("Helix workstation tool gateway", () => {
     });
     expect(observation.scientific_run_trace?.stages).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ stage: "theory_reflection", status: "blocked" }),
-        expect.objectContaining({ stage: "calculator_payload_filter", status: "blocked" }),
+        expect.objectContaining({
+          stage: "theory_reflection",
+          status: "blocked",
+        }),
+        expect.objectContaining({
+          stage: "calculator_payload_filter",
+          status: "blocked",
+        }),
       ]),
     );
     expect(observation.calculator_payloads ?? []).not.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ payload_id: "tokamak_thermal_pressure_payload" }),
-        expect.objectContaining({ payload_id: "tokamak_confinement_energy_payload" }),
+        expect.objectContaining({
+          payload_id: "tokamak_thermal_pressure_payload",
+        }),
+        expect.objectContaining({
+          payload_id: "tokamak_confinement_energy_payload",
+        }),
       ]),
     );
     expect(result.observation_packet.produced_affordances ?? []).not.toEqual(
@@ -6907,7 +7504,9 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
-    expect(String(observation.reflection_id ?? "")).toMatch(/^ideology-context-reflection:/);
+    expect(String(observation.reflection_id ?? "")).toMatch(
+      /^ideology-context-reflection:/,
+    );
     expect(observation.located_badge_ids?.length).toBeGreaterThan(0);
     expect(observation.claim_boundary_notes?.length).toBeGreaterThan(0);
     expect(observation.procedural_classification).toBeTruthy();
@@ -6935,7 +7534,12 @@ describe("Helix workstation tool gateway", () => {
       likely_substrate_badge_ids?: string[];
       source_theory_badge_ids?: string[];
       source_ref_ids?: string[];
-      source_references?: Array<{ id?: string; title?: string; url?: string; note?: string }>;
+      source_references?: Array<{
+        id?: string;
+        title?: string;
+        url?: string;
+        note?: string;
+      }>;
       claim_boundary_notes?: string[];
       procedural_derivation_ids?: string[];
       procedural_derivations?: Array<{
@@ -6996,7 +7600,9 @@ describe("Helix workstation tool gateway", () => {
         status: "succeeded",
         reflection_schema: "moral_living_substrate_reflection/v1",
         admissions_included: true,
-        admission_reason_codes: expect.arrayContaining(["living_substrate_reflection_request"]),
+        admission_reason_codes: expect.arrayContaining([
+          "living_substrate_reflection_request",
+        ]),
         admission_blocking_reason_codes: [],
         reflection_terminal_eligible: false,
         terminal_eligible: false,
@@ -7016,13 +7622,19 @@ describe("Helix workstation tool gateway", () => {
         raw_content_included: false,
       },
     });
-    expect(String(observation.reflection_id ?? "")).toMatch(/^moral-living-substrate-reflection:/);
-    expect([...(observation.exact_substrate_badge_ids ?? []), ...(observation.likely_substrate_badge_ids ?? [])])
-      .toEqual(expect.arrayContaining([
+    expect(String(observation.reflection_id ?? "")).toMatch(
+      /^moral-living-substrate-reflection:/,
+    );
+    expect([
+      ...(observation.exact_substrate_badge_ids ?? []),
+      ...(observation.likely_substrate_badge_ids ?? []),
+    ]).toEqual(
+      expect.arrayContaining([
         "boundary-before-obligation",
         "sensing-before-judgment",
         "maintenance-before-optimization",
-      ]));
+      ]),
+    );
     expect(observation.source_theory_badge_ids).toEqual(
       expect.arrayContaining([
         "biophysics.organism_environment_boundary",
@@ -7030,7 +7642,9 @@ describe("Helix workstation tool gateway", () => {
       ]),
     );
     expect(observation.source_ref_ids).toEqual(
-      expect.arrayContaining(["von-stockar-liu-1999-microbial-negative-entropy"]),
+      expect.arrayContaining([
+        "von-stockar-liu-1999-microbial-negative-entropy",
+      ]),
     );
     expect(observation.source_references).toEqual(
       expect.arrayContaining([
@@ -7040,7 +7654,9 @@ describe("Helix workstation tool gateway", () => {
         }),
       ]),
     );
-    expect(observation.claim_boundary_notes?.join("\n")).toContain("not terminal answer authority");
+    expect(observation.claim_boundary_notes?.join("\n")).toContain(
+      "not terminal answer authority",
+    );
     expect(observation.procedural_derivation_ids).toEqual(
       expect.arrayContaining([
         "boundary-integrity",
@@ -7058,7 +7674,9 @@ describe("Helix workstation tool gateway", () => {
             dependency: "medium",
             agency: "medium",
           }),
-          obligation_hint: expect.stringContaining("provisional care constraints"),
+          obligation_hint: expect.stringContaining(
+            "provisional care constraints",
+          ),
           forbidden_overclaim: expect.stringContaining("personhood"),
         }),
       ]),
@@ -7070,7 +7688,9 @@ describe("Helix workstation tool gateway", () => {
     );
     expect(boundaryMaintenanceLink).toMatchObject({
       transition_label: "boundary to maintenance",
-      procedural_claim: expect.stringContaining("maintained before optional optimization"),
+      procedural_claim: expect.stringContaining(
+        "maintained before optional optimization",
+      ),
       evidence_strength: "present",
       missing_evidence: [],
       forbidden_overclaim: expect.stringContaining("morally identical"),
@@ -7086,11 +7706,13 @@ describe("Helix workstation tool gateway", () => {
       missing_evidence: [],
       forbidden_overclaim: expect.stringContaining("human-like preference"),
     });
-    expect(observation.synthesis_path?.map((step) => step.output_kind)).toEqual([
-      "substrate_observation",
-      "vulnerability_dependency_agency_estimate",
-      "obligation_caution_forbidden_overclaim",
-    ]);
+    expect(observation.synthesis_path?.map((step) => step.output_kind)).toEqual(
+      [
+        "substrate_observation",
+        "vulnerability_dependency_agency_estimate",
+        "obligation_caution_forbidden_overclaim",
+      ],
+    );
     expect(observation.recommended_action_ids).toEqual(
       expect.arrayContaining([
         "moral-graph.inspect_living_substrate_badges",
@@ -7220,17 +7842,25 @@ describe("Helix workstation tool gateway", () => {
       scholarly_lookup_request_count?: number;
       exact_verification_result_count?: number;
     };
-    expect(String(observation.reflection_id ?? "")).toMatch(/^theory-context-reflection:/);
-    expect(String(observation.search_id ?? "")).toMatch(/^(?:frontier_search|theory-frontier-search):/);
+    expect(String(observation.reflection_id ?? "")).toMatch(
+      /^theory-context-reflection:/,
+    );
+    expect(String(observation.search_id ?? "")).toMatch(
+      /^(?:frontier_search|theory-frontier-search):/,
+    );
     expect(observation.frontier_candidate_count ?? 0).toBeGreaterThan(0);
     expect(observation.scholarly_lookup_request_count ?? 0).toBeGreaterThan(0);
-    expect(observation.exact_verification_result_count ?? 0).toBe(observation.frontier_candidate_count);
+    expect(observation.exact_verification_result_count ?? 0).toBe(
+      observation.frontier_candidate_count,
+    );
     expect(observation.recommended_actions_solve).toBe(false);
 
     const firstCandidate = observation.candidates?.[0];
     expect(firstCandidate).toMatchObject({
       candidate_id: expect.any(String),
-      candidate_kind: expect.stringMatching(/candidate_connection|missing_intermediate_badge|unresolved_semantic_region/),
+      candidate_kind: expect.stringMatching(
+        /candidate_connection|missing_intermediate_badge|unresolved_semantic_region/,
+      ),
       status: expect.stringMatching(
         /coarse_candidate|exact_verification_pending|needs_observable|needs_scholarly_evidence|blocked_by_boundary/,
       ),
@@ -7325,15 +7955,33 @@ describe("Helix workstation tool gateway", () => {
         claim_boundary_notes?: string[];
       }>;
     };
-    expect(observation.forbidden_claim_scan_notes?.length ?? 0).toBeGreaterThan(0);
+    expect(observation.forbidden_claim_scan_notes?.length ?? 0).toBeGreaterThan(
+      0,
+    );
     expect(observation.candidate_status_counts).toEqual({
       blocked_by_boundary: observation.candidates?.length ?? 0,
     });
     expect(observation.candidates?.length ?? 0).toBeGreaterThan(0);
-    expect(observation.candidates?.every((candidate) => candidate.status === "blocked_by_boundary")).toBe(true);
-    expect(observation.candidates?.every((candidate) => candidate.promotion_allowed === false)).toBe(true);
-    expect(observation.candidates?.every((candidate) => candidate.terminal_eligible === false)).toBe(true);
-    expect(observation.candidates?.every((candidate) => candidate.assistant_answer === false)).toBe(true);
+    expect(
+      observation.candidates?.every(
+        (candidate) => candidate.status === "blocked_by_boundary",
+      ),
+    ).toBe(true);
+    expect(
+      observation.candidates?.every(
+        (candidate) => candidate.promotion_allowed === false,
+      ),
+    ).toBe(true);
+    expect(
+      observation.candidates?.every(
+        (candidate) => candidate.terminal_eligible === false,
+      ),
+    ).toBe(true);
+    expect(
+      observation.candidates?.every(
+        (candidate) => candidate.assistant_answer === false,
+      ),
+    ).toBe(true);
     expect(observation.candidates?.[0]?.claim_boundary_notes).toEqual(
       expect.arrayContaining(observation.forbidden_claim_scan_notes ?? []),
     );
@@ -7347,49 +7995,102 @@ describe("Helix workstation tool gateway", () => {
 
     expect(manifest.capabilities.length).toBeGreaterThan(50);
     for (const capability of manifest.capabilities) {
-      expect(capability.produces_affordances, capability.capability_id).toEqual(expect.any(Array));
-      expect(capability.consumes_affordances, capability.capability_id).toEqual(expect.any(Array));
-      expect(capability.typed_handoff_role, capability.capability_id).toMatch(/^(?:producer|consumer|producer_consumer|none)$/);
+      expect(capability.produces_affordances, capability.capability_id).toEqual(
+        expect.any(Array),
+      );
+      expect(capability.consumes_affordances, capability.capability_id).toEqual(
+        expect.any(Array),
+      );
+      expect(capability.typed_handoff_role, capability.capability_id).toMatch(
+        /^(?:producer|consumer|producer_consumer|none)$/,
+      );
       expect(
-        (capability.produces_affordances?.length ?? 0) + (capability.consumes_affordances?.length ?? 0),
+        (capability.produces_affordances?.length ?? 0) +
+          (capability.consumes_affordances?.length ?? 0),
         capability.capability_id,
       ).toBeGreaterThan(0);
       if (capability.typed_handoff_role === "producer") {
-        expect(capability.produces_affordances?.length ?? 0, capability.capability_id).toBeGreaterThan(0);
-        expect(capability.consumes_affordances?.length ?? 0, capability.capability_id).toBe(0);
+        expect(
+          capability.produces_affordances?.length ?? 0,
+          capability.capability_id,
+        ).toBeGreaterThan(0);
+        expect(
+          capability.consumes_affordances?.length ?? 0,
+          capability.capability_id,
+        ).toBe(0);
       }
       if (capability.typed_handoff_role === "consumer") {
-        expect(capability.produces_affordances?.length ?? 0, capability.capability_id).toBe(0);
-        expect(capability.consumes_affordances?.length ?? 0, capability.capability_id).toBeGreaterThan(0);
+        expect(
+          capability.produces_affordances?.length ?? 0,
+          capability.capability_id,
+        ).toBe(0);
+        expect(
+          capability.consumes_affordances?.length ?? 0,
+          capability.capability_id,
+        ).toBeGreaterThan(0);
       }
       if (capability.typed_handoff_role === "producer_consumer") {
-        expect(capability.produces_affordances?.length ?? 0, capability.capability_id).toBeGreaterThan(0);
-        expect(capability.consumes_affordances?.length ?? 0, capability.capability_id).toBeGreaterThan(0);
+        expect(
+          capability.produces_affordances?.length ?? 0,
+          capability.capability_id,
+        ).toBeGreaterThan(0);
+        expect(
+          capability.consumes_affordances?.length ?? 0,
+          capability.capability_id,
+        ).toBeGreaterThan(0);
       }
       if (capability.typed_handoff_role === "none") {
-        expect(capability.capability_id, capability.capability_id).toBe("__no_shared_gateway_capability_should_use_none__");
+        expect(capability.capability_id, capability.capability_id).toBe(
+          "__no_shared_gateway_capability_should_use_none__",
+        );
       }
     }
-    expect(manifest.capabilities.find((capability) => capability.capability_id === THEORY_CONTEXT_REFLECTION_CAPABILITY)).toMatchObject({
-      produces_affordances: expect.arrayContaining(["theory_context", "calculator_expression_template", "claim_boundary"]),
+    expect(
+      manifest.capabilities.find(
+        (capability) =>
+          capability.capability_id === THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      ),
+    ).toMatchObject({
+      produces_affordances: expect.arrayContaining([
+        "theory_context",
+        "calculator_expression_template",
+        "claim_boundary",
+      ]),
       typed_handoff_role: "producer",
     });
-    expect(manifest.capabilities.find((capability) => capability.capability_id === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY)).toMatchObject({
+    expect(
+      manifest.capabilities.find(
+        (capability) =>
+          capability.capability_id === CALCULATOR_SOLVE_EXPRESSION_CAPABILITY,
+      ),
+    ).toMatchObject({
       consumes_affordances: expect.arrayContaining([
         "bound_calculator_expression",
         "calculator_expression_template",
         "numeric_value_evidence",
       ]),
-      produces_affordances: expect.arrayContaining(["calculator_result", "numeric_value_evidence"]),
+      produces_affordances: expect.arrayContaining([
+        "calculator_result",
+        "numeric_value_evidence",
+      ]),
       typed_handoff_role: "producer_consumer",
     });
-    expect(manifest.capabilities.find((capability) => capability.capability_id === CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY)).toMatchObject({
+    expect(
+      manifest.capabilities.find(
+        (capability) =>
+          capability.capability_id ===
+          CALCULATOR_SOLVE_SCALAR_EXPRESSION_CAPABILITY,
+      ),
+    ).toMatchObject({
       consumes_affordances: expect.arrayContaining([
         "bound_calculator_expression",
         "calculator_expression_template",
         "numeric_value_evidence",
       ]),
-      produces_affordances: expect.arrayContaining(["calculator_result", "numeric_value_evidence"]),
+      produces_affordances: expect.arrayContaining([
+        "calculator_result",
+        "numeric_value_evidence",
+      ]),
       typed_handoff_role: "producer_consumer",
     });
   });
@@ -7400,7 +8101,8 @@ describe("Helix workstation tool gateway", () => {
       mode: "read",
       capabilityId: THEORY_FRONTIER_CONJECTURE_CAPABILITY,
       arguments: {
-        prompt: "Compare this idea with the other one and find possible bridge regions.",
+        prompt:
+          "Compare this idea with the other one and find possible bridge regions.",
         frontier_search_seed: "gateway-frontier-conjecture-ambiguous-test",
       },
       turnId: "ask:test:gateway-theory-frontier-conjecture-ambiguous",
@@ -7414,16 +8116,29 @@ describe("Helix workstation tool gateway", () => {
         interpretation?: string;
         placementCertainty?: number;
       };
-      candidates?: Array<{ terminal_eligible?: boolean; assistant_answer?: boolean }>;
+      candidates?: Array<{
+        terminal_eligible?: boolean;
+        assistant_answer?: boolean;
+      }>;
     };
     expect(observation.probability_terrain).toMatchObject({
       uncertaintyMode: "broad",
       interpretation: "placement_probability_not_truth_claim",
     });
-    expect(observation.probability_terrain?.placementCertainty ?? 1).toBeLessThan(0.1);
+    expect(
+      observation.probability_terrain?.placementCertainty ?? 1,
+    ).toBeLessThan(0.1);
     expect(observation.candidates?.length ?? 0).toBeGreaterThan(0);
-    expect(observation.candidates?.every((candidate) => candidate.terminal_eligible === false)).toBe(true);
-    expect(observation.candidates?.every((candidate) => candidate.assistant_answer === false)).toBe(true);
+    expect(
+      observation.candidates?.every(
+        (candidate) => candidate.terminal_eligible === false,
+      ),
+    ).toBe(true);
+    expect(
+      observation.candidates?.every(
+        (candidate) => candidate.assistant_answer === false,
+      ),
+    ).toBe(true);
   });
 
   it("calls interim voice callout as a host-projected non-terminal receipt", async () => {
@@ -7513,11 +8228,19 @@ describe("Helix workstation tool gateway", () => {
       receipt?: { receiptId?: string; model_id?: string };
     };
     expect(observation.model_id).toBe("eleven_multilingual_v2");
-    expect(observation.selected_model_or_service).toBe("eleven_multilingual_v2");
+    expect(observation.selected_model_or_service).toBe(
+      "eleven_multilingual_v2",
+    );
     expect(observation.receipt?.model_id).toBe("eleven_multilingual_v2");
-    expect(observation.host_projection?.model_id).toBe("eleven_multilingual_v2");
-    expect(observation.request?.requestId).toMatch(/^helix_interim_voice_callout_request:/);
-    expect(observation.receipt?.receiptId).toMatch(/^helix_interim_voice_callout_receipt:/);
+    expect(observation.host_projection?.model_id).toBe(
+      "eleven_multilingual_v2",
+    );
+    expect(observation.request?.requestId).toMatch(
+      /^helix_interim_voice_callout_request:/,
+    );
+    expect(observation.receipt?.receiptId).toMatch(
+      /^helix_interim_voice_callout_receipt:/,
+    );
   });
 
   it("calls text_to_speech.speak_text as the canonical governed voice lane", async () => {
@@ -7662,13 +8385,15 @@ describe("Helix workstation tool gateway", () => {
       arguments: {
         label: "visible translated section",
         source_doc_path: "docs/helix-ask-api-parity-matrix.md",
-        translation_blocks: [{
-          unit_id: "doc-unit:1",
-          source_text: "Original sentence.",
-          translated_text: "Translated sentence.",
-          locale: "es",
-          status: "ready",
-        }],
+        translation_blocks: [
+          {
+            unit_id: "doc-unit:1",
+            source_text: "Original sentence.",
+            translated_text: "Translated sentence.",
+            locale: "es",
+            status: "ready",
+          },
+        ],
       },
       turnId: "ask:test:gateway-readable-translation",
       iteration: 11,
@@ -8062,7 +8787,8 @@ describe("Helix workstation tool gateway", () => {
     appendInterpretationCard({
       thread_id: threadId,
       title: "Current visual scene",
-      summary: "The current frame shows a workstation panel with a Start button.",
+      summary:
+        "The current frame shows a workstation panel with a Start button.",
       evidence_refs: [observation.observation_id],
       confidence: 0.86,
       expires_at: new Date(Date.now() + 60_000).toISOString(),
@@ -8073,7 +8799,7 @@ describe("Helix workstation tool gateway", () => {
       mode: "read",
       capabilityId: VISUAL_SITUATION_OBSERVATION_CAPABILITY,
       arguments: {
-        thread_id: threadId,
+        thread_id: "model-supplied-wrong-thread",
         prompt: "What is happening right now in the visual screen capture?",
         source_target_intent: {
           target_source: "visual_capture",
@@ -8081,6 +8807,7 @@ describe("Helix workstation tool gateway", () => {
           strength: "hard",
         },
       },
+      conversationThreadId: threadId,
       turnId: "ask:test:gateway-visual-evidence",
       iteration: 1,
     });
@@ -8155,7 +8882,10 @@ describe("Helix workstation tool gateway", () => {
       tool_followup_decision: {
         schema: "helix.tool_followup_decision.v1",
         next_action: "retry",
-        terminal_blockers: ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
+        terminal_blockers: [
+          "post_tool_model_step_required",
+          "terminal_authority_not_evaluated",
+        ],
         required_surface_satisfied: false,
         evidence_reentered: false,
         assistant_answer: false,

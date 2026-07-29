@@ -5,7 +5,7 @@ const CAPABILITY_BEHAVIOR_SUBJECT_PATTERN =
   `(?:(?:(?:the|this)\\s+)?${CAPABILITY_BEHAVIOR_TOOL_LABEL_PATTERN}|(?:your|the|this)\\s+(?:${CAPABILITY_BEHAVIOR_TOOL_LABEL_PATTERN}\\s+)?(?:tool|capability|workflow))`;
 
 const CAPABILITY_CATALOG_OBJECT_PATTERN =
-  `(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|ask|agent|live\\s+answer)[\\s\\S]{0,120}(?:tools?|tool\\s+calls?|tool\\s+call\\s+goals?|capabilities)|(?:tools?|tool\\s+calls?|tool\\s+call\\s+goals?|capabilities)[\\s\\S]{0,120}(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|ask|agent|live\\s+answer)|${CAPABILITY_BEHAVIOR_SUBJECT_PATTERN}`;
+  `(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|this\\s+workstation|the\\s+workstation|ask|agent|live\\s+answer)[\\s\\S]{0,120}(?:tools?|tool\\s+calls?|tool\\s+call\\s+goals?|capabilities)|(?:tools?|tool\\s+calls?|tool\\s+call\\s+goals?|capabilities)[\\s\\S]{0,120}(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|this\\s+workstation|the\\s+workstation|ask|agent|live\\s+answer)|\\bwhat\\s+can\\s+(?:this|the)\\s+workstation\\s+do\\b|${CAPABILITY_BEHAVIOR_SUBJECT_PATTERN}`;
 
 const stripWholePromptWrappingQuotes = (promptText: string): string | null => {
   const trimmed = promptText.trim();
@@ -24,7 +24,7 @@ const CAPABILITY_CATALOG_REQUEST_PATTERNS = [
     "i",
   ),
   /\bwhat\s+can\s+i\s+do\s+with\s+helix\s+ask\b/i,
-  /\bwhat\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+do\b/i,
+  /\bwhat\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent|this\s+workstation|the\s+workstation)\s+do\b/i,
   /\bhow\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+help\b/i,
   /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+(?:are\s+)?(?:available|visible|admissible)\b/i,
   /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+can\s+(?:helix\s+ask|ask|agent)\s+(?:use|call|run|see|access)\b/i,
@@ -40,7 +40,7 @@ const capabilityCatalogRequestMatchIndex = (promptText: string): number | null =
   const prompt = promptText.trim();
   if (!prompt) return null;
   const mentionsAskSurface = new RegExp(
-    `\\b(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|live\\s+answer|${CAPABILITY_BEHAVIOR_SUBJECT_PATTERN})\\b`,
+    `\\b(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|this\\s+workstation|the\\s+workstation|live\\s+answer|${CAPABILITY_BEHAVIOR_SUBJECT_PATTERN})\\b`,
     "i",
   ).test(prompt);
   const patterns = mentionsAskSurface
@@ -95,11 +95,13 @@ export const isAskTurnCapabilityCatalogAvailabilityPrompt = (transcript: string)
 export const isAskTurnCapabilityHelpIntent = (transcript: string): boolean => {
   const normalized = transcript.trim().toLowerCase().replace(/[?!.]+$/g, "").replace(/\s+/g, " ");
   if (!normalized) return false;
+  if (hasContextualCapabilityCatalogCue(transcript)) return false;
   return (
     isAskTurnCapabilityCatalogAvailabilityPrompt(transcript) ||
     /\bwhat\s+can\s+i\s+do\s+with\s+helix\s+ask\b/i.test(normalized) ||
     /\bhow\s+can\s+(?:you|helix\s+ask)\s+help\s+me\b/i.test(normalized) ||
     /\bwhat\s+can\s+(?:this\s+)?(?:workspace\s+)?agent\s+do\b/i.test(normalized) ||
+    /\bwhat\s+can\s+(?:this|the)\s+workstation\s+do\b/i.test(normalized) ||
     /\bwhat\s+can\s+helix\s+ask\s+do\b/i.test(normalized)
   );
 };

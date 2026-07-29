@@ -6,6 +6,8 @@ import {
 } from "@shared/helix-scholarly-research-observation";
 import type { HelixToolCallAdmissionDecision } from "@shared/helix-tool-call-admission";
 import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-itinerary";
+import { explicitCapabilityContractForCapability } from
+  "../services/helix-ask/explicit-capability-contract";
 import {
   attachHelixCapabilityItineraryExecutionState,
   buildHelixCapabilityItineraryExecutionState,
@@ -208,6 +210,23 @@ describe("Helix Ask capability itinerary", () => {
 
     expect(isHelixCapabilityItineraryFamilyObserved("visual_capture", [packet("failed")])).toBe(false);
     expect(isHelixCapabilityItineraryFamilyObserved("visual_capture", [packet("succeeded")])).toBe(true);
+  });
+
+  it("counts only successful Minecraft gateway packets as live-environment observations", () => {
+    const packet = (status: string) => ({
+      artifact_id: `ask:minecraft-inventory:workstation_gateway:${status}`,
+      kind: "provider_gateway_observation_packet",
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        capability_key: "com.casimirbot.minecraft.inventory.check",
+        status,
+      },
+    });
+
+    expect(isHelixCapabilityItineraryFamilyObserved("live_environment", [packet("failed")]))
+      .toBe(false);
+    expect(isHelixCapabilityItineraryFamilyObserved("live_environment", [packet("succeeded")]))
+      .toBe(true);
   });
 
   it("creates ordered compound subgoals for workspace status then calculator", () => {
@@ -1642,5 +1661,48 @@ describe("Helix Ask capability itinerary", () => {
     expect(itinerary.terminal_success_criteria.typed_failure_codes).not.toContain(
       "research_observation_missing",
     );
+  });
+
+  it("does not turn current Minecraft state into an unrelated internet-search leg", () => {
+    const capability = "com.casimirbot.minecraft.inventory.check";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:current-minecraft-inventory",
+      promptText:
+        "What is the player carrying in Minecraft right now? Inspect the connected shared-room world and wait for a fresh inventory observation.",
+      toolCallAdmissionDecision: {
+        source_target: "live_environment",
+        admitted_tool_families: ["live_environment"],
+      },
+      availableCapabilities: availableCapabilities([capability]),
+      exactAdmittedCapabilityContract:
+        explicitCapabilityContractForCapability(capability),
+    });
+
+    expect(itinerary.relevant_tool_families).toEqual(["live_environment"]);
+    expect(itinerary.relevant_tool_families).not.toContain("internet_search");
+    expect(itinerary.prompt_shape).toBe("single_tool");
+    expect(itinerary.missing_tool_families).toEqual([]);
+  });
+
+  it("does not infer Docs from theory identifiers containing evidence and Casimir", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:theory-graph-no-docs",
+      promptText:
+        "Locate the Stage 3 Casimir-DP evidence-map theory and the energy-density theory in the Theory Badge Graph. Explain their registered relationship and claim boundary without treating graph proximity as proof.",
+      toolCallAdmissionDecision: {
+        source_target: "theory_locator",
+        admitted_tool_families: ["theory_locator"],
+      },
+      availableCapabilities: availableCapabilities([
+        "helix_ask.reflect_theory_context",
+        "docs.search",
+      ]),
+    });
+
+    expect(itinerary.relevant_tool_families).toEqual(["theory_locator"]);
+    expect(itinerary.missing_tool_families).toEqual([]);
+    expect(itinerary.terminal_success_criteria.required_observation_families).toEqual([
+      "theory_locator",
+    ]);
   });
 });

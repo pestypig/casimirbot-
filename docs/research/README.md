@@ -249,6 +249,91 @@ The synchronized paper layer contains 41 equation markers, 41 source actions,
 and 41 generated actions; the study graph contains 27 badges and 79 edges; the
 math-stage registry contains 213 entries.
 
+The implemented Stage-4.2C identifiability-first redesign campaign is
+maintained in:
+
+- `casimir-dp-identifiability-redesign-stage4-2c-plan.md`
+- `casimir-dp-identifiability-redesign-stage4-2c-report.md`
+- `casimir-dp-identifiability-redesign-stage4-2c-verification-receipt.json`
+- `../../configs/research/casimir-dp-stage4-2c-authorities.v1.json`
+- `../../configs/research/casimir-dp-identifiability-redesign-stage4-2c.v1.json`
+- `../../configs/research/fixtures/casimir-dp-stage4-2c-campaign.synthetic.v1.json`
+- `../../shared/contracts/casimir-dp-identifiability-redesign-stage4-2c.v1.ts`
+- `../../shared/casimir-dp-control-response-stage4-2c.ts`
+- `../../shared/casimir-dp-apparatus-redesign-stage4-2c.ts`
+- `../../shared/casimir-dp-acquisition-packets-stage4-2c.ts`
+- `../../scripts/research/run-casimir-dp-identifiability-redesign-stage4-2c.ts`
+
+Run it only with the immutable Stage-4.2B authority tuple present:
+
+```text
+npx tsx scripts/research/run-casimir-dp-identifiability-redesign-stage4-2c.ts --config configs/research/casimir-dp-identifiability-redesign-stage4-2c.v1.json --report-doc docs/research/casimir-dp-identifiability-redesign-stage4-2c-report.md
+```
+
+The authoritative synthetic run is
+`casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z`.
+It recovers the Stage-4.2B no-go, compiles numerical design-assumption response
+vectors and block covariance for 30 controls, and searches a frozen bounded
+candidate catalogue through the unchanged registered DP generator. The
+selected silica candidate clears the preregistered design gates with maximum
+whitened cosine `0.7177243227022941`, normalized Gram condition
+`6.531693613125537`, forecast power `0.9978580863455258`, and 542 required
+paired windows. All 16 fixtures and the initial 22 focused tests pass.
+
+That result is not physical pilot readiness. Measured control response,
+measured covariance, and an authentic state-preparation receipt remain absent;
+the calibration, pilot, confirmatory, and independent-replication outputs are
+packet schemas only. The Stage-4.2C badge is diagnostic, non-promotable, and
+has no calculator payload or observable bridge. The synchronized paper layer
+now contains 45 equation markers/actions; the study graph contains 28 badges
+and 83 edges; the math-stage registry contains 216 validated entries. Fresh
+adapter run `2332` is `PASS` with integrity `OK`, validated trace
+`3d454ba0cf3e778dc934cae1c0ee33996bb792caa06255a9dfe984a38138bdee`,
+and downstream receipt
+`51c461db1fdaa29162b2c5287a31c01823e5bb23b16a25fe2914841239abba98`.
+Its scientific scope is `none`. Measured evidence
+and physical pilot readiness remain `not_ready`, collapse and manifold
+identification remain `blocked`, and physical viability remains
+`not_evaluated`.
+
+The implemented Stage-4.2D cross-scale recovery and field-metrology campaign
+is maintained in:
+
+- `casimir-dp-cross-scale-metrology-stage4-2d-plan.md`
+- `casimir-dp-cross-scale-metrology-stage4-2d-report.md`
+- `casimir-dp-cross-scale-metrology-stage4-2d-verification-receipt.json`
+- `../../configs/research/casimir-dp-stage4-2d-authorities.v1.json`
+- `../../configs/research/casimir-dp-cross-scale-metrology-stage4-2d.v1.json`
+- `../../configs/research/fixtures/casimir-dp-stage4-2d-cross-scale.synthetic.v1.json`
+- `../../shared/contracts/casimir-dp-cross-scale-metrology-stage4-2d.v1.ts`
+- `../../shared/casimir-dp-cross-scale-metrology-stage4-2d.ts`
+- `../../scripts/research/run-casimir-dp-cross-scale-metrology-stage4-2d.ts`
+
+Run it only with the immutable Stage-4.2C authority tuple present:
+
+```text
+npm run casimir:dp:stage4-2d
+```
+
+The authoritative synthetic run is
+`casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z`.
+It passes 10/10 fixtures, recovers sourced Stark/Zeeman/blackbody field
+responses and conventional compactness/material-yield/Jeans limits, rejects
+spinor-as-mass semantics, leaves the registered DP generator unchanged, and
+adds zero observable bridge edges. These are calibration and recovery
+diagnostics only. Measured spectroscopic response, a witness-to-coherence
+transfer, physical pilot readiness, and measured evidence remain `not_ready`;
+collapse and manifold identification remain `blocked`; physical viability
+remains `not_evaluated`.
+
+Fresh adapter run `2338` is `PASS` with no first failure, no deltas, and
+certificate integrity `OK`. The exclusive validated trace SHA-256 is
+`bb4f53cf48f7cf0726822e53dbacd369485c638636df1e6f5078027d36f91d38`;
+the downstream verification-receipt SHA-256 is
+`d96430684379dd5408d8099ae49a05ca0eaf4042a0ea64b09e23d0a4156a0556`.
+The certificate verifies repository convergence only and has scientific scope
+`none`.
+
 The implemented Stage-4.2A runtime sources are:
 
 - `../../shared/casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts`

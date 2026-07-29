@@ -53,9 +53,11 @@ The keyed live validation command is:
 npm run helix:ask:runtime-goal-probe:providers:both
 ```
 
-Run it only against a user-started keyed server. It executes Codex and Helix
-runtime goal probes through both JSON and stream Ask routes, then writes a run
-directory under `artifacts/helix-ask-runtime-goal`.
+Run it only against the normal keyed server, started either by the user or by
+an explicitly authorized Codex Desktop invocation of the configured opaque
+`start-myapp-for-codex` launcher. It executes Codex and Helix runtime goal
+probes through both JSON and stream Ask routes, then writes a run directory
+under `artifacts/helix-ask-runtime-goal`.
 
 Each run writes `artifact-manifest.json`, which indexes the saved response,
 Debug Copy, stream event, and validation files. The validation must prove:
@@ -108,6 +110,7 @@ The current provider-shared workstation gateway exposes these capabilities:
 
 ```txt
 workspace_os.status
+helix_ask.inspect_capability_catalog
 workstation.active_context
 theory-badge-graph.current_context
 workstation-notes.list_notes
@@ -201,6 +204,14 @@ live_env.query_visual_observer_profiles
 live_env.test_visual_observer_profile
 live_env.compare_visual_observer_profiles
 room.evidence.read_bound
+com.casimirbot.minecraft.actor.status.read
+com.casimirbot.minecraft.inventory.check
+com.casimirbot.minecraft.nearby_entities.list
+com.casimirbot.minecraft.hazards.scan
+com.casimirbot.minecraft.local_map.inspect
+com.casimirbot.minecraft.line_of_sight.check
+com.casimirbot.minecraft.crop_state.read
+com.casimirbot.minecraft.reachability.check
 situation-room.describe_visual_capture
 room.list
 room.inspect
@@ -218,6 +229,14 @@ capability.
 | Capability                 | Required args                | Observation or receipt                                      | Boundary                                                                                                                                                     |
 | -------------------------- | ---------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `room.evidence.read_bound` | none                         | `helix.shared_live_room.bound_room_evidence_observation.v1` | Read-only Agent-continuation capability; exact run-room binding, current role/consent, source provenance, freshness, and current-turn re-entry are required. |
+| `com.casimirbot.minecraft.actor.status.read` | `target` (`current_actor`), optional `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | Read-only health, hunger, game-mode, flags, world, and position observation for the bound actor. |
+| `com.casimirbot.minecraft.inventory.check` | `target` (`current_actor`), optional `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | On-demand read-only probe through `room.environment.probe`; all room, source, world, device, credential, admission, catalog, schema, run, turn, and tool-call identity is server-derived. |
+| `com.casimirbot.minecraft.nearby_entities.list` | `target` (`current_actor`), optional `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | Bounded nearby-entity classifications, distances, and hostile targeting observations. |
+| `com.casimirbot.minecraft.hazards.scan` | `target` (`current_actor`), optional `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | Hostile-presence count and nearest-hostile distance; not a complete environmental danger proof. |
+| `com.casimirbot.minecraft.local_map.inspect` | `target` (`current_actor`), optional `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | Coarse 9×9 floor occupancy sample; not a full map or route planner. |
+| `com.casimirbot.minecraft.line_of_sight.check` | `target` (`position`), `position`, optional `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | Same-world read-only ray trace to exact coordinates. |
+| `com.casimirbot.minecraft.crop_state.read` | `target` (`current_focus` or `position`), optional `position` and `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | Crop maturity only; it does not harvest or open anything. |
+| `com.casimirbot.minecraft.reachability.check` | `target` (`position`), `position`, optional `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | Straight-line radius and interaction-range screening; not pathfinding or safe-route authority. |
 | `situation-room.describe_visual_capture` | `thread_id`, `prompt` | `helix.visual_situation_observation.v1` | Read-only bounded SituationRun evidence; execution failure remains an admitted observation, and successful evidence must re-enter the runtime before synthesis. |
 | `room.list`                | none                         | `helix.shared_live_room.list_receipt.v1`                    | Server-authenticated account policy filters the list.                                                                                                        |
 | `room.inspect`             | `room_id`                    | `helix.shared_live_room.inspect_receipt.v1`                 | Current membership is rechecked; the receipt is nonterminal.                                                                                                 |
@@ -523,10 +542,17 @@ the canonical `theory-badge-graph.reflect_discussion_context` and
 alias is preserved in `source_target_intent.alias_capability`; reflections
 remain diagnostic observations and are not proof or terminal authority.
 
+`helix_ask.inspect_capability_catalog` is an exact shared gateway manifest
+capability. It returns the current governed runtime capability records and
+family prefixes as a nonterminal `helix.capability_catalog_observation.v1`
+observation. The catalog is source-agnostic: conformed documents, scientific
+evidence packets, theory graphs, and runtime receipts bind into capabilities
+without creating paper-specific workbenches. A current-turn observation must
+re-enter model reasoning before a `capability_help_summary` can become terminal.
+
 ```txt
 runtime_evidence
 debug.inspect_current_turn
-helix_ask.inspect_capability_catalog
 helix_ask.reflect_workstation_tool_alignment
 workspace-directory.resolve
 helix.theory.frontierVectorFieldTrace
@@ -1266,5 +1292,6 @@ npm run helix:ask:discipline:quick
 git diff --check
 ```
 
-Live validation must use the user-started keyed server. Do not start or restart
-that server from an agent shell.
+Live validation must use the normal keyed server. Codex Desktop may start or
+restart it only through an explicitly authorized configured opaque
+`start-myapp-for-codex` launcher; an ad hoc agent-shell server is prohibited.

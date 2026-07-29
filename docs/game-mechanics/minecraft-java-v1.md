@@ -25,10 +25,16 @@ game version, while the room source establishes what the actor currently has.
 
 ## Read-only probes
 
-The first Minecraft adapter may report route feasibility, reachability,
-line-of-sight, container freshness, crop state, hazards, inventory, and a
-bounded local-map summary. Probe results are observations only. The reporting
-credential cannot be reused to execute game actions.
+The first Minecraft adapter may report actor status, inventory, nearby
+entities, hostile-presence hazards, line of sight, crop state, geometric
+distance/range, and a bounded 9×9 floor-occupancy summary. Probe results are
+observations only. The reporting credential cannot be reused to execute game
+actions.
+
+The current reachability observation is straight-line distance with configured
+radius and interaction-range thresholds. It is not pathfinding and does not
+prove that a safe walkable route exists. Closed-container contents and route
+feasibility are unsupported by the first adapter.
 
 ## Version boundary
 

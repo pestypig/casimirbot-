@@ -945,9 +945,12 @@ describe("Helix theory execution-closure provider integration", () => {
       candidateAxes.find(
         (axis) => axis.axisId === "independent_numerical_replay",
       ),
-    ).toMatchObject({ status: "missing", evidenceRefs: [] });
+    ).toMatchObject({ status: "blocked", evidenceRefs: [] });
     expect(record(closure.synthesisReadiness)).toMatchObject({
       modelSynthesisAllowed: false,
+      openRequirementCodes: expect.arrayContaining([
+        "numerical_execution_catalog_unconfigured",
+      ]),
     });
   });
 

@@ -1,0 +1,32 @@
+{
+  "generatedAt": "2026-07-28T19:57:41.260Z",
+  "source": "explicit_stage4_2d_receipt_grade_replay",
+  "repo": {
+    "build": {
+      "status": "pass",
+      "ok": true,
+      "exitCode": 0,
+      "command": "npm run build",
+      "warningsPresent": true
+    },
+    "tests": {
+      "total": 225,
+      "failed": 0,
+      "passed": 225,
+      "status": "pass",
+      "files": 23,
+      "scope": "stage4_2d_focused_paper_graph_root_46_plus_required_gr_warp_179"
+    },
+    "schema": {
+      "contracts": "pass",
+      "ok": true,
+      "scope": "stage4_2d_strict_contract_10_fixtures_immutable_stage4_2c_lineage_spectroscopic_witness_classical_gravity_recovery_spinor_semantic_nonbridge_equation_sidecar_theory_badge_math_root_leaf_and_required_gr_warp"
+    },
+    "deps": {
+      "coherence": "pass",
+      "exitCode": 0,
+      "command": "npm ls --depth=0",
+      "packageLockSha256": "c85521a758783fa5cea1c8933e3c5ad54d604d596620279fce916e3c2ce42367"
+    }
+  }
+}

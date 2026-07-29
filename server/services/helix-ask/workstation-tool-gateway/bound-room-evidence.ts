@@ -92,6 +92,8 @@ export type BoundRoomEvidenceErrorCode =
 
 export type BoundRoomEvidenceSourceCandidate = {
   bindingId: string;
+  /** Server-owned credential identity only; never projected into observations. */
+  credentialId?: string;
   roomId: string;
   sourceId: string;
   worldId: string;
@@ -332,9 +334,9 @@ const receiptMatchesCandidate = (
  * The returned admission is reconstructed from durable server-owned identity;
  * no source payload may select a run, account, room, or Ask turn.
  */
-export const readLatestBoundRoomSourceCandidate = async (
+export const listLatestBoundRoomSourceCandidates = async (
   roomId: string,
-): Promise<BoundRoomEvidenceSourceCandidate | null> => {
+): Promise<BoundRoomEvidenceSourceCandidate[]> => {
   const db = await readSharedRealtimeRoomDatabase();
   const { rows } = await db.query<SourceCandidateRow>(
     `
@@ -391,6 +393,7 @@ export const readLatestBoundRoomSourceCandidate = async (
     [roomId],
   );
   const newestRequestSeenByBinding = new Set<string>();
+  const candidates: BoundRoomEvidenceSourceCandidate[] = [];
   for (const row of rows) {
     if (newestRequestSeenByBinding.has(row.binding_id)) continue;
     newestRequestSeenByBinding.add(row.binding_id);
@@ -437,8 +440,9 @@ export const readLatestBoundRoomSourceCandidate = async (
     ) {
       continue;
     }
-    return {
+    candidates.push({
       bindingId: row.binding_id,
+      credentialId: row.credential_id,
       roomId: row.room_id,
       sourceId: row.source_id,
       worldId: row.world_id,
@@ -456,10 +460,15 @@ export const readLatestBoundRoomSourceCandidate = async (
       mechanicsCollectionIds:
         adapterAdmission.mechanics_collection_ids,
       admission,
-    };
+    });
   }
-  return null;
+  return candidates;
 };
+
+export const readLatestBoundRoomSourceCandidate = async (
+  roomId: string,
+): Promise<BoundRoomEvidenceSourceCandidate | null> =>
+  (await listLatestBoundRoomSourceCandidates(roomId))[0] ?? null;
 
 const dependencies = (
   overrides: Partial<BoundRoomEvidenceDependencies> = {},

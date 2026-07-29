@@ -1271,7 +1271,8 @@ export function buildSolverControllerDecision(input: {
       evidenceReentryRequiredIncomplete &&
       terminalArtifactKind !== "typed_failure" &&
       !modelDirectAnswerTerminal &&
-      !liveSourceSetupReceiptTerminal
+      !liveSourceSetupReceiptTerminal &&
+      !liveMaintenanceTerminal
     ) {
       pushUnique(blockingReasons, "post_observation_model_decision_missing");
     }

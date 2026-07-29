@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 
 import type { HelixAccountType } from "../../../shared/helix-account-session";
 import { buildCasimirFormalVerificationRequestV1 } from "../../../shared/contracts/casimir-formal-verification-request.v1";
-import type { CasimirFormalVerificationCertificateV1 } from "../../../shared/contracts/casimir-formal-verification-certificate.v1";
 import {
   CASIMIR_FORMAL_RUNTIME_SELF_TEST_ARTIFACT_ID,
   resolveCasimirFormalRuntimeSelfTestCatalogEntryV1,
@@ -35,6 +34,8 @@ export const CASIMIR_FORMAL_RUNTIME_CANARY_JOB_RECEIPT_SCHEMA =
   "casimir.formal_runtime_canary.job_receipt.v1" as const;
 export const CASIMIR_FORMAL_RUNTIME_CANARY_RESULT_SCHEMA =
   "casimir.formal_runtime_canary.result.v1" as const;
+export const CASIMIR_FORMAL_RUNTIME_CANARY_REPLAY_REPORT_SCHEMA =
+  "casimir.formal_runtime_canary.replay_report.v1" as const;
 
 export type CasimirFormalRuntimeCanaryAuthorityV1 = {
   outputRole: "non_scientific_runtime_readiness_evidence";
@@ -118,9 +119,19 @@ export type CasimirFormalRuntimeCanaryResultV1 = {
   ok: boolean;
   status: "running" | "completed" | "failed" | "blocked";
   planId: string | null;
+  sealedInputSha256: string | null;
   jobId: string | null;
   issues: string[];
-  runtimeReplayCertificate: CasimirFormalVerificationCertificateV1 | null;
+  runtimeReplayReport: {
+    schema: typeof CASIMIR_FORMAL_RUNTIME_CANARY_REPLAY_REPORT_SCHEMA;
+    status: "passed" | "failed" | "blocked";
+    certificateArtifactSha256: string;
+    aggregateTranscriptSha256: string;
+    requiredReplayCount: number;
+    completedReplayCount: number;
+    byteIdentical: boolean;
+    blockerCodes: string[];
+  } | null;
   selfTest: RuntimeSelfTestIdentityV1 | null;
   authority: CasimirFormalRuntimeCanaryAuthorityV1;
 };
@@ -280,6 +291,13 @@ export function createCasimirFormalRuntimeCanaryService(
     readResultCapabilityId: THEORY_RUNTIME_CANARY_READ_RESULT_CAPABILITY,
     now: dependencies.now,
   });
+  const acceptedJobs = new Map<
+    string,
+    {
+      selfTest: RuntimeSelfTestIdentityV1;
+      sealedInputSha256: string;
+    }
+  >();
 
   const resolveReadiness = async (input: {
     accountType: HelixAccountType;
@@ -466,17 +484,22 @@ export function createCasimirFormalRuntimeCanaryService(
       approvalReceipt: input.approvalReceipt,
       approvalToken: input.approvalToken,
     });
-    const planned = await verifier.plan({
-      accountType: input.accountType,
-      profileId: input.profileId,
-      sealedInput: resolved.sealedInput,
-    });
+    if (
+      started.status === "running" &&
+      started.jobId &&
+      started.sealedInputSha256
+    ) {
+      acceptedJobs.set(started.jobId, {
+        selfTest: selfTestIdentity(resolved.selfTest),
+        sealedInputSha256: started.sealedInputSha256,
+      });
+    }
     return {
       schema: CASIMIR_FORMAL_RUNTIME_CANARY_JOB_RECEIPT_SCHEMA,
       ok: started.ok,
       status: started.status,
       planId: started.planId,
-      sealedInputSha256: planned.sealedInputSha256,
+      sealedInputSha256: started.sealedInputSha256,
       jobId: started.jobId,
       issues: started.issues,
       nextCapability:
@@ -494,43 +517,77 @@ export function createCasimirFormalRuntimeCanaryService(
     profileId?: string | null;
     jobId?: string | null;
   }): Promise<CasimirFormalRuntimeCanaryResultV1> => {
-    const resolved = await resolveReadiness(input);
-    if (resolved.issues.length > 0) {
+    const jobId = input.jobId?.trim() || "";
+    const acceptedJob = acceptedJobs.get(jobId);
+    if (input.accountType !== "developer") {
       return {
         schema: CASIMIR_FORMAL_RUNTIME_CANARY_RESULT_SCHEMA,
         ok: false,
         status: "blocked",
         planId: null,
-        jobId: input.jobId?.trim() || null,
-        issues: resolved.issues,
-        runtimeReplayCertificate: null,
-        selfTest: resolved.selfTest
-          ? selfTestIdentity(resolved.selfTest)
-          : null,
+        sealedInputSha256: null,
+        jobId: jobId || null,
+        issues: ["developer_account_required"],
+        runtimeReplayReport: null,
+        selfTest: null,
         authority: authority(),
       };
     }
     const result = verifier.readResult({
       accountType: input.accountType,
       profileId: input.profileId,
-      jobId: input.jobId,
+      jobId,
     });
+    const certificate = result.certificate;
+    const replayPassed =
+      result.status === "completed" &&
+      certificate?.status === "passed" &&
+      certificate.blockers.length === 0;
+    const completedWithFailedCertificate =
+      result.status === "completed" && certificate !== null && !replayPassed;
+    const status = completedWithFailedCertificate
+      ? "failed"
+      : result.status;
+    const certificateIssues = completedWithFailedCertificate
+      ? [
+          "formal_runtime_canary_replay_failed",
+          ...certificate.blockers.map((blocker) => blocker.code),
+        ]
+      : [];
+    const runtimeReplayReport = certificate
+      ? {
+          schema: CASIMIR_FORMAL_RUNTIME_CANARY_REPLAY_REPORT_SCHEMA,
+          status: certificate.status,
+          certificateArtifactSha256: certificate.artifactSha256,
+          aggregateTranscriptSha256:
+            certificate.replay.aggregateTranscriptSha256,
+          requiredReplayCount: certificate.replay.requiredReplayCount,
+          completedReplayCount: certificate.replay.completedReplayCount,
+          byteIdentical: certificate.replay.byteIdentical,
+          blockerCodes: certificate.blockers.map((blocker) => blocker.code),
+        }
+      : null;
     return {
       schema: CASIMIR_FORMAL_RUNTIME_CANARY_RESULT_SCHEMA,
-      ok: result.ok,
-      status: result.status,
+      ok: result.ok && !completedWithFailedCertificate,
+      status,
       planId: result.planId,
+      sealedInputSha256:
+        result.sealedInputSha256 ??
+        acceptedJob?.sealedInputSha256 ??
+        null,
       jobId: result.jobId,
-      issues: result.issues,
-      runtimeReplayCertificate: result.certificate,
-      selfTest: resolved.selfTest
-        ? selfTestIdentity(resolved.selfTest)
-        : null,
+      issues: uniqueIssues([...result.issues, ...certificateIssues]),
+      runtimeReplayReport,
+      selfTest: acceptedJob?.selfTest ?? null,
       authority: authority(),
     };
   };
 
-  const reset = (): void => verifier.reset();
+  const reset = (): void => {
+    acceptedJobs.clear();
+    verifier.reset();
+  };
 
   return { inspect, plan, start, readResult, reset };
 }

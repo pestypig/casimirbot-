@@ -34,6 +34,12 @@ export type RealtimeConversationContextMaterializationAudit = {
 
 export type RealtimeConversationContextMaterialization = {
   audit: RealtimeConversationContextMaterializationAudit;
+  /**
+   * Server-validated conversation identity for trusted gateway routing. This
+   * remains null unless the stored handoff/context pack and current utterance
+   * all match the route metadata.
+   */
+  trustedMailboxThreadId: string | null;
   promptLines: string[];
   latestGroundedAnswer: {
     text: string;
@@ -196,6 +202,7 @@ export const materializeRealtimeConversationContext = (input: {
         workstationSources: [],
         modelContextIncluded: false,
       }),
+      trustedMailboxThreadId: null,
       promptLines: [],
       latestGroundedAnswer: null,
       latestPriorUserTurn: null,
@@ -226,6 +233,7 @@ export const materializeRealtimeConversationContext = (input: {
         workstationSources: [],
         modelContextIncluded: false,
       }),
+      trustedMailboxThreadId: null,
       promptLines: [],
       latestGroundedAnswer: null,
       latestPriorUserTurn: null,
@@ -259,6 +267,7 @@ export const materializeRealtimeConversationContext = (input: {
   if (!bindingValid) {
     return {
       audit,
+      trustedMailboxThreadId: null,
       promptLines: [],
       latestGroundedAnswer: null,
       latestPriorUserTurn: null,
@@ -280,6 +289,7 @@ export const materializeRealtimeConversationContext = (input: {
   const latestPriorUserTurn = priorUserTurns.at(-1) ?? null;
   return {
     audit,
+    trustedMailboxThreadId: pack.thread_id,
     latestGroundedAnswer: latestGroundedAnswer
       ? {
           text: latestGroundedAnswer.summary,

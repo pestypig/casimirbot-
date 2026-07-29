@@ -149,7 +149,9 @@ const collectImageLensEvidenceRefs = (input: {
   const terminalUsesImageLens =
     /image_lens_(?:observation_report|named_receipt_evaluation)/i.test(input.terminalArtifactKind) ||
     /image_lens_(?:observation_report|named_receipt_evaluation)/i.test(input.finalAnswerSource) ||
-    /provider_image_lens_observation_report/i.test(input.finalAnswerSource);
+    /provider_image_lens_observation_report/i.test(input.finalAnswerSource) ||
+    /scientific_image_evidence_continuity_summary/i.test(input.terminalArtifactKind) ||
+    /scientific_image_evidence_continuity_summary/i.test(input.finalAnswerSource);
   if (!terminalUsesImageLens) return [];
 
   const refs: string[] = [];

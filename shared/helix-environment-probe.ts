@@ -11,6 +11,8 @@ export const HELIX_ENVIRONMENT_PROBE_RESULT_SCHEMA =
   "helix.environment_probe_result.v1" as const;
 
 export type HelixEnvironmentProbeType =
+  | "actor_status"
+  | "nearby_entities"
   | "route_feasibility"
   | "reachability"
   | "line_of_sight"
@@ -93,6 +95,8 @@ const probeWireTimestampSchema = z.string().trim().min(1).max(64).refine(
   "Expected an ISO-compatible timestamp.",
 );
 const probeTypeSchema = z.enum([
+  "actor_status",
+  "nearby_entities",
   "route_feasibility",
   "reachability",
   "line_of_sight",

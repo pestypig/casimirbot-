@@ -62,6 +62,34 @@ final class HelixHttpClientLifecycleTest {
     }
 
     @Test
+    void usesHttp11WithoutAHiddenCleartextHttp2Upgrade() throws Exception {
+        List<String> upgradeHeaders = new CopyOnWriteArrayList<>();
+        List<String> http2SettingsHeaders = new CopyOnWriteArrayList<>();
+        server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/manifest",
+            exchange -> {
+                upgradeHeaders.add(String.valueOf(
+                    exchange.getRequestHeaders().getFirst("Upgrade")
+                ));
+                http2SettingsHeaders.add(String.valueOf(
+                    exchange.getRequestHeaders().getFirst("HTTP2-Settings")
+                ));
+                respond(exchange, 200, receipt(exchange, true, null));
+            }
+        );
+
+        HelixHttpClient client = client(new AtomicInteger());
+        HelixHttpClient.IngressResponse manifest = client
+            .postManifestAsync("{}")
+            .get(5, TimeUnit.SECONDS);
+
+        assertTrue(manifest.success());
+        assertEquals(List.of("null"), upgradeHeaders);
+        assertEquals(List.of("null"), http2SettingsHeaders);
+        client.close();
+    }
+
+    @Test
     void retriesWithTheSameIdentityAndSerializesQueuedDelivery() throws Exception {
         AtomicInteger manifestAttempts = new AtomicInteger();
         List<String> manifestRequestIds = new CopyOnWriteArrayList<>();
@@ -116,6 +144,183 @@ final class HelixHttpClientLifecycleTest {
         assertTrue(second.get(5, TimeUnit.SECONDS).success());
         assertEquals(1, maxConcurrentHeartbeats.get());
         assertEquals(List.of(2L, 3L), heartbeatSequences);
+        client.close();
+    }
+
+    @Test
+    void prioritizesOnDemandProbePollingAheadOfQueuedTelemetry() throws Exception {
+        CountDownLatch firstHeartbeatEntered = new CountDownLatch(1);
+        CountDownLatch releaseFirstHeartbeat = new CountDownLatch(1);
+        AtomicBoolean holdFirstHeartbeat = new AtomicBoolean(true);
+        List<String> deliveryOrder = new CopyOnWriteArrayList<>();
+        List<Long> deliverySequences = new CopyOnWriteArrayList<>();
+        server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/heartbeat",
+            exchange -> {
+                deliveryOrder.add("heartbeat");
+                deliverySequences.add(Long.parseLong(
+                    exchange.getRequestHeaders().getFirst("X-Helix-Sequence")
+                ));
+                if (holdFirstHeartbeat.compareAndSet(true, false)) {
+                    firstHeartbeatEntered.countDown();
+                    try {
+                        releaseFirstHeartbeat.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                respond(exchange, 200, receipt(exchange, true, null));
+            }
+        );
+        server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/probes/pending",
+            exchange -> {
+                deliveryOrder.add("probe_requests");
+                deliverySequences.add(Long.parseLong(
+                    exchange.getRequestHeaders().getFirst("X-Helix-Sequence")
+                ));
+                respond(exchange, 200, receipt(exchange, true, null));
+            }
+        );
+
+        HelixHttpClient client = client(new AtomicInteger());
+        var firstHeartbeat = client.postHeartbeatAsync("{}");
+        assertTrue(firstHeartbeatEntered.await(2, TimeUnit.SECONDS));
+        var secondHeartbeat = client.postHeartbeatAsync("{}");
+        var pendingProbe = client.getPendingProbesAsync();
+        releaseFirstHeartbeat.countDown();
+
+        assertTrue(firstHeartbeat.get(5, TimeUnit.SECONDS).success());
+        assertFalse(pendingProbe.get(5, TimeUnit.SECONDS).isBlank());
+        assertTrue(secondHeartbeat.get(5, TimeUnit.SECONDS).success());
+        assertEquals(
+            List.of("heartbeat", "probe_requests", "heartbeat"),
+            deliveryOrder
+        );
+        assertEquals(List.of(1L, 2L, 3L), deliverySequences);
+        client.close();
+    }
+
+    @Test
+    void prioritizesManifestReadmissionAheadOfQueuedTelemetry() throws Exception {
+        CountDownLatch firstHeartbeatEntered = new CountDownLatch(1);
+        CountDownLatch releaseFirstHeartbeat = new CountDownLatch(1);
+        AtomicBoolean holdFirstHeartbeat = new AtomicBoolean(true);
+        List<String> deliveryOrder = new CopyOnWriteArrayList<>();
+        server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/heartbeat",
+            exchange -> {
+                deliveryOrder.add("heartbeat");
+                if (holdFirstHeartbeat.compareAndSet(true, false)) {
+                    firstHeartbeatEntered.countDown();
+                    try {
+                        releaseFirstHeartbeat.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                respond(exchange, 200, receipt(exchange, true, null));
+            }
+        );
+        server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/manifest",
+            exchange -> {
+                deliveryOrder.add("manifest");
+                respond(exchange, 200, receipt(exchange, true, null));
+            }
+        );
+
+        HelixHttpClient client = client(new AtomicInteger());
+        var firstHeartbeat = client.postHeartbeatAsync("{}");
+        assertTrue(firstHeartbeatEntered.await(2, TimeUnit.SECONDS));
+        var secondHeartbeat = client.postHeartbeatAsync("{}");
+        var manifest = client.postManifestAsync("{}");
+        releaseFirstHeartbeat.countDown();
+
+        assertTrue(firstHeartbeat.get(5, TimeUnit.SECONDS).success());
+        assertTrue(manifest.get(5, TimeUnit.SECONDS).success());
+        assertTrue(secondHeartbeat.get(5, TimeUnit.SECONDS).success());
+        assertEquals(
+            List.of("heartbeat", "manifest", "heartbeat"),
+            deliveryOrder
+        );
+        client.close();
+    }
+
+    @Test
+    void priorityProbePollingBypassesTelemetryRetryBackoff() throws Exception {
+        CountDownLatch heartbeatEntered = new CountDownLatch(1);
+        CountDownLatch releaseHeartbeat = new CountDownLatch(1);
+        AtomicInteger heartbeatAttempts = new AtomicInteger();
+        server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/heartbeat",
+            exchange -> {
+                heartbeatAttempts.incrementAndGet();
+                heartbeatEntered.countDown();
+                try {
+                    releaseHeartbeat.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+                respond(
+                    exchange,
+                    503,
+                    receipt(exchange, false, "room_source_unavailable")
+                );
+            }
+        );
+        server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/probes/pending",
+            exchange -> respond(exchange, 200, receipt(exchange, true, null))
+        );
+
+        HelixHttpClient client = client(new AtomicInteger());
+        var heartbeat = client.postHeartbeatAsync("{}");
+        assertTrue(heartbeatEntered.await(2, TimeUnit.SECONDS));
+        var pendingProbe = client.getPendingProbesAsync();
+        releaseHeartbeat.countDown();
+
+        assertFalse(heartbeat.get(5, TimeUnit.SECONDS).success());
+        assertFalse(pendingProbe.get(5, TimeUnit.SECONDS).isBlank());
+        assertEquals(1, heartbeatAttempts.get());
+        client.close();
+    }
+
+    @Test
+    void manifestReadmissionRespectsTransportBackoff() throws Exception {
+        AtomicInteger heartbeatAttempts = new AtomicInteger();
+        server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/heartbeat",
+            exchange -> {
+                heartbeatAttempts.incrementAndGet();
+                respond(
+                    exchange,
+                    503,
+                    receipt(exchange, false, "room_source_unavailable")
+                );
+            }
+        );
+        AtomicInteger manifestAttempts = new AtomicInteger();
+        server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/manifest",
+            exchange -> {
+                manifestAttempts.incrementAndGet();
+                respond(exchange, 200, receipt(exchange, true, null));
+            }
+        );
+
+        HelixHttpClient client = client(new AtomicInteger());
+        HelixHttpClient.IngressResponse heartbeat = client
+            .postHeartbeatAsync("{}")
+            .get(5, TimeUnit.SECONDS);
+        assertFalse(heartbeat.success());
+        assertEquals(3, heartbeatAttempts.get());
+
+        HelixHttpClient.IngressResponse manifest = client
+            .postManifestAsync("{}")
+            .get(2, TimeUnit.SECONDS);
+        assertEquals("client_backoff", manifest.errorCode());
+        assertEquals(0, manifestAttempts.get());
         client.close();
     }
 

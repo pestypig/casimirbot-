@@ -18,6 +18,8 @@ import { arbitrateHelixIntent } from "../intent-arbitration";
 import { isHelixAskClarifyRescueGreetingOnlyQuestion } from "../policy/clarify-rescue";
 import { interpretHelixAskPrompt } from "../prompt-interpretation";
 import { isActiveWorkstationContextPrompt } from "../workstation-active-context-intent";
+import { extractExplicitCapabilityContracts } from "../explicit-capability-contract";
+import { resolveToolFamilyContract } from "../tool-family-contract";
 
 type RecordLike = Record<string, unknown>;
 
@@ -268,12 +270,51 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
     promptInterpretation: interpretation,
     hypotheses,
   });
-  const sourceTargetIntent = input.sourceTargetIntent ?? resolveRealtimeTranscriptSourceTargetIntent({
+  const preliminarySourceTargetIntent =
+    input.sourceTargetIntent ?? resolveRealtimeTranscriptSourceTargetIntent({
     handoffId: input.handoffId,
     threadId: input.threadId,
     transcriptText: input.transcriptText,
     sourceBinding: input.sourceBinding,
   });
+  const explicitReadonlyCapabilityContracts =
+    extractExplicitCapabilityContracts(input.transcriptText).filter(
+      (entry) =>
+        resolveToolFamilyContract({
+          toolName:
+            entry.contract.runtime_capability ?? entry.contract.capability,
+        })?.mutating === false,
+    );
+  const explicitReadonlyCapabilityIds = unique(
+    explicitReadonlyCapabilityContracts.map(
+      (entry) =>
+        entry.contract.runtime_capability ?? entry.contract.capability,
+    ),
+  );
+  const explicitSourceTargets = unique(
+    explicitReadonlyCapabilityContracts
+      .filter((entry) => entry.contract.source_target === "live_environment")
+      .map((entry) => entry.contract.source_target),
+  );
+  const explicitSourceTarget =
+    explicitSourceTargets.length === 1 ? explicitSourceTargets[0] : null;
+  const sourceTargetIntent =
+    explicitSourceTarget &&
+    explicitSourceTarget !== preliminarySourceTargetIntent.target_source
+      ? ({
+          ...preliminarySourceTargetIntent,
+          target_source: explicitSourceTarget,
+          target_kind: explicitSourceTarget,
+          reasons: unique([
+            ...preliminarySourceTargetIntent.reasons,
+            "explicit_readonly_capability_contract",
+          ]),
+          precedence_reason: "explicit_readonly_capability_contract",
+          must_enter_backend_ask: true,
+          allow_client_shortcut: false,
+          allow_no_tool_direct: false,
+        } as HelixAskSourceTargetIntent)
+      : preliminarySourceTargetIntent;
   let requests: RecordLike[] = [];
   let plannerFailed = false;
   try {
@@ -293,7 +334,10 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
   }
   const readonlyCapabilityIds = bindReadonlyCapabilitiesToSourceTarget({
     sourceTargetIntent,
-    capabilityIds: capabilityIdsByMode(requests, new Set(["read", "observe"])),
+    capabilityIds: unique([
+      ...capabilityIdsByMode(requests, new Set(["read", "observe"])),
+      ...explicitReadonlyCapabilityIds,
+    ]),
   });
   const actionCapabilityIds = capabilityIdsByMode(requests, new Set(["act"]));
   const primaryIntent = arbitration.selected_primary_intent_kind;
@@ -350,6 +394,9 @@ export const buildRealtimeTranscriptWorkerAdmission = (input: {
       : null,
     actionCapabilityIds.length > 0 ? "normal_ask_policy_found_action_candidate" : null,
     readonlyCapabilityIds.length > 0 ? "normal_ask_policy_found_readonly_capability" : null,
+    explicitReadonlyCapabilityIds.length > 0
+      ? "explicit_readonly_capability_contract"
+      : null,
     admittedSourceTargetRequiresEvidence
       ? `source_target_${sourceTargetIntent.target_source}`
       : null,

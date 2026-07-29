@@ -39,6 +39,7 @@ import { compileTheoryExperimentProcedureV1 } from "@shared/theory/theory-experi
 import { compileTheoryExperimentExecutionClosureV1 } from "@shared/theory/theory-experiment-execution-closure";
 
 import type { CasimirSpecSemanticAdmissionReceiptV1 } from "../../theory/casimir-spec-semantic-admission";
+import { inspectCasimirIndependentNumericalVerifierRuntimeV1 } from "../../theory/casimir-independent-numerical-verifier-job-service";
 import { buildWorkstationGatewayObservationArtifactRef } from "./observation-packet";
 import type { HelixWorkstationCapabilityManifest } from "./types";
 
@@ -2320,6 +2321,9 @@ export async function executeTheoryExperimentProcedureGatewayCapability(input: {
       turnId: input.turnId,
       evidenceObservations: collected.observations,
       empiricalObservationSchemaRegistered: false,
+      numericalExecutionCatalogConfigured:
+        inspectCasimirIndependentNumericalVerifierRuntimeV1()
+          .executionCatalogConfigured,
     });
     const contractIssues =
       await validateTheoryExperimentExecutionClosureIntegrityV1(closure);

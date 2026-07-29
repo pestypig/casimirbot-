@@ -1,8 +1,15 @@
-import { asksForScientificImageTextEvidenceComparison } from "@shared/helix-scientific-image-intent";
+import {
+  asksForScientificImageEvidenceContinuity,
+  asksForScientificImageTextEvidenceComparison,
+} from "@shared/helix-scientific-image-intent";
 import type { HardToolBackendEntrypointRouteMetadata } from "./hard-tool-route-metadata";
 
 export const isAskTurnScientificImageTextComparisonPrompt = (prompt: string): boolean =>
   asksForScientificImageTextEvidenceComparison(prompt);
+
+export const isAskTurnScientificImageEvidencePrompt = (prompt: string): boolean =>
+  asksForScientificImageTextEvidenceComparison(prompt) ||
+  asksForScientificImageEvidenceContinuity(prompt);
 
 export const buildAskTurnScientificImageComparisonRouteMetadata = (args: {
   turnId: string;

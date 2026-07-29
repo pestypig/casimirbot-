@@ -1,0 +1,69 @@
+{
+  "schema_version": "casimir_dp_stage4_2d_fixture/1",
+  "campaign_id": "casimir-dp-cross-scale-metrology-stage4-2d-v1",
+  "evidence_class": "synthetic_fixture",
+  "generated_at": "2026-07-28T16:00:00.000Z",
+  "cases": [
+    {
+      "case_id": "baseline_recovery",
+      "expected_gate": "pass",
+      "expected_status": "all_recovery_and_nonbridge_gates_pass",
+      "scientific_interpretation": "The source-backed equations and synthetic calibration coefficients replay without promoting physical evidence."
+    },
+    {
+      "case_id": "zeeman_missing_field_authority",
+      "expected_gate": "blocked",
+      "expected_status": "missing_magnetic_field_authority",
+      "scientific_interpretation": "A Zeeman shift cannot estimate magnetic field without a calibrated transition response and field uncertainty."
+    },
+    {
+      "case_id": "stark_missing_polarizability_authority",
+      "expected_gate": "blocked",
+      "expected_status": "missing_differential_polarizability_authority",
+      "scientific_interpretation": "A Stark shift cannot estimate electric field without a transition-specific polarizability authority."
+    },
+    {
+      "case_id": "blackbody_stark_dp_bridge_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "thermal_calibration_is_not_dp_kernel",
+      "scientific_interpretation": "A dynamic Stark response to blackbody radiation calibrates the electromagnetic thermal lane only."
+    },
+    {
+      "case_id": "spinor_as_mass_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "representation_is_not_mass_identity",
+      "scientific_interpretation": "Spinor representation of fields and curvature cannot be relabeled as particle mass."
+    },
+    {
+      "case_id": "schwarzschild_as_dp_threshold_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "compactness_is_not_dp_threshold",
+      "scientific_interpretation": "Horizon compactness does not generate the weak-field DP collapse law."
+    },
+    {
+      "case_id": "potato_radius_as_dp_threshold_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "material_crossover_is_not_dp_threshold",
+      "scientific_interpretation": "The self-gravity versus yield-strength crossover is not a wave-function-collapse threshold."
+    },
+    {
+      "case_id": "jeans_scale_as_dp_threshold_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "hydrodynamic_instability_is_not_dp_threshold",
+      "scientific_interpretation": "Jeans instability compares pressure support with self-gravity and does not derive microscopic objective reduction."
+    },
+    {
+      "case_id": "registered_dp_generator_mutation_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "frozen_dp_generator_mutation",
+      "scientific_interpretation": "No cross-scale benchmark may retune the frozen Stage-4.2C DP law."
+    },
+    {
+      "case_id": "synthetic_metrology_promotion_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "measured_response_not_ready",
+      "scientific_interpretation": "Synthetic calibration and recovery calculations cannot satisfy empirical pilot or measured-evidence gates."
+    }
+  ]
+}
+

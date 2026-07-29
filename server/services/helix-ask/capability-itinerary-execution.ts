@@ -910,7 +910,42 @@ export const isHelixCapabilityItineraryFamilyObserved = (
     );
   }
   if (family === "live_environment") {
-    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) => artifactKind(artifact) === "live_environment_tool_observation");
+    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) => {
+      if (artifactKind(artifact) === "live_environment_tool_observation") {
+        return true;
+      }
+      const payload = artifactPayload(artifact);
+      const priorEnvironmentObservation = readRecord(payload?.observation);
+      if (
+        artifactKind(artifact) === "prior_environment_probe_evidence" &&
+        readString(payload?.schema) ===
+          "helix.environment_connector.prior_probe_evidence.v1" &&
+        readString(priorEnvironmentObservation?.schema) ===
+          "helix.environment_connector.probe_observation.v1" &&
+        readString(priorEnvironmentObservation?.outcome) === "succeeded" &&
+        priorEnvironmentObservation?.provenance_valid === true &&
+        priorEnvironmentObservation?.eligible_for_current_turn_reentry ===
+          true &&
+        priorEnvironmentObservation?.assistant_answer === false &&
+        priorEnvironmentObservation?.terminal_eligible === false &&
+        readString(payload?.content_role) ===
+          "prior_environment_probe_evidence_not_assistant_answer" &&
+        payload?.answer_authority === false &&
+        payload?.reentry_required === true
+      ) {
+        return true;
+      }
+      const capability = artifactCapability(artifact);
+      const status = readString(payload?.status);
+      return Boolean(
+        capability &&
+        (
+          capability.startsWith("live_env.") ||
+          capability.startsWith("com.casimirbot.minecraft.")
+        ) &&
+        /^(?:succeeded|completed|success|ok)$/i.test(status ?? ""),
+      );
+    });
   }
   if (family === "workstation_action" || family === "notes") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>

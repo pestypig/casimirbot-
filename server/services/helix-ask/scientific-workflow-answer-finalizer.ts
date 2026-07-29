@@ -53,6 +53,13 @@ export const shouldUseRawScientificWorkflowAuditAnswer = (promptText: string): b
 
 export const finalizeScientificWorkflowAnswer = (input: ScientificWorkflowFinalizerInput): string => {
   if (shouldUseRawScientificWorkflowAuditAnswer(input.promptText)) return input.rawText;
+  if (
+    input.failureReason ===
+      "scientific_image_retry_source_materialization_missing" ||
+    input.failureReason === "scientific_image_machine_text_evidence_missing"
+  ) {
+    return input.rawText;
+  }
 
   const sidecar = input.sidecar ?? null;
   const source = input.sourceState ?? null;

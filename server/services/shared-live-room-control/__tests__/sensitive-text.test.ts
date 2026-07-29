@@ -12,6 +12,8 @@ describe("Shared Live Room sensitive text boundary", () => {
       "helix_room_src_secret_value",
       "room_source_claim_secret_value",
       "agent_chat_claim_secret_value",
+      "helix_env_device_secret_value_1234567890_abcdef",
+      "helix_probe_lease_secret_value_1234567890_abcdef",
       "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature",
     ];
     const result = redactSharedLiveRoomSensitiveText(values.join(" | "));

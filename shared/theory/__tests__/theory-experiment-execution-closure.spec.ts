@@ -417,6 +417,172 @@ describe("theory experiment execution closure", () => {
     expect(closure.synthesisReadiness.openRequirementCodes).toContain(
       "formal_certificate_failed",
     );
+    expect(closure.synthesisReadiness.openRequirementCodes).not.toContain(
+      "formal_certificate_current_turn_reentry_required",
+    );
+  });
+
+  it("separates static full-1d support from an installed numerical execution catalog", async () => {
+    const procedure = await buildProcedure({
+      formalSystem: "Lean 4",
+      lanyonCaseId: "advection_diffusion_full_1d",
+    });
+    const closure = await compileTheoryExperimentExecutionClosureV1({
+      procedure,
+      procedureArtifactRef: `${TURN_ID}:procedure-artifact`,
+      numericalExecutionCatalogConfigured: false,
+      evidenceObservations: [
+        evidence(
+          "semantic_admission",
+          `${TURN_ID}:semantic`,
+          "admitted",
+          true,
+          "a".repeat(64),
+        ),
+      ],
+      generatedAt: "2026-07-26T12:00:01.000Z",
+    });
+
+    expect(
+      closure.candidates[0].axes.find(
+        (entry) => entry.axisId === "independent_numerical_replay",
+      ),
+    ).toMatchObject({ applicable: true, status: "blocked" });
+    expect(closure.synthesisReadiness.openRequirementCodes).toContain(
+      "numerical_execution_catalog_unconfigured",
+    );
+    expect(closure.synthesisReadiness.openRequirementCodes).not.toContain(
+      "numerical_certificate_current_turn_reentry_required",
+    );
+    expect(closure.synthesisReadiness.claimCeiling).not.toBe(
+      "numerically_checked_comparison",
+    );
+    expect(
+      closure.nextCapabilityCandidates.some(
+        (entry) =>
+          entry.capabilityId.includes("independent-numerical-verifier"),
+      ),
+    ).toBe(false);
+  });
+
+  it("distinguishes bound re-entry, failed evidence, and satisfied formal closure", async () => {
+    const procedure = await buildProcedure({ formalSystem: "Lean 4" });
+    procedure.evidenceBindings.push(
+      binding(
+        "formal_certificate",
+        `${TURN_ID}:bound-formal`,
+        "f".repeat(64),
+        procedure.graphId,
+      ),
+    );
+    const missingCurrentTurn = await compileTheoryExperimentExecutionClosureV1({
+      procedure,
+      procedureArtifactRef: `${TURN_ID}:procedure-artifact`,
+      evidenceObservations: [
+        evidence(
+          "semantic_admission",
+          `${TURN_ID}:semantic`,
+          "admitted",
+          true,
+          "a".repeat(64),
+        ),
+      ],
+      generatedAt: "2026-07-26T12:00:01.000Z",
+    });
+    expect(
+      missingCurrentTurn.synthesisReadiness.openRequirementCodes,
+    ).toContain("formal_certificate_current_turn_reentry_required");
+
+    const satisfied = await compileTheoryExperimentExecutionClosureV1({
+      procedure,
+      procedureArtifactRef: `${TURN_ID}:procedure-artifact`,
+      evidenceObservations: [
+        evidence(
+          "semantic_admission",
+          `${TURN_ID}:semantic`,
+          "admitted",
+          true,
+          "a".repeat(64),
+        ),
+        evidence(
+          "formal_certificate",
+          `${TURN_ID}:bound-formal`,
+          "passed",
+          true,
+          "f".repeat(64),
+        ),
+      ],
+      generatedAt: "2026-07-26T12:00:02.000Z",
+    });
+    expect(satisfied.synthesisReadiness.openRequirementCodes).not.toContain(
+      "formal_certificate_required",
+    );
+    expect(satisfied.synthesisReadiness.openRequirementCodes).not.toContain(
+      "formal_certificate_current_turn_reentry_required",
+    );
+    expect(
+      satisfied.stages.find(
+        (stage) => stage.id === "artifact_and_formal_closure",
+      )?.blockerCodes,
+    ).not.toContain("formal_certificate_required");
+  });
+
+  it("requires candidate coverage instead of treating one candidate's evidence as shared closure", async () => {
+    const procedure = await buildProcedure();
+    addSyntheticComparison(procedure);
+    const closure = await compileTheoryExperimentExecutionClosureV1({
+      procedure,
+      procedureArtifactRef: `${TURN_ID}:procedure-artifact`,
+      evidenceObservations: [
+        evidence(
+          "semantic_admission",
+          `${TURN_ID}:semantic`,
+          "admitted",
+          true,
+          "a".repeat(64),
+        ),
+      ],
+      generatedAt: "2026-07-26T12:00:01.000Z",
+    });
+    expect(closure.synthesisReadiness.openRequirementCodes).toContain(
+      "semantic_admission_candidate_coverage_incomplete",
+    );
+    expect(closure.synthesisReadiness.openRequirementCodes).not.toContain(
+      "semantic_admission_current_turn_reentry_required",
+    );
+  });
+
+  it("requires current-turn re-entry for a bound Lanyon artifact receipt", async () => {
+    const procedure = await buildProcedure({
+      formalSystem: "Lean 4",
+      lanyonCaseId: "advection_diffusion_full_1d",
+    });
+    procedure.evidenceBindings.push(
+      binding(
+        "artifact_generation_receipt",
+        `${TURN_ID}:bound-lanyon-receipt`,
+        "9".repeat(64),
+        procedure.graphId,
+      ),
+    );
+    const closure = await compileTheoryExperimentExecutionClosureV1({
+      procedure,
+      procedureArtifactRef: `${TURN_ID}:procedure-artifact`,
+      numericalExecutionCatalogConfigured: false,
+      evidenceObservations: [
+        evidence(
+          "semantic_admission",
+          `${TURN_ID}:semantic`,
+          "admitted",
+          true,
+          "a".repeat(64),
+        ),
+      ],
+      generatedAt: "2026-07-26T12:00:01.000Z",
+    });
+    expect(closure.synthesisReadiness.openRequirementCodes).toContain(
+      "artifact_generation_receipt_current_turn_reentry_required",
+    );
   });
 
   it("retains an unscoped failed certificate without attributing it to this procedure", async () => {

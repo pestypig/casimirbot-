@@ -3,6 +3,7 @@ import minecraftManifestFixture from "../../fixtures/environment-source/minecraf
 import {
   HELIX_MINECRAFT_ADAPTER_PROFILE_ID,
   HELIX_SYNTHETIC_GAME_ADAPTER_PROFILE_ID,
+  HELIX_SYSTEM_CLOCK_ADAPTER_PROFILE_ID,
   helixEnvironmentAdapterProfileSchema,
 } from "@shared/helix-environment-adapter-profile";
 import {
@@ -46,6 +47,11 @@ describe("environment adapter registry", () => {
           collection_id: "mechanics.minecraft.java.v1",
           retrieval_namespace: "mechanics:minecraft:java",
         }),
+        expect.objectContaining({
+          collection_id: "mechanics.minecraft.crimson_curse.v1",
+          adapter_ids: ["minecraft.fabric_mod.v1"],
+          retrieval_namespace: "mechanics:minecraft:crimson_curse",
+        }),
       ]),
     );
     expect(first.contract_hash).toMatch(/^sha256:[a-f0-9]{64}$/);
@@ -56,6 +62,31 @@ describe("environment adapter registry", () => {
     expect(helixEnvironmentAdapterProfileSchema.parse(first.profile)).toEqual(
       first.profile,
     );
+  });
+
+  it("admits the Fabric integrated-server adapter under the same Minecraft contract", () => {
+    const resolved = resolveEnvironmentAdapterProfile({
+      domainAdapter: "minecraft.fabric_mod.v1",
+      worldId: "minecraft:fabric-essential:test-world",
+    });
+    expect(resolved.profile.profile_id).toBe(
+      HELIX_MINECRAFT_ADAPTER_PROFILE_ID,
+    );
+    expect(resolved.profile.accepted_domain_adapters).toContain(
+      "minecraft.fabric_mod.v1",
+    );
+    expect(
+      resolved.profile.mechanics_collections[0]?.adapter_ids,
+    ).toContain("minecraft.fabric_mod.v1");
+
+    const manifest = minecraftManifest();
+    manifest.domain_adapter = "minecraft.fabric_mod.v1";
+    manifest.source_label = "Minecraft Fabric Sensor";
+    const admitted = assertEnvironmentAdapterManifest({
+      manifest,
+      worldId: "minecraft:fabric-essential:test-world",
+    });
+    expect(admitted.ok).toBe(true);
   });
 
   it("fails closed for unknown and cross-domain world identities", () => {
@@ -106,8 +137,31 @@ describe("environment adapter registry", () => {
     expect(fixture.profile.normalizer.producer_code_loaded).toBe(false);
     expect(
       listEnvironmentAdapterProfiles({ includeFixtureProfiles: true }),
-    ).toHaveLength(2);
-    expect(listEnvironmentAdapterProfiles()).toHaveLength(1);
+    ).toHaveLength(3);
+    expect(listEnvironmentAdapterProfiles()).toHaveLength(2);
+  });
+
+  it("admits a real non-game system connector without Minecraft identity fields", () => {
+    const system = resolveEnvironmentAdapterProfile({
+      domainAdapter: "system.clock.connector.v1",
+      worldId: "system:host-clock",
+    });
+    expect(system.profile).toMatchObject({
+      profile_id: HELIX_SYSTEM_CLOCK_ADAPTER_PROFILE_ID,
+      domain: "custom",
+      source_family: "system_clock",
+      allowed_probe_types: [],
+      required_probe_types: [],
+      mechanics_collections: [],
+      execution_policy: {
+        may_execute_live_actions: false,
+        may_perform_read_only_probes: true,
+        action_credential_reused: false,
+      },
+    });
+    expect(JSON.stringify(system.profile)).not.toMatch(
+      /player|block|chunk|world command|game version/i,
+    );
   });
 
   it("admits the existing Minecraft manifest and rejects incompatible claims", () => {

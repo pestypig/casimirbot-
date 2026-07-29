@@ -10,8 +10,11 @@ final class ProbeGuardRuntimeTest {
     @Test
     void separatesReadOnlyUnsupportedAndForbiddenProbes() {
         ProbeContractGuard guard = new ProbeContractGuard();
+        assertTrue(guard.isKnownReadOnlyProbe(Map.of("probe_type", "actor_status")));
         assertTrue(guard.isKnownReadOnlyProbe(Map.of("probe_type", "inventory_check")));
-        assertTrue(guard.isKnownReadOnlyProbe(Map.of("probe_type", "route_feasibility")));
+        assertTrue(guard.isKnownReadOnlyProbe(Map.of("probe_type", "nearby_entities")));
+        assertFalse(guard.isKnownReadOnlyProbe(Map.of("probe_type", "route_feasibility")));
+        assertFalse(guard.isKnownReadOnlyProbe(Map.of("probe_type", "container_freshness")));
         assertTrue(guard.isForbiddenAction(Map.of("probe_type", "place_block")));
         assertFalse(guard.isKnownReadOnlyProbe(Map.of("probe_type", "place_block")));
         assertFalse(guard.isKnownReadOnlyProbe(Map.of("probe_type", "teleport_actor")));

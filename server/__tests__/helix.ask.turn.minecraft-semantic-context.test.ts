@@ -49,7 +49,7 @@ describe("Helix Ask Minecraft semantic context", () => {
     clearSyntheticEvidenceForTest();
   });
 
-  it("answers farm/use questions from compact semantic utility evidence", async () => {
+  it("does not promote legacy unbound semantic utility events into answer authority", async () => {
     const app = await createApp();
     await replayFixture("chicken-egg-flow.jsonl");
 
@@ -62,17 +62,18 @@ describe("Helix Ask Minecraft semantic context", () => {
       })
       .expect(200);
 
-    expect(response.body.final_answer_source).toBe("artifact_synthesis");
-    expect(String(response.body.answer)).toMatch(/Semantic reference/i);
-    expect(String(response.body.answer)).toMatch(/egg-source farm/i);
-    expect(String(response.body.answer)).toMatch(/Status: confirmed; confidence 0\.85/i);
-    expect(String(response.body.answer)).toMatch(/plugin did not emit a gameplay meaning label/i);
-    expect(response.body.situation_context_pack?.utility_hypotheses?.[0]?.assistant_answer).toBe(false);
-    expect(response.body.situation_context_pack?.semantic_reference_hits?.[0]?.raw_reference_included).toBe(false);
-    expect(JSON.stringify(response.body.situation_context_pack ?? {})).not.toMatch(/entity_cluster_sample.*entity_cluster_sample/);
-  }, 20000);
+    expect(response.body.final_answer_source).not.toBe("artifact_synthesis");
+    expect(response.body.source_target_intent).toMatchObject({
+      target_source: "model_only",
+      target_kind: "general_background",
+    });
+    expect(String(response.body.answer)).not.toMatch(
+      /Semantic reference|egg-source farm|Status: confirmed/i,
+    );
+    expect(response.body.situation_context_pack).toBeUndefined();
+  }, 60000);
 
-  it("keeps open-field animals below farm interpretation", async () => {
+  it("fails closed when legacy unbound world events are the only current-state evidence", async () => {
     const app = await createApp();
     await replayFixture("random-animals-no-farm.jsonl");
 
@@ -85,8 +86,15 @@ describe("Helix Ask Minecraft semantic context", () => {
       })
       .expect(200);
 
-    expect(String(response.body.answer)).toMatch(/Chicken utility context|entity cluster/i);
-    expect(String(response.body.answer)).toMatch(/confidence 0\.35/i);
-    expect(String(response.body.answer)).toMatch(/Containment context is not established/i);
-  }, 20000);
+    expect(response.body.ok).toBe(false);
+    expect(response.body.response_type).toBe("final_failure");
+    expect(response.body.final_answer_source).toBe("typed_failure");
+    expect([
+      "capability_itinerary_observations_missing",
+      "direct_answer_unavailable",
+    ]).toContain(response.body.terminal_error_code);
+    expect(String(response.body.answer)).not.toMatch(
+      /confidence 0\.35|Containment context is not established/i,
+    );
+  }, 60000);
 });

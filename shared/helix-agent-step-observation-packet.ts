@@ -235,6 +235,7 @@ export type HelixAgentStepObservationPacket = {
     text_to_speech_receipt?: unknown;
     voice_playback_receipt_barrier?: unknown;
     voice_playback_client_receipt?: unknown;
+    prior_environment_probe_evidence?: Record<string, unknown>;
     visual_analysis_region_inspection?: {
       lane_id: "visual_analysis";
       capability: "visual_analysis.inspect_image_region";

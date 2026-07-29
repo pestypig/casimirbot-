@@ -232,6 +232,21 @@ describe("Helix factual turn lifecycle", () => {
       matched_reentry_refs: ["paper:full-text:1"],
       runtime_observation_reentry_refs: ["paper:full-text:1"],
     });
+
+    const selected = readVerifiedHelixRuntimeLifecycleFromPayload({
+      payload: {
+        turn_lifecycle: canonicalLifecycle,
+        native_provider_turn_lifecycle: nativeRecorder.snapshot(),
+      },
+      turnId: canonicalLifecycle.turn_id,
+    });
+    expect(selected).toMatchObject({
+      scope: "helix_ask_turn",
+      reduction: {
+        observation_reentry_refs: ["paper:full-text:1"],
+        post_observation_reasoning_completed: true,
+      },
+    });
   });
 
   it("rejects a lifecycle whose event history fails recomputed integrity", () => {

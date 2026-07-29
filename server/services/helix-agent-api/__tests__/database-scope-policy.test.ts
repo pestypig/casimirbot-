@@ -79,6 +79,11 @@ describe("Helix agent database-scope policy", () => {
       ),
     ).toContain("shared_live_room_evidence");
     expect(
+      evidenceRequirementFamiliesForArtifactKind(
+        "helix.environment_probe_observation.v1",
+      ),
+    ).toContain("shared_live_room_environment_probe");
+    expect(
       evidenceRequirementFamiliesForArtifactKind("untrusted_text"),
     ).toEqual([]);
   });

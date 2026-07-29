@@ -222,8 +222,9 @@ turns and assertions without network calls.
 
 ## Current External Limits
 
-- Live Ask and Realtime evidence still require a user-started keyed server via
-  the opaque `start-myapp-for-codex` launcher.
+- Live Ask and Realtime evidence require the normal keyed server. It may be
+  user-started or launched by Codex Desktop through an explicitly authorized
+  configured opaque `start-myapp-for-codex` action.
 - Casimir adapter verification requires that keyed server and must report PASS
   plus certificate integrity before release completion.
 - Lanyon eligibility is limited to the nine pinned 1D/2D/3D linear-advection,
@@ -253,9 +254,12 @@ turns and assertions without network calls.
   is intentionally unreachable until that server-owned catalog is installed;
   preparation currently returns typed blockers only.
 - A repository-owned, no-import Lean 4.31 self-test now checks only the pinned
-  kernel/replay runtime. It is test-process-only, absent from the scientific
-  catalog, and cannot satisfy a semantic, theorem-type, graph, badge, formal
-  closure, or certificate-promotion requirement.
+  launcher/source replay path. A developer-only runtime canary may expose it
+  through `inspect -> plan -> confirmed start -> read_result` after trusted
+  server dependencies are installed; the default singleton remains blocked.
+  It stays absent from the scientific catalog and cannot satisfy a semantic,
+  theorem-type, graph, badge, formal-closure, or certificate-promotion
+  requirement.
 - Immutable Lanyon numerical enrollment can bind an exact procedure, sealed
   request, replay policy, upstream commit/tree, persistent bundle, platform,
   architecture, and attested sandbox capability. The default catalog remains

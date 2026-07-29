@@ -1,0 +1,164 @@
+{
+  "schema_version": "casimir_dp_cross_scale_metrology_stage4_2d_verification_receipt/1",
+  "campaign_id": "casimir-dp-cross-scale-metrology-stage4-2d-v1",
+  "campaign_run_id": "casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z",
+  "verified_at": "2026-07-28T20:01:04.958Z",
+  "evidence_class": "synthetic_cross_scale_recovery_and_spectroscopic_field_metrology",
+  "claim_ceiling": "spectroscopic_field_metrology_and_classical_gravity_recovery_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-cross-scale-metrology-stage4-2d.v1.json",
+    "config_sha256": "614f5b6de4176ffda7fc49ce794592aa50a56ecb56d4accf7df3cae6b0bcc41e",
+    "authority_manifest_path": "configs/research/casimir-dp-stage4-2d-authorities.v1.json",
+    "authority_manifest_sha256": "721e0ffbcc26425236d62ba2d368fc8cabec9ba469d5dfac89a707e90d42dcb1",
+    "fixture_path": "configs/research/fixtures/casimir-dp-stage4-2d-cross-scale.synthetic.v1.json",
+    "fixture_sha256": "9fb2f66f5d454aafde3c65e058c2c94c7279d4a5e821bd4b2c359cae6e12ab85",
+    "report_json_path": "artifacts/research/casimir-dp-cross-scale-metrology-stage4-2d/casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z/cross-scale-metrology-stage4-2d-report.json",
+    "report_json_sha256": "5e16c28a32ab77d0ca7ee44483824ca6ddedfb09657a77340df4b4f892c74229",
+    "report_markdown_path": "artifacts/research/casimir-dp-cross-scale-metrology-stage4-2d/casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z/cross-scale-metrology-stage4-2d-report.md",
+    "report_markdown_sha256": "3ef52e169d5f4b91f1236d705bbd7acda5097e2e3fdb165e15fdb571acb7ce55",
+    "campaign_trace_path": "artifacts/research/casimir-dp-cross-scale-metrology-stage4-2d/casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z/cross-scale-metrology-stage4-2d-trace.jsonl",
+    "campaign_trace_sha256": "81b22e62a58f7bd6cb4940bd4004455b3816a9486dba345e25535f5294dea6a5",
+    "campaign_receipt_path": "artifacts/research/casimir-dp-cross-scale-metrology-stage4-2d/casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z/cross-scale-metrology-stage4-2d-receipt.json",
+    "campaign_receipt_sha256": "e602cb12250c2560b1f71502ae93c17e754cacbbe69b6f0acfbb4a5a55a6809c",
+    "maintained_report_path": "docs/research/casimir-dp-cross-scale-metrology-stage4-2d-report.md",
+    "maintained_report_matches_immutable_markdown": true,
+    "git_head": "41d640c4acee2f2a414c4e1ebf1c4bb2f88ead6d",
+    "worktree_state": "dirty_uncommitted_stage4_2d_source_and_content_hashes_authoritative",
+    "authority_mode": "role_path_and_content_hash_tuple"
+  },
+  "immutable_stage4_2c_upstream": {
+    "run_id": "casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z",
+    "campaign_receipt_sha256": "59cca7ab7f6f6a3d27a83ad8b455fc63fc6db3ca7207cdeff350ed97d497865c",
+    "downstream_verification_receipt_path": "docs/research/casimir-dp-identifiability-redesign-stage4-2c-verification-receipt.json",
+    "downstream_verification_receipt_sha256": "51c461db1fdaa29162b2c5287a31c01823e5bb23b16a25fe2914841239abba98",
+    "mutation_detected": false
+  },
+  "verification_inputs": {
+    "explicit_repo_telemetry": {
+      "path": "reports/repo-telemetry-stage4-2d-20260728T195741260Z.json",
+      "sha256": "76ca6aa413637aef7a7b20abc1768bdddcc4c3c8482de656c154e46b624d0845",
+      "auto_merge_used": false
+    },
+    "adapter_request": {
+      "path": "artifacts/casimir-dp-stage4-2d-20260728T195741260Z-adapter-request.json",
+      "sha256": "f74d9d3ec99ebd7ff43a453d91aa7b02f8aa795c7dd8696c42e049c56fe6cd68",
+      "auto_telemetry": false,
+      "explicit_hard_inputs": [
+        "build.status",
+        "tests.status",
+        "schema.contracts",
+        "deps.coherence"
+      ],
+      "stale_proxy_carry_forward_allowed": false
+    },
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-2d-20260728T195741260Z-bound-validated.jsonl",
+      "sha256": "bb4f53cf48f7cf0726822e53dbacd369485c638636df1e6f5078027d36f91d38",
+      "bytes": 3547,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true,
+      "validated_exporter_path": "scripts/research/export-casimir-dp-stage4-verification-trace.ts"
+    }
+  },
+  "local_gates": {
+    "stage4_2d_runtime_campaign_paper_graph_and_root": {
+      "files": 5,
+      "tests": 46,
+      "status": "pass"
+    },
+    "required_gr_warp_replay": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    },
+    "historical_immutable_orchestrator_replay": {
+      "attempted_files": 4,
+      "attempted_tests": 24,
+      "status": "fail_closed_on_frozen_provenance_as_expected",
+      "reason": "The historical Stage-4, Stage-4.1, Stage-4.2A, and Stage-4.2B campaign configs bind earlier Git-head and content-hash tuples. Rewriting those immutable configs or receipts is prohibited; their content-addressed receipts remain upstream authority.",
+      "used_as_adapter_pass_evidence": false
+    },
+    "production_build": {
+      "status": "pass_with_warnings",
+      "command": "npm run build",
+      "exit_code": 0,
+      "warnings_present": true,
+      "note": "The production client and server bundles completed. Existing browser-externalization, chunk-size, duplicate-key, and duplicate-case warnings remain outside this campaign's scientific authority."
+    },
+    "dependency_coherence": {
+      "status": "pass",
+      "command": "npm ls --depth=0",
+      "exit_code": 0,
+      "package_lock_sha256": "c85521a758783fa5cea1c8933e3c5ad54d604d596620279fce916e3c2ce42367"
+    },
+    "equation_sidecar": {
+      "paper_markers": 49,
+      "source_entries": 49,
+      "generated_entries": 49,
+      "source_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
+      "source_sha256_before_downstream_receipt_binding": "dc8a63b1d915b79813d2cc0313bace7906be34ac230343e9374e4713c7b5196b",
+      "generated_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
+      "generated_sha256_before_downstream_receipt_binding": "9bfa28ae64366430ec19a03ed9a8b476da0054632461936834f21988c57d9560",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 29,
+      "edges": 87,
+      "stage4_2d_badges": 1,
+      "calculator_payloads": 0,
+      "observable_bridge_edges": 0,
+      "graph_path": "shared/theory/casimir-dp-study-theory-badges.ts",
+      "graph_sha256_before_downstream_receipt_binding": "1b1bfb5bfc32e0ceaaa307e8e3eeb63e2deda8c74955639819a15902eb3fe2c2",
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 217,
+      "validation": "pass",
+      "strict_congruence_errors": 0,
+      "strict_congruence_warnings": 0,
+      "report_json_path": "reports/math-report.json",
+      "report_json_sha256": "583803522821954d5abb235251321e6c2ad22c7e6230a88cb4cf1d8625ff93be",
+      "report_markdown_path": "reports/math-report.md",
+      "report_markdown_sha256": "dc30125f6e108cea6ce14d7f03e0121c482049785379a1c1c527d3758cda7640"
+    },
+    "physics_root_to_leaf_manifest": {
+      "status": "pass",
+      "manifest_path": "configs/physics-root-leaf-manifest.v1.json",
+      "manifest_sha256": "d351f079129f597c223d6e310b45ce1236139daa2c6a7f5580db922c95f7040c",
+      "readiness_and_scientific_falsifier_rules_separated": true
+    }
+  },
+  "adapter_result": {
+    "trace_id": "casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T195741260Z-final",
+    "run_id": "2338",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate": {
+      "status": "GREEN",
+      "certificate_hash": "38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34",
+      "certificate_id": "constraint-pack:repo-convergence:38b2e69264ac",
+      "integrity_ok": true
+    },
+    "scientific_scope": "none"
+  },
+  "scientific_standing": {
+    "software_and_recovery_diagnostics": "pass",
+    "spectroscopic_response_authority": "not_ready",
+    "witness_to_complex_coherence_transfer": "not_ready",
+    "physical_pilot_readiness": "not_ready",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "explanation": "The certificate validates the supplied software, test, schema, dependency, graph, sidecar, math, root-to-leaf, and GR/WARP gates. It does not authenticate the synthetic spectroscopic response as measurement, supply a witness-to-coherence transfer, demonstrate state preparation, exclude or support DP, admit a Casimir-to-collapse bridge, identify collapse or manifold dynamics, or establish physical viability."
+  }
+}

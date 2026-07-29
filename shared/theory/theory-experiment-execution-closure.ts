@@ -20,6 +20,11 @@ export type CompileTheoryExperimentExecutionClosureInput = {
   generatedAt?: string;
   closureId?: string;
   empiricalObservationSchemaRegistered?: boolean;
+  /**
+   * Server-owned runtime inspection. Undefined preserves pure compiler
+   * compatibility; gateway callers must pass the actual catalog state.
+   */
+  numericalExecutionCatalogConfigured?: boolean;
 };
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
@@ -200,6 +205,7 @@ const reachesCandidateContext = (input: {
 const candidateRows = (input: {
   procedure: TheoryExperimentProcedureV1;
   evidence: TheoryExperimentExecutionClosureEvidenceObservationV1[];
+  numericalExecutionCatalogConfigured?: boolean;
 }): TheoryExperimentExecutionClosureCandidateV1[] => {
   const candidateIds = unique([
     ...input.procedure.request.selectedBadgeIds,
@@ -242,6 +248,8 @@ const candidateRows = (input: {
     input.procedure.lanyonEligibility.status === "eligible";
   const artifactApplicable = input.procedure.lanyonEligibility.requested;
   const numericalApplicable = numericalBackendRegistered(input.procedure);
+  const numericalRuntimeAvailable =
+    input.numericalExecutionCatalogConfigured !== false;
   const empiricalApplicable = Boolean(input.procedure.request.targetObservable);
 
   const rows = candidateIds.map((candidateId) => {
@@ -263,12 +271,18 @@ const candidateRows = (input: {
       formalApplicable,
       candidateId,
     );
-    const numerical = evidenceStatus(
-      input.evidence,
-      "numerical_certificate",
-      numericalApplicable,
-      candidateId,
-    );
+    const numerical =
+      numericalApplicable && !numericalRuntimeAvailable
+        ? {
+            status: "blocked" as const,
+            refs: [] as string[],
+          }
+        : evidenceStatus(
+            input.evidence,
+            "numerical_certificate",
+            numericalApplicable,
+            candidateId,
+          );
     const empirical = evidenceStatus(
       input.evidence,
       "empirical_observation",
@@ -409,7 +423,9 @@ const candidateRows = (input: {
         numerical.status,
         numerical.refs,
         numericalApplicable
-          ? "Numerical status applies to the frozen registered backend, two lineages, tolerances, and observables."
+          ? numericalRuntimeAvailable
+            ? "Numerical status applies to the frozen registered backend, two lineages, tolerances, and observables."
+            : "The case is statically supported, but no server-owned numerical execution catalog is configured."
           : input.procedure.lanyonEligibility.requested
             ? "No registered numerical backend exists for this selected Lanyon case."
             : "No independent numerical replay is applicable.",
@@ -501,6 +517,8 @@ export async function compileTheoryExperimentExecutionClosureV1(
   const candidates = candidateRows({
     procedure: input.procedure,
     evidence,
+    numericalExecutionCatalogConfigured:
+      input.numericalExecutionCatalogConfigured,
   });
   const comparable = candidates.filter((candidate) => candidate.comparable);
   const topScore = comparable[0]?.evidenceCoverageScore ?? null;
@@ -553,6 +571,8 @@ export async function compileTheoryExperimentExecutionClosureV1(
     );
   const semanticEvidenceSatisfied =
     axisSatisfiedAcrossAllCandidates("semantic_identity");
+  const artifactEvidenceSatisfied =
+    axisSatisfiedAcrossAllCandidates("artifact_admission");
   const formalEvidenceSatisfied =
     axisSatisfiedAcrossAllCandidates("formal_replay");
   const numericalEvidenceSatisfied = axisSatisfiedAcrossAllCandidates(
@@ -561,11 +581,29 @@ export async function compileTheoryExperimentExecutionClosureV1(
   const empiricalEvidenceSatisfied = axisSatisfiedAcrossAllCandidates(
     "empirical_grounding",
   );
+  const numericalCatalogUnavailable =
+    numericalBackendRegistered(input.procedure) &&
+    input.numericalExecutionCatalogConfigured === false;
   const semanticSatisfied =
     allCandidatesComparable && semanticEvidenceSatisfied;
   const formalSatisfied = semanticSatisfied && formalEvidenceSatisfied;
   const numericalSatisfied = semanticSatisfied && numericalEvidenceSatisfied;
   const empiricalSatisfied = semanticSatisfied && empiricalEvidenceSatisfied;
+  const frozenRequirementSatisfied = new Map<string, boolean>([
+    ["semantic_admission_required", semanticEvidenceSatisfied],
+    ["artifact_generation_receipt_required", artifactEvidenceSatisfied],
+    ["formal_certificate_required", formalEvidenceSatisfied],
+    [
+      "independent_numerical_certificate_required",
+      numericalEvidenceSatisfied || numericalCatalogUnavailable,
+    ],
+    ["empirical_observation_required", empiricalEvidenceSatisfied],
+  ]);
+  const filteredProcedureRequirements =
+    input.procedure.missingRequirements.filter(
+      (requirement) =>
+        frozenRequirementSatisfied.get(requirement.code) !== true,
+    );
   const blockerCodes = unique([
     ...(hardBlocked ? ["graph_or_derivation_runtime_blocked"] : []),
     ...(candidates.length === 0 ? ["candidate_set_empty"] : []),
@@ -575,7 +613,7 @@ export async function compileTheoryExperimentExecutionClosureV1(
     ...(comparable.length > 0 && !allCandidatesComparable
       ? ["candidate_set_partially_incomparable"]
       : []),
-    ...input.procedure.missingRequirements
+    ...filteredProcedureRequirements
       .filter((requirement) => !requirement.retryable)
       .map((requirement) => requirement.code),
   ]);
@@ -586,23 +624,83 @@ export async function compileTheoryExperimentExecutionClosureV1(
         (entry.status === "failed" || entry.status === "blocked"),
     )
     .map((entry) => `${entry.kind}_${entry.status}`);
+  const dynamicEvidenceRequirementCodes = (inputRequirement: {
+    kind: TheoryExperimentExecutionClosureEvidenceObservationV1["kind"];
+    axisId: TheoryExperimentExecutionClosureAxisV1["axisId"];
+    baseCode: string;
+    reentryCode: string;
+  }): string[] => {
+    if (!axisApplicable(inputRequirement.axisId)) return [];
+    if (axisSatisfiedAcrossAllCandidates(inputRequirement.axisId)) return [];
+    const current = evidence.filter(
+      (entry) =>
+        entry.scope === "shared_procedure_evidence" &&
+        entry.kind === inputRequirement.kind,
+    );
+    if (
+      current.some(
+        (entry) => entry.status === "failed" || entry.status === "blocked",
+      )
+    ) {
+      return [];
+    }
+    if (current.length > 0) {
+      return [`${inputRequirement.kind}_candidate_coverage_incomplete`];
+    }
+    if (
+      input.procedure.evidenceBindings.some(
+        (binding) => binding.kind === inputRequirement.kind,
+      )
+    ) {
+      return [inputRequirement.reentryCode];
+    }
+    return [inputRequirement.baseCode];
+  };
+  const dynamicEvidenceRequirements = [
+    ...dynamicEvidenceRequirementCodes({
+      kind: "semantic_admission",
+      axisId: "semantic_identity",
+      baseCode: "semantic_admission_required",
+      reentryCode: "semantic_admission_current_turn_reentry_required",
+    }),
+    ...dynamicEvidenceRequirementCodes({
+      kind: "artifact_generation_receipt",
+      axisId: "artifact_admission",
+      baseCode: "artifact_generation_receipt_required",
+      reentryCode:
+        "artifact_generation_receipt_current_turn_reentry_required",
+    }),
+    ...dynamicEvidenceRequirementCodes({
+      kind: "formal_certificate",
+      axisId: "formal_replay",
+      baseCode: "formal_certificate_required",
+      reentryCode: "formal_certificate_current_turn_reentry_required",
+    }),
+    ...(numericalCatalogUnavailable
+      ? []
+      : dynamicEvidenceRequirementCodes({
+          kind: "numerical_certificate",
+          axisId: "independent_numerical_replay",
+          baseCode: "independent_numerical_certificate_required",
+          reentryCode:
+            "numerical_certificate_current_turn_reentry_required",
+        })),
+    ...dynamicEvidenceRequirementCodes({
+      kind: "empirical_observation",
+      axisId: "empirical_grounding",
+      baseCode: "empirical_observation_required",
+      reentryCode:
+        "empirical_observation_current_turn_reentry_required",
+    }),
+  ];
   const openRequirementCodes = unique([
-    ...input.procedure.missingRequirements.map(
+    ...filteredProcedureRequirements.map(
       (requirement) => requirement.code,
     ),
     ...failedEvidenceCodes,
-    ...(!semanticEvidenceSatisfied
-      ? ["semantic_admission_current_turn_reentry_required"]
-      : []),
-    ...(axisApplicable("formal_replay") && !formalEvidenceSatisfied
-      ? ["formal_certificate_current_turn_reentry_required"]
-      : []),
-    ...(axisApplicable("independent_numerical_replay") &&
-    !numericalEvidenceSatisfied
-      ? ["numerical_certificate_current_turn_reentry_required"]
-      : []),
-    ...(axisApplicable("empirical_grounding") && !empiricalEvidenceSatisfied
-      ? ["empirical_observation_current_turn_reentry_required"]
+    ...dynamicEvidenceRequirements,
+    ...(numericalCatalogUnavailable
+      ? ["numerical_execution_catalog_unconfigured"]
       : []),
     ...(input.procedure.lanyonEligibility.requested &&
     !numericalBackendRegistered(input.procedure)
@@ -727,7 +825,30 @@ export async function compileTheoryExperimentExecutionClosureV1(
         .map((entry) => entry.artifactRef),
     ]),
     blockerCodes: unique([
-      ...stage.missingRequirementCodes,
+      ...openRequirementCodes.filter((code) => {
+        if (stage.missingRequirementCodes.includes(code)) return true;
+        if (
+          code.startsWith("semantic_admission_") ||
+          code === "semantic_admission_required"
+        ) {
+          return stage.id === "semantic_definition";
+        }
+        if (
+          code.startsWith("artifact_generation_receipt_") ||
+          code.startsWith("formal_certificate_")
+        ) {
+          return stage.id === "artifact_and_formal_closure";
+        }
+        if (
+          code.startsWith("numerical_certificate_") ||
+          code.startsWith("independent_numerical_certificate_") ||
+          code === "numerical_execution_catalog_unconfigured" ||
+          code.startsWith("empirical_observation_")
+        ) {
+          return stage.id === "numerical_and_observational_closure";
+        }
+        return false;
+      }),
       ...evidence
         .filter(
           (entry) =>
@@ -792,6 +913,31 @@ export async function compileTheoryExperimentExecutionClosureV1(
         (affordance) =>
           affordance.capabilityId !==
             "theory-experiment-procedure.evaluate_closure" &&
+          !(
+            numericalCatalogUnavailable &&
+            affordance.phase === "verify_numerical"
+          ) &&
+          !(
+            affordance.producesEvidenceKind === "semantic_admission" &&
+            semanticEvidenceSatisfied
+          ) &&
+          !(
+            affordance.producesEvidenceKind ===
+              "artifact_generation_receipt" &&
+            artifactEvidenceSatisfied
+          ) &&
+          !(
+            affordance.producesEvidenceKind === "formal_certificate" &&
+            formalEvidenceSatisfied
+          ) &&
+          !(
+            affordance.producesEvidenceKind === "numerical_certificate" &&
+            numericalEvidenceSatisfied
+          ) &&
+          !(
+            affordance.producesEvidenceKind === "empirical_observation" &&
+            empiricalEvidenceSatisfied
+          ) &&
           (affordance.status === "admitted" ||
             affordance.status === "conditional"),
       )

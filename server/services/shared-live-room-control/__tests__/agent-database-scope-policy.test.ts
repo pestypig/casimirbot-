@@ -4,6 +4,10 @@ import {
   HELIX_AGENT_BOUND_ROOM_EVIDENCE_CAPABILITY,
   HELIX_AGENT_BOUND_ROOM_EVIDENCE_DATABASE_SCOPE,
   HELIX_AGENT_BOUND_ROOM_EVIDENCE_REQUIREMENT,
+  HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_CAPABILITY,
+  HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_CAPABILITIES,
+  HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_DATABASE_SCOPE,
+  HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_REQUIREMENT,
   HELIX_AGENT_DATABASE_SCOPE_CATALOG,
 } from "../../helix-agent-api/database-scope-policy";
 import {
@@ -27,6 +31,20 @@ describe("Shared Live Room external-agent database scope extension", () => {
       requiredEvidence: [HELIX_AGENT_BOUND_ROOM_EVIDENCE_REQUIREMENT],
       oauthScope: HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
     });
+    expect(
+      extended.get(
+        HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_DATABASE_SCOPE,
+      ),
+    ).toEqual({
+      allowedTools: HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_CAPABILITIES,
+      requiredEvidence: [
+        HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_REQUIREMENT,
+      ],
+      oauthScope: HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+    });
+    expect(
+      HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_CAPABILITIES,
+    ).toContain(HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_CAPABILITY);
   });
 
   it("admits the extension only when deployment configuration selects it", () => {
@@ -37,12 +55,14 @@ describe("Shared Live Room external-agent database scope extension", () => {
       new Set([
         "repository_evidence",
         HELIX_AGENT_BOUND_ROOM_EVIDENCE_DATABASE_SCOPE,
+        HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_DATABASE_SCOPE,
         "attacker_defined_scope",
       ]),
     );
     expect(Array.from(configured.keys())).toEqual([
       "repository_evidence",
       HELIX_AGENT_BOUND_ROOM_EVIDENCE_DATABASE_SCOPE,
+      HELIX_AGENT_BOUND_ROOM_ENVIRONMENT_PROBE_DATABASE_SCOPE,
     ]);
     expect(configured.has("attacker_defined_scope")).toBe(false);
   });

@@ -97,6 +97,30 @@ describe("internet-search arbitration for workstation context", () => {
     expect(detectInternetSearchIntent(prompt).searchRequested).toBe(true);
   });
 
+  it("keeps a current Minecraft observation follow-up on the local evidence path", () => {
+    const prompt =
+      "Given the current Minecraft observations you just gathered, what should I fix first before moving? Be explicit about what the evidence does and does not prove.";
+
+    expect(buildToolUseRestatement(prompt).requiredToolFamilies).not.toContain(
+      "internet_search",
+    );
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:minecraft-observation-followup",
+        threadId: "thread:test",
+        promptText: prompt,
+      }).target_source,
+    ).not.toBe("internet_search");
+  });
+
+  it("still admits an explicit web request from a Minecraft room", () => {
+    const prompt =
+      "In this Minecraft room, search the web for the current Fabric release notes.";
+
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(true);
+  });
+
   it("admits an affirmative panel question after quoted screen-visible wording", () => {
     const prompt =
       "The button label reads \"What panel in the workstation is active?\", but what panel in the workstation is active?";

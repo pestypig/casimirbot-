@@ -3,15 +3,16 @@
 ## Purpose
 
 Once the full CasimirBot server is published at `https://casimirbot.com`, a
-Minehut/Paper server can send observations directly to that deployment. A
-Cloudflare tunnel is not part of the production path.
+Minehut/Paper server or Fabric server/integrated-server host can send
+observations directly to that deployment. A Cloudflare tunnel is not part of
+the production path.
 
 The source link is attached to a durable Shared Live Room, but it is not a
 human invitation and it does not use the room's browser WebRTC data channel.
 It is a separate, read-only server credential:
 
 ```text
-Minehut Paper plugin
+Paper plugin or Fabric mod
   -> https://casimirbot.com/api/room-ingress/v1/bindings/<opaque-binding-id>
   -> trusted Minecraft adapter profile + durable manifest admission
   -> exact room/source/world/credential/producer-epoch admission
@@ -31,6 +32,13 @@ Sign in with a `developer` account, create or open a Shared Live Room, and use
 **Generate link** under **Minecraft room source link**. Only the room owner can
 create, rotate, list, or revoke source bindings.
 
+For local and test environments, an experimental guest owner receives the same
+read-only source-link control only while both the public Shared Live Rooms
+experiment and guest room creation are enabled. Production additionally
+requires `HELIX_GUEST_ROOM_SOURCE_INGRESS=1`. The grant is session-bound,
+expires with the guest session, exposes only bound-room evidence and the
+allowlisted Minecraft inventory probe, and never enables command execution.
+
 The server returns a setup packet once:
 
 ```yaml
@@ -44,10 +52,12 @@ helix:
   execution_enabled: false
 ```
 
-Paste those exact values into
-`plugins/HelixPaperSensor/config.yml`, then set `helix.enabled: true`. The
-bundled configuration is disabled by default. At startup the plugin refuses a
-remote non-HTTPS endpoint and refuses the placeholder room-ingress credential.
+Paste those exact values into either
+`plugins/HelixPaperSensor/config.yml` for Paper or
+`config/helix-fabric-sensor.json` for Fabric, then enable the sensor. Both
+bundled configurations are disabled by default. At startup the sensor refuses
+a remote non-HTTPS endpoint and refuses the placeholder room-ingress
+credential.
 The bearer secret is shown once and only its SHA-256 hash and bounded prefix
 are stored by CasimirBot. Do not put the secret in a URL, chat message, log,
 screenshot, or source-control file.
@@ -115,7 +125,8 @@ bearer, or a recognized source/chat claim-handle pattern, appears in the
 request ID, producer epoch, or raw/parsed payload. Do not copy credentials into
 actor labels, summaries, item names, evidence refs, or metadata.
 
-The Paper client serializes its delivery queue, preserves the same request ID,
+The shared Minecraft connector client serializes its delivery queue, preserves
+the same request ID,
 producer epoch, sequence, timestamp, and digest across transport/5xx retries,
 caps queued work, discards requests that become stale before delivery, and
 coalesces periodic heartbeat/probe cycles while one is in flight. It validates
@@ -194,9 +205,11 @@ reasoning or completion.
 - Successful world-event ingress carries a server-created
   `helix.room_source_admission.v1` with exact
   binding/request-digest/room/source/world identity into the protected
-  observation. The source payload cannot
-  manufacture this admission. The baseline does not yet attach that
-  observation to an Ask thread or current-turn continuation.
+  observation. The source payload cannot manufacture this admission.
+- An authenticated Ask turn bound to the room can dispatch one of the admitted
+  read-only capabilities. Its correlated current-turn observation must re-enter
+  Codex before terminal synthesis; prior observations may be reused only as
+  explicitly identified conversation evidence.
 - A planner or panel action that merely queues/attaches a source remains
   `transport: unknown`, `freshness: unknown`, and `trust_level: unverified`.
   Only verified current-turn room-ingress evidence may promote source trust.
@@ -212,10 +225,10 @@ reasoning or completion.
 Generic Situation Room source lists, status projections, journal queries,
 attach/replay actions, and thread-binding routes deliberately exclude the
 reserved room-ingress namespace. They are not room-membership authorities and
-must never enumerate or rebind a generated source. A future Ask continuation
-must use a dedicated authenticated room-aware binding that verifies current
-room membership and preserves the exact server-created source admission.
-Transport acceptance by itself is not answer authority.
+must never enumerate or rebind a generated source. Ask continuation uses its
+dedicated authenticated room-aware binding, verifies current room membership,
+and preserves the exact server-created source admission. Transport acceptance
+by itself is not answer authority.
 
 ## Deployment Configuration
 
@@ -251,26 +264,26 @@ source of truth.
 
 ## Typed Failure Guide
 
-| HTTP    | Example error                         | Meaning                                                                                                                                                                                                   |
-| ------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 400     | `room_source_request_headers_invalid` | Required ingress identity header is missing or malformed.                                                                                                                                                 |
-| 400     | `environment_adapter_unknown` | The requested producer adapter has no trusted code-owned profile. |
-| 400     | `environment_adapter_identity_mismatch` | Adapter, world, manifest domain, or bound identity crosses profile boundaries. |
-| 400     | `environment_adapter_protocol_unsupported` | The manifest protocol is not accepted by the selected profile. |
-| 400     | `environment_adapter_manifest_incompatible` | Required modalities, sections, probes, or read-only policy are missing or exceeded. |
-| 400     | `environment_adapter_observation_schema_invalid` | An observation or probe result does not match the profile's admitted schema. |
-| 400     | `room_source_secret_exposure_rejected` | Credential or claim material appeared in an ingress header or payload field; nothing from that request was persisted as observation evidence.                                                            |
-| 401     | `room_source_credential_invalid`      | Bearer is missing, wrong, or has been rotated.                                                                                                                                                            |
-| 403     | `room_source_identity_mismatch`       | Payload identity differs from the durable binding.                                                                                                                                                        |
-| 403     | `room_source_owner_policy_revoked`    | The owner lost developer room-source policy; the binding was revoked.                                                                                                                                     |
-| 408     | `room_source_request_stale`           | Transport or live event timestamp is outside its window.                                                                                                                                                  |
-| 409     | `room_source_idempotency_conflict`    | Request ID or producer sequence was reused for different content.                                                                                                                                         |
-| 409     | `environment_adapter_admission_required` | Register a compatible manifest for this exact credential and producer epoch before sending observations. |
-| 409     | `environment_adapter_contract_changed` | The durable admission names an obsolete profile version/hash and must be re-admitted. |
-| 409/503 | `room_source_request_outcome_unknown` | A prior operation may have applied but its durable receipt cannot be proven. Do not retry the same mutation or assume failure; send a fresh current-state observation with a new request ID and sequence. |
-| 410     | `room_source_binding_closed`          | The attached room was closed.                                                                                                                                                                             |
-| 413     | `room_source_payload_too_large`       | Reduce snapshot/batch size.                                                                                                                                                                               |
-| 429     | `room_source_rate_limited`            | Back off before sending more source traffic.                                                                                                                                                              |
+| HTTP    | Example error                                    | Meaning                                                                                                                                                                                                   |
+| ------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 400     | `room_source_request_headers_invalid`            | Required ingress identity header is missing or malformed.                                                                                                                                                 |
+| 400     | `environment_adapter_unknown`                    | The requested producer adapter has no trusted code-owned profile.                                                                                                                                         |
+| 400     | `environment_adapter_identity_mismatch`          | Adapter, world, manifest domain, or bound identity crosses profile boundaries.                                                                                                                            |
+| 400     | `environment_adapter_protocol_unsupported`       | The manifest protocol is not accepted by the selected profile.                                                                                                                                            |
+| 400     | `environment_adapter_manifest_incompatible`      | Required modalities, sections, probes, or read-only policy are missing or exceeded.                                                                                                                       |
+| 400     | `environment_adapter_observation_schema_invalid` | An observation or probe result does not match the profile's admitted schema.                                                                                                                              |
+| 400     | `room_source_secret_exposure_rejected`           | Credential or claim material appeared in an ingress header or payload field; nothing from that request was persisted as observation evidence.                                                             |
+| 401     | `room_source_credential_invalid`                 | Bearer is missing, wrong, or has been rotated.                                                                                                                                                            |
+| 403     | `room_source_identity_mismatch`                  | Payload identity differs from the durable binding.                                                                                                                                                        |
+| 403     | `room_source_owner_policy_revoked`               | The owner lost developer room-source policy; the binding was revoked.                                                                                                                                     |
+| 408     | `room_source_request_stale`                      | Transport or live event timestamp is outside its window.                                                                                                                                                  |
+| 409     | `room_source_idempotency_conflict`               | Request ID or producer sequence was reused for different content.                                                                                                                                         |
+| 409     | `environment_adapter_admission_required`         | Register a compatible manifest for this exact credential and producer epoch before sending observations.                                                                                                  |
+| 409     | `environment_adapter_contract_changed`           | The durable admission names an obsolete profile version/hash and must be re-admitted.                                                                                                                     |
+| 409/503 | `room_source_request_outcome_unknown`            | A prior operation may have applied but its durable receipt cannot be proven. Do not retry the same mutation or assume failure; send a fresh current-state observation with a new request ID and sequence. |
+| 410     | `room_source_binding_closed`                     | The attached room was closed.                                                                                                                                                                             |
+| 413     | `room_source_payload_too_large`                  | Reduce snapshot/batch size.                                                                                                                                                                               |
+| 429     | `room_source_rate_limited`                       | Back off before sending more source traffic.                                                                                                                                                              |
 
 These are accurate source failures, not assistant answers. Clients should
 surface them as diagnostics and must not fall back to stale world state.

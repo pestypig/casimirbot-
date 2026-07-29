@@ -89,6 +89,7 @@ describe("Realtime conversation context materialization", () => {
     expect(materialized?.audit.selected_prior_user_refs).not.toContain(
       current.stage_play_event_ref,
     );
+    expect(materialized?.trustedMailboxThreadId).toBe("helix-ask:desktop");
     expect(materialized?.promptLines.join("\n")).toContain("Casimir effect");
     expect(materialized?.promptLines.join("\n")).toContain("prior_user_turns");
     expect(materialized?.latestPriorUserTurn).toMatchObject({
@@ -244,6 +245,7 @@ describe("Realtime conversation context materialization", () => {
       model_context_included: false,
     });
     expect(materialized?.promptLines).toEqual([]);
+    expect(materialized?.trustedMailboxThreadId).toBeNull();
     expect(materialized?.latestGroundedAnswer).toBeNull();
     expect(materialized?.latestPriorUserTurn).toBeNull();
   });

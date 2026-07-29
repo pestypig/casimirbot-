@@ -72,6 +72,7 @@ export const AUXILIARY_TERMINAL_PRODUCTS = [
   "capability_help_summary",
   "image_lens_named_receipt_evaluation",
   "image_lens_observation_report",
+  "scientific_image_evidence_continuity_summary",
 ] as const;
 
 export const ALL_ROUTE_TERMINAL_PRODUCTS = [
@@ -713,6 +714,7 @@ export function buildRouteProductContract(input: {
         "visual_frame_evidence",
         "image_lens_observation_report",
         "image_lens_named_receipt_evaluation",
+        "scientific_image_evidence_continuity_summary",
         "source_binding_status",
         "source_binding_repair_candidate",
       ],
@@ -1560,6 +1562,7 @@ export function buildRouteProductContract(input: {
         "live_pipeline_receipt",
       ],
       allowedExtra: [
+        "model_synthesized_answer",
         "source_binding_status",
         "source_binding_repair_candidate",
         "source_binding_procedure",

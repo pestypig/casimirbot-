@@ -7,6 +7,8 @@ import { canonicalizeCasimirSpecValueV1 } from "@shared/contracts/casimir-spec-s
 import {
   buildCasimirArtifactGenerationReceiptV1,
   buildCasimirArtifactGenerationRequestV1,
+  validateCasimirArtifactGenerationReceiptAgainstRequestV1,
+  validateCasimirArtifactGenerationReceiptV1,
   type CasimirArtifactGenerationRequestV1,
 } from "@shared/contracts/casimir-artifact-generation.v1";
 import {
@@ -59,6 +61,8 @@ import {
   extractCodexSemanticRouteProposalCandidate,
   forbiddenEvidenceFamiliesForLaneCapability,
   imageLensObservationReportCanSelfTerminal,
+  imageLensReceiptNameFromQuestion,
+  isImageLensCapabilityLanePrompt,
   asksForImageLensSidecarMetadataReport,
   ensureCodexPreGatewayRouteAuthority,
   isScholarlyFollowupReferencePrompt,
@@ -91,9 +95,21 @@ const buildIntegrityValidLanyonReceipt = async (input: {
       artifactSha256: "1".repeat(64),
       sizeBytes: 1,
     },
-    formal_source: selectedCase.formalSource,
-    implementation_source: selectedCase.implementationSource,
-    numerical_case: selectedCase.specification,
+    formal_source: {
+      logicalPath: selectedCase.formalSource.logicalPath,
+      artifactSha256: selectedCase.formalSource.sha256,
+      sizeBytes: selectedCase.formalSource.sizeBytes,
+    },
+    implementation_source: {
+      logicalPath: selectedCase.implementationSource.logicalPath,
+      artifactSha256: selectedCase.implementationSource.sha256,
+      sizeBytes: selectedCase.implementationSource.sizeBytes,
+    },
+    numerical_case: {
+      logicalPath: selectedCase.specification.logicalPath,
+      artifactSha256: selectedCase.specification.sha256,
+      sizeBytes: selectedCase.specification.sizeBytes,
+    },
   } as const;
   return buildCasimirArtifactGenerationReceiptV1({
     generatedAt: "2026-07-26T12:00:01.000Z",
@@ -102,11 +118,20 @@ const buildIntegrityValidLanyonReceipt = async (input: {
       schemaVersion: input.request.schemaVersion,
       requestId: input.request.requestId,
       artifactSha256: input.request.artifactSha256,
-      casimirSpec: input.request.casimirSpec,
+      casimirSpec: {
+        semanticSha256: input.request.casimirSpec.semanticSha256,
+        artifactSha256: input.request.casimirSpec.artifactSha256,
+      },
       claimId: input.request.claim.claimId,
       propositionSha256: input.request.claim.propositionSha256,
-      masterProblem: input.request.masterProblem,
-      derivationProgram: input.request.derivationProgram,
+      masterProblem: {
+        planId: input.request.masterProblem.planId,
+        artifactSha256: input.request.masterProblem.artifactSha256,
+      },
+      derivationProgram: {
+        programId: input.request.derivationProgram.programId,
+        artifactSha256: input.request.derivationProgram.artifactSha256,
+      },
     },
     producer: {
       producerId: CASIMIR_LANYON_PRODUCER_ID,
@@ -132,7 +157,9 @@ const buildIntegrityValidLanyonReceipt = async (input: {
           ...artifact,
           logicalPath: source.logicalPath,
           artifactSha256: source.artifactSha256,
-          sizeBytes: source.sizeBytes,
+          ...(typeof source.sizeBytes === "number"
+            ? { sizeBytes: source.sizeBytes }
+            : {}),
           derivedFromSha256s: [input.request.sourcePacket.artifactSha256],
         };
       })
@@ -144,7 +171,92 @@ const buildIntegrityValidLanyonReceipt = async (input: {
 describe("Codex provider capability lane adapter", () => {
   const previousLiveTranslationExternalBackends = process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
   const previousScholarlyWorkbenchMemoryDir = process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR;
+  const providerFakeEnvKeys = [
+    "CODEX_AGENT_FAKE_STDOUT",
+    "CODEX_AGENT_FAKE_STDOUT_SEQUENCE",
+    "CODEX_AGENT_FAKE_CALL_INDEX",
+    "CODEX_AGENT_FAKE_NATIVE_EVENT_JSONL",
+    "CODEX_AGENT_FAKE_STDERR",
+    "CODEX_AGENT_FAKE_EXIT_CODE",
+    "CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH",
+  ] as const;
+  const providerFakeEnvBaseline = Object.fromEntries(
+    providerFakeEnvKeys.map((key) => [key, process.env[key]]),
+  ) as Record<(typeof providerFakeEnvKeys)[number], string | undefined>;
   let scholarlyWorkbenchTestMemoryDir: string | null = null;
+
+  const restoreProviderFakeEnv = (): void => {
+    for (const key of providerFakeEnvKeys) {
+      const baseline = providerFakeEnvBaseline[key];
+      if (baseline === undefined) delete process.env[key];
+      else process.env[key] = baseline;
+    }
+  };
+
+  it("does not coerce an unbound calculator result referent into scholarly follow-up", () => {
+    const question = "Now double that result and tell me the new value.";
+
+    expect(isScholarlyFollowupReferencePrompt(question)).toBe(false);
+    expect(
+      isScholarlyFollowupReferencePrompt(question, {
+        question,
+        thread_id: "thread:calculator-followup-without-scholarly-evidence",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not let capability-help wording about an open scientific document admit Image Lens", () => {
+    expect(
+      isImageLensCapabilityLanePrompt(
+        "What can this workstation do with a scientific document I have open? Keep it short.",
+      ),
+    ).toBe(false);
+    expect(
+      isImageLensCapabilityLanePrompt(
+        "Inspect the currently active scientific document image and crop the equation region.",
+      ),
+    ).toBe(true);
+    for (const contextualPrompt of [
+      "Later, tell me what this workstation can do with a scientific document I have open.",
+      "The document says 'what can this workstation do with a scientific document I have open?' Explain that wording.",
+      "Do not list what this workstation can do with a scientific document I have open.",
+    ]) {
+      expect(
+        isImageLensCapabilityLanePrompt(contextualPrompt),
+        contextualPrompt,
+      ).toBe(false);
+    }
+  });
+
+  it("requires live prior scholarly context before an ambiguous result referent selects scholarly follow-up", () => {
+    const priorScholarlyBody = {
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          previous_assistant_final_answer: {
+            source_ref: "chat.final_answer.previous:paper",
+            text: "The selected paper is arXiv:2202.09424v1 and reports a bounded spectral-line result.",
+          },
+        },
+      },
+    };
+
+    expect(
+      isScholarlyFollowupReferencePrompt(
+        "Now explain that result and its evidence limits.",
+        priorScholarlyBody,
+      ),
+    ).toBe(true);
+    for (const prompt of [
+      "Do not use that result; explain the phrase only.",
+      "Later, explain that result and its evidence limits.",
+      'The screen says "explain that result"; describe that instruction.',
+      "Previously I asked you to explain that result; tell me why the request was useful.",
+    ]) {
+      expect(
+        isScholarlyFollowupReferencePrompt(prompt, priorScholarlyBody),
+      ).toBe(false);
+    }
+  });
 
   it("materializes normalized document content for model reasoning re-entry", () => {
     const lines = buildCodexNormalizedObservationReentryEvidenceLines([{
@@ -236,13 +348,6 @@ describe("Codex provider capability lane adapter", () => {
       terminal_eligible: false,
       raw_content_included: false,
     } as const;
-    const payloadAuthority = {
-      outputRole: "evidence_for_bounded_synthesis",
-      assistantAnswer: false,
-      terminalEligible: false,
-      promotionAllowed: false,
-      postToolModelStepRequired: true,
-    } as const;
     const semanticObservation = {
       schema: "casimir.theory_semantic_admitter.observation.v1",
       status: "succeeded",
@@ -261,13 +366,6 @@ describe("Codex provider capability lane adapter", () => {
         },
       },
       ...observationAuthority,
-    };
-    const generationReceipt = {
-      artifactId: "casimir_artifact_generation_receipt",
-      schemaVersion: "casimir_artifact_generation_receipt/v1",
-      receiptId: "lanyon-receipt:test",
-      run: { status: "succeeded" },
-      authority: payloadAuthority,
     };
     const formalCertificate =
       await buildCasimirFormalVerificationCertificateV1({
@@ -414,7 +512,7 @@ describe("Codex provider capability lane adapter", () => {
             schema:
               "casimir.theory_artifact_producer.lanyon_admission_observation.v1",
             status: "admitted",
-            receipt: generationReceipt,
+            receipt: {},
             ...observationAuthority,
           },
           observation_packet: {
@@ -687,6 +785,13 @@ describe("Codex provider capability lane adapter", () => {
       policy,
       caseId: selectedCase.caseId,
     });
+    expect(validateCasimirArtifactGenerationReceiptV1(generationReceipt)).toEqual([]);
+    expect(
+      validateCasimirArtifactGenerationReceiptAgainstRequestV1(
+        generationReceipt,
+        request,
+      ),
+    ).toEqual([]);
     const admissionCapability =
       "theory-artifact-producer.admit_lanyon_snapshot";
     const admissionResult = {
@@ -838,6 +943,50 @@ describe("Codex provider capability lane adapter", () => {
           affordance.capability === "theory-formal-verifier.start",
       ),
     ).toBe(false);
+
+    const expectAdmissionRejected = (
+      candidate: typeof admissionResult,
+    ) => {
+      const rejectedAdmission =
+        buildCodexNormalizedObservationArtifacts({
+          turnId,
+          gatewayCallResults: [
+            gatewayResult,
+            candidate,
+          ] as never[],
+        });
+      expect(rejectedAdmission.artifacts.map((artifact) => artifact.kind))
+        .toEqual([
+          "theory_artifact_producer_lanyon_request_observation",
+        ]);
+      expect(rejectedAdmission.missingNormalizationFailures).toEqual([
+        `provider_observation_normalization_missing:${admissionCapability}`,
+      ]);
+    };
+
+    const tamperedReceiptAdmission = structuredClone(admissionResult);
+    tamperedReceiptAdmission.observation.receipt.artifactSha256 =
+      "0".repeat(64);
+    expectAdmissionRejected(tamperedReceiptAdmission);
+
+    const mismatchedRequest = structuredClone(request);
+    mismatchedRequest.requestId = "lanyon-request:different";
+    const mismatchedRequestAdmission = structuredClone(admissionResult);
+    mismatchedRequestAdmission.observation.receipt =
+      await buildIntegrityValidLanyonReceipt({
+        request: mismatchedRequest,
+        policy,
+        caseId: selectedCase.caseId,
+      });
+    expectAdmissionRejected(mismatchedRequestAdmission);
+
+    const missingCallIdentityAdmission = structuredClone(admissionResult);
+    missingCallIdentityAdmission.observation_packet.call_id = "";
+    expectAdmissionRejected(missingCallIdentityAdmission);
+
+    const promotedAuthorityAdmission = structuredClone(admissionResult);
+    promotedAuthorityAdmission.terminal_eligible = true;
+    expectAdmissionRejected(promotedAuthorityAdmission);
   });
 
   it("normalizes theory lifecycle receipts without promoting them as certificates", () => {
@@ -1176,13 +1325,26 @@ describe("Codex provider capability lane adapter", () => {
     fs.writeFileSync(filePath, pdf, "ascii");
   };
 
+  const scholarlyFullTextAnswerDecision = (
+    turnId: string,
+    answerText: string,
+  ): string =>
+    [
+      `HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:{"decision":"answer","selected_result_ids":["${turnId}:workstation_gateway:scholarly-research.fetch_full_text:1:scholarly_full_text_observation"],"reason":"The exact current-turn full-text observation satisfies the bounded status request."}`,
+      answerText,
+    ].join("\n");
+
   beforeEach(() => {
+    restoreProviderFakeEnv();
+    resetScholarlyPdfWorkbenchVolatileMemoryForTest();
     scholarlyWorkbenchTestMemoryDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-scholarly-workbench-test-"));
     process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR = scholarlyWorkbenchTestMemoryDir;
     process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED = "false";
   });
 
   afterEach(() => {
+    resetScholarlyPdfWorkbenchVolatileMemoryForTest();
+    restoreProviderFakeEnv();
     if (scholarlyWorkbenchTestMemoryDir) {
       fs.rmSync(scholarlyWorkbenchTestMemoryDir, { recursive: true, force: true });
       scholarlyWorkbenchTestMemoryDir = null;
@@ -3588,7 +3750,10 @@ describe("Codex provider capability lane adapter", () => {
       "Extraction status: `full_text_usable`.",
       "Failure reason: none.",
     ].join("\n");
-    process.env.CODEX_AGENT_FAKE_STDOUT = modelAnswer;
+    process.env.CODEX_AGENT_FAKE_STDOUT = scholarlyFullTextAnswerDecision(
+      "ask:test:direct-full-text-without-lookup",
+      modelAnswer,
+    );
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
     const htmlBytes = new TextEncoder().encode(
       `<html><body><article>${"Accessible scholarly full-text evidence. ".repeat(120)}</article></body></html>`,
@@ -3657,10 +3822,16 @@ describe("Codex provider capability lane adapter", () => {
     ].join("\n");
     delete process.env.CODEX_AGENT_FAKE_STDOUT;
     process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    const groundedModelAnswer = scholarlyFullTextAnswerDecision(
+      "ask:test:suppressed-image-lens-answer-reentry",
+      modelAnswer,
+    );
     process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
       sequence: [
         'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"capability":"visual_analysis.inspect_image_region","bbox_px":{"x":0,"y":0,"width":1,"height":1},"question":"Inspect the rendered scholarly PDF page for equations.","reason_for_crop":"Scholarly PDF page image evidence extraction.","assistant_answer":false,"terminal_eligible":false}',
-        modelAnswer,
+        groundedModelAnswer,
+        groundedModelAnswer,
+        groundedModelAnswer,
       ],
     });
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
@@ -3774,10 +3945,11 @@ describe("Codex provider capability lane adapter", () => {
         terminal_eligible: false,
       });
       expect(debug.route_source_comparison).toMatchObject({
-        explicit_user_command_refs: ["turn-codex-provider-semantic-proposal:explicit_command"],
-        prompt_derived_policy_fallback_refs: ["turn-codex-provider-semantic-proposal:policy_fallback"],
-        ambient_context_refs: ["turn-codex-provider-semantic-proposal:active_panel"],
-        final_admitted_route_ref: "turn-codex-provider-semantic-proposal:route",
+        codex_semantic_proposal_ref: null,
+        explicit_user_command_refs: [],
+        prompt_derived_policy_fallback_refs: [],
+        ambient_context_refs: [],
+        final_admitted_route_ref: expect.stringMatching(/^committed-route:/),
       });
     } finally {
       if (previousStdout === undefined) {
@@ -3903,7 +4075,9 @@ describe("Codex provider capability lane adapter", () => {
       });
       const debug = result.debug as Record<string, unknown>;
 
-      expect(result.answer).toContain("current Image Lens panel");
+      expect(result.ok).toBe(false);
+      expect(result.terminal_artifact_kind).toBe("typed_failure");
+      expect(result.terminal_error_code).toBeTruthy();
       expect(result.answer).not.toContain("bounded conceptual reflection");
       expect(result.answer).not.toContain("Evidence state: exact_row_promoted");
       expect(debug.scientific_image_evidence_continuity_requested).not.toBe(true);
@@ -4816,7 +4990,7 @@ describe("Codex provider capability lane adapter", () => {
       const observationPackets = debug.capability_lane_observation_packets as Array<Record<string, any>>;
 
       expect(result).toMatchObject({
-        ok: true,
+        ok: false,
         answer: "The translation is hola. Voice playback status is blocked.",
       });
       expect(callResults.map((call) => call.capability)).toEqual([
@@ -4838,7 +5012,7 @@ describe("Codex provider capability lane adapter", () => {
           schema: "helix.runtime_agent_translation_text_to_speech_chain.v1",
           translation_requested: true,
           speech_requested: true,
-          playback_status: expect.stringMatching(/^(pending|blocked)$/),
+          playback_status: "missing_input",
           terminal_eligible: false,
           assistant_answer: false,
         }),
@@ -4923,9 +5097,11 @@ describe("Codex provider capability lane adapter", () => {
       expect(debug.runtime_lane_request_retry).toBeNull();
       expect(debug.capability_lane_call_results).toEqual([]);
       expect(debug.provider_reasoning_reentry).toMatchObject({
-        status: "pending_helix_solver_reentry",
+        status: "completed",
         capability_lane_observation_packet_count: 0,
-        evidence_reentered: false,
+        evidence_reentry_required: false,
+        evidence_reentered: true,
+        model_only_direct_answer_allowed: true,
       });
       expect(fs.existsSync(path.join(tempDir, "prompt.2.txt"))).toBe(false);
     } finally {
@@ -5697,8 +5873,14 @@ describe("Codex provider capability lane adapter", () => {
         runtime: "codex",
         response_type: "final_answer",
         final_status: "completed",
-        answer: "The crop observation is candidate evidence only; no equation is confirmed from this fixture.",
+        final_answer_source: "provider_image_lens_observation_report",
+        terminal_artifact_kind: "image_lens_observation_report",
       });
+      expect(result.answer).toContain(
+        "no usable post-observation answer after Image Lens observations re-entered",
+      );
+      expect(result.answer).toContain("Exact equation admissibility: partial_candidate");
+      expect(result.answer).toContain("no_ocr_or_latex_candidate");
       expect(initialPrompt).toContain("For Image Lens, attached-image, or visible-image requests");
       expect(retryPrompt).toContain("visual_analysis.inspect_image_region");
       expect(callResults.map((call) => call.capability)).toEqual(["visual_analysis.inspect_image_region"]);
@@ -5844,8 +6026,11 @@ describe("Codex provider capability lane adapter", () => {
 
       expect(result).toMatchObject({
         ok: true,
-        answer: "The Image Lens observations include header and equation crop candidates.",
+        final_answer_source: "provider_image_lens_observation_report",
+        terminal_artifact_kind: "image_lens_observation_report",
       });
+      expect(result.answer).toContain("**header_caption**");
+      expect(result.answer).toContain("**equation_3.51**");
       expect(callResults.map((call) => call.capability)).toEqual([
         "visual_analysis.inspect_image_region",
         "visual_analysis.inspect_image_region",
@@ -5881,10 +6066,9 @@ describe("Codex provider capability lane adapter", () => {
         },
       });
       const reentryPrompt = fs.readFileSync(capturePromptPath.replace(/(\.[^./\\]+)?$/, ".2$1"), "utf8");
-      expect(reentryPrompt).toContain("using only Image Lens extraction evidence");
       expect(reentryPrompt).toContain("bbox/crop receipts alone are not text or equation transcription authority");
       expect(reentryPrompt).toContain("Only report exact text or LaTeX candidates that appear in text_candidate or latex_candidate fields");
-      expect(reentryPrompt).toContain("For crops with extraction_status failed/not_run and no candidate fields");
+      expect(reentryPrompt).toContain("For extraction_status failed/not_run with no candidate fields");
       expect(debug.runtime_lane_request_loop).toMatchObject({
         status: "lane_observation_reentered",
         image_lens_region_candidate_augmented: true,
@@ -5989,8 +6173,11 @@ describe("Codex provider capability lane adapter", () => {
 
       expect(result).toMatchObject({
         ok: true,
-        answer: "The Image Lens observations include equation and caption crop candidates.",
+        final_answer_source: "provider_image_lens_observation_report",
+        terminal_artifact_kind: "image_lens_observation_report",
       });
+      expect(result.answer).toContain("**equation_area**");
+      expect(result.answer).toContain("**caption_text**");
       expect(labels).toEqual(["equation_area", "caption_text"]);
       expect(callResults[0].receipt).toMatchObject({
         source_image_ref: "data:image/png;base64,test-image",
@@ -6272,15 +6459,23 @@ describe("Codex provider capability lane adapter", () => {
 
       expect(result).toMatchObject({
         ok: true,
-        answer: "The image evidence sidecar was not admissible, so graph reflection was blocked.",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "scientific_image_exact_row_promotion_missing",
       });
+      expect(result.answer).toContain(
+        "no promoted exact equation row exists yet",
+      );
+      expect(result.answer).toContain(
+        "Theory Badge Graph reflection from a promoted row is blocked",
+      );
       expect(gatewayResults.some((entry) =>
         entry.capability_id === "theory-badge-graph.reflect_discussion_context"
       )).toBe(false);
       expect(debug.runtime_lane_request_loop).toMatchObject({
         scientific_image_sidecar_gateway_bridge: {
           status: "blocked",
-          capability_id: "theory-badge-graph.reflect_discussion_context",
+          capability_id: "helix_ask.reflect_theory_context",
           result_count: 0,
           blocked_reason: "scientific_image_exact_row_promotion_missing",
           sidecar_admissibility_status: "inadmissible_for_exact_mapping",
@@ -6371,7 +6566,9 @@ describe("Codex provider capability lane adapter", () => {
         final_answer_source: "typed_failure",
         terminal_artifact_kind: "typed_failure",
       });
-      expect(result.answer).toContain("could not retrieve the prior scientific image evidence sidecar");
+      expect(result.answer).toContain(
+        "scientific sidecar missing; exact row not promoted",
+      );
       expect(debug.capability_lane_call_results ?? []).toEqual([]);
       expect(gatewayResults.some((entry) =>
         entry.capability_id === "theory-badge-graph.reflect_discussion_context"
@@ -6380,7 +6577,7 @@ describe("Codex provider capability lane adapter", () => {
         status: "prior_scientific_image_sidecar_lookup_failed",
         scientific_image_sidecar_gateway_bridge: {
           status: "blocked",
-          capability_id: "theory-badge-graph.reflect_discussion_context",
+          capability_id: "helix_ask.reflect_theory_context",
           result_count: 0,
           blocked_reason: "scientific_image_evidence_sidecar_lookup_failed",
         },
@@ -6510,7 +6707,7 @@ describe("Codex provider capability lane adapter", () => {
         scientific_image_sidecar_gateway_bridge: {
           status: "blocked",
           bridge_source: "prior_turn_sidecar",
-          capability_id: "theory-badge-graph.reflect_discussion_context",
+          capability_id: "helix_ask.reflect_theory_context",
           blocked_reason: "scientific_image_exact_row_promotion_missing",
         },
       });
@@ -6630,6 +6827,23 @@ describe("Codex provider capability lane adapter", () => {
       expect(result.text).toContain("Page: `2`");
       expect(result.text).toContain("E_{ab} = R_{ab}");
       expect(result.text).not.toContain("lookup_papers observation packet");
+      expect(result.committed_ask_route).toMatchObject({
+        route: {
+          source_target: "scientific_image_evidence",
+          target_kind: "scientific_image_evidence_sidecar",
+        },
+        canonical_goal: {
+          goal_kind: "scientific_image_evidence_continuity",
+          required_terminal_kind:
+            "scientific_image_evidence_continuity_summary",
+        },
+        terminal_product: {
+          required_terminal_product:
+            "scientific_image_evidence_continuity_summary",
+          evidence_reentry_required: true,
+          followup_reasoning_required: false,
+        },
+      });
       expect(debug.scientific_image_evidence_continuity_lookup).toMatchObject({
         status: "found",
         source: "current_turn_sidecar",
@@ -6640,6 +6854,36 @@ describe("Codex provider capability lane adapter", () => {
         }),
       });
       expect(debug.followup_referent_resolution).toBeNull();
+      const continuityArtifactId =
+        "turn-codex-scientific-image-continuity-followup:prior_scientific_image_evidence_sidecar";
+      expect(result.provider_reasoning_reentry).toMatchObject({
+        schema: "helix.provider_reasoning_reentry.v1",
+        status: "completed",
+        evidence_reentry_required: true,
+        evidence_reentered: true,
+        solver_completed: true,
+        goal_satisfaction_compatible: true,
+        input_observation_refs: expect.arrayContaining([
+          continuityArtifactId,
+        ]),
+        normalized_observation_refs: expect.arrayContaining([
+          continuityArtifactId,
+        ]),
+      });
+      expect(result.turn_lifecycle).toMatchObject({
+        schema: "helix.turn_lifecycle.v1",
+        integrity: {
+          violations: [],
+        },
+      });
+      expect(
+        (result.turn_lifecycle as any).events.some(
+          (event: Record<string, unknown>) =>
+            event.kind === "observation.reentered" &&
+            Array.isArray(event.observation_refs) &&
+            event.observation_refs.includes(continuityArtifactId),
+        ),
+      ).toBe(true);
     } finally {
       if (previousStdout === undefined) {
         delete process.env.CODEX_AGENT_FAKE_STDOUT;
@@ -7043,7 +7287,7 @@ describe("Codex provider capability lane adapter", () => {
       sequence: [
         "The scientific Image Lens exact row evidence was filed.",
         "Available Helix workstation gateway capabilities:\nHelix request context JSON:",
-        "The provider should not perform lookup_papers for this graph-reflection continuity audit.",
+        "Theory Badge Graph reflection completed as diagnostic evidence only.",
       ],
     });
     process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([
@@ -7114,7 +7358,7 @@ describe("Codex provider capability lane adapter", () => {
       expect((reflection.debug as Record<string, any>).runtime_lane_request_loop).toMatchObject({
         scientific_image_sidecar_gateway_bridge: {
           status: "completed",
-          capability_id: "theory-badge-graph.reflect_discussion_context",
+          capability_id: "helix_ask.reflect_theory_context",
         },
       });
       expect(reflection.ok).toBe(true);
@@ -7154,15 +7398,22 @@ describe("Codex provider capability lane adapter", () => {
       expect(debug.scientific_image_graph_reflection_lookup).toMatchObject({
         status: "found",
         persistent_snapshot_recovered: true,
-        selected_reflection_id: expect.stringContaining("theory-badge-graph.reflect_discussion_context"),
+        selected_reflection_id: expect.stringContaining(
+          "helix_ask.reflect_theory_context",
+        ),
         selected_bridge_status: "completed",
       });
       expect(debug.scientific_image_evidence_continuity_summary.latest_graph_reflection).toMatchObject({
         bridge_status: "completed",
         observation_refs: expect.arrayContaining([
-          expect.stringContaining("theory-badge-graph.reflect_discussion_context"),
+          expect.stringContaining("helix_ask.reflect_theory_context"),
         ]),
       });
+      expect(result.text).toContain("Latest Theory Badge Graph reflection ref:");
+      expect(result.text).toContain("helix_ask.reflect_theory_context");
+      expect(result.text).toContain(
+        "Graph reflection status: bridge `completed`",
+      );
       expect(result.text).not.toContain("lookup_papers observation packet");
     } finally {
       resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
@@ -7298,7 +7549,18 @@ describe("Codex provider capability lane adapter", () => {
       });
 
       expect(result.ok).toBe(true);
-      expect(result.text).toContain("Postulate Board draft revised");
+      expect(result).toMatchObject({
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "retained_scientific_image_evidence_missing",
+      });
+      expect(result.text).toContain(
+        "no verified retained scientific Image Lens sidecar re-entered this turn",
+      );
+      expect(result.text).toContain(
+        "I will not invent a page number, crop ref, source/hash, evidence depth, or promotion state",
+      );
+      expect(result.text).not.toContain("Postulate Board draft revised");
       expect(result.text).not.toContain("no scholarly-research.lookup_papers observation packet");
       expect(result.text).not.toContain("Ask with an explicit scholarly search target");
       expect((result.debug as any)?.scholarly_response_mode_selection?.requested_modes ?? []).toEqual([]);
@@ -7423,7 +7685,7 @@ describe("Codex provider capability lane adapter", () => {
         },
         evidence_chain: {
           graph_reflection_refs: expect.arrayContaining([
-            expect.stringContaining("theory-badge-graph.reflect_discussion_context"),
+            expect.stringContaining("helix_ask.reflect_theory_context"),
           ]),
         },
       });
@@ -7505,7 +7767,6 @@ describe("Codex provider capability lane adapter", () => {
       },
     });
     const debug = result.debug as Record<string, any>;
-
     expect(result.ok).toBe(true);
     expect(result.text).toContain("The exact equation-row retry ran from retained Image Lens page evidence.");
     expect(result.text).toContain("Retry status: `completed`");
@@ -7625,7 +7886,6 @@ describe("Codex provider capability lane adapter", () => {
       },
     });
     const debug = result.debug as Record<string, any>;
-
     expect(result.ok).toBe(true);
     expect(result.text).toContain("The exact equation-row retry ran from retained Image Lens page evidence.");
     expect(result.text).toContain("Promoted exact rows: `1`");
@@ -8684,6 +8944,39 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
+  it("recognizes an affirmative named Image Lens receipt evaluation without treating a separate no-retrieval constraint as negation", () => {
+    expect(
+      imageLensReceiptNameFromQuestion(
+        "Do not run scholarly lookup. Use only the latest Image Lens observation receipt named crop_1 and evaluate it.",
+      ),
+    ).toBe("crop_1");
+  });
+
+  it("distinguishes Image Lens crop metadata from an affirmative fresh-crop command", () => {
+    expect(
+      asksForFreshScientificImageCapture(
+        "Report the page number, crop ref, Image Lens source/hash, and evidence depth currently in use.",
+      ),
+    ).toBe(false);
+    expect(
+      asksForFreshScientificImageCapture(
+        "Use page 5 of the PDF and crop only the exact equation row.",
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    "Do not evaluate the Image Lens observation receipt named crop_1.",
+    "Later, evaluate the Image Lens observation receipt named crop_1.",
+    'The screen says "evaluate the Image Lens observation receipt named crop_1." Explain that instruction.',
+    "Yesterday I evaluated the Image Lens observation receipt named crop_1.",
+  ])(
+    "does not admit a non-affirmative named Image Lens receipt evaluation: %s",
+    (question) => {
+      expect(imageLensReceiptNameFromQuestion(question)).toBeNull();
+    },
+  );
+
   it("evaluates a named prior Image Lens receipt without re-running the crop", async () => {
     const result = await codexProvider.runTurn({
       runtime: "codex",
@@ -8933,7 +9226,7 @@ describe("Codex provider capability lane adapter", () => {
   it("keeps unrequested scientific image sidecars ambient instead of required", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
-    process.env.CODEX_AGENT_FAKE_STDOUT = "I can reflect on the moral tradeoff without requiring unrelated image evidence.";
+    process.env.CODEX_AGENT_FAKE_STDOUT = "I can discuss the moral tradeoff without requiring unrelated image evidence.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
     try {
       const result = await codexProvider.runTurn({
@@ -8941,7 +9234,7 @@ describe("Codex provider capability lane adapter", () => {
         route: "/ask/turn",
         body: {
           turn_id: "turn-codex-sidecar-ambient-not-required",
-          question: "Reflect on the moral graph implications of publishing a confusing tool before it is ready.",
+          question: "Discuss the moral implications of publishing a confusing tool before it is ready.",
           scientific_evidence_sidecar: {
             schema: "helix.scientific_image_evidence_sidecar.v1",
             sidecar_id: "scientific_image_sidecar:ambient-test",
@@ -9227,7 +9520,8 @@ describe("Codex provider capability lane adapter", () => {
     const previousCapturePromptPath = process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
     const captureDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-codex-missing-conversational-referent-"));
     const capturePromptPath = path.join(captureDir, "prompt.txt");
-    const expectedAnswer = "I cannot identify the two prior causes because the preceding assistant answer was not restored into this turn.";
+    const expectedAnswer =
+      "The preceding assistant answer is absent from this turn. Please restate the two causes so I can compare them.";
     process.env.CODEX_AGENT_FAKE_STDOUT = expectedAnswer;
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
     process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = capturePromptPath;
@@ -9340,7 +9634,7 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
-  it("authorizes a no-evidence scholarly answer when the retained antecedent is failure-only", async () => {
+  it("fails closed on a scholarly route when direct provider invocation bypasses failure-only referent arbitration", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
     const expectedAnswer = "The immediately previous answer contained no scientific claims, so there are no valid scholarly queries to run.";
@@ -9391,17 +9685,17 @@ describe("Codex provider capability lane adapter", () => {
       });
 
       expect(result).toMatchObject({
-        ok: true,
-        response_type: "final_answer",
-        final_answer_source: "agent_provider_terminal_candidate",
-        terminal_artifact_kind: "agent_provider_terminal_candidate",
-        text: expectedAnswer,
+        ok: false,
+        response_type: "final_failure",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "capability_itinerary_observations_missing",
       });
       expect((result.debug as Record<string, any>).workstation_gateway_call_results ?? []).toHaveLength(0);
       expect((result.debug as Record<string, any>).provider_terminal_authority_bridge).toMatchObject({
-        model_only_direct_answer_allowed: true,
-        terminal_authority_status: "authorized_by_model_only_direct_answer_contract",
-        terminal_authority_granted: true,
+        model_only_direct_answer_allowed: false,
+        terminal_authority_status: "blocked_by_missing_normalized_observations",
+        terminal_authority_granted: false,
       });
     } finally {
       if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
@@ -9456,12 +9750,17 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
-  it("reuses the retained context crop for machine-text comparison without exact-row search retries", async () => {
+  it("reuses the retained context crop without retry but fails closed when machine-text evidence is absent", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
     const previousExtractionFixtures = process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES;
     resetScholarlyPdfWorkbenchVolatileMemoryForTest({ persistent: true });
-    process.env.CODEX_AGENT_FAKE_STDOUT = "The retained machine-readable text and Image Lens crop can be compared by the model-authored solver step.";
+    const comparisonAnswer = [
+      "The retained visual evidence reports five displayed rows for equation (47).",
+      "The machine-readable and visual candidates agree on the objective trace term, the distance bound, and the positive-semidefinite constraints.",
+      "The retained crop does not provide enough typed subscript detail to certify every subscript, so those remain unresolved mismatches.",
+    ].join(" ");
+    process.env.CODEX_AGENT_FAKE_STDOUT = comparisonAnswer;
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
     process.env.HELIX_IMAGE_LENS_EXTRACTION_FIXTURES = JSON.stringify([{
       region_label: "scholarly_pdf_page_8_equation_pass",
@@ -9516,7 +9815,6 @@ describe("Codex provider capability lane adapter", () => {
       });
       const debug = result.debug as Record<string, any>;
       const packets = debug.capability_lane_observation_packets as Array<Record<string, any>>;
-
       expect(debug.scientific_image_evidence_retry).toMatchObject({
         status: "suppressed_for_cross_evidence_comparison",
         failure_reason: "retained_crop_evidence_reused_without_exact_row_retry",
@@ -9530,15 +9828,18 @@ describe("Codex provider capability lane adapter", () => {
       expect(packets.filter((packet) =>
         String(packet?.state_delta?.visual_analysis_region_inspection?.region_label ?? "").startsWith("equation_row_search_"),
       )).toHaveLength(0);
-      expect(result.final_answer_source).not.toBe("provider_image_lens_observation_report");
-      expect(result.terminal_artifact_kind).not.toBe("image_lens_observation_report");
-      expect(result.final_answer_source).not.toBe("scientific_image_evidence_continuity_summary");
-      expect(result.text).toBe(
-        "The retained machine-readable text and Image Lens crop can be compared by the model-authored solver step.",
-      );
-      expect(debug.provider_reasoning_reentry).toMatchObject({
-        schema: "helix.provider_reasoning_reentry.v1",
+      expect(result).toMatchObject({
+        ok: false,
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
       });
+      expect(result.text).toContain(
+        "no verified machine-readable page-text observation re-entered this turn",
+      );
+      expect(result.text).toContain(
+        "I cannot compare the equation row by row from prompt text alone",
+      );
+      expect(result.text).not.toBe(comparisonAnswer);
       expect(result.text).not.toContain("Requested evidence depth: scientific_evidence_packet");
       expect(result.text).not.toContain("scientific_evidence_packet_ref_missing");
       expect(result.text).not.toContain("page_image_observation_refs_missing");
@@ -9553,7 +9854,7 @@ describe("Codex provider capability lane adapter", () => {
     }
   });
 
-  it("re-enters a prompt-leak rejection for Image Lens comparisons instead of terminalizing the crop receipt", async () => {
+  it("fails closed before a crop receipt can answer an ungrounded Image Lens comparison", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
     const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
     const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
@@ -9618,27 +9919,18 @@ describe("Codex provider capability lane adapter", () => {
       });
 
       expect(result).toMatchObject({
-        ok: true,
-        response_type: "final_answer",
+        ok: false,
+        response_type: "final_failure",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
       });
-      expect(result.answer).toContain("agree on the maximization");
-      expect(result.answer).toContain("exact-block promotion remains blocked");
+      expect((result.debug as Record<string, any>).fail_reason).toBe(
+        "scientific_image_machine_text_evidence_missing",
+      );
+      expect(result.answer).not.toContain("agree on the maximization");
       expect(result.answer).not.toContain("using only the observation receipts below");
       expect(result.final_answer_source).not.toBe("provider_image_lens_observation_report");
       expect(result.terminal_artifact_kind).not.toBe("image_lens_observation_report");
-      expect(result.provider_prompt_leak_guard).toMatchObject({
-        status: "routed_to_terminal_rejection_observation",
-        recovered_with_observation_only_image_lens_report: false,
-        routed_to_terminal_rejection_observation: true,
-      });
-      expect(result.terminal_rejection_observations).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            rejection_reason: "missing_post_tool_model_step",
-            recoverable: true,
-          }),
-        ]),
-      );
     } finally {
       if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
       else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
@@ -9704,6 +9996,8 @@ describe("Codex provider capability lane adapter", () => {
       expect(result).toMatchObject({
         ok: true,
         response_type: "final_answer",
+        final_answer_source: "provider_image_lens_observation_report",
+        terminal_artifact_kind: "image_lens_observation_report",
       });
       expect(result.answer).toContain("**scholarly_pdf_page**");
       expect(result.answer).toContain("P = -\\frac{\\pi^2 \\hbar c}{240 a^4}");
@@ -9783,7 +10077,9 @@ describe("Codex provider capability lane adapter", () => {
       expect(debug?.compound_evidence_synthesis_answer).toBeUndefined();
       expect(visibleAndRawText).not.toContain("Available Helix workstation gateway capabilities");
       expect(visibleAndRawText).not.toContain("model_visible_capability_lane_manifest");
-      expect(result.answer).toContain("prior scientific image evidence sidecar");
+      expect(result.answer).toContain(
+        "reusable scientific evidence package is not available in this turn",
+      );
     } finally {
       if (previousStdout === undefined) {
         delete process.env.CODEX_AGENT_FAKE_STDOUT;
@@ -9858,6 +10154,8 @@ describe("Codex provider capability lane adapter", () => {
       expect(result).toMatchObject({
         ok: true,
         response_type: "final_answer",
+        final_answer_source: "provider_image_lens_observation_report",
+        terminal_artifact_kind: "image_lens_observation_report",
       });
       expect(result.answer).toContain("**scholarly_pdf_page_1_equation_pass**");
       expect(result.answer).toContain("Extraction status: failed");
@@ -10040,8 +10338,11 @@ describe("Codex provider capability lane adapter", () => {
         ok: true,
         runtime: "codex",
         response_type: "final_answer",
-        answer: "The synthesized Image Lens crop observation re-entered as candidate evidence.",
+        final_answer_source: "provider_image_lens_observation_report",
+        terminal_artifact_kind: "image_lens_observation_report",
       });
+      expect(result.answer).toContain("**crop_1**");
+      expect(result.answer).toContain("Extraction status: failed");
       expect(callResults.map((call) => call.capability)).toEqual(["visual_analysis.inspect_image_region"]);
       expect(debug.runtime_lane_request_contract).toMatchObject({
         retry_attempted: true,
@@ -10051,7 +10352,8 @@ describe("Codex provider capability lane adapter", () => {
       expect(debug.runtime_lane_request_loop).toMatchObject({
         status: "lane_observation_reentered",
         synthesized_by_helix_policy: true,
-        synthesis_reason: "explicit_image_lens_region_prompt_with_submitted_image_but_no_runtime_lane_json",
+        synthesis_reason:
+          "explicit_image_lens_multi_region_prompt_missing_requested_equation_crops",
       });
       expect(debug.runtime_lane_request_retry).toMatchObject({
         prior_response_preview: "[blocked_prompt_leak_preview]",
@@ -11935,16 +12237,13 @@ describe("Codex provider capability lane adapter", () => {
       expect(JSON.stringify(translation.goal_binding_call_shape_hint)).toContain("bind | update_attention | record_mail_loop | record_report | stop");
       expect(JSON.stringify(translation.goal_binding_call_shape_hint)).toContain("terminal_authorized");
       expect(debug.agent_runtime_adapter_contract.model_visible_capability_lane_manifest).toEqual(modelVisible);
-      expect(prompt).toContain("Model-visible Helix capability lane manifest:");
+      expect(prompt).toContain("Helix continuation state (non-terminal adapter evidence):");
+      expect(prompt).toContain('"capability_proposal"');
+      expect(prompt).toContain('"admitted_capability_ids"');
       expect(prompt).toContain("live_translation.translate_text");
       expect(prompt).toContain("workstation_tool_reference.collect_visible_translation_targets");
-      expect(prompt).toContain("capability_lane_session_call");
-      expect(prompt).toContain("start | pause | resume | stop | record_observation | list");
-      expect(prompt).toContain("capability_lane_goal_binding_call");
-      expect(prompt).toContain("bind | update_attention | record_mail_loop | record_report | stop");
       expect(prompt).toContain("docs-viewer.read_active_translation");
-      expect(prompt).toContain("lane_outputs_are_not_final_answers");
-      expect(prompt).toContain("Capability lane outputs are observations or receipts");
+      expect(prompt).toContain("This is a proposal, not admission");
     } finally {
       if (previousStdout === undefined) {
         delete process.env.CODEX_AGENT_FAKE_STDOUT;

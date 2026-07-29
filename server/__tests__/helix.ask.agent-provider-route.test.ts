@@ -225,6 +225,67 @@ describe("Helix Ask agent provider route metadata", () => {
     });
   });
 
+  it("binds workstation capability questions to current runtime catalog evidence during provider preflight", () => {
+    const turnId = "ask:test:provider-capability-help-preflight";
+    const result = attachHelixProviderPreflightRouteContext({
+      turnId,
+      body: {
+        turn_id: turnId,
+        question:
+          "What can this workstation do with a scientific document I have open? Keep it short.",
+        workspace_context_snapshot: {
+          activePanel: "docs-viewer",
+          active_doc_path: "docs/research/example.md",
+        },
+      },
+    });
+
+    expect(result.source_target_intent).toMatchObject({
+      target_source: "capability_catalog",
+      target_kind: "capability_catalog_runtime",
+      selected_capability: "helix_ask.inspect_capability_catalog",
+      strength: "hard",
+    });
+    expect(result.canonical_goal_frame).toMatchObject({
+      goal_kind: "capability_help",
+      requested_capability: "helix_ask.inspect_capability_catalog",
+      required_terminal_kind: "capability_help_summary",
+    });
+    expect(result.route_product_contract).toMatchObject({
+      source_target: "capability_catalog",
+      required_terminal_kind: "capability_help_summary",
+      evidence_reentry_required: true,
+      followup_reasoning_required: true,
+    });
+    expect(result.tool_call_admission_decision).toMatchObject({
+      required: true,
+      admitted_tool_families: expect.arrayContaining([
+        "capability_catalog",
+        "runtime_evidence",
+      ]),
+    });
+    expect(result.committed_ask_route).toMatchObject({
+      route: {
+        source_target: "capability_catalog",
+        target_kind: "capability_catalog",
+        strength: "hard",
+      },
+      canonical_goal: {
+        goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+      },
+      capability_policy: {
+        allowed_tool_families: ["capability_catalog"],
+        required_capability_families: ["capability_catalog"],
+      },
+      terminal_product: {
+        evidence_reentry_required: true,
+        followup_reasoning_required: true,
+        required_terminal_product: "capability_help_summary",
+      },
+    });
+  });
+
   it("rejects the Helix-native runtime for a guest account", async () => {
     const priorBypass = process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS;
     process.env.HELIX_ASK_TEST_RUNTIME_POLICY_BYPASS = "0";

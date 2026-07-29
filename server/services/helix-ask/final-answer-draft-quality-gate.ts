@@ -398,7 +398,11 @@ export const collectFinalAnswerDraftSupportRefs = (input: {
   draftPayload?: Record<string, unknown> | null;
   artifactLedger?: ArtifactLike[] | null;
 }): string[] => {
-  const draftRefs = readArray(input.draftPayload?.artifact_refs)
+  const draftRefs = [
+    ...readArray(input.draftPayload?.artifact_refs),
+    ...readArray(input.draftPayload?.support_refs),
+    ...readArray(input.draftPayload?.selected_observation_refs),
+  ]
     .map(readString)
     .filter((entry): entry is string => Boolean(entry));
   const ledgerRefs = (input.artifactLedger ?? []).flatMap((artifact: ArtifactLike) => {
@@ -833,7 +837,7 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
     /\b(?:ineligible|unsupported|not registered|blocked)\b/i.test(text);
   const groundedBoundedTheoryProcedureOperationRefusal =
     groundedBoundedTheoryProcedureLimitation &&
-    /\b(?:I (?:can(?:not|'t)|am unable)|I['’]m unable|unable to)\b.{0,120}\b(?:improvise|run|execute|treat(?: it| the case)? as eligible|claim support)\b/i.test(text);
+    /\b(?:I (?:can(?:not|'t)|am unable)|I['’]m unable|unable to)\b.{0,160}\b(?:configure|admit|use|improvise|run|execute|treat(?: it| the case)? as eligible|claim support)\b/i.test(text);
   if (!text) violations.push("empty_draft");
   if (
     isFallbackLike(text) &&

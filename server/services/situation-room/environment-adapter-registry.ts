@@ -3,6 +3,7 @@ import {
   HELIX_ENVIRONMENT_ADAPTER_PROFILE_SCHEMA,
   HELIX_MINECRAFT_ADAPTER_PROFILE_ID,
   HELIX_SYNTHETIC_GAME_ADAPTER_PROFILE_ID,
+  HELIX_SYSTEM_CLOCK_ADAPTER_PROFILE_ID,
   helixEnvironmentAdapterProfileSchema,
   type HelixEnvironmentAdapterProfile,
   type HelixEnvironmentAdapterRegistryRecord,
@@ -70,11 +71,12 @@ export const environmentAdapterManifestHash = (
 const minecraftProfile = helixEnvironmentAdapterProfileSchema.parse({
   schema: HELIX_ENVIRONMENT_ADAPTER_PROFILE_SCHEMA,
   profile_id: HELIX_MINECRAFT_ADAPTER_PROFILE_ID,
-  profile_version: 1,
+  profile_version: 3,
   domain: "minecraft",
   source_family: "minecraft",
   accepted_domain_adapters: [
     "minecraft.paper_plugin.v1",
+    "minecraft.fabric_mod.v1",
     "minecraft.minehut.v1",
     "minecraft.adapter.v1",
     "minecraft",
@@ -87,18 +89,17 @@ const minecraftProfile = helixEnvironmentAdapterProfileSchema.parse({
   required_modalities: ["environment_state"],
   required_snapshot_sections: ["actor_state", "inventory_state"],
   allowed_probe_types: [
-    "route_feasibility",
+    "actor_status",
+    "nearby_entities",
     "reachability",
     "line_of_sight",
-    "container_freshness",
     "crop_state",
     "hazard_check",
     "inventory_check",
     "local_map_summary",
   ],
   required_probe_types: [
-    "route_feasibility",
-    "reachability",
+    "actor_status",
     "inventory_check",
   ],
   observation_schemas: {
@@ -128,12 +129,24 @@ const minecraftProfile = helixEnvironmentAdapterProfileSchema.parse({
       game_versions: ["minecraft.java:1.20-1.21"],
       adapter_ids: [
         "minecraft.paper_plugin.v1",
+        "minecraft.fabric_mod.v1",
         "minecraft.minehut.v1",
         "minecraft.adapter.v1",
         "minecraft",
       ],
       retrieval_namespace: "mechanics:minecraft:java",
       document_paths: ["docs/game-mechanics/minecraft-java-v1.md"],
+    },
+    {
+      collection_id: "mechanics.minecraft.crimson_curse.v1",
+      collection_version: 1,
+      game_id: "minecraft.java.mod.mr_crimson_curse",
+      game_versions: ["minecraft.java:1.21.8-crimson_curse:1.4.1"],
+      adapter_ids: ["minecraft.fabric_mod.v1"],
+      retrieval_namespace: "mechanics:minecraft:crimson_curse",
+      document_paths: [
+        "docs/game-mechanics/minecraft-crimson-curse-v1.md",
+      ],
     },
   ],
   normalizer: {
@@ -217,9 +230,64 @@ const syntheticGameFixtureProfile = helixEnvironmentAdapterProfileSchema.parse({
   raw_content_included: false,
 }) as HelixEnvironmentAdapterProfile;
 
+const systemClockProfile = helixEnvironmentAdapterProfileSchema.parse({
+  schema: HELIX_ENVIRONMENT_ADAPTER_PROFILE_SCHEMA,
+  profile_id: HELIX_SYSTEM_CLOCK_ADAPTER_PROFILE_ID,
+  profile_version: 1,
+  domain: "custom",
+  source_family: "system_clock",
+  accepted_domain_adapters: ["system.clock.connector.v1"],
+  world_id_prefixes: ["system:"],
+  protocol_versions: ["helix.environment_connector.v1"],
+  required_modalities: ["environment_state"],
+  required_snapshot_sections: ["domain_specific"],
+  allowed_probe_types: [],
+  required_probe_types: [],
+  observation_schemas: {
+    world_event: "helix.world_event.v1",
+    environment_snapshot: HELIX_ENVIRONMENT_STATE_SNAPSHOT_SCHEMA,
+    manifest: HELIX_ENVIRONMENT_SOURCE_MANIFEST_SCHEMA,
+    heartbeat: HELIX_ENVIRONMENT_SOURCE_HEARTBEAT_SCHEMA,
+    probe_result: HELIX_ENVIRONMENT_PROBE_RESULT_SCHEMA,
+    normalized_evidence:
+      "helix.environment_connector.probe_observation.v1",
+  },
+  freshness: {
+    heartbeat_max_age_ms: 15_000,
+    ingress_request_max_age_ms: 60_000,
+    observation_max_age_ms: 10_000,
+  },
+  payload_policy: {
+    max_manifest_bytes: 16_000,
+    max_event_batch_bytes: 16_000,
+    max_snapshot_bytes: 16_000,
+    raw_payload_included: false,
+  },
+  mechanics_collections: [],
+  normalizer: {
+    normalizer_id: "helix.system.clock_normalizer.v1",
+    output_schema:
+      "helix.environment_connector.probe_observation.v1",
+    server_owned: true,
+    producer_code_loaded: false,
+  },
+  execution_policy: {
+    may_execute_live_actions: false,
+    may_perform_read_only_probes: true,
+    action_credential_reused: false,
+  },
+  lifecycle: {
+    status: "enabled",
+    replacement_profile_id: null,
+  },
+  assistant_answer: false,
+  raw_content_included: false,
+}) as HelixEnvironmentAdapterProfile;
+
 const records: HelixEnvironmentAdapterRegistryRecord[] = [
   minecraftProfile,
   syntheticGameFixtureProfile,
+  systemClockProfile,
 ].map(
   (
     profile: HelixEnvironmentAdapterProfile,

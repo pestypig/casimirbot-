@@ -3,6 +3,7 @@ import {
   deriveDirectScholarlyPortfolioQueries,
   detectScholarlyResearchIntent,
   extractScholarlyArxivId,
+  hasFullyNegatedScholarlyResearchInstruction,
 } from "../scholarly-research-intent";
 import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
 
@@ -448,6 +449,17 @@ describe("scholarly research intent", () => {
         promptText,
       }).target_source).toBe("model_only");
     }
+  });
+
+  it("keeps an affirmative page mount active when later inspection operations are negated", () => {
+    const prompt = [
+      "Use the selected paper from the prior step.",
+      "Mount PDF page 1 as a source only.",
+      "Do not inspect, crop, OCR, analyze, extract, or read it yet.",
+      "Report whether typed page-mount evidence was created.",
+    ].join(" ");
+
+    expect(hasFullyNegatedScholarlyResearchInstruction(prompt)).toBe(false);
   });
 
   it("does not resurrect a naturally worded direct fetch when full text is explicitly negated", () => {

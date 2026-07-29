@@ -299,4 +299,94 @@ describe("Helix capability itinerary execution", () => {
       }],
     });
   });
+
+  it("counts only the exact broker-revalidated prior environment evidence schema", () => {
+    const artifact = {
+      artifact_id: "ask:turn-2:prior-environment-evidence",
+      kind: "prior_environment_probe_evidence",
+      capability_key:
+        "com.casimirbot.minecraft.reachability.check",
+      source_scope: "prior_turn_context",
+      payload: {
+        schema:
+          "helix.environment_connector.prior_probe_evidence.v1",
+        capability_id:
+          "com.casimirbot.minecraft.reachability.check",
+        content_role:
+          "prior_environment_probe_evidence_not_assistant_answer",
+        reentry_required: true,
+        answer_authority: false,
+        observation: {
+          schema:
+            "helix.environment_connector.probe_observation.v1",
+          capability_id:
+            "com.casimirbot.minecraft.reachability.check",
+          outcome: "succeeded",
+          provenance_valid: true,
+          eligible_for_current_turn_reentry: true,
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+    };
+    const itinerary = {
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        required_observation_families: ["live_environment"],
+      },
+    };
+
+    expect(
+      isHelixCapabilityItineraryFamilyObserved("live_environment", [
+        artifact,
+      ]),
+    ).toBe(true);
+    expect(
+      buildHelixCapabilityItineraryExecutionState({
+        capabilityItinerary: itinerary,
+        artifacts: [artifact],
+      }),
+    ).toMatchObject({
+      complete: true,
+      observed_families: ["live_environment"],
+      missing_observation_families: [],
+    });
+
+    for (const invalidArtifact of [
+      {
+        ...artifact,
+        payload: {
+          ...artifact.payload,
+          answer_authority: true,
+        },
+      },
+      {
+        ...artifact,
+        payload: {
+          ...artifact.payload,
+          observation: {
+            ...artifact.payload.observation,
+            provenance_valid: false,
+          },
+        },
+      },
+      {
+        ...artifact,
+        payload: {
+          ...artifact.payload,
+          observation: {
+            ...artifact.payload.observation,
+            outcome: "target_ambiguous",
+          },
+        },
+      },
+    ]) {
+      expect(
+        isHelixCapabilityItineraryFamilyObserved(
+          "live_environment",
+          [invalidArtifact],
+        ),
+      ).toBe(false);
+    }
+  });
 });

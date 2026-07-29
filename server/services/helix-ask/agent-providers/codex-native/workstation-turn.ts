@@ -10,9 +10,7 @@ import {
 import type { HelixWorkstationGatewayCallResult } from "../../workstation-tool-gateway/types";
 import { HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY } from "@shared/helix-scholarly-research-observation";
 import { enrichScholarlyNumericArgumentsFromGatewayResults } from "../scholarly-gateway-evidence";
-import {
-  buildSharedLiveRoomGatewayMutationApprovalPlanV1,
-} from "../../workstation-tool-gateway/shared-live-room";
+import { buildSharedLiveRoomGatewayMutationApprovalPlanV1 } from "../../workstation-tool-gateway/shared-live-room";
 import {
   runCodexNativeAppServerTurn,
   type CodexNativeAppServerTurnResult,
@@ -178,6 +176,7 @@ const normalizeRuntimeApprovalHostOutcome = (
 export const runCodexNativeWorkstationTurn = async (input: {
   prompt: string;
   turnId: string;
+  conversationThreadId?: string | null;
   cwd: string;
   accountContext: HelixWorkstationGatewayAccountContext;
   requestedMode?: string | null;
@@ -227,9 +226,7 @@ export const runCodexNativeWorkstationTurn = async (input: {
   const runtimeApprovalStartCapabilities = runtimeApprovalHostReady
     ? listing.capabilities.filter(
         (capability) =>
-          isCodexNativeRuntimeApprovalCapability(
-            capability.capability_id,
-          ) &&
+          isCodexNativeRuntimeApprovalCapability(capability.capability_id) &&
           exactGoalTools.has(capability.capability_id) &&
           capability.code_mutation === false &&
           capability.shell_access === false &&
@@ -471,7 +468,13 @@ export const runCodexNativeWorkstationTurn = async (input: {
         reason: "runtime_semantic_route_validated_against_helix_admission",
       };
     },
-    executeCapability: async ({ capabilityId, arguments: args, iteration }) => {
+    executeCapability: async ({
+      capabilityId,
+      arguments: args,
+      iteration,
+      callId,
+      providerExecutionId,
+    }) => {
       if (!goalVisibleSet.has(capabilityId)) {
         return {
           ok: false,
@@ -526,15 +529,13 @@ export const runCodexNativeWorkstationTurn = async (input: {
             observationRef: `${input.turnId}:${capabilityId}:${iteration}:runtime_approval_blocked`,
           };
         }
-        let trustedPlan:
-          | {
-              capabilityId: string;
-              planId: string;
-              preparedRequestId: string | null;
-              sealedInputSha256: string;
-              gatewayArguments: Record<string, unknown>;
-            }
-          | null = null;
+        let trustedPlan: {
+          capabilityId: string;
+          planId: string;
+          preparedRequestId: string | null;
+          sealedInputSha256: string;
+          gatewayArguments: Record<string, unknown>;
+        } | null = null;
         if (
           isCodexNativeSharedLiveRoomMutationApprovalCapability(capabilityId)
         ) {
@@ -563,9 +564,7 @@ export const runCodexNativeWorkstationTurn = async (input: {
               observationRef: `${input.turnId}:${capabilityId}:${iteration}:runtime_approval_blocked`,
             };
           }
-        } else if (
-          isCodexNativeRuntimeApprovalStartCapability(capabilityId)
-        ) {
+        } else if (isCodexNativeRuntimeApprovalStartCapability(capabilityId)) {
           trustedPlan = resolveCodexNativeTrustedRuntimeStartPlan({
             capabilityId,
             arguments: args,
@@ -677,6 +676,9 @@ export const runCodexNativeWorkstationTurn = async (input: {
         arguments: governedArguments,
         approvalReceipt,
         turnId: input.turnId,
+        conversationThreadId: input.conversationThreadId,
+        toolCallId: callId,
+        providerExecutionId,
         iteration,
         authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
       });

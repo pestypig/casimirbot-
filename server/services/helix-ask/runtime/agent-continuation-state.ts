@@ -247,6 +247,8 @@ const collectMissingRequirementIds = (payload: RecordLike): string[] => {
       record.missing_evidence,
       record.missing_actions,
       record.unsatisfied_requirement_ids,
+      record.missing_required_capabilities,
+      record.missing_compound_subgoal_ids,
     );
   }
   const reviews = Array.isArray(payload.post_tool_observation_reviews)
@@ -285,6 +287,20 @@ const normalizeGoalStatus = (
     readString(docsContinuationContract.current_docs_phase) !==
       "terminal_ready",
   );
+  const itinerary =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(readRecord(payload.capability_itinerary)?.execution_state);
+  const itineraryHasRequirements = Boolean(
+    itinerary &&
+      [
+        itinerary.required_observation_families,
+        itinerary.required_observation_kinds,
+        itinerary.required_capabilities,
+        itinerary.compound_subgoal_ledger,
+      ].some((value) => Array.isArray(value) && value.length > 0),
+  );
+  const itineraryPending =
+    itineraryHasRequirements && readBoolean(itinerary?.complete) !== true;
   const report = readRecord(payload.satisfaction_report);
   const authority = readRecord(payload.route_evidence_authority);
   const providerBridge = readRecord(payload.provider_terminal_authority_bridge);
@@ -318,6 +334,7 @@ const normalizeGoalStatus = (
     : evaluationStatus || terminalStatus;
   const satisfied =
     !docsContinuationPending &&
+    !itineraryPending &&
     [
       "satisfied",
       "terminal_satisfied",
@@ -328,7 +345,9 @@ const normalizeGoalStatus = (
     ].includes(raw);
   let status: HelixAgentContinuationGoalStatus = satisfied
     ? "satisfied"
-    : "unknown";
+    : docsContinuationPending || itineraryPending
+      ? "in_progress"
+      : "unknown";
   if (/needs_user_input|pending_input|ask_user|clarif/.test(raw))
     status = "needs_user_input";
   else if (/blocked|failed|failure|non_retryable/.test(raw)) status = "blocked";
@@ -343,7 +362,9 @@ const normalizeGoalStatus = (
     status,
     satisfied,
     terminalProductAllowed:
-      providerTerminalAllowed || completedSolverTerminalAllowed
+      itineraryPending
+        ? false
+        : providerTerminalAllowed || completedSolverTerminalAllowed
         ? true
         : (readBoolean(authority?.terminal_product_allowed) ??
           readBoolean(readRecord(payload.terminal_answer_authority)?.allowed) ??
@@ -717,8 +738,10 @@ const collectAffordances = (
   payload: RecordLike,
   turnId: string,
   triedFingerprints: string[],
+  admittedCapabilityIds: string[] = [],
 ): HelixAgentContinuationAffordance[] => {
   const tried = new Set(triedFingerprints);
+  const admitted = new Set(uniqueStrings(admittedCapabilityIds));
   const candidates: HelixAgentContinuationAffordance[] = [];
   const push = (
     value: unknown,
@@ -746,6 +769,49 @@ const collectAffordances = (
     const artifactPayload = readRecord(artifact.payload);
     push(artifactPayload?.next_affordances, artifact.artifact_id);
     push(artifactPayload?.next_admissible_affordances, artifact.artifact_id);
+  }
+  const itinerary =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(readRecord(payload.capability_itinerary)?.execution_state);
+  for (const rawSubgoal of Array.isArray(itinerary?.compound_subgoal_ledger)
+    ? itinerary.compound_subgoal_ledger
+    : []) {
+    const subgoal = readRecord(rawSubgoal);
+    const capabilityId =
+      readString(subgoal?.runtime_capability) ??
+      readString(subgoal?.requested_capability);
+    if (
+      !subgoal ||
+      !capabilityId ||
+      !admitted.has(capabilityId) ||
+      readString(subgoal.satisfaction) !== "pending" ||
+      readString(subgoal.rail_failure_code) !== "subgoal_observation_missing"
+    ) {
+      continue;
+    }
+    const subgoalId = readString(subgoal.subgoal_id);
+    const subgoalArgs =
+      readRecord(subgoal.selected_args) ??
+      readRecord(subgoal.args) ??
+      readRecord(subgoal.planned_args) ??
+      {};
+    push(
+      {
+        affordance_id: subgoalId
+          ? `${subgoalId}:bounded_continuation`
+          : `${turnId}:compound_subgoal:${capabilityId}`,
+        capability_id: capabilityId,
+        args: subgoalArgs,
+        lane_request: {
+          capability: capabilityId,
+          ...subgoalArgs,
+        },
+        admissible: true,
+        reason:
+          "The committed compound itinerary still requires this admitted subgoal observation before terminal synthesis.",
+      },
+      subgoalId,
+    );
   }
   const available = readRecord(payload.available_capabilities);
   for (const rawCapability of Array.isArray(available?.capabilities)
@@ -882,6 +948,7 @@ const resolveAllowedDecisions = (args: {
   capabilityProposalAllowed: boolean;
   missingRequirementIds: string[];
   budget: HelixAgentContinuationBudget;
+  terminalProductAllowed: boolean | null;
 }): HelixAgentContinuationDecision[] => {
   const decisions = new Set<HelixAgentContinuationDecision>();
   if (args.goalSatisfied) return ["answer"];
@@ -902,7 +969,11 @@ const resolveAllowedDecisions = (args: {
   // A model may answer directly before any attempt, or give a bounded answer
   // after the admitted recovery surface is exhausted. It must not terminate an
   // unsatisfied post-tool path while a concrete act/retry decision remains.
-  if (!args.lastAttempt || (!canAct && !canRetry)) decisions.add("answer");
+  if (
+    (!args.lastAttempt && args.terminalProductAllowed !== false) ||
+    (!canAct && !canRetry)
+  )
+    decisions.add("answer");
   if (
     args.goalStatus === "needs_user_input" ||
     args.lastAttempt?.retryability === "requires_user_input" ||
@@ -970,6 +1041,7 @@ export const buildHelixAgentContinuationState = (
     args.payload,
     args.turnId,
     triedFingerprints,
+    args.capabilityProposal?.admittedCapabilityIds ?? [],
   );
   const previousAffordanceIds = new Set(
     previousState?.next_admissible_affordances?.map(
@@ -1052,6 +1124,7 @@ export const buildHelixAgentContinuationState = (
     capabilityProposalAllowed: capabilityProposal.allowed,
     missingRequirementIds,
     budget,
+    terminalProductAllowed: goal.terminalProductAllowed,
   });
   return {
     schema: HELIX_AGENT_CONTINUATION_STATE_SCHEMA,

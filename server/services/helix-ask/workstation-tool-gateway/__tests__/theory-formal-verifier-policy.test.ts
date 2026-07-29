@@ -12,12 +12,18 @@ const formalPreparationMocks = vi.hoisted(() => ({
 
 vi.mock(
   "../../../theory/casimir-formal-verifier-job-service",
-  () => ({
-    planCasimirFormalVerifierJobV1: formalVerifierServiceMocks.plan,
-    startCasimirFormalVerifierJobV1: formalVerifierServiceMocks.start,
-    readCasimirFormalVerifierJobResultV1:
-      formalVerifierServiceMocks.readResult,
-  }),
+  async (importOriginal) => {
+    const actual = await importOriginal<
+      typeof import("../../../theory/casimir-formal-verifier-job-service")
+    >();
+    return {
+      ...actual,
+      planCasimirFormalVerifierJobV1: formalVerifierServiceMocks.plan,
+      startCasimirFormalVerifierJobV1: formalVerifierServiceMocks.start,
+      readCasimirFormalVerifierJobResultV1:
+        formalVerifierServiceMocks.readResult,
+    };
+  },
 );
 vi.mock(
   "../../../theory/casimir-formal-verification-preparer",

@@ -1,0 +1,68 @@
+{
+  "schema_version": "casimir_dp_stage4_2e_fixture/1",
+  "campaign_id": "casimir-dp-causal-cone-clock-stage4-2e-v1",
+  "evidence_class": "synthetic_fixture",
+  "generated_at": "2026-07-29T19:30:00.000Z",
+  "cases": [
+    {
+      "case_id": "baseline_recovery",
+      "expected_gate": "pass",
+      "expected_status": "causal_geometry_recovery_and_nonbridge_gates_pass",
+      "scientific_interpretation": "Minkowski, bounded ADM, weak-field radial-null, clock, Casimir-screening, and QED-control calculations replay without empirical promotion."
+    },
+    {
+      "case_id": "nonpositive_lapse_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "nonpositive_lapse",
+      "scientific_interpretation": "A time-oriented ADM cone and stationary proper-clock rate require positive lapse in the declared chart."
+    },
+    {
+      "case_id": "nonpositive_spatial_metric_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "spatial_metric_not_positive_definite",
+      "scientific_interpretation": "The spatial metric must be positive definite before local null directions can be reconstructed."
+    },
+    {
+      "case_id": "timelike_path_outside_cone_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "timelike_path_not_inside_null_cone",
+      "scientific_interpretation": "A claimed massive-particle clock path cannot lie on or outside the local null boundary."
+    },
+    {
+      "case_id": "flat_l_over_c_promoted_as_null_solve_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "reference_parameterization_is_not_null_geodesic",
+      "scientific_interpretation": "The NHM2 L/c route parameterization is a useful reference but is not solved null transport through lapse and shift."
+    },
+    {
+      "case_id": "scalar_negative_density_as_geometry_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "complete_apparatus_tensor_missing",
+      "scientific_interpretation": "The sign of the ideal Casimir interaction energy density cannot substitute for a conserved complete-apparatus stress tensor and metric solve."
+    },
+    {
+      "case_id": "qed_effective_cone_as_gr_metric_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "qed_effective_propagation_is_not_gr_metric",
+      "scientific_interpretation": "Vacuum-polarization, material, frequency, or polarization response is an ordinary propagation control rather than a universal spacetime metric observation."
+    },
+    {
+      "case_id": "boundary_label_as_standard_dp_modifier_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "standard_dp_boundary_independence",
+      "scientific_interpretation": "At fixed material branches and regularization, standard DP has no Casimir-boundary modifier."
+    },
+    {
+      "case_id": "branch_metric_without_kernel_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "tensor_to_metric_to_coherence_kernel_missing",
+      "scientific_interpretation": "Branch-dependent cones cannot be connected to a collapse rate without a registered causal tensor-to-metric-to-coherence kernel."
+    },
+    {
+      "case_id": "synthetic_causal_recovery_promotion_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "measured_causal_response_not_ready",
+      "scientific_interpretation": "Synthetic causal recovery and screening bounds cannot establish measured spacetime response, collapse, manifold dynamics, or physical viability."
+    }
+  ]
+}

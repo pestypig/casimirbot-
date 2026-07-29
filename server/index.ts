@@ -54,6 +54,10 @@ import {
 } from
   "./routes/agi.realtime-room/source-link-routes";
 import {
+  environmentConnectorBrowserRouter,
+  environmentConnectorPublicRouter,
+} from "./routes/environment-connector-platform";
+import {
   installRuntimeToolConfirmationVerifierFromEnvironmentV1,
 } from
   "./services/theory/runtime-tool-confirmation-server-bootstrap";
@@ -507,6 +511,11 @@ app.use("/api/agi", sharedRealtimeRoomSourceLinkRouter);
 // cookie-authenticated browser lane. Keep it outside external OAuth/JWT
 // middleware and separate from the ordinary room management router.
 app.use("/api/agi", sharedRealtimeRoomSourceCredentialClaimRouter);
+// Connector pairing and southbound device transport own their parser,
+// credential, rate-limit, and secret-delivery boundaries. Mount them before
+// the optional legacy JWT middleware; neither route admits action execution.
+app.use(environmentConnectorPublicRouter);
+app.use("/api/agi", environmentConnectorBrowserRouter);
 // Agent-binding readiness and revocation are first-party account-session
 // operations. Mount them before the optional legacy bearer middleware so
 // ENABLE_AUTH does not silently replace their documented cookie boundary.

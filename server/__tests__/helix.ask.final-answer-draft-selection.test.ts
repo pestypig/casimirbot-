@@ -1757,6 +1757,52 @@ describe("final_answer_draft terminal selection", () => {
     expect(payload.model_synthesized_answer).toBeUndefined();
   });
 
+  it("recognizes support refs carried by a materialized provider route product", () => {
+    const turnId = "ask:test:provider-route-product-support";
+    const supportRef = `${turnId}:prior_environment_probe_evidence:verified`;
+    const draftPayload = {
+      schema: "helix.provider_route_product.v1",
+      turn_id: turnId,
+      kind: "model_synthesized_answer",
+      text: "The target is visible and nearby, but path viability remains unproven.",
+      support_refs: [supportRef],
+      selected_observation_refs: [supportRef],
+    };
+    const gate = evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:model_synthesized_answer`,
+      draftText: draftPayload.text,
+      draftPayload,
+      routeProductContract: {
+        schema: "helix.route_product_contract.v1",
+        turn_id: turnId,
+        source_target: "world_event",
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: [
+          "model_synthesized_answer",
+          "typed_failure",
+        ],
+      },
+      payload: {
+        turn_id: turnId,
+        committed_ask_route: {
+          route: { source_target: "world_event" },
+          canonical_goal: {
+            goal_kind: "environment_evidence_synthesis",
+            required_terminal_kind: "model_synthesized_answer",
+          },
+        },
+      },
+      artifactLedger: [],
+    });
+
+    expect(gate.route_family).toBe("situation_room");
+    expect(gate.violations).not.toContain(
+      "missing_support_refs_for_source_route",
+    );
+    expect(gate.ok).toBe(true);
+  });
+
   it("blocks result-only docs plus calculator drafts when the prompt asks to explain the connection", () => {
     const turnId = "ask:test:docs-calculator-result-only-connection";
     const docRef = `${turnId}:doc_location_matches`;
@@ -3376,6 +3422,44 @@ describe("final_answer_draft terminal selection", () => {
     });
 
     expect(gate).toMatchObject({
+      ok: true,
+      route_family: "theory_locator",
+      violations: [],
+    });
+
+    const configureGate = evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:configure-draft`,
+      draftText: [
+        "The procedure is blocked at the Lanyon congruence stage.",
+        "Exact typed limitation: unsupported_lanyon_case.",
+        "I cannot configure Lanyon for the requested unregistered 2D adaptive-mesh case without a registered supported case.",
+        "Missing requirements include target_observable_required, coordinate_frame_required, and initial_boundary_conditions_required.",
+      ].join("\n"),
+      draftPayload: {
+        schema: "helix.final_answer_draft.v1",
+        grounded_in_observation_refs: [observationRef],
+      },
+      promptText:
+        "Do not improvise support or run code; give the exact typed limitation and missing requirements.",
+      routeProductContract,
+      payload: {
+        active_prompt:
+          "Do not improvise support or run code; give the exact typed limitation and missing requirements.",
+        route_product_contract: routeProductContract,
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          route: { source_target: "theory_locator" },
+          canonical_goal: {
+            goal_kind: "theory_locator",
+            required_terminal_kind: "model_synthesized_answer",
+          },
+        },
+      },
+      artifactLedger,
+    });
+
+    expect(configureGate).toMatchObject({
       ok: true,
       route_family: "theory_locator",
       violations: [],

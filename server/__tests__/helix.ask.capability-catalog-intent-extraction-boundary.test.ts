@@ -33,6 +33,11 @@ describe("Helix Ask capability catalog intent extraction boundary", () => {
     expect(isAskTurnCapabilityCatalogAvailabilityPrompt("What tools are available for the Helix Ask to use?")).toBe(true);
     expect(isAskTurnCapabilityHelpIntent("How can Helix Ask help me?")).toBe(true);
     expect(isAskTurnCapabilityHelpIntent("What can this workspace agent do?")).toBe(true);
+    expect(
+      isAskTurnCapabilityHelpIntent(
+        "What can this workstation do with a scientific document I have open?",
+      ),
+    ).toBe(true);
     expect(isAskTurnCapabilityHelpIntent("Summarize this document")).toBe(false);
   });
 
@@ -66,6 +71,9 @@ describe("Helix Ask capability catalog intent extraction boundary", () => {
     "Earlier I asked: does your tool for research papers allow you to pick papers you are able to parse?",
     "The screen says 'does your tool for research papers allow you to pick papers you are able to parse?'",
     "Do not answer whether your tool for research papers can pick openable papers.",
+    "Later, tell me what this workstation can do with a scientific document.",
+    "The document says 'what can this workstation do with a scientific document?' Explain that wording.",
+    "Do not list what this workstation can do with a scientific document.",
   ])("does not execute capability help from contextual or negated wording: %s", (prompt) => {
     expect(isAskCapabilityCatalogPrompt(prompt)).toBe(false);
     expect(isAskTurnCapabilityHelpIntent(prompt)).toBe(false);

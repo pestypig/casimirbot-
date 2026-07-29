@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { HelixAccountCapabilityPolicy } from "@shared/helix-account-session";
+import { HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS } from "@shared/helix-environment-connector";
 
 export type HelixExternalCapabilityPolicy = {
   runId: string;
@@ -76,6 +77,8 @@ export const HELIX_EXTERNAL_AGENT_READ_ONLY_CAPABILITY_IDS =
     "docs-viewer.read_visible_surface",
     "docs-viewer.read_active_translation",
     "room.evidence.read_bound",
+    "room.environment.probe",
+    ...HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
     "helix_ask.reflect_theory_context",
     "theory-badge-graph.reflect_discussion_context",
   ].map(normalized));

@@ -597,7 +597,7 @@ export function buildToolCallAdmissionDecision(input: {
   let discoveryPolicy: HelixToolCallAdmissionDecision["discovery_policy"] | undefined;
   let reason = "source_target_requires_evidence_path";
   const isStagePlayLiveEnvironmentPrompt =
-    sourceTarget === "live_environment" &&
+    effectiveSourceTarget === "live_environment" &&
     (
       isStagePlayCheckpointRequestPrompt(promptText) ||
       isStagePlayJobPlanningPrompt(promptText) ||
@@ -844,18 +844,21 @@ export function buildToolCallAdmissionDecision(input: {
     extraForbiddenTerminalKinds = ["situation_context_pack", "doc_summary", "active_doc_identity", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "active_doc_identity", "model_only_concept"];
     reason = "live_pipeline_requires_receipt_presentation_path";
-  } else if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox") {
+  } else if (
+    effectiveSourceTarget === "live_environment" ||
+    effectiveSourceTarget === "live_source_mailbox"
+  ) {
     admittedToolFamilies = ["live_environment"];
     extraForbiddenTerminalKinds = isStagePlayLiveEnvironmentPrompt
       ? ["situation_context_pack", "doc_summary", "active_doc_identity", "live_card_projection", "live_pipeline_receipt", "client_projection", "panel_generated_answer", "no_tool_direct", "model_only_concept"]
       : ["direct_answer_text", "situation_context_pack", "doc_summary", "active_doc_identity", "live_card_projection", "panel_generated_answer", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "active_doc_identity", "model_only_concept", "no_tool_direct", "panel_generated_answer"];
-    reason = sourceTarget === "live_source_mailbox"
+    reason = effectiveSourceTarget === "live_source_mailbox"
       ? "live_source_mailbox_requires_mail_read_then_decision"
       : isStagePlayLiveEnvironmentPrompt
       ? "stage_play_live_environment_requires_tool_observation_then_model_synthesis"
       : "live_environment_requires_tool_evidence_path";
-  } else if (sourceTarget === "world_event") {
+  } else if (effectiveSourceTarget === "world_event") {
     admittedToolFamilies = ["world_event"];
     extraForbiddenTerminalKinds = ["active_doc_identity", "doc_location_matches", "no_tool_direct", "model_only_concept"];
     reason = "world_event_requires_world_source_path";

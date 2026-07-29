@@ -122,6 +122,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
   allowed_runtime_agents: ["codex"],
   allowed_workstation_capabilities: [
     "workspace_os.status",
+    "helix_ask.inspect_capability_catalog",
     "workstation.active_context",
     "theory-badge-graph.current_context",
     "workstation-notes.list_notes",
