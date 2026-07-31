@@ -1,0 +1,330 @@
+{
+  "schema_version": "casimir_dp_empirical_pilot_packet_stage4_2g/1",
+  "campaign_id": "casimir-dp-empirical-feasibility-pilot-stage4-2g-v1",
+  "packet_id": "casimir-dp-stage4-2g-synthetic-ingestion-validation-v1",
+  "generated_at": "2026-07-30T03:00:00.000Z",
+  "evidence_class": "synthetic_validation",
+  "partition": "pilot",
+  "blinded": false,
+  "apparatus_identity": {
+    "identity_id": "silica_high_mass_identifiable_single_object_v1",
+    "candidate_id": "silica_high_mass_identifiable",
+    "material_id": "silica",
+    "geometry": "sphere",
+    "radius_m": 2.76302362398029e-7,
+    "mass_kg": 1.94385e-16,
+    "branch_separation_m": 1.6e-7,
+    "hold_time_s": 0.25,
+    "primary_sequence": "ramsey",
+    "cavity_gap_m": 1.2e-6,
+    "boundary_modulation_Hz": 0.5,
+    "environment_temperature_K": 4,
+    "pressure_Pa": 2e-11,
+    "vibration_acceleration_asd_m_s2_sqrtHz": 5e-10,
+    "readout_power_W": 5e-9,
+    "readout_wavelength_m": 1.55e-6,
+    "polarization_program": "circular_control_pair"
+  },
+  "products": [
+    {
+      "product_id": "apparatus_mass_geometry",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/apparatus-mass-geometry",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": false
+    },
+    {
+      "product_id": "material_response",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/material-response",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": false
+    },
+    {
+      "product_id": "finite_geometry_maxwell_green",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/finite-geometry-maxwell-green",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": true
+    },
+    {
+      "product_id": "state_preparation",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/state-preparation",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": false
+    },
+    {
+      "product_id": "branch_hold_metrology",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/branch-hold-metrology",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": true
+    },
+    {
+      "product_id": "boundary_modulation_transfer",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/boundary-modulation-transfer",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": true
+    },
+    {
+      "product_id": "environment_backgrounds",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/environment-backgrounds",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": true
+    },
+    {
+      "product_id": "complex_coherence_response",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/complex-coherence-response",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": false
+    },
+    {
+      "product_id": "block_covariance",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/block-covariance",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": false
+    },
+    {
+      "product_id": "companion_detector",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/companion-detector",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": true
+    },
+    {
+      "product_id": "blind_custody_freeze",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/blind-custody-freeze",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": true
+    },
+    {
+      "product_id": "independent_solver_replication",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/independent-solver-replication",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": true
+    },
+    {
+      "product_id": "complete_apparatus_stress_energy",
+      "authority_class": "synthetic_validation",
+      "artifact_ref": "synthetic://stage4-2g/complete-apparatus-stress-energy",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "calibration_ref": "synthetic://stage4-2g/calibration",
+      "uncertainty_model_ref": "synthetic://stage4-2g/uncertainty",
+      "custody_event_ids": ["synthetic-event"],
+      "acquired_at": "2026-07-30T03:00:00.000Z",
+      "operator_id": "synthetic-validator",
+      "instrument_ids": ["synthetic-instrument"],
+      "independent_of_primary_channel": true
+    }
+  ],
+  "identifiability_input": {
+    "schema_version": "casimir_dp_apparatus_identifiability_stage4_2b/1",
+    "cell_ids": [
+      "pilot_cell_01",
+      "pilot_cell_02",
+      "pilot_cell_03",
+      "pilot_cell_04",
+      "pilot_cell_05",
+      "pilot_cell_06",
+      "pilot_cell_07",
+      "pilot_cell_08"
+    ],
+    "whitened_signatures_per_sqrt_window": [
+      {
+        "signature_id": "synthetic_intercept",
+        "lane": "intercept",
+        "values": [1, 1, 1, 1, 1, 1, 1, 1],
+        "source_ref": "synthetic://stage4-2g/signature/intercept"
+      },
+      {
+        "signature_id": "synthetic_thermal",
+        "lane": "thermal",
+        "values": [1, -1, 1, -1, 1, -1, 1, -1],
+        "source_ref": "synthetic://stage4-2g/signature/thermal"
+      },
+      {
+        "signature_id": "synthetic_electromagnetic",
+        "lane": "electromagnetic",
+        "values": [1, 1, -1, -1, 1, 1, -1, -1],
+        "source_ref": "synthetic://stage4-2g/signature/electromagnetic"
+      },
+      {
+        "signature_id": "synthetic_vibration",
+        "lane": "vibration",
+        "values": [1, 1, 1, 1, -1, -1, -1, -1],
+        "source_ref": "synthetic://stage4-2g/signature/vibration"
+      },
+      {
+        "signature_id": "synthetic_gas",
+        "lane": "gas",
+        "values": [1, -1, -1, 1, 1, -1, -1, 1],
+        "source_ref": "synthetic://stage4-2g/signature/gas"
+      },
+      {
+        "signature_id": "synthetic_readout",
+        "lane": "readout",
+        "values": [1, -1, 1, -1, -1, 1, -1, 1],
+        "source_ref": "synthetic://stage4-2g/signature/readout"
+      },
+      {
+        "signature_id": "synthetic_dp",
+        "lane": "dp",
+        "values": [0.1, 0.1, -0.1, -0.1, -0.1, -0.1, 0.1, 0.1],
+        "source_ref": "synthetic://stage4-2g/signature/dp"
+      }
+    ],
+    "forecast_covariance": {
+      "covariance_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "whitening_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "learned_from": "calibration_or_pilot",
+      "frozen_before_confirmatory": true,
+      "constructed_from_full_cross_covariance": true,
+      "condition_number": 2,
+      "maximum_condition_number": 100000000
+    },
+    "design_contract": {
+      "design_matrix_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "cell_order_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "frozen_before_confirmatory": true,
+      "preparation_readout_intercept_included": true,
+      "nuisance_columns_profiled": true
+    },
+    "bounded_parameter_regions": [
+      {
+        "region_id": "r0_100nm_synthetic_validation_only",
+        "r0_lower_m": 1e-7,
+        "r0_upper_m": 1e-7,
+        "whitened_dp_signature_per_sqrt_window": [
+          0.1,
+          0.1,
+          -0.1,
+          -0.1,
+          -0.1,
+          -0.1,
+          0.1,
+          0.1
+        ],
+        "preregistered": true,
+        "external_bound_status": "contextual_not_admitted",
+        "source_ref": "synthetic://stage4-2g/region/r0-100nm"
+      }
+    ],
+    "power_coverage": {
+      "asymptotic_method_valid": true,
+      "simulation_coverage_validated": false,
+      "simulation_coverage_probability": 0.95,
+      "simulation_receipt_sha256": null
+    },
+    "planned_paired_windows": 1600,
+    "thresholds": {
+      "minimum_signature_rank": 7,
+      "maximum_abs_whitened_cosine": 0.97,
+      "minimum_power": 0.8,
+      "maximum_false_positive_rate": 0.05,
+      "minimum_companion_snr": 5,
+      "augmented_design_condition_number_max": 100
+    },
+    "companion": {
+      "applicable": true,
+      "independently_powered": true,
+      "forecast_snr": 6
+    },
+    "ordinary_physics_forecast_complete": true,
+    "branch_provenance_complete": true,
+    "independent_replication_planned": true,
+    "legacy_rate_power_input": {
+      "schema_version": "casimir_dp_visibility_power/1",
+      "baseline_rate_s": 1,
+      "target_additional_rate_s": 0.02400420398374263,
+      "observation_time_s": 0.25,
+      "type_i_error": 0.05,
+      "target_power": 0.8,
+      "technical_variance_inflation": 1
+    }
+  },
+  "exclusions_frozen": true,
+  "covariance_frozen": true,
+  "dp_model_frozen": true,
+  "transfer_kernel_registered": false,
+  "automatic_unblinding_allowed": false,
+  "confirmatory_refit_allowed": false
+}

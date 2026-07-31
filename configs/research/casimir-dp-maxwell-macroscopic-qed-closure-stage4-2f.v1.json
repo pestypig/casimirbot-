@@ -1,0 +1,260 @@
+{
+  "schema_version": "casimir_dp_maxwell_macroscopic_qed_closure_stage4_2f/1",
+  "study_id": "casimir-dp-quantum-foam-study-v1",
+  "campaign_id": "casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1",
+  "implementation_version": "stage4.2f-v1",
+  "evidence_cutoff": "2026-07-29T23:30:00.000Z",
+  "evidence_class": "synthetic_maxwell_macroscopic_qed_closure_and_readiness_audit",
+  "claim_ceiling": "maxwell_macroscopic_qed_and_named_dp_model_definition_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "authority_manifest": {
+    "path": "configs/research/casimir-dp-stage4-2f-authorities.v1.json",
+    "sha256": "e0eab3f58a8b5c10ca91ef28232d4fda2392bbfceb02bc6822ef4e3290e4f19b"
+  },
+  "upstream_authorities": [
+    {
+      "role": "stage4_2e_config",
+      "path": "configs/research/casimir-dp-causal-cone-clock-stage4-2e.v1.json",
+      "sha256": "1279c8e23fb033237a79c29546ef5c210a9405d21604ad844ae801e55d5732e5",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2e_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-2e-authorities.v1.json",
+      "sha256": "cba9c8b40dc153cda0bb9683834df953c9de09a0c4d1a2bb9aa32ac5167b91f2",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2e_fixture",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2e-causal-cone.synthetic.v1.json",
+      "sha256": "16245e73a70acee3a429a6beaee6ec5b18b66863a357c60918d602920ef9bab8",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2e_report",
+      "path": "artifacts/research/casimir-dp-causal-cone-clock-stage4-2e/casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z/causal-cone-clock-stage4-2e-report.json",
+      "sha256": "d75857f22e0a95b4302e61d60d25c9fa689182ce8c9ef31eabfd15e64f66ed58",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2e_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-causal-cone-clock-stage4-2e/casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z/causal-cone-clock-stage4-2e-receipt.json",
+      "sha256": "633b07c4f2d769b4701612bd4e112e5a2e12e111f60f7405f1f752b3e260d2c2",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2e_verification_receipt",
+      "path": "docs/research/casimir-dp-causal-cone-clock-stage4-2e-verification-receipt.json",
+      "sha256": "b37bdbd1612912fc5c91fd51667559dc739018d43d9f57d7f182d76d1d3bbb1b",
+      "required_at_runtime": true
+    }
+  ],
+  "method_authorities": [
+    {
+      "role": "nhm2_maxwell_stress_contract_method_only",
+      "path": "shared/contracts/casimir-finite-temperature-finite-geometry-maxwell-stress.v1.ts",
+      "sha256": "55b402eef6baa260927d4d15f7afb6c3ca401c17f3669fd705e0cadc52875a7c",
+      "evidence_reuse_allowed": false
+    },
+    {
+      "role": "registered_dp_generator_method_only",
+      "path": "shared/casimir-dp-dp-companion.ts",
+      "sha256": "6432f931dd465624291c4cd7c33eda6a780d4b9687f89f6e76a2794d8708b5ac",
+      "evidence_reuse_allowed": false
+    }
+  ],
+  "immutable_stage4_2e": {
+    "campaign_run_id": "casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z",
+    "software_and_causal_recovery_diagnostics": "pass",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  },
+  "sources": [
+    {
+      "source_id": "rahi_scattering_2009",
+      "title": "Scattering Theory Approach to Electrodynamic Casimir Forces",
+      "url": "https://arxiv.org/abs/0908.2649",
+      "source_class": "primary_research",
+      "supports": "Casimir calculations from classical electromagnetic scattering amplitudes for arbitrary shapes, material susceptibilities, media, and nonzero temperature.",
+      "does_not_support": "A Casimir-boundary modification of a DP generator or objective collapse."
+    },
+    {
+      "source_id": "rodriguez_imaginary_frequency_2007",
+      "title": "Casimir forces in the time domain: Theory",
+      "url": "https://arxiv.org/abs/0705.3661",
+      "source_class": "primary_research",
+      "supports": "Casimir force evaluation from fluctuation-dissipation field correlations and the mean electromagnetic stress tensor using Green-function computational electrodynamics.",
+      "does_not_support": "Using mean Casimir pressure as a force-noise PSD or collapse rate."
+    },
+    {
+      "source_id": "buhmann_scheel_macroscopic_qed_2008",
+      "title": "Macroscopic quantum electrodynamics and duality",
+      "url": "https://arxiv.org/abs/0806.2211",
+      "source_class": "primary_research",
+      "supports": "Operator Maxwell equations, Green tensors, and macroscopic-QED observables including Casimir forces in causal material media.",
+      "does_not_support": "A gravitational transfer kernel from electromagnetic duality or polarization."
+    },
+    {
+      "source_id": "hwang_noh_curved_maxwell_2023",
+      "title": "Maxwell equations in curved spacetime",
+      "url": "https://arxiv.org/abs/2307.14555",
+      "source_class": "primary_research",
+      "supports": "Observer-dependent electric and magnetic fields and frame-explicit Maxwell equations in curved spacetime.",
+      "does_not_support": "Treating a material phase or group velocity as a universal metric light cone."
+    },
+    {
+      "source_id": "diosi_master_equation_1989",
+      "title": "Models for universal reduction of macroscopic quantum fluctuations",
+      "url": "https://doi.org/10.1103/PhysRevA.40.1165",
+      "source_class": "primary_research",
+      "supports": "A mass-density dynamical-reduction master-equation model distinct from Penrose's lifetime heuristic.",
+      "does_not_support": "A Casimir-boundary variable in the registered standard DP generator."
+    },
+    {
+      "source_id": "bahrami_dp_heating_2014",
+      "title": "The Schroedinger-Newton equation and its foundations",
+      "url": "https://doi.org/10.1103/PhysRevA.90.062105",
+      "source_class": "primary_research",
+      "supports": "Regularization and energy-increase implications used by the registered nondissipative Gaussian DP companion.",
+      "does_not_support": "A demonstrated heating detector for the proposed Casimir-DP apparatus."
+    },
+    {
+      "source_id": "donadi_dp_radiation_bound_2021",
+      "title": "Underground test of gravity-related wave function collapse",
+      "url": "https://doi.org/10.1038/s41567-020-1008-4",
+      "source_class": "primary_research",
+      "supports": "Radiation constraints that rule out the natural parameter-free DP version under the registered mapping assumptions.",
+      "does_not_support": "Exclusion of every regularized or dissipative DP model, or a local apparatus heating sensitivity."
+    }
+  ],
+  "constants": {
+    "epsilon0_F_m": 8.8541878128e-12,
+    "mu0_N_A2": 1.25663706212e-6,
+    "c_m_s": 299792458,
+    "hbar_J_s": 1.054571817e-34,
+    "k_B_J_K": 1.380649e-23,
+    "G_m3_kg_s2": 6.6743e-11
+  },
+  "maxwell_recovery": {
+    "observer_frame": "eulerian_laboratory_frame",
+    "constitutive_domain": "local_linear_isotropic_vacuum_recovery_only",
+    "frequency_Hz": 194400000000000,
+    "electric_field_peak_V_m": 1,
+    "propagation_axis": "z",
+    "linear_polarization_axis": "x",
+    "relative_permittivity": 1,
+    "relative_permeability": 1,
+    "maximum_normalized_residual": 1e-12,
+    "maximum_basis_invariance_error": 1e-12
+  },
+  "green_fdt_recovery": {
+    "angular_frequency_rad_s": 100000000000,
+    "temperature_K": 4,
+    "imaginary_green_trace_m_inv": 1000000,
+    "passive_response_required": true,
+    "maximum_zero_temperature_relative_error": 1e-12
+  },
+  "ideal_casimir_recovery": {
+    "gap_m": 1e-7,
+    "ideal_parallel_conductors": true,
+    "analytic_limit_only": true,
+    "pressure_to_energy_density_ratio": 3,
+    "maximum_identity_relative_error": 1e-12
+  },
+  "finite_geometry_readiness": {
+    "method_contract_path": "shared/contracts/casimir-finite-temperature-finite-geometry-maxwell-stress.v1.ts",
+    "import_nhm2_evidence": false,
+    "measured_dielectric_response_available": false,
+    "finite_cad_green_tensor_available": false,
+    "maxwell_stress_receipt_available": false,
+    "independent_solver_receipt_available": false
+  },
+  "dp_model_audit": {
+    "registered_model_id": "diosi_1989_gaussian_regularized_nondissipative",
+    "mass_kg": 1.94385e-16,
+    "branch_separation_m": 1.6e-7,
+    "hold_time_s": 0.25,
+    "selected_R0_m": 1e-7,
+    "sensitivity_R0_m": [1e-8, 1e-7, 1e-6],
+    "sensitivity_is_allowed_parameter_region": false,
+    "boundary_variable_in_generator": false,
+    "transfer_kernel_registered": false
+  },
+  "stage4_2c_transport_audit": {
+    "source_report_path": "artifacts/research/casimir-dp-identifiability-redesign-stage4-2c/casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z/identifiability-redesign-stage4-2c-report.json",
+    "source_report_sha256": "d9237eeb9079e7fab84a86b3eda28b0f14bb83be1a340b3d6f9695dcffb5047c",
+    "selected_candidate_id": "silica_high_mass_identifiable",
+    "declared_candidate_mass_kg": 1.94385e-16,
+    "strongest_baseline_cell_mass_kg": 9.2153e-18,
+    "mass_scale": 50,
+    "strongest_baseline_separation_m": 4e-8,
+    "branch_separation_scale": 4,
+    "reported_strongest_Gamma_DP_s": 0.13487168259863525,
+    "single_mass_apparatus_identity_demonstrated": false
+  },
+  "companion_forecast_audit": {
+    "source_report_path": "artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/apparatus-coherence-residual-stage4-2b-report.json",
+    "source_report_sha256": "2ebd9971bacc393842dc71bfd80063d7b244231947074bc70b3be25bd7ad5b67",
+    "observable": "heating_W",
+    "one_shot_standard_uncertainty_W": 1e-43,
+    "planned_independent_samples": 100,
+    "expected_forecast_snr": 1985.5322830887471,
+    "independence_receipt_class": "synthetic",
+    "detector_noise_receipt_available": false,
+    "measured_companion_authority": "not_ready"
+  },
+  "apparatus_gates": {
+    "selected_superposition_prepared": false,
+    "branch_separation_metrology_measured": false,
+    "hold_time_coherence_demonstrated": false,
+    "boundary_modulation_Hz": 0.5,
+    "cavity_relaxation_measured": false,
+    "material_relaxation_measured": false,
+    "mechanical_sideband_transfer_measured": false,
+    "dynamical_casimir_background_bounded": false,
+    "complete_apparatus_renormalized_stress_energy_available": false,
+    "conserved_total_stress_verified": false
+  },
+  "fixture": {
+    "path": "configs/research/fixtures/casimir-dp-stage4-2f-maxwell-closure.synthetic.v1.json",
+    "sha256": "fe81cda1ed30dfce8b58e8eeaeb13ceddad4c353aa95ad185e448a5bdf961128"
+  },
+  "run_order": [
+    "verify_immutable_stage4_2e_authority_tuples",
+    "bind_nhm2_maxwell_contract_as_method_only",
+    "freeze_maxwell_macroscopic_qed_source_boundaries",
+    "recover_covariant_maxwell_charge_conservation",
+    "recover_transverse_plane_wave_and_polarization_basis_invariance",
+    "recover_green_tensor_fdt_passivity_and_zero_temperature_limit",
+    "recover_ideal_casimir_stress_limit",
+    "instantiate_empty_finite_geometry_contract_fail_closed",
+    "freeze_exact_regularized_dp_generator_and_model_domain",
+    "compute_r0_sensitivity_without_declaring_allowed_region",
+    "audit_stage4_2b_companion_observable_and_synthetic_uncertainty",
+    "audit_state_preparation_and_active_boundary_timescale_gates",
+    "separate_maxwell_stress_from_complete_renormalized_apparatus_tensor",
+    "enforce_zero_maxwell_qed_gr_to_dp_observable_bridges",
+    "execute_fail_closed_fixture_matrix",
+    "write_content_addressed_report_trace_and_receipt"
+  ],
+  "final_status_policy": {
+    "software_and_equation_recovery": "pass",
+    "finite_geometry_maxwell_authority": "not_ready",
+    "measured_material_green_authority": "not_ready",
+    "named_dp_model_definition": "pass",
+    "candidate_transport_identity_authority": "not_ready",
+    "dp_parameter_region_authority": "not_ready",
+    "companion_detector_authority": "not_ready",
+    "companion_model_identity_authority": "not_ready",
+    "state_preparation_authority": "not_ready",
+    "quasistatic_modulation_authority": "not_ready",
+    "complete_apparatus_stress_energy": "not_ready",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  }
+}

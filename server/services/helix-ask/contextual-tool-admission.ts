@@ -184,6 +184,15 @@ export function contextualToolSuppressionBlocksFamily(
 
 export function detectContextualToolAdmissionSuppression(promptText: string): HelixContextualToolAdmissionSuppression | null {
   const prompt = promptText.trim();
+  const genericNoTools = prompt.match(/\b(?:do\s+not|don't|dont|never|without)\s+(?:call|use|run|execute)\s+(?:any\s+)?tools?\b|\bno\s+tools?\b/i)?.[0];
+  if (genericNoTools) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "negated_tool_instruction",
+      verb_or_cue: "all_tools",
+      text: genericNoTools,
+    };
+  }
   if (
     !prompt ||
     (
@@ -206,16 +215,6 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
     )
   ) return null;
   MUTATING_WRITE_NEGATION_RE.lastIndex = 0;
-
-  const genericNoTools = prompt.match(/\b(?:do\s+not|don't|dont|never|without)\s+(?:call|use|run|execute)\s+(?:any\s+)?tools?\b|\bno\s+tools?\b/i)?.[0];
-  if (genericNoTools) {
-    return {
-      tool_admission_suppressed: true,
-      suppression_reason: "negated_tool_instruction",
-      verb_or_cue: "all_tools",
-      text: genericNoTools,
-    };
-  }
 
   const negatedEvidenceFamily = prompt.match(NEGATED_EVIDENCE_FAMILY_RE)?.[0];
   if (negatedEvidenceFamily) {

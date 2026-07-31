@@ -2,7 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resetDbClient } from "../db/client";
+import {
+  flushLocalDatabaseSnapshotIfEnabled,
+  resetDbClient,
+} from "../db/client";
 import {
   getAccountSessionStatus,
   resetAccountSessionStore,
@@ -90,5 +93,29 @@ describe("local pg-mem persistence", () => {
     expect(restored.entries).toHaveLength(1);
     expect(JSON.parse(restored.entries[0]?.value ?? "{}")).toMatchObject({ title: "Restart proof" });
     expect(restored.artifacts[0]?.sync_status).toBe("profile_synced");
+  });
+
+  it("defers and coalesces local snapshots until an explicit flush", async () => {
+    vi.stubEnv("HELIX_LOCAL_PG_MEM_WRITE_MODE", "deferred");
+    vi.stubEnv("HELIX_LOCAL_PG_MEM_IDLE_FLUSH_MS", "60000");
+    vi.stubEnv("HELIX_LOCAL_PG_MEM_MAX_FLUSH_MS", "60000");
+
+    const signedUp = await signUpPasswordAccountSession({
+      email: "deferred-local-profile@example.com",
+      password: "CorrectHorseBattery456!",
+      display_name: "Deferred Local Profile",
+    });
+    expect(signedUp.ok).toBe(true);
+    expect(fs.existsSync(snapshotPath)).toBe(false);
+
+    await flushLocalDatabaseSnapshotIfEnabled();
+    expect(fs.existsSync(snapshotPath)).toBe(true);
+
+    await resetDbClient();
+    const signedIn = await signInPasswordAccountSession({
+      email: "deferred-local-profile@example.com",
+      password: "CorrectHorseBattery456!",
+    });
+    expect(signedIn.ok).toBe(true);
   });
 });

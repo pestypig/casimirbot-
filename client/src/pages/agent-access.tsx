@@ -3,10 +3,15 @@ import { ArrowLeft, MonitorCog } from "lucide-react";
 import { Link } from "wouter";
 import AgentAccessGuide from "@/components/agent-access/AgentAccessGuide";
 import { AGENT_ACCESS_CONTENT } from "@/lib/agent-access/agentAccessContent";
+import { buildWorkstationEntryUrl } from "@shared/workstation-link-meta";
 
 const workstationUrl =
   AGENT_ACCESS_CONTENT.endpoints.find((endpoint) => endpoint.id === "workstation")
-    ?.url ?? "/desktop?panels=agent-access&focus=agent-access";
+    ?.url ??
+  buildWorkstationEntryUrl({
+    search: "?panels=agent-access&focus=agent-access",
+    entry: "workstation",
+  });
 
 export default function AgentAccessPage() {
   return (

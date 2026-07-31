@@ -24,6 +24,8 @@ import {
 } from "@shared/ideology/ideology-verifiers";
 import { collectIdeologyNodeIdsFromTree } from "../scripts/collect-ideology-node-ids";
 import { resolveStartupConfig } from "./startup-config";
+import { scheduleStartupMemorySettle } from "./services/runtime/startup-memory-settle";
+import { flushLocalDatabaseSnapshotIfEnabled } from "./db/client";
 import {
   renderRootBootHtml,
   renderRootRedirectHtml,
@@ -574,28 +576,38 @@ const requestShutdown = (signal: NodeJS.Signals | string) => {
     process.exit(code);
   };
 
-  if (!serverInstance) {
-    exit(0);
-    return;
-  }
-
-  try {
-    serverInstance.close((err) => {
-      if (err) {
-        try {
-          console.error("[process] error while closing server:", err);
-        } catch {}
-        exit(1);
-        return;
-      }
-      exit(0);
-    });
-  } catch (err) {
+  const persistenceFlush = flushLocalDatabaseSnapshotIfEnabled().catch((err) => {
     try {
-      console.error("[process] server close threw:", err);
+      console.error("[db] local snapshot shutdown flush failed:", err);
     } catch {}
-    exit(1);
-  }
+  });
+
+  const serverClose = new Promise<void>((resolve, reject) => {
+    if (!serverInstance) {
+      resolve();
+      return;
+    }
+    try {
+      serverInstance.close((err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve();
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+
+  void Promise.all([persistenceFlush, serverClose])
+    .then(() => exit(0))
+    .catch((err) => {
+      try {
+        console.error("[process] graceful shutdown failed:", err);
+      } catch {}
+      exit(1);
+    });
 };
 
 void initErrorReporter();
@@ -1207,6 +1219,7 @@ app.use((req, res, next) => {
     appReady = true;
     healthReady = true;
     log("app ready");
+    scheduleStartupMemorySettle();
 
     if (!fastBoot) {
       if (skipModuleInit) {

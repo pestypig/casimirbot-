@@ -11,6 +11,7 @@ import { useQiStream } from "@/hooks/useQiStream";
 import { LumaWhispersProvider } from "@/lib/luma-whispers";
 import { useIsMobileViewport } from "@/hooks/useIsMobileViewport";
 import RouteBootSplash from "@/components/RouteBootSplash";
+import { buildWorkstationShellHandoff } from "@/lib/workstation/workstationEntryRoute";
 
 const Home = lazy(() => import("@/pages/home"));
 const Simulation = lazy(() => import("@/pages/simulation"));
@@ -55,7 +56,14 @@ const hasMobileOverride = () => {
   }
 };
 
-function DesktopRedirect() {
+const buildCurrentWorkstationHandoff = (
+  targetPath: "/desktop" | "/mobile",
+) => {
+  if (typeof window === "undefined") return targetPath;
+  return buildWorkstationShellHandoff(targetPath, window.location);
+};
+
+function AdaptiveWorkstationRoute() {
   const [, setLocation] = useLocation();
   const { isMobile, isReady } = useIsMobileViewport();
   const desktopOverride = hasDesktopOverride();
@@ -63,23 +71,23 @@ function DesktopRedirect() {
 
   useEffect(() => {
     if (mobileOverride) {
-      setLocation("/mobile", { replace: true });
+      setLocation(buildCurrentWorkstationHandoff("/mobile"), { replace: true });
       return;
     }
 
     if (desktopOverride) {
-      setLocation("/desktop", { replace: true });
+      setLocation(buildCurrentWorkstationHandoff("/desktop"), { replace: true });
       return;
     }
 
     if (!isReady) return;
 
     if (isMobile) {
-      setLocation("/mobile", { replace: true });
+      setLocation(buildCurrentWorkstationHandoff("/mobile"), { replace: true });
       return;
     }
 
-    setLocation("/desktop", { replace: true });
+    setLocation(buildCurrentWorkstationHandoff("/desktop"), { replace: true });
   }, [desktopOverride, isMobile, isReady, mobileOverride, setLocation]);
 
   return (
@@ -98,7 +106,7 @@ function StartRoute() {
 
   useEffect(() => {
     if (mobileOverride) {
-      setLocation("/mobile", { replace: true });
+      setLocation(buildCurrentWorkstationHandoff("/mobile"), { replace: true });
       return;
     }
 
@@ -106,7 +114,7 @@ function StartRoute() {
 
     if (!isReady) return;
     if (isMobile) {
-      setLocation("/mobile", { replace: true });
+      setLocation(buildCurrentWorkstationHandoff("/mobile"), { replace: true });
     }
   }, [desktopOverride, isMobile, isReady, mobileOverride, setLocation]);
 
@@ -166,7 +174,8 @@ function Router() {
       }
     >
       <Switch>
-        <Route path="/" component={DesktopRedirect} />
+        <Route path="/" component={AdaptiveWorkstationRoute} />
+        <Route path="/open" component={AdaptiveWorkstationRoute} />
         <Route path="/start" component={StartRoute} />
         <Route path="/mobile" component={MobileRoute} />
         <Route path="/bridge" component={Home} />

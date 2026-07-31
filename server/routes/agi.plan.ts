@@ -429,6 +429,7 @@ import {
 } from "../services/helix-ask/runtime/decision-source-map";
 import { createAskTurnCapabilitySelectionResultBuilder } from "../services/helix-ask/runtime/capability-selection-result";
 import { createAskTurnObservationDecisionBuilder } from "../services/helix-ask/runtime/observation-decision";
+import { maybeBuildHelixProviderProcedureMemoryPreflightTerminalPayload } from "../services/helix-ask/runtime/provider-source-preflight";
 import {
   readHelixAskLiveDebugMode,
   type HelixAskLiveDebugMode,
@@ -44931,6 +44932,36 @@ const buildAskTurnCanonicalGoalFrame = (args: {
       ]),
     };
   }
+  if (
+    canonicalSourceTargetIntent.target_source === "procedure_memory" ||
+    canonicalSourceTargetIntent.target_source === "situation_epoch"
+  ) {
+    const replayRequired =
+      canonicalSourceTargetIntent.target_kind === "situation_epoch";
+    return {
+      turn_id: args.turnId,
+      goal_kind: replayRequired
+        ? "procedure_epoch_replay_question"
+        : "situation_context_question",
+      answer_scope: "workspace_state",
+      required_terminal_kind: replayRequired
+        ? "procedure_epoch_replay"
+        : "situation_context_pack",
+      allows_workspace_context: true,
+      allows_prior_artifacts: true,
+      corpus_anchors: [],
+      numeric_tokens: [],
+      concept_tokens: replayRequired
+        ? ["procedure_memory", "procedure_epoch_replay"]
+        : ["procedure_memory", "situation_context"],
+      confidence: "high",
+      classifier_reasons: uniqueAskTurnStrings([
+        "canonical_source_target_precedes_repo_concept_hypothesis",
+        canonicalSourceTargetIntent.precedence_reason,
+        ...canonicalSourceTargetIntent.reasons,
+      ]),
+    };
+  }
   if (isHardCalculatorRouteMetadata(hardToolRouteMetadata)) {
     return {
       turn_id: args.turnId,
@@ -50636,6 +50667,12 @@ const buildHelixCapabilityInputSchema = (capability: Pick<HelixAvailableCapabili
         case_id: { type: "string", minLength: 1, description: "Registered Lanyon case identifier." },
         source_target_intent: { type: "object" },
       });
+    case "theory-formal-verifier.inspect_artifact_family":
+      return schema([], {
+        formal_artifact_id: { type: "string", minLength: 1, description: "Optional registered formal artifact family identifier." },
+        theorem_name: { type: "string", minLength: 1, description: "Optional exact audited theorem name; requires formal_artifact_id." },
+        source_target_intent: { type: "object" },
+      });
     case "theory-formal-verifier.prepare_request":
       return schema(["procedure_artifact_ref", "procedure_id", "procedure_sha256"], {
         procedure_artifact_ref: { type: "string", minLength: 1, description: "Current-turn authoritative theory experiment procedure artifact reference." },
@@ -50643,10 +50680,16 @@ const buildHelixCapabilityInputSchema = (capability: Pick<HelixAvailableCapabili
         procedure_sha256: { type: "string", pattern: "^[a-f0-9]{64}$", description: "Exact theory experiment procedure SHA-256." },
         semantic_admission_artifact_ref: { type: "string", minLength: 1, description: "Current-turn authoritative semantic-admission artifact reference." },
         artifact_generation_artifact_ref: { type: "string", minLength: 1, description: "Current-turn authoritative formal-artifact producer reference." },
+        formal_source_admission_artifact_ref: { type: "string", minLength: 1, description: "Current-turn authoritative governed formal-source audit reference." },
         claim_id: { type: "string", minLength: 1, description: "Optional exact admitted claim selection." },
         formal_artifact_id: { type: "string", minLength: 1, description: "Optional server-governed formal artifact selection." },
         theorem_name: { type: "string", minLength: 1, description: "Optional theorem selection hint; it is not authority until registered." },
+        theorem_type_sha256: { type: "string", pattern: "^[a-f0-9]{64}$", description: "Optional exact observed Lean theorem-type digest; it is not authority until server-bound." },
+        semantic_to_lean_binding_id: { type: "string", minLength: 1, description: "Optional exact reviewed semantic-to-Lean binding identifier." },
+        semantic_to_lean_binding_sha256: { type: "string", pattern: "^[a-f0-9]{64}$", description: "Optional exact reviewed semantic-to-Lean binding artifact SHA-256." },
         environment_policy_id: { type: "string", minLength: 1, description: "Optional server-governed Lean environment policy selection." },
+        sandbox_executor_capability_id: { type: "string", minLength: 1, description: "Optional server-governed external OS-isolated replay capability selection." },
+        execution_catalog_entry_id: { type: "string", minLength: 1, description: "Optional opaque server-governed v2 formal execution catalog entry. When present, preparation uses only the provider-neutral external-sandbox lifecycle." },
         source_target_intent: { type: "object" },
       });
     case "theory-formal-verifier.plan":
@@ -62141,6 +62184,29 @@ const buildHelixAgentRuntimeLoopAdmission = (args: {
       args.canonicalGoalFrame.required_terminal_kind === "typed_failure" ||
       readAskTurnString(args.payload.final_answer_source) === "typed_failure"
     );
+  const payloadSatisfactionReport =
+    args.payload.satisfaction_report &&
+    typeof args.payload.satisfaction_report === "object" &&
+    !Array.isArray(args.payload.satisfaction_report)
+      ? (args.payload.satisfaction_report as HelixAskTurnSatisfactionReport)
+      : null;
+  const hasAuthoritativeTypedFailureSatisfaction =
+    (
+      args.satisfactionReport?.terminal_kind === "final_failure" &&
+      args.satisfactionReport?.terminal_artifact_kind === "typed_failure"
+    ) ||
+    (
+      payloadSatisfactionReport?.terminal_kind === "final_failure" &&
+      payloadSatisfactionReport?.terminal_artifact_kind === "typed_failure"
+    );
+  const authoritativeTypedFailureTerminal =
+    readAskTurnString(args.payload.terminal_artifact_kind) === "typed_failure" &&
+    Boolean(
+      args.payload.typed_failure &&
+      typeof args.payload.typed_failure === "object" &&
+      !Array.isArray(args.payload.typed_failure),
+    ) &&
+    hasAuthoritativeTypedFailureSatisfaction;
   const sourceOrCapabilityTurn =
     isHelixRuntimeSourceTargetedTurn(args.payload, buildHelixRuntimeIntentPacketDependencies()) ||
     isHelixRuntimeCapabilityTurn(args.payload, buildHelixRuntimeIntentPacketDependencies());
@@ -62170,6 +62236,8 @@ const buildHelixAgentRuntimeLoopAdmission = (args: {
     admitted = true;
     mode = "execute_or_record";
     reason = "interim_voice_callout_supersedes_stale_pending_user_input";
+  } else if (authoritativeTypedFailureTerminal) {
+    reason = "authoritative_typed_failure_terminal";
   } else if (explicitNonAgentTerminal && !sourceOrCapabilityTurn) {
     reason = "explicit_terminal_failure_policy";
   } else if (explicitNonAgentTerminal && sourceOrCapabilityTurn) {
@@ -139358,6 +139426,24 @@ const handleAskTurnRequest = async (
       missionAnswer: string,
       terminalArtifactId: string,
     ): void => {
+      const payloadSatisfaction =
+        payload.satisfaction_report &&
+        typeof payload.satisfaction_report === "object" &&
+        !Array.isArray(payload.satisfaction_report)
+          ? (payload.satisfaction_report as Record<string, unknown>)
+          : null;
+      const authoritativeFailureTerminal =
+        readAskTurnString(payload.terminal_artifact_kind) === "typed_failure" ||
+        readAskTurnString(payload.final_answer_source) === "typed_failure" ||
+        readAskTurnString(payload.response_type) === "final_failure" ||
+        readAskTurnString(payload.final_status) === "final_failure" ||
+        (
+          readAskTurnString(payloadSatisfaction?.terminal_kind) === "final_failure" &&
+          readAskTurnString(payloadSatisfaction?.terminal_artifact_kind) === "typed_failure"
+        );
+      if (authoritativeFailureTerminal) {
+        return;
+      }
       const payloadSourceTargetIntent =
         payload.source_target_intent && typeof payload.source_target_intent === "object"
           ? (payload.source_target_intent as Record<string, unknown>)
@@ -158331,8 +158417,12 @@ const handleAskTurnRequest = async (
     });
   }
   const turnRepoCodeEvidenceIntent = detectRepoCodeEvidenceIntent(transcript);
+  const authoritativeSituationSourceTarget =
+    sourceTargetIntentForTurnRouting.target_source === "procedure_memory" ||
+    sourceTargetIntentForTurnRouting.target_source === "situation_epoch" ||
+    sourceTargetIntentForTurnRouting.target_kind === "situation_epoch";
   const situationContextSuppressedBySourceTarget =
-    turnRepoCodeEvidenceIntent.strength === "hard" ||
+    (!authoritativeSituationSourceTarget && turnRepoCodeEvidenceIntent.strength === "hard") ||
     isAskTurnAbstractUnderspecifiedProblemPrompt(transcript) ||
     sourceTargetSuppressesRoute(sourceTargetIntentForTurnRouting, "situation_context_question") ||
     (
@@ -170644,6 +170734,40 @@ planRouter.post("/ask/turn", async (req, res) => {
         }),
         turnId: admissionTurnId,
       });
+      const providerPreflightTerminal =
+        maybeBuildHelixProviderProcedureMemoryPreflightTerminalPayload({
+          body: providerBody,
+          turnId: admissionTurnId,
+        });
+      if (providerPreflightTerminal) {
+        attachHelixAskRuntimeMemoryGovernorAdmission({
+          payload: providerPreflightTerminal,
+          admission: runtimeAdmission,
+          body: providerBody,
+          source: "helix_ask_turn",
+        });
+        refreshHelixAskRuntimeMemoryDebugExport({
+          payload: providerPreflightTerminal,
+          body: providerBody,
+        });
+        recordHelixAskRuntimeTerminalCheckpoint({
+          body: providerBody,
+          payload: providerPreflightTerminal,
+          route: "/ask/turn",
+          statusCode: 200,
+        });
+        recordHelixAskRuntimeCompletionCheckpoint({
+          body: providerBody,
+          payload: providerPreflightTerminal,
+          route: "/ask/turn",
+          statusCode: 200,
+        });
+        return res.status(200).json(
+          prepareHelixAskLiveResponsePayload(providerPreflightTerminal, {
+            mode: readHelixAskLiveDebugMode(body),
+          }),
+        );
+      }
       const gatewayManifest = listWorkstationGatewayCapabilities({
         agentRuntime: provider.id,
         mode: provider.id === "codex" ? "act" : "observe",
@@ -172467,6 +172591,42 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         }),
         turnId: streamTurnId,
       });
+      const streamProviderPreflightTerminal =
+        maybeBuildHelixProviderProcedureMemoryPreflightTerminalPayload({
+          body: streamProviderBody,
+          turnId: streamTurnId,
+        });
+      if (streamProviderPreflightTerminal) {
+        attachHelixAskRuntimeMemoryGovernorAdmission({
+          payload: streamProviderPreflightTerminal,
+          admission: runtimeAdmission,
+          body: streamProviderBody,
+          source: "helix_ask_turn_stream",
+        });
+        attachHelixAskStreamFinalDebugExport({
+          payload: streamProviderPreflightTerminal,
+          prompt: question,
+          sessionId: readHelixAskRuntimeSessionId(streamProviderBody),
+        });
+        recordHelixAskRuntimeTerminalCheckpoint({
+          body: streamProviderBody,
+          payload: streamProviderPreflightTerminal,
+          route: "/ask/turn/stream",
+          statusCode: 200,
+          turnId: streamTurnId,
+          traceId: streamTraceId,
+        });
+        recordHelixAskRuntimeCompletionCheckpoint({
+          body: streamProviderBody,
+          payload: streamProviderPreflightTerminal,
+          route: "/ask/turn/stream",
+          statusCode: 200,
+          turnId: streamTurnId,
+          traceId: streamTraceId,
+        });
+        writeAskTurnSse(res, "turn_final", streamProviderPreflightTerminal);
+        return;
+      }
       const requestedRuntime = selectHelixAgentRuntime({
         body: streamProviderBody,
         headers: req.headers,

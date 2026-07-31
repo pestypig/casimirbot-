@@ -292,8 +292,14 @@ describe("account session panel API", () => {
           "situation-room-pipelines",
           "stage-play-badge-graph",
         ]),
-        feature_flags: expect.arrayContaining(["runtime_agent_controls"]),
-        locked_features: expect.not.arrayContaining(["runtime_agent_controls"]),
+        feature_flags: expect.arrayContaining([
+          "docs_viewer_print_pdf_export",
+          "runtime_agent_controls",
+        ]),
+        locked_features: expect.not.arrayContaining([
+          "docs_viewer_print_pdf_export",
+          "runtime_agent_controls",
+        ]),
         allowed_runtime_agents: ["codex"],
       },
       session: {

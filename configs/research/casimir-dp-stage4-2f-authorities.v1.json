@@ -1,0 +1,56 @@
+{
+  "schema_version": "casimir_dp_stage4_2f_authority_manifest/1",
+  "campaign_id": "casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1",
+  "immutable_upstream": [
+    {
+      "role": "stage4_2e_config",
+      "path": "configs/research/casimir-dp-causal-cone-clock-stage4-2e.v1.json",
+      "sha256": "1279c8e23fb033237a79c29546ef5c210a9405d21604ad844ae801e55d5732e5",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2e_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-2e-authorities.v1.json",
+      "sha256": "cba9c8b40dc153cda0bb9683834df953c9de09a0c4d1a2bb9aa32ac5167b91f2",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2e_fixture",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2e-causal-cone.synthetic.v1.json",
+      "sha256": "16245e73a70acee3a429a6beaee6ec5b18b66863a357c60918d602920ef9bab8",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2e_report",
+      "path": "artifacts/research/casimir-dp-causal-cone-clock-stage4-2e/casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z/causal-cone-clock-stage4-2e-report.json",
+      "sha256": "d75857f22e0a95b4302e61d60d25c9fa689182ce8c9ef31eabfd15e64f66ed58",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2e_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-causal-cone-clock-stage4-2e/casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z/causal-cone-clock-stage4-2e-receipt.json",
+      "sha256": "633b07c4f2d769b4701612bd4e112e5a2e12e111f60f7405f1f752b3e260d2c2",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2e_verification_receipt",
+      "path": "docs/research/casimir-dp-causal-cone-clock-stage4-2e-verification-receipt.json",
+      "sha256": "b37bdbd1612912fc5c91fd51667559dc739018d43d9f57d7f182d76d1d3bbb1b",
+      "required_at_runtime": true
+    }
+  ],
+  "method_authorities": [
+    {
+      "role": "nhm2_maxwell_stress_contract_method_only",
+      "path": "shared/contracts/casimir-finite-temperature-finite-geometry-maxwell-stress.v1.ts",
+      "sha256": "55b402eef6baa260927d4d15f7afb6c3ca401c17f3669fd705e0cadc52875a7c",
+      "evidence_reuse_allowed": false
+    },
+    {
+      "role": "registered_dp_generator_method_only",
+      "path": "shared/casimir-dp-dp-companion.ts",
+      "sha256": "6432f931dd465624291c4cd7c33eda6a780d4b9687f89f6e76a2794d8708b5ac",
+      "evidence_reuse_allowed": false
+    }
+  ]
+}

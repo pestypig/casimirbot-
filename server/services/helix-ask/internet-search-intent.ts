@@ -138,10 +138,10 @@ export const hasAffirmativeDocsViewerSearchCue = (promptText: string): boolean =
 };
 
 const hasCurrentWebCue = (promptText: string): boolean =>
-  /\b(?:latest|current|today|yesterday|recent|newest|news|breaking|updated|right\s+now|this\s+week|this\s+month|online|internet|web\s+(?:results?|sources?|pages?)|google(?:\s+custom\s+search)?|search\s+engine)\b/i.test(promptText);
+  /\b(?:latest|current(?![-\s]?turn\b)|today|yesterday|recent|newest|news|breaking|updated|right\s+now|this\s+week|this\s+month|online|internet|web\s+(?:results?|sources?|pages?)|google(?:\s+custom\s+search)?|search\s+engine)\b/i.test(promptText);
 
 const hasTimeSensitiveFactCue = (promptText: string): boolean =>
-  /\b(?:latest|current|today|yesterday|recent|newest|news|breaking|updated|right\s+now|this\s+week|this\s+month|ongoing|election|elections|law|laws|regulation|regulations|court\s+ruling|public\s+figure|ceo|president|prime\s+minister|minister|company\s+status|product\s+status|prices?|schedules?|release\s+date|earnings|stock|exchange\s+rate|inflation|sanctions?)\b/i.test(promptText);
+  /\b(?:latest|current(?![-\s]?turn\b)|today|yesterday|recent|newest|news|breaking|updated|right\s+now|this\s+week|this\s+month|ongoing|election|elections|law|laws|regulation|regulations|court\s+ruling|public\s+figure|ceo|president|prime\s+minister|minister|company\s+status|product\s+status|prices?|schedules?|release\s+date|earnings|stock|exchange\s+rate|inflation|sanctions?)\b/i.test(promptText);
 
 const hasCurrentAffairsDomainCue = (promptText: string): boolean =>
   /\b(?:ongoing\s+(?:border\s+)?(?:conflict|war|crisis)|ceasefire|reconstruction|battlefield|infrastructure\s+stability|resource[-\s]?capacity|decision\s+makers?|countries?\s+can\s+see|economic\s+(?:max\s+)?capacity|possible\s+reserves?|current\s+affairs?|geopolitics?|sanctions?|trade\s+bloc|supply\s+chain\s+shock|public\s+policy|election|elections|new\s+law|recent\s+law|current\s+law)\b/i.test(promptText);
@@ -159,6 +159,8 @@ const extractDomains = (promptText: string): string[] => {
   for (const match of promptText.matchAll(domainPattern)) {
     const domain = match[1]?.toLowerCase();
     if (!domain) continue;
+    // Exact decimals such as 0.01 are scientific parameters, not domains.
+    if (!/[a-z]/i.test(domain)) continue;
     if (/^(?:doi\.org|arxiv\.org|openalex\.org|semanticscholar\.org|crossref\.org)$/i.test(domain)) continue;
     domains.push(domain);
   }

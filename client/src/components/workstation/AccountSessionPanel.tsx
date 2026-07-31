@@ -211,6 +211,11 @@ const sourceFamilyMessages = {
   helix_ask_desktop: "account.display.sourceFamily.helixAskDesktop",
 } satisfies DisplayMessageMap;
 
+// Account projection is comparatively expensive under the local pg-mem
+// fallback. Mutating actions refresh explicitly, so a slower background poll
+// preserves freshness without monopolizing the event loop on small machines.
+const ACCOUNT_SESSION_POLL_INTERVAL_MS = 15_000;
+
 function displayMappedValue(t: Translate, value: string | null | undefined, messages: DisplayMessageMap): string {
   if (!value) return t("account.common.none");
   const messageId = messages[value];
@@ -314,7 +319,7 @@ export default function AccountSessionPanel() {
 
   React.useEffect(() => {
     refresh();
-    const timer = window.setInterval(refresh, 5000);
+    const timer = window.setInterval(refresh, ACCOUNT_SESSION_POLL_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [refresh]);
 

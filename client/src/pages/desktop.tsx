@@ -52,6 +52,7 @@ import {
   parseWorkstationViewStateFromUrl,
   type WorkstationViewState,
 } from "@/lib/workstation/workstationDeepLink";
+import { parseWorkstationLinkMetaFromUrl } from "@shared/workstation-link-meta";
 import { useProfileStorageSync } from "@/lib/workstation/profileStorageSync";
 import {
   HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT,
@@ -164,6 +165,13 @@ export default function DesktopPage({
   );
   const { mood } = useLumaMoodTheme({ randomize: true, listenToBus: true });
   const orientation = layoutVariant === "mobile" ? "mobile" : "desktop";
+  const initialMobileSurface = useMemo(
+    () =>
+      typeof window !== "undefined"
+        ? parseWorkstationLinkMetaFromUrl(window.location.href).entry ?? "ask"
+        : "ask",
+    [],
+  );
   const wallpaperRecipe = useMemo(
     () =>
       generateSurfaceRecipe({
@@ -980,6 +988,7 @@ export default function DesktopPage({
         {workstationEnabled ? (
           <HelixWorkstationShell
             layoutVariant={layoutVariant}
+            initialMobileSurface={initialMobileSurface}
             onOpenPanel={openPanelUniversal}
           />
         ) : (

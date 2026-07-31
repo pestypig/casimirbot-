@@ -66,6 +66,7 @@ import {
   providerBridgeAllEvidenceReentryCompatible,
   providerBridgeCapabilityLaneEvidenceReentryCompatible,
 } from "./provider-evidence-reentry-compatibility";
+import { reconcileAuthoritativeTypedFailureLifecycle } from "./runtime/typed-failure-lifecycle-reconciliation";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -548,6 +549,81 @@ const readEnvironmentConnectorGatewayFailure = (
   return null;
 };
 
+const readRequiredGatewayObservationFailure = (
+  payload: Record<string, unknown>,
+): TerminalBlockingToolRailFailure | null => {
+  const debug = readRecord(payload.debug);
+  const itinerary =
+    readRecord(payload.capability_itinerary) ??
+    readRecord(debug?.capability_itinerary);
+  const executionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state) ??
+    readRecord(debug?.capability_itinerary_execution_state);
+  const terminalCriteria = readRecord(
+    itinerary?.terminal_success_criteria,
+  );
+  const requiredCapabilities = new Set([
+    ...readStringArray(terminalCriteria?.required_capabilities),
+    ...readStringArray(executionState?.missing_required_capabilities),
+  ]);
+  if (requiredCapabilities.size === 0) return null;
+
+  const gatewayResults = [
+    ...readArray(payload.workstation_gateway_call_results),
+    ...readArray(debug?.workstation_gateway_call_results),
+  ];
+  for (const result of gatewayResults.reverse()) {
+    const record = readRecord(result);
+    if (!record || record.ok !== false) continue;
+    const admission = readRecord(record.gateway_admission);
+    const observation = readRecord(record.observation);
+    const lifecycle = readRecord(record.tool_lifecycle_trace);
+    const followup = readRecord(record.tool_followup_decision);
+    const capability =
+      readString(record.capability_id) ??
+      readString(admission?.requested_capability) ??
+      readString(lifecycle?.requested_capability);
+    if (!capability || !requiredCapabilities.has(capability)) continue;
+    const failureCode =
+      readString(record.error) ??
+      readString(admission?.blocked_reason) ??
+      readString(lifecycle?.failure_reason) ??
+      readString(followup?.reason);
+    const observationStatus = readString(observation?.status);
+    if (
+      !failureCode ||
+      (
+        !/^(?:blocked|failed|missing_input|rejected|error)$/i.test(
+          observationStatus ?? "",
+        ) &&
+        readString(admission?.admission_status) !== "blocked"
+      )
+    ) {
+      continue;
+    }
+    const followupAction = readString(followup?.next_action);
+    return {
+      railStatus: "fail_closed",
+      railFailureCode: failureCode,
+      firstBrokenRail:
+        readString(admission?.admission_status) === "blocked"
+          ? "tool_admission"
+          : "capability_execution",
+      repairTarget:
+        followupAction === "ask_user" || followupAction === "repair"
+          ? "subgoal_argument_extraction"
+          : "tool_execution",
+      selectedCapability: capability,
+      executedCapability: null,
+      terminalText:
+        readString(followup?.observation_summary) ??
+        `The required capability ${capability} could not complete: ${failureCode}.`,
+    };
+  }
+  return null;
+};
+
 const readTerminalBlockingToolRailFailure = (
   payload: Record<string, unknown>,
 ): TerminalBlockingToolRailFailure | null => {
@@ -557,6 +633,11 @@ const readTerminalBlockingToolRailFailure = (
   const environmentConnectorFailure =
     readEnvironmentConnectorGatewayFailure(payload);
   if (environmentConnectorFailure) return environmentConnectorFailure;
+  const requiredGatewayObservationFailure =
+    readRequiredGatewayObservationFailure(payload);
+  if (requiredGatewayObservationFailure) {
+    return requiredGatewayObservationFailure;
+  }
   const blockedTypedAffordanceFailure =
     readBlockedTypedAffordanceRailFailure(payload);
   if (blockedTypedAffordanceFailure) return blockedTypedAffordanceFailure;
@@ -6303,11 +6384,34 @@ export const shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal = (input: {
 
 const unavailableRequestedCapabilityFailureForPayload = (
   payload: Record<string, unknown>,
-): { errorCode: "capability_unavailable"; text: string } | null => {
+): {
+  errorCode: "capability_unavailable";
+  requestedCapability: string;
+  text: string;
+} | null => {
   const admission = readRecord(payload.tool_call_admission_decision);
+  const itinerary = readRecord(payload.capability_itinerary);
+  const terminalCriteria = readRecord(
+    itinerary?.terminal_success_criteria,
+  );
+  const exactRequiredCapabilities = readStringArray(
+    terminalCriteria?.required_capabilities,
+  );
+  const requiredFamilies = readStringArray(
+    terminalCriteria?.required_observation_families,
+  );
+  const admittedFamilies = readStringArray(
+    admission?.admitted_tool_families,
+  );
   const requestedCapability =
     readString(admission?.requested_capability) ??
-    readString(admission?.mandatory_next_tool_name);
+    readString(admission?.mandatory_next_tool_name) ??
+    (exactRequiredCapabilities.length === 1
+      ? exactRequiredCapabilities[0]
+      : null) ??
+    (requiredFamilies.length === 1 && admittedFamilies.length === 1
+      ? requiredFamilies[0]
+      : null);
   if (!requestedCapability) return null;
 
   const providerBridge = readRecord(payload.codex_native_provider_bridge);
@@ -6331,6 +6435,7 @@ const unavailableRequestedCapabilityFailureForPayload = (
 
   return {
     errorCode: "capability_unavailable",
+    requestedCapability,
     text: `The requested capability ${requestedCapability} is not available in the current environment connector, so I cannot determine the requested environment state. Install or enable a connector implementation for that capability, or provide an observation from a source that can expose it.`,
   };
 };
@@ -8777,10 +8882,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       ...(unavailableCapabilityFailure
         ? {
             requested_capability:
-              readString(
-                readRecord(input.payload.tool_call_admission_decision)
-                  ?.requested_capability,
-              ) ?? null,
+              unavailableCapabilityFailure.requestedCapability,
             first_broken_rail: "capability_execution",
             repair_target: "connector_capability_implementation",
           }
@@ -10551,6 +10653,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
   input.payload.terminal_authority_single_writer = result;
   input.payload.terminal_candidate_rejections = auditRejectedCandidates;
   input.payload.legacy_terminal_candidates = legacyCandidates;
+  reconcileAuthoritativeTypedFailureLifecycle({
+    payload: input.payload,
+    turnId: input.turnId,
+    promptText: input.prompt,
+    selectedTerminalArtifactKind: result.selected_terminal_artifact_kind,
+    finalAnswerSource: result.source,
+  });
   attachAskTurnProcedureTrace({
     turnId: input.turnId,
     payload: input.payload,

@@ -76,6 +76,10 @@ import {
   isAffirmativeTheoryExperimentProcedurePrompt,
 } from "../theory-experiment-procedure-intent";
 import {
+  THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY,
+  buildTheoryFormalArtifactInspectionPromptArguments,
+} from "../theory-formal-artifact-intent";
+import {
   HELIX_RESEARCH_LIBRARY_READ_CAPABILITY,
   isSavedResearchLibraryEvidencePrompt,
 } from "@shared/helix-research-library";
@@ -86,6 +90,21 @@ import {
 import { materializeRealtimeConversationContext } from "./realtime-conversation-context";
 import { extractExplicitTheoryDerivationRequestAssignments } from "../theory-congruence/derivation-request";
 import { isAffirmativeTheoryBadgeGraphReflectionPrompt } from "../theory-badge-graph-current-context-intent";
+
+const SCIENTIFIC_EVIDENCE_CLOSURE_INSPECT_ENROLLMENT_CAPABILITY =
+  "scientific-evidence-closure.inspect_enrollment" as const;
+const SCIENTIFIC_EVIDENCE_CLOSURE_PREPARE_CAPABILITY =
+  "scientific-evidence-closure.prepare" as const;
+const SCIENTIFIC_EVIDENCE_CLOSURE_EVALUATE_CAPABILITY =
+  "scientific-evidence-closure.evaluate" as const;
+const ADVECTION_DIFFUSION_SCIENTIFIC_EVIDENCE_MANIFEST_ID =
+  "scientific-evidence:advection-diffusion-dxx:v1" as const;
+const ADVECTION_DIFFUSION_SCIENTIFIC_EVIDENCE_ORIENTATION_ID =
+  "orientation:advection-diffusion-dxx-closure:v1" as const;
+const ADVECTION_DIFFUSION_SOURCE_CLAIM_ID =
+  "source-claim:lanyon:advection_diffusion_full_1d:v1" as const;
+const ADVECTION_DIFFUSION_MUTABLE_PARAMETER_ID =
+  "parameter:diffusivity" as const;
 
 export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -378,6 +397,25 @@ export const buildPromptNamedCapabilityGatewayCallRequests = (
       },
     },
   }]);
+
+  const formalArtifactInspectionArgs =
+    buildTheoryFormalArtifactInspectionPromptArguments(prompt);
+  if (formalArtifactInspectionArgs) {
+    addNamedRequest(
+      THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY,
+      "read",
+      {
+        ...formalArtifactInspectionArgs,
+        source_target_intent: {
+          target_source: "theory_locator",
+          target_kind: "theory_formal_artifact_family",
+          explicit_cues: ["affirmative_theory_formal_artifact_inspection"],
+          terminal_eligible: false,
+          assistant_answer: false,
+        },
+      },
+    );
+  }
 
   if (
     hasPromptNamedCapability(prompt, WORKSPACE_OS_STATUS_CAPABILITY) &&
@@ -1247,6 +1285,200 @@ export const buildPromptDerivedTheoryExperimentProcedureGatewayCallRequests = (
     },
   }];
 };
+
+export const buildPromptDerivedScientificEvidenceEnrollmentGatewayCallRequests =
+  (body: Record<string, unknown>): Record<string, unknown>[] => {
+    const prompt = readPrompt(body);
+    if (!prompt) return [];
+    const unquoted = unquotePrompt(prompt);
+    const clauses = unquoted
+      .split(/[!?;\n]+/)
+      .map((clause) => clause.trim())
+      .filter(Boolean);
+    const directPlanClause = clauses.find((clause) => {
+        const affirmative =
+          /\b(?:prepare|stage|plan|bind)\b[\s\S]{0,180}\b(?:scientific\s+evidence|evidence\s+closure|advection[_\s-]*diffusion|theory\s+badge\s+orientation|(?:that\s+same\s+)?enrolled\s+(?:scientific\s+evidence\s+)?closure\s+plan)\b/i.test(
+            clause,
+          ) ||
+          /\b(?:scientific\s+evidence|evidence\s+closure|advection[_\s-]*diffusion|theory\s+badge\s+orientation|(?:that\s+same\s+)?enrolled\s+(?:scientific\s+evidence\s+)?closure\s+plan)\b[\s\S]{0,180}\b(?:prepare|stage|plan|bind)\b/i.test(
+            clause,
+          );
+        if (!affirmative) return false;
+        return !/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|if|when|would|could|might|later|future|previously|earlier|historically|screen|button|label|phrase|quoted)\b[\s\S]{0,80}\b(?:prepare|stage|plan|bind)\b/i.test(
+          clause,
+        );
+      });
+    const hasBoundedDeicticEnrollmentPlan =
+      /\b(?:that|this|the|same)\s+(?:(?:exact|same)\s+)?enrollment\b/i.test(
+        unquoted,
+      ) &&
+      /\bDxx\b/i.test(unquoted) &&
+      /\b(?:Lanyon|Lean|theory\s+badge\s+orientation|badge\s+orientation|source\s+claim|closure\s+evaluator)\b/i.test(
+        unquoted,
+      ) &&
+      /\b(?:prepare|stage|plan|bind)\b/i.test(unquoted) &&
+      !/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|if|when|would|could|might|later|future|previously|earlier|historically|screen|button|label|phrase|quoted)\b[\s\S]{0,80}\b(?:prepare|stage|plan|bind)\b/i.test(
+        unquoted,
+      );
+    const planClause =
+      directPlanClause ??
+      (hasBoundedDeicticEnrollmentPlan ? unquoted : undefined);
+    if (
+      planClause &&
+      !hasNegatedToolInstruction(
+        prompt,
+        /\b(?:prepare|stage|plan|bind)\b[\s\S]{0,160}\b(?:scientific\s+evidence|evidence\s+closure|advection[_\s-]*diffusion|theory\s+badge\s+orientation|(?:that\s+same\s+)?enrolled\s+(?:scientific\s+evidence\s+)?closure\s+plan|(?:that|this|the|same)\s+(?:(?:exact|same)\s+)?enrollment)\b/i,
+      )
+    ) {
+      const interventionValue =
+        /\bDxx\b[\s\S]{0,40}?\b(?:to|=)\s*(0\.\d+|0)\b/i.exec(
+          planClause,
+        )?.[1] ??
+        /\b(?:change|set|modify)\b[\s\S]{0,40}?\bDxx\b[\s\S]{0,20}?\b(0\.\d+|0)\b/i.exec(
+          planClause,
+        )?.[1] ??
+        null;
+      if (interventionValue) {
+        return [
+          {
+            schema:
+              "helix.workstation_gateway.prompt_derived_scientific_evidence_execution_plan_call_request.v1",
+            derivation_source:
+              "helix_prompt_derived_scientific_evidence_execution_plan",
+            capability_id:
+              SCIENTIFIC_EVIDENCE_CLOSURE_PREPARE_CAPABILITY,
+            mode: "read",
+            arguments: {
+              manifest_id:
+                ADVECTION_DIFFUSION_SCIENTIFIC_EVIDENCE_MANIFEST_ID,
+              orientation_id:
+                ADVECTION_DIFFUSION_SCIENTIFIC_EVIDENCE_ORIENTATION_ID,
+              source_claim_id:
+                ADVECTION_DIFFUSION_SOURCE_CLAIM_ID,
+              intervention_parameter_id:
+                ADVECTION_DIFFUSION_MUTABLE_PARAMETER_ID,
+              intervention_value: interventionValue,
+              source_target_intent: {
+                source:
+                  "helix_prompt_derived_scientific_evidence_execution_plan",
+                target_source: "theory_locator",
+                target_kind:
+                  "scientific_evidence_execution_plan",
+                strength: "hard",
+                explicit_cues: [
+                  "affirmative_scientific_evidence_execution_plan_command",
+                ],
+                terminal_eligible: false,
+                assistant_answer: false,
+                raw_content_included: false,
+              },
+            },
+          },
+        ];
+      }
+    }
+    if (
+      hasPromptNamedCapability(
+        prompt,
+        SCIENTIFIC_EVIDENCE_CLOSURE_EVALUATE_CAPABILITY,
+      ) &&
+      !hasNegatedToolInstruction(
+        prompt,
+        /\bscientific-evidence-closure\.evaluate\b/i,
+      )
+    ) {
+      return [
+        {
+          schema:
+            "helix.workstation_gateway.prompt_derived_scientific_evidence_closure_evaluation_call_request.v1",
+          derivation_source:
+            "helix_prompt_derived_scientific_evidence_closure_evaluation",
+          capability_id:
+            SCIENTIFIC_EVIDENCE_CLOSURE_EVALUATE_CAPABILITY,
+          mode: "read",
+          arguments: {
+            manifest_id:
+              ADVECTION_DIFFUSION_SCIENTIFIC_EVIDENCE_MANIFEST_ID,
+            source_target_intent: {
+              source:
+                "helix_prompt_derived_scientific_evidence_closure_evaluation",
+              target_source: "theory_locator",
+              target_kind: "scientific_evidence_closure_evaluation",
+              strength: "hard",
+              explicit_cues: [
+                "affirmative_scientific_evidence_closure_evaluation_command",
+              ],
+              terminal_eligible: false,
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        },
+      ];
+    }
+    if (
+      hasPromptNamedCapability(
+        prompt,
+        SCIENTIFIC_EVIDENCE_CLOSURE_INSPECT_ENROLLMENT_CAPABILITY,
+      )
+    ) {
+      return [];
+    }
+    if (
+      hasNegatedToolInstruction(
+        prompt,
+        /\b(?:inspect|load|read|show|open|traverse|use)\b[\s\S]{0,120}\b(?:scientific\s+evidence|conformed\s+(?:document|evidence)|runtime\s+workbench|evidence\s+(?:manifest|sidecar|orientation|enrollment))\b/i,
+      )
+    ) {
+      return [];
+    }
+    const affirmativeClause = unquoted
+      .split(/[.!?;\n]+/)
+      .map((clause) => clause.trim())
+      .filter(Boolean)
+      .find((clause) => {
+        const affirmative =
+          /\b(?:inspect|load|read|show|open|traverse|use)\b[\s\S]{0,140}\b(?:scientific\s+evidence|conformed\s+(?:document|evidence)|runtime\s+workbench|evidence\s+(?:manifest|sidecar|orientation|enrollment))\b/i.test(
+            clause,
+          ) ||
+          /\b(?:scientific\s+evidence|conformed\s+(?:document|evidence)|runtime\s+workbench|evidence\s+(?:manifest|sidecar|orientation|enrollment))\b[\s\S]{0,140}\b(?:inspect|load|read|show|open|traverse|use)\b/i.test(
+            clause,
+          );
+        if (!affirmative) return false;
+        return !/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|if|when|would|could|might|later|future|previously|earlier|historically|screen|button|label|phrase|quoted)\b/i.test(
+          clause,
+        );
+      });
+    if (!affirmativeClause) return [];
+    return [
+      {
+        schema:
+          "helix.workstation_gateway.prompt_derived_scientific_evidence_enrollment_call_request.v1",
+        derivation_source:
+          "helix_prompt_derived_scientific_evidence_enrollment",
+        capability_id:
+          SCIENTIFIC_EVIDENCE_CLOSURE_INSPECT_ENROLLMENT_CAPABILITY,
+        mode: "read",
+        arguments: {
+          manifest_id:
+            ADVECTION_DIFFUSION_SCIENTIFIC_EVIDENCE_MANIFEST_ID,
+          source_target_intent: {
+            source:
+              "helix_prompt_derived_scientific_evidence_enrollment",
+            target_source: "theory_locator",
+            target_kind: "retained_scientific_evidence_sidecar",
+            strength: "hard",
+            explicit_cues: [
+              "affirmative_scientific_evidence_enrollment_command",
+            ],
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      },
+    ];
+  };
 
 export const buildPromptDerivedCivilizationBoundsGatewayCallRequests = (
   body: Record<string, unknown>,

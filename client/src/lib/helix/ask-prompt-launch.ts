@@ -5,6 +5,7 @@ import {
   isHelixAgentRuntimeId,
   type HelixAgentRuntimeId,
 } from "@shared/helix-agent-runtime";
+import { isWorkstationShellPathname } from "@/lib/workstation/workstationEntryRoute";
 
 export const HELIX_PENDING_ASK_KEY = "helix:pending-ask";
 export const HELIX_ASK_PROMPT_EVENT = "helix-ask:prompt";
@@ -139,10 +140,11 @@ const promptRequiresBackendAskEntrypoint = (
 ): boolean =>
   /^\s*\/postulate\b/i.test(question) || routeMetadataRequiresBackendAskEntrypoint(routeMetadata);
 
-const isDesktopRoute = () =>
-  typeof window !== "undefined" && window.location.pathname.startsWith("/desktop");
+const isWorkstationAskConsumerRoute = () =>
+  typeof window !== "undefined" &&
+  isWorkstationShellPathname(window.location.pathname);
 
-const desktopAskConsumerUrl = (): string => "/desktop";
+const defaultAskConsumerUrl = (): string => "/desktop";
 
 export function clearPendingHelixAskPrompt() {
   if (typeof window === "undefined") return;
@@ -281,7 +283,7 @@ export function launchHelixAskPrompt(args: {
 
   window.dispatchEvent(new CustomEvent(HELIX_ASK_PROMPT_EVENT, { detail: payload }));
 
-  if (!isDesktopRoute()) {
-    navigate(desktopAskConsumerUrl());
+  if (!isWorkstationAskConsumerRoute()) {
+    navigate(defaultAskConsumerUrl());
   }
 }

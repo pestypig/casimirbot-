@@ -192,17 +192,31 @@ export const removeSatisfiedNativeWorkstationTools = (
   if (allowedWorkstationTools === null || gatewayCallResults.length === 0) {
     return allowedWorkstationTools;
   }
-  const satisfiedCapabilities = new Set(
+  const observedCapabilities = new Set(
     gatewayCallResults
       .filter(
-        (result) =>
-          result.ok === true &&
-          result.observation_packet?.status === "succeeded",
+        (result) => {
+          if (
+            result.ok === true &&
+            result.observation_packet?.status === "succeeded"
+          ) {
+            return true;
+          }
+          const nextAction = readString(
+            result.tool_followup_decision?.next_action,
+          );
+          return (
+            result.observation_packet?.status === "blocked" &&
+            (nextAction === "ask_user" ||
+              nextAction === "fail_closed" ||
+              nextAction === "abort")
+          );
+        },
       )
       .map((result) => result.capability_id),
   );
   return allowedWorkstationTools.filter(
-    (capabilityId) => !satisfiedCapabilities.has(capabilityId),
+    (capabilityId) => !observedCapabilities.has(capabilityId),
   );
 };
 

@@ -35,12 +35,27 @@ export function guardTerminalArtifactSelection(input: {
         selectedStatusRefSet.size === 0 || selectedStatusRefSet.has(status.status_id)
       )
     : selectedStatusRefs.map((ref: string) => getSourceBindingStatus(ref)).filter((status: HelixSourceBindingStatus | null): status is HelixSourceBindingStatus => Boolean(status));
-  const forbidden = input.contract.forbidden_terminal_artifact_kinds.includes(terminalArtifactKind);
+  const allowedTerminalArtifactKinds = Array.isArray(
+    input.contract.allowed_terminal_artifact_kinds,
+  )
+    ? input.contract.allowed_terminal_artifact_kinds
+    : [];
+  const forbiddenTerminalArtifactKinds = Array.isArray(
+    input.contract.forbidden_terminal_artifact_kinds,
+  )
+    ? input.contract.forbidden_terminal_artifact_kinds
+    : [];
+  const hasAllowedTerminalArtifactPolicy = Array.isArray(
+    input.contract.allowed_terminal_artifact_kinds,
+  );
+  const forbidden =
+    forbiddenTerminalArtifactKinds.includes(terminalArtifactKind);
   const routeAllowed =
+    hasAllowedTerminalArtifactPolicy &&
     !forbidden &&
     (
-      input.contract.allowed_terminal_artifact_kinds.length === 0 ||
-      input.contract.allowed_terminal_artifact_kinds.includes(terminalArtifactKind)
+      allowedTerminalArtifactKinds.length === 0 ||
+      allowedTerminalArtifactKinds.includes(terminalArtifactKind)
     );
   const requiresSourceGate = selectedStatusRefs.length > 0 || selectedStatuses.length > 0;
   const hasSelectedSource = selectedStatuses.length > 0;
@@ -50,6 +65,8 @@ export function guardTerminalArtifactSelection(input: {
   const allowed = routeAllowed && (!requiresSourceGate || (hasSelectedSource && selectedSourcesBound && sourceRefsShown));
   const reason = allowed
     ? "terminal_artifact_satisfies_route_product_contract"
+    : !hasAllowedTerminalArtifactPolicy
+      ? "terminal_artifact_policy_missing"
     : forbidden
       ? "terminal_artifact_forbidden_by_route_product_contract"
       : requiresSourceGate && !hasSelectedSource

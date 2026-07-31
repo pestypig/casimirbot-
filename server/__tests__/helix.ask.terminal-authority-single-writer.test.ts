@@ -6036,6 +6036,123 @@ describe("Helix terminal authority single writer", () => {
     });
   });
 
+  it("turns a required capability family with no governed model tool into an actionable typed limitation", () => {
+    const turnId = "ask:test:capability-family-unavailable";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "live_pipeline",
+        allowed_terminal_artifact_kinds: [
+          "workstation_tool_evaluation",
+          "typed_failure",
+        ],
+      },
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "live_pipeline",
+        target_kind: "runtime_evidence",
+        strength: "hard",
+        must_enter_backend_ask: true,
+        allow_client_shortcut: false,
+        allow_no_tool_direct: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "live_environment",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        required: true,
+        admitted_tool_families: ["live_pipeline"],
+      },
+      codex_native_provider_bridge: {
+        schema: "helix.codex_native_provider_bridge.v1",
+        status: "fallback_required",
+        fallback_reason: "native_admitted_capability_set_empty",
+        native_workstation_turn: {
+          model_visible_tools: [],
+          executed_tools: [],
+          account_locked_tools: [],
+          compatibility_fallback_reason:
+            "native_admitted_capability_set_empty",
+        },
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "source_backed",
+        relevant_tool_families: ["live_pipeline"],
+        terminal_success_criteria: {
+          required_observation_families: ["live_pipeline"],
+          requires_post_observation_synthesis: true,
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [],
+      loop_parity_trace: {
+        schema: "helix.loop_parity_trace.v1",
+        selected_route: "/ask/turn",
+        observations_created: [],
+        short_circuit_risk_flags: [
+          "route_contract_missing",
+          "route_authority_missing",
+        ],
+      },
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        route_authority_ok: false,
+        solver_risk_flags: ["terminal_authority_before_solver_completion"],
+        solver_short_circuit_flags: [
+          "terminal_authority_before_solver_completion",
+        ],
+        final_arbitration: {
+          terminal_artifact_kind: "unknown",
+          final_answer_source: "unknown",
+          remaining_uncertainty: [
+            "terminal_authority_before_solver_completion",
+          ],
+        },
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("capability_unavailable");
+    expect(payload.selected_final_answer).toContain("live_pipeline");
+    expect(payload.typed_failure).toMatchObject({
+      error_code: "capability_unavailable",
+      requested_capability: "live_pipeline",
+      first_broken_rail: "capability_execution",
+      repair_target: "connector_capability_implementation",
+    });
+    expect(
+      (payload.route_authority_audit as Record<string, unknown>)
+        .route_authority_ok,
+    ).toBe(true);
+    expect(
+      (
+        payload.loop_parity_trace as {
+          short_circuit_risk_flags: string[];
+        }
+      ).short_circuit_risk_flags,
+    ).toEqual([]);
+    expect(
+      (
+        payload.ask_turn_solver_trace as {
+          solver_short_circuit_flags: string[];
+        }
+      ).solver_short_circuit_flags,
+    ).toEqual([]);
+  });
+
   it("rejects stale no-context model fallbacks after live-source observations exist", () => {
     const turnId = "ask:test:stale-live-source-fallback";
     const staleText = "I am unable to provide context because no observations are available.";
@@ -6199,6 +6316,95 @@ describe("Helix terminal authority single writer", () => {
       complete: false,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("preserves a required gateway policy rejection instead of replacing it with a generic missing-observation failure", () => {
+    const turnId = "ask:test:scientific-evidence-policy-rejection";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        allowed_terminal_artifact_kinds: [
+          "model_synthesized_answer",
+          "typed_failure",
+        ],
+      },
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "single_tool",
+        admitted_tool_families: ["theory_locator"],
+        terminal_success_criteria: {
+          required_observation_families: ["theory_locator"],
+          required_capabilities: [
+            "scientific-evidence-closure.prepare",
+          ],
+          requires_post_observation_synthesis: true,
+        },
+      },
+      capability_itinerary_execution_state: {
+        schema: "helix.capability_itinerary_execution_state.v1",
+        missing_required_capabilities: [
+          "scientific-evidence-closure.prepare",
+        ],
+        complete: false,
+      },
+      workstation_gateway_call_results: [
+        {
+          ok: false,
+          capability_id: "scientific-evidence-closure.prepare",
+          error:
+            "scientific_evidence_intervention_value_not_permitted",
+          gateway_admission: {
+            admission_status: "admitted",
+          },
+          observation: {
+            schema:
+              "casimir.scientific_evidence_execution_plan.observation.v1",
+            status: "blocked",
+            issues: [
+              "scientific_evidence_intervention_value_not_permitted",
+            ],
+            terminal_eligible: false,
+            assistant_answer: false,
+          },
+          tool_followup_decision: {
+            next_action: "ask_user",
+            reason:
+              "scientific_evidence_intervention_value_not_permitted",
+            observation_summary:
+              "The requested intervention value is outside the exact enrolled value set.",
+          },
+        },
+      ],
+      current_turn_artifact_ledger: [],
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe(
+      "scientific_evidence_intervention_value_not_permitted",
+    );
+    expect(payload.selected_final_answer).toBe(
+      "The requested intervention value is outside the exact enrolled value set.",
+    );
+    expect(payload.typed_failure).toMatchObject({
+      error_code:
+        "scientific_evidence_intervention_value_not_permitted",
+      first_broken_rail: "capability_execution",
+      repair_target: "subgoal_argument_extraction",
+      selected_capability: "scientific-evidence-closure.prepare",
     });
   });
 

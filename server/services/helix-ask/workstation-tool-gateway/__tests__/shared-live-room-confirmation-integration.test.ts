@@ -24,6 +24,18 @@ import {
   signInLocalAccountSession,
 } from "../../../helix-account/account-session-store";
 import {
+  inspectCasimirFormalRuntimeCanaryV1,
+} from "../../../theory/casimir-formal-runtime-canary-service";
+import {
+  inspectCasimirFormalVerifierRuntimeReadinessV2,
+} from "../../../theory/casimir-formal-verifier-job-service.v2";
+import {
+  inspectCasimirIndependentNumericalVerifierRuntimeV1,
+} from "../../../theory/casimir-independent-numerical-verifier-job-service";
+import {
+  resetCasimirTheoryExecutionServerCompositionForTestsV1,
+} from "../../../theory/casimir-theory-execution-server-composition";
+import {
   installRuntimeToolConfirmationVerifierAtServerBootstrapV1,
   RuntimeToolConfirmationServerBootstrapError,
 } from "../../../theory/runtime-tool-confirmation-server-bootstrap";
@@ -114,6 +126,7 @@ describe("trusted server room-confirmation composition", () => {
     installSharedLiveRoomGatewayConfirmationDependenciesForServerV1({
       requireDurableReplayProtection: true,
     });
+    resetCasimirTheoryExecutionServerCompositionForTestsV1();
     await resetDbClient();
     if (originalDatabaseUrl === undefined) {
       delete process.env.DATABASE_URL;
@@ -148,6 +161,48 @@ describe("trusted server room-confirmation composition", () => {
       configured: true,
       trusted_key_count: 1,
       replay_protection: "durable_postgres",
+    });
+    expect(
+      inspectCasimirFormalVerifierRuntimeReadinessV2(),
+    ).toMatchObject({
+      status: "blocked",
+      composition: {
+        executionCatalogResolverConfigured: false,
+        executionCatalogInspectorConfigured: false,
+        externalSandboxExecutorResolverConfigured: false,
+        trustedReceiptVerifierConfigured: true,
+        durableReplayLedgerConfigured: true,
+      },
+      configuredForExactResolutionAttempt: false,
+      blockerCodes: [
+        "formal_execution_catalog_unconfigured",
+        "formal_execution_catalog_inspector_unconfigured",
+        "formal_external_sandbox_executor_unconfigured",
+      ],
+    });
+    expect(
+      inspectCasimirIndependentNumericalVerifierRuntimeV1(),
+    ).toMatchObject({
+      executionCatalogConfigured: false,
+      sandboxExecutorConfigured: false,
+      trustedReceiptVerifierConfigured: true,
+      durableReplayLedgerConfigured: true,
+      readyForConfirmedExecution: false,
+    });
+    await expect(
+      inspectCasimirFormalRuntimeCanaryV1({
+        accountType: "developer",
+        profileId: "profile:runtime-bootstrap-inspection",
+      }),
+    ).resolves.toMatchObject({
+      status: "blocked",
+      dependencies: {
+        runtimeApprovalHostConfigured: false,
+        repositoryRootConfigured: false,
+        leanExecutableConfigured: false,
+        trustedReceiptVerifierConfigured: true,
+        durableReplayLedgerConfigured: true,
+      },
     });
 
     const sessionReceipt = await signInLocalAccountSession({

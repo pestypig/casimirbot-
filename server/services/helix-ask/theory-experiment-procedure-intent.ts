@@ -35,7 +35,7 @@ const normalizeSpace = (value: string): string =>
   value.replace(/\s+/g, " ").trim();
 
 const PROCEDURE_OBJECT_PATTERN =
-  /\b(?:(?:seven|7)[-\s]+stage\s+)?theory\s+experiment\s+procedure\b|\b(?:first[-\s]+principles\s+)?comparison\s+procedure\b|\b(?:that\s+same|same|this|the)\s+(?:bounded\s+)?procedure\b/i;
+  /\b(?:(?:seven|7)[-\s]+stage\s+)?theory\s+experiment\s+procedure\b|\b(?:seven|7)[-\s]+stage\s+(?:theory\s+)?experiment\s+(?:plan|workflow|procedure)\b|\b(?:first[-\s]+principles\s+)?comparison\s+procedure\b|\b(?:that\s+same|same|this|the)\s+(?:bounded\s+)?procedure\b/i;
 
 const PROCEDURE_COMMAND_PATTERN =
   /\b(?:prepare|re[-\s]?prepare|set\s+up|configure|call|use|run|invoke|execute)\b/i;
@@ -130,12 +130,20 @@ const getRegisteredBadgeIdsByFoldedId = (): ReadonlyMap<string, string> => {
 
 const extractBadgeIds = (value: string): string[] => {
   const registeredIds = getRegisteredBadgeIdsByFoldedId();
-  return Array.from(
+  const explicitIds = Array.from(
     value.matchAll(
       /\b(?:badge\.)?([a-z][a-z0-9_-]*(?:\.[a-z0-9_][a-z0-9_-]*){1,})\b/gi,
     ),
     (match) => registeredIds.get(match[1]!.toLowerCase()),
   ).filter((badgeId): badgeId is string => Boolean(badgeId));
+  const naturalIds = [
+    /\b(?:stage\s*3|third[-\s]+stage)\s+casimir[-\s]*dp\s+(?:quantum[-\s]+foam\s+)?evidence(?:[-\s]+map)?\b/i.test(
+      value,
+    )
+      ? registeredIds.get("study.casimir_dp.evidence_map_stage3")
+      : null,
+  ].filter((badgeId): badgeId is string => Boolean(badgeId));
+  return unique([...explicitIds, ...naturalIds]);
 };
 
 const unique = (values: string[]): string[] =>
@@ -176,6 +184,16 @@ const operationFromPrompt = (
 
 const explicitLanyonCaseId = (value: string): string | null =>
   value.match(/\badvection_diffusion_[a-z0-9_]+\b/i)?.[0]?.toLowerCase() ??
+  (
+    /\b(?:registered\s+)?(?:one|1)[-\s]*dimensional\b[\s\S]{0,80}\badvection[-\s]+diffusion\b/i.test(
+      value,
+    ) ||
+    /\badvection[-\s]+diffusion\b[\s\S]{0,80}\b(?:registered\s+)?(?:one|1)[-\s]*dimensional\b/i.test(
+      value,
+    )
+      ? "advection_diffusion_full_1d"
+      : null
+  ) ??
   null;
 
 const unsupportedLanyonCaseId = (value: string): string | null => {

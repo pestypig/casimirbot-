@@ -171,4 +171,27 @@ describe("useEnergyPipeline contract", () => {
       expect(apiRequestMock).toHaveBeenCalledWith("GET", "/api/helix/pipeline");
     },
   );
+
+  it("can observe cached pipeline state without starting a global poll", async () => {
+    const apiRequestMock = vi
+      .spyOn(queryClientModule, "apiRequest")
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({ zeta: 0.5 }),
+      } as Response);
+
+    function Harness() {
+      useEnergyPipeline({ enabled: false });
+      return null;
+    }
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(apiRequestMock).not.toHaveBeenCalled();
+  });
 });

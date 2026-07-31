@@ -1,6 +1,7 @@
 import React from "react";
 import { KeyRound, LogIn } from "lucide-react";
 import { Link } from "wouter";
+import { buildWorkstationEntryUrl } from "@shared/workstation-link-meta";
 
 export default function AccountResetPasswordPage() {
   const [token, setToken] = React.useState(() => {
@@ -74,7 +75,13 @@ export default function AccountResetPasswordPage() {
             Reset password
           </button>
           <div>
-            <Link href="/desktop?panels=account-session&focus=account-session" className="inline-flex items-center gap-2 text-xs text-cyan-200 hover:text-cyan-100">
+            <Link
+              href={buildWorkstationEntryUrl({
+                search: "?panels=account-session&focus=account-session",
+                entry: "workstation",
+              })}
+              className="inline-flex items-center gap-2 text-xs text-cyan-200 hover:text-cyan-100"
+            >
               <LogIn className="h-3.5 w-3.5" />
               Back to sign in
             </Link>

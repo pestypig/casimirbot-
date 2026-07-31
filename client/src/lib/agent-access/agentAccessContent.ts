@@ -1,3 +1,5 @@
+import { buildWorkstationEntryUrl } from "@shared/workstation-link-meta";
+
 export const CASIMIRBOT_PUBLIC_ORIGIN = "https://casimirbot.com";
 
 export const AGENT_ACCESS_CONNECTION_WARNING =
@@ -115,7 +117,11 @@ export const createAgentAccessContent = (
       {
         id: "workstation",
         label: "Workstation configuration",
-        url: `${publicOrigin}/desktop?panels=agent-access&focus=agent-access`,
+        url: buildWorkstationEntryUrl({
+          baseUrl: publicOrigin,
+          search: "?panels=agent-access&focus=agent-access",
+          entry: "workstation",
+        }),
         description:
           "Human-facing connection guidance inside the CasimirBot workstation.",
         protected: false,

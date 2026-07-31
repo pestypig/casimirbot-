@@ -43,12 +43,19 @@ function resolveDistPath(): string {
 
 export function serveStaticAssets(app: Express) {
   const assetPath = path.resolve(resolveDistPath(), "assets");
+  const cacheHashedAssets = process.env.NODE_ENV === "production";
 
   app.use(
     "/assets",
     express.static(assetPath, {
-      immutable: true,
-      maxAge: "1y",
+      immutable: cacheHashedAssets,
+      maxAge: cacheHashedAssets ? "1y" : 0,
+      setHeaders: cacheHashedAssets
+        ? undefined
+        : (response) => {
+            response.setHeader("Cache-Control", "no-store");
+            response.setHeader("Pragma", "no-cache");
+          },
     }),
   );
 }

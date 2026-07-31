@@ -777,7 +777,7 @@ export const isHelixCapabilityItineraryFamilyObserved = (
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
       artifactMatchesObservationKind(
         artifact,
-        /helix_theory_context_reflection_tool_receipt|theory_context_reflection|theory_experiment_procedure_observation|casimir\.theory_experiment_procedure\.observation\.v1|theory_experiment_execution_closure_observation|casimir\.theory_experiment_execution_closure\.observation\.v1|theory_frontier_search|theory_frontier_candidate|theory_frontier_conjecture_observation|theory_frontier_exact_contract_verification/i,
+        /helix_theory_context_reflection_tool_receipt|theory_context_reflection|theory_experiment_procedure_observation|casimir\.theory_experiment_procedure\.observation\.v1|theory_experiment_execution_closure_observation|casimir\.theory_experiment_execution_closure\.observation\.v1|theory_formal_artifact_family_audit_observation|casimir\.theory_formal_artifact_family_audit\.observation\.v1|scientific_evidence_enrollment_observation|casimir\.scientific_evidence_enrollment\.observation\.v1|scientific_evidence_execution_plan_observation|casimir\.scientific_evidence_execution_plan\.observation\.v1|scientific_evidence_closure_observation|casimir\.scientific_evidence_closure\.observation\.v1|theory_frontier_search|theory_frontier_candidate|theory_frontier_conjecture_observation|theory_frontier_exact_contract_verification/i,
       ),
     );
   }

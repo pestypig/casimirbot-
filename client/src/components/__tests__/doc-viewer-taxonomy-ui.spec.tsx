@@ -40,6 +40,10 @@ const messages: Record<string, string> = {
   "docsViewer.translation.hideInline": "Hide translation",
   "docsViewer.translation.generateInline": "Translate",
   "docsViewer.translation.generating": "Translating",
+  "docsViewer.action.exportPdf": "Download PDF",
+  "docsViewer.action.exportingPdf": "Building PDF",
+  "docsViewer.pdf.ready": "Print PDF ready: {pageCount} pages.",
+  "docsViewer.pdf.error": "PDF export failed: {reason}",
 };
 
 const t = ((id: string, values?: Record<string, string | number>) => {
@@ -805,6 +809,102 @@ describe("DocViewerPanel taxonomy UI", () => {
     expect(headerBadges).toHaveTextContent("Canonical research");
     expect(headerBadges).toHaveTextContent("Calculator-ready");
     expect(headerBadges).toHaveTextContent("Sidecars attached");
+  });
+
+  it("offers the validated print-PDF action and exposes export state", () => {
+    const { PanelHeader } = DocViewerPanelModule;
+    const onExportPrintPdf = vi.fn();
+
+    const { rerender } = render(
+      <PanelHeader
+        mode="doc"
+        entry={whitepaper}
+        anchor={undefined}
+        isAutoReading={false}
+        autoReadError={null}
+        proceduralStatus={null}
+        readProgress={null}
+        onStopAutoRead={vi.fn()}
+        onShowDirectory={vi.fn()}
+        canRejoinLiveRead={false}
+        onRejoinLiveRead={vi.fn()}
+        translationEligible={false}
+        translationAccountLocale="en"
+        translationTargetLanguage="es"
+        translationSourceId={null}
+        translationSourceHash={null}
+        translationSourceTextHash={null}
+        translationSourceTextCharCount={null}
+        translationLaneSessionId={null}
+        inlineTranslationEnabled={false}
+        translationStatus="idle"
+        translationError={null}
+        liveTranslationProjectionSummary={summarizeDocumentLiveTranslationProjectionSnapshot({
+          version: 0,
+          translations: {},
+          laneSessions: {},
+          mailLoops: {},
+          goalBindings: {},
+        })}
+        onToggleInlineTranslation={vi.fn()}
+        onToggleInlineTranslationSessionPause={vi.fn()}
+        canExportPrintPdf
+        pdfExportStatus="idle"
+        pdfExportMessage={null}
+        onExportPrintPdf={onExportPrintPdf}
+        t={t}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("docs-print-pdf-button"));
+    expect(onExportPrintPdf).toHaveBeenCalledOnce();
+
+    rerender(
+      <PanelHeader
+        mode="doc"
+        entry={whitepaper}
+        anchor={undefined}
+        isAutoReading={false}
+        autoReadError={null}
+        proceduralStatus={null}
+        readProgress={null}
+        onStopAutoRead={vi.fn()}
+        onShowDirectory={vi.fn()}
+        canRejoinLiveRead={false}
+        onRejoinLiveRead={vi.fn()}
+        translationEligible={false}
+        translationAccountLocale="en"
+        translationTargetLanguage="es"
+        translationSourceId={null}
+        translationSourceHash={null}
+        translationSourceTextHash={null}
+        translationSourceTextCharCount={null}
+        translationLaneSessionId={null}
+        inlineTranslationEnabled={false}
+        translationStatus="idle"
+        translationError={null}
+        liveTranslationProjectionSummary={summarizeDocumentLiveTranslationProjectionSnapshot({
+          version: 0,
+          translations: {},
+          laneSessions: {},
+          mailLoops: {},
+          goalBindings: {},
+        })}
+        onToggleInlineTranslation={vi.fn()}
+        onToggleInlineTranslationSessionPause={vi.fn()}
+        canExportPrintPdf
+        pdfExportStatus="exporting"
+        pdfExportMessage="Building the print-ready PDF."
+        onExportPrintPdf={onExportPrintPdf}
+        t={t}
+      />,
+    );
+
+    expect(screen.getByTestId("docs-print-pdf-button")).toBeDisabled();
+    expect(screen.getByTestId("docs-print-pdf-button")).toHaveTextContent("Building PDF");
+    expect(screen.getByTestId("docs-print-pdf-status")).toHaveTextContent(
+      "Building the print-ready PDF.",
+    );
   });
 
   it("reports visible translation bboxes for account-language header regions", () => {

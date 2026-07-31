@@ -17,13 +17,16 @@ describe("workstation shell capabilities", () => {
       "workstation.restore_view_state",
     ]);
 
+    expect(
+      findWorkstationShellCapability("workstation.deep_link_state")
+        ?.supported_query_params,
+    ).toEqual(["panels", "focus", "doc", "anchor", "entry"]);
+    expect(
+      findWorkstationShellCapability("workstation.restore_view_state")
+        ?.supported_query_params,
+    ).toEqual(["panels", "focus", "doc", "anchor"]);
+
     for (const capability of WORKSTATION_SHELL_CAPABILITIES) {
-      expect(capability.supported_query_params).toEqual([
-        "panels",
-        "focus",
-        "doc",
-        "anchor",
-      ]);
       expect(capability.path_policy).toBe("workspace_relative_path_ref_only");
       expect(capability.passive_restore_emits_receipt).toBe(false);
       expect(capability.workspace_os_status_executes).toBe(false);

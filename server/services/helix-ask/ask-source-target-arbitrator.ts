@@ -16,6 +16,7 @@ import {
   SCENE_EPOCH_REPLAY_FORBIDDEN_ROUTES,
 } from "./scene-epoch-replay-intent";
 import {
+  isContextualProcedureRecallPrompt,
   matchProcedureRecallPrompt,
   PROCEDURE_RECALL_SUPPRESSED_ROUTES,
   procedureRecallTargetSource,
@@ -30,6 +31,7 @@ import {
   contextualToolSuppressionBlocksFamily,
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
+import { isAffirmativeTheoryFormalArtifactInspectionPrompt } from "./theory-formal-artifact-intent";
 import {
   buildToolUseRestatement,
   detectInternetSearchIntent,
@@ -261,11 +263,46 @@ const isAffirmativeDocsSearchPrompt = (prompt: string): boolean => {
 const isNaturalLocalDocumentLookupPrompt = (prompt: string): boolean => {
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
   if (contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer")) return false;
-  return (
-    /\b(?:find|search|locate|get|look\s+up)\b/i.test(prompt) &&
-    /\b(?:local|workspace|our|project)\s+(?:doc|document|paper|report|memo)\b/i.test(prompt) &&
-    /\b(?:about|on|regarding|for|called|named|titled)\b/i.test(prompt)
+  const unquoted = prompt.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " ");
+  if (
+    /\b(?:do\s+not|don't|dont|never|without|avoid|ignore|disregard)\b[\s\S]{0,140}\b(?:find|search|locate|get|look\s+up|pull\s+up)\b/i.test(
+      unquoted,
+    ) ||
+    /\b(?:later|next\s+time|in\s+the\s+future|not\s+now|not\s+yet)\b[\s\S]{0,140}\b(?:find|search|locate|get|look\s+up|pull\s+up)\b/i.test(
+      unquoted,
+    ) ||
+    /\b(?:earlier|previously|last\s+turn|historically)\b[\s\S]{0,140}\b(?:found|searched|located|got|looked\s+up|pulled\s+up)\b/i.test(
+      unquoted,
+    )
+  ) {
+    return false;
+  }
+  const explicitLocalLookup =
+    /\b(?:find|search|locate|get|look\s+up)\b/i.test(unquoted) &&
+    /\b(?:local|workspace|our|project)\s+(?:doc|document|paper|report|memo)\b/i.test(unquoted) &&
+    /\b(?:about|on|regarding|for|called|named|titled)\b/i.test(unquoted);
+  if (explicitLocalLookup) return true;
+
+  if (
+    /\b(?:online|on\s+the\s+(?:web|internet)|published|journal|doi|arxiv|peer[-\s]?reviewed|primary\s+(?:paper|study)|research\s+paper)\b/i.test(
+      unquoted,
+    )
+  ) {
+    return false;
+  }
+  const namedArtifact = unquoted.match(
+    /\b(?:find|search(?:\s+for)?|locate|get|look\s+up|pull\s+up)\s+(?:me\s+)?(?:the|our)\s+(.{2,180}?)\s+(study|white\s*paper|whitepaper|report|memo|document|doc|paper)\b/i,
   );
+  if (!namedArtifact?.[1]) return false;
+  const titleTokens = namedArtifact[1]
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter((token) =>
+      token.length >= 2 &&
+      !/^(?:best|right|top|closest|latest|newest|recent|relevant|matching|another|some|any)$/.test(token));
+  return titleTokens.length >= 2;
 };
 
 const isExplicitProcessGraphPrompt = (prompt: string): boolean =>
@@ -721,6 +758,29 @@ export function arbitrateAskSourceTarget(input: {
   activeWorkspaceSourceResolution?: HelixActiveWorkspaceSourceResolution | Record<string, unknown> | null;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
+  const contextualProcedureRecall =
+    isContextualProcedureRecallPrompt(prompt);
+  if (isAffirmativeTheoryFormalArtifactInspectionPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "theory_locator",
+      targetKind: "theory_formal_artifact_family",
+      strength: "hard",
+      explicitCues: ["affirmative_theory_formal_artifact_inspection"],
+      reasons: ["registered_formal_artifact_inspection_source_target"],
+      requestedOutputs: [
+        "theory_formal_artifact_family_audit_observation",
+        "model_synthesized_answer",
+        "typed_failure",
+      ],
+      suppressedRoutes: ["model_only_concept", "no_tool_direct"],
+      precedenceReason: "registered_formal_artifact_inspection_source_target",
+      confidence: 0.98,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (isMinecraftSituationSessionSetupPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,
@@ -810,6 +870,24 @@ export function arbitrateAskSourceTarget(input: {
       ],
       precedenceReason: "historical_runtime_evidence_source_target",
       confidence: 0.92,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  const procedureRecallRule = matchProcedureRecallPrompt(prompt);
+  if (procedureRecallRule) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: procedureRecallTargetSource(procedureRecallRule),
+      targetKind: procedureRecallRule.target_kind,
+      strength: "hard",
+      explicitCues: [procedureRecallRule.cue],
+      reasons: ["hard_procedure_memory_recall_prompt", procedureRecallRule.cue],
+      requestedOutputs: procedureRecallRule.requested_outputs,
+      suppressedRoutes: [...PROCEDURE_RECALL_SUPPRESSED_ROUTES],
+      precedenceReason: "hard_procedure_memory_recall_prompt",
+      confidence: 0.98,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });
@@ -1946,24 +2024,6 @@ export function arbitrateAskSourceTarget(input: {
       });
     }
   }
-  const procedureRecallRule = matchProcedureRecallPrompt(prompt);
-  if (procedureRecallRule) {
-    return toSourceTargetIntent({
-      turnId: input.turnId,
-      threadId: input.threadId,
-      target: procedureRecallTargetSource(procedureRecallRule),
-      targetKind: procedureRecallRule.target_kind,
-      strength: "hard",
-      explicitCues: [procedureRecallRule.cue],
-      reasons: ["hard_procedure_memory_recall_prompt", procedureRecallRule.cue],
-      requestedOutputs: procedureRecallRule.requested_outputs,
-      suppressedRoutes: [...PROCEDURE_RECALL_SUPPRESSED_ROUTES],
-      precedenceReason: "hard_procedure_memory_recall_prompt",
-      confidence: 0.98,
-      allowClientShortcut: false,
-      allowNoToolDirect: false,
-    });
-  }
   if (isDeicticDocsIdentityPrompt(prompt)) {
     const activeDocRule = rules.find((rule: CueRule) => rule.target === "active_doc");
     const explicitCues = activeDocRule ? matches(prompt, activeDocRule.cues) : [];
@@ -2043,7 +2103,11 @@ export function arbitrateAskSourceTarget(input: {
     }
   }
   const visualSceneMemoryRule = rules.find((rule: CueRule) => rule.reason === "explicit_visual_scene_memory_source_target");
-  if (visualSceneMemoryRule && !isGenericSceneEpochPhrase(prompt)) {
+  if (
+    visualSceneMemoryRule &&
+    !contextualProcedureRecall &&
+    !isGenericSceneEpochPhrase(prompt)
+  ) {
     const explicitCues = matches(prompt, visualSceneMemoryRule.cues);
     if (explicitCues.length > 0) {
       return toSourceTargetIntent({
@@ -2063,7 +2127,7 @@ export function arbitrateAskSourceTarget(input: {
       });
     }
   }
-  if (isSceneEpochReplayPrompt(prompt)) {
+  if (isSceneEpochReplayPrompt(prompt) && !contextualProcedureRecall) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
@@ -2081,7 +2145,7 @@ export function arbitrateAskSourceTarget(input: {
     });
   }
   const procedureMemoryRule = rules.find((rule: CueRule) => rule.target === "procedure_memory");
-  if (procedureMemoryRule) {
+  if (procedureMemoryRule && !contextualProcedureRecall) {
     const explicitCues = matches(prompt, procedureMemoryRule.cues);
     if (procedureMemoryRule.reason === "explicit_visual_scene_memory_source_target" && explicitCues.length > 0) {
       return toSourceTargetIntent({
@@ -2145,6 +2209,9 @@ export function arbitrateAskSourceTarget(input: {
     });
   }
   for (const rule of rules) {
+    if (rule.target === "procedure_memory" && contextualProcedureRecall) {
+      continue;
+    }
     if (rule.target === "docs_viewer" && isDocsViewerTopicLabelPrompt(prompt)) {
       continue;
     }

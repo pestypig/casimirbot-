@@ -75,6 +75,7 @@ import {
   buildPromptDerivedRepoSearchGatewayCallRequests,
   buildPromptDerivedResearchLibraryGatewayCallRequests,
   buildPromptDerivedScholarlyResearchGatewayCallRequests,
+  buildPromptDerivedScientificEvidenceEnrollmentGatewayCallRequests,
   buildPromptDerivedTheoryExperimentProcedureGatewayCallRequests,
   buildPromptDerivedTheoryReflectionGatewayCallRequests,
   buildPromptDerivedVoiceGatewayCallRequests,
@@ -690,6 +691,7 @@ export {
   buildPromptDerivedRepoSearchGatewayCallRequests,
   buildPromptDerivedResearchLibraryGatewayCallRequests,
   buildPromptDerivedScholarlyResearchGatewayCallRequests,
+  buildPromptDerivedScientificEvidenceEnrollmentGatewayCallRequests,
   buildPromptDerivedTheoryExperimentProcedureGatewayCallRequests,
   buildPromptDerivedTheoryReflectionGatewayCallRequests,
   buildPromptDerivedVoiceGatewayCallRequests,
@@ -1029,11 +1031,78 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     /\b(?:research\s+papers?|papers?|arxiv|scholarly|internet|web|sources?|reflect|reflection|theory\s+badge\s+graph|theory\s+graph|civilization\s+bounds?|civilization)\b/i.test(
       unquotePrompt(prompt),
     );
+  const promptDerivedScientificEvidenceRequests =
+    buildPromptDerivedScientificEvidenceEnrollmentGatewayCallRequests(
+      input.body,
+    );
+  const promptNamedRequests =
+    buildPromptNamedCapabilityGatewayCallRequests(input.body);
   const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(
     input.body,
   ).map((request) => {
     const capability =
       readString(request.capability_id) ?? readString(request.capabilityId);
+    const scientificEvidenceRequest =
+      promptDerivedScientificEvidenceRequests.find((candidate) => {
+        const candidateCapability =
+          readString(candidate.capability_id) ??
+          readString(candidate.capabilityId);
+        return candidateCapability === capability;
+      });
+    if (scientificEvidenceRequest) {
+      const requestArgs =
+        readRecord(request.arguments ?? request.args) ?? {};
+      const enrolledArgs =
+        readRecord(
+          scientificEvidenceRequest.arguments ??
+            scientificEvidenceRequest.args,
+        ) ?? {};
+      return {
+        ...request,
+        arguments: {
+          ...enrolledArgs,
+          ...requestArgs,
+          source_target_intent:
+            readRecord(
+              requestArgs.source_target_intent ??
+                requestArgs.sourceTargetIntent,
+            ) ??
+            readRecord(
+              enrolledArgs.source_target_intent ??
+                enrolledArgs.sourceTargetIntent,
+            ),
+        },
+      };
+    }
+    const promptNamedRequest = promptNamedRequests.find((candidate) => {
+      const candidateCapability =
+        readString(candidate.capability_id) ??
+        readString(candidate.capabilityId);
+      return candidateCapability === capability;
+    });
+    if (promptNamedRequest) {
+      const requestArgs = readRecord(request.arguments ?? request.args) ?? {};
+      const promptNamedArgs =
+        readRecord(
+          promptNamedRequest.arguments ?? promptNamedRequest.args,
+        ) ?? {};
+      return {
+        ...request,
+        arguments: {
+          ...promptNamedArgs,
+          ...requestArgs,
+          source_target_intent:
+            readRecord(
+              promptNamedArgs.source_target_intent ??
+                promptNamedArgs.sourceTargetIntent,
+            ) ??
+            readRecord(
+              requestArgs.source_target_intent ??
+                requestArgs.sourceTargetIntent,
+            ),
+        },
+      };
+    }
     if (
       capability !== CALCULATOR_SOLVE_EXPRESSION_CAPABILITY ||
       !promptCalculatorExpression
@@ -1089,6 +1158,14 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     seen,
     buildPromptDerivedTheoryExperimentProcedureGatewayCallRequests(input.body),
   );
+  // Retained scientific-evidence enrollment is also a bounded read-only
+  // preparation rail. Route admission alone is insufficient: the exact
+  // sidecar must execute and re-enter this turn before Codex may discuss it.
+  appendDedupe(
+    requests,
+    seen,
+    promptDerivedScientificEvidenceRequests,
+  );
   // A structured source-target admission is the authoritative route decision for
   // the turn. Keep independently admitted compound dependencies, but do not let
   // lexical capability names or active-panel context append a competing source.
@@ -1115,7 +1192,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   }
 
   const promptNamed = filterContextuallySuppressedPromptRequests(
-    buildPromptNamedCapabilityGatewayCallRequests(input.body),
+    promptNamedRequests,
     contextualSuppression,
   );
   const promptNamedCapabilities = new Set(

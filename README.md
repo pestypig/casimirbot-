@@ -125,17 +125,32 @@ Prerequisites:
 
 ```bash
 npm install
-npm run dev:agi:5050
+npm run build
+npm run dev
 ```
 
-The development server runs Express with Vite middleware. Open:
+The default development server runs Express against the prebuilt client to keep
+the local Helix, browser, and Minecraft coexistence footprint bounded. Open:
 
-- Desktop workstation: http://localhost:5050/desktop
-- Mobile panels: http://localhost:5050/mobile
+- Desktop workstation: http://localhost:5173/desktop
+- Mobile panels: http://localhost:5173/mobile
 
-Do not start a separate Vite server for normal development; the dev scripts
-already wire the API and UI together. Use `npm run dev` for the default port or
-`npm run dev:agi:5050` for the AGI-enabled 5050 workflow.
+The configured keyed launcher supplies port 1522 and reports its own local URL;
+use that reported URL for keyed-agent testing.
+
+Use `npm run dev:hmr` when editing the client and hot-module replacement matters.
+That command preserves the former Vite-middleware workflow and all developer
+capabilities, but intentionally uses more memory after the workstation loads.
+`npm run dev:agi:5050` remains the AGI-enabled Vite workflow on port 5050. Do
+not start a separate Vite server; these scripts wire the API and UI together.
+If `npm run dev` reports that `dist/public` is missing, run `npm run build`
+instead of silently serving stale or incomplete client assets.
+
+When this low-memory profile falls back to the local pg-mem database, it
+coalesces disk snapshots for up to 30 seconds instead of serializing the full
+fallback database after every mutation. Graceful shutdown flushes pending
+changes. Production Postgres and the normal synchronous local persistence mode
+are unchanged.
 
 The normal development commands also enable the Account-panel Shared Live Rooms
 experiment and guest room hosting for local two-browser testing. Production
@@ -307,9 +322,10 @@ advanced controls remain policy-gated while `developer` stays the superset. The
 `HELIX_REALTIME_SESSION_*_ENABLED` variables are optional emergency overrides;
 set an individual flag to `0` only when that Realtime layer must be disabled.
 
-`OPENAI_REALTIME_API_KEY` is an optional explicit credential override. When it
-is absent, GPT Realtime uses the same `OPENAI_API_KEY` from the normal startup
-command.
+GPT Realtime uses the same `OPENAI_API_KEY` as the rest of the API-backed
+runtime. There is no separate Realtime credential or override. The credential
+and provider error body are never returned to the browser or written to debug
+output.
 
 `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` should use the same Google OAuth
 Web application client ID. `VITE_GOOGLE_CLIENT_ID` is intentionally exposed to
@@ -409,9 +425,12 @@ connection string.
 
 For local development without `DATABASE_URL`, the app uses a pg-mem fallback and
 persists that fallback to `.cal/local-pg-mem.json` so workstation accounts,
-password credentials, email recovery rows, and profile saves survive server
-restarts. Override the file with `HELIX_LOCAL_DB_PATH`, or set
-`HELIX_LOCAL_PG_MEM_PERSIST=0` to return to memory-only behavior.
+password credentials, email recovery rows, profile saves, rooms, and connector
+bindings survive server restarts. Override the file with
+`HELIX_LOCAL_DB_PATH`, or set `HELIX_LOCAL_PG_MEM_PERSIST=0` only for disposable
+memory-attribution or test runs. Large recent ingress/replay test corpora remain
+inside the database's required idempotency window and can materially increase
+the local process heap; do not disable persistence for normal room operation.
 
 ## High-Signal Runs
 

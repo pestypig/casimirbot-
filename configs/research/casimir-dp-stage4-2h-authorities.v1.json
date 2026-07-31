@@ -1,0 +1,50 @@
+{
+  "schema_version": "casimir_dp_stage4_2h_authority_manifest/1",
+  "campaign_id": "casimir-dp-commissioning-intake-stage4-2h-v1",
+  "immutable_upstream": [
+    {
+      "role": "stage4_2g_config",
+      "path": "configs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g.v1.json",
+      "sha256": "a9516529a7c2f935c777fc4c1b29c207457a8f1618f1df580bff89ee27692487",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_unacquired_packet",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2g-pilot-unacquired.v1.json",
+      "sha256": "f06425aa1355f3fee13e02fdbd97ca5493f65138ec8f835e6e03fb21d5d5ba43",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_synthetic_packet",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2g-pilot-synthetic-validation.v1.json",
+      "sha256": "251ae42ac6e60454d1af850fec591febd104b9d5c33093a61569f6b8dddae7a8",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_report",
+      "path": "artifacts/research/casimir-dp-empirical-feasibility-pilot-stage4-2g/casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z/empirical-feasibility-pilot-stage4-2g-report.json",
+      "sha256": "0de543b66dc6e79f523b10083f7712bebbfd0dc2857f51d72337af7c8e600a4b",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-empirical-feasibility-pilot-stage4-2g/casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z/empirical-feasibility-pilot-stage4-2g-receipt.json",
+      "sha256": "d53405187bb494aa8db3b83a68f0f4ea746fb36ffd70ede127d95cdc8e1e1f6c",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_verification_receipt",
+      "path": "docs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g-verification-receipt.json",
+      "sha256": "3530465e24ef861bd84cbd258cff153e39823e4329e7461a216ef978e712821b",
+      "required_at_runtime": true
+    }
+  ],
+  "method_authorities": [
+    {
+      "role": "stage4_2g_packet_and_gate_evaluator",
+      "path": "shared/casimir-dp-empirical-feasibility-pilot-stage4-2g.ts",
+      "sha256": "37470d38cd73d9753d202e67aedfe4ebd6b516c494cfdc34a16b5728bb6d16fe",
+      "required_at_runtime": true
+    }
+  ]
+}

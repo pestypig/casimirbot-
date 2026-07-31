@@ -407,6 +407,7 @@ describe("Helix Ask conversational referent resolution", () => {
     "Can you please reflect that through the Theory Badge Graph?",
     "Okay, please reflect that using the theory badge graph.",
     "Use the Theory Badge Graph to reflect this.",
+    "Now reflect that corrected claim in the Theory Badge Graph. Separate what is represented from what is still missing.",
   ])("resolves an affirmative theory-graph imperative to the previous assistant answer: %s", (question) => {
     const resolution = resolveHelixAskConversationalReferent(bodyWithPreviousAnswer(question));
 
@@ -462,6 +463,33 @@ describe("Helix Ask conversational referent resolution", () => {
     expect(resolution.resolvedText).toContain("Deterministic microscopic laws");
     expect(resolution.trace).toMatchObject({
       resolved_source_ref: "chat.final_answer.recent:substantive-determinism",
+      candidate_count: 2,
+      matched_candidate_count: 1,
+      selection_policy: "latest_substantive_answer",
+      resolution_confidence: "high",
+    });
+  });
+
+  it("skips a typed terminal failure for a natural corrected-claim graph handoff", () => {
+    const resolution = resolveHelixAskConversationalReferent(
+      bodyWithRecentAnswers(
+        "Now reflect that corrected claim in the Theory Badge Graph. Separate what is represented from what is still missing.",
+        [
+          {
+            id: "failed-correction",
+            text: "I could not complete this turn because the terminal boundary blocked the source answer.",
+          },
+          {
+            id: "substantive-correction",
+            text: "The Casimir-DP study separates boundary-conditioned Casimir observables from DP collapse diagnostics and leaves their quantitative bridge blocked.",
+          },
+        ],
+      ),
+    );
+
+    expect(resolution.resolvedText).toContain("Casimir-DP study");
+    expect(resolution.trace).toMatchObject({
+      resolved_source_ref: "chat.final_answer.recent:substantive-correction",
       candidate_count: 2,
       matched_candidate_count: 1,
       selection_policy: "latest_substantive_answer",
@@ -547,6 +575,9 @@ describe("Helix Ask conversational referent resolution", () => {
     'The screen displays "Reflect this with the Theory Badge Graph." Explain that example.',
     'The screen displays "can you reflect this in theory badge graph?" Explain that example.',
     "I previously asked you to reflect this with the Theory Badge Graph.",
+    "Do not reflect that corrected claim in the Theory Badge Graph.",
+    "Later, reflect that corrected claim in the Theory Badge Graph.",
+    'The screen displays "reflect that corrected claim in the Theory Badge Graph." Explain that example.',
   ])("does not admit non-affirmative theory-graph referent text: %s", (question) => {
     const resolution = resolveHelixAskConversationalReferent(bodyWithPreviousAnswer(question));
 

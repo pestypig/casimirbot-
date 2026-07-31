@@ -1,0 +1,165 @@
+{
+  "schema_version": "casimir_dp_empirical_feasibility_pilot_stage4_2g_verification_receipt/1",
+  "campaign_id": "casimir-dp-empirical-feasibility-pilot-stage4-2g-v1",
+  "campaign_run_id": "casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z",
+  "verified_at": "2026-07-30T04:01:52.562Z",
+  "evidence_class": "unacquired_empirical_feasibility_contract_and_ingestion_software",
+  "claim_ceiling": "single_apparatus_prediction_and_empirical_packet_readiness_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g.v1.json",
+    "config_sha256": "a9516529a7c2f935c777fc4c1b29c207457a8f1618f1df580bff89ee27692487",
+    "authority_manifest_path": "configs/research/casimir-dp-stage4-2g-authorities.v1.json",
+    "authority_manifest_sha256": "7bce49cd2c49028321aa591b1571c88a1418d2e2a125631f810bc966f49b8fff",
+    "unacquired_packet_path": "configs/research/fixtures/casimir-dp-stage4-2g-pilot-unacquired.v1.json",
+    "unacquired_packet_sha256": "f06425aa1355f3fee13e02fdbd97ca5493f65138ec8f835e6e03fb21d5d5ba43",
+    "synthetic_validation_packet_path": "configs/research/fixtures/casimir-dp-stage4-2g-pilot-synthetic-validation.v1.json",
+    "synthetic_validation_packet_sha256": "251ae42ac6e60454d1af850fec591febd104b9d5c33093a61569f6b8dddae7a8",
+    "report_json_path": "artifacts/research/casimir-dp-empirical-feasibility-pilot-stage4-2g/casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z/empirical-feasibility-pilot-stage4-2g-report.json",
+    "report_json_sha256": "0de543b66dc6e79f523b10083f7712bebbfd0dc2857f51d72337af7c8e600a4b",
+    "report_markdown_path": "artifacts/research/casimir-dp-empirical-feasibility-pilot-stage4-2g/casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z/empirical-feasibility-pilot-stage4-2g-report.md",
+    "report_markdown_sha256": "848cb5c19c5db4df3be38b2e55b8bbe6cddc669259ab6d9c3437cd11652a7509",
+    "campaign_trace_path": "artifacts/research/casimir-dp-empirical-feasibility-pilot-stage4-2g/casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z/empirical-feasibility-pilot-stage4-2g-trace.jsonl",
+    "campaign_trace_sha256": "30abd0e70eaca3e0b9998a999d4b4e6c16b61124008edd6cb2ab95954b3d944c",
+    "campaign_receipt_path": "artifacts/research/casimir-dp-empirical-feasibility-pilot-stage4-2g/casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z/empirical-feasibility-pilot-stage4-2g-receipt.json",
+    "campaign_receipt_sha256": "d53405187bb494aa8db3b83a68f0f4ea746fb36ffd70ede127d95cdc8e1e1f6c",
+    "maintained_report_path": "docs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g-report.md",
+    "maintained_report_matches_immutable_markdown": true,
+    "git_head": "31709409fba197516e966484259f81725a2ad0fa",
+    "worktree_state": "dirty_uncommitted_stage4_2g_source_and_content_hashes_authoritative",
+    "authority_mode": "role_path_and_content_hash_tuple"
+  },
+  "immutable_stage4_2f_upstream": {
+    "run_id": "casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z",
+    "downstream_verification_receipt_path": "docs/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-verification-receipt.json",
+    "downstream_verification_receipt_sha256": "f1b8219b7c74bc25db9cc3137aeec97b714bfc3193052a94e3929326eb858f73",
+    "mutation_detected": false
+  },
+  "verification_inputs": {
+    "adapter_command": "npm run casimir:verify -- --ci --trace-out artifacts/training-trace-stage4-2g-20260730T040151726Z.jsonl --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export",
+    "telemetry_mode": "standard_cli_repository_telemetry",
+    "non_authoritative_preflight": {
+      "outcome": "api_bootstrapping",
+      "http_status": 503,
+      "adapter_result_issued": false,
+      "used_as_evidence": false
+    },
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-2g-20260730T040151726Z-bound-validated.jsonl",
+      "sha256": "cf4c1f72bbcd7cbac83694cd6d2d981cd0813070e461fbc9835712b1f42d3f53",
+      "bytes": 986,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true,
+      "validated_exporter_path": "scripts/research/export-casimir-dp-stage4-verification-trace.ts"
+    }
+  },
+  "local_gates": {
+    "stage4_2f_inherited_and_stage4_2g_runtime_campaign_paper_graph_sidecar_and_root": {
+      "files": 8,
+      "tests": 80,
+      "status": "pass"
+    },
+    "required_gr_warp_replay": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    },
+    "production_build": {
+      "status": "pass_with_pre_existing_warnings",
+      "commands": [
+        "npm run build:client",
+        "npm run build:server"
+      ],
+      "exit_codes": [
+        0,
+        0
+      ],
+      "warnings_present": true,
+      "note": "The client transformed 7054 modules and completed; the server bundle completed. Existing browser-externalization, eval, chunk-size, duplicate-key, and duplicate-case warnings are outside this campaign's scientific authority."
+    },
+    "dependency_coherence": {
+      "status": "pass_from_adapter_trace",
+      "package_lock_sha256": "c85521a758783fa5cea1c8933e3c5ad54d604d596620279fce916e3c2ce42367"
+    },
+    "equation_sidecar": {
+      "paper_markers": 61,
+      "source_entries": 61,
+      "generated_entries": 61,
+      "source_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
+      "source_sha256_before_downstream_receipt_binding": "62c736224fec064967725b6a598827c419b0921e9c5db6b47403cf0657a48ab2",
+      "generated_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
+      "generated_sha256_before_downstream_receipt_binding": "0a2f8968f396f71e22442fce848b2f41e8cc4a13e24c8f5159facbf4a1aebc59",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 32,
+      "edges": 96,
+      "stage4_2g_badges": 1,
+      "calculator_payloads": 0,
+      "observable_bridge_edges": 0,
+      "graph_path": "shared/theory/casimir-dp-study-theory-badges.ts",
+      "graph_sha256_before_downstream_receipt_binding": "8696c6119fe190e3cd73d58cc44b56bd4fff31de211322aa1ed5a99bcd45bca5",
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 217,
+      "validation": "pass",
+      "strict_congruence_errors": 0,
+      "strict_congruence_warnings": 0,
+      "report_json_path": "reports/math-report.json",
+      "report_json_sha256": "61a9c794746737f2abadab073a0a7016b79de5fb29e71a2b6280cf0a72c26f5b",
+      "report_markdown_path": "reports/math-report.md",
+      "report_markdown_sha256": "4e9da17411c481a02cea0450fe7c2387911e9583b36389834074aba054e9db14"
+    },
+    "physics_root_to_leaf_manifest": {
+      "status": "pass",
+      "manifest_path": "configs/physics-root-leaf-manifest.v1.json",
+      "manifest_sha256": "5429487aed292a635bd02abb6a397bf33deb10d854971b6cc7cf5013b8fe86fc",
+      "readiness_and_scientific_falsifier_rules_separated": true
+    }
+  },
+  "adapter_result": {
+    "trace_id": "adapter:74bf6a09-8aac-40f1-b2bf-19851531eed1",
+    "run_id": "2349",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate": {
+      "status": "GREEN",
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+      "integrity_ok": true
+    },
+    "scientific_scope": "none"
+  },
+  "scientific_standing": {
+    "software_and_packet_contracts": "pass",
+    "design_identity_frozen": true,
+    "dp_and_companion_same_identity": true,
+    "finite_geometry_maxwell_green_authority": "not_ready",
+    "measured_material_response": "not_ready",
+    "state_preparation_authority": "not_ready",
+    "branch_hold_metrology": "not_ready",
+    "boundary_modulation_transfer": "not_ready",
+    "environment_backgrounds": "not_ready",
+    "measured_complex_coherence_response": "not_ready",
+    "measured_block_covariance": "not_ready",
+    "companion_detector_authority": "not_ready",
+    "blind_custody_freeze": "not_ready",
+    "independent_solver_replication": "not_ready",
+    "complete_apparatus_stress_energy": "not_ready",
+    "pilot_identifiability": "not_ready",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "explanation": "The certificate validates the supplied software, contracts, frozen identity, prediction provenance, packet ingestion rules, tests, graph, sidecar, math registry, root-to-leaf manifest, build, and GR/WARP gates. It does not supply any acquired apparatus product, measured control response or covariance, a prepared superposition, a detector-confirmed companion, a held-out coherence residual, DP evidence, a Casimir-to-collapse transfer kernel, collapse or manifold identification, or physical viability."
+  }
+}

@@ -56,6 +56,29 @@ describe("HelixWorkstationShell mobile navigation", () => {
     useHelixWorkflowDemoStore.getState().clearDebugHistory();
   });
 
+  it("honors a workstation-first mobile entry link", () => {
+    render(
+      <HelixWorkstationShell
+        layoutVariant="mobile"
+        initialMobileSurface="workstation"
+        onOpenPanel={vi.fn()}
+      />,
+    );
+
+    const shell = screen.getByTestId("helix-mobile-workstation-shell");
+    const askSurface = screen.getByTestId("helix-mobile-ask-surface");
+    const workstationSurface = screen.getByTestId(
+      "helix-mobile-workstation-surface",
+    );
+
+    expect(shell).toHaveAttribute("data-mobile-surface", "workstation");
+    expect(askSurface).toHaveAttribute("inert");
+    expect(workstationSurface).not.toHaveAttribute("inert");
+    expect(
+      screen.getByTestId("helix-mobile-surface-switch"),
+    ).toHaveAttribute("data-target-surface", "ask");
+  });
+
   it("keeps the surface switch available when Workflow Demo adds a QTE to Ask", async () => {
     render(<HelixWorkstationShell layoutVariant="mobile" onOpenPanel={vi.fn()} />);
 

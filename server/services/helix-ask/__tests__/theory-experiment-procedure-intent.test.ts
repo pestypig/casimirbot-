@@ -30,6 +30,7 @@ describe("Theory Experiment Procedure natural-language admission", () => {
     `Prepare a first-principles comparison procedure for badges ${BADGE_ID} and ${COMPARISON_BADGE_ID}; do not execute anything.`,
     `Prepare a theory experiment procedure for badge ${BADGE_ID}, but configure Lanyon for an unregistered two-dimensional adaptive-mesh advection-diffusion case. Do not run code.`,
     "Use the theory experiment procedure to compare the Stage 3 evidence-map badge with the registered one-dimensional Lanyon advection-diffusion case. Prepare only.",
+    "Prepare a seven-stage experiment plan for the Stage 3 Casimir-DP evidence map using the registered one-dimensional advection-diffusion example. Do not run anything.",
   ])("admits an affirmative, preparation-only request: %s", (prompt) => {
     expect(isAffirmativeTheoryExperimentProcedurePrompt(prompt)).toBe(true);
     expect(
@@ -80,6 +81,24 @@ describe("Theory Experiment Procedure natural-language admission", () => {
       lanyon_requested: true,
       lanyon_case_id: CASE_ID,
     });
+  });
+
+  it("binds human-facing registered aliases to canonical procedure identities", () => {
+    const prompt =
+      "Prepare a seven-stage experiment plan for the Stage 3 Casimir-DP evidence map using the registered one-dimensional advection-diffusion example. Do not run anything.";
+    expect(
+      buildTheoryExperimentProcedurePromptArguments({ promptText: prompt }),
+    ).toMatchObject({
+      selected_badge_ids: [BADGE_ID],
+      lanyon_requested: true,
+      lanyon_case_id: CASE_ID,
+      evidence_maturity_ceiling: "exploratory",
+    });
+    expect(
+      buildPromptDerivedTheoryExperimentProcedureGatewayCallRequests({
+        question: prompt,
+      }),
+    ).toHaveLength(1);
   });
 
   it("recognizes a canonical AdvectionDiffusion case id without a separate Lanyon label", () => {

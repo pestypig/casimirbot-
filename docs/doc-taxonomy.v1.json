@@ -172,10 +172,26 @@
       "docClass": "canonical-research",
       "bundleKind": "equation-action-whitepaper",
       "canonical": true,
-      "title": "Boundary-Condition Casimir Observables and Diósi–Penrose Collapse",
+      "title": "An Identifiability-First Feasibility Protocol for a Gaussian-Regularized Diósi Collapse Test with a Casimir-Boundary Control",
       "sidecars": [
         "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
         "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json"
+      ],
+      "toolHints": {
+        "preferMarkdownOverSidecars": true,
+        "calculatorReady": true,
+        "contentAuthority": "bounded_docs_observation_required"
+      }
+    },
+    {
+      "path": "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.md",
+      "docClass": "canonical-research",
+      "bundleKind": "equation-action-whitepaper",
+      "canonical": false,
+      "title": "Reproducibility Supplement: Casimir–Diósi Coherence Feasibility Program",
+      "sidecars": [
+        "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.equation-actions.json",
+        "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.equation-actions.source.json"
       ],
       "toolHints": {
         "preferMarkdownOverSidecars": true,

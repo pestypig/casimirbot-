@@ -36,6 +36,10 @@ import {
   THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
   theoryExperimentProcedurePromptMatch,
 } from "./theory-experiment-procedure-intent";
+import {
+  THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY as NATURAL_THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY,
+  theoryFormalArtifactInspectionPromptMatch,
+} from "./theory-formal-artifact-intent";
 import { isAffirmativeReadAloudPrompt } from "./referent-resolution";
 import { isAffirmativeImmediateMinecraftSituationPrompt } from "./minecraft-situation-intent";
 
@@ -43,12 +47,20 @@ const THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY =
   "theory-experiment-procedure.evaluate_closure" as const;
 const THEORY_EXPERIMENT_PROCEDURE_READMIT_CAPABILITY =
   "theory-experiment-procedure.readmit" as const;
+const SCIENTIFIC_EVIDENCE_CLOSURE_INSPECT_ENROLLMENT_CAPABILITY =
+  "scientific-evidence-closure.inspect_enrollment" as const;
+const SCIENTIFIC_EVIDENCE_CLOSURE_PREPARE_CAPABILITY =
+  "scientific-evidence-closure.prepare" as const;
+const SCIENTIFIC_EVIDENCE_CLOSURE_EVALUATE_CAPABILITY =
+  "scientific-evidence-closure.evaluate" as const;
 const THEORY_SEMANTIC_ADMITTER_NORMALIZE_CAPABILITY =
   "theory-semantic-admitter.normalize" as const;
 const THEORY_ARTIFACT_PRODUCER_PREPARE_LANYON_REQUEST_CAPABILITY =
   "theory-artifact-producer.prepare_lanyon_request" as const;
 const THEORY_ARTIFACT_PRODUCER_ADMIT_LANYON_CAPABILITY =
   "theory-artifact-producer.admit_lanyon_snapshot" as const;
+const THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY =
+  NATURAL_THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY;
 const THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY =
   "theory-formal-verifier.prepare_request" as const;
 const THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY =
@@ -287,6 +299,15 @@ const requiredArgsForCapability = (capability: string): string[] => {
       return ["prompt"];
     case THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY:
       return ["prompt", "operation", "target", "selected_badge_ids"];
+    case SCIENTIFIC_EVIDENCE_CLOSURE_INSPECT_ENROLLMENT_CAPABILITY:
+      return ["manifest_id"];
+    case SCIENTIFIC_EVIDENCE_CLOSURE_EVALUATE_CAPABILITY:
+      return [
+        "manifest_id",
+        "closure_input_artifact_ref",
+        "execution_plan_artifact_ref",
+        "plan_id",
+      ];
     case THEORY_EXPERIMENT_PROCEDURE_READMIT_CAPABILITY:
       return ["procedure_artifact_ref", "procedure_id", "procedure_sha256"];
     case THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY:
@@ -308,6 +329,8 @@ const requiredArgsForCapability = (capability: string): string[] => {
       ];
     case THEORY_ARTIFACT_PRODUCER_ADMIT_LANYON_CAPABILITY:
       return ["request_artifact_ref", "case_id"];
+    case THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY:
+      return [];
     case THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY:
       return ["procedure_artifact_ref", "procedure_id", "procedure_sha256"];
     case THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY:
@@ -592,19 +615,33 @@ const optionalArgsForCapability = (capability: string): string[] => {
       return ["source_target_intent"];
     case THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY:
       return ["procedure_artifact_ref", "source_target_intent"];
+    case SCIENTIFIC_EVIDENCE_CLOSURE_INSPECT_ENROLLMENT_CAPABILITY:
+      return ["source_target_intent"];
+    case SCIENTIFIC_EVIDENCE_CLOSURE_EVALUATE_CAPABILITY:
+      return ["source_target_intent"];
     case THEORY_SEMANTIC_ADMITTER_NORMALIZE_CAPABILITY:
       return ["source_target_intent"];
     case THEORY_ARTIFACT_PRODUCER_PREPARE_LANYON_REQUEST_CAPABILITY:
       return ["claim_id", "source_target_intent"];
     case THEORY_ARTIFACT_PRODUCER_ADMIT_LANYON_CAPABILITY:
       return ["source_target_intent"];
+    case THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY:
+      return [
+        "formal_artifact_id",
+        "theorem_name",
+        "source_target_intent",
+      ];
     case THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY:
       return [
         "semantic_admission_artifact_ref",
         "artifact_generation_artifact_ref",
+        "formal_source_admission_artifact_ref",
         "claim_id",
         "formal_artifact_id",
         "theorem_name",
+        "theorem_type_sha256",
+        "semantic_to_lean_binding_id",
+        "semantic_to_lean_binding_sha256",
         "environment_policy_id",
         "source_target_intent",
       ];
@@ -1988,6 +2025,64 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     },
     {
       schema: "helix.explicit_capability_contract.v1",
+      capability:
+        SCIENTIFIC_EVIDENCE_CLOSURE_INSPECT_ENROLLMENT_CAPABILITY,
+      aliases: [
+        "scientific_evidence_closure_inspect_enrollment",
+        "scientific evidence enrollment",
+        "conformed scientific evidence sidecar",
+        "scientific evidence runtime workbench",
+      ],
+      capability_family: "theory_locator",
+      plan_family: "theory_locator",
+      source_target: "theory_locator",
+      admission_families: ["theory_locator"],
+      required_observation_kinds: [
+        "scientific_evidence_enrollment_observation",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: SCIENTIFIC_EVIDENCE_CLOSURE_PREPARE_CAPABILITY,
+      aliases: [
+        "scientific_evidence_closure_prepare",
+        "prepare scientific evidence execution",
+        "prepare scientific evidence intervention",
+      ],
+      capability_family: "theory_locator",
+      plan_family: "theory_locator",
+      source_target: "theory_locator",
+      admission_families: ["theory_locator"],
+      required_observation_kinds: [
+        "scientific_evidence_execution_plan_observation",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: SCIENTIFIC_EVIDENCE_CLOSURE_EVALUATE_CAPABILITY,
+      aliases: [
+        "scientific_evidence_closure_evaluate",
+        "evaluate scientific evidence closure",
+      ],
+      capability_family: "theory_locator",
+      plan_family: "theory_locator",
+      source_target: "theory_locator",
+      admission_families: ["theory_locator"],
+      required_observation_kinds: [
+        "scientific_evidence_closure_observation",
+      ],
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
       capability: THEORY_EXPERIMENT_PROCEDURE_READMIT_CAPABILITY,
       aliases: ["theory_experiment_procedure_readmit"],
       capability_family: "theory_locator",
@@ -2034,6 +2129,14 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       capability: THEORY_ARTIFACT_PRODUCER_ADMIT_LANYON_CAPABILITY,
       aliases: ["theory_artifact_producer_admit_lanyon_snapshot"],
       requiredObservationKinds: ["artifact_generation_receipt"],
+    }),
+    theoryExecutionEvidenceContract({
+      capability:
+        THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY,
+      aliases: ["theory_formal_verifier_inspect_artifact_family"],
+      requiredObservationKinds: [
+        "theory_formal_artifact_family_audit_observation",
+      ],
     }),
     theoryExecutionEvidenceContract({
       capability: THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY,
@@ -3198,6 +3301,25 @@ export const extractExplicitCapabilityContracts = (
       match_index: theoryExperimentProcedureMatch.match_index,
       match_end_index: theoryExperimentProcedureMatch.match_end_index,
       source: "command_mention",
+    });
+  }
+  const theoryFormalArtifactInspectionContract =
+    explicitCapabilityContractForCapability(
+      THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY,
+    );
+  const theoryFormalArtifactInspectionMatch =
+    theoryFormalArtifactInspectionPromptMatch(prompt);
+  if (
+    theoryFormalArtifactInspectionContract &&
+    theoryFormalArtifactInspectionMatch
+  ) {
+    matches.push({
+      contract: theoryFormalArtifactInspectionContract,
+      capability: theoryFormalArtifactInspectionContract.capability,
+      matched_name: theoryFormalArtifactInspectionMatch.matched_text,
+      match_index: theoryFormalArtifactInspectionMatch.match_index,
+      match_end_index: theoryFormalArtifactInspectionMatch.match_end_index,
+      source: "natural_capability_intent",
     });
   }
   const theoryExecutionClosureContract =

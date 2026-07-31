@@ -31,6 +31,8 @@ const THEORY_ARTIFACT_PRODUCER_PREPARE_LANYON_REQUEST_CAPABILITY =
   "theory-artifact-producer.prepare_lanyon_request" as const;
 const THEORY_ARTIFACT_PRODUCER_ADMIT_LANYON_CAPABILITY =
   "theory-artifact-producer.admit_lanyon_snapshot" as const;
+const THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY =
+  "theory-formal-verifier.inspect_artifact_family" as const;
 const THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY =
   "theory-formal-verifier.prepare_request" as const;
 const THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY =
@@ -623,6 +625,19 @@ const argsHintForSubgoal = (input: {
     };
   }
   if (
+    capability ===
+    THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY
+  ) {
+    return {
+      formal_artifact_id: theoryEvidenceBindingHint(
+        "registered formal artifact family selection",
+      ),
+      theorem_name: theoryEvidenceBindingHint(
+        "exact audited theorem selection",
+      ),
+    };
+  }
+  if (
     capability === THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY
   ) {
     return {
@@ -640,6 +655,9 @@ const argsHintForSubgoal = (input: {
       ),
       artifact_generation_artifact_ref: theoryEvidenceBindingHint(
         "current-turn formal-artifact producer observation",
+      ),
+      formal_source_admission_artifact_ref: theoryEvidenceBindingHint(
+        "current-turn governed formal-source audit observation",
       ),
     };
   }

@@ -1088,6 +1088,11 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.final_answer_source).not.toBe("live_pipeline_receipt");
     expect(response.body?.answer).not.toContain("Pipeline:");
     expect(response.body?.answer).toContain("Auntie Dot: sensors are separate from mission memory.");
+    expect(response.body?.agent_runtime_loop_admission).toMatchObject({
+      admitted: false,
+      mode: "skip",
+      reason: "authoritative_typed_failure_terminal",
+    });
   }, 30_000);
 
   it("does not classify scene-epoch comparison prompts as binding diagnosis", () => {

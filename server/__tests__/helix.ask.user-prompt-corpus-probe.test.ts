@@ -77,6 +77,38 @@ describe("Helix Ask natural prompt corpus scoring", () => {
     });
   });
 
+  it("projects a bounded recent-answer history for realistic multi-turn referents", () => {
+    const snapshot = buildUserPromptConversationWorkspaceSnapshot({
+      turn_id: "ask:latest",
+      user_prompt: "Correct that overclaim.",
+      assistant_text: "I could not complete this turn because terminal authority blocked it.",
+      recent_assistant_answers: [
+        {
+          turn_id: "ask:latest",
+          assistant_text: "I could not complete this turn because terminal authority blocked it.",
+        },
+        {
+          turn_id: "ask:substantive",
+          assistant_text: "The Casimir-DP study keeps the quantitative bridge blocked.",
+        },
+      ],
+    });
+
+    expect(
+      (snapshot?.chat_referent_context as Record<string, unknown>)
+        .recent_assistant_final_answers,
+    ).toEqual([
+      expect.objectContaining({
+        reply_id: "ask:latest",
+        text: expect.stringContaining("could not complete"),
+      }),
+      expect.objectContaining({
+        reply_id: "ask:substantive",
+        text: expect.stringContaining("Casimir-DP study"),
+      }),
+    ]);
+  });
+
   it("preserves configured bounded panel context when conversation context is added", () => {
     expect(mergeUserPromptWorkspaceSnapshots({
       activePanel: "workstation-notes",
@@ -218,6 +250,81 @@ describe("Helix Ask natural prompt corpus scoring", () => {
       lifecycle_failure_stage: "complete",
       expected_capabilities_successful: true,
     });
+  });
+
+  it("accepts a grounded conversational continuation when a tool refresh is optional", () => {
+    const result = summarizeTurn({
+      id: "optional-procedure-followup",
+      category: "compound",
+      prompt: "Which missing requirement blocks real execution first?",
+      expected_tool_mode: "optional",
+      expected_capability_patterns: ["^theory-experiment-procedure\\.prepare$"],
+      expected_answer_patterns: ["block", "evidence"],
+    }, {
+      selected_final_answer:
+        "The first blocker is the unbound example identity. Evidence naming the registered case and its boundary conditions would satisfy it.",
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "agent_provider_codex",
+      codex_parity_agent_spine_rail_table: {
+        rail_status: "complete",
+        codex_parity_class: "complete",
+        requested_capability: "model_only",
+        selected_capability: "model_only",
+        admitted_capability: "model_only",
+      },
+    }, {});
+
+    expect(result).toMatchObject({
+      verdict: "PASS",
+      lifecycle_failure_stage: "complete",
+      executed_capabilities: [],
+      expected_capabilities_successful: true,
+      answer_quality_flags: [],
+    });
+  });
+
+  it("requires a complete observation lifecycle when an optional tool is used", () => {
+    const result = summarizeTurn({
+      id: "optional-procedure-refresh",
+      category: "compound",
+      prompt: "Refresh the closure evidence if needed.",
+      expected_tool_mode: "optional",
+      expected_capability_patterns: ["^theory-experiment-procedure\\.prepare$"],
+      expected_answer_patterns: ["block", "evidence"],
+    }, {
+      selected_final_answer:
+        "The first blocker is the semantic boundary, based on the refreshed evidence.",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "agent_provider_codex",
+      workstation_gateway_call_results: [{
+        capability_id: "theory-experiment-procedure.prepare",
+        ok: false,
+        observation_packet: {
+          status: "blocked",
+          observation_ref: "artifact:procedure:blocked",
+        },
+        tool_lifecycle_trace: {
+          failure_reason: "procedure_preparation_failed",
+        },
+      }],
+      codex_parity_agent_spine_rail_table: {
+        rail_status: "complete",
+        codex_parity_class: "complete",
+        executed_capability: "theory-experiment-procedure.prepare",
+        observation_ref: "artifact:procedure:blocked",
+        reentry_status: "reentered",
+      },
+    }, {});
+
+    expect(result).toMatchObject({
+      verdict: "FAIL",
+      lifecycle_failure_stage: "capability_execution",
+      expected_capabilities_successful: false,
+    });
+    expect(result.answer_quality_flags).toEqual(expect.arrayContaining([
+      "optional_tool_not_successful:^theory-experiment-procedure\\.prepare$",
+      expect.stringContaining("tool_observation_failed:theory-experiment-procedure.prepare:blocked"),
+    ]));
   });
 
   it("accepts a completed governed client lane without inventing a gateway call", () => {

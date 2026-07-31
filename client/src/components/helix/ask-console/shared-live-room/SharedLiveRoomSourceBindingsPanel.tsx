@@ -28,6 +28,21 @@ type SafeSourceBindingReceipt = Partial<HelixRoomSourceBindingReceipt> & {
   credential_delivery?: SafeCredentialDelivery;
 };
 
+const MINECRAFT_SOURCE_ADAPTERS = [
+  {
+    id: "minecraft.fabric_mod.v1",
+    label: "Minecraft Fabric mod",
+    sourceLabel: "Minecraft Fabric source",
+  },
+  {
+    id: "minecraft.paper_plugin.v1",
+    label: "Minecraft Paper plugin",
+    sourceLabel: "Minecraft Paper source",
+  },
+] as const;
+
+type MinecraftSourceAdapterId = (typeof MINECRAFT_SOURCE_ADAPTERS)[number]["id"];
+
 const readReceipt = async (
   response: Response,
 ): Promise<SafeSourceBindingReceipt> => {
@@ -70,6 +85,8 @@ export function SharedLiveRoomSourceBindingsPanel({
     useState<HelixRoomSourcePluginConfig | null>(null);
   const [pendingDelivery, setPendingDelivery] =
     useState<SafeCredentialDelivery | null>(null);
+  const [sourceAdapterId, setSourceAdapterId] =
+    useState<MinecraftSourceAdapterId>("minecraft.fabric_mod.v1");
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
@@ -159,8 +176,11 @@ export function SharedLiveRoomSourceBindingsPanel({
     }
   };
 
-  const create = (): Promise<void> =>
-    run("create", async () =>
+  const create = (): Promise<void> => {
+    const sourceAdapter = MINECRAFT_SOURCE_ADAPTERS.find(
+      (adapter) => adapter.id === sourceAdapterId,
+    ) ?? MINECRAFT_SOURCE_ADAPTERS[0];
+    return run("create", async () =>
       readReceipt(
         await fetch(basePath, {
           method: "POST",
@@ -170,12 +190,13 @@ export function SharedLiveRoomSourceBindingsPanel({
             "Idempotency-Key": `browser-source-create:${crypto.randomUUID()}`,
           },
           body: JSON.stringify({
-            domain_adapter: "minecraft.paper_plugin.v1",
-            source_label: "Minecraft Paper source",
+            domain_adapter: sourceAdapter.id,
+            source_label: sourceAdapter.sourceLabel,
           }),
         }),
       ),
     );
+  };
 
   const rotate = (binding: HelixRoomSourceBinding): Promise<void> => {
     if (
@@ -239,22 +260,42 @@ export function SharedLiveRoomSourceBindingsPanel({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-[11px] font-semibold text-cyan-100">
-            Minecraft room source link
+            Minecraft environment source link
           </p>
           <p className="mt-0.5 text-[10px] text-cyan-100/60">
             Creates a first-party, read-only HTTPS ingress bound to this exact
             room.
           </p>
         </div>
-        <button
-          type="button"
-          disabled={busy !== null || available === null}
-          className="inline-flex items-center gap-1 rounded border border-cyan-300/30 px-2 py-1 text-[10px] font-semibold text-cyan-100 disabled:opacity-50"
-          onClick={() => void create()}
-        >
-          <KeyRound className="h-3 w-3" />
-          Generate link
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="sr-only" htmlFor={`minecraft-source-adapter-${roomId}`}>
+            Minecraft environment adapter
+          </label>
+          <select
+            id={`minecraft-source-adapter-${roomId}`}
+            value={sourceAdapterId}
+            disabled={busy !== null || available === null}
+            className="rounded border border-cyan-300/30 bg-slate-950 px-2 py-1 text-[10px] text-cyan-100 disabled:opacity-50"
+            onChange={(event) =>
+              setSourceAdapterId(event.target.value as MinecraftSourceAdapterId)
+            }
+          >
+            {MINECRAFT_SOURCE_ADAPTERS.map((adapter) => (
+              <option key={adapter.id} value={adapter.id}>
+                {adapter.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={busy !== null || available === null}
+            className="inline-flex items-center gap-1 rounded border border-cyan-300/30 px-2 py-1 text-[10px] font-semibold text-cyan-100 disabled:opacity-50"
+            onClick={() => void create()}
+          >
+            <KeyRound className="h-3 w-3" />
+            Generate link
+          </button>
+        </div>
       </div>
 
       {setupConfig ? (

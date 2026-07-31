@@ -1,0 +1,146 @@
+{
+  "schema": "helix.ask.user_prompt_corpus.v1",
+  "scenarios": [
+    {
+      "id": "casimir_dp_find",
+      "thread_group": "casimir_dp_document_to_graph",
+      "category": "docs",
+      "prompt": "Can you find the Casimir-DP quantum foam study?",
+      "notes": "Begin with an ordinary document lookup and retain the canonical source for follow-up reasoning.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": [
+        "^(?:docs\\.search|docs-viewer\\.(?:search_docs|open_doc_by_path|identify_current_doc))$"
+      ],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": [
+        "Casimir",
+        "DP|Diosi|Penrose|quantum foam",
+        "docs/research|study"
+      ],
+      "expected_minimum_answer_chars": 80
+    },
+    {
+      "id": "casimir_dp_plain_explanation",
+      "thread_group": "casimir_dp_document_to_graph",
+      "category": "docs",
+      "prompt": "What is it really trying to establish?",
+      "notes": "Resolve the prior document naturally and distinguish its bounded research goal from a promoted result.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": [
+        "^(?:docs\\.search|docs-viewer\\.(?:identify_current_doc|open_doc_by_path|summarize_doc|locate_in_doc)|research-library\\.read_document)$"
+      ],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": [
+        "Casimir|boundary|experiment|hardware",
+        "DP|collapse|Penrose",
+        "bridge|separate|blocked|evidence|claim"
+      ],
+      "expected_minimum_answer_chars": 140
+    },
+    {
+      "id": "casimir_dp_correct_overclaim",
+      "thread_group": "casimir_dp_document_to_graph",
+      "category": "docs",
+      "prompt": "That sounds stronger than the evidence. Correct it and tell me what the paper does not prove.",
+      "notes": "A corrective follow-up must revisit source evidence instead of preserving conversational overclaim.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": [
+        "^(?:docs\\.search|docs-viewer\\.(?:identify_current_doc|open_doc_by_path|summarize_doc|locate_in_doc)|research-library\\.read_document)$"
+      ],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": [
+        "not|does not",
+        "prove|demonstrate|validate|establish",
+        "Casimir|DP|bridge|foam"
+      ],
+      "expected_minimum_answer_chars": 120
+    },
+    {
+      "id": "casimir_dp_graph_handoff",
+      "thread_group": "casimir_dp_document_to_graph",
+      "category": "theory_reflection",
+      "prompt": "Now reflect that corrected claim in the Theory Badge Graph. Separate what is represented from what is still missing.",
+      "notes": "Cross from retained document evidence into a graph observation without treating the earlier answer as graph authority.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": [
+        "^(?:helix_ask\\.reflect_theory_context|theory-badge-graph\\.(?:reflect_discussion_context|current_context))$"
+      ],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": [
+        "graph|badge|represented",
+        "missing|unresolved|unsupported|blocked",
+        "Casimir|DP|boundary"
+      ],
+      "expected_minimum_answer_chars": 150
+    },
+    {
+      "id": "natural_stage3_procedure",
+      "thread_group": "natural_theory_procedure",
+      "category": "compound",
+      "prompt": "Prepare a seven-stage experiment plan for the Stage 3 Casimir-DP evidence map using the registered one-dimensional advection-diffusion example. Do not run anything.",
+      "notes": "Natural procedure request should reach the bounded compiler and report closure requirements without machine-language capability syntax.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": [
+        "^theory-experiment-procedure\\.prepare$"
+      ],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": [
+        "seven|7",
+        "stage|procedure|plan",
+        "advection|diffusion|Lanyon",
+        "not.{0,12}run|not.{0,12}executed|missing|require|before.{0,20}execution|would need|plan only|planning"
+      ],
+      "expected_minimum_answer_chars": 180
+    },
+    {
+      "id": "natural_stage3_boundary_followup",
+      "thread_group": "natural_theory_procedure",
+      "category": "compound",
+      "prompt": "Which missing requirement blocks real execution first, and what evidence would satisfy it?",
+      "notes": "The follow-up should retain the prepared procedure, refresh evidence when Codex judges it necessary, and synthesize the first actionable boundary.",
+      "expected_tool_mode": "optional",
+      "expected_capability_patterns": [
+        "^theory-experiment-procedure\\.prepare$"
+      ],
+      "expected_answer_patterns": [
+        "missing|block|require",
+        "evidence|satisfy|closure",
+        "provenance|source|identity|semantic|boundary|formal|numerical|observable"
+      ],
+      "expected_minimum_answer_chars": 140
+    },
+    {
+      "id": "natural_formal_claim_ceiling",
+      "thread_group": "natural_formal_audit",
+      "category": "theory_reflection",
+      "prompt": "Inspect the registered GR-Maxwell one-dimensional formal source around xHyperbolicity. What does that theorem name actually prove, and what does it not prove? Do not run Lean.",
+      "notes": "Use ordinary audit language while preserving the formal source claim ceiling and non-execution boundary.",
+      "expected_tool_mode": "required",
+      "expected_capability_patterns": [
+        "^theory-formal-verifier\\.inspect_artifact_family$"
+      ],
+      "expected_minimum_observations": 1,
+      "expected_answer_patterns": [
+        "xHyperbolicity|hyperbolicity",
+        "well.typed|Real|definition",
+        "not.{0,12}prove|does.{0,12}not|denied|blocked",
+        "not run|not executed|Lean"
+      ],
+      "expected_minimum_answer_chars": 150
+    },
+    {
+      "id": "quoted_formal_label_no_run",
+      "thread_group": "natural_formal_non_admission",
+      "category": "negated_context",
+      "prompt": "I saw `theory-formal-verifier.inspect_artifact_family` in the debug panel. Just explain the label; do not call tools.",
+      "notes": "Quoted screen-visible capability text must remain contextual and non-executable.",
+      "expected_tool_mode": "none",
+      "expected_maximum_observations": 0,
+      "expected_answer_patterns": [
+        "formal|artifact|inspect|audit",
+        "not|does not|read.only|tool"
+      ],
+      "expected_minimum_answer_chars": 70
+    }
+  ]
+}

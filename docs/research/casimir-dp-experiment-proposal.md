@@ -35,6 +35,16 @@
 **Stage-4.2D config/runner:** `configs/research/casimir-dp-cross-scale-metrology-stage4-2d.v1.json`; `scripts/research/run-casimir-dp-cross-scale-metrology-stage4-2d.ts`
 **Stage-4.2D verification receipt:** `docs/research/casimir-dp-cross-scale-metrology-stage4-2d-verification-receipt.json`
 **Stage-4.2D authoritative synthetic run:** `artifacts/research/casimir-dp-cross-scale-metrology-stage4-2d/casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z/` (calibration/recovery diagnostics only; spectroscopic response and physical pilot not ready)
+**Stage-4.2E causal-cone/clock plan/report:** `docs/research/casimir-dp-causal-cone-clock-stage4-2e-plan.md`; `docs/research/casimir-dp-causal-cone-clock-stage4-2e-report.md`
+**Stage-4.2E config/runner:** `configs/research/casimir-dp-causal-cone-clock-stage4-2e.v1.json`; `scripts/research/run-casimir-dp-causal-cone-clock-stage4-2e.ts`
+**Stage-4.2E verification receipt:** `docs/research/casimir-dp-causal-cone-clock-stage4-2e-verification-receipt.json`
+**Stage-4.2E authoritative synthetic run:** `artifacts/research/casimir-dp-causal-cone-clock-stage4-2e/casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z/` (causal recovery and scale-screen diagnostics only; complete apparatus metric response and measured evidence not ready)
+**Stage-4.2F Maxwell/macroscopic-QED plan/report:** `docs/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-plan.md`; `docs/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-report.md`
+**Stage-4.2F authoritative synthetic run:** `artifacts/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z/` (equation/provenance closure only; apparatus gates not ready)
+**Stage-4.2G empirical-pilot plan/report:** `docs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g-plan.md`; `docs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g-report.md`
+**Stage-4.2G config/runner:** `configs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g.v1.json`; `scripts/research/run-casimir-dp-empirical-feasibility-pilot-stage4-2g.ts`
+**Stage-4.2G verification receipt:** `docs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g-verification-receipt.json`
+**Stage-4.2G authoritative run:** `artifacts/research/casimir-dp-empirical-feasibility-pilot-stage4-2g/casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z/` (single-apparatus prediction and packet-ingestion validation only; empirical pilot no-go)
 
 ## Executive summary
 
@@ -85,6 +95,30 @@ domains. Penrose spinors remain a representation of fields and curvature, not
 mass variables or collapse generators. These lanes can qualify calibration
 and dimensional consistency, but they add no transfer edge into the frozen
 DP rate.
+
+Stage 4.2E closes the causal-notation audit. It reconstructs local null cones
+and timelike proper-clock rates from the ADM metric, recovers radial
+Schwarzschild null propagation, and evaluates an ideal Casimir stress-energy
+curvature screen beside a separate QED effective-propagation control. At
+100 nm the direct gravitational fractional light-time screen is approximately
+\(9.00\times10^{-57}\), whereas the QED proxy is approximately
+\(4.76\times10^{-28}\). Neither is a DP-collapse signal. Complex coherence
+therefore remains the primary collapse discriminator; optical timing and
+polarization remain ordinary-physics controls unless a future complete
+apparatus metric predicts a measurable differential signal.
+
+Stage 4.2G closes the apparatus-identity ambiguity and opens the empirical
+intake. The proposed pilot now refers to one silica sphere with mass
+\(1.94385\times10^{-16}\ {\rm kg}\), radius
+\(2.76302362398029\times10^{-7}\ {\rm m}\), 160 nm branch separation, and
+250 ms hold time. The same registered DP manifest predicts
+\(\Gamma_{\rm DP}=0.02400420398374263\ {\rm s^{-1}}\), visibility
+0.9940169193, and heating
+\(1.9297884642410306\times10^{-40}\ {\rm W}\). A strict pilot packet now
+binds all material, finite-geometry, preparation, metrology, modulation,
+background, covariance, companion, blinding, custody, and replication
+products. The synthetic ingestion path passes, but no measured packet exists;
+the present decision remains an empirical pilot no-go.
 
 ## Scientific premise
 
@@ -924,18 +958,248 @@ and downstream receipt SHA-256
 `d96430684379dd5408d8099ae49a05ca0eaf4042a0ea64b09e23d0a4156a0556`
 bind that software verification. Its scientific scope is `none`.
 
+### Implemented Stage-4.2E causal-cone and clock-congruence gate
+
+Stage 4.2E asks whether the spacetime and clock language is internally
+consistent and whether it supplies a plausible additional apparatus
+observable. It does not modify the Stage-4.2C likelihood or the frozen DP law.
+
+The runtime:
+
+1. solves local directional null roots from lapse, shift, and the spatial
+   metric and rejects noncausal massive-clock trajectories;
+2. compares bounded light paths with a flat \(L/c\) baseline without
+   relabelling the baseline as a geodesic solution;
+3. reproduces analytic radial Schwarzschild null propagation;
+4. converts the ideal parallel-plate stress-energy scale into a
+   semiclassical curvature upper screen while refusing to treat it as a
+   complete apparatus metric;
+5. evaluates the QED effective-propagation proxy as a separate
+   polarization/dispersion control; and
+6. leaves standard mass-density DP boundary independent and adds zero
+   observable bridge edges.
+
+The authoritative run
+`casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z`
+passes 10/10 baseline and fail-closed fixtures. Its maximum local-null
+constraint error is \(1.11\times10^{-16}\), and its Schwarzschild
+analytic/numerical relative error is \(2.08\times10^{-16}\).
+
+This result improves the pilot contract rather than adding a second
+confirmatory DP observable. The pilot must freeze optical paths, endpoint
+clock worldlines, synchronization, polarization, phase/group-delay response,
+loss, and detector transfer; measure those quantities in sham, detuned,
+active, and reference sequences; and admit a GR timing channel only if a
+complete conserved source model predicts a resolvable differential effect. A
+Casimir-conditioned collapse rate still requires a separately sourced and
+preregistered transfer kernel.
+
+Null-geodesic apparatus authority, complete-apparatus metric response,
+physical pilot readiness, and measured evidence remain `not_ready`; collapse
+identification and manifold dynamics remain `blocked`; physical viability
+remains `not_evaluated`.
+
+Fresh adapter run `2346` returns `PASS`, no first failure, no deltas,
+certificate integrity `OK`, and certificate SHA-256
+`38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34`.
+The validated trace and downstream receipt SHA-256 values are
+`378c915329514f13bf4111f732217f9b9bf7d710adb50510c5ed8626928d8311`
+and
+`b37bdbd1612912fc5c91fd51667559dc739018d43d9f57d7f182d76d1d3bbb1b`.
+This certifies repository convergence only; its scientific scope is `none`.
+
+### Implemented Stage-4.2F Maxwell/macroscopic-QED and exact-DP closure
+
+Stage 4.2F makes the ordinary electromagnetic baseline explicit:
+
+\[
+\nabla_{[\alpha}F_{\beta\gamma]}=0,\qquad
+\nabla_\mu H^{\mu\nu}=J^\nu_{\rm free},
+\]
+
+\[
+\left[\nabla\times\mu^{-1}\nabla\times
+-\frac{\omega^2}{c^2}\epsilon\right]\mathbf G
+=\mathbf I\delta,\qquad
+\langle\mathbf E\mathbf E^\dagger\rangle_\omega
+\propto\hbar\coth\!\left(\frac{\hbar\omega}{2k_BT}\right)
+\operatorname{Im}\mathbf G.
+\]
+
+The resulting Green/FDT correlations feed the renormalized electromagnetic
+stress, force-noise, phase, heating, and ordinary-decoherence predictions. The
+synthetic transverse-wave, linear/circular polarization, FDT passivity,
+zero-temperature, and ideal Casimir-limit recoveries pass. The NHM2
+finite-temperature finite-geometry Maxwell-stress contract is reused as a
+method only; no NHM2 evidence or certificate is imported. With no
+apparatus-specific input, all 11 finite-geometry checks remain blocked.
+
+The same campaign states the exact registered Gaussian nondissipative DP
+master-equation convention, its \(r_0\) sensitivity, and the heating companion.
+It also corrects an important presentation ambiguity. The selected Stage-4.2C
+design is a multi-mass scaling grid:
+
+- reference candidate mass:
+  \(1.94385\times10^{-16}\ {\rm kg}\);
+- transported mass grid:
+  \(5.7595\times10^{-17}\),
+  \(1.94385\times10^{-16}\), and
+  \(4.60765\times10^{-16}\ {\rm kg}\);
+- transported separation grid: \(40\), \(80\), and \(160\ {\rm nm}\).
+
+The headline \(\Gamma_{\rm DP}=0.1348716826\ {\rm s^{-1}}\) and 3.3156%
+DP-only loss at 250 ms belong to the strongest transported grid cell, not the
+reference mass. The reference mass at 160 nm instead predicts
+\(\Gamma_{\rm DP}=0.0240042040\ {\rm s^{-1}}\), or 0.5983% conditional loss.
+Every grid mass therefore needs an authentic state-preparation and branch
+metrology receipt.
+
+The companion gate is also now operationally named. It is a synthetic heating
+forecast with signal \(1.9855\times10^{-41}\ {\rm W}\), assumed one-shot
+uncertainty \(10^{-43}\ {\rm W}\), and 100 samples, producing the quoted SNR
+1985.53. No measured detector-noise receipt demonstrates that uncertainty,
+and the forecast signal matches neither the declared reference-object
+named-DP heating nor the strongest transported-cell heating. The companion
+must be regenerated from the finally frozen object/branch manifest and then
+recomputed with pilot detector data before it can support a confirmatory
+design.
+
+The authoritative run
+`casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z`
+passes 12/12 software and fail-closed fixtures and adds zero observable bridge
+edges. Finite-geometry Maxwell authority, measured material/Green authority,
+candidate-transport identity, companion detector/model identity authority, state preparation,
+quasistatic boundary modulation, complete apparatus stress-energy, and measured
+evidence remain `not_ready`. Collapse identification and manifold dynamics
+remain `blocked`; physical viability remains `not_evaluated`.
+
+Fresh explicit-endpoint adapter run `2348` returns `PASS`, no first failure,
+no deltas, certificate integrity `OK`, and certificate SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+The exclusive validated trace and downstream receipt SHA-256 values are
+`13ea52a95383b5e2f6cb80322a4321ad28dbc52bf5533a5771386fc6fbc0f0c8`
+and
+`f1b8219b7c74bc25db9cc3137aeec97b714bfc3193052a94e3929326eb858f73`.
+This certifies repository convergence only; its scientific scope is `none`.
+
+### Implemented Stage-4.2G empirical-feasibility packet
+
+The proposal now freezes a single apparatus rather than carrying a
+multi-object sensitivity grid into commissioning. The pilot identity is one
+silica sphere:
+
+| Quantity | Frozen design |
+|---|---:|
+| Radius | \(2.76302362398029\times10^{-7}\ {\rm m}\) |
+| Mass | \(1.94385\times10^{-16}\ {\rm kg}\) |
+| Branch separation | \(1.6\times10^{-7}\ {\rm m}\) |
+| Hold time | \(0.25\ {\rm s}\) |
+| Cavity gap | \(1.2\times10^{-6}\ {\rm m}\) |
+| Boundary modulation | \(0.5\ {\rm Hz}\) |
+| Environment | \(4\ {\rm K}\), \(2\times10^{-11}\ {\rm Pa}\) |
+| Planned windows | 1,600 paired |
+
+The registered 100 nm-regularized nondissipative DP model predicts a 0.5983%
+DP-only visibility loss over the frozen hold time. The same mass-density
+manifest predicts the heating companion
+\(1.9297884642410306\times10^{-40}\ {\rm W}\); for 100 independent samples,
+SNR 5 requires one-shot uncertainty no larger than
+\(3.859576928482061\times10^{-40}\ {\rm W}\). These numbers are conditional
+instrument targets, not achieved specifications.
+
+Commissioning must fill the Stage-4.2G packet with provenance-bound products
+for mass/geometry, material response, finite-geometry Maxwell/Green fields,
+state preparation, branch and hold-time metrology, boundary transfer,
+environmental backgrounds, complex-coherence response, full block covariance,
+an independent companion detector, blind custody, and independent
+solver/replication. The runtime verifies artifact hashes and recomputes the
+cosine, conditioning, power, false-positive, and companion-SNR gates in the
+same whitened complex-coherence space. Synthetic inputs exercise that software
+path but cannot satisfy a measured product.
+
+The complete conserved apparatus stress tensor is tracked separately. It is
+required before a manifold-dynamics interpretation, but it is not an entry
+condition for the narrower registered-DP coherence pilot. This preserves a
+clean decision: failure of the core packet is an apparatus redesign no-go;
+success permits pilot interpretation only, not a collapse claim.
+
+Fresh explicit-endpoint adapter run `2349` returns `PASS`, no first failure,
+no deltas, certificate integrity `GREEN/true`, and certificate SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+Its exclusive validated trace SHA-256 is
+`cf4c1f72bbcd7cbac83694cd6d2d981cd0813070e461fbc9835712b1f42d3f53`;
+the downstream verification-receipt SHA-256 is
+`3530465e24ef861bd84cbd258cff153e39823e4329e7461a216ef978e712821b`.
+This verifies repository convergence, packet-contract execution, and the
+fail-closed claim boundary only. Its scientific scope is `none`.
+
+### Implemented Stage-4.2H commissioning intake
+
+Stage 4.2H is the operational preflight between the synthetic apparatus
+forecast and a physical pilot. Its strict dossier assigns twelve instrument or
+computational roles, binds all thirteen Stage-4.2G products to calibration and
+custody ancestry, freezes four data partitions, and specifies twenty-eight raw
+columns for complex coherence, metrology, environment, controls, companion
+detection, exclusions, and provenance.
+
+The commissioning gate is
+
+\[
+G_{\rm comm}
+=I_{\rm inst}\land I_{\rm cal}\land I_{\rm custody}
+\land I_{\rm raw}\land I_{\rm cov}\land I_{\rm repl}.
+\]
+
+Every factor is a measured-receipt gate. Protocol-only authority is permitted
+only for blind custody/freeze and independent solver replication; it cannot
+stand in for physical response, covariance, coherence, or metrology data.
+Confirmatory and replication data cannot refit the frozen response/covariance
+model and remain blind to the boundary mapping.
+
+The authoritative blank run
+`casimir-dp-commissioning-intake-stage4-2h-v1-20260730T050000000Z`
+passes the intake contract and a full synthetic packet-compilation dry run. It
+returns `no_go_until_provenance_bound_measured_dossier_passes`. Synthetic
+instrument identities, calibrations, covariance, hashes, and custody have zero
+empirical authority. Consequently instrument registry, calibration ancestry,
+custody/freeze, raw data, Stage-4.2G packet compilation, empirical pilot
+readiness, and measured evidence remain `not_ready`; collapse/manifold remain
+`blocked`; physical viability remains `not_evaluated`.
+
+A later measured Stage-4.2H pass authorizes the preregistered pilot only. It
+does not establish collapse. Confirmatory DP scaling, ordinary-background
+rejection, and independent replication remain necessary; complete relativistic
+stress-energy remains a separate manifold gate. No Casimir-to-collapse
+transfer kernel is registered.
+
+Fresh adapter run `2350` (`adapter:8c24aa23-edd5-4380-b071-24dc62613d88`)
+returns `PASS`, first failure `null`, empty deltas, certificate status `GREEN`,
+and integrity `true`. The certificate SHA-256 is
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`;
+the exclusive validated-trace SHA-256 is
+`8d71d21a3f3eb4d2d386d53100bf07009ac65d29280eaf64dccbfde37ce03a13`;
+and the downstream verification-receipt SHA-256 is
+`acbab1f786e688fe04ad2d5cae15219166368e41b01b8df5949617ef150ce364`.
+This verifies repository, runtime-contract, and certificate integrity only. It
+does not commission the apparatus or change any scientific promotion gate.
+
 ## Work plan and milestones
 
 | Work package | Indicative interval | Exit artifact |
 |---|---:|---|
 | WP0 materials, surfaces, metrology | months 0-6 | measured optical/surface receipt pack |
 | WP0P polarization and thermal sidecars | months 0-9 | Jones/Stokes, mirror, emissivity, thermometry, and Green/FDT receipt pack |
+| WP0M Maxwell/macroscopic-QED apparatus closure | months 0-12 | measured dielectric, CAD/mesh, boundary, Green-tensor, Maxwell-stress, convergence, covariance, and independent-solver receipt pack |
+| WP0G Stage-4.2G packet binding | months 0-12 | hash- and custody-bound single-apparatus mass/geometry, calibration, instrument, operator, and uncertainty receipts |
+| WP0H Stage-4.2H commissioning intake | months 0-16 | commissioned instrument registry, calibration ancestry, raw-column/cell-order contract, blind freeze, measured dossier, and packet-compilation preflight |
 | WP1 force calibrator and finite geometry | months 4-12 | validated boundary-contrast report |
 | WP2 classical particle integration | months 9-18 | transfer-function and distance-ladder pack |
 | WP2C numerical control identifiability | months 12-22 | source-backed/measured control response vectors, block covariance, and passing rank/cosine/conditioning receipt |
 | WP2D cross-scale field metrology | months 12-22 | selected Stark/Zeeman witness transitions, polarization convention, response/covariance calibration, conventional-gravity recovery receipt, and a measured witness-to-coherence transfer or explicit no-go |
+| WP2E causal/timing control | months 12-22 | frozen optical paths and clock worldlines, polarization-resolved phase/group-delay calibration, complete-source metric screen, and a measured timing-control receipt or explicit no-go |
 | WP3 transverse coherence pilot | months 16-24 | branch-provenance and baseline-coherence receipt |
-| WP4 blinded 400-window pilot | months 22-30 | frozen-analysis and pilot integrity report |
+| WP3C companion and switching pilot | months 16-24 | calibrated heating-noise floor, independence covariance, cavity/material relaxation, mechanical-sideband, and switching-radiation receipts |
+| WP4 blinded 400-window pilot | months 22-30 | Stage-4.2G gate recomputation, frozen-analysis, and pilot integrity report |
 | WP5 powered main run, contingent on all gates and a fresh identifiable forecast | months 30-36 | reproduced decision-table result |
 
 The schedule is a planning envelope, not an assertion that subsystem

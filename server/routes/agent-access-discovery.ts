@@ -2,6 +2,7 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { resolveCasimirPublicBaseUrl } from "../services/public-base-url";
+import { buildWorkstationEntryUrl } from "@shared/workstation-link-meta";
 
 const DISCOVERY_CACHE_CONTROL = "public, max-age=300";
 
@@ -37,8 +38,11 @@ const agentAccessUrls = (): AgentAccessUrls => {
     oauthProtectedResource:
       `${base}/.well-known/oauth-protected-resource/mcp`,
     documentation: `${base}/docs/architecture/helix-agent-api-v1.md`,
-    workstation:
-      `${base}/desktop?panels=agent-access&focus=agent-access`,
+    workstation: buildWorkstationEntryUrl({
+      baseUrl: base,
+      search: "?panels=agent-access&focus=agent-access",
+      entry: "workstation",
+    }),
     sitemap: `${base}/sitemap.xml`,
   };
 };

@@ -2,7 +2,7 @@ import React from "react";
 import { marked, type MarkedOptions, type Tokens } from "marked";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { ArrowLeft, Folder, Languages, LoaderCircle, Pause, Play, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, FileDown, Folder, Languages, LoaderCircle, Pause, Play, Search, Trash2 } from "lucide-react";
 import { HelixAccountLanguageTranslationProjection } from "@/components/helix/HelixAccountLanguageTranslationProjection";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,8 @@ import { consumeDocViewerIntent } from "@/lib/docs/docViewer";
 import { buildWorkstationPathRef } from "@/lib/workstation/workstationDeepLink";
 import {
   HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT,
+  fetchAccountCapabilityPolicy,
+  readCachedAccountCapabilityPolicy,
   readCachedAccountProfileIdentity,
 } from "@/lib/workstation/accountCapabilityPolicy";
 import {
@@ -117,6 +119,18 @@ import {
   readResearchLibraryDocument,
   researchLibraryDocumentToMarkdown,
 } from "@/lib/docs/researchLibraryClient";
+import {
+  downloadDocsPrintPdfArtifact,
+  requestDocsPrintPdf,
+} from "@/lib/docs/docsPrintPdfClient";
+import {
+  DOCS_PRINT_PDF_FEATURE_FLAG,
+  type DocsPrintPdfSourceKind,
+} from "@shared/docs-print-pdf";
+import {
+  HELIX_USER_ACCOUNT_POLICY,
+  type HelixAccountCapabilityPolicy,
+} from "@shared/helix-account-session";
 import {
   HELIX_RESEARCH_LIBRARY_DOC_VIEWER_PATH_PREFIX,
   type HelixResearchLibraryDocument,
@@ -580,6 +594,11 @@ export function DocViewerPanel() {
   const [inlineTranslations, setInlineTranslations] = React.useState<Record<string, InlineTranslationState>>({});
   const [translationStatus, setTranslationStatus] = React.useState<DocumentTranslationUiStatus>("idle");
   const [translationError, setTranslationError] = React.useState<string | null>(null);
+  const [accountPolicy, setAccountPolicy] = React.useState<HelixAccountCapabilityPolicy | null>(
+    () => readCachedAccountCapabilityPolicy(),
+  );
+  const [pdfExportStatus, setPdfExportStatus] = React.useState<"idle" | "exporting" | "ready" | "error">("idle");
+  const [pdfExportMessage, setPdfExportMessage] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [loadedDocId, setLoadedDocId] = React.useState<string | null>(null);
@@ -619,6 +638,7 @@ export function DocViewerPanel() {
   const documentTranslationChunkIndexRef = React.useRef(0);
   const translationScopeKeyRef = React.useRef<string | null>(null);
   const researchDocumentReadControllerRef = React.useRef<AbortController | null>(null);
+  const pdfExportControllerRef = React.useRef<AbortController | null>(null);
   const currentEntry = React.useMemo(() => (currentPath ? findDocEntry(currentPath) : null), [currentPath]);
   const displayEntry = React.useMemo<DocManifestEntry | null>(() => {
     if (!activeResearchDocument) return currentEntry;
@@ -658,7 +678,33 @@ export function DocViewerPanel() {
   React.useEffect(() => {
     setSelectedVisibleText(null);
     setHoveredVisibleText(null);
+    pdfExportControllerRef.current?.abort();
+    pdfExportControllerRef.current = null;
+    setPdfExportStatus("idle");
+    setPdfExportMessage(null);
   }, [activeDocument?.docPath]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const applyPolicy = (policy: HelixAccountCapabilityPolicy | null | undefined) => {
+      if (mounted) setAccountPolicy(policy ?? null);
+    };
+    applyPolicy(readCachedAccountCapabilityPolicy());
+    void fetchAccountCapabilityPolicy().then(applyPolicy).catch(() => undefined);
+    const handlePolicyChange = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        account_policy?: HelixAccountCapabilityPolicy | null;
+      }>).detail;
+      applyPolicy(detail?.account_policy);
+    };
+    window.addEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChange);
+    return () => {
+      mounted = false;
+      pdfExportControllerRef.current?.abort();
+      pdfExportControllerRef.current = null;
+      window.removeEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChange);
+    };
+  }, []);
 
   React.useEffect(() => {
     activeResearchDocumentRef.current = activeResearchDocument;
@@ -862,6 +908,15 @@ export function DocViewerPanel() {
   );
   const activeDocumentContentReady = Boolean(
     activeDocument && loadedDocId === activeDocument.documentId && rawMarkdown,
+  );
+  const canExportPrintPdf = Boolean(
+    activeDocumentContentReady &&
+    (accountPolicy ?? HELIX_USER_ACCOUNT_POLICY).feature_flags.includes(
+      DOCS_PRINT_PDF_FEATURE_FLAG,
+    ) &&
+    !(accountPolicy ?? HELIX_USER_ACCOUNT_POLICY).locked_features.includes(
+      DOCS_PRINT_PDF_FEATURE_FLAG,
+    ),
   );
   const translationEligible = isActiveDocViewerTranslationEligible({
     contentReady: activeDocumentContentReady,
@@ -2199,6 +2254,59 @@ export function DocViewerPanel() {
     viewDirectory();
   }, [cancelResearchDocumentRead, isAutoReading, viewDirectory]);
 
+  const handleExportPrintPdf = React.useCallback(() => {
+    if (
+      !canExportPrintPdf ||
+      !activeDocument ||
+      !activeDocumentContentReady ||
+      !rawMarkdown ||
+      pdfExportStatus === "exporting"
+    ) {
+      return;
+    }
+    pdfExportControllerRef.current?.abort();
+    const controller = new AbortController();
+    pdfExportControllerRef.current = controller;
+    setPdfExportStatus("exporting");
+    setPdfExportMessage(null);
+    const sourceKind: DocsPrintPdfSourceKind = activeDocument.privateSource
+      ? "private_research"
+      : "canonical_docs";
+    void requestDocsPrintPdf({
+      title: activeDocument.entry.title,
+      source_path: activeDocument.docPath,
+      source_kind: sourceKind,
+      source_markdown: rawMarkdown,
+    }, controller.signal)
+      .then((artifact) => {
+        if (controller.signal.aborted) return;
+        downloadDocsPrintPdfArtifact(artifact);
+        setPdfExportStatus("ready");
+        setPdfExportMessage(t("docsViewer.pdf.ready", {
+          pageCount: artifact.page_count,
+        }));
+      })
+      .catch((error) => {
+        if (controller.signal.aborted || isAbortError(error)) return;
+        setPdfExportStatus("error");
+        setPdfExportMessage(t("docsViewer.pdf.error", {
+          reason: error instanceof Error ? error.message : "unknown_error",
+        }));
+      })
+      .finally(() => {
+        if (pdfExportControllerRef.current === controller) {
+          pdfExportControllerRef.current = null;
+        }
+      });
+  }, [
+    activeDocument,
+    activeDocumentContentReady,
+    canExportPrintPdf,
+    pdfExportStatus,
+    rawMarkdown,
+    t,
+  ]);
+
   const handleToggleInlineTranslation = React.useCallback(() => {
     if (!translationEligible || !activeTranslationScopeKey || !activeDocument || !rawMarkdownSourceHash) return;
     setTranslationError(null);
@@ -2500,6 +2608,10 @@ export function DocViewerPanel() {
             onVisibleTranslationRegionBboxesChange={handleVisibleTranslationRegionBboxesChange}
             onToggleInlineTranslation={handleToggleInlineTranslation}
             onToggleInlineTranslationSessionPause={handleToggleInlineTranslationSessionPause}
+            canExportPrintPdf={canExportPrintPdf}
+            pdfExportStatus={pdfExportStatus}
+            pdfExportMessage={pdfExportMessage}
+            onExportPrintPdf={handleExportPrintPdf}
             t={t}
           />
           <div
@@ -2882,6 +2994,10 @@ type PanelHeaderProps = {
   onVisibleTranslationRegionBboxesChange?: (bboxes: Record<string, HelixVisibleTranslationRegionBbox | null>) => void;
   onToggleInlineTranslation: () => void;
   onToggleInlineTranslationSessionPause: () => void;
+  canExportPrintPdf?: boolean;
+  pdfExportStatus?: "idle" | "exporting" | "ready" | "error";
+  pdfExportMessage?: string | null;
+  onExportPrintPdf?: () => void;
   t: Translate;
 };
 
@@ -2916,6 +3032,10 @@ export function PanelHeader({
   onVisibleTranslationRegionBboxesChange,
   onToggleInlineTranslation,
   onToggleInlineTranslationSessionPause,
+  canExportPrintPdf = false,
+  pdfExportStatus = "idle",
+  pdfExportMessage = null,
+  onExportPrintPdf,
   t,
 }: PanelHeaderProps) {
   const titleTranslationRegionRef = React.useRef<HTMLHeadingElement | null>(null);
@@ -3134,6 +3254,17 @@ export function PanelHeader({
           <p className="mt-0.5 text-[11px] text-cyan-200">{t("docsViewer.reading.active")}</p>
         ) : null}
         {proceduralStatus ? <p className="mt-0.5 text-[11px] text-sky-200">{proceduralStatus}</p> : null}
+        {pdfExportMessage ? (
+          <p
+            className={cn(
+              "mt-0.5 text-[11px]",
+              pdfExportStatus === "error" ? "text-amber-300" : "text-emerald-200",
+            )}
+            data-testid="docs-print-pdf-status"
+          >
+            {pdfExportMessage}
+          </p>
+        ) : null}
         {readProgress ? (
           <p className="mt-0.5 line-clamp-2 text-[11px] text-cyan-100/90">
             {t("docsViewer.reading.progress", {
@@ -3435,6 +3566,25 @@ export function PanelHeader({
         ) : null}
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        {canExportPrintPdf && onExportPrintPdf ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onExportPrintPdf}
+            disabled={pdfExportStatus === "exporting"}
+            data-testid="docs-print-pdf-button"
+            title={t("docsViewer.action.exportPdf")}
+          >
+            {pdfExportStatus === "exporting" ? (
+              <LoaderCircle className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <FileDown className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            {pdfExportStatus === "exporting"
+              ? t("docsViewer.action.exportingPdf")
+              : t("docsViewer.action.exportPdf")}
+          </Button>
+        ) : null}
         {translationEligible ? (
           <>
             <Button

@@ -745,11 +745,23 @@ export function buildLoopParityTrace(input: {
   const poisonAuditOk =
     poisonAudit?.ok === true ||
     (routeAuthorityOk && terminalAuthorityOk && onlyStaleContractPoison);
+  const terminalSingleWriter = readRecord(
+    payload.terminal_authority_single_writer,
+  );
+  const terminalSingleWriterIntegrity = readRecord(
+    terminalSingleWriter?.integrity,
+  );
+  const terminalSingleWriterSelectionRan =
+    terminalSingleWriterIntegrity?.single_writer_applied === true &&
+    readString(terminalSingleWriter?.selected_terminal_artifact_kind) ===
+      terminalArtifactKind &&
+    observationsCreated.length === 0;
   const terminalSelectionRan = Boolean(
     readRecord(payload.terminal_artifact_selection_guard) ||
     readRecord(payload.product_authority_guard) ||
     routeAuthorityAudit ||
-    providerCompletionMaterialized,
+    providerCompletionMaterialized ||
+    terminalSingleWriterSelectionRan,
   );
   const postObservationFinalizerRan = Boolean(
     readRecord(payload.terminal_presentation) || terminalSelectionRan,

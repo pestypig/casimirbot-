@@ -28,8 +28,8 @@ export const WORKSTATION_SHELL_CAPABILITIES: WorkstationShellCapabilityDefinitio
     capability_id: "workstation.deep_link_state",
     label: "Workstation deep-link state",
     description:
-      "Reports the shareable workstation view-state contract for panels, focus, docs, and anchors.",
-    supported_query_params: ["panels", "focus", "doc", "anchor"],
+      "Reports the shareable workstation view-state contract for panels, focus, docs, anchors, and presentation-only entry surface metadata.",
+    supported_query_params: ["panels", "focus", "doc", "anchor", "entry"],
     path_policy: "workspace_relative_path_ref_only",
     passive_restore_emits_receipt: false,
     agent_triggered_emits_receipt: false,

@@ -43,7 +43,6 @@ describe("Shared Realtime room runtime routes", () => {
       "HELIX_REALTIME_SESSION_ADAPTER_ENABLED",
       "HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED",
       "HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED",
-      "OPENAI_REALTIME_API_KEY",
       "OPENAI_API_KEY",
     ] as const;
     const priorEnv = new Map(envKeys.map((key) => [key, process.env[key]]));
@@ -52,7 +51,6 @@ describe("Shared Realtime room runtime routes", () => {
       process.env.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = "1";
       process.env.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = "1";
       process.env.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = "1";
-      delete process.env.OPENAI_REALTIME_API_KEY;
       process.env.OPENAI_API_KEY = "personal-session-test-key-must-not-leak";
       const developer = await signInSharedRealtimeRoomTestAgent({
         app: createSharedRealtimeRoomTestApp(),

@@ -21,6 +21,9 @@ import {
   buildCasimirFormalVerificationCertificateV1,
 } from "@shared/contracts/casimir-formal-verification-certificate.v1";
 import {
+  buildCasimirFormalVerificationCertificateV2,
+} from "@shared/contracts/casimir-formal-verification-certificate.v2";
+import {
   CASIMIR_FORMAL_VERIFICATION_REQUEST_SCHEMA_VERSION,
 } from "@shared/contracts/casimir-formal-verification-request.v1";
 import {
@@ -51,6 +54,7 @@ import {
   codexProviderOutputHasPendingCapabilityLaneRequest,
   codexRouteAllowsTerminalKind,
   codexProvider,
+  continuationStateAdmitsPreparedLaneRequest,
   continuationStateAdmitsPreparedRecoveryLaneRequest,
   detectProviderPromptLeakMarkers,
   enrichCapabilityLaneCandidatesFromBody,
@@ -167,6 +171,96 @@ const buildIntegrityValidLanyonReceipt = async (input: {
     blockers: [],
   });
 };
+
+const buildIntegrityValidFormalV2Failure = async () =>
+  buildCasimirFormalVerificationCertificateV2({
+    generatedAt: "2026-07-29T00:05:00.000Z",
+    certificateId: "formal-v2:certificate:provider-reentry",
+    request: {
+      schemaVersion: "casimir_formal_verification_request/v2",
+      requestId: "formal-v2:request:provider-reentry",
+      artifactSha256: "1".repeat(64),
+      semanticPropositionSha256: "2".repeat(64),
+      candidateBadgeIds: ["badge:gr-maxwell"],
+      observedTheoremTypeSha256: "3".repeat(64),
+      semanticToLeanBindingSha256: "4".repeat(64),
+      casimirSpecId: "casimir-spec:provider-reentry",
+      casimirSpecSemanticSha256: "5".repeat(64),
+      casimirSpecArtifactSha256: "6".repeat(64),
+      masterProblemPlanId: "master-problem:provider-reentry",
+      masterProblemArtifactSha256: "7".repeat(64),
+      derivationProgramId: "derivation:provider-reentry",
+      derivationProgramArtifactSha256: "8".repeat(64),
+      graphId: "theory-graph:provider-reentry",
+      graphSnapshotSha256: "6".repeat(64),
+    },
+    status: "failed",
+    theorem: {
+      claimId: "claim:gr-maxwell:provider-reentry",
+      formalArtifactId:
+        "casimir:lanyon:gr_hyperbolic_maxwell_1d:formal_source",
+      sourceAuditArtifactSha256: "7".repeat(64),
+      theoremName: "xHyperbolicity",
+      theoremModule: "gr_hyperbolic_maxwell_1d",
+      sourceSha256: "8".repeat(64),
+      declarationSha256: "9".repeat(64),
+      propositionSourceSha256: "a".repeat(64),
+      observedTheoremTypeSha256: "3".repeat(64),
+      emittedSourceSha256: "8".repeat(64),
+    },
+    environment: {
+      prover: "lean4",
+      pinnedVersion: "4.31.0",
+      environmentPolicySha256: "b".repeat(64),
+      kernelBinarySha256: "c".repeat(64),
+      dependencyLockSha256: "d".repeat(64),
+      importClosureSha256: "e".repeat(64),
+      imports: [],
+    },
+    sandbox: {
+      executorCapabilityId: "casimir.formal.external-sandbox.v1",
+      executorCapabilitySha256: "f".repeat(64),
+      sandboxPolicySha256: "0".repeat(64),
+      attestationSha256: "1".repeat(64),
+      workerId: "worker:provider-reentry",
+      memoryLimitBytes: 1024 * 1024 * 1024,
+      processLimit: 8,
+      timeoutMs: 300_000,
+      outputLimitBytes: 4 * 1024 * 1024,
+      peakMemoryBytes: null,
+      outputBytes: null,
+      oomKilled: false,
+      timedOut: false,
+      outputLimitExceeded: false,
+      operatingSystemMemoryLimitApplied: true,
+      operatingSystemProcessLimitApplied: true,
+      operatingSystemFilesystemIsolationApplied: true,
+      operatingSystemNetworkIsolationApplied: true,
+      hostWorkstationExecution: false,
+    },
+    replay: {
+      observationMode: "outer_observed_process",
+      requiredReplayCount: 2,
+      completedReplayCount: 0,
+      byteIdentical: false,
+      aggregateTranscriptSha256: "2".repeat(64),
+      runs: [],
+    },
+    axiomAudit: {
+      declaredAxiomIds: [],
+      allowedAxiomIds: [],
+      usedAxiomIds: [],
+      hiddenAxiomsDetected: false,
+      reportSha256: "3".repeat(64),
+    },
+    blockers: [
+      {
+        code: "formal_external_worker_failed",
+        message: "The external worker did not close both replays.",
+        evidenceRefs: ["formal-v2:request:provider-reentry"],
+      },
+    ],
+  });
 
 describe("Codex provider capability lane adapter", () => {
   const previousLiveTranslationExternalBackends = process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
@@ -593,6 +687,92 @@ describe("Codex provider capability lane adapter", () => {
     });
   });
 
+  it("re-enters an integrity-valid v2 external formal certificate as nonterminal current-turn evidence", async () => {
+    const certificate =
+      await buildIntegrityValidFormalV2Failure();
+    const result = buildCodexNormalizedObservationArtifacts({
+      turnId: "ask:test:formal-v2-provider-reentry",
+      gatewayCallResults: [
+        {
+          capability_id: "theory-formal-verifier.read_result",
+          ok: true,
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+          observation: {
+            schema:
+              "casimir.theory_formal_verifier.result_observation.v1",
+            status: "completed",
+            certificate,
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          observation_packet: {
+            call_id: "ask:test:formal-v2-provider-reentry:result",
+            produced_artifact_refs: ["gateway:formal-v2"],
+          },
+        },
+      ] as never[],
+    });
+    expect(result.missingNormalizationFailures).toEqual([]);
+    expect(result.artifacts).toEqual([
+      expect.objectContaining({
+        kind: "formal_certificate",
+        observation_kind: "formal_certificate",
+        payload_schema:
+          "casimir_formal_verification_certificate/v2",
+        status: "failed",
+        payload: certificate,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        post_tool_model_step_required: true,
+      }),
+    ]);
+  });
+
+  it("fails closed instead of re-entering a hash-invalid v2 formal certificate", async () => {
+    const certificate =
+      await buildIntegrityValidFormalV2Failure();
+    certificate.request.candidateBadgeIds = [
+      "badge:substituted-after-signing",
+    ];
+    const result = buildCodexNormalizedObservationArtifacts({
+      turnId: "ask:test:formal-v2-provider-invalid",
+      gatewayCallResults: [
+        {
+          capability_id: "theory-formal-verifier.read_result",
+          ok: true,
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          raw_content_included: false,
+          observation: {
+            schema:
+              "casimir.theory_formal_verifier.result_observation.v1",
+            status: "completed",
+            certificate,
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          observation_packet: {
+            call_id: "ask:test:formal-v2-provider-invalid:result",
+            produced_artifact_refs: ["gateway:formal-v2-invalid"],
+          },
+        },
+      ] as never[],
+    });
+    expect(result.artifacts).toEqual([]);
+    expect(result.missingNormalizationFailures).toEqual([
+      "provider_observation_normalization_missing:theory-formal-verifier.read_result",
+    ]);
+  });
+
   it("normalizes only an integrity-valid nonterminal Lanyon request preparation", async () => {
     const turnId = "ask:test:lanyon-request-normalization";
     const capabilityId =
@@ -1000,6 +1180,42 @@ describe("Codex provider capability lane adapter", () => {
       turnId: "ask:test:theory-non-certificate-observations",
       gatewayCallResults: [
         {
+          capability_id:
+            "theory-formal-verifier.inspect_artifact_family",
+          ok: true,
+          observation: {
+            schema:
+              "casimir.theory_formal_verifier.artifact_family_audit_observation.v1",
+            status: "succeeded",
+            selectedTheorem: {
+              theoremName: "xHyperbolicity",
+              claimCeiling: "definition_well_typed",
+            },
+            runtimeReadiness: {
+              schema:
+                "casimir.theory_formal_verifier.runtime_readiness.v2",
+              status: "blocked",
+              configuredForExactResolutionAttempt: false,
+              blockerCodes: [
+                "formal_execution_catalog_unconfigured",
+                "formal_external_sandbox_executor_unconfigured",
+              ],
+              authority: {
+                configurationEvidenceOnly: true,
+                exactCatalogEntryResolved: false,
+                exactExecutorResolved: false,
+                assistantAnswer: false,
+                terminalEligible: false,
+              },
+            },
+            ...observationAuthority,
+          },
+          observation_packet: {
+            call_id: "ask:test:theory-source-audit",
+            produced_artifact_refs: [],
+          },
+        },
+        {
           capability_id: "theory-formal-verifier.prepare_request",
           ok: false,
           observation: {
@@ -1099,6 +1315,7 @@ describe("Codex provider capability lane adapter", () => {
     });
 
     expect(result.artifacts.map((artifact) => artifact.kind)).toEqual([
+      "theory_formal_artifact_family_audit_observation",
       "theory_formal_verifier_preparation_observation",
       "theory_formal_verifier_plan_observation",
       "theory_formal_verifier_start_observation",
@@ -1112,6 +1329,32 @@ describe("Codex provider capability lane adapter", () => {
         ),
       ),
     ).toBe(false);
+    expect(result.artifacts[0]).toMatchObject({
+      kind: "theory_formal_artifact_family_audit_observation",
+      payload: {
+        runtimeReadiness: {
+          schema:
+            "casimir.theory_formal_verifier.runtime_readiness.v2",
+          status: "blocked",
+          configuredForExactResolutionAttempt: false,
+          blockerCodes: [
+            "formal_execution_catalog_unconfigured",
+            "formal_external_sandbox_executor_unconfigured",
+          ],
+          authority: {
+            configurationEvidenceOnly: true,
+            exactCatalogEntryResolved: false,
+            exactExecutorResolved: false,
+            assistantAnswer: false,
+            terminalEligible: false,
+          },
+        },
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
     expect(result.missingNormalizationFailures).toEqual([]);
   });
 
@@ -1441,6 +1684,73 @@ describe("Codex provider capability lane adapter", () => {
     expect(instruction).toContain("scholarly-research.lookup_papers");
     expect(instruction).toContain("magnetar primary research observations");
     expect(instruction).toContain("Copy its capability and arguments exactly");
+  });
+
+  it("allows an initial runtime argument proposal only for a Helix-admitted capability", () => {
+    const capability = "theory-experiment-procedure.prepare";
+    const preciseCandidate = {
+      capability,
+      prompt: "Compare the selected Stage 3 evidence-map badge.",
+      operation: "compare",
+      target: "Stage 3 evidence map",
+      selected_badge_ids: ["study.casimir_dp.evidence_map_stage3"],
+      lanyon_requested: true,
+      lanyon_case_id: "advection_diffusion_full_1d",
+    };
+    const state = {
+      next_admissible_affordances: [{
+        admissible: true,
+        tried: false,
+        lane_request: {
+          capability,
+          prompt: "Use the theory experiment procedure.",
+          selected_badge_ids: [
+            "<bind from current-turn registered Theory Badge selection>",
+          ],
+        },
+      }],
+      capability_proposal: {
+        allowed: true,
+        admitted_capability_ids: [capability],
+        authority: "helix_policy_admits_runtime_proposal",
+      },
+      allowed_decisions: ["act"],
+      last_attempt: null,
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+
+    expect(continuationStateAdmitsPreparedLaneRequest({
+      state,
+      requestedCandidate: preciseCandidate,
+      preparedCandidate: preciseCandidate,
+    })).toBe(true);
+    const inventedCandidate = {
+      ...preciseCandidate,
+      capability: "theory-experiment-procedure.execute_untrusted",
+    };
+    expect(continuationStateAdmitsPreparedLaneRequest({
+      state,
+      requestedCandidate: inventedCandidate,
+      preparedCandidate: inventedCandidate,
+    })).toBe(false);
+    expect(continuationStateAdmitsPreparedLaneRequest({
+      state: {
+        ...state,
+        last_attempt: {
+          attempt_id: "attempt:1",
+          capability_id: capability,
+          action_fingerprint: "attempt:1",
+          status: "failed",
+          failure_class: "invalid_args",
+          failure_code: "invalid_args",
+          failure_message: "The first attempt was rejected.",
+          retryability: "retryable",
+          observation_refs: [],
+        },
+      },
+      requestedCandidate: preciseCandidate,
+      preparedCandidate: preciseCandidate,
+    })).toBe(false);
   });
 
   it("keeps an admitted Image Lens continuation valid after additive Helix enrichment", () => {

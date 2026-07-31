@@ -8,6 +8,7 @@ import {
   Mic,
   Radio,
   ShieldCheck,
+  TriangleAlert,
   Volume2,
 } from "lucide-react";
 import type { HelixAccountCapabilityPolicy } from "@shared/helix-account-session";
@@ -28,6 +29,7 @@ import {
   type HelixAskLiveRuntimeTransportControllerState,
 } from "./HelixAskLiveRuntimeLifecycle";
 import { useHelixAskLiveRuntimeSession } from "./useHelixAskLiveRuntimeSession";
+import { describeHelixAskRealtimeFailure } from "./HelixAskRealtimeFailurePresentation";
 import { HelixAskSharedLiveRoomControls } from "./shared-live-room";
 
 export type HelixAskLiveRuntimeControlsModel = {
@@ -222,6 +224,7 @@ function HelixAskVisibleLiveRuntimeControls({
     runtime.transportState === "connecting" ||
     runtime.transportState === "active";
   const workerRelayIndicator = describeHelixAskWorkerRelayStatus(runtime.workerRelayStatus);
+  const runtimeFailure = describeHelixAskRealtimeFailure(runtime.error);
   const toggleVisualInput = useCallback(() => {
     const nextEnabled = !runtime.visualInputEnabled;
     if (nextEnabled) onVisualInputEnableRequested?.();
@@ -293,7 +296,7 @@ function HelixAskVisibleLiveRuntimeControls({
         type="button"
         data-helix-ask-action-item="true"
         aria-label="Live runtime agent lifecycle"
-        title={model.lockReason ?? runtime.error ?? "Start or stop live runtime agent"}
+        title={model.lockReason ?? runtimeFailure?.detail ?? "Start or stop live runtime agent"}
         className="inline-flex h-10 shrink-0 snap-center items-center gap-2 rounded-full border border-violet-300/45 bg-violet-400/12 px-3 text-sm font-medium text-violet-100 transition hover:bg-violet-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200/70 disabled:opacity-60"
         disabled={startDisabled}
         data-lifecycle-state={runtime.lifecycleState}
@@ -302,6 +305,19 @@ function HelixAskVisibleLiveRuntimeControls({
         <Activity className="h-4 w-4" />
         <span>{labelForHelixAskLiveRuntimeLifecycleState(runtime.lifecycleState)}</span>
       </button>
+      {runtimeFailure ? (
+        <span
+          role="status"
+          aria-live="polite"
+          data-helix-ask-realtime-failure={runtimeFailure.code}
+          data-retryable={runtimeFailure.retryable ? "true" : "false"}
+          title={runtimeFailure.detail}
+          className="inline-flex h-10 shrink-0 snap-center items-center gap-2 border-l border-rose-300/25 px-3 text-sm font-medium text-rose-100"
+        >
+          <TriangleAlert className="h-4 w-4 text-rose-300" />
+          <span>{runtimeFailure.label}</span>
+        </span>
+      ) : null}
       {model.sharedRealtimeRoomsAllowed ? (
         <HelixAskSharedLiveRoomControls
           realtimeSessionId={runtime.realtimeSessionId}

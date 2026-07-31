@@ -26,6 +26,12 @@ import {
   type RealtimeTerminalRelayAuthorityEvaluation,
 } from "./terminal-relay-authority";
 import { resolveRealtimeFinalWorkerAdmission } from "./worker-admission";
+import {
+  projectScientificEvidenceClosureGroundingIdentities,
+} from "./scientific-evidence-closure-grounding";
+import type {
+  HelixScientificEvidenceClosureGroundingIdentityV1,
+} from "@shared/contracts/helix-scientific-evidence-closure-grounding.v1";
 
 const groundedAnswersByHandoffId = new Map<string, HelixRealtimeStagePlayGroundedAnswerV1>();
 
@@ -82,6 +88,8 @@ const recordAcceptedRealtimeGroundedAnswer = (input: {
     | "canonical_solver_trace"
     | null;
   terminalRelayAuthority: RealtimeTerminalRelayAuthorityEvaluation;
+  scientificEvidenceClosureIdentities:
+    HelixScientificEvidenceClosureGroundingIdentityV1[];
   askTurnId?: string | null;
   additionalEvidenceRefs?: string[];
   nowMs: number;
@@ -141,6 +149,8 @@ const recordAcceptedRealtimeGroundedAnswer = (input: {
     terminal_speech_authority_status: "validated",
     evidence_refs: evidenceRefs,
     grounding_evidence_refs: input.groundingEvidenceRefs,
+    scientific_evidence_closure_identities:
+      input.scientificEvidenceClosureIdentities,
     grounding_proof_source: input.groundingProofSource,
     required_grounding_capability_ids:
       input.terminalRelayAuthority.requiredGroundingCapabilityIds,
@@ -236,6 +246,16 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
     askTurnId: input.askTurnId,
   });
   const nowMs = input.nowMs ?? Date.now();
+  const scientificClosureProjection =
+    terminalRelayAuthority.askTurnId &&
+      terminalRelayAuthority.terminalSpeechAuthorityStatus === "validated"
+      ? projectScientificEvidenceClosureGroundingIdentities({
+          payload: input.payload,
+          debug,
+          turnId: terminalRelayAuthority.askTurnId,
+          selectedEvidenceRefs: terminalRelayAuthority.groundingEvidenceRefs,
+        })
+      : { identities: [], failureCode: null };
   const rejectionReason =
     terminalArtifactKind === "typed_failure" || finalAnswerSource === "typed_failure"
       ? "typed_failure_not_spoken"
@@ -243,6 +263,8 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
         ? "request_user_input_not_spoken"
         : terminalArtifactKind === "tool_receipt"
           ? "tool_receipt_not_answer_authority"
+          : scientificClosureProjection.failureCode
+            ? scientificClosureProjection.failureCode
           : terminalRelayAuthority.failureCode
             ? terminalRelayAuthority.failureCode
             : null;
@@ -302,6 +324,8 @@ export const recordRealtimeGroundedAnswerFromPayload = (input: {
     groundingEvidenceRefs: terminalRelayAuthority.groundingEvidenceRefs,
     groundingProofSource: terminalRelayAuthority.groundingProofSource,
     terminalRelayAuthority,
+    scientificEvidenceClosureIdentities:
+      scientificClosureProjection.identities,
     askTurnId: input.askTurnId,
     nowMs,
   });
@@ -478,6 +502,7 @@ export const recordRealtimeGroundedAnswerFromRuntimeGoalPayload = (input: {
       requiredGroundingCapabilityIds: handoff.required_grounding_capability_ids,
       failureCode: null,
     },
+    scientificEvidenceClosureIdentities: [],
     additionalEvidenceRefs: wakeEventId ? [wakeEventId] : [],
     askTurnId: input.askTurnId,
     nowMs,

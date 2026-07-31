@@ -13,6 +13,7 @@ const HELIX_ACCOUNT_SIGNED_OUT_PROFILE = "__signed_out__";
 let cachedPolicy: HelixAccountCapabilityPolicy | null = null;
 let cachedProfileId: string | null | undefined;
 let cachedProfileRevision = 0;
+let accountPolicyRequest: Promise<HelixAccountCapabilityPolicy> | null = null;
 
 const stringArraysEqual = (left: string[], right: string[]): boolean =>
   left.length === right.length && left.every((value, index) => value === right[index]);
@@ -161,16 +162,24 @@ export function clearCachedAccountCapabilityPolicy(): void {
 
 export async function fetchAccountCapabilityPolicy(): Promise<HelixAccountCapabilityPolicy> {
   if (typeof fetch !== "function") return HELIX_USER_ACCOUNT_POLICY;
-  const response = await fetch("/api/account/session", {
-    credentials: "include",
-    cache: "no-store",
-  });
-  if (!response.ok) return cachedPolicy ?? HELIX_USER_ACCOUNT_POLICY;
-  const payload = await response.json();
-  const policy =
-    payload?.account_policy ??
-    payload?.session?.account_policy ??
-    HELIX_USER_ACCOUNT_POLICY;
-  cacheAccountCapabilityPolicy(policy, payload?.session?.profile?.profile_id ?? null);
-  return policy;
+  if (accountPolicyRequest) return accountPolicyRequest;
+  accountPolicyRequest = (async () => {
+    const response = await fetch("/api/account/session", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!response.ok) return cachedPolicy ?? HELIX_USER_ACCOUNT_POLICY;
+    const payload = await response.json();
+    const policy =
+      payload?.account_policy ??
+      payload?.session?.account_policy ??
+      HELIX_USER_ACCOUNT_POLICY;
+    cacheAccountCapabilityPolicy(policy, payload?.session?.profile?.profile_id ?? null);
+    return policy;
+  })();
+  try {
+    return await accountPolicyRequest;
+  } finally {
+    accountPolicyRequest = null;
+  }
 }

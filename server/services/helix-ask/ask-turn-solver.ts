@@ -2208,6 +2208,23 @@ export function buildAskTurnSolverTrace(input: {
   const finalAnswerSource =
     authoritativeWorkstationTerminal?.finalAnswerSource ??
     (readString(input.finalAnswerSource) || "unknown");
+  const deterministicPreflightTypedFailure =
+    terminalArtifactKind === "typed_failure" &&
+    finalAnswerSource === "typed_failure" &&
+    readBoolean(
+      readRecord(input.payload.canonical_goal_frame)
+        ?.deterministic_preflight_terminal,
+    );
+  const authoritativeZeroObservationTypedFailure =
+    terminalArtifactKind === "typed_failure" &&
+    finalAnswerSource === "typed_failure" &&
+    readBoolean(
+      readRecord(input.payload.canonical_goal_frame)
+        ?.authoritative_zero_observation_typed_failure,
+    );
+  const settledZeroObservationTypedFailure =
+    deterministicPreflightTypedFailure ||
+    authoritativeZeroObservationTypedFailure;
   const loopTrace = (input.loopParityTrace ??
     readRecord(input.payload.loop_parity_trace)) as
     HelixLoopParityTrace | RecordLike | null;
@@ -2461,15 +2478,25 @@ export function buildAskTurnSolverTrace(input: {
     readString(goalSatisfaction?.satisfaction) === "satisfied" &&
     readString(goalSatisfaction?.next_decision) === "allow_terminal" &&
     terminalMatchesCanonicalGoalContract(input.payload, terminalArtifactKind);
-  const effectiveEvidenceReentryGate = evidenceReentryGate;
+  const effectiveEvidenceReentryGate: typeof evidenceReentryGate =
+    settledZeroObservationTypedFailure
+      ? {
+          ...evidenceReentryGate,
+          required: false,
+          completed: true,
+          violation_codes: [],
+        }
+      : evidenceReentryGate;
   const effectiveFollowupReasoningGate: typeof followupReasoningGate =
-    routeAuthorizedReceiptTerminalAllowed
+    routeAuthorizedReceiptTerminalAllowed || settledZeroObservationTypedFailure
       ? {
           schema: followupReasoningGate.schema,
           turn_id: followupReasoningGate.turn_id,
           required: false,
           completed: true,
-          reason: "simple_no_source_turn",
+          reason: deterministicPreflightTypedFailure
+            ? "deterministic_preflight_terminal"
+            : "simple_no_source_turn",
           assistant_answer: false,
           raw_content_included: false,
         }

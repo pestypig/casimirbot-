@@ -2,10 +2,32 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createDefaultOpenAiRealtimeSdpTransport,
   isValidRealtimeOfferSdp,
+  probeOpenAiApiCredential,
 } from "../sdp-transport";
 import { createOpenAiRealtimeSessionAdapter } from "../adapter";
 
 describe("OpenAI Realtime SDP transport", () => {
+  it("diagnoses whether the same credential is accepted by the standard API without reading a response body", async () => {
+    const acceptedFetch = vi.fn(async () => ({ ok: true, status: 200 }));
+    const rejectedFetch = vi.fn(async () => ({ ok: false, status: 401 }));
+
+    await expect(probeOpenAiApiCredential({
+      apiKey: "accepted-key-must-not-leak",
+      fetchImpl: acceptedFetch,
+    })).resolves.toBe("accepted");
+    await expect(probeOpenAiApiCredential({
+      apiKey: "rejected-key-must-not-leak",
+      fetchImpl: rejectedFetch,
+    })).resolves.toBe("authentication_failed");
+
+    expect(acceptedFetch).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/models",
+      expect.objectContaining({
+        method: "GET",
+        headers: { Authorization: "Bearer accepted-key-must-not-leak" },
+      }),
+    );
+  });
   afterEach(() => vi.restoreAllMocks());
 
   it("posts multipart SDP and a governed GA Realtime session contract", async () => {

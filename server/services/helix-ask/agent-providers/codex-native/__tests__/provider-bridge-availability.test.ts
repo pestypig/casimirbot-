@@ -129,6 +129,49 @@ describe("Codex native provider bridge availability", () => {
     ).toEqual(["repo.search"]);
   });
 
+  it("does not re-expose a capability after an actionable blocker has re-entered", () => {
+    expect(
+      removeSatisfiedNativeWorkstationTools(
+        [
+          "scientific-evidence-closure.evaluate",
+          "repo.search",
+        ],
+        [
+          {
+            ok: false,
+            capability_id: "scientific-evidence-closure.evaluate",
+            observation_packet: {
+              status: "blocked",
+            },
+            tool_followup_decision: {
+              next_action: "ask_user",
+            },
+          } as never,
+        ],
+      ),
+    ).toEqual(["repo.search"]);
+  });
+
+  it("keeps a capability available when the observation explicitly permits a retry", () => {
+    expect(
+      removeSatisfiedNativeWorkstationTools(
+        ["scientific-evidence-closure.evaluate"],
+        [
+          {
+            ok: false,
+            capability_id: "scientific-evidence-closure.evaluate",
+            observation_packet: {
+              status: "blocked",
+            },
+            tool_followup_decision: {
+              next_action: "retry",
+            },
+          } as never,
+        ],
+      ),
+    ).toEqual(["scientific-evidence-closure.evaluate"]);
+  });
+
   it("does not turn deterministic test suites into live API calls", () => {
     process.env.VITEST = "true";
     process.env.OPENAI_API_KEY = "test-key-present";

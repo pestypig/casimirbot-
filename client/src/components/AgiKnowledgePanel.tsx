@@ -20,6 +20,7 @@ import {
   type KnowledgeFileRecord,
 } from "@/lib/agi/knowledge-store";
 import { decodeLayout } from "@/lib/desktop/shareState";
+import { buildWorkstationEntryUrl } from "@shared/workstation-link-meta";
 
 const ACCEPTED_FILE_TYPES = [".txt", ".md", ".pdf", ".json", ".mp3", ".wav", ".m4a"].join(",");
 const PREVIEW_LIMIT = 4096;
@@ -271,7 +272,11 @@ export function AgiKnowledgePanel() {
     async (projectId: string) => {
       try {
         const hash = deriveDesktopLayout(projectId);
-        const link = `${window.location.origin}/desktop${hash}`;
+        const link = buildWorkstationEntryUrl({
+          baseUrl: window.location.origin,
+          hash,
+          entry: "workstation",
+        });
         await navigator.clipboard.writeText(link);
         setStatus("Share link copied to clipboard.");
       } catch {

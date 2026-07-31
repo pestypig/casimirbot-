@@ -334,6 +334,174 @@ the downstream verification-receipt SHA-256 is
 The certificate verifies repository convergence only and has scientific scope
 `none`.
 
+The implemented Stage-4.2E causal-cone and clock-congruence campaign is
+maintained in:
+
+- `casimir-dp-causal-cone-clock-stage4-2e-plan.md`
+- `casimir-dp-causal-cone-clock-stage4-2e-report.md`
+- `casimir-dp-causal-cone-clock-stage4-2e-verification-receipt.json`
+- `../../configs/research/casimir-dp-stage4-2e-authorities.v1.json`
+- `../../configs/research/casimir-dp-causal-cone-clock-stage4-2e.v1.json`
+- `../../configs/research/fixtures/casimir-dp-stage4-2e-causal-cone.synthetic.v1.json`
+- `../../shared/contracts/casimir-dp-causal-cone-clock-stage4-2e.v1.ts`
+- `../../shared/casimir-dp-causal-cone-clock-stage4-2e.ts`
+- `../../scripts/research/run-casimir-dp-causal-cone-clock-stage4-2e.ts`
+
+Run it only with the immutable Stage-4.2D authority tuple present:
+
+```text
+npm run casimir:dp:stage4-2e
+```
+
+The authoritative synthetic run is
+`casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z`.
+It passes 10/10 fixtures, recovers ADM local-null and timelike-clock
+kinematics, reproduces radial Schwarzschild null propagation, and separates an
+ideal Casimir semiclassical-curvature screen from the QED
+effective-propagation control. It leaves standard mass-density DP boundary
+independent and adds zero observable bridge edges. These are causal-recovery
+and scale-separation diagnostics only. Complete-apparatus metric response,
+measured timing and coherence evidence, and physical pilot readiness remain
+`not_ready`; collapse and manifold identification remain `blocked`; physical
+viability remains `not_evaluated`.
+
+Fresh adapter run `2346` is `PASS` with no first failure, no deltas, and
+certificate integrity `OK`. The exclusive validated trace SHA-256 is
+`378c915329514f13bf4111f732217f9b9bf7d710adb50510c5ed8626928d8311`;
+the downstream verification-receipt SHA-256 is
+`b37bdbd1612912fc5c91fd51667559dc739018d43d9f57d7f182d76d1d3bbb1b`.
+The certificate verifies repository convergence only and has scientific scope
+`none`.
+
+The implemented Stage-4.2F Maxwell/macroscopic-QED and exact-DP closure is
+maintained in:
+
+- `casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-plan.md`
+- `casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-report.md`
+- `casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-verification-receipt.json`
+- `../../configs/research/casimir-dp-stage4-2f-authorities.v1.json`
+- `../../configs/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.v1.json`
+- `../../configs/research/fixtures/casimir-dp-stage4-2f-maxwell-closure.synthetic.v1.json`
+- `../../shared/contracts/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.v1.ts`
+- `../../shared/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.ts`
+- `../../scripts/research/run-casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.ts`
+
+Run it only with the immutable Stage-4.2E authority tuple present:
+
+```text
+npm run casimir:dp:stage4-2f
+```
+
+The authoritative synthetic run is
+`casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z`.
+It passes 12/12 fixtures, recovers the covariant Maxwell, transverse
+polarization, Green/FDT, and ideal-Casimir identities, freezes the exact named
+regularized DP master model, separates the Stage-4.2C reference mass from the
+strongest transported cell, and discloses that the companion SNR is synthetic.
+It also finds that the inherited heating signal matches neither Stage-4.2C
+mass identity, so companion model identity remains `not_ready`.
+The inherited NHM2 Maxwell-stress contract is method-only: all 11 apparatus
+evidence checks correctly remain blocked. Finite-geometry fields, measured
+material response, detector authority, state preparation, modulation,
+complete stress-energy, and measured evidence remain `not_ready`; collapse
+and manifold identification remain `blocked`; physical viability remains
+`not_evaluated`. The campaign adds zero observable bridge edges.
+
+Fresh explicit-endpoint adapter run `2348` is `PASS` with no first failure,
+no deltas, and certificate integrity `OK`. Its certificate SHA-256 is
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`;
+the exclusive validated trace SHA-256 is
+`13ea52a95383b5e2f6cb80322a4321ad28dbc52bf5533a5771386fc6fbc0f0c8`;
+and the downstream verification-receipt SHA-256 is
+`f1b8219b7c74bc25db9cc3137aeec97b714bfc3193052a94e3929326eb858f73`.
+The certificate verifies repository convergence only and has scientific scope
+`none`.
+
+The implemented Stage-4.2G empirical-feasibility handoff is maintained in:
+
+- `casimir-dp-empirical-feasibility-pilot-stage4-2g-plan.md`
+- `casimir-dp-empirical-feasibility-pilot-stage4-2g-report.md`
+- `casimir-dp-empirical-feasibility-pilot-stage4-2g-verification-receipt.json`
+- `../../configs/research/casimir-dp-stage4-2g-authorities.v1.json`
+- `../../configs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g.v1.json`
+- `../../configs/research/fixtures/casimir-dp-stage4-2g-pilot-unacquired.v1.json`
+- `../../configs/research/fixtures/casimir-dp-stage4-2g-pilot-synthetic-validation.v1.json`
+- `../../shared/contracts/casimir-dp-empirical-feasibility-pilot-stage4-2g.v1.ts`
+- `../../shared/casimir-dp-empirical-feasibility-pilot-stage4-2g.ts`
+- `../../scripts/research/run-casimir-dp-empirical-feasibility-pilot-stage4-2g.ts`
+
+Run the canonical unacquired handoff only with the immutable Stage-4.2F
+authority tuple present:
+
+```text
+npm run casimir:dp:stage4-2g
+```
+
+The authoritative run
+`casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z`
+freezes one silica apparatus and mass-density identity and derives from that
+same identity \(\Gamma_{\rm DP}=0.02400420398374263\ {\rm s^{-1}}\),
+\(V(0.25\,{\rm s})=0.9940169192982985\), and
+\(\dot E_{\rm DP}=1.9297884642410306\times10^{-40}\ {\rm W}\). It specifies
+13 acquisition products spanning finite-geometry Maxwell/macroscopic QED,
+material response, preparation and branch metrology, modulation,
+environmental response/covariance, companion detection, blinding/custody,
+independent replication, and complete apparatus stress-energy. The registered
+synthetic packet exercises ingestion and whitening software only. Until a
+provenance-bound measured packet passes, measured evidence remains
+`not_ready`, collapse and manifold identification remain `blocked`, physical
+viability remains `not_evaluated`, and the campaign adds zero observable
+Casimir-to-collapse bridges.
+
+Fresh explicit-endpoint adapter run `2349` is `PASS` with no first failure,
+no deltas, and certificate integrity `GREEN/true`. Its certificate SHA-256 is
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`;
+the exclusive validated trace SHA-256 is
+`cf4c1f72bbcd7cbac83694cd6d2d981cd0813070e461fbc9835712b1f42d3f53`;
+and the downstream verification-receipt SHA-256 is
+`3530465e24ef861bd84cbd258cff153e39823e4329e7461a216ef978e712821b`.
+The certificate verifies repository convergence only and has scientific scope
+`none`.
+
+The implemented Stage-4.2H commissioning intake is maintained in:
+
+- `casimir-dp-commissioning-intake-stage4-2h-plan.md`
+- `casimir-dp-commissioning-intake-stage4-2h-report.md`
+- `casimir-dp-commissioning-intake-stage4-2h-verification-receipt.json`
+- `../../configs/research/casimir-dp-stage4-2h-authorities.v1.json`
+- `../../configs/research/casimir-dp-commissioning-intake-stage4-2h.v1.json`
+- `../../configs/research/fixtures/casimir-dp-stage4-2h-commissioning-blank.v1.json`
+- `../../shared/contracts/casimir-dp-commissioning-intake-stage4-2h.v1.ts`
+- `../../shared/casimir-dp-commissioning-intake-stage4-2h.ts`
+- `../../scripts/research/run-casimir-dp-commissioning-intake-stage4-2h.ts`
+
+Run the canonical blank intake and synthetic dry run with:
+
+```text
+npm run casimir:dp:stage4-2h
+```
+
+The authoritative run
+`casimir-dp-commissioning-intake-stage4-2h-v1-20260730T050000000Z`
+freezes twelve instrument/computational roles, thirteen product slots, four
+partitions, and twenty-eight raw columns. It successfully recompiles a
+software-only synthetic dossier through the Stage-4.2G whitened gate, but
+returns `no_go_until_provenance_bound_measured_dossier_passes`. Synthetic
+calibrations, covariance, hashes, and custody have zero empirical authority.
+Measured evidence remains `not_ready`, collapse/manifold remain `blocked`,
+physical viability remains `not_evaluated`, and zero Casimir-to-collapse
+bridges are added.
+
+Fresh adapter run `2350` (`adapter:8c24aa23-edd5-4380-b071-24dc62613d88`)
+passes with first failure `null`, empty deltas, certificate status `GREEN`, and
+integrity `true`. The certificate SHA-256 is
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`;
+the exclusive validated-trace SHA-256 is
+`8d71d21a3f3eb4d2d386d53100bf07009ac65d29280eaf64dccbfde37ce03a13`;
+and the downstream verification-receipt SHA-256 is
+`acbab1f786e688fe04ad2d5cae15219166368e41b01b8df5949617ef150ce364`.
+This is software/certificate verification, not empirical evidence.
+
 The implemented Stage-4.2A runtime sources are:
 
 - `../../shared/casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts`

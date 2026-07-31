@@ -127,6 +127,7 @@ const buildFeedback = (
   terminal_speech_authority_status: "validated",
   evidence_refs: [`gateway-call:${handoff.handoff_id}`],
   grounding_evidence_refs: [`gateway-call:${handoff.handoff_id}`],
+  scientific_evidence_closure_identities: [],
   grounding_proof_source: "canonical_terminal_boundary",
   required_grounding_capability_ids: handoff.required_grounding_capability_ids,
   grounding_required: true,
@@ -285,6 +286,92 @@ describe("Realtime grounded answer relay", () => {
       status: "delivered",
       provider_response_ref: "response:delivery",
       playback_receipt_ref: "receipt:playback:delivery",
+    });
+  });
+
+  it("projects the scientific closure claim ceiling into speech without promoting authority", () => {
+    const preliminary = buildAdmission({
+      handoffId: "handoff:scientific-closure",
+      nowMs,
+    });
+    const handoff = buildHandoff("scientific-closure", preliminary, nowMs);
+    startRealtimeGroundedRelayForHandoff({
+      handoff,
+      workerAdmission: preliminary,
+      nowMs,
+    });
+    const finalAdmission = buildAdmission({
+      handoffId: handoff.handoff_id,
+      phase: "solver_final",
+      provider: "codex",
+      model: "gpt-5.4",
+      nowMs: nowMs + 10,
+    });
+    const feedback = buildFeedback(handoff, nowMs + 10);
+    feedback.scientific_evidence_closure_identities = [{
+      schema: "helix.scientific_evidence_closure_grounding_identity.v1",
+      observation_ref: "observation:scientific-closure",
+      observation_schema:
+        "casimir.scientific_evidence_closure.observation.v1",
+      packet_id: "closure:blocked",
+      packet_artifact_sha256: "a".repeat(64),
+      turn_id: feedback.ask_turn_id as string,
+      plan_id: "plan:closure",
+      manifest_id: "manifest:closure",
+      orientation_id: "orientation:closure",
+      selected_badge_ids: ["badge:closure"],
+      status: "blocked",
+      canonical_within_enrollment: false,
+      evidence_class: "synthetic_computational",
+      maximum_claim:
+        "bounded synthetic comparison within the exact enrolled case",
+      establishes: ["The registered contracts were evaluated."],
+      does_not_establish: [
+        "It does not establish empirical validity or physical truth.",
+      ],
+      integrity_verified: true,
+      current_turn_binding_verified: true,
+      selected_as_terminal_support: true,
+      source_authority: false,
+      semantic_authority: false,
+      theory_authority: false,
+      empirical_authority: false,
+      physical_authority: false,
+      implementation_correctness_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    }];
+
+    const relay = enqueueRealtimeGroundedAnswerRelay({
+      handoff,
+      feedback,
+      workerAdmission: finalAdmission,
+      answerText:
+        "The closure is blocked and is not canonical within the enrollment.",
+      nowMs: nowMs + 10,
+    });
+
+    expect(relay.scientific_evidence_closure_identities).toEqual(
+      feedback.scientific_evidence_closure_identities,
+    );
+    const response = sentEvents[0]?.response as Record<string, unknown>;
+    expect(String(response.instructions)).toContain(
+      "say only 'canonical within the exact enrollment'",
+    );
+    expect(String(response.instructions)).toContain(
+      "Never promote it to source, semantic, theory, empirical, physical",
+    );
+    const input = response.input as Array<Record<string, unknown>>;
+    const content = input[0]?.content as Array<Record<string, unknown>>;
+    const projection = JSON.parse(String(content[0]?.text));
+    expect(projection.scientific_evidence_closure_identities[0]).toMatchObject({
+      status: "blocked",
+      canonical_within_enrollment: false,
+      maximum_claim:
+        "bounded synthetic comparison within the exact enrolled case",
+      empirical_authority: false,
+      physical_authority: false,
     });
   });
 

@@ -1,7 +1,7 @@
 import { hasAnyConfiguredEnvVar } from "./backend-provider-config";
 import type { HelixCapabilityLaneTemplate } from "./lane-template";
 
-const REALTIME_ENV_VARS = ["OPENAI_REALTIME_API_KEY", "OPENAI_API_KEY"] as const;
+const REALTIME_ENV_VARS = ["OPENAI_API_KEY"] as const;
 
 const realtimeConfigured = (env: NodeJS.ProcessEnv): boolean =>
   hasAnyConfiguredEnvVar(env, [...REALTIME_ENV_VARS]);

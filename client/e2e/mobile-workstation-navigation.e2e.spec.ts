@@ -118,6 +118,12 @@ test("Workflow Demo cannot cover or displace the mobile Ask/workstation switch",
   await expectSwitchOwnsItsHitTarget(page, surfaceSwitch);
   await expectLeftRailReserved(surfaceSwitch, inlineQte);
 
+  await inlineQte.getByRole("button", { name: /Use next prompt/i }).click();
+  await expect(page).toHaveURL(/\/mobile(?:[?#]|$)/);
+  await expect(shell).toHaveAttribute("data-mobile-surface", "ask");
+  await expectSwitchOwnsItsHitTarget(page, surfaceSwitch);
+  await expectLeftRailReserved(surfaceSwitch, inlineQte);
+
   await surfaceSwitch.click();
   await expect(shell).toHaveAttribute("data-mobile-surface", "workstation");
   await expect(demoPanel).toBeVisible();

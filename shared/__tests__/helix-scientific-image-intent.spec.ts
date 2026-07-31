@@ -44,6 +44,8 @@ describe("scientific evidence continuity intent", () => {
     "Later report the retained extraction sidecar id and crop reference; for now answer conceptually.",
     "Create a fresh crop and report its source id and evidence depth.",
     "Reflect the promoted equation evidence to the Theory Badge Graph and report calculator template admissibility.",
+    "Load the conformed scientific evidence sidecar for the runtime workbench, then explain its Theory Badge orientation and closure blockers.",
+    "Show the retained scientific evidence enrollment and its claim boundary.",
   ])("does not admit contextual or fresh-capture wording: %s", (question) => {
     expect(asksForScientificImageEvidenceContinuity(question)).toBe(false);
   });

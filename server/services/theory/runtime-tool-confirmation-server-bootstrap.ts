@@ -4,6 +4,11 @@ import type { Pool } from "pg";
 import { installSharedLiveRoomGatewayConfirmationDependenciesForServerV1 } from "../helix-ask/workstation-tool-gateway/shared-live-room";
 import { createPostgresTrustedRuntimeToolConfirmationReplayLedgerV1 } from "./runtime-tool-confirmation-postgres-replay-ledger";
 import {
+  installCasimirTheoryExecutionRuntimeApprovalDependenciesForServerV1,
+  installCasimirTheoryExecutionStateDependenciesForServerV1,
+} from "./casimir-theory-execution-server-composition";
+import { createPostgresCasimirTheoryExecutionStateStoreV1 } from "./casimir-theory-execution-state-store";
+import {
   createTrustedRuntimeToolConfirmationEd25519VerifierV1,
   type TrustedRuntimeToolConfirmationPublicKeyV1,
 } from "./runtime-tool-confirmation-public-key-verifier";
@@ -139,11 +144,26 @@ export const installRuntimeToolConfirmationVerifierAtServerBootstrapV1 = (
     replayPool?: Pool;
   } = {},
 ): RuntimeToolConfirmationServerBootstrapStatusV1 => {
+  installCasimirTheoryExecutionStateDependenciesForServerV1({
+    formalStateStore:
+      createPostgresCasimirTheoryExecutionStateStoreV1(
+        "formal_v2",
+        input.replayPool,
+      ),
+    independentNumericalStateStore:
+      createPostgresCasimirTheoryExecutionStateStoreV1(
+        "independent_numerical_v1",
+        input.replayPool,
+      ),
+  });
   const rawConfig = input.trustedPublicKeysJson?.trim() ?? "";
   if (!rawConfig) {
     installSharedLiveRoomGatewayConfirmationDependenciesForServerV1({
       requireDurableReplayProtection: true,
     });
+    installCasimirTheoryExecutionRuntimeApprovalDependenciesForServerV1(
+      {},
+    );
     return {
       schema: "helix.runtime_tool_confirmation.server_bootstrap_status.v1",
       configured: false,
@@ -153,16 +173,25 @@ export const installRuntimeToolConfirmationVerifierAtServerBootstrapV1 = (
   }
 
   const trustedPublicKeys = parseTrustedPublicKeys(rawConfig);
-  installSharedLiveRoomGatewayConfirmationDependenciesForServerV1({
-    verifyTrustedRuntimeReceipt:
-      createTrustedRuntimeToolConfirmationEd25519VerifierV1({
-        trustedPublicKeys,
-      }),
-    replayLedger: createPostgresTrustedRuntimeToolConfirmationReplayLedgerV1(
+  const verifyTrustedRuntimeReceipt =
+    createTrustedRuntimeToolConfirmationEd25519VerifierV1({
+      trustedPublicKeys,
+    });
+  const confirmationReplayLedger =
+    createPostgresTrustedRuntimeToolConfirmationReplayLedgerV1(
       input.replayPool,
-    ),
+    );
+  installSharedLiveRoomGatewayConfirmationDependenciesForServerV1({
+    verifyTrustedRuntimeReceipt,
+    replayLedger: confirmationReplayLedger,
     requireDurableReplayProtection: true,
   });
+  installCasimirTheoryExecutionRuntimeApprovalDependenciesForServerV1(
+    {
+      verifyTrustedRuntimeReceipt,
+      confirmationReplayLedger,
+    },
+  );
   return {
     schema: "helix.runtime_tool_confirmation.server_bootstrap_status.v1",
     configured: true,

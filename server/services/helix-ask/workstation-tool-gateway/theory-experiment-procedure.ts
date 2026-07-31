@@ -5,6 +5,9 @@ import {
   type CasimirSpecScientificClaimIrV1,
 } from "@shared/contracts/casimir-spec-scientific-claim-ir.v1";
 import { validateCasimirFormalVerificationCertificateIntegrityV1 } from "@shared/contracts/casimir-formal-verification-certificate.v1";
+import {
+  validateCasimirFormalVerificationCertificateV2Integrity,
+} from "@shared/contracts/casimir-formal-verification-certificate.v2";
 import { validateCasimirIndependentNumericalVerificationCertificateIntegrityV1 } from "@shared/contracts/casimir-independent-numerical-verification.v1";
 import { validateCasimirArtifactGenerationReceiptIntegrityV1 } from "@shared/contracts/casimir-artifact-generation.v1";
 import {
@@ -272,6 +275,10 @@ const retainedTheoryExperimentProcedures = new Map<
   string,
   RetainedTheoryExperimentProcedure
 >();
+const procedureGenerationTimes = new Map<
+  string,
+  { generatedAt: string; storedAtMs: number }
+>();
 
 const retainedProcedureOwnerKey = (input: {
   accountType: HelixAccountType;
@@ -303,6 +310,41 @@ const pruneRetainedTheoryExperimentProcedures = (nowMs: number): void => {
     if (!oldestKey) break;
     retainedTheoryExperimentProcedures.delete(oldestKey);
   }
+  for (const [key, generation] of procedureGenerationTimes) {
+    if (nowMs - generation.storedAtMs > RETAINED_PROCEDURE_TTL_MS) {
+      procedureGenerationTimes.delete(key);
+    }
+  }
+  while (procedureGenerationTimes.size > RETAINED_PROCEDURE_LIMIT) {
+    const oldestKey = procedureGenerationTimes.keys().next().value as
+      string | undefined;
+    if (!oldestKey) break;
+    procedureGenerationTimes.delete(oldestKey);
+  }
+};
+
+const stableProcedureGeneratedAt = (input: {
+  accountType: HelixAccountType;
+  profileId?: string | null;
+  sessionId?: string | null;
+  turnId: string;
+  procedureId: string;
+}): string => {
+  const nowMs = Date.now();
+  pruneRetainedTheoryExperimentProcedures(nowMs);
+  const key = JSON.stringify([
+    input.accountType,
+    readString(input.profileId),
+    readString(input.sessionId),
+    input.turnId,
+    input.procedureId,
+  ]);
+  const retained = procedureGenerationTimes.get(key);
+  if (retained) return retained.generatedAt;
+  const generatedAt = new Date(nowMs).toISOString();
+  procedureGenerationTimes.set(key, { generatedAt, storedAtMs: nowMs });
+  pruneRetainedTheoryExperimentProcedures(nowMs);
+  return generatedAt;
 };
 
 const retainTheoryExperimentProcedure = (input: {
@@ -353,6 +395,7 @@ const readRetainedTheoryExperimentProcedure = (input: {
 
 export const resetRetainedTheoryExperimentProceduresForTests = (): void => {
   retainedTheoryExperimentProcedures.clear();
+  procedureGenerationTimes.clear();
 };
 
 const operation = (
@@ -720,7 +763,14 @@ async function validateEvidenceArtifact(
   }
   if (kind === "formal_certificate") {
     const issues = (
-      await validateCasimirFormalVerificationCertificateIntegrityV1(artifact)
+      artifact.schemaVersion ===
+      "casimir_formal_verification_certificate/v2"
+        ? await validateCasimirFormalVerificationCertificateV2Integrity(
+            artifact,
+          )
+        : await validateCasimirFormalVerificationCertificateIntegrityV1(
+            artifact,
+          )
     ).map((issue) => `formal_certificate:${issue}`);
     if (artifact.status !== "passed") {
       issues.push("formal_certificate:not_passed");
@@ -931,27 +981,46 @@ function intrinsicEvidenceLineage(input: {
   if (input.kind === "formal_certificate") {
     const request = readRecord(input.artifact.request);
     const spec = readRecord(request.casimirSpec);
-    const masterProblem = nestedOrDirectIdentity(
-      request,
-      "masterProblem",
-      "planId",
-      "artifactSha256",
-      ["masterProblemPlanId"],
-      ["masterProblemArtifactSha256"],
-    );
-    const derivationProgram = nestedOrDirectIdentity(
-      request,
-      "derivationProgram",
-      "programId",
-      "artifactSha256",
-      ["derivationProgramId"],
-      ["derivationProgramArtifactSha256"],
-    );
+    const v2 =
+      input.artifact.schemaVersion ===
+      "casimir_formal_verification_certificate/v2";
+    const masterProblem = v2
+      ? {
+          id: readString(request.masterProblemPlanId),
+          artifactSha256: sha256OrNull(
+            request.masterProblemArtifactSha256,
+          ),
+        }
+      : nestedOrDirectIdentity(
+          request,
+          "masterProblem",
+          "planId",
+          "artifactSha256",
+          ["masterProblemPlanId"],
+          ["masterProblemArtifactSha256"],
+        );
+    const derivationProgram = v2
+      ? {
+          id: readString(request.derivationProgramId),
+          artifactSha256: sha256OrNull(
+            request.derivationProgramArtifactSha256,
+          ),
+        }
+      : nestedOrDirectIdentity(
+          request,
+          "derivationProgram",
+          "programId",
+          "artifactSha256",
+          ["derivationProgramId"],
+          ["derivationProgramArtifactSha256"],
+        );
     const theoryGraph = readRecord(request.theoryGraph);
     const theorem = readRecord(input.artifact.theorem);
     const claim = lineageClaim(
       theorem.claimId,
-      request.propositionSha256 ?? theorem.statementSha256,
+      request.semanticPropositionSha256 ??
+        request.propositionSha256 ??
+        theorem.statementSha256,
       [],
     );
     const semanticSha256 =
@@ -960,18 +1029,34 @@ function intrinsicEvidenceLineage(input: {
     const artifactSha256 =
       sha256OrNull(spec.artifactSha256) ??
       sha256OrNull(request.casimirSpecArtifactSha256);
-    if (!claim || !semanticSha256 || !artifactSha256) return null;
+    if (
+      !claim ||
+      !semanticSha256 ||
+      !artifactSha256 ||
+      !masterProblem.id ||
+      !masterProblem.artifactSha256 ||
+      !derivationProgram.id ||
+      !derivationProgram.artifactSha256
+    )
+      return null;
     return {
       sourceKind: "formal_verification_request",
       procedureId: input.procedureId,
-      candidateBadgeIds: [],
-      casimirSpecId: readString(spec.specId),
+      candidateBadgeIds: v2
+        ? readStringArray(request.candidateBadgeIds)
+        : [],
+      casimirSpecId:
+        readString(request.casimirSpecId) ??
+        readString(spec.specId),
       casimirSpecSemanticSha256: semanticSha256,
       casimirSpecArtifactSha256: artifactSha256,
       claims: [claim],
       sourceGraphId:
-        readString(theoryGraph.graphId) ?? readString(request.theoryGraphId),
+        readString(request.graphId) ??
+        readString(theoryGraph.graphId) ??
+        readString(request.theoryGraphId),
       sourceGraphSnapshotSha256:
+        sha256OrNull(request.graphSnapshotSha256) ??
         sha256OrNull(theoryGraph.snapshotSha256) ??
         sha256OrNull(request.theoryGraphSnapshotSha256),
       sourceMasterProblemPlanId: masterProblem.id,
@@ -1457,6 +1542,22 @@ async function scopeEvidenceBindingsToProcedure(input: {
     }
     if (lineage.sourceKind === "formal_verification_request") {
       if (
+        !lineage.casimirSpecId ||
+        lineage.casimirSpecId !== semantic.casimirSpecId
+      ) {
+        issues.push(
+          `${binding.artifactRef}:formal_spec_identity_lineage_mismatch`,
+        );
+      }
+      if (
+        JSON.stringify(sortedUniqueStrings(lineage.candidateBadgeIds)) !==
+        JSON.stringify(sortedUniqueStrings(semantic.candidateBadgeIds))
+      ) {
+        issues.push(
+          `${binding.artifactRef}:formal_candidate_badge_lineage_mismatch`,
+        );
+      }
+      if (
         lineage.sourceGraphId !== input.procedure.graphId ||
         !semantic.sourceGraphSnapshotSha256 ||
         lineage.sourceGraphSnapshotSha256 !== semantic.sourceGraphSnapshotSha256
@@ -1835,7 +1936,14 @@ async function collectClosureEvidenceObservations(input: {
           : "failed";
     } else if (kind === "formal_certificate") {
       integrityIssues =
-        await validateCasimirFormalVerificationCertificateIntegrityV1(payload);
+        payload.schemaVersion ===
+        "casimir_formal_verification_certificate/v2"
+          ? await validateCasimirFormalVerificationCertificateV2Integrity(
+              payload,
+            )
+          : await validateCasimirFormalVerificationCertificateIntegrityV1(
+              payload,
+            );
       status =
         payload.status === "passed"
           ? "passed"
@@ -2616,7 +2724,13 @@ export async function executeTheoryExperimentProcedureGatewayCapability(input: {
     ),
     normalizationStatus: "explicit",
   };
-  const generatedAt = new Date().toISOString();
+  const generatedAt = stableProcedureGeneratedAt({
+    accountType: input.accountType,
+    profileId: input.profileId,
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    procedureId,
+  });
   const reflection = buildTheoryContextReflection({
     graph,
     prompt: prompt as string,

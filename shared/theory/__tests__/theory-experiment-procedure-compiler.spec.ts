@@ -176,6 +176,7 @@ describe("theory experiment procedure compiler", () => {
             "procedure_sha256",
             "semantic_admission_artifact_ref",
             "artifact_generation_artifact_ref",
+            "formal_source_admission_artifact_ref",
           ]),
           producesEvidenceKind: null,
           executesAutomatically: false,

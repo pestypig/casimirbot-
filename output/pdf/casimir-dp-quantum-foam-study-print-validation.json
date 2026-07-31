@@ -1,0 +1,27 @@
+{
+  "schema": "casimir_dp_print_pdf_validation/1",
+  "pdf_path": "output/pdf/casimir-dp-quantum-foam-study-print.pdf",
+  "sha256": "0323efa166447b59030f2f353060e4af08d9ab748a97c9fcd19a82e740f29de8",
+  "bytes": 2846390,
+  "pages": 107,
+  "page_sizes_points": [
+    [
+      612.0,
+      792.0
+    ]
+  ],
+  "all_pages_letter": true,
+  "tagged": true,
+  "outline_entries": 110,
+  "outline_titles_nonempty": true,
+  "link_annotations": 111,
+  "external_links": 21,
+  "internal_links": 90,
+  "empty_text_pages": [],
+  "replacement_characters": 0,
+  "outside_page_characters": [],
+  "missing_expected_text": [],
+  "has_acroform": false,
+  "has_javascript": false,
+  "pass": true
+}

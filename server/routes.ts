@@ -211,6 +211,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   const { discordLinkRouter } = await import("./routes/discord-link");
   app.use(discordLinkRouter);
   const { accountSessionRouter } = await import("./routes/account-session");
+  const { docsPrintPdfRouter } = await import("./routes/docs-print-pdf");
   const { docsTranslationRouter } = await import("./routes/docs-translation");
   const { researchLibraryRouter } = await import("./routes/research-library");
   const { googleAuthRouter } = await import("./routes/google-auth");
@@ -218,6 +219,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   const { roomSourceIngressRouter } = await import("./routes/room-source-ingress");
   app.use("/api/auth", googleAuthRouter);
   app.use("/api/account", accountSessionRouter);
+  app.use("/api/docs", docsPrintPdfRouter);
   app.use("/api/docs", docsTranslationRouter);
   app.use("/api/research-library", researchLibraryRouter);
   app.use("/api/profile-ingress", profileIngressRouter);

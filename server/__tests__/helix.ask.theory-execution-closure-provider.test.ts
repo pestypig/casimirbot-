@@ -310,6 +310,103 @@ const buildPassedUnrelatedNumericalCertificate = () =>
   });
 
 describe("Helix theory execution-closure provider integration", () => {
+  it("re-enters exact formal source and runtime readiness blockers without admitting execution", async () => {
+    const turnId = `${TURN_ID}:formal-readiness-inspection`;
+    const inspected = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      accountType: "developer",
+      capabilityId:
+        "theory-formal-verifier.inspect_artifact_family",
+      turnId,
+      iteration: 1,
+      arguments: {
+        formal_artifact_id:
+          "casimir:lanyon:gr_hyperbolic_maxwell_1d:formal_source",
+        theorem_name: "xHyperbolicity",
+      },
+    });
+    expect(inspected).toMatchObject({
+      ok: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      observation_packet: {
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        missing_requirements: expect.arrayContaining([
+          expect.objectContaining({
+            code: "formal_generator_lineage_unavailable",
+          }),
+          expect.objectContaining({
+            code: "formal_execution_catalog_unconfigured",
+          }),
+          expect.objectContaining({
+            code: "formal_external_sandbox_executor_unconfigured",
+          }),
+          expect.objectContaining({
+            code: "runtime_approval_receipt_issuer_unconfigured",
+          }),
+          expect.objectContaining({
+            code:
+              "runtime_approval_receipt_replay_ledger_unconfigured",
+          }),
+        ]),
+      },
+      observation: {
+        selectedTheorem: {
+          theoremName: "xHyperbolicity",
+          claimCeiling: "definition_well_typed",
+        },
+        runtimeReadiness: {
+          status: "blocked",
+          configuredForExactResolutionAttempt: false,
+        },
+        next_affordances: [],
+      },
+    });
+
+    const normalized = buildCodexNormalizedObservationArtifacts({
+      turnId,
+      gatewayCallResults: [inspected],
+    });
+    expect(normalized.missingNormalizationFailures).toEqual([]);
+    expect(normalized.artifacts).toEqual([
+      expect.objectContaining({
+        kind: "theory_formal_artifact_family_audit_observation",
+        terminal_eligible: false,
+        assistant_answer: false,
+        payload: expect.objectContaining({
+          selectedTheorem: expect.objectContaining({
+            theoremName: "xHyperbolicity",
+            claimCeiling: "definition_well_typed",
+          }),
+          runtimeReadiness: expect.objectContaining({
+            status: "blocked",
+            configuredForExactResolutionAttempt: false,
+            blockerCodes: expect.arrayContaining([
+              "formal_execution_catalog_unconfigured",
+              "formal_external_sandbox_executor_unconfigured",
+            ]),
+          }),
+          next_affordances: [],
+          terminal_eligible: false,
+          assistant_answer: false,
+        }),
+      }),
+    ]);
+
+    const continuation = buildHelixAgentContinuationState({
+      payload: {
+        current_turn_artifact_ledger: normalized.artifacts,
+        final_status: "in_progress",
+      },
+      turnId,
+      trigger: "observation",
+    });
+    expect(continuation.next_admissible_affordances).toEqual([]);
+  });
+
   it("authenticates and re-enters the full hash-bound closure as nonterminal current-turn evidence", async () => {
     const prepared = await callWorkstationGatewayCapability({
       agentRuntime: "codex",

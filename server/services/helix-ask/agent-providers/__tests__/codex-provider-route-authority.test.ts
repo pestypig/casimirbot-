@@ -4,6 +4,7 @@ import {
   attachCodexProviderExactCapabilityItinerary,
   ensureCodexPreGatewayRouteAuthority,
 } from "../codex-provider";
+import { readWorkstationGatewayCallRequestsForTurn } from "../explicit-workstation-gateway";
 
 describe("Codex provider pre-gateway route authority", () => {
   it("does not promote a generic visual-source turn into named receipt evaluation", () => {
@@ -520,5 +521,87 @@ describe("Codex provider pre-gateway route authority", () => {
         }),
       ],
     });
+  });
+
+  it("replaces a stale no-tool projection with the retained scientific sidecar route", () => {
+    const turnId = "ask:scientific-sidecar-continuation";
+    const promptText =
+      "Continue with that exact enrollment. Prepare a current-turn execution plan changing permitted Dxx from 0.01 to 0.02 while freezing every other registered input. Bind the plan to the same badge orientation, source claim, Lanyon semantics, pinned Lean contract, primary and independent numerics, confirmation policy, and closure evaluator. Prepare only; do not start or evaluate.";
+    const body: Record<string, unknown> = {
+      question: promptText,
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        turn_id: turnId,
+        thread_id: "thread:scientific-sidecar-continuation",
+        target_source: "unknown",
+        target_kind: "unknown",
+        strength: "none",
+        allow_client_shortcut: true,
+        allow_no_tool_direct: true,
+      },
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId,
+      selectedRoute: "/ask/turn",
+    });
+
+    expect(body.source_target_intent).toMatchObject({
+      target_source: "theory_locator",
+      target_kind: "scientific_evidence_execution_plan",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+    expect(body.committed_ask_route).toMatchObject({
+      route: {
+        source_target: "theory_locator",
+      },
+      terminal_product: {
+        evidence_reentry_required: true,
+        followup_reasoning_required: true,
+      },
+    });
+  });
+
+  it("enriches one structured closure evaluation with the enrolled manifest", () => {
+    const turnId = "ask:scientific-closure-evaluate";
+    const promptText =
+      "Now call scientific-evidence-closure.evaluate for that exact current-turn plan, using only current-turn confirmation, formal, and numerical artifacts that actually exist.";
+    const body: Record<string, unknown> = {
+      question: promptText,
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        turn_id: turnId,
+        thread_id: "thread:scientific-closure-evaluate",
+        target_source: "unknown",
+        target_kind: "unknown",
+        strength: "none",
+        allow_no_tool_direct: true,
+      },
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId,
+      selectedRoute: "/ask/turn",
+    });
+
+    expect(
+      readWorkstationGatewayCallRequestsForTurn({
+        body,
+        includePlannerDerived: true,
+      }),
+    ).toMatchObject([
+      {
+        capability_id: "scientific-evidence-closure.evaluate",
+        arguments: {
+          manifest_id:
+            "scientific-evidence:advection-diffusion-dxx:v1",
+        },
+      },
+    ]);
   });
 });

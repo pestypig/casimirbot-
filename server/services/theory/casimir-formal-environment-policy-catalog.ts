@@ -81,9 +81,10 @@ export type CasimirFormalRuntimeSelfTestCatalogEntryV1 = {
 };
 
 /*
- * Intentionally empty in production. A scientific formal environment remains
- * unavailable until it has an additive request/certificate contract that
- * separates semantic claim identity from the observed Lean theorem type.
+ * Intentionally empty in production. This catalog belongs to the legacy v1
+ * runtime-canary/preparation rail. Scientific v2 execution is selected through
+ * the external sealed-execution catalog and may not inherit a host executable
+ * or filesystem path from this module.
  */
 const ENTRIES = new Map<string, CasimirFormalEnvironmentPolicyCatalogEntryV1>();
 let installedRuntimeSelfTest: CasimirFormalRuntimeSelfTestCatalogEntryV1 | null =

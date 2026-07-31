@@ -848,6 +848,60 @@ describe("Realtime grounded answer feedback", () => {
     });
   });
 
+  it("suppresses speech when selected scientific closure evidence is malformed", () => {
+    const handoff = createHandoff("scientific-closure-malformed");
+    const turnId = "ask:scientific-closure:malformed";
+    const observationRef =
+      `${turnId}:workstation_gateway:scientific-evidence-closure.evaluate:1`;
+    const payload = {
+      ...nativeCapabilityTerminalPayload({
+        answer: "This should not be spoken.",
+        turnId,
+        capabilityId: "scientific-evidence-closure.evaluate",
+        observationRef,
+      }),
+      current_turn_artifact_ledger: [{
+        artifact_id: observationRef,
+        turn_id: turnId,
+        producer_item_id: "call:scientific-closure",
+        kind: "scientific_evidence_closure_observation",
+        created_at_ms: Date.now(),
+        source_scope: "current_turn",
+        goal_hash: "goal:scientific-closure",
+        payload: {
+          schema: "casimir.scientific_evidence_closure.observation.v1",
+          status: "succeeded",
+          current_turn_id: turnId,
+          current_turn_evidence: true,
+          closure_packet: {
+            artifactId: "scientific_evidence_closure_packet",
+            schemaVersion: "scientific_evidence_closure_packet/v1",
+            artifactSha256: "forged",
+          },
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      }],
+    };
+
+    expect(recordRealtimeGroundedAnswerFromPayload({
+      handoffId: handoff.handoff_id,
+      payload,
+      askTurnId: turnId,
+    })).toBeNull();
+    expect(readRealtimeGroundedFeedbackObserverAudit(handoff.handoff_id)).toMatchObject({
+      terminal_speech_authority_status: "validated",
+      feedback_status: "suppressed",
+      failure_code: "scientific_closure_grounding_identity_invalid",
+    });
+    expect(readRealtimeGroundedAnswerRelay(handoff.handoff_id)).toMatchObject({
+      status: "suppressed",
+      failure_code: "scientific_closure_grounding_identity_invalid",
+      response_created: false,
+    });
+  });
+
   it("suppresses typed failures and exports the complete authority-safe relay chain", () => {
     const nowMs = Date.now();
     const session = admitRealtimeSession({

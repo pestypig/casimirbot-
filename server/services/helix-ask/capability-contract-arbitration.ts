@@ -211,11 +211,15 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "helix_ask.reflect_theory_context":
     case "theory-badge-graph.propose_frontier_conjectures":
     case "theory-experiment-procedure.prepare":
+    case "scientific-evidence-closure.inspect_enrollment":
+    case "scientific-evidence-closure.prepare":
+    case "scientific-evidence-closure.evaluate":
     case "theory-experiment-procedure.readmit":
     case "theory-experiment-procedure.evaluate_closure":
     case "theory-semantic-admitter.normalize":
     case "theory-artifact-producer.prepare_lanyon_request":
     case "theory-artifact-producer.admit_lanyon_snapshot":
+    case "theory-formal-verifier.inspect_artifact_family":
     case "theory-formal-verifier.prepare_request":
     case "theory-formal-verifier.plan":
     case "theory-formal-verifier.start":
@@ -317,11 +321,15 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "theory-badge-graph.propose_frontier_conjectures":
     case "helix.theory.frontierVectorFieldTrace":
     case "theory-experiment-procedure.prepare":
+    case "scientific-evidence-closure.inspect_enrollment":
+    case "scientific-evidence-closure.prepare":
+    case "scientific-evidence-closure.evaluate":
     case "theory-experiment-procedure.readmit":
     case "theory-experiment-procedure.evaluate_closure":
     case "theory-semantic-admitter.normalize":
     case "theory-artifact-producer.prepare_lanyon_request":
     case "theory-artifact-producer.admit_lanyon_snapshot":
+    case "theory-formal-verifier.inspect_artifact_family":
     case "theory-formal-verifier.prepare_request":
     case "theory-formal-verifier.plan":
     case "theory-formal-verifier.start":

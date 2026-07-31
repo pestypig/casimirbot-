@@ -1274,6 +1274,7 @@ export function buildGreensFromTiles(
 
 // Hook to get current pipeline state
 export function useEnergyPipeline(options?: {
+  enabled?: boolean;
   staleTime?: number;
   refetchOnWindowFocus?: boolean;
   refetchInterval?: number;
@@ -1405,6 +1406,7 @@ export function useEnergyPipeline(options?: {
 
   const query = useQuery<EnergyPipelineSnapshot>({
     queryKey: ['/api/helix/pipeline'],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/helix/pipeline');
       const json = await response.json();

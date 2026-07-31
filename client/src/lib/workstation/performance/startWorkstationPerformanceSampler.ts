@@ -24,6 +24,7 @@ import {
 
 const SAMPLE_WINDOW_MS = 60_000;
 const PUBLISH_INTERVAL_MS = 1000;
+const SERVER_PUBLISH_INTERVAL_MS = 10_000;
 const INTERACTION_SAMPLE_THROTTLE_MS = 50;
 
 let activeRefCount = 0;
@@ -73,6 +74,7 @@ function startSamplerInstance(): () => void {
   let lastFrameDurationMs: number | null = null;
   let lastInteractionSampleAtMs = 0;
   let cancelDeferredPublish: (() => void) | null = null;
+  let lastServerPublishAtMs = Number.NEGATIVE_INFINITY;
   let stopped = false;
 
   const readDomNodeCount = () => {
@@ -235,15 +237,18 @@ function startSamplerInstance(): () => void {
       scheduler_last_deferred_at_ms: schedulerSnapshot.lastDeferredAtMs,
     });
     useWorkstationPerformanceStore.getState().setLatest(sample);
-    const postSample = async () => {
-      await fetch("/api/workspace-os/browser-performance/sample", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sample),
-        keepalive: true,
-      }).catch(() => undefined);
-    };
-    void postSample();
+    if (nowMs - lastServerPublishAtMs >= SERVER_PUBLISH_INTERVAL_MS) {
+      lastServerPublishAtMs = nowMs;
+      const postSample = async () => {
+        await fetch("/api/workspace-os/browser-performance/sample", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(sample),
+          keepalive: true,
+        }).catch(() => undefined);
+      };
+      void postSample();
+    }
   };
 
   const publish = () => {

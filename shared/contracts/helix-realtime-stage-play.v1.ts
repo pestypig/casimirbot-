@@ -227,6 +227,9 @@ export type HelixRealtimeStagePlayGroundedAnswerV1 = {
   terminal_speech_authority_status: "validated";
   evidence_refs: string[];
   grounding_evidence_refs: string[];
+  scientific_evidence_closure_identities: import(
+    "./helix-scientific-evidence-closure-grounding.v1"
+  ).HelixScientificEvidenceClosureGroundingIdentityV1[];
   grounding_proof_source:
     | "canonical_terminal_boundary"
     | "canonical_terminal_boundary_compatibility"

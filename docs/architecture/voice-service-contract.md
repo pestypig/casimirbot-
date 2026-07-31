@@ -351,6 +351,11 @@ contract-stable baseline. Changes to these paths must preserve:
    receipt. Conversational rendering may paraphrase the canonical answer, so a
    spoken transcript hash mismatch is not itself a failure when binding and
    playback correlation succeed.
+8. When selected Ask evidence includes a scientific closure packet, the relay
+   carries its integrity-verified identity and claim ceiling. Voice may say
+   “canonical within the exact enrollment” only when that bounded flag is true,
+   and may never promote the result to source, semantic, theory, empirical,
+   physical, or implementation-correctness authority.
 
 Implementation files are not frozen. Source breadth, tool parity, speech style,
 and context economy may evolve behind these invariants.

@@ -120,7 +120,7 @@ describe("doc equation actions", () => {
     );
     const generatedIds = generated.entries.map((entry) => entry.equationId);
 
-    expect(markerIds).toHaveLength(41);
+    expect(markerIds).toHaveLength(62);
     expect(source.entries.map((entry) => entry.equationId).sort()).toEqual([...markerIds].sort());
     expect([...generatedIds].sort()).toEqual([...markerIds].sort());
     expect(generatedIds).toEqual(
@@ -143,6 +143,10 @@ describe("doc equation actions", () => {
         "cdp-stage4-2b-joint-complex-residual",
         "cdp-stage4-2b-frozen-dp-scaling",
         "cdp-stage4-2b-identifiability-power-gate",
+        "cdp-stage4-2g-single-identity-dp",
+        "cdp-stage4-2g-companion-threshold",
+        "cdp-stage4-2g-whitened-pilot-gates",
+        "cdp-stage4-2h-commissioning-gate",
       ]),
     );
   });
@@ -247,6 +251,40 @@ describe("doc equation actions", () => {
         "study.casimir_dp.apparatus_coherence_residual_stage4_2b",
       );
     }
+  });
+
+  it("opens the Stage-4.2G empirical-feasibility badge from its prediction and pilot gates", () => {
+    for (const equationId of [
+      "cdp-stage4-2g-single-identity-dp",
+      "cdp-stage4-2g-companion-threshold",
+      "cdp-stage4-2g-whitened-pilot-gates",
+    ]) {
+      const generatedEquation = readCasimirDpGeneratedEntry(equationId);
+      const entry = getDocEquationActionEntryForLatex(
+        `/${CASIMIR_DP_STUDY}`,
+        generatedEquation.latex,
+      );
+      expect(entry?.equationId).toBe(equationId);
+      expect(getDocEquationTheoryActions(entry)[0]?.preferredBadgeId).toBe(
+        "study.casimir_dp.empirical_feasibility_pilot_stage4_2g",
+      );
+    }
+  });
+
+  it("opens the Stage-4.2H commissioning badge from its intake gate", () => {
+    const generatedEquation = readCasimirDpGeneratedEntry(
+      "cdp-stage4-2h-commissioning-gate",
+    );
+    const entry = getDocEquationActionEntryForLatex(
+      `/${CASIMIR_DP_STUDY}`,
+      generatedEquation.latex,
+    );
+    expect(entry?.equationId).toBe(
+      "cdp-stage4-2h-commissioning-gate",
+    );
+    expect(getDocEquationTheoryActions(entry)[0]?.preferredBadgeId).toBe(
+      "study.casimir_dp.commissioning_intake_stage4_2h",
+    );
   });
 
   it("opens the experiment-design badge from the accessible-rate equation", () => {

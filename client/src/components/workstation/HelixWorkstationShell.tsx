@@ -28,6 +28,7 @@ import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
 import { useInterfaceText } from "@/lib/i18n/interfaceText";
 import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
+import type { WorkstationEntrySurface } from "@shared/workstation-link-meta";
 
 const HELIX_CONVERSATION_TRACE_PANEL_ID = "workstation-workflow-timeline";
 const HELIX_CHAT_CONTEXT_PREFIX = "helix-ask-chat:";
@@ -70,9 +71,11 @@ const clampDockWidth = (value: number) =>
 export function HelixWorkstationShell({
   onOpenPanel,
   layoutVariant = "desktop",
+  initialMobileSurface = "ask",
 }: {
   onOpenPanel: (panelId: PanelDefinition["id"]) => void;
   layoutVariant?: "desktop" | "mobile";
+  initialMobileSurface?: WorkstationEntrySurface;
 }) {
   const chatDock = useWorkstationLayoutStore((state) => state.chatDock);
   const setChatDockWidth = useWorkstationLayoutStore((state) => state.setChatDockWidth);
@@ -89,7 +92,8 @@ export function HelixWorkstationShell({
   const deleteLocalSession = useAgiChatStore((state) => state.deleteSession);
   const ensureContextSession = useAgiChatStore((state) => state.ensureContextSession);
   const [sessionListOpen, setSessionListOpen] = useState(false);
-  const [mobileSurface, setMobileSurface] = useState<"ask" | "workstation">("ask");
+  const [mobileSurface, setMobileSurface] =
+    useState<WorkstationEntrySurface>(initialMobileSurface);
   const [resizePreviewWidth, setResizePreviewWidth] = useState<number | null>(null);
   const resizeStartWidthRef = useRef(chatDock.widthPx);
   const mobileSwipeStartRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);

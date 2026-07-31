@@ -105,4 +105,6 @@ The release acceptance adds a real local Fabric 1.21.8 server, a headless
 player, a keyed Shared Live Room, natural Ask turns, stale/offline recovery,
 permission isolation and credential-leak scanning. See
 `docs/minecraft-situation-awareness-capability-matrix.md` and
-`docs/audits/helix-environment-connector-release-audit-2026-07-29.md`.
+`docs/audits/helix-environment-connector-release-audit-2026-07-29.md`. For the
+interactive local-player workflow, see
+`docs/runbooks/minecraft-fabric-shared-live-room-debugging.md`.

@@ -1,0 +1,56 @@
+{
+  "schema_version": "casimir_dp_stage4_2g_authority_manifest/1",
+  "campaign_id": "casimir-dp-empirical-feasibility-pilot-stage4-2g-v1",
+  "immutable_upstream": [
+    {
+      "role": "stage4_2f_config",
+      "path": "configs/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.v1.json",
+      "sha256": "421f9d4c570c135cf2bb4a92849868c2862074696911dc7cb139608a4b5f60dd",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2f_authority_manifest",
+      "path": "configs/research/casimir-dp-stage4-2f-authorities.v1.json",
+      "sha256": "e0eab3f58a8b5c10ca91ef28232d4fda2392bbfceb02bc6822ef4e3290e4f19b",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2f_fixture",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2f-maxwell-closure.synthetic.v1.json",
+      "sha256": "fe81cda1ed30dfce8b58e8eeaeb13ceddad4c353aa95ad185e448a5bdf961128",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2f_report",
+      "path": "artifacts/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z/maxwell-macroscopic-qed-closure-stage4-2f-report.json",
+      "sha256": "f832e7081abcbd54b9b9879e80257c6f064cf5c78c7779cf9a181400d848e176",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2f_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z/maxwell-macroscopic-qed-closure-stage4-2f-receipt.json",
+      "sha256": "b33689bc4c2fc751219a2af33fee9cf00cbe38477b2134d90c684e9eb7465f89",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2f_verification_receipt",
+      "path": "docs/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-verification-receipt.json",
+      "sha256": "f1b8219b7c74bc25db9cc3137aeec97b714bfc3193052a94e3929326eb858f73",
+      "required_at_runtime": true
+    }
+  ],
+  "method_authorities": [
+    {
+      "role": "registered_dp_generator",
+      "path": "shared/casimir-dp-dp-companion.ts",
+      "sha256": "6432f931dd465624291c4cd7c33eda6a780d4b9687f89f6e76a2794d8708b5ac",
+      "required_at_runtime": true
+    },
+    {
+      "role": "whitened_complex_identifiability_evaluator",
+      "path": "shared/casimir-dp-apparatus-identifiability-stage4-2b.ts",
+      "sha256": "d4a2cecd3238bae15de020568f2b1f659559d269470fd5c4015f495ab8fc0b12",
+      "required_at_runtime": true
+    }
+  ]
+}

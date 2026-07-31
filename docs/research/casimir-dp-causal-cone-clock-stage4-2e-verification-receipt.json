@@ -1,0 +1,157 @@
+{
+  "schema_version": "casimir_dp_causal_cone_clock_stage4_2e_verification_receipt/1",
+  "campaign_id": "casimir-dp-causal-cone-clock-stage4-2e-v1",
+  "campaign_run_id": "casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z",
+  "verified_at": "2026-07-29T22:15:13.000Z",
+  "evidence_class": "synthetic_causal_geometry_recovery_and_scale_separation",
+  "claim_ceiling": "causal_geometry_recovery_and_scale_separation_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-causal-cone-clock-stage4-2e.v1.json",
+    "config_sha256": "1279c8e23fb033237a79c29546ef5c210a9405d21604ad844ae801e55d5732e5",
+    "authority_manifest_path": "configs/research/casimir-dp-stage4-2e-authorities.v1.json",
+    "authority_manifest_sha256": "cba9c8b40dc153cda0bb9683834df953c9de09a0c4d1a2bb9aa32ac5167b91f2",
+    "fixture_path": "configs/research/fixtures/casimir-dp-stage4-2e-causal-cone.synthetic.v1.json",
+    "fixture_sha256": "16245e73a70acee3a429a6beaee6ec5b18b66863a357c60918d602920ef9bab8",
+    "report_json_path": "artifacts/research/casimir-dp-causal-cone-clock-stage4-2e/casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z/causal-cone-clock-stage4-2e-report.json",
+    "report_json_sha256": "d75857f22e0a95b4302e61d60d25c9fa689182ce8c9ef31eabfd15e64f66ed58",
+    "report_markdown_path": "artifacts/research/casimir-dp-causal-cone-clock-stage4-2e/casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z/causal-cone-clock-stage4-2e-report.md",
+    "report_markdown_sha256": "fd3463408012bc168832167159641bc30a87a627bf26ec2d9d3ebd9bfe0af5c0",
+    "campaign_trace_path": "artifacts/research/casimir-dp-causal-cone-clock-stage4-2e/casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z/causal-cone-clock-stage4-2e-trace.jsonl",
+    "campaign_trace_sha256": "c20f9c95594c2b2b47f4bbcb8360e6eee032a22e77db21fdf9b379c21f451e57",
+    "campaign_receipt_path": "artifacts/research/casimir-dp-causal-cone-clock-stage4-2e/casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z/causal-cone-clock-stage4-2e-receipt.json",
+    "campaign_receipt_sha256": "633b07c4f2d769b4701612bd4e112e5a2e12e111f60f7405f1f752b3e260d2c2",
+    "maintained_report_path": "docs/research/casimir-dp-causal-cone-clock-stage4-2e-report.md",
+    "maintained_report_matches_immutable_markdown": true,
+    "git_head": "31709409fba197516e966484259f81725a2ad0fa",
+    "worktree_state": "dirty_uncommitted_stage4_2e_source_and_content_hashes_authoritative",
+    "authority_mode": "role_path_and_content_hash_tuple"
+  },
+  "immutable_stage4_2d_upstream": {
+    "run_id": "casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z",
+    "campaign_receipt_sha256": "e602cb12250c2560b1f71502ae93c17e754cacbbe69b6f0acfbb4a5a55a6809c",
+    "downstream_verification_receipt_path": "docs/research/casimir-dp-cross-scale-metrology-stage4-2d-verification-receipt.json",
+    "downstream_verification_receipt_sha256": "d96430684379dd5408d8099ae49a05ca0eaf4042a0ea64b09e23d0a4156a0556",
+    "mutation_detected": false
+  },
+  "verification_inputs": {
+    "explicit_repo_telemetry": {
+      "path": "reports/repo-telemetry-stage4-2e-20260729T221500000Z.json",
+      "sha256": "5302730bb9e9116ef441a0f6770fe293d16aa6ba6e73d993ca056d82ece2bc4a",
+      "auto_merge_used": false
+    },
+    "adapter_request": {
+      "path": "artifacts/casimir-dp-stage4-2e-20260729T221500000Z-adapter-request.json",
+      "sha256": "81c4fa2be21deb0bc77c027985885490c7467603802ae9568efa967e8c442142",
+      "auto_telemetry": false,
+      "explicit_hard_inputs": [
+        "build.status",
+        "tests.status",
+        "schema.contracts",
+        "deps.coherence"
+      ],
+      "stale_proxy_carry_forward_allowed": false
+    },
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-2e-20260729T221500000Z-bound-validated.jsonl",
+      "sha256": "378c915329514f13bf4111f732217f9b9bf7d710adb50510c5ed8626928d8311",
+      "bytes": 3403,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true,
+      "validated_exporter_path": "scripts/research/export-casimir-dp-stage4-verification-trace.ts"
+    }
+  },
+  "local_gates": {
+    "stage4_2e_runtime_campaign_paper_graph_and_root": {
+      "files": 5,
+      "tests": 49,
+      "status": "pass"
+    },
+    "required_gr_warp_replay": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    },
+    "production_build": {
+      "status": "pass_with_warnings",
+      "command": "npm run build",
+      "exit_code": 0,
+      "warnings_present": true,
+      "note": "The production client and server bundles completed. Existing browser-externalization, chunk-size, duplicate-key, and duplicate-case warnings remain outside this campaign's scientific authority."
+    },
+    "dependency_coherence": {
+      "status": "pass",
+      "command": "npm ls --depth=0",
+      "exit_code": 0,
+      "package_lock_sha256": "c85521a758783fa5cea1c8933e3c5ad54d604d596620279fce916e3c2ce42367"
+    },
+    "equation_sidecar": {
+      "paper_markers": 54,
+      "source_entries": 54,
+      "generated_entries": 54,
+      "source_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
+      "source_sha256_before_downstream_receipt_binding": "9fd2ae5a6cbfff5abdd8dc7c4436d3cc1dcda133a5e48f8005fc13de1b867eb7",
+      "generated_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
+      "generated_sha256_before_downstream_receipt_binding": "77fe863862541d8ab8b37b19728c0c1466ccee4d1a291218999395bb919be4e7",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 30,
+      "edges": 90,
+      "stage4_2e_badges": 1,
+      "calculator_payloads": 0,
+      "observable_bridge_edges": 0,
+      "graph_path": "shared/theory/casimir-dp-study-theory-badges.ts",
+      "graph_sha256_before_downstream_receipt_binding": "9f53d9552c2ed91fac66a32805b03cf9b235c1221d84ea7a354cfc648a25fbba",
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 217,
+      "validation": "pass",
+      "strict_congruence_errors": 0,
+      "strict_congruence_warnings": 0,
+      "report_json_path": "reports/math-report.json",
+      "report_json_sha256": "9ffe8553113480ce3a3ec972a3cc1a226234e65eb46ac82788b4947fe4fc57c0",
+      "report_markdown_path": "reports/math-report.md",
+      "report_markdown_sha256": "ace856d4e04a52483f132f8321b6b2de6557e41f68e5e5436b7457719b7ec1b1"
+    },
+    "physics_root_to_leaf_manifest": {
+      "status": "pass",
+      "manifest_path": "configs/physics-root-leaf-manifest.v1.json",
+      "manifest_sha256": "f4d0fb2f73b43221ef3656e5450c87f02869463c60ad5981da1efec5d80dda37",
+      "readiness_and_scientific_falsifier_rules_separated": true
+    }
+  },
+  "adapter_result": {
+    "trace_id": "casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T221500000Z-final",
+    "run_id": "2346",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate": {
+      "status": "GREEN",
+      "certificate_hash": "38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34",
+      "certificate_id": "constraint-pack:repo-convergence:38b2e69264ac",
+      "integrity_ok": true
+    },
+    "scientific_scope": "none"
+  },
+  "scientific_standing": {
+    "software_and_causal_recovery_diagnostics": "pass",
+    "null_geodesic_apparatus_authority": "not_ready",
+    "complete_apparatus_metric_response": "not_ready",
+    "physical_pilot_readiness": "not_ready",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "explanation": "The certificate validates the supplied software, tests, schema, dependency, graph, sidecar, math, root-to-leaf, and GR/WARP gates. It does not authenticate a measured light path or clock response, supply a complete conserved apparatus stress tensor and metric, demonstrate state preparation, exclude or support DP, admit a Casimir-to-collapse bridge, identify collapse or manifold dynamics, or establish physical viability."
+  }
+}

@@ -3,6 +3,7 @@ import path from "node:path";
 import pg from "pg";
 import { newDb } from "pg-mem";
 import type { Pool as PgPool } from "pg";
+import { LocalPersistenceScheduler } from "./local-persistence-scheduler";
 
 const { Pool } = pg;
 import { runMigrations } from "./migrator";
@@ -44,6 +45,7 @@ const localPersistenceTables = [
   "helix_environment_connector_device_credentials",
   "helix_room_source_credential_deliveries",
   "helix_runtime_tool_confirmation_replay_claims",
+  "casimir_theory_execution_state",
   "helix_account_linked_providers",
   "helix_account_sessions",
   "helix_account_profile_storage",
@@ -87,6 +89,7 @@ const localPersistenceJsonColumns = new Set([
   "helix_account_profile_storage.snapshot",
   "helix_account_events.payload",
   "helix_research_library_documents.metadata",
+  "casimir_theory_execution_state.payload",
 ]);
 
 type LocalSnapshot = {
@@ -95,11 +98,35 @@ type LocalSnapshot = {
   tables: Record<string, Array<Record<string, unknown>>>;
 };
 
+const ROOM_SOURCE_REQUEST_TABLE = "helix_room_source_ingress_requests";
+const ROOM_SOURCE_REQUEST_RETENTION_MS = 24 * 60 * 60 * 1000;
+const ROOM_SOURCE_REQUEST_REFRESH_OVERLAP_MS = 10 * 60 * 1000;
+
 let localPersistencePath: string | null = null;
 let localPersistenceReady = false;
 let localPersistenceRestored = false;
 let localPersistenceWrite: Promise<void> = Promise.resolve();
 let localPersistenceSuppress = false;
+let localPersistenceScheduler: LocalPersistenceScheduler | null = null;
+let localPersistenceSnapshotCache: LocalSnapshot | null = null;
+const localPersistenceMutationVersions = new Map<string, number>();
+
+const deferredLocalPersistenceEnabled = (): boolean =>
+  (process.env.HELIX_LOCAL_PG_MEM_WRITE_MODE ?? "").trim().toLowerCase() ===
+  "deferred";
+
+const localPersistenceIdleDelayMs = (): number => {
+  const value = Number(process.env.HELIX_LOCAL_PG_MEM_IDLE_FLUSH_MS ?? 5_000);
+  return Number.isFinite(value) ? Math.max(100, Math.floor(value)) : 5_000;
+};
+
+const localPersistenceMaxDelayMs = (): number => {
+  const value = Number(process.env.HELIX_LOCAL_PG_MEM_MAX_FLUSH_MS ?? 30_000);
+  const idleDelayMs = localPersistenceIdleDelayMs();
+  return Number.isFinite(value)
+    ? Math.max(idleDelayMs, Math.floor(value))
+    : 30_000;
+};
 
 const shouldPersistLocalMem = (): boolean => {
   if ((process.env.HELIX_LOCAL_PG_MEM_PERSIST ?? "").trim() === "0") return false;
@@ -120,7 +147,43 @@ const queryText = (input: unknown): string =>
       : "";
 
 const isMutationQuery = (text: string): boolean =>
-  /^(insert|update|delete|truncate)\b/i.test(text.trim());
+  /^(insert|update|delete|truncate)\b/i.test(text.trim()) ||
+  (/^with\b/i.test(text.trim()) &&
+    /\b(insert\s+into|update|delete\s+from|truncate(?:\s+table)?)\b/i.test(
+      text,
+    ));
+
+const mutationTableFromQuery = (text: string): string | null => {
+  const match =
+    /\b(?:insert\s+into|update|delete\s+from|truncate(?:\s+table)?)\s+(?:["\w]+\.)?["]?([\w]+)["]?/i.exec(
+      text,
+    );
+  const table = match?.[1]?.toLowerCase() ?? "";
+  return localPersistenceTables.includes(
+    table as (typeof localPersistenceTables)[number],
+  )
+    ? table
+    : null;
+};
+
+const markLocalPersistenceTablesDirty = (
+  tables?: readonly string[],
+): void => {
+  const selected =
+    tables && tables.length > 0 ? tables : localPersistenceTables;
+  for (const table of selected) {
+    if (
+      localPersistenceTables.includes(
+        table as (typeof localPersistenceTables)[number],
+      )
+    ) {
+      localPersistenceMutationVersions.set(
+        table,
+        (localPersistenceMutationVersions.get(table) ?? 0) + 1,
+      );
+    }
+  }
+};
 
 function installLocalPersistence(pool: PgPool): PgPool {
   const originalQuery = pool.query.bind(pool);
@@ -136,6 +199,14 @@ function installLocalPersistence(pool: PgPool): PgPool {
       typeof (result as Promise<unknown>).then === "function"
     ) {
       return (result as Promise<unknown>).then(async (value) => {
+        const mutationTable = mutationTableFromQuery(text);
+        markLocalPersistenceTablesDirty(
+          mutationTable ? [mutationTable] : undefined,
+        );
+        if (deferredLocalPersistenceEnabled()) {
+          scheduleDeferredLocalPersistence(pool);
+          return value;
+        }
         localPersistenceWrite = localPersistenceWrite.then(() => persistLocalSnapshot(pool)).catch((err) => {
           console.warn("[db] failed to persist local pg-mem snapshot", err);
         });
@@ -190,27 +261,117 @@ function createPool(): PgPool {
 
 async function persistLocalSnapshot(activePool: PgPool): Promise<void> {
   if (!localPersistencePath) return;
-  const tables: LocalSnapshot["tables"] = {};
-  for (const table of localPersistenceTables) {
+  const startedAtMs = Date.now();
+  const capturedVersions = new Map(localPersistenceMutationVersions);
+  const tables: LocalSnapshot["tables"] = localPersistenceSnapshotCache
+    ? { ...localPersistenceSnapshotCache.tables }
+    : {};
+  const tablesToRefresh =
+    localPersistenceSnapshotCache && capturedVersions.size > 0
+      ? localPersistenceTables.filter((table) =>
+          capturedVersions.has(table),
+        )
+      : localPersistenceTables;
+  if (tablesToRefresh.length === 0) return;
+  const savedAt = new Date().toISOString();
+  for (const table of tablesToRefresh) {
     try {
-      const { rows } = await activePool.query(`SELECT * FROM ${table};`);
-      tables[table] = rows as Array<Record<string, unknown>>;
+      if (
+        table === ROOM_SOURCE_REQUEST_TABLE &&
+        localPersistenceSnapshotCache?.tables[table]
+      ) {
+        const previousSavedAtMs = Date.parse(localPersistenceSnapshotCache.saved_at);
+        const refreshStartMs = Math.max(
+          Date.now() - ROOM_SOURCE_REQUEST_RETENTION_MS,
+          (Number.isFinite(previousSavedAtMs) ? previousSavedAtMs : Date.now()) -
+            ROOM_SOURCE_REQUEST_REFRESH_OVERLAP_MS,
+        );
+        const { rows } = await activePool.query(
+          `SELECT * FROM ${table} WHERE received_at >= $1;`,
+          [new Date(refreshStartMs).toISOString()],
+        );
+        const retainedAfterMs = Date.now() - ROOM_SOURCE_REQUEST_RETENTION_MS;
+        const merged = new Map<string, Record<string, unknown>>();
+        for (const row of localPersistenceSnapshotCache.tables[table]) {
+          const receivedAtMs = Date.parse(String(row.received_at ?? ""));
+          if (!Number.isFinite(receivedAtMs) || receivedAtMs < retainedAfterMs) {
+            continue;
+          }
+          merged.set(`${row.binding_id}\u0000${row.request_id}`, row);
+        }
+        for (const row of rows as Array<Record<string, unknown>>) {
+          merged.set(`${row.binding_id}\u0000${row.request_id}`, row);
+        }
+        const validBindings = new Set(
+          (tables.helix_room_source_bindings ?? []).map((row) =>
+            String(row.binding_id),
+          ),
+        );
+        const validCredentials = new Set(
+          (tables.helix_room_source_credentials ?? []).map((row) =>
+            String(row.credential_id),
+          ),
+        );
+        tables[table] = [...merged.values()].filter(
+          (row) =>
+            validBindings.has(String(row.binding_id)) &&
+            validCredentials.has(String(row.credential_id)),
+        );
+      } else {
+        const { rows } = await activePool.query(`SELECT * FROM ${table};`);
+        tables[table] = rows as Array<Record<string, unknown>>;
+      }
     } catch {
       tables[table] = [];
     }
   }
   const snapshot: LocalSnapshot = {
     schema: "helix.local_pg_mem_snapshot.v1",
-    saved_at: new Date().toISOString(),
+    saved_at: savedAt,
     tables,
   };
   await fs.promises.mkdir(path.dirname(localPersistencePath), { recursive: true });
   const tempPath = `${localPersistencePath}.${process.pid}.tmp`;
-  await fs.promises.writeFile(tempPath, JSON.stringify(snapshot, null, 2), "utf8");
+  await fs.promises.writeFile(tempPath, JSON.stringify(snapshot), "utf8");
   await fs.promises.rename(tempPath, localPersistencePath);
+  localPersistenceSnapshotCache = snapshot;
+  for (const [table, version] of capturedVersions) {
+    if (localPersistenceMutationVersions.get(table) === version) {
+      localPersistenceMutationVersions.delete(table);
+    }
+  }
+  const elapsedMs = Date.now() - startedAtMs;
+  if (elapsedMs >= 250) {
+    console.warn(
+      `[db] local pg-mem snapshot took ${elapsedMs}ms (refreshed ${tablesToRefresh.length}/${localPersistenceTables.length} tables)`,
+    );
+  }
+  if (deferredLocalPersistenceEnabled()) {
+    void import("../services/runtime/runtime-memory-governor")
+      .then(({ scheduleRuntimeIdleMemorySettle }) =>
+        scheduleRuntimeIdleMemorySettle(),
+      )
+      .catch(() => undefined);
+  }
 }
 
-export async function persistLocalDatabaseSnapshotIfEnabled(): Promise<void> {
+function scheduleDeferredLocalPersistence(activePool: PgPool): void {
+  if (!localPersistenceScheduler) {
+    localPersistenceScheduler = new LocalPersistenceScheduler({
+      idleDelayMs: localPersistenceIdleDelayMs(),
+      maxDelayMs: localPersistenceMaxDelayMs(),
+      persist: () => persistLocalSnapshot(activePool),
+      onError: (err) => {
+        console.warn("[db] failed to persist deferred local pg-mem snapshot", err);
+      },
+    });
+  }
+  localPersistenceScheduler.schedule();
+}
+
+export async function persistLocalDatabaseSnapshotIfEnabled(
+  touchedTables?: readonly string[],
+): Promise<void> {
   if (
     !pool ||
     !localPersistencePath ||
@@ -219,12 +380,25 @@ export async function persistLocalDatabaseSnapshotIfEnabled(): Promise<void> {
   ) {
     return;
   }
+  if (touchedTables && touchedTables.length === 0) return;
+  markLocalPersistenceTablesDirty(touchedTables);
   const activePool = pool;
+  if (deferredLocalPersistenceEnabled()) {
+    scheduleDeferredLocalPersistence(activePool);
+    return;
+  }
   localPersistenceWrite = localPersistenceWrite
     .then(() => persistLocalSnapshot(activePool))
     .catch((err) => {
       console.warn("[db] failed to persist local pg-mem snapshot", err);
     });
+  await localPersistenceWrite;
+}
+
+export async function flushLocalDatabaseSnapshotIfEnabled(): Promise<void> {
+  if (localPersistenceScheduler) {
+    await localPersistenceScheduler.drain();
+  }
   await localPersistenceWrite;
 }
 
@@ -238,6 +412,14 @@ async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
     const raw = await fs.promises.readFile(localPersistencePath, "utf8");
     const snapshot = JSON.parse(raw) as Partial<LocalSnapshot>;
     if (snapshot.schema !== "helix.local_pg_mem_snapshot.v1" || !snapshot.tables) return;
+    localPersistenceSnapshotCache = {
+      schema: "helix.local_pg_mem_snapshot.v1",
+      saved_at:
+        typeof snapshot.saved_at === "string"
+          ? snapshot.saved_at
+          : new Date(0).toISOString(),
+      tables: snapshot.tables,
+    };
     for (const table of localPersistenceTables) {
       const rows = snapshot.tables[table] ?? [];
       for (const row of rows) {
@@ -288,6 +470,7 @@ export async function ensureDatabase(): Promise<void> {
 }
 
 export async function resetDbClient(): Promise<void> {
+  await flushLocalDatabaseSnapshotIfEnabled();
   if (pool && "end" in pool) {
     try {
       await (pool as PgPool).end();
@@ -302,6 +485,10 @@ export async function resetDbClient(): Promise<void> {
   localPersistenceRestored = false;
   localPersistenceWrite = Promise.resolve();
   localPersistenceSuppress = false;
+  localPersistenceScheduler?.reset();
+  localPersistenceScheduler = null;
+  localPersistenceSnapshotCache = null;
+  localPersistenceMutationVersions.clear();
   if (lastDsn?.startsWith("pg-mem://") || !lastDsn) {
     memPools.clear();
   }

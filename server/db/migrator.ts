@@ -39,6 +39,7 @@ import { migration037 } from "./migrations/037_shared_live_room_binding_consent_
 import { migration038 } from "./migrations/038_environment_adapter_registry";
 import { migration039 } from "./migrations/039_environment_connector_platform";
 import { migration040 } from "./migrations/040_environment_probe_execution_authority";
+import { migration041 } from "./migrations/041_casimir_theory_execution_state";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -82,6 +83,7 @@ const MIGRATIONS = [
   migration038,
   migration039,
   migration040,
+  migration041,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

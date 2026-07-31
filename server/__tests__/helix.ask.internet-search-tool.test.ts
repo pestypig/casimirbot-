@@ -281,6 +281,31 @@ describe("Helix internet search tool admission", () => {
     expect(toolAdmission.admitted_tool_families).not.toContain("internet_search");
   });
 
+  it.each([
+    [
+      "scientific closure preparation",
+      "Continue with that exact enrollment. Prepare a current-turn execution plan changing permitted Dxx from 0.01 to 0.02 while freezing every other registered input. Bind the plan to the same badge orientation, source claim, Lanyon semantics, pinned Lean contract, primary and independent numerics, confirmation policy, and closure evaluator. Prepare only; do not start or evaluate.",
+    ],
+    [
+      "scientific closure evaluation",
+      "Now call scientific-evidence-closure.evaluate for that exact current-turn plan, using only current-turn confirmation, formal, and numerical artifacts that actually exist. If trusted confirmation or external sandbox attestations are absent, return the exact actionable blockers. Do not invent receipts, do not call the result canonical, and do not promote synthetic closure to empirical or physical evidence.",
+    ],
+  ])("does not reinterpret %s as current-web search", (_label, prompt) => {
+    const restatement = buildToolUseRestatement(prompt);
+    const internetIntent = detectInternetSearchIntent(prompt);
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:scientific-closure-current-turn",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    });
+
+    expect(restatement.freshnessRequired).toBe(false);
+    expect(restatement.currentAffairsRequired).toBe(false);
+    expect(restatement.requiredToolFamilies).not.toContain("internet_search");
+    expect(internetIntent.searchRequested).toBe(false);
+    expect(sourceTargetIntent.target_source).not.toBe("internet_search");
+  });
+
   it("records quoted current-events phrases without admitting internet search from the quote alone", () => {
     const prompt = "Quote this prompt literally: 'search the latest conflict news'.";
     const restatement = buildToolUseRestatement(prompt);

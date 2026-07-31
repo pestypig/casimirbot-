@@ -1,263 +1,245 @@
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildCasimirDpStudyTheoryBadgesV1 } from "../shared/theory/casimir-dp-study-theory-badges";
 
 const root = process.cwd();
-const paperPath = path.resolve(root, "docs/research/casimir-dp-quantum-foam-study.md");
-const sourcePath = path.resolve(
+const mainPath = path.resolve(root, "docs/research/casimir-dp-quantum-foam-study.md");
+const supplementPath = path.resolve(
+  root,
+  "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.md",
+);
+const mainSourcePath = path.resolve(
   root,
   "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
 );
-const generatedPath = path.resolve(
+const mainGeneratedPath = path.resolve(
   root,
   "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
 );
+const supplementSourcePath = path.resolve(
+  root,
+  "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.equation-actions.source.json",
+);
+const supplementGeneratedPath = path.resolve(
+  root,
+  "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.equation-actions.json",
+);
 
-const paper = readFileSync(paperPath, "utf8");
-const source = JSON.parse(readFileSync(sourcePath, "utf8")) as {
+const main = readFileSync(mainPath, "utf8");
+const supplement = readFileSync(supplementPath, "utf8");
+
+type Sidecar = {
+  docPath: string;
   entries: Array<{ equationId: string }>;
 };
-const generated = JSON.parse(readFileSync(generatedPath, "utf8")) as {
-  entries: Array<{ equationId: string }>;
-};
 
-describe("Casimir-DP paper provenance parity", () => {
-  it("keeps the paper experiment-first and separates DP from the Casimir bridge", () => {
-    expect(paper).toMatch(
-      /^# A Controlled Coherence Test of Diósi–Penrose Collapse with Casimir Boundary Modulation/,
+const loadSidecar = (pathname: string): Sidecar =>
+  JSON.parse(readFileSync(pathname, "utf8")) as Sidecar;
+
+function markerIds(markdown: string): string[] {
+  return [
+    ...markdown.matchAll(/helix-doc-equation-action\/v1 id=([^\s]+)\s*-->/g),
+  ].map((match) => match[1]);
+}
+
+describe("Casimir-Diósi article and reproducibility supplement", () => {
+  it("keeps the canonical article focused on the exact tested model", () => {
+    expect(main).toMatch(
+      /^# An Identifiability-First Feasibility Protocol for a Gaussian-Regularized Diósi Collapse Test with a Casimir-Boundary Control/,
     );
-    const theoreticalResult = paper.indexOf("## The theoretical result and why it matters");
-    const experimentAtAGlance = paper.indexOf("## Experiment at a glance");
-    const reproducibilityLedger = paper.indexOf("## Reproducibility and status ledger");
-    const technicalRecord = paper.indexOf("## 1. Why this is separate from NHM2");
-    expect(theoreticalResult).toBeGreaterThan(0);
-    expect(experimentAtAGlance).toBeGreaterThan(theoreticalResult);
-    expect(reproducibilityLedger).toBeGreaterThan(experimentAtAGlance);
-    expect(technicalRecord).toBeGreaterThan(reproducibilityLedger);
-    expect(experimentAtAGlance).toBeGreaterThan(0);
-    expect(technicalRecord).toBeGreaterThan(experimentAtAGlance);
-    expect(paper).toContain("### Strongest defensible statement");
-    expect(paper).toContain("**Equation congruence is not mechanism congruence.**");
-    expect(paper).toContain("### Hypotheses separated before measurement");
-    expect(paper).toContain(
-      "The significant advance is therefore methodological and falsifiable.",
+    expect(main).toContain("## 2. Exact tested dynamics");
+    expect(main).toContain("nondissipative, Gaussian-regularized Diósi");
+    expect(main).toContain("single effective particle");
+    expect(main).toContain("Penrose's objective-reduction argument motivates");
+    expect(main).toMatch(/they\s+are not the same theory object/);
+    expect(main).toContain("not a representation-independent or generic DP test");
+  });
+
+  it("freezes one authoritative apparatus and demotes older geometries", () => {
+    expect(main).toContain("## 3. Current Authoritative Apparatus Manifest");
+    expect(main).toContain("276.302 nm");
+    expect(main).toContain("1.94385×10^-16 kg");
+    expect(main).toContain("160 nm");
+    expect(main).toContain("250 ms");
+    expect(main).toContain("1.2 μm");
+    expect(main).toContain("`superseded_design_record`");
+    expect(main).toContain(
+      "75 nm radius, 20 nm separation, 0.1 s, 5 μm nominal gap, 10–4 μm commissioning ladder",
     );
-    expect(paper).toContain(
-      "A boundary anomaly eligible for a new preregistered mechanism study",
+    expect(main).toMatch(/about\s+\\\(6\.89\\times10\^5\\\) times more massive/);
+    expect(main).toContain("State preparation is the first physical go/no-go");
+  });
+
+  it("makes the two coherence-loss values impossible to conflate", () => {
+    expect(main).toContain("0.598308\\%");
+    expect(main).toMatch(
+      /This is the only headline coherence-loss forecast for the authoritative\s+apparatus/,
     );
-    expect(paper).toMatch(
-      /the\s+result is an apparatus-design no-go—not a null result on DP/,
-    );
-    expect(paper).toContain("### Primary experimental question");
-    expect(paper).toContain("### Projection if the frozen DP model is true");
-    expect(paper).toContain("## Decisive outcomes");
-    expect(paper).toContain("## How the Casimir part fits");
-    expect(paper).toContain("## Recommended execution");
-    expect(paper).toContain("1.34871682598635\\times10^{-1}");
-    expect(paper).toContain("| \\(250\\ {\\rm ms}\\) | 0.03371792 | 0.966844 | 3.32% |");
-    expect(paper).toContain(
-      "The Casimir apparatus supplies a controlled QED boundary perturbation, not the",
-    );
-    expect(paper).toContain(
-      "Until Steps 1–4 pass with empirical inputs, the correct action is an apparatus",
-    );
-    expect(paper).toContain(
-      "`HQF` and `HOR` remain non-executable at the",
+    expect(main).toContain("3.32% loss");
+    expect(main).toMatch(
+      /It is a\s+different point, not a second estimate of Eq\. \(4\)\./,
     );
   });
 
-  it("keeps paper markers and both equation-action sidecars in exact parity", () => {
-    const markerIds = [...paper.matchAll(/helix-doc-equation-action\/v1 id=([^\s]+)\s*-->/g)]
-      .map((match) => match[1]);
-    const sourceIds = source.entries.map((entry) => entry.equationId);
-    const generatedIds = generated.entries.map((entry) => entry.equationId);
-
-    expect(markerIds).toHaveLength(49);
-    expect(new Set(markerIds).size).toBe(markerIds.length);
-    expect(new Set(sourceIds).size).toBe(sourceIds.length);
-    expect(new Set(generatedIds).size).toBe(generatedIds.length);
-    expect([...sourceIds].sort()).toEqual([...markerIds].sort());
-    expect([...generatedIds].sort()).toEqual([...markerIds].sort());
-  });
-
-  it("maps every equation into the paper's artifact-and-claim appendix", () => {
-    const appendix = paper.split("## Appendix A. Equation-to-artifact and equation-to-claim map")[1];
-    expect(appendix).toBeDefined();
-    for (const entry of generated.entries) {
-      expect(appendix).toContain(`\`${entry.equationId}\``);
-    }
-  });
-
-  it("documents the cross-runtime rail, frozen inputs, receipts, and current ledgers", () => {
-    expect(paper).toContain("### 7.4 Cross-runtime authority order");
-    expect(paper).toContain("### 8.1 Runtime-to-artifact contract");
-    for (const runner of [
-      "run-casimir-dp-quantum-foam-study.ts",
-      "run-casimir-dp-experiment-design.ts",
-      "run-casimir-dp-next-computations.ts",
-      "run-casimir-dp-data-readiness.ts",
-      "run-casimir-dp-proposal-closure.ts",
-      "run-casimir-dp-or-phase-stage2.ts",
-      "run-casimir-dp-evidence-map-stage3.ts",
-      "run-casimir-dp-polarization-congruence-stage4.ts",
-      "run-casimir-dp-qed-scale-hierarchy-stage4-1.ts",
-      "run-casimir-dp-apparatus-coherence-residual-stage4-2b.ts",
-      "run-casimir-dp-identifiability-redesign-stage4-2c.ts",
-      "run-casimir-dp-cross-scale-metrology-stage4-2d.ts",
+  it("preserves hypothesis and observable separation", () => {
+    for (const heading of [
+      "### 4.1 Ordinary-physics null, H0",
+      "### 4.2 Frozen Diósi hypothesis, HD",
+      "### 4.3 Lane C: boundary-conditioned extension, HB",
+      "### 4.4 Manifold-response hypothesis",
+      "### 4.5 Compton-frequency non-bridge",
+      "## 9. Observable-separation gate",
+      "## 11. Discussion",
+      "## 12. Claim boundaries",
     ]) {
-      expect(paper).toContain(runner);
+      expect(main).toContain(heading);
     }
-    expect(paper).toContain("9e0f1e8aa01f8ff3e7faf0c070853e0cd4887a191115c51804fa5c71a7c2be5d");
-    expect(paper).toContain("aae5cf37e01df022509bc9f997287719eafd5670c6156fdd626d24ce94dbb4c0");
-    expect(paper).toContain("casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z");
-    expect(paper).toContain("signature_not_identifiable");
-    expect(paper).toContain("0.9999771044199663");
-    expect(paper).toContain("179103.91134865975");
-    expect(paper).toContain("50632b32c4133fe3f0f5eee3cbbb157a983d0a9da69de6239d58563ca88f569c");
-    expect(paper).toContain("2ebd9971bacc393842dc71bfd80063d7b244231947074bc70b3be25bd7ad5b67");
-    expect(paper).toContain("e29564c6cedcace388233f6006b98683fab54f9326b96ab9bbaf3334f33adcbe");
-    expect(paper).toContain("727d78249462f0b4171532af37db97be5500a3a7a870cc56b2e533cae0ae0df7");
-    expect(paper).toContain(
-      "docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-verification-receipt.json",
+    expect(main).toContain(
+      "No Casimir variable enters the registered collapse generator",
     );
-    expect(paper).toContain(
-      "casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T130100867Z-final",
+    expect(main).toMatch(
+      /A Casimir-correlated residual cannot move from the left branch to\s+the right branch without a registered transfer kernel/,
     );
-    expect(paper).toContain("run `2325`");
-    expect(paper).toContain(
-      "3894af959e1f3de8d28ede457727a97688c2fd64031c3512f941f5b89a889ffd",
-    );
-    expect(paper).toContain(
-      "194a58bcfa4cc855c8a50a8a862fac391a01ee55c4dc9feeb1d6e98526b8bf3d",
-    );
-    expect(paper).toContain(
-      "casimir-dp-identifiability-redesign-stage4-2c-v1-20260728T042510781Z",
-    );
-    expect(paper).toContain("0.7177243227022941");
-    expect(paper).toContain("6.531693613125537");
-    expect(paper).toContain("0.9978580863455258");
-    expect(paper).toContain("542 required paired windows");
-    expect(paper).toContain(
-      "59cca7ab7f6f6a3d27a83ad8b455fc63fc6db3ca7207cdeff350ed97d497865c",
-    );
-    expect(paper).toContain(
-      "d9237eeb9079e7fab84a86b3eda28b0f14bb83be1a340b3d6f9695dcffb5047c",
-    );
-    expect(paper).toContain(
-      "3ceeaddbdb0e8a78f1038bd3227f8b0ddbac4ac0af24ca7c37a6b026e5fe2b81",
-    );
-    expect(paper).toContain("run `2332`");
-    expect(paper).toContain(
-      "3d454ba0cf3e778dc934cae1c0ee33996bb792caa06255a9dfe984a38138bdee",
-    );
-    expect(paper).toContain(
-      "51c461db1fdaa29162b2c5287a31c01823e5bb23b16a25fe2914841239abba98",
-    );
-    expect(paper).toContain(
-      "casimir-dp-cross-scale-metrology-stage4-2d-v1-20260728T193200000Z",
-    );
-    expect(paper).toContain(
-      "614f5b6de4176ffda7fc49ce794592aa50a56ecb56d4accf7df3cae6b0bcc41e",
-    );
-    expect(paper).toContain(
-      "e602cb12250c2560b1f71502ae93c17e754cacbbe69b6f0acfbb4a5a55a6809c",
-    );
-    expect(paper).toContain("run `2338`");
-    expect(paper).toContain(
-      "bb4f53cf48f7cf0726822e53dbacd369485c638636df1e6f5078027d36f91d38",
-    );
-    expect(paper).toContain(
-      "d96430684379dd5408d8099ae49a05ca0eaf4042a0ea64b09e23d0a4156a0556",
-    );
-    expect(paper).toContain("adds zero observable");
-    expect(paper).not.toContain("| pending | pending | pending |");
-  });
-
-  it("registers the scientific-standing baseline and fails closed on a frequency-to-cavity bridge", () => {
-    expect(paper).toContain("### 4.1 Compton-frequency non-bridge");
-    expect(paper).toContain("### 4.2 Scientific and runtime claim baseline");
-    expect(paper).toContain("cdp-compton-dp-frequency-identities");
-    expect(paper).toContain("cdp-frequency-cavity-bridge-gate");
-    expect(paper).toContain("\\mathcal K_{cavity\\rightarrow branch/coherence}\\ \\text{not registered}");
-    expect(paper).toContain("A boundary-conditioned coherence residual proves objective collapse");
-    expect(paper).toContain("### 2.4 Penrose OR motivation, notation, and scope");
-    expect(paper).toContain("cdp-or-branch-geometry-context");
-    expect(paper).toContain("cdp-ambient-gravity-phase-control");
-    expect(paper).toContain("cdp-interferometric-phase-visibility-readout");
-    expect(paper).toContain("No numerical plausibility score");
-    expect(paper).toContain("### 8.2 Validation standing");
-    expect(paper).toContain("Math-stage registry | 217 entries;");
-    expect(paper).toContain("10 files, 67 tests `pass`");
-    expect(paper).toContain("18 files, 179 tests `pass`");
-    expect(paper).toContain(
-      "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
-    );
-    expect(paper).toContain(
-      "38b2e69264ac9e846676fced5d7318a0ab6e35affcb572246bcae7bf6606fa34",
-    );
-    expect(paper).toContain(
-      "measured evidence `not_ready`; collapse identification `blocked`; manifold dynamics `blocked`",
+    expect(main).toMatch(
+      /renormalized negative energy density is not automatically negative spacetime\s+curvature/,
     );
   });
 
-  it("prints the current byte hashes for every frozen runtime config", () => {
-    const expected = {
-      "configs/research/casimir-dp-quantum-foam-study.v1.json":
-        "56ab76ca85f4ef4da7ce1ac9da3e87d2eb4e898b02cbc09aca0ad301e0a3f2d2",
-      "configs/research/casimir-dp-experiment-design.v1.json":
-        "bd5528824d70de65e8b181dc18a78c3a287b2fd9c2cdd66bb5a9a79a3c97fe84",
-      "configs/research/casimir-dp-next-computations.v1.json":
-        "5b12c758228dc68865f4a91d3ae1aa9ade698932546c686aab5cb9e5773b5e93",
-      "configs/research/casimir-dp-data-readiness.v1.json":
-        "a95e7a22c20e29ed9c34f45ece90916748a9264a32be8315663819171b406475",
-      "configs/research/casimir-dp-proposal-closure.v1.json":
-        "7b3b2673c95d4eebca060261385f3b0659365c1112c1d9d42bc1d8700686b8ba",
-      "configs/research/casimir-dp-or-phase-stage2.v1.json":
-        "b517e8fbf002303258a5269e7f37c6b16d4bc3c45c609072bdb2a9e5184e596d",
-      "configs/research/casimir-dp-polarization-congruence-stage4.v1.json":
-        "ade06cd7b95e27fe414614ad36512d5764d439c4fa6623f8499ad218ba07c3d7",
-      "configs/research/casimir-dp-apparatus-coherence-residual-stage4-2b.v1.json":
-        "2abf8808fe73f6099d3e9e93e1bed2c8ca33d1094b6a93e9ad926f5fd900fa3e",
-      "configs/research/casimir-dp-identifiability-redesign-stage4-2c.v1.json":
-        "81f6109525202f57b6e5958373b37ec18d15dfff0ddc9ad0af274b8a294af6aa",
-      "configs/research/casimir-dp-cross-scale-metrology-stage4-2d.v1.json":
-        "614f5b6de4176ffda7fc49ce794592aa50a56ecb56d4accf7df3cae6b0bcc41e",
-    } as const;
-
-    for (const [relativePath, expectedHash] of Object.entries(expected)) {
-      const actualHash = createHash("sha256")
-        .update(readFileSync(path.resolve(root, relativePath)))
-        .digest("hex");
-      expect(actualHash).toBe(expectedHash);
-      expect(paper).toContain(expectedHash);
+  it("reports nominal identifiability honestly and requires a robustness envelope", () => {
+    expect(main).toContain("0.999977");
+    expect(main).toContain("179,104");
+    expect(main).toContain("0.717724");
+    expect(main).toContain("6.53169");
+    expect(main).toContain("0.997858");
+    expect(main).toContain("542");
+    expect(main).toMatch(
+      /The next computation must report an envelope rather than a single\s+number/,
+    );
+    for (const requiredStress of [
+      "finite-pilot covariance",
+      "shrinkage/regularization",
+      "drift and non-Gaussian tails",
+      "response amplitude/phase error",
+      "missing nuisance",
+      "branch and hold-time jitter",
+      "leave-one-control-out",
+      "selection optimism",
+    ]) {
+      expect(main).toContain(requiredStress);
     }
   });
 
-  it("keeps the paper canonical, sidecar-bundled, and badge-count synchronized", () => {
+  it("states the external-bound screen and its convention limitation", () => {
+    expect(main).toContain("\\(R_0>4.9\\times10^{-10}\\) m at 90% confidence");
+    expect(main).toContain("\\(R_0>4.5\\times10^{-10}\\) m at 95% confidence");
+    expect(main).toContain("about 204 times");
+    expect(main).toMatch(
+      /the\s+mass-density smearing definition, normalization convention, charged-constituent\s+radiation map, and treatment of the effective composite particle/,
+    );
+  });
+
+  it("downgrades positive interpretation while the companion is infeasible", () => {
+    expect(main).toContain("1.92979\\times10^{-40}");
+    expect(main).toContain("3.85958\\times10^{-40}");
+    expect(main).toContain("Equation (13) is not an instrument model");
+    expect(main).toContain(
+      "replicated DP-shaped coherence residual may be reported as unexplained",
+    );
+    expect(main).toContain(
+      "model-consistent phenomenology, but not as support-eligible identification",
+    );
+  });
+
+  it("includes publication elements and six scientific figures", () => {
+    for (const figure of [
+      "apparatus-schematic.svg",
+      "timing-sequence.svg",
+      "hypothesis-graph.svg",
+      "identifiability-geometry.svg",
+      "constraint-screen.svg",
+      "coherence-forecast.svg",
+    ]) {
+      expect(main).toContain(figure);
+    }
+    for (const element of [
+      "## Publication declarations",
+      "**Author contributions.**",
+      "**Code and data availability.**",
+      "**Competing interests.**",
+      "**Acknowledgments.**",
+      "## References",
+      "## 13. Conclusion",
+    ]) {
+      expect(main).toContain(element);
+    }
+  });
+
+  it("keeps main and supplement equation sidecars in exact parity", () => {
+    for (const [markdown, sourcePath, generatedPath, expectedDocPath] of [
+      [
+        main,
+        mainSourcePath,
+        mainGeneratedPath,
+        "docs/research/casimir-dp-quantum-foam-study.md",
+      ],
+      [
+        supplement,
+        supplementSourcePath,
+        supplementGeneratedPath,
+        "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.md",
+      ],
+    ] as const) {
+      const markers = markerIds(markdown);
+      const source = loadSidecar(sourcePath);
+      const generated = loadSidecar(generatedPath);
+      expect(new Set(markers).size).toBe(markers.length);
+      expect(source.docPath).toBe(expectedDocPath);
+      expect(generated.docPath).toBe(expectedDocPath);
+      expect(source.entries.map((entry) => entry.equationId).sort()).toEqual(
+        [...markers].sort(),
+      );
+      expect(generated.entries.map((entry) => entry.equationId).sort()).toEqual(
+        [...markers].sort(),
+      );
+    }
+  });
+
+  it("preserves the long-form audit as a noncanonical supplement", () => {
+    expect(supplement).toMatch(
+      /^# Reproducibility Supplement: Casimir–Diósi Coherence Feasibility Program/,
+    );
+    expect(supplement).toContain("## Reproducibility and status ledger");
+    expect(supplement).toContain("## 13. Source register");
+    expect(supplement).toContain("## 14. Repository evidence map");
+    expect(supplement).toContain("## Appendix A. Equation-to-artifact and equation-to-claim map");
+
     const taxonomy = JSON.parse(
       readFileSync(path.resolve(root, "docs/doc-taxonomy.v1.json"), "utf8"),
     ) as {
-      documents: Array<{
-        path: string;
-        canonical?: boolean;
-        sidecars?: string[];
-      }>;
+      documents: Array<{ path: string; canonical?: boolean; sidecars?: string[] }>;
     };
-    const document = taxonomy.documents.find((entry) =>
-      entry.path === "docs/research/casimir-dp-quantum-foam-study.md"
-    );
-    expect(document?.canonical).toBe(true);
-    expect(document?.sidecars).toEqual([
-      "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
-      "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
-    ]);
+    expect(
+      taxonomy.documents.find((entry) => entry.path.endsWith("quantum-foam-study.md"))
+        ?.canonical,
+    ).toBe(true);
+    expect(
+      taxonomy.documents.find((entry) =>
+        entry.path.endsWith("quantum-foam-study-reproducibility-supplement.md")
+      )?.canonical,
+    ).toBe(false);
+  });
 
+  it("keeps the canonical article connected to the live Theory Badge graph", () => {
     const graph = buildCasimirDpStudyTheoryBadgesV1();
-    expect(graph.badges).toHaveLength(29);
-    expect(graph.edges).toHaveLength(87);
-    expect(paper).toContain("29 study badges connected by");
-    expect(paper).toContain("87 dependency, requirement, documentation, and blocking edges");
+    expect(graph.badges).toHaveLength(33);
+    expect(graph.edges).toHaveLength(98);
+    expect(
+      graph.badges.some((badge) =>
+        badge.sourceRefs.some((source) =>
+          source.path === "docs/research/casimir-dp-quantum-foam-study.md"
+        )
+      ),
+    ).toBe(true);
   });
 });

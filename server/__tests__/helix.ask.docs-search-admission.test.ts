@@ -73,6 +73,42 @@ describe("Helix Ask docs-search admission", () => {
     expect(admission.admitted_tool_families).not.toContain("repo_code");
   });
 
+  it.each([
+    "Can you find the Casimir-DP quantum foam study?",
+    "Find the NHM2 current status whitepaper.",
+  ])("routes a definite multi-word named workspace artifact through Docs Viewer: %s", (promptText) => {
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "docs_viewer",
+      strength: "hard",
+      precedence_reason: "natural_local_document_lookup_source_target",
+      allow_no_tool_direct: false,
+    });
+    expect(admission.admitted_tool_families).toContain("docs_viewer");
+    expect(admission.admitted_tool_families).not.toContain("model_only");
+    expect(admission.admitted_tool_families).not.toContain("scholarly_research");
+  });
+
+  it.each([
+    "Find a study about magnetars.",
+    "Find the best study about magnetars.",
+    "Find the latest published magnetar study online.",
+    "Do not find the Casimir-DP quantum foam study.",
+    "Later, find the Casimir-DP quantum foam study.",
+    "Earlier you found the Casimir-DP quantum foam study.",
+    'The screen says "Find the Casimir-DP quantum foam study." Explain that text.',
+  ])("does not reinterpret generic or dormant study language as a workspace document command: %s", (promptText) => {
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+
+    expect(sourceTargetIntent.precedence_reason, promptText).not.toBe(
+      "natural_local_document_lookup_source_target",
+    );
+    expect(admission.admitted_tool_families, promptText).not.toContain("docs_viewer");
+  });
+
   it("routes a natural docs-topic explanation through Docs Viewer before model-only synthesis", () => {
     const promptText = "Can you look for docs about NHM2 and explain what it is?";
     const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });

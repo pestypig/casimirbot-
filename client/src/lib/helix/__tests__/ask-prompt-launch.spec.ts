@@ -23,7 +23,7 @@ describe("helix ask prompt launch bridge", () => {
     window.history.replaceState({}, "", "/helix-core");
   });
 
-  it("stores a pending prompt and navigates to desktop when launched off desktop", () => {
+  it("stores a pending prompt and navigates to desktop when launched outside the workstation shell", () => {
     const listener = vi.fn();
     window.addEventListener(HELIX_ASK_PROMPT_EVENT, listener as EventListener);
     try {
@@ -44,6 +44,31 @@ describe("helix ask prompt launch bridge", () => {
     expect(stored.bypassWorkstationDispatch).toBe(false);
     expect(listener).toHaveBeenCalledTimes(1);
     expect(navigateMock).toHaveBeenCalledWith("/desktop");
+  });
+
+  it("keeps mobile Ask launches on the mobile workstation route", () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/mobile?panels=workflow-demo-lab&focus=workflow-demo-lab",
+    );
+
+    launchHelixAskPrompt({
+      question: "Use the next Workflow Demo prompt.",
+      autoSubmit: false,
+      panelId: "workflow-demo-lab",
+    });
+
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/mobile");
+    expect(window.location.search).toBe(
+      "?panels=workflow-demo-lab&focus=workflow-demo-lab",
+    );
+    expect(consumePendingHelixAskPrompt()).toMatchObject({
+      question: "Use the next Workflow Demo prompt.",
+      autoSubmit: false,
+      panelId: "workflow-demo-lab",
+    });
   });
 
   it("preserves the active workstation panel for auto-submitted desktop prompts", () => {

@@ -9,8 +9,18 @@ import {
   prepareCasimirFormalVerificationRequestV1,
   resolveCasimirFormalPreparedRequestV1,
 } from "../../theory/casimir-formal-verification-preparer";
+import {
+  inspectCasimirFormalVerifierRuntimeReadinessV2,
+  planCasimirFormalVerifierJobV2,
+  prepareCasimirFormalVerifierRequestV2,
+  readCasimirFormalVerifierJobResultV2,
+  startCasimirFormalVerifierJobV2,
+} from "../../theory/casimir-formal-verifier-job-service.v2";
+import { queryCasimirFormalArtifactFamilyAuditCatalogV1 } from "../../theory/casimir-formal-artifact-family-audit-catalog";
 import type { HelixWorkstationCapabilityManifest } from "./types";
 
+export const THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY =
+  "theory-formal-verifier.inspect_artifact_family" as const;
 export const THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY =
   "theory-formal-verifier.prepare_request" as const;
 export const THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY =
@@ -21,6 +31,7 @@ export const THEORY_FORMAL_VERIFIER_READ_RESULT_CAPABILITY =
   "theory-formal-verifier.read_result" as const;
 
 export const THEORY_FORMAL_VERIFIER_CAPABILITIES = [
+  THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY,
   THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY,
   THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY,
   THEORY_FORMAL_VERIFIER_START_CAPABILITY,
@@ -29,6 +40,8 @@ export const THEORY_FORMAL_VERIFIER_CAPABILITIES = [
 
 const FORMAL_VERIFIER_PREPARATION_OBSERVATION_SCHEMA =
   "casimir.theory_formal_verifier.preparation_observation.v1" as const;
+const FORMAL_ARTIFACT_FAMILY_AUDIT_OBSERVATION_SCHEMA =
+  "casimir.theory_formal_verifier.artifact_family_audit_observation.v1" as const;
 const FORMAL_VERIFIER_PLAN_OBSERVATION_SCHEMA =
   "casimir.theory_formal_verifier.plan_observation.v1" as const;
 const FORMAL_VERIFIER_START_OBSERVATION_SCHEMA =
@@ -39,6 +52,55 @@ const FORMAL_VERIFIER_RESULT_OBSERVATION_SCHEMA =
 const preparedRequestProperties = {
   prepared_request_id: { type: "string" },
 } as const;
+
+export const theoryFormalVerifierInspectArtifactFamilyManifest: HelixWorkstationCapabilityManifest =
+  {
+    schema: "helix.workstation_tool_gateway.capability.v1",
+    capability_id:
+      THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY,
+    label: "Inspect audited formal artifact family",
+    description:
+      "Reads a server-governed, hash-bound formal artifact-family audit and reports exact proposition scope and replay blockers. It does not read an arbitrary repository, run Lean, validate semantic equivalence, or establish scientific truth.",
+    panel_id: "theory-badge-graph",
+    action_id: "inspect_formal_artifact_family",
+    mode: "read",
+    mutating: false,
+    code_mutation: false,
+    shell_access: false,
+    requires_confirmation: false,
+    requires_source: false,
+    terminal_eligible: false,
+    permission_profile_required: "read",
+    post_tool_model_step_required: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        formal_artifact_id: { type: "string" },
+        theorem_name: { type: "string" },
+        source_target_intent: { type: "object" },
+      },
+    },
+    output_observation_schema:
+      FORMAL_ARTIFACT_FAMILY_AUDIT_OBSERVATION_SCHEMA,
+    observation_schema:
+      FORMAL_ARTIFACT_FAMILY_AUDIT_OBSERVATION_SCHEMA,
+    safety_tags: [
+      "developer_only",
+      "read_only_catalog_inspection",
+      "server_governed_source_audit",
+      "exact_proposition_scope",
+      "formal_evidence",
+      "non_terminal",
+      "no_shell",
+      "no_code_mutation",
+      "does_not_execute_lean",
+      "does_not_validate_semantic_equivalence",
+      "does_not_validate_scientific_truth",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 
 export const theoryFormalVerifierPrepareRequestManifest: HelixWorkstationCapabilityManifest =
   {
@@ -72,10 +134,16 @@ export const theoryFormalVerifierPrepareRequestManifest: HelixWorkstationCapabil
         procedure_sha256: { type: "string" },
         semantic_admission_artifact_ref: { type: "string" },
         artifact_generation_artifact_ref: { type: "string" },
+        formal_source_admission_artifact_ref: { type: "string" },
         claim_id: { type: "string" },
         formal_artifact_id: { type: "string" },
         theorem_name: { type: "string" },
+        theorem_type_sha256: { type: "string" },
+        semantic_to_lean_binding_id: { type: "string" },
+        semantic_to_lean_binding_sha256: { type: "string" },
         environment_policy_id: { type: "string" },
+        sandbox_executor_capability_id: { type: "string" },
+        execution_catalog_entry_id: { type: "string" },
         source_target_intent: { type: "object" },
       },
     },
@@ -229,6 +297,7 @@ export const theoryFormalVerifierReadResultManifest: HelixWorkstationCapabilityM
   };
 
 export const theoryFormalVerifierManifests = [
+  theoryFormalVerifierInspectArtifactFamilyManifest,
   theoryFormalVerifierPrepareRequestManifest,
   theoryFormalVerifierPlanManifest,
   theoryFormalVerifierStartManifest,
@@ -249,6 +318,13 @@ const readPollAttempt = (value: unknown): number =>
   value >= 0
     ? value
     : 0;
+
+const isV2PreparedRequestId = (value: string | null): value is string =>
+  Boolean(
+    value?.startsWith("casimir-formal-verifier-prepared-v2:"),
+  );
+const isV2JobId = (value: string | null): value is string =>
+  Boolean(value?.startsWith("casimir-formal-verifier-job-v2:"));
 
 const formalStartAffordance = (
   preparedRequestId: string,
@@ -378,8 +454,150 @@ export async function executeTheoryFormalVerifierGatewayCapability(input: {
 
   if (
     input.capabilityId ===
+    THEORY_FORMAL_VERIFIER_INSPECT_ARTIFACT_FAMILY_CAPABILITY
+  ) {
+    const result = await queryCasimirFormalArtifactFamilyAuditCatalogV1({
+      formalArtifactId: readString(
+        input.args.formal_artifact_id ??
+          input.args.formalArtifactId,
+      ),
+      theoremName: readString(
+        input.args.theorem_name ?? input.args.theoremName,
+      ),
+    });
+    const runtimeReadiness =
+      inspectCasimirFormalVerifierRuntimeReadinessV2();
+    const selectedCaseReadiness =
+      result.selectedCase?.executionEnrollmentReadiness.blockerCodes ??
+      [];
+    const inspectionRequirementCodes = [
+      ...new Set([
+        ...result.issues,
+        ...(result.ok
+          ? [
+              result.generationLineageAudit.generatorLineage
+                .blockerCode,
+              ...selectedCaseReadiness,
+              ...runtimeReadiness.blockerCodes,
+            ]
+          : []),
+      ]),
+    ].sort();
+    const observation = {
+      ...result,
+      runtimeReadiness,
+      schema: FORMAL_ARTIFACT_FAMILY_AUDIT_OBSERVATION_SCHEMA,
+      output_role: "evidence_for_bounded_synthesis",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      next_affordances: [],
+    };
+    return {
+      ok: result.ok,
+      status: result.ok ? "succeeded" : "blocked",
+      admissionStatus: result.ok ? "admitted" : "blocked",
+      admissionReason: result.ok
+        ? "formal_artifact_family_audit_inspected"
+        : "formal_artifact_family_audit_query_blocked",
+      ...(result.ok ? {} : { blockedReason: result.issues[0] }),
+      summary: result.ok
+        ? "The server-governed formal artifact-family audit was inspected; its theorem scopes and replay blockers are evidence only."
+        : "The requested formal artifact-family audit entry was not admitted.",
+      observation,
+      missingRequirements: inspectionRequirementCodes.map((code) => ({
+        code,
+        message: result.ok
+          ? `Formal execution enrollment or runtime composition still requires: ${code}.`
+          : `Formal artifact-family inspection requires repair: ${code}.`,
+        repair_action: "repair" as const,
+      })),
+      ...(result.ok ? {} : { error: result.issues[0] }),
+    };
+  }
+
+  if (
+    input.capabilityId ===
     THEORY_FORMAL_VERIFIER_PREPARE_REQUEST_CAPABILITY
   ) {
+    const executionCatalogEntryId = readString(
+      input.args.execution_catalog_entry_id ??
+        input.args.executionCatalogEntryId,
+    );
+    if (executionCatalogEntryId) {
+      const prepared =
+        await prepareCasimirFormalVerifierRequestV2({
+          accountType: input.accountType,
+          profileId: input.profileId,
+          turnId: input.turnId,
+          authoritativeEvidenceArtifacts:
+            input.authoritativeEvidenceArtifacts,
+          executionCatalogEntryId,
+          procedureId: readString(
+            input.args.procedure_id ?? input.args.procedureId,
+          ),
+          procedureSha256: readString(
+            input.args.procedure_sha256 ??
+              input.args.procedureSha256,
+          ),
+        });
+      const ready =
+        prepared.ok && prepared.status === "prepared";
+      const observation = {
+        ...prepared,
+        schema: FORMAL_VERIFIER_PREPARATION_OBSERVATION_SCHEMA,
+        lifecycle_schema: prepared.schema,
+        status: ready ? "succeeded" : "blocked",
+        disposition: ready ? "ready" : "blocked",
+        prepared_request_id: prepared.preparedRequestId,
+        missing_requirements: prepared.issues.map((code) => ({
+          code,
+          message: `Formal v2 execution preparation requires repair: ${code}.`,
+          repairAction: "repair_formal_verification_catalog",
+        })),
+        next_affordances:
+          ready && prepared.preparedRequestId
+            ? [formalPlanAffordance(prepared.preparedRequestId)]
+            : [],
+        output_role: "candidate_next_step",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      return {
+        ok: ready,
+        status: ready ? "succeeded" : "blocked",
+        admissionStatus: ready ? "admitted" : "blocked",
+        admissionReason: ready
+          ? "formal_v2_prepared_request_ready"
+          : "formal_v2_prepared_request_blocked",
+        ...(ready
+          ? {}
+          : {
+              blockedReason:
+                prepared.issues[0] ??
+                "formal_v2_prepared_request_not_ready",
+            }),
+        summary: ready
+          ? "Prepared a provider-neutral v2 formal replay request bound to an external sandbox; preflight is available."
+          : "The provider-neutral v2 formal replay request remains blocked by a governed catalog or evidence requirement.",
+        observation,
+        missingRequirements: prepared.issues.map((code) => ({
+          code,
+          message: `Formal v2 execution preparation requires repair: ${code}.`,
+          repair_action: "repair" as const,
+        })),
+        ...(ready
+          ? {}
+          : {
+              error:
+                prepared.issues[0] ??
+                "formal_v2_prepared_request_not_ready",
+            }),
+      };
+    }
     const result = await prepareCasimirFormalVerificationRequestV1({
       profileId: input.profileId,
       turnId: input.turnId ?? "turn:unscoped",
@@ -445,11 +663,20 @@ export async function executeTheoryFormalVerifierGatewayCapability(input: {
 
   if (input.capabilityId === THEORY_FORMAL_VERIFIER_READ_RESULT_CAPABILITY) {
     const pollAttempt = readPollAttempt(input.args.poll_attempt);
-    const result = readCasimirFormalVerifierJobResultV1({
+    const jobId = readString(
+      input.args.job_id ?? input.args.jobId,
+    );
+    const result = await (isV2JobId(jobId)
+      ? readCasimirFormalVerifierJobResultV2({
+          accountType: input.accountType,
+          profileId: input.profileId,
+          jobId,
+        })
+      : readCasimirFormalVerifierJobResultV1({
       accountType: input.accountType,
-      profileId: input.profileId,
-      jobId: readString(input.args.job_id ?? input.args.jobId),
-    });
+          profileId: input.profileId,
+          jobId,
+        }));
     const running = result.status === "running";
     const completed = result.status === "completed";
     const blocked = result.status === "blocked";
@@ -541,6 +768,121 @@ export async function executeTheoryFormalVerifierGatewayCapability(input: {
     input.args.prepared_request_id ??
       input.args.preparedRequestId,
   );
+  if (isV2PreparedRequestId(preparedRequestId)) {
+    if (input.capabilityId === THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY) {
+      const result = await planCasimirFormalVerifierJobV2({
+        accountType: input.accountType,
+        profileId: input.profileId,
+        preparedRequestId,
+      });
+      const observation = {
+        ...result,
+        schema: FORMAL_VERIFIER_PLAN_OBSERVATION_SCHEMA,
+        lifecycle_schema: result.schema,
+        prepared_request_id: preparedRequestId,
+        output_role: "candidate_next_step",
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+        next_affordances:
+          result.ok && result.planId
+            ? [
+                formalStartAffordance(
+                  preparedRequestId,
+                  result.planId,
+                ),
+              ]
+            : [],
+      };
+      return {
+        ok: result.ok,
+        status: result.ok ? "succeeded" : "blocked",
+        admissionStatus: result.ok ? "admitted" : "blocked",
+        admissionReason: result.ok
+          ? "formal_v2_external_preflight_ready"
+          : "formal_v2_external_preflight_blocked",
+        ...(result.ok
+          ? {}
+          : { blockedReason: result.issues[0] }),
+        summary: result.ok
+          ? "The exact v2 formal replay inputs and external sandbox passed preflight; confirmation is required."
+          : "The v2 external formal replay inputs failed preflight.",
+        observation,
+        missingRequirements: result.issues.map((code) => ({
+          code,
+          message: `Formal v2 replay preflight requires repair: ${code}.`,
+          repair_action: "repair" as const,
+        })),
+        ...(result.ok ? {} : { error: result.issues[0] }),
+      };
+    }
+    const result = await startCasimirFormalVerifierJobV2({
+      accountType: input.accountType,
+      profileId: input.profileId,
+      preparedRequestId,
+      planId: readString(input.args.plan_id ?? input.args.planId),
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      approvalReceipt: input.approvalReceipt,
+      approvalToken: input.approvalToken,
+    });
+    const needsConfirmation = result.status === "needs_confirmation";
+    const blocked = result.status === "blocked";
+    const observation = {
+      ...result,
+      schema: FORMAL_VERIFIER_START_OBSERVATION_SCHEMA,
+      lifecycle_schema: result.schema,
+      prepared_request_id: preparedRequestId,
+      output_role: "candidate_next_step",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      next_affordances:
+        result.ok && result.status === "running" && result.jobId
+          ? [formalReadResultAffordance(result.jobId, 0)]
+          : [],
+    };
+    return {
+      ok: result.ok,
+      status: needsConfirmation
+        ? "needs_confirmation"
+        : blocked
+          ? "blocked"
+          : "client_pending",
+      admissionStatus:
+        blocked || needsConfirmation ? "blocked" : "admitted",
+      admissionReason: needsConfirmation
+        ? "runtime_confirmation_required"
+        : blocked
+          ? "formal_v2_external_start_blocked"
+          : "confirmed_formal_v2_external_job_started",
+      ...(blocked || needsConfirmation
+        ? { blockedReason: result.issues[0] }
+        : {}),
+      summary: needsConfirmation
+        ? "The external formal replay was not started because exact runtime confirmation is required."
+        : blocked
+          ? "The external formal replay job was not started."
+          : "The confirmed external formal replay job started; read_result is required before synthesis.",
+      observation,
+      missingRequirements: result.issues.map((code) => ({
+        code,
+        message:
+          code === "runtime_approval_receipt_required"
+            ? "Obtain explicit user confirmation through the trusted runtime approval lifecycle."
+            : `Formal v2 replay start requires repair: ${code}.`,
+        repair_action:
+          code === "runtime_approval_receipt_required"
+            ? ("ask_user" as const)
+            : ("repair" as const),
+      })),
+      ...(blocked || needsConfirmation
+        ? { error: result.issues[0] }
+        : {}),
+    };
+  }
   const prepared = await resolveCasimirFormalPreparedRequestV1({
     profileId: input.profileId,
     preparedRequestId,

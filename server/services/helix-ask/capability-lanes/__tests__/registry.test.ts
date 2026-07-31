@@ -1110,7 +1110,7 @@ describe("Helix capability lane registry", () => {
     ]);
     expect(provider).toMatchObject({
       configuration_status: "disabled",
-      required_env_vars: ["OPENAI_REALTIME_API_KEY", "OPENAI_API_KEY"],
+      required_env_vars: ["OPENAI_API_KEY"],
       configured_env_vars: [],
       availability_status: "disabled",
       permission_status: "policy_disabled",
@@ -1171,7 +1171,7 @@ describe("Helix capability lane registry", () => {
       requestedLane: "realtime_session",
       env: {
         HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED: "1",
-        OPENAI_REALTIME_API_KEY: "test-realtime-key",
+        OPENAI_API_KEY: "test-realtime-key",
       } as NodeJS.ProcessEnv,
     });
 
@@ -1202,7 +1202,7 @@ describe("Helix capability lane registry", () => {
         HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED: "0",
         HELIX_REALTIME_SESSION_ADAPTER_ENABLED: "1",
         HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED: "1",
-        OPENAI_REALTIME_API_KEY: "test-realtime-key",
+        OPENAI_API_KEY: "test-realtime-key",
       } as NodeJS.ProcessEnv,
     });
 

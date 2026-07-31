@@ -1,5 +1,6 @@
 import os from "node:os";
 import { randomUUID } from "node:crypto";
+import { scheduleIdleMemorySettle } from "./idle-memory-settle";
 
 export type RuntimeTaskClass =
   | "critical_resident"
@@ -231,6 +232,12 @@ let hostMemoryReader: RuntimeHostMemoryReader = () => {
 };
 
 const activeTasks = new Map<string, ActiveRuntimeTask>();
+
+export const scheduleRuntimeIdleMemorySettle = (): void => {
+  scheduleIdleMemorySettle({
+    hasActiveTasks: () => activeTasks.size > 0,
+  });
+};
 const pausableTasks = new Map<string, PausableRuntimeTaskRegistration>();
 const pausedTaskIds = new Set<string>();
 const recentDecisions: RecentRuntimeDecision[] = [];
@@ -486,6 +493,7 @@ const buildLease = (taskClass: RuntimeTaskClass): RuntimeTaskLease => {
       pushRecentCompletion(activeTask, outcome);
       activeTasks.delete(id);
       void maybeResumePausedTasks();
+      scheduleRuntimeIdleMemorySettle();
     },
   };
   return lease;

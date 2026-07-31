@@ -12,6 +12,7 @@ import { buildTheoryContextReflection } from "../../../../shared/theory/theory-c
 import { compileTheoryExperimentProcedureV1 } from "../../../../shared/theory/theory-experiment-procedure-compiler";
 import { CasimirIndependentNumericalExecutionCatalogResolutionErrorV1 } from "../casimir-independent-numerical-execution-catalog";
 import { createCasimirIndependentNumericalVerifierJobService } from "../casimir-independent-numerical-verifier-job-service";
+import { createInMemoryCasimirTheoryExecutionStateStoreV1 } from "../casimir-theory-execution-state-store";
 import { buildNumericalLaneGenerationEvidence } from "./casimir-independent-numerical-generation-fixture";
 import {
   buildRuntimeToolConfirmationTestReceipt,
@@ -25,6 +26,10 @@ const hash = (character: string): string => character.repeat(64);
 const roots: string[] = [];
 const PROCEDURE_TURN_ID = "ask:numerical-verifier:prepare";
 const PROCEDURE_BADGE_ID = "study.casimir_dp.evidence_map_stage3";
+const durableTestStateStore = () => ({
+  ...createInMemoryCasimirTheoryExecutionStateStoreV1(),
+  durability: "durable_postgres" as const,
+});
 
 const procedureEnvelope = (
   procedure: TheoryExperimentProcedureV1,
@@ -379,6 +384,7 @@ describe("Casimir independent numerical verifier jobs", () => {
       sandboxExecutorConfigured: false,
       trustedReceiptVerifierConfigured: false,
       durableReplayLedgerConfigured: false,
+      durableJobStateStoreConfigured: false,
       readyForConfirmedExecution: false,
       assistantAnswer: false,
       terminalEligible: false,
@@ -390,15 +396,52 @@ describe("Casimir independent numerical verifier jobs", () => {
         resolveSandboxedExecutor: async () => null,
         verifyTrustedRuntimeReceipt: verifyTrustedRuntimeTestReceipt,
         confirmationReplayLedger: createTrustedRuntimeTestReplayLedger(),
+        stateStore: durableTestStateStore(),
       });
     expect(configured.inspectConfiguration()).toMatchObject({
       executionCatalogConfigured: true,
       sandboxExecutorConfigured: true,
       trustedReceiptVerifierConfigured: true,
       durableReplayLedgerConfigured: true,
+      durableJobStateStoreConfigured: true,
       readyForConfirmedExecution: true,
       assistantAnswer: false,
       terminalEligible: false,
+    });
+  });
+
+  it("turns a persisted running replay from a previous service process into an actionable failure", async () => {
+    const stateStore = durableTestStateStore();
+    await stateStore.put("job", "numerical-job:interrupted", {
+      jobId: "numerical-job:interrupted",
+      planId: "numerical-plan:interrupted",
+      ownerKey: "developer:developer-a",
+      requestId: "numerical-request:interrupted",
+      status: "running",
+      certificate: null,
+      issues: [],
+    });
+    const restarted =
+      createCasimirIndependentNumericalVerifierJobService({
+        stateStore,
+      });
+
+    await expect(
+      restarted.readResult({
+        accountType: "developer",
+        profileId: "developer-a",
+        jobId: "numerical-job:interrupted",
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: "failed",
+      issues: ["numerical_job_interrupted_by_server_restart"],
+    });
+    await expect(
+      stateStore.get("job", "numerical-job:interrupted"),
+    ).resolves.toMatchObject({
+      status: "failed",
+      issues: ["numerical_job_interrupted_by_server_restart"],
     });
   });
 
@@ -776,7 +819,7 @@ describe("Casimir independent numerical verifier jobs", () => {
     });
     expect(started).toMatchObject({ ok: true, status: "running" });
     expect(
-      service.readResult({
+      await service.readResult({
         accountType: "developer",
         profileId: "developer-b",
         jobId: started.jobId,
@@ -786,7 +829,7 @@ describe("Casimir independent numerical verifier jobs", () => {
       status: "blocked",
       issues: ["independent_numerical_job_not_found"],
     });
-    let result = service.readResult({
+    let result = await service.readResult({
       accountType: "developer",
       profileId: "developer-a",
       jobId: started.jobId,
@@ -797,7 +840,7 @@ describe("Casimir independent numerical verifier jobs", () => {
       attempt++
     ) {
       await new Promise((resolve) => setTimeout(resolve, 10));
-      result = service.readResult({
+      result = await service.readResult({
         accountType: "developer",
         profileId: "developer-a",
         jobId: started.jobId,

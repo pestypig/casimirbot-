@@ -36,10 +36,9 @@ export const asksForScientificImageTextEvidenceComparison = (question: string): 
 
 /**
  * Detects a current request to inspect the identity and claim boundary of a
- * retained scientific-image extraction. This is deliberately broader than a
- * paper workflow: the retained sidecar may originate from any conformed
- * scientific source that supplies stable source, page, crop, and packet
- * identities.
+ * retained scientific-image extraction. A generic "scientific evidence
+ * sidecar" is not sufficient: conformed runtime enrollments use that language
+ * too and must not be captured by the Image Lens continuation lane.
  */
 export const asksForScientificImageEvidenceContinuity = (
   question: string,
@@ -63,6 +62,11 @@ export const asksForScientificImageEvidenceContinuity = (
   ) {
     return false;
   }
+  const refersToImageDerivedEvidence =
+    /\b(?:image\s+lens|scientific\s+image|page\s+image|visual\s+evidence|pdf|paper|page(?:\s+\d+)?|crop|ocr|exact\s+row|promoted\s+equation|source\s+image\s+hash|machine-readable\s+(?:page\s+)?text)\b/i.test(
+      affirmativeQuestion,
+    );
+  if (!refersToImageDerivedEvidence) return false;
 
   const requestsIdentityOrBoundary =
     /\b(?:report|show|tell\s+me|summari[sz]e|audit|identify|which|what)\b[\s\S]{0,180}\b(?:sidecar|source\s+(?:id|hash)|page|crop\s+(?:ref|reference)|evidence\s+depth|promoted\s+equation|exact\s+row|claim\s+boundary|graph\s+reflection)\b/i.test(

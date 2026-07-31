@@ -104,6 +104,9 @@ export type HelixRealtimeGroundedRelayV1 = {
   answer_projection_truncated: boolean;
   answer_projection_redacted: boolean;
   evidence_refs: string[];
+  scientific_evidence_closure_identities: import(
+    "./helix-scientific-evidence-closure-grounding.v1"
+  ).HelixScientificEvidenceClosureGroundingIdentityV1[];
   provider_event_ref: string | null;
   provider_response_ref: string | null;
   playback_receipt_ref: string | null;

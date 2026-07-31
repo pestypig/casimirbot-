@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="590" viewBox="0 0 1100 590" role="img" aria-labelledby="title desc">
+  <title id="title">Whitened signature geometry</title><desc id="desc">Comparison of the rejected and redesigned synthetic signatures.</desc>
+  <defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#2563eb"/></marker><style>text{font-family:Inter,Arial,sans-serif;fill:#172033}.h{font-size:26px;font-weight:700}.l{font-size:18px;font-weight:700}.s{font-size:14px}</style></defs>
+  <rect width="1100" height="590" fill="white"/><text x="45" y="50" class="h">Covariance-whitened identifiability</text>
+  <rect x="45" y="95" width="480" height="390" rx="16" fill="#fff1f2" stroke="#e11d48" stroke-width="2"/>
+  <text x="75" y="135" class="l">Rejected synthetic design</text>
+  <path d="M105 405 C200 320 330 295 465 185" fill="none" stroke="#94a3b8" stroke-width="55" opacity=".55"/>
+  <text x="120" y="455" class="s">modeled nuisance span</text>
+  <line x1="125" y1="405" x2="455" y2="195" stroke="#2563eb" stroke-width="5" marker-end="url(#a)"/>
+  <text x="305" y="245" class="s" fill="#1d4ed8">candidate</text>
+  <text x="75" y="175" class="s">max |cos| = 0.999977</text><text x="75" y="201" class="s">κ = 1.79×10⁵</text><text x="75" y="227" class="s" font-weight="700">Power withheld</text>
+  <rect x="575" y="95" width="480" height="390" rx="16" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+  <text x="605" y="135" class="l">Bounded synthetic redesign</text>
+  <path d="M635 405 C720 345 790 320 860 255" fill="none" stroke="#94a3b8" stroke-width="55" opacity=".55"/>
+  <text x="650" y="455" class="s">modeled nuisance span</text>
+  <line x1="650" y1="405" x2="990" y2="170" stroke="#2563eb" stroke-width="5" marker-end="url(#a)"/>
+  <text x="885" y="220" class="s" fill="#1d4ed8">candidate</text>
+  <text x="605" y="175" class="s">max |cos| = 0.717724</text><text x="605" y="201" class="s">κ = 6.53169</text><text x="605" y="227" class="s">nominal power = 0.997858</text>
+  <text x="45" y="540" class="s">The right panel is not empirical. Finite-pilot covariance, response error, missing channels, drift, tails, and selection optimism remain unstressed.</text>
+</svg>

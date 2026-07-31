@@ -46,7 +46,7 @@ describe("CasimirBot Agent Access discovery routes", () => {
       `${TEST_BASE_URL}/api/v1/rooms`,
       `${TEST_BASE_URL}/.well-known/oauth-protected-resource/mcp`,
       `${TEST_BASE_URL}/docs/architecture/helix-agent-api-v1.md`,
-      `${TEST_BASE_URL}/desktop?panels=agent-access&amp;focus=agent-access`,
+      `${TEST_BASE_URL}/open?panels=agent-access&amp;focus=agent-access&amp;entry=workstation`,
       `${TEST_BASE_URL}/agent-access.json`,
     ]) {
       expect(response.text).toContain(url);
@@ -124,7 +124,7 @@ describe("CasimirBot Agent Access discovery routes", () => {
         api_contract:
           `${TEST_BASE_URL}/docs/architecture/helix-agent-api-v1.md`,
         workstation:
-          `${TEST_BASE_URL}/desktop?panels=agent-access&focus=agent-access`,
+          `${TEST_BASE_URL}/open?panels=agent-access&focus=agent-access&entry=workstation`,
       },
     });
     expect(JSON.stringify(response.body)).not.toMatch(

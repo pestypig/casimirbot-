@@ -175,7 +175,12 @@ async function fetchWithFallback(
 }
 
 export function LumaWhispersProvider({ children }: { children: React.ReactNode }) {
-  const { data: pipeline } = useEnergyPipeline({ staleTime: 1500 });
+  // Observe pipeline data populated by a visible physics surface without
+  // making every desktop route poll the heavyweight pipeline on its own.
+  const { data: pipeline } = useEnergyPipeline({
+    enabled: false,
+    staleTime: 1500,
+  });
 
   const rawHash = useHashLocation();
   const canonicalHash = useMemo(() => normalizeHash(rawHash), [rawHash]);

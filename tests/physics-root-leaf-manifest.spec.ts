@@ -808,6 +808,102 @@ describe("validatePhysicsRootLeafManifest", () => {
     expect(readinessBlockRule).toContain(
       "bridgeCompared == true AND registeredNumericBridgeKernel != true",
     );
+    expect(readinessBlockRule).toContain(
+      "stage4_2eCausalRecoveryReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2eQEDMetricNonbridgePreserved != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2eStandardDpBoundaryIndependence != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2eMeasuredTimingControlReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2eCompleteApparatusMetricReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2fSoftwareEquationRecoveryReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2fFiniteGeometryMaxwellReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2fMeasuredMaterialGreenReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2fCandidateTransportIdentityReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2fDpParameterRegionReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2fCompanionDetectorReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2fCompanionModelIdentityReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2fStatePreparationReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2fQuasistaticModulationReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2fCompleteApparatusStressEnergyReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2fZeroBridgePreserved != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gDesignIdentityFrozen != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gDpCompanionConsistent != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gMeasuredPacketIntegrityReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gFiniteGeometryMaterialReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gStatePreparationReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gBranchMetrologyReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gModulationReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gMeasuredCovarianceReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gCompanionDetectorReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gBlindReplicationReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gPilotIdentifiabilityReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gCompleteStressEnergyReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2gZeroBridgePreserved != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2hInstrumentRegistryReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2hPacketCompilationReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2hZeroBridgePreserved != true",
+    );
     const rejectRule = pathEntry?.falsifier?.reject_rule ?? "";
     expect(rejectRule).toContain("heldOutReplicationReady == true");
     expect(rejectRule).toContain("apparatusDpPowerReady == true");
@@ -839,6 +935,22 @@ describe("validatePhysicsRootLeafManifest", () => {
         "bridge-stage4-2b-dp-scaling-to-identifiability-power",
         "bridge-stage4-2b-complete-equivalence-to-conditional-dp-null",
         "bridge-stage4-2b-missing-kernel-to-manifold-nonclaim",
+        "bridge-stage4-2e-adm-null-clock-to-causal-consistency",
+        "bridge-stage4-2e-casimir-screen-to-complete-tensor-nonclaim",
+        "bridge-stage4-2e-qed-propagation-to-metric-nonbridge",
+        "bridge-stage4-2e-standard-dp-boundary-independence",
+        "bridge-stage4-2f-maxwell-green-fdt-to-ordinary-null",
+        "bridge-stage4-2f-named-dp-to-frozen-signature",
+        "bridge-stage4-2f-apparatus-authority-to-pilot-readiness",
+        "bridge-stage4-2f-zero-observable-bridge-preservation",
+        "bridge-stage4-2g-single-identity-to-dp-prediction",
+        "bridge-stage4-2g-packet-to-empirical-pilot-readiness",
+        "bridge-stage4-2g-companion-to-same-identity",
+        "bridge-stage4-2g-complete-stress-to-manifold-nonclaim",
+        "bridge-stage4-2h-instrument-calibration-to-commissioning-gate",
+        "bridge-stage4-2h-raw-covariance-custody-to-packet-compilation",
+        "bridge-stage4-2h-synthetic-dry-run-to-empirical-nonclaim",
+        "bridge-stage4-2h-measured-dossier-to-pilot-readiness",
       ]),
     );
     expect(pathEntry?.falsifier?.test_refs).toEqual(
@@ -870,6 +982,14 @@ describe("validatePhysicsRootLeafManifest", () => {
         "tests/casimir-dp-apparatus-identifiability-stage4-2b.spec.ts",
         "tests/casimir-dp-stage4-2b-contract.spec.ts",
         "tests/casimir-dp-stage4-2b-campaign.spec.ts",
+        "tests/casimir-dp-causal-cone-clock-stage4-2e.spec.ts",
+        "tests/casimir-dp-stage4-2e-campaign.spec.ts",
+        "tests/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.spec.ts",
+        "tests/casimir-dp-stage4-2f-campaign.spec.ts",
+        "tests/casimir-dp-empirical-feasibility-pilot-stage4-2g.spec.ts",
+        "tests/casimir-dp-stage4-2g-campaign.spec.ts",
+        "tests/casimir-dp-commissioning-intake-stage4-2h.spec.ts",
+        "tests/casimir-dp-stage4-2h-campaign.spec.ts",
       ]),
     );
 

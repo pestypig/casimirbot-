@@ -4,7 +4,11 @@ import {
   applyGatewayFailureAuthorityGuard,
   buildCodexMoralGraphReflectionReceiptAnswer,
   buildMoralGraphObservationFallbackAnswer,
+  compactPostToolRecoveryModelValue,
+  genericCurrentTurnToolRecoveryReadyForSolver,
+  missingTheoryReferentGuardApplies,
   providerGatewayEvidenceReadyForSolver,
+  settleCompletedItineraryContinuationForPostToolSynthesis,
 } from "../codex-provider";
 
 const buildTheoryGraphGatewayResult = (capability: string, ok: boolean) => ({
@@ -286,6 +290,150 @@ describe("Codex provider terminal pass-through", () => {
       gatewayCallResults,
       selectedScholarlyResultIds: ["arxiv:magnetar-review"],
     })).toBe("The observed search found a relevant magnetar review.");
+  });
+
+  it("admits bounded post-tool recovery only for a completed current-turn itinerary", () => {
+    const completedItinerary = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      applies: true,
+      complete: true,
+    };
+
+    expect(genericCurrentTurnToolRecoveryReadyForSolver({
+      providerGatewayEvidenceReady: true,
+      normalizedObservationArtifactCount: 1,
+      capabilityItineraryExecutionState: completedItinerary,
+    })).toBe(true);
+
+    for (const input of [
+      {
+        providerGatewayEvidenceReady: false,
+        normalizedObservationArtifactCount: 1,
+        capabilityItineraryExecutionState: completedItinerary,
+      },
+      {
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 0,
+        capabilityItineraryExecutionState: completedItinerary,
+      },
+      {
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 1,
+        capabilityItineraryExecutionState: {
+          ...completedItinerary,
+          complete: false,
+        },
+      },
+      {
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 1,
+        capabilityItineraryExecutionState: {
+          ...completedItinerary,
+          applies: false,
+        },
+      },
+    ]) {
+      expect(genericCurrentTurnToolRecoveryReadyForSolver(input)).toBe(false);
+    }
+  });
+
+  it("does not let a stale theory referent guard override a bound procedure request", () => {
+    const resolutionBlockReason =
+      "referent_resolution_required:missing_previous_assistant_final_answer";
+
+    expect(missingTheoryReferentGuardApplies({
+      question: "Can you reflect this in the Theory Badge Graph?",
+      resolutionBlockReason,
+      currentTurnTheoryExperimentProcedureRequestCount: 0,
+    })).toBe(true);
+    expect(missingTheoryReferentGuardApplies({
+      question:
+        "Prepare a seven-stage experiment plan for the Stage 3 Casimir-DP evidence map using the registered one-dimensional advection-diffusion example. Do not run anything.",
+      resolutionBlockReason,
+      currentTurnTheoryExperimentProcedureRequestCount: 1,
+    })).toBe(false);
+  });
+
+  it("closes optional affordances once a complete itinerary only needs synthesis", () => {
+    const state = {
+      schema: "helix.agent_continuation_state.v1",
+      state_id: "ask:test:continuation:1",
+      turn_id: "ask:test",
+      sequence: 1,
+      trigger: "terminal_rejection",
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: false,
+      },
+      missing_requirement_ids: [],
+      consumed_observation_refs: ["ask:test:observation"],
+      next_admissible_affordances: [{
+        affordance_id: "ask:test:optional-tool",
+        decision: "act",
+        capability_id: "helix_ask.reflect_theory_context",
+        admissible: true,
+        reason: "Optional context reflection remains available.",
+      }],
+      progress: {
+        made_progress: false,
+        no_progress_repeat_count: 1,
+        reason_codes: [],
+      },
+      budget: {
+        hard: {
+          iterations: { max: 6, consumed: 2, remaining: 4 },
+          tool_calls: { max: 6, consumed: 2, remaining: 4 },
+          model_decisions: { max: 6, consumed: 2, remaining: 4 },
+          exhausted: false,
+        },
+      },
+      last_attempt: null,
+      allowed_decisions: ["act", "retry"],
+      assistant_answer: false,
+      raw_content_included: false,
+    } as never;
+
+    expect(
+      settleCompletedItineraryContinuationForPostToolSynthesis(state, true),
+    ).toMatchObject({
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: true,
+      },
+      next_admissible_affordances: [{ admissible: false }],
+      progress: {
+        made_progress: true,
+        no_progress_repeat_count: 0,
+        reason_codes: [
+          "current_turn_itinerary_complete_pending_synthesis",
+        ],
+      },
+      allowed_decisions: ["answer"],
+    });
+    expect(
+      settleCompletedItineraryContinuationForPostToolSynthesis(state, false),
+    ).toBe(state);
+  });
+
+  it("bounds nested recovery evidence without erasing its top-level structure", () => {
+    const projected = compactPostToolRecoveryModelValue({
+      schema: "helix.test_observation.v1",
+      summary: "x".repeat(2_500),
+      rows: Array.from({ length: 20 }, (_, index) => ({
+        id: `row:${index}`,
+      })),
+    }) as Record<string, unknown>;
+
+    expect(projected.schema).toBe("helix.test_observation.v1");
+    expect(String(projected.summary)).toContain(
+      "[recovery value truncated]",
+    );
+    expect(projected.rows).toHaveLength(13);
+    expect((projected.rows as unknown[]).at(-1)).toBe(
+      "[8 additional entries omitted]",
+    );
   });
 
   it("preserves Moral Graph synthesis when adjacent external evidence is unavailable", () => {

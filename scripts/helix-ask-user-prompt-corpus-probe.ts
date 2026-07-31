@@ -23,7 +23,7 @@ export type UserPromptScenario = {
     | "negated_context";
   notes?: string;
   workspace_context_snapshot?: RecordLike;
-  expected_tool_mode?: "none" | "required";
+  expected_tool_mode?: "none" | "optional" | "required";
   expected_capability_patterns?: string[];
   expected_minimum_observations?: number;
   expected_maximum_observations?: number;
@@ -45,6 +45,10 @@ export type UserPromptConversationContext = {
   assistant_text: string;
   user_prompt: string;
   active_doc_path?: string | null;
+  recent_assistant_answers?: Array<{
+    turn_id: string;
+    assistant_text: string;
+  }>;
 };
 
 const BASE_URL = (process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:1498").replace(/\/+$/, "");
@@ -460,8 +464,12 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
   const evaluatedObservationRefs = scenario.expected_tool_mode === "none" && executedCapabilities.length === 0
     ? []
     : observationRefs;
+  const optionalToolExecuted =
+    scenario.expected_tool_mode === "optional" && executedCapabilities.length > 0;
+  const toolExecutionMustBeComplete =
+    scenario.expected_tool_mode === "required" || optionalToolExecuted;
   const modelOnlyLifecycleHealthy =
-    scenario.expected_tool_mode === "none" &&
+    (scenario.expected_tool_mode === "none" || scenario.expected_tool_mode === "optional") &&
     executedCapabilities.length === 0 &&
     !terminalError &&
     terminalKind !== "typed_failure" &&
@@ -505,6 +513,7 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
     ].filter((capability): capability is string => Boolean(capability));
   });
   const expectedCapabilitiesSuccessful =
+    !toolExecutionMustBeComplete ||
     expectedCapabilityPatterns.length === 0 ||
     expectedCapabilityPatterns.every((pattern) =>
       gatewayResultSummaries.some((result) => pattern.test(result.capability) && result.successful) ||
@@ -512,10 +521,11 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
     );
   const failedExpectedGatewayResults = expectedGatewayResults.filter((result) => !result.successful);
   const expectedCapabilityObserved =
+    !toolExecutionMustBeComplete ||
     expectedCapabilityPatterns.length === 0 ||
     expectedCapabilityPatterns.every((pattern) => executedCapabilities.some((capability) => pattern.test(capability)));
   const expectedMinimumObservations = scenario.expected_minimum_observations ??
-    (scenario.expected_tool_mode === "required" ? 1 : 0);
+    (toolExecutionMustBeComplete ? 1 : 0);
   const expectedMaximumObservations = scenario.expected_maximum_observations ??
     (scenario.expected_tool_mode === "none" ? 0 : null);
   const expectedTerminalKinds = scenario.expected_terminal_kinds ?? [];
@@ -553,7 +563,13 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
       }
       return "not_required";
     }
-    if (scenario.expected_tool_mode !== "required") return null;
+    if (scenario.expected_tool_mode === "optional" && executedCapabilities.length === 0) {
+      if (terminalError || terminalKind === "typed_failure" || finalAnswerSource === "typed_failure") {
+        return "terminal_authority";
+      }
+      return "complete";
+    }
+    if (!toolExecutionMustBeComplete) return null;
     if (executedCapabilities.length === 0) {
       if (admittedCapability) return "capability_execution";
       if (selectedCapability) return "tool_admission";
@@ -602,6 +618,12 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
     scenario.expected_tool_mode === "required" && !expectedCapabilitiesSuccessful
       ? `expected_capability_not_successful:${scenario.expected_capability_patterns?.join("|") ?? "unspecified"}`
       : "",
+    optionalToolExecuted && !expectedCapabilityObserved
+      ? `optional_tool_unexpected_capability:${executedCapabilities.join(",")}`
+      : "",
+    optionalToolExecuted && !expectedCapabilitiesSuccessful
+      ? `optional_tool_not_successful:${scenario.expected_capability_patterns?.join("|") ?? "unspecified"}`
+      : "",
     ...failedExpectedGatewayResults.map((result) =>
       `tool_observation_failed:${result.capability}:${result.packet_status}${result.failure_reason ? `:${result.failure_reason}` : ""}`
     ),
@@ -625,7 +647,7 @@ export const summarizeTurn = (scenario: UserPromptScenario, ask: RecordLike, deb
   ].filter(Boolean);
 
   const hardLifecycleFailure =
-    scenario.expected_tool_mode === "required" &&
+    toolExecutionMustBeComplete &&
     (
       !expectedCapabilitiesSuccessful ||
       failedExpectedGatewayResults.length > 0 ||
@@ -769,6 +791,19 @@ export const buildUserPromptConversationWorkspaceSnapshot = (
     source_ref: sourceRef,
     text: context.assistant_text,
   };
+  const recentAnswers = (
+    context.recent_assistant_answers?.length
+      ? context.recent_assistant_answers
+      : [{ turn_id: context.turn_id, assistant_text: context.assistant_text }]
+  )
+    .filter((answer) => answer.assistant_text.trim())
+    .slice(0, 8)
+    .map((answer) => ({
+      role: "assistant",
+      reply_id: answer.turn_id,
+      source_ref: `chat.final_answer.recent:${answer.turn_id}`,
+      text: answer.assistant_text,
+    }));
   return {
     ...(activeDocPath
       ? {
@@ -783,7 +818,7 @@ export const buildUserPromptConversationWorkspaceSnapshot = (
       schema: "helix.ask.chat_referent_context.v1",
       previous_assistant_final_answer: previousAnswer,
       previous_chat_message: previousAnswer,
-      recent_assistant_final_answers: [previousAnswer],
+      recent_assistant_final_answers: recentAnswers,
       previous_user_message: {
         role: "user",
         source_ref: `chat.user.previous:${context.turn_id}`,
@@ -843,6 +878,7 @@ const runScenario = async (
   const result = summarizeTurn(scenario, ask, debug);
   const finalText = selectedFinalText(ask, debug);
   if (turnId && finalText.trim()) {
+    const previousContext = conversationContexts.get(threadId);
     const activeDocPath =
       finalText.match(/\bdocs[\\/][^\s)\]]+\.md\b/i)?.[0]?.replace(/\\/g, "/") ??
       readString(workspaceContextSnapshot?.activeDocPath);
@@ -851,6 +887,14 @@ const runScenario = async (
       assistant_text: finalText,
       user_prompt: scenario.prompt,
       active_doc_path: activeDocPath,
+      recent_assistant_answers: [
+        { turn_id: turnId, assistant_text: finalText },
+        ...(previousContext?.recent_assistant_answers ?? (
+          previousContext
+            ? [{ turn_id: previousContext.turn_id, assistant_text: previousContext.assistant_text }]
+            : []
+        )),
+      ].slice(0, 8),
     });
   }
 

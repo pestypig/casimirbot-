@@ -55,6 +55,57 @@ type RealtimeCallsFetch = (
   headers?: { get(name: string): string | null };
 }>;
 
+type OpenAiCredentialProbeFetch = (
+  input: string,
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    signal?: AbortSignal;
+  },
+) => Promise<{
+  ok: boolean;
+  status: number;
+}>;
+
+export type OpenAiApiCredentialProbeStatus =
+  | "accepted"
+  | "authentication_failed"
+  | "access_forbidden"
+  | "rate_limited"
+  | `provider_http_${number}`
+  | "timeout"
+  | "network_error";
+
+export const probeOpenAiApiCredential = async (input: {
+  apiKey: string;
+  fetchImpl?: OpenAiCredentialProbeFetch;
+  timeoutMs?: number;
+}): Promise<OpenAiApiCredentialProbeStatus> => {
+  const fetchImpl = input.fetchImpl ?? globalThis.fetch as OpenAiCredentialProbeFetch;
+  if (typeof fetchImpl !== "function") return "network_error";
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 5_000);
+  try {
+    const response = await fetchImpl("https://api.openai.com/v1/models", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${input.apiKey}` },
+      signal: controller.signal,
+    });
+    if (response.ok) return "accepted";
+    if (response.status === 401) return "authentication_failed";
+    if (response.status === 403) return "access_forbidden";
+    if (response.status === 429) return "rate_limited";
+    return `provider_http_${response.status}`;
+  } catch (error) {
+    const name = error && typeof error === "object" && "name" in error
+      ? String((error as { name?: unknown }).name ?? "")
+      : "";
+    return name === "AbortError" ? "timeout" : "network_error";
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const readSafeToken = (value: unknown, fallback: string): string =>
   typeof value === "string" && /^[A-Za-z0-9._:-]{1,128}$/.test(value.trim())
     ? value.trim()

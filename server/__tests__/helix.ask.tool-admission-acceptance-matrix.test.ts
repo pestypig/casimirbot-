@@ -728,6 +728,45 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     });
   });
 
+  it("fails closed instead of throwing when a projected terminal policy omits runtime arrays", () => {
+    const prompt = "Prepare the bounded scientific evidence plan.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:terminal-policy-projection",
+      threadId: "thread:terminal-policy-projection",
+      promptText: prompt,
+    });
+    const routeProductContract = buildRouteProductContract({
+      turnId: "ask:terminal-policy-projection",
+      threadId: "thread:terminal-policy-projection",
+      sourceTargetIntent,
+      promptText: prompt,
+    });
+
+    expect(() =>
+      guardTerminalArtifactSelection({
+        contract: {
+          ...routeProductContract,
+          forbidden_terminal_artifact_kinds: undefined,
+        } as unknown as typeof routeProductContract,
+        terminalArtifactKind: "typed_failure",
+      }),
+    ).not.toThrow();
+
+    expect(
+      guardTerminalArtifactSelection({
+        contract: {
+          ...routeProductContract,
+          allowed_terminal_artifact_kinds: undefined,
+          forbidden_terminal_artifact_kinds: undefined,
+        } as unknown as typeof routeProductContract,
+        terminalArtifactKind: "typed_failure",
+      }),
+    ).toMatchObject({
+      allowed: false,
+      reason: "terminal_artifact_policy_missing",
+    });
+  });
+
   it("uses a docs route-product contract to admit docs tools when source target arbitration is unknown", () => {
     const prompt = "summarize docs about paper ingestion contracts in 4 bullets include paths";
     const routeProductContract = buildRouteProductContract({

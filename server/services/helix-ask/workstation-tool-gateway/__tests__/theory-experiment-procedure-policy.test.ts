@@ -25,10 +25,19 @@ import {
 import { buildWorkstationGatewayObservationArtifactRef } from "../observation-packet";
 import { validateTheoryExperimentExecutionClosureIntegrityV1 } from "@shared/contracts/theory-experiment-execution-closure.v1";
 import { buildCasimirFormalVerificationCertificateV1 } from "@shared/contracts/casimir-formal-verification-certificate.v1";
+import { buildCasimirFormalVerificationCertificateV2 } from "@shared/contracts/casimir-formal-verification-certificate.v2";
+import {
+  buildCasimirSpecScientificClaimIrV1,
+  computeCasimirSpecValueSha256V1,
+  type CasimirSpecScientificClaimIrV1,
+} from "@shared/contracts/casimir-spec-scientific-claim-ir.v1";
+import fixtureJson from "../../../../../shared/contracts/__tests__/fixtures/casimir-spec/advection-diffusion.open-world.valid.v1.json";
+import { admitCasimirSpecScientificClaimIrV1 } from "../../../theory/casimir-spec-semantic-admission";
 
 const BADGE_ID = "study.casimir_dp.evidence_map_stage3";
 const CURRENT_TURN_ID = "ask:test:procedure-evidence";
 const PRIOR_TURN_ID = "ask:test:procedure-evidence-prior";
+const FORMAL_V2_GRAPH_SNAPSHOT_SHA256 = "7".repeat(64);
 
 const repoObservation = (
   artifactId = "repo-observation:test",
@@ -51,10 +60,11 @@ const currentTurnArtifact = (input: {
   sourceTurnId?: string;
   contentSha256?: string;
   sourceCapability?: string;
+  kind?: string;
 }): Record<string, unknown> => ({
   schema: "helix.current_turn_artifact.v1",
   artifact_id: `${input.admissionTurnId ?? CURRENT_TURN_ID}:ledger:${input.artifactRef}`,
-  kind: "test_evidence",
+  kind: input.kind ?? "test_evidence",
   turn_id: input.admissionTurnId ?? CURRENT_TURN_ID,
   source_scope: input.sourceScope ?? "current_turn_context",
   ...(input.sourceTurnId ? { source_turn_id: input.sourceTurnId } : {}),
@@ -71,6 +81,199 @@ const currentTurnArtifact = (input: {
   terminal_eligible: false,
   raw_content_included: false,
 });
+
+const buildSemanticAdmissionForProcedure = async (
+  procedure: Record<string, any>,
+) => {
+  const fixture =
+    structuredClone(fixtureJson) as CasimirSpecScientificClaimIrV1;
+  const {
+    artifactId: _artifactId,
+    schemaVersion: _schemaVersion,
+    generatedAt: _generatedAt,
+    semanticSha256: _semanticSha256,
+    artifactSha256: _artifactSha256,
+    definitions,
+    assumptions,
+    axiomLedger,
+    claims,
+    world,
+    ...body
+  } = fixture;
+  const claimIr = await buildCasimirSpecScientificClaimIrV1({
+    ...body,
+    generatedAt: "2026-07-29T00:00:00.000Z",
+    world: {
+      ...world,
+      graphId: procedure.graphId,
+      masterProblemPlanId: procedure.masterProblem.planId,
+      badgeIds: [BADGE_ID],
+    },
+    definitions: definitions.map(
+      ({ expressionSha256: _expressionSha256, ...definition }) => definition,
+    ),
+    assumptions: assumptions.map(
+      ({ propositionSha256: _propositionSha256, ...assumption }) => assumption,
+    ),
+    axiomLedger: {
+      ...axiomLedger,
+      entries: axiomLedger.entries.map(
+        ({ typeExpressionSha256: _typeExpressionSha256, ...axiom }) => axiom,
+      ),
+    },
+    claims: claims.map(
+      ({ propositionSha256: _propositionSha256, ...claim }) => claim,
+    ),
+  });
+  const receipt = await admitCasimirSpecScientificClaimIrV1({
+    claimIr,
+    generatedAt: "2026-07-29T00:00:01.000Z",
+    receiptId: "semantic-admission:procedure-formal-v2-closure",
+    catalogSnapshots: [],
+    registeredIdentityBindings: [],
+    graphSnapshot: {
+      graphId: procedure.graphId,
+      snapshotSha256: FORMAL_V2_GRAPH_SNAPSHOT_SHA256,
+      badgeIds: [BADGE_ID],
+      edges: [],
+    },
+  });
+  return {
+    claimIr,
+    observation: {
+      schema: "casimir.theory_semantic_admitter.observation.v1",
+      status: "succeeded",
+      source_packet_sha256: "0".repeat(64),
+      claim_ir: claimIr,
+      semantic_admission_receipt: receipt,
+      output_role: "evidence_for_synthesis",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+};
+
+const buildPassingFormalV2CertificateForProcedure = async (
+  procedure: Record<string, any>,
+  claimIr: CasimirSpecScientificClaimIrV1,
+  options: {
+    candidateBadgeIds?: string[];
+    certificateId?: string;
+  } = {},
+) => {
+  const [masterProblemArtifactSha256, derivationProgramArtifactSha256] =
+    await Promise.all([
+      computeCasimirSpecValueSha256V1(procedure.masterProblem),
+      computeCasimirSpecValueSha256V1(
+        procedure.derivationProgram,
+      ),
+    ]);
+  return buildCasimirFormalVerificationCertificateV2({
+    generatedAt: "2026-07-29T00:05:00.000Z",
+    certificateId:
+      options.certificateId ??
+      "formal-v2:certificate:procedure-closure",
+    request: {
+      schemaVersion: "casimir_formal_verification_request/v2",
+      requestId: "formal-v2:request:procedure-closure",
+      artifactSha256: "1".repeat(64),
+      semanticPropositionSha256: claimIr.claims[0].propositionSha256,
+      candidateBadgeIds: options.candidateBadgeIds ?? [BADGE_ID],
+      observedTheoremTypeSha256: "3".repeat(64),
+      semanticToLeanBindingSha256: "4".repeat(64),
+      casimirSpecId: claimIr.specId,
+      casimirSpecSemanticSha256: claimIr.semanticSha256,
+      casimirSpecArtifactSha256: claimIr.artifactSha256,
+      masterProblemPlanId: procedure.masterProblem.planId,
+      masterProblemArtifactSha256,
+      derivationProgramId: procedure.derivationProgram.programId,
+      derivationProgramArtifactSha256,
+      graphId: procedure.graphId,
+      graphSnapshotSha256: FORMAL_V2_GRAPH_SNAPSHOT_SHA256,
+    },
+    status: "passed",
+    theorem: {
+      claimId: claimIr.claims[0].claimId,
+      formalArtifactId:
+        "casimir:lanyon:gr_hyperbolic_maxwell_1d:formal_source",
+      sourceAuditArtifactSha256: "8".repeat(64),
+      theoremName: "xHyperbolicity",
+      theoremModule: "gr_hyperbolic_maxwell_1d",
+      sourceSha256: "9".repeat(64),
+      declarationSha256: "a".repeat(64),
+      propositionSourceSha256: "b".repeat(64),
+      observedTheoremTypeSha256: "3".repeat(64),
+      emittedSourceSha256: "9".repeat(64),
+    },
+    environment: {
+      prover: "lean4",
+      pinnedVersion: "4.31.0",
+      environmentPolicySha256: "c".repeat(64),
+      kernelBinarySha256: "d".repeat(64),
+      dependencyLockSha256: "e".repeat(64),
+      importClosureSha256: "f".repeat(64),
+      imports: [],
+    },
+    sandbox: {
+      executorCapabilityId: "casimir.formal.external-sandbox.v1",
+      executorCapabilitySha256: "0".repeat(64),
+      sandboxPolicySha256: "1".repeat(64),
+      attestationSha256: "2".repeat(64),
+      workerId: "worker:procedure-closure",
+      memoryLimitBytes: 1024 * 1024 * 1024,
+      processLimit: 8,
+      timeoutMs: 300_000,
+      outputLimitBytes: 4 * 1024 * 1024,
+      peakMemoryBytes: 512 * 1024 * 1024,
+      outputBytes: 1024,
+      oomKilled: false,
+      timedOut: false,
+      outputLimitExceeded: false,
+      operatingSystemMemoryLimitApplied: true,
+      operatingSystemProcessLimitApplied: true,
+      operatingSystemFilesystemIsolationApplied: true,
+      operatingSystemNetworkIsolationApplied: true,
+      hostWorkstationExecution: false,
+    },
+    replay: {
+      observationMode: "outer_observed_process",
+      requiredReplayCount: 2,
+      completedReplayCount: 2,
+      byteIdentical: true,
+      aggregateTranscriptSha256: "3".repeat(64),
+      runs: [
+        {
+          replayIndex: 1,
+          exitCode: 0,
+          stdoutSha256: "4".repeat(64),
+          stderrSha256: "5".repeat(64),
+          transcriptSha256: "6".repeat(64),
+          startedAt: "2026-07-29T00:01:00.000Z",
+          completedAt: "2026-07-29T00:02:00.000Z",
+        },
+        {
+          replayIndex: 2,
+          exitCode: 0,
+          stdoutSha256: "4".repeat(64),
+          stderrSha256: "5".repeat(64),
+          transcriptSha256: "6".repeat(64),
+          startedAt: "2026-07-29T00:03:00.000Z",
+          completedAt: "2026-07-29T00:04:00.000Z",
+        },
+      ],
+    },
+    axiomAudit: {
+      declaredAxiomIds: [],
+      allowedAxiomIds: [],
+      usedAxiomIds: [],
+      hiddenAxiomsDetected: false,
+      reportSha256: "7".repeat(64),
+    },
+    blockers: [],
+  });
+};
 
 describe("theory experiment procedure gateway policy", () => {
   beforeEach(async () => {
@@ -699,6 +902,232 @@ describe("theory experiment procedure gateway policy", () => {
     expect(closure.synthesisReadiness.openRequirementCodes).not.toContain(
       "formal_certificate_failed",
     );
+  });
+
+  it("admits a v2 external formal certificate with exact procedure, badge, graph, and program lineage", async () => {
+    const turnId = "ask:test:procedure-formal-v2-closure";
+    const procedureId = "procedure:formal-v2-closure";
+    const baseArgs = {
+      prompt:
+        "Compare the Stage 3 evidence map with the exact GR Maxwell proposition.",
+      operation: "compare",
+      target: "Stage 3 evidence map",
+      selected_badge_ids: [BADGE_ID],
+      formal_system: "Lean 4",
+      procedure_id: procedureId,
+    };
+    const skeleton =
+      await executeTheoryExperimentProcedureGatewayCapability({
+        capabilityId:
+          THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+        accountType: "developer",
+        turnId,
+        args: baseArgs,
+      });
+    const skeletonProcedure = (
+      skeleton.observation as Record<string, any>
+    ).procedure;
+    const semantic =
+      await buildSemanticAdmissionForProcedure(skeletonProcedure);
+    const semanticRef = `${turnId}:semantic-admission`;
+    const authoritativeSemantic = currentTurnArtifact({
+      artifact: semantic.observation,
+      artifactRef: semanticRef,
+      admissionTurnId: turnId,
+      sourceCapability: "theory-semantic-admitter.normalize",
+      kind: "semantic_admission",
+    });
+    const semanticPrepared =
+      await executeTheoryExperimentProcedureGatewayCapability({
+        capabilityId:
+          THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+        accountType: "developer",
+        turnId,
+        authoritativeEvidenceArtifacts: [
+          authoritativeSemantic,
+        ],
+        args: {
+          ...baseArgs,
+          evidence_artifacts: [
+            {
+              artifact_ref: semanticRef,
+              source_turn_id: turnId,
+              kind: "semantic_admission",
+              artifact: semantic.observation,
+            },
+          ],
+        },
+      });
+    expect(semanticPrepared).toMatchObject({ ok: true });
+    const semanticProcedure = (
+      semanticPrepared.observation as Record<string, any>
+    ).procedure;
+    const certificate =
+      await buildPassingFormalV2CertificateForProcedure(
+        semanticProcedure,
+        semantic.claimIr,
+      );
+    const certificateRef = `${turnId}:formal-v2-certificate`;
+    const authoritativeCertificate = currentTurnArtifact({
+      artifact: certificate as unknown as Record<string, unknown>,
+      artifactRef: certificateRef,
+      admissionTurnId: turnId,
+      sourceCapability: "theory-formal-verifier.read_result",
+      kind: "formal_certificate",
+    });
+    const prepared =
+      await executeTheoryExperimentProcedureGatewayCapability({
+        capabilityId:
+          THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+        accountType: "developer",
+        turnId,
+        authoritativeEvidenceArtifacts: [
+          authoritativeSemantic,
+          authoritativeCertificate,
+        ],
+        args: {
+          ...baseArgs,
+          evidence_artifacts: [
+            {
+              artifact_ref: semanticRef,
+              source_turn_id: turnId,
+              kind: "semantic_admission",
+              artifact: semantic.observation,
+            },
+            {
+              artifact_ref: certificateRef,
+              source_turn_id: turnId,
+              kind: "formal_certificate",
+              artifact: certificate,
+            },
+          ],
+        },
+      });
+    expect(prepared).toMatchObject({ ok: true });
+    const observation = prepared.observation as Record<string, any>;
+    const procedure = observation.procedure;
+    expect(procedure.evidenceBindings).toContainEqual(
+      expect.objectContaining({
+        artifactRef: certificateRef,
+        kind: "formal_certificate",
+        lineage: expect.objectContaining({
+          sourceKind: "formal_verification_request",
+          procedureId,
+          candidateBadgeIds: [BADGE_ID],
+          casimirSpecId: semantic.claimIr.specId,
+          sourceGraphId: procedure.graphId,
+          sourceMasterProblemPlanId:
+            procedure.masterProblem.planId,
+          sourceDerivationProgramId:
+            procedure.derivationProgram.programId,
+          requestArtifactSha256: "1".repeat(64),
+        }),
+      }),
+    );
+
+    const procedureRef = `${turnId}:procedure-observation`;
+    const authoritativeProcedure = {
+      schema: "helix.current_turn_artifact.v1",
+      artifact_id: procedureRef,
+      turn_id: turnId,
+      produced_artifact_refs: [procedureRef],
+      payload: observation,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const evaluated =
+      await executeTheoryExperimentProcedureGatewayCapability({
+        capabilityId:
+          THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY,
+        accountType: "developer",
+        turnId,
+        authoritativeEvidenceArtifacts: [
+          authoritativeProcedure,
+          authoritativeSemantic,
+          authoritativeCertificate,
+        ],
+        args: {
+          prompt: "Evaluate the exact v2 formal closure evidence.",
+          procedure_artifact_ref: procedureRef,
+          procedure_id: procedure.procedureId,
+          procedure_sha256: procedure.procedureSha256,
+        },
+      });
+    expect(evaluated.ok).toBe(true);
+    const closure = (
+      evaluated.observation as Record<string, any>
+    ).closure;
+    expect(
+      closure.evidenceObservations.find(
+        (entry: Record<string, unknown>) =>
+          entry.boundArtifactRef === certificateRef,
+      ),
+    ).toMatchObject({
+      kind: "formal_certificate",
+      status: "passed",
+      scope: "shared_procedure_evidence",
+      closureSatisfied: true,
+    });
+    expect(
+      closure.candidates[0].axes.find(
+        (entry: Record<string, unknown>) =>
+          entry.axisId === "formal_replay",
+      ),
+    ).toMatchObject({ status: "satisfied" });
+
+    const substitutedCertificate =
+      await buildPassingFormalV2CertificateForProcedure(
+        semanticProcedure,
+        semantic.claimIr,
+        {
+          candidateBadgeIds: ["badge:substituted", BADGE_ID],
+          certificateId:
+            "formal-v2:certificate:procedure-closure-badge-substitution",
+        },
+      );
+    const substitutedRef = `${turnId}:formal-v2-certificate-substituted`;
+    const substitutedEnvelope = currentTurnArtifact({
+      artifact:
+        substitutedCertificate as unknown as Record<string, unknown>,
+      artifactRef: substitutedRef,
+      admissionTurnId: turnId,
+      sourceCapability: "theory-formal-verifier.read_result",
+      kind: "formal_certificate",
+    });
+    const substitutedPreparation =
+      await executeTheoryExperimentProcedureGatewayCapability({
+        capabilityId:
+          THEORY_EXPERIMENT_PROCEDURE_PREPARE_CAPABILITY,
+        accountType: "developer",
+        turnId,
+        authoritativeEvidenceArtifacts: [
+          authoritativeSemantic,
+          substitutedEnvelope,
+        ],
+        args: {
+          ...baseArgs,
+          evidence_artifacts: [
+            {
+              artifact_ref: semanticRef,
+              source_turn_id: turnId,
+              kind: "semantic_admission",
+              artifact: semantic.observation,
+            },
+            {
+              artifact_ref: substitutedRef,
+              source_turn_id: turnId,
+              kind: "formal_certificate",
+              artifact: substitutedCertificate,
+            },
+          ],
+        },
+      });
+    expect(substitutedPreparation).toMatchObject({
+      ok: false,
+      status: "blocked",
+      blockedReason: `${substitutedRef}:formal_candidate_badge_lineage_mismatch`,
+    });
   });
 
   it("rejects procedure hash aliases, ambiguity, and payload substitution before closure evaluation", async () => {

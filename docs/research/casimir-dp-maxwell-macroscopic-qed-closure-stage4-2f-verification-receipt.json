@@ -1,0 +1,152 @@
+{
+  "schema_version": "casimir_dp_maxwell_macroscopic_qed_closure_stage4_2f_verification_receipt/1",
+  "campaign_id": "casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1",
+  "campaign_run_id": "casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z",
+  "verified_at": "2026-07-30T02:32:39.330Z",
+  "evidence_class": "synthetic_maxwell_macroscopic_qed_closure_and_readiness_audit",
+  "claim_ceiling": "maxwell_macroscopic_qed_and_named_dp_model_definition_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.v1.json",
+    "config_sha256": "421f9d4c570c135cf2bb4a92849868c2862074696911dc7cb139608a4b5f60dd",
+    "authority_manifest_path": "configs/research/casimir-dp-stage4-2f-authorities.v1.json",
+    "authority_manifest_sha256": "e0eab3f58a8b5c10ca91ef28232d4fda2392bbfceb02bc6822ef4e3290e4f19b",
+    "fixture_path": "configs/research/fixtures/casimir-dp-stage4-2f-maxwell-closure.synthetic.v1.json",
+    "fixture_sha256": "fe81cda1ed30dfce8b58e8eeaeb13ceddad4c353aa95ad185e448a5bdf961128",
+    "report_json_path": "artifacts/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z/maxwell-macroscopic-qed-closure-stage4-2f-report.json",
+    "report_json_sha256": "f832e7081abcbd54b9b9879e80257c6f064cf5c78c7779cf9a181400d848e176",
+    "report_markdown_path": "artifacts/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z/maxwell-macroscopic-qed-closure-stage4-2f-report.md",
+    "report_markdown_sha256": "e8e976840db8a6dd421364eead3f233d84fc5cfa127babe1eb3bea7749edfc27",
+    "campaign_trace_path": "artifacts/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z/maxwell-macroscopic-qed-closure-stage4-2f-trace.jsonl",
+    "campaign_trace_sha256": "1f73089b5d5c9528d8c9914ab6d706ba96383d8e25dde7134360479ed70acdce",
+    "campaign_receipt_path": "artifacts/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z/maxwell-macroscopic-qed-closure-stage4-2f-receipt.json",
+    "campaign_receipt_sha256": "b33689bc4c2fc751219a2af33fee9cf00cbe38477b2134d90c684e9eb7465f89",
+    "maintained_report_path": "docs/research/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-report.md",
+    "maintained_report_matches_immutable_markdown": true,
+    "git_head": "31709409fba197516e966484259f81725a2ad0fa",
+    "worktree_state": "dirty_uncommitted_stage4_2f_source_and_content_hashes_authoritative",
+    "authority_mode": "role_path_and_content_hash_tuple"
+  },
+  "immutable_stage4_2e_upstream": {
+    "run_id": "casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z",
+    "campaign_receipt_sha256": "633b07c4f2d769b4701612bd4e112e5a2e12e111f60f7405f1f752b3e260d2c2",
+    "downstream_verification_receipt_path": "docs/research/casimir-dp-causal-cone-clock-stage4-2e-verification-receipt.json",
+    "downstream_verification_receipt_sha256": "b37bdbd1612912fc5c91fd51667559dc739018d43d9f57d7f182d76d1d3bbb1b",
+    "mutation_detected": false
+  },
+  "verification_inputs": {
+    "adapter_command": "npm run casimir:verify -- --ci --trace-out artifacts/training-trace.jsonl --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export",
+    "telemetry_mode": "standard_cli_repository_telemetry",
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-2f-20260730T023239330Z-bound-validated.jsonl",
+      "sha256": "13ea52a95383b5e2f6cb80322a4321ad28dbc52bf5533a5771386fc6fbc0f0c8",
+      "bytes": 986,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true,
+      "validated_exporter_path": "scripts/research/export-casimir-dp-stage4-verification-trace.ts"
+    }
+  },
+  "local_gates": {
+    "stage4_2f_runtime_campaign_paper_graph_sidecar_and_root": {
+      "files": 6,
+      "tests": 69,
+      "status": "pass"
+    },
+    "required_gr_warp_replay": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    },
+    "production_build": {
+      "status": "pass_with_warnings_after_environment_retry",
+      "commands": [
+        "npm run build:client",
+        "npm run build:server"
+      ],
+      "exit_codes": [
+        0,
+        0
+      ],
+      "warnings_present": true,
+      "note": "The first combined build attempt reached 7054 transformed modules but Windows could not clear dist/public/assets because system resources were temporarily insufficient. A clean retry completed the client bundle, followed by the server bundle. Existing browser-externalization, chunk-size, duplicate-key, and duplicate-case warnings remain outside this campaign's scientific authority."
+    },
+    "dependency_coherence": {
+      "status": "pass_from_adapter_trace",
+      "package_lock_sha256": "c85521a758783fa5cea1c8933e3c5ad54d604d596620279fce916e3c2ce42367"
+    },
+    "equation_sidecar": {
+      "paper_markers": 58,
+      "source_entries": 58,
+      "generated_entries": 58,
+      "source_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
+      "source_sha256_before_downstream_receipt_binding": "b0d30e16a4bb5dd82ab1ed56ff9a1d2e586399fb5cbd733a4f48f847fdb60ba2",
+      "generated_path": "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
+      "generated_sha256_before_downstream_receipt_binding": "c69f002c88fb12fc7dc8546c930d10f7d887f0cb4127e19cd38f1798a1da4d31",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 31,
+      "edges": 94,
+      "stage4_2f_badges": 1,
+      "calculator_payloads": 0,
+      "observable_bridge_edges": 0,
+      "graph_path": "shared/theory/casimir-dp-study-theory-badges.ts",
+      "graph_sha256_before_downstream_receipt_binding": "b38051f264ff472a0ab258350158fc9e2ded0339f8c4e48d3eec12354cf8338e",
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 217,
+      "validation": "pass",
+      "strict_congruence_errors": 0,
+      "strict_congruence_warnings": 0,
+      "report_json_path": "reports/math-report.json",
+      "report_json_sha256": "a7e3c54925be61528a667dfa656c7d8aececdfe5af59f272c5677661ba211ba7",
+      "report_markdown_path": "reports/math-report.md",
+      "report_markdown_sha256": "9aa268fa0e765fa12717b5aafc014caae2eec2430e3fe24531a775bdd99a153d"
+    },
+    "physics_root_to_leaf_manifest": {
+      "status": "pass",
+      "manifest_path": "configs/physics-root-leaf-manifest.v1.json",
+      "manifest_sha256": "39f91b070e9ca3a31d99133a58e8a4ae3e0333ecc88525597ad4e190c20e5ba5",
+      "readiness_and_scientific_falsifier_rules_separated": true
+    }
+  },
+  "adapter_result": {
+    "trace_id": "adapter:7d6fd3b0-9cd6-4634-a501-51352bb1c53d",
+    "run_id": "2348",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate": {
+      "status": "GREEN",
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+      "integrity_ok": true
+    },
+    "scientific_scope": "none"
+  },
+  "scientific_standing": {
+    "software_and_equation_recovery": "pass",
+    "finite_geometry_maxwell_authority": "not_ready",
+    "measured_material_green_authority": "not_ready",
+    "candidate_transport_identity_authority": "not_ready",
+    "dp_parameter_region_authority": "not_ready",
+    "companion_model_identity_authority": "not_ready",
+    "companion_detector_authority": "not_ready",
+    "state_preparation_authority": "not_ready",
+    "quasistatic_modulation_authority": "not_ready",
+    "complete_apparatus_stress_energy": "not_ready",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "explanation": "The certificate validates the supplied software, tests, schemas, dependencies, graph, sidecar, math registry, root-to-leaf manifest, build, and GR/WARP gates. It does not supply measured material response, a finite-geometry Green tensor or Maxwell-stress solution, an authentic selected-candidate superposition, a model-identity-matched or measured companion, validated boundary modulation, a complete conserved apparatus stress tensor, DP evidence, a Casimir-to-collapse transfer kernel, collapse or manifold identification, or physical viability."
+  }
+}

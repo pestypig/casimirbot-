@@ -1,11 +1,12 @@
 # Casimir artifact generation and independent numerical evidence
 
-Status: contract layer, pinned Lanyon snapshot admission, and the governed
-independent numerical `plan`/`start`/`read_result` execution rail are
-implemented. A release-pinned Casimir harness, Lanyon-kernel adapter, analytic
-reference lane, and bounded frozen-case numerical certificate are also
-implemented. Live artifact generation and broader numerical, empirical, or
-physical validation remain downstream work.
+Status: contract layer, pinned Lanyon snapshot admission, audited formal-source
+catalog, and the governed independent numerical
+`plan`/`start`/`read_result` execution rail are implemented. A release-pinned
+Casimir harness, Lanyon-kernel adapter, analytic reference lane, and bounded
+frozen-case numerical certificate are also implemented. Live artifact
+generation and broader numerical, empirical, or physical validation remain
+downstream work.
 
 ## Seven-stage reasoning order
 
@@ -93,17 +94,156 @@ and workstation schemas, and the gateway does not consult caller-supplied
 checks: the adapter still rejects path aliases, symlinks, missing files, and
 hash, size, or selected-tree drift.
 
+## GeneralRelativisticMaxwell reference audit
+
+The upstream `lanyonai/GeneralRelativisticMaxwell` repository is separately
+audited at commit `b13da44d9e93e9f3c8dbdab48590fc2e08a8bff3`. The audited
+selection contains six Racket/Lean/C triplets and 156 Lean theorem
+declarations. Canonical bytes come from Git blobs, not a platform-transformed
+working tree. The 18 selected artifacts bind to source-tree digest
+`0ff049323382600bac8ef7a24d97fe07c19adad27d66634e7fb136be7a7ecb7c`.
+The companion generation-lineage audit also binds the complete,
+non-truncated 32-entry recursive repository tree. Its generator-name scan is
+empty: the pinned repository publishes outputs and screen captures, but no
+generator artifact, generator revision, invocation manifest, prompt artifact,
+or generation receipt. This is the typed
+`formal_generator_lineage_unavailable` blocker; the repository README is not
+an executable or hash-bound generation receipt.
+
+`casimir_formal_artifact_family_audit/v1` binds every theorem to its exact
+module, source range, declaration digest, proposition-source digest, narrow
+property class, claim ceiling, denied promotions, and replay blockers. A
+server catalog resolves a theorem only from the complete tuple:
+
+```text
+formal artifact id
++ exact formal-source SHA-256
++ exact theorem name
+```
+
+The developer agent reaches this catalog through
+`theory-formal-verifier.inspect_artifact_family`. Ask normalizes the result as
+current-turn evidence, and `prepare_request` accepts its exact artifact
+reference through `formal_source_admission_artifact_ref`. The preparer
+re-resolves the server catalog rather than trusting copied payload fields. This
+is a provider-neutral source-admission route and remains distinct from a
+producer receipt for artifacts actually generated during a run.
+
+Names are not claim authority. In particular, all 12 declarations ending in
+`Hyperbolicity` prove only the existence of a witness for an expression already
+typed as `Real`; the audit classifies them as
+`real_typed_expression_witness` with ceiling `definition_well_typed`. They do
+not establish a complete real eigensystem, strong or symmetric
+hyperbolicity, well-posedness, CFL stability, or a numerical solution.
+
+The upstream C files use binary64 `double`, while the Lean sources use exact
+`Real`; their `main` entrypoints are placeholders and contain no simulation
+drivers. The repository also supplies no pinned Lean/Mathlib environment,
+dependency lock, import-closure digest, or CI replay record. Consequently this
+catalog grants source-admission authority only. It does not grant theorem
+replay, semantic equivalence, implementation refinement, numerical,
+empirical, or physical authority.
+
 ## Formal replay production boundary
 
-The formal contracts and blocked-preparation rail are implemented, but the
-production theorem/type-digest, semantic-to-Lean binding, import-closure,
-graph-snapshot, and Lean environment-policy catalog is intentionally empty.
-The successful `prepare_request -> plan -> start` path therefore remains
-unreachable. `prepare_request` can only report typed missing requirements; it
-cannot emit a ready prepared-request ID until a reviewed server-owned catalog
-is installed. Caller-supplied theorem names, imports, source paths, executable
-paths, or hashes cannot fill that gap. An executable environment setting by
-itself is not a catalog.
+The formal contracts, blocked legacy-preparation rail, provider-neutral v2
+sealed-execution catalog, external-only job service, gateway lifecycle, and v2
+certificate evidence re-entry are implemented. A server-governed
+source/theorem claim-scope catalog covers the audited
+GeneralRelativisticMaxwell family, but the production observed theorem-type
+digest, semantic-to-Lean binding, import closure, graph binding, Lean
+environment entry, sealed execution entry, and external executor remain
+absent.
+
+The successful scientific `prepare_request -> plan -> start` path therefore
+remains unreachable in the default deployment. The legacy route reports its
+independent missing bindings. The v2 route accepts only an opaque execution
+catalog ID and fails closed as `formal_execution_catalog_unconfigured` or
+`formal_external_sandbox_executor_unconfigured`. Caller-supplied theorem names,
+imports, request/policy bodies, source paths, executable paths, commands,
+resolver references, or hashes cannot fill that gap. An audited source
+declaration or executable environment setting by itself is not a replayed
+theorem and is not semantic equivalence.
+
+Local qualification confirmed why the resource policy is part of the trust
+boundary: the exact 1D GR-Maxwell module replayed twice, but a larger-module
+campaign exhausted a 16 GiB workstation and crashed the host. That local
+Mathlib environment is not production-admissible. No larger replay should run
+on the workstation until an isolated external executor can enforce memory,
+timeout, process, filesystem, and output ceilings and return resource
+exhaustion as a typed observation instead of destabilizing the agent host.
+
+The additive `casimir_formal_verification_request/v2` and certificate v2
+contracts bind the Casimir semantic proposition and the observed Lean theorem
+type as distinct identities. `casimir_semantic_to_lean_binding/v1` is the
+review artifact joining those identities. It binds the exact source audit,
+theorem declaration/proposition source, observed type, environment policy,
+translation/assumption/units correspondence digests, review evidence, and
+limitations. Only an integrity-valid `reviewed` artifact installed in the
+server-owned binding catalog may satisfy preparation; the production catalog
+currently contains no such artifact. This prevents source proximity, equal
+names, or a caller-created hash from being treated as semantic equivalence.
+
+The v2 request also binds an exact sandbox-executor capability and requires
+external OS memory/process limits, wall timeout, output ceiling, plus
+filesystem/network isolation. Direct host-workstation execution is false by
+contract. The v2 certificate repeats the executor capability, sandbox policy
+and attestation hashes, worker identity, memory/process/timeout/output
+ceilings, peak memory/output, and OOM/timeout/output-limit results. A passing
+certificate is invalid if it ran on the workstation, lacks any required
+isolation, exceeded a ceiling, was OOM-killed, timed out, or exceeded its
+output limit.
+
+The corresponding
+`casimir_formal_sandbox_executor_capability/v1` contract records the external
+worker target, platform, architecture, policy and attestation hashes, every
+required OS isolation control, and hard resource ceilings. The v2 sealed
+execution entry additionally binds the exact procedure, request, source/import
+bundle, non-path `casimir-formal-bundle:*` resolver reference, and capability.
+The immutable catalog factory clones and validates entries at installation,
+rejects duplicate entry IDs and duplicate procedure/hash bindings, withholds
+the entire catalog on any issue, exposes only redacted identity/integrity
+inspection, and returns a newly cloned exact developer-scoped match after
+rehashing the stored sealed input. This is a server-composition boundary, not
+a caller enrollment API or a trust signature.
+The catalog accepts a nonempty entry only with an integrity-valid
+`casimir_formal_execution_enrollment/v2` record and a trusted registration
+verifier. That record binds the exact specification, Lean and C artifacts,
+registered generator revision/invocation/receipt, theorem and observed type,
+reviewed semantic binding, graph snapshot, environment, bundle, executor,
+procedure, and request. The enrollment grants no execution or scientific
+authority; it prevents any one of those lineages from being omitted when a
+trusted server later installs an entry.
+Preparation recomputes the procedure's Master Problem and derivation-program
+hashes and requires one exact semantic claim/badge/graph-snapshot lineage.
+Plan requires the matching
+external executor resolver; start requires the exact plan plus a single-use
+trusted confirmation and delegates only through that executor interface. The
+v2 service contains no host process, shell, filesystem, or local Lean runner.
+No generator registration, trusted enrollment verifier, production entry, or
+executor resolver is installed, so a model- or caller-created capability
+cannot unlock replay.
+The shared runtime-approval bootstrap now composes its Ed25519 receipt verifier
+and durable PostgreSQL replay ledger into the formal, independent numerical,
+and runtime-canary rails. Formal and independent numerical prepared requests,
+plans, jobs, and completed certificates additionally use lane-isolated
+PostgreSQL lifecycle stores. A persisted running job becomes a typed
+restart-interruption failure when a new process reads it; it is never projected
+as indefinitely live. This removes production wiring and soft-lock
+contradictions
+without making any rail executable by itself: missing catalog and executor
+registrations remain explicit blockers. Formal artifact-family inspection
+reports the catalog resolver, redacted catalog inspector, catalog entry count,
+external-executor resolver, receipt verifier, and durable ledger in a
+non-terminal readiness packet. A configured-but-empty or invalid catalog stays
+blocked, while exact entry and executor resolution occurs only in preparation
+and plan.
+The production registry bootstrap is transactional in the fail-closed
+direction: it clears the prior formal catalog/executor composition before
+validating a replacement, preflights each distinct executor ID/hash without
+executing a job, and installs only when every enrollment, catalog binding, and
+executor capability succeeds. A failed replacement cannot silently retain the
+old execution authority.
 
 A repository-owned, no-import Lean 4.31 runtime self-test is available only in
 the test process. It pins the exact Lean executable and source bytes and checks
@@ -211,9 +351,13 @@ theory truth, empirical validation, or physical validation.
 
 The production enrollment catalog remains empty, and no persistent release
 bundle or attested sandbox executor is installed. The PostgreSQL replay-ledger
-backend is implemented, but it provides cross-process single-use authority only
-when all workers share PostgreSQL; the local pg-mem snapshot is single-process
-restart recovery.
+backend is implemented and composed into every confirmation-gated theory rail
+when the trusted key registry is present, but it provides cross-process
+single-use authority only when all workers share PostgreSQL; the local pg-mem
+snapshot is single-process restart recovery.
+The PostgreSQL job-state backend is composed independently of trusted-key
+presence, so lifecycle evidence remains durable even while execution authority
+is fail-closed.
 
 The source adapter recognizes nine pinned upstream cases, but source
 eligibility is not numerical-backend eligibility. The only registered Casimir

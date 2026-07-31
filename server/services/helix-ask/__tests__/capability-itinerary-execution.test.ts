@@ -189,6 +189,35 @@ describe("Helix capability itinerary execution", () => {
     });
   });
 
+  it("counts a formal artifact-family audit observation as theory-locator evidence", () => {
+    const artifacts = [{
+      artifact_id: "ask:test:theory-formal-artifact-family-audit",
+      kind: "theory_formal_artifact_family_audit_observation",
+      payload: {
+        schema: "casimir.theory_formal_artifact_family_audit.observation.v1",
+        capability_key: "theory-formal-verifier.inspect_artifact_family",
+        status: "succeeded",
+      },
+    }];
+
+    expect(
+      isHelixCapabilityItineraryFamilyObserved("theory_locator", artifacts),
+    ).toBe(true);
+    expect(buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: {
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["theory_locator"],
+        },
+      },
+      artifacts,
+    })).toMatchObject({
+      complete: true,
+      observed_families: ["theory_locator"],
+      missing_observation_families: [],
+    });
+  });
+
   it("reconciles stale planning hints with authenticated executed observation arguments", () => {
     const capability = "theory-experiment-procedure.prepare";
     const observationKind = "theory_experiment_procedure_observation";

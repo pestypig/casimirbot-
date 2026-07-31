@@ -1,0 +1,68 @@
+{
+  "schema_version": "casimir_dp_stage4_2f_fixture/1",
+  "campaign_id": "casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1",
+  "evidence_class": "synthetic_fixture",
+  "generated_at": "2026-07-29T23:30:00.000Z",
+  "cases": [
+    {
+      "case_id": "baseline_maxwell_qed_dp_separation",
+      "expected_gate": "pass",
+      "expected_status": "synthetic_closure_and_nonbridge_pass"
+    },
+    {
+      "case_id": "longitudinal_plane_wave_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "gauss_and_transversality_failure"
+    },
+    {
+      "case_id": "nonpassive_green_response_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "fdt_passivity_failure"
+    },
+    {
+      "case_id": "polarization_basis_changes_energy_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "polarization_basis_invariance_failure"
+    },
+    {
+      "case_id": "nhm2_method_promoted_as_casimir_dp_evidence_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "cross_campaign_evidence_reuse_forbidden"
+    },
+    {
+      "case_id": "ideal_scalar_promoted_as_finite_geometry_authority_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "finite_geometry_maxwell_authority_not_ready"
+    },
+    {
+      "case_id": "maxwell_frequency_connected_to_dp_rate_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "registered_transfer_kernel_missing"
+    },
+    {
+      "case_id": "synthetic_companion_snr_promoted_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "companion_detector_and_model_identity_authority_not_ready"
+    },
+    {
+      "case_id": "r0_sensitivity_promoted_as_allowed_region_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "dp_parameter_region_authority_not_ready"
+    },
+    {
+      "case_id": "unprepared_superposition_promoted_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "state_preparation_authority_not_ready"
+    },
+    {
+      "case_id": "active_boundary_without_transfer_audit_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "quasistatic_modulation_authority_not_ready"
+    },
+    {
+      "case_id": "partial_field_stress_promoted_as_gr_source_rejected",
+      "expected_gate": "blocked",
+      "expected_status": "complete_apparatus_stress_energy_not_ready"
+    }
+  ]
+}

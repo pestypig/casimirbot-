@@ -261,6 +261,7 @@ Each capability contract should define:
 | `theory-experiment-procedure.readmit`                   | [theory-experiment-procedure.readmit.md](theory-experiment-procedure.readmit.md)                         | `draft`     |
 | `theory-experiment-procedure.evaluate_closure`          | [theory-experiment-procedure.prepare.md](theory-experiment-procedure.prepare.md)                         | `draft`     |
 | `theory-badge-graph.propose_frontier_conjectures`       | [theory-badge-graph.propose_frontier_conjectures.md](theory-badge-graph.propose_frontier_conjectures.md) | `draft`     |
+| `theory-formal-verifier.inspect_artifact_family`        | [theory-formal-verifier.md](theory-formal-verifier.md)                                                   | `draft`     |
 | `theory-formal-verifier.prepare_request`                | [theory-formal-verifier.md](theory-formal-verifier.md)                                                   | `draft`     |
 | `theory-formal-verifier.plan`                           | [theory-formal-verifier.md](theory-formal-verifier.md)                                                   | `draft`     |
 | `theory-formal-verifier.start`                          | [theory-formal-verifier.md](theory-formal-verifier.md)                                                   | `draft`     |
@@ -276,6 +277,9 @@ Each capability contract should define:
 | `theory-independent-numerical-verifier.plan`            | [theory-independent-numerical-verifier.md](theory-independent-numerical-verifier.md)                     | `draft`     |
 | `theory-independent-numerical-verifier.start`           | [theory-independent-numerical-verifier.md](theory-independent-numerical-verifier.md)                     | `draft`     |
 | `theory-independent-numerical-verifier.read_result`     | [theory-independent-numerical-verifier.md](theory-independent-numerical-verifier.md)                     | `draft`     |
+| `scientific-evidence-closure.inspect_enrollment`         | [scientific-evidence-closure.md](scientific-evidence-closure.md)                                         | `draft`     |
+| `scientific-evidence-closure.prepare`                    | [scientific-evidence-closure.md](scientific-evidence-closure.md)                                         | `draft`     |
+| `scientific-evidence-closure.evaluate`                   | [scientific-evidence-closure.md](scientific-evidence-closure.md)                                         | `draft`     |
 | `moral-graph.reflect_context`                           | [moral-graph.reflect_context.md](moral-graph.reflect_context.md)                                         | `draft`     |
 | `moral-graph.reflect_living_substrate_context`          | [moral-graph.reflect_living_substrate_context.md](moral-graph.reflect_living_substrate_context.md)       | `candidate` |
 | `civilization-bounds.reflect_system_bounds`             | [civilization-bounds.reflect_system_bounds.md](civilization-bounds.reflect_system_bounds.md)             | `candidate` |

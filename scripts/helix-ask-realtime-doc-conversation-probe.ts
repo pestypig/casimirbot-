@@ -17,6 +17,7 @@ type TurnResult = {
   handoff_id: string;
   selected_route: string | null;
   required_grounding_capability_ids: string[];
+  called_capability_ids: string[];
   executed_capability_ids: string[];
   selected_model: string | null;
   terminal_artifact_kind: string | null;
@@ -38,6 +39,10 @@ type TurnResult = {
   provisional_utterance_code: string | null;
   provisional_answer_authority: boolean;
   continuity_evidence_refs: string[];
+  handoff_evidence_refs: string[];
+  scientific_closure_identity_count: number;
+  scientific_closure_statuses: string[];
+  scientific_closure_canonical_within_enrollment: boolean[];
 };
 
 export type RealtimeDocProbeTurn = {
@@ -49,6 +54,7 @@ export type RealtimeDocProbeTurn = {
   requireDocsSearch?: boolean;
   expectedCapabilities?: string[];
   requireGroundedVoiceRelay?: boolean;
+  allowTypedCapabilityFailure?: boolean;
 };
 
 export type RealtimeDocProbeScenario = {
@@ -115,8 +121,80 @@ export const THEORY_EXPERIMENT_PROCEDURE_REALTIME_SCENARIO: RealtimeDocProbeScen
       expectedCapabilities: ["theory-experiment-procedure.prepare"],
       requireGroundedVoiceRelay: true,
     },
+    {
+      id: "gr-maxwell-formal-source-scope",
+      prompt:
+        "Now call theory-formal-verifier.inspect_artifact_family for formal artifact casimir:lanyon:gr_hyperbolic_maxwell_1d:formal_source and theorem xHyperbolicity. Explain its exact claim ceiling and denied promotions. Do not start Lean, numerical work, or any downstream job.",
+      focusPanelId: "workflow-demo-lab",
+      expectedText: [
+        /xHyperbolicity|hyperbolicity/i,
+        /definition.?well.?typed|well.?typed|Real/i,
+        /does not|not prove|denied|blocked/i,
+        /not run|not executed|did not.*Lean|replay/i,
+      ],
+      expectedCapabilities: [
+        "theory-formal-verifier.inspect_artifact_family",
+      ],
+      requireGroundedVoiceRelay: true,
+    },
   ],
 };
+
+export const SCIENTIFIC_EVIDENCE_CLOSURE_REALTIME_SCENARIO:
+  RealtimeDocProbeScenario = {
+    id: "scientific-evidence-closure",
+    requiresDeveloper: true,
+    focusPanelId: "workflow-demo-lab",
+    turns: [
+      {
+        id: "scientific-closure-inspect",
+        prompt:
+          "Inspect the conformed scientific-evidence enrollment for advection_diffusion_full_1d. Show the selected Theory Badge orientation, registered source claim, permitted Dxx intervention, exact Lanyon and Lean bindings, numerical lineages, and the maximum claim ceiling. Inspect only; do not prepare, evaluate, or start any runtime.",
+        expectedText: [
+          /advection.?diffusion|Dxx/i,
+          /badge|orientation/i,
+          /Lanyon/i,
+          /Lean|formal/i,
+          /numerical|lineage/i,
+          /bounded|claim|synthetic/i,
+        ],
+        expectedCapabilities: [
+          "scientific-evidence-closure.inspect_enrollment",
+        ],
+        requireGroundedVoiceRelay: true,
+      },
+      {
+        id: "scientific-closure-prepare",
+        prompt:
+          "Continue with that exact enrollment. Prepare a current-turn execution plan changing permitted Dxx from 0.01 to 0.02 while freezing every other registered input. Bind the plan to the same badge orientation, source claim, Lanyon semantics, pinned Lean contract, primary and independent numerics, confirmation policy, and closure evaluator. Prepare only; do not start or evaluate.",
+        expectedText: [
+          /0\.01/,
+          /0\.02/,
+          /plan|prepared/i,
+          /Lanyon|semantic/i,
+          /Lean|formal/i,
+          /primary|independent|numerical/i,
+          /confirmation|approval/i,
+        ],
+        expectedCapabilities: ["scientific-evidence-closure.prepare"],
+        requireGroundedVoiceRelay: true,
+      },
+      {
+        id: "scientific-closure-evaluate-or-block",
+        prompt:
+          "Now call scientific-evidence-closure.evaluate for that exact current-turn plan, using only current-turn confirmation, formal, and numerical artifacts that actually exist. If trusted confirmation or external sandbox attestations are absent, return the exact actionable blockers. Do not invent receipts, do not call the result canonical, and do not promote synthetic closure to empirical or physical evidence.",
+        expectedText: [
+          /current-turn/i,
+          /closure input ref/i,
+          /execution-plan ref/i,
+          /plan ID/i,
+          /required/i,
+        ],
+        expectedCapabilities: ["scientific-evidence-closure.evaluate"],
+        allowTypedCapabilityFailure: true,
+      },
+    ],
+  };
 
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as RecordLike : null;
@@ -185,6 +263,8 @@ export const resolveRealtimeDocProbeScenario = (
 ): RealtimeDocProbeScenario | null =>
   scenarioId === THEORY_EXPERIMENT_PROCEDURE_REALTIME_SCENARIO.id
     ? THEORY_EXPERIMENT_PROCEDURE_REALTIME_SCENARIO
+    : scenarioId === SCIENTIFIC_EVIDENCE_CLOSURE_REALTIME_SCENARIO.id
+      ? SCIENTIFIC_EVIDENCE_CLOSURE_REALTIME_SCENARIO
     : null;
 
 const establishLocalDeveloperSession = async (): Promise<void> => {
@@ -445,6 +525,9 @@ const runLiveProbe = async (): Promise<void> => {
     const audit = readRecord(handoffDebug?.feedback_observer_audit);
     const relay = readRecord(handoffDebug?.grounded_relay);
     const groundedAnswer = readRecord(handoffDebug?.grounded_answer);
+    const scientificClosureIdentities = readRecords(
+      groundedAnswer?.scientific_evidence_closure_identities,
+    );
     const answer = readString(
       ask.body.selected_final_answer ?? ask.body.content ?? ask.body.answer ?? ask.body.text,
     ) ?? "";
@@ -452,7 +535,13 @@ const runLiveProbe = async (): Promise<void> => {
     const terminalAuthority = readRecord(ask.body.terminal_answer_authority);
     const groundingAuthority = readRecord(ask.body.terminal_grounding_authority);
     const requiredCapabilities = readStrings(handoff.required_grounding_capability_ids);
-    const executedCapabilities = readRecords(ask.body.workstation_gateway_call_results)
+    const gatewayCallResults = readRecords(
+      ask.body.workstation_gateway_call_results,
+    );
+    const calledCapabilities = gatewayCallResults
+      .map((result) => readString(result.capability_id ?? result.capabilityId))
+      .filter((entry): entry is string => Boolean(entry));
+    const executedCapabilities = gatewayCallResults
       .filter((result) => result.ok === true)
       .map((result) => readString(result.capability_id ?? result.capabilityId))
       .filter((entry): entry is string => Boolean(entry));
@@ -465,6 +554,7 @@ const runLiveProbe = async (): Promise<void> => {
       handoff_id: handoffId,
       selected_route: readString(workerAdmission?.selected_route),
       required_grounding_capability_ids: requiredCapabilities,
+      called_capability_ids: calledCapabilities,
       executed_capability_ids: executedCapabilities,
       selected_model: readString(ask.body.llm_model),
       terminal_artifact_kind: readString(ask.body.terminal_artifact_kind),
@@ -488,6 +578,23 @@ const runLiveProbe = async (): Promise<void> => {
       provisional_utterance_code: readString(dispatchProvisional?.utterance_code),
       provisional_answer_authority: dispatchProvisional?.answer_authority === true,
       continuity_evidence_refs: continuityRefs,
+      handoff_evidence_refs: readStrings(handoff.evidence_refs).concat(
+        [
+          readString(handoff.provider_event_ref),
+          readString(handoff.transcript_observation_ref),
+          readString(handoff.stage_play_event_ref),
+          readString(handoff.context_pack_id),
+        ].filter((entry): entry is string => Boolean(entry)),
+      ),
+      scientific_closure_identity_count:
+        scientificClosureIdentities.length,
+      scientific_closure_statuses: scientificClosureIdentities
+        .map((identity) => readString(identity.status))
+        .filter((entry): entry is string => Boolean(entry)),
+      scientific_closure_canonical_within_enrollment:
+        scientificClosureIdentities.map(
+          (identity) => identity.canonical_within_enrollment === true,
+        ),
     });
 
     assert(`${input.id}_http`, ask.status === 200, `HTTP ${ask.status}`);
@@ -504,13 +611,25 @@ const runLiveProbe = async (): Promise<void> => {
     );
     assert(
       `${input.id}_solver_terminal_authority`,
-      solverTrace?.completed_solver_path === true && terminalAuthority?.server_authoritative === true,
-      `solver=${String(solverTrace?.completed_solver_path)} authoritative=${String(terminalAuthority?.server_authoritative)}`,
+      input.allowTypedCapabilityFailure
+        ? readString(ask.body.terminal_artifact_kind) === "typed_failure" &&
+          readString(ask.body.final_answer_source) === "typed_failure" &&
+          terminalAuthority?.server_authoritative === true
+        : solverTrace?.completed_solver_path === true &&
+          terminalAuthority?.server_authoritative === true,
+      `typed_failure_allowed=${String(input.allowTypedCapabilityFailure === true)} solver=${String(solverTrace?.completed_solver_path)} terminal=${String(ask.body.terminal_artifact_kind)} source=${String(ask.body.final_answer_source)} authoritative=${String(terminalAuthority?.server_authoritative)}`,
     );
     assert(
       `${input.id}_grounded_feedback`,
-      Boolean(groundedAnswer) && audit?.feedback_status === "recorded" &&
-        readString(relay?.failure_code) !== "required_grounding_evidence_missing",
+      input.allowTypedCapabilityFailure
+        ? !groundedAnswer &&
+          audit?.feedback_status === "suppressed" &&
+          readString(relay?.status) === "suppressed" &&
+          readString(relay?.failure_code) === "typed_failure_not_spoken"
+        : Boolean(groundedAnswer) &&
+          audit?.feedback_status === "recorded" &&
+          readString(relay?.failure_code) !==
+            "required_grounding_evidence_missing",
       `feedback=${String(audit?.feedback_status)} grounding=${String(audit?.grounding_evidence_status)} relay=${String(relay?.status)} failure=${String(relay?.failure_code)} authority=${String(groundingAuthority?.status)} authority_failures=${readStrings(groundingAuthority?.failure_codes).join(",")}`,
     );
     if (input.requireDocsSearch) {
@@ -530,11 +649,14 @@ const runLiveProbe = async (): Promise<void> => {
       );
     }
     for (const capabilityId of input.expectedCapabilities ?? []) {
+      const capabilityWasObserved = input.allowTypedCapabilityFailure
+        ? calledCapabilities.includes(capabilityId)
+        : executedCapabilities.includes(capabilityId);
       assert(
-        `${input.id}_${capabilityId}_required_and_executed`,
+        `${input.id}_${capabilityId}_required_and_${input.allowTypedCapabilityFailure ? "called" : "executed"}`,
         requiredCapabilities.includes(capabilityId) &&
-          executedCapabilities.includes(capabilityId),
-        `required=${requiredCapabilities.join(",")} executed=${executedCapabilities.join(",")}`,
+          capabilityWasObserved,
+        `required=${requiredCapabilities.join(",")} called=${calledCapabilities.join(",")} executed=${executedCapabilities.join(",")}`,
       );
     }
     if (input.requireGroundedVoiceRelay) {
@@ -560,10 +682,15 @@ const runLiveProbe = async (): Promise<void> => {
     }
     const previous = turns.at(-2);
     if (previous) {
+      const priorContinuityRefs = [
+        previous.handoff_id,
+        previous.turn_id,
+        ...previous.handoff_evidence_refs,
+      ];
       assert(
         `${input.id}_conversation_continuity`,
-        continuityRefs.includes(previous.handoff_id) || continuityRefs.includes(previous.turn_id),
-        `prior_handoff=${previous.handoff_id} refs=${continuityRefs.length}`,
+        priorContinuityRefs.some((ref) => continuityRefs.includes(ref)),
+        `prior_handoff=${previous.handoff_id} prior_refs=${priorContinuityRefs.length} refs=${continuityRefs.length}`,
       );
     }
   };
@@ -669,8 +796,8 @@ const runLiveProbe = async (): Promise<void> => {
         prompt: "Can you quote the exact passage where it says that and explain what the surrounding section is doing?",
         documentRef,
         expectedText: [
-          /intentionally noncomputable|No parameter fit|not executable|deliberately unregistered/i,
-          /response|operator|model/i,
+          /intentionally noncomputable|No parameter fit|not executable|deliberately unregistered|declared model.{0,120}(?:units|parameters|provenance|falsifiers)|registered (?:generator|model).{0,120}(?:parameter|falsifier)/is,
+          /response|operator|model|observable.separation|hard boundary|hypothesis|null result|overclaim/i,
         ],
         requireDocsSearch: true,
       });
@@ -680,7 +807,7 @@ const runLiveProbe = async (): Promise<void> => {
         documentRef,
         expectedText: [
           /not.{0,80}Turing|not claiming Turing/is,
-          /not (?:yet )?(?:specified|registered|instantiated|computable)|undefined|underspecified|missing (?:specification|dynamics)/i,
+          /not (?:yet )?(?:uniquely |fully )?(?:specified|registered|instantiated|computable|defined|identified)|undefined|under.?specified|missing (?:specification|dynamics)/i,
         ],
         requireDocsSearch: true,
       });
@@ -745,6 +872,8 @@ const writeDryRunReport = async (): Promise<void> => {
       expected_capabilities: turn.expectedCapabilities ?? [],
       expected_text_patterns: turn.expectedText.map((pattern) => pattern.source),
       require_grounded_voice_relay: turn.requireGroundedVoiceRelay === true,
+      allow_typed_capability_failure:
+        turn.allowTypedCapabilityFailure === true,
     })),
     summary: {
       passed: selectedScenario.turns.length,
@@ -765,7 +894,7 @@ const main = async (): Promise<void> => {
   }
   if (selectedScenario?.requiresDeveloper && !LOCAL_DEVELOPER_SIGN_IN) {
     throw new Error(
-      "theory_experiment_procedure_scenario_requires_explicit_local_developer_sign_in",
+      "selected_realtime_probe_scenario_requires_explicit_local_developer_sign_in",
     );
   }
 

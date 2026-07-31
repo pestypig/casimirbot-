@@ -1415,6 +1415,7 @@ export const formatHelixAgentContinuationStateForRuntime = (
   return [
     "Helix continuation state (non-terminal adapter evidence):",
     JSON.stringify(state, null, 2),
+    "The fields missing_requirement_ids and next_admissible_affordances describe only the current turn's Helix control lifecycle. Empty values do not prove that the user's scientific, document, workflow, or conversational subject has no missing requirements or useful next steps. Determine those domain facts from current-turn observations and bounded conversation context, and request an admitted capability when fresh evidence is needed.",
     "Choose exactly one allowed decision. An untried lane_request in next_admissible_affordances is authoritative: copy it exactly rather than inventing a replacement.",
     mayProposeBoundedRecovery
       ? "Retry is allowed but no concrete lane_request was prescribed. You may propose exactly one bounded recovery capability grounded in the failed observation, its missing requirements, and the same source identity. Helix must independently admit the capability and arguments before execution. Do not broaden the source, invent identifiers, or repeat an unchanged failed request."

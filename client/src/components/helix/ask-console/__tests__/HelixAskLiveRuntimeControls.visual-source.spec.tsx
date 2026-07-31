@@ -48,6 +48,7 @@ const model = buildHelixAskLiveRuntimeControlsModel({
 
 describe("Helix Ask GPT Live Vision source coordination", () => {
   beforeEach(() => {
+    mocks.runtime.error = null;
     mocks.runtime.visualInputEnabled = false;
     mocks.runtime.visualInputFrameCount = 0;
     mocks.runtime.visualInputProviderAcknowledgedFrameCount = 0;
@@ -180,5 +181,21 @@ describe("Helix Ask GPT Live Vision source coordination", () => {
     render(<HelixAskLiveRuntimeControls model={model} />);
 
     expect(screen.getByRole("button", { name: "Live runtime agent authority" })).toBeVisible();
+  });
+
+  it("shows an actionable provider-auth status without projecting credential material", () => {
+    mocks.runtime.error = "openai_realtime_authentication_failed_invalid_api_key";
+    render(<HelixAskLiveRuntimeControls model={model} />);
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("OpenAI rejected the Realtime credential");
+    expect(status).toHaveAttribute(
+      "data-helix-ask-realtime-failure",
+      "openai_realtime_authentication_failed_invalid_api_key",
+    );
+    expect(screen.getByRole("button", { name: "Live runtime agent lifecycle" })).toHaveAttribute(
+      "title",
+      "Check the private server OPENAI_API_KEY configuration. Helix did not inspect or expose its value.",
+    );
   });
 });

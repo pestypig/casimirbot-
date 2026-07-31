@@ -1,0 +1,109 @@
+{
+  "schema_version": "casimir_dp_commissioning_intake_stage4_2h/1",
+  "study_id": "casimir-dp-quantum-foam-study-v1",
+  "campaign_id": "casimir-dp-commissioning-intake-stage4-2h-v1",
+  "implementation_version": "stage4.2h-v1",
+  "evidence_cutoff": "2026-07-30T05:00:00.000Z",
+  "evidence_class": "commissioning_template_and_synthetic_dry_run_only",
+  "claim_ceiling": "commissioning_intake_and_stage4_2g_packet_compilation_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "authority_manifest": {
+    "path": "configs/research/casimir-dp-stage4-2h-authorities.v1.json",
+    "sha256": "d607691158c0156903f7f79f2970b7f5021b9350047c988279a938435a30ba3d"
+  },
+  "upstream_authorities": [
+    {
+      "role": "stage4_2g_config",
+      "path": "configs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g.v1.json",
+      "sha256": "a9516529a7c2f935c777fc4c1b29c207457a8f1618f1df580bff89ee27692487",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_unacquired_packet",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2g-pilot-unacquired.v1.json",
+      "sha256": "f06425aa1355f3fee13e02fdbd97ca5493f65138ec8f835e6e03fb21d5d5ba43",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_synthetic_packet",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2g-pilot-synthetic-validation.v1.json",
+      "sha256": "251ae42ac6e60454d1af850fec591febd104b9d5c33093a61569f6b8dddae7a8",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_report",
+      "path": "artifacts/research/casimir-dp-empirical-feasibility-pilot-stage4-2g/casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z/empirical-feasibility-pilot-stage4-2g-report.json",
+      "sha256": "0de543b66dc6e79f523b10083f7712bebbfd0dc2857f51d72337af7c8e600a4b",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-empirical-feasibility-pilot-stage4-2g/casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z/empirical-feasibility-pilot-stage4-2g-receipt.json",
+      "sha256": "d53405187bb494aa8db3b83a68f0f4ea746fb36ffd70ede127d95cdc8e1e1f6c",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_verification_receipt",
+      "path": "docs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g-verification-receipt.json",
+      "sha256": "3530465e24ef861bd84cbd258cff153e39823e4329e7461a216ef978e712821b",
+      "required_at_runtime": true
+    }
+  ],
+  "method_authorities": [
+    {
+      "role": "stage4_2g_packet_and_gate_evaluator",
+      "path": "shared/casimir-dp-empirical-feasibility-pilot-stage4-2g.ts",
+      "sha256": "37470d38cd73d9753d202e67aedfe4ebd6b516c494cfdc34a16b5728bb6d16fe",
+      "required_at_runtime": true
+    }
+  ],
+  "immutable_stage4_2g": {
+    "campaign_run_id": "casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z",
+    "report_sha256": "0de543b66dc6e79f523b10083f7712bebbfd0dc2857f51d72337af7c8e600a4b",
+    "campaign_receipt_sha256": "d53405187bb494aa8db3b83a68f0f4ea746fb36ffd70ede127d95cdc8e1e1f6c",
+    "verification_receipt_sha256": "3530465e24ef861bd84cbd258cff153e39823e4329e7461a216ef978e712821b",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  },
+  "blank_dossier": {
+    "path": "configs/research/fixtures/casimir-dp-stage4-2h-commissioning-blank.v1.json",
+    "sha256": "57318b8bc2986530154fb02bb2765e5dc5a711920d8c88483bc19772625bad65"
+  },
+  "partition_windows": {
+    "calibration": 200,
+    "pilot": 400,
+    "confirmatory": 1600,
+    "independent_replication": 1600
+  },
+  "run_order": [
+    "verify_immutable_stage4_2g_authority_tuples",
+    "load_frozen_single_apparatus_identity",
+    "validate_blank_commissioning_dossier",
+    "generate_synthetic_dry_run_without_empirical_authority",
+    "freeze_instrument_role_and_product_slot_order",
+    "freeze_partition_and_raw_column_order",
+    "validate_calibration_and_custody_ancestry",
+    "validate_local_artifact_hashes_for_measured_dossiers",
+    "compile_stage4_2g_packet_only_when_complete",
+    "recompute_stage4_2g_gates_without_refit",
+    "preserve_zero_casimir_to_collapse_transfer_edges",
+    "write_content_addressed_report_trace_and_receipt"
+  ],
+  "final_status_policy": {
+    "commissioning_contract": "pass",
+    "synthetic_dry_run": "pass",
+    "instrument_registry": "not_ready",
+    "calibration_ancestry": "not_ready",
+    "custody_and_blind_freeze": "not_ready",
+    "raw_data_availability": "not_ready",
+    "stage4_2g_packet_compilation": "not_ready",
+    "empirical_pilot_readiness": "not_ready",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  }
+}

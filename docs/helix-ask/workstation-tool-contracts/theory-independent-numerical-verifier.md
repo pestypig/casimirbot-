@@ -115,8 +115,9 @@ before file inspection or execution.
 
 The server must install a trusted numerical execution catalog resolver, an
 exact capability-bound sandbox-executor resolver, a trusted receipt verifier,
-and a shared atomic replay ledger. Harness, source, build, and executable bytes
-must all match the catalog enrollment and replay policy.
+a shared atomic replay ledger, and a durable job-state store. Harness, source,
+build, and executable bytes must all match the catalog enrollment and replay
+policy.
 
 Trusted bootstrap code installs those dependencies through
 `installCasimirIndependentNumericalVerifierDependenciesForServerV1`. This is a
@@ -127,6 +128,11 @@ attested sandbox executor, signer, or approval host is installed. A
 PostgreSQL-backed replay-ledger implementation exists, but cross-process
 single-use authority requires all workers to share that PostgreSQL database;
 the local pg-mem snapshot provides only single-process restart recovery.
+The same bootstrap installs a PostgreSQL lifecycle store for prepared requests,
+plans, jobs, and completed certificates. A replay still running when the
+process stopped is not resumable: its first read after restart returns
+`numerical_job_interrupted_by_server_restart`, while completed results remain
+readable.
 
 The numerical request's Casimir Spec identity, semantic and artifact hashes,
 claim ID, and proposition hash must exactly match both artifact-generation

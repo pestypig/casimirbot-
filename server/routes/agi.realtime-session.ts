@@ -26,6 +26,7 @@ import {
 import {
   exchangeOpenAiRealtimeSdp,
   isValidRealtimeOfferSdp,
+  probeOpenAiApiCredential,
 } from "../services/helix-ask/realtime-session/sdp-transport";
 import {
   bridgeRealtimeTranscriptToStagePlay,
@@ -604,10 +605,19 @@ realtimeSessionRouter.post("/realtime/session/:id/sdp", async (req: Request, res
     safetyIdentifier: session.requesterRef,
   });
   if (!result.ok || !result.answerSdp) {
+    const failureReason = readString(result.failureReason) ?? "openai_realtime_contract_failed";
+    const sameCredentialModelsProbe =
+      process.env.NODE_ENV === "development" &&
+      failureReason.startsWith("openai_realtime_authentication_failed")
+        ? await probeOpenAiApiCredential({ apiKey })
+        : "not_run";
+    console.warn(
+      `[realtime-sdp] Provider exchange failed: reason=${failureReason} model=${session.model} credential_source=OPENAI_API_KEY same_credential_models_probe=${sameCredentialModelsProbe}`,
+    );
     return res.status(502).json(buildSdpExchangeResponse({
       ok: false,
       error: "realtime_openai_contract_failed",
-      blocked_reason: readString(result.failureReason) ?? "openai_realtime_contract_failed",
+      blocked_reason: failureReason,
       realtime_session_id: req.params.id,
       openai_network_call_attempted: true,
     }));

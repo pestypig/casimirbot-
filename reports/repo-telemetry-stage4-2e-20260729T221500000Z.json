@@ -1,0 +1,32 @@
+{
+  "generatedAt": "2026-07-29T22:15:00.000Z",
+  "source": "explicit_stage4_2e_receipt_grade_replay",
+  "repo": {
+    "build": {
+      "status": "pass",
+      "ok": true,
+      "exitCode": 0,
+      "command": "npm run build",
+      "warningsPresent": true
+    },
+    "tests": {
+      "total": 228,
+      "failed": 0,
+      "passed": 228,
+      "status": "pass",
+      "files": 23,
+      "scope": "stage4_2e_focused_paper_graph_root_49_plus_required_gr_warp_179"
+    },
+    "schema": {
+      "contracts": "pass",
+      "ok": true,
+      "scope": "stage4_2e_strict_contract_10_fixtures_immutable_stage4_2d_lineage_adm_causal_recovery_schwarzschild_null_recovery_casimir_curvature_screen_qed_metric_dp_nonbridge_equation_sidecar_theory_badge_math_root_leaf_and_required_gr_warp"
+    },
+    "deps": {
+      "coherence": "pass",
+      "exitCode": 0,
+      "command": "npm ls --depth=0",
+      "packageLockSha256": "c85521a758783fa5cea1c8933e3c5ad54d604d596620279fce916e3c2ce42367"
+    }
+  }
+}

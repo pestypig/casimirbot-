@@ -317,6 +317,7 @@ describe("Helix capability contract arbitration", () => {
         "theory_artifact_producer_lanyon_request_observation",
       ],
       ["theory-artifact-producer.admit_lanyon_snapshot", "artifact_generation_receipt"],
+      ["theory-formal-verifier.inspect_artifact_family", "theory_formal_artifact_family_audit_observation"],
       ["theory-formal-verifier.prepare_request", "theory_formal_verifier_preparation_observation"],
       ["theory-formal-verifier.plan", "theory_formal_verifier_plan_observation"],
       ["theory-formal-verifier.start", "theory_formal_verifier_start_observation"],
@@ -368,6 +369,28 @@ describe("Helix capability contract arbitration", () => {
       "semantic_admission_artifact_ref",
       "case_id",
     ]);
+
+    const inspectCapability =
+      "theory-formal-verifier.inspect_artifact_family";
+    expect(
+      extractExplicitCapabilityContracts(
+        "Call theory-formal-verifier.inspect_artifact_family now for the audited GR-Maxwell theorem.",
+      ).map((entry) => entry.contract.capability),
+    ).toContain(inspectCapability);
+    for (const promptText of [
+      "Do not call theory-formal-verifier.inspect_artifact_family; explain its contract.",
+      "Later we may call theory-formal-verifier.inspect_artifact_family.",
+      "Earlier the agent called theory-formal-verifier.inspect_artifact_family.",
+      'The notes say "call theory-formal-verifier.inspect_artifact_family"; explain that quote.',
+      "The screen shows theory-formal-verifier.inspect_artifact_family, but only describe it.",
+    ]) {
+      expect(
+        extractExplicitCapabilityContracts(promptText).map(
+          (entry) => entry.contract.capability,
+        ),
+        promptText,
+      ).not.toContain(inspectCapability);
+    }
   });
 
   it("keeps research-paper and Image Lens workflow questions explanatory", () => {

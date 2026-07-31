@@ -32,6 +32,10 @@ import {
   type TrustedRuntimeToolConfirmationReplayLedgerV1,
   type TrustedRuntimeToolConfirmationVerifierV1,
 } from "./runtime-tool-confirmation-receipt-verifier";
+import {
+  createInMemoryCasimirTheoryExecutionStateStoreV1,
+  type CasimirTheoryExecutionStateStoreV1,
+} from "./casimir-theory-execution-state-store";
 
 export const CASIMIR_INDEPENDENT_NUMERICAL_PLAN_SCHEMA =
   "casimir.independent_numerical_verifier.plan.v1" as const;
@@ -131,6 +135,7 @@ export type CasimirIndependentNumericalRuntimeInspectionV1 = {
   sandboxExecutorConfigured: boolean;
   trustedReceiptVerifierConfigured: boolean;
   durableReplayLedgerConfigured: boolean;
+  durableJobStateStoreConfigured: boolean;
   readyForConfirmedExecution: boolean;
   assistantAnswer: false;
   terminalEligible: false;
@@ -195,6 +200,7 @@ export type CasimirIndependentNumericalVerifierJobServiceDependenciesV1 = {
   verifyTrustedRuntimeReceipt?: TrustedRuntimeToolConfirmationVerifierV1;
   confirmationReplayLedger?: TrustedRuntimeToolConfirmationReplayLedgerV1;
   resolveTrustedExecutionCatalogEntry?: TrustedCasimirIndependentNumericalExecutionCatalogResolverV1;
+  stateStore?: CasimirTheoryExecutionStateStoreV1;
   now?: () => number;
 };
 
@@ -369,9 +375,10 @@ async function cleanupTempRoot(root: string): Promise<void> {
 export function createCasimirIndependentNumericalVerifierJobService(
   dependencies: CasimirIndependentNumericalVerifierJobServiceDependenciesV1 = {},
 ) {
-  const jobs = new Map<string, JobRecord>();
-  const preparedRequests = new Map<string, PreparedRequestRecord>();
-  const plans = new Map<string, PlanRecord>();
+  const stateStore =
+    dependencies.stateStore ??
+    createInMemoryCasimirTheoryExecutionStateStoreV1();
+  const activeJobIds = new Set<string>();
   const confirmationReceipts = createRuntimeToolConfirmationReceiptVerifierV1({
     verifyTrustedRuntimeReceipt: dependencies.verifyTrustedRuntimeReceipt,
     replayLedger: dependencies.confirmationReplayLedger,
@@ -391,17 +398,21 @@ export function createCasimirIndependentNumericalVerifierJobService(
       const durableReplayLedgerConfigured = Boolean(
         dependencies.confirmationReplayLedger,
       );
+      const durableJobStateStoreConfigured =
+        stateStore.durability === "durable_postgres";
       return {
         schema: CASIMIR_INDEPENDENT_NUMERICAL_RUNTIME_INSPECTION_SCHEMA,
         executionCatalogConfigured,
         sandboxExecutorConfigured,
         trustedReceiptVerifierConfigured,
         durableReplayLedgerConfigured,
+        durableJobStateStoreConfigured,
         readyForConfirmedExecution:
           executionCatalogConfigured &&
           sandboxExecutorConfigured &&
           trustedReceiptVerifierConfigured &&
-          durableReplayLedgerConfigured,
+          durableReplayLedgerConfigured &&
+          durableJobStateStoreConfigured,
         assistantAnswer: false,
         terminalEligible: false,
       };
@@ -495,13 +506,17 @@ export function createCasimirIndependentNumericalVerifierJobService(
     const preparedRequestId = `casimir-independent-numerical-prepared:${randomBytes(
       32,
     ).toString("base64url")}`;
-    preparedRequests.set(preparedRequestId, {
+    await stateStore.put<PreparedRequestRecord>(
+      "prepared",
+      preparedRequestId,
+      {
       preparedRequestId,
       catalogEntryId,
       ownerKey: ownerKey(input.accountType, input.profileId),
       sealedInputSha256,
       sealedInput,
-    });
+      },
+    );
     return {
       schema: CASIMIR_INDEPENDENT_NUMERICAL_PREPARED_REQUEST_SCHEMA,
       ok: true,
@@ -531,7 +546,10 @@ export function createCasimirIndependentNumericalVerifierJobService(
     if (input.accountType !== "developer")
       issues.push("developer_account_required");
     const preparedRequestId = input.preparedRequestId?.trim() ?? "";
-    const prepared = preparedRequests.get(preparedRequestId);
+    const prepared = await stateStore.get<PreparedRequestRecord>(
+      "prepared",
+      preparedRequestId,
+    );
     if (
       !prepared ||
       prepared.ownerKey !== ownerKey(input.accountType, input.profileId)
@@ -740,7 +758,7 @@ export function createCasimirIndependentNumericalVerifierJobService(
           })
         : null;
     if (planId && sealedInputSha256) {
-      plans.set(planId, {
+      await stateStore.put<PlanRecord>("plan", planId, {
         planId,
         preparedRequestId,
         ownerKey: ownerKey(input.accountType, input.profileId),
@@ -778,7 +796,10 @@ export function createCasimirIndependentNumericalVerifierJobService(
   }): Promise<CasimirIndependentNumericalJobReceiptV1> => {
     const requestedPlanId = input.planId?.trim() ?? "";
     const owner = ownerKey(input.accountType, input.profileId);
-    const storedPlan = plans.get(requestedPlanId);
+    const storedPlan = await stateStore.get<PlanRecord>(
+      "plan",
+      requestedPlanId,
+    );
     if (!storedPlan || storedPlan.ownerKey !== owner)
       return {
         schema: CASIMIR_INDEPENDENT_NUMERICAL_JOB_RECEIPT_SCHEMA,
@@ -791,7 +812,10 @@ export function createCasimirIndependentNumericalVerifierJobService(
         nextCapability: "repair_independent_numerical_inputs",
         authority: authority(),
       };
-    const prepared = preparedRequests.get(storedPlan.preparedRequestId);
+    const prepared = await stateStore.get<PreparedRequestRecord>(
+      "prepared",
+      storedPlan.preparedRequestId,
+    );
     if (!prepared || prepared.ownerKey !== owner)
       return {
         schema: CASIMIR_INDEPENDENT_NUMERICAL_JOB_RECEIPT_SCHEMA,
@@ -886,8 +910,9 @@ export function createCasimirIndependentNumericalVerifierJobService(
             : "repair_independent_numerical_inputs",
         authority: authority(),
       };
-    const existing = [...jobs.values()].find(
-      (job) => job.planId === planned.planId && job.ownerKey === owner,
+    const existing = (await stateStore.list<JobRecord>("job")).find(
+      (job: JobRecord) =>
+        job.planId === planned.planId && job.ownerKey === owner,
     );
     if (existing)
       return {
@@ -910,7 +935,8 @@ export function createCasimirIndependentNumericalVerifierJobService(
       certificate: null,
       issues: [],
     };
-    jobs.set(job.jobId, job);
+    activeJobIds.add(job.jobId);
+    await stateStore.put<JobRecord>("job", job.jobId, job);
     void (async () => {
       let tempRoot: string | null = null;
       try {
@@ -948,6 +974,8 @@ export function createCasimirIndependentNumericalVerifierJobService(
           } catch {
             job.issues.push("numerical_replay_temp_cleanup_failed");
           }
+        await stateStore.put<JobRecord>("job", job.jobId, job);
+        activeJobIds.delete(job.jobId);
       }
     })();
     return {
@@ -963,11 +991,11 @@ export function createCasimirIndependentNumericalVerifierJobService(
     };
   };
 
-  const readResult = (input: {
+  const readResult = async (input: {
     accountType: HelixAccountType;
     profileId?: string | null;
     jobId?: string | null;
-  }): CasimirIndependentNumericalResultV1 => {
+  }): Promise<CasimirIndependentNumericalResultV1> => {
     if (input.accountType !== "developer")
       return {
         schema: CASIMIR_INDEPENDENT_NUMERICAL_RESULT_SCHEMA,
@@ -981,7 +1009,7 @@ export function createCasimirIndependentNumericalVerifierJobService(
         authority: authority(),
       };
     const jobId = input.jobId?.trim() ?? "";
-    const job = jobs.get(jobId);
+    const job = await stateStore.get<JobRecord>("job", jobId);
     if (!job || job.ownerKey !== ownerKey(input.accountType, input.profileId))
       return {
         schema: CASIMIR_INDEPENDENT_NUMERICAL_RESULT_SCHEMA,
@@ -994,6 +1022,11 @@ export function createCasimirIndependentNumericalVerifierJobService(
         issues: ["independent_numerical_job_not_found"],
         authority: authority(),
       };
+    if (job.status === "running" && !activeJobIds.has(job.jobId)) {
+      job.status = "failed";
+      job.issues = ["numerical_job_interrupted_by_server_restart"];
+      await stateStore.put<JobRecord>("job", job.jobId, job);
+    }
     return {
       schema: CASIMIR_INDEPENDENT_NUMERICAL_RESULT_SCHEMA,
       ok: job.status !== "failed",
@@ -1012,10 +1045,9 @@ export function createCasimirIndependentNumericalVerifierJobService(
     plan,
     start,
     readResult,
-    reset: () => {
-      jobs.clear();
-      plans.clear();
-      preparedRequests.clear();
+    reset: async () => {
+      activeJobIds.clear();
+      await stateStore.clear();
       confirmationReceipts.reset();
     },
   };

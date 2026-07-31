@@ -9,6 +9,7 @@ import { z } from "zod";
 import {
   helixEnvironmentProbeSubmissionSchema,
 } from "@shared/helix-environment-connector";
+import { buildWorkstationEntryUrl } from "@shared/workstation-link-meta";
 import {
   leaseDurableEnvironmentProbesForClaim,
   submitDurableEnvironmentProbeResult,
@@ -199,7 +200,11 @@ const verificationUriForRequest = (req: Request): string => {
       "A single valid Host header is required.",
     );
   }
-  return `${req.protocol}://${host}/desktop?focus=account-session`;
+  return buildWorkstationEntryUrl({
+    baseUrl: `${req.protocol}://${host}`,
+    search: "?focus=account-session",
+    entry: "workstation",
+  });
 };
 
 const readBearer = (req: Request): string => {

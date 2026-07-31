@@ -90,6 +90,7 @@ export const HELIX_DEVELOPER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
   feature_flags: [
     "advanced_helix_ask_controls",
     "developer_workstation_panels",
+    "docs_viewer_print_pdf_export",
     "experimental_panels",
     "runtime_agent_controls",
     "room_source_ingress",
@@ -165,6 +166,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "permission:danger",
   ],
   feature_flags: [
+    "docs_viewer_print_pdf_export",
     "stable_workstation_panels",
     "locked_dev_features_visible",
     "runtime_agent_controls",

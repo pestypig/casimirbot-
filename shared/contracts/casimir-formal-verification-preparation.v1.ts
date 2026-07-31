@@ -1,4 +1,12 @@
 import { computeCasimirSpecValueSha256V1 } from "./casimir-spec-scientific-claim-ir.v1";
+import {
+  CASIMIR_FORMAL_CLAIM_CEILINGS,
+  CASIMIR_FORMAL_DENIED_PROMOTIONS,
+  CASIMIR_FORMAL_PROPERTY_KINDS,
+  type CasimirFormalClaimCeilingV1,
+  type CasimirFormalDeniedPromotionV1,
+  type CasimirFormalPropertyKindV1,
+} from "./casimir-formal-artifact-family-audit.v1";
 
 export const CASIMIR_FORMAL_VERIFICATION_PREPARATION_ARTIFACT_ID =
   "casimir_formal_verification_preparation_receipt" as const;
@@ -24,15 +32,23 @@ export const CASIMIR_FORMAL_PREPARATION_REQUIREMENT_CODES = [
   "artifact_generation_receipt_not_admitted",
   "artifact_generation_receipt_ambiguous",
   "artifact_generation_receipt_integrity_invalid",
+  "formal_source_admission_artifact_required",
+  "formal_source_admission_artifact_not_admitted",
+  "formal_source_admission_artifact_ambiguous",
+  "formal_source_admission_integrity_invalid",
   "formal_claim_selection_required",
   "formal_claim_selection_invalid",
   "formal_theorem_selection_required",
   "formal_theorem_selection_unregistered",
   "formal_theorem_type_digest_required",
   "semantic_to_lean_binding_required",
+  "semantic_to_lean_binding_unregistered",
   "formal_import_closure_required",
   "formal_environment_policy_catalog_unconfigured",
   "formal_environment_policy_unregistered",
+  "formal_sandbox_executor_catalog_unconfigured",
+  "formal_sandbox_executor_capability_required",
+  "formal_sandbox_executor_capability_unregistered",
   "formal_graph_snapshot_required",
   "formal_source_root_unconfigured",
   "formal_evidence_identity_mismatch",
@@ -51,6 +67,7 @@ export type CasimirFormalPreparationMissingRequirementV1 = {
     | "select_registered_theorem"
     | "register_semantic_binding"
     | "register_environment_policy"
+    | "register_sandbox_executor"
     | "register_import_closure"
     | "register_graph_snapshot"
     | "configure_source_root";
@@ -70,23 +87,39 @@ export type CasimirFormalVerificationPreparationReceiptV1 = {
     procedureSha256: string | null;
     semanticAdmissionArtifactRef: string | null;
     artifactGenerationArtifactRef: string | null;
+    formalSourceAdmissionArtifactRef: string | null;
     claimId: string | null;
     formalArtifactId: string | null;
     theoremName: string | null;
+    theoremTypeSha256: string | null;
+    semanticToLeanBindingId: string | null;
+    semanticToLeanBindingSha256: string | null;
     environmentPolicyId: string | null;
+    sandboxExecutorCapabilityId: string | null;
   };
   admittedBindings: {
     procedureArtifactRef: string | null;
     semanticAdmissionArtifactRef: string | null;
     artifactGenerationArtifactRef: string | null;
+    formalSourceAdmissionArtifactRef: string | null;
     claimId: string | null;
     claimPropositionSha256: string | null;
     graphSnapshotSha256: string | null;
+    formalArtifactId: string | null;
     formalSourceSha256: string | null;
+    formalArtifactAuditSha256: string | null;
+    theoremDeclarationSha256: string | null;
+    theoremPropositionSourceSha256: string | null;
+    theoremPropertyKind: CasimirFormalPropertyKindV1 | null;
+    theoremClaimCeiling: CasimirFormalClaimCeilingV1 | null;
+    theoremDeniedPromotions: CasimirFormalDeniedPromotionV1[];
     theoremTypeSha256: string | null;
+    semanticToLeanBindingId: string | null;
     semanticToLeanBindingSha256: string | null;
     importClosureSha256: string | null;
     environmentPolicySha256: string | null;
+    sandboxExecutorCapabilityId: string | null;
+    sandboxExecutorCapabilitySha256: string | null;
   };
   missingRequirements: CasimirFormalPreparationMissingRequirementV1[];
   preparedSealedInputSha256: string | null;
@@ -185,6 +218,85 @@ export async function validateCasimirFormalVerificationPreparationReceiptIntegri
     missingRequirements.length === 0
   ) {
     issues.push("blocked_preparation_missing_reason");
+  }
+  const admitted = receipt.admittedBindings;
+  if (!admitted || typeof admitted !== "object") {
+    issues.push("preparation_admitted_bindings_invalid");
+  } else {
+    const auditedFields = [
+      admitted.formalArtifactAuditSha256,
+      admitted.theoremDeclarationSha256,
+      admitted.theoremPropositionSourceSha256,
+    ];
+    const hasAuditedTheorem = auditedFields.some((entry) => entry !== null);
+    if (
+      hasAuditedTheorem &&
+      (auditedFields.some(
+        (entry) => typeof entry !== "string" || !SHA256.test(entry),
+      ) ||
+        !admitted.formalArtifactId ||
+        !admitted.formalSourceSha256 ||
+        !SHA256.test(admitted.formalSourceSha256) ||
+        !admitted.theoremPropertyKind ||
+        !CASIMIR_FORMAL_PROPERTY_KINDS.includes(
+          admitted.theoremPropertyKind,
+        ) ||
+        !admitted.theoremClaimCeiling ||
+        !CASIMIR_FORMAL_CLAIM_CEILINGS.includes(
+          admitted.theoremClaimCeiling,
+        ) ||
+        !Array.isArray(admitted.theoremDeniedPromotions) ||
+        CASIMIR_FORMAL_DENIED_PROMOTIONS.some(
+          (promotion) =>
+            !admitted.theoremDeniedPromotions.includes(promotion),
+        ))
+    ) {
+      issues.push("preparation_audited_theorem_binding_invalid");
+    }
+    if (
+      !hasAuditedTheorem &&
+      (admitted.theoremPropertyKind !== null ||
+        admitted.theoremClaimCeiling !== null ||
+        (Array.isArray(admitted.theoremDeniedPromotions) &&
+          admitted.theoremDeniedPromotions.length > 0))
+    ) {
+      issues.push("preparation_partial_theorem_audit_binding");
+    }
+    const semanticBindingFields = [
+      admitted.semanticToLeanBindingId,
+      admitted.semanticToLeanBindingSha256,
+      admitted.theoremTypeSha256,
+    ];
+    const hasSemanticBinding = semanticBindingFields.some(
+      (entry) => entry !== null,
+    );
+    if (
+      hasSemanticBinding &&
+      (typeof admitted.semanticToLeanBindingId !== "string" ||
+        !admitted.semanticToLeanBindingId.trim() ||
+        typeof admitted.semanticToLeanBindingSha256 !== "string" ||
+        !SHA256.test(admitted.semanticToLeanBindingSha256) ||
+        typeof admitted.theoremTypeSha256 !== "string" ||
+        !SHA256.test(admitted.theoremTypeSha256))
+    ) {
+      issues.push("preparation_partial_semantic_to_lean_binding");
+    }
+    const sandboxBindingFields = [
+      admitted.sandboxExecutorCapabilityId,
+      admitted.sandboxExecutorCapabilitySha256,
+    ];
+    const hasSandboxBinding = sandboxBindingFields.some(
+      (entry) => entry !== null,
+    );
+    if (
+      hasSandboxBinding &&
+      (typeof admitted.sandboxExecutorCapabilityId !== "string" ||
+        !admitted.sandboxExecutorCapabilityId.trim() ||
+        typeof admitted.sandboxExecutorCapabilitySha256 !== "string" ||
+        !SHA256.test(admitted.sandboxExecutorCapabilitySha256))
+    ) {
+      issues.push("preparation_partial_sandbox_executor_binding");
+    }
   }
   if (
     receipt.authority?.evidenceOnly !== true ||

@@ -328,7 +328,7 @@ export async function executeTheoryIndependentNumericalGatewayCapability(input: 
     input.capabilityId === THEORY_INDEPENDENT_NUMERICAL_READ_RESULT_CAPABILITY
   ) {
     const currentPollAttempt = pollAttempt(input.args.poll_attempt);
-    const result = readCasimirIndependentNumericalVerifierJobResultV1({
+    const result = await readCasimirIndependentNumericalVerifierJobResultV1({
       accountType: input.accountType,
       profileId: input.profileId,
       jobId: string(input.args.job_id ?? input.args.jobId),

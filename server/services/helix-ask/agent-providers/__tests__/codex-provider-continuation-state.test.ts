@@ -61,6 +61,9 @@ describe("Codex provider continuation state", () => {
         authority: "runtime_agent_decides_within_admitted_boundaries",
       });
       expect(prompt).toContain("Helix continuation state (non-terminal adapter evidence)");
+      expect(prompt).toContain(
+        "Empty values do not prove that the user's scientific, document, workflow, or conversational subject has no missing requirements or useful next steps.",
+      );
       expect(prompt).toContain("Budgets are resource boundaries, not conclusions.");
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });

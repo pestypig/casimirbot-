@@ -29,6 +29,12 @@ import {
   inspectCasimirFormalEnvironmentPolicyCatalogV1,
   resolveCasimirFormalEnvironmentPolicyCatalogEntryV1,
 } from "./casimir-formal-environment-policy-catalog";
+import { resolveCasimirFormalArtifactFamilyTheoremCatalogEntryV1 } from "./casimir-formal-artifact-family-audit-catalog";
+import { resolveCasimirSemanticToLeanBindingCatalogEntryV1 } from "./casimir-semantic-to-lean-binding-catalog";
+import {
+  inspectCasimirFormalSandboxExecutorCapabilityCatalogV1,
+  resolveCasimirFormalSandboxExecutorCapabilityV1,
+} from "./casimir-formal-sandbox-executor-capability-catalog";
 
 const CURRENT_TURN_ARTIFACT_SCHEMA = "helix.current_turn_artifact.v1";
 const PROCEDURE_OBSERVATION_SCHEMA =
@@ -37,6 +43,8 @@ const SEMANTIC_ADMISSION_OBSERVATION_SCHEMA =
   "casimir.theory_semantic_admitter.observation.v1";
 const LANYON_ADMISSION_OBSERVATION_SCHEMA =
   "casimir.theory_artifact_producer.lanyon_admission_observation.v1";
+const FORMAL_ARTIFACT_FAMILY_AUDIT_OBSERVATION_SCHEMA =
+  "casimir.theory_formal_verifier.artifact_family_audit_observation.v1";
 const SHA256 = /^[a-f0-9]{64}$/;
 
 type RecordValue = Record<string, unknown>;
@@ -229,6 +237,26 @@ const requirementMessages: Record<
       "The selected artifact-generation receipt failed integrity checks.",
     repairAction: "retrieve_authoritative_evidence",
   },
+  formal_source_admission_artifact_required: {
+    message:
+      "Re-enter an exact governed formal-source admission observation.",
+    repairAction: "retrieve_authoritative_evidence",
+  },
+  formal_source_admission_artifact_not_admitted: {
+    message:
+      "The requested governed formal-source observation was not admitted in the current turn.",
+    repairAction: "retrieve_authoritative_evidence",
+  },
+  formal_source_admission_artifact_ambiguous: {
+    message:
+      "More than one governed formal-source observation matches; select its exact artifact reference.",
+    repairAction: "retrieve_authoritative_evidence",
+  },
+  formal_source_admission_integrity_invalid: {
+    message:
+      "The formal-source observation does not resolve to the exact server-governed source audit.",
+    repairAction: "retrieve_authoritative_evidence",
+  },
   formal_claim_selection_required: {
     message:
       "Select one admitted semantic claim for the formal verification request.",
@@ -246,7 +274,7 @@ const requirementMessages: Record<
   },
   formal_theorem_selection_unregistered: {
     message:
-      "The named theorem is only a caller hint and has no server-governed artifact binding.",
+      "The theorem name, exact formal-source hash, and formal artifact ID do not resolve to one server-governed proposition and claim-scope audit.",
     repairAction: "select_registered_theorem",
   },
   formal_theorem_type_digest_required: {
@@ -257,6 +285,11 @@ const requirementMessages: Record<
   semantic_to_lean_binding_required: {
     message:
       "Register an inspected semantic-to-Lean translation binding; source correlation is not semantic equivalence.",
+    repairAction: "register_semantic_binding",
+  },
+  semantic_to_lean_binding_unregistered: {
+    message:
+      "The supplied semantic-to-Lean binding is not an exact reviewed entry in the server-owned binding catalog.",
     repairAction: "register_semantic_binding",
   },
   formal_import_closure_required: {
@@ -273,6 +306,21 @@ const requirementMessages: Record<
     message:
       "Select a formal environment policy registered by the server; caller-supplied self-hashed policies are not trust roots.",
     repairAction: "register_environment_policy",
+  },
+  formal_sandbox_executor_catalog_unconfigured: {
+    message:
+      "Configure a server-owned catalog with an externally attested, OS-isolated formal replay worker.",
+    repairAction: "register_sandbox_executor",
+  },
+  formal_sandbox_executor_capability_required: {
+    message:
+      "Select an exact server-registered external sandbox executor capability before formal replay.",
+    repairAction: "register_sandbox_executor",
+  },
+  formal_sandbox_executor_capability_unregistered: {
+    message:
+      "The selected sandbox executor is not an exact entry in the server-owned capability catalog; caller-supplied identities are not authority.",
+    repairAction: "register_sandbox_executor",
   },
   formal_graph_snapshot_required: {
     message:
@@ -369,6 +417,13 @@ export async function prepareCasimirFormalVerificationRequestV1(input: {
     input.args.artifact_generation_artifact_ref ??
       input.args.artifactGenerationArtifactRef,
   );
+  const requestedFormalSourceAdmissionArtifactRef = readString(
+    input.args.formal_source_admission_artifact_ref ??
+      input.args.formalSourceAdmissionArtifactRef,
+  );
+  const formalSourceAdmissionArtifactRef =
+    requestedFormalSourceAdmissionArtifactRef ??
+    artifactGenerationArtifactRef;
   const requestedClaimId = readString(
     input.args.claim_id ?? input.args.claimId,
   );
@@ -378,9 +433,25 @@ export async function prepareCasimirFormalVerificationRequestV1(input: {
   const theoremName = readString(
     input.args.theorem_name ?? input.args.theoremName,
   );
+  const theoremTypeSha256 = readString(
+    input.args.theorem_type_sha256 ??
+      input.args.theoremTypeSha256,
+  );
+  const semanticToLeanBindingId = readString(
+    input.args.semantic_to_lean_binding_id ??
+      input.args.semanticToLeanBindingId,
+  );
+  const requestedSemanticToLeanBindingSha256 = readString(
+    input.args.semantic_to_lean_binding_sha256 ??
+      input.args.semanticToLeanBindingSha256,
+  );
   const environmentPolicyId = readString(
     input.args.environment_policy_id ??
       input.args.environmentPolicyId,
+  );
+  const sandboxExecutorCapabilityId = readString(
+    input.args.sandbox_executor_capability_id ??
+      input.args.sandboxExecutorCapabilityId,
   );
 
   if (!Array.isArray(input.authoritativeEvidenceArtifacts)) {
@@ -543,99 +614,214 @@ export async function prepareCasimirFormalVerificationRequestV1(input: {
   }
 
   let admittedArtifactGenerationRef: string | null = null;
+  let admittedFormalSourceAdmissionRef: string | null = null;
+  let admittedFormalArtifactId: string | null = null;
   let formalSourceSha256: string | null = null;
-  if (!artifactGenerationArtifactRef) {
+  if (!formalSourceAdmissionArtifactRef) {
     addRequirement(
       requirements,
-      "artifact_generation_receipt_required",
+      "formal_source_admission_artifact_required",
     );
   }
-  const artifactCandidates = currentTurnCandidates({
+  const generationCandidates = currentTurnCandidates({
     turnId: input.turnId,
     authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
     payloadSchema: LANYON_ADMISSION_OBSERVATION_SCHEMA,
-    artifactRef: artifactGenerationArtifactRef,
+    artifactRef: formalSourceAdmissionArtifactRef,
   });
-  if (artifactCandidates.length === 0) {
+  const auditedSourceCandidates = currentTurnCandidates({
+    turnId: input.turnId,
+    authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
+    payloadSchema: FORMAL_ARTIFACT_FAMILY_AUDIT_OBSERVATION_SCHEMA,
+    artifactRef: formalSourceAdmissionArtifactRef,
+  });
+  const sourceCandidates = [
+    ...generationCandidates.map((candidate) => ({
+      kind: "generation" as const,
+      candidate,
+    })),
+    ...auditedSourceCandidates.map((candidate) => ({
+      kind: "audited_source" as const,
+      candidate,
+    })),
+  ];
+  if (sourceCandidates.length === 0) {
     addRequirement(
       requirements,
-      "artifact_generation_receipt_not_admitted",
+      requestedFormalSourceAdmissionArtifactRef
+        ? "formal_source_admission_artifact_not_admitted"
+        : "artifact_generation_receipt_not_admitted",
     );
     addRequirement(requirements, "formal_source_root_unconfigured");
-  } else if (artifactCandidates.length > 1) {
+  } else if (sourceCandidates.length > 1) {
     addRequirement(
       requirements,
-      "artifact_generation_receipt_ambiguous",
+      requestedFormalSourceAdmissionArtifactRef
+        ? "formal_source_admission_artifact_ambiguous"
+        : "artifact_generation_receipt_ambiguous",
     );
   } else {
-    const candidate = artifactCandidates[0];
-    const generationReceipt = readRecord(
-      candidate.payload.receipt,
-    ) as CasimirArtifactGenerationReceiptV1;
-    const receiptIssues =
-      await validateCasimirArtifactGenerationReceiptIntegrityV1(
-        generationReceipt,
+    const { kind, candidate } = sourceCandidates[0];
+    if (kind === "audited_source") {
+      const selectedCase = readRecord(candidate.payload.selectedCase);
+      const formalSource = readRecord(selectedCase.formalSource);
+      const observedFormalArtifactId = readString(
+        selectedCase.formalArtifactId,
       );
-    if (
-      receiptIssues.length > 0 ||
-      generationReceipt.run?.status !== "succeeded"
-    ) {
-      addRequirement(
-        requirements,
-        "artifact_generation_receipt_integrity_invalid",
+      const observedFormalSourceSha256 = readString(
+        formalSource.sha256,
       );
-    } else {
-      admittedArtifactGenerationRef =
-        artifactGenerationArtifactRef ?? candidate.refs[0] ?? null;
-      const formalArtifact = generationReceipt.artifacts.find(
-        (artifact) => artifact.role === "formal_source",
+      const observedAuditSha256 = readString(
+        candidate.payload.auditArtifactSha256,
       );
-      formalSourceSha256 =
-        readString(formalArtifact?.artifactSha256) ?? null;
-      const bindings = readRecord(
-        candidate.payload.artifactBindings ??
-          candidate.payload.artifact_bindings,
-      );
+      const resolved =
+        await resolveCasimirFormalArtifactFamilyTheoremCatalogEntryV1({
+          formalArtifactId: observedFormalArtifactId,
+          formalSourceSha256: observedFormalSourceSha256,
+          theoremName,
+        });
       if (
-        !readString(
-          bindings.formal_source_path ?? bindings.formalSourcePath,
-        )
+        !resolved ||
+        !observedAuditSha256 ||
+        resolved.auditArtifactSha256 !== observedAuditSha256 ||
+        (formalArtifactId &&
+          formalArtifactId !== observedFormalArtifactId)
       ) {
         addRequirement(
           requirements,
-          "formal_source_root_unconfigured",
+          "formal_source_admission_integrity_invalid",
         );
+      } else {
+        admittedFormalSourceAdmissionRef =
+          formalSourceAdmissionArtifactRef ??
+          candidate.refs[0] ??
+          null;
+        admittedFormalArtifactId = observedFormalArtifactId;
+        formalSourceSha256 = observedFormalSourceSha256;
       }
+    } else {
+      const generationReceipt = readRecord(
+        candidate.payload.receipt,
+      ) as CasimirArtifactGenerationReceiptV1;
+      const receiptIssues =
+        await validateCasimirArtifactGenerationReceiptIntegrityV1(
+          generationReceipt,
+        );
       if (
-        claimIr &&
-        selectedClaimId &&
-        selectedPropositionSha256 &&
-        !receiptIdentityIsBound({
-          receipt: generationReceipt,
-          claimIr,
-          claimId: selectedClaimId,
-          propositionSha256: selectedPropositionSha256,
-        })
+        receiptIssues.length > 0 ||
+        generationReceipt.run?.status !== "succeeded"
       ) {
         addRequirement(
           requirements,
-          "formal_evidence_identity_mismatch",
+          "artifact_generation_receipt_integrity_invalid",
         );
+      } else {
+        admittedArtifactGenerationRef =
+          formalSourceAdmissionArtifactRef ??
+          candidate.refs[0] ??
+          null;
+        admittedFormalSourceAdmissionRef =
+          admittedArtifactGenerationRef;
+        const formalArtifact = generationReceipt.artifacts.find(
+          (artifact) => artifact.role === "formal_source",
+        );
+        admittedFormalArtifactId =
+          readString(formalArtifact?.artifactId) ?? null;
+        formalSourceSha256 =
+          readString(formalArtifact?.artifactSha256) ?? null;
+        if (
+          formalArtifactId &&
+          admittedFormalArtifactId &&
+          formalArtifactId !== admittedFormalArtifactId
+        ) {
+          addRequirement(
+            requirements,
+            "formal_evidence_identity_mismatch",
+          );
+        }
+        const bindings = readRecord(
+          candidate.payload.artifactBindings ??
+            candidate.payload.artifact_bindings,
+        );
+        if (
+          !readString(
+            bindings.formal_source_path ?? bindings.formalSourcePath,
+          )
+        ) {
+          addRequirement(
+            requirements,
+            "formal_source_root_unconfigured",
+          );
+        }
+        if (
+          claimIr &&
+          selectedClaimId &&
+          selectedPropositionSha256 &&
+          !receiptIdentityIsBound({
+            receipt: generationReceipt,
+            claimIr,
+            claimId: selectedClaimId,
+            propositionSha256: selectedPropositionSha256,
+          })
+        ) {
+          addRequirement(
+            requirements,
+            "formal_evidence_identity_mismatch",
+          );
+        }
       }
     }
   }
 
-  addRequirement(
-    requirements,
-    theoremName
-      ? "formal_theorem_selection_unregistered"
-      : "formal_theorem_selection_required",
-  );
-  addRequirement(
-    requirements,
-    "formal_theorem_type_digest_required",
-  );
-  addRequirement(requirements, "semantic_to_lean_binding_required");
+  const auditedTheorem =
+    await resolveCasimirFormalArtifactFamilyTheoremCatalogEntryV1({
+      formalArtifactId:
+        admittedFormalArtifactId ?? formalArtifactId,
+      formalSourceSha256,
+      theoremName,
+    });
+  if (!auditedTheorem) {
+    addRequirement(
+      requirements,
+      theoremName
+        ? "formal_theorem_selection_unregistered"
+        : "formal_theorem_selection_required",
+    );
+  }
+  if (!theoremTypeSha256 || !SHA256.test(theoremTypeSha256)) {
+    addRequirement(
+      requirements,
+      "formal_theorem_type_digest_required",
+    );
+  }
+  const semanticToLeanBinding =
+    theoremTypeSha256 &&
+    SHA256.test(theoremTypeSha256) &&
+    semanticToLeanBindingId &&
+    requestedSemanticToLeanBindingSha256 &&
+    SHA256.test(requestedSemanticToLeanBindingSha256)
+      ? await resolveCasimirSemanticToLeanBindingCatalogEntryV1({
+          bindingId: semanticToLeanBindingId,
+          artifactSha256: requestedSemanticToLeanBindingSha256,
+          claimId: selectedClaimId,
+          semanticPropositionSha256: selectedPropositionSha256,
+          formalArtifactId:
+            admittedFormalArtifactId ?? formalArtifactId,
+          observedTheoremTypeSha256: theoremTypeSha256,
+        })
+      : null;
+  if (
+    !semanticToLeanBindingId ||
+    !requestedSemanticToLeanBindingSha256 ||
+    !SHA256.test(requestedSemanticToLeanBindingSha256)
+  ) {
+    addRequirement(requirements, "semantic_to_lean_binding_required");
+  } else if (!semanticToLeanBinding) {
+    addRequirement(
+      requirements,
+      "semantic_to_lean_binding_unregistered",
+    );
+  }
   addRequirement(requirements, "formal_import_closure_required");
 
   const catalog =
@@ -653,6 +839,28 @@ export async function prepareCasimirFormalVerificationRequestV1(input: {
     addRequirement(
       requirements,
       "formal_environment_policy_unregistered",
+    );
+  }
+  const sandboxCatalog =
+    await inspectCasimirFormalSandboxExecutorCapabilityCatalogV1();
+  const sandboxExecutorCapability =
+    await resolveCasimirFormalSandboxExecutorCapabilityV1({
+      capabilityId: sandboxExecutorCapabilityId,
+    });
+  if (!sandboxCatalog.configured) {
+    addRequirement(
+      requirements,
+      "formal_sandbox_executor_catalog_unconfigured",
+    );
+  } else if (!sandboxExecutorCapabilityId) {
+    addRequirement(
+      requirements,
+      "formal_sandbox_executor_capability_required",
+    );
+  } else if (!sandboxExecutorCapability) {
+    addRequirement(
+      requirements,
+      "formal_sandbox_executor_capability_unregistered",
     );
   }
 
@@ -676,25 +884,55 @@ export async function prepareCasimirFormalVerificationRequestV1(input: {
       procedureSha256,
       semanticAdmissionArtifactRef,
       artifactGenerationArtifactRef,
+      formalSourceAdmissionArtifactRef,
       claimId: requestedClaimId,
       formalArtifactId,
       theoremName,
+      theoremTypeSha256,
+      semanticToLeanBindingId,
+      semanticToLeanBindingSha256:
+        requestedSemanticToLeanBindingSha256,
       environmentPolicyId,
+      sandboxExecutorCapabilityId,
     },
     admittedBindings: {
       procedureArtifactRef: admittedProcedureRef,
       semanticAdmissionArtifactRef: admittedSemanticRef,
       artifactGenerationArtifactRef:
         admittedArtifactGenerationRef,
+      formalSourceAdmissionArtifactRef:
+        admittedFormalSourceAdmissionRef,
       claimId: selectedClaimId,
       claimPropositionSha256: selectedPropositionSha256,
       graphSnapshotSha256,
+      formalArtifactId: admittedFormalArtifactId,
       formalSourceSha256,
-      theoremTypeSha256: null,
-      semanticToLeanBindingSha256: null,
+      formalArtifactAuditSha256:
+        auditedTheorem?.auditArtifactSha256 ?? null,
+      theoremDeclarationSha256:
+        auditedTheorem?.theorem.declarationSha256 ?? null,
+      theoremPropositionSourceSha256:
+        auditedTheorem?.theorem.propositionSourceSha256 ?? null,
+      theoremPropertyKind:
+        auditedTheorem?.theorem.propertyKind ?? null,
+      theoremClaimCeiling:
+        auditedTheorem?.theorem.claimCeiling ?? null,
+      theoremDeniedPromotions:
+        auditedTheorem?.theorem.deniedPromotions ?? [],
+      theoremTypeSha256:
+        semanticToLeanBinding?.formalArtifact
+          .observedTheoremTypeSha256 ?? null,
+      semanticToLeanBindingId:
+        semanticToLeanBinding?.bindingId ?? null,
+      semanticToLeanBindingSha256:
+        semanticToLeanBinding?.artifactSha256 ?? null,
       importClosureSha256: null,
       environmentPolicySha256:
         environmentEntry?.policyArtifactSha256 ?? null,
+      sandboxExecutorCapabilityId:
+        sandboxExecutorCapability?.capabilityId ?? null,
+      sandboxExecutorCapabilitySha256:
+        sandboxExecutorCapability?.artifactSha256 ?? null,
     },
     missingRequirements: requirements,
     preparedSealedInputSha256: null,

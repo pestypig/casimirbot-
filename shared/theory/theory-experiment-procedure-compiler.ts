@@ -324,6 +324,7 @@ function capabilityAffordances(input: {
     "procedure_sha256",
     "semantic_admission_artifact_ref",
     "artifact_generation_artifact_ref",
+    "formal_source_admission_artifact_ref",
   ];
   const numericalBackendRegistered = hasRegisteredNumericalBackend(
     input.lanyon,

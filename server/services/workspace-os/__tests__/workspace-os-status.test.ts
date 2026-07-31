@@ -328,7 +328,7 @@ describe("Workspace OS status", () => {
         terminal_eligible: false,
       },
       diagnostics: expect.objectContaining({
-        supported_query_params: ["panels", "focus", "doc", "anchor"],
+        supported_query_params: ["panels", "focus", "doc", "anchor", "entry"],
         path_policy: "workspace_relative_path_ref_only",
         passive_restore_emits_receipt: false,
         workspace_os_status_executes: false,

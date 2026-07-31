@@ -183,7 +183,7 @@ Codex-authored synthesis.
 
 ## Live Validation Corpus
 
-`npm run helix:ask:theory-experiment-live` runs a seven-case natural Ask
+`npm run helix:ask:theory-experiment-live` runs a nine-case natural Ask
 corpus against an already-running keyed server. Set `HELIX_ASK_BASE_URL` when
 the launcher selects a non-default port. The corpus covers:
 
@@ -192,8 +192,10 @@ the launcher selects a non-default port. The corpus covers:
 - explicit missing semantic, boundary, formal, numerical, and observable
   closure;
 - unsupported Lanyon scope as a typed limitation;
+- exact GR-Maxwell formal-family source/theorem inspection with bounded claim
+  ceiling;
 - cross-scale, multi-badge congruence with open-world bridge handling;
-- screen-visible and future/conditional non-admission.
+- screen-visible formal/procedure labels and future/conditional non-admission.
 
 The probe never starts a server. It requests a temporary developer session
 only when the base URL is loopback, verifies the returned developer policy,
@@ -202,14 +204,16 @@ uses that cookie for the Ask turns, and signs out when the battery ends.
 network calls.
 
 `npm run helix:ask:realtime-theory-experiment` runs the corresponding
-developer-only two-turn Realtime handoff journey against that same
+developer-only three-turn Realtime handoff journey against that same
 operator-started keyed server. The first natural prompt prepares the
 multi-badge, pinned-Lanyon procedure. The follow-up re-prepares current-turn
 evidence and asks for the bounded missing semantic, bridge/boundary, formal,
-independent numerical, and empirical requirements. The probe requires the
-procedure capability to be both required by the handoff and successfully
-executed by Ask on each turn; it also checks completed solver authority,
-validated evidence-backed voice relay admission, and prior-turn continuity.
+independent numerical, and empirical requirements. The third turn inspects the
+exact GR-Maxwell `xHyperbolicity` source audit and requires the bounded claim
+ceiling without starting Lean. The probe requires each expected capability to
+be both required by the handoff and successfully executed by Ask; it also
+checks completed solver authority, validated evidence-backed voice relay
+admission, and prior-turn continuity.
 It does not claim browser audio playback from the API-only harness.
 
 The Realtime probe requests its temporary developer session only when
@@ -229,6 +233,17 @@ turns and assertions without network calls.
   plus certificate integrity before release completion.
 - Lanyon eligibility is limited to the nine pinned 1D/2D/3D linear-advection,
   isotropic, and full advection-diffusion cases.
+- The separate GeneralRelativisticMaxwell reference audit admits six immutable
+  source triplets and 156 exact theorem declarations for source/claim-scope
+  comparison only. The developer agent can inspect and re-enter that governed
+  source audit through
+  `theory-formal-verifier.inspect_artifact_family` and
+  `formal_source_admission_artifact_ref`; this is source admission, not a new
+  artifact-generation run. It is not yet an artifact-producer case family or a
+  replay-ready formal environment. Its complete 32-entry tree audit contains
+  no published generator/invocation/receipt lineage, so inspection reports
+  `formal_generator_lineage_unavailable` instead of treating the Racket, Lean,
+  or C output files as their own generator.
 - Source admission and numerical-backend admission are separate. Only
   `advection_diffusion_full_1d` currently has a registered Casimir independent
   numerical fixture. The other eight pinned source cases fail early with
@@ -248,11 +263,38 @@ turns and assertions without network calls.
   signer/private key, trusted-key installation, or host bootstrap is configured
   yet. The current receipt binds execution identity but not a digest of the
   exact human-facing confirmation display.
-- The production theorem/type-digest, semantic-to-Lean binding, import-closure,
-  graph-snapshot, and Lean environment-policy catalog is currently
-  unconfigured. The successful formal `prepare_request -> plan -> start` path
-  is intentionally unreachable until that server-owned catalog is installed;
-  preparation currently returns typed blockers only.
+- The production formal source/theorem claim-scope catalog now recognizes the
+  pinned GeneralRelativisticMaxwell propositions by exact artifact ID, source
+  hash, and theorem name. Observed Lean theorem-type digests,
+  semantic-to-Lean bindings, import closure, graph binding, and Lean
+  environment-policy entries remain unconfigured. The v2 sealed-execution
+  catalog factory, external-only job service, confirmation boundary, gateway
+  lifecycle, and evidence re-entry are implemented. The catalog factory clones
+  and validates installed entries, rejects duplicate identities and procedure
+  bindings, withholds all entries on any issue, redacts resolver/source details
+  from inspection, and returns only immutable exact developer/procedure
+  matches. No production execution entry is installed and the external
+  executor resolver is empty. The successful formal
+  `prepare_request -> plan -> start` path is intentionally unreachable until
+  all independent server-owned bindings and the external worker are installed;
+  preparation returns typed blockers instead of promoting the source audit.
+  Nonempty catalog installation additionally requires
+  `casimir_formal_execution_enrollment/v2` and a trusted enrollment verifier,
+  binding the exact specification, Lean, C, registered generator
+  revision/invocation/receipt, theorem, semantic, graph, environment, bundle,
+  executor, procedure, and request lineages. Neither is configured in
+  production.
+- A local Lean/Mathlib candidate replayed the exact 1D GR-Maxwell source twice,
+  but the larger-module campaign exhausted and crashed a 16 GiB workstation.
+  That environment is rejected for direct scientific replay. The v2
+  request/certificate contract requires an attested external executor with
+  OS-enforced memory/process limits and filesystem/network isolation, and
+  forbids host-workstation execution. Preparation accepts only an opaque
+  server-owned sealed-execution entry; caller-supplied requests, policies,
+  paths, commands, runners, and attestations are not authority. The default
+  deployment reports `formal_execution_catalog_unconfigured` (or the legacy
+  `formal_sandbox_executor_catalog_unconfigured` blocker); no production
+  execution entry or external executor is installed yet.
 - A repository-owned, no-import Lean 4.31 self-test now checks only the pinned
   launcher/source replay path. A developer-only runtime canary may expose it
   through `inspect -> plan -> confirmed start -> read_result` after trusted
