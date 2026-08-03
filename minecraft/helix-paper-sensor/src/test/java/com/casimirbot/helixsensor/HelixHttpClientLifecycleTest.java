@@ -148,6 +148,41 @@ final class HelixHttpClientLifecycleTest {
     }
 
     @Test
+    void replacesFailedTransportAndRecoversAfterTheEndpointReturns() throws Exception {
+        AtomicBoolean terminateConnections = new AtomicBoolean(true);
+        AtomicInteger successfulHeartbeats = new AtomicInteger();
+        server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/heartbeat",
+            exchange -> {
+                if (terminateConnections.get()) {
+                    exchange.getRequestBody().readAllBytes();
+                    exchange.close();
+                    return;
+                }
+                successfulHeartbeats.incrementAndGet();
+                respond(exchange, 200, receipt(exchange, true, null));
+            }
+        );
+
+        HelixHttpClient client = client(new AtomicInteger());
+        HelixHttpClient.IngressResponse unavailable = client
+            .postHeartbeatAsync("{}")
+            .get(8, TimeUnit.SECONDS);
+        assertFalse(unavailable.success());
+        assertTrue(client.transportGenerationForTest() > 1L);
+
+        terminateConnections.set(false);
+        // Heartbeats are control-plane priority requests and may probe recovery
+        // even while the failure backoff remains active.
+        HelixHttpClient.IngressResponse recovered = client
+            .postHeartbeatAsync("{}")
+            .get(5, TimeUnit.SECONDS);
+        assertTrue(recovered.success());
+        assertEquals(1, successfulHeartbeats.get());
+        client.close();
+    }
+
+    @Test
     void prioritizesOnDemandProbePollingAheadOfQueuedTelemetry() throws Exception {
         CountDownLatch firstHeartbeatEntered = new CountDownLatch(1);
         CountDownLatch releaseFirstHeartbeat = new CountDownLatch(1);
@@ -173,6 +208,16 @@ final class HelixHttpClientLifecycleTest {
             }
         );
         server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/world-events/batch",
+            exchange -> {
+                deliveryOrder.add("world_events");
+                deliverySequences.add(Long.parseLong(
+                    exchange.getRequestHeaders().getFirst("X-Helix-Sequence")
+                ));
+                respond(exchange, 200, receipt(exchange, true, null));
+            }
+        );
+        server.createContext(
             "/api/room-ingress/v1/bindings/test-binding/probes/pending",
             exchange -> {
                 deliveryOrder.add("probe_requests");
@@ -186,18 +231,64 @@ final class HelixHttpClientLifecycleTest {
         HelixHttpClient client = client(new AtomicInteger());
         var firstHeartbeat = client.postHeartbeatAsync("{}");
         assertTrue(firstHeartbeatEntered.await(2, TimeUnit.SECONDS));
-        var secondHeartbeat = client.postHeartbeatAsync("{}");
+        var telemetry = client.postWorldEventBatchAsync("{}");
         var pendingProbe = client.getPendingProbesAsync();
         releaseFirstHeartbeat.countDown();
 
         assertTrue(firstHeartbeat.get(5, TimeUnit.SECONDS).success());
         assertFalse(pendingProbe.get(5, TimeUnit.SECONDS).isBlank());
-        assertTrue(secondHeartbeat.get(5, TimeUnit.SECONDS).success());
+        assertTrue(telemetry.get(5, TimeUnit.SECONDS).success());
         assertEquals(
-            List.of("heartbeat", "probe_requests", "heartbeat"),
+            List.of("heartbeat", "probe_requests", "world_events"),
             deliveryOrder
         );
         assertEquals(List.of(1L, 2L, 3L), deliverySequences);
+        client.close();
+    }
+
+    @Test
+    void keepsHeartbeatLivenessAheadOfQueuedProbePolling() throws Exception {
+        CountDownLatch firstProbeEntered = new CountDownLatch(1);
+        CountDownLatch releaseFirstProbe = new CountDownLatch(1);
+        AtomicBoolean holdFirstProbe = new AtomicBoolean(true);
+        List<String> deliveryOrder = new CopyOnWriteArrayList<>();
+        server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/probes/pending",
+            exchange -> {
+                deliveryOrder.add("probe_requests");
+                if (holdFirstProbe.compareAndSet(true, false)) {
+                    firstProbeEntered.countDown();
+                    try {
+                        releaseFirstProbe.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                respond(exchange, 200, receipt(exchange, true, null));
+            }
+        );
+        server.createContext(
+            "/api/room-ingress/v1/bindings/test-binding/heartbeat",
+            exchange -> {
+                deliveryOrder.add("heartbeat");
+                respond(exchange, 200, receipt(exchange, true, null));
+            }
+        );
+
+        HelixHttpClient client = client(new AtomicInteger());
+        var firstProbe = client.getPendingProbesAsync();
+        assertTrue(firstProbeEntered.await(2, TimeUnit.SECONDS));
+        var secondProbe = client.getPendingProbesAsync();
+        var heartbeat = client.postHeartbeatAsync("{}");
+        releaseFirstProbe.countDown();
+
+        assertFalse(firstProbe.get(5, TimeUnit.SECONDS).isBlank());
+        assertTrue(heartbeat.get(5, TimeUnit.SECONDS).success());
+        assertFalse(secondProbe.get(5, TimeUnit.SECONDS).isBlank());
+        assertEquals(
+            List.of("probe_requests", "heartbeat", "probe_requests"),
+            deliveryOrder
+        );
         client.close();
     }
 
@@ -248,7 +339,7 @@ final class HelixHttpClientLifecycleTest {
     }
 
     @Test
-    void priorityProbePollingBypassesTelemetryRetryBackoff() throws Exception {
+    void priorityProbePollingBypassesBackoffAfterHeartbeatRetriesSettle() throws Exception {
         CountDownLatch heartbeatEntered = new CountDownLatch(1);
         CountDownLatch releaseHeartbeat = new CountDownLatch(1);
         AtomicInteger heartbeatAttempts = new AtomicInteger();
@@ -282,7 +373,7 @@ final class HelixHttpClientLifecycleTest {
 
         assertFalse(heartbeat.get(5, TimeUnit.SECONDS).success());
         assertFalse(pendingProbe.get(5, TimeUnit.SECONDS).isBlank());
-        assertEquals(1, heartbeatAttempts.get());
+        assertEquals(3, heartbeatAttempts.get());
         client.close();
     }
 

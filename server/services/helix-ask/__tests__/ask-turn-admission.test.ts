@@ -187,6 +187,66 @@ describe("ask turn admission", () => {
     if (first.status === "admitted") first.release("completed");
   });
 
+  it("preserves host commit exhaustion as an actionable typed rejection", () => {
+    const admission = reserveHelixAskTurnAdmission({
+      sessionId: "session-a",
+      turnId: "ask:commit-pressure",
+      route: "/ask/turn",
+      runtimeAdmission: makeRuntimeAdmission({
+        admitted: false,
+        action: "reject_memory_pressure",
+        reason: "host_commit_pressure",
+        pressureLevel: "hard_pressure",
+        host: {
+          freeMiB: 4096,
+          totalMiB: 16384,
+          freeRatio: 0.25,
+          commit: {
+            status: "available",
+            source: "windows_wmic",
+            platform: "win32",
+            committedMiB: 18200,
+            limitMiB: 20000,
+            freeMiB: 1800,
+            ratio: 0.91,
+            sampledAtMs: 1234,
+            ageMs: 0,
+          },
+        },
+        lease: undefined,
+      }),
+    });
+
+    expect(admission).toMatchObject({
+      status: "rejected",
+      reason: "host_commit_pressure",
+      pressure_level: "hard_pressure",
+      runtime_reason: "host_commit_pressure",
+      host_commit: {
+        status: "available",
+        freeMiB: 1800,
+        limitMiB: 20000,
+        ratio: 0.91,
+      },
+    });
+    if (admission.status !== "rejected") throw new Error("expected rejected admission");
+    expect(buildHelixAskTurnAdmissionPayload({ admission })).toMatchObject({
+      response_type: "capacity_rejected",
+      final_status: "final_failure",
+      route_reason_code: "ask_turn_admission / host_commit_pressure",
+      ask_turn_admission: {
+        runtime_reason: "host_commit_pressure",
+        host_commit: {
+          freeMiB: 1800,
+          limitMiB: 20000,
+          ratio: 0.91,
+        },
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+  });
+
   it("builds non-terminal typed queue payloads", () => {
     const admission = reserveHelixAskTurnAdmission({
       sessionId: "session-a",

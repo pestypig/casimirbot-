@@ -121,6 +121,56 @@ describe("internet-search arbitration for workstation context", () => {
     expect(detectInternetSearchIntent(prompt).searchRequested).toBe(true);
   });
 
+  it.each([
+    "What is my Minecraft status right now?",
+    "Can you check my Minecraft health now?",
+    "What Minecraft mobs are nearby, and am I in immediate danger?",
+    "What is in my Minecraft inventory right now?",
+  ])("keeps affirmative current Minecraft probes on the live environment path: %s", (prompt) => {
+    const restatement = buildToolUseRestatement(prompt);
+
+    expect(restatement.requiredToolFamilies).not.toContain("internet_search");
+    expect(restatement.freshnessRequired).toBe(false);
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:minecraft-live-environment",
+        threadId: "thread:test",
+        promptText: prompt,
+      }).target_source,
+    ).toBe("live_environment");
+  });
+
+  it.each([
+    "Do not check my Minecraft status right now; explain what the check would show.",
+    "If I later ask you to check my Minecraft health, explain what evidence would be needed.",
+    "Earlier I asked, \"What is my Minecraft status right now?\" Summarize that request.",
+    "The room displays the prompt \"What am I carrying in Minecraft right now?\"",
+  ])("does not convert contextual Minecraft probe wording into a live or web request: %s", (prompt) => {
+    expect(buildToolUseRestatement(prompt).requiredToolFamilies).not.toContain(
+      "internet_search",
+    );
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:minecraft-contextual-language",
+        threadId: "thread:test",
+        promptText: prompt,
+      }).target_source,
+    ).not.toBe("live_environment");
+  });
+
+  it.each([
+    "Search the web for the current status of Minecraft's online services.",
+    "What is the current Minecraft server service status online?",
+    "In this Minecraft room, search the internet for the latest Fabric release notes.",
+  ])("preserves explicit current-web Minecraft requests: %s", (prompt) => {
+    expect(buildToolUseRestatement(prompt).requiredToolFamilies).toContain(
+      "internet_search",
+    );
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(true);
+  });
+
   it("admits an affirmative panel question after quoted screen-visible wording", () => {
     const prompt =
       "The button label reads \"What panel in the workstation is active?\", but what panel in the workstation is active?";

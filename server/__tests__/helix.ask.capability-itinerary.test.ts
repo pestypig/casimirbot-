@@ -5,6 +5,8 @@ import {
   HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
 } from "@shared/helix-scholarly-research-observation";
 import type { HelixToolCallAdmissionDecision } from "@shared/helix-tool-call-admission";
+import { HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY } from
+  "@shared/helix-environment-connector";
 import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-itinerary";
 import { explicitCapabilityContractForCapability } from
   "../services/helix-ask/explicit-capability-contract";
@@ -882,7 +884,7 @@ describe("Helix Ask capability itinerary", () => {
         admittedFamilies: ["repo_code", "docs_viewer"],
         available: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
         expectedRequested: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
-        expectedRuntime: ["repo-code.search_concept", "docs.search"],
+        expectedRuntime: ["repo.search", "docs.search"],
       },
       {
         turnId: "ask:visual-then-calculator",
@@ -1682,6 +1684,46 @@ describe("Helix Ask capability itinerary", () => {
     expect(itinerary.relevant_tool_families).not.toContain("internet_search");
     expect(itinerary.prompt_shape).toBe("single_tool");
     expect(itinerary.missing_tool_families).toEqual([]);
+  });
+
+  it("does not read imperative Report wording as a local report document", () => {
+    const promptText =
+      "Where am I in Minecraft right now? Report my player name, dimension, position, health, and food from the fresh live environment observation.";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:current-minecraft-status-report",
+      promptText,
+      toolCallAdmissionDecision: {
+        source_target: "live_environment",
+        admitted_tool_families: ["live_environment"],
+      },
+      availableCapabilities: availableCapabilities([
+        HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+        "docs-viewer.search_docs",
+      ]),
+      exactAdmittedCapabilityContract: explicitCapabilityContractForCapability(
+        HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+      ),
+    });
+
+    expect(itinerary.relevant_tool_families).toEqual(["live_environment"]);
+    expect(itinerary.relevant_tool_families).not.toContain("docs_viewer");
+    expect(itinerary.prompt_shape).toBe("single_tool");
+    expect(itinerary.missing_tool_families).toEqual([]);
+  });
+
+  it("still treats an explicitly scoped local report as document evidence", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:local-report-document",
+      promptText: "Check the local report for the recorded launch window.",
+      toolCallAdmissionDecision: {
+        source_target: "docs_viewer",
+        admitted_tool_families: ["docs_viewer"],
+      },
+      availableCapabilities: availableCapabilities(["docs-viewer.search_docs"]),
+    });
+
+    expect(itinerary.relevant_tool_families).toEqual(["docs_viewer"]);
+    expect(itinerary.prompt_shape).toBe("single_tool");
   });
 
   it("does not infer Docs from theory identifiers containing evidence and Casimir", () => {

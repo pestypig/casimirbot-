@@ -131,6 +131,11 @@ import {
   sharedLiveRoomGatewayManifests,
 } from "./shared-live-room";
 import {
+  executeLivePipelineControlGatewayCapability,
+  LIVE_PIPELINE_SET_RATE_CAPABILITY,
+  livePipelineControlManifest,
+} from "./live-pipeline-control";
+import {
   boundRoomEvidenceManifest,
   executeBoundRoomEvidenceCapability,
   HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY,
@@ -140,6 +145,12 @@ import {
   executeEnvironmentProbeGatewayCapability,
 } from "./environment-probe";
 import {
+  environmentCommandCatalogMinecraftManifest,
+  environmentCommandMinecraftManifest,
+  executeEnvironmentCommandCatalogGatewayCapability,
+  executeEnvironmentCommandGatewayCapability,
+} from "./environment-command";
+import {
   executeVisualSituationObservationCapability,
   visualSituationObservationManifest,
   VISUAL_SITUATION_OBSERVATION_CAPABILITY,
@@ -148,6 +159,10 @@ import {
   EnvironmentMechanicsRegistryError,
   resolveEnvironmentMechanicsSearchScope,
 } from "../../situation-room/environment-mechanics-registry";
+import {
+  resolveRoomEnvironmentMechanicsSearchScope,
+  RoomEnvironmentMechanicsSearchError,
+} from "./environment-mechanics-search";
 import {
   HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
   type HelixLiveEnvironmentToolName,
@@ -561,6 +576,9 @@ const manifestProducesAffordances = (
   }
   if (capabilityId === HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY) {
     return ["source_ref", "text_evidence"];
+  }
+  if (capabilityId === LIVE_PIPELINE_SET_RATE_CAPABILITY) {
+    return ["ui_projection_receipt", "source_ref"];
   }
   if (
     capabilityId === WORKSTATION_ACTIVE_CONTEXT_CAPABILITY ||
@@ -4348,7 +4366,7 @@ const docsSearchManifest: HelixWorkstationCapabilityManifest = {
   capability_id: DOCS_SEARCH_CAPABILITY,
   label: "Docs search",
   description:
-    "Searches bounded workspace documentation paths for current document evidence. It returns non-terminal evidence observations and cannot open files, write files, or execute shell commands for the agent.",
+    "Searches bounded workspace documentation for goal-relevant, line-addressable evidence. For connected environment mechanics, set environment_scope to active_room_environment and query by the user's goal without guessing a document title; Helix binds the search to the selected room environment's admitted adapter profile and mechanics collections. Results are non-terminal guidance, never live-world evidence or command authority.",
   panel_id: "docs-viewer",
   action_id: "search_docs",
   mode: "read",
@@ -4365,9 +4383,52 @@ const docsSearchManifest: HelixWorkstationCapabilityManifest = {
     additionalProperties: false,
     required: ["query"],
     properties: {
-      query: { type: "string" },
-      paths: { type: "array", items: { type: "string" } },
-      max_hits: { type: "number" },
+      query: {
+        type: "string",
+        description:
+          "Describe the evidence goal in natural language; a document title is not required.",
+      },
+      paths: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Optional bounded docs paths. Do not combine arbitrary paths with active_room_environment mechanics scope.",
+      },
+      environment_scope: {
+        type: "string",
+        enum: ["active_room_environment"],
+        description:
+          "Bind retrieval to the active shared-room environment's server-admitted mechanics collections.",
+      },
+      environment_label: {
+        type: "string",
+        description:
+          "Exact room environment label, required only when multiple active environments have mechanics guidance.",
+      },
+      mechanics_collection_ids: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Optional exact mechanics collection ids. With environment_scope, these may only narrow the selected environment's admitted collections.",
+      },
+      adapter_profile_id: {
+        type: "string",
+        description:
+          "Optional exact adapter profile id. With environment_scope, it must match the selected room environment.",
+      },
+      max_hits: { type: "number", minimum: 1, maximum: 12 },
+      exact_terms: { type: "array", items: { type: "string" } },
+      section_heading: { type: "string" },
+      section_headings: { type: "array", items: { type: "string" } },
+      section_contains_terms: {
+        type: "array",
+        items: { type: "string" },
+      },
+      section_match_unit: {
+        type: "string",
+        enum: ["line", "sentence", "paragraph"],
+      },
+      source_target_intent: { type: "object" },
     },
   },
   output_observation_schema: DOCS_SEARCH_OBSERVATION_SCHEMA,
@@ -5635,9 +5696,18 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
     (manifest) => [manifest.capability_id, manifest] as const,
   ),
   [boundRoomEvidenceManifest.capability_id, boundRoomEvidenceManifest],
+  [livePipelineControlManifest.capability_id, livePipelineControlManifest],
   ...environmentProbeMinecraftManifests.map(
     (manifest) => [manifest.capability_id, manifest] as const,
   ),
+  [
+    environmentCommandCatalogMinecraftManifest.capability_id,
+    environmentCommandCatalogMinecraftManifest,
+  ],
+  [
+    environmentCommandMinecraftManifest.capability_id,
+    environmentCommandMinecraftManifest,
+  ],
   [
     visualSituationObservationManifest.capability_id,
     visualSituationObservationManifest,
@@ -6126,6 +6196,159 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
+  if (
+    manifest.capability_id ===
+    environmentCommandCatalogMinecraftManifest.capability_id
+  ) {
+    const gatewayResult = await executeEnvironmentCommandCatalogGatewayCapability({
+      turnId,
+      toolCallId: input.toolCallId,
+      providerExecutionId: input.providerExecutionId,
+      arguments: readArguments(input.arguments),
+      accountContext: input.accountContext,
+      conversationThreadId: input.conversationThreadId,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.ok ? "admitted" : "blocked",
+      reason: gatewayResult.ok
+        ? "authenticated_environment_command_catalog_admitted"
+        : "authenticated_environment_command_catalog_blocked",
+      blockedReason: gatewayResult.error,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "workstation-gateway",
+      action: manifest.action_id,
+      status:
+        gatewayResult.status === "completed"
+          ? "succeeded"
+          : gatewayResult.status,
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      ...(gatewayResult.error
+        ? {
+            missingRequirements: [
+              {
+                code: gatewayResult.error,
+                message: gatewayResult.summary,
+                repair_action: "ask_user" as const,
+              },
+            ],
+          }
+        : {}),
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: gatewayResult.error,
+      terminalEligible: false,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
+    };
+  }
+
+  if (
+    manifest.capability_id ===
+    environmentCommandMinecraftManifest.capability_id
+  ) {
+    const gatewayResult = await executeEnvironmentCommandGatewayCapability({
+      turnId,
+      toolCallId: input.toolCallId,
+      providerExecutionId: input.providerExecutionId,
+      arguments: readArguments(input.arguments),
+      accountContext: input.accountContext,
+      conversationThreadId: input.conversationThreadId,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.ok ? "admitted" : "blocked",
+      reason: gatewayResult.ok
+        ? "authenticated_environment_command_admitted"
+        : "authenticated_environment_command_blocked",
+      blockedReason: gatewayResult.error,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "workstation-gateway",
+      action: manifest.action_id,
+      executedArgs: gatewayResult.executedArgs,
+      status:
+        gatewayResult.status === "completed"
+          ? "succeeded"
+          : gatewayResult.status,
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      ...(gatewayResult.error
+        ? {
+            missingRequirements: [
+              {
+                code: gatewayResult.error,
+                message: gatewayResult.summary,
+                repair_action: "ask_user" as const,
+              },
+            ],
+          }
+        : {}),
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: gatewayResult.error,
+      terminalEligible: false,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
+    };
+  }
+
   if (manifest.capability_id === VISUAL_SITUATION_OBSERVATION_CAPABILITY) {
     const args = {
       ...readArguments(input.arguments),
@@ -6193,6 +6416,77 @@ export const callWorkstationGatewayCapability = async (
       assistant_answer: false,
       raw_content_included: false,
       ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
+    };
+  }
+
+  if (manifest.capability_id === LIVE_PIPELINE_SET_RATE_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const gatewayResult = executeLivePipelineControlGatewayCapability({
+      args,
+      conversationThreadId: input.conversationThreadId,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.ok ? "admitted" : "blocked",
+      reason: gatewayResult.ok
+        ? "conversation_scoped_live_pipeline_control_admitted"
+        : "conversation_scoped_live_pipeline_control_blocked",
+      blockedReason: "error" in gatewayResult ? gatewayResult.error : undefined,
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "situation-room-pipelines",
+      action: manifest.action_id,
+      status: gatewayResult.ok ? "succeeded" : "blocked",
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      ...(!gatewayResult.ok
+        ? {
+            missingRequirements: [
+              {
+                code: gatewayResult.error,
+                message: gatewayResult.summary,
+                repair_action:
+                  gatewayResult.observation.retryable === true
+                    ? ("retry" as const)
+                    : ("ask_user" as const),
+              },
+            ],
+          }
+        : {}),
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: "error" in gatewayResult ? gatewayResult.error : undefined,
+      terminalEligible: false,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...("error" in gatewayResult ? { error: gatewayResult.error } : {}),
     };
   }
 
@@ -8859,6 +9153,14 @@ export const callWorkstationGatewayCapability = async (
   if (manifest.capability_id === DOCS_SEARCH_CAPABILITY) {
     const args = readArguments(input.arguments);
     const query = normalizeRepoSearchQuery(args.query);
+    const environmentScope = clipObservationText(
+      args.environment_scope ?? args.environmentScope,
+      64,
+    );
+    const requestedEnvironmentLabel = clipObservationText(
+      args.environment_label ?? args.environmentLabel,
+      240,
+    );
     const requestedMechanicsCollectionIds = readStringArray(
       args.mechanics_collection_ids ?? args.mechanicsCollectionIds,
     ).slice(0, 8);
@@ -8869,8 +9171,38 @@ export const callWorkstationGatewayCapability = async (
     let mechanicsScope: ReturnType<
       typeof resolveEnvironmentMechanicsSearchScope
     > | null = null;
-    let mechanicsScopeError: EnvironmentMechanicsRegistryError | null = null;
-    if (requestedMechanicsCollectionIds.length > 0) {
+    let roomEnvironmentMechanicsScope: Awaited<
+      ReturnType<typeof resolveRoomEnvironmentMechanicsSearchScope>
+    > | null = null;
+    let mechanicsScopeError:
+      | EnvironmentMechanicsRegistryError
+      | RoomEnvironmentMechanicsSearchError
+      | null = null;
+    if (environmentScope === "active_room_environment") {
+      try {
+        roomEnvironmentMechanicsScope =
+          await resolveRoomEnvironmentMechanicsSearchScope({
+            accountContext: input.accountContext,
+            conversationThreadId: input.conversationThreadId,
+            environmentLabel: requestedEnvironmentLabel,
+            requestedCollectionIds: requestedMechanicsCollectionIds,
+            requestedAdapterProfileId,
+            includeFixtureProfiles:
+              process.env.HELIX_ENVIRONMENT_ADAPTER_FIXTURES === "1" &&
+              process.env.NODE_ENV !== "production",
+          });
+        mechanicsScope = roomEnvironmentMechanicsScope;
+      } catch (error) {
+        if (
+          error instanceof EnvironmentMechanicsRegistryError ||
+          error instanceof RoomEnvironmentMechanicsSearchError
+        ) {
+          mechanicsScopeError = error;
+        } else {
+          throw error;
+        }
+      }
+    } else if (requestedMechanicsCollectionIds.length > 0) {
       try {
         if (!requestedAdapterProfileId) {
           throw new EnvironmentMechanicsRegistryError(
@@ -8950,9 +9282,15 @@ export const callWorkstationGatewayCapability = async (
         paths,
         mechanics_scope: mechanicsScope
           ? {
-              adapter_profile_id: requestedAdapterProfileId,
-              collection_ids: requestedMechanicsCollectionIds,
+              adapter_profile_id:
+                roomEnvironmentMechanicsScope?.environment.adapter_profile_id ??
+                requestedAdapterProfileId,
+              collection_ids:
+                roomEnvironmentMechanicsScope?.environment
+                  .mechanics_collection_ids ?? requestedMechanicsCollectionIds,
               document_paths: mechanicsScope.documentPaths,
+              environment:
+                roomEnvironmentMechanicsScope?.environment ?? null,
             }
           : null,
         hits: [],
@@ -9035,11 +9373,12 @@ export const callWorkstationGatewayCapability = async (
       args.source_target_intent,
       documentCandidates,
     );
-    const activeDocumentObservation =
-      readBoundedDocsExcerpt(paths) ??
-      (compoundReadAloudResolvedPath
-        ? readBoundedDocsExcerpt([compoundReadAloudResolvedPath])
-        : null);
+    const activeDocumentObservation = mechanicsScope
+      ? null
+      : readBoundedDocsExcerpt(paths) ??
+        (compoundReadAloudResolvedPath
+          ? readBoundedDocsExcerpt([compoundReadAloudResolvedPath])
+          : null);
     const exactLocationMatches = readDocsExactLocationMatches(
       paths,
       exactTerms,
@@ -9095,9 +9434,12 @@ export const callWorkstationGatewayCapability = async (
       paths,
       mechanics_scope: mechanicsScope
         ? {
-            adapter_profile_id: requestedAdapterProfileId,
+            adapter_profile_id:
+              roomEnvironmentMechanicsScope?.environment.adapter_profile_id ??
+              requestedAdapterProfileId,
             collections: mechanicsScope.collections,
             document_paths: mechanicsScope.documentPaths,
+            environment: roomEnvironmentMechanicsScope?.environment ?? null,
             content_role: "mechanics_reference_not_live_observation",
             assistant_answer: false,
             terminal_eligible: false,

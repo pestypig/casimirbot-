@@ -13,6 +13,9 @@ import {
 import { buildRealtimeTranscriptObservation } from "../../realtime-session/route-boundary";
 import { codexProvider } from "../codex-provider";
 import { readWorkstationGatewayCallRequestsForTurn } from "../explicit-workstation-gateway";
+import { buildHelixAccountCapabilityPolicy } from "@shared/helix-account-session";
+import { materializeRealtimeConversationContext } from "../realtime-conversation-context";
+import { bindTrustedRealtimeTurnActorContext } from "../realtime-turn-actor-context";
 
 const ENV_KEYS = [
   "CODEX_AGENT_FAKE_STDOUT",
@@ -27,6 +30,10 @@ const bridgeTranscript = (input: {
   eventRef: string;
   nowMs: number;
   sourceBinding?: Record<string, unknown>;
+  threadId?: string;
+  trustedTurnActorContext?: Parameters<
+    typeof bridgeRealtimeTranscriptToStagePlay
+  >[0]["trustedTurnActorContext"];
 }) => {
   const observation = buildRealtimeTranscriptObservation({
     realtimeSessionId: "realtime:provider-context",
@@ -39,12 +46,13 @@ const bridgeTranscript = (input: {
   })!;
   return bridgeRealtimeTranscriptToStagePlay({
     realtimeSessionId: "realtime:provider-context",
-    threadId: "helix-ask:desktop",
+    threadId: input.threadId ?? "helix-ask:desktop",
     providerEventRef: input.eventRef,
     transcriptText: input.transcriptText,
     observation,
     sourceBinding: input.sourceBinding,
     selectedRuntimeAgentProvider: "codex",
+    trustedTurnActorContext: input.trustedTurnActorContext,
     nowMs: input.nowMs,
   });
 };
@@ -159,5 +167,60 @@ describe("Codex provider Realtime conversation context", () => {
         }),
       }),
     ]);
+  });
+
+  it("reattaches only the private speaker bound to a validated room transcript", () => {
+    const currentText = "Check my current Minecraft status.";
+    const current = bridgeTranscript({
+      transcriptText: currentText,
+      eventRef: "provider-event:room-speaker",
+      nowMs: 400,
+      threadId: "helix-ask:room:shared_realtime_room:test",
+      trustedTurnActorContext: {
+        schema: "helix.realtime_room.turn_actor_context.v1",
+        origin: "realtime_voice",
+        room_id: "shared_realtime_room:test",
+        requester_profile_id: "profile:room-owner",
+        realtime_session_id: "realtime:provider-context",
+        participant_id: "participant:room-guest",
+        resolution: "resolved",
+        resolution_source: "active_speaker_floor",
+        captured_at_ms: 400,
+      },
+    });
+    const realtimeContext = materializeRealtimeConversationContext({
+      body: { route_metadata: current.route_metadata },
+      question: currentText,
+    });
+    const baseAccountContext = {
+      session_id: "account_session:room-owner",
+      profile_id: "profile:room-owner",
+      trusted_account_session: true,
+      account_session: null,
+      account_policy: buildHelixAccountCapabilityPolicy("developer"),
+    };
+    const bound = bindTrustedRealtimeTurnActorContext({
+      accountContext: baseAccountContext,
+      realtimeConversationContext: realtimeContext,
+      gatewayConversationThreadId:
+        realtimeContext?.trustedMailboxThreadId ?? "helix-ask:desktop",
+      nowMs: 401,
+    });
+    expect(bound.trusted_turn_actor_context).toMatchObject({
+      participant_id: "participant:room-guest",
+      resolution: "resolved",
+      resolution_source: "active_speaker_floor",
+    });
+
+    const mismatched = materializeRealtimeConversationContext({
+      body: { route_metadata: current.route_metadata },
+      question: "Check another participant instead.",
+    });
+    expect(bindTrustedRealtimeTurnActorContext({
+      accountContext: baseAccountContext,
+      realtimeConversationContext: mismatched,
+      gatewayConversationThreadId: "helix-ask:room:shared_realtime_room:test",
+      nowMs: 402,
+    }).trusted_turn_actor_context).toBeUndefined();
   });
 });

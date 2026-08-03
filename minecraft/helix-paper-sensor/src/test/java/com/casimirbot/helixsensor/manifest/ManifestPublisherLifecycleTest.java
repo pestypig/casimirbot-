@@ -25,4 +25,11 @@ final class ManifestPublisherLifecycleTest {
         assertEquals(first, refresh);
         assertEquals(first.get("created_at"), refresh.get("created_at"));
     }
+
+    @Test
+    void keepsManifestRefreshIndependentFromFastHeartbeats() {
+        assertEquals(300L, ManifestPublisher.refreshTicksFor(100));
+        assertEquals(300L, ManifestPublisher.refreshTicksFor(300));
+        assertEquals(600L, ManifestPublisher.refreshTicksFor(600));
+    }
 }

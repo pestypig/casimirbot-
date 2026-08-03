@@ -269,6 +269,20 @@ const observationKindBelongsToCapability = (
 ): boolean => {
   const text = artifactCapabilityHaystack(artifact);
   const kind = artifactKind(artifact);
+  if (
+    capability === "situation-room.live-source.set_rate" ||
+    runtimeCapability === "situation-room.live-source.set_rate"
+  ) {
+    const payload = artifactPayload(artifact);
+    const status = readString(payload?.status);
+    const exactSuccessfulGatewayObservation =
+      artifactCapability(artifact) === "situation-room.live-source.set_rate" &&
+      /^(?:succeeded|completed|success|ok)$/i.test(status ?? "") &&
+      /^(?:provider_gateway_observation_packet|runtime_tool_observation|visual_producer_cadence_receipt)$/i.test(kind);
+    return exactSuccessfulGatewayObservation ||
+      /live_pipeline_receipt|visual_producer_cadence_receipt/i.test(text) ||
+      /^(?:live_pipeline_receipt|visual_producer_cadence_receipt)$/i.test(kind);
+  }
   if (capability === "scientific-calculator.solve_expression" || runtimeCapability === "scientific-calculator.solve_expression") {
     return /calculator_receipt|calculator_result|scientific[-_.:]calculator[-_.:]solve[-_.:]expression/i.test(text) ||
       /^(?:calculator_receipt|calculator_result)$/i.test(kind);
@@ -737,6 +751,22 @@ export const isHelixCapabilityItineraryFamilyObserved = (
   family: string,
   artifacts: HelixCapabilityItineraryArtifactLike[],
 ): boolean => {
+  if (family === "live_pipeline") {
+    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) => {
+      const payload = artifactPayload(artifact);
+      const exactSuccessfulCadenceObservation =
+        artifactCapability(artifact) === "situation-room.live-source.set_rate" &&
+        /^(?:succeeded|completed|success|ok)$/i.test(readString(payload?.status) ?? "") &&
+        /^(?:provider_gateway_observation_packet|runtime_tool_observation|visual_producer_cadence_receipt)$/i.test(
+          artifactKind(artifact),
+        );
+      return exactSuccessfulCadenceObservation ||
+        artifactMatchesObservationKind(
+          artifact,
+          /live_pipeline_receipt|visual_producer_cadence_receipt/i,
+        );
+    });
+  }
   if (family === "scholarly_research") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) => {
       const payload = artifactPayload(artifact);

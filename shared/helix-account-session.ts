@@ -160,6 +160,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "postulate.submit_proposal",
     "text_to_speech.speak_text",
     "live_env.narrator_say",
+    "situation-room.live-source.set_rate",
   ],
   locked_workstation_capabilities: [
     "permission:write",

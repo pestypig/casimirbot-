@@ -49,6 +49,9 @@ const canonicalGoalKindForCommittedExplicitCapability = (
 ): string =>
   contract?.capability_family === "capability_catalog"
     ? "capability_help"
+    : contract?.source_target === "live_pipeline" &&
+        contract?.required_terminal_kind === "live_pipeline_receipt"
+      ? "live_pipeline_control"
     : contract?.plan_family ?? "unknown";
 
 const asksForScholarlyPdfImageLensWorkflow = (promptText: string): boolean => {
@@ -342,22 +345,38 @@ const readCapabilityCandidatesFromPayload = (payload: RecordLike): HelixRouteEvi
 const readExplicitCapabilityContractFromPayload = (payload: RecordLike) => {
   const admission = readRecord(payload.tool_call_admission_decision);
   const capabilityPlan = readRecord(payload.capability_plan);
-  const lifecycle = readRecord(payload.tool_lifecycle_trace);
-  const operational = readRecord(payload.operational_capability_trace);
+  const sourceTargetIntent = readRecord(payload.source_target_intent);
+  const hardSourceTarget =
+    readString(sourceTargetIntent?.strength) === "hard"
+      ? readString(sourceTargetIntent?.target_source)
+      : "";
+  // An explicit capability route is an admission-time policy decision. Runtime
+  // lifecycle and operational traces contain model proposals as well as policy
+  // outcomes; accepting either here lets a late, incompatible proposal rewrite
+  // an already committed source route.
   for (const candidate of [
     admission?.admitted_capability,
     admission?.selected_capability,
     admission?.requested_capability,
     capabilityPlan?.selected_capability,
-    lifecycle?.admitted_capability,
-    lifecycle?.requested_capability,
-    operational?.policy_admitted_capability,
-    operational?.model_proposed_capability,
   ]) {
     const capability = readString(candidate);
     if (!capability) continue;
     const contract = explicitCapabilityContractForCapability(capability);
-    if (contract) return contract;
+    if (!contract) continue;
+    if (hardSourceTarget) {
+      const intendedFamily = inferCommittedRouteToolFamilyFromSourceTarget(hardSourceTarget);
+      const contractFamily = inferCommittedRouteToolFamilyFromSourceTarget(
+        contract.source_target,
+      );
+      if (
+        contract.source_target !== hardSourceTarget &&
+        (!intendedFamily || !contractFamily || intendedFamily !== contractFamily)
+      ) {
+        continue;
+      }
+    }
+    return contract;
   }
   return null;
 };
@@ -506,6 +525,14 @@ export function reconcileCanonicalGoalFrameToCommittedRoute(input: {
     currentGoalKind === "unknown" ||
     currentTerminalKind === "direct_answer_text" ||
     currentTerminalKind === "unknown";
+  const currentFrameIsCompatibleSituationContextSpecialization =
+    currentGoalKind === "situation_context_question" &&
+    committedSourceTarget === "visual_capture" &&
+    currentTerminalKind === "situation_context_pack";
+  const currentFrameConflictsWithCommittedRoute =
+    !currentFrameIsCompatibleSituationContextSpecialization &&
+    (currentGoalKind !== committedGoalKind ||
+      currentTerminalKind !== committedTerminalKind);
   const classifierReasons = readStringArray(current.classifier_reasons);
   const authoritativeModelOnlyDemotionReasons = new Set([
     "conversational_referent_no_evidence",
@@ -521,11 +548,15 @@ export function reconcileCanonicalGoalFrameToCommittedRoute(input: {
 
   if (
     !committedRouteIsSourceBacked ||
-    !currentFrameIsStaleModelOnly ||
+    !currentFrameConflictsWithCommittedRoute ||
     currentFrameIsAuthoritativelyDemoted
   ) {
     return { reconciled: false, frame: current, reason: null };
   }
+
+  const reconciliationReason = currentFrameIsStaleModelOnly
+    ? "committed_source_route_overrode_stale_model_only_goal"
+    : "committed_source_route_overrode_stale_incompatible_goal";
 
   const answerScope =
     committedSourceTarget === "scholarly_research"
@@ -535,18 +566,24 @@ export function reconcileCanonicalGoalFrameToCommittedRoute(input: {
         : committedSourceTarget || "source_backed";
   const reconciledClassifierReasons = unique([
     ...classifierReasons,
-    "committed_source_route_overrode_stale_model_only_goal",
+    reconciliationReason,
   ]);
 
   return {
     reconciled: true,
-    reason: "committed_source_route_overrode_stale_model_only_goal",
+    reason: reconciliationReason,
     frame: {
       ...current,
       turn_id: input.turnId,
       goal_kind: committedGoalKind,
+      requested_capability:
+        route.canonical_goal.requested_capability ?? null,
       answer_scope: answerScope,
       required_terminal_kind: route.canonical_goal.required_terminal_kind,
+      allowed_terminal_artifact_kinds:
+        route.canonical_goal.allowed_terminal_artifact_kinds,
+      forbidden_terminal_artifact_kinds:
+        route.canonical_goal.forbidden_terminal_artifact_kinds,
       allows_workspace_context:
         committedSourceTarget !== "scholarly_research" &&
         committedSourceTarget !== "internet_search",
@@ -555,6 +592,83 @@ export function reconcileCanonicalGoalFrameToCommittedRoute(input: {
         committedSourceTarget === "conversation_memory",
       confidence: readString(current.confidence) === "high" ? "high" : "medium",
       classifier_reasons: reconciledClassifierReasons,
+      source: "committed_route_canonical_goal_reconciliation",
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+}
+
+export function reconcileRouteProductContractToCommittedRoute(input: {
+  turnId: string;
+  routeProductContract: RecordLike | null | undefined;
+  committedRoute: HelixCommittedAskRoute | null | undefined;
+}): {
+  reconciled: boolean;
+  contract: RecordLike | null;
+  reason: string | null;
+} {
+  const current = readRecord(input.routeProductContract);
+  const route = input.committedRoute ?? null;
+  if (!current || !route || route.turn_id !== input.turnId) {
+    return { reconciled: false, contract: current, reason: null };
+  }
+
+  const committedSourceTarget = readString(route.route.source_target);
+  const committedGoalKind = readString(route.canonical_goal.goal_kind);
+  const committedTerminalKind = normalizeCommittedRouteTerminalKind(
+    route.canonical_goal.required_terminal_kind,
+  );
+  const currentSourceTarget = readString(current.source_target);
+  const currentGoalKind = readString(current.goal_kind);
+  const currentTerminalKind = normalizeCommittedRouteTerminalKind(
+    readString(current.required_terminal_artifact_kind) ||
+      readString(current.required_terminal_kind),
+  );
+  const currentAllowedKinds = readStringArray(
+    current.allowed_terminal_artifact_kinds,
+  ).map(normalizeCommittedRouteTerminalKind);
+  const committedRouteCompatible =
+    route.compatibility.source_goal_capability_terminal_compatible === true &&
+    route.compatibility.violations.length === 0;
+  const committedRouteIsSourceBacked =
+    committedRouteCompatible &&
+    committedSourceTarget !== "model_only" &&
+    committedTerminalKind !== "direct_answer_text" &&
+    committedTerminalKind !== "unknown";
+  const contractConflictsWithCommittedRoute =
+    (currentSourceTarget && currentSourceTarget !== committedSourceTarget) ||
+    (currentGoalKind && currentGoalKind !== committedGoalKind) ||
+    currentTerminalKind !== committedTerminalKind ||
+    !currentAllowedKinds.includes(committedTerminalKind);
+  if (!committedRouteIsSourceBacked || !contractConflictsWithCommittedRoute) {
+    return { reconciled: false, contract: current, reason: null };
+  }
+
+  return {
+    reconciled: true,
+    reason: "committed_source_route_overrode_stale_product_contract",
+    contract: {
+      ...current,
+      schema: "helix.route_product_contract.v1",
+      turn_id: input.turnId,
+      source_target: committedSourceTarget,
+      goal_kind: committedGoalKind,
+      required_terminal_kind: route.canonical_goal.required_terminal_kind,
+      required_terminal_artifact_kind:
+        route.canonical_goal.required_terminal_kind,
+      allowed_terminal_artifact_kinds:
+        route.canonical_goal.allowed_terminal_artifact_kinds,
+      forbidden_terminal_artifact_kinds:
+        route.canonical_goal.forbidden_terminal_artifact_kinds,
+      evidence_reentry_required:
+        route.terminal_product.evidence_reentry_required,
+      followup_reasoning_required:
+        route.terminal_product.followup_reasoning_required,
+      precedence_reason:
+        "committed_source_route_overrode_stale_product_contract",
+      assistant_answer: false,
+      raw_content_included: false,
     },
   };
 }
@@ -590,6 +704,27 @@ export function buildCommittedAskRoute(input: {
     routeProductContract: readRecord(input.payload.route_product_contract),
   });
   const existingCandidate = readCommittedAskRoute(input.payload);
+  const currentSourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const currentHardSourceTarget =
+    readString(currentSourceTargetIntent?.strength) === "hard"
+      ? readString(currentSourceTargetIntent?.target_source)
+      : "";
+  const currentHardSourceFamily = currentHardSourceTarget
+    ? inferCommittedRouteToolFamilyFromSourceTarget(currentHardSourceTarget)
+    : "";
+  const existingSourceFamily = existingCandidate
+    ? inferCommittedRouteToolFamilyFromSourceTarget(
+        existingCandidate.route.source_target,
+      )
+    : "";
+  const staleExistingHardSourceRoute = Boolean(
+    existingCandidate &&
+      currentHardSourceTarget &&
+      existingCandidate.route.source_target !== currentHardSourceTarget &&
+      (!currentHardSourceFamily ||
+        !existingSourceFamily ||
+        currentHardSourceFamily !== existingSourceFamily),
+  );
   const staleExistingLivePipelineRoute = Boolean(
     existingCandidate &&
     authoritativeLivePipelineRoute &&
@@ -603,8 +738,25 @@ export function buildCommittedAskRoute(input: {
       !existingCandidate.capability_policy.required_capability_families.includes("live_pipeline")
     )
   );
+  const staleExistingWorldEventGoal = Boolean(
+    existingCandidate?.route.source_target === "world_event" &&
+      (
+        existingCandidate.canonical_goal.goal_kind !==
+          "environment_evidence_synthesis" ||
+        normalizeCommittedRouteTerminalKind(
+          existingCandidate.canonical_goal.required_terminal_kind,
+        ) !== "model_synthesized_answer" ||
+        !existingCandidate.canonical_goal.allowed_terminal_artifact_kinds.some(
+          (kind) =>
+            normalizeCommittedRouteTerminalKind(kind) ===
+            "model_synthesized_answer",
+        )
+      )
+  );
   const existing =
     staleExistingLivePipelineRoute ||
+    staleExistingHardSourceRoute ||
+    staleExistingWorldEventGoal ||
     (
       hasReusablePriorEnvironmentEvidence &&
       existingCandidate?.route.source_target === "world_event"
@@ -786,6 +938,11 @@ export function buildCommittedAskRoute(input: {
           : shouldRepairExistingScientificImageComparisonRoute
             ? "scholarly_research_lookup"
           : existing.canonical_goal.goal_kind,
+        requested_capability:
+          shouldRepairExistingExplicitCapabilityRoute &&
+          explicitCapabilityContract
+            ? explicitCapabilityContract.capability
+            : existing.canonical_goal.requested_capability ?? null,
         required_terminal_kind: requiredTerminalProduct,
         allowed_terminal_artifact_kinds:
           shouldRepairExistingScientificImageContinuityRoute
@@ -907,7 +1064,18 @@ export function buildCommittedAskRoute(input: {
     };
   }
 
-  const route = readRouteSource(input.payload);
+  const route = staleExistingHardSourceRoute
+    ? {
+        sourceTarget: currentHardSourceTarget,
+        targetKind:
+          readString(currentSourceTargetIntent?.target_kind) ||
+          currentHardSourceTarget,
+        strength: "hard" as const,
+        reason:
+          readString(currentSourceTargetIntent?.precedence_reason) ||
+          "hard_source_target_recommitted",
+      }
+    : readRouteSource(input.payload);
   const explicitCapabilityContractCandidate = readExplicitCapabilityContractFromPayload(input.payload);
   const explicitCapabilityContract = authoritativeLivePipelineRoute
     ? null
@@ -989,6 +1157,19 @@ export function buildCommittedAskRoute(input: {
         /^(?:summarize_doc|doc_|docs_|active_doc|repo_code_)/i.test(rawGoal.goalKind)
       )
     );
+  const livePipelineRequestedOutputs = readStringArray(
+    currentSourceTargetIntent?.requested_outputs,
+  );
+  const inferredLivePipelineTerminalKind =
+    effectiveRoute.sourceTarget === "live_pipeline"
+      ? livePipelineRequestedOutputs.includes("live_pipeline_receipt")
+        ? "live_pipeline_receipt"
+        : livePipelineRequestedOutputs.includes(
+              "live_environment_binding_diagnosis",
+            )
+          ? "live_environment_binding_diagnosis"
+          : ""
+      : "";
   const goal = authoritativeLivePipelineRoute
     ? {
         goalKind: authoritativeLivePipelineRoute.goalKind,
@@ -1004,8 +1185,7 @@ export function buildCommittedAskRoute(input: {
     ? { goalKind: "scholarly_research_lookup", requiredTerminalKind: "scholarly_research_answer" }
     : affirmativeScholarlyPdfImageLensWorkflow
     ? { goalKind: "scholarly_research_lookup", requiredTerminalKind: "scholarly_research_answer" }
-    : hasReusablePriorEnvironmentEvidence &&
-        effectiveRoute.sourceTarget === "world_event"
+    : effectiveRoute.sourceTarget === "world_event"
       ? {
           goalKind: "environment_evidence_synthesis",
           requiredTerminalKind: "model_synthesized_answer",
@@ -1019,6 +1199,30 @@ export function buildCommittedAskRoute(input: {
               explicitCapabilityContract,
             ),
           requiredTerminalKind: explicitCapabilityContract.required_terminal_kind,
+        }
+    : inferredLivePipelineTerminalKind
+      ? {
+          goalKind:
+            inferredLivePipelineTerminalKind === "live_pipeline_receipt"
+              ? "live_pipeline_control"
+              : "live_environment_binding_diagnosis",
+          requiredTerminalKind: inferredLivePipelineTerminalKind,
+        }
+    : effectiveRoute.sourceTarget === "procedure_memory" &&
+        effectiveRoute.targetKind === "situation_epoch"
+      ? {
+          goalKind: "procedure_epoch_replay_question",
+          requiredTerminalKind: "procedure_epoch_replay",
+        }
+    : effectiveRoute.sourceTarget === "procedure_memory" &&
+        (rawGoal.goalKind === "unknown" ||
+          rawGoal.requiredTerminalKind === "unknown")
+      ? {
+          goalKind: "situation_context_question",
+          requiredTerminalKind:
+            readString(routeContract?.required_terminal_artifact_kind) ||
+            readString(routeContract?.required_terminal_kind) ||
+            "situation_context_pack",
         }
     : rawGoal;
   const modelOnlyTerminalAliases =
@@ -1043,6 +1247,13 @@ export function buildCommittedAskRoute(input: {
     ...(affirmativeScholarlyPdfImageLensWorkflow
       ? ["scholarly_research_answer", "typed_failure"]
       : []),
+    ...(effectiveRoute.sourceTarget === "world_event"
+      ? [
+          "model_synthesized_answer",
+          "agent_provider_terminal_candidate",
+          "typed_failure",
+        ]
+      : []),
     ...modelOnlyTerminalAliases,
     goal.requiredTerminalKind !== "unknown" ? goal.requiredTerminalKind : "",
   ]);
@@ -1065,7 +1276,15 @@ export function buildCommittedAskRoute(input: {
             "model_synthesized_answer",
           ].includes(normalizeCommittedRouteTerminalKind(kind)),
         )
-      : rawForbiddenTerminalKinds;
+      : effectiveRoute.sourceTarget === "world_event"
+        ? rawForbiddenTerminalKinds.filter(
+            (kind) =>
+              ![
+                "model_synthesized_answer",
+                "agent_provider_terminal_candidate",
+              ].includes(normalizeCommittedRouteTerminalKind(kind)),
+          )
+        : rawForbiddenTerminalKinds;
   const compoundPolicy = applyCompoundTerminalPolicy(input.payload, {
     allowed: rawAllowedTerminalKindsWithGoal,
     forbidden: rawForbiddenTerminalKindsWithGoal,
@@ -1126,6 +1345,14 @@ export function buildCommittedAskRoute(input: {
   if (sourceBacked && goal.goalKind === "model_only_concept") {
     violations.push("source_target_goal_mismatch:model_only_concept_for_source_backed_route");
   }
+  if (
+    sourceTargetFamily === "live_environment" &&
+    /^(?:doc_|docs_|active_doc|focused_doc)/i.test(goal.goalKind)
+  ) {
+    violations.push(
+      "source_target_goal_mismatch:document_goal_for_live_environment_route",
+    );
+  }
   if (requiredTerminalProduct !== "unknown" && forbiddenTerminalKinds.includes(requiredTerminalProduct)) {
     violations.push("required_terminal_product_forbidden");
   }
@@ -1152,14 +1379,20 @@ export function buildCommittedAskRoute(input: {
       strength: effectiveRoute.strength,
       source_identity:
         readString(readRecord(input.payload.source_target_exact_contract)?.requested_source_identity) ||
-        readString(readRecord(input.payload.active_doc_identity)?.active_doc_path) ||
-        readWorkspaceActiveDocPath(input.payload) ||
+        (
+          effectiveRoute.sourceTarget === "docs_viewer" ||
+          effectiveRoute.sourceTarget === "active_doc"
+            ? readString(readRecord(input.payload.active_doc_identity)?.active_doc_path) ||
+              readWorkspaceActiveDocPath(input.payload)
+            : ""
+        ) ||
         null,
       route_reason: effectiveRoute.reason,
       stale_metadata_policy: "ignore_unless_matches_commit",
     },
     canonical_goal: {
       goal_kind: goal.goalKind,
+      requested_capability: explicitCapabilityContract?.capability ?? null,
       required_terminal_kind: goal.requiredTerminalKind,
       allowed_terminal_artifact_kinds: allowedTerminalKinds,
       forbidden_terminal_artifact_kinds: forbiddenTerminalKinds,
@@ -1191,7 +1424,10 @@ export function buildCommittedAskRoute(input: {
         sourceBacked ||
         readStringArray(routeContract?.required_artifact_refs).length > 0,
       followup_reasoning_required:
-        affirmativeScientificImageContinuity
+        normalizeCommittedRouteTerminalKind(requiredTerminalProduct) ===
+        "procedure_epoch_replay"
+          ? false
+        : affirmativeScientificImageContinuity
           ? false
           : affirmativeScientificImageComparison ||
         affirmativeScholarlyPdfImageLensWorkflow ||

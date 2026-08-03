@@ -108,7 +108,11 @@ const explicitRepoEvidenceCueAllowedInCompound = (promptText: string): boolean =
 
 const hasAffirmativeLocalDocumentEvidenceRequest = (promptText: string): boolean =>
   /\b(?:check|use|from|in|inside|look\s+in|look\s+at|consult|according\s+to|where|find|locate|reported|stated|specified|listed|table|row|source|cite|citation|evidence)\b/i.test(promptText) &&
-  /\b(?:white\s*paper|whitepaper|paper|document|doc|docs|report|memo)\b/i.test(promptText);
+  (
+    /\b(?:white\s*paper|whitepaper|paper|document|doc|docs|memo)\b/i.test(promptText) ||
+    /\b(?:a|an|the|this|that|our|your|their|current|open|active|attached|local|workspace)\s+report\b/i.test(promptText) ||
+    /\breport\s+(?:document|file|titled|named|section|table|page|appendix)\b/i.test(promptText)
+  );
 
 const hasExplicitLocalDocumentScope = (promptText: string): boolean =>
   /\b(?:docs?\s+viewer|documents?\s+viewer|(?:current(?:ly)?|open|active|visible)\s+(?:doc|document|paper|white\s*paper|whitepaper)|document\s+path\s*:|locate\s+query\s*:|from\s+(?:our|local|the)\s+docs?)\b/i.test(promptText) ||

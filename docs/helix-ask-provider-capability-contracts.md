@@ -208,6 +208,7 @@ live_env.query_visual_observer_profiles
 live_env.test_visual_observer_profile
 live_env.compare_visual_observer_profiles
 room.evidence.read_bound
+situation-room.live-source.set_rate
 com.casimirbot.minecraft.actor.status.read
 com.casimirbot.minecraft.inventory.check
 com.casimirbot.minecraft.nearby_entities.list
@@ -216,6 +217,8 @@ com.casimirbot.minecraft.local_map.inspect
 com.casimirbot.minecraft.line_of_sight.check
 com.casimirbot.minecraft.crop_state.read
 com.casimirbot.minecraft.reachability.check
+com.casimirbot.minecraft.command.catalog
+com.casimirbot.minecraft.command
 situation-room.describe_visual_capture
 room.list
 room.inspect
@@ -233,6 +236,7 @@ capability.
 | Capability                 | Required args                | Observation or receipt                                      | Boundary                                                                                                                                                     |
 | -------------------------- | ---------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `room.evidence.read_bound` | none                         | `helix.shared_live_room.bound_room_evidence_observation.v1` | Read-only Agent-continuation capability; exact run-room binding, current role/consent, source provenance, freshness, and current-turn re-entry are required. |
+| `situation-room.live-source.set_rate` | `cadence_ms`, `capture_mode` | `helix.visual_producer_cadence_receipt.v1` | Confirmation-gated producer cadence mutation. The receipt is nonterminal evidence and does not grant source or answer authority. |
 | `com.casimirbot.minecraft.actor.status.read` | `target` (`current_actor`), optional `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | Read-only health, hunger, game-mode, flags, world, and position observation for the bound actor. |
 | `com.casimirbot.minecraft.inventory.check` | `target` (`current_actor`), optional `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | On-demand read-only probe through `room.environment.probe`; all room, source, world, device, credential, admission, catalog, schema, run, turn, and tool-call identity is server-derived. |
 | `com.casimirbot.minecraft.nearby_entities.list` | `target` (`current_actor`), optional `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | Bounded nearby-entity classifications, distances, and hostile targeting observations. |
@@ -241,11 +245,13 @@ capability.
 | `com.casimirbot.minecraft.line_of_sight.check` | `target` (`position`), `position`, optional `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | Same-world read-only ray trace to exact coordinates. |
 | `com.casimirbot.minecraft.crop_state.read` | `target` (`current_focus` or `position`), optional `position` and `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | Crop maturity only; it does not harvest or open anything. |
 | `com.casimirbot.minecraft.reachability.check` | `target` (`position`), `position`, optional `freshness_requirement_ms` | `helix.environment_connector.probe_observation.v1` | Straight-line radius and interaction-range screening; not pathfinding or safe-route authority. |
+| `com.casimirbot.minecraft.command.catalog` | optional `query`, `path_prefix`, `limit`, `environment_label` | `helix.environment_command.catalog_observation.v1` | Read-only, version-correct paths from the bound server's live Brigadier tree, with every vanilla/mod root prioritized in the bounded snapshot. It exposes no room/source/world IDs or credentials. |
+| `com.casimirbot.minecraft.command` | `command`, `category`, `effect`, optional `environment_label` | `helix.environment_command.observation.v1` | Executes one exact command through the bound server's live dispatcher. Room authority, member ceiling, autonomy, live catalog, dispatcher parse, category/effect match, idempotency, one-shot leasing, and current-turn evidence re-entry are all required. Full mode includes mod/admin commands but never host shell, files, RCON, processes, or credentials. |
 | `situation-room.describe_visual_capture` | `thread_id`, `prompt` | `helix.visual_situation_observation.v1` | Read-only bounded SituationRun evidence; execution failure remains an admitted observation, and successful evidence must re-enter the runtime before synthesis. |
 | `room.list`                | none                         | `helix.shared_live_room.list_receipt.v1`                    | Server-authenticated account policy filters the list.                                                                                                        |
 | `room.inspect`             | `room_id`                    | `helix.shared_live_room.inspect_receipt.v1`                 | Current membership is rechecked; the receipt is nonterminal.                                                                                                 |
 | `room.create`              | `idempotency_key`            | `helix.shared_live_room.create_receipt.v1`                  | Confirmed mutation through the shared lifecycle service.                                                                                                     |
-| `room.source.list`         | `room_id`                    | `helix.shared_live_room.source_list_receipt.v1`             | Developer-owner read; no bearer or raw source payload.                                                                                                       |
+| `room.source.list`         | `room_id`                    | `helix.shared_live_room.source_list_receipt.v1`             | Policy-admitted owner read; no bearer or raw source payload.                                                                                                  |
 | `room.source.create`       | `room_id`, `idempotency_key` | `helix.shared_live_room.source_create_receipt.v1`           | Confirmed observation-only binding; returns only a short-lived owner-bound delivery handle.                                                                  |
 
 ## Shared Capability Lanes
@@ -401,6 +407,8 @@ capability uses:
 | `helix.theory_run_context_observation.v1`                                       | Bounded selected runtime-result context for current-turn explanation; it remains evidence for synthesis rather than an answer.                                                                                                                                                                    |
 | `helix.interim_voice_callout_tool_result.v1`                                    | Voice/narrator request receipts and host playback projections.                                                                                                                                                                                                                                    |
 | `helix.live_environment_tool_observation.v1`                                    | Graduated live-environment read/dry-run observations.                                                                                                                                                                                                                                             |
+| `helix.environment_command.observation.v1`                                      | One-shot Minecraft live-dispatcher outcomes with exact room/source/world, catalog, policy, command hash, provenance, and current-turn re-entry eligibility. The observation is never an assistant answer.                                                                                         |
+| `helix.visual_producer_cadence_receipt.v1`                                      | Confirmation-gated Situation Room live-source cadence changes; the receipt is nonterminal and must re-enter before any model synthesis.                                                                                                                                                         |
 
 ## Shared Gateway Required Args
 
@@ -454,6 +462,9 @@ capabilities with non-empty `input_schema.required`:
 | `text_to_speech.speak_text`                             | `text`                                                                                                                                                                                                                                                                    |
 | `live_env.request_interim_voice_callout`                | `text`                                                                                                                                                                                                                                                                    |
 | `live_env.narrator_say`                                 | `text`                                                                                                                                                                                                                                                                    |
+| `situation-room.live-source.set_rate`                   | `cadence_ms`, `capture_mode`                                                                                                                                                                                                                                              |
+| `com.casimirbot.minecraft.command.catalog`              | optional `query`, `path_prefix`, `limit`, `environment_label`                                                                                                                                                                                                             |
+| `com.casimirbot.minecraft.command`                      | `command`, `category`, `effect`; optional `environment_label` only disambiguates multiple active command-enabled Minecraft environments                                                                                                                                  |
 
 ## Theory Procedure Readmission Boundary
 
@@ -512,6 +523,12 @@ workstation-notes.open
 ```
 
 ## Explicit Route Contracts Not Yet Gateway Manifest IDs
+
+`com.casimirbot.minecraft.container_contents.read` remains
+`blocked_pending_contract`: its schema is available, but provider execution
+requires a distinct owner-selected privileged container-read scope and exact
+block/subject binding. Full Minecraft command authority does not silently grant
+this typed sensor capability.
 
 These Helix Ask route contract ids are classified so provider runtimes do not
 silently miss them. They are not automatically provider-executable gateway

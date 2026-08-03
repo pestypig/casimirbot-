@@ -62,6 +62,7 @@ import {
 } from "../services/helix-ask/realtime-session/source-binding";
 import { resolveWorkstationGatewayAccountContext } from "../services/helix-ask/workstation-tool-gateway/account-policy";
 import { buildRuntimeGoalAccountScope } from "../services/helix-ask/runtime-goals/runtime-goal-account-binding";
+import { resolveRealtimeRoomTurnActorContext } from "../services/helix-ask/realtime-room/turn-actor-context";
 
 export const realtimeSessionRouter = Router();
 
@@ -403,6 +404,14 @@ const respondRealtimeBoundary = async (input: {
     const observation = response.realtime_transcript_observations[0] ?? null;
     const transcriptText = readString(body.transcript_text ?? body.transcriptText ?? body.text);
     const providerEventRef = readString(body.event_ref ?? body.eventRef) ?? observation?.observation_ref ?? null;
+    const trustedTurnActorContext =
+      contextualSession && accountContext.profile_id
+        ? await resolveRealtimeRoomTurnActorContext({
+            threadId: contextualSession.threadId,
+            requesterProfileId: accountContext.profile_id,
+            realtimeSessionId: contextualSession.realtimeSessionId,
+          }).catch(() => null)
+        : null;
     const handoff = contextualSession && observation && transcriptText && providerEventRef && body.event_type === "transcript.final"
       ? bridgeRealtimeTranscriptToStagePlay({
           realtimeSessionId: contextualSession.realtimeSessionId,
@@ -425,6 +434,7 @@ const respondRealtimeBoundary = async (input: {
           audioFocusOwner: readString(body.realtime_audio_focus_owner ?? body.audio_focus_owner),
           qualifiedUserInterruption: body.qualified_user_interruption === true,
           terminalVoiceInterrupted: body.terminal_voice_interrupted === true,
+          trustedTurnActorContext,
         })
       : null;
     const provisionalResponse =

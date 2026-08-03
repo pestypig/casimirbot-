@@ -4,7 +4,11 @@ import {
   recordStagePlayLiveSourceConversationEvent,
   resetStagePlayLiveSourceConversationStoreForTest,
 } from "../../../stage-play/stage-play-live-source-conversation-store";
-import { bridgeRealtimeTranscriptToStagePlay, resetRealtimeStagePlayAskHandoffsForTests } from "../../live-source/realtime-stage-play-handoff";
+import {
+  bridgeRealtimeTranscriptToStagePlay,
+  readRealtimeStagePlayTurnActorContext,
+  resetRealtimeStagePlayAskHandoffsForTests,
+} from "../../live-source/realtime-stage-play-handoff";
 import { buildRealtimeTranscriptObservation } from "../route-boundary";
 
 describe("Realtime transcript Stage Play handoff", () => {
@@ -91,6 +95,45 @@ describe("Realtime transcript Stage Play handoff", () => {
       .not.toBe("operator_text");
     expect(JSON.stringify(first)).not.toContain(transcriptText);
     expect(JSON.stringify(first)).not.toContain("realtime_transcript_readonly_reentry");
+  });
+
+  it("keeps the frozen room speaker in server-only handoff control state", () => {
+    const transcriptText = "Check my current Minecraft status.";
+    const observation = buildRealtimeTranscriptObservation({
+      realtimeSessionId: "realtime:room-speaker",
+      nowMs: 250,
+      body: {
+        event_type: "transcript.final",
+        event_ref: "provider-event:room-speaker",
+        transcript_text: transcriptText,
+      },
+    })!;
+    const trustedTurnActorContext = {
+      schema: "helix.realtime_room.turn_actor_context.v1" as const,
+      origin: "realtime_voice" as const,
+      room_id: "shared_realtime_room:test",
+      requester_profile_id: "profile:owner",
+      realtime_session_id: "realtime:room-speaker",
+      participant_id: "participant:guest",
+      resolution: "resolved" as const,
+      resolution_source: "active_speaker_floor" as const,
+      captured_at_ms: 250,
+    };
+    const handoff = bridgeRealtimeTranscriptToStagePlay({
+      realtimeSessionId: "realtime:room-speaker",
+      threadId: "helix-ask:room:shared_realtime_room:test",
+      providerEventRef: "provider-event:room-speaker",
+      transcriptText,
+      observation,
+      trustedTurnActorContext,
+      nowMs: 250,
+    });
+
+    expect(readRealtimeStagePlayTurnActorContext(handoff.handoff_id)).toEqual(
+      trustedTurnActorContext,
+    );
+    expect(JSON.stringify(handoff)).not.toContain("participant:guest");
+    expect(JSON.stringify(handoff)).not.toContain("profile:owner");
   });
 
   it("requires an active-context observation for a deictic workstation question", () => {

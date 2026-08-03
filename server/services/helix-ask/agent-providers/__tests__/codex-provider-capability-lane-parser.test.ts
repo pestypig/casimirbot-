@@ -1,12 +1,24 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildGenericCompoundContinuationReviewGuidance,
   extractCodexCapabilityLaneRequestCandidate,
   extractCodexCapabilityLaneRequestCandidates,
   stripCodexCapabilityLaneRequestMarkers,
 } from "../codex-provider";
 
 describe("Codex capability-lane request parsing", () => {
+  it("keeps dynamic same-capability steps available during compound terminal review", () => {
+    const guidance = buildGenericCompoundContinuationReviewGuidance([
+      "com.casimirbot.minecraft.command",
+    ]).join("\n");
+
+    expect(guidance).toContain("compound prompt contract");
+    expect(guidance).toContain("empty next_admissible_affordances");
+    expect(guidance).toContain("does not prohibit Codex");
+    expect(guidance).toContain("com.casimirbot.minecraft.command");
+  });
+
   it("does not reinterpret a structured Master Problem answer as an unknown capability lane", () => {
     const answer = JSON.stringify({
       master_problem_v1: {
@@ -71,6 +83,29 @@ describe("Codex capability-lane request parsing", () => {
       arguments: { query: "NHM tube", max_hits: 5 },
     });
     expect(stripCodexCapabilityLaneRequestMarkers(request)).toBe("");
+  });
+
+  it("recovers a one-character structured marker near miss without exposing it as answer text", () => {
+    const request =
+      "HELICX_CAPABILITY_LANE_REQUEST_JSON: " +
+      JSON.stringify({
+        capability: "com.casimirbot.minecraft.command",
+        command: "gamerule doDaylightCycle true",
+      });
+
+    expect(extractCodexCapabilityLaneRequestCandidate(request)).toEqual({
+      capability: "com.casimirbot.minecraft.command",
+      command: "gamerule doDaylightCycle true",
+    });
+    expect(stripCodexCapabilityLaneRequestMarkers(request)).toBe("");
+  });
+
+  it("does not reinterpret unrelated marker-like prose as a capability request", () => {
+    const answer =
+      'HELLO_CAPABILITY_LANE_REQUEST_JSON: {"operation":"compare"}';
+
+    expect(extractCodexCapabilityLaneRequestCandidate(answer)).toBeNull();
+    expect(stripCodexCapabilityLaneRequestMarkers(answer)).toBe(answer);
   });
 
   it("rejects an explicitly wrapped lane object that omits its capability", () => {

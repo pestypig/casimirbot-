@@ -4012,6 +4012,78 @@ describe("Helix workstation tool gateway", () => {
     ).toBe(true);
   });
 
+  it("exposes goal-shaped room mechanics retrieval and returns the exact cited command line", async () => {
+    const manifest = listWorkstationGatewayCapabilities({
+      agentRuntime: "codex",
+      mode: "act",
+    }).capabilities.find(
+      (capability) => capability.capability_id === DOCS_SEARCH_CAPABILITY,
+    );
+    expect(manifest?.input_schema).toMatchObject({
+      additionalProperties: false,
+      properties: {
+        environment_scope: {
+          enum: ["active_room_environment"],
+        },
+        environment_label: { type: "string" },
+        mechanics_collection_ids: { type: "array" },
+        adapter_profile_id: { type: "string" },
+        exact_terms: { type: "array" },
+        section_headings: { type: "array" },
+        section_match_unit: {
+          enum: ["line", "sentence", "paragraph"],
+        },
+      },
+    });
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "make the bound player glow temporarily",
+        mechanics_collection_ids: ["mechanics.minecraft.commands.v1"],
+        adapter_profile_id: "game.minecraft.readonly.v1",
+        max_hits: 4,
+      },
+      turnId: "ask:test:gateway-docs-mechanics-glow",
+      iteration: 4,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation: {
+        active_document_observation: null,
+        mechanics_scope: {
+          content_role: "mechanics_reference_not_live_observation",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+        hits: expect.arrayContaining([
+          expect.objectContaining({
+            filePath:
+              "docs/game-mechanics/minecraft-command-playbook-v1.md",
+            line: 78,
+            text: expect.stringContaining(
+              "effect give @s minecraft:glowing 10 0 true",
+            ),
+          }),
+        ]),
+        evidence_observations: expect.arrayContaining([
+          expect.objectContaining({
+            source_id:
+              "docs/game-mechanics/minecraft-command-playbook-v1.md:78",
+            lineStart: 78,
+            lineEnd: 78,
+            content_role: "evidence_not_assistant_answer",
+          }),
+        ]),
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+    });
+  });
+
   it("fails closed when a mechanics collection does not match the named adapter profile", async () => {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",

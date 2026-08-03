@@ -22,6 +22,7 @@ public final class FabricConnectorRuntime implements AutoCloseable {
     public static final String ADAPTER_VERSION = "0.1.0";
 
     private final HelixSensorConfig config;
+    private final FabricCommandConfig commandConfig;
     private final Logger logger;
     private final AtomicBoolean active = new AtomicBoolean(false);
     private final AtomicBoolean admitted = new AtomicBoolean(false);
@@ -37,15 +38,19 @@ public final class FabricConnectorRuntime implements AutoCloseable {
     private HelixHttpClient httpClient;
     private HelixSensorRuntimeStatus runtimeStatus;
     private FabricProbeExecutor probeExecutor;
+    private FabricTransportScheduler manifestScheduler;
+    private FabricCommandRuntime commandRuntime;
     private long localTick;
     private String latestSnapshotId;
     private String latestSnapshotTimestamp;
 
     public FabricConnectorRuntime(
         HelixSensorConfig config,
+        FabricCommandConfig commandConfig,
         Logger logger
     ) {
         this.config = config;
+        this.commandConfig = commandConfig;
         this.logger = logger;
     }
 
@@ -83,7 +88,19 @@ public final class FabricConnectorRuntime implements AutoCloseable {
             config,
             runtimeStatus
         );
+        this.commandRuntime = new FabricCommandRuntime(
+            commandConfig,
+            logger,
+            httpClient.producerEpochRef()
+        );
         publishManifest();
+        this.manifestScheduler = new FabricTransportScheduler(
+            "helix-fabric-manifest-refresh"
+        );
+        this.manifestScheduler.start(
+            this::publishManifestSafely,
+            manifestRefreshIntervalMillis()
+        );
         logger.info(
             "Helix Fabric Sensor started in read-only mode and is waiting for manifest admission."
         );
@@ -94,10 +111,8 @@ public final class FabricConnectorRuntime implements AutoCloseable {
             return;
         }
         localTick++;
-        if (localTick == 1L || localTick % config.heartbeatIntervalTicks() == 0L) {
-            publishManifest();
-        }
         if (!admitted.get()) return;
+        if (commandRuntime != null) commandRuntime.tick();
         if (localTick % config.heartbeatIntervalTicks() == 0L) {
             publishHeartbeat();
         }
@@ -151,10 +166,19 @@ public final class FabricConnectorRuntime implements AutoCloseable {
                     return;
                 }
                 if (response.success()) {
-                    if (admitted.compareAndSet(false, true)) {
+                    boolean recovered = admitted.compareAndSet(false, true);
+                    if (recovered) {
                         logger.info(
                             "Helix Fabric Sensor manifest was admitted; read-only observations are active."
                         );
+                    }
+                    FabricCommandRuntime currentCommandRuntime = commandRuntime;
+                    if (currentCommandRuntime != null) {
+                        if (recovered && currentCommandRuntime.active()) {
+                            currentCommandRuntime.refreshAfterSourceRecovery();
+                        } else {
+                            currentCommandRuntime.start(server);
+                        }
                     }
                     return;
                 }
@@ -171,6 +195,35 @@ public final class FabricConnectorRuntime implements AutoCloseable {
             });
     }
 
+    private void publishManifestSafely() {
+        try {
+            publishManifest();
+        } catch (RuntimeException error) {
+            logger.warning(
+                "Helix Fabric Sensor wall-clock manifest refresh failed: " +
+                error.getClass().getSimpleName()
+            );
+        }
+    }
+
+    private long manifestRefreshIntervalMillis() {
+        return manifestRefreshIntervalMillisFor(
+            config.heartbeatIntervalTicks()
+        );
+    }
+
+    static long manifestRefreshIntervalMillisFor(
+        int heartbeatIntervalTicks
+    ) {
+        return Math.max(
+            Math.multiplyExact(
+                (long) HelixSensorConfig.MIN_MANIFEST_REFRESH_INTERVAL_TICKS,
+                50L
+            ),
+            Math.multiplyExact((long) heartbeatIntervalTicks, 50L)
+        );
+    }
+
     private void publishHeartbeat() {
         if (!heartbeatInFlight.compareAndSet(false, true)) return;
         String now = Instant.now().toString();
@@ -181,6 +234,8 @@ public final class FabricConnectorRuntime implements AutoCloseable {
                 Map.of(
                     "actor_id",
                     FabricProbeExecutor.canonicalActorId(label),
+                    "stable_actor_id",
+                    player.getUUID().toString(),
                     "actor_label",
                     label,
                     "dimension",
@@ -371,9 +426,13 @@ public final class FabricConnectorRuntime implements AutoCloseable {
         admitted.set(false);
         pendingProbeCount.set(0);
         if (runtimeStatus != null) runtimeStatus.setPendingProbeCount(0);
+        if (manifestScheduler != null) manifestScheduler.close();
+        manifestScheduler = null;
         if (httpClient != null) httpClient.close();
         httpClient = null;
         probeExecutor = null;
+        if (commandRuntime != null) commandRuntime.close();
+        commandRuntime = null;
         server = null;
         logger.info("Helix Fabric Sensor stopped.");
     }

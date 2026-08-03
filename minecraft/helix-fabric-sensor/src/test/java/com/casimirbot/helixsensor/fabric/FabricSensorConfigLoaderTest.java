@@ -1,6 +1,8 @@
 package com.casimirbot.helixsensor.fabric;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.casimirbot.helixsensor.HelixSensorConfig;
@@ -16,9 +18,43 @@ final class FabricSensorConfigLoaderTest {
         assertFalse(config.enabled());
         assertFalse(config.executionEnabled());
         assertTrue(config.readOnlyProbesEnabled());
+        assertEquals(
+            HelixSensorConfig.DEFAULT_HEARTBEAT_INTERVAL_TICKS,
+            config.heartbeatIntervalTicks()
+        );
         assertTrue(config.domainAdapter().equals("minecraft.fabric_mod.v1"));
         assertFalse(config.sendOnlyChangedSections());
         assertFalse(config.sensorUploadsAllowed());
+        assertEquals(
+            false,
+            FabricSensorConfigLoader.disabledCommandTemplate().get(
+                "command_execution_enabled"
+            )
+        );
+        assertFalse(
+            FabricSensorConfigLoader.disabledCommandTemplate().containsKey(
+                "bearer_token"
+            )
+        );
+    }
+
+    @Test
+    void sourceOnlyPairingCannotCarryAnOlderCommandCredential() {
+        Map<String, Object> sourceOnly =
+            FabricSensorConfigLoader.commandConfigForPairedSource(Map.of());
+        assertEquals(false, sourceOnly.get("command_execution_enabled"));
+        assertFalse(sourceOnly.containsKey("bearer_token"));
+
+        Map<String, Object> pairedCommand = new LinkedHashMap<>(
+            Map.of(
+                "command_execution_enabled", true,
+                "bearer_token", "test-only-credential"
+            )
+        );
+        Map<String, Object> retained =
+            FabricSensorConfigLoader.commandConfigForPairedSource(pairedCommand);
+        assertEquals("test-only-credential", retained.get("bearer_token"));
+        assertNotSame(pairedCommand, retained);
     }
 
     @Test

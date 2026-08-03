@@ -28,16 +28,18 @@ local-only testing still needs a staging deployment or a temporary tunnel.
 
 ## Generate The Link
 
-Sign in with a `developer` account, create or open a Shared Live Room, and use
-**Generate link** under **Minecraft room source link**. Only the room owner can
-create, rotate, list, or revoke source bindings.
+Create or open a Shared Live Room and use **Generate link** under **Minecraft
+room source link**. Only the room owner can create, rotate, list, or revoke
+source bindings.
 
-For local and test environments, an experimental guest owner receives the same
-read-only source-link control only while both the public Shared Live Rooms
-experiment and guest room creation are enabled. Production additionally
-requires `HELIX_GUEST_ROOM_SOURCE_INGRESS=1`. The grant is session-bound,
-expires with the guest session, exposes only bound-room evidence and the
-allowlisted Minecraft inventory probe, and never enables command execution.
+For local and test environments, signed-in `user` owners who enable the public
+Shared Live Rooms experiment receive the same read-only source-link control as
+developers. A temporary guest owner additionally requires guest room creation
+to be enabled. Production requires `HELIX_PUBLIC_ROOM_SOURCE_INGRESS=1` for
+ordinary public users; the retained `HELIX_GUEST_ROOM_SOURCE_INGRESS=1` flag
+may separately admit temporary guests. The grant is session-bound, expires
+with the session, exposes only bound-room evidence and allowlisted Minecraft
+read-only probes, and never enables command execution.
 
 The server returns a setup packet once:
 
@@ -157,6 +159,12 @@ that admission. Credential rotation, revocation, expiry, owner-policy loss, or
 room closure invalidates it. A restarted producer with a new epoch registers a
 new manifest before sending observations.
 
+Successful manifest admission also materializes the existing room-source
+connector into the generic environment binding and frozen capability catalog.
+This is an idempotent server-side compatibility bridge, not a second pairing
+flow: the source credential remains private transport authority while every
+room member receives only the sanitized environment projection.
+
 The architecture and extension procedure are documented in
 `docs/architecture/helix-environment-adapter-registry-v1.md`.
 
@@ -257,10 +265,10 @@ Recommended production requirements:
 
 Closing the durable room or revoking its binding immediately stops new source
 traffic. Rotation immediately revokes the previous credential. If the binding
-owner loses the developer account policy or the `room_source_ingress` feature,
-the next bearer admission revokes the binding and credential. Published base
-URLs may include a deployment pathname; the generated endpoint remains the
-source of truth.
+owner loses the active session policy or the `room_source_ingress` feature, the
+next bearer admission revokes the binding and credential. Published base URLs
+may include a deployment pathname; the generated endpoint remains the source
+of truth.
 
 ## Typed Failure Guide
 
@@ -275,7 +283,7 @@ source of truth.
 | 400     | `room_source_secret_exposure_rejected`           | Credential or claim material appeared in an ingress header or payload field; nothing from that request was persisted as observation evidence.                                                             |
 | 401     | `room_source_credential_invalid`                 | Bearer is missing, wrong, or has been rotated.                                                                                                                                                            |
 | 403     | `room_source_identity_mismatch`                  | Payload identity differs from the durable binding.                                                                                                                                                        |
-| 403     | `room_source_owner_policy_revoked`               | The owner lost developer room-source policy; the binding was revoked.                                                                                                                                     |
+| 403     | `room_source_owner_policy_revoked`               | The owner lost the admitted room-source session policy; the binding was revoked.                                                                                                                          |
 | 408     | `room_source_request_stale`                      | Transport or live event timestamp is outside its window.                                                                                                                                                  |
 | 409     | `room_source_idempotency_conflict`               | Request ID or producer sequence was reused for different content.                                                                                                                                         |
 | 409     | `environment_adapter_admission_required`         | Register a compatible manifest for this exact credential and producer epoch before sending observations.                                                                                                  |

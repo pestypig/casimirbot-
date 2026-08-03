@@ -71,8 +71,8 @@ export function SharedLiveRoomDialog({
               Shared GPT Live Room
             </p>
             <p id={descriptionId} className="mt-1 max-w-2xl text-[11px] leading-5 text-slate-400">
-              Two signed-in developer accounts can share labeled visual frames and floor-controlled
-              microphone audio with one host-owned GPT Live call, then receive the same GPT audio and transcripts.
+              Two room members can share labeled visual frames and floor-controlled microphone audio
+              with one host-owned GPT Live call, then receive the same GPT audio and transcripts.
             </p>
           </div>
           <button

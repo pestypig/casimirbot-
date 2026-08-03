@@ -783,6 +783,52 @@ describe("provider terminal authority for capability lanes", () => {
     expect(result.terminalAnswerAuthority).toBeNull();
   });
 
+  it("does not let retained evidence satisfy a required current-turn observation", () => {
+    const priorPacket = buildLanePacket();
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-fresh-environment-observation-required",
+      threadId: "thread-fresh-environment-observation-required",
+      route: "/ask/turn",
+      gatewayCallResults: [],
+      capabilityLaneObservationPackets: [],
+      priorEvidenceObservationPackets: [priorPacket],
+      normalizedObservationPackets: [priorPacket],
+      providerText: "A fresh hazard scan found no nearby threats.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+      modelOnlyDirectAnswerAllowed: false,
+      currentTurnEvidenceRequired: true,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "completed_not_terminal",
+      evidence_reentered: true,
+      prior_evidence_observation_packet_count: 1,
+      current_turn_evidence_required: true,
+      current_turn_observation_present: false,
+    });
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_status:
+        "blocked_by_current_turn_observation_required",
+      terminal_authority_granted: false,
+      blockers: ["current_turn_observation_required"],
+      prior_evidence_observation_refs: [
+        "ask:lane:utility:authority-obs",
+      ],
+      current_turn_evidence_required: true,
+      current_turn_observation_present: false,
+    });
+    expect(result.providerTerminalAuthorityBridge).toMatchObject({
+      current_turn_evidence_required: true,
+      current_turn_observation_present: false,
+      terminal_authority_granted: false,
+    });
+    expect(result.terminalAnswerAuthority).toBeNull();
+  });
+
   it("reports missing provider text distinctly for model-only direct answer contracts", () => {
     const result = buildHelixProviderReasoningReentry({
       runtime: "codex",

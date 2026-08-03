@@ -265,6 +265,14 @@ export async function leaveOrCloseSharedRealtimeRoom(input: {
           `,
               [roomId, changedAt],
             );
+            await client.query(
+              `
+            UPDATE helix_room_environment_subject_bindings
+            SET status = 'revoked', revoked_at = $2, updated_at = $2
+            WHERE room_id = $1 AND status = 'active';
+          `,
+              [roomId, changedAt],
+            );
             await insertAuditEvent({
               db: client,
               roomId,
@@ -295,6 +303,16 @@ export async function leaveOrCloseSharedRealtimeRoom(input: {
         WHERE room_id = $1 AND profile_id = $2 AND presence <> 'left';
       `,
           [roomId, profileId, changedAt],
+        );
+        await client.query(
+          `
+        UPDATE helix_room_environment_subject_bindings
+        SET status = 'revoked', revoked_at = $3, updated_at = $3
+        WHERE room_id = $1
+          AND participant_id = $2
+          AND status = 'active';
+      `,
+          [roomId, member.participant_id, changedAt],
         );
         await insertAuditEvent({
           db: client,

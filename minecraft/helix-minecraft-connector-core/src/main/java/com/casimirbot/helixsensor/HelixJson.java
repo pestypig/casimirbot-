@@ -12,7 +12,13 @@ public final class HelixJson {
 
     public static String stringify(Object value) {
         StringBuilder builder = new StringBuilder();
-        write(builder, value);
+        write(builder, value, false);
+        return builder.toString();
+    }
+
+    public static String stringifyIncludingNulls(Object value) {
+        StringBuilder builder = new StringBuilder();
+        write(builder, value, true);
         return builder.toString();
     }
 
@@ -30,7 +36,11 @@ public final class HelixJson {
         return value instanceof List<?> ? (List<Object>) value : List.of();
     }
 
-    private static void write(StringBuilder builder, Object value) {
+    private static void write(
+        StringBuilder builder,
+        Object value,
+        boolean includeNullMapValues
+    ) {
         if (value == null) {
             builder.append("null");
         } else if (value instanceof String text) {
@@ -43,12 +53,12 @@ public final class HelixJson {
             entries.sort(Comparator.comparing(entry -> String.valueOf(entry.getKey())));
             boolean first = true;
             for (Map.Entry<?, ?> entry : entries) {
-                if (entry.getValue() == null) continue;
+                if (entry.getValue() == null && !includeNullMapValues) continue;
                 if (!first) builder.append(',');
                 first = false;
                 writeString(builder, String.valueOf(entry.getKey()));
                 builder.append(':');
-                write(builder, entry.getValue());
+                write(builder, entry.getValue(), includeNullMapValues);
             }
             builder.append('}');
         } else if (value instanceof Collection<?> collection) {
@@ -57,7 +67,7 @@ public final class HelixJson {
             for (Object entry : collection) {
                 if (!first) builder.append(',');
                 first = false;
-                write(builder, entry);
+                write(builder, entry, includeNullMapValues);
             }
             builder.append(']');
         } else {

@@ -94,6 +94,8 @@ export function SharedLiveRoomParticipantsPanel({
         roomId={room.room_id}
         roomClosed={room.status === "closed"}
         isOwner={isOwner}
+        selfParticipantId={room.self_participant_id}
+        participants={room.participants}
       />
     </section>
   );

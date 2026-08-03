@@ -9,6 +9,12 @@ import { z } from "zod";
 import {
   helixEnvironmentProbeSubmissionSchema,
 } from "@shared/helix-environment-connector";
+import {
+  HELIX_CONNECTOR_PAIRING_REDEMPTION_SCHEMA,
+  HELIX_CONNECTOR_PAIRING_UNPAIR_RECEIPT_SCHEMA,
+  helixConnectorPairingRedeemRequestSchema,
+  helixConnectorUnpairRequestSchema,
+} from "@shared/helix-connector-pairing";
 import { buildWorkstationEntryUrl } from "@shared/workstation-link-meta";
 import {
   leaseDurableEnvironmentProbesForClaim,
@@ -23,10 +29,16 @@ import {
   revokeEnvironmentConnectorDevice,
   rotateEnvironmentConnectorDeviceCredential,
   startEnvironmentConnectorPairing,
+  ConnectorBootstrapPairingError,
+  redeemConnectorBootstrapPairing,
+  unpairConnectorBootstrapBinding,
   type AuthenticatedEnvironmentConnectorDevice,
 } from "../services/environment-connectors/pairing";
 import type {
   RoomSourceIngressRequestClaim,
+} from "../services/helix-ask/realtime-room/source-link-store";
+import {
+  isRoomSourceIngressError,
 } from "../services/helix-ask/realtime-room/source-link-store";
 import {
   readMembership,
@@ -145,6 +157,18 @@ const sendError = (res: Response, error: unknown): void => {
       .json(errorPayload({ code: error.code, message: error.message }));
     return;
   }
+  if (error instanceof ConnectorBootstrapPairingError) {
+    res
+      .status(error.statusCode)
+      .json(errorPayload({ code: error.code, message: error.message }));
+    return;
+  }
+  if (isRoomSourceIngressError(error)) {
+    res
+      .status(error.statusCode)
+      .json(errorPayload({ code: error.code, message: error.message }));
+    return;
+  }
   if (error instanceof DurableEnvironmentProbeError) {
     res
       .status(error.statusCode)
@@ -205,6 +229,18 @@ const verificationUriForRequest = (req: Request): string => {
     search: "?focus=account-session",
     entry: "workstation",
   });
+};
+
+const pairingEndpointForRequest = (req: Request): string => {
+  const host = req.get("host")?.trim();
+  if (!host || host.includes(",") || /\s/.test(host)) {
+    throw new ConnectorBootstrapPairingError(
+      "connector_pairing_invalid",
+      400,
+      "A single valid Host header is required.",
+    );
+  }
+  return `${req.protocol}://${host}/api/environment-connectors/v1/pairing/redeem`;
 };
 
 const readBearer = (req: Request): string => {
@@ -324,6 +360,74 @@ environmentConnectorPublicRouter.post(
       credential_shown_once: true,
       secret_stored_raw: false,
       command_execution: "command_execution_not_enabled",
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  }),
+);
+
+environmentConnectorPublicRouter.post(
+  "/api/environment-connectors/v1/pairing/redeem",
+  route(async (req, res) => {
+    const parsed = helixConnectorPairingRedeemRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      invalid(res, "The connector pairing redemption request is invalid.");
+      return;
+    }
+    const redeemed = await redeemConnectorBootstrapPairing({
+      pairingCode: parsed.data.pairing_code,
+      redemptionNonce: parsed.data.redemption_nonce,
+      domainAdapter: parsed.data.domain_adapter,
+      connectorKind: parsed.data.connector_kind,
+      connectorVersion: parsed.data.connector_version,
+      pairingEndpoint: pairingEndpointForRequest(req),
+    });
+    res.json({
+      schema: HELIX_CONNECTOR_PAIRING_REDEMPTION_SCHEMA,
+      ok: true,
+      error: null,
+      message: redeemed.replayed
+        ? "The idempotent connector pairing redemption was replayed."
+        : redeemed.pluginConfig.pairing_mode === "command_only"
+          ? "The connector command lane is paired. Its separate command credential was delivered only to the connector."
+          : "The connector is paired. Its room-source credential was delivered only to the connector.",
+      pairing_id: redeemed.pairingId,
+      binding_id: redeemed.binding.binding_id,
+      plugin_config: redeemed.pluginConfig,
+      replayed: redeemed.replayed,
+      credential_included: true,
+      credential_shown_once: true,
+      secret_stored_raw: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  }),
+);
+
+environmentConnectorPublicRouter.post(
+  "/api/environment-connectors/v1/pairing/unpair",
+  route(async (req, res) => {
+    const parsed = helixConnectorUnpairRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      invalid(res, "The connector unpair request is invalid.");
+      return;
+    }
+    const binding = await unpairConnectorBootstrapBinding({
+      bindingId: parsed.data.binding_id,
+      bearerToken: readBearer(req),
+    });
+    res.json({
+      schema: HELIX_CONNECTOR_PAIRING_UNPAIR_RECEIPT_SCHEMA,
+      ok: true,
+      error: null,
+      message: "The connector source binding was revoked.",
+      binding_id: binding.binding_id,
+      status: "revoked",
+      credential_included: false,
       answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,

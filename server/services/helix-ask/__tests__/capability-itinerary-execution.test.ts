@@ -5,6 +5,98 @@ import {
 } from "../capability-itinerary-execution";
 
 describe("Helix capability itinerary execution", () => {
+  it("counts only a successful exact live-pipeline cadence observation", () => {
+    const capability = "situation-room.live-source.set_rate";
+    const artifact = {
+      artifact_id: "ask:test:live-pipeline-cadence",
+      kind: "provider_gateway_observation_packet",
+      capability_key: capability,
+      executed_args: {
+        cadence_ms: 10_000,
+      },
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        capability_key: capability,
+        status: "succeeded",
+      },
+    };
+    const capabilityItinerary = {
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        required_observation_families: ["live_pipeline"],
+        required_capabilities: [capability],
+      },
+      compound_capability_contract: {
+        subgoals: [{
+          subgoal_id: "subgoal:live-pipeline-cadence",
+          requested_capability: capability,
+          runtime_capability: capability,
+          required_args: ["cadence_ms"],
+          args_hint: {
+            cadence_ms: 10_000,
+          },
+          required_observation_kinds: [
+            "live_pipeline_receipt",
+            "visual_producer_cadence_receipt",
+            "tool_observation",
+          ],
+        }],
+      },
+    };
+
+    expect(isHelixCapabilityItineraryFamilyObserved("live_pipeline", [artifact])).toBe(true);
+    expect(buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary,
+      artifacts: [artifact],
+    })).toMatchObject({
+      complete: true,
+      observed_families: ["live_pipeline"],
+      missing_observation_families: [],
+      missing_required_capabilities: [],
+      compound_subgoal_ledger: [{
+        selected_capability: capability,
+        executed_capability: capability,
+        observation_ref: artifact.artifact_id,
+        observation_provenance: "capability_key",
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+      }],
+    });
+
+    for (const rejectedArtifact of [
+      {
+        ...artifact,
+        payload: {
+          ...artifact.payload,
+          status: "failed",
+        },
+      },
+      {
+        ...artifact,
+        capability_key: "workspace_os.status",
+        payload: {
+          ...artifact.payload,
+          capability_key: "workspace_os.status",
+        },
+      },
+    ]) {
+      expect(isHelixCapabilityItineraryFamilyObserved("live_pipeline", [rejectedArtifact])).toBe(false);
+      expect(buildHelixCapabilityItineraryExecutionState({
+        capabilityItinerary,
+        artifacts: [rejectedArtifact],
+      })).toMatchObject({
+        complete: false,
+        missing_observation_families: ["live_pipeline"],
+        missing_required_capabilities: [capability],
+        compound_subgoal_ledger: [{
+          satisfaction: "pending",
+          rail_failure_code: "subgoal_observation_missing",
+        }],
+      });
+    }
+  });
+
   it("counts the canonical moral graph observation as completed family evidence", () => {
     const artifacts = [{
       artifact_id: "ask:test:moral-graph",
@@ -322,6 +414,76 @@ describe("Helix capability itinerary execution", () => {
         },
         observation_kind: "calculator_receipt",
         observation_ref: receiptRef,
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+      }],
+    });
+  });
+
+  it("satisfies an exact Minecraft command subgoal from a gateway packet with validated executed arguments", () => {
+    const capability = "com.casimirbot.minecraft.command";
+    const observationRef = "ask:test:minecraft-command:observation";
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: {
+        admitted_tool_families: ["live_environment"],
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["live_environment"],
+          required_capabilities: [capability],
+        },
+        compound_capability_contract: {
+          subgoals: [{
+            subgoal_id: "subgoal:minecraft-command",
+            requested_capability: capability,
+            runtime_capability: capability,
+            required_args: ["command", "category", "effect"],
+            args_hint: {},
+            required_observation_kinds: [
+              "live_environment_tool_observation",
+              "helix.environment_command.observation.v1",
+              "helix.agent_step_observation_packet.v1",
+              "provider_gateway_observation_packet",
+            ],
+          }],
+        },
+      },
+      artifacts: [{
+        artifact_id: observationRef,
+        kind: "provider_gateway_observation_packet",
+        capability_key: capability,
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          capability_key: capability,
+          status: "succeeded",
+          executed_args: {
+            command: "whitelist list",
+            category: "server_administration",
+            effect: "server_administration",
+          },
+          produced_artifact_refs: [observationRef],
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      }],
+    });
+
+    expect(state).toMatchObject({
+      complete: true,
+      missing_required_capabilities: [],
+      missing_compound_subgoal_ids: [],
+      next_missing_subgoal_id: null,
+      compound_subgoal_ledger: [{
+        requested_capability: capability,
+        selected_capability: capability,
+        executed_capability: capability,
+        selected_args: {
+          command: "whitelist list",
+          category: "server_administration",
+          effect: "server_administration",
+        },
+        observation_kind: "provider_gateway_observation_packet",
+        observation_ref: observationRef,
         satisfaction: "satisfied",
         rail_status: "complete",
         rail_failure_code: null,

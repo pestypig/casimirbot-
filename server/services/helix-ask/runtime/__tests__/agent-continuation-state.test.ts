@@ -123,6 +123,147 @@ describe("agent continuation state", () => {
     );
   });
 
+  it("keeps a bounded admitted capability proposal open when non-partial compound coverage is incomplete", () => {
+    const state = buildHelixAgentContinuationState({
+      payload: {
+        goal_satisfaction_evaluation: { satisfaction: "satisfied" },
+        compound_prompt_coverage_gate: {
+          schema: "helix.compound_prompt_coverage_gate.v1",
+          applies: true,
+          passed: false,
+          unresolved_requirement_ids: ["R2"],
+          non_visible_blocked_requirement_ids: [],
+        },
+        current_turn_artifact_ledger: [
+          artifact({
+            id: "ask:continuation:minecraft-observation",
+            kind: "provider_gateway_observation_packet",
+          }),
+        ],
+      },
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      capabilityProposal: {
+        allowed: true,
+        admittedCapabilityIds: ["com.casimirbot.minecraft.command"],
+      },
+      lastAttempt: {
+        capability_id: "com.casimirbot.minecraft.command",
+        args: { command: "gamerule doDaylightCycle true" },
+        status: "succeeded",
+      },
+    });
+
+    expect(state).toMatchObject({
+      goal: { status: "in_progress", satisfied: false },
+      missing_requirement_ids: ["R2"],
+      allowed_decisions: ["act"],
+      capability_proposal: {
+        allowed: true,
+        admitted_capability_ids: ["com.casimirbot.minecraft.command"],
+      },
+    });
+    expect(formatHelixAgentContinuationStateForRuntime(state)).toContain(
+      "This is a proposal, not admission",
+    );
+    expect(formatHelixAgentContinuationStateForRuntime(state)).toContain(
+      "If answer is absent from allowed_decisions",
+    );
+  });
+
+  it("settles an authoritative source typed failure instead of advertising unrelated recovery actions", () => {
+    const typedFailure = {
+      schema: "helix.typed_failure.v1",
+      error_code: "procedure_epoch_previous_unavailable",
+      next_required_action: "wait_for_scene_memory_index",
+      message:
+        "Previous visual observation evidence is unavailable for comparison.",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const payload: Record<string, unknown> = {
+      question: "What changed since the previous visual capture?",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "procedure_epoch_previous_unavailable",
+      typed_failure: typedFailure,
+      terminal_answer_authority: { server_authoritative: true },
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "procedure_memory",
+        target_kind: "situation_epoch",
+        strength: "hard",
+        must_enter_backend_ask: true,
+        allow_client_shortcut: false,
+        allow_no_tool_direct: false,
+      },
+      loop_parity_trace: {
+        schema: "helix.loop_parity_trace.v1",
+        selected_route: "procedure_epoch_replay_question",
+        observations_created: [
+          { observation_id: "ask:continuation:source-observation" },
+        ],
+        actual_tool_calls: [],
+        route_authority_ok: false,
+      },
+      current_turn_artifact_ledger: [
+        artifact({
+          id: "ask:continuation:source-observation",
+          kind: "source_observation",
+          payload: { status: "observed" },
+        }),
+        artifact({
+          id: "ask:continuation:typed-failure",
+          kind: "typed_failure",
+          payload: typedFailure,
+        }),
+      ],
+      runtime_continuation_hints: [
+        {
+          hint_id: "ask:continuation:unrelated",
+          suggested_capability: "repo-code.search_concept",
+          suggested_args: { query: "previous visual capture" },
+        },
+      ],
+    };
+
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "initial",
+      capabilityProposal: {
+        allowed: true,
+        admittedCapabilityIds: ["repo-code.search_concept"],
+      },
+    });
+
+    expect(state).toMatchObject({
+      goal: {
+        status: "blocked",
+        satisfied: false,
+        terminal_product_allowed: true,
+      },
+      next_admissible_affordances: [],
+      capability_proposal: { allowed: false },
+      allowed_decisions: ["fail"],
+      progress: {
+        reason_codes: expect.arrayContaining([
+          "authoritative_typed_failure_settled",
+        ]),
+      },
+    });
+    expect(payload.route_product_contract).toMatchObject({
+      schema: "helix.route_product_contract.v1",
+      source_target: "procedure_memory",
+      allowed_terminal_artifact_kinds: expect.arrayContaining([
+        "typed_failure",
+      ]),
+    });
+    expect(payload.canonical_goal_frame).toMatchObject({
+      authoritative_source_observation_typed_failure: true,
+    });
+  });
+
   it("keeps a docs continuation in progress until its terminal artifact exists", () => {
     const state = buildHelixAgentContinuationState({
       payload: {
@@ -882,6 +1023,10 @@ describe("agent continuation state", () => {
       payload,
       turnId: "ask:continuation",
       trigger: "invalid_tool_call_observation",
+      capabilityProposal: {
+        allowed: true,
+        admittedCapabilityIds: ["live_env.read_processed_live_source_mail"],
+      },
       lastAttempt: {
         attempt_id: "attempt:policy-rejection",
         capability_id: "live_env.read_processed_live_source_mail",
@@ -901,6 +1046,8 @@ describe("agent continuation state", () => {
       reason_codes: expect.arrayContaining(["failed_attempt_observation_only"]),
     });
     expect(state.allowed_decisions).not.toContain("retry");
+    expect(state.allowed_decisions).not.toContain("act");
+    expect(state.allowed_decisions).toContain("fail");
   });
 
   it("tracks compound observations and remaining subgoals without privileging a tool order", () => {
@@ -1138,6 +1285,23 @@ describe("agent continuation state", () => {
       retryability: "retryable",
     });
     expect(state.allowed_decisions).toEqual(["retry"]);
+  });
+
+  it("treats incomplete non-partial compound coverage as a recoverable terminal rejection", () => {
+    const observation = buildHelixTerminalRejectionObservation({
+      turnId: "ask:continuation",
+      candidateKind: "model_synthesized_answer",
+      candidateRef: "ask:continuation:partial-compound-answer",
+      reason: "compound_prompt_coverage_incomplete",
+    });
+
+    expect(observation).toMatchObject({
+      rejection_reason: "compound_prompt_coverage_incomplete",
+      recoverable: true,
+      retryability: "retryable",
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
   });
 
   it("lets the runtime propose one bounded recovery when retry is allowed without a concrete affordance", () => {

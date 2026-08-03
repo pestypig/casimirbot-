@@ -150,6 +150,7 @@ public final class ProbeExecutor {
         return success(probe, "Actor status read-only probe completed.", SensorScope.PLAYER_OBSERVABLE, Map.of(
             "confidence", 0.98,
             "details", Map.ofEntries(
+                Map.entry("actor_label", player.getName()),
                 Map.entry("health", round(player.getHealth())),
                 Map.entry("max_health", round(player.getMaxHealth())),
                 Map.entry("food_level", player.getFoodLevel()),

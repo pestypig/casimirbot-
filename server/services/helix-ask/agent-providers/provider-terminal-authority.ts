@@ -397,6 +397,7 @@ export const buildHelixProviderReasoningReentry = (input: {
   solverCompleted?: boolean;
   goalSatisfied?: boolean;
   modelOnlyDirectAnswerAllowed?: boolean;
+  currentTurnEvidenceRequired?: boolean;
   selectedScholarlyResultIds?: string[];
   structuredNumericEvidenceRequired?: boolean;
   committedSubgoalContract?: Record<string, unknown> | null;
@@ -549,6 +550,12 @@ export const buildHelixProviderReasoningReentry = (input: {
     providerReasoningCompleted &&
     input.solverCompleted === true &&
     input.goalSatisfied !== false;
+  const currentTurnObservationPresent =
+    input.gatewayCallResults.length > 0 ||
+    capabilityLaneObservationPackets.length > 0;
+  const currentTurnEvidenceSatisfied =
+    input.currentTurnEvidenceRequired !== true ||
+    currentTurnObservationPresent;
   const pendingVoiceHandoffOverclaim = Boolean(
     candidateId &&
     capabilityLaneObservationPackets.some(
@@ -560,6 +567,7 @@ export const buildHelixProviderReasoningReentry = (input: {
     candidateId &&
     evidenceReentered &&
     solverAuthoritySatisfied &&
+    currentTurnEvidenceSatisfied &&
     !pendingVoiceHandoffOverclaim,
   );
   const terminalAuthorityStatus = terminalAuthorityMayUseProviderText
@@ -568,6 +576,8 @@ export const buildHelixProviderReasoningReentry = (input: {
       : "authorized_by_helix_provider_candidate_bridge"
     : candidateId && pendingVoiceHandoffOverclaim
       ? "blocked_by_voice_playback_overclaim"
+      : candidateId && !currentTurnEvidenceSatisfied
+        ? "blocked_by_current_turn_observation_required"
       : candidateId && !allEvidenceReentryCompatible
         ? "blocked_by_observation_state"
         : candidateId && !normalizedObservationsReady
@@ -582,6 +592,8 @@ export const buildHelixProviderReasoningReentry = (input: {
       ? []
       : pendingVoiceHandoffOverclaim
         ? ["voice_playback_completion_not_observed"]
+        : !currentTurnEvidenceSatisfied
+          ? ["current_turn_observation_required"]
         : !allGatewayCallsSucceeded
           ? ["gateway_observation_missing_or_failed"]
           : !allCapabilityLaneObservationsReentryCompatible
@@ -641,6 +653,9 @@ export const buildHelixProviderReasoningReentry = (input: {
       reenteredCapabilityLaneObservationRefs,
     model_only_direct_answer_allowed:
       input.modelOnlyDirectAnswerAllowed === true,
+    current_turn_evidence_required:
+      input.currentTurnEvidenceRequired === true,
+    current_turn_observation_present: currentTurnObservationPresent,
     runtime_selected_scholarly_result_ids:
       input.selectedScholarlyResultIds ?? [],
     structured_numeric_evidence_required:
@@ -684,6 +699,9 @@ export const buildHelixProviderReasoningReentry = (input: {
     actionable_blocked_capability_lane_observation_refs:
       actionableBlockedCapabilityLaneObservationRefs,
     prior_evidence_observation_refs: priorEvidenceObservationRefs,
+    current_turn_evidence_required:
+      input.currentTurnEvidenceRequired === true,
+    current_turn_observation_present: currentTurnObservationPresent,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -755,6 +773,9 @@ export const buildHelixProviderReasoningReentry = (input: {
     evidence_reentry_required: evidenceReentryRequired,
     model_only_direct_answer_allowed:
       input.modelOnlyDirectAnswerAllowed === true,
+    current_turn_evidence_required:
+      input.currentTurnEvidenceRequired === true,
+    current_turn_observation_present: currentTurnObservationPresent,
     solver_completed: input.solverCompleted === true,
     goal_satisfaction_compatible: input.goalSatisfied === true,
     route_authority_status: terminalAnswerAuthority

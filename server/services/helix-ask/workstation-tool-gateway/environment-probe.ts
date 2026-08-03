@@ -20,6 +20,10 @@ import {
   listActiveEnvironmentConnectorBindings,
   materializeLegacyRoomSourceConnector,
 } from "../../environment-connectors/bindings";
+import {
+  isRoomEnvironmentSubjectError,
+  resolveRoomEnvironmentSubjectForProbe,
+} from "../../environment-connectors/subjects";
 import { validateEnvironmentConnectorSchemaValue } from "../../environment-connectors/conformance";
 import {
   awaitDurableEnvironmentProbeObservation,
@@ -65,6 +69,7 @@ export type EnvironmentProbeGatewayDependencies = {
   ) => Promise<BoundRoomEvidenceSourceCandidate[]>;
   materializeConnector: typeof materializeLegacyRoomSourceConnector;
   listActiveConnectors: typeof listActiveEnvironmentConnectorBindings;
+  resolveSubject: typeof resolveRoomEnvironmentSubjectForProbe;
   dispatchProbe: typeof dispatchDurableEnvironmentProbe;
   awaitProbe: typeof awaitDurableEnvironmentProbeObservation;
   now: () => Date;
@@ -82,12 +87,40 @@ const dependencies = (
     overrides.materializeConnector ?? materializeLegacyRoomSourceConnector,
   listActiveConnectors:
     overrides.listActiveConnectors ?? listActiveEnvironmentConnectorBindings,
+  resolveSubject:
+    overrides.resolveSubject ?? resolveRoomEnvironmentSubjectForProbe,
   dispatchProbe: overrides.dispatchProbe ?? dispatchDurableEnvironmentProbe,
   awaitProbe: overrides.awaitProbe ?? awaitDurableEnvironmentProbeObservation,
   now: overrides.now ?? (() => new Date()),
 });
 
 const normalized = (value: string): string => value.trim().toLowerCase();
+
+const normalizeServerOwnedSemanticTarget = (input: {
+  descriptor: NonNullable<
+    ReturnType<typeof readEnvironmentConnectorCapabilityDescriptor>
+  >;
+  arguments: Record<string, unknown>;
+}): Record<string, unknown> => {
+  const argumentKeys = Object.keys(input.arguments);
+  const wrappedInput = input.arguments.input;
+  const semanticArguments =
+    argumentKeys.length === 1 &&
+    argumentKeys[0] === "input" &&
+    wrappedInput !== null &&
+    typeof wrappedInput === "object" &&
+    !Array.isArray(wrappedInput)
+      ? { ...(wrappedInput as Record<string, unknown>) }
+      : input.arguments;
+  const targetSchema = input.descriptor.input_schema.properties?.target;
+  const serverOwnsCurrentActorTarget =
+    targetSchema?.type === "string" &&
+    targetSchema.enum?.length === 1 &&
+    targetSchema.enum[0] === "current_actor";
+  return serverOwnsCurrentActorTarget
+    ? { ...semanticArguments, target: "current_actor" }
+    : semanticArguments;
+};
 
 type EnvironmentProbeExecutionAuthority = {
   kind: "external_agent_run" | "first_party_shared_room";
@@ -484,7 +517,10 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       summary: `The Minecraft capability ${capabilityId} is not registered.`,
     });
   }
-  const args = input.arguments ?? {};
+  const args = normalizeServerOwnedSemanticTarget({
+    descriptor,
+    arguments: input.arguments ?? {},
+  });
   const inputIssues = validateEnvironmentConnectorSchemaValue(
     descriptor.input_schema,
     args,
@@ -531,7 +567,7 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       membership.roomStatus === "closed" ||
       (binding
         ? !bindingIdentityMatches({ binding, membership })
-        : membership.role !== "owner" || membership.presence !== "present")
+        : membership.presence !== "present")
     ) {
       return fail({
         outcome: "permission_revoked",
@@ -546,25 +582,36 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
     const roomSelf = room.participants.find(
       (participant) => participant.participant_id === room.self_participant_id,
     );
+    const participantIdentityMismatch =
+      !roomSelf || roomSelf.participant_id !== membership.participantId;
+    const consentIdentityMismatch = Boolean(roomSelf) && (
+      roomSelf!.consent.consent_version !== membership.consent.consent_version ||
+      roomSelf!.consent.consent_receipt_ref !==
+        membership.consent.consent_receipt_ref
+    );
+    const boundAuthorizationMismatch = Boolean(binding && roomSelf) && (
+      roomSelf!.participant_id !== binding!.participantIdAtBind ||
+      roomSelf!.consent.consent_version !== binding!.consentVersionAtBind ||
+      roomSelf!.consent.consent_receipt_ref !== binding!.consentReceiptRefAtBind
+    );
+    const firstPartyPresenceMismatch =
+      !binding && Boolean(roomSelf) && roomSelf!.presence !== "present";
     if (
       room.status === "closed" ||
-      !roomSelf ||
-      roomSelf.participant_id !== membership.participantId ||
-      roomSelf.consent.consent_version !== membership.consent.consent_version ||
-      roomSelf.consent.consent_receipt_ref !==
-        membership.consent.consent_receipt_ref ||
-      (binding
-        ? roomSelf.participant_id !== binding.participantIdAtBind ||
-          roomSelf.consent.consent_version !== binding.consentVersionAtBind ||
-          roomSelf.consent.consent_receipt_ref !==
-            binding.consentReceiptRefAtBind
-        : roomSelf.role !== "owner" || roomSelf.presence !== "present")
+      participantIdentityMismatch ||
+      consentIdentityMismatch ||
+      boundAuthorizationMismatch ||
+      firstPartyPresenceMismatch
     ) {
       return fail({
         outcome: "permission_revoked",
-        summary: binding
-          ? "The current room projection no longer matches the authorizing membership."
-          : "The first-party room owner is not currently present in the exact server-validated Shared GPT Live Room chat.",
+        summary: room.status === "closed"
+          ? "The exact server-validated Shared GPT Live Room is closed."
+          : participantIdentityMismatch
+            ? "The current room projection no longer matches the authenticated participant identity."
+            : consentIdentityMismatch || boundAuthorizationMismatch
+              ? "The current room consent identity no longer matches the authorizing membership."
+              : "The first-party room member is not currently present in the exact server-validated Shared GPT Live Room chat.",
       });
     }
     const allCandidates = await deps.listSourceCandidates(roomId);
@@ -616,8 +663,10 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
     const descriptors = listEnvironmentConnectorCapabilityDescriptors({
       adapterProfileId: source.adapterAdmission.adapter_profile_id,
     });
+    const connectorOwnerProfileId =
+      source.ownerProfileId ?? authority.accountProfileId;
     const activeConnectors = await deps.listActiveConnectors({
-      ownerProfileId: authority.accountProfileId,
+      ownerProfileId: connectorOwnerProfileId,
       roomId: source.roomId,
       roomSourceBindingId: source.bindingId,
       sourceId: source.sourceId,
@@ -641,7 +690,7 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       pairedConnectors[0] ??
       activeConnectors[0] ??
       (await deps.materializeConnector({
-        ownerProfileId: authority.accountProfileId,
+        ownerProfileId: connectorOwnerProfileId,
         roomSourceBindingId: source.bindingId,
         credentialId: source.credentialId,
         roomId: source.roomId,
@@ -651,6 +700,77 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
         adapterAdmission: source.adapterAdmission,
         capabilityDescriptors: descriptors,
       }));
+    const trustedTurnActorContext =
+      authority.kind === "first_party_shared_room"
+        ? input.accountContext?.trusted_turn_actor_context ?? null
+        : null;
+    let requestingParticipantId = membership.participantId;
+    if (trustedTurnActorContext?.origin === "realtime_voice") {
+      const frozenParticipant = trustedTurnActorContext.participant_id
+        ? room.participants.find(
+            (participant) =>
+              participant.participant_id ===
+                trustedTurnActorContext.participant_id &&
+              participant.presence === "present",
+          ) ?? null
+        : null;
+      if (
+        trustedTurnActorContext.room_id !== roomId ||
+        trustedTurnActorContext.requester_profile_id !==
+          authority.accountProfileId ||
+        trustedTurnActorContext.resolution !== "resolved" ||
+        !frozenParticipant
+      ) {
+        return fail({
+          outcome: "permission_revoked",
+          summary:
+            "The GPT Live speaker identity for this turn is unavailable, stale, or no longer present in the bound room.",
+          status: "failed",
+        });
+      }
+      requestingParticipantId = frozenParticipant.participant_id;
+    }
+    let resolvedSubject: Awaited<
+      ReturnType<typeof resolveRoomEnvironmentSubjectForProbe>
+    > = null;
+    if (args.target === "current_actor") {
+      try {
+        resolvedSubject = await deps.resolveSubject({
+          membership,
+          participantId: requestingParticipantId,
+          environmentBindingId: connector.environmentBindingId,
+          sourceId: source.sourceId,
+          worldId: source.worldId,
+          producerEpochRef: source.adapterAdmission.producer_epoch_ref,
+        });
+      } catch (error) {
+        if (isRoomEnvironmentSubjectError(error)) {
+          const outcome: Exclude<
+            HelixEnvironmentProbeOutcome,
+            "succeeded"
+          > =
+            error.code === "subject_offline"
+              ? "subject_offline"
+              : error.code === "subject_binding_required"
+                ? "subject_binding_required"
+              : error.code === "producer_epoch_mismatch"
+                ? "producer_epoch_mismatch"
+                : error.code === "wrong_environment"
+                  ? "wrong_environment"
+                  : error.code === "wrong_world"
+                    ? "wrong_world"
+                    : error.code === "subject_binding_forbidden"
+                      ? "permission_revoked"
+                      : "subject_binding_stale";
+          return fail({
+            outcome,
+            summary: error.message,
+            status: "failed",
+          });
+        }
+        throw error;
+      }
+    }
     const requestedFreshness = Number(args.freshness_requirement_ms);
     const freshnessRequirementMs = Number.isFinite(requestedFreshness)
       ? Math.floor(requestedFreshness)
@@ -676,6 +796,13 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       roomId: source.roomId,
       sourceId: source.sourceId,
       producerEpochRef: source.adapterAdmission.producer_epoch_ref,
+      requestingParticipantId,
+      resolvedSubject: resolvedSubject
+        ? {
+            subjectBindingId: resolvedSubject.subjectBindingId,
+            subjectNativeId: resolvedSubject.subjectNativeId,
+          }
+        : null,
       adapterAdmission: source.adapterAdmission,
       connector,
       descriptor,

@@ -14,6 +14,7 @@ import {
 import { extractScholarlySourceTargets } from "./scholarly-research-intent";
 import { isAffirmativeTheoryExperimentProcedurePrompt } from "./theory-experiment-procedure-intent";
 import { hasWorkstationPanelScopeCue } from "./workstation-active-context-intent";
+import { extractExplicitCapabilityContracts } from "./explicit-capability-contract";
 
 const KNOWN_WORKSTATION_PANEL_IDS = [
   ...HELIX_USER_WORKSTATION_PANEL_IDS,
@@ -70,11 +71,37 @@ const hasLocalWorkspaceScopeCue = (promptText: string): boolean =>
   /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b[\s\S]{0,80}\bdocs?\s+about\b/i.test(promptText) ||
   /(?:^|[\s"'(])(?:\/docs\/|docs[\\/])\S+/i.test(promptText);
 
+const hasExplicitLocalEnvironmentCapabilityCue = (
+  promptText: string,
+): boolean =>
+  extractExplicitCapabilityContracts(promptText).some(
+    ({ contract }) => contract.source_target === "live_environment",
+  );
+
+const hasMinecraftPlayerObservationScopeCue = (
+  promptText: string,
+): boolean => {
+  if (/\bminecraft\s+(?:server|service|network|realm)\b/i.test(promptText)) {
+    return false;
+  }
+  const playerObservation =
+    /\b(?:health|hearts?|hunger|food\s+level|saturation|status|game\s+mode|position|coordinates?|inventory|armor|gear|equipment|hotbar|carrying|holding|mobs?|entities|players?|animals?|hazards?|danger|threats?|terrain|surroundings|line\s+of\s+sight|reachability|crops?|container|chest|barrel)\b/i;
+  const minecraftIndex = promptText.search(/\bminecraft\b/i);
+  if (minecraftIndex < 0) return false;
+  const observationMatch = promptText.match(playerObservation);
+  if (!observationMatch || typeof observationMatch.index !== "number") {
+    return false;
+  }
+  return Math.abs(observationMatch.index - minecraftIndex) <= 140;
+};
+
 const hasLocalObservationScopeCue = (promptText: string): boolean =>
   /\b(?:screen\s+capture|screenshot|screen|visual|frame|capture|camera|live\s+(?:source|environment|answer|card|pipeline)|current\s+(?:screen|visual|frame|capture|live\s+source|live\s+environment)|what\s+is\s+happening\s+right\s+now\s+in\s+the\s+screen)\b/i.test(promptText) ||
   /\b(?:image\s*lens|pdf\s+page|page\s+\d+|current\s+page|crop(?:ped|ping)?|bbox|bounding\s+box|equation\s+row|exact\s+row|crop\s+ref|source\s+image\s+hash|page[-\s]?grounded|scientific\s+image\s+evidence|visual_analysis\.inspect_image_region)\b/i.test(promptText) ||
   /\b(?:minecraft|game)\s+(?:room|world)\b/i.test(promptText) ||
-  /\b(?:(?:current|prior|earlier|previous|just[-\s]?gathered)\s+)?(?:minecraft\s+|game\s+|environment\s+)?observations?\b/i.test(promptText);
+  /\b(?:(?:current|prior|earlier|previous|just[-\s]?gathered)\s+)?(?:minecraft\s+|game\s+|environment\s+)?observations?\b/i.test(promptText) ||
+  hasExplicitLocalEnvironmentCapabilityCue(promptText) ||
+  hasMinecraftPlayerObservationScopeCue(promptText);
 
 const hasScholarlyScopeCue = (promptText: string): boolean =>
   /\b(?:doi|pmid|pmcid|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|journal|peer[-\s]?reviewed|citations?|references?|bibliograph(?:y|ies)|research\s+papers?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText) ||

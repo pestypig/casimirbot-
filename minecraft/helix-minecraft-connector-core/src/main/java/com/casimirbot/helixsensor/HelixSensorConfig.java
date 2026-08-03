@@ -34,6 +34,8 @@ public record HelixSensorConfig(
     public static final boolean DEFAULT_ENABLED = false;
     public static final boolean DEFAULT_READ_ONLY_PROBES_ENABLED = true;
     public static final boolean DEFAULT_EXECUTION_ENABLED = false;
+    public static final int DEFAULT_HEARTBEAT_INTERVAL_TICKS = 100;
+    public static final int MIN_MANIFEST_REFRESH_INTERVAL_TICKS = 300;
     public static final String INACTIVE_ENDPOINT =
         "https://casimirbot.com/api/room-ingress/v1/bindings/replace-with-generated-id";
 

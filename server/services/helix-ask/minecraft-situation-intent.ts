@@ -16,6 +16,33 @@ const futureOrConditionalExecution =
 const quotedHistoricalOrCapabilityDiscussion =
   /\b(?:the\s+(?:screen|docs?|guide)\s+(?:says?|shows?|uses?)|quoted?|someone\s+said|historically|previous\s+turn\s+said|why\s+did|can\s+(?:the|this|our|a)\s+(?:minecraft\s+)?connector)\b/i;
 
+const immediateMinecraftActorStateQuestion =
+  /\b(?:where\s+am\s+i|what(?:'s|\s+is)\s+my\s+(?:current\s+)?(?:minecraft\s+)?(?:location|position|dimension)|how\s+am\s+i\s+doing)\b[\s\S]{0,120}\bminecraft\b|\bminecraft\b[\s\S]{0,120}\b(?:where\s+am\s+i|what(?:'s|\s+is)\s+my\s+(?:current\s+)?(?:location|position|dimension)|how\s+am\s+i\s+doing)\b/i;
+
+const negatedActorStateQuestion =
+  /\b(?:do\s+not|don't|dont|never|without)\b[\s\S]{0,100}\b(?:answer|tell|show|report|determine|check|where\s+am\s+i|location|position|dimension)\b/i;
+
+const futureOrConditionalActorStateQuestion =
+  /\b(?:later|eventually|tomorrow|may|might|would|could|if|when)\b[\s\S]{0,120}\b(?:ask|answer|tell|show|report|determine|check|where\s+am\s+i|location|position|dimension)\b/i;
+
+const minecraftCommandDiscussionScope =
+  /\b(?:minecraft|fabric|minehut|mine\s*hut)\b[\s\S]{0,120}\b(?:server\s+)?command\b|\b(?:server\s+)?command\b[\s\S]{0,120}\b(?:minecraft|fabric|minehut|mine\s*hut)\b/i;
+
+const explicitCommandNonExecution =
+  /\b(?:do\s+not|don't|dont|never)\s+(?:actually\s+)?(?:execute|run|issue|send|apply|change|modify|mutate|use)\b|\bwithout\s+(?:actually\s+)?(?:executing|running|issuing|sending|applying|changing|modifying|mutating|using)\b/i;
+
+/** Keeps command education and quoted syntax out of the live execution lane. */
+export const isMinecraftCommandNonExecutionDiscussionPrompt = (
+  promptText: string | null | undefined,
+): boolean => {
+  const prompt = String(promptText ?? "").trim();
+  return Boolean(
+    prompt &&
+      minecraftCommandDiscussionScope.test(prompt) &&
+      explicitCommandNonExecution.test(prompt),
+  );
+};
+
 /**
  * Identifies an operator request to configure/start the workstation monitoring
  * session. This is an action workflow, not a request for current world
@@ -69,13 +96,21 @@ export const isAffirmativeImmediateMinecraftSituationPrompt = (
 ): boolean => {
   const prompt = String(promptText ?? "").trim();
   if (!prompt) return false;
+  const actorStateQuestion = immediateMinecraftActorStateQuestion.test(prompt);
   return (
     !isMinecraftSituationSessionSetupPrompt(prompt) &&
-    affirmativeObservationVerb.test(prompt) &&
-    immediateGameSituationSubject.test(prompt) &&
-    immediateCue.test(prompt) &&
+    (
+      (
+        affirmativeObservationVerb.test(prompt) &&
+        immediateGameSituationSubject.test(prompt) &&
+        immediateCue.test(prompt)
+      ) ||
+      actorStateQuestion
+    ) &&
     !negatedExecution.test(prompt) &&
     !futureOrConditionalExecution.test(prompt) &&
+    !negatedActorStateQuestion.test(prompt) &&
+    !futureOrConditionalActorStateQuestion.test(prompt) &&
     !quotedHistoricalOrCapabilityDiscussion.test(prompt)
   );
 };

@@ -95,6 +95,24 @@ export const helixEnvironmentAdapterProfileSchema = z
     required_snapshot_sections: z.array(snapshotSectionSchema).min(1).max(32),
     allowed_probe_types: z.array(probeTypeSchema).max(32),
     required_probe_types: z.array(probeTypeSchema).max(32),
+    subject_directory: z
+      .object({
+        supported: z.boolean(),
+        subject_kind: identifierSchema.nullable(),
+        ui_label_plural: z.string().trim().min(1).max(80).nullable(),
+        stable_identity_field: z
+          .enum(["stable_actor_id", "actor_id"])
+          .nullable(),
+        verification_methods: z
+          .array(z.enum([
+            "self_claim",
+            "owner_assigned",
+            "connector_challenge",
+            "server_auth",
+          ]))
+          .max(8),
+      })
+      .strict(),
     observation_schemas: z
       .object({
         world_event: identifierSchema,
@@ -169,6 +187,34 @@ export const helixEnvironmentAdapterProfileSchema = z
           });
         }
       }
+    }
+    if (
+      profile.subject_directory.supported &&
+      (!profile.subject_directory.subject_kind ||
+        !profile.subject_directory.ui_label_plural ||
+        !profile.subject_directory.stable_identity_field ||
+        profile.subject_directory.verification_methods.length === 0)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["subject_directory"],
+        message:
+          "Supported subject directories require a kind, UI label, stable identity field, and verification method.",
+      });
+    }
+    if (
+      !profile.subject_directory.supported &&
+      (profile.subject_directory.subject_kind !== null ||
+        profile.subject_directory.ui_label_plural !== null ||
+        profile.subject_directory.stable_identity_field !== null ||
+        profile.subject_directory.verification_methods.length > 0)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["subject_directory"],
+        message:
+          "Unsupported subject directories must not advertise identity semantics.",
+      });
     }
   });
 

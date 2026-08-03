@@ -24,6 +24,7 @@ import {
 } from "@shared/helix-shared-realtime-room";
 import type { SharedLiveRoomRunRoomBinding } from "../../../shared-live-room-control/binding-store";
 import { readEnvironmentConnectorCapabilityDescriptor } from "../../../environment-connectors/catalog";
+import { RoomEnvironmentSubjectError } from "../../../environment-connectors/subjects";
 import { resolveEnvironmentAdapterProfile } from "../../../situation-room/environment-adapter-registry";
 import type { SharedRealtimeRoomMembership } from "../../realtime-room/room-store";
 import type { HelixExternalCapabilityPolicy } from "../../runtime/external-capability-policy";
@@ -196,6 +197,7 @@ const sourceAdmission: HelixRoomSourceAdmission = {
 
 const sourceCandidate: BoundRoomEvidenceSourceCandidate = {
   bindingId: SOURCE_BINDING_ID,
+  ownerProfileId: "profile:environment-probe",
   credentialId: CREDENTIAL_ID,
   roomId: ROOM_ID,
   sourceId: SOURCE_ID,
@@ -314,6 +316,7 @@ const dependencies = (
   readRoom: async () => room,
   listSourceCandidates: async () => [sourceCandidate],
   listActiveConnectors: async () => [],
+  resolveSubject: async () => null,
   materializeConnector: async () => ({
     packageVersionId: "connector_package_version:environment-probe",
     installationId: "connector_installation:environment-probe",
@@ -446,6 +449,78 @@ describe("environment probe workstation gateway", () => {
     expect(JSON.stringify(result)).not.toContain("lease_token");
   });
 
+  it("freezes a verified participant subject while keeping its native id out of model-visible evidence", async () => {
+    const subjectNativeId = "123e4567-e89b-12d3-a456-426614174000";
+    const resolveSubject = vi.fn(async () => ({
+      participantId: membership.participantId,
+      subjectBindingId: "environment_subject_binding:operator",
+      subjectNativeId,
+      subjectRef: "environment_subject:operator",
+      subjectLabel: "OperatorPlayer",
+      verificationMethod: "self_claim" as const,
+      confidence: 0.8,
+      producerEpochRef: adapterAdmission.producer_epoch_ref,
+    }));
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:subject`,
+      arguments: { target: "current_actor" },
+      policy: policy(),
+      dependencies: dependencies({ resolveSubject, dispatchProbe }),
+    });
+
+    expect(resolveSubject).toHaveBeenCalledWith({
+      membership,
+      participantId: membership.participantId,
+      environmentBindingId: "environment_binding:environment-probe",
+      sourceId: SOURCE_ID,
+      worldId: sourceAdmission.world_id,
+      producerEpochRef: adapterAdmission.producer_epoch_ref,
+    });
+    expect(dispatchProbe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestingParticipantId: membership.participantId,
+        resolvedSubject: {
+          subjectBindingId: "environment_subject_binding:operator",
+          subjectNativeId,
+        },
+        arguments: expect.objectContaining({ target: "current_actor" }),
+      }),
+    );
+    expect(result.ok).toBe(true);
+    expect(JSON.stringify(result)).not.toContain(subjectNativeId);
+    expect(JSON.stringify(result)).not.toContain("OperatorPlayer");
+  });
+
+  it("fails with an actionable typed result when current_actor has no participant binding", async () => {
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:binding-required`,
+      arguments: { target: "current_actor" },
+      policy: policy(),
+      dependencies: dependencies({
+        resolveSubject: async () => {
+          throw new RoomEnvironmentSubjectError(
+            "subject_binding_required",
+            409,
+            "Choose which online player you are in this room before asking about yourself.",
+          );
+        },
+        dispatchProbe,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      error: "subject_binding_required",
+    });
+    expect(result.summary).toContain("Choose which online player");
+    expect(dispatchProbe).not.toHaveBeenCalled();
+  });
+
   it("admits the exact owner-bound first-party Shared GPT Live Room chat", async () => {
     const bindingStore = {
       getActiveRunRoomBinding: vi.fn(async () => {
@@ -492,6 +567,207 @@ describe("environment probe workstation gateway", () => {
     );
   });
 
+  it("resolves GPT Live current_actor from the present active speaker", async () => {
+    const speakerParticipantId = "participant:environment-probe:guest";
+    const speakerRoom: HelixSharedRealtimeRoom = {
+      ...room,
+      participants: [
+        ...room.participants,
+        {
+          participant_id: speakerParticipantId,
+          display_name: "Guest Player",
+          role: "participant",
+          presence: "present",
+          consent,
+          joined_at: "2026-07-27T11:30:00.000Z",
+          last_seen_at: "2026-07-27T11:59:59.000Z",
+        },
+      ],
+      runtime: {
+        ...room.runtime,
+        state: "active",
+        active_speaker_participant_id: speakerParticipantId,
+      },
+    };
+    const resolveSubject = vi.fn(async () => ({
+      participantId: speakerParticipantId,
+      subjectBindingId: "environment_subject_binding:guest",
+      subjectNativeId: "123e4567-e89b-12d3-a456-426614174001",
+      subjectRef: "environment_subject:guest",
+      subjectLabel: "GuestPlayer",
+      verificationMethod: "self_claim" as const,
+      confidence: 0.8,
+      producerEpochRef: adapterAdmission.producer_epoch_ref,
+    }));
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const voiceAccountContext = firstPartyAccountContext();
+    voiceAccountContext.trusted_turn_actor_context = {
+      schema: "helix.realtime_room.turn_actor_context.v1",
+      origin: "realtime_voice",
+      room_id: ROOM_ID,
+      requester_profile_id: "profile:environment-probe",
+      realtime_session_id: "realtime:environment-probe",
+      participant_id: speakerParticipantId,
+      resolution: "resolved",
+      resolution_source: "active_speaker_floor",
+      captured_at_ms: NOW.getTime(),
+    };
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:speaker`,
+      arguments: { target: "current_actor" },
+      policy: null,
+      accountContext: voiceAccountContext,
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: dependencies({
+        readRoom: async () => speakerRoom,
+        resolveSubject,
+        dispatchProbe,
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(resolveSubject).toHaveBeenCalledWith(
+      expect.objectContaining({ participantId: speakerParticipantId }),
+    );
+    expect(dispatchProbe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestingParticipantId: speakerParticipantId,
+        resolvedSubject: expect.objectContaining({
+          subjectBindingId: "environment_subject_binding:guest",
+        }),
+      }),
+    );
+  });
+
+  it("keeps typed room current_actor on the authenticated member when another speaker floor lingers", async () => {
+    const speakerParticipantId = "participant:environment-probe:guest";
+    const speakerRoom: HelixSharedRealtimeRoom = {
+      ...room,
+      participants: [
+        ...room.participants,
+        {
+          participant_id: speakerParticipantId,
+          display_name: "Guest Player",
+          role: "participant",
+          presence: "present",
+          consent,
+          joined_at: "2026-07-27T11:30:00.000Z",
+          last_seen_at: "2026-07-27T11:59:59.000Z",
+        },
+      ],
+      runtime: {
+        ...room.runtime,
+        state: "active",
+        active_speaker_participant_id: speakerParticipantId,
+      },
+    };
+    const resolveSubject = vi.fn(async () => null);
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: `${TURN_ID}:typed`,
+      toolCallId: `${TOOL_CALL_ID}:typed`,
+      arguments: { target: "current_actor" },
+      policy: null,
+      accountContext: firstPartyAccountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: dependencies({
+        readRoom: async () => speakerRoom,
+        resolveSubject,
+        dispatchProbe,
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(resolveSubject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        participantId: membership.participantId,
+      }),
+    );
+    expect(dispatchProbe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestingParticipantId: membership.participantId,
+      }),
+    );
+  });
+
+  it("fails closed when the frozen GPT Live participant is no longer present", async () => {
+    const voiceAccountContext = firstPartyAccountContext();
+    voiceAccountContext.trusted_turn_actor_context = {
+      schema: "helix.realtime_room.turn_actor_context.v1",
+      origin: "realtime_voice",
+      room_id: ROOM_ID,
+      requester_profile_id: "profile:environment-probe",
+      realtime_session_id: "realtime:environment-probe",
+      participant_id: "participant:environment-probe:departed",
+      resolution: "resolved",
+      resolution_source: "active_speaker_floor",
+      captured_at_ms: NOW.getTime(),
+    };
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: `${TURN_ID}:departed-speaker`,
+      toolCallId: `${TOOL_CALL_ID}:departed-speaker`,
+      arguments: { target: "current_actor" },
+      policy: null,
+      accountContext: voiceAccountContext,
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: dependencies({ dispatchProbe }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "permission_revoked",
+    });
+    expect(result.summary).toContain("speaker identity");
+    expect(dispatchProbe).not.toHaveBeenCalled();
+  });
+
+  it("admits a present non-owner room member and routes through the owner's connector", async () => {
+    const memberParticipantId = "participant:environment-probe:member";
+    const memberMembership: SharedRealtimeRoomMembership = {
+      ...membership,
+      participantId: memberParticipantId,
+      role: "participant",
+    };
+    const memberRoom: HelixSharedRealtimeRoom = {
+      ...room,
+      self_participant_id: memberParticipantId,
+      participants: [
+        {
+          ...room.participants[0],
+          participant_id: memberParticipantId,
+          role: "participant",
+        },
+      ],
+    };
+    const materializeConnector = vi.fn(
+      dependencies().materializeConnector!,
+    );
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:member`,
+      arguments: { target: "current_actor" },
+      policy: null,
+      accountContext: firstPartyAccountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: dependencies({
+        readMembership: async () => memberMembership,
+        readRoom: async () => memberRoom,
+        listSourceCandidates: async () => [{
+          ...sourceCandidate,
+          ownerProfileId: "profile:room-owner",
+        }],
+        materializeConnector,
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(materializeConnector).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerProfileId: "profile:room-owner" }),
+    );
+  });
+
   it("does not turn an ordinary browser Ask thread into room authority", async () => {
     const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
     const result = await executeEnvironmentProbeGatewayCapability({
@@ -535,7 +811,7 @@ describe("environment probe workstation gateway", () => {
     expect(dispatchProbe).not.toHaveBeenCalled();
   });
 
-  it("requires the room owner to be currently present in the exact first-party room chat", async () => {
+  it("requires the room member to be currently present in the exact first-party room chat", async () => {
     const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
     const leftMembership = {
       ...membership,
@@ -570,6 +846,44 @@ describe("environment probe workstation gateway", () => {
     expect(dispatchProbe).not.toHaveBeenCalled();
   });
 
+  it("fails closed when the current room consent identity no longer matches membership", async () => {
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const changedConsentRoom: HelixSharedRealtimeRoom = {
+      ...room,
+      participants: room.participants.map((participant) =>
+        participant.participant_id === membership.participantId
+          ? {
+              ...participant,
+              consent: {
+                ...participant.consent,
+                consent_version: participant.consent.consent_version + 1,
+                consent_receipt_ref: "room-consent:environment-probe:changed",
+                updated_at: "2026-07-27T12:01:00.000Z",
+              },
+            }
+          : participant),
+    };
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:consent-changed`,
+      arguments: { target: "current_actor" },
+      policy: null,
+      accountContext: firstPartyAccountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: dependencies({
+        readRoom: async () => changedConsentRoom,
+        dispatchProbe,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "permission_revoked",
+    });
+    expect(result.summary).toContain("authorizing membership");
+    expect(dispatchProbe).not.toHaveBeenCalled();
+  });
+
   it("fails closed on caller-supplied command or environment identity", async () => {
     const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
     const result = await executeEnvironmentProbeGatewayCapability({
@@ -594,6 +908,83 @@ describe("environment probe workstation gateway", () => {
       },
     });
     expect(dispatchProbe).not.toHaveBeenCalled();
+  });
+
+  it("normalizes a malformed model target to the authenticated current actor", async () => {
+    const resolveSubject = vi.fn(dependencies().resolveSubject!);
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:server-owned-target`,
+      arguments: {
+        target: { player: "model-selected-player" },
+        freshness_requirement_ms: 4_000,
+      },
+      policy: policy(),
+      dependencies: dependencies({ resolveSubject, dispatchProbe }),
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation: {
+        outcome: "succeeded",
+        eligible_for_current_turn_reentry: true,
+      },
+    });
+    expect(resolveSubject).toHaveBeenCalledOnce();
+    expect(dispatchProbe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        arguments: {
+          target: "current_actor",
+          freshness_requirement_ms: 4_000,
+        },
+      }),
+    );
+    expect(JSON.stringify(dispatchProbe.mock.calls)).not.toContain(
+      "model-selected-player",
+    );
+  });
+
+  it("unwraps a sole model input envelope without admitting sibling caller fields", async () => {
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:model-input-envelope`,
+      arguments: {
+        input: {
+          target: "current_actor",
+          freshness_requirement_ms: 10_000,
+        },
+      },
+      policy: policy(),
+      dependencies: dependencies({ dispatchProbe }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(dispatchProbe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        arguments: {
+          target: "current_actor",
+          freshness_requirement_ms: 10_000,
+        },
+      }),
+    );
+
+    const rejected = await executeEnvironmentProbeGatewayCapability({
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:model-input-envelope-with-sibling`,
+      arguments: {
+        input: { target: "current_actor" },
+        command: "/give @s diamond",
+      },
+      policy: policy(),
+      dependencies: dependencies({ dispatchProbe }),
+    });
+    expect(rejected).toMatchObject({
+      ok: false,
+      error: "schema_validation_failed",
+    });
+    expect(dispatchProbe).toHaveBeenCalledTimes(1);
   });
 
   it("dispatches a typed position probe while retaining server-owned environment identity", async () => {

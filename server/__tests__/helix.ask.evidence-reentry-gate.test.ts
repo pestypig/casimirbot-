@@ -193,6 +193,29 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     }).completed).toBe(false);
   });
 
+  it.each(["typed_failure", "request_user_input"])(
+    "does not demand follow-up reasoning after an authoritative %s terminal",
+    (terminalArtifactKind) => {
+      expect(
+        buildFollowupReasoningGate({
+          turnId: `turn:non-answer:${terminalArtifactKind}`,
+          primaryIntent: "procedure_memory_question",
+          secondaryIntentKinds: ["status_question"],
+          sourceTarget: "procedure_memory",
+          terminalArtifactKind,
+          selectedEvidenceCount: 4,
+          conflictingHypotheses: true,
+          finalArbitrationRan: true,
+          postEvidenceReasoningCompleted: false,
+        }),
+      ).toMatchObject({
+        required: false,
+        completed: true,
+        reason: "non_answer_terminal",
+      });
+    },
+  );
+
   it("recognizes ledger-backed evidence selected by a provider-authored route product", () => {
     const turnId = "turn:provider-route-product";
     const observationRef = `${turnId}:workstation_gateway:docs.search:1`;

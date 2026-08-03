@@ -150,16 +150,15 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
   {
     id: "affirmative_cadence_control",
     description:
-      "An affirmative cadence command must fail with an actionable typed limitation while the retired live-pipeline control has no governed provider implementation.",
+      "An affirmative cadence command must use the governed live-pipeline control and return its admitted observation receipt.",
     enabled: true,
     seed: "visual_source_available",
     prompt: "Set the visual capture interval to 10 seconds.",
     expected: {
       source_target: "live_pipeline",
       target_kind: "live_pipeline",
-      terminal_artifact_kind: "typed_failure",
-      terminal_error_code: "capability_unavailable",
-      forbidden_tool_calls: ["situation-room.live-source.set_rate"],
+      terminal_artifact_kind: "live_pipeline_receipt",
+      allowed_tool_calls: ["situation-room.live-source.set_rate"],
       forbidden_trace_flags: [
         "receipt_promoted_to_answer",
         "tool_called_without_admission",

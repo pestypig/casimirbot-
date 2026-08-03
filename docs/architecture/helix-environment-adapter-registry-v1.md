@@ -45,6 +45,8 @@ canonical SHA-256 digest. Each versioned profile declares:
 - per-payload size ceilings;
 - compatible versioned mechanics collections and bounded document paths;
 - one server-owned normalizer identity; and
+- subject-directory semantics, including a stable producer identity field,
+  subject kind, safe UI label, and admitted verification methods; and
 - an execution policy that forbids live actions and credential reuse.
 
 Profiles are compiled into
@@ -115,6 +117,25 @@ The observation is always `assistant_answer: false`,
 `answer_authority: false`, `terminal_eligible: false`, and
 `reentry_required: true`.
 
+## Room members and environment subjects
+
+Adapters that can distinguish people, tracks, documents, devices, or other
+user-addressable subjects declare `subject_directory.supported`. Minecraft is
+the first enabled implementation and publishes a safe player roster in fresh
+heartbeats. Paper and Fabric report the Minecraft account UUID as
+`stable_actor_id`; Helix hashes it into an environment-scoped `subject_ref`
+before projecting the directory to a room member.
+
+The native ID is stored only in the durable subject binding and frozen probe
+request. It is never returned in the room environment API, GPT Live sideband,
+Ask evidence, debug export, or connector-independent capability request. For a
+`current_actor` probe, Helix resolves the current text participant or active
+voice speaker, validates the exact room/source/world/connector/producer epoch,
+and injects the native ID only into the authenticated connector lease.
+
+See `helix-room-environment-subject-binding-v1.md` for the binding lifecycle,
+privacy boundary, and extension rules.
+
 ## Mechanics retrieval
 
 Each mechanics collection is versioned and code-bound to one or more adapter
@@ -141,11 +162,14 @@ collection, not a producer-supplied manifest alone:
 1. Define exact adapter IDs, world prefixes, protocol and schema compatibility.
 2. Set the minimum modalities/sections, allowlisted read-only probes,
    freshness, and payload ceilings.
-3. Add a server-owned normalizer and versioned mechanics collection with
+3. If the environment exposes addressable subjects, declare a stable identity
+   field, subject kind, safe label, verification methods, and reconnect/name-
+   change semantics.
+4. Add a server-owned normalizer and versioned mechanics collection with
    bounded docs paths.
-4. Add cross-adapter, cross-room, stale, replay, rotation, revocation, malformed
+5. Add cross-adapter, cross-room, stale, replay, rotation, revocation, malformed
    schema, mechanics mismatch, and nonterminal re-entry tests.
-5. Enable the profile only after deterministic and keyed live acceptance.
+6. Enable the profile only after deterministic and keyed live acceptance.
 
 Action execution remains a separate future capability with a separate
 credential, allowlist, approval and idempotency policy, and typed result

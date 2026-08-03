@@ -45,7 +45,18 @@ describe("environment connector REST boundary", () => {
       private_installation_data_included: false,
       user_evidence_included: false,
     });
-    expect(response.body.packages).toHaveLength(3);
+    expect(
+      response.body.packages.map(
+        (entry: { package_id: string }) => entry.package_id,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "com.casimirbot.minecraft.paper",
+        "com.casimirbot.minecraft.fabric",
+        "com.casimirbot.synthetic.fixture",
+        "com.casimirbot.system.clock",
+      ]),
+    );
     expect(JSON.stringify(response.body)).not.toMatch(
       /owner_profile_id|room_id|device_credential|environment_binding_id/,
     );
@@ -82,6 +93,29 @@ describe("environment connector REST boundary", () => {
       error: "device_credential_invalid",
       credential_included: false,
       raw_content_included: false,
+    });
+
+    const malformedBootstrap = await request(app())
+      .post("/api/environment-connectors/v1/pairing/redeem")
+      .send({ pairing_code: "not-a-code", bearer_token: "must-not-echo" })
+      .expect(400);
+    expect(malformedBootstrap.body).toMatchObject({
+      error: "pairing_request_invalid",
+      credential_included: false,
+      terminal_eligible: false,
+    });
+    expect(JSON.stringify(malformedBootstrap.body)).not.toContain(
+      "must-not-echo",
+    );
+
+    const unauthorizedUnpair = await request(app())
+      .post("/api/environment-connectors/v1/pairing/unpair")
+      .send({ binding_id: "room_source_binding:test" })
+      .expect(401);
+    expect(unauthorizedUnpair.body).toMatchObject({
+      error: "device_credential_invalid",
+      credential_included: false,
+      assistant_answer: false,
     });
   });
 

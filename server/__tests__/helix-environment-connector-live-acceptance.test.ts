@@ -236,6 +236,41 @@ describe("environment connector live acceptance harness", () => {
         }
         if (
           path ===
+            "/api/agi/realtime/rooms/room_environment_acceptance/environments" &&
+          method === "GET"
+        ) {
+          return jsonResponse({
+            environments: [
+              {
+                environment_binding_id: "environment_binding:acceptance",
+                room_source_binding_id: "binding_environment_acceptance",
+                subject_directory: {
+                  subjects: [
+                    {
+                      subject_ref: "environment_subject:acceptance",
+                      display_label: "AcceptancePlayer",
+                    },
+                  ],
+                },
+              },
+            ],
+          });
+        }
+        if (
+          path ===
+            "/api/agi/realtime/rooms/room_environment_acceptance/environments/environment_binding%3Aacceptance/me" &&
+          method === "PUT"
+        ) {
+          return jsonResponse({
+            binding: {
+              subject_kind: "minecraft.player",
+              subject_label: "AcceptancePlayer",
+              verification_method: "self_claim",
+            },
+          });
+        }
+        if (
+          path ===
           "/api/environment-connectors/v1/device/probes/pending"
         ) {
           if (!continuationStarted) {
@@ -408,6 +443,18 @@ describe("environment connector live acceptance harness", () => {
     expect(continuationStarted).toBe(true);
     expect(continuationResolved).toBe(true);
     expect(report.status).toBe("pass");
+    expect(report.checks).toContainEqual(
+      expect.objectContaining({
+        id: "room_environment_subject_binding",
+        status: "pass",
+        evidence: expect.objectContaining({
+          subject_kind: "minecraft.player",
+          subject_label: "AcceptancePlayer",
+          verification_method: "self_claim",
+          raw_native_identity_reported: false,
+        }),
+      }),
+    );
     expect(report.checks).toContainEqual(
       expect.objectContaining({
         id: "agent_api_environment_probe",

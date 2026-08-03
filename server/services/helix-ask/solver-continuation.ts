@@ -1,3 +1,5 @@
+import { authoritativeTypedFailureRequiresNoContinuation } from "./runtime/typed-failure-lifecycle-reconciliation";
+
 type RecordLike = Record<string, unknown>;
 
 export type HelixSolverContinuationReason =
@@ -173,6 +175,9 @@ export function buildSolverContinuationObservation(input: {
 }): HelixSolverContinuationObservation | null {
   const code = String(input.hardGateCode ?? "").trim();
   if (!RECOVERABLE_SOLVER_FAILURES.has(code)) return null;
+  if (authoritativeTypedFailureRequiresNoContinuation(input.payload)) {
+    return null;
+  }
   if (
     (code === "route_authority_missing" || code === "poison_clean_but_authority_failed") &&
     modelOnlySuppressedContextualDirectAnswerSatisfied(input.payload, input.terminalKind)

@@ -10,6 +10,7 @@ import { HELIX_DEVELOPER_ACCOUNT_POLICY } from "@shared/helix-account-session";
 import { resolveCasimirPublicBaseUrl } from "../../public-base-url";
 import {
   isGuestSharedRealtimeRoomSourceIngressEnabled,
+  isPublicSharedRealtimeRoomSourceIngressEnabled,
   resolveEffectiveAccountPolicyFromStoredRow,
 } from "../../helix-account/account-session-store";
 import { invalidateRoomSourceRuntimeState } from "../../situation-room/room-source-runtime-state";
@@ -298,11 +299,10 @@ const policyAllowsRoomSourceIngress = (
   );
   if (!featureAllowed) return false;
   if (policy?.account_type === "developer") return true;
-  return (
-    options.guestAccount &&
-    options.activeSession &&
-    isGuestSharedRealtimeRoomSourceIngressEnabled()
-  );
+  if (!options.activeSession) return false;
+  return options.guestAccount
+    ? isGuestSharedRealtimeRoomSourceIngressEnabled()
+    : isPublicSharedRealtimeRoomSourceIngressEnabled();
 };
 
 const bindingOwnerPolicyAllowsIngress = async (
@@ -329,19 +329,34 @@ const bindingOwnerPolicyAllowsIngress = async (
       WHERE profile_id = $1
         AND status = 'active'
         AND (expires_at IS NULL OR expires_at > now())
-      ORDER BY updated_at DESC
-      LIMIT 1;
+      ORDER BY updated_at DESC;
     `,
     [ownerProfileId],
   );
-  const effectivePolicy = resolveEffectiveAccountPolicyFromStoredRow({
-    account_type: accountRows[0]?.account_type ?? "user",
-    account_policy: sessionRows[0]?.account_policy ?? HELIX_DEVELOPER_ACCOUNT_POLICY,
-    provider: accountRows[0]?.provider ?? null,
-  });
-  return policyAllowsRoomSourceIngress(effectivePolicy, {
-    guestAccount: accountRows[0]?.provider === "guest",
-    activeSession: sessionRows.length > 0,
+  const accountType = accountRows[0]?.account_type ?? "user";
+  const provider = accountRows[0]?.provider ?? null;
+  const guestAccount = provider === "guest";
+  if (sessionRows.length === 0) {
+    const effectivePolicy = resolveEffectiveAccountPolicyFromStoredRow({
+      account_type: accountType,
+      account_policy: HELIX_DEVELOPER_ACCOUNT_POLICY,
+      provider,
+    });
+    return policyAllowsRoomSourceIngress(effectivePolicy, {
+      guestAccount,
+      activeSession: false,
+    });
+  }
+  return sessionRows.some((row) => {
+    const effectivePolicy = resolveEffectiveAccountPolicyFromStoredRow({
+      account_type: accountType,
+      account_policy: row.account_policy,
+      provider,
+    });
+    return policyAllowsRoomSourceIngress(effectivePolicy, {
+      guestAccount,
+      activeSession: true,
+    });
   });
 };
 
@@ -478,9 +493,23 @@ const createCredential = async (
   db: Queryable,
   bindingId: string,
   requestedTtlMs?: number | null,
+  suppliedSecret?: string | null,
 ): Promise<{ credentialId: string; secret: string; expiresAt: string }> => {
   const credentialId = `room_source_credential:${crypto.randomUUID()}`;
-  const secret = `helix_room_src_${crypto.randomBytes(32).toString("base64url")}`;
+  const candidate = normalize(suppliedSecret);
+  if (
+    candidate &&
+    !/^helix_room_src_[a-zA-Z0-9_-]{43,96}$/.test(candidate)
+  ) {
+    throw new RoomSourceIngressError(
+      "room_source_credential_invalid",
+      400,
+      "The trusted source credential material is invalid.",
+    );
+  }
+  const secret =
+    candidate ||
+    `helix_room_src_${crypto.randomBytes(32).toString("base64url")}`;
   const expiresAt = new Date(
     Date.now() + credentialTtlMs(requestedTtlMs),
   ).toISOString();
@@ -580,6 +609,12 @@ export const persistSharedRealtimeRoomSourceCredentialForTrustedClaim = async (
     ownerProfileId: string;
     purpose: "create" | "rotate";
     credentialTtlMs: number;
+    /**
+     * Optional deterministic high-entropy secret for an authenticated,
+     * idempotent connector-pairing exchange. This remains server-internal and
+     * is never accepted by a browser or public source-binding route.
+     */
+    trustedCredentialSecret?: string | null;
   },
   db: Queryable,
 ): Promise<{
@@ -645,6 +680,7 @@ export const persistSharedRealtimeRoomSourceCredentialForTrustedClaim = async (
     db,
     input.bindingId,
     input.credentialTtlMs,
+    input.trustedCredentialSecret,
   );
   await db.query(
     `
@@ -741,6 +777,107 @@ export const revokeSharedRealtimeRoomSourceBinding = async (input: {
           "room_source_binding_invalid",
           503,
           "The revoked source binding could not be projected.",
+        );
+      }
+      return projectBinding(row);
+    },
+  );
+  invalidateBindingRuntimeState({
+    bindingId: revoked.binding_id,
+    sourceId: revoked.source_id,
+    roomId: revoked.room_id,
+  });
+  return revoked;
+};
+
+export const revokeSharedRealtimeRoomSourceBindingByCredential = async (input: {
+  bindingId: string;
+  bearerToken: string;
+}): Promise<HelixRoomSourceBinding> => {
+  const bearerToken = normalize(input.bearerToken);
+  if (
+    !/^helix_room_src_[a-zA-Z0-9_-]{43,96}$/.test(bearerToken) ||
+    !normalize(input.bindingId)
+  ) {
+    throw new RoomSourceIngressError(
+      "room_source_credential_invalid",
+      401,
+      "The source credential is invalid.",
+    );
+  }
+  const revoked = await withSharedRealtimeRoomTransaction(
+    async (db: Queryable) => {
+      const { rows } = await db.query<{
+        credential_id: string;
+        status: string;
+        expires_at: Date | string;
+      }>(
+        `
+          SELECT c.credential_id, c.status, c.expires_at
+          FROM helix_room_source_credentials c
+          JOIN helix_room_source_bindings b ON b.binding_id = c.binding_id
+          WHERE c.binding_id = $1 AND c.token_hash = $2
+          LIMIT 1
+          FOR UPDATE;
+        `,
+        [input.bindingId, sha256Hex(bearerToken)],
+      );
+      const credential = rows[0];
+      if (!credential) {
+        throw new RoomSourceIngressError(
+          "room_source_credential_invalid",
+          401,
+          "The source credential is invalid.",
+        );
+      }
+      if (
+        credential.status !== "active" ||
+        Date.parse(iso(credential.expires_at)) <= Date.now()
+      ) {
+        throw new RoomSourceIngressError(
+          "room_source_credential_expired",
+          410,
+          "The source credential is no longer active.",
+        );
+      }
+      await db.query(
+        `
+          UPDATE helix_room_source_bindings
+          SET status = 'revoked', revoked_at = now(), updated_at = now()
+          WHERE binding_id = $1 AND status = 'active';
+        `,
+        [input.bindingId],
+      );
+      await db.query(
+        `
+          UPDATE helix_room_source_credentials
+          SET status = 'revoked', revoked_at = now()
+          WHERE binding_id = $1 AND status = 'active';
+        `,
+        [input.bindingId],
+      );
+      await db.query(
+        `
+          UPDATE helix_environment_adapter_admissions
+          SET status = 'revoked', revoked_at = now(), updated_at = now()
+          WHERE binding_id = $1 AND status = 'active';
+        `,
+        [input.bindingId],
+      );
+      await db.query(
+        `
+          UPDATE helix_connector_pairing_codes
+          SET status = 'revoked', revoked_at = now(), updated_at = now()
+          WHERE binding_id = $1 AND status = 'pending';
+        `,
+        [input.bindingId],
+      );
+      const row = await readBindingProjection(db, input.bindingId);
+      if (!row) {
+        throw new RoomSourceIngressError(
+          "room_source_binding_not_found",
+          404,
+          "Room source binding not found.",
         );
       }
       return projectBinding(row);
@@ -1021,7 +1158,7 @@ export const claimRoomSourceIngressRequest = async (input: {
               code: "room_source_owner_policy_revoked",
               statusCode: 403,
               message:
-                "The room owner no longer has developer room-source ingress access. The binding was revoked.",
+                "The room owner no longer has eligible room-source ingress access. The binding was revoked.",
             };
             return null;
           }

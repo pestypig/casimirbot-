@@ -71,7 +71,7 @@ export const environmentAdapterManifestHash = (
 const minecraftProfile = helixEnvironmentAdapterProfileSchema.parse({
   schema: HELIX_ENVIRONMENT_ADAPTER_PROFILE_SCHEMA,
   profile_id: HELIX_MINECRAFT_ADAPTER_PROFILE_ID,
-  profile_version: 3,
+  profile_version: 6,
   domain: "minecraft",
   source_family: "minecraft",
   accepted_domain_adapters: [
@@ -102,6 +102,16 @@ const minecraftProfile = helixEnvironmentAdapterProfileSchema.parse({
     "actor_status",
     "inventory_check",
   ],
+  subject_directory: {
+    supported: true,
+    subject_kind: "minecraft.player",
+    ui_label_plural: "Players",
+    stable_identity_field: "stable_actor_id",
+    // Advertise only ceremonies that have an admitted route and verifier.
+    // Stronger methods remain reserved by the shared schema until the signed
+    // connector challenge flow exists end to end.
+    verification_methods: ["self_claim", "owner_assigned"],
+  },
   observation_schemas: {
     world_event: "helix.world_event.v1",
     environment_snapshot: HELIX_ENVIRONMENT_STATE_SNAPSHOT_SCHEMA,
@@ -136,6 +146,23 @@ const minecraftProfile = helixEnvironmentAdapterProfileSchema.parse({
       ],
       retrieval_namespace: "mechanics:minecraft:java",
       document_paths: ["docs/game-mechanics/minecraft-java-v1.md"],
+    },
+    {
+      collection_id: "mechanics.minecraft.commands.v1",
+      collection_version: 1,
+      game_id: "minecraft.java.commands",
+      game_versions: ["minecraft.java:1.21.8"],
+      adapter_ids: [
+        "minecraft.paper_plugin.v1",
+        "minecraft.fabric_mod.v1",
+        "minecraft.minehut.v1",
+        "minecraft.adapter.v1",
+        "minecraft",
+      ],
+      retrieval_namespace: "mechanics:minecraft:commands",
+      document_paths: [
+        "docs/game-mechanics/minecraft-command-playbook-v1.md",
+      ],
     },
     {
       collection_id: "mechanics.minecraft.crimson_curse.v1",
@@ -181,6 +208,13 @@ const syntheticGameFixtureProfile = helixEnvironmentAdapterProfileSchema.parse({
   required_snapshot_sections: ["actor_state"],
   allowed_probe_types: ["reachability", "hazard_check"],
   required_probe_types: ["reachability"],
+  subject_directory: {
+    supported: false,
+    subject_kind: null,
+    ui_label_plural: null,
+    stable_identity_field: null,
+    verification_methods: [],
+  },
   observation_schemas: {
     world_event: "helix.world_event.v1",
     environment_snapshot: HELIX_ENVIRONMENT_STATE_SNAPSHOT_SCHEMA,
@@ -243,6 +277,13 @@ const systemClockProfile = helixEnvironmentAdapterProfileSchema.parse({
   required_snapshot_sections: ["domain_specific"],
   allowed_probe_types: [],
   required_probe_types: [],
+  subject_directory: {
+    supported: false,
+    subject_kind: null,
+    ui_label_plural: null,
+    stable_identity_field: null,
+    verification_methods: [],
+  },
   observation_schemas: {
     world_event: "helix.world_event.v1",
     environment_snapshot: HELIX_ENVIRONMENT_STATE_SNAPSHOT_SCHEMA,

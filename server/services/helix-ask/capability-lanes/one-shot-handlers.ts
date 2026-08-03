@@ -1281,9 +1281,39 @@ const GATEWAY_LANE_CONTROL_KEYS = new Set([
   "raw_content_included",
 ]);
 
-const gatewayArgumentsFromLaneCall = (call: RecordLike): RecordLike => {
+const gatewaySchemaDefinesInputArgument = (
+  capability: HelixWorkstationCapabilityManifest | null | undefined,
+): boolean => {
+  const inputSchema = readRecord(capability?.input_schema);
+  const properties = readRecord(inputSchema?.properties);
+  if (properties && Object.prototype.hasOwnProperty.call(properties, "input")) {
+    return true;
+  }
+  return (
+    Array.isArray(inputSchema?.required) &&
+    inputSchema.required.some((entry) => entry === "input")
+  );
+};
+
+const gatewayArgumentsFromLaneCall = (
+  call: RecordLike,
+  capability?: HelixWorkstationCapabilityManifest | null,
+): RecordLike => {
   const nested = readRecord(call.arguments) ?? readRecord(call.args);
-  if (nested) return nested;
+  if (nested) {
+    const nestedKeys = Object.keys(nested);
+    const providerInputEnvelope =
+      nestedKeys.length === 1 && nestedKeys[0] === "input"
+        ? readRecord(nested.input)
+        : null;
+    if (
+      providerInputEnvelope &&
+      !gatewaySchemaDefinesInputArgument(capability)
+    ) {
+      return providerInputEnvelope;
+    }
+    return nested;
+  }
   return Object.fromEntries(
     Object.entries(call).filter(
       ([key, value]) =>
@@ -1340,7 +1370,10 @@ export const governedWorkstationGatewayBridgeHandler: HelixCapabilityLaneOneShot
         typeof input.iteration === "number" && Number.isFinite(input.iteration)
           ? Math.max(0, Math.trunc(input.iteration))
           : 0;
-      const gatewayArguments = gatewayArgumentsFromLaneCall(input.call);
+      const gatewayArguments = gatewayArgumentsFromLaneCall(
+        input.call,
+        authorizedCapability,
+      );
       const providerExecutionId = `capability_lane_execution:${hashShort({
         provider: input.provider.id,
         turnId,

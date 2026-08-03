@@ -32,6 +32,102 @@ const hasCurrentTurnObservation = (payload: RecordLike): boolean => {
   });
 };
 
+const readTypedFailure = (payload: RecordLike): RecordLike | null => {
+  const direct = readRecord(payload.typed_failure);
+  if (direct) return direct;
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger)
+    ? payload.current_turn_artifact_ledger
+    : [];
+  for (const value of [...ledger].reverse()) {
+    const artifact = readRecord(value);
+    if (readString(artifact?.kind) !== "typed_failure") continue;
+    const artifactPayload = readRecord(artifact?.payload);
+    if (artifactPayload) return artifactPayload;
+  }
+  return null;
+};
+
+const isSettledSourceObservationTypedFailure = (
+  payload: RecordLike,
+): boolean => {
+  if (!hasCurrentTurnObservation(payload)) return false;
+  const loopTrace = readRecord(payload.loop_parity_trace);
+  if (
+    Array.isArray(loopTrace?.actual_tool_calls) &&
+    loopTrace.actual_tool_calls.length > 0
+  ) {
+    return false;
+  }
+  const failure = readTypedFailure(payload);
+  const errorCode =
+    readString(failure?.error_code) ?? readString(payload.terminal_error_code);
+  const nextRequiredAction = readString(failure?.next_required_action);
+  return Boolean(
+    errorCode &&
+      [
+        "procedure_epoch_current_unavailable",
+        "procedure_epoch_previous_unavailable",
+        "procedure_memory_unavailable",
+        "procedure_epoch_replay_evidence_unavailable",
+        "visual_scene_memory_no_match",
+        "visual_scene_memory_current_missing",
+      ].includes(errorCode) &&
+      (!nextRequiredAction ||
+        [
+          "none",
+          "capture_current_visual_epoch",
+          "wait_for_scene_memory_index",
+          "repair_procedure_memory",
+        ].includes(nextRequiredAction)),
+  );
+};
+
+export const authoritativeTypedFailureRequiresNoContinuation = (
+  payload: RecordLike,
+): boolean => {
+  if (
+    readString(payload.terminal_artifact_kind) !== "typed_failure" ||
+    readString(payload.final_answer_source) !== "typed_failure"
+  ) {
+    return false;
+  }
+
+  const failure = readTypedFailure(payload);
+  const errorCode =
+    readString(failure?.error_code) ?? readString(payload.terminal_error_code);
+  if (!errorCode) return false;
+
+  const routeProductContract = readRecord(payload.route_product_contract);
+  const allowedTerminalKinds = Array.isArray(
+    routeProductContract?.allowed_terminal_artifact_kinds,
+  )
+    ? routeProductContract.allowed_terminal_artifact_kinds
+        .map((value) => readString(value))
+        .filter((value): value is string => Boolean(value))
+    : [];
+  if (
+    readString(routeProductContract?.schema) !==
+      "helix.route_product_contract.v1" ||
+    !allowedTerminalKinds.includes("typed_failure")
+  ) {
+    return false;
+  }
+
+  const routeAuthorityAudit = readRecord(payload.route_authority_audit);
+  const loopParityTrace = readRecord(payload.loop_parity_trace);
+  const terminalAuthority = readRecord(payload.terminal_answer_authority);
+  const authorityEstablished =
+    routeAuthorityAudit?.route_authority_ok === true ||
+    loopParityTrace?.route_authority_ok === true ||
+    terminalAuthority?.server_authoritative === true;
+  if (!authorityEstablished) return false;
+
+  return (
+    !hasCurrentTurnObservation(payload) ||
+    isSettledSourceObservationTypedFailure(payload)
+  );
+};
+
 const selectedRouteForPayload = (payload: RecordLike): string =>
   readString(readRecord(payload.loop_parity_trace)?.selected_route) ??
   readString(readRecord(payload.route_authority_audit)?.selected_route) ??
@@ -49,6 +145,9 @@ const withoutSettledTypedFailureFlags = (value: unknown): string[] =>
             "route_contract_missing",
             "route_authority_missing",
             "poison_clean_but_authority_failed",
+            "missing_followup_reasoning",
+            "goal_satisfaction_incomplete",
+            "tool_result_terminal_without_reasoning",
             "terminal_selected_before_observation_finalizer",
             "terminal_authority_before_solver_completion",
           ].includes(entry),
@@ -124,10 +223,15 @@ export const reconcileAuthoritativeTypedFailureLifecycle = (args: {
   const finalAnswerSource =
     readString(args.finalAnswerSource) ??
     readString(args.payload.final_answer_source);
+  const currentTurnObservationPresent = hasCurrentTurnObservation(
+    args.payload,
+  );
+  const settledSourceObservationFailure =
+    isSettledSourceObservationTypedFailure(args.payload);
   if (
     terminalArtifactKind !== "typed_failure" ||
     finalAnswerSource !== "typed_failure" ||
-    hasCurrentTurnObservation(args.payload)
+    (currentTurnObservationPresent && !settledSourceObservationFailure)
   ) {
     return false;
   }
@@ -163,6 +267,8 @@ export const reconcileAuthoritativeTypedFailureLifecycle = (args: {
 
   const promptText = readString(args.promptText) ?? "";
   const selectedRoute = selectedRouteForPayload(args.payload);
+  const establishedAuthority =
+    authoritativeTypedFailureRequiresNoContinuation(args.payload);
   const routeAuthorityAudit = auditRouteAuthority({
     turnId: args.turnId,
     promptText,
@@ -181,17 +287,29 @@ export const reconcileAuthoritativeTypedFailureLifecycle = (args: {
     productAuthorityGuard: readRecord(args.payload.product_authority_guard),
     committedAskRoute: readRecord(args.payload.committed_ask_route),
   });
-  if (!routeAuthorityAudit.route_authority_ok) return false;
+  if (!routeAuthorityAudit.route_authority_ok && !establishedAuthority) {
+    return false;
+  }
+  const existingRouteAuthorityAudit = readRecord(
+    args.payload.route_authority_audit,
+  );
+  const effectiveRouteAuthorityAudit = routeAuthorityAudit.route_authority_ok
+    ? routeAuthorityAudit
+    : existingRouteAuthorityAudit ?? routeAuthorityAudit;
 
   const canonicalGoalFrame =
     readRecord(args.payload.canonical_goal_frame) ?? {};
-  canonicalGoalFrame.authoritative_zero_observation_typed_failure = true;
+  if (settledSourceObservationFailure) {
+    canonicalGoalFrame.authoritative_source_observation_typed_failure = true;
+  } else {
+    canonicalGoalFrame.authoritative_zero_observation_typed_failure = true;
+  }
   args.payload.canonical_goal_frame = canonicalGoalFrame;
-  args.payload.route_authority_audit = routeAuthorityAudit;
+  args.payload.route_authority_audit = effectiveRouteAuthorityAudit;
   const loopParityTrace = readRecord(args.payload.loop_parity_trace);
   if (loopParityTrace) {
     loopParityTrace.route_authority_audit_ref =
-      routeAuthorityAudit.audit_id;
+      effectiveRouteAuthorityAudit.audit_id;
     loopParityTrace.route_authority_ok = true;
     loopParityTrace.terminal_selection_ran_after_observations = true;
     loopParityTrace.terminal_artifact_kind = terminalArtifactKind;
@@ -219,8 +337,9 @@ export const reconcileAuthoritativeTypedFailureLifecycle = (args: {
         withoutSettledTypedFailureFlags(
           finalArbitration.remaining_uncertainty,
         );
-      finalArbitration.why_complete =
-        "authoritative zero-observation typed failure settled by terminal policy";
+      finalArbitration.why_complete = settledSourceObservationFailure
+        ? "authoritative source-observation typed failure settled by terminal policy"
+        : "authoritative zero-observation typed failure settled by terminal policy";
     }
     for (const gate of [
       readRecord(solverTrace.evidence_reentry),
@@ -231,7 +350,9 @@ export const reconcileAuthoritativeTypedFailureLifecycle = (args: {
       if (!gate) continue;
       gate.required = false;
       gate.completed = true;
-      gate.reason = "authoritative_typed_failure_no_observation";
+      gate.reason = settledSourceObservationFailure
+        ? "authoritative_source_observation_typed_failure"
+        : "authoritative_typed_failure_no_observation";
       delete gate.skipped_reason;
       if (Array.isArray(gate.violation_codes)) gate.violation_codes = [];
     }

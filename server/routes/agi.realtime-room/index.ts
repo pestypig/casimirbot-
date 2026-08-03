@@ -10,6 +10,8 @@ import { sharedRealtimeRoomLifecycleRouter } from "./room-lifecycle-routes";
 import { sharedRealtimeRoomMediaSignalRouter } from "./media-signal-routes";
 import { sharedRealtimeRoomRuntimeRouter } from "./runtime-routes";
 import { sharedRealtimeRoomVisualFrameRouter } from "./visual-frame-routes";
+import { sharedRealtimeRoomEnvironmentRouter } from "./environment-routes";
+import { sharedRealtimeRoomConnectorPairingRouter } from "./connector-pairing-routes";
 
 installSharedRealtimeRoomBoundSessionLifecycle();
 installSharedRealtimeRoomProviderFrameAcknowledgement();
@@ -22,4 +24,6 @@ sharedRealtimeRoomRouter.use(sharedRealtimeRoomParticipantRouter);
 sharedRealtimeRoomRouter.use(sharedRealtimeRoomRuntimeRouter);
 sharedRealtimeRoomRouter.use(sharedRealtimeRoomMediaSignalRouter);
 sharedRealtimeRoomRouter.use(sharedRealtimeRoomVisualFrameRouter);
+sharedRealtimeRoomRouter.use(sharedRealtimeRoomEnvironmentRouter);
+sharedRealtimeRoomRouter.use(sharedRealtimeRoomConnectorPairingRouter);
 sharedRealtimeRoomRouter.use(sharedRealtimeRoomDebugRouter);

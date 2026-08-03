@@ -25,6 +25,11 @@ import {
 import { collectIdeologyNodeIdsFromTree } from "../scripts/collect-ideology-node-ids";
 import { resolveStartupConfig } from "./startup-config";
 import { scheduleStartupMemorySettle } from "./services/runtime/startup-memory-settle";
+import {
+  initializeHostCommitMemoryMonitor,
+  stopHostCommitMemoryMonitor,
+} from "./services/runtime/host-commit-memory";
+import { installRuntimeProcessDiagnostics } from "./services/runtime/process-diagnostics";
 import { flushLocalDatabaseSnapshotIfEnabled } from "./db/client";
 import {
   renderRootBootHtml,
@@ -98,6 +103,7 @@ function loadLocalEnvFile(): void {
 }
 
 loadLocalEnvFile();
+installRuntimeProcessDiagnostics();
 const runtimeApprovalVerifierStatus =
   installRuntimeToolConfirmationVerifierFromEnvironmentV1();
 patchExpressAsyncHandlers();
@@ -553,6 +559,7 @@ const requestShutdown = (signal: NodeJS.Signals | string) => {
     return;
   }
   shuttingDown = true;
+  stopHostCommitMemoryMonitor();
 
   const watcherHandle = latticeWatcher;
   latticeWatcher = null;
@@ -949,6 +956,18 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const hostCommit = await initializeHostCommitMemoryMonitor({
+    log: (message) => log(message, "memory"),
+  });
+  log(
+    hostCommit.status === "available"
+      ? `[memory] host commit monitor ready source=${hostCommit.source} ` +
+          `used=${hostCommit.committedMiB ?? "?"}MiB limit=${hostCommit.limitMiB ?? "?"}MiB ` +
+          `free=${hostCommit.freeMiB ?? "?"}MiB`
+      : `[memory] host commit monitor ${hostCommit.status} source=${hostCommit.source} ` +
+          `reason=${hostCommit.errorCode ?? "unknown"}`,
+    "memory",
+  );
   const startBootstrap = (reason: string) => {
     if (bootstrapPromise) return;
     log(`bootstrap start (${reason})`);

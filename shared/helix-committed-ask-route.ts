@@ -31,6 +31,7 @@ export type HelixCommittedAskRoute = {
 
   canonical_goal: {
     goal_kind: string;
+    requested_capability?: string | null;
     required_terminal_kind: string;
     allowed_terminal_artifact_kinds: string[];
     forbidden_terminal_artifact_kinds: string[];

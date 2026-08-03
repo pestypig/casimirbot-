@@ -23,6 +23,8 @@ export type BoundedProviderContinuationResult<TResult, TRequest, TObservation> =
   rejections: Array<BoundedProviderContinuationRejection<TRequest>>;
   stop_reason: BoundedProviderContinuationStopReason;
   pending_request: TRequest | null;
+  terminal_reviewed: boolean;
+  terminal_review_count: number;
 };
 
 /**
@@ -53,6 +55,15 @@ export const runBoundedProviderSelectedContinuation = async <
     reason: "duplicate_request" | "request_rejected",
     iteration: number,
   ) => Promise<TResult>;
+  reviewTerminalCandidate?: (
+    result: TResult,
+    context: {
+      iteration: number;
+      steps: Array<BoundedProviderContinuationStep<TRequest, TObservation>>;
+      rejections: Array<BoundedProviderContinuationRejection<TRequest>>;
+    },
+  ) => Promise<TResult>;
+  maxTerminalReviews?: number;
   priorRequestFingerprints?: Iterable<string>;
 }): Promise<
   BoundedProviderContinuationResult<TResult, TRequest, TObservation>
@@ -64,6 +75,11 @@ export const runBoundedProviderSelectedContinuation = async <
   const rejections: Array<BoundedProviderContinuationRejection<TRequest>> = [];
   const attempted = new Set(input.priorRequestFingerprints ?? []);
   const reenteredRejections = new Set<string>();
+  let terminalReviewCount = 0;
+  let terminalReviewsSinceProgress = 0;
+  const maxTerminalReviews = input.reviewTerminalCandidate
+    ? Math.max(1, Math.floor(input.maxTerminalReviews ?? 1))
+    : 0;
 
   for (
     let iteration = 1;
@@ -77,10 +93,26 @@ export const runBoundedProviderSelectedContinuation = async <
         rejections,
         stop_reason: "aborted",
         pending_request: input.requestFromResult(result),
+        terminal_reviewed: terminalReviewCount > 0,
+        terminal_review_count: terminalReviewCount,
       };
     }
 
-    const request = input.requestFromResult(result);
+    let request = input.requestFromResult(result);
+    while (
+      !request &&
+      input.reviewTerminalCandidate &&
+      terminalReviewsSinceProgress < maxTerminalReviews
+    ) {
+      terminalReviewCount += 1;
+      terminalReviewsSinceProgress += 1;
+      result = await input.reviewTerminalCandidate(result, {
+        iteration,
+        steps: [...steps],
+        rejections: [...rejections],
+      });
+      request = input.requestFromResult(result);
+    }
     if (!request) {
       return {
         result,
@@ -88,6 +120,8 @@ export const runBoundedProviderSelectedContinuation = async <
         rejections,
         stop_reason: "no_next_request",
         pending_request: null,
+        terminal_reviewed: terminalReviewCount > 0,
+        terminal_review_count: terminalReviewCount,
       };
     }
 
@@ -116,6 +150,8 @@ export const runBoundedProviderSelectedContinuation = async <
         rejections,
         stop_reason: "duplicate_request",
         pending_request: request,
+        terminal_reviewed: terminalReviewCount > 0,
+        terminal_review_count: terminalReviewCount,
       };
     }
     if (!(await input.admitRequest(request, iteration))) {
@@ -142,11 +178,14 @@ export const runBoundedProviderSelectedContinuation = async <
         rejections,
         stop_reason: "request_rejected",
         pending_request: request,
+        terminal_reviewed: terminalReviewCount > 0,
+        terminal_review_count: terminalReviewCount,
       };
     }
 
     attempted.add(fingerprint);
     const next = await input.executeAndReenter(request, iteration);
+    terminalReviewsSinceProgress = 0;
     steps.push({
       iteration,
       request,
@@ -162,5 +201,7 @@ export const runBoundedProviderSelectedContinuation = async <
     rejections,
     stop_reason: pendingRequest ? "budget_exhausted" : "no_next_request",
     pending_request: pendingRequest,
+    terminal_reviewed: terminalReviewCount > 0,
+    terminal_review_count: terminalReviewCount,
   };
 };

@@ -1,7 +1,9 @@
 # Helix Fabric Sensor 0.1.0
 
 `minecraft/helix-fabric-sensor` is the Fabric 1.21.8 host adapter for the
-read-only Helix Minecraft connector. It supports a dedicated Fabric server and
+Helix Minecraft connector. Its default lane is read-only; an independently
+credentialed command lane can be enabled by an explicit room-owner lease. It
+supports a dedicated Fabric server and
 an integrated server started from a modded client, including a world shared by
 a multiplayer-hosting mod. It does not replace or modify the user's other
 mods.
@@ -50,11 +52,19 @@ from the one-time Helix setup packet, then set `enabled` to `true`. Keep:
 {
   "execution_enabled": false,
   "read_only_probes_enabled": true,
+  "heartbeat_interval_ticks": 100,
   "sensor_scope_default": "player_observable",
   "allow_privileged_container_scan": false,
   "allow_privileged_entity_scan": false
 }
 ```
+
+The five-second default heartbeat publishes only a sanitized online-player
+directory and runtime health. Manifest re-admission is scheduled separately at
+no faster than 15 seconds, so manifest traffic cannot crowd out the roster that
+Helix uses to resolve the current room participant. Helix continues to reject a
+participant binding when that roster exceeds the adapter's 30-second freshness
+ceiling.
 
 Do not put the bearer token in chat, logs, screenshots, source control or a
 client-distributed modpack. When hosting from a client, the token remains in
@@ -76,8 +86,13 @@ The Fabric sensor advertises the same eight capabilities as Paper:
 | `crop_state`        | `com.casimirbot.minecraft.crop_state.read`      |
 | `reachability`      | `com.casimirbot.minecraft.reachability.check`   |
 
-It does not advertise pathfinding, closed-container contents or command
-execution. Actor selection fails closed: an explicit actor must match exactly,
+It does not advertise pathfinding or closed-container contents. When a room
+owner explicitly configures command authority and completes **Pair command
+access in game**, it also exposes a live, bounded Brigadier catalog and the
+`com.casimirbot.minecraft.command` capability. The command credential is
+separate from observation ingress, is delivered directly to the server-side
+mod, and cannot grant host shell, files, RCON, processes, or credentials.
+Actor selection fails closed: an explicit actor must match exactly,
 and an unspecified current actor becomes `target_ambiguous` when more than one
 player is online.
 

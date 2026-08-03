@@ -7,6 +7,33 @@ const CAPABILITY_PREFIX = "com.casimirbot.minecraft.";
 const DEFAULT_TIMEOUT_MS = 300_000;
 
 const scenarios = {
+  command_time_query: {
+    prompt:
+      "What is the current daytime value in our Minecraft world? Please read it directly from the live Fabric server before you answer.",
+    expected: ["com.casimirbot.minecraft.command"],
+  },
+  command_time_set_day: {
+    prompt:
+      "Set the connected Minecraft world to daytime now, then verify the new daytime value from fresh server evidence.",
+    expected: ["com.casimirbot.minecraft.command"],
+    mode: "write",
+  },
+  command_admin_whitelist_query: {
+    prompt:
+      "Using the live Fabric server command dispatcher, list the players currently on the server whitelist and tell me the result.",
+    expected: ["com.casimirbot.minecraft.command"],
+    mode: "write",
+  },
+  command_quoted_no_execute: {
+    prompt:
+      "Explain what the Minecraft command `time set night` would do, but do not execute it or change the world.",
+    expected: [],
+    forbiddenCapabilities: ["com.casimirbot.minecraft.command"],
+  },
+  actor_status_short: {
+    prompt: "What is my Minecraft status right now?",
+    expected: ["com.casimirbot.minecraft.actor.status.read"],
+  },
   inventory_status: {
     prompt:
       "In this Minecraft room, check my current health, hunger or effects, armor, and inventory now. Am I equipped to explore for a few minutes?",
@@ -214,7 +241,10 @@ const observationsFromLedger = (ledger) => {
     }
     const candidate = record(value);
     if (!candidate) continue;
-    const capabilityId = string(candidate.capability_id);
+    const capabilityId =
+      string(candidate.capability_id) ||
+      string(candidate.executed_capability) ||
+      string(candidate.capability_key);
     if (
       candidate.schema === "helix.environment_connector.probe_observation.v1" &&
       capabilityId?.startsWith(CAPABILITY_PREFIX)
@@ -230,6 +260,25 @@ const observationsFromLedger = (ledger) => {
           evidence_ref: evidenceRef,
           eligible_for_current_turn_reentry:
             candidate.eligible_for_current_turn_reentry === true,
+        });
+      }
+    }
+    if (
+      candidate.schema === "helix.capability_result.v1" &&
+      capabilityId?.startsWith(CAPABILITY_PREFIX)
+    ) {
+      const evidenceRef = array(candidate.evidence_refs)
+        .map(string)
+        .find(Boolean);
+      const key = `${capabilityId}:${evidenceRef || string(candidate.capability_plan_id) || observations.length}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        observations.push({
+          capability_id: capabilityId,
+          outcome: string(candidate.status),
+          summary: string(candidate.summary),
+          evidence_ref: evidenceRef,
+          eligible_for_current_turn_reentry: candidate.reentered_solver === true,
         });
       }
     }
@@ -270,6 +319,11 @@ const terminalKind = (ask, debug) =>
 const cookie = await signIn();
 if (!scenario.skipPresence) {
   await postJson(
+    `${baseUrl}/api/account/session/experimental-rooms`,
+    cookie,
+    { enabled: true },
+  );
+  await postJson(
     `${baseUrl}/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/presence`,
     cookie,
     { presence: "present" },
@@ -286,7 +340,7 @@ try {
     conversation_thread_id: threadId,
     question: scenario.prompt,
     prompt: scenario.prompt,
-    mode: "read",
+    mode: scenario.mode || "read",
     debug: true,
     turnId: turnRef,
     turn_id: turnRef,

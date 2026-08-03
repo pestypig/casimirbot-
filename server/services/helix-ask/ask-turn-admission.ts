@@ -3,6 +3,7 @@ import type {
   RuntimePressureLevel,
   RuntimeTaskLease,
 } from "../runtime/runtime-memory-governor";
+import type { HostCommitMemorySnapshot } from "../runtime/host-commit-memory";
 
 export type HelixAskTurnAdmissionRoute = "/ask/turn" | "/ask/turn/stream" | "/ask";
 
@@ -13,6 +14,8 @@ export type HelixAskTurnAdmissionQueueReason =
 
 export type HelixAskTurnAdmissionRejectReason =
   | "memory_hard_pressure"
+  | "host_commit_pressure"
+  | "host_commit_telemetry_stale"
   | "queue_full";
 
 export type HelixAskTurnAdmission =
@@ -48,6 +51,8 @@ export type HelixAskTurnAdmission =
       turn_id: string;
       reason: HelixAskTurnAdmissionRejectReason;
       retry_after_ms?: number;
+      runtime_reason?: RuntimeAdmissionDecision["reason"];
+      host_commit?: HostCommitMemorySnapshot;
       pressure_level: "hard_pressure";
       active_workloads: number;
       max_active_workloads: number;
@@ -169,6 +174,7 @@ const reject = (input: {
   sessionId: string;
   turnId: string;
   reason: HelixAskTurnAdmissionRejectReason;
+  runtimeAdmission?: RuntimeAdmissionDecision;
 }): HelixAskTurnAdmission => ({
   status: "rejected",
   turn_id: input.turnId,
@@ -178,6 +184,14 @@ const reject = (input: {
   active_workloads: activeTurnsBySession.size,
   max_active_workloads: maxActiveWorkloads(),
   session_id: input.sessionId,
+  ...(input.runtimeAdmission
+    ? {
+        runtime_reason: input.runtimeAdmission.reason,
+        ...(input.runtimeAdmission.host?.commit
+          ? { host_commit: input.runtimeAdmission.host.commit }
+          : {}),
+      }
+    : {}),
   assistant_answer: false,
   terminal_eligible: false,
   raw_content_included: false,
@@ -198,7 +212,17 @@ export const reserveHelixAskTurnAdmission = (input: {
       input.runtimeAdmission.action === "reject_memory_pressure")
   ) {
     input.runtimeAdmission.lease?.release("rejected");
-    return reject({ sessionId, turnId: input.turnId, reason: "memory_hard_pressure" });
+    const reason: HelixAskTurnAdmissionRejectReason =
+      input.runtimeAdmission.reason === "host_commit_pressure" ||
+      input.runtimeAdmission.reason === "host_commit_telemetry_stale"
+        ? input.runtimeAdmission.reason
+        : "memory_hard_pressure";
+    return reject({
+      sessionId,
+      turnId: input.turnId,
+      reason,
+      runtimeAdmission: input.runtimeAdmission,
+    });
   }
 
   if (activeTurnsBySession.has(sessionId)) {

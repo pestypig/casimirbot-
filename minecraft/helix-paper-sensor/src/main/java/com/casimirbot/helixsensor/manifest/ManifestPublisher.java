@@ -32,12 +32,21 @@ public final class ManifestPublisher {
 
     public void start(Runnable onFirstAdmission) {
         if (refreshTask != null) return;
-        long refreshTicks = Math.max(100L, config.heartbeatIntervalTicks());
+        long refreshTicks = refreshTicksFor(
+            config.heartbeatIntervalTicks()
+        );
         refreshTask = plugin.getServer().getScheduler().runTaskTimerAsynchronously(
             plugin,
             () -> publishIfIdle(onFirstAdmission),
             0L,
             refreshTicks
+        );
+    }
+
+    static long refreshTicksFor(int heartbeatIntervalTicks) {
+        return Math.max(
+            HelixSensorConfig.MIN_MANIFEST_REFRESH_INTERVAL_TICKS,
+            heartbeatIntervalTicks
         );
     }
 

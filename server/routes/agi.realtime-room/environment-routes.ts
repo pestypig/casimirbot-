@@ -1,0 +1,516 @@
+import {
+  Router,
+  json,
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
+import { z } from "zod";
+import {
+  HELIX_ROOM_ENVIRONMENTS_RECEIPT_SCHEMA,
+  helixRoomEnvironmentOwnerBindingRequestSchema,
+  helixRoomEnvironmentSelfBindingRequestSchema,
+  type HelixRoomEnvironmentsReceipt,
+} from "@shared/helix-environment-subject";
+import {
+  HELIX_ENVIRONMENT_COMMAND_AUTHORITY_RECEIPT_SCHEMA,
+  helixEnvironmentCommandAuthoritySettingsSchema,
+  helixEnvironmentCommandMemberGrantRequestSchema,
+  type HelixEnvironmentCommandAuthorityReceipt,
+} from "@shared/helix-environment-command";
+import {
+  assignRoomEnvironmentSubject,
+  bindOwnRoomEnvironmentSubject,
+  isRoomEnvironmentSubjectError,
+  listRoomEnvironmentProjections,
+  revokeOwnRoomEnvironmentSubject,
+} from "../../services/environment-connectors/subjects";
+import {
+  configureEnvironmentCommandAuthority,
+  configureEnvironmentCommandMemberGrant,
+  emergencyStopEnvironmentCommandAuthority,
+  isEnvironmentCommandBrokerError,
+  isEnvironmentCommandAuthorityError,
+  issueEnvironmentCommandConnectorCredential,
+  readEnvironmentCommandAuthority,
+} from "../../services/environment-connectors/commands";
+import { resolveCasimirPublicBaseUrl } from "../../services/public-base-url";
+import {
+  isSharedRealtimeRoomDomainError,
+} from "../../services/helix-ask/realtime-room/room-store";
+import {
+  sendSharedRealtimeRoomEnvironmentSubjectContextIfBound,
+} from "../../services/helix-ask/realtime-room/participant-context";
+import {
+  readMembership,
+  requireOwner,
+  requireSharedRoomAccount,
+} from "./http-context";
+import {
+  FirstPartyCookieBoundary,
+  FirstPartyCookieBoundaryError,
+} from "../../middleware/first-party-cookie-boundary";
+
+const environmentCookieBoundary = new FirstPartyCookieBoundary({
+  codePrefix: "room_environment_cookie",
+  ipMax: Number(process.env.HELIX_ROOM_ENVIRONMENT_IP_RATE_LIMIT ?? "300"),
+  accountMax: Number(
+    process.env.HELIX_ROOM_ENVIRONMENT_ACCOUNT_RATE_LIMIT ?? "240",
+  ),
+});
+
+const receipt = (
+  input: Omit<
+    HelixRoomEnvironmentsReceipt,
+    | "schema"
+    | "answer_authority"
+    | "assistant_answer"
+    | "terminal_eligible"
+    | "raw_content_included"
+  >,
+): HelixRoomEnvironmentsReceipt => ({
+  schema: HELIX_ROOM_ENVIRONMENTS_RECEIPT_SCHEMA,
+  ...input,
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
+const commandReceipt = (
+  input: Omit<
+    HelixEnvironmentCommandAuthorityReceipt,
+    | "schema"
+    | "command_credential_included"
+    | "answer_authority"
+    | "assistant_answer"
+    | "terminal_eligible"
+    | "raw_content_included"
+  >,
+): HelixEnvironmentCommandAuthorityReceipt => ({
+  schema: HELIX_ENVIRONMENT_COMMAND_AUTHORITY_RECEIPT_SCHEMA,
+  ...input,
+  command_credential_included: false,
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
+const sendError = (res: Response, error: unknown): void => {
+  if (error instanceof FirstPartyCookieBoundaryError) {
+    res.status(error.statusCode).json(receipt({
+      ok: false,
+      error: error.code,
+      message: error.message,
+      binding: null,
+    }));
+    return;
+  }
+  if (isRoomEnvironmentSubjectError(error)) {
+    res.status(error.statusCode).json(receipt({
+      ok: false,
+      error: error.code,
+      message: error.message,
+      binding: null,
+    }));
+    return;
+  }
+  if (isEnvironmentCommandAuthorityError(error)) {
+    res.status(error.statusCode).json(commandReceipt({
+      ok: false,
+      error: error.code,
+      message: error.message,
+      authority: null,
+      member_grant: null,
+    }));
+    return;
+  }
+  if (isEnvironmentCommandBrokerError(error)) {
+    res.status(error.statusCode).json({
+      schema: "helix.environment_command.connector_credential_receipt.v1",
+      ok: false,
+      error: error.code,
+      message: error.message,
+      command_config: null,
+      token_value_shown_once: false,
+      secret_stored_raw: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    return;
+  }
+  if (isSharedRealtimeRoomDomainError(error)) {
+    res.status(error.statusCode).json(receipt({
+      ok: false,
+      error: error.code,
+      message: error.message,
+      binding: null,
+    }));
+    return;
+  }
+  console.warn(
+    "[room-environments] request failed",
+    error instanceof Error ? error.message : "unknown",
+  );
+  res.status(503).json(receipt({
+    ok: false,
+    error: "room_environments_unavailable",
+    message: "Room environments are temporarily unavailable.",
+    binding: null,
+  }));
+};
+
+const environmentRoute = (
+  handler: (req: Request, res: Response, next: NextFunction) => Promise<void>,
+) => (req: Request, res: Response, next: NextFunction): void => {
+  void handler(req, res, next).catch((error: unknown) => sendError(res, error));
+};
+
+export const sharedRealtimeRoomEnvironmentRouter = Router();
+
+sharedRealtimeRoomEnvironmentRouter.use(
+  "/realtime/rooms/:roomId/environments",
+  environmentCookieBoundary.noStore,
+  environmentCookieBoundary.enforceIpRateLimit,
+  environmentCookieBoundary.enforceSameOrigin,
+  json({ limit: "16kb" }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.get(
+  "/realtime/rooms/:roomId/environments",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const environments = await listRoomEnvironmentProjections({
+      roomId: req.params.roomId,
+      profileId: account.profileId,
+    });
+    res.json(receipt({
+      ok: true,
+      error: null,
+      message: "Room environments listed.",
+      environments,
+      binding: null,
+    }));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.get(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/subjects",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const environments = await listRoomEnvironmentProjections({
+      roomId: req.params.roomId,
+      profileId: account.profileId,
+    });
+    const environment = environments.find(
+      (candidate) =>
+        candidate.environment_binding_id === req.params.environmentBindingId,
+    );
+    if (!environment) {
+      res.status(404).json(receipt({
+        ok: false,
+        error: "environment_not_found",
+        message: "Room environment not found.",
+        binding: null,
+      }));
+      return;
+    }
+    res.json(receipt({
+      ok: true,
+      error: null,
+      message: "Environment subjects listed.",
+      environments: [environment],
+      binding: environment.self_subject_binding,
+    }));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.put(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/me",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const parsed = helixRoomEnvironmentSelfBindingRequestSchema.safeParse(
+      req.body ?? {},
+    );
+    if (!parsed.success) {
+      res.status(400).json(receipt({
+        ok: false,
+        error: "subject_binding_invalid",
+        message: "A valid environment subject reference is required.",
+        binding: null,
+      }));
+      return;
+    }
+    const binding = await bindOwnRoomEnvironmentSubject({
+      roomId: req.params.roomId,
+      profileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+      subjectRef: parsed.data.subject_ref,
+    });
+    void sendSharedRealtimeRoomEnvironmentSubjectContextIfBound({
+      roomId: req.params.roomId,
+      reason: "identity_changed",
+    });
+    res.json(receipt({
+      ok: true,
+      error: null,
+      message: `Your room identity is now ${binding.subject_label} in this environment.`,
+      binding,
+    }));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.get(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/command-authority",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const result = await readEnvironmentCommandAuthority({
+      roomId: req.params.roomId,
+      profileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+    });
+    res.json(commandReceipt({
+      ok: true,
+      error: null,
+      message: result.authority
+        ? "Environment command authority loaded."
+        : "Environment command authority is not configured.",
+      authority: result.authority,
+      member_grant: result.memberGrant,
+      member_grants: result.memberGrants,
+    }));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.put(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/command-authority",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const parsed = helixEnvironmentCommandAuthoritySettingsSchema.safeParse(
+      req.body ?? {},
+    );
+    if (!parsed.success) {
+      res.status(400).json(commandReceipt({
+        ok: false,
+        error: "command_authority_invalid",
+        message: "A valid command profile and autonomy policy are required.",
+        authority: null,
+        member_grant: null,
+      }));
+      return;
+    }
+    const result = await configureEnvironmentCommandAuthority({
+      roomId: req.params.roomId,
+      ownerProfileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+      authorityProfile: parsed.data.authority_profile,
+      autonomyMode: parsed.data.autonomy_mode,
+      approvedCategories: parsed.data.approved_categories,
+      expiresAt: parsed.data.expires_at,
+    });
+    res.json(commandReceipt({
+      ok: true,
+      error: null,
+      message: `Environment command profile set to ${result.authority.authority_profile}.`,
+      authority: result.authority,
+      member_grant: result.ownerGrant,
+      member_grants: [result.ownerGrant],
+    }));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.delete(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/command-authority",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const authority = await emergencyStopEnvironmentCommandAuthority({
+      roomId: req.params.roomId,
+      ownerProfileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+    });
+    res.json(commandReceipt({
+      ok: true,
+      error: null,
+      message: "Environment command authority stopped and pending commands canceled.",
+      authority,
+      member_grant: null,
+      member_grants: [],
+    }));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.post(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/command-credential",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const parsed = z
+      .object({
+        ttl_ms: z.number().int().min(60_000).max(7 * 24 * 60 * 60 * 1_000).optional(),
+      })
+      .strict()
+      .safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({
+        schema: "helix.environment_command.connector_credential_receipt.v1",
+        ok: false,
+        error: "command_credential_invalid",
+        message: "Command credential lifetime is invalid.",
+        command_config: null,
+        token_value_shown_once: false,
+        secret_stored_raw: false,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+      return;
+    }
+    const config = await issueEnvironmentCommandConnectorCredential({
+      roomId: req.params.roomId,
+      ownerProfileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+      publicBaseUrl: resolveCasimirPublicBaseUrl(),
+      ttlMs: parsed.data.ttl_ms,
+    });
+    res.json({
+      schema: "helix.environment_command.connector_credential_receipt.v1",
+      ok: true,
+      error: null,
+      message:
+        "Separate command credential created. Install it in the bound connector now; only its hash is retained.",
+      command_config: config,
+      token_value_shown_once: true,
+      secret_stored_raw: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.put(
+  [
+    "/realtime/rooms/:roomId/environments/:environmentBindingId/participants/:participantId/command-grant",
+    // Compatibility for workstation bundles loaded before the canonical
+    // member-grant path correction. New clients use the route above.
+    "/realtime/rooms/:roomId/environments/:environmentBindingId/command-authority/participants/:participantId/command-grant",
+  ],
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const parsed = helixEnvironmentCommandMemberGrantRequestSchema.safeParse(
+      req.body ?? {},
+    );
+    if (!parsed.success) {
+      res.status(400).json(commandReceipt({
+        ok: false,
+        error: "command_grant_invalid",
+        message: "A valid room member command grant is required.",
+        authority: null,
+        member_grant: null,
+      }));
+      return;
+    }
+    const memberGrant = await configureEnvironmentCommandMemberGrant({
+      roomId: req.params.roomId,
+      ownerProfileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+      participantId: req.params.participantId,
+      maxAuthorityProfile: parsed.data.max_authority_profile,
+      autonomyOverride: parsed.data.autonomy_override,
+      expiresAt: parsed.data.expires_at,
+    });
+    const current = await readEnvironmentCommandAuthority({
+      roomId: req.params.roomId,
+      profileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+    });
+    res.json(commandReceipt({
+      ok: true,
+      error: null,
+      message: "Room member command grant updated.",
+      authority: current.authority,
+      member_grant: memberGrant,
+      member_grants: current.memberGrants,
+    }));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.delete(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/me",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    await revokeOwnRoomEnvironmentSubject({
+      roomId: req.params.roomId,
+      profileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+    });
+    void sendSharedRealtimeRoomEnvironmentSubjectContextIfBound({
+      roomId: req.params.roomId,
+      reason: "identity_changed",
+    });
+    res.json(receipt({
+      ok: true,
+      error: null,
+      message: "Your environment identity selection was removed.",
+      binding: null,
+    }));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.put(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/participants/:participantId/subject",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const membership = await readMembership(req.params.roomId, account);
+    requireOwner(membership);
+    const parsed = helixRoomEnvironmentOwnerBindingRequestSchema.safeParse(
+      req.body ?? {},
+    );
+    if (!parsed.success) {
+      res.status(400).json(receipt({
+        ok: false,
+        error: "subject_binding_invalid",
+        message: "A valid environment subject reference is required.",
+        binding: null,
+      }));
+      return;
+    }
+    const binding = await assignRoomEnvironmentSubject({
+      roomId: req.params.roomId,
+      ownerProfileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+      participantId: req.params.participantId,
+      subjectRef: parsed.data.subject_ref,
+    });
+    void sendSharedRealtimeRoomEnvironmentSubjectContextIfBound({
+      roomId: req.params.roomId,
+      reason: "identity_changed",
+    });
+    res.json(receipt({
+      ok: true,
+      error: null,
+      message: "The room member environment identity was assigned.",
+      binding,
+    }));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.use(
+  (error: unknown, _req: Request, res: Response, _next: NextFunction): void => {
+    sendError(res, error);
+  },
+);

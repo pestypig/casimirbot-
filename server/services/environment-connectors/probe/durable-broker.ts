@@ -86,6 +86,9 @@ type ProbeRequestRow = {
   adapter_contract_hash: string;
   manifest_hash: string;
   producer_epoch_ref: string;
+  requesting_participant_id: string | null;
+  resolved_subject_binding_id: string | null;
+  resolved_subject_native_id: string | null;
   capability_id: string;
   capability_version: number | string;
   input_schema_hash: string;
@@ -324,6 +327,11 @@ export const dispatchDurableEnvironmentProbe = async (input: {
   roomId: string;
   sourceId: string;
   producerEpochRef: string;
+  requestingParticipantId?: string | null;
+  resolvedSubject?: {
+    subjectBindingId: string;
+    subjectNativeId: string;
+  } | null;
   adapterAdmission: HelixEnvironmentAdapterAdmissionProjection;
   connector: MaterializedEnvironmentConnectorBinding;
   descriptor: HelixEnvironmentCapabilityDescriptor;
@@ -334,6 +342,16 @@ export const dispatchDurableEnvironmentProbe = async (input: {
   now?: Date;
 }): Promise<{ requestId: string; replayed: boolean }> => {
   const now = input.now ?? new Date();
+  if (
+    input.resolvedSubject &&
+    !input.requestingParticipantId?.trim()
+  ) {
+    throw new DurableEnvironmentProbeError(
+      "permission_revoked",
+      403,
+      "An exact environment subject requires authenticated room-participant identity.",
+    );
+  }
   const firstPartyIdentityValid =
     input.tenantId === "first_party_browser_session" &&
     input.ownerSubjectId.startsWith("first_party_subject:") &&
@@ -425,7 +443,13 @@ export const dispatchDurableEnvironmentProbe = async (input: {
           row.execution_authority_kind !== input.executionAuthorityKind ||
           row.run_id !== input.runId ||
           row.turn_id !== input.turnId ||
-          row.tool_call_id !== input.toolCallId
+          row.tool_call_id !== input.toolCallId ||
+          row.requesting_participant_id !==
+            (input.requestingParticipantId?.trim() || null) ||
+          row.resolved_subject_binding_id !==
+            (input.resolvedSubject?.subjectBindingId ?? null) ||
+          row.resolved_subject_native_id !==
+            (input.resolvedSubject?.subjectNativeId ?? null)
         ) {
           throw new DurableEnvironmentProbeError(
             "probe_result_conflict",
@@ -458,6 +482,9 @@ export const dispatchDurableEnvironmentProbe = async (input: {
             adapter_contract_hash,
             manifest_hash,
             producer_epoch_ref,
+            requesting_participant_id,
+            resolved_subject_binding_id,
+            resolved_subject_native_id,
             capability_id,
             capability_version,
             input_schema_hash,
@@ -471,8 +498,8 @@ export const dispatchDurableEnvironmentProbe = async (input: {
             updated_at
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-            $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25::jsonb,
-            $26, $27, $28, $29, $30, $30
+            $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
+            $27, $28::jsonb, $29, $30, $31, $32, $33, $33
           );
         `,
         [
@@ -496,6 +523,9 @@ export const dispatchDurableEnvironmentProbe = async (input: {
           input.adapterAdmission.adapter_contract_hash,
           input.adapterAdmission.manifest_hash,
           input.producerEpochRef,
+          input.requestingParticipantId?.trim() || null,
+          input.resolvedSubject?.subjectBindingId ?? null,
+          input.resolvedSubject?.subjectNativeId ?? null,
           input.descriptor.capability_id,
           input.descriptor.capability_version,
           input.descriptor.input_schema_hash,
@@ -796,9 +826,15 @@ export const leaseDurableEnvironmentProbesForClaim = async (input: {
               reason: "live_answer_validation",
               objective: `Read-only ${row.capability_id} probe.`,
               target:
-                args.target === "current_actor" ||
-                args.target === "current_focus"
-                  ? { target_ref: String(args.target) }
+                args.target === "current_actor"
+                  ? {
+                      target_ref: "current_actor",
+                      ...(row.resolved_subject_native_id
+                        ? { actor_id: row.resolved_subject_native_id }
+                        : {}),
+                    }
+                  : args.target === "current_focus"
+                    ? { target_ref: "current_focus" }
                   : args.target === "position"
                     ? {
                         target_ref: "position",
@@ -903,9 +939,9 @@ const normalizeLegacyResult = (
       normalized[key] = details[key];
     }
   }
-  for (const key of ["game_mode", "world"]) {
+  for (const key of ["actor_label", "game_mode", "world"]) {
     if (typeof details[key] === "string" && details[key].trim()) {
-      normalized[key] = details[key].trim();
+      normalized[key] = details[key].trim().slice(0, 160);
     }
   }
   const position = asRecord(details.position);
@@ -1481,7 +1517,7 @@ export const submitDurableEnvironmentProbeResult = async (input: {
       row.room_status !== null &&
       row.room_status !== "closed" &&
       row.member_participant_id !== null &&
-      row.member_role === "owner" &&
+      ["owner", "participant"].includes(row.member_role ?? "") &&
       row.member_presence === "present" &&
       row.member_consent_version !== null &&
       Number.isFinite(Number(row.member_consent_version)) &&

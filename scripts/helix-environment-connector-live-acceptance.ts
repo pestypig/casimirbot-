@@ -509,6 +509,7 @@ export const runEnvironmentConnectorLiveAcceptance = async (
       active_players: [
         {
           actor_id: "minecraft:player:acceptance",
+          stable_actor_id: "00000000-0000-4000-8000-000000000001",
           actor_label: "AcceptancePlayer",
           dimension: "minecraft:overworld",
         },
@@ -600,6 +601,58 @@ export const runEnvironmentConnectorLiveAcceptance = async (
         {
           health: deviceHeartbeat.health,
           command_execution: deviceHeartbeat.commandExecution,
+        },
+      ),
+    );
+
+    const environmentsResponse = await request(
+      `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/environments`,
+      { method: "GET" },
+      true,
+    );
+    const environment = asArray(
+      asRecord(environmentsResponse.body).environments,
+    )
+      .map(asRecord)
+      .find(
+        (candidate) =>
+          candidate.room_source_binding_id === sourceBindingId,
+      );
+    if (!environment) {
+      throw new Error("acceptance_environment_projection_missing");
+    }
+    const environmentBindingId = stringField(
+      environment,
+      "environment_binding_id",
+    );
+    const subjects = asArray(
+      asRecord(environment.subject_directory).subjects,
+    ).map(asRecord);
+    const acceptanceSubject = subjects.find(
+      (candidate) => candidate.display_label === "AcceptancePlayer",
+    );
+    if (!acceptanceSubject) {
+      throw new Error("acceptance_environment_subject_missing");
+    }
+    const subjectRef = stringField(acceptanceSubject, "subject_ref");
+    const subjectBindingResponse = await jsonRequest(
+      `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/environments/${encodeURIComponent(environmentBindingId)}/me`,
+      { subject_ref: subjectRef },
+      { method: "PUT", cookieAuthenticated: true },
+    );
+    const subjectBinding = asRecord(subjectBindingResponse.body).binding;
+    checks.push(
+      check(
+        "room_environment_subject_binding",
+        "pass",
+        "The room member selected the fresh stable Minecraft player identity before current-actor routing.",
+        null,
+        {
+          environment_binding_id: environmentBindingId,
+          subject_kind: asRecord(subjectBinding).subject_kind,
+          subject_label: asRecord(subjectBinding).subject_label,
+          verification_method: asRecord(subjectBinding).verification_method,
+          raw_native_identity_reported: false,
         },
       ),
     );

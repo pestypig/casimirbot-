@@ -62,8 +62,15 @@ const normalizeBaseUrl = (value) => {
 };
 
 const parseArgs = () => {
-  const [mode, configPath, statePath, suppliedBaseUrl, suppliedPlatform] =
-    process.argv.slice(2);
+  const [
+    mode,
+    configPath,
+    statePath,
+    suppliedBaseUrl,
+    suppliedPlatform,
+    suppliedRoomId,
+    suppliedProfileId,
+  ] = process.argv.slice(2);
   if (mode !== MODE_SETUP && mode !== MODE_CLEANUP) {
     fail("usage_setup_or_cleanup_required");
   }
@@ -76,6 +83,8 @@ const parseArgs = () => {
     statePath: path.resolve(statePath),
     baseUrl: normalizeBaseUrl(suppliedBaseUrl),
     platform,
+    roomId: suppliedRoomId?.trim() || null,
+    profileId: suppliedProfileId?.trim() || null,
   };
 };
 
@@ -213,7 +222,7 @@ const renderFabricPluginConfig = (pluginConfig, baseUrl) =>
       execution_enabled: false,
       read_only_probes_enabled: true,
       snapshot_interval_ticks: 100,
-      heartbeat_interval_ticks: 300,
+      heartbeat_interval_ticks: 100,
       probe_poll_interval_ticks: 40,
       max_pending_probes_per_poll: 8,
       send_only_changed_sections: false,
@@ -266,17 +275,45 @@ const resetPluginConfig = async (configPath, platform) => {
   await writePrivateFile(configPath, await fs.readFile(templatePath, "utf8"));
 };
 
-const setup = async ({ baseUrl, configPath, statePath, platform }) => {
+const setup = async ({
+  baseUrl,
+  configPath,
+  statePath,
+  platform,
+  roomId: suppliedRoomId,
+  profileId: suppliedProfileId,
+}) => {
   const platformSettings = PLATFORM_SETTINGS[platform];
-  const profileId = DEFAULT_PROFILE_ID;
+  const profileId = suppliedProfileId || DEFAULT_PROFILE_ID;
   const cookie = await signIn(baseUrl, profileId);
-  const nonce = crypto.randomUUID();
-  const roomReceipt = await request(baseUrl, cookie, "/api/agi/realtime/rooms", {
-    body: { title: "Minecraft situation-awareness local test" },
-    idempotencyKey: `minecraft-local-room-${nonce}`,
+  await request(baseUrl, cookie, "/api/account/session/experimental-rooms", {
+    body: { enabled: true },
   });
-  const room = requireRecord(roomReceipt.room, "room_missing");
-  const roomId = requireString(room.room_id, "room_id_missing");
+  const nonce = crypto.randomUUID();
+  const roomCreatedBySetup = suppliedRoomId === null;
+  const roomId = roomCreatedBySetup
+    ? requireString(
+        requireRecord(
+          (
+            await request(baseUrl, cookie, "/api/agi/realtime/rooms", {
+              body: { title: "Minecraft situation-awareness local test" },
+              idempotencyKey: `minecraft-local-room-${nonce}`,
+            })
+          ).room,
+          "room_missing",
+        ).room_id,
+        "room_id_missing",
+      )
+    : requireString(suppliedRoomId, "room_id_missing");
+  if (!roomCreatedBySetup) {
+    const roomReceipt = await request(
+      baseUrl,
+      cookie,
+      `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}`,
+      { method: "GET" },
+    );
+    requireRecord(roomReceipt.room, "room_missing");
+  }
   await request(
     baseUrl,
     cookie,
@@ -354,6 +391,7 @@ const setup = async ({ baseUrl, configPath, statePath, platform }) => {
     plugin_config_path: configPath,
     credential_persisted_only_in_plugin_config: true,
     command_execution_enabled: false,
+    room_created_by_setup: roomCreatedBySetup,
   };
   await writePrivateFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
   process.stdout.write(
@@ -367,6 +405,7 @@ const setup = async ({ baseUrl, configPath, statePath, platform }) => {
       plugin_config_written: true,
       credential_value_reported: false,
       command_execution_enabled: false,
+      reused_existing_room: !roomCreatedBySetup,
     })}\n`,
   );
 };
@@ -413,23 +452,27 @@ const cleanup = async ({ baseUrl, configPath, statePath }) => {
     cleanupResults.binding_revoked = true;
   }
   try {
-    await request(
-      baseUrl,
-      cookie,
-      `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/leave`,
-      { body: {} },
-    );
-    cleanupResults.room_closed = true;
-  } catch (error) {
-    if (
-      !errorIncludesAny(error, [
-        "room_closed",
-        "shared_realtime_room_closed",
-      ])
-    ) {
-      throw error;
+    if (state.room_created_by_setup !== false) {
+      try {
+        await request(
+          baseUrl,
+          cookie,
+          `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/leave`,
+          { body: {} },
+        );
+        cleanupResults.room_closed = true;
+      } catch (error) {
+        if (
+          !errorIncludesAny(error, [
+            "room_closed",
+            "shared_realtime_room_closed",
+          ])
+        ) {
+          throw error;
+        }
+        cleanupResults.room_closed = true;
+      }
     }
-    cleanupResults.room_closed = true;
   } finally {
     const platform =
       state.platform === PLATFORM_FABRIC ? PLATFORM_FABRIC : PLATFORM_PAPER;

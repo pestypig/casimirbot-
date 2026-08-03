@@ -4485,19 +4485,58 @@ export function buildHelixCausalTurnTraceRows(reply: HelixAskTranscriptReply): H
     });
 }
 
+function selectHelixTranscriptEventsForDisplay(
+  events: Record<string, unknown>[],
+  maxEvents: number,
+): Record<string, unknown>[] {
+  if (events.length <= maxEvents) return events;
+  const proofEventTypes = new Set([
+    "tool_request",
+    "tool_observation",
+    "action_request",
+    "action_observation",
+    "model_reentry",
+    "lane_requested",
+    "lane_backend_selected",
+    "lane_observation",
+    "lane_reentered",
+    "terminal_selected",
+    "terminal_rejected",
+    "terminal_answer",
+  ]);
+  const proofIndexes = events.flatMap((event, index) => {
+    const sourceEventType = coerceText(event.source_event_type).trim();
+    const type = coerceText(event.type).trim();
+    const status = coerceText(event.status).trim().toLowerCase();
+    return proofEventTypes.has(sourceEventType) ||
+      type === "final_answer" ||
+      status === "failed" ||
+      status === "blocked"
+      ? [index]
+      : [];
+  });
+  const keptIndexes = new Set(proofIndexes.slice(-maxEvents));
+  for (let index = events.length - 1; index >= 0 && keptIndexes.size < maxEvents; index -= 1) {
+    keptIndexes.add(index);
+  }
+  return events.filter((_, index) => keptIndexes.has(index));
+}
+
 export function buildHelixTurnTranscriptRows(reply: HelixAskTranscriptReply): HelixTurnTranscriptRow[] {
   const publicCommentaryRows = buildHelixPublicCommentaryTranscriptRows(reply);
   const transcriptEvents = resolveHelixTurnTranscriptEvents(reply);
   if (transcriptEvents.length > 0) {
-    const lifecycleRows = transcriptEvents
-      .filter((event) => {
+    const visibleTranscriptEvents = transcriptEvents.filter((event) => {
         const type = String(event.type ?? "");
         const status = String(event.status ?? "");
         if (publicCommentaryRows.length > 0 && (type === "turn_completed" || type === "work_delta")) return false;
         if (publicCommentaryRows.length > 0 && type === "step_started") return false;
         return type !== "question" && type !== "turn_completed" && status !== "superseded";
-      })
-      .slice(-14)
+      });
+    const lifecycleRows = selectHelixTranscriptEventsForDisplay(
+      visibleTranscriptEvents,
+      13,
+    )
       .map((event, index) => {
         const role = String(event.role ?? "agent");
         const type = String(event.type ?? "event");

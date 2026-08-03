@@ -22,6 +22,7 @@ export const buildWorkstationGatewayObservationPacket = (input: {
   capabilityId: string;
   panelId: string;
   action: string;
+  executedArgs?: Record<string, unknown>;
   status: HelixAgentStepObservationPacket["status"];
   summary: string;
   observation: unknown;
@@ -51,6 +52,7 @@ export const buildWorkstationGatewayObservationPacket = (input: {
     capability_key: input.capabilityId,
     panel_id: input.panelId,
     action: input.action,
+    ...(input.executedArgs ? { executed_args: input.executedArgs } : {}),
     status: input.status,
     produced_artifact_refs: [artifactRef],
     observation_summary: input.summary,

@@ -55,6 +55,7 @@ import {
   codexRouteAllowsTerminalKind,
   codexProvider,
   continuationStateAdmitsPreparedLaneRequest,
+  continuationStateAdmitsGenericProviderLaneRequest,
   continuationStateAdmitsPreparedRecoveryLaneRequest,
   detectProviderPromptLeakMarkers,
   enrichCapabilityLaneCandidatesFromBody,
@@ -1750,6 +1751,44 @@ describe("Codex provider capability lane adapter", () => {
       },
       requestedCandidate: preciseCandidate,
       preparedCandidate: preciseCandidate,
+    })).toBe(false);
+  });
+
+  it("keeps a provider-selected generic next step available after a successful first observation", () => {
+    const capability = "room.environment.command";
+    const state = {
+      next_admissible_affordances: [],
+      allowed_decisions: ["answer"],
+      last_attempt: {
+        attempt_id: "attempt:minecraft-query",
+        capability_id: capability,
+        action_fingerprint: "minecraft-query:false",
+        status: "succeeded",
+        failure_class: null,
+        failure_code: null,
+        failure_message: null,
+        retryability: null,
+        observation_refs: ["observation:minecraft-query"],
+      },
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+    const nextCandidate = {
+      capability,
+      command: "/gamerule doDaylightCycle true",
+    };
+
+    expect(continuationStateAdmitsGenericProviderLaneRequest({
+      state,
+      candidate: nextCandidate,
+      admittedCapabilityIds: [capability],
+    })).toBe(true);
+    expect(continuationStateAdmitsGenericProviderLaneRequest({
+      state,
+      candidate: {
+        capability: "host.shell.execute",
+        command: "whoami",
+      },
+      admittedCapabilityIds: [capability],
     })).toBe(false);
   });
 

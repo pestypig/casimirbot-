@@ -3,7 +3,10 @@ import {
   HELIX_COMMITTED_ASK_ROUTE_SCHEMA,
   type HelixCommittedAskRoute,
 } from "@shared/helix-committed-ask-route";
-import { reconcileCanonicalGoalFrameToCommittedRoute } from "../committed-ask-route";
+import {
+  reconcileCanonicalGoalFrameToCommittedRoute,
+  reconcileRouteProductContractToCommittedRoute,
+} from "../committed-ask-route";
 
 const scholarlyRoute = (turnId: string): HelixCommittedAskRoute => ({
   schema: HELIX_COMMITTED_ASK_ROUTE_SCHEMA,
@@ -146,6 +149,110 @@ describe("committed route canonical goal reconciliation", () => {
       reconciled: false,
       frame,
       reason: null,
+    });
+  });
+
+  it("preserves a situation-context goal specialized over a visual-capture source", () => {
+    const turnId = "ask:test:visual-situation-context";
+    const route = scholarlyRoute(turnId);
+    route.route.source_target = "visual_capture";
+    route.route.target_kind = "visual_capture";
+    route.canonical_goal = {
+      goal_kind: "visual_capture",
+      required_terminal_kind: "situation_context_pack",
+      allowed_terminal_artifact_kinds: ["situation_context_pack", "typed_failure"],
+      forbidden_terminal_artifact_kinds: ["direct_answer_text"],
+    };
+    route.capability_policy.allowed_tool_families = ["situation_run"];
+    route.capability_policy.required_capability_families = ["situation_run"];
+    route.terminal_product.required_terminal_product = "situation_context_pack";
+    const frame = {
+      turn_id: turnId,
+      goal_kind: "situation_context_question",
+      answer_scope: "visual_capture",
+      required_terminal_kind: "situation_context_pack",
+      classifier_reasons: ["situation_context_question"],
+    };
+
+    expect(reconcileCanonicalGoalFrameToCommittedRoute({
+      turnId,
+      canonicalGoalFrame: frame,
+      committedRoute: route,
+    })).toEqual({
+      reconciled: false,
+      frame,
+      reason: null,
+    });
+  });
+
+  it("replaces a stale document frame and product contract with a compatible world route", () => {
+    const turnId = "ask:test:world-route-stale-doc-lifecycle";
+    const route = scholarlyRoute(turnId);
+    route.route.source_target = "world_event";
+    route.route.target_kind = "world_event";
+    route.canonical_goal = {
+      goal_kind: "environment_evidence_synthesis",
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_terminal_artifact_kinds: [
+        "model_synthesized_answer",
+        "agent_provider_terminal_candidate",
+        "typed_failure",
+      ],
+      forbidden_terminal_artifact_kinds: [],
+    };
+    route.capability_policy.allowed_tool_families = ["live_environment"];
+    route.capability_policy.required_capability_families = [
+      "live_environment",
+    ];
+    route.terminal_product.required_terminal_product =
+      "model_synthesized_answer";
+
+    const frameResult = reconcileCanonicalGoalFrameToCommittedRoute({
+      turnId,
+      canonicalGoalFrame: {
+        turn_id: turnId,
+        goal_kind: "doc_open_best",
+        required_terminal_kind: "doc_open_receipt",
+        classifier_reasons: ["doc_read_aloud_phrase"],
+      },
+      committedRoute: route,
+    });
+    const productResult = reconcileRouteProductContractToCommittedRoute({
+      turnId,
+      routeProductContract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "world_event",
+        goal_kind: "doc_open_best",
+        required_terminal_kind: "doc_open_receipt",
+        allowed_terminal_artifact_kinds: ["doc_open_receipt"],
+      },
+      committedRoute: route,
+    });
+
+    expect(frameResult).toMatchObject({
+      reconciled: true,
+      reason: "committed_source_route_overrode_stale_incompatible_goal",
+      frame: {
+        goal_kind: "environment_evidence_synthesis",
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: expect.arrayContaining([
+          "model_synthesized_answer",
+          "agent_provider_terminal_candidate",
+        ]),
+        source: "committed_route_canonical_goal_reconciliation",
+      },
+    });
+    expect(productResult).toMatchObject({
+      reconciled: true,
+      reason: "committed_source_route_overrode_stale_product_contract",
+      contract: {
+        source_target: "world_event",
+        goal_kind: "environment_evidence_synthesis",
+        required_terminal_kind: "model_synthesized_answer",
+        required_terminal_artifact_kind: "model_synthesized_answer",
+        evidence_reentry_required: true,
+        followup_reasoning_required: true,
+      },
     });
   });
 });

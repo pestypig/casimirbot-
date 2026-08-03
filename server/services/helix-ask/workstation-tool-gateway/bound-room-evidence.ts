@@ -92,6 +92,8 @@ export type BoundRoomEvidenceErrorCode =
 
 export type BoundRoomEvidenceSourceCandidate = {
   bindingId: string;
+  /** Server-owned source owner. It is routing authority, not model context. */
+  ownerProfileId?: string;
   /** Server-owned credential identity only; never projected into observations. */
   credentialId?: string;
   roomId: string;
@@ -151,6 +153,7 @@ export type BoundRoomEvidenceDependencies = {
 
 type SourceCandidateRow = {
   binding_id: string;
+  owner_profile_id: string;
   room_id: string;
   source_id: string;
   world_id: string;
@@ -342,6 +345,7 @@ export const listLatestBoundRoomSourceCandidates = async (
     `
       SELECT
         b.binding_id,
+        b.owner_profile_id,
         b.room_id,
         b.source_id,
         b.world_id,
@@ -442,6 +446,7 @@ export const listLatestBoundRoomSourceCandidates = async (
     }
     candidates.push({
       bindingId: row.binding_id,
+      ownerProfileId: row.owner_profile_id,
       credentialId: row.credential_id,
       roomId: row.room_id,
       sourceId: row.source_id,

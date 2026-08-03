@@ -73,8 +73,10 @@ import {
 } from "./theory-badge-graph-current-context-intent";
 import {
   isAffirmativeImmediateMinecraftSituationPrompt,
+  isMinecraftCommandNonExecutionDiscussionPrompt,
   isMinecraftSituationSessionSetupPrompt,
 } from "./minecraft-situation-intent";
+import { extractExplicitCapabilityContracts } from "./explicit-capability-contract";
 
 export {
   isStagePlayCheckpointRequestPrompt,
@@ -799,6 +801,77 @@ export function arbitrateAskSourceTarget(input: {
       precedenceReason:
         "minecraft_situation_session_setup_is_action_not_evidence",
       confidence: 0.98,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isMinecraftCommandNonExecutionDiscussionPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "model_only",
+      targetKind: "general_background",
+      strength: "hard",
+      explicitCues: ["minecraft_command_non_execution_discussion"],
+      reasons: [
+        "minecraft_command_non_execution_discussion_is_not_execution",
+      ],
+      requestedOutputs: [],
+      suppressedRoutes: [
+        "world_event_current_state",
+        "live_environment_current_state",
+        "workstation_action",
+      ],
+      precedenceReason:
+        "minecraft_command_non_execution_discussion_is_not_execution",
+      confidence: 0.99,
+      allowClientShortcut: false,
+      allowNoToolDirect: true,
+    });
+  }
+  const explicitMinecraftEnvironmentCapabilities =
+    extractExplicitCapabilityContracts(prompt).filter(
+      ({ capability, contract, source }) =>
+        source === "natural_capability_intent" &&
+        contract.source_target === "live_environment" &&
+        capability.startsWith("com.casimirbot.minecraft."),
+    );
+  if (explicitMinecraftEnvironmentCapabilities.length > 0) {
+    const capabilities = Array.from(
+      new Set(
+        explicitMinecraftEnvironmentCapabilities.map(
+          ({ capability }) => capability,
+        ),
+      ),
+    );
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "live_environment",
+      targetKind: "live_environment",
+      strength: "hard",
+      explicitCues: capabilities.map(
+        (capability) => `explicit_capability:${capability}`,
+      ),
+      reasons: [
+        "explicit_minecraft_environment_capability_source_target",
+        ...capabilities,
+      ],
+      requestedOutputs: [
+        "field_evaluation_refs",
+        "interpretation_refs",
+        "tool_call_eligibility",
+        "typed_failure",
+      ],
+      suppressedRoutes: [
+        "world_event_current_state",
+        "internet_search_lookup",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason:
+        "explicit_minecraft_environment_capability_source_target",
+      confidence: 0.99,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });

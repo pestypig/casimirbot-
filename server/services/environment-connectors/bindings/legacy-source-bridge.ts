@@ -67,25 +67,13 @@ export const materializeLegacyRoomSourceConnector = async (input: {
       input.roomSourceBindingId,
       input.credentialId,
     ])}`;
-  const environmentBindingId =
+  let environmentBindingId =
     `environment_binding:legacy:${shortHash([
       deviceId,
       input.roomSourceBindingId,
-      input.adapterAdmission.admission_id,
     ])}`;
-  const catalogHash = environmentConnectorSha256({
-    environment_binding_id: environmentBindingId,
-    adapter_profile_id: input.adapterAdmission.adapter_profile_id,
-    adapter_profile_version: input.adapterAdmission.adapter_profile_version,
-    adapter_contract_hash: input.adapterAdmission.adapter_contract_hash,
-    manifest_hash: input.adapterAdmission.manifest_hash,
-    capability_descriptors: input.capabilityDescriptors,
-  });
-  const catalogSnapshotId =
-    `environment_catalog_snapshot:${shortHash([
-      environmentBindingId,
-      catalogHash,
-    ])}`;
+  let catalogHash = "";
+  let catalogSnapshotId = "";
   const frozenAt = new Date().toISOString();
 
   await withSharedRealtimeRoomTransaction(async (db: Queryable) => {
@@ -111,6 +99,43 @@ export const materializeLegacyRoomSourceConnector = async (input: {
         input.adapterAdmission.adapter_contract_hash,
         JSON.stringify(input.capabilityDescriptors),
       ],
+    );
+    const existingBinding = await db.query<{ environment_binding_id: string }>(
+      `
+        SELECT environment_binding_id
+        FROM helix_environment_connector_bindings
+        WHERE installation_id = $1
+          AND device_id = $2
+          AND room_source_binding_id = $3
+        ORDER BY updated_at DESC, created_at DESC
+        LIMIT 1;
+      `,
+      [installationId, deviceId, input.roomSourceBindingId],
+    );
+    environmentBindingId =
+      existingBinding.rows[0]?.environment_binding_id ?? environmentBindingId;
+    catalogHash = environmentConnectorSha256({
+      environment_binding_id: environmentBindingId,
+      adapter_profile_id: input.adapterAdmission.adapter_profile_id,
+      adapter_profile_version: input.adapterAdmission.adapter_profile_version,
+      adapter_contract_hash: input.adapterAdmission.adapter_contract_hash,
+      manifest_hash: input.adapterAdmission.manifest_hash,
+      capability_descriptors: input.capabilityDescriptors,
+    });
+    catalogSnapshotId =
+      `environment_catalog_snapshot:${shortHash([
+        environmentBindingId,
+        catalogHash,
+      ])}`;
+    await db.query(
+      `
+        UPDATE helix_environment_connector_bindings
+        SET status = 'suspended', updated_at = now()
+        WHERE room_source_binding_id = $1
+          AND environment_binding_id <> $2
+          AND status = 'active';
+      `,
+      [input.roomSourceBindingId, environmentBindingId],
     );
     await db.query(
       `
@@ -175,7 +200,16 @@ export const materializeLegacyRoomSourceConnector = async (input: {
           world_id,
           consent_capability_ids
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
-        ON CONFLICT (environment_binding_id) DO NOTHING;
+        ON CONFLICT (environment_binding_id) DO UPDATE
+        SET adapter_admission_id = EXCLUDED.adapter_admission_id,
+            owner_profile_id = EXCLUDED.owner_profile_id,
+            room_id = EXCLUDED.room_id,
+            source_id = EXCLUDED.source_id,
+            world_id = EXCLUDED.world_id,
+            consent_capability_ids = EXCLUDED.consent_capability_ids,
+            status = 'active',
+            revoked_at = NULL,
+            updated_at = now();
       `,
       [
         environmentBindingId,
@@ -252,4 +286,3 @@ export const materializeLegacyRoomSourceConnector = async (input: {
     }),
   };
 };
-

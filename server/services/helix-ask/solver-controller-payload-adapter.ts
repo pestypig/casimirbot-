@@ -1,3 +1,5 @@
+import { resolveCompoundCoverageRouteScope } from "./compound-coverage-route-scope";
+
 type RecordLike = Record<string, unknown>;
 
 type HelixAskCanonicalGoalFrame = any;
@@ -880,17 +882,16 @@ export const createSolverControllerPayloadAdapter = (dependencies: SolverControl
         payload.source_target_intent && typeof payload.source_target_intent === "object" && !Array.isArray(payload.source_target_intent)
           ? (payload.source_target_intent as Record<string, unknown>)
           : null;
-      const compoundGateRouteScope =
-        canonicalGoalForController.goal_kind === "model_only_concept" ||
-        canonicalGoalForController.goal_kind === "conversation" ||
-        canonicalGoalForController.goal_kind === "workspace_help" ||
-        canonicalGoalForController.answer_scope === "model_only" ||
-        (
-          !["repo_code", "docs_viewer", "active_doc", "runtime_evidence", "workstation_panel", "workspace_action", "calculator_stream", "situation_room", "live_pipeline", "visual_capture"].includes(readAskTurnString(sourceTargetIntentForCompoundGate?.target_source) ?? "") &&
-          !["hard"].includes(readAskTurnString(sourceTargetIntentForCompoundGate?.strength) ?? "")
-        )
-          ? "model_only" as const
-          : "source_targeted" as const;
+      const compoundGateRouteScope = resolveCompoundCoverageRouteScope({
+        goalKind: canonicalGoalForController.goal_kind,
+        answerScope: canonicalGoalForController.answer_scope,
+        targetSource: readAskTurnString(
+          sourceTargetIntentForCompoundGate?.target_source,
+        ),
+        sourceStrength: readAskTurnString(
+          sourceTargetIntentForCompoundGate?.strength,
+        ),
+      });
       const compoundGateArtifacts = Array.isArray(payload.current_turn_artifact_ledger)
         ? (payload.current_turn_artifact_ledger as HelixTurnArtifact[])
         : mergedAgentDisciplineArtifacts;

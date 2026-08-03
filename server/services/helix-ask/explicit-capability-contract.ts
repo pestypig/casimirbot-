@@ -20,6 +20,12 @@ import {
   HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
 } from "@shared/helix-environment-connector";
 import {
+  HELIX_ENVIRONMENT_COMMAND_CATALOG_OBSERVATION_SCHEMA,
+  HELIX_ENVIRONMENT_COMMAND_OBSERVATION_SCHEMA,
+  HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+  HELIX_MINECRAFT_COMMAND_CAPABILITY,
+} from "@shared/helix-environment-command";
+import {
   askCapabilityCatalogPromptMatchIndex,
   isAskCapabilityCatalogPrompt,
 } from "./capability-catalog-intent";
@@ -41,7 +47,11 @@ import {
   theoryFormalArtifactInspectionPromptMatch,
 } from "./theory-formal-artifact-intent";
 import { isAffirmativeReadAloudPrompt } from "./referent-resolution";
-import { isAffirmativeImmediateMinecraftSituationPrompt } from "./minecraft-situation-intent";
+import {
+  isAffirmativeImmediateMinecraftSituationPrompt,
+  isMinecraftSituationSessionSetupPrompt,
+} from "./minecraft-situation-intent";
+import { minecraftMechanicsDocsPromptMatch } from "./minecraft-mechanics-docs-intent";
 
 const THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY =
   "theory-experiment-procedure.evaluate_closure" as const;
@@ -837,7 +847,10 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     {
       schema: "helix.explicit_capability_contract.v1",
       capability: "live_pipeline",
-      aliases: ["live-pipeline", "live_pipeline_control"],
+      aliases: [
+        "live-pipeline",
+        "live_pipeline_control",
+      ],
       capability_family: "live_environment",
       plan_family: "live_environment",
       source_target: "live_pipeline",
@@ -848,6 +861,23 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
         "tool_observation",
       ],
       required_terminal_kind: "workstation_tool_evaluation",
+      allowed_substitutions: [],
+      forbidden_nearby_capabilities: ["model.direct_answer"],
+    },
+    {
+      schema: "helix.explicit_capability_contract.v1",
+      capability: "situation-room.live-source.set_rate",
+      aliases: ["live-source.set_rate"],
+      capability_family: "live_pipeline",
+      plan_family: "live_pipeline",
+      source_target: "live_pipeline",
+      admission_families: ["live_pipeline"],
+      required_observation_kinds: [
+        "live_pipeline_receipt",
+        "visual_producer_cadence_receipt",
+        "tool_observation",
+      ],
+      required_terminal_kind: "live_pipeline_receipt",
       allowed_substitutions: [],
       forbidden_nearby_capabilities: ["model.direct_answer"],
     },
@@ -1899,6 +1929,28 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       optionalArgs: ["freshness_requirement_ms"],
     }),
     liveEnvironmentEvidenceContract({
+      capability: HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+      aliases: ["minecraft command catalog", "minecraft live command tree"],
+      requiredObservationKinds: [
+        HELIX_ENVIRONMENT_COMMAND_CATALOG_OBSERVATION_SCHEMA,
+        "helix.agent_step_observation_packet.v1",
+        "provider_gateway_observation_packet",
+      ],
+      requiredArgs: [],
+      optionalArgs: ["query", "path_prefix", "limit", "environment_label"],
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: HELIX_MINECRAFT_COMMAND_CAPABILITY,
+      aliases: ["minecraft command", "minecraft live command"],
+      requiredObservationKinds: [
+        HELIX_ENVIRONMENT_COMMAND_OBSERVATION_SCHEMA,
+        "helix.agent_step_observation_packet.v1",
+        "provider_gateway_observation_packet",
+      ],
+      requiredArgs: ["command"],
+      optionalArgs: ["category", "effect", "environment_label"],
+    }),
+    liveEnvironmentEvidenceContract({
       capability: "live_env.record_commentary",
       aliases: ["record_commentary", "live evidence commentary"],
     }),
@@ -2919,7 +2971,7 @@ const naturalMinecraftInventoryProbePromptMatch = (
     /\bwhy\s+did\b[\s\S]{0,80}\b(?:previous|earlier|last)\s+turn\b/i.test(
       prompt,
     ) ||
-    /\bcan\s+(?:the|this|our|a)\s+(?:minecraft\s+)?connector\b[\s\S]{0,100}\b(?:check|inspect|read|show)\b/i.test(
+    /\bcan\s+(?:the|this|our|a)\s+(?:(?:minecraft|fabric)\s+)?connector\b[\s\S]{0,100}\b(?:recheck|check|inspect|read|show)\b/i.test(
       prompt,
     )
   ) {
@@ -2975,6 +3027,119 @@ const naturalMinecraftInventoryProbePromptMatch = (
   };
 };
 
+const BARE_MINECRAFT_SLASH_COMMAND_PROMPT =
+  /^\s*\/[a-z][a-z0-9:_-]*(?:\s+[^\r\n]+)?\s*$/i;
+
+const NATURAL_MINECRAFT_COMMAND_ACTION =
+  String.raw`(?:make|give|grant|apply|remove|clear|summon|spawn|teleport|bring|move|kill|damage|heal|feed|equip|enchant|fill|replace|place|put|take|turn|set|change|toggle|enable|disable|start|stop|freeze|unfreeze|save|flush|kick|ban|pardon|whitelist|op|deop|title|message|say|play|trigger|award|drop|locate)`;
+
+/**
+ * Recognizes an affirmative operator request whose implementation belongs to
+ * the live Minecraft command surface. This only proposes the command
+ * capability; the model still chooses a command and Helix independently
+ * validates the resulting request, room authority, source, and arguments.
+ */
+const naturalMinecraftCommandActionPromptMatch = (
+  prompt: string,
+): {
+  matched_text: string;
+  match_index: number;
+  match_end_index: number;
+} | null => {
+  const hasMinecraftScope =
+    /\b(?:minecraft|fabric|minehut|mine\s*hut|in[-\s]?game)\b|\bconnected\s+(?:game|world|server)\b/i.test(
+      prompt,
+    );
+  if (!hasMinecraftScope) return null;
+  if (isMinecraftSituationSessionSetupPrompt(prompt)) return null;
+
+  const directRequestPatterns = [
+    new RegExp(
+      String.raw`\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(${NATURAL_MINECRAFT_COMMAND_ACTION})\b`,
+      "i",
+    ),
+    new RegExp(
+      String.raw`\bi\s+(?:want|need|would\s+like)\s+you\s+to\s+(${NATURAL_MINECRAFT_COMMAND_ACTION})\b`,
+      "i",
+    ),
+    new RegExp(
+      String.raw`(?:^|[.!?;]\s*|\b(?:then|and)\s+)(?:please\s+)?(${NATURAL_MINECRAFT_COMMAND_ACTION})\b`,
+      "i",
+    ),
+    new RegExp(
+      String.raw`\bplease\s+(${NATURAL_MINECRAFT_COMMAND_ACTION})\b`,
+      "i",
+    ),
+    new RegExp(
+      String.raw`\b(?:in|on)\s+(?:the\s+)?(?:(?:connected|live|current|our|my)\s+)?(?:minecraft|fabric|minehut|mine\s*hut|game)(?:\s+(?:world|server))?\b[\s\S]{0,100}\b(${NATURAL_MINECRAFT_COMMAND_ACTION})\b`,
+      "i",
+    ),
+  ];
+  const requestMatch = directRequestPatterns
+    .map((pattern) => prompt.match(pattern))
+    .find(
+      (candidate): candidate is RegExpMatchArray =>
+        Boolean(candidate && typeof candidate.index === "number" && candidate[1]),
+    );
+  if (!requestMatch || typeof requestMatch.index !== "number") return null;
+
+  const matchedText = requestMatch[1];
+  const matchIndex =
+    requestMatch.index + Math.max(0, requestMatch[0].lastIndexOf(matchedText));
+  const clausePrefix = prompt
+    .slice(Math.max(0, matchIndex - 220), matchIndex)
+    .split(/[.!?;\n]/)
+    .pop() ?? "";
+  const clauseWindow = prompt.slice(
+    Math.max(0, matchIndex - 220),
+    Math.min(prompt.length, matchIndex + 220),
+  );
+  const explainsInsteadOfActs =
+    /\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:explain|describe|tell|show|teach|outline|write|plan|simulate|quote|repeat|discuss)\b/i.test(
+      clausePrefix,
+    ) ||
+    /\b(?:explain|describe|tell\s+me\s+how|show\s+me\s+how|what\s+(?:command|would)|which\s+command)\b/i.test(
+      clausePrefix,
+    );
+  const negatedOrNoChange = new RegExp(
+    String.raw`\b(?:do\s+not|don['’]t|dont|never|not|avoid|without)\b[\s\S]{0,120}\b${NATURAL_MINECRAFT_COMMAND_ACTION}\b|\b(?:do\s+not|don['’]t|dont|never|without)\b[\s\S]{0,100}\b(?:change|modify|affect|execute|run|apply)\b`,
+    "i",
+  ).test(clauseWindow);
+  const deferredOrConditional = new RegExp(
+    String.raw`\b(?:later|eventually|tomorrow|someday|if|when|unless|once|may|might)\b[\s\S]{0,140}\b${NATURAL_MINECRAFT_COMMAND_ACTION}\b`,
+    "i",
+  ).test(clausePrefix);
+  const contextualDiscussion =
+    /\b(?:screen|page|button|label|ui|text|menu|docs?|guide|transcript|example|quoted?|someone\s+said)\b[\s\S]{0,140}\b(?:says|shows|reads|contains|uses|mentions|asks?|called|named)?\b/i.test(
+      clausePrefix,
+    ) ||
+    /\b(?:earlier|previously|historically|last\s+turn|before)\b[\s\S]{0,160}$/i.test(
+      clausePrefix,
+    ) ||
+    /\bcan\s+(?:the|this|our|a)\s+(?:(?:minecraft|fabric)\s+)?(?:connector|adapter|tool)\b/i.test(
+      clausePrefix,
+    );
+  const targetsCommandTextOrHostArtifact =
+    /\b(?:save|write|copy|record|export)\b[\s\S]{0,100}\b(?:text|wording|example|snippet)\b[\s\S]{0,100}\b(?:command|file|disk|document|note)\b/i.test(
+      clauseWindow,
+    );
+
+  if (
+    explainsInsteadOfActs ||
+    negatedOrNoChange ||
+    deferredOrConditional ||
+    contextualDiscussion ||
+    targetsCommandTextOrHostArtifact
+  ) {
+    return null;
+  }
+  return {
+    matched_text: matchedText,
+    match_index: matchIndex,
+    match_end_index: matchIndex + matchedText.length,
+  };
+};
+
 const naturalMinecraftSituationProbePromptMatches = (
   prompt: string,
 ): Array<{
@@ -2983,9 +3148,20 @@ const naturalMinecraftSituationProbePromptMatches = (
   match_index: number;
   match_end_index: number;
 }> => {
+  const minecraftCommandActionMatch =
+    naturalMinecraftCommandActionPromptMatch(prompt);
+  const hasMinecraftCommandSurfaceIntent =
+    /\b(?:use|using|run|execute|issue|send|query|read|list|set|change)\b[\s\S]{0,100}\b(?:live\s+)?(?:minecraft|fabric|minehut|mine\s*hut|game)\b[\s\S]{0,100}\b(?:server\s+)?(?:command(?:\s+(?:dispatcher|surface|tree|catalog))?|dispatcher)\b/i.test(
+      prompt,
+    );
+  const hasBareMinecraftSlashCommand =
+    BARE_MINECRAFT_SLASH_COMMAND_PROMPT.test(prompt);
   if (
     !/\bminecraft\b/i.test(prompt) &&
-    !isAffirmativeImmediateMinecraftSituationPrompt(prompt)
+    !isAffirmativeImmediateMinecraftSituationPrompt(prompt) &&
+    !hasMinecraftCommandSurfaceIntent &&
+    !hasBareMinecraftSlashCommand &&
+    !minecraftCommandActionMatch
   ) {
     return [];
   }
@@ -2993,7 +3169,10 @@ const naturalMinecraftSituationProbePromptMatches = (
     /\bwhy\s+did\b[\s\S]{0,100}\b(?:previous|earlier|last)\s+turn\b/i.test(
       prompt,
     ) ||
-    /\bcan\s+(?:the|this|our|a)\s+(?:minecraft\s+)?connector\b[\s\S]{0,100}\b(?:check|inspect|read|show)\b/i.test(
+    /\bcan\s+(?:the|this|our|a)\s+(?:(?:minecraft|fabric)\s+)?connector\b[\s\S]{0,100}\b(?:recheck|check|inspect|read|show|use|run|execute|issue|send|query|list|set|change|save|flush)\b/i.test(
+      prompt,
+    ) ||
+    /\b(?:explain|describe|tell\s+me\s+how|what\s+would)\b[\s\S]{0,180}\b(?:minecraft|fabric|minehut|mine\s*hut)\b[\s\S]{0,180}(?:\bcommand\b|\/[a-z0-9:_-]+\b)[\s\S]{0,120}\b(?:do\s+not|don't|dont|never|without)\s+(?:run|execute|issue|send|use)\b/i.test(
       prompt,
     )
   ) {
@@ -3006,7 +3185,9 @@ const naturalMinecraftSituationProbePromptMatches = (
     {
       capability: HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
       patterns: [
-        /\b(?:check|read|show|inspect|tell\s+me)\b[\s\S]{0,50}\b(?:my|the\s+player'?s?|current\s+actor'?s?)\s+(?:current\s+)?(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position)\b/i,
+        /\b(?:where\s+am\s+i|what(?:'s|\s+is)\s+my\s+(?:current\s+)?(?:minecraft\s+)?(?:location|position|dimension)|how\s+am\s+i\s+doing)\b[\s\S]{0,120}\bminecraft\b|\bminecraft\b[\s\S]{0,120}\b(?:where\s+am\s+i|what(?:'s|\s+is)\s+my\s+(?:current\s+)?(?:location|position|dimension)|how\s+am\s+i\s+doing)\b/i,
+        /\b(?:what(?:'s|\s+is)|recheck|check|read|show|inspect|tell\s+me)\b[\s\S]{0,40}\bmy\s+(?:(?:current\s+)?(?:minecraft\s+)?|minecraft\s+(?:current\s+)?)(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position)\b/i,
+        /\b(?:recheck|check|read|show|inspect|tell\s+me)\b[\s\S]{0,50}\b(?:my|the\s+player'?s?|current\s+actor'?s?)\s+(?:current\s+)?(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position)\b/i,
         /\b(?:my|the\s+player'?s?|current\s+actor'?s?)\s+(?:current\s+)?(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position)\b/i,
         /\b(?:check|read|show|inspect|tell\s+me|what(?:'s|\s+is))\b[\s\S]{0,70}\b(?:crimson\s+curse|infection)\b[\s\S]{0,40}\b(?:phase|mass|points?|state|status)\b/i,
       ],
@@ -3061,6 +3242,14 @@ const naturalMinecraftSituationProbePromptMatches = (
         /\b(?:inspect|read|check|show|list|tell\s+me)\b[\s\S]{0,90}\b(?:closed\s+|unopened\s+)?(?:chest|barrel|container|shulker\s+box)\b[\s\S]{0,80}\b(?:contents?|items?|what(?:'s|\s+is)\s+inside|inside)\b/i,
       ],
     },
+    {
+      capability: HELIX_MINECRAFT_COMMAND_CAPABILITY,
+      patterns: [
+        BARE_MINECRAFT_SLASH_COMMAND_PROMPT,
+        /\b(?:use|using|run|execute|issue|send|query|read|list|set|change)\b[\s\S]{0,100}\b(?:live\s+)?(?:minecraft|fabric|minehut|mine\s*hut|game)\b[\s\S]{0,100}\b(?:server\s+)?(?:command(?:\s+(?:dispatcher|surface|tree|catalog))?|dispatcher)\b/i,
+        /\b(?:save|flush)\b[\s\S]{0,120}\b(?:connected\s+|live\s+)?(?:minecraft|fabric|minehut|mine\s*hut)\b[\s\S]{0,100}\b(?:server|world)\b[\s\S]{0,100}\b(?:using|with|via)\b[\s\S]{0,60}(?:\bcommand\b|\/save-all\b)/i,
+      ],
+    },
   ];
   const matches: Array<{
     capability: string;
@@ -3101,24 +3290,36 @@ const naturalMinecraftSituationProbePromptMatches = (
       HELIX_MINECRAFT_CONTAINER_CONTENTS_READ_CAPABILITY,
       /\b(?:contents?|items?|inside|chest|barrel|container|shulker\s+box)\b/i,
     ],
+    [
+      HELIX_MINECRAFT_COMMAND_CAPABILITY,
+      /\b(?:minecraft|fabric|minehut|mine\s*hut|command|dispatcher)\b/i,
+    ],
   ]);
   for (const specification of specifications) {
-    const match = specification.patterns
+    const patternMatch = specification.patterns
       .map((pattern) => prompt.match(pattern))
       .find(
         (candidate): candidate is RegExpMatchArray =>
           Boolean(candidate && typeof candidate.index === "number"),
       );
-    if (!match || typeof match.index !== "number") continue;
-    const semanticAnchor = match[0].match(
+    const directActionMatch =
+      specification.capability === HELIX_MINECRAFT_COMMAND_CAPABILITY
+        ? minecraftCommandActionMatch
+        : null;
+    if (!patternMatch && !directActionMatch) continue;
+    const rawMatchedText = directActionMatch?.matched_text ?? patternMatch?.[0] ?? "";
+    const rawMatchIndex =
+      directActionMatch?.match_index ?? patternMatch?.index ?? -1;
+    if (!rawMatchedText || rawMatchIndex < 0) continue;
+    const semanticAnchor = rawMatchedText.match(
       semanticAnchorPatterns.get(specification.capability) ?? /[\s\S]+/,
     );
     const semanticOffset =
       semanticAnchor && typeof semanticAnchor.index === "number"
         ? semanticAnchor.index
         : 0;
-    const matchedText = semanticAnchor?.[0] ?? match[0];
-    const matchIndex = match.index + semanticOffset;
+    const matchedText = semanticAnchor?.[0] ?? rawMatchedText;
+    const matchIndex = rawMatchIndex + semanticOffset;
     matches.push({
       capability: specification.capability,
       matched_text: matchedText,
@@ -3178,6 +3379,32 @@ export const extractExplicitCapabilityContracts = (
       match_index: capabilityCatalogMatchIndex ?? 0,
       match_end_index: capabilityCatalogMatchIndex ?? 0,
       source: "capability_catalog_prompt",
+    });
+  }
+  const minecraftMechanicsDocsContract =
+    explicitCapabilityContractForCapability("docs-viewer.search_docs");
+  const minecraftMechanicsDocsMatch =
+    minecraftMechanicsDocsPromptMatch(prompt);
+  if (
+    minecraftMechanicsDocsContract &&
+    minecraftMechanicsDocsMatch &&
+    !negatedCommandMentionsCapabilityAt(
+      prompt,
+      minecraftMechanicsDocsMatch.match_index,
+    ) &&
+    !capabilityMentionIsNonExecutableContextAt(
+      prompt,
+      minecraftMechanicsDocsMatch.match_index,
+    ) &&
+    !familySuppressed(prompt, minecraftMechanicsDocsContract)
+  ) {
+    matches.push({
+      contract: minecraftMechanicsDocsContract,
+      capability: minecraftMechanicsDocsContract.capability,
+      matched_name: minecraftMechanicsDocsMatch.matched_text,
+      match_index: minecraftMechanicsDocsMatch.match_index,
+      match_end_index: minecraftMechanicsDocsMatch.match_end_index,
+      source: "natural_capability_intent",
     });
   }
   for (const minecraftSituationMatch of

@@ -154,6 +154,7 @@ export type HelixAgentStepObservationPacket = {
   capability_key: string;
   panel_id: string;
   action: string;
+  executed_args?: Record<string, unknown>;
   status: "succeeded" | "blocked" | "missing_input" | "needs_confirmation" | "failed" | "client_pending";
   produced_artifact_refs: string[];
   observation_summary: string;

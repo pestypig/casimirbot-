@@ -191,6 +191,7 @@ const minecraftActorStatusOutputSchema: HelixEnvironmentConstrainedJsonSchema =
       max_health: { type: "number", minimum: 0, maximum: 2_048 },
       food_level: { type: "integer", minimum: 0, maximum: 20 },
       saturation: { type: "number", minimum: 0, maximum: 20 },
+      actor_label: { type: "string", maxLength: 160 },
       game_mode: { type: "string", maxLength: 64 },
       world: { type: "string", maxLength: 160 },
       position: minecraftPositionSchema,

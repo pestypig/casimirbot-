@@ -7,14 +7,25 @@ import { codexProvider } from "./codex-provider";
 import { futureProvider } from "./future-provider";
 import { listHelixCapabilityLanes } from "../capability-lanes/registry";
 
-const providers = new Map<string, HelixAgentProvider>([
-  [helixNativeProvider.id, helixNativeProvider],
-  [codexProvider.id, codexProvider],
-  [futureProvider.id, futureProvider],
-]);
+// Build the registry only when it is used. Goal-runtime and terminal-authority
+// modules can be reached while the Codex provider import graph is still being
+// initialized; eagerly reading `codexProvider.id` here turns that valid module
+// cycle into a startup-order crash. ESM imports are live bindings, so deferring
+// this read preserves the same provider instances without duplicating runtime
+// ownership or introducing a second registry.
+const registeredProviders = (): HelixAgentProvider[] => [
+  helixNativeProvider,
+  codexProvider,
+  futureProvider,
+];
+
+const providerMap = (): Map<string, HelixAgentProvider> =>
+  new Map(
+    registeredProviders().map((provider) => [provider.id, provider] as const),
+  );
 
 export function listHelixAgentProviders(): HelixAgentRuntimeDescriptor[] {
-  return Array.from(providers.values()).map((provider) => ({
+  return registeredProviders().map((provider) => ({
     id: provider.id,
     label: provider.label,
     enabled: provider.enabled(),
@@ -31,7 +42,7 @@ export function resolveDefaultHelixAgentProvider(): HelixAgentProvider {
 }
 
 export function getHelixAgentProviderById(id: string): HelixAgentProvider | null {
-  return providers.get(id) ?? null;
+  return providerMap().get(id) ?? null;
 }
 
 export function resolveHelixAgentProvider(input: {
@@ -39,7 +50,7 @@ export function resolveHelixAgentProvider(input: {
   headers?: IncomingHttpHeaders;
 }): HelixAgentProvider {
   const requested = selectHelixAgentRuntime(input);
-  const provider = providers.get(requested);
+  const provider = providerMap().get(requested);
 
   if (provider) {
     return provider;

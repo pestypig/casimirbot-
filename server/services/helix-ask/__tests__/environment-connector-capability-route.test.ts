@@ -24,6 +24,7 @@ import {
   HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
   HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
 } from "@shared/helix-environment-connector";
+import { HELIX_MINECRAFT_COMMAND_CAPABILITY } from "@shared/helix-environment-command";
 
 const CAPABILITY = "com.casimirbot.minecraft.inventory.check";
 
@@ -145,6 +146,272 @@ describe("Minecraft environment connector capability routing", () => {
     );
   });
 
+  it("routes an affirmative live Fabric dispatcher request to the exact Minecraft command capability", () => {
+    const prompt =
+      "Using the live Fabric server command dispatcher, list the players currently on the server whitelist and tell me the result.";
+    expect(extractExplicitCapabilityContracts(prompt)).toContainEqual(
+      expect.objectContaining({
+        capability: HELIX_MINECRAFT_COMMAND_CAPABILITY,
+        source: "natural_capability_intent",
+      }),
+    );
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:minecraft-command-surface",
+        threadId: "helix-ask:room:shared_realtime_room:command-surface",
+        promptText: prompt,
+      }),
+    ).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+      precedence_reason:
+        "explicit_minecraft_environment_capability_source_target",
+    });
+  });
+
+  it.each([
+    "Can you make me glow for ten seconds in the connected Minecraft world?",
+    "Please give me night vision for one minute in Minecraft.",
+    "In the live Fabric world, bring that pig over here.",
+    "Clear the weather in the connected Minecraft world.",
+    "I want you to save the current Minecraft server world now.",
+    "In Minecraft, set the time to noon and tell me what happened.",
+  ])(
+    "proposes the command surface for an affirmative natural Minecraft action: %s",
+    (prompt) => {
+      expect(extractExplicitCapabilityContracts(prompt)).toContainEqual(
+        expect.objectContaining({
+          capability: HELIX_MINECRAFT_COMMAND_CAPABILITY,
+          source: "natural_capability_intent",
+        }),
+      );
+      expect(
+        arbitrateAskSourceTarget({
+          turnId: `ask:test:minecraft-natural-action:${prompt.length}`,
+          threadId: "helix-ask:room:shared_realtime_room:natural-action",
+          promptText: prompt,
+        }),
+      ).toMatchObject({
+        target_source: "live_environment",
+        target_kind: "live_environment",
+        strength: "hard",
+        allow_no_tool_direct: false,
+      });
+    },
+  );
+
+  it.each([
+    "Do not make me glow in the connected Minecraft world.",
+    "Later I may ask you to make me glow in Minecraft.",
+    "If I join again, make me glow in Minecraft.",
+    'The screen says "Can you make me glow in Minecraft?"',
+    '"Make me glow in Minecraft" is only an example request.',
+    "Historically, I asked you to make me glow in Minecraft.",
+    "Can you explain how to make me glow in Minecraft?",
+    "Explain glowing in Minecraft, but do not apply it.",
+    "Can the Minecraft connector make me glow?",
+  ])(
+    "does not propose a mutating Minecraft command for contextual wording: %s",
+    (prompt) => {
+      expect(
+        extractExplicitCapabilityContracts(prompt).map(
+          (entry) => entry.capability,
+        ),
+      ).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+    },
+  );
+
+  it("admits an affirmative action in a mixed request while preserving final synthesis", () => {
+    const prompt =
+      "Make me glow in the connected Minecraft world, then explain what happened.";
+    expect(extractExplicitCapabilityContracts(prompt)).toContainEqual(
+      expect.objectContaining({
+        capability: HELIX_MINECRAFT_COMMAND_CAPABILITY,
+        source: "natural_capability_intent",
+        contract: expect.objectContaining({
+          required_terminal_kind: "model_synthesized_answer",
+        }),
+      }),
+    );
+  });
+
+  it("admits goal-shaped Minecraft mechanics retrieval without requiring a document title and keeps execution suppressed", () => {
+    const prompt =
+      "Before doing anything in Minecraft, look up the connected environment mechanics for how to give my bound player a temporary glowing effect for ten seconds. Cite the exact source file and line that supports the command you would use. Do not execute any command.";
+    const capabilities = extractExplicitCapabilityContracts(prompt).map(
+      (entry) => entry.capability,
+    );
+    expect(capabilities).toContain("docs-viewer.search_docs");
+    expect(capabilities).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+  });
+
+  it.each([
+    "Do not look up any Minecraft command docs; explain the phrase only.",
+    "Later, look up the Minecraft command mechanics, but not now.",
+    "If I join again, look up the Fabric command syntax.",
+    "Earlier you looked up the Minecraft mechanics and cited a source line.",
+    'The screen says "look up the Minecraft command docs"; explain that text.',
+    '"Look up the Minecraft command docs" is only an example prompt.',
+  ])("does not retrieve mechanics for contextual wording: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt).map(
+        (entry) => entry.capability,
+      ),
+    ).not.toContain("docs-viewer.search_docs");
+  });
+
+  it("treats a bare one-line Minecraft slash command as an affirmative exact operator command", () => {
+    const prompt = "/gamerule doDaylightCycle false";
+    expect(extractExplicitCapabilityContracts(prompt)).toContainEqual(
+      expect.objectContaining({
+        capability: HELIX_MINECRAFT_COMMAND_CAPABILITY,
+        source: "natural_capability_intent",
+      }),
+    );
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:bare-minecraft-command",
+        threadId: "helix-ask:room:shared_realtime_room:bare-command",
+        promptText: prompt,
+      }),
+    ).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+    });
+  });
+
+  it.each([
+    'The screen says "/gamerule doDaylightCycle false".',
+    'Later run "/gamerule doDaylightCycle false".',
+    'Explain "/gamerule doDaylightCycle false" without executing it.',
+    '`/gamerule doDaylightCycle false`',
+  ])("does not treat referenced slash-command text as bare execution: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt).map(
+        (entry) => entry.capability,
+      ),
+    ).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+  });
+
+  it("routes a natural Minecraft world-save request to the command capability without treating it as host filesystem access", () => {
+    const prompt =
+      'Save the connected Minecraft Fabric server world to disk now using the exact administrator command "/save-all flush". Report only the fresh observed server result.';
+    expect(extractExplicitCapabilityContracts(prompt)).toContainEqual(
+      expect.objectContaining({
+        capability: HELIX_MINECRAFT_COMMAND_CAPABILITY,
+        source: "natural_capability_intent",
+      }),
+    );
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:minecraft-save-all",
+        threadId: "helix-ask:room:shared_realtime_room:save-all",
+        promptText: prompt,
+      }),
+    ).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+      precedence_reason:
+        "explicit_minecraft_environment_capability_source_target",
+    });
+  });
+
+  it.each([
+    'Later, save the connected Minecraft Fabric server world using the command "/save-all flush".',
+    'The screen says "Save the connected Minecraft Fabric server world using /save-all flush."',
+    'Explain how to save the connected Minecraft Fabric server world with /save-all flush, but do not execute it.',
+    'Can the Fabric connector save the Minecraft server world using /save-all flush?',
+    'Save the text of the Minecraft command "/save-all flush" to a file on disk.',
+  ])("does not execute contextual or host-file save wording: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt).map(
+        (entry) => entry.capability,
+      ),
+    ).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+  });
+
+  it.each([
+    "Explain what the Fabric server command `time set night` would do; do not execute it.",
+    'The screen says "Using the live Fabric server command dispatcher, run whitelist list."',
+    "Later I may ask you to use the live Fabric server command dispatcher to list the whitelist.",
+    "If I enable full mode, use the live Fabric server command dispatcher to list the whitelist.",
+    "Historically, we used the live Fabric server command dispatcher to list the whitelist.",
+    "Can the Fabric connector use the live Fabric server command dispatcher to list the whitelist?",
+  ])("does not execute contextual Fabric command-surface wording: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt).map(
+        (entry) => entry.capability,
+      ),
+    ).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+  });
+
+  it("keeps an explicit Minecraft command explanation with a non-execution instruction model-only", () => {
+    const prompt =
+      "Explain what the Minecraft command `time set night` would do, but do not execute it or change the world.";
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:minecraft-command-discussion",
+        threadId: "helix-ask:room:shared_realtime_room:command-discussion",
+        promptText: prompt,
+      }),
+    ).toMatchObject({
+      target_source: "model_only",
+      target_kind: "general_background",
+      strength: "hard",
+      allow_no_tool_direct: true,
+      precedence_reason:
+        "minecraft_command_non_execution_discussion_is_not_execution",
+    });
+  });
+
+  it.each([
+    "What is my Minecraft status right now?",
+    "Can you check my Minecraft health now?",
+    "Given the inventory you just observed, check my current Minecraft status again now. Clearly separate what is freshly observed from your advice.",
+    "Recheck my current Minecraft status now for me. Require a new current-turn actor observation from the room-bound Fabric source.",
+  ])("treats first-person current Minecraft state as a live actor probe: %s", (prompt) => {
+    expect(extractExplicitCapabilityContracts(prompt)).toContainEqual(
+      expect.objectContaining({
+        capability: HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+        source: "natural_capability_intent",
+      }),
+    );
+  });
+
+  it.each([
+    "What is Minecraft's service status right now?",
+    "Search the web for the current Minecraft server status.",
+    "Do not check my Minecraft status right now.",
+    "Later I may ask what my Minecraft status is.",
+    'The screen says "What is my Minecraft status right now?"',
+    "Historically, I asked what my Minecraft status was.",
+    "If I join the world, check my Minecraft status.",
+    "Can the Minecraft connector check my Minecraft status?",
+    "Do not check my current Minecraft status again now.",
+    "Later I may ask you to check my current Minecraft status again.",
+    'The transcript says "check my current Minecraft status again now."',
+    "Historically, we checked my current Minecraft status again.",
+    "If I rejoin, check my current Minecraft status again.",
+    "Do not recheck my current Minecraft status now.",
+    "Later I may ask you to recheck my current Minecraft status.",
+    'The transcript says "recheck my current Minecraft status now."',
+    "Historically, we rechecked my current Minecraft status.",
+    "If I rejoin, recheck my current Minecraft status.",
+    "Can the Minecraft connector recheck my current Minecraft status?",
+  ])("does not execute contextual or non-player Minecraft status wording: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt).map(
+        (entry) => entry.capability,
+      ),
+    ).not.toContain(HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY);
+  });
+
   it("recognizes closed-container knowledge as an exact unsupported frontier without advertising it as an implemented situation probe", () => {
     const prompt =
       "In this Minecraft room, inspect the contents of the nearest closed chest without opening it and tell me exactly what is inside.";
@@ -178,10 +445,12 @@ describe("Minecraft environment connector capability routing", () => {
       promptText: prompt,
     });
     expect(sourceTargetIntent).toMatchObject({
-      target_source: "world_event",
-      target_kind: "world_event",
+      target_source: "live_environment",
+      target_kind: "live_environment",
       strength: "hard",
       allow_no_tool_direct: false,
+      precedence_reason:
+        "explicit_minecraft_environment_capability_source_target",
     });
     const admission = buildToolCallAdmissionDecision({
       turnId: "ask:test:minecraft-closed-container-frontier",
@@ -255,10 +524,12 @@ describe("Minecraft environment connector capability routing", () => {
         promptText: prompt,
       }),
     ).toMatchObject({
-      target_source: "world_event",
-      target_kind: "world_event",
+      target_source: "live_environment",
+      target_kind: "live_environment",
       strength: "hard",
       allow_no_tool_direct: false,
+      precedence_reason:
+        "explicit_minecraft_environment_capability_source_target",
     });
   });
 
@@ -373,6 +644,38 @@ describe("Minecraft environment connector capability routing", () => {
     );
   });
 
+  it("routes an immediate Minecraft where-am-I question through the current actor observation", () => {
+    const prompt =
+      "Where am I in Minecraft right now? Report my player name, dimension, position, health, and food from the live environment.";
+    expect(extractExplicitCapabilityContracts(prompt)).toContainEqual(
+      expect.objectContaining({
+        capability: HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+        source: "natural_capability_intent",
+        contract: expect.objectContaining({
+          source_target: "live_environment",
+          capability_family: "live_environment",
+        }),
+      }),
+    );
+  });
+
+  it.each([
+    "Do not tell me where I am in Minecraft right now.",
+    "Later I might ask where I am in Minecraft.",
+    'The screen says "Where am I in Minecraft right now?"',
+    "Why did the previous turn answer where I am in Minecraft?",
+    "Can the Minecraft connector tell me where I am?",
+  ])(
+    "does not execute contextual Minecraft where-am-I wording: %s",
+    (prompt) => {
+      expect(
+        extractExplicitCapabilityContracts(prompt).map(
+          (entry) => entry.capability,
+        ),
+      ).not.toContain(HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY);
+    },
+  );
+
   it.each([
     "In Minecraft, do not check the Crimson Curse infection phase.",
     "In Minecraft, later I may ask you to check the Crimson Curse infection phase.",
@@ -424,7 +727,7 @@ describe("Minecraft environment connector capability routing", () => {
     },
   );
 
-  it("lets the exact connector contract replace generic world-event tool admission", () => {
+  it("keeps exact connector source arbitration and tool admission on live_environment", () => {
     const turnId = "ask:test:minecraft-environment-connector-admission";
     const prompt =
       "Check my current Minecraft inventory now using the connected environment.";
@@ -440,7 +743,7 @@ describe("Minecraft environment connector capability routing", () => {
     });
 
     expect(admission).toMatchObject({
-      original_source_target: "world_event",
+      original_source_target: "live_environment",
       effective_source_target: "live_environment",
       source_target: "live_environment",
       requested_capability: CAPABILITY,
@@ -571,6 +874,128 @@ describe("Minecraft environment connector capability routing", () => {
         violations: [],
       },
     });
+  });
+
+  it("repairs a hard Minecraft world route when generic read wording left a stale document goal", () => {
+    const turnId = "ask:test:minecraft-world-read-directly";
+    const prompt =
+      "What is the current daytime value in our Minecraft world? Please read it directly from the live Fabric server before you answer.";
+    const sourceTargetIntent = {
+      schema: "helix.ask_source_target_intent.v1",
+      turn_id: turnId,
+      thread_id: "helix-ask:room:shared_realtime_room:world-read",
+      target_source: "world_event",
+      target_kind: "world_event",
+      strength: "hard",
+      precedence_reason: "explicit_world_event_source_target",
+    };
+    const staleDocumentRoute = {
+      schema: "helix.committed_ask_route.v1",
+      turn_id: turnId,
+      commit_id: "committed-route:stale-document-goal",
+      prompt_hash: "stale",
+      committed_at_stage: "post_prompt_source_arbitration",
+      prompt_intent: {
+        primary_intent_kind: "doc_open_best",
+        secondary_intent_kinds: [],
+      },
+      route: {
+        selected_route: "/ask/turn/stream",
+        source_target: "world_event",
+        target_kind: "world_event",
+        strength: "hard",
+        source_identity: "docs/example.md",
+        route_reason: "explicit_world_event_source_target",
+        stale_metadata_policy: "ignore_unless_matches_commit",
+      },
+      canonical_goal: {
+        goal_kind: "doc_open_best",
+        required_terminal_kind: "doc_open_receipt",
+        allowed_terminal_artifact_kinds: ["doc_open_receipt"],
+        forbidden_terminal_artifact_kinds: [],
+      },
+      capability_policy: {
+        allowed_tool_families: ["live_environment"],
+        suppressed_tool_families: [],
+        required_capability_families: ["live_environment"],
+        mutating_families_allowed: true,
+      },
+      suppression: {
+        contextual_tool_mentions: [],
+        negative_constraints: [],
+        suppressed_families: [],
+        firewall_required: true,
+      },
+      terminal_product: {
+        terminal_authority_required: true,
+        evidence_reentry_required: true,
+        followup_reasoning_required: true,
+        required_terminal_product: "doc_open_receipt",
+      },
+      transitions: [],
+      compatibility: {
+        source_goal_capability_terminal_compatible: true,
+        stale_metadata_ignored: false,
+        shortcut_firewall_applied: false,
+        violations: [],
+      },
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    const committedRoute = buildCommittedAskRoute({
+      turnId,
+      promptText: prompt,
+      selectedRoute: "/ask/turn/stream",
+      payload: {
+        source_target_intent: sourceTargetIntent,
+        committed_ask_route: staleDocumentRoute,
+        canonical_goal_frame: {
+          goal_kind: "doc_open_best",
+          required_terminal_kind: "doc_open_receipt",
+        },
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          source_target: "world_event",
+          required_terminal_kind: "doc_open_receipt",
+          allowed_terminal_artifact_kinds: ["doc_open_receipt"],
+        },
+        active_doc_identity: { active_doc_path: "docs/example.md" },
+        tool_call_admission_decision: {
+          admitted_tool_families: ["live_environment"],
+        },
+      },
+    });
+
+    expect(committedRoute).toMatchObject({
+      route: {
+        source_target: "world_event",
+        target_kind: "world_event",
+        strength: "hard",
+        source_identity: null,
+      },
+      canonical_goal: {
+        goal_kind: "environment_evidence_synthesis",
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: expect.arrayContaining([
+          "model_synthesized_answer",
+          "agent_provider_terminal_candidate",
+          "typed_failure",
+        ]),
+      },
+      terminal_product: {
+        evidence_reentry_required: true,
+        followup_reasoning_required: true,
+        required_terminal_product: "model_synthesized_answer",
+      },
+      compatibility: {
+        source_goal_capability_terminal_compatible: true,
+        violations: [],
+      },
+    });
+    expect(committedRoute.commit_id).not.toBe(
+      staleDocumentRoute.commit_id,
+    );
   });
 
   it.each([

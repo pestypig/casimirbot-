@@ -451,6 +451,86 @@ describe("Helix Ask turn transcript projection", () => {
     expect(combined).not.toContain("no workstation observation packet was available");
   });
 
+  it("keeps current tool execution proof visible when many available lanes would exceed the transcript cap", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-codex-environment-gateway-bounded",
+      turn_id: "turn-codex-environment-gateway-bounded",
+      content: "No immediate hazards were observed.",
+      debug: {
+        turn_id: "turn-codex-environment-gateway-bounded",
+        agent_runtime: "codex",
+        turn_transcript_events: [
+          {
+            role: "assistant",
+            type: "final_answer",
+            status: "completed",
+            text: "No immediate hazards were observed.",
+            source_event_type: "terminal_answer",
+          },
+        ],
+        model_visible_capability_lane_manifest: {
+          schema: "helix.agent_model_visible_capability_lane_manifest.v1",
+          selected_runtime_agent_provider: "codex",
+          lanes: Array.from({ length: 10 }, (_, index) => ({
+            lane_id: `available_lane_${index}`,
+            label: `Available lane ${index}`,
+            status: "available",
+            default_backend_provider: `available_lane_${index}.backend`,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+            capabilities: [
+              {
+                capability_id: `available_lane_${index}.read`,
+                one_shot_status: "executable",
+                session_status: "not_supported",
+                terminal_eligible: false,
+                assistant_answer: false,
+              },
+            ],
+          })),
+        },
+        workstation_gateway_call_results: [
+          {
+            schema: "helix.workstation_tool_gateway.call_result.v1",
+            ok: true,
+            capability_id: "com.casimirbot.minecraft.hazards.scan",
+            mode: "act",
+            gateway_admission: {
+              requested_capability: "com.casimirbot.minecraft.hazards.scan",
+              admission_status: "admitted",
+            },
+            observation: {
+              outcome: "succeeded",
+              result: { hazard_present: false },
+            },
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: "turn-codex-environment-gateway-bounded",
+              capability_key: "com.casimirbot.minecraft.hazards.scan",
+              status: "succeeded",
+              observation_summary: "Hazard check read-only probe completed.",
+            },
+          },
+        ],
+      },
+    });
+
+    const combined = rows.map((row) => `${row.label}: ${row.text}`).join("\n");
+    expect(rows.length).toBeLessThanOrEqual(14);
+    expect(combined).toContain(
+      "Action request: com.casimirbot.minecraft.hazards.scan.",
+    );
+    expect(combined).toContain(
+      "Action observation: com.casimirbot.minecraft.hazards.scan observed Hazard check read-only probe completed.",
+    );
+    expect(combined).toContain(
+      "Model re-entry: Codex received the workstation observation packet",
+    );
+    expect(combined).toContain("No immediate hazards were observed.");
+    expect(rows.filter((row) => row.label === "Lane Visible").length).toBeLessThan(10);
+  });
+
   it("projects structured Codex voice gateway receipts as non-terminal tool observations", () => {
     const rows = buildHelixTurnTranscriptRows({
       id: "reply-codex-voice-gateway",

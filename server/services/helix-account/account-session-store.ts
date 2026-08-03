@@ -16,6 +16,10 @@ import {
   HELIX_ACCOUNT_SESSION_STATUS_SCHEMA,
 } from "@shared/helix-account-session";
 import { HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS } from "@shared/helix-environment-connector";
+import {
+  HELIX_MINECRAFT_COMMAND_CAPABILITY,
+  HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+} from "@shared/helix-environment-command";
 import { ensureDatabase, getPool, resetDbClient } from "../../db/client";
 import { getHelixThreadLedgerEvents } from "../helix-thread/ledger";
 import { listDiscordVoiceSessions } from "../situation-room/discord-session-store";
@@ -150,16 +154,25 @@ export const isGuestSharedRealtimeRoomHostingEnabled = (): boolean =>
   isSharedRealtimeRoomsPublicExperimentEnabled() &&
   envEnabled("HELIX_GUEST_ROOM_CREATION");
 
+export const isPublicSharedRealtimeRoomSourceIngressEnabled = (): boolean =>
+  isSharedRealtimeRoomsPublicExperimentEnabled() &&
+  (
+    !isProductionRuntime() ||
+    envEnabled("HELIX_PUBLIC_ROOM_SOURCE_INGRESS")
+  );
+
 export const isGuestSharedRealtimeRoomSourceIngressEnabled = (): boolean =>
   isGuestSharedRealtimeRoomHostingEnabled() &&
   (
-    !isProductionRuntime() ||
+    isPublicSharedRealtimeRoomSourceIngressEnabled() ||
     envEnabled("HELIX_GUEST_ROOM_SOURCE_INGRESS")
   );
 
-const GUEST_ROOM_SOURCE_CAPABILITY_IDS = [
+const PUBLIC_ROOM_SOURCE_CAPABILITY_IDS = [
   "room.evidence.read_bound",
   ...HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+  HELIX_MINECRAFT_COMMAND_CAPABILITY,
 ] as const;
 
 const buildSharedRealtimeRoomsSessionPolicy = (
@@ -167,17 +180,17 @@ const buildSharedRealtimeRoomsSessionPolicy = (
   options: { guestSession?: boolean } = {},
 ): HelixAccountCapabilityPolicy => {
   const policy = buildHelixSharedRealtimeRoomsExperimentPolicy(accountType);
-  if (
-    options.guestSession &&
-    isGuestSharedRealtimeRoomSourceIngressEnabled()
-  ) {
+  const sourceIngressEnabled = options.guestSession
+    ? isGuestSharedRealtimeRoomSourceIngressEnabled()
+    : isPublicSharedRealtimeRoomSourceIngressEnabled();
+  if (accountType !== "developer" && sourceIngressEnabled) {
     if (!policy.feature_flags.includes("room_source_ingress")) {
       policy.feature_flags.push("room_source_ingress");
     }
     policy.locked_features = policy.locked_features.filter(
       (feature) => feature !== "room_source_ingress",
     );
-    for (const capabilityId of GUEST_ROOM_SOURCE_CAPABILITY_IDS) {
+    for (const capabilityId of PUBLIC_ROOM_SOURCE_CAPABILITY_IDS) {
       if (!policy.allowed_workstation_capabilities.includes(capabilityId)) {
         policy.allowed_workstation_capabilities.push(capabilityId);
       }

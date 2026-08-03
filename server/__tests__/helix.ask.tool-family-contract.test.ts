@@ -28,6 +28,7 @@ const activeParityToolFamilies: ToolFamily[] = [
   "workspace_diagnostic",
   "workstation",
   "visual_capture",
+  "procedure_memory",
   "live_environment",
   "live_source_mail",
   "live_source_decision",
@@ -120,6 +121,7 @@ describe("Helix Ask tool-family contract registry", () => {
       [HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY, "scholarly_research", "evidence_only"],
       ["image_lens.inspect", "visual_capture", "evidence_only"],
       ["situation-room.describe_visual_capture", "visual_capture", "evidence_only"],
+      ["procedure_memory:retrieve_procedure_evidence", "procedure_memory", "evidence_only"],
       ["helix_ask.reflect_theory_context", "theory_locator", "evidence_only"],
       ["helix.theory.frontierVectorFieldTrace", "theory_locator", "evidence_only"],
       ["helix_ask.reflect_ideology_context", "moral_graph_reflection", "evidence_only"],
@@ -274,7 +276,7 @@ describe("Helix Ask tool-family contract registry", () => {
         mutating: false,
       });
 
-      expect(decision).toMatchObject({
+      expect(decision, `${entry.toolName}:${receiptKind}`).toMatchObject({
         allowed: false,
         reason: "evidence_only_tool_cannot_terminalize_receipt",
         assistant_answer: false,
@@ -374,10 +376,10 @@ describe("Helix Ask tool-family contract registry", () => {
         mutating: entry.mutating,
       });
 
-      const expectedReason = /^stage_play_(?:workstation_control_receipt|agent_goal_session_tool_result)/.test(receiptKind)
+      const expectedReason = isWorkstationObservationTerminalKind(receiptKind)
         ? "observation_artifact_cannot_terminalize"
         : "terminal_kind_forbidden_by_route_product_contract";
-      expect(decision).toMatchObject({
+      expect(decision, `${entry.toolName}:${receiptKind}`).toMatchObject({
         allowed: false,
         reason: expectedReason,
         assistant_answer: false,

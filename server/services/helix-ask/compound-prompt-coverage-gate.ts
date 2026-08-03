@@ -169,6 +169,93 @@ const isAnsweredByText = (requirementText: string, normalizedAnswer: string): bo
   return matches >= Math.min(2, keywords.length);
 };
 
+const visibleNonCompletionForRequirement = (
+  requirementText: string,
+  finalAnswerText: string,
+): string | null => {
+  const requirementKeywords = keywordsForRequirement(requirementText);
+  if (requirementKeywords.length === 0) return null;
+  const segments = finalAnswerText
+    .split(/(?:\r?\n)+|(?<=[.!?])\s+/u)
+    .map((segment) => segment.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const nonCompletionPattern =
+    /\b(?:cannot|can't|could not|couldn't|unable to|do not have|don't have|did not|didn't|not completed|not complete|not performed|not executed|not verified|not available|missing|remains? (?:unfinished|unresolved|incomplete))\b/i;
+  const mentionsKeyword = (segment: string, keyword: string): boolean => {
+    const words = segment
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+    const singularKeyword = keyword.endsWith("s")
+      ? keyword.slice(0, -1)
+      : keyword;
+    const yInflectionPrefix = keyword.endsWith("y")
+      ? `${keyword.slice(0, -1)}i`
+      : null;
+    return words.some(
+      (word) =>
+        word === keyword ||
+        word.startsWith(keyword) ||
+        (singularKeyword.length >= 5 &&
+          (word === singularKeyword || word.startsWith(singularKeyword))) ||
+        Boolean(yInflectionPrefix && word.startsWith(yInflectionPrefix)),
+    );
+  };
+  const matchCount = (segment: string): number => {
+    return requirementKeywords.filter((keyword) =>
+      mentionsKeyword(segment, keyword),
+    ).length;
+  };
+  let nonCompletionListContext = false;
+  const segmentRecords = segments.map((segment) => {
+    const directNonCompletion = nonCompletionPattern.test(segment);
+    const listItem = /^\s*[-*•]\s+/u.test(segment);
+    const contextualNonCompletion = nonCompletionListContext && listItem;
+    if (directNonCompletion && /:\s*$/u.test(segment)) {
+      nonCompletionListContext = true;
+    } else if (!contextualNonCompletion) {
+      nonCompletionListContext = false;
+    }
+    return {
+      segment,
+      nonCompletion: directNonCompletion || contextualNonCompletion,
+    };
+  });
+  const strongestPositiveMatch = segmentRecords
+    .filter((record) => !record.nonCompletion)
+    .reduce(
+      (strongest, record) =>
+        Math.max(strongest, matchCount(record.segment)),
+      0,
+    );
+  for (const record of segmentRecords) {
+    const { segment } = record;
+    const normalizedSegment = segment.toLowerCase();
+    if (!record.nonCompletion) continue;
+    const matchingKeywordCount = matchCount(normalizedSegment);
+    const stronglyNamesRequirement =
+      matchingKeywordCount >=
+      Math.min(
+        requirementKeywords.length,
+        Math.max(2, Math.ceil(requirementKeywords.length * 0.6)),
+      );
+    // A truthful non-completion sentence often names only the unfinished
+    // operations (for example, "set/restore/re-query") rather than repeating
+    // the entire user requirement. Treat two distinctive requirement terms as
+    // sufficient only when that sentence is a stronger match than any
+    // positive result sentence. This preserves an already reported sub-result
+    // while preventing the missing remainder from being counted as complete.
+    const namesRequirement =
+      stronglyNamesRequirement ||
+      (matchingKeywordCount >= Math.min(2, requirementKeywords.length) &&
+        matchingKeywordCount > strongestPositiveMatch);
+    if (!namesRequirement) continue;
+    return segment.slice(0, 320);
+  }
+  return null;
+};
+
 const isTerminalFailure = (terminalArtifactKind?: string | null, finalAnswerSource?: string | null): boolean => {
   const terminalKind = readString(terminalArtifactKind);
   const source = readString(finalAnswerSource);
@@ -214,6 +301,7 @@ export const evaluateCompoundPromptCoverageGate = (
     (input.proposedResolutions ?? []).map((entry: NonNullable<HelixCompoundPromptCoverageGateInput["proposedResolutions"]>[number]) => [normalizeId(entry.requirement_id), entry]),
   );
   const terminalFailure = isTerminalFailure(input.terminalArtifactKind, input.finalAnswerSource);
+  const allowPartialAnswer = contract.output_contract?.allow_partial_answer === true;
 
   const resolutions = required.map((requirement: HelixCompoundPromptContract["requirements"][number]): HelixCompoundRequirementResolution => {
     const id = normalizeId(requirement.id);
@@ -258,6 +346,23 @@ export const evaluateCompoundPromptCoverageGate = (
       };
     }
 
+    const visibleNonCompletion = visibleNonCompletionForRequirement(
+      requirement.text,
+      finalAnswerText,
+    );
+    if (visibleNonCompletion) {
+      return {
+        requirement_id: requirement.id,
+        status: "blocked_with_reason",
+        reason: visibleNonCompletion,
+        answer_excerpt: visibleNonCompletion,
+        evidence_refs: proposedResolution?.evidence_refs ?? input.selectedEvidenceRefs ?? [],
+        terminal_visible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+
     if (tagged?.state === "answered" || isAnsweredByText(requirement.text, normalizedAnswer)) {
       return {
         requirement_id: requirement.id,
@@ -296,7 +401,11 @@ export const evaluateCompoundPromptCoverageGate = (
   });
 
   const unresolved = resolutions
-    .filter((resolution: HelixCompoundRequirementResolution) => resolution.status === "blocked_with_reason" && !resolution.terminal_visible)
+    .filter(
+      (resolution: HelixCompoundRequirementResolution) =>
+        resolution.status === "blocked_with_reason" &&
+        (!resolution.terminal_visible || !allowPartialAnswer),
+    )
     .map((resolution: HelixCompoundRequirementResolution) => resolution.requirement_id);
   const nonVisibleBlocked = resolutions
     .filter((resolution: HelixCompoundRequirementResolution) => resolution.status === "blocked_with_reason" && !resolution.terminal_visible)
@@ -309,8 +418,10 @@ export const evaluateCompoundPromptCoverageGate = (
     passed,
     decision: passed ? "PASS" : "FAIL_CLOSED",
     reason: passed
-      ? "all required compound prompt items were answered, visibly blocked, or failed closed"
-      : "required compound prompt items were missing or blocked without a visible reason",
+      ? "all required compound prompt items were answered, allowed as visibly blocked, or failed closed"
+      : allowPartialAnswer
+        ? "required compound prompt items were missing or blocked without a visible reason"
+        : "required compound prompt items were missing or blocked while partial answers were disallowed",
     required_count: required.length,
     answered_count: resolutions.filter((resolution: HelixCompoundRequirementResolution) => resolution.status === "answered").length,
     blocked_count: resolutions.filter((resolution: HelixCompoundRequirementResolution) => resolution.status === "blocked_with_reason").length,

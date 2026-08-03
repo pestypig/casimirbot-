@@ -30,6 +30,12 @@ describe("runtime memory governor", () => {
     delete process.env.RUNTIME_MEMORY_RESUME_RSS_MB;
     delete process.env.RUNTIME_MEMORY_HOST_FREE_RATIO_MIN;
     delete process.env.RUNTIME_MEMORY_HOST_FREE_RATIO_SOFT_MIN;
+    delete process.env.RUNTIME_MEMORY_HOST_COMMIT_FREE_MIN_MB;
+    delete process.env.RUNTIME_MEMORY_HOST_COMMIT_FREE_SOFT_MIN_MB;
+    delete process.env.RUNTIME_MEMORY_HOST_COMMIT_RATIO_MAX;
+    delete process.env.RUNTIME_MEMORY_HOST_COMMIT_RATIO_SOFT_MAX;
+    delete process.env.RUNTIME_MEMORY_V8_HEAP_SAFETY_RESERVE_MB;
+    delete process.env.HELIX_HOST_COMMIT_REQUIRED;
     delete process.env.VOICE_TRANSCRIBE_MEMORY_GUARD;
     delete process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB;
     delete process.env.VOICE_TRANSCRIBE_MAX_RSS_MB;
@@ -65,6 +71,12 @@ describe("runtime memory governor", () => {
     delete process.env.RUNTIME_MEMORY_RESUME_RSS_MB;
     delete process.env.RUNTIME_MEMORY_HOST_FREE_RATIO_MIN;
     delete process.env.RUNTIME_MEMORY_HOST_FREE_RATIO_SOFT_MIN;
+    delete process.env.RUNTIME_MEMORY_HOST_COMMIT_FREE_MIN_MB;
+    delete process.env.RUNTIME_MEMORY_HOST_COMMIT_FREE_SOFT_MIN_MB;
+    delete process.env.RUNTIME_MEMORY_HOST_COMMIT_RATIO_MAX;
+    delete process.env.RUNTIME_MEMORY_HOST_COMMIT_RATIO_SOFT_MAX;
+    delete process.env.RUNTIME_MEMORY_V8_HEAP_SAFETY_RESERVE_MB;
+    delete process.env.HELIX_HOST_COMMIT_REQUIRED;
     delete process.env.VOICE_TRANSCRIBE_MEMORY_GUARD;
     delete process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB;
     delete process.env.VOICE_TRANSCRIBE_MAX_RSS_MB;
@@ -544,6 +556,118 @@ describe("runtime memory governor", () => {
 
     expect(decision.admitted).toBe(true);
     expect(decision.pressureLevel).toBe("soft_pressure");
+    decision.lease?.release("completed");
+  });
+
+  it("rejects a foreground turn when Windows commit headroom is below the hard reserve", () => {
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: memoryReader({ heapUsed: 100 * mib, rss: 200 * mib }),
+      hostMemoryReader: () => ({
+        freeMiB: 4096,
+        totalMiB: 16384,
+        freeRatio: 0.25,
+        commit: {
+          status: "available",
+          source: "windows_wmic",
+          platform: "win32",
+          committedMiB: 18200,
+          limitMiB: 20000,
+          freeMiB: 1800,
+          ratio: 0.91,
+          sampledAtMs: Date.now(),
+          ageMs: 0,
+        },
+      }),
+    });
+
+    const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "active_user_turn" });
+
+    expect(decision).toMatchObject({
+      admitted: false,
+      action: "reject_memory_pressure",
+      reason: "host_commit_pressure",
+      pressureLevel: "hard_pressure",
+    });
+  });
+
+  it("treats stale required Windows commit telemetry as a typed hard failure", () => {
+    process.env.HELIX_HOST_COMMIT_REQUIRED = "1";
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: memoryReader({ heapUsed: 100 * mib, rss: 200 * mib }),
+      hostMemoryReader: () => ({
+        freeMiB: 4096,
+        totalMiB: 16384,
+        freeRatio: 0.25,
+        commit: {
+          status: "stale",
+          source: "windows_wmic",
+          platform: "win32",
+          committedMiB: 10000,
+          limitMiB: 20000,
+          freeMiB: 10000,
+          ratio: 0.5,
+          sampledAtMs: 1,
+          ageMs: 60_000,
+        },
+      }),
+    });
+
+    const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "active_user_turn" });
+
+    expect(decision).toMatchObject({
+      admitted: false,
+      reason: "host_commit_telemetry_stale",
+      pressureLevel: "hard_pressure",
+    });
+  });
+
+  it("rechecks an active foreground turn against newly exhausted host commit", () => {
+    let commitFreeMiB = 6000;
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: memoryReader({ heapUsed: 100 * mib, rss: 200 * mib }),
+      hostMemoryReader: () => ({
+        freeMiB: 4096,
+        totalMiB: 16384,
+        freeRatio: 0.25,
+        commit: {
+          status: "available",
+          source: "windows_wmic",
+          platform: "win32",
+          committedMiB: 20000 - commitFreeMiB,
+          limitMiB: 20000,
+          freeMiB: commitFreeMiB,
+          ratio: (20000 - commitFreeMiB) / 20000,
+          sampledAtMs: Date.now(),
+          ageMs: 0,
+        },
+      }),
+    });
+    const admitted = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "active_user_turn" });
+    expect(admitted.admitted).toBe(true);
+    commitFreeMiB = 1500;
+
+    const recheck = runtimeMemoryGovernor.recheckRuntimeTask(admitted.lease, {
+      taskClass: "active_user_turn",
+    });
+
+    expect(recheck).toMatchObject({
+      admitted: false,
+      reason: "host_commit_pressure",
+      pressureLevel: "hard_pressure",
+    });
+    expect(runtimeMemoryGovernor.getRuntimeMemorySnapshot().activeTasks).toHaveLength(0);
+  });
+
+  it("clamps configured heap admission below the actual V8 ceiling", () => {
+    process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_HEAP_USED_MB = "100000";
+    process.env.RUNTIME_MEMORY_V8_HEAP_SAFETY_RESERVE_MB = "384";
+
+    const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "active_user_turn" });
+
+    expect(decision.limits.processHeapLimitMiB).toBeGreaterThan(384);
+    expect(decision.limits.maxHeapUsedMiB).toBeLessThanOrEqual(
+      (decision.limits.processHeapLimitMiB ?? 0) - 384,
+    );
     decision.lease?.release("completed");
   });
 

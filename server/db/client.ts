@@ -15,6 +15,16 @@ let lastDsn: string | undefined;
 const memPools = new Map<string, PgPool>();
 const localPersistenceTables = [
   "helix_accounts",
+  // Restore the account/session policy root before any durable connector can
+  // evaluate its owner's ingress eligibility. A later recoverable connector
+  // row must never make an otherwise valid guest session look absent.
+  "helix_account_linked_providers",
+  "helix_account_sessions",
+  "helix_account_profile_storage",
+  "helix_account_events",
+  "helix_account_credentials",
+  "helix_account_sign_in_attempts",
+  "helix_email_outbox",
   "helix_shared_realtime_rooms",
   "helix_shared_realtime_room_members",
   "helix_shared_realtime_room_invites",
@@ -36,23 +46,31 @@ const localPersistenceTables = [
   "helix_environment_connector_devices",
   "helix_environment_connector_bindings",
   "helix_environment_capability_catalog_snapshots",
+  // Probe requests freeze this row by foreign key, so room subject bindings
+  // must be included in the durable snapshot and restored first.
+  "helix_room_environment_subject_bindings",
+  // Command state is source-, room-, and environment-bound. Keep this block
+  // in foreign-key restore order so local keyed-server restarts retain the
+  // owner's authority lease, connector credential, live dispatcher catalog,
+  // and every command receipt needed for evidence re-entry and audit.
+  "helix_environment_command_authorities",
+  "helix_environment_command_member_grants",
+  "helix_environment_command_connector_credentials",
+  "helix_environment_command_catalog_snapshots",
+  "helix_environment_command_requests",
+  "helix_environment_command_results",
+  "helix_environment_command_events",
   "helix_environment_probe_requests",
   "helix_environment_probe_attempts",
   "helix_environment_probe_results",
   "helix_environment_probe_observations",
   "helix_environment_probe_events",
   "helix_environment_pairing_sessions",
+  "helix_connector_pairing_codes",
   "helix_environment_connector_device_credentials",
   "helix_room_source_credential_deliveries",
   "helix_runtime_tool_confirmation_replay_claims",
   "casimir_theory_execution_state",
-  "helix_account_linked_providers",
-  "helix_account_sessions",
-  "helix_account_profile_storage",
-  "helix_account_events",
-  "helix_account_credentials",
-  "helix_account_sign_in_attempts",
-  "helix_email_outbox",
   "helix_research_library_documents",
 ] as const;
 const localPersistenceJsonColumns = new Set([
@@ -78,6 +96,12 @@ const localPersistenceJsonColumns = new Set([
   "helix_environment_connector_installations.granted_capability_ids",
   "helix_environment_connector_bindings.consent_capability_ids",
   "helix_environment_capability_catalog_snapshots.capability_descriptors",
+  "helix_environment_command_authorities.approved_categories",
+  "helix_environment_command_connector_credentials.scopes",
+  "helix_environment_command_catalog_snapshots.catalog_summary",
+  "helix_environment_command_requests.approved_categories",
+  "helix_environment_command_results.result_payload",
+  "helix_environment_command_events.payload",
   "helix_environment_probe_requests.arguments",
   "helix_environment_probe_results.result_payload",
   "helix_environment_probe_observations.normalized_observation",
@@ -101,6 +125,9 @@ type LocalSnapshot = {
 const ROOM_SOURCE_REQUEST_TABLE = "helix_room_source_ingress_requests";
 const ROOM_SOURCE_REQUEST_RETENTION_MS = 24 * 60 * 60 * 1000;
 const ROOM_SOURCE_REQUEST_REFRESH_OVERLAP_MS = 10 * 60 * 1000;
+const LOCAL_ROOM_SOURCE_REQUEST_MAX_ROWS_PER_BINDING = 2_048;
+const LOCAL_RESTORE_BATCH_MAX_ROWS = 500;
+const LOCAL_RESTORE_BATCH_MAX_PARAMETERS = 5_000;
 
 let localPersistencePath: string | null = null;
 let localPersistenceReady = false;
@@ -139,6 +166,42 @@ const shouldPersistLocalMem = (): boolean => {
 const resolveLocalPersistencePath = (): string =>
   path.resolve(process.cwd(), (process.env.HELIX_LOCAL_DB_PATH ?? "").trim() || ".cal/local-pg-mem.json");
 
+const localRoomSourceRequestMaxRowsPerBinding = (): number => {
+  const value = Number(
+    process.env.HELIX_LOCAL_PG_MEM_ROOM_SOURCE_REQUEST_MAX_ROWS_PER_BINDING ??
+      LOCAL_ROOM_SOURCE_REQUEST_MAX_ROWS_PER_BINDING,
+  );
+  return Number.isFinite(value)
+    ? Math.max(128, Math.min(100_000, Math.floor(value)))
+    : LOCAL_ROOM_SOURCE_REQUEST_MAX_ROWS_PER_BINDING;
+};
+
+const compactLocalRoomSourceRequestRows = (
+  rows: Array<Record<string, unknown>>,
+  nowMs = Date.now(),
+): Array<Record<string, unknown>> => {
+  const retainedAfterMs = nowMs - ROOM_SOURCE_REQUEST_RETENTION_MS;
+  const rowsByBinding = new Map<string, Array<Record<string, unknown>>>();
+  for (const row of rows) {
+    const receivedAtMs = Date.parse(String(row.received_at ?? ""));
+    if (!Number.isFinite(receivedAtMs) || receivedAtMs < retainedAfterMs) continue;
+    const bindingId = String(row.binding_id ?? "");
+    const bindingRows = rowsByBinding.get(bindingId) ?? [];
+    bindingRows.push(row);
+    rowsByBinding.set(bindingId, bindingRows);
+  }
+  const maxRows = localRoomSourceRequestMaxRowsPerBinding();
+  return [...rowsByBinding.values()].flatMap((bindingRows) =>
+    bindingRows
+      .sort(
+        (left, right) =>
+          Date.parse(String(right.received_at ?? "")) -
+          Date.parse(String(left.received_at ?? "")),
+      )
+      .slice(0, maxRows),
+  );
+};
+
 const queryText = (input: unknown): string =>
   typeof input === "string"
     ? input
@@ -153,12 +216,16 @@ const isMutationQuery = (text: string): boolean =>
       text,
     ));
 
-const mutationTableFromQuery = (text: string): string | null => {
+const mutationTableNameFromQuery = (text: string): string | null => {
   const match =
     /\b(?:insert\s+into|update|delete\s+from|truncate(?:\s+table)?)\s+(?:["\w]+\.)?["]?([\w]+)["]?/i.exec(
       text,
     );
-  const table = match?.[1]?.toLowerCase() ?? "";
+  return match?.[1]?.toLowerCase() ?? null;
+};
+
+const mutationTableFromQuery = (text: string): string | null => {
+  const table = mutationTableNameFromQuery(text) ?? "";
   return localPersistenceTables.includes(
     table as (typeof localPersistenceTables)[number],
   )
@@ -199,7 +266,11 @@ function installLocalPersistence(pool: PgPool): PgPool {
       typeof (result as Promise<unknown>).then === "function"
     ) {
       return (result as Promise<unknown>).then(async (value) => {
+        const mutatedTableName = mutationTableNameFromQuery(text);
         const mutationTable = mutationTableFromQuery(text);
+        if (mutatedTableName && !mutationTable) {
+          return value;
+        }
         markLocalPersistenceTablesDirty(
           mutationTable ? [mutationTable] : undefined,
         );
@@ -290,13 +361,8 @@ async function persistLocalSnapshot(activePool: PgPool): Promise<void> {
           `SELECT * FROM ${table} WHERE received_at >= $1;`,
           [new Date(refreshStartMs).toISOString()],
         );
-        const retainedAfterMs = Date.now() - ROOM_SOURCE_REQUEST_RETENTION_MS;
         const merged = new Map<string, Record<string, unknown>>();
         for (const row of localPersistenceSnapshotCache.tables[table]) {
-          const receivedAtMs = Date.parse(String(row.received_at ?? ""));
-          if (!Number.isFinite(receivedAtMs) || receivedAtMs < retainedAfterMs) {
-            continue;
-          }
           merged.set(`${row.binding_id}\u0000${row.request_id}`, row);
         }
         for (const row of rows as Array<Record<string, unknown>>) {
@@ -312,10 +378,12 @@ async function persistLocalSnapshot(activePool: PgPool): Promise<void> {
             String(row.credential_id),
           ),
         );
-        tables[table] = [...merged.values()].filter(
-          (row) =>
-            validBindings.has(String(row.binding_id)) &&
-            validCredentials.has(String(row.credential_id)),
+        tables[table] = compactLocalRoomSourceRequestRows(
+          [...merged.values()].filter(
+            (row) =>
+              validBindings.has(String(row.binding_id)) &&
+              validCredentials.has(String(row.credential_id)),
+          ),
         );
       } else {
         const { rows } = await activePool.query(`SELECT * FROM ${table};`);
@@ -420,25 +488,102 @@ async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
           : new Date(0).toISOString(),
       tables: snapshot.tables,
     };
+    const restoreStartedAtMs = Date.now();
+    let restoredRowCount = 0;
+    let discardedRowCount = 0;
     for (const table of localPersistenceTables) {
-      const rows = snapshot.tables[table] ?? [];
-      for (const row of rows) {
-        const columns = Object.keys(row);
-        if (columns.length === 0) continue;
-        const placeholders = columns.map((_, index) => `$${index + 1}`).join(", ");
+      const snapshotRows = Array.isArray(snapshot.tables[table])
+        ? snapshot.tables[table]
+        : [];
+      const rows = table === ROOM_SOURCE_REQUEST_TABLE
+        ? compactLocalRoomSourceRequestRows(snapshotRows)
+        : snapshotRows;
+      discardedRowCount += snapshotRows.length - rows.length;
+      const restoredRows: Array<Record<string, unknown>> = [];
+      let invalidRowCount = 0;
+
+      let rowIndex = 0;
+      while (rowIndex < rows.length) {
+        const firstRow = rows[rowIndex];
+        const columns = Object.keys(firstRow);
+        if (columns.length === 0) {
+          invalidRowCount += 1;
+          rowIndex += 1;
+          continue;
+        }
+        const columnSignature = columns.join("\u0000");
+        const batch: Array<Record<string, unknown>> = [];
+        while (
+          rowIndex < rows.length &&
+          batch.length < LOCAL_RESTORE_BATCH_MAX_ROWS &&
+          (batch.length + 1) * columns.length <= LOCAL_RESTORE_BATCH_MAX_PARAMETERS
+        ) {
+          const candidate = rows[rowIndex];
+          if (Object.keys(candidate).join("\u0000") !== columnSignature) break;
+          batch.push(candidate);
+          rowIndex += 1;
+        }
+
         const columnList = columns.map((column) => `"${column}"`).join(", ");
-        await activePool.query(
-          `INSERT INTO ${table} (${columnList}) VALUES (${placeholders}) ON CONFLICT DO NOTHING;`,
-          columns.map((column) => {
-            const value = row[column];
-            return value !== null &&
-              typeof value === "object" &&
-              localPersistenceJsonColumns.has(`${table}.${column}`)
-              ? JSON.stringify(value)
-              : value;
-          }),
+        const insertBatch = async (
+          candidates: Array<Record<string, unknown>>,
+        ): Promise<void> => {
+          const parameters: unknown[] = [];
+          const valueGroups = candidates.map((row) => {
+            const placeholders = columns.map((column) => {
+              const value = row[column];
+              parameters.push(
+                value !== null &&
+                  typeof value === "object" &&
+                  localPersistenceJsonColumns.has(`${table}.${column}`)
+                  ? JSON.stringify(value)
+                  : value,
+              );
+              return `$${parameters.length}`;
+            });
+            return `(${placeholders.join(", ")})`;
+          });
+          await activePool.query(
+            `INSERT INTO ${table} (${columnList}) VALUES ${valueGroups.join(", ")} ON CONFLICT DO NOTHING;`,
+            parameters,
+          );
+        };
+        try {
+          await insertBatch(batch);
+          restoredRows.push(...batch);
+          restoredRowCount += batch.length;
+        } catch {
+          // Local snapshots can outlive an older connector row whose parent
+          // was intentionally compacted. Recover every independently valid
+          // row instead of abandoning all later policy and evidence tables.
+          // The rejected row's content is never logged.
+          for (const row of batch) {
+            try {
+              await insertBatch([row]);
+              restoredRows.push(row);
+              restoredRowCount += 1;
+            } catch {
+              invalidRowCount += 1;
+            }
+          }
+        }
+      }
+      if (invalidRowCount > 0) {
+        discardedRowCount += invalidRowCount;
+        markLocalPersistenceTablesDirty([table]);
+        console.warn(
+          `[db] local pg-mem restore skipped ${invalidRowCount} invalid row(s) from ${table}; valid rows and later tables continued`,
         );
       }
+      if (localPersistenceSnapshotCache) {
+        localPersistenceSnapshotCache.tables[table] = restoredRows;
+      }
+    }
+    const restoreElapsedMs = Date.now() - restoreStartedAtMs;
+    if (restoreElapsedMs >= 250 || discardedRowCount > 0) {
+      console.warn(
+        `[db] local pg-mem restore took ${restoreElapsedMs}ms (restored ${restoredRowCount} rows; discarded ${discardedRowCount} expired rows)`,
+      );
     }
   } catch (err) {
     console.warn("[db] failed to restore local pg-mem snapshot", err);
@@ -461,6 +606,16 @@ export async function ensureDatabase(): Promise<void> {
     migratePromise = runMigrations(activePool).then(async () => {
       await restoreLocalSnapshot(activePool);
       localPersistenceReady = Boolean(localPersistencePath);
+      if (
+        localPersistenceReady &&
+        localPersistenceMutationVersions.size > 0
+      ) {
+        if (deferredLocalPersistenceEnabled()) {
+          scheduleDeferredLocalPersistence(activePool);
+        } else {
+          await persistLocalSnapshot(activePool);
+        }
+      }
     }).catch((err) => {
       migratePromise = null;
       throw err;

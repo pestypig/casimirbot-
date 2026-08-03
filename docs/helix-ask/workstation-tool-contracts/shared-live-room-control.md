@@ -1,6 +1,6 @@
 # Shared Live Room control
 
-Status: draft developer-only shared provider capability.
+Status: draft shared provider capability behind the Shared Live Rooms policy.
 
 ## Purpose
 
@@ -8,8 +8,9 @@ Expose the existing Shared Live Room lifecycle through exact provider-neutral
 workstation capabilities without creating another room store, agent loop,
 authentication path, event journal, or terminal writer. The six capabilities
 read fresh evidence from one exactly bound room, list and inspect rooms, create
-a room idempotently, and let a developer owner list or create observation-only
-source bindings.
+a room idempotently, and let a policy-admitted owner list or create
+observation-only source bindings when the active room-source experiment admits
+their account.
 
 ## Owner
 
@@ -17,7 +18,8 @@ source bindings.
   `room.create`, `room.source.list`, and `room.source.create`.
 - Panel: none; these are shared control-service capabilities.
 - Permission profiles: `read` for list/inspect and `act` for create.
-- Account availability: developer while the workflow is draft.
+- Account availability: developers and explicitly admitted public-experiment
+  user sessions. Source control remains owner-only.
 - `room.create` and `room.source.create` require explicit confirmation.
 
 ## Admission
@@ -36,7 +38,8 @@ source bindings.
   previous-turn artifact cannot clear the hard gate.
 - Mutations require an affirmative operator command and a stable
   `idempotency_key`.
-- Source controls require a developer owner and the room-source policy flag.
+- Source controls require an admitted room owner and the room-source policy
+  flag. Account type alone is not the grant.
 - These workstation controls are not placed in Agent API `database_scope`.
 
 ## Negative Admission Cases
@@ -123,7 +126,7 @@ Canonical terminal-authority evaluation
 
 - exact room lifecycle and idempotent replay
 - tenant/account/profile spoof fields rejected by closed input schemas
-- current membership and developer-owner source policy rechecked
+- current membership and owner source policy rechecked
 - negated, quoted, historical, future, conditional, and mixed intents do not
   admit mutations
 - source bearer absent from gateway, MCP, events, chat, debug, and model context

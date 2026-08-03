@@ -23,6 +23,7 @@ export type ToolFamily =
   | "workspace_diagnostic"
   | "workstation"
   | "visual_capture"
+  | "procedure_memory"
   | "live_environment"
   | "live_source_mail"
   | "live_source_decision"
@@ -261,6 +262,35 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
       "image-lens.inspect",
       "situation-room.describe_visual_capture",
       "situation room visual capture",
+    ],
+  }),
+  procedure_memory: contract({
+    toolName: "family:procedure_memory",
+    toolFamily: "procedure_memory",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: [
+      "active_situation_run",
+      "procedure_memory",
+      "procedure_memory_recall",
+      "procedure_epoch_replay",
+      "situation_context_pack_with_epoch_evidence",
+    ],
+    allowedTerminalKinds: [
+      "procedure_memory_recall",
+      "answer_distillation_expansion",
+      "procedure_epoch_replay",
+      ...evidenceOnlyTerminalKinds,
+    ],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: [
+      "procedure_memory",
+      "procedure-memory",
+      "situation_epoch",
+      "situation-epoch",
+      "retrieve_procedure_evidence",
+      "procedure_memory:retrieve_procedure_evidence",
     ],
   }),
   live_environment: contract({
@@ -1780,6 +1810,7 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
   if (/workspace[-.:]?directory|workspace-directory\.resolve|workspace[-.:]?directory[-.:]?resolution/.test(normalized)) return "workspace_directory";
   if (/docs?[-.:]?viewer|active[-.:]?doc|document/.test(normalized)) return "docs_viewer";
   if (/visual[-.:]?capture|image[-.:]?lens|situation-room\.describe-visual-capture/.test(normalized)) return "visual_capture";
+  if (/procedure[-.:]?memory|situation[-.:]?epoch|retrieve[-.:]?procedure[-.:]?evidence/.test(normalized)) return "procedure_memory";
   if (/com\.casimirbot\.minecraft\.inventory\.check|minecraft[-.:]?inventory[-.:]?check/.test(normalized)) return "live_environment";
   if (/workstation|workspace[-.:]?action|workspace[-.:]?panel|panel-control|click-or-activate-control/.test(normalized)) return "workstation";
   if (/live[-.:]?environment|live[-.:]?env|live[-.:]?answer[-.:]?environment|live[-.:]?source[-.:]?set[-.:]?rate|set[-.:]?rate|stage[-.:]?play[-.:]?reflection[-.:]?result/.test(normalized)) return "live_environment";
@@ -1804,10 +1835,15 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
 
 const exactMatches = new Map<string, ToolFamilyContract>();
 for (const entry of TOOL_FAMILY_CONTRACTS) {
-  exactMatches.set(normalize(entry.toolName), entry);
   for (const alias of entry.aliases ?? []) {
     exactMatches.set(normalize(alias), entry);
   }
+}
+// Concrete registered names are authoritative over compatibility aliases.
+// Populate them last so a later contract cannot redirect an exact tool name
+// through one of its legacy aliases.
+for (const entry of TOOL_FAMILY_CONTRACTS) {
+  exactMatches.set(normalize(entry.toolName), entry);
 }
 
 export const normalizeToolFamily = (value: unknown): ToolFamily | null => normalizeFamily(value);

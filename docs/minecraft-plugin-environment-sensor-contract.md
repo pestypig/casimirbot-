@@ -9,7 +9,7 @@ For a published deployment, configure the generated room source base URL from
 credential for the complete handshake:
 
 1. The plugin posts a `helix.environment_source_manifest.v1` artifact to `<room-source-endpoint>/manifest`.
-2. The plugin posts `helix.environment_source_heartbeat.v1` to `<room-source-endpoint>/heartbeat` every 15 seconds, or every 5 seconds while probes are pending.
+2. The plugin or mod posts `helix.environment_source_heartbeat.v1` to `<room-source-endpoint>/heartbeat` every 5 seconds. Manifest refresh is scheduled separately and no faster than every 15 seconds.
 3. The plugin posts compact environment snapshots through the world-event environment snapshot path.
 4. The plugin polls `<room-source-endpoint>/probes/pending`.
 5. The plugin posts `helix.environment_probe_result.v1` to `<room-source-endpoint>/probes/result`.

@@ -107,6 +107,7 @@ export type HelixEnvironmentSourceHeartbeat = {
   latest_snapshot_ts?: string | null;
   active_players?: Array<{
     actor_id: string;
+    stable_actor_id?: string | null;
     actor_label: string;
     dimension?: string | null;
   }>;
@@ -233,6 +234,7 @@ export const helixEnvironmentSourceHeartbeatSchema = z.object({
   latest_snapshot_ts: environmentWireTimestampSchema.nullable().optional(),
   active_players: z.array(z.object({
     actor_id: environmentWireIdSchema,
+    stable_actor_id: environmentWireIdSchema.nullable().optional(),
     actor_label: z.string().trim().min(1).max(160),
     dimension: z.string().trim().min(1).max(160).nullable().optional(),
   }).strict()).max(256).optional(),

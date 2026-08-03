@@ -434,8 +434,9 @@ describe("environment connector public-key pairing", () => {
 
   it("publishes immutable package trust without installations, devices, rooms, or evidence", async () => {
     const directory = await listPublicEnvironmentConnectorDirectory();
-    expect(directory).toHaveLength(3);
+    expect(directory).toHaveLength(4);
     expect(directory.map((entry) => entry.package_id)).toEqual([
+      "com.casimirbot.minecraft.fabric",
       "com.casimirbot.minecraft.paper",
       "com.casimirbot.synthetic.fixture",
       "com.casimirbot.system.clock",

@@ -265,6 +265,17 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
     notes:
       "Provider-shared visual source alias admitted onto the bounded SituationRun observation gateway; the observation must re-enter the runtime before terminal synthesis.",
   }),
+  explicit("com.casimirbot.minecraft.container_contents.read", {
+    availability: "blocked_pending_contract",
+    permissionClass: "read_observe",
+    requiredContractBeforeGateway: [
+      "owner-selected privileged container-read scope",
+      "exact block target and current-turn subject binding",
+      "negative contextual/quoted/negated admission tests",
+    ],
+    notes:
+      "The schema exists, but closed-container reads remain held back until the room owner grants a distinct privileged sensor scope. Full command authority does not silently graduate this typed read.",
+  }),
   ...[
     "runtime_evidence",
     "debug.inspect_current_turn",
@@ -450,7 +461,10 @@ export const resolveProviderGatewayCapabilityId = (
 
 const currentGatewayListing = listWorkstationGatewayCapabilities({
   agentRuntime: "codex",
-  mode: "observe",
+  // Classify the complete shared gateway catalog. Individual calls still pass
+  // through mode admission; using observe here made valid act-only manifests
+  // appear unclassified even though every provider receives them in act mode.
+  mode: "act",
 });
 
 const currentGatewayCapabilities = currentGatewayListing.capabilities;

@@ -75,6 +75,7 @@ public final class HeartbeatScheduler {
         for (Player player : Bukkit.getOnlinePlayers()) {
             players.add(Map.of(
                 "actor_id", "minecraft:player:" + player.getName(),
+                "stable_actor_id", player.getUniqueId().toString(),
                 "actor_label", player.getName(),
                 "dimension", player.getWorld().getKey().toString()
             ));

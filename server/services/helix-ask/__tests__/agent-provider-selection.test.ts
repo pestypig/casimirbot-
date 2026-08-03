@@ -5875,6 +5875,57 @@ describe("Helix Ask agent provider selection", () => {
     expect(result.turn_transcript_events?.some((event: any) => event.source_event_type === "tool_observation")).toBe(false);
   });
 
+  it("fails closed when a fresh environment follow-up produces no current-turn observation", async () => {
+    const unsupportedClaim = [
+      "Your current Minecraft inventory, from a fresh read for the same bound participant, is:",
+      "- 11x minecraft:oak_log",
+      "- 2x minecraft:sand",
+      "- 2x minecraft:stick",
+    ].join("\n");
+    process.env.CODEX_AGENT_FAKE_STDOUT = unsupportedClaim;
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:codex-environment-followup-current-turn-evidence-required",
+        agent_runtime: "codex",
+        question:
+          "Now check my current Minecraft inventory. Tell me what I am carrying and whether I have useful equipment, using a fresh environment observation for the same room participant.",
+        canonical_goal_frame: {
+          goal_kind: "live_environment_review",
+          required_terminal_kind: "model_synthesized_answer",
+          allowed_terminal_artifact_kinds: [
+            "model_synthesized_answer",
+            "typed_failure",
+          ],
+          forbidden_terminal_artifact_kinds: [
+            "direct_answer_text",
+            "no_tool_direct",
+          ],
+        },
+        tool_call_admission_decision: {
+          required: true,
+          reason: "fresh_current_turn_environment_observation_required",
+        },
+      },
+      headers: {},
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.response_type).toBe("final_failure");
+    expect(result.terminal_artifact_kind).toBe("typed_failure");
+    expect(result.text).not.toContain("11x minecraft:oak_log");
+    expect((result.debug as any)?.provider_reasoning_reentry).toMatchObject({
+      model_only_direct_answer_allowed: false,
+      evidence_reentered: false,
+    });
+    expect((result.debug as any)?.terminal_authority_status).not.toBe(
+      "authorized_no_gateway_tool_required",
+    );
+  });
+
   it("does not publish Codex claims when a requested gateway action was blocked", async () => {
     process.env.CODEX_AGENT_FAKE_STDOUT = "I wrote the requested file.";
     process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";

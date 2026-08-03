@@ -1,3 +1,5 @@
+import { resolveCompoundCoverageRouteScope } from "./compound-coverage-route-scope";
+
 type RecordLike = Record<string, unknown>;
 
 type HelixTurnArtifact = {
@@ -124,17 +126,18 @@ export const applyAskTurnSolverHardGateFailure = (input: {
       : promptInterpretationForCompoundGate?.compound_contract && typeof promptInterpretationForCompoundGate.compound_contract === "object" && !Array.isArray(promptInterpretationForCompoundGate.compound_contract)
         ? (promptInterpretationForCompoundGate.compound_contract as Record<string, unknown>)
         : null;
-  const routeScopeForCompoundGate =
-    readAskTurnString(canonicalGoalFrameForCompoundGate?.goal_kind) === "model_only_concept" ||
-    readAskTurnString(canonicalGoalFrameForCompoundGate?.goal_kind) === "conversation" ||
-    readAskTurnString(canonicalGoalFrameForCompoundGate?.goal_kind) === "workspace_help" ||
-    readAskTurnString(canonicalGoalFrameForCompoundGate?.answer_scope) === "model_only" ||
-    (
-      !["repo_code", "docs_viewer", "active_doc", "runtime_evidence", "workstation_panel", "workspace_action", "calculator_stream", "situation_room", "live_pipeline", "visual_capture"].includes(readAskTurnString(sourceTargetIntentForCompoundGate?.target_source) ?? "") &&
-      readAskTurnString(sourceTargetIntentForCompoundGate?.strength) !== "hard"
-    )
-      ? "model_only" as const
-      : "source_targeted" as const;
+  const routeScopeForCompoundGate = resolveCompoundCoverageRouteScope({
+    goalKind: readAskTurnString(canonicalGoalFrameForCompoundGate?.goal_kind),
+    answerScope: readAskTurnString(
+      canonicalGoalFrameForCompoundGate?.answer_scope,
+    ),
+    targetSource: readAskTurnString(
+      sourceTargetIntentForCompoundGate?.target_source,
+    ),
+    sourceStrength: readAskTurnString(
+      sourceTargetIntentForCompoundGate?.strength,
+    ),
+  });
   const existingModelOnlyCoverage =
     payload.model_only_compound_coverage_from_answer && typeof payload.model_only_compound_coverage_from_answer === "object" && !Array.isArray(payload.model_only_compound_coverage_from_answer)
       ? (payload.model_only_compound_coverage_from_answer as Record<string, unknown>)

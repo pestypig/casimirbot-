@@ -8,6 +8,7 @@ export type HelixFollowupReasoningReason =
   | "mixed_intent_requires_post_evidence_reasoning"
   | "conflicting_hypotheses_require_reasoning"
   | "route_terminal_product_does_not_require_followup"
+  | "non_answer_terminal"
   | "pure_control_receipt"
   | "pure_status_receipt"
   | "simple_no_source_turn";
@@ -37,6 +38,12 @@ const reasonFor = (input: {
   const onlyAcceptanceStatusSecondary =
     input.secondaryIntentKinds.length === 0 ||
     input.secondaryIntentKinds.every((kind) => kind === "status_question");
+  if (
+    input.terminalArtifactKind === "typed_failure" ||
+    input.terminalArtifactKind === "request_user_input"
+  ) {
+    return "non_answer_terminal";
+  }
   if (input.primaryIntent === "control_command" && isReceiptKind(input.terminalArtifactKind) && onlyAcceptanceStatusSecondary) {
     return "pure_control_receipt";
   }
@@ -104,7 +111,11 @@ export function buildFollowupReasoningGate(input: {
       raw_content_included: false,
     };
   }
-  const maySkip = reason === "pure_control_receipt" || reason === "pure_status_receipt" || reason === "simple_no_source_turn";
+  const maySkip =
+    reason === "non_answer_terminal" ||
+    reason === "pure_control_receipt" ||
+    reason === "pure_status_receipt" ||
+    reason === "simple_no_source_turn";
   const required = !maySkip;
   const completed = required
     ? input.postEvidenceReasoningCompleted ?? input.finalArbitrationRan

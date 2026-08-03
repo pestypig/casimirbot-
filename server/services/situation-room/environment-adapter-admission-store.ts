@@ -242,6 +242,48 @@ export const recordEnvironmentAdapterAdmission = async (input: {
         return existing;
       }
 
+      if (existing && existing.manifest_hash === validation.manifest_hash) {
+        // The producer has not asserted a new manifest identity. A server-side
+        // adapter contract revision must therefore re-evaluate this admission
+        // in place instead of colliding with the durable manifest uniqueness
+        // boundary or pretending the connector emitted a new observation.
+        const { rows: refreshedRows } =
+          await db.query<EnvironmentAdapterAdmissionRow>(
+            `
+              UPDATE helix_environment_adapter_admissions
+              SET adapter_profile_id = $2,
+                  adapter_profile_version = $3,
+                  adapter_contract_hash = $4,
+                  manifest_id = $5,
+                  source_family = $6,
+                  mechanics_collection_ids = $7::jsonb,
+                  status = 'active',
+                  admitted_at = now(),
+                  updated_at = now(),
+                  revoked_at = NULL
+              WHERE admission_id = $1
+              RETURNING *;
+            `,
+            [
+              existing.admission_id,
+              validation.record.profile.profile_id,
+              validation.record.profile.profile_version,
+              validation.record.contract_hash,
+              input.manifest.manifest_id,
+              validation.record.profile.source_family,
+              JSON.stringify(mechanicsIds),
+            ],
+          );
+        if (!refreshedRows[0]) {
+          throw new RoomSourceIngressError(
+            "room_source_unavailable",
+            503,
+            "The environment adapter admission could not be refreshed.",
+          );
+        }
+        return refreshedRows[0];
+      }
+
       await db.query(
         `
           UPDATE helix_environment_adapter_admissions

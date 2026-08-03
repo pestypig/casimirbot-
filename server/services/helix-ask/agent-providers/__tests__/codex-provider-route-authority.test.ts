@@ -7,6 +7,62 @@ import {
 import { readWorkstationGatewayCallRequestsForTurn } from "../explicit-workstation-gateway";
 
 describe("Codex provider pre-gateway route authority", () => {
+  it("commits an affirmative cadence command to the concrete control capability", () => {
+    const body: Record<string, unknown> = {
+      question: "Set the visual capture interval to 10 seconds.",
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "live_pipeline",
+        target_kind: "live_pipeline",
+        strength: "hard",
+        requested_outputs: ["live_pipeline_receipt", "typed_failure"],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "visual_capture_describe",
+        requested_capability: "live_pipeline",
+        required_terminal_kind: "situation_context_pack",
+      },
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:affirmative-cadence-control",
+      selectedRoute: "/ask/turn",
+    });
+
+    expect(body.tool_call_admission_decision).toMatchObject({
+      required: true,
+      requested_capability: "situation-room.live-source.set_rate",
+      selected_capability: "situation-room.live-source.set_rate",
+      admitted_capability: "situation-room.live-source.set_rate",
+      source_target: "live_pipeline",
+    });
+    expect(body.committed_ask_route).toMatchObject({
+      route: { source_target: "live_pipeline" },
+      canonical_goal: {
+        goal_kind: "live_pipeline_control",
+        requested_capability: "situation-room.live-source.set_rate",
+        required_terminal_kind: "live_pipeline_receipt",
+      },
+    });
+    expect(
+      readWorkstationGatewayCallRequestsForTurn({
+        body,
+        includePlannerDerived: true,
+      }),
+    ).toMatchObject([
+      {
+        capability_id: "situation-room.live-source.set_rate",
+        mode: "act",
+        arguments: {
+          cadence_ms: 10_000,
+          capture_mode: "interval",
+        },
+      },
+    ]);
+  });
+
   it("does not promote a generic visual-source turn into named receipt evaluation", () => {
     const body: Record<string, unknown> = {
       question: "What is happening right now in the visual screen capture?",
@@ -603,5 +659,86 @@ describe("Codex provider pre-gateway route authority", () => {
         },
       },
     ]);
+  });
+
+  it("reconciles a stale document lifecycle before a hard Minecraft world turn reaches Codex", () => {
+    const turnId = "ask:minecraft-world-stale-document-lifecycle";
+    const body: Record<string, unknown> = {
+      question:
+        "What is the current daytime value in our Minecraft world? Please read it directly from the live Fabric server before you answer.",
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        turn_id: turnId,
+        thread_id: "helix-ask:room:shared_realtime_room:minecraft",
+        target_source: "world_event",
+        target_kind: "world_event",
+        strength: "hard",
+        precedence_reason: "explicit_world_event_source_target",
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        turn_id: turnId,
+        goal_kind: "doc_open_best",
+        required_terminal_kind: "doc_open_receipt",
+        classifier_reasons: ["doc_read_aloud_phrase"],
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        turn_id: turnId,
+        source_target: "world_event",
+        goal_kind: "doc_open_best",
+        required_terminal_kind: "doc_open_receipt",
+        required_terminal_artifact_kind: "doc_open_receipt",
+        allowed_terminal_artifact_kinds: ["doc_open_receipt"],
+      },
+      active_doc_identity: {
+        active_doc_path: "docs/example.md",
+      },
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId,
+      selectedRoute: "/ask/turn/stream",
+    });
+
+    expect(body.committed_ask_route).toMatchObject({
+      route: {
+        source_target: "world_event",
+        source_identity: null,
+      },
+      canonical_goal: {
+        goal_kind: "environment_evidence_synthesis",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+    });
+    expect(body.canonical_goal_frame).toMatchObject({
+      goal_kind: "environment_evidence_synthesis",
+      required_terminal_kind: "model_synthesized_answer",
+      source: "committed_route_canonical_goal_reconciliation",
+    });
+    expect(body.route_product_contract).toMatchObject({
+      source_target: "world_event",
+      goal_kind: "environment_evidence_synthesis",
+      required_terminal_kind: "model_synthesized_answer",
+      required_terminal_artifact_kind: "model_synthesized_answer",
+      evidence_reentry_required: true,
+      followup_reasoning_required: true,
+    });
+    expect(body.route_evidence_authority).toMatchObject({
+      schema: "helix.route_evidence_authority.v1",
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_terminal_artifact_kinds: expect.arrayContaining([
+        "model_synthesized_answer",
+        "agent_provider_terminal_candidate",
+      ]),
+    });
+    expect(body.committed_route_lifecycle_reconciliation).toMatchObject({
+      canonical_goal_reconciled: true,
+      route_product_contract_reconciled: true,
+      authority: "helix_committed_route",
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
   });
 });

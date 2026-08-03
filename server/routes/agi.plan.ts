@@ -353,6 +353,7 @@ import {
   buildHelixAgentContinuationState,
   resolveHelixContinuationBudgetExtension,
 } from "../services/helix-ask/runtime/agent-continuation-state";
+import { authoritativeTypedFailureRequiresNoContinuation } from "../services/helix-ask/runtime/typed-failure-lifecycle-reconciliation";
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
 import {
   appendHelixRuntimeGoalSatisfactionObservation,
@@ -62184,29 +62185,8 @@ const buildHelixAgentRuntimeLoopAdmission = (args: {
       args.canonicalGoalFrame.required_terminal_kind === "typed_failure" ||
       readAskTurnString(args.payload.final_answer_source) === "typed_failure"
     );
-  const payloadSatisfactionReport =
-    args.payload.satisfaction_report &&
-    typeof args.payload.satisfaction_report === "object" &&
-    !Array.isArray(args.payload.satisfaction_report)
-      ? (args.payload.satisfaction_report as HelixAskTurnSatisfactionReport)
-      : null;
-  const hasAuthoritativeTypedFailureSatisfaction =
-    (
-      args.satisfactionReport?.terminal_kind === "final_failure" &&
-      args.satisfactionReport?.terminal_artifact_kind === "typed_failure"
-    ) ||
-    (
-      payloadSatisfactionReport?.terminal_kind === "final_failure" &&
-      payloadSatisfactionReport?.terminal_artifact_kind === "typed_failure"
-    );
   const authoritativeTypedFailureTerminal =
-    readAskTurnString(args.payload.terminal_artifact_kind) === "typed_failure" &&
-    Boolean(
-      args.payload.typed_failure &&
-      typeof args.payload.typed_failure === "object" &&
-      !Array.isArray(args.payload.typed_failure),
-    ) &&
-    hasAuthoritativeTypedFailureSatisfaction;
+    authoritativeTypedFailureRequiresNoContinuation(args.payload);
   const sourceOrCapabilityTurn =
     isHelixRuntimeSourceTargetedTurn(args.payload, buildHelixRuntimeIntentPacketDependencies()) ||
     isHelixRuntimeCapabilityTurn(args.payload, buildHelixRuntimeIntentPacketDependencies());

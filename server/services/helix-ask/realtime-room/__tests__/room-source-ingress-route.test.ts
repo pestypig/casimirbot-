@@ -44,7 +44,9 @@ import {
   getSharedLiveRoomBindingStore,
   getSharedLiveRoomControlService,
 } from "../../../shared-live-room-control/default-service";
-import { materializeLegacyRoomSourceConnector } from "../../../environment-connectors/bindings";
+import {
+  listActiveEnvironmentConnectorBindings,
+} from "../../../environment-connectors/bindings";
 import {
   listEnvironmentConnectorCapabilityDescriptors,
   readEnvironmentConnectorCapabilityDescriptor,
@@ -285,14 +287,16 @@ describe("Shared Realtime room source ingress", () => {
       .send({ enabled: true })
       .expect(200);
     const userRoomId = await createRoom(publicUser, "User room");
-    await publicUser
-      .post(
-        `/api/agi/realtime/rooms/${encodeURIComponent(userRoomId)}/source-bindings`,
-      )
-      .set(SAME_ORIGIN_HEADERS)
-      .set("Idempotency-Key", "public-user-source-create")
-      .send({})
-      .expect(403);
+    const publicUserBinding = await createBinding(publicUser, userRoomId, {
+      world_id: "minecraft:local:public-user-fabric",
+      domain_adapter: "minecraft.fabric_mod.v1",
+      source_label: "Public user Fabric source",
+    });
+    expect(publicUserBinding.binding).toMatchObject({
+      room_id: userRoomId,
+      world_id: "minecraft:local:public-user-fabric",
+      domain_adapter: "minecraft.fabric_mod.v1",
+    });
 
     const owner = await signIn(app, "profile:source-owner", "Source Owner");
     const participant = await signIn(
@@ -1018,15 +1022,18 @@ describe("Shared Realtime room source ingress", () => {
       assistant_answer: false,
       terminal_eligible: false,
     });
-    await getPool().query(
-      `
-        UPDATE helix_environment_adapter_admissions
-        SET adapter_contract_hash = $2
-        WHERE binding_id = $1
-          AND status = 'active';
-      `,
-      [created.binding.binding_id, admittedContractHash],
-    );
+    const refreshedManifest = await request(app)
+      .post(sourcePath(created.binding.binding_id, "manifest"))
+      .set(nextHeaders(manifest))
+      .send(manifest)
+      .expect(200);
+    expect(refreshedManifest.body.observation_ref.adapter_admission).toMatchObject({
+      admission_id:
+        manifestResponse.body.observation_ref.adapter_admission.admission_id,
+      adapter_contract_hash: admittedContractHash,
+      manifest_hash:
+        manifestResponse.body.observation_ref.adapter_admission.manifest_hash,
+    });
     const candidate = await readLatestBoundRoomSourceCandidate(roomId);
     expect(candidate).toMatchObject({
       bindingId: created.binding.binding_id,
@@ -1615,7 +1622,49 @@ describe("Shared Realtime room source ingress", () => {
     expect(closed.body.error).toBe("room_source_binding_closed");
   });
 
-  it("revokes ingress when the binding owner loses developer policy", async () => {
+  it("keeps ingress active when a newer owner session is ineligible but another active session remains eligible", async () => {
+    const app = createApp();
+    const profileId = "profile:multi-session-policy-owner";
+    const owner = await signIn(app, profileId, "Multi-session Policy Owner");
+    const roomId = await createRoom(owner);
+    const created = await createBinding(owner, roomId);
+    await signIn(app, profileId, "Multi-session Policy Owner");
+    await ensureDatabase();
+    const preFeatureDeveloperPolicy = {
+      ...HELIX_DEVELOPER_ACCOUNT_POLICY,
+      feature_flags: HELIX_DEVELOPER_ACCOUNT_POLICY.feature_flags.filter(
+        (feature) => feature !== "room_source_ingress",
+      ),
+    };
+    await getPool().query(
+      `
+        UPDATE helix_account_sessions
+        SET account_policy = $2::jsonb, updated_at = now()
+        WHERE session_id = (
+          SELECT session_id
+          FROM helix_account_sessions
+          WHERE profile_id = $1 AND status = 'active'
+          ORDER BY created_at DESC
+          LIMIT 1
+        );
+      `,
+      [profileId, JSON.stringify(preFeatureDeveloperPolicy)],
+    );
+
+    const nextHeaders = ingressHeaderFactory(created.token);
+    await request(app)
+      .get(sourcePath(created.binding.binding_id, "status"))
+      .set(nextHeaders(""))
+      .expect(200);
+
+    const state = await getPool().query<{ status: string }>(
+      `SELECT status FROM helix_room_source_bindings WHERE binding_id = $1;`,
+      [created.binding.binding_id],
+    );
+    expect(state.rows[0]?.status).toBe("active");
+  });
+
+  it("revokes ingress when the binding owner loses every eligible policy path", async () => {
     const app = createApp();
     const owner = await signIn(app, "profile:policy-owner", "Policy Owner");
     const roomId = await createRoom(owner);
@@ -1649,6 +1698,7 @@ describe("Shared Realtime room source ingress", () => {
       `,
       ["profile:policy-owner"],
     );
+    vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "0");
 
     const denied = await request(app)
       .get(sourcePath(created.binding.binding_id, "status"))
@@ -1886,29 +1936,28 @@ describe("Shared Realtime room source ingress", () => {
       .expect(200);
     const adapterAdmission = manifestResponse.body.observation_ref
       .adapter_admission as HelixEnvironmentAdapterAdmissionProjection;
-    await ensureDatabase();
-    const credential = await getPool().query<{ credential_id: string }>(
-      `
-        SELECT credential_id
-        FROM helix_room_source_credentials
-        WHERE binding_id = $1 AND status = 'active'
-        LIMIT 1;
-      `,
-      [created.binding.binding_id],
-    );
-    const connector = await materializeLegacyRoomSourceConnector({
+    const connectors = await listActiveEnvironmentConnectorBindings({
       ownerProfileId: "profile:durable-probe-route",
       roomSourceBindingId: created.binding.binding_id,
-      credentialId: credential.rows[0].credential_id,
       roomId: created.binding.room_id,
       sourceId: created.binding.source_id,
-      worldId: created.binding.world_id,
+      adapterAdmissionId: adapterAdmission.admission_id,
+      adapterContractHash: adapterAdmission.adapter_contract_hash,
+      manifestHash: adapterAdmission.manifest_hash,
       producerEpochRef: adapterAdmission.producer_epoch_ref,
-      adapterAdmission,
-      capabilityDescriptors: listEnvironmentConnectorCapabilityDescriptors({
-        adapterProfileId: adapterAdmission.adapter_profile_id,
-      }),
+      capabilityId: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
     });
+    expect(connectors).toHaveLength(1);
+    const connector = connectors[0];
+    expect(connector.catalogSnapshot).toMatchObject({
+      adapter_profile_id: adapterAdmission.adapter_profile_id,
+      adapter_contract_hash: adapterAdmission.adapter_contract_hash,
+      manifest_hash: adapterAdmission.manifest_hash,
+      content_role: "server_owned_capability_catalog",
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    await ensureDatabase();
     const now = new Date();
     await getPool().query(
       `

@@ -103,6 +103,19 @@ Preparing level "helix_fabric_test_world"
 Done (...)! For help, type "help"
 ```
 
+Manifest refresh is wall-clock driven and must continue after Minecraft logs
+`Server empty for 60 seconds, pausing`. With keyed CasimirBot already ready, an
+empty server must still reach `manifest was admitted`; requiring a player to
+join before source admission is a connector-lifecycle regression. World reads,
+snapshots, and probe execution remain on the Minecraft server thread.
+
+The default player-roster heartbeat runs every `100` ticks (approximately five
+seconds), while manifest re-admission remains on an independent wall-clock path
+with a minimum `300`-tick (15-second) cadence. The Minecraft adapter still
+fails closed when the latest roster is more than 30 seconds old. This gives the
+identity check enough missed-heartbeat headroom for bounded local event-loop or
+network stalls without treating stale player identity as current evidence.
+
 An `UnsupportedClassVersionError` mentioning class-file version `65.0` and
 runtime version `52.0` means Java 8 was selected. Stop that process and launch
 with Java 21; the world is not damaged by this startup failure.
@@ -136,7 +149,32 @@ The participant list should show both people before testing conversational
 handoff. Starting GPT Live is a separate Realtime operation; a working text
 provider route does not by itself prove that the Realtime route is healthy.
 
-## 5. Verify or replace the Minecraft source binding
+### Choose an authorized reasoning path
+
+The ordinary **Ask Helix** composer remains owned by the browser session that
+submits the turn. Merely joining the same room does not turn an invited
+participant's local Ask turn into the owner's connector authority. A natural
+Minecraft request from a participant may correctly select the environment
+capability and then fail as `permission_revoked`; that proves tool selection
+and the room security boundary, not connector execution.
+
+Use one of these paths for the successful probe battery:
+
+1. In the room owner's browser, submit the prompt from the room-scoped Helix
+   Ask chat. The owner must remain present for the full turn.
+2. In the room owner's browser, start GPT Live and bind that single model
+   session to the room. After the room reports a bound owner transport, the
+   invited participant may speak through the connected room-audio bridge; the
+   probe still executes under the server-validated owner-hosted room session.
+3. Use an authenticated Agent API run only after legitimate OAuth/account
+   binding and an exact durable run-room binding have completed. A human room
+   invitation or browser guest session is not a substitute for that binding.
+
+Do not sign into the owner's profile from an automation harness, copy browser
+session material, promote a participant to owner implicitly, or relax the
+gateway's owner/membership/consent checks just to make the test pass.
+
+## 5. Pair or replace the Minecraft source binding
 
 If the room shows **Local Fabric 1.21.8 source — active**, preserve the current
 binding and continue to the probe battery.
@@ -150,20 +188,40 @@ The room attached to this source binding is closed.
 
 the old binding cannot be repointed or reactivated. The room owner must:
 
-1. Generate a new Minecraft room-source link for the current room using the
-   `minecraft.fabric_mod.v1` adapter identity.
-2. Claim the one-time setup packet in the trusted browser surface.
-3. Copy its values locally into
-   `run/config/helix-fabric-sensor.json`, leaving read-only policy enabled and
-   command execution disabled.
-4. Restart the Fabric server so it creates a new producer epoch and republishes
-   its manifest.
-5. Confirm the room source becomes **active**, not merely configured or
-   attached.
+1. Select the Fabric environment in the room's environment panel.
+2. Click **Pair in game**. The owner receives a short-lived, single-use pairing
+   code, not the connector credential.
+3. Run `/helix pair <code>` from the Fabric server console or as an authorized
+   in-game operator. The connector redeems the code directly, stores the
+   resulting local configuration, and restarts its source loops.
+4. Confirm the room source becomes **active**, not merely configured or
+   attached, and that its admitted capability list appears.
+5. Under **Your identity in this environment**, select the online player that
+   represents the room participant before asking actor-scoped questions.
 
-Do not send the setup packet to Codex. The human operator performs the local
-credential copy; Codex can diagnose only the sanitized binding and source
-status.
+The source bearer credential is never returned to the browser, Codex, MCP,
+chat history, or debug exports. Helix stores only hashed pairing material; a
+successful redemption consumes the code. **Pair again** rotates the connector
+credential and invalidates the previous producer. **Manual config** remains an
+advanced local fallback, not the normal workflow.
+
+To enable live Minecraft commands after the source is admitted:
+
+1. Configure the environment's command authority, approval mode, and member
+   ceilings. Full/autonomous mode requires the explicit warning acknowledgement.
+2. Click **Pair command access in game** for that Fabric environment.
+3. Run the displayed `/helix pair <code>` command as a Minecraft operator.
+4. Wait for the in-game success message. This is a command-only pairing: it
+   preserves the active observation credential and installs the distinct
+   outbound command credential directly in the connector.
+5. Confirm a read-only natural-language command such as “Run `/time query
+   daytime` and report the returned value” succeeds before testing mutations.
+
+The command credential is never displayed in the room, sent to Codex, placed
+in chat history, or copied through MCP/debug output. Emergency stop remains
+available throughout command provisioning. Fabric publishes its Brigadier
+catalog only after source-manifest admission, avoiding the startup race where
+catalog setup could arrive before the room recognized the connector.
 
 If the room still labels the source as Paper, do not accept it as equivalent.
 Verify that the new binding names `minecraft.fabric_mod.v1`, has the intended
@@ -173,6 +231,10 @@ Paper plugin config.
 ## 6. Run the natural-language probe battery
 
 Start with one probe per turn so failures are easy to classify.
+
+Before submitting the first prompt, confirm that the selected authorized path
+above is active. For shared GPT Live, the room must no longer report
+`runtime: idle`, `transport owner: unbound`, or `bound reference: none`.
 
 | Scenario | Example request | Expected capability |
 | --- | --- | --- |
@@ -241,6 +303,8 @@ architectural failure by hard-coding one prompt.
 | `room_source_binding_closed` | Room/source admission | Create a fresh source binding for the current room, install it locally, and restart Fabric. |
 | Source is configured but not active | Manifest/heartbeat admission | Check the sanitized typed source status and adapter/world identity. |
 | Source says Paper | Wrong adapter identity | Create a Fabric binding; do not reuse the Paper setup packet. |
+| A player-state prompt that says `Report my player...` requests `docs_viewer` | Prompt interpretation | Treat `report` as an output verb unless the surrounding phrase identifies an actual report document. The Minecraft prompt must admit `live_environment`. |
+| Active Fabric source returns `subject_binding_required` | Participant-to-subject binding | Confirm the player is online, refresh the sanitized subject directory, then select that player under **Your identity in this environment**. Do not bypass identity selection or expose a raw player UUID. |
 | Probe waits indefinitely | Connector poll/result lane | Confirm Fabric is running, manifest-admitted, and polling after heartbeat startup. |
 | Tool completed but answer is missing | Evidence re-entry or continuation | Look for the current-turn observation and the required post-tool model step. |
 | Answer describes old state | Freshness/current-turn authority | Move again and require a new probe with a bounded freshness requirement. |
@@ -263,10 +327,34 @@ Stop the Fabric server cleanly with `stop` in its console when testing ends.
 Stop keyed CasimirBot only when the broader test session is finished. Never
 copy source credentials into the test report or debug export.
 
+### Verified no-player baseline (2026-08-01)
+
+With the keyed application ready, the Fabric 1.21.8 server listening on
+`localhost:25565`, and `minecraft.fabric_mod.v1` manifest-admitted, the prompt
+`Where am I in Minecraft right now? Report my player name, dimension,
+position, health, and food from the fresh live environment observation.`
+selected `com.casimirbot.minecraft.actor.status.read`. The gateway produced a
+`subject_binding_required` observation, that observation re-entered provider
+reasoning, and Helix selected an actionable typed failure. This is the expected
+fail-closed result before an online player is selected. It also proves that the
+word `Report` no longer misroutes this prompt to `docs_viewer`.
+
+### Verified one-time Fabric pairing and actor probe (2026-08-02)
+
+From a normal owner account, **Pair in game** issued a single-use code for a
+Fabric source. Running `/helix pair <code>` on the local Fabric server redeemed
+it without exposing a connector credential, restarted the source loops, and
+made the room report an active `minecraft.fabric_mod.v1` source with eight
+admitted read capabilities. After the owner selected the online player under
+**Your identity in this environment**, a natural-language status request chose
+`com.casimirbot.minecraft.actor.status.read`, received a fresh current-turn
+observation, re-entered that observation into provider reasoning, and produced
+the Helix-authorized answer. Replaying the consumed command failed closed while
+the admitted connector remained active.
+
 Related contracts:
 
 - [`../minecraft-room-source-ingress.md`](../minecraft-room-source-ingress.md)
 - [`../minecraft-situation-awareness-capability-matrix.md`](../minecraft-situation-awareness-capability-matrix.md)
 - [`../helix-ask/workstation-tool-contracts/environment-connector.probe.md`](../helix-ask/workstation-tool-contracts/environment-connector.probe.md)
 - [`../helix-ask/workstation-tool-contracts/shared-live-room-control.md`](../helix-ask/workstation-tool-contracts/shared-live-room-control.md)
-

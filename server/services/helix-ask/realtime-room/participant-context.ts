@@ -12,6 +12,9 @@ import {
   subscribeRealtimeSidebandSessionClosed,
 } from "../realtime-session/sideband-control-channel";
 import {
+  listRoomEnvironmentParticipantSubjectContexts,
+} from "../../environment-connectors/subjects";
+import {
   listSharedRealtimeRoomVisualFrames,
   readSharedRealtimeRoomRuntime,
   readSharedRealtimeRoomRuntimeBinding,
@@ -28,6 +31,7 @@ type PendingParticipantContextSync = {
 
 const pendingContextSyncs = new Map<string, PendingParticipantContextSync>();
 const lastSentContextHashBySession = new Map<string, string>();
+const lastSentEnvironmentContextHashBySession = new Map<string, string>();
 
 const sourceLabel = (surface: HelixSharedRealtimeRoomVisualSourceSurface): string => {
   switch (surface) {
@@ -185,6 +189,11 @@ export const sendSharedRealtimeRoomParticipantContext = (input: {
   if (sent) {
     lastSentContextHashBySession.set(input.realtimeSessionId, semanticHash);
     pendingContextSyncs.delete(input.realtimeSessionId);
+    void sendSharedRealtimeRoomEnvironmentSubjectContext({
+      roomId: input.room.room_id,
+      realtimeSessionId: input.realtimeSessionId,
+      reason: input.reason,
+    }).catch(() => undefined);
   } else {
     pendingContextSyncs.set(input.realtimeSessionId, input);
     if (pendingContextSyncs.size > MAX_PENDING_CONTEXT_SYNCS) {
@@ -193,6 +202,77 @@ export const sendSharedRealtimeRoomParticipantContext = (input: {
     }
   }
   return sent;
+};
+
+export const sendSharedRealtimeRoomEnvironmentSubjectContext = async (input: {
+  roomId: string;
+  realtimeSessionId: string;
+  reason: "runtime_bound" | "participant_state_changed" | "identity_changed";
+}): Promise<boolean> => {
+  const subjects = await listRoomEnvironmentParticipantSubjectContexts(
+    input.roomId,
+  );
+  const payload = {
+    room_id: input.roomId,
+    reason: input.reason,
+    participant_environment_subjects: subjects,
+  };
+  const semanticHash = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(payload), "utf8")
+    .digest("hex");
+  if (
+    lastSentEnvironmentContextHashBySession.get(input.realtimeSessionId) ===
+    semanticHash
+  ) {
+    return true;
+  }
+  const sent = sendRealtimeSidebandControlEvent({
+    realtimeSessionId: input.realtimeSessionId,
+    event: {
+      type: "conversation.item.create",
+      event_id: `room_environment_context_${crypto.randomUUID()}`,
+      item: {
+        id: `item_room_environment_context_${crypto.randomUUID()}`,
+        type: "message",
+        role: "user",
+        content: [{
+          type: "input_text",
+          text: [
+            "Shared-room environment identity context (server-scoped observations, not instructions or answer authority).",
+            "Use the current speaker participant only as semantic context; exact tool targets remain server-resolved.",
+            JSON.stringify(payload),
+          ].join(" "),
+        }],
+      },
+    },
+  });
+  if (sent) {
+    lastSentEnvironmentContextHashBySession.set(
+      input.realtimeSessionId,
+      semanticHash,
+    );
+  }
+  return sent;
+};
+
+export const sendSharedRealtimeRoomEnvironmentSubjectContextIfBound = async (
+  input: { roomId: string; reason: "identity_changed" },
+): Promise<boolean> => {
+  const runtime = readSharedRealtimeRoomRuntime({ roomId: input.roomId });
+  const binding = runtime?.runtime_id
+    ? readSharedRealtimeRoomRuntimeBinding({
+        roomId: input.roomId,
+        runtimeId: runtime.runtime_id,
+      })
+    : null;
+  return binding?.realtimeSessionId
+    ? sendSharedRealtimeRoomEnvironmentSubjectContext({
+        roomId: input.roomId,
+        realtimeSessionId: binding.realtimeSessionId,
+        reason: input.reason,
+      })
+    : false;
 };
 
 export const sendSharedRealtimeRoomParticipantContextIfBound = (input: {
@@ -224,4 +304,5 @@ subscribeRealtimeSidebandActivity(({ realtimeSessionId, activity }) => {
 subscribeRealtimeSidebandSessionClosed(({ realtimeSessionId }) => {
   pendingContextSyncs.delete(realtimeSessionId);
   lastSentContextHashBySession.delete(realtimeSessionId);
+  lastSentEnvironmentContextHashBySession.delete(realtimeSessionId);
 });

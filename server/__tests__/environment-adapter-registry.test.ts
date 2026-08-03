@@ -35,12 +35,23 @@ describe("environment adapter registry", () => {
     });
 
     expect(first.profile.profile_id).toBe(HELIX_MINECRAFT_ADAPTER_PROFILE_ID);
+    expect(first.profile.profile_version).toBe(6);
     expect(first.profile.domain).toBe("minecraft");
     expect(first.profile.execution_policy).toEqual({
       may_execute_live_actions: false,
       may_perform_read_only_probes: true,
       action_credential_reused: false,
     });
+    expect(first.profile.subject_directory.verification_methods).toEqual([
+      "self_claim",
+      "owner_assigned",
+    ]);
+    expect(first.profile.subject_directory.verification_methods).not.toContain(
+      "connector_challenge",
+    );
+    expect(first.profile.subject_directory.verification_methods).not.toContain(
+      "server_auth",
+    );
     expect(first.profile.mechanics_collections).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

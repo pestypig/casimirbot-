@@ -204,6 +204,7 @@ const reviewedSharedProviderGatewayCapabilityIds = [
   "live_env.test_visual_observer_profile",
   "live_env.compare_visual_observer_profiles",
   "room.evidence.read_bound",
+  "situation-room.live-source.set_rate",
   "com.casimirbot.minecraft.actor.status.read",
   "com.casimirbot.minecraft.inventory.check",
   "com.casimirbot.minecraft.nearby_entities.list",
@@ -212,6 +213,8 @@ const reviewedSharedProviderGatewayCapabilityIds = [
   "com.casimirbot.minecraft.line_of_sight.check",
   "com.casimirbot.minecraft.crop_state.read",
   "com.casimirbot.minecraft.reachability.check",
+  "com.casimirbot.minecraft.command.catalog",
+  "com.casimirbot.minecraft.command",
   "situation-room.describe_visual_capture",
   "room.list",
   "room.inspect",
@@ -228,6 +231,7 @@ const reviewedSharedCapabilityLaneClassifications = [
 
 const reviewedNonSharedProviderCapabilityClassifications = [
   "client.read_aloud|client_projection_only|user_confirmed_side_effect|client_projection",
+  "com.casimirbot.minecraft.container_contents.read|blocked_pending_contract|read_observe|explicit_contract",
   "debug.inspect_current_turn|safe_to_graduate_next|read_observe|explicit_contract",
   "docs-viewer.identify_current_doc|safe_to_graduate_next|read_observe|explicit_contract",
   "docs-viewer.validate_doc_candidates|safe_to_graduate_next|read_observe|explicit_contract",

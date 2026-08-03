@@ -28,6 +28,7 @@ import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 import { readCommittedAskRoute } from "./committed-ask-route";
 import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "./workstation-context-feed-query-tool-contracts";
 import { resolveHelixRuntimeObservationReentry } from "./runtime/turn-lifecycle";
+import { authoritativeTypedFailureRequiresNoContinuation } from "./runtime/typed-failure-lifecycle-reconciliation";
 
 type RecordLike = Record<string, unknown>;
 
@@ -236,6 +237,31 @@ const normalizedEqual = (left: unknown, right: unknown): boolean => {
   return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
 };
 
+const toolFamilyAliasMatches = (
+  requestedCapability: unknown,
+  actualCapability: unknown,
+): boolean => {
+  const requested = readString(requestedCapability);
+  const actual = readString(actualCapability);
+  if (!requested || !actual) return false;
+  const requestedContract = resolveToolFamilyContract({ toolName: requested });
+  const actualContract = resolveToolFamilyContract({ toolName: actual });
+  if (!requestedContract || requestedContract !== actualContract) return false;
+  const declaredNames = [
+    requestedContract.toolName,
+    ...(requestedContract.aliases ?? []),
+  ];
+  return declaredNames.some((name) => normalizedEqual(name, requested)) &&
+    declaredNames.some((name) => normalizedEqual(name, actual));
+};
+
+const auditedCapabilityMatches = (
+  requestedCapability: string | null | undefined,
+  actualCapability: string | null | undefined,
+): boolean =>
+  explicitCapabilityMatches(requestedCapability, actualCapability) ||
+  toolFamilyAliasMatches(requestedCapability, actualCapability);
+
 const isGenericAuditFamily = (family: unknown): boolean => {
   const normalized = normalize(family);
   return (
@@ -304,7 +330,11 @@ const explicitCapabilitySubstitutionRuleId = (
   const actual = readString(actualCapability);
   if (!requested || !actual || normalizedEqual(requested, actual)) return null;
   const contract = explicitCapabilityContractForCapability(requested);
-  if (!contract) return null;
+  if (!contract) {
+    return toolFamilyAliasMatches(requested, actual)
+      ? `tool_family_alias:${actual}`
+      : null;
+  }
   if (normalizedEqual(contract.runtime_capability, actual)) return `runtime_capability:${actual}`;
   if (contract.allowed_substitutions.some((substitution) => normalizedEqual(substitution, actual))) {
     return `allowed_substitution:${actual}`;
@@ -1604,6 +1634,7 @@ const buildToolTurnChainAudit = (input: {
   const capabilityCatalogArtifact = input.artifacts.find((artifact) => observationKindMatches(artifact, "capability_registry")) ?? null;
   const requestedObservationKinds = unique([
     ...readStringArray(admission?.required_observation_kinds_for_requested_capability),
+    ...readStringArray(capabilityPlan?.required_observation_kinds),
     ...(requestedCapabilityContract?.required_observation_kinds ?? []),
     ...(requestedToolFamilyContract?.requiredObservationKinds ?? []),
   ]);
@@ -1668,13 +1699,13 @@ const buildToolTurnChainAudit = (input: {
       : rawExecutedCapability;
   const requestedSelectedDirectMatch =
     requestedCapability && selectedCapability
-      ? explicitCapabilityMatches(requestedCapability, selectedCapability)
+      ? auditedCapabilityMatches(requestedCapability, selectedCapability)
       : requestedCapability
         ? false
         : null;
   const requestedExecutedDirectMatch =
     requestedCapability && executedCapability
-      ? explicitCapabilityMatches(requestedCapability, executedCapability)
+      ? auditedCapabilityMatches(requestedCapability, executedCapability)
       : requestedCapability
         ? false
         : null;
@@ -1702,7 +1733,7 @@ const buildToolTurnChainAudit = (input: {
           readNullableString(entry.runtime_capability),
           readNullableString(entry.selected_capability),
           readNullableString(entry.executed_capability),
-        ].some((candidate) => Boolean(candidate && explicitCapabilityMatches(capability, candidate))),
+        ].some((candidate) => Boolean(candidate && auditedCapabilityMatches(capability, candidate))),
       ),
     );
   const compoundTransitionAuthorized = Boolean(
@@ -2017,9 +2048,12 @@ const buildToolTurnChainAudit = (input: {
       normalizedEqual(authorityTerminal, "typed_failure") ||
       normalizedEqual(visibleTerminal, "typed_failure"),
   );
+  const authoritativeTypedFailureTerminal =
+    authoritativeTypedFailureRequiresNoContinuation(input.payload);
   const typedFailureInsteadOfRequiredTerminal = Boolean(
     terminalErrorCode &&
       typedFailureSelected &&
+      !authoritativeTypedFailureTerminal &&
       requiredTerminal &&
       !normalizedEqual(requiredTerminal, "typed_failure"),
   );
@@ -2077,6 +2111,8 @@ const buildToolTurnChainAudit = (input: {
                       ? "reentry_step_not_executed"
                     : observationNeedsReentry
                       ? "observation_not_reentered"
+                    : authoritativeTypedFailureTerminal
+                      ? "required_observation_missing"
                     : !input.requiredObservationsSatisfied && !concreteTurnChainComplete
                       ? requestedCapability
                         ? "required_observation_missing"

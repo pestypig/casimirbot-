@@ -19,9 +19,14 @@ import {
   resetRealtimeStagePlayContextPacksForTests,
   storeRealtimeStagePlayContextPack,
 } from "../realtime-session/context-pack-store";
+import type { HelixRealtimeRoomTurnActorContext } from "../realtime-room/turn-actor-context";
 
 const handoffsById = new Map<string, HelixRealtimeStagePlayAskHandoffV1>();
 const handoffIdByProviderEventKey = new Map<string, string>();
+const turnActorContextByHandoffId = new Map<
+  string,
+  HelixRealtimeRoomTurnActorContext
+>();
 const MAX_HANDOFFS = 240;
 
 const hash = (value: unknown): string =>
@@ -49,6 +54,7 @@ const trimHandoffs = (): void => {
     .slice(0, handoffsById.size - MAX_HANDOFFS);
   for (const handoff of oldest) {
     handoffsById.delete(handoff.handoff_id);
+    turnActorContextByHandoffId.delete(handoff.handoff_id);
     deleteRealtimeStagePlayContextPack(handoff.handoff_id);
     handoffIdByProviderEventKey.delete(
       `${handoff.realtime_session_id}:${handoff.provider_event_ref}`,
@@ -72,6 +78,7 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
   audioFocusOwner?: string | null;
   qualifiedUserInterruption?: boolean;
   terminalVoiceInterrupted?: boolean;
+  trustedTurnActorContext?: HelixRealtimeRoomTurnActorContext | null;
   nowMs?: number;
 }): HelixRealtimeStagePlayAskHandoffV1 => {
   const providerEventKey = `${input.realtimeSessionId}:${input.providerEventRef}`;
@@ -336,6 +343,12 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
     raw_content_included: false,
   };
   handoffsById.set(handoffId, handoff);
+  if (input.trustedTurnActorContext) {
+    turnActorContextByHandoffId.set(
+      handoffId,
+      input.trustedTurnActorContext,
+    );
+  }
   handoffIdByProviderEventKey.set(providerEventKey, handoffId);
   startRealtimeGroundedRelayForHandoff({
     handoff,
@@ -350,6 +363,15 @@ export const readRealtimeStagePlayAskHandoff = (
   handoffId: string | null | undefined,
 ): HelixRealtimeStagePlayAskHandoffV1 | null =>
   handoffId ? handoffsById.get(handoffId) ?? null : null;
+
+export const readRealtimeStagePlayTurnActorContext = (
+  handoffId: string | null | undefined,
+): HelixRealtimeRoomTurnActorContext | null => {
+  const context = handoffId
+    ? turnActorContextByHandoffId.get(handoffId) ?? null
+    : null;
+  return context ? { ...context } : null;
+};
 
 export const listRealtimeStagePlayAskHandoffs = (input: {
   realtimeSessionId?: string | null;
@@ -370,5 +392,6 @@ export const listRealtimeStagePlayAskHandoffs = (input: {
 export const resetRealtimeStagePlayAskHandoffsForTests = (): void => {
   handoffsById.clear();
   handoffIdByProviderEventKey.clear();
+  turnActorContextByHandoffId.clear();
   resetRealtimeStagePlayContextPacksForTests();
 };

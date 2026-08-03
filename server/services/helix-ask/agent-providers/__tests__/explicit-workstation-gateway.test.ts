@@ -2135,6 +2135,59 @@ describe("explicit workstation gateway derived calls", () => {
     });
   });
 
+  it("binds a natural Minecraft mechanics docs admission to the active room environment", () => {
+    const question =
+      "Before changing Minecraft, look up the connected environment mechanics for how to give my player a temporary glowing effect and cite the exact source line. Do not execute a command.";
+    const requests = buildStructuredAdmissionWorkstationGatewayCallRequests({
+      question,
+      source_target_intent: {
+        selected_capability: "docs-viewer.search_docs",
+      },
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        mode: "read",
+        arguments: expect.objectContaining({
+          query: question,
+          environment_scope: "active_room_environment",
+          source_target_intent: expect.objectContaining({
+            target_source: "docs",
+            target_kind: "environment_mechanics_docs",
+            environment_scope: "active_room_environment",
+          }),
+        }),
+      }),
+    ]);
+  });
+
+  it("materializes a natural Minecraft mechanics lookup from the user goal alone", () => {
+    const question =
+      "For this test, look up the connected Minecraft environment mechanics for how to give my player a temporary glowing effect and cite the exact source line. Do not execute a command.";
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question,
+      },
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        derivation_source: "helix_minecraft_mechanics_docs_intent",
+        capability_id: "docs.search",
+        arguments: expect.objectContaining({
+          query: question,
+          environment_scope: "active_room_environment",
+          source_target_intent: expect.objectContaining({
+            target_kind: "environment_mechanics_docs",
+          }),
+        }),
+      }),
+    ]);
+  });
+
   it("maps structured capability catalog admissions onto the executable catalog gateway", () => {
     const requests = buildStructuredAdmissionWorkstationGatewayCallRequests({
       question: "what tools are available to use with this agent?",

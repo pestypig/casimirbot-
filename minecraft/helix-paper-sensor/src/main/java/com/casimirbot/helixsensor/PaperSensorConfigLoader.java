@@ -29,7 +29,13 @@ public final class PaperSensorConfigLoader {
             config.getString("helix.domain_adapter", "minecraft.paper_plugin.v1"),
             config.getString("helix.source_label", "Minecraft Paper Plugin"),
             positive(config.getInt("helix.snapshot_interval_ticks", 100), 100),
-            positive(config.getInt("helix.heartbeat_interval_ticks", 300), 300),
+            positive(
+                config.getInt(
+                    "helix.heartbeat_interval_ticks",
+                    HelixSensorConfig.DEFAULT_HEARTBEAT_INTERVAL_TICKS
+                ),
+                HelixSensorConfig.DEFAULT_HEARTBEAT_INTERVAL_TICKS
+            ),
             positive(config.getInt("helix.probe_poll_interval_ticks", 40), 40),
             positive(config.getInt("helix.burst_interval_ticks", 20), 20),
             positive(config.getInt("helix.burst_duration_ticks", 120), 120),

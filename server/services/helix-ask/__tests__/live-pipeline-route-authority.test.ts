@@ -172,4 +172,101 @@ describe("authoritative live-pipeline route contract", () => {
       },
     });
   });
+
+  it("reconciles a stale visual goal from a hard live-pipeline receipt request", () => {
+    const committedRoute = buildCommittedAskRoute({
+      turnId,
+      promptText: "Set the visual capture interval to 10 seconds.",
+      selectedRoute: "/ask/turn",
+      payload: {
+        canonical_goal_frame: {
+          turn_id: turnId,
+          goal_kind: "visual_capture_describe",
+          required_terminal_kind: "situation_context_pack",
+        },
+        route_product_contract: {
+          source_target: "live_pipeline",
+          allowed_terminal_artifact_kinds: [
+            "live_pipeline_receipt",
+            "typed_failure",
+          ],
+          forbidden_terminal_artifact_kinds: ["situation_context_pack"],
+        },
+        source_target_intent: {
+          target_source: "live_pipeline",
+          target_kind: "live_pipeline",
+          strength: "hard",
+          requested_outputs: [
+            "live_pipeline_receipt",
+            "tool_call_eligibility",
+            "typed_failure",
+          ],
+        },
+        tool_call_admission_decision: {
+          source_target: "live_pipeline",
+          required: true,
+          admitted_tool_families: ["live_pipeline"],
+        },
+      },
+    });
+
+    expect(committedRoute).toMatchObject({
+      route: {
+        source_target: "live_pipeline",
+        target_kind: "live_pipeline",
+      },
+      canonical_goal: {
+        goal_kind: "live_pipeline_control",
+        required_terminal_kind: "live_pipeline_receipt",
+        allowed_terminal_artifact_kinds: expect.arrayContaining([
+          "live_pipeline_receipt",
+          "typed_failure",
+        ]),
+      },
+      capability_policy: {
+        required_capability_families: ["live_pipeline"],
+      },
+      terminal_product: {
+        required_terminal_product: "live_pipeline_receipt",
+      },
+      compatibility: {
+        source_goal_capability_terminal_compatible: true,
+        violations: [],
+      },
+    });
+  });
+
+  it("maps the exact cadence capability contract to the live control goal", () => {
+    const committedRoute = buildCommittedAskRoute({
+      turnId,
+      promptText: "Set the visual capture interval to 10 seconds.",
+      selectedRoute: "/ask/turn",
+      payload: {
+        requested_capability: "situation-room.live-source.set_rate",
+        source_target_intent: {
+          target_source: "live_pipeline",
+          target_kind: "live_pipeline",
+          strength: "hard",
+          requested_outputs: ["live_pipeline_receipt"],
+        },
+        tool_call_admission_decision: {
+          source_target: "live_pipeline",
+          required: true,
+          requested_capability: "situation-room.live-source.set_rate",
+          admitted_capability: "situation-room.live-source.set_rate",
+          admitted_tool_families: ["live_pipeline"],
+        },
+      },
+    });
+
+    expect(committedRoute).toMatchObject({
+      route: {
+        source_target: "live_pipeline",
+      },
+      canonical_goal: {
+        goal_kind: "live_pipeline_control",
+        required_terminal_kind: "live_pipeline_receipt",
+      },
+    });
+  });
 });

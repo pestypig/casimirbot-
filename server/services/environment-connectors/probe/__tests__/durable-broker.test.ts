@@ -1201,6 +1201,208 @@ describe("durable environment probe broker", () => {
     });
   });
 
+  it("accepts a timely read-only result for a present consented room participant", async () => {
+    const connector = await seed();
+    const participantProfileId = "profile:durable-environment-participant";
+    const participantId = "room_participant:durable-environment-participant";
+    await getPool().query(
+      `
+        INSERT INTO helix_accounts (
+          profile_id, display_name, account_type, provider
+        ) VALUES ($1, 'Durable probe participant', 'user', 'local');
+
+        INSERT INTO helix_shared_realtime_room_members (
+          room_id, slot_number, profile_id, participant_id, member_role,
+          presence, consent, joined_at, last_seen_at, updated_at
+        ) VALUES (
+          $2, 2, $1, $3, 'participant', 'present', $4::jsonb, $5, $5, $5
+        );
+      `,
+      [
+        participantProfileId,
+        ROOM_ID,
+        participantId,
+        JSON.stringify({
+          consent_version: CONSENT_VERSION,
+          consent_receipt_ref:
+            "room_consent:durable-environment-participant:1",
+        }),
+        NOW.toISOString(),
+      ],
+    );
+    const dispatched = await dispatchDurableEnvironmentProbe({
+      tenantId: "first_party_browser_session",
+      ownerSubjectId: "first_party_subject:durable-environment-participant",
+      ownerProfileId: participantProfileId,
+      executionAuthorityKind: "first_party_shared_room",
+      runId: "first_party_shared_room:durable-environment-participant",
+      turnId: "ask:first-party-room:participant-success",
+      providerExecutionId:
+        "provider_execution:first-party-room:participant-success",
+      toolCallId: "tool_call:first-party-room:participant-success",
+      roomId: ROOM_ID,
+      sourceId: SOURCE_ID,
+      producerEpochRef,
+      requestingParticipantId: participantId,
+      adapterAdmission: admission,
+      connector,
+      descriptor: readEnvironmentConnectorCapabilityDescriptor(
+        HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+      )!,
+      arguments: {
+        target: "current_actor",
+        freshness_requirement_ms: 5_000,
+      },
+      freshnessRequirementMs: 5_000,
+      timeoutMs: 10_000,
+      idempotencyKey: "idempotency:first-party-room:participant-success",
+      now: NOW,
+    });
+    const [lease] = await leaseDurableEnvironmentProbesForClaim({
+      claim,
+      adapterAdmission: admission,
+      limit: 1,
+      now: new Date(NOW.getTime() + 100),
+    });
+
+    const accepted = await submitDurableEnvironmentProbeResult({
+      claim,
+      adapterAdmission: admission,
+      submission: {
+        schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
+        probe_attempt_id: lease.probe_attempt_id,
+        lease_token: lease.lease_token,
+        result: resultFor(dispatched.requestId),
+        submitted_at: new Date(NOW.getTime() + 500).toISOString(),
+      },
+      now: new Date(NOW.getTime() + 500),
+    });
+
+    expect(accepted.observation).toMatchObject({
+      outcome: "succeeded",
+      provenance_valid: true,
+      eligible_for_current_turn_reentry: true,
+      late_result_disposition: null,
+    });
+  });
+
+  it("injects a frozen native subject only into the connector lease", async () => {
+    const connector = await seed();
+    const subjectNativeId = "123e4567-e89b-12d3-a456-426614174000";
+    const subjectBindingId = "environment_subject_binding:durable-probe";
+    await getPool().query(
+      `
+        INSERT INTO helix_room_environment_subject_bindings (
+          subject_binding_id,
+          room_id,
+          participant_id,
+          profile_id,
+          environment_binding_id,
+          room_source_binding_id,
+          source_id,
+          world_id,
+          subject_kind,
+          subject_ref,
+          subject_native_id,
+          subject_label,
+          verification_method,
+          confidence,
+          producer_epoch_ref,
+          verified_at,
+          last_confirmed_at,
+          created_at,
+          updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8,
+          'minecraft.player', 'environment_subject:durable-probe', $9,
+          'DurablePlayer', 'self_claim', 0.8, $10, $11, $11, $11, $11
+        );
+      `,
+      [
+        subjectBindingId,
+        ROOM_ID,
+        PARTICIPANT_ID,
+        PROFILE_ID,
+        connector.environmentBindingId,
+        BINDING_ID,
+        SOURCE_ID,
+        WORLD_ID,
+        subjectNativeId,
+        producerEpochRef,
+        NOW.toISOString(),
+      ],
+    );
+    const dispatched = await dispatchDurableEnvironmentProbe({
+      tenantId: "first_party_browser_session",
+      ownerSubjectId: "first_party_subject:durable-environment-probe",
+      ownerProfileId: PROFILE_ID,
+      executionAuthorityKind: "first_party_shared_room",
+      runId: "first_party_shared_room:durable-environment-probe-subject",
+      turnId: "ask:first-party-room:subject",
+      providerExecutionId: "provider_execution:first-party-room:subject",
+      toolCallId: "tool_call:first-party-room:subject",
+      roomId: ROOM_ID,
+      sourceId: SOURCE_ID,
+      producerEpochRef,
+      requestingParticipantId: PARTICIPANT_ID,
+      resolvedSubject: { subjectBindingId, subjectNativeId },
+      adapterAdmission: admission,
+      connector,
+      descriptor: readEnvironmentConnectorCapabilityDescriptor(
+        HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+      )!,
+      arguments: {
+        target: "current_actor",
+        freshness_requirement_ms: 5_000,
+      },
+      freshnessRequirementMs: 5_000,
+      timeoutMs: 10_000,
+      idempotencyKey: "idempotency:first-party-room:subject",
+      now: NOW,
+    });
+    const [lease] = await leaseDurableEnvironmentProbesForClaim({
+      claim,
+      adapterAdmission: admission,
+      limit: 1,
+      now: new Date(NOW.getTime() + 100),
+    });
+
+    expect(lease.capability_request.arguments).toEqual({
+      target: "current_actor",
+      freshness_requirement_ms: 5_000,
+    });
+    expect(JSON.stringify(lease.capability_request)).not.toContain(
+      subjectNativeId,
+    );
+    expect(lease.request).toMatchObject({
+      probe_request_id: dispatched.requestId,
+      target: {
+        target_ref: "current_actor",
+        actor_id: subjectNativeId,
+      },
+    });
+    const persisted = await getPool().query<{
+      requesting_participant_id: string;
+      resolved_subject_binding_id: string;
+      resolved_subject_native_id: string;
+    }>(
+      `
+        SELECT
+          requesting_participant_id,
+          resolved_subject_binding_id,
+          resolved_subject_native_id
+        FROM helix_environment_probe_requests
+        WHERE probe_request_id = $1;
+      `,
+      [dispatched.requestId],
+    );
+    expect(persisted.rows[0]).toEqual({
+      requesting_participant_id: PARTICIPANT_ID,
+      resolved_subject_binding_id: subjectBindingId,
+      resolved_subject_native_id: subjectNativeId,
+    });
+  });
+
   it("recovers the frozen request and lease across a local server restart without persisting the raw lease token", async () => {
     const tempRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "helix-environment-probe-restart-"),
@@ -1214,7 +1416,78 @@ describe("durable environment probe broker", () => {
       await resetDbClient();
 
       const connector = await seed();
-      const dispatched = await dispatch(connector, "restart");
+      const subjectNativeId = "123e4567-e89b-12d3-a456-426614174001";
+      const subjectBindingId = "environment_subject_binding:restart";
+      await getPool().query(
+        `
+          INSERT INTO helix_room_environment_subject_bindings (
+            subject_binding_id,
+            room_id,
+            participant_id,
+            profile_id,
+            environment_binding_id,
+            room_source_binding_id,
+            source_id,
+            world_id,
+            subject_kind,
+            subject_ref,
+            subject_native_id,
+            subject_label,
+            verification_method,
+            confidence,
+            producer_epoch_ref,
+            verified_at,
+            last_confirmed_at,
+            created_at,
+            updated_at
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8,
+            'minecraft.player', 'environment_subject:restart', $9,
+            'RestartPlayer', 'self_claim', 0.8, $10, $11, $11, $11, $11
+          );
+        `,
+        [
+          subjectBindingId,
+          ROOM_ID,
+          PARTICIPANT_ID,
+          PROFILE_ID,
+          connector.environmentBindingId,
+          BINDING_ID,
+          SOURCE_ID,
+          WORLD_ID,
+          subjectNativeId,
+          producerEpochRef,
+          NOW.toISOString(),
+        ],
+      );
+      const dispatched = await dispatchDurableEnvironmentProbe({
+        tenantId: "first_party_browser_session",
+        ownerSubjectId: "first_party_subject:restart",
+        ownerProfileId: PROFILE_ID,
+        executionAuthorityKind: "first_party_shared_room",
+        runId: "first_party_shared_room:restart",
+        turnId: "ask:first-party-room:restart",
+        providerExecutionId: "provider_execution:first-party-room:restart",
+        toolCallId: "tool_call:first-party-room:restart",
+        roomId: ROOM_ID,
+        sourceId: SOURCE_ID,
+        producerEpochRef,
+        requestingParticipantId: PARTICIPANT_ID,
+        resolvedSubject: { subjectBindingId, subjectNativeId },
+        adapterAdmission: admission,
+        connector,
+        descriptor: readEnvironmentConnectorCapabilityDescriptor(
+          HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+        )!,
+        arguments: {
+          target: "current_actor",
+          freshness_requirement_ms: 5_000,
+        },
+        freshnessRequirementMs: 5_000,
+        timeoutMs: 10_000,
+        idempotencyKey: "idempotency:first-party-room:restart",
+        now: NOW,
+      });
       const [lease] = await leaseDurableEnvironmentProbesForClaim({
         claim,
         adapterAdmission: admission,
@@ -1229,15 +1502,19 @@ describe("durable environment probe broker", () => {
         request_status: string;
         attempt_status: string;
         lease_token_hash: string;
+        subject_label: string;
       }>(
         `
           SELECT
             r.status AS request_status,
             a.status AS attempt_status,
-            a.lease_token_hash
+            a.lease_token_hash,
+            s.subject_label
           FROM helix_environment_probe_requests r
           JOIN helix_environment_probe_attempts a
             ON a.probe_request_id = r.probe_request_id
+          JOIN helix_room_environment_subject_bindings s
+            ON s.subject_binding_id = r.resolved_subject_binding_id
           WHERE r.probe_request_id = $1;
         `,
         [dispatched.requestId],
@@ -1245,6 +1522,7 @@ describe("durable environment probe broker", () => {
       expect(restored.rows[0]).toMatchObject({
         request_status: "leased",
         attempt_status: "leased",
+        subject_label: "RestartPlayer",
       });
       expect(JSON.stringify(restored.rows[0])).not.toContain(lease.lease_token);
 

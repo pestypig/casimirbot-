@@ -329,6 +329,7 @@ Each capability contract should define:
 | `live_env.test_visual_observer_profile`                 | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md)                         | `draft`     |
 | `live_env.compare_visual_observer_profiles`             | [live_env.visual_observer_read_tools.md](live_env.visual_observer_read_tools.md)                         | `draft`     |
 | `room.evidence.read_bound`                              | [shared-live-room-control.md](shared-live-room-control.md)                                               | `draft`     |
+| `situation-room.live-source.set_rate`                   | [situation-room.live-source.set_rate.md](situation-room.live-source.set_rate.md)                         | `draft`     |
 | `com.casimirbot.minecraft.actor.status.read`            | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
 | `com.casimirbot.minecraft.inventory.check`              | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
 | `com.casimirbot.minecraft.nearby_entities.list`         | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
@@ -337,6 +338,8 @@ Each capability contract should define:
 | `com.casimirbot.minecraft.line_of_sight.check`          | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
 | `com.casimirbot.minecraft.crop_state.read`              | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
 | `com.casimirbot.minecraft.reachability.check`           | [environment-connector.probe.md](environment-connector.probe.md)                                         | `draft`     |
+| `com.casimirbot.minecraft.command.catalog`              | [environment-connector.command.md](environment-connector.command.md)                                     | `draft`     |
+| `com.casimirbot.minecraft.command`                      | [environment-connector.command.md](environment-connector.command.md)                                     | `draft`     |
 | `situation-room.describe_visual_capture`                | [situation-room.describe_visual_capture.md](situation-room.describe_visual_capture.md)                   | `draft`     |
 | `room.list`                                             | [shared-live-room-control.md](shared-live-room-control.md)                                               | `draft`     |
 | `room.inspect`                                          | [shared-live-room-control.md](shared-live-room-control.md)                                               | `draft`     |
@@ -358,6 +361,7 @@ tested.
 | `live_env.request_probe`                           | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md)       | `requires_confirmation_contract`                                                             |
 | `live_env.record_commentary`                       | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md)       | `requires_confirmation_contract`                                                             |
 | `live_env.evaluate_goal_satisfaction`              | [live_env.side_effect_evidence_projection.md](live_env.side_effect_evidence_projection.md)       | `requires_confirmation_contract`                                                             |
+| `com.casimirbot.minecraft.container_contents.read` | [environment-connector.probe.md](environment-connector.probe.md)                                 | `blocked_pending_contract` pending an owner-selected privileged container-read scope          |
 | `live_env.start_agent_goal_session`                | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
 | `live_env.change_workstation_preset`               | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |
 | `live_env.set_visual_preset`                       | [live_env.mutating_control_boundaries.md](live_env.mutating_control_boundaries.md)               | `blocked_pending_contract`                                                                   |

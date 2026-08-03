@@ -13,6 +13,7 @@ import {
   materializeAgentProviderRouteProductTerminal,
 } from "../services/helix-ask/terminal-product-materializers";
 import { buildAskTurnSolverTrace } from "../services/helix-ask/ask-turn-solver";
+import { buildCommittedAskRoute } from "../services/helix-ask/committed-ask-route";
 import { buildTheoryExecutionClosureTerminalFixture } from "./fixtures/theory-execution-closure-terminal-fixture";
 
 const makePostToolObservation = (turnId: string) => ({
@@ -5089,6 +5090,168 @@ describe("Helix terminal authority single writer", () => {
       visible_answer_source: "note_update_receipt",
       failure_rail: null,
     });
+  });
+
+  it("selects a live-pipeline receipt only when the exact control contract authorizes it", () => {
+    const turnId = "ask:test:live-pipeline-receipt-terminal";
+    const receiptRef = `${turnId}:live_pipeline_receipt`;
+    const modelText = "I set the live visual producer cadence to 30 seconds.";
+    const artifacts = [
+      {
+        artifact_id: receiptRef,
+        kind: "live_pipeline_receipt",
+        payload: {
+          schema: "helix.live_pipeline_turn_receipt.v1",
+          kind: "live_pipeline_receipt",
+          receipt_id: receiptRef,
+          status: "succeeded",
+          action: "set_visual_producer_cadence",
+          interval_seconds: 30,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const routeProductContract = {
+      schema: "helix.route_product_contract.v1",
+      turn_id: turnId,
+      thread_id: "thread:test",
+      source_target: "live_pipeline",
+      required_terminal_kind: "live_pipeline_receipt",
+      allowed_terminal_artifact_kinds: [
+        "live_pipeline_receipt",
+        "typed_failure",
+        "request_user_input",
+      ],
+      forbidden_terminal_artifact_kinds: [
+        "model_synthesized_answer",
+        "direct_answer_text",
+      ],
+      required_artifact_refs: [receiptRef],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const canonicalGoalFrame = {
+      goal_kind: "live_pipeline_control",
+      required_terminal_kind: "live_pipeline_receipt",
+    };
+    const committedAskRoute = buildCommittedAskRoute({
+      turnId,
+      promptText: "Set the live visual producer cadence to 30 seconds.",
+      selectedRoute: "/ask",
+      payload: {
+        route_product_contract: routeProductContract,
+        canonical_goal_frame: canonicalGoalFrame,
+      },
+    });
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      committed_ask_route: committedAskRoute,
+      route_product_contract: routeProductContract,
+      canonical_goal_frame: canonicalGoalFrame,
+      source_target_intent: {
+        target_source: "live_pipeline",
+        allow_no_tool_direct: false,
+        allow_client_shortcut: false,
+      },
+      tool_call_admission_decision: {
+        source_target: "live_pipeline",
+        required: true,
+        requested_capability: "situation-room.live-source.set_rate",
+        selected_capability: "situation-room.live-source.set_rate",
+        admitted_capability: "situation-room.live-source.set_rate",
+        admitted_tool_families: ["live_pipeline"],
+      },
+      terminal_artifact_selection_guard: {
+        schema: "helix.terminal_artifact_selection_guard.v1",
+        terminal_artifact_kind: "live_pipeline_receipt",
+        source_target: "live_pipeline",
+        allowed: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      product_authority_guard: {
+        schema: "helix.product_authority_guard.v1",
+        terminal_artifact_kind: "live_pipeline_receipt",
+        source_target: "live_pipeline",
+        allowed: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      route_authority_audit: {
+        schema: "helix.route_authority_audit.v1",
+        turn_id: turnId,
+        source_target: "live_pipeline",
+        selected_route: "live_pipeline_control",
+        terminal_artifact_kind: "live_pipeline_receipt",
+        final_answer_source: "live_pipeline_receipt",
+        terminal_artifact_allowed: true,
+        route_authority_ok: true,
+        violation_codes: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      live_pipeline_turn_receipt: artifacts[0].payload,
+      tool_trace_disclosure: {
+        schema: "helix.ask_tool_trace_disclosure.v1",
+        turn_id: turnId,
+        items: [
+          {
+            capability_id: "situation-room.live-source.set_rate",
+            status: "succeeded",
+            observation_ref: receiptRef,
+          },
+        ],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: modelText,
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        text: modelText,
+        authority: "llm_post_observation_composer",
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        required_terminal_kind: "live_pipeline_receipt",
+        terminal_artifact_kind: "live_pipeline_receipt",
+        observed_results: [
+          {
+            kind: "live_pipeline_receipt",
+            artifact_ref: receiptRef,
+            supports_goal: true,
+          },
+        ],
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe(
+      "live_pipeline_receipt",
+    );
+    expect(result.source).toBe("live_pipeline_receipt");
+    expect(result.visible_text).toBe(modelText);
+    expect(payload.terminal_artifact_kind).toBe("live_pipeline_receipt");
+    expect(payload.final_answer_source).toBe("live_pipeline_receipt");
+    expect(payload.terminal_answer_authority).toMatchObject({
+      terminal_kind: "answer",
+      terminal_artifact_kind: "live_pipeline_receipt",
+      final_answer_source: "live_pipeline_receipt",
+      server_authoritative: true,
+      terminal_eligible: true,
+      single_writer_synchronized: true,
+    });
+    expect(result.integrity.receipt_visible_as_answer).toBe(false);
   });
 
   it("blocks receipt terminals for multi-subgoal compound synthesis turns", () => {

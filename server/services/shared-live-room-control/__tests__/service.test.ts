@@ -474,7 +474,7 @@ describe("SharedLiveRoomControlService", () => {
     expect(harness.createRoom).not.toHaveBeenCalled();
   });
 
-  it("keeps source management developer-owner scoped with outsider privacy", async () => {
+  it("keeps source management policy-and-owner scoped with outsider privacy", async () => {
     const participantHarness = await createHarness({
       roomMembership: membership({ role: "participant" }),
     });
@@ -509,11 +509,29 @@ describe("SharedLiveRoomControlService", () => {
     );
   });
 
-  it("admits only a first-party experimental guest and caps its source credential lifetime", async () => {
+  it("admits first-party public users and caps temporary guest source credentials", async () => {
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
     vi.stubEnv("HELIX_GUEST_ROOM_CREATION", "1");
     const harness = await createHarness({ listedBindings: [] });
+    const publicUserPolicy = buildHelixSharedRealtimeRoomsExperimentPolicy("user");
+    publicUserPolicy.feature_flags.push("room_source_ingress");
+    publicUserPolicy.locked_features = publicUserPolicy.locked_features.filter(
+      (feature) => feature !== "room_source_ingress",
+    );
+    await expect(
+      harness.service.listSourceBindings({
+        actor: actor({
+          authKind: "first_party_session",
+          accountType: "user",
+          accountPolicy: publicUserPolicy,
+          isGuest: false,
+          oauthScopes: new Set(),
+        }),
+        roomId: ROOM_ID,
+      }),
+    ).resolves.toMatchObject({ bindings: [] });
+
     const guestPolicy = buildHelixSharedRealtimeRoomsExperimentPolicy("user");
     guestPolicy.feature_flags.push("room_source_ingress");
     guestPolicy.locked_features = guestPolicy.locked_features.filter(

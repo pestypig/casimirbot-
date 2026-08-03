@@ -64,6 +64,7 @@ public final class HelixHttpClient implements Closeable {
         String body,
         boolean get,
         boolean priority,
+        boolean controlPlane,
         String requestId,
         String producerEpoch,
         long sequence,
@@ -77,6 +78,7 @@ public final class HelixHttpClient implements Closeable {
         String body,
         boolean get,
         boolean priority,
+        boolean controlPlane,
         long enqueuedAtMs,
         CompletableFuture<IngressResponse> completion
     ) {}
@@ -89,7 +91,9 @@ public final class HelixHttpClient implements Closeable {
     private final HelixSensorConfig config;
     private final Logger logger;
     private final HelixSensorRuntimeStatus runtimeStatus;
-    private final HttpClient client;
+    private volatile HttpClient client;
+    private final Object clientLock = new Object();
+    private final AtomicLong transportGeneration = new AtomicLong(1L);
     private final Runnable terminalPauseHandler;
     private final boolean roomIngressEndpoint;
     private final String roomIngressBindingId;
@@ -99,6 +103,7 @@ public final class HelixHttpClient implements Closeable {
     private final AtomicBoolean terminallyPaused = new AtomicBoolean(false);
     private final AtomicInteger failureCount = new AtomicInteger(0);
     private final Object queueLock = new Object();
+    private final ArrayDeque<PendingRequest> controlPlaneRequests = new ArrayDeque<>();
     private final ArrayDeque<PendingRequest> priorityRequests = new ArrayDeque<>();
     private final ArrayDeque<PendingRequest> ordinaryRequests = new ArrayDeque<>();
     private boolean requestInFlight;
@@ -127,7 +132,21 @@ public final class HelixHttpClient implements Closeable {
         this.roomIngressBindingId = roomIngressEndpoint
             ? roomIngressBindingId(config.endpoint())
             : null;
-        this.client = HttpClient.newBuilder()
+        this.client = newHttpClient();
+    }
+
+    /**
+     * Identifies this exact connector process epoch across every lane it
+     * publishes. Command catalogs must use the same epoch as source manifests
+     * and observations so subject bindings are checked against one connector
+     * identity rather than an unrelated command-lane nonce.
+     */
+    public String producerEpochRef() {
+        return producerEpoch;
+    }
+
+    private static HttpClient newHttpClient() {
+        return HttpClient.newBuilder()
             // Room ingress is served by ordinary HTTP/1.1 application servers.
             // Java's default cleartext HTTP/2 upgrade can stall against some
             // Express/Vite deployments before the request reaches the route.
@@ -160,15 +179,22 @@ public final class HelixHttpClient implements Closeable {
             ),
             json,
             false,
+            true,
             true
         );
     }
 
     public CompletableFuture<IngressResponse> postHeartbeatAsync(String json) {
-        return postJsonAsync(route(
-            "/heartbeat",
-            "/api/agi/environment/sources/heartbeat"
-        ), json);
+        return enqueue(
+            route(
+                "/heartbeat",
+                "/api/agi/environment/sources/heartbeat"
+            ),
+            json,
+            false,
+            true,
+            true
+        );
     }
 
     public CompletableFuture<String> getPendingProbesAsync() {
@@ -210,7 +236,7 @@ public final class HelixHttpClient implements Closeable {
     }
 
     private CompletableFuture<IngressResponse> enqueue(String path, String body, boolean get) {
-        return enqueue(path, body, get, false);
+        return enqueue(path, body, get, false, false);
     }
 
     private CompletableFuture<IngressResponse> enqueue(
@@ -219,19 +245,35 @@ public final class HelixHttpClient implements Closeable {
         boolean get,
         boolean priority
     ) {
+        return enqueue(path, body, get, priority, false);
+    }
+
+    private CompletableFuture<IngressResponse> enqueue(
+        String path,
+        String body,
+        boolean get,
+        boolean priority,
+        boolean controlPlane
+    ) {
         synchronized (queueLock) {
             PendingRequest pending = new PendingRequest(
                 path,
                 body,
                 get,
                 priority,
+                controlPlane,
                 System.currentTimeMillis(),
                 new CompletableFuture<>()
             );
             if (queuedRequestCount >= MAX_QUEUED_REQUESTS) {
-                PendingRequest displaced = priority
+                PendingRequest displaced = controlPlane
                     ? ordinaryRequests.pollLast()
-                    : null;
+                    : priority
+                        ? ordinaryRequests.pollLast()
+                        : null;
+                if (displaced == null && controlPlane) {
+                    displaced = priorityRequests.pollLast();
+                }
                 if (displaced == null) {
                     return rejectQueuedRequest(pending);
                 }
@@ -244,7 +286,18 @@ public final class HelixHttpClient implements Closeable {
                 displaced.completion().complete(rejected);
             }
             queuedRequestCount++;
-            (priority ? priorityRequests : ordinaryRequests).addLast(pending);
+            if (controlPlane) {
+                // A manifest re-establishes the admission contract and must run
+                // before an already queued heartbeat. Heartbeats otherwise retain
+                // FIFO order while staying ahead of probe polling and telemetry.
+                if (path.endsWith("/manifest")) {
+                    controlPlaneRequests.addFirst(pending);
+                } else {
+                    controlPlaneRequests.addLast(pending);
+                }
+            } else {
+                (priority ? priorityRequests : ordinaryRequests).addLast(pending);
+            }
             pumpLocked();
             return pending.completion();
         }
@@ -275,7 +328,8 @@ public final class HelixHttpClient implements Closeable {
 
     private void pumpLocked() {
         if (requestInFlight) return;
-        PendingRequest pending = priorityRequests.pollFirst();
+        PendingRequest pending = controlPlaneRequests.pollFirst();
+        if (pending == null) pending = priorityRequests.pollFirst();
         if (pending == null) pending = ordinaryRequests.pollFirst();
         if (pending == null) return;
 
@@ -302,6 +356,7 @@ public final class HelixHttpClient implements Closeable {
             pending.body(),
             pending.get(),
             pending.priority(),
+            pending.controlPlane(),
             UUID.randomUUID().toString(),
             producerEpoch,
             sequence.incrementAndGet(),
@@ -356,13 +411,15 @@ public final class HelixHttpClient implements Closeable {
                 ));
         }
         long started = System.nanoTime();
-        return client.sendAsync(
+        HttpClient attemptClient = client;
+        return attemptClient.sendAsync(
             builder.build(),
             HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
         )
             .handle((response, error) -> {
                 IngressResponse ingressResponse;
                 if (error != null) {
+                    replaceTransport(attemptClient);
                     ingressResponse = new IngressResponse(
                         0,
                         "",
@@ -414,6 +471,21 @@ public final class HelixHttpClient implements Closeable {
                 );
                 return CompletableFuture.completedFuture(response);
             });
+    }
+
+    private void replaceTransport(HttpClient failedClient) {
+        synchronized (clientLock) {
+            if (client != failedClient) return;
+            client = newHttpClient();
+            transportGeneration.incrementAndGet();
+            // Graceful shutdown prevents a poisoned pooled channel from being
+            // reused while allowing any already-completing callback to settle.
+            failedClient.shutdown();
+        }
+    }
+
+    long transportGenerationForTest() {
+        return transportGeneration.get();
     }
 
     private static boolean mayBypassBackoff(RequestEnvelope envelope) {
@@ -850,5 +922,8 @@ public final class HelixHttpClient implements Closeable {
     @Override
     public void close() {
         terminallyPaused.set(true);
+        synchronized (clientLock) {
+            client.shutdownNow();
+        }
     }
 }

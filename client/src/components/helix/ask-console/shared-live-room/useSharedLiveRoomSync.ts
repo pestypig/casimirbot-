@@ -8,6 +8,12 @@ import type { HelixSharedLiveRoomApi } from "./SharedLiveRoomApi";
 const ROOM_REFRESH_INTERVAL_MS = 750;
 const FRAME_REFRESH_INTERVAL_MS = 3_000;
 const ROOM_PRESENCE_INTERVAL_MS = 15_000;
+const ROOM_REFRESH_MAX_BACKOFF_MS = 12_000;
+const FRAME_REFRESH_MAX_BACKOFF_MS = 30_000;
+const ROOM_PRESENCE_MAX_BACKOFF_MS = 60_000;
+
+const nextBackoffMs = (currentMs: number, maximumMs: number): number =>
+  Math.min(maximumMs, Math.max(1, currentMs * 2));
 
 export const sortHelixSharedLiveRooms = (
   rooms: readonly HelixSharedRealtimeRoom[],
@@ -48,29 +54,60 @@ export function useSharedLiveRoomSync(input: {
       return;
     }
     let disposed = false;
-    const refreshRoom = async (): Promise<void> => {
-      const room = await input.api.getRoom(input.activeRoomId as string);
+    let roomTimer: number | null = null;
+    let frameTimer: number | null = null;
+    let roomDelayMs = ROOM_REFRESH_INTERVAL_MS;
+    let frameDelayMs = FRAME_REFRESH_INTERVAL_MS;
+
+    const scheduleRoomRefresh = (delayMs: number): void => {
       if (disposed) return;
-      input.onRoom(room);
+      roomTimer = window.setTimeout(() => {
+        roomTimer = null;
+        void refreshRoom();
+      }, delayMs);
+    };
+    const scheduleFrameRefresh = (delayMs: number): void => {
+      if (disposed) return;
+      frameTimer = window.setTimeout(() => {
+        frameTimer = null;
+        void refreshFrames();
+      }, delayMs);
+    };
+    const refreshRoom = async (): Promise<void> => {
+      try {
+        const room = await input.api.getRoom(input.activeRoomId as string);
+        if (disposed) return;
+        roomDelayMs = ROOM_REFRESH_INTERVAL_MS;
+        input.onRoom(room);
+      } catch (error) {
+        if (disposed) return;
+        input.onError(error);
+        roomDelayMs = nextBackoffMs(roomDelayMs, ROOM_REFRESH_MAX_BACKOFF_MS);
+      } finally {
+        if (!disposed) scheduleRoomRefresh(roomDelayMs);
+      }
     };
     const refreshFrames = async (): Promise<void> => {
-      const frames = await input.api.listVisualFrames(input.activeRoomId as string);
-      if (disposed) return;
-      input.onFrames(frames);
+      try {
+        const frames = await input.api.listVisualFrames(input.activeRoomId as string);
+        if (disposed) return;
+        frameDelayMs = FRAME_REFRESH_INTERVAL_MS;
+        input.onFrames(frames);
+      } catch (error) {
+        if (disposed) return;
+        input.onError(error);
+        frameDelayMs = nextBackoffMs(frameDelayMs, FRAME_REFRESH_MAX_BACKOFF_MS);
+      } finally {
+        if (!disposed) scheduleFrameRefresh(frameDelayMs);
+      }
     };
-    void Promise.all([refreshRoom(), refreshFrames()]).catch((error) => {
-      if (!disposed) input.onError(error);
-    });
-    const roomInterval = window.setInterval(() => {
-      void refreshRoom().catch(() => undefined);
-    }, ROOM_REFRESH_INTERVAL_MS);
-    const frameInterval = window.setInterval(() => {
-      void refreshFrames().catch(() => undefined);
-    }, FRAME_REFRESH_INTERVAL_MS);
+
+    void refreshRoom();
+    void refreshFrames();
     return () => {
       disposed = true;
-      window.clearInterval(roomInterval);
-      window.clearInterval(frameInterval);
+      if (roomTimer !== null) window.clearTimeout(roomTimer);
+      if (frameTimer !== null) window.clearTimeout(frameTimer);
     };
   }, [
     input.activeRoomId,
@@ -84,12 +121,33 @@ export function useSharedLiveRoomSync(input: {
   useEffect(() => {
     if (!input.activeRoomId) return;
     let disposed = false;
-    const sendPresentHeartbeat = (): void => {
-      void input.api.updatePresence(input.activeRoomId as string, "present")
-        .then((room) => {
-          if (!disposed) input.onRoom(room);
-        })
-        .catch(() => undefined);
+    let heartbeatTimer: number | null = null;
+    let heartbeatDelayMs = ROOM_PRESENCE_INTERVAL_MS;
+    const schedulePresentHeartbeat = (delayMs: number): void => {
+      if (disposed) return;
+      heartbeatTimer = window.setTimeout(() => {
+        heartbeatTimer = null;
+        void sendPresentHeartbeat();
+      }, delayMs);
+    };
+    const sendPresentHeartbeat = async (): Promise<void> => {
+      try {
+        const room = await input.api.updatePresence(
+          input.activeRoomId as string,
+          "present",
+        );
+        if (disposed) return;
+        heartbeatDelayMs = ROOM_PRESENCE_INTERVAL_MS;
+        input.onRoom(room);
+      } catch {
+        if (disposed) return;
+        heartbeatDelayMs = nextBackoffMs(
+          heartbeatDelayMs,
+          ROOM_PRESENCE_MAX_BACKOFF_MS,
+        );
+      } finally {
+        if (!disposed) schedulePresentHeartbeat(heartbeatDelayMs);
+      }
     };
     const sendAwayOnPageExit = (): void => {
       void input.api.updatePresence(input.activeRoomId as string, "away", { keepalive: true })
@@ -98,13 +156,12 @@ export function useSharedLiveRoomSync(input: {
     // Visibility is intentionally not presence: a host may switch tabs while
     // sharing a screen. The heartbeat proves connectivity; page exit or TTL
     // expiry transitions the member away.
-    sendPresentHeartbeat();
+    void sendPresentHeartbeat();
     window.addEventListener("pagehide", sendAwayOnPageExit);
-    const interval = window.setInterval(sendPresentHeartbeat, ROOM_PRESENCE_INTERVAL_MS);
     return () => {
       disposed = true;
       window.removeEventListener("pagehide", sendAwayOnPageExit);
-      window.clearInterval(interval);
+      if (heartbeatTimer !== null) window.clearTimeout(heartbeatTimer);
     };
   }, [input.activeRoomId, input.api, input.onRoom]);
 }

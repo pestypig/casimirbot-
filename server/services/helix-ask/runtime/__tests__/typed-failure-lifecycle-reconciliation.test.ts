@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { buildAskTurnSolverTrace } from "../../ask-turn-solver";
 import { reconcileAuthoritativeTypedFailureLifecycle } from "../typed-failure-lifecycle-reconciliation";
 
 const basePayload = (): Record<string, unknown> => ({
@@ -176,5 +177,190 @@ describe("authoritative typed-failure lifecycle reconciliation", () => {
         }
       ).short_circuit_risk_flags,
     ).toContain("route_authority_missing");
+  });
+
+  it("settles an actionable source-observation failure without launching a generic tool loop", () => {
+    const payload = basePayload();
+    payload.terminal_error_code = "procedure_epoch_previous_unavailable";
+    payload.typed_failure = {
+      schema: "helix.typed_failure.v1",
+      error_code: "procedure_epoch_previous_unavailable",
+      next_required_action: "wait_for_scene_memory_index",
+      message:
+        "Previous visual observation evidence is unavailable for comparison.",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.source_target_intent = {
+      schema: "helix.ask_source_target_intent.v1",
+      target_source: "procedure_memory",
+      target_kind: "situation_epoch",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    };
+    payload.route_product_contract = {
+      schema: "helix.route_product_contract.v1",
+      source_target: "procedure_memory",
+      allowed_terminal_artifact_kinds: [
+        "procedure_epoch_replay",
+        "typed_failure",
+      ],
+      forbidden_terminal_artifact_kinds: [],
+    };
+    payload.current_turn_artifact_ledger = [
+      {
+        artifact_id: "ask:test:source-observation",
+        kind: "source_observation",
+        payload: { status: "observed" },
+      },
+      {
+        artifact_id: "ask:test:source-typed-failure",
+        kind: "typed_failure",
+        payload: payload.typed_failure,
+      },
+    ];
+    payload.loop_parity_trace = {
+      ...(payload.loop_parity_trace as Record<string, unknown>),
+      selected_route: "procedure_epoch_replay_question",
+      observations_created: [
+        {
+          observation_id: "ask:test:source-observation",
+          source_kind: "source_observation",
+        },
+      ],
+      actual_tool_calls: [],
+      short_circuit_risk_flags: [
+        "missing_followup_reasoning",
+        "goal_satisfaction_incomplete",
+      ],
+    };
+    payload.ask_turn_solver_trace = {
+      ...(payload.ask_turn_solver_trace as Record<string, unknown>),
+      solver_risk_flags: [
+        "missing_followup_reasoning",
+        "goal_satisfaction_incomplete",
+      ],
+      followup_reasoning_gate: {
+        required: true,
+        completed: false,
+        violation_codes: ["missing_followup_reasoning"],
+      },
+    };
+
+    expect(
+      reconcileAuthoritativeTypedFailureLifecycle({
+        payload,
+        turnId: "ask:test:source-observation-failure",
+        promptText: "What changed since the previous visual capture?",
+        selectedTerminalArtifactKind: "typed_failure",
+        finalAnswerSource: "typed_failure",
+      }),
+    ).toBe(true);
+    expect(payload.canonical_goal_frame).toMatchObject({
+      authoritative_source_observation_typed_failure: true,
+    });
+    expect(payload.ask_turn_solver_trace).toMatchObject({
+      completed_solver_path: true,
+      solver_risk_flags: [],
+      followup_reasoning_gate: {
+        required: false,
+        completed: true,
+        reason: "authoritative_source_observation_typed_failure",
+        violation_codes: [],
+      },
+    });
+  });
+
+  it("builds a complete solver trace for an already-authoritative bounded source failure", () => {
+    const payload = basePayload();
+    payload.terminal_error_code = "procedure_epoch_previous_unavailable";
+    payload.typed_failure = {
+      schema: "helix.typed_failure.v1",
+      error_code: "procedure_epoch_previous_unavailable",
+      next_required_action: "wait_for_scene_memory_index",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.source_target_intent = {
+      schema: "helix.ask_source_target_intent.v1",
+      target_source: "procedure_memory",
+      target_kind: "situation_epoch",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    };
+    payload.route_product_contract = {
+      schema: "helix.route_product_contract.v1",
+      source_target: "procedure_memory",
+      allowed_terminal_artifact_kinds: [
+        "procedure_epoch_replay",
+        "typed_failure",
+      ],
+      forbidden_terminal_artifact_kinds: [],
+    };
+    payload.current_turn_artifact_ledger = [
+      {
+        artifact_id: "ask:test:bounded-source-observation",
+        kind: "source_observation",
+        payload: { status: "observed" },
+      },
+    ];
+    payload.loop_parity_trace = {
+      ...(payload.loop_parity_trace as Record<string, unknown>),
+      selected_route: "procedure_epoch_replay_question",
+      observations_created: [
+        {
+          observation_id: "ask:test:bounded-source-observation",
+          source_kind: "source_observation",
+        },
+      ],
+      actual_tool_calls: [],
+      route_authority_ok: true,
+      poison_audit_ok: true,
+      terminal_authority_ok: true,
+      terminal_selection_ran_after_observations: true,
+    };
+    payload.route_authority_audit = {
+      schema: "helix.route_authority_audit.v1",
+      route_authority_ok: true,
+    };
+    payload.poison_audit = {
+      schema: "helix.poison_audit.v1",
+      ok: true,
+    };
+    payload.terminal_answer_authority = {
+      schema: "helix.terminal_answer_authority.v1",
+      server_authoritative: true,
+    };
+
+    const trace = buildAskTurnSolverTrace({
+      turnId: "ask:test:bounded-source-terminal",
+      promptText: "What changed since the previous visual capture?",
+      selectedRoute: "procedure_epoch_replay_question",
+      terminalArtifactKind: "typed_failure",
+      finalAnswerSource: "typed_failure",
+      payload,
+    });
+
+    expect(trace).toMatchObject({
+      completed_solver_path: true,
+      evidence_reentry_gate: {
+        required: false,
+        completed: true,
+      },
+      followup_reasoning_gate: {
+        required: false,
+        completed: true,
+        reason: "authoritative_typed_failure_no_continuation",
+      },
+      final_arbitration: {
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        remaining_uncertainty: [],
+      },
+    });
   });
 });

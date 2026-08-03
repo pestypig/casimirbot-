@@ -62,6 +62,7 @@ import {
   buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests,
   buildActiveTheoryRuntimeContextWorkstationGatewayCallRequests,
   buildActiveDocsContextWorkstationGatewayCallRequests,
+  buildMinecraftMechanicsDocsWorkstationGatewayCallRequests,
   buildActiveWorkstationContextGatewayCallRequests,
   buildPlannerDerivedWorkstationGatewayCallRequests,
   buildPromptDerivedReadableSurfaceGatewayCallRequests,
@@ -86,6 +87,9 @@ import {
   isPaperBackedNumericBindingPhasePrompt,
   isTheoryFormulaDiscoveryPhasePrompt,
 } from "./prompt-named-tool-requests";
+import {
+  buildPromptDerivedLivePipelineControlGatewayCallRequests,
+} from "./live-pipeline-control-tool-requests";
 import {
   assertCapabilityAllowedByCommittedRoute,
   readCommittedAskRoute,
@@ -1035,6 +1039,8 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     buildPromptDerivedScientificEvidenceEnrollmentGatewayCallRequests(
       input.body,
     );
+  const promptDerivedLivePipelineControlRequests =
+    buildPromptDerivedLivePipelineControlGatewayCallRequests(input.body);
   const promptNamedRequests =
     buildPromptNamedCapabilityGatewayCallRequests(input.body);
   const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(
@@ -1130,6 +1136,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     };
   });
   appendDedupe(requests, seen, structured);
+  appendPromptDerivedDedupe(promptDerivedLivePipelineControlRequests);
   if (
     isAskTurnCapabilityHelpIntent(prompt) &&
     buildPromptDerivedWorkspaceStatusGatewayCallRequests(input.body).length ===
@@ -1234,6 +1241,9 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   );
   const activeDocsContext =
     buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
+  const minecraftMechanicsDocs =
+    buildMinecraftMechanicsDocsWorkstationGatewayCallRequests(input.body);
+  appendPromptDerivedDedupe(minecraftMechanicsDocs);
   if (hasNamedDocsSearch) {
     appendPromptDerivedDedupe(promptNamedForAppend);
   } else {

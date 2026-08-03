@@ -70,6 +70,12 @@ import {
   leaseDurableEnvironmentProbesForClaim,
   submitDurableEnvironmentProbeResult,
 } from "../services/environment-connectors/probe";
+import {
+  materializeLegacyRoomSourceConnector,
+} from "../services/environment-connectors/bindings";
+import {
+  listEnvironmentConnectorCapabilityDescriptors,
+} from "../services/environment-connectors/catalog";
 
 type RequestWithRawBody = Request & { rawBody?: Buffer };
 
@@ -800,6 +806,23 @@ roomSourceIngressRouter.post(
         claim: activeClaim,
         manifest,
       });
+      const capabilityDescriptors =
+        listEnvironmentConnectorCapabilityDescriptors({
+          adapterProfileId: adapterAdmission.adapter_profile_id,
+        });
+      if (capabilityDescriptors.length > 0) {
+        await materializeLegacyRoomSourceConnector({
+          ownerProfileId: activeClaim.binding.owner_profile_id,
+          roomSourceBindingId: activeClaim.binding.binding_id,
+          credentialId: activeClaim.credentialId,
+          roomId: activeClaim.binding.room_id,
+          sourceId: activeClaim.binding.source_id,
+          worldId: activeClaim.binding.world_id,
+          producerEpochRef: adapterAdmission.producer_epoch_ref,
+          adapterAdmission,
+          capabilityDescriptors,
+        });
+      }
       const admission = sourceAdmission(activeClaim, adapterAdmission);
       const registered = registerEnvironmentSourceManifest(manifest, {
         sourceAdmission: admission,

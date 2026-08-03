@@ -1,6 +1,8 @@
 import os from "node:os";
+import v8 from "node:v8";
 import { randomUUID } from "node:crypto";
 import { scheduleIdleMemorySettle } from "./idle-memory-settle";
+import { getHostCommitMemorySnapshot, type HostCommitMemorySnapshot } from "./host-commit-memory";
 
 export type RuntimeTaskClass =
   | "critical_resident"
@@ -46,6 +48,8 @@ export type RuntimeAdmissionDecision = {
     | "heap_used_limit"
     | "rss_limit"
     | "host_memory_limit"
+    | "host_commit_pressure"
+    | "host_commit_telemetry_stale"
     | "background_paused"
     | "queue_deferrable"
     | "critical_bypass"
@@ -64,12 +68,15 @@ export type RuntimeAdmissionDecision = {
     freeMiB: number;
     totalMiB: number;
     freeRatio: number;
+    commit?: HostCommitMemorySnapshot;
   };
   limits: {
     maxHeapUsedMiB: number;
     maxRssMiB: number;
     resumeHeapUsedMiB: number;
     resumeRssMiB: number;
+    processHeapLimitMiB?: number;
+    heapSafetyReserveMiB?: number;
   };
   pausedTaskCount: number;
   activeTaskCount: number;
@@ -81,6 +88,7 @@ export type RuntimeHostMemoryReader = () => {
   freeMiB: number;
   totalMiB: number;
   freeRatio: number;
+  commit?: HostCommitMemorySnapshot;
 };
 
 type RuntimeTaskBudget = {
@@ -154,6 +162,7 @@ const RECENT_COMPLETION_LIMIT = 50;
 const DEFAULT_BURST_WINDOW_MS = 60_000;
 const DEFAULT_ACTIVE_USER_TURN_MAX_HEAP_USED_MIB = 2048;
 const DEFAULT_ACTIVE_USER_TURN_MAX_RSS_MIB = 3200;
+const DEFAULT_V8_HEAP_SAFETY_RESERVE_MIB = 384;
 const DEV_VOICE_STT_MAX_HEAP_USED_MIB = 2048;
 const DEV_VOICE_STT_MAX_RSS_MIB = 3200;
 const DEV_VOICE_TTS_MAX_HEAP_USED_MIB = 2048;
@@ -228,6 +237,7 @@ let hostMemoryReader: RuntimeHostMemoryReader = () => {
     freeMiB,
     totalMiB,
     freeRatio: totalMiB > 0 ? freeMiB / totalMiB : 1,
+    commit: getHostCommitMemorySnapshot() ?? undefined,
   };
 };
 
@@ -282,7 +292,7 @@ const readLimits = (taskClass: RuntimeTaskClass): RuntimeAdmissionDecision["limi
   const genericMaxRss = readPositiveNumberEnv("RUNTIME_MEMORY_MAX_RSS_MB", budget.maxRssMiB ?? 950);
   const taskMaxHeap = readPositiveNumberEnv(`${taskPrefix}_MAX_HEAP_USED_MB`, genericMaxHeap);
   const taskMaxRss = readPositiveNumberEnv(`${taskPrefix}_MAX_RSS_MB`, genericMaxRss);
-  const maxHeapUsedMiB =
+  const configuredMaxHeapUsedMiB =
     taskClass === "voice_stt"
       ? readPositiveNumberEnv("VOICE_TRANSCRIBE_MAX_HEAP_USED_MB", taskMaxHeap)
       : taskClass === "voice_tts"
@@ -294,13 +304,20 @@ const readLimits = (taskClass: RuntimeTaskClass): RuntimeAdmissionDecision["limi
       : taskClass === "voice_tts"
         ? readPositiveNumberEnv("VOICE_TTS_MAX_RSS_MB", taskMaxRss)
         : taskMaxRss;
-  const resumeHeapUsedMiB = readPositiveNumberEnv(
+  const processHeapLimitMiB = roundMiB(v8.getHeapStatistics().heap_size_limit / BYTES_PER_MIB);
+  const heapSafetyReserveMiB = readPositiveNumberEnv(
+    "RUNTIME_MEMORY_V8_HEAP_SAFETY_RESERVE_MB",
+    DEFAULT_V8_HEAP_SAFETY_RESERVE_MIB,
+  );
+  const safeProcessHeapCeilingMiB = Math.max(256, processHeapLimitMiB - heapSafetyReserveMiB);
+  const maxHeapUsedMiB = Math.min(configuredMaxHeapUsedMiB, safeProcessHeapCeilingMiB);
+  const resumeHeapUsedMiB = Math.min(maxHeapUsedMiB, readPositiveNumberEnv(
     taskClass === "voice_tts" ? "VOICE_TTS_RESUME_HEAP_USED_MB" : `${taskPrefix}_RESUME_HEAP_USED_MB`,
     readPositiveNumberEnv(
       "RUNTIME_MEMORY_RESUME_HEAP_USED_MB",
       Math.floor(maxHeapUsedMiB * 0.85),
     ),
-  );
+  ));
   const resumeRssMiB = readPositiveNumberEnv(
     taskClass === "voice_tts" ? "VOICE_TTS_RESUME_RSS_MB" : `${taskPrefix}_RESUME_RSS_MB`,
     readPositiveNumberEnv(
@@ -313,6 +330,8 @@ const readLimits = (taskClass: RuntimeTaskClass): RuntimeAdmissionDecision["limi
     maxRssMiB,
     resumeHeapUsedMiB,
     resumeRssMiB,
+    processHeapLimitMiB,
+    heapSafetyReserveMiB,
   };
 };
 
@@ -328,6 +347,21 @@ const classifyPressure = (
 ): { level: RuntimePressureLevel; reason: RuntimeAdmissionDecision["reason"] } => {
   const hostFreeRatioMin = readPositiveNumberEnv("RUNTIME_MEMORY_HOST_FREE_RATIO_MIN", 0.08);
   const hostFreeRatioSoftMin = readPositiveNumberEnv("RUNTIME_MEMORY_HOST_FREE_RATIO_SOFT_MIN", 0.18);
+  const hostCommitFreeMinMiB = readPositiveNumberEnv("RUNTIME_MEMORY_HOST_COMMIT_FREE_MIN_MB", 2048);
+  const hostCommitFreeSoftMinMiB = readPositiveNumberEnv("RUNTIME_MEMORY_HOST_COMMIT_FREE_SOFT_MIN_MB", 4096);
+  const hostCommitRatioMax = readPositiveNumberEnv("RUNTIME_MEMORY_HOST_COMMIT_RATIO_MAX", 0.92);
+  const hostCommitRatioSoftMax = readPositiveNumberEnv("RUNTIME_MEMORY_HOST_COMMIT_RATIO_SOFT_MAX", 0.82);
+  const commit = host?.commit;
+  if (commit && commit.status !== "available" && commit.platform === "win32" && envEnabled("HELIX_HOST_COMMIT_REQUIRED")) {
+    return { level: "hard_pressure", reason: "host_commit_telemetry_stale" };
+  }
+  if (
+    commit?.status === "available" &&
+    ((commit.freeMiB !== undefined && commit.freeMiB < hostCommitFreeMinMiB) ||
+      (commit.ratio !== undefined && commit.ratio >= hostCommitRatioMax))
+  ) {
+    return { level: "hard_pressure", reason: "host_commit_pressure" };
+  }
   if (host && host.freeRatio < hostFreeRatioMin) {
     return { level: "hard_pressure", reason: "host_memory_limit" };
   }
@@ -340,7 +374,10 @@ const classifyPressure = (
   if (
     memory.heapUsedMiB >= limits.resumeHeapUsedMiB ||
     memory.rssMiB >= limits.resumeRssMiB ||
-    (host && host.freeRatio < hostFreeRatioSoftMin)
+    (host && host.freeRatio < hostFreeRatioSoftMin) ||
+    (commit?.status === "available" &&
+      ((commit.freeMiB !== undefined && commit.freeMiB < hostCommitFreeSoftMinMiB) ||
+        (commit.ratio !== undefined && commit.ratio >= hostCommitRatioSoftMax)))
   ) {
     return { level: "soft_pressure", reason: "ok" };
   }
@@ -406,6 +443,8 @@ const stagePlayLocalPressureBypassAllowed = (
   envEnabled("STAGE_PLAY_MAIL_WAKE_PRESSURE_BYPASS_FOR_LOCAL") &&
   pressure.level !== "normal" &&
   pressure.reason !== "host_memory_limit" &&
+  pressure.reason !== "host_commit_pressure" &&
+  pressure.reason !== "host_commit_telemetry_stale" &&
   !hasActiveForegroundOrVoiceTask();
 
 const readClassConcurrencyLimit = (taskClass: RuntimeTaskClass): number => {
@@ -651,7 +690,13 @@ export const maybeResumePausedTasks = async (): Promise<number> => {
   if (pausedTaskIds.size === 0) return 0;
   const memory = toMemorySnapshot(memoryReader());
   const limits = readLimits("voice_stt");
-  if (memory.heapUsedMiB > limits.resumeHeapUsedMiB || memory.rssMiB > limits.resumeRssMiB) {
+  const host = hostMemoryReader();
+  const pressure = classifyPressure(memory, host, limits);
+  if (
+    pressure.level === "hard_pressure" ||
+    memory.heapUsedMiB > limits.resumeHeapUsedMiB ||
+    memory.rssMiB > limits.resumeRssMiB
+  ) {
     return 0;
   }
   const candidates = Array.from(pausedTaskIds)
@@ -804,7 +849,7 @@ export const recheckRuntimeTask = (
   if (readGuardDisabled(input.taskClass)) {
     return makeDecision(input, "admit", true, "guard_disabled", pressure.level, memory, host, limits, lease);
   }
-  if (input.taskClass === "critical_resident" || input.taskClass === "active_user_turn") {
+  if (input.taskClass === "critical_resident") {
     return makeDecision(input, "admit", true, "ok", pressure.level, memory, host, limits, lease);
   }
   const budget = DEFAULT_TASK_BUDGETS[input.taskClass];
@@ -866,6 +911,7 @@ export const resetRuntimeMemoryGovernorForTests = (options?: {
       freeMiB,
       totalMiB,
       freeRatio: totalMiB > 0 ? freeMiB / totalMiB : 1,
+      commit: getHostCommitMemorySnapshot() ?? undefined,
     };
   });
 };

@@ -106,7 +106,7 @@ describe("compound prompt coverage gate", () => {
     expect(result.non_visible_blocked_requirement_ids).toEqual(expect.arrayContaining(["R2", "R3"]));
   });
 
-  it("passes when every required item is answered or visibly blocked", () => {
+  it("fails closed on a visibly blocked required item when partial answers are disallowed", () => {
     const result = evaluateCompoundPromptCoverageGate({
       contract: contractWith(["R1", "R2"]),
       finalAnswerText: [
@@ -117,8 +117,174 @@ describe("compound prompt coverage gate", () => {
       finalAnswerSource: "model_direct_answer",
     });
 
+    expect(result.passed).toBe(false);
+    expect(result.blocked_count).toBe(1);
+    expect(result.unresolved_requirement_ids).toContain("R2");
+  });
+
+  it("allows a visibly blocked required item only when the prompt contract permits partial answers", () => {
+    const contract = contractWith(["R1", "R2"]);
+    contract.output_contract.allow_partial_answer = true;
+    const result = evaluateCompoundPromptCoverageGate({
+      contract,
+      finalAnswerText: [
+        "[REQ:R1] Answer one.",
+        "[REQ:R2_BLOCKED] I could not answer this because the required repo evidence is missing.",
+      ].join("\n"),
+      terminalArtifactKind: "direct_answer_text",
+      finalAnswerSource: "model_direct_answer",
+    });
+
     expect(result.passed).toBe(true);
     expect(result.blocked_count).toBe(1);
+    expect(result.unresolved_requirement_ids).toEqual([]);
+  });
+
+  it("does not mistake an untagged truthful non-completion report for completed execution", () => {
+    const result = evaluateCompoundPromptCoverageGate({
+      contract: {
+        ...contractWith(["R1", "R2"]),
+        requirements: [
+          {
+            id: "R1",
+            text: "Query the current gamerule value.",
+            kind: "instruction",
+            required: true,
+            depends_on: [],
+            status: "pending",
+          },
+          {
+            id: "R2",
+            text: "Restore the exact original gamerule value and query it again with fresh observations.",
+            kind: "constraint",
+            required: true,
+            depends_on: ["R1"],
+            status: "pending",
+          },
+        ],
+      },
+      finalAnswerText: [
+        "The gamerule was queried and changed.",
+        "I do not have a fresh observation showing the exact original gamerule value was restored.",
+      ].join("\n"),
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.blocked_count).toBe(1);
+    expect(result.unresolved_requirement_ids).toContain("R2");
+  });
+
+  it("keeps a completed first observation while rejecting a live set/restore/re-query non-completion", () => {
+    const result = evaluateCompoundPromptCoverageGate({
+      contract: {
+        ...contractWith(["R1", "R2"]),
+        requirements: [
+          {
+            id: "R1",
+            text: 'Safely test reversible Minecraft world mutation now. First query "/gamerule doDaylightCycle".',
+            kind: "instruction",
+            required: true,
+            depends_on: [],
+            status: "pending",
+          },
+          {
+            id: "R2",
+            text: "Then set it to the opposite value, restore the exact original value, and query it once more to verify restoration. Use fresh Fabric command observations for every step and do not stop after the first query.",
+            kind: "constraint",
+            required: true,
+            depends_on: ["R1"],
+            status: "pending",
+          },
+        ],
+      },
+      finalAnswerText: [
+        "`/gamerule doDaylightCycle` returned `false`.",
+        "I cannot complete the set/restore/re-query sequence from the currently re-entered evidence because this turn only admits the read-only query observation, not a mutation-capable follow-up.",
+      ].join("\n\n"),
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.resolutions.find((entry) => entry.requirement_id === "R1")?.status).toBe("answered");
+    expect(result.resolutions.find((entry) => entry.requirement_id === "R2")?.status).toBe("blocked_with_reason");
+    expect(result.unresolved_requirement_ids).toEqual(["R2"]);
+  });
+
+  it("treats a visible missing-items heading as applying to its compound-operation list", () => {
+    const result = evaluateCompoundPromptCoverageGate({
+      contract: {
+        ...contractWith(["R1", "R2"]),
+        requirements: [
+          {
+            id: "R1",
+            text: 'First query "/gamerule doDaylightCycle".',
+            kind: "instruction",
+            required: true,
+            depends_on: [],
+            status: "pending",
+          },
+          {
+            id: "R2",
+            text: "Set it to the opposite value, restore the exact original value, and query it once more with a fresh observation to verify restoration.",
+            kind: "constraint",
+            required: true,
+            depends_on: ["R1"],
+            status: "pending",
+          },
+        ],
+      },
+      finalAnswerText: [
+        "Observed sequence:",
+        "- Initial query: doDaylightCycle was false",
+        "- Mutation: set doDaylightCycle to true",
+        "What is still missing:",
+        "- restoring the exact original value, false",
+        "- a final fresh query to verify it was restored",
+      ].join("\n"),
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.unresolved_requirement_ids).toContain("R2");
+  });
+
+  it("rejects the exact live restore-and-verify evidence disclaimer", () => {
+    const result = evaluateCompoundPromptCoverageGate({
+      contract: {
+        ...contractWith(["R1", "R2"]),
+        requirements: [
+          {
+            id: "R1",
+            text: 'First query "/gamerule doDaylightCycle".',
+            kind: "instruction",
+            required: true,
+            depends_on: [],
+            status: "pending",
+          },
+          {
+            id: "R2",
+            text: "Set it to the opposite value, restore the exact original value, and query it once more with a fresh observation to verify restoration.",
+            kind: "constraint",
+            required: true,
+            depends_on: ["R1"],
+            status: "pending",
+          },
+        ],
+      },
+      finalAnswerText: [
+        "Initial query returned false. Mutation to true succeeded.",
+        "I do not have a fresh observation for the restore-back-to-original step, so I cannot verify from the supplied evidence that the exact original value was restored and queried again.",
+      ].join("\n\n"),
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.unresolved_requirement_ids).toContain("R2");
   });
 
   it("does not apply compound coverage gate to non-compound prompts", () => {

@@ -14,6 +14,10 @@ import {
   type HelixAgentContinuationState,
   type HelixTerminalRejectionObservation,
 } from "@shared/helix-agent-continuation-state";
+import {
+  authoritativeTypedFailureRequiresNoContinuation,
+  reconcileAuthoritativeTypedFailureLifecycle,
+} from "./typed-failure-lifecycle-reconciliation";
 
 type RecordLike = Record<string, unknown>;
 
@@ -112,6 +116,7 @@ const RECOVERABLE_TERMINAL_REJECTION_REASONS = new Set([
   "missing_required_observation",
   "visible_answer_policy_repair_required",
   "route_requires_synthesis",
+  "compound_prompt_coverage_incomplete",
   "solver_continuation_pending",
   "pending_tool_call",
 ]);
@@ -229,6 +234,9 @@ const collectMissingRequirementIds = (payload: RecordLike): string[] => {
   const docsContinuationContract = readRecord(
     payload.docs_continuation_contract,
   );
+  const compoundPromptCoverageGate = readRecord(
+    payload.compound_prompt_coverage_gate,
+  );
   const records = [
     payload,
     readRecord(payload.goal_satisfaction_evaluation),
@@ -265,7 +273,18 @@ const collectMissingRequirementIds = (payload: RecordLike): string[] => {
     values.push(
       readString(docsContinuationContract.terminal_block_reason) ??
         readString(docsContinuationContract.required_next_capability) ??
-        "docs_continuation_pending",
+      "docs_continuation_pending",
+    );
+  }
+  if (
+    readString(compoundPromptCoverageGate?.schema) ===
+      "helix.compound_prompt_coverage_gate.v1" &&
+    compoundPromptCoverageGate?.applies === true &&
+    compoundPromptCoverageGate?.passed !== true
+  ) {
+    values.push(
+      compoundPromptCoverageGate?.unresolved_requirement_ids,
+      compoundPromptCoverageGate?.non_visible_blocked_requirement_ids,
     );
   }
   return uniqueStrings(values);
@@ -286,6 +305,15 @@ const normalizeGoalStatus = (
     docsContinuationContract &&
     readString(docsContinuationContract.current_docs_phase) !==
       "terminal_ready",
+  );
+  const compoundPromptCoverageGate = readRecord(
+    payload.compound_prompt_coverage_gate,
+  );
+  const compoundPromptCoveragePending = Boolean(
+    readString(compoundPromptCoverageGate?.schema) ===
+      "helix.compound_prompt_coverage_gate.v1" &&
+      compoundPromptCoverageGate?.applies === true &&
+      compoundPromptCoverageGate?.passed !== true,
   );
   const itinerary =
     readRecord(payload.capability_itinerary_execution_state) ??
@@ -334,6 +362,7 @@ const normalizeGoalStatus = (
     : evaluationStatus || terminalStatus;
   const satisfied =
     !docsContinuationPending &&
+    !compoundPromptCoveragePending &&
     !itineraryPending &&
     [
       "satisfied",
@@ -345,7 +374,7 @@ const normalizeGoalStatus = (
     ].includes(raw);
   let status: HelixAgentContinuationGoalStatus = satisfied
     ? "satisfied"
-    : docsContinuationPending || itineraryPending
+    : docsContinuationPending || compoundPromptCoveragePending || itineraryPending
       ? "in_progress"
       : "unknown";
   if (/needs_user_input|pending_input|ask_user|clarif/.test(raw))
@@ -362,7 +391,7 @@ const normalizeGoalStatus = (
     status,
     satisfied,
     terminalProductAllowed:
-      itineraryPending
+      itineraryPending || compoundPromptCoveragePending
         ? false
         : providerTerminalAllowed || completedSolverTerminalAllowed
         ? true
@@ -952,13 +981,16 @@ const resolveAllowedDecisions = (args: {
 }): HelixAgentContinuationDecision[] => {
   const decisions = new Set<HelixAgentContinuationDecision>();
   if (args.goalSatisfied) return ["answer"];
+  const hasUntriedAdmissibleAffordance = args.affordances.some(
+    (affordance: HelixAgentContinuationAffordance) =>
+      affordance.admissible && !affordance.tried,
+  );
+  const nonRetryableAttempt =
+    args.lastAttempt?.retryability === "non_retryable";
   const canAct =
     !args.budget.hard.exhausted &&
-    (args.capabilityProposalAllowed ||
-      args.affordances.some(
-        (affordance: HelixAgentContinuationAffordance) =>
-          affordance.admissible && !affordance.tried,
-      ));
+    (hasUntriedAdmissibleAffordance ||
+      (args.capabilityProposalAllowed && !nonRetryableAttempt));
   const canRetry =
     !args.budget.hard.exhausted &&
     args.lastAttempt?.retryability === "retryable";
@@ -998,6 +1030,16 @@ const resolveAllowedDecisions = (args: {
 export const buildHelixAgentContinuationState = (
   args: BuildHelixAgentContinuationStateArgs,
 ): HelixAgentContinuationState => {
+  reconcileAuthoritativeTypedFailureLifecycle({
+    payload: args.payload,
+    turnId: args.turnId,
+    promptText:
+      readString(args.payload.question) ??
+      readString(args.payload.prompt) ??
+      readString(args.payload.user_prompt),
+  });
+  const authoritativeTypedFailureSettled =
+    authoritativeTypedFailureRequiresNoContinuation(args.payload);
   const previousState = args.previousState ?? null;
   const previousSequence = Number.isFinite(previousState?.sequence)
     ? (previousState?.sequence ?? 0)
@@ -1037,12 +1079,15 @@ export const buildHelixAgentContinuationState = (
     previousState,
     lastAttempt,
   );
-  const affordances = collectAffordances(
+  const collectedAffordances = collectAffordances(
     args.payload,
     args.turnId,
     triedFingerprints,
     args.capabilityProposal?.admittedCapabilityIds ?? [],
   );
+  const affordances = authoritativeTypedFailureSettled
+    ? []
+    : collectedAffordances;
   const previousAffordanceIds = new Set(
     previousState?.next_admissible_affordances?.map(
       (entry: HelixAgentContinuationAffordance) => entry.affordance_id,
@@ -1081,7 +1126,13 @@ export const buildHelixAgentContinuationState = (
     lastAttempt?.failure_class === "terminal_authority" &&
     lastAttempt.retryability === "retryable",
   );
-  const goal = recoverableTerminalRejectionPending
+  const goal = authoritativeTypedFailureSettled
+    ? {
+        status: "blocked" as const,
+        satisfied: false,
+        terminalProductAllowed: true,
+      }
+    : recoverableTerminalRejectionPending
     ? {
         status: "in_progress" as const,
         satisfied: false,
@@ -1091,6 +1142,7 @@ export const buildHelixAgentContinuationState = (
   const budget = readBudget(args.payload);
   const capabilityProposal = {
     allowed:
+      !authoritativeTypedFailureSettled &&
       args.capabilityProposal?.allowed === true &&
       !budget.hard.exhausted &&
       uniqueStrings(args.capabilityProposal.admittedCapabilityIds).length > 0,
@@ -1114,18 +1166,23 @@ export const buildHelixAgentContinuationState = (
       ? `soft_budget_${budget.soft.pressure}`
       : null,
     budget.hard.exhausted ? "hard_resource_boundary_exhausted" : null,
+    authoritativeTypedFailureSettled
+      ? "authoritative_typed_failure_settled"
+      : null,
     !previousState ? "initial_continuation_state" : null,
   ]);
-  const allowedDecisions = resolveAllowedDecisions({
-    goalStatus: goal.status,
-    goalSatisfied: goal.satisfied,
-    lastAttempt,
-    affordances,
-    capabilityProposalAllowed: capabilityProposal.allowed,
-    missingRequirementIds,
-    budget,
-    terminalProductAllowed: goal.terminalProductAllowed,
-  });
+  const allowedDecisions = authoritativeTypedFailureSettled
+    ? (["fail"] as HelixAgentContinuationDecision[])
+    : resolveAllowedDecisions({
+        goalStatus: goal.status,
+        goalSatisfied: goal.satisfied,
+        lastAttempt,
+        affordances,
+        capabilityProposalAllowed: capabilityProposal.allowed,
+        missingRequirementIds,
+        budget,
+        terminalProductAllowed: goal.terminalProductAllowed,
+      });
   return {
     schema: HELIX_AGENT_CONTINUATION_STATE_SCHEMA,
     turn_id: args.turnId,

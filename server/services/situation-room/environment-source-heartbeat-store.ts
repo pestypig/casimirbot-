@@ -55,6 +55,27 @@ export function getEnvironmentSourceHeartbeat(
   return heartbeat;
 }
 
+/**
+ * Exact-identity server lookup for trusted policy services. This does not
+ * accept a caller-selected room or adapter mismatch and never projects source
+ * credentials. HTTP routes must continue to use admission-scoped lookups.
+ */
+export function getEnvironmentSourceHeartbeatForServerIdentity(input: {
+  sourceId: string;
+  roomId: string;
+  domainAdapter: string;
+}): HelixEnvironmentSourceHeartbeat | null {
+  const heartbeat = heartbeatsBySource.get(input.sourceId) ?? null;
+  if (
+    !heartbeat ||
+    heartbeat.room_id !== input.roomId ||
+    heartbeat.domain_adapter !== input.domainAdapter
+  ) {
+    return null;
+  }
+  return heartbeat;
+}
+
 export function listEnvironmentSourceHeartbeats(input?: {
   roomId?: string | null;
   sourceAdmission?: HelixRoomSourceAdmission | null;

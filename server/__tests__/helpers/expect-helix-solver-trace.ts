@@ -131,6 +131,8 @@ export const expectNegativeConstraint = (body: unknown, pattern: RegExp): void =
 
 export const expectNoMutatingToolCalls = (body: unknown): void => {
   const trace = expectSolverTrace(body);
+  const bodyRecord = readRecord(body);
+  const debug = readRecord(bodyRecord?.debug);
   const loopTrace = readRecord(getPath(body, ["loop_parity_trace"]));
   const actualCalls = Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [];
   const mutating = actualCalls
@@ -140,9 +142,63 @@ export const expectNoMutatingToolCalls = (body: unknown): void => {
   const commandCount = Array.isArray(getPath(trace, ["prompt_interpretation", "executable_operator_commands"]))
     ? (getPath(trace, ["prompt_interpretation", "executable_operator_commands"]) as unknown[]).length
     : 0;
+  const gatewayResults = [
+    ...(Array.isArray(bodyRecord?.workstation_gateway_call_results)
+      ? bodyRecord.workstation_gateway_call_results
+      : []),
+    ...(Array.isArray(debug?.workstation_gateway_call_results)
+      ? debug.workstation_gateway_call_results
+      : []),
+  ].map(readRecord).filter((entry): entry is RecordLike => Boolean(entry));
+  const laneResults = [
+    ...(Array.isArray(bodyRecord?.capability_lane_call_results)
+      ? bodyRecord.capability_lane_call_results
+      : []),
+    ...(Array.isArray(debug?.capability_lane_call_results)
+      ? debug.capability_lane_call_results
+      : []),
+  ].map(readRecord).filter((entry): entry is RecordLike => Boolean(entry));
+  const successfulExecutionCapabilities = [
+    ...gatewayResults
+      .filter((entry) => entry.ok === true)
+      .map((entry) => readString(entry.capability_id)),
+    ...laneResults
+      .filter(
+        (entry) =>
+          entry.ok === true &&
+          readString(entry.delegation_status) === "gateway_executed",
+      )
+      .map((entry) =>
+        readString(entry.delegated_capability_id) ?? readString(entry.capability),
+      ),
+    ...[bodyRecord, debug]
+      .map((scope) => readRecord(scope?.capability_result))
+      .filter(
+        (entry): entry is RecordLike =>
+          Boolean(
+            entry &&
+            /^(?:succeeded|completed|success|ok)$/i.test(
+              readString(entry.status) ?? "",
+            ),
+          ),
+      )
+      .map((entry) => readString(entry.executed_capability)),
+  ].filter((entry): entry is string => Boolean(entry));
+  const mutatingExecutionCapabilities = successfulExecutionCapabilities.filter(
+    (capability) =>
+      /set_rate|start|stop|click|open|repair|run|write|delete|update/i.test(
+        capability,
+      ),
+  );
   expect(mutating, "admission failure: unexpected mutating tool calls").toEqual([]);
   expect(commandCount, "admission failure: executable operator commands present").toBe(0);
-  expect(JSON.stringify(body), "admission failure: set_rate leaked into response").not.toContain("situation-room.live-source.set_rate");
+  // A capability identifier may legitimately be visible in a manifest,
+  // proposal allowlist, or debug catalog. Those are affordances, not proof of
+  // execution. Assert only against execution-bearing call/result fields.
+  expect(
+    mutatingExecutionCapabilities,
+    "admission failure: mutating gateway capability executed",
+  ).toEqual([]);
 };
 
 export const expectNoTerminalArtifact = (body: unknown, artifacts: string[]): void => {

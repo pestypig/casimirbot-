@@ -1,3 +1,5 @@
+import type { HelixEnvironmentCommandConnectorConfig } from "./helix-environment-command";
+
 export const HELIX_ROOM_SOURCE_BINDING_SCHEMA =
   "helix.room_source_binding.v1" as const;
 export const HELIX_ROOM_SOURCE_BINDING_RECEIPT_SCHEMA =
@@ -59,12 +61,18 @@ export type HelixRoomSourceBinding = {
 
 export type HelixRoomSourcePluginConfig = {
   endpoint: string;
+  pairing_endpoint?: string;
   bearer_token: string;
   source_id: string;
   room_id: string;
   world_id: string;
   domain_adapter: string;
   execution_enabled: false;
+  /**
+   * Present only for an explicitly command-enabled in-game pairing. The
+   * command credential remains distinct from the source ingress credential.
+   */
+  command?: HelixEnvironmentCommandConnectorConfig;
 };
 
 export type HelixRoomSourceBindingReceipt = {

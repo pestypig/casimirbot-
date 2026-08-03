@@ -382,7 +382,7 @@ describe("Helix capability plan contract", () => {
       });
 
       expect(admission).toMatchObject({
-        source_target: "runtime_evidence",
+        source_target: "capability_catalog",
         admitted_tool_families: expect.arrayContaining(["capability_catalog", "runtime_evidence"]),
         reason: expect.stringContaining("capability_catalog_prompt_requires_runtime_catalog_observation"),
       });
@@ -403,14 +403,14 @@ describe("Helix capability plan contract", () => {
         mutating: false,
         operator_command_required: false,
         operator_command_present: false,
-        source_target: "runtime_evidence",
+        source_target: "capability_catalog",
         goal_kind: "capability_help",
         required_terminal_kind: "capability_help_summary",
         admission_status: "needs_evidence",
         capability_contract_arbitration: expect.objectContaining({
           contract_state: "explicit_capability_command",
           requested_capability: "helix_ask.inspect_capability_catalog",
-          selected_source_target: "runtime_evidence",
+          selected_source_target: "capability_catalog",
           selected_plan_family: "capability_catalog",
           canonical_goal_kind: "capability_help",
           required_observation_kinds: ["capability_registry"],
@@ -443,7 +443,7 @@ describe("Helix capability plan contract", () => {
     });
 
     expect(admission).toMatchObject({
-      source_target: "runtime_evidence",
+      source_target: "capability_catalog",
       admitted_tool_families: expect.arrayContaining(["capability_catalog", "runtime_evidence"]),
       reason: expect.stringContaining("capability_catalog_prompt_requires_runtime_catalog_observation"),
     });
@@ -466,7 +466,7 @@ describe("Helix capability plan contract", () => {
       capability_family: "capability_catalog",
       requested_action: "helix_ask.inspect_capability_catalog",
       selected_capability: "helix_ask.inspect_capability_catalog",
-      source_target: "runtime_evidence",
+      source_target: "capability_catalog",
       goal_kind: "capability_help",
       required_terminal_kind: "capability_help_summary",
     });

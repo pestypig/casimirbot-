@@ -26,6 +26,7 @@ import type {
   HelixWorkstationGatewayMode,
   HelixWorkstationCapabilityManifest,
 } from "./types";
+import type { HelixRealtimeRoomTurnActorContext } from "../realtime-room/turn-actor-context";
 
 export const HELIX_WORKSTATION_GATEWAY_ACCOUNT_POLICY_BLOCKED_SCHEMA =
   "helix.workstation_tool_gateway.account_policy_blocked.v1" as const;
@@ -36,6 +37,11 @@ export type HelixWorkstationGatewayAccountContext = {
   trusted_account_session: boolean;
   account_session: HelixAccountSession | null;
   account_policy: HelixAccountCapabilityPolicy;
+  /**
+   * Server-validated participant identity for a hash-bound GPT Live turn.
+   * This control field is never accepted from model-authored arguments.
+   */
+  trusted_turn_actor_context?: HelixRealtimeRoomTurnActorContext | null;
 };
 
 export type HelixWorkstationGatewayPolicyGate = {

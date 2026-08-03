@@ -82,6 +82,49 @@ const withRuntimeMemoryGuardDisabled = async <T>(
   }
 };
 
+const buildGatewayObservationStub = async (
+  input: Parameters<typeof callWorkstationGatewayCapability>[0],
+): Promise<Awaited<ReturnType<typeof callWorkstationGatewayCapability>>> => ({
+  schema: "helix.workstation_tool_gateway.call_result.v1",
+  manifest_version: "test",
+  ok: true,
+  agent_runtime: String(input.agentRuntime ?? "codex"),
+  capability_id: input.capabilityId,
+  mode: "act",
+  gateway_admission: {} as never,
+  observation_packet: {
+    schema: "helix.agent_step_observation_packet.v1",
+    turn_id: input.turnId ?? "ask:test:gateway-stub",
+    iteration: input.iteration ?? 0,
+    call_id: input.toolCallId ?? "tool-call:gateway-stub",
+    decision_id:
+      input.providerExecutionId ?? "provider-execution:gateway-stub",
+    capability_key: input.capabilityId,
+    panel_id: "test",
+    action: input.capabilityId,
+    status: "succeeded",
+    produced_artifact_refs: [`test:gateway:${input.capabilityId}`],
+    observation_summary: "Deterministic governed gateway test observation.",
+    receipts: [],
+    missing_requirements: [],
+    state_delta: {},
+    suggested_next_steps: ["answer"],
+    answer_authority: false,
+    terminal_eligible: false,
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  tool_lifecycle_trace: {} as never,
+  tool_followup_decision: {} as never,
+  observation: { arguments: input.arguments ?? {} },
+  artifact_refs: [`test:gateway:${input.capabilityId}`],
+  terminal_eligible: false,
+  post_tool_model_step_required: true,
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 const projectPayload = (
   provider: HelixAgentProvider,
   debugProjection: Record<string, unknown>,
@@ -3231,6 +3274,141 @@ describe("provider-neutral capability lane one-shot runner", () => {
     expect(result.resolve_traces[0]).toMatchObject({
       requested_lane: "workstation_tool_reference",
       execution_status: "executed_observation_only",
+    });
+  });
+
+  it("normalizes a sole provider-native input envelope before governed gateway validation", async () => {
+    const repoSearch = listWorkstationGatewayCapabilities({
+      mode: "act",
+    }).capabilities.find(
+      (capability) => capability.capability_id === "repo.search",
+    );
+    expect(repoSearch).toBeDefined();
+    const gatewayCaller = vi.fn(buildGatewayObservationStub);
+
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-governed-gateway-input-envelope",
+        capability_lane_call: {
+          capability: "repo.search",
+          arguments: {
+            input: { query: "terminal authority" },
+          },
+        },
+      },
+      authorizedGatewayCapabilities: repoSearch ? [repoSearch] : [],
+      gatewayCaller,
+      accountType: "user",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(gatewayCaller).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capabilityId: "repo.search",
+        arguments: { query: "terminal authority" },
+      }),
+    );
+    expect(result.call_results[0]).toMatchObject({
+      arguments: { query: "terminal authority" },
+    });
+  });
+
+  it("preserves input when it is a literal governed capability argument", async () => {
+    const repoSearch = listWorkstationGatewayCapabilities({
+      mode: "act",
+    }).capabilities.find(
+      (capability) => capability.capability_id === "repo.search",
+    );
+    expect(repoSearch).toBeDefined();
+    const inputLiteralCapability = repoSearch
+      ? {
+          ...repoSearch,
+          input_schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              input: { type: "object" },
+            },
+            required: ["input"],
+          },
+        }
+      : null;
+    const gatewayCaller = vi.fn(buildGatewayObservationStub);
+
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-governed-gateway-literal-input",
+        capability_lane_call: {
+          capability: "repo.search",
+          arguments: {
+            input: { query: "terminal authority" },
+          },
+        },
+      },
+      authorizedGatewayCapabilities: inputLiteralCapability
+        ? [inputLiteralCapability]
+        : [],
+      gatewayCaller,
+      accountType: "user",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(gatewayCaller).toHaveBeenCalledWith(
+      expect.objectContaining({
+        arguments: {
+          input: { query: "terminal authority" },
+        },
+      }),
+    );
+    expect(result.call_results[0]).toMatchObject({
+      arguments: {
+        input: { query: "terminal authority" },
+      },
+    });
+  });
+
+  it("does not unwrap an input object when provider arguments include siblings", async () => {
+    const repoSearch = listWorkstationGatewayCapabilities({
+      mode: "act",
+    }).capabilities.find(
+      (capability) => capability.capability_id === "repo.search",
+    );
+    expect(repoSearch).toBeDefined();
+    const gatewayCaller = vi.fn(buildGatewayObservationStub);
+
+    const result = await runHelixCapabilityLaneOneShotRequests({
+      provider: buildProvider("codex"),
+      body: {
+        turn_id: "turn-governed-gateway-ambiguous-input-envelope",
+        capability_lane_call: {
+          capability: "repo.search",
+          arguments: {
+            input: { query: "nested" },
+            query: "direct",
+          },
+        },
+      },
+      authorizedGatewayCapabilities: repoSearch ? [repoSearch] : [],
+      gatewayCaller,
+      accountType: "user",
+      env: {} as NodeJS.ProcessEnv,
+    });
+
+    expect(gatewayCaller).toHaveBeenCalledWith(
+      expect.objectContaining({
+        arguments: {
+          input: { query: "nested" },
+          query: "direct",
+        },
+      }),
+    );
+    expect(result.call_results[0]).toMatchObject({
+      arguments: {
+        input: { query: "nested" },
+        query: "direct",
+      },
     });
   });
 

@@ -6,7 +6,12 @@ import { getPool } from "../db/client";
 import { discordRouter } from "../routes/discord";
 import { profileIngressRouter } from "../routes/profile-ingress";
 import {
+  isGuestSharedRealtimeRoomSourceIngressEnabled,
+  isPublicSharedRealtimeRoomSourceIngressEnabled,
+  isSharedRealtimeRoomsPublicExperimentEnabled,
   resetAccountSessionStore,
+  setSharedRealtimeRoomsExperiment,
+  signInLocalAccountSession,
   signInWebAccountSession,
 } from "../services/helix-account/account-session-store";
 import { listEmailOutboxRecords } from "../services/email/email-outbox";
@@ -195,12 +200,106 @@ describe("account session panel API", () => {
       .post("/api/account/session/experimental-rooms")
       .send({ enabled: true })
       .expect(200);
+    expect(isGuestSharedRealtimeRoomSourceIngressEnabled()).toBe(true);
     expect(admitted.body.status.account_policy).toMatchObject({
       feature_flags: expect.arrayContaining(["room_source_ingress"]),
       locked_features: expect.not.arrayContaining(["room_source_ingress"]),
       allowed_workstation_capabilities: expect.arrayContaining([
         "room.evidence.read_bound",
         "com.casimirbot.minecraft.inventory.check",
+        "com.casimirbot.minecraft.command",
+      ]),
+    });
+  });
+
+  it("grants signed-in users the governed room-source experiment without developer access", async () => {
+    vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
+    const agent = request.agent(createApp());
+    await agent
+      .post("/api/account/session/sign-in")
+      .send({
+        profile_id: "profile:public-room-source-user",
+        display_name: "Public Room Source User",
+        account_type: "user",
+      })
+      .expect(200);
+
+    const enabled = await agent
+      .post("/api/account/session/experimental-rooms")
+      .send({ enabled: true })
+      .expect(200);
+
+    expect(enabled.body.status).toMatchObject({
+      session: {
+        profile: {
+          account_type: "user",
+          auth_mode: "local_dev_profile",
+        },
+      },
+      account_policy: {
+        account_type: "user",
+        feature_flags: expect.arrayContaining([
+          "shared_realtime_rooms",
+          "room_source_ingress",
+        ]),
+        locked_features: expect.not.arrayContaining([
+          "shared_realtime_rooms",
+          "room_source_ingress",
+        ]),
+        allowed_workstation_capabilities: expect.arrayContaining([
+          "room.evidence.read_bound",
+          "com.casimirbot.minecraft.inventory.check",
+          "com.casimirbot.minecraft.command",
+        ]),
+      },
+    });
+    expect(enabled.body.status.account_policy.allowed_panels).not.toEqual(["*"]);
+    expect(enabled.body.status.account_policy.feature_flags).not.toContain(
+      "developer_workstation_panels",
+    );
+  });
+
+  it("requires the explicit public source-ingress flag for signed-in users in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
+    vi.stubEnv("HELIX_PUBLIC_ROOM_SOURCE_INGRESS", "0");
+    const signedIn = await signInLocalAccountSession({
+      profile_id: "profile:blocked-public-source-user",
+      display_name: "Blocked Public Source User",
+      account_type: "user",
+    });
+    const blocked = await setSharedRealtimeRoomsExperiment({
+      session_id: signedIn.session?.session_id,
+      enabled: true,
+    });
+    expect(blocked.status.account_policy).toMatchObject({
+      feature_flags: expect.not.arrayContaining(["room_source_ingress"]),
+      locked_features: expect.arrayContaining(["room_source_ingress"]),
+    });
+  });
+
+  it("admits signed-in public source ingress when the production flag is enabled", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
+    vi.stubEnv("HELIX_PUBLIC_ROOM_SOURCE_INGRESS", "1");
+    expect(isSharedRealtimeRoomsPublicExperimentEnabled()).toBe(true);
+    expect(isPublicSharedRealtimeRoomSourceIngressEnabled()).toBe(true);
+    const signedIn = await signInLocalAccountSession({
+      profile_id: "profile:admitted-public-source-user",
+      display_name: "Admitted Public Source User",
+      account_type: "user",
+    });
+    const admitted = await setSharedRealtimeRoomsExperiment({
+      session_id: signedIn.session?.session_id,
+      enabled: true,
+    });
+    expect(admitted.status.account_policy).toMatchObject({
+      feature_flags: expect.arrayContaining(["room_source_ingress"]),
+      locked_features: expect.not.arrayContaining(["room_source_ingress"]),
+      allowed_workstation_capabilities: expect.arrayContaining([
+        "room.evidence.read_bound",
+        "com.casimirbot.minecraft.inventory.check",
+        "com.casimirbot.minecraft.command",
       ]),
     });
   });

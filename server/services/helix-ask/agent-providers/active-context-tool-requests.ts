@@ -58,6 +58,7 @@ import {
 } from "../docs-viewer-intent";
 import { resolveHelixAskConversationalReferent } from "../referent-resolution";
 import { materializeRealtimeConversationContext } from "./realtime-conversation-context";
+import { isMinecraftMechanicsDocsPrompt } from "../minecraft-mechanics-docs-intent";
 
 const HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY = "helix_ask.inspect_capability_catalog" as const;
 const SCIENTIFIC_CALCULATOR_THEORY_RUN_CONTEXT_CAPABILITY =
@@ -739,9 +740,41 @@ export const readGatewayPaths = (admission: Record<string, unknown>): string[] =
   return path ? [path] : [];
 };
 
+export const buildMinecraftMechanicsDocsWorkstationGatewayCallRequests = (
+  body: Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  if (!prompt || !isMinecraftMechanicsDocsPrompt(prompt)) return [];
+  return [
+    {
+      schema:
+        "helix.workstation_gateway.minecraft_mechanics_docs_call_request.v1",
+      derivation_source: "helix_minecraft_mechanics_docs_intent",
+      capability_id: DOCS_SEARCH_CAPABILITY,
+      mode: "read",
+      arguments: {
+        query: prompt,
+        environment_scope: "active_room_environment",
+        source_target_intent: {
+          source: "helix_minecraft_mechanics_docs_intent",
+          target_source: "docs",
+          target_kind: "environment_mechanics_docs",
+          environment_scope: "active_room_environment",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    },
+  ];
+};
+
 export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
   body: Record<string, unknown>,
 ): Record<string, unknown>[] => {
+  const prompt = readPrompt(body);
+  const roomEnvironmentMechanicsSearch =
+    isMinecraftMechanicsDocsPrompt(prompt);
   const requests: Record<string, unknown>[] = [];
   const seen = new Set<string>();
   for (const admission of collectStructuredAdmissionRecords(body)) {
@@ -911,10 +944,18 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
         arguments: {
           query,
           ...(paths.length > 0 ? { paths } : {}),
+          ...(roomEnvironmentMechanicsSearch
+            ? { environment_scope: "active_room_environment" }
+            : {}),
           source_target_intent: {
             ...sourceTargetIntent,
             target_source: "docs",
-            target_kind: "docs_search",
+            target_kind: roomEnvironmentMechanicsSearch
+              ? "environment_mechanics_docs"
+              : "docs_search",
+            ...(roomEnvironmentMechanicsSearch
+              ? { environment_scope: "active_room_environment" }
+              : {}),
             alias_capability: selectedCapability === DOCS_SEARCH_CAPABILITY ? undefined : selectedCapability,
           },
         },

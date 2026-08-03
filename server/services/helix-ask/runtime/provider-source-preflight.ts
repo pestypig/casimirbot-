@@ -74,21 +74,78 @@ export const maybeBuildHelixProviderProcedureMemoryPreflightTerminalPayload = (
   });
   if (!route.typed_failure) return null;
 
+  const rawRouteErrorCode =
+    readString(route.typed_failure.error_code) ??
+    readString(route.typed_failure.failure_code) ??
+    "procedure_memory_unavailable";
+  const activeSituationRunMissing =
+    rawRouteErrorCode === "PROCEDURE_MEMORY_ACTIVE_SITUATION_RUN_MISSING";
+  const routeErrorCode = activeSituationRunMissing
+    ? "procedure_memory_unavailable"
+    : rawRouteErrorCode;
+  const routeNextRequiredAction =
+    (activeSituationRunMissing
+      ? "repair_procedure_memory"
+      : readString(route.typed_failure.next_required_action)) ??
+    (routeErrorCode === "procedure_memory_unavailable"
+      ? "repair_procedure_memory"
+      : "none");
+  const routeMissingEvidence = activeSituationRunMissing
+    ? ["active_situation_run", "procedure_memory"]
+    : Array.isArray(route.typed_failure.missing_evidence)
+      ? route.typed_failure.missing_evidence
+          .map((value) => readString(value))
+          .filter((value): value is string => Boolean(value))
+      : [];
+  const routeBlockingReason =
+    readString(route.typed_failure.blocking_reason) ??
+    (routeErrorCode === "procedure_epoch_previous_unavailable"
+      ? "previous_visual_observation_unavailable"
+      : routeErrorCode === "procedure_epoch_current_unavailable"
+        ? "current_visual_observation_unavailable"
+        : routeErrorCode === "procedure_memory_unavailable"
+          ? "no_active_situation_run"
+          : routeErrorCode);
+  const routeRepairHint =
+    (activeSituationRunMissing
+      ? "create_or_resume_situation_run"
+      : readString(route.typed_failure.repair_hint)) ?? routeNextRequiredAction;
+  const routeFailureMessage =
+    activeSituationRunMissing
+      ? "Auntie Dot: sensors are separate from mission memory. Procedure memory is unavailable because no_active_situation_run. Repair hint: create_or_resume_situation_run."
+      : readString(route.typed_failure.message) ??
+        "The requested procedure-memory evidence is unavailable.";
   const failureText =
-    "Auntie Dot: sensors are separate from mission memory. Procedure memory is unavailable because no_active_situation_run. Repair hint: create_or_resume_situation_run.";
+    routeNextRequiredAction && routeNextRequiredAction !== "none"
+      ? `${routeFailureMessage} Next required action: ${routeNextRequiredAction}.`
+      : routeFailureMessage;
+  const targetKind =
+    readString(sourceTargetIntent?.target_kind) ?? "procedure_memory";
+  const isProcedureEpochReplay =
+    targetKind === "situation_epoch" ||
+    routeErrorCode.toLowerCase().includes("procedure_epoch");
+  const goalKind = isProcedureEpochReplay
+    ? "procedure_epoch_replay_question"
+    : "situation_context_question";
+  const requiredTerminalKind = isProcedureEpochReplay
+    ? "procedure_epoch_replay"
+    : "procedure_memory_recall";
+  const requiredObservationKinds = isProcedureEpochReplay
+    ? ["current_visual_observation", "previous_visual_observation"]
+    : ["active_situation_run", "procedure_memory"];
   const typedFailure = {
     ...route.typed_failure,
-    error_code: "procedure_memory_unavailable",
-    failure_kind: "procedure_memory_unavailable",
+    error_code: routeErrorCode,
+    failure_kind:
+      readString(route.typed_failure.failure_kind) ?? routeErrorCode,
     requested_capability: "procedure_memory",
     failure_code:
       readString(route.typed_failure.failure_code) ??
-      readString(route.typed_failure.error_code) ??
-      "PROCEDURE_MEMORY_ACTIVE_SITUATION_RUN_MISSING",
-    missing_evidence: ["active_situation_run", "procedure_memory"],
-    next_required_action: "repair_procedure_memory",
-    blocking_reason: "no_active_situation_run",
-    repair_hint: "create_or_resume_situation_run",
+      rawRouteErrorCode,
+    missing_evidence: routeMissingEvidence,
+    next_required_action: routeNextRequiredAction,
+    blocking_reason: routeBlockingReason,
+    repair_hint: routeRepairHint,
     message: failureText,
     assistant_answer: false,
     raw_content_included: false,
@@ -110,7 +167,7 @@ export const maybeBuildHelixProviderProcedureMemoryPreflightTerminalPayload = (
     createdAtMs: now.getTime(),
     routeGateArtifactId,
     terminalResultId,
-    requiredTerminalKind: "procedure_memory_recall",
+    requiredTerminalKind,
     answerScope: "runtime_evidence",
     canonicalGoalFrameExtra: {
       requested_capability: "procedure_memory",
@@ -127,28 +184,29 @@ export const maybeBuildHelixProviderProcedureMemoryPreflightTerminalPayload = (
         "panel_generated_answer",
       ],
     },
-    goalKind: "situation_context_question",
+    goalKind,
     classifierReasons: [
       "provider_preflight_hard_procedure_memory_source",
-      "procedure_memory_source_unavailable",
+      routeErrorCode,
     ],
     requestedCapability: "procedure_memory",
     selectedCapability: "procedure_memory",
     sourceTarget: "procedure_memory",
     family: "procedure_memory",
-    requiredObservationKinds: ["active_situation_run", "procedure_memory"],
-    status: "procedure_memory_unavailable",
+    requiredObservationKinds,
+    status: routeErrorCode,
     route: "procedure_memory_preflight",
-    errorCode: "procedure_memory_unavailable",
+    errorCode: routeErrorCode,
     brokenRail: "observation",
-    missingRequirement: "active_situation_run",
+    missingRequirement:
+      routeMissingEvidence[0] ?? routeBlockingReason,
     text: failureText,
     terminalArtifactId,
     terminalArtifactRef: terminalArtifactId,
     terminalResultIdInRuntimeStatus: terminalResultId,
     routeGate: "hard_source_target",
     routeGateTerminalEligible: false,
-    debugStatus: "procedure_memory_unavailable",
+    debugStatus: routeErrorCode,
     debugPrivateRuntimeLoopEntered: false,
     completedSolverPath: false,
     goalSatisfaction: "not_satisfied",
@@ -176,10 +234,10 @@ export const maybeBuildHelixProviderProcedureMemoryPreflightTerminalPayload = (
       typed_failure: typedFailure,
       blocking_reason:
         readString(typedFailure.blocking_reason) ??
-        "no_active_situation_run",
+        routeBlockingReason,
       repair_hint:
         readString(typedFailure.repair_hint) ??
-        "create_or_resume_situation_run",
+        routeRepairHint,
     };
   }
   payload.source_target_intent = sourceTargetIntent;
@@ -201,7 +259,7 @@ export const maybeBuildHelixProviderProcedureMemoryPreflightTerminalPayload = (
     turn_id: args.turnId,
     prompt_hash: hashGoalFrame(promptText),
     source_target: "procedure_memory",
-    target_kind: "procedure_memory",
+    target_kind: targetKind,
     selected_route: "procedure_memory_preflight",
     terminal_artifact_kind: "typed_failure",
     final_answer_source: "typed_failure",

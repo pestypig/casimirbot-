@@ -178,6 +178,11 @@ const terminalKindForSelectedArtifact = (
     return "tool_evaluation";
   if (selectedArtifactKind === "image_lens_named_receipt_evaluation")
     return "answer";
+  // A governed live-pipeline receipt is selected only after the exact
+  // committed control contract, current-turn observation, and model re-entry
+  // gates pass. Its artifact remains a receipt, while its visible text is the
+  // provider-authored terminal answer synchronized by this single writer.
+  if (selectedArtifactKind === "live_pipeline_receipt") return "answer";
   if (selectedArtifactKind?.includes("receipt")) return "tool_receipt";
   return "answer";
 };
@@ -3249,6 +3254,7 @@ const CONTRACT_AUTHORIZED_RECEIPT_TERMINAL_KINDS = new Set([
   "note_update_receipt",
   "note_action_receipt",
   "note_create_receipt",
+  "live_pipeline_receipt",
 ]);
 
 const isContractAuthorizedReceiptTerminalKind = (

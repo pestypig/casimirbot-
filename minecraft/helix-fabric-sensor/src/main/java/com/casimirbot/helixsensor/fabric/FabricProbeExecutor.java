@@ -208,6 +208,7 @@ public final class FabricProbeExecutor {
             )
             .toList();
         Map<String, Object> details = new LinkedHashMap<>();
+        details.put("actor_label", player.getGameProfile().getName());
         details.put("health", round(player.getHealth()));
         details.put("max_health", round(player.getMaxHealth()));
         details.put("food_level", player.getFoodData().getFoodLevel());

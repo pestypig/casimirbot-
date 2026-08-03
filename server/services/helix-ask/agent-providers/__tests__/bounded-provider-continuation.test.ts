@@ -181,4 +181,145 @@ describe("bounded provider-selected continuation", () => {
       },
     });
   });
+
+  it("gives a compound terminal candidate one bounded provider-owned completeness review", async () => {
+    const executed: string[] = [];
+    let reviews = 0;
+    const result = await runBoundedProviderSelectedContinuation<
+      Result,
+      Request,
+      { capability: string; ok: true }
+    >({
+      initialResult: {
+        request: null,
+        answer: "The first observation succeeded, but the procedure is incomplete.",
+      },
+      maxSteps: 3,
+      requestFromResult: (entry) => entry.request,
+      requestFingerprint: (request) => request.capability,
+      admitRequest: (request) => request.capability === "tool.restore",
+      reviewTerminalCandidate: async (currentResult) => {
+        reviews += 1;
+        return currentResult.answer === "The procedure is now complete."
+          ? currentResult
+          : { request: { capability: "tool.restore" } };
+      },
+      executeAndReenter: async (request) => {
+        executed.push(request.capability);
+        return {
+          observation: { capability: request.capability, ok: true },
+          result: { request: null, answer: "The procedure is now complete." },
+        };
+      },
+    });
+
+    expect(reviews).toBe(2);
+    expect(executed).toEqual(["tool.restore"]);
+    expect(result).toMatchObject({
+      stop_reason: "no_next_request",
+      pending_request: null,
+      terminal_reviewed: true,
+      terminal_review_count: 2,
+      result: { request: null, answer: "The procedure is now complete." },
+    });
+  });
+
+  it("uses the configured bounded review count when the first review still terminalizes early", async () => {
+    let reviews = 0;
+    const result = await runBoundedProviderSelectedContinuation<
+      Result,
+      Request,
+      { capability: string; ok: true }
+    >({
+      initialResult: {
+        request: null,
+        answer: "Only the first observation exists.",
+      },
+      maxSteps: 3,
+      maxTerminalReviews: 2,
+      requestFromResult: (entry) => entry.request,
+      requestFingerprint: (request) => request.capability,
+      admitRequest: () => true,
+      reviewTerminalCandidate: async (currentResult) => {
+        reviews += 1;
+        if (currentResult.answer === "Restored and verified.") {
+          return currentResult;
+        }
+        return reviews === 1
+          ? { request: null, answer: "The first review still stopped early." }
+          : { request: { capability: "tool.restore" } };
+      },
+      executeAndReenter: async (request) => ({
+        observation: { capability: request.capability, ok: true },
+        result: { request: null, answer: "Restored and verified." },
+      }),
+    });
+
+    expect(reviews).toBe(4);
+    expect(result).toMatchObject({
+      stop_reason: "no_next_request",
+      terminal_reviewed: true,
+      terminal_review_count: 4,
+      steps: [{ request: { capability: "tool.restore" } }],
+      result: { answer: "Restored and verified." },
+    });
+  });
+
+  it("renews the bounded completeness review after each successful observation", async () => {
+    const executed: string[] = [];
+    let reviews = 0;
+    const nextRequests = ["tool.mutate", "tool.restore", "tool.verify"];
+    const result = await runBoundedProviderSelectedContinuation<
+      Result,
+      Request,
+      { capability: string; ok: true }
+    >({
+      initialResult: {
+        request: null,
+        answer: "Only the initial query has been observed.",
+      },
+      maxSteps: 3,
+      maxTerminalReviews: 1,
+      requestFromResult: (entry) => entry.request,
+      requestFingerprint: (request) => request.capability,
+      admitRequest: () => true,
+      reviewTerminalCandidate: async () => {
+        const capability = nextRequests[reviews] ?? null;
+        reviews += 1;
+        return capability
+          ? { request: { capability } }
+          : { request: null, answer: "Complete." };
+      },
+      executeAndReenter: async (request) => {
+        executed.push(request.capability);
+        return {
+          observation: { capability: request.capability, ok: true },
+          result: {
+            request: null,
+            answer:
+              request.capability === "tool.verify"
+                ? "Restored and verified."
+                : "The procedure is still incomplete.",
+          },
+        };
+      },
+    });
+
+    expect(executed).toEqual([
+      "tool.mutate",
+      "tool.restore",
+      "tool.verify",
+    ]);
+    expect(reviews).toBe(3);
+    expect(result).toMatchObject({
+      stop_reason: "no_next_request",
+      terminal_review_count: 3,
+      steps: [
+        { request: { capability: "tool.mutate" } },
+        { request: { capability: "tool.restore" } },
+        { request: { capability: "tool.verify" } },
+      ],
+      result: { answer: "Restored and verified." },
+    });
+  });
 });

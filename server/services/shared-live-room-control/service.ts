@@ -38,6 +38,7 @@ import {
 import {
   isGuestSharedRealtimeRoomHostingEnabled,
   isGuestSharedRealtimeRoomSourceIngressEnabled,
+  isPublicSharedRealtimeRoomSourceIngressEnabled,
 } from "../helix-account/account-session-store";
 import type { HelixAgentApiPrincipal } from "../helix-agent-api/types";
 import {
@@ -97,11 +98,10 @@ export const sharedLiveRoomActorAllowsSourceIngress = (
     !actor.accountPolicy.locked_features.includes("room_source_ingress");
   if (!roomFeatureAllowed || !sourceFeatureAllowed) return false;
   if (actor.accountType === "developer") return true;
-  return (
-    actor.authKind === "first_party_session" &&
-    actor.isGuest &&
-    isGuestSharedRealtimeRoomSourceIngressEnabled()
-  );
+  if (actor.authKind !== "first_party_session") return false;
+  return actor.isGuest
+    ? isGuestSharedRealtimeRoomSourceIngressEnabled()
+    : isPublicSharedRealtimeRoomSourceIngressEnabled();
 };
 
 export const MAX_GUEST_ROOM_SOURCE_CREDENTIAL_TTL_MS =
