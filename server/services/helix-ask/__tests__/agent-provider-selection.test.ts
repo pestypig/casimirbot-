@@ -156,6 +156,182 @@ describe("Helix Ask agent provider selection", () => {
     expect(guarded).toContain("Blocked or failed gateway request: repo.search: missing_query.");
   });
 
+  it("lets a successful environment retry supersede its retryable schema failure", () => {
+    const failedSpatial = {
+      ok: false,
+      capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+      gateway_admission: {
+        requested_capability:
+          "com.casimirbot.minecraft.spatial_region.inspect",
+        blocked_reason: "schema_validation_failed",
+      },
+      error: "schema_validation_failed",
+      observation_packet: {
+        status: "failed",
+        observation_summary:
+          "The probe arguments failed the trusted schema at $.intent.",
+      },
+      tool_lifecycle_trace: {
+        retry_recommendation: "retry_same_tool",
+      },
+      tool_followup_decision: {
+        next_action: "retry",
+      },
+    };
+    const successfulSpatial = {
+      ok: true,
+      capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+      gateway_admission: {
+        requested_capability:
+          "com.casimirbot.minecraft.spatial_region.inspect",
+        admission_reason: "admitted",
+      },
+      observation_packet: {
+        status: "succeeded",
+        observation_summary: "Bounded spatial-region read-only probe completed.",
+      },
+    };
+    const gatewayCallResults = [failedSpatial, successfulSpatial] as any;
+
+    expect(
+      applyGatewayFailureAuthorityGuard({
+        text: "The repaired probe found a safe west-side edge.",
+        gatewayCallResults,
+      }),
+    ).toBe("The repaired probe found a safe west-side edge.");
+    expect(
+      providerGatewayEvidenceReadyForSolver({
+        gatewayCallResults,
+        scholarlyRecoveryObservationReentered: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("retires a repaired schema failure when the successful packet reports completed", () => {
+    const guarded = applyGatewayFailureAuthorityGuard({
+      text: "The corrected local map observation is available.",
+      gatewayCallResults: [
+        {
+          ok: false,
+          capability_id: "com.casimirbot.minecraft.local_map.inspect",
+          gateway_admission: {
+            requested_capability:
+              "com.casimirbot.minecraft.local_map.inspect",
+            blocked_reason: "schema_validation_failed",
+          },
+          error: "schema_validation_failed",
+          observation_packet: {
+            status: "failed",
+            observation_summary:
+              "The probe arguments failed the trusted schema.",
+          },
+        },
+        {
+          ok: true,
+          capability_id: "com.casimirbot.minecraft.local_map.inspect",
+          gateway_admission: {
+            requested_capability:
+              "com.casimirbot.minecraft.local_map.inspect",
+            admission_reason: "admitted",
+          },
+          observation_packet: {
+            status: "completed",
+            observation_summary: "The repaired local map probe completed.",
+          },
+        },
+      ] as any,
+    });
+
+    expect(guarded).toBe("The corrected local map observation is available.");
+  });
+
+  it("does not terminalize a schema error that a later observation repaired", () => {
+    const summary =
+      "The probe arguments failed the trusted schema at $.center.";
+    const guarded = applyGatewayFailureAuthorityGuard({
+      text: summary,
+      gatewayCallResults: [
+        {
+          ok: false,
+          capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+          gateway_admission: {
+            requested_capability:
+              "com.casimirbot.minecraft.spatial_region.inspect",
+            blocked_reason: "schema_validation_failed",
+          },
+          error: "schema_validation_failed",
+          observation_packet: {
+            status: "failed",
+            observation_summary: summary,
+          },
+        },
+        {
+          ok: true,
+          capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+          gateway_admission: {
+            requested_capability:
+              "com.casimirbot.minecraft.spatial_region.inspect",
+            admission_reason: "admitted",
+          },
+          observation_packet: {
+            status: "succeeded",
+            observation_summary: "Bounded spatial-region probe completed.",
+          },
+        },
+      ] as any,
+    });
+
+    expect(guarded).not.toContain("$.center");
+    expect(guarded).toContain("later observation succeeded");
+    expect(guarded).toContain("remaining bounded action and verification");
+  });
+
+  it("does not supersede a non-retryable environment failure with an unrelated later success", () => {
+    const guarded = applyGatewayFailureAuthorityGuard({
+      text: "Environment answer draft",
+      gatewayCallResults: [
+        {
+          ok: false,
+          capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+          gateway_admission: {
+            requested_capability:
+              "com.casimirbot.minecraft.spatial_region.inspect",
+            blocked_reason: "permission_revoked",
+          },
+          error: "permission_revoked",
+          observation_packet: {
+            status: "blocked",
+            observation_summary: "Permission revoked.",
+          },
+          tool_lifecycle_trace: {
+            retry_recommendation: "ask_user",
+          },
+          tool_followup_decision: {
+            next_action: "ask_user",
+          },
+        },
+        {
+          ok: true,
+          capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+          gateway_admission: {
+            requested_capability:
+              "com.casimirbot.minecraft.spatial_region.inspect",
+            admission_reason: "admitted",
+          },
+          observation_packet: {
+            status: "succeeded",
+            observation_summary:
+              "Bounded spatial-region read-only probe completed.",
+          },
+        },
+      ] as any,
+    });
+
+    expect(guarded).toContain(
+      "Blocked or failed gateway request: com.casimirbot.minecraft.spatial_region.inspect: permission_revoked.",
+    );
+  });
+
   it("explains fail-closed scholarly numeric extraction instead of claiming the tool did not run", () => {
     const guarded = applyGatewayFailureAuthorityGuard({
       text: "All requested tools ran.",

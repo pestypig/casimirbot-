@@ -176,6 +176,12 @@ describe("Minecraft command workstation gateway", () => {
         },
       },
     });
+    expect(environmentCommandMinecraftManifest.description).toContain(
+      "never send a commands array",
+    );
+    expect(environmentCommandMinecraftManifest.description).toContain(
+      "Player-only arguments such as /title require @s",
+    );
     expect(environmentCommandMinecraftManifest.safety_tags).toEqual(
       expect.arrayContaining([
         "live_dispatcher_parse_required",
@@ -208,6 +214,37 @@ describe("Minecraft command workstation gateway", () => {
         eligible_for_current_turn_reentry: false,
         assistant_answer: false,
         terminal_eligible: false,
+      },
+    });
+    expect(listRoomEnvironments).not.toHaveBeenCalled();
+  });
+
+  it("returns a retryable parse failure when the provider batches commands instead of issuing one tool call per command", async () => {
+    const listRoomEnvironments = vi.fn();
+    const result = await executeEnvironmentCommandGatewayCapability({
+      turnId: "ask:command-test:batched-commands",
+      toolCallId: "tool_call:batched-commands",
+      providerExecutionId: "provider_execution:batched-commands",
+      arguments: {
+        commands: [
+          'title DatDamPig title {"text":"HELIX GUIDE ONLINE"}',
+          "playsound minecraft:block.amethyst_block.chime master DatDamPig ~ ~ ~ 1 1 1",
+        ],
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: { listRoomEnvironments },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      error: "command_parse_failed",
+      summary: expect.stringContaining("exactly one command string per tool call"),
+      observation: {
+        outcome: "command_parse_failed",
+        provenance_valid: false,
+        eligible_for_current_turn_reentry: false,
       },
     });
     expect(listRoomEnvironments).not.toHaveBeenCalled();
@@ -289,6 +326,8 @@ describe("Minecraft command workstation gateway", () => {
       command: "time query daytime",
       category: "query",
       effect: "read_only",
+      idempotent_replay: false,
+      physical_execution_performed: true,
     });
     expect(enqueueCommand).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -322,6 +361,8 @@ describe("Minecraft command workstation gateway", () => {
       command: "execute in minecraft:overworld run time query daytime",
       category: "query",
       effect: "read_only",
+      idempotent_replay: false,
+      physical_execution_performed: true,
     });
     expect(enqueueCommand).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -337,7 +378,7 @@ describe("Minecraft command workstation gateway", () => {
       turnId: "ask:command-test:unknown-risk",
       toolCallId: "tool_call:command-unknown-risk",
       providerExecutionId: "provider_execution:command-unknown-risk",
-      arguments: { command: "helixgame ping" },
+      arguments: { command: "some_installed_mod ping" },
       accountContext: accountContext(),
       conversationThreadId: `helix-ask:room:${ROOM_ID}`,
       dependencies: dependencies({ enqueueCommand }),
@@ -420,6 +461,8 @@ describe("Minecraft command workstation gateway", () => {
       command: "whitelist list",
       category: "server_administration",
       effect: "server_administration",
+      idempotent_replay: false,
+      physical_execution_performed: true,
     });
     expect(enqueueCommand).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -428,6 +471,62 @@ describe("Minecraft command workstation gateway", () => {
         expectedEffect: "server_administration",
       }),
     );
+  });
+
+  it("reuses one turn-scoped command request across provider tool-call retries", async () => {
+    const enqueueCommand = vi
+      .fn()
+      .mockImplementationOnce(async (input: { toolCallId: string }) => ({
+        schema: HELIX_ENVIRONMENT_COMMAND_REQUEST_SCHEMA,
+        command_request_id: "command_request:stable-retry",
+        tool_call_id: input.toolCallId,
+        deadline_at: "2026-08-02T12:00:15.000Z",
+      }) as never)
+      .mockImplementationOnce(async () => ({
+        schema: HELIX_ENVIRONMENT_COMMAND_REQUEST_SCHEMA,
+        command_request_id: "command_request:stable-retry",
+        tool_call_id: "tool_call:first-attempt",
+        deadline_at: "2026-08-02T12:00:15.000Z",
+      }) as never);
+    const deps = dependencies({ enqueueCommand });
+    const base = {
+      turnId: "ask:command-test:stable-retry",
+      providerExecutionId: "provider_execution:stable-retry",
+      arguments: { command: "time query daytime" },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps,
+    };
+
+    const first = await executeEnvironmentCommandGatewayCapability({
+      ...base,
+      toolCallId: "tool_call:first-attempt",
+    });
+    const replay = await executeEnvironmentCommandGatewayCapability({
+      ...base,
+      toolCallId: "tool_call:provider-retry",
+    });
+    const firstKey = enqueueCommand.mock.calls[0]?.[0]?.idempotencyKey;
+    const replayKey = enqueueCommand.mock.calls[1]?.[0]?.idempotencyKey;
+
+    expect(firstKey).toBe(replayKey);
+    expect(first).toMatchObject({
+      ok: true,
+      idempotentReplay: false,
+      executedArgs: {
+        idempotent_replay: false,
+        physical_execution_performed: true,
+      },
+    });
+    expect(replay).toMatchObject({
+      ok: true,
+      idempotentReplay: true,
+      summary: expect.stringContaining("did not execute the duplicate"),
+      executedArgs: {
+        idempotent_replay: true,
+        physical_execution_performed: false,
+      },
+    });
   });
 
   it("does not guess when multiple command-enabled environments match", async () => {

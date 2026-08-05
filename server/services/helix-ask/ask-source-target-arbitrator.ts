@@ -76,7 +76,11 @@ import {
   isMinecraftCommandNonExecutionDiscussionPrompt,
   isMinecraftSituationSessionSetupPrompt,
 } from "./minecraft-situation-intent";
-import { extractExplicitCapabilityContracts } from "./explicit-capability-contract";
+import { isMinecraftMechanicsDocsPrompt } from "./minecraft-mechanics-docs-intent";
+import {
+  extractExplicitCapabilityContracts,
+  type ExplicitCapabilityExtractionContext,
+} from "./explicit-capability-contract";
 
 export {
   isStagePlayCheckpointRequestPrompt,
@@ -758,6 +762,7 @@ export function arbitrateAskSourceTarget(input: {
   threadId: string;
   promptText: string;
   activeWorkspaceSourceResolution?: HelixActiveWorkspaceSourceResolution | Record<string, unknown> | null;
+  trustedEnvironmentContext?: ExplicitCapabilityExtractionContext | null;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
   const contextualProcedureRecall =
@@ -805,34 +810,51 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  if (isMinecraftCommandNonExecutionDiscussionPrompt(prompt)) {
+  if (isMinecraftMechanicsDocsPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
-      target: "model_only",
-      targetKind: "general_background",
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
       strength: "hard",
-      explicitCues: ["minecraft_command_non_execution_discussion"],
+      explicitCues: ["minecraft_environment_mechanics_docs_lookup"],
       reasons: [
-        "minecraft_command_non_execution_discussion_is_not_execution",
+        "minecraft_environment_mechanics_docs_source_target",
+        "mechanics_lookup_is_non_mutating_document_evidence",
       ],
-      requestedOutputs: [],
+      requestedOutputs: [
+        "file_path",
+        "line_backed_source",
+        "tool_call_eligibility",
+        "typed_failure",
+      ],
       suppressedRoutes: [
+        "repo_code_evidence_question",
+        "internet_search_lookup",
+        "scholarly_research_lookup",
         "world_event_current_state",
         "live_environment_current_state",
         "workstation_action",
+        "model_only_concept",
+        "no_tool_direct",
       ],
-      precedenceReason:
-        "minecraft_command_non_execution_discussion_is_not_execution",
+      precedenceReason: "minecraft_environment_mechanics_docs_source_target",
       confidence: 0.99,
       allowClientShortcut: false,
-      allowNoToolDirect: true,
+      allowNoToolDirect: false,
     });
   }
   const explicitMinecraftEnvironmentCapabilities =
-    extractExplicitCapabilityContracts(prompt).filter(
+    extractExplicitCapabilityContracts(
+      prompt,
+      input.trustedEnvironmentContext,
+    ).filter(
       ({ capability, contract, source }) =>
-        source === "natural_capability_intent" &&
+        [
+          "natural_capability_intent",
+          "command_mention",
+          "compound_command_chain",
+        ].includes(source) &&
         contract.source_target === "live_environment" &&
         capability.startsWith("com.casimirbot.minecraft."),
     );
@@ -874,6 +896,30 @@ export function arbitrateAskSourceTarget(input: {
       confidence: 0.99,
       allowClientShortcut: false,
       allowNoToolDirect: false,
+    });
+  }
+  if (isMinecraftCommandNonExecutionDiscussionPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "model_only",
+      targetKind: "general_background",
+      strength: "hard",
+      explicitCues: ["minecraft_command_non_execution_discussion"],
+      reasons: [
+        "minecraft_command_non_execution_discussion_is_not_execution",
+      ],
+      requestedOutputs: [],
+      suppressedRoutes: [
+        "world_event_current_state",
+        "live_environment_current_state",
+        "workstation_action",
+      ],
+      precedenceReason:
+        "minecraft_command_non_execution_discussion_is_not_execution",
+      confidence: 0.99,
+      allowClientShortcut: false,
+      allowNoToolDirect: true,
     });
   }
   const evidenceTargetArbitration = buildAskEvidenceTargetArbitration({

@@ -12,7 +12,7 @@ final class FabricCommandClassifier {
         "save-off", "save-on", "stop", "whitelist",
         // Server-originated communication can address arbitrary players and
         // therefore uses the server-administration authority rail.
-        "me", "msg", "say", "tell", "tellraw", "title", "w"
+        "me", "msg", "playsound", "say", "stopsound", "tell", "tellraw", "title", "w"
     );
     private static final Set<String> PLAYER_INVENTORY = Set.of(
         "clear", "give", "item", "loot", "recipe"
@@ -47,6 +47,29 @@ final class FabricCommandClassifier {
         int runIndex = lower.lastIndexOf(" run ");
         if ("execute".equals(root) && runIndex >= 0) {
             return classify(normalized.substring(runIndex + 5));
+        }
+        if ("helixgame".equals(root)) {
+            if (
+                lower.matches("^helixgame\\s+(?:ping|checkpoint\\s+status|fall_rescue\\s+status)(?:\\s|$).*$")
+            ) {
+                return new Classification("query", "read_only");
+            }
+            if (lower.matches("^helixgame\\s+checkpoint\\s+restore(?:\\s|$).*$")) {
+                return new Classification("world_build", "world_mutation");
+            }
+            if (
+                lower.matches("^helixgame\\s+fall_rescue\\s+(?:arm|disarm)(?:\\s|$).*$")
+            ) {
+                return new Classification("world_build", "world_mutation");
+            }
+            if (
+                lower.matches("^helixgame\\s+checkpoint\\s+(?:capture|discard)(?:\\s|$).*$")
+            ) {
+                return new Classification(
+                    "server_administration",
+                    "server_administration"
+                );
+            }
         }
         if ("data".equals(root) && lower.matches("^data\\s+get(?:\\s|$).*$")) {
             return new Classification("query", "read_only");

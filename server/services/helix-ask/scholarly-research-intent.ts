@@ -117,7 +117,9 @@ const canonicalizeScholarlySourceUrl = (sourceUrl: string): string => {
     if (pmid) return `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
     const pmcid = extractScholarlyPmcid(parsed.toString());
     if (pmcid) return `https://pmc.ncbi.nlm.nih.gov/articles/${pmcid}/`;
-    const doi = host === "doi.org" ? extractScholarlyDoi(parsed.toString()) : null;
+    const doi = host === "doi.org"
+      ? trimIdentifier(decodeURIComponent(parsed.pathname).replace(/^\/+/, ""))
+      : null;
     if (doi) return `https://doi.org/${doi}`;
     const arxivId = extractScholarlyArxivId(parsed.toString());
     if (arxivId) {

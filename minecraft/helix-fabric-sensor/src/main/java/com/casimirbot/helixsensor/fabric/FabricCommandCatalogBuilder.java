@@ -41,7 +41,13 @@ final class FabricCommandCatalogBuilder {
             appendNode(nodes, root, root.getName());
             if (nodes.size() >= MAX_NODES) break;
         }
-        for (CommandNode<CommandSourceStack> root : roots) {
+        List<CommandNode<CommandSourceStack>> detailRoots = new ArrayList<>(roots);
+        detailRoots.sort(
+            Comparator.comparingInt((CommandNode<CommandSourceStack> root) ->
+                FabricGameplayCommands.ROOT.equals(root.getName()) ? 0 : 1
+            ).thenComparing(CommandNode::getName)
+        );
+        for (CommandNode<CommandSourceStack> root : detailRoots) {
             appendChildren(nodes, root, root.getName());
             if (nodes.size() >= MAX_NODES) break;
         }

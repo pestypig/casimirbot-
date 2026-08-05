@@ -1043,6 +1043,8 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     buildPromptDerivedLivePipelineControlGatewayCallRequests(input.body);
   const promptNamedRequests =
     buildPromptNamedCapabilityGatewayCallRequests(input.body);
+  const minecraftMechanicsDocs =
+    buildMinecraftMechanicsDocsWorkstationGatewayCallRequests(input.body);
   const structured = buildStructuredAdmissionWorkstationGatewayCallRequests(
     input.body,
   ).map((request) => {
@@ -1135,6 +1137,11 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
       },
     };
   });
+  // Mechanics are evidence for Codex command synthesis, never execution
+  // authority. Put this read-only observation before structured or compound
+  // Minecraft requests so a model cannot author a mutation from an ungrounded
+  // command guess and only discover the playbook afterwards.
+  appendPromptDerivedDedupe(minecraftMechanicsDocs);
   appendDedupe(requests, seen, structured);
   appendPromptDerivedDedupe(promptDerivedLivePipelineControlRequests);
   if (
@@ -1241,9 +1248,6 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   );
   const activeDocsContext =
     buildActiveDocsContextWorkstationGatewayCallRequests(input.body);
-  const minecraftMechanicsDocs =
-    buildMinecraftMechanicsDocsWorkstationGatewayCallRequests(input.body);
-  appendPromptDerivedDedupe(minecraftMechanicsDocs);
   if (hasNamedDocsSearch) {
     appendPromptDerivedDedupe(promptNamedForAppend);
   } else {

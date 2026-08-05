@@ -1047,6 +1047,9 @@ const capabilityObservationArtifact = (
       const genericObservation = /(?:observation|evidence|result|receipt|context|trace|packet|resolution|reflection|registry|summary)/i.test(
         artifactDisplayKind(artifact) ?? "",
       );
+      const artifactStatus = normalize(
+        firstString(artifact.status, artifactPayload(artifact)?.status),
+      );
       let score = 0;
       if (artifactIdentityMismatch) score -= 1_000;
       if (capabilityMatch) score += 100;
@@ -1058,6 +1061,10 @@ const capabilityObservationArtifact = (
         else if (normalizedArtifactKind === "doc_evidence_location") score += 20;
       }
       if (genericObservation) score += 20;
+      if (/^(?:success|succeeded|complete|completed|observed)$/.test(artifactStatus))
+        score += 60;
+      if (/^(?:failed|blocked|rejected|error)$/.test(artifactStatus))
+        score -= 60;
       if (normalizedCapability.startsWith("live_env_") && normalizedArtifactKind === "reasoning_context") score += 140;
       if (ref.includes("agent_runtime")) score += 30;
       if (ref.includes("runtime_tool_call")) score += 25;
@@ -1092,6 +1099,8 @@ const explicitObservationCoverageMode = (capability: string | null): "all" | "an
     normalized === "image_lens_inspect" ||
     normalized === "situation_room_describe_visual_capture" ||
     normalized === "docs_viewer_locate_in_doc" ||
+    normalized === "repo_code_search_concept" ||
+    normalized === "repo_search" ||
     normalized === "scientific_calculator_solve_expression"
   ) {
     return "any";
@@ -1651,6 +1660,20 @@ const buildToolTurnChainAudit = (input: {
         requestedObservationKinds,
       ),
   );
+  const requestedCapabilityObservationArtifact = capabilityObservationArtifact(
+    input.artifacts,
+    requestedCapability,
+    requestedObservationKinds,
+  );
+  const requestedCapabilityObservationProvesExecution = Boolean(
+    requestedCapability &&
+      requestedCapabilityObservationArtifact &&
+      artifactSupportsCapabilityOrUnscopedObservationKind(
+        requestedCapabilityObservationArtifact,
+        requestedCapability,
+        requestedObservationKinds,
+      ),
+  );
   const hasCompatibleCapabilityObservation = input.artifacts.some((artifact) =>
     artifactSupportsCapabilityOrUnscopedObservationKind(
       artifact,
@@ -1743,12 +1766,23 @@ const buildToolTurnChainAudit = (input: {
     compoundCapabilityIsCovered(selectedCapability) &&
     compoundCapabilityIsCovered(executedCapability),
   );
+  const observedMultiStepTransitionAuthorized = Boolean(
+    requestedCapability &&
+      selectedCapability &&
+      executedCapability &&
+      requestedCapabilityObservationProvesExecution &&
+      selectedCapabilityObservationProvesExecution,
+  );
   const requestedSelectedMatch =
-    compoundTransitionAuthorized && requestedCapability && selectedCapability
+    (compoundTransitionAuthorized || observedMultiStepTransitionAuthorized) &&
+    requestedCapability &&
+    selectedCapability
       ? true
       : requestedSelectedDirectMatch;
   const requestedExecutedMatch =
-    compoundTransitionAuthorized && requestedCapability && executedCapability
+    (compoundTransitionAuthorized || observedMultiStepTransitionAuthorized) &&
+    requestedCapability &&
+    executedCapability
       ? true
       : requestedExecutedDirectMatch;
   const selectedExecutedMatch =
@@ -2168,6 +2202,8 @@ const buildToolTurnChainAudit = (input: {
     requested_selected_direct_match: requestedSelectedDirectMatch,
     requested_executed_direct_match: requestedExecutedDirectMatch,
     compound_transition_authorized: compoundTransitionAuthorized,
+    observed_multi_step_transition_authorized:
+      observedMultiStepTransitionAuthorized,
     selected_executed_match: selectedExecutedMatch,
     substitution_rule_applied: Boolean(substitutionRuleId),
     substitution_rule_id: substitutionRuleId,

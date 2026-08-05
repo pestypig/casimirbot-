@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA } from "@shared/helix-agent-step-observation-packet";
-import { buildHelixProviderReasoningReentry } from "../provider-terminal-authority";
+import {
+  buildHelixProviderReasoningReentry,
+  hasSuccessfulLaterRetryForFailedGatewayCapability,
+} from "../provider-terminal-authority";
 
 const buildLanePacket = () => ({
   schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
@@ -649,6 +652,261 @@ const buildCalculatorUnsupportedExpressionResult = () => ({
 });
 
 describe("provider terminal authority for capability lanes", () => {
+  it("authorizes a provider synthesis after a retryable gateway schema failure is superseded by a successful retry", () => {
+    const turnId = "turn-minecraft-repaired-probe-authority";
+    const capability = "com.casimirbot.minecraft.hazards.scan";
+    const failedPacket = {
+      ...buildLanePacket(),
+      turn_id: turnId,
+      call_id: `${turnId}:gateway:hazards-scan:1`,
+      decision_id: `${turnId}:gateway:hazards-scan:1:decision`,
+      capability_key: capability,
+      status: "failed" as const,
+      produced_artifact_refs: [`${turnId}:hazards-scan:failed`],
+      observation_summary:
+        "The probe arguments failed the trusted schema at $.purpose.",
+    };
+    const succeededPacket = {
+      ...buildLanePacket(),
+      turn_id: turnId,
+      call_id: `${turnId}:gateway:hazards-scan:2`,
+      decision_id: `${turnId}:gateway:hazards-scan:2:decision`,
+      capability_key: capability,
+      status: "succeeded" as const,
+      produced_artifact_refs: [`${turnId}:hazards-scan:succeeded`],
+      observation_summary:
+        "Fresh fire-safety observation found one safe fireplace candidate.",
+    };
+    const failedResult = {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: "test",
+      ok: false,
+      agent_runtime: "codex",
+      capability_id: capability,
+      mode: "read",
+      gateway_admission: {
+        requested_capability: capability,
+        admission_status: "admitted",
+        blocked_reason: "schema_validation_failed",
+      },
+      observation_packet: failedPacket,
+      observation: { error_code: "schema_validation_failed" },
+      artifact_refs: failedPacket.produced_artifact_refs,
+      tool_followup_decision: { next_action: "retry" },
+      error: "schema_validation_failed",
+    };
+    const succeededResult = {
+      ...failedResult,
+      ok: true,
+      gateway_admission: {
+        requested_capability: capability,
+        admission_status: "admitted",
+      },
+      observation_packet: succeededPacket,
+      observation: {
+        safe_fireplace_candidates: [
+          {
+            fire_cell: { x: -50, y: 68, z: -2 },
+            safe_candidate: true,
+          },
+        ],
+      },
+      artifact_refs: succeededPacket.produced_artifact_refs,
+      tool_followup_decision: { next_action: "finish" },
+      error: undefined,
+    };
+
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId,
+      threadId: "thread-minecraft-repaired-probe-authority",
+      route: "/ask/turn",
+      gatewayCallResults: [failedResult as never, succeededResult as never],
+      normalizedObservationPackets: [
+        failedPacket as never,
+        succeededPacket as never,
+      ],
+      providerText:
+        "The fresh observation identifies (-50, 68, -2) as a safe fireplace candidate.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+      currentTurnEvidenceRequired: true,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "completed",
+      evidence_reentered: true,
+      current_turn_observation_present: true,
+    });
+    expect(result.providerTerminalAuthorityBridge).toMatchObject({
+      all_gateway_calls_succeeded: true,
+      all_observations_reentry_compatible: true,
+      normalized_observations_ready: true,
+      terminal_authority_granted: true,
+    });
+    expect(result.terminalAnswerAuthority).toMatchObject({
+      terminal_kind: "answer",
+      final_answer_source: "agent_provider_terminal_candidate",
+    });
+
+    const reverseProjectedResult = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId,
+      threadId: "thread-minecraft-repaired-probe-authority",
+      route: "/ask/turn",
+      gatewayCallResults: [succeededResult as never, failedResult as never],
+      capabilityLaneObservationPackets: [failedPacket as never],
+      normalizedObservationPackets: [
+        succeededPacket as never,
+        failedPacket as never,
+        failedPacket as never,
+      ],
+      providerText:
+        "The fresh observation identifies (-50, 68, -2) as a safe fireplace candidate.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+      currentTurnEvidenceRequired: true,
+    });
+
+    expect(reverseProjectedResult.providerReasoningReentry).toMatchObject({
+      status: "completed",
+      evidence_reentered: true,
+      capability_lane_observation_packet_count: 0,
+    });
+    expect(reverseProjectedResult.providerTerminalAuthorityBridge).toMatchObject(
+      {
+        all_gateway_calls_succeeded: true,
+        all_capability_lane_observations_reentry_compatible: true,
+        all_observations_reentry_compatible: true,
+        terminal_authority_granted: true,
+      },
+    );
+  });
+
+  it("authorizes a verified later read after an ineligible earlier observation without weakening write failures", () => {
+    const capability = "com.casimirbot.minecraft.spatial_region.inspect";
+    const failed = {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: "test",
+      ok: false,
+      agent_runtime: "codex",
+      capability_id: capability,
+      mode: "verify",
+      gateway_admission: {
+        requested_capability: capability,
+        admission_status: "admitted",
+      },
+      observation_packet: {
+        ...buildLanePacket(),
+        capability_key: capability,
+        status: "failed",
+        produced_artifact_refs: ["ask:minecraft:spatial:stale"],
+        observation_summary:
+          "The authentic observation was not eligible for current-turn re-entry.",
+      },
+      observation: { error_code: "current_turn_reentry_ineligible" },
+      artifact_refs: ["ask:minecraft:spatial:stale"],
+      tool_followup_decision: { next_action: "finish" },
+      error: "current_turn_reentry_ineligible",
+    };
+    const succeeded = {
+      ...failed,
+      ok: true,
+      observation_packet: {
+        ...failed.observation_packet,
+        status: "succeeded",
+        produced_artifact_refs: ["ask:minecraft:spatial:fresh"],
+        observation_summary:
+          "Fresh structure verification observed one matching fire block.",
+      },
+      observation: {
+        status: "succeeded",
+        total_cells: 1,
+        matched_cells: 1,
+        mismatched_cells: 0,
+      },
+      artifact_refs: ["ask:minecraft:spatial:fresh"],
+      error: undefined,
+    };
+
+    expect(
+      hasSuccessfulLaterRetryForFailedGatewayCapability(
+        [failed as never, succeeded as never],
+        0,
+      ),
+    ).toBe(true);
+    expect(
+      hasSuccessfulLaterRetryForFailedGatewayCapability(
+        [failed as never],
+        0,
+      ),
+    ).toBe(false);
+    expect(
+      hasSuccessfulLaterRetryForFailedGatewayCapability(
+        [
+          failed as never,
+          {
+            ...succeeded,
+            capability_id: "com.casimirbot.minecraft.player_state.inspect",
+            gateway_admission: {
+              ...succeeded.gateway_admission,
+              requested_capability:
+                "com.casimirbot.minecraft.player_state.inspect",
+            },
+          } as never,
+        ],
+        0,
+      ),
+    ).toBe(false);
+    expect(
+      hasSuccessfulLaterRetryForFailedGatewayCapability(
+        [
+          { ...failed, mode: "act" } as never,
+          { ...succeeded, mode: "act" } as never,
+        ],
+        0,
+      ),
+    ).toBe(false);
+    expect(
+      hasSuccessfulLaterRetryForFailedGatewayCapability(
+        [succeeded as never, failed as never],
+        1,
+      ),
+    ).toBe(false);
+
+    const authority = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-minecraft-current-reentry-repaired",
+      threadId: "thread-minecraft-current-reentry-repaired",
+      route: "/ask/turn",
+      gatewayCallResults: [failed as never, succeeded as never],
+      normalizedObservationPackets: [
+        failed.observation_packet as never,
+        succeeded.observation_packet as never,
+      ],
+      providerText:
+        "Fresh verification confirmed the one requested cell is minecraft:fire.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+      currentTurnEvidenceRequired: true,
+    });
+
+    expect(authority.providerTerminalAuthorityBridge).toMatchObject({
+      all_gateway_calls_succeeded: true,
+      terminal_authority_granted: true,
+    });
+    expect(authority.terminalAnswerAuthority).toMatchObject({
+      terminal_kind: "answer",
+      final_answer_source: "agent_provider_terminal_candidate",
+    });
+  });
+
   it("allows model-only direct provider text without observation evidence when the route contract permits it", () => {
     const result = buildHelixProviderReasoningReentry({
       runtime: "codex",

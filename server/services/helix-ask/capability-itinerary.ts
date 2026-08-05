@@ -19,8 +19,12 @@ import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-
 import {
   buildHelixCompoundCapabilityContract,
   buildHelixSingleCapabilityContractFromAdmission,
+  prependHelixRequiredGroundingCapability,
 } from "./compound-capability-contract";
-import type { ExplicitCapabilityContract } from "./explicit-capability-contract";
+import type {
+  ExplicitCapabilityContract,
+  ExplicitCapabilityExtractionContext,
+} from "./explicit-capability-contract";
 import { isAskTurnCapabilityHelpIntent } from "./capability-catalog-intent";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
@@ -407,16 +411,22 @@ export function buildHelixCapabilityItinerary(input: {
   availableCapabilities?: unknown;
   exactAdmittedCapabilityContract?: ExplicitCapabilityContract | null;
   exactAdmittedCapabilityArgs?: RecordLike | null;
+  trustedEnvironmentContext?: ExplicitCapabilityExtractionContext | null;
+  requiredPolicyGrounding?: Array<{
+    contract: ExplicitCapabilityContract;
+    argsHint: RecordLike;
+  }>;
 }): HelixCapabilityItinerary {
   const admission = readRecord(input.toolCallAdmissionDecision);
   const capabilityHelpIntent = isAskTurnCapabilityHelpIntent(input.promptText);
   const capabilityHelpHasSeparateAction = /[?!.]\s*(?:then\s+)?(?:use|call|run|open|inspect|search|create|append|set|start|stop)\b/i.test(
     input.promptText,
   );
-  const candidateCompoundCapabilityContract =
+  const baseCompoundCapabilityContract =
     buildHelixCompoundCapabilityContract({
       turnId: input.turnId,
       promptText: input.promptText,
+      trustedEnvironmentContext: input.trustedEnvironmentContext,
     }) ??
     (input.exactAdmittedCapabilityContract
       ? buildHelixSingleCapabilityContractFromAdmission({
@@ -426,6 +436,20 @@ export function buildHelixCapabilityItinerary(input: {
           argsHint: input.exactAdmittedCapabilityArgs,
         })
       : null);
+  const candidateCompoundCapabilityContract =
+    baseCompoundCapabilityContract && input.requiredPolicyGrounding
+      ? input.requiredPolicyGrounding.reduce(
+          (contract, grounding) =>
+            prependHelixRequiredGroundingCapability({
+              turnId: input.turnId,
+              promptText: input.promptText,
+              compoundContract: contract,
+              groundingContract: grounding.contract,
+              argsHint: grounding.argsHint,
+            }),
+          baseCompoundCapabilityContract,
+        )
+      : baseCompoundCapabilityContract;
   const candidateCompoundSubgoals = Array.isArray(candidateCompoundCapabilityContract?.subgoals)
     ? candidateCompoundCapabilityContract.subgoals
     : [];

@@ -315,6 +315,9 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
     readRecord(input.payload.compound_capability_contract) ??
     readRecord(itinerary?.compound_capability_contract) ??
     artifactPayloadByKind(artifacts, "compound_capability_contract");
+  const occurrenceAwareContract =
+    readString(contract?.subgoal_identity_policy) ===
+    "provider_call_occurrence";
   const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
   const itineraryRequiresSynthesis = terminalCriteria?.requires_post_observation_synthesis === true;
   const subgoals = readArray(contract?.subgoals);
@@ -350,7 +353,10 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
     const requestedCapability = readString(subgoal.requested_capability);
     const runtimeCapability = readString(subgoal.runtime_capability);
     return compoundRows.some((row) => {
-      if (subgoalId && readString(row.subgoal_id) === subgoalId) return true;
+      if (subgoalId) {
+        if (readString(row.subgoal_id) === subgoalId) return true;
+        if (occurrenceAwareContract) return false;
+      }
       const rowCapabilities = [
         readString(row.requested_capability),
         readString(row.runtime_capability),
@@ -369,7 +375,10 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
     const runtimeCapability = readString(subgoal.runtime_capability);
     return compoundRows.some((row) => {
       if (!ledgerEntryHasSatisfiedObservation(row)) return false;
-      if (subgoalId && readString(row.subgoal_id) === subgoalId) return true;
+      if (subgoalId) {
+        if (readString(row.subgoal_id) === subgoalId) return true;
+        if (occurrenceAwareContract) return false;
+      }
       const rowCapabilities = [
         readString(row.requested_capability),
         readString(row.runtime_capability),
@@ -453,9 +462,14 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
     requiredFamilies.join(" "),
   ].join(" ");
   const hasDocsSubgoal =
-    /docs-viewer\.(?:locate_in_doc|summarize_doc|search_docs|doc_equation_context)|doc_equation_context/i.test([
+    /docs(?:-viewer)?\.(?:locate_in_doc|summarize_doc|search_docs|search|open_doc|doc_equation_context)|doc_equation_context/i.test([
       combinedCapabilityText,
     ].join(" "));
+  const hasLiveEnvironmentSubgoal =
+    /\blive_environment\b|\benvironment[.-](?:minecraft|probe|command|mechanics)|\bcom\.casimirbot\.minecraft\.|\bminecraft\b/i.test(
+      combinedCapabilityText,
+    );
+  const docsDominantTerminal = hasDocsSubgoal && !hasLiveEnvironmentSubgoal;
   const hasCalculatorSubgoal = /scientific-calculator\.solve_expression|\bcalculator\b/i.test(combinedCapabilityText);
   const hasTheoryLocatorSubgoal = /theory_locator|helix_ask\.reflect_theory_context|theory_context_reflection/i.test(combinedCapabilityText);
   const hasResearchSourceSubgoal =
@@ -463,14 +477,14 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
   const hasResearchLocatorSubgoal =
     hasResearchSourceSubgoal && hasTheoryLocatorSubgoal && !hasDocsSubgoal && !hasCalculatorSubgoal;
   const requiredTerminalKind = applies
-    ? hasDocsSubgoal
+    ? docsDominantTerminal
       ? "doc_evidence_synthesis_answer"
       : hasResearchLocatorSubgoal
         ? "compound_research_locator_answer"
         : "compound_evidence_synthesis_answer"
     : undefined;
   const synthesisTerminalKind = complete
-    ? hasDocsSubgoal
+    ? docsDominantTerminal
       ? "doc_evidence_synthesis_answer"
       : hasResearchLocatorSubgoal
         ? "compound_research_locator_answer"
@@ -501,7 +515,7 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
     terminal_contribution_kinds: allTerminalContributionKinds,
     synthesis_terminal_kind: synthesisTerminalKind,
     goal_kind: applies
-      ? hasDocsSubgoal
+      ? docsDominantTerminal
         ? "doc_evidence_synthesis"
         : hasResearchLocatorSubgoal
           ? "compound_research_locator"

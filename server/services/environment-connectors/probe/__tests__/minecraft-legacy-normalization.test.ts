@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY } from "@shared/helix-environment-connector";
 import {
   HELIX_ENVIRONMENT_PROBE_RESULT_SCHEMA,
   type HelixEnvironmentProbeResult,
   type HelixEnvironmentProbeType,
 } from "@shared/helix-environment-probe";
+import { validateEnvironmentConnectorSchemaValue } from "../../conformance";
+import { readEnvironmentConnectorCapabilityDescriptor } from "../../catalog";
 import {
   normalizeLegacyEnvironmentProbeResultForTests,
   outcomeForLegacyEnvironmentProbeResultForTests,
@@ -180,6 +183,70 @@ describe("Minecraft legacy probe normalization", () => {
       },
     ],
     [
+      "spatial_region",
+      {
+        confidence: 0.99,
+        details: {
+          purpose: "fire_safety",
+          center: { x: 10, y: 64, z: -4 },
+          horizontal_radius: 1,
+          vertical_radius: 1,
+          sample_count: 27,
+          bounds: {
+            min: { x: 9, y: 63, z: -5 },
+            max: { x: 11, y: 65, z: -3 },
+          },
+          palette: [{ block: "minecraft:stone_bricks", count: 26 }],
+          columns: [
+            {
+              x: 10,
+              z: -4,
+              runs: [
+                {
+                  y_start: 63,
+                  y_end: 65,
+                  block: "minecraft:stone_bricks",
+                  flags: ["solid"],
+                },
+              ],
+            },
+          ],
+          anchors: [
+            {
+              kind: "hearth_base",
+              block: "minecraft:netherrack",
+              position: { x: 10, y: 63, z: -4 },
+            },
+          ],
+          fireplace_candidates: [
+            {
+              base_position: { x: 10, y: 63, z: -4 },
+              fire_position: { x: 10, y: 64, z: -4 },
+              base_block: "minecraft:netherrack",
+              flammable_within_two: 0,
+              solid_nonflammable_enclosure: 4,
+              replaceable_fire_cell: true,
+              safe_candidate: true,
+            },
+          ],
+        },
+      },
+      {
+        purpose: "fire_safety",
+        center: { x: 10, y: 64, z: -4 },
+        horizontal_radius: 1,
+        vertical_radius: 1,
+        sample_count: 27,
+        bounds: {
+          min: { x: 9, y: 63, z: -5 },
+          max: { x: 11, y: 65, z: -3 },
+        },
+        fireplace_candidates: [
+          expect.objectContaining({ safe_candidate: true }),
+        ],
+      },
+    ],
+    [
       "line_of_sight",
       { line_of_sight: true, distance_blocks: 9.5, confidence: 0.85 },
       { line_of_sight: true, distance_blocks: 9.5 },
@@ -240,4 +307,229 @@ describe("Minecraft legacy probe normalization", () => {
       });
     },
   );
+
+  it("expands the bounded Fabric spatial wire encoding into trusted model evidence", () => {
+    const normalized = normalizeLegacyEnvironmentProbeResultForTests(
+      result("spatial_region", {
+        confidence: 0.95,
+        details: {
+          purpose: "structure_planning",
+          center: { x: 10, y: 64, z: -4 },
+          horizontal_radius: 1,
+          vertical_radius: 1,
+          requested_length: 5,
+          requested_height: 3,
+          requested_orientation: "north_south",
+          requested_relative_side: "west",
+          sample_count: 27,
+          bounds: {
+            min: { x: 9, y: 63, z: -5 },
+            max: { x: 11, y: 65, z: -3 },
+          },
+          palette: [
+            { block: "minecraft:stone_bricks", count: 18 },
+            { block: "minecraft:air", count: 9 },
+          ],
+          palette_complete: true,
+          column_encoding: "relative_xz_relative_y_palette_flags_v1",
+          columns: [
+            {
+              offset: [0, 0],
+              runs: [
+                { y: [-1, 0], p: 0, f: 4 },
+                { y: [1, 1], p: 1, f: 17 },
+              ],
+            },
+          ],
+          columns_complete: false,
+          retained_column_count: 1,
+          omitted_column_count: 8,
+          omitted_run_count: 2,
+          omitted_palette_block_types: 0,
+          wire_details_json_bytes: 1_024,
+          anchors: [],
+          anchors_complete: true,
+          retained_anchor_count: 0,
+          omitted_anchor_count: 0,
+          fireplace_candidates: [],
+          fireplace_candidates_complete: false,
+          retained_fireplace_candidate_count: 0,
+          omitted_fireplace_candidate_count: 2,
+          build_line_candidates: [
+            {
+              orientation: "north_south",
+              relative_side: "west",
+              from: { x: 7, y: 64, z: -6 },
+              to: { x: 7, y: 64, z: -2 },
+              length: 5,
+              minimum_clear_height: 4,
+              minimum_actor_distance: 3,
+              nearest_anchor_distance: 5,
+              ground_blocks: ["minecraft:grass_block"],
+              target_cells_replaceable: true,
+              target_cells_air: true,
+              ground_solid_nonhazardous: true,
+              fluid_cells: 0,
+              flammable_cells: 0,
+              block_entity_cells: 0,
+              safe_candidate: true,
+            },
+          ],
+          build_line_candidates_complete: true,
+          retained_build_line_candidate_count: 1,
+          omitted_build_line_candidate_count: 0,
+        },
+      }),
+    );
+
+    expect(normalized).toMatchObject({
+      column_encoding: "expanded_relative_xz_relative_y_palette_flags_v1",
+      columns_complete: false,
+      palette_complete: true,
+      retained_column_count: 1,
+      omitted_column_count: 8,
+      omitted_run_count: 2,
+      wire_details_json_bytes: 1_024,
+      anchors_complete: true,
+      retained_anchor_count: 0,
+      omitted_anchor_count: 0,
+      fireplace_candidates_complete: false,
+      retained_fireplace_candidate_count: 0,
+      omitted_fireplace_candidate_count: 2,
+      retained_build_line_candidate_count: 1,
+      omitted_build_line_candidate_count: 0,
+      build_line_candidates_complete: true,
+      requested_length: 5,
+      requested_height: 3,
+      requested_orientation: "north_south",
+      requested_relative_side: "west",
+      build_line_candidates: [
+        expect.objectContaining({
+          orientation: "north_south",
+          relative_side: "west",
+          length: 5,
+          target_cells_air: true,
+          safe_candidate: true,
+        }),
+      ],
+      columns: [
+        {
+          x: 10,
+          z: -4,
+          runs: [
+            {
+              y_start: 63,
+              y_end: 64,
+              block: "minecraft:stone_bricks",
+              flags: ["solid"],
+            },
+            {
+              y_start: 65,
+              y_end: 65,
+              block: "minecraft:air",
+              flags: ["air", "replaceable"],
+            },
+          ],
+        },
+      ],
+    });
+    const descriptor = readEnvironmentConnectorCapabilityDescriptor(
+      HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    );
+    expect(descriptor).not.toBeNull();
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        descriptor!.output_schema,
+        normalized,
+      ),
+    ).toEqual([]);
+  });
+
+  it("normalizes exact geometry verification and recomputes terminal match flags", () => {
+    const spatialDetails = {
+      purpose: "structure_verification",
+      center: { x: -39, y: 68, z: -12 },
+      horizontal_radius: 7,
+      vertical_radius: 8,
+      sample_count: 3_825,
+      bounds: {
+        min: { x: -46, y: 60, z: -19 },
+        max: { x: -32, y: 76, z: -5 },
+      },
+      palette: [{ block: "minecraft:stone_bricks", count: 15 }],
+      palette_complete: true,
+      column_encoding: "relative_xz_relative_y_palette_flags_v1",
+      columns: [],
+      columns_complete: true,
+      retained_column_count: 0,
+      omitted_column_count: 0,
+      omitted_run_count: 0,
+      omitted_palette_block_types: 0,
+      wire_details_json_bytes: 2_000,
+      anchors: [],
+      anchors_complete: true,
+      retained_anchor_count: 0,
+      omitted_anchor_count: 0,
+      fireplace_candidates: [],
+      fireplace_candidates_complete: true,
+      retained_fireplace_candidate_count: 0,
+      omitted_fireplace_candidate_count: 0,
+      build_line_candidates: [],
+      build_line_candidates_complete: true,
+      retained_build_line_candidate_count: 0,
+      omitted_build_line_candidate_count: 0,
+      target_geometry_verification: {
+        from: { x: -46, y: 69, z: -16 },
+        to: { x: -42, y: 71, z: -16 },
+        expected_block: "minecraft:stone_bricks",
+        total_cells: 15,
+        sampled_cells: 15,
+        matching_cells: 15,
+        mismatched_cells: 0,
+        unobserved_cells: 0,
+        mismatch_samples: [],
+        within_survey_bounds: true,
+        complete: true,
+        all_match: true,
+      },
+    };
+    const normalized = normalizeLegacyEnvironmentProbeResultForTests(
+      result("spatial_region", {
+        confidence: 0.95,
+        details: spatialDetails,
+      }),
+    );
+
+    expect(normalized.target_geometry_verification).toEqual(
+      expect.objectContaining({
+        total_cells: 15,
+        matching_cells: 15,
+        complete: true,
+        all_match: true,
+      }),
+    );
+    const descriptor = readEnvironmentConnectorCapabilityDescriptor(
+      HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    );
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        descriptor!.output_schema,
+        normalized,
+      ),
+    ).toEqual([]);
+
+    const inconsistent = normalizeLegacyEnvironmentProbeResultForTests(
+      result("spatial_region", {
+        confidence: 0.95,
+        details: {
+          ...spatialDetails,
+          target_geometry_verification: {
+            ...spatialDetails.target_geometry_verification,
+            matching_cells: 14,
+          },
+        },
+      }),
+    );
+    expect(inconsistent).not.toHaveProperty("target_geometry_verification");
+  });
 });

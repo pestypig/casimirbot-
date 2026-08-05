@@ -77,6 +77,8 @@ export type HelixToolCallAdmissionDecision = {
   forbidden_routes: string[];
   forbidden_tools?: string[];
   forbidden_tool_families?: string[];
+  exclusive_tool_capabilities?: string[];
+  requested_tool_cardinality?: number | null;
   operational_constraints_ref?: string;
   required_surface?: string | null;
   reason: string;

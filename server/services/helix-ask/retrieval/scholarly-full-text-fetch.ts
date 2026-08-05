@@ -14,6 +14,10 @@ import {
   type HelixScholarlyPdfVisualCandidate,
 } from "@shared/helix-scholarly-research-observation";
 import { runScholarlyResearchLookup } from "./scholarly-research-lookup";
+import {
+  buildEvidenceUnitsFromText,
+  selectEvidencePassages,
+} from "./evidence-passage-selection";
 import { saveResearchLibraryExtraction } from "../../helix-account/research-library-store";
 import { normalizeScholarlyFullTextSourceUrl } from "../scholarly-research-intent";
 
@@ -373,11 +377,15 @@ export const extractPdfTextWithPdfJs: ScholarlyPdfTextExtractor = async (bytes, 
       const text = content.items
         .map((item: { str?: string; hasEOL?: boolean }) => {
           const value = typeof item.str === "string" ? item.str : "";
-          return item.hasEOL ? `${value}\n` : value;
+          return item.hasEOL ? `${value}\n` : `${value} `;
         })
         .filter(Boolean)
-        .join(" ");
-      pages.push({ page: pageNum, text: normalizeWhitespace(text) });
+        .join("")
+        .replace(/[^\S\n]+/g, " ")
+        .replace(/ *\n */g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+      pages.push({ page: pageNum, text });
     }
   } finally {
     await doc.cleanup();
@@ -474,41 +482,35 @@ const selectChunks = (input: {
   maxChunks: number;
   sourcePdfRef?: string;
 }): HelixScholarlyFullTextChunk[] => {
-  const queryTokens = tokenize([input.query, input.paper?.title ?? "", input.paper?.abstract ?? ""].join(" "));
-  const exactQueryPhrases = quotedQueryPhrases(input.query);
-  const scored = buildPageChunks(input.pages).map((chunk: ReturnType<typeof buildPageChunks>[number], index: number) => {
-    const exactPhraseHits = exactQueryPhraseHits(chunk.text, exactQueryPhrases);
-    return {
-      chunk,
-      index,
-      exactPhraseHits,
-      score: scoreChunk(chunk.text, queryTokens, exactPhraseHits),
-    };
+  const sourceRef = input.sourcePdfRef ?? "artifact://scholarly-source";
+  const passages = selectEvidencePassages({
+    units: input.pages.flatMap((page) =>
+      buildEvidenceUnitsFromText({ text: page.text, page: page.page })
+    ),
+    query: input.query,
+    source_ref: sourceRef,
+    title: input.paper?.title ?? "Research paper",
+    max_passages: input.maxChunks,
+    max_chars: 1400,
   });
-  const ranked = scored
-    .sort((left: typeof scored[number], right: typeof scored[number]) =>
-      right.exactPhraseHits - left.exactPhraseHits ||
-      right.score - left.score ||
-      left.chunk.page - right.chunk.page ||
-      left.index - right.index
-    )
-    .slice(0, input.maxChunks);
-  return ranked.map(({ chunk, score }: typeof ranked[number], index: number) => {
-    const sourceTextRef = `${input.sourcePdfRef ?? "artifact://scholarly-source"}/page/${chunk.page}#text`;
-    const citationRef = `${input.paper?.result_id ?? "paper"}#page=${chunk.page}`;
+  return passages.map((passage) => {
     return {
-      chunk_id: `scholarly-full-text-chunk:${hashShort([input.paper?.result_id, chunk.page, chunk.charStart, chunk.text])}`,
+      chunk_id: passage.passage_id,
       ...(input.paper?.result_id ? { paper_result_id: input.paper.result_id } : {}),
       ...(input.paper?.title ? { title: input.paper.title } : {}),
-      page_start: chunk.page,
-      page_end: chunk.page,
-      ...(inferSectionHint(chunk.text) ? { section_hint: inferSectionHint(chunk.text) } : {}),
-      text_excerpt: compactExcerpt(chunk.text, index === 0 ? 1400 : 1100),
-      relevance_score: score,
-      citation_ref: citationRef,
-      source_text_ref: sourceTextRef,
-      char_start: chunk.charStart,
-      char_end: chunk.charEnd,
+      page_start: passage.page ?? 1,
+      page_end: passage.page ?? 1,
+      ...(passage.section ? { section_hint: passage.section } : {}),
+      text_excerpt: compactExcerpt(passage.text, 1400),
+      relevance_score: passage.relevance_score,
+      citation_ref: passage.citation_ref,
+      citation_label: passage.citation_label,
+      source_text_ref: passage.citation_ref,
+      char_start: passage.char_start,
+      char_end: passage.char_end,
+      ...(passage.line_start ? { line_start: passage.line_start } : {}),
+      ...(passage.line_end ? { line_end: passage.line_end } : {}),
+      matched_terms: passage.matched_terms,
     };
   });
 };
@@ -979,6 +981,27 @@ export async function runScholarlyFullTextFetch(
     pages_parsed: pages.length,
     page_text_refs: pageTextRefs,
     selected_chunks: selectedChunks,
+    citation_packet: {
+      schema: "helix.scholarly_citation_packet.v1",
+      source: {
+        ...(paper?.title ? { title: paper.title } : {}),
+        ...(sourceUrl ? { url: sourceUrl } : {}),
+        ...(paper?.result_id ? { paper_result_id: paper.result_id } : {}),
+        ...(cacheIntegrityHash ? { integrity_hash: cacheIntegrityHash } : {}),
+      },
+      passages: selectedChunks.map((chunk) => ({
+        passage_id: chunk.chunk_id,
+        quote: chunk.text_excerpt,
+        citation_ref: chunk.citation_ref,
+        citation_label: chunk.citation_label ?? `${paper?.title ?? "Research paper"}, p. ${chunk.page_start}`,
+        page: chunk.page_start,
+        ...(chunk.section_hint ? { section: chunk.section_hint } : {}),
+        matched_terms: chunk.matched_terms ?? [],
+      })),
+      citation_instruction: "cite_claims_with_passage_labels",
+      assistant_answer: false,
+      raw_content_included: false,
+    },
     visual_candidates: visualCandidates,
     evidence_state: evidenceState,
     next_affordances: evidenceState === "full_text_usable" ? [] : nextAffordances,

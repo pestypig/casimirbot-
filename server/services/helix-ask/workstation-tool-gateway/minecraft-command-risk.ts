@@ -16,7 +16,7 @@ const SERVER_ADMIN_ROOTS = new Set([
   // Server-originated communication is intentionally authority-scoped as
   // administration. It can address arbitrary players and must not fall
   // through to the unknown/mod-command category.
-  "me", "msg", "say", "tell", "tellraw", "title", "w",
+  "me", "msg", "playsound", "say", "stopsound", "tell", "tellraw", "title", "w",
 ]);
 const PLAYER_INVENTORY_ROOTS = new Set(["clear", "give", "item", "loot", "recipe"]);
 const PLAYER_MOVEMENT_ROOTS = new Set(["return", "spawnpoint", "spreadplayers", "teleport", "tp"]);
@@ -34,6 +34,27 @@ const WORLD_BUILD_ROOTS = new Set([
 const ENTITY_CONTROL_ROOTS = new Set([
   "bossbar", "ride", "summon", "tag", "team", "teammsg", "tm",
 ]);
+
+const classifyKnownHelixGameplayCommand = (
+  command: string,
+): MinecraftCommandRiskDeclaration | null => {
+  if (/^helixgame\s+(?:ping|checkpoint\s+status|fall_rescue\s+status)(?:\s|$)/u.test(command)) {
+    return { category: "query", effect: "read_only" };
+  }
+  if (/^helixgame\s+checkpoint\s+restore(?:\s|$)/u.test(command)) {
+    return { category: "world_build", effect: "world_mutation" };
+  }
+  if (/^helixgame\s+fall_rescue\s+(?:arm|disarm)(?:\s|$)/u.test(command)) {
+    return { category: "world_build", effect: "world_mutation" };
+  }
+  if (/^helixgame\s+checkpoint\s+(?:capture|discard)(?:\s|$)/u.test(command)) {
+    return {
+      category: "server_administration",
+      effect: "server_administration",
+    };
+  }
+  return null;
+};
 
 /**
  * Canonicalize only syntactically unambiguous vanilla read forms. This is a
@@ -53,6 +74,8 @@ export const classifyKnownMinecraftReadOnlyCommand = (
       command.slice(runIndex + " run ".length),
     );
   }
+  const helixGameplay = classifyKnownHelixGameplayCommand(command);
+  if (helixGameplay?.effect === "read_only") return helixGameplay;
   const readOnly =
     /^time\s+query(?:\s|$)/u.test(command) ||
     /^gamerule\s+\S+$/u.test(command) ||
@@ -85,6 +108,8 @@ export const classifyKnownMinecraftCommand = (
   if (root === "execute" && runIndex >= 0) {
     return classifyKnownMinecraftCommand(command.slice(runIndex + " run ".length));
   }
+  const helixGameplay = classifyKnownHelixGameplayCommand(command);
+  if (helixGameplay) return helixGameplay;
   const readOnly = classifyKnownMinecraftReadOnlyCommand(command);
   if (readOnly) return readOnly;
   if (SERVER_ADMIN_ROOTS.has(root)) {

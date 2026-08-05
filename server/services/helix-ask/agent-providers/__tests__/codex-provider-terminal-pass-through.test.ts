@@ -7,6 +7,7 @@ import {
   compactPostToolRecoveryModelValue,
   genericCurrentTurnToolRecoveryReadyForSolver,
   missingTheoryReferentGuardApplies,
+  mergeUniqueGatewayCallResults,
   providerGatewayEvidenceReadyForSolver,
   settleCompletedItineraryContinuationForPostToolSynthesis,
 } from "../codex-provider";
@@ -189,6 +190,149 @@ const buildCalculatorUnsupportedExpressionResult = () => ({
 });
 
 describe("Codex provider terminal pass-through", () => {
+  it("retains a later successful retry when a gateway reuses the call id", () => {
+    const failed = {
+      ok: false,
+      capability_id: "com.casimirbot.minecraft.hazards.scan",
+      mode: "read",
+      gateway_admission: {
+        requested_capability: "com.casimirbot.minecraft.hazards.scan",
+        admission_reason: "environment_probe_requested",
+        blocked_reason: "schema_validation_failed",
+      },
+      observation_packet: {
+        call_id: "turn:test:hazards.scan:call",
+        status: "failed",
+        produced_artifact_refs: [],
+        observation_summary:
+          "The probe arguments failed the trusted schema at $.purpose.",
+      },
+      observation: {
+        status: "failed",
+        error_code: "schema_validation_failed",
+      },
+      artifact_refs: [],
+      tool_lifecycle_trace: {
+        retry_recommendation: "retry_same_tool",
+      },
+      tool_followup_decision: {
+        next_action: "retry",
+      },
+      error: "schema_validation_failed",
+    };
+    const succeeded = {
+      ok: true,
+      capability_id: "com.casimirbot.minecraft.hazards.scan",
+      mode: "read",
+      gateway_admission: {
+        requested_capability: "com.casimirbot.minecraft.hazards.scan",
+        admission_reason: "environment_probe_requested",
+        blocked_reason: null,
+      },
+      observation_packet: {
+        call_id: "turn:test:hazards.scan:call",
+        status: "succeeded",
+        produced_artifact_refs: ["ask:test:hazards:success"],
+        observation_summary: "Hazard check read-only probe completed.",
+      },
+      observation: {
+        status: "succeeded",
+        probe_type: "fire_safety",
+        safe_fireplace_candidates: [{ x: -50, y: 68, z: -2 }],
+      },
+      artifact_refs: ["ask:test:hazards:success"],
+      tool_lifecycle_trace: {
+        retry_recommendation: "allow_terminal",
+      },
+      tool_followup_decision: {
+        next_action: "terminal_answer",
+      },
+      error: null,
+    };
+
+    const merged = mergeUniqueGatewayCallResults(
+      [failed as never],
+      [failed as never, succeeded as never],
+    );
+
+    expect(merged).toEqual([failed, succeeded]);
+    expect(
+      applyGatewayFailureAuthorityGuard({
+        text: failed.observation_packet.observation_summary,
+        gatewayCallResults: merged,
+      }),
+    ).toContain(
+      "the later observation succeeded, so the earlier schema error is not the current blocker",
+    );
+
+    const narrative =
+      "The fresh fire-safety observation found a safe fireplace candidate at (-50, 68, -2).";
+    expect(
+      applyGatewayFailureAuthorityGuard({
+        text: narrative,
+        gatewayCallResults: [succeeded as never, failed as never],
+      }),
+    ).toBe(narrative);
+  });
+
+  it("preserves the Codex answer when a later verification supersedes an ineligible read attempt", () => {
+    const capability = "com.casimirbot.minecraft.spatial_region.inspect";
+    const failed = {
+      ok: false,
+      capability_id: capability,
+      mode: "verify",
+      gateway_admission: {
+        requested_capability: capability,
+        admission_reason: "environment_probe_requested",
+        blocked_reason: null,
+      },
+      observation_packet: {
+        status: "failed",
+        produced_artifact_refs: ["ask:minecraft:spatial:stale"],
+        observation_summary:
+          "The authentic observation was not eligible for current-turn re-entry.",
+      },
+      observation: { error_code: "current_turn_reentry_ineligible" },
+      artifact_refs: ["ask:minecraft:spatial:stale"],
+      tool_followup_decision: { next_action: "finish" },
+      error: "current_turn_reentry_ineligible",
+    };
+    const succeeded = {
+      ...failed,
+      ok: true,
+      observation_packet: {
+        ...failed.observation_packet,
+        status: "succeeded",
+        produced_artifact_refs: ["ask:minecraft:spatial:fresh"],
+        observation_summary:
+          "Fresh structure verification observed one matching fire block.",
+      },
+      observation: {
+        status: "succeeded",
+        total_cells: 1,
+        matched_cells: 1,
+        mismatched_cells: 0,
+      },
+      artifact_refs: ["ask:minecraft:spatial:fresh"],
+      error: null,
+    };
+    const answer =
+      "Fresh verification confirmed the one requested cell is minecraft:fire.";
+
+    expect(
+      applyGatewayFailureAuthorityGuard({
+        text: answer,
+        gatewayCallResults: [failed as never, succeeded as never],
+      }),
+    ).toBe(answer);
+    expect(
+      providerGatewayEvidenceReadyForSolver({
+        gatewayCallResults: [failed as never, succeeded as never],
+        scholarlyRecoveryObservationReentered: false,
+      }),
+    ).toBe(true);
+  });
+
   it("does not overwrite a narrative answer when selected full text supersedes an optional numeric helper", () => {
     const providerText =
       "I fetched the paper evidence and found density values, but the magnetic-field binding B_T was missing, so the calculator step cannot be completed from the retrieved text.";

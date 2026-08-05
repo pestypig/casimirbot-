@@ -1,4 +1,4 @@
-# Helix Fabric Sensor 0.1.0
+# Helix Fabric Sensor 0.2.0
 
 `minecraft/helix-fabric-sensor` is the Fabric 1.21.8 host adapter for the
 Helix Minecraft connector. Its default lane is read-only; an independently
@@ -26,14 +26,14 @@ handling, and normalized probe envelopes.
 The production artifact is:
 
 ```text
-minecraft/helix-fabric-sensor/build/libs/HelixFabricSensor-0.1.0.jar
+minecraft/helix-fabric-sensor/build/libs/HelixFabricSensor-0.2.0.jar
 ```
 
 Release artifact:
 
-- size: `95,888` bytes
+- candidate size: `183,085` bytes
 - SHA-256:
-  `a646fbe3a800684bf334df916043401a76f63b37dc36cc25e324ece2a679897e`
+  `c2dbdc2b7c98bcfa3edcd8d1ed5691c0bef845504f3694dfea9e2345b932dc02`
 - reproducible receipt:
   `minecraft/helix-fabric-sensor/helix-fabric-sensor-build-receipt.json`
 
@@ -73,7 +73,9 @@ disabled template only and bind each host separately.
 
 ## Capability boundary
 
-The Fabric sensor advertises the same eight capabilities as Paper:
+The Fabric sensor advertises the eight shared Minecraft situation probes plus
+one Fabric spatial-planning extension. Paper remains on the shared eight-probe
+contract until it implements the same exact evidence schema:
 
 | Probe               | Northbound capability                           |
 | ------------------- | ----------------------------------------------- |
@@ -82,11 +84,25 @@ The Fabric sensor advertises the same eight capabilities as Paper:
 | `nearby_entities`   | `com.casimirbot.minecraft.nearby_entities.list` |
 | `hazard_check`      | `com.casimirbot.minecraft.hazards.scan`         |
 | `local_map_summary` | `com.casimirbot.minecraft.local_map.inspect`    |
+| `spatial_region`    | `com.casimirbot.minecraft.spatial_region.inspect` |
 | `line_of_sight`     | `com.casimirbot.minecraft.line_of_sight.check`  |
 | `crop_state`        | `com.casimirbot.minecraft.crop_state.read`      |
 | `reachability`      | `com.casimirbot.minecraft.reachability.check`   |
 
-It does not advertise pathfinding or closed-container contents. When a room
+The spatial probe is bounded, read-only evidence: a compact block-column survey,
+palette, semantic anchors, and conservative fireplace candidates centered on
+the selected player. It does not choose a build plan or possess answer
+authority. On the connector wire, the survey uses the typed
+`relative_xz_relative_y_palette_flags_v1` encoding and stays below the frozen
+34 KB evidence ceiling. Helix validates the compact schema before expanding it
+into absolute trusted columns for provider re-entry. The evidence also declares
+whether its palette, columns, semantic anchors, and evaluated fireplace
+candidates are complete and reports the corresponding retained or omitted
+counts. A solver must narrow and repeat the probe or fail actionably when those
+fields show that a requested conclusion is outside the retained evidence;
+truncation is never permission to guess.
+
+The sensor does not advertise pathfinding or closed-container contents. When a room
 owner explicitly configures command authority and completes **Pair command
 access in game**, it also exposes a live, bounded Brigadier catalog and the
 `com.casimirbot.minecraft.command` capability. The command credential is
@@ -113,8 +129,10 @@ Use Java 21:
 ```
 
 The build includes the shared connector core in the remapped Fabric JAR. Unit
-tests cover disabled defaults, read-only manifest policy, exact/ambiguous actor
-selection, result shapes, and Crimson Curse phase mapping.
+tests cover disabled defaults, the Fabric-only manifest extension,
+exact/ambiguous actor selection, result shapes, command classification and
+player-source binding, bounded checkpoint math, fall-rescue trigger policy,
+and Crimson Curse phase mapping.
 
 The release acceptance adds a real local Fabric 1.21.8 server, a headless
 player, a keyed Shared Live Room, natural Ask turns, stale/offline recovery,

@@ -1905,6 +1905,186 @@ describe("helix ask runtime authority contract", () => {
     expect(report.blocking_reasons).toEqual([]);
   });
 
+  it("accepts a fully supported current-turn compound environment draft without requiring a legacy agent loop projection", () => {
+    const turnId = "turn-compound-environment-ledger-authority";
+    const inspectRef = `${turnId}:live-environment:inspect`;
+    const commandRef = `${turnId}:live-environment:command`;
+    const draftRef = `${turnId}:final-answer-draft`;
+    const report = evaluateTerminalBoundaryEligibility({
+      turn_id: turnId,
+      source_target_intent: {
+        target_source: "live_environment",
+        target_kind: "live_environment",
+        strength: "hard",
+      },
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "compound_evidence_synthesis",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      route_product_contract: {
+        required_terminal_artifact_kind:
+          "compound_evidence_synthesis_answer",
+        allowed_terminal_artifact_kinds: [
+          "compound_evidence_synthesis_answer",
+          "typed_failure",
+        ],
+      },
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      compound_subgoal_ledger: [
+        {
+          subgoal_id: `${turnId}:subgoal:inspect`,
+          selected_capability:
+            "com.casimirbot.minecraft.spatial_region.inspect",
+          executed_capability:
+            "com.casimirbot.minecraft.spatial_region.inspect",
+          observation_ref: inspectRef,
+          satisfaction: "satisfied",
+          rail_status: "complete",
+        },
+        {
+          subgoal_id: `${turnId}:subgoal:command`,
+          selected_capability: "com.casimirbot.minecraft.command",
+          executed_capability: "com.casimirbot.minecraft.command",
+          observation_ref: commandRef,
+          satisfaction: "satisfied",
+          rail_status: "complete",
+        },
+      ],
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: inspectRef,
+          kind: "live_environment_observation",
+          source_scope: "current_turn",
+          capability_key:
+            "com.casimirbot.minecraft.spatial_region.inspect",
+          payload: {
+            schema: "helix.live_environment_observation.v1",
+            status: "succeeded",
+          },
+        },
+        {
+          artifact_id: commandRef,
+          kind: "live_environment_observation",
+          source_scope: "current_turn",
+          capability_key: "com.casimirbot.minecraft.command",
+          payload: {
+            schema: "helix.live_environment_observation.v1",
+            status: "succeeded",
+          },
+        },
+        {
+          artifact_id: draftRef,
+          kind: "final_answer_draft",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.final_answer_draft.v1",
+            text: "The wall was built and verified from current-turn observations.",
+            support_refs: [inspectRef, commandRef],
+          },
+        },
+      ],
+    });
+
+    expect(report.checks).toMatchObject({
+      agent_runtime_loop: true,
+      agent_step_decision: true,
+      selected_capability_observation: true,
+      post_observation_model_decision: true,
+      goal_satisfaction_allows_terminal: true,
+    });
+    expect(report.eligible).toBe(true);
+    expect(report.blocking_reasons).toEqual([]);
+  });
+
+  it("rejects a compound environment draft that omits one required subgoal observation ref", () => {
+    const turnId = "turn-compound-environment-missing-support";
+    const inspectRef = `${turnId}:live-environment:inspect`;
+    const commandRef = `${turnId}:live-environment:command`;
+    const report = evaluateTerminalBoundaryEligibility({
+      turn_id: turnId,
+      source_target_intent: {
+        target_source: "live_environment",
+        target_kind: "live_environment",
+        strength: "hard",
+      },
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "compound_evidence_synthesis",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      route_product_contract: {
+        required_terminal_artifact_kind:
+          "compound_evidence_synthesis_answer",
+        allowed_terminal_artifact_kinds: [
+          "compound_evidence_synthesis_answer",
+          "typed_failure",
+        ],
+      },
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      compound_subgoal_ledger: [
+        {
+          subgoal_id: `${turnId}:subgoal:inspect`,
+          selected_capability:
+            "com.casimirbot.minecraft.spatial_region.inspect",
+          executed_capability:
+            "com.casimirbot.minecraft.spatial_region.inspect",
+          observation_ref: inspectRef,
+          satisfaction: "satisfied",
+          rail_status: "complete",
+        },
+        {
+          subgoal_id: `${turnId}:subgoal:command`,
+          selected_capability: "com.casimirbot.minecraft.command",
+          executed_capability: "com.casimirbot.minecraft.command",
+          observation_ref: commandRef,
+          satisfaction: "satisfied",
+          rail_status: "complete",
+        },
+      ],
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: inspectRef,
+          kind: "live_environment_observation",
+          source_scope: "current_turn",
+        },
+        {
+          artifact_id: commandRef,
+          kind: "live_environment_observation",
+          source_scope: "current_turn",
+        },
+        {
+          artifact_id: `${turnId}:final-answer-draft`,
+          kind: "final_answer_draft",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.final_answer_draft.v1",
+            text: "The wall was built.",
+            support_refs: [inspectRef],
+          },
+        },
+      ],
+    });
+
+    expect(report.eligible).toBe(false);
+    expect(report.blocking_reasons).toEqual(
+      expect.arrayContaining([
+        "agent_runtime_loop_missing",
+        "selected_capability_observation_missing",
+      ]),
+    );
+  });
+
   it("accepts an authorized model-only provider product without observation refs", () => {
     const turnId = "turn-provider-model-only-authority";
     const report = evaluateTerminalBoundaryEligibility({

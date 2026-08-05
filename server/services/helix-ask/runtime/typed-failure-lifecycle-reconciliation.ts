@@ -68,6 +68,9 @@ const isSettledSourceObservationTypedFailure = (
         "procedure_epoch_current_unavailable",
         "procedure_epoch_previous_unavailable",
         "procedure_memory_unavailable",
+        "PROCEDURE_MEMORY_RECALL_EVIDENCE_MISSING",
+        "PROCEDURE_MEMORY_ACTIVE_SITUATION_RUN_MISSING",
+        "PROCEDURE_MEMORY_SELECTED_REFS_MISSING",
         "procedure_epoch_replay_evidence_unavailable",
         "visual_scene_memory_no_match",
         "visual_scene_memory_current_missing",
@@ -116,10 +119,22 @@ export const authoritativeTypedFailureRequiresNoContinuation = (
   const routeAuthorityAudit = readRecord(payload.route_authority_audit);
   const loopParityTrace = readRecord(payload.loop_parity_trace);
   const terminalAuthority = readRecord(payload.terminal_answer_authority);
+  const terminalWriter = readRecord(payload.terminal_authority_single_writer);
+  const terminalWriterIntegrity = readRecord(terminalWriter?.integrity);
+  const typedFailureSelectedBySingleWriter = Boolean(
+    readString(terminalWriter?.schema) ===
+      "helix.terminal_authority_single_writer_result.v1" &&
+      readString(terminalWriter?.selected_terminal_artifact_kind) ===
+        "typed_failure" &&
+      readString(terminalWriter?.source) === "typed_failure" &&
+      readString(terminalWriter?.selected_terminal_artifact_ref) &&
+      terminalWriterIntegrity?.single_writer_applied === true,
+  );
   const authorityEstablished =
     routeAuthorityAudit?.route_authority_ok === true ||
     loopParityTrace?.route_authority_ok === true ||
-    terminalAuthority?.server_authoritative === true;
+    terminalAuthority?.server_authoritative === true ||
+    typedFailureSelectedBySingleWriter;
   if (!authorityEstablished) return false;
 
   return (
@@ -208,6 +223,34 @@ const reconcileRailObservationContract = (
       rail.observed_artifact_supports_requested_capability = false;
     }
   }
+};
+
+const reconcileAgentRuntimeLoopAdmission = (payload: RecordLike): void => {
+  const settle = (value: unknown): void => {
+    const admission = readRecord(value);
+    if (
+      readString(admission?.schema) !==
+      "helix.agent_runtime_loop_admission.v1"
+    ) {
+      return;
+    }
+    admission.admitted = false;
+    admission.mode = "skip";
+    admission.reason = "authoritative_typed_failure_terminal";
+  };
+
+  settle(payload.agent_runtime_loop_admission);
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger)
+    ? payload.current_turn_artifact_ledger
+    : [];
+  for (const value of ledger) {
+    const artifact = readRecord(value);
+    if (readString(artifact?.kind) === "agent_runtime_loop_admission") {
+      settle(artifact?.payload);
+    }
+  }
+  const debug = readRecord(payload.debug);
+  settle(debug?.agent_runtime_loop_admission);
 };
 
 export const reconcileAuthoritativeTypedFailureLifecycle = (args: {
@@ -362,6 +405,7 @@ export const reconcileAuthoritativeTypedFailureLifecycle = (args: {
     args.payload,
     readString(sourceTargetIntent?.target_source),
   );
+  reconcileAgentRuntimeLoopAdmission(args.payload);
 
   const debug = readRecord(args.payload.debug);
   if (debug) {

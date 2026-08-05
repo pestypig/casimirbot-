@@ -39,6 +39,15 @@ final class FabricCommandClassifierTest {
             ),
             FabricCommandClassifier.classify("say Helix admin test")
         );
+        assertEquals(
+            new FabricCommandClassifier.Classification(
+                "server_administration",
+                "server_administration"
+            ),
+            FabricCommandClassifier.classify(
+                "execute at @s run playsound minecraft:block.amethyst_block.chime master @s ~ ~ ~ 1 1 1"
+            )
+        );
     }
 
     @Test

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { buildAskTurnSolverTrace } from "../../ask-turn-solver";
-import { reconcileAuthoritativeTypedFailureLifecycle } from "../typed-failure-lifecycle-reconciliation";
+import {
+  authoritativeTypedFailureRequiresNoContinuation,
+  reconcileAuthoritativeTypedFailureLifecycle,
+} from "../typed-failure-lifecycle-reconciliation";
 
 const basePayload = (): Record<string, unknown> => ({
   terminal_artifact_kind: "typed_failure",
@@ -72,9 +75,85 @@ const basePayload = (): Record<string, unknown> => ({
     required_observation_kinds_for_requested_capability: [],
     observed_artifact_supports_requested_capability: true,
   },
+  agent_runtime_loop_admission: {
+    schema: "helix.agent_runtime_loop_admission.v1",
+    admitted: true,
+    mode: "record_only",
+    reason:
+      "source_or_capability_terminal_failure_requires_runtime_loop_record",
+  },
+  debug: {
+    agent_runtime_loop_admission: {
+      schema: "helix.agent_runtime_loop_admission.v1",
+      admitted: true,
+      mode: "record_only",
+      reason:
+        "source_or_capability_terminal_failure_requires_runtime_loop_record",
+    },
+  },
 });
 
 describe("authoritative typed-failure lifecycle reconciliation", () => {
+  it("accepts the canonical single writer as typed-failure authority before later mirrors settle", () => {
+    const payload = basePayload();
+    payload.terminal_error_code = "procedure_memory_unavailable";
+    payload.typed_failure = {
+      schema: "helix.typed_failure.v1",
+      error_code: "procedure_memory_unavailable",
+      next_required_action: "repair_procedure_memory",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.route_authority_audit = { route_authority_ok: false };
+    payload.loop_parity_trace = {
+      ...(payload.loop_parity_trace as Record<string, unknown>),
+      route_authority_ok: false,
+    };
+    payload.terminal_answer_authority = { server_authoritative: false };
+    payload.terminal_authority_single_writer = {
+      schema: "helix.terminal_authority_single_writer_result.v1",
+      selected_terminal_artifact_kind: "typed_failure",
+      selected_terminal_artifact_ref: "ask:test:typed_failure:1",
+      source: "typed_failure",
+      integrity: { single_writer_applied: true },
+    };
+
+    expect(authoritativeTypedFailureRequiresNoContinuation(payload)).toBe(
+      true,
+    );
+
+    (payload.terminal_authority_single_writer as Record<string, unknown>).source =
+      "final_answer_draft";
+    expect(authoritativeTypedFailureRequiresNoContinuation(payload)).toBe(
+      false,
+    );
+  });
+
+  it("settles the canonical uppercase procedure-memory source failure", () => {
+    const payload = basePayload();
+    payload.terminal_error_code =
+      "PROCEDURE_MEMORY_ACTIVE_SITUATION_RUN_MISSING";
+    payload.typed_failure = {
+      schema: "helix.typed_failure.v1",
+      error_code: "PROCEDURE_MEMORY_ACTIVE_SITUATION_RUN_MISSING",
+      next_required_action: "repair_procedure_memory",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.route_authority_audit = { route_authority_ok: true };
+    (payload.loop_parity_trace as Record<string, unknown>).observations_created = [
+      {
+        observation_id: "ask:test:procedure-memory-source-failure",
+        source_kind: "source_observation",
+      },
+    ];
+    (payload.loop_parity_trace as Record<string, unknown>).actual_tool_calls = [];
+
+    expect(authoritativeTypedFailureRequiresNoContinuation(payload)).toBe(
+      true,
+    );
+  });
+
   it("settles stale route and terminal flags after a zero-observation typed failure", () => {
     const payload = basePayload();
     delete payload.route_product_contract;
@@ -148,6 +227,19 @@ describe("authoritative typed-failure lifecycle reconciliation", () => {
       ],
       observed_artifact_supports_requested_capability: false,
     });
+    expect(payload.agent_runtime_loop_admission).toMatchObject({
+      admitted: false,
+      mode: "skip",
+      reason: "authoritative_typed_failure_terminal",
+    });
+    expect(
+      (payload.debug as Record<string, unknown>)
+        .agent_runtime_loop_admission,
+    ).toMatchObject({
+      admitted: false,
+      mode: "skip",
+      reason: "authoritative_typed_failure_terminal",
+    });
   });
 
   it("does not reconcile an observed-tool path", () => {
@@ -170,6 +262,12 @@ describe("authoritative typed-failure lifecycle reconciliation", () => {
         finalAnswerSource: "typed_failure",
       }),
     ).toBe(false);
+    expect(payload.agent_runtime_loop_admission).toMatchObject({
+      admitted: true,
+      mode: "record_only",
+      reason:
+        "source_or_capability_terminal_failure_requires_runtime_loop_record",
+    });
     expect(
       (
         payload.loop_parity_trace as {

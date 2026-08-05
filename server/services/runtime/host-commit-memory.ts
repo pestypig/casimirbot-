@@ -159,9 +159,22 @@ export const sampleHostCommitMemory = async (
   };
 };
 
+export const resolveHostCommitCacheUpdate = (
+  previous: HostCommitMemorySnapshot | null,
+  sampled: HostCommitMemorySnapshot,
+): HostCommitMemorySnapshot => {
+  if (sampled.status === "available" || previous === null) return sampled;
+  // A transient sampler failure must not erase a still-fresh reading. The
+  // stale window is enforced when the cache is read, so retaining the last
+  // valid sample here preserves short-lived WMIC/procfs failures while still
+  // failing closed once that evidence actually ages past the configured
+  // ceiling.
+  return previous.status === "available" ? previous : sampled;
+};
+
 const refreshCachedSnapshot = async (): Promise<HostCommitMemorySnapshot> => {
   const sampled = await sampleHostCommitMemory(monitorOptions.platform, monitorOptions.now());
-  cachedSnapshot = sampled;
+  cachedSnapshot = resolveHostCommitCacheUpdate(cachedSnapshot, sampled);
   return sampled;
 };
 

@@ -21,6 +21,7 @@ import {
   type RepoSearchHit,
 } from "../repo-search";
 import {
+  buildDocsEvidencePassages,
   buildDocsSearchDocumentCandidates,
   buildDocsSearchTerms,
   mergeDocsSearchPathCandidates,
@@ -157,6 +158,7 @@ import {
 } from "./visual-situation-observation";
 import {
   EnvironmentMechanicsRegistryError,
+  resolveEnvironmentMechanicsRetrievalPlan,
   resolveEnvironmentMechanicsSearchScope,
 } from "../../situation-room/environment-mechanics-registry";
 import {
@@ -6150,6 +6152,14 @@ export const callWorkstationGatewayCapability = async (
           : gatewayResult.status,
       summary: gatewayResult.summary,
       observation: gatewayResult.observation,
+      ...(gatewayResult.schemaRepair
+        ? {
+            stateDelta: {
+              schema_repair: gatewayResult.schemaRepair,
+              next_affordances: gatewayResult.schemaRepair.next_affordances,
+            },
+          }
+        : {}),
       ...(gatewayResult.error
         ? {
             missingRequirements: [
@@ -6158,7 +6168,8 @@ export const callWorkstationGatewayCapability = async (
                 message: gatewayResult.summary,
                 repair_action:
                   gatewayResult.error === "connector_offline" ||
-                  gatewayResult.error === "probe_timeout"
+                  gatewayResult.error === "probe_timeout" ||
+                  gatewayResult.error === "schema_validation_failed"
                     ? "retry"
                     : "ask_user",
               },
@@ -6200,14 +6211,15 @@ export const callWorkstationGatewayCapability = async (
     manifest.capability_id ===
     environmentCommandCatalogMinecraftManifest.capability_id
   ) {
-    const gatewayResult = await executeEnvironmentCommandCatalogGatewayCapability({
-      turnId,
-      toolCallId: input.toolCallId,
-      providerExecutionId: input.providerExecutionId,
-      arguments: readArguments(input.arguments),
-      accountContext: input.accountContext,
-      conversationThreadId: input.conversationThreadId,
-    });
+    const gatewayResult =
+      await executeEnvironmentCommandCatalogGatewayCapability({
+        turnId,
+        toolCallId: input.toolCallId,
+        providerExecutionId: input.providerExecutionId,
+        arguments: readArguments(input.arguments),
+        accountContext: input.accountContext,
+        conversationThreadId: input.conversationThreadId,
+      });
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
@@ -6236,7 +6248,10 @@ export const callWorkstationGatewayCapability = async (
               {
                 code: gatewayResult.error,
                 message: gatewayResult.summary,
-                repair_action: "ask_user" as const,
+                repair_action:
+                  gatewayResult.error === "command_parse_failed"
+                    ? ("retry" as const)
+                    : ("ask_user" as const),
               },
             ],
           }
@@ -6273,8 +6288,7 @@ export const callWorkstationGatewayCapability = async (
   }
 
   if (
-    manifest.capability_id ===
-    environmentCommandMinecraftManifest.capability_id
+    manifest.capability_id === environmentCommandMinecraftManifest.capability_id
   ) {
     const gatewayResult = await executeEnvironmentCommandGatewayCapability({
       turnId,
@@ -6705,8 +6719,7 @@ export const callWorkstationGatewayCapability = async (
         capabilityId: manifest.capability_id,
         args,
         turnId,
-        authoritativeEvidenceArtifacts:
-          input.authoritativeEvidenceArtifacts,
+        authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
       });
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
@@ -7474,8 +7487,7 @@ export const callWorkstationGatewayCapability = async (
       requires_source: capability.requires_source,
       terminal_eligible: capability.terminal_eligible,
       permission_profile_required: capability.permission_profile_required,
-      post_tool_model_step_required:
-        capability.post_tool_model_step_required,
+      post_tool_model_step_required: capability.post_tool_model_step_required,
       output_observation_schema: capability.output_observation_schema,
       produces_affordances: capability.produces_affordances ?? [],
       consumes_affordances: capability.consumes_affordances ?? [],
@@ -9236,12 +9248,19 @@ export const callWorkstationGatewayCapability = async (
     const requestedSectionHeadings = readDocsExactTerms(
       args.section_headings ?? args.sectionHeadings,
     );
+    const mechanicsRetrievalPlan = mechanicsScope
+      ? resolveEnvironmentMechanicsRetrievalPlan({
+          collections: mechanicsScope.collections,
+          query,
+        })
+      : null;
     const sectionHeadings = Array.from(
       new Set([
         ...requestedSectionHeadings,
         ...(sectionHeading ? [sectionHeading] : []),
+        ...(mechanicsRetrievalPlan?.section_headings ?? []),
       ]),
-    ).slice(0, 4);
+    ).slice(0, 6);
     const sectionContainsTerms = readDocsExactTerms(
       args.section_contains_terms ?? args.sectionContainsTerms,
     );
@@ -9289,8 +9308,7 @@ export const callWorkstationGatewayCapability = async (
                 roomEnvironmentMechanicsScope?.environment
                   .mechanics_collection_ids ?? requestedMechanicsCollectionIds,
               document_paths: mechanicsScope.documentPaths,
-              environment:
-                roomEnvironmentMechanicsScope?.environment ?? null,
+              environment: roomEnvironmentMechanicsScope?.environment ?? null,
             }
           : null,
         hits: [],
@@ -9368,6 +9386,11 @@ export const callWorkstationGatewayCapability = async (
       query,
       maxHits,
     );
+    const evidencePassages = buildDocsEvidencePassages(
+      documentCandidates,
+      query,
+      maxHits,
+    );
     const truncated = result.truncated || rankedHits.length > hits.length;
     const compoundReadAloudResolvedPath = readCompoundReadAloudResolvedDocsPath(
       args.source_target_intent,
@@ -9375,10 +9398,10 @@ export const callWorkstationGatewayCapability = async (
     );
     const activeDocumentObservation = mechanicsScope
       ? null
-      : readBoundedDocsExcerpt(paths) ??
+      : (readBoundedDocsExcerpt(paths) ??
         (compoundReadAloudResolvedPath
           ? readBoundedDocsExcerpt([compoundReadAloudResolvedPath])
-          : null);
+          : null));
     const exactLocationMatches = readDocsExactLocationMatches(
       paths,
       exactTerms,
@@ -9445,9 +9468,28 @@ export const callWorkstationGatewayCapability = async (
             terminal_eligible: false,
           }
         : null,
+      mechanics_retrieval_plan: mechanicsRetrievalPlan,
       hits,
       hit_count: hits.length,
       document_candidates: documentCandidates,
+      evidence_passages: evidencePassages,
+      citation_packet: {
+        schema: "helix.docs_citation_packet.v1",
+        passages: evidencePassages.map((passage) => ({
+          passage_id: passage.passage_id,
+          quote: passage.text_excerpt,
+          citation_ref: passage.citation_ref,
+          citation_label: passage.citation_label,
+          path: passage.path,
+          ...(passage.section ? { section: passage.section } : {}),
+          ...(passage.line_start ? { line_start: passage.line_start } : {}),
+          ...(passage.line_end ? { line_end: passage.line_end } : {}),
+          matched_terms: passage.matched_terms,
+        })),
+        citation_instruction: "cite_claims_with_passage_labels",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
       unique_document_count: documentCandidates.length,
       file_paths: evidence.filePaths,
       active_document_observation: activeDocumentObservation

@@ -106,5 +106,16 @@ describe("scholarly full-text source normalization", () => {
     expect(observation.selected_chunks[0].text_excerpt).toContain(
       "show that line energy is linear with line width within error bars",
     );
+    expect(observation.selected_chunks[0].citation_label).toBe(
+      "Probing Magnetars Using Spectral Lines with Future Telescopes, p. 3, Results",
+    );
+    expect(observation.citation_packet).toMatchObject({
+      schema: "helix.scholarly_citation_packet.v1",
+      citation_instruction: "cite_claims_with_passage_labels",
+    });
+    expect(observation.citation_packet?.passages[0]).toMatchObject({
+      page: 3,
+      citation_label: "Probing Magnetars Using Spectral Lines with Future Telescopes, p. 3, Results",
+    });
   });
 });

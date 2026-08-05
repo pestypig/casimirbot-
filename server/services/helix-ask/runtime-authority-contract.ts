@@ -1652,8 +1652,13 @@ export function hasPostObservationModelDecision(
 const hasLedgerBackedPostObservationAnswerDraft = (
   payload: Record<string, unknown>,
 ): boolean => {
-  if (readString(payload.terminal_artifact_kind) !== "model_synthesized_answer")
+  const terminalArtifactKind = readString(payload.terminal_artifact_kind);
+  if (
+    terminalArtifactKind !== "model_synthesized_answer" &&
+    terminalArtifactKind !== "compound_evidence_synthesis_answer"
+  ) {
     return false;
+  }
   if (readString(payload.final_answer_source) !== "final_answer_draft")
     return false;
   const canonicalGoal = readRecord(payload.canonical_goal_frame);
@@ -1662,13 +1667,105 @@ const hasLedgerBackedPostObservationAnswerDraft = (
     readString(canonicalGoal?.required_terminal_kind) ??
     readString(routeProduct?.required_terminal_kind) ??
     readString(routeProduct?.required_terminal_artifact_kind);
-  if (requiredTerminalKind !== "model_synthesized_answer") return false;
+  if (requiredTerminalKind !== terminalArtifactKind) return false;
 
   const artifacts = readArray(payload.current_turn_artifact_ledger)
     .map(readRecord)
     .filter((artifact): artifact is Record<string, unknown> =>
       Boolean(artifact),
     );
+  if (terminalArtifactKind === "compound_evidence_synthesis_answer") {
+    const artifactIndexById = new Map<string, number>();
+    artifacts.forEach((artifact, index) => {
+      const sourceScope = readString(artifact.source_scope);
+      const artifactId = readString(artifact.artifact_id);
+      if (
+        artifactId &&
+        sourceScope !== "prior_context" &&
+        sourceScope !== "prior_turn_context" &&
+        sourceScope !== "prior_artifact"
+      ) {
+        artifactIndexById.set(artifactId, index);
+      }
+    });
+    const itineraryExecutionState = readRecord(
+      payload.capability_itinerary_execution_state,
+    );
+    const compoundSubgoalValues = readArray(payload.compound_subgoal_ledger);
+    const compoundSubgoals = (compoundSubgoalValues.length > 0
+      ? compoundSubgoalValues
+      : readArray(itineraryExecutionState?.compound_subgoal_ledger))
+      .map(readRecord)
+      .filter(
+        (subgoal): subgoal is Record<string, unknown> => Boolean(subgoal),
+      );
+    if (compoundSubgoals.length === 0) return false;
+    const requiredObservationRefs = compoundSubgoals.map((subgoal) => {
+      const guardedNoopSatisfied = Boolean(
+        subgoal.satisfied_without_execution === true &&
+        subgoal.mutation_performed === false &&
+        readString(subgoal.satisfaction_reason),
+      );
+      if (
+        readString(subgoal.satisfaction) !== "satisfied" ||
+        readString(subgoal.rail_status) !== "complete" ||
+        (!guardedNoopSatisfied &&
+          (!readString(subgoal.selected_capability) ||
+            !readString(subgoal.executed_capability)))
+      ) {
+        return null;
+      }
+      const observationRef = readString(subgoal.observation_ref);
+      return observationRef && artifactIndexById.has(observationRef)
+        ? observationRef
+        : null;
+    });
+    if (requiredObservationRefs.some((ref) => !ref)) return false;
+    const observationRefs = requiredObservationRefs.filter(
+      (ref): ref is string => Boolean(ref),
+    );
+    const latestObservationIndex = Math.max(
+      ...observationRefs.map((ref) => artifactIndexById.get(ref) ?? -1),
+    );
+    if (latestObservationIndex < 0) return false;
+    const materializedCompoundAnswer = readRecord(
+      payload.compound_evidence_synthesis_answer,
+    );
+    return artifacts.slice(latestObservationIndex + 1).some((artifact) => {
+      const artifactPayload = readRecord(artifact.payload);
+      const kind = readString(artifact.kind);
+      const schema =
+        readString(artifactPayload?.schema) ??
+        readString(artifact.payload_schema);
+      if (
+        kind !== "final_answer_draft" &&
+        schema !== "helix.final_answer_draft.v1"
+      ) {
+        return false;
+      }
+      const text =
+        readString(artifactPayload?.text) ??
+        readString(artifactPayload?.answer_text) ??
+        readString(artifact.text) ??
+        readString(artifact.text_preview) ??
+        readString(materializedCompoundAnswer?.text) ??
+        readString(materializedCompoundAnswer?.answer_text);
+      if (!text) return false;
+      const supportRefs = new Set([
+        ...readStringArray(artifactPayload?.support_refs),
+        ...readStringArray(artifactPayload?.evidence_refs),
+        ...readStringArray(artifactPayload?.observation_refs),
+        ...readStringArray(artifactPayload?.grounded_observation_refs),
+        ...readStringArray(artifactPayload?.grounded_in_observation_refs),
+        ...readStringArray(materializedCompoundAnswer?.support_refs),
+        ...readStringArray(
+          materializedCompoundAnswer?.subgoal_observation_refs,
+        ),
+      ]);
+      return observationRefs.every((ref) => supportRefs.has(ref));
+    });
+  }
+
   const latestObservationIndex = artifacts.reduce((latest, artifact, index) => {
     const sourceScope = readString(artifact.source_scope);
     if (

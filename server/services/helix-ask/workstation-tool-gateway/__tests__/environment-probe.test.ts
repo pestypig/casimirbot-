@@ -11,6 +11,7 @@ import {
   HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
   HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
   HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
   helixEnvironmentCatalogSnapshotSchema,
   type HelixEnvironmentProbeObservation,
 } from "@shared/helix-environment-connector";
@@ -24,6 +25,7 @@ import {
 } from "@shared/helix-shared-realtime-room";
 import type { SharedLiveRoomRunRoomBinding } from "../../../shared-live-room-control/binding-store";
 import { readEnvironmentConnectorCapabilityDescriptor } from "../../../environment-connectors/catalog";
+import { validateEnvironmentConnectorSchemaValue } from "../../../environment-connectors/conformance";
 import { RoomEnvironmentSubjectError } from "../../../environment-connectors/subjects";
 import { resolveEnvironmentAdapterProfile } from "../../../situation-room/environment-adapter-registry";
 import type { SharedRealtimeRoomMembership } from "../../realtime-room/room-store";
@@ -33,6 +35,7 @@ import {
   environmentProbeMinecraftInventoryManifest,
   environmentProbeMinecraftManifests,
   executeEnvironmentProbeGatewayCapability,
+  normalizeEnvironmentProbeSemanticArguments,
   type EnvironmentProbeGatewayDependencies,
 } from "../environment-probe";
 import type { BoundRoomEvidenceSourceCandidate } from "../bound-room-evidence";
@@ -211,8 +214,7 @@ const sourceCandidate: BoundRoomEvidenceSourceCandidate = {
   domain: adapterRecord.profile.domain,
   requestFreshnessMaxAgeMs:
     adapterRecord.profile.freshness.ingress_request_max_age_ms,
-  freshnessMaxAgeMs:
-    adapterRecord.profile.freshness.observation_max_age_ms,
+  freshnessMaxAgeMs: adapterRecord.profile.freshness.observation_max_age_ms,
   mechanicsCollectionIds: adapterAdmission.mechanics_collection_ids,
   admission: sourceAdmission,
 };
@@ -231,53 +233,55 @@ const policy = (): HelixExternalCapabilityPolicy => ({
   deadlineAt: "2026-07-27T12:00:15.000Z",
 });
 
-const firstPartyAccountContext =
-  (): HelixWorkstationGatewayAccountContext => {
-    const basePolicy = buildHelixAccountCapabilityPolicy("user");
-    const accountPolicy = {
-      ...basePolicy,
-      feature_flags: Array.from(new Set([
+const firstPartyAccountContext = (): HelixWorkstationGatewayAccountContext => {
+  const basePolicy = buildHelixAccountCapabilityPolicy("user");
+  const accountPolicy = {
+    ...basePolicy,
+    feature_flags: Array.from(
+      new Set([
         ...basePolicy.feature_flags,
         "shared_realtime_rooms",
         "room_source_ingress",
-      ])),
-      locked_features: basePolicy.locked_features.filter(
-        (entry) =>
-          entry !== "shared_realtime_rooms" &&
-          entry !== "room_source_ingress",
-      ),
-      allowed_workstation_capabilities: Array.from(new Set([
+      ]),
+    ),
+    locked_features: basePolicy.locked_features.filter(
+      (entry) =>
+        entry !== "shared_realtime_rooms" && entry !== "room_source_ingress",
+    ),
+    allowed_workstation_capabilities: Array.from(
+      new Set([
         ...basePolicy.allowed_workstation_capabilities,
         HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
-      ])),
-    };
-    const accountSession = {
-      schema: "helix.account_session.v1" as const,
-      session_id: "account_session:first-party-environment-probe",
-      profile: {
-        profile_id: "profile:environment-probe",
-        display_name: "Guest Operator",
-        auth_mode: "guest" as const,
-        account_type: "user" as const,
-        provider: "guest" as const,
-        created_at: "2026-07-27T11:00:00.000Z",
-        updated_at: "2026-07-27T11:59:59.000Z",
-      },
-      account_policy: accountPolicy,
-      status: "active" as const,
-      memory_scope: "session_only" as const,
+      ]),
+    ),
+  };
+  const accountSession = {
+    schema: "helix.account_session.v1" as const,
+    session_id: "account_session:first-party-environment-probe",
+    profile: {
+      profile_id: "profile:environment-probe",
+      display_name: "Guest Operator",
+      auth_mode: "guest" as const,
+      account_type: "user" as const,
+      provider: "guest" as const,
       created_at: "2026-07-27T11:00:00.000Z",
       updated_at: "2026-07-27T11:59:59.000Z",
-      expires_at: "2026-07-28T11:00:00.000Z",
-    };
-    return {
-      session_id: accountSession.session_id,
-      profile_id: accountSession.profile.profile_id,
-      trusted_account_session: true,
-      account_session: accountSession,
-      account_policy: accountPolicy,
-    };
+    },
+    account_policy: accountPolicy,
+    status: "active" as const,
+    memory_scope: "session_only" as const,
+    created_at: "2026-07-27T11:00:00.000Z",
+    updated_at: "2026-07-27T11:59:59.000Z",
+    expires_at: "2026-07-28T11:00:00.000Z",
   };
+  return {
+    session_id: accountSession.session_id,
+    profile_id: accountSession.profile.profile_id,
+    trusted_account_session: true,
+    account_session: accountSession,
+    account_policy: accountPolicy,
+  };
+};
 
 const observation: HelixEnvironmentProbeObservation = {
   schema: HELIX_ENVIRONMENT_PROBE_OBSERVATION_SCHEMA,
@@ -353,6 +357,363 @@ const dependencies = (
 });
 
 describe("environment probe workstation gateway", () => {
+  it("canonicalizes a bounded spatial radius alias without weakening the trusted schema", () => {
+    const spatialDescriptor = readEnvironmentConnectorCapabilityDescriptor(
+      HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    )!;
+
+    expect(
+      normalizeEnvironmentProbeSemanticArguments({
+        descriptor: spatialDescriptor,
+        arguments: {
+          target: "current_actor",
+          radius: 6,
+          purpose: "fire_safety",
+        },
+      }),
+    ).toEqual({
+      target: "current_actor",
+      horizontal_radius: 6,
+      vertical_radius: 6,
+      purpose: "fire_safety",
+    });
+
+    const oversized = normalizeEnvironmentProbeSemanticArguments({
+      descriptor: spatialDescriptor,
+      arguments: {
+        target: "current_actor",
+        radius: 8,
+        purpose: "general",
+      },
+    });
+    expect(oversized).toHaveProperty("radius", 8);
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        spatialDescriptor.input_schema,
+        oversized,
+      ),
+    ).not.toHaveLength(0);
+
+    const mixed = normalizeEnvironmentProbeSemanticArguments({
+      descriptor: spatialDescriptor,
+      arguments: {
+        target: "current_actor",
+        radius: 6,
+        horizontal_radius: 4,
+        purpose: "general",
+      },
+    });
+    expect(mixed).toHaveProperty("radius", 6);
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        spatialDescriptor.input_schema,
+        mixed,
+      ),
+    ).not.toHaveLength(0);
+
+    const modelAuthoredPrebuildAliases =
+      normalizeEnvironmentProbeSemanticArguments({
+        descriptor: spatialDescriptor,
+        arguments: {
+          center: { x: -44.5, y: 67, z: -5.1 },
+          radius: 7,
+          category: "prebuild_safety",
+          effect: "read_only",
+        },
+      });
+    expect(modelAuthoredPrebuildAliases).toEqual({
+      target: "current_actor",
+      horizontal_radius: 7,
+      vertical_radius: 7,
+      purpose: "build_planning",
+    });
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        spatialDescriptor.input_schema,
+        modelAuthoredPrebuildAliases,
+      ),
+    ).toEqual([]);
+
+    const exactVerification =
+      normalizeEnvironmentProbeSemanticArguments({
+        descriptor: spatialDescriptor,
+        arguments: {
+          purpose: "structure_verification",
+          verification_from: { x: -46, y: 69, z: -16 },
+          verification_to: { x: -42, y: 71, z: -16 },
+          expected_block: "minecraft:stone_bricks",
+          freshness_requirement_ms: 5_000,
+        },
+      });
+    expect(exactVerification).toEqual({
+      target: "current_actor",
+      purpose: "structure_verification",
+      verification_from: { x: -46, y: 69, z: -16 },
+      verification_to: { x: -42, y: 71, z: -16 },
+      expected_block: "minecraft:stone_bricks",
+      freshness_requirement_ms: 5_000,
+    });
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        spatialDescriptor.input_schema,
+        exactVerification,
+      ),
+    ).toEqual([]);
+
+    const modelAuthoredExactVerificationAliases =
+      normalizeEnvironmentProbeSemanticArguments({
+        descriptor: spatialDescriptor,
+        arguments: {
+          from: { x: -63, y: 69, z: -2 },
+          to: { x: -59, y: 71, z: -2 },
+          expected_block: "minecraft:stone_bricks",
+          freshness_ms: 5_000,
+        },
+      });
+    expect(modelAuthoredExactVerificationAliases).toEqual({
+      target: "current_actor",
+      purpose: "structure_verification",
+      verification_from: { x: -63, y: 69, z: -2 },
+      verification_to: { x: -59, y: 71, z: -2 },
+      expected_block: "minecraft:stone_bricks",
+      freshness_requirement_ms: 5_000,
+    });
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        spatialDescriptor.input_schema,
+        modelAuthoredExactVerificationAliases,
+      ),
+    ).toEqual([]);
+
+    const modelAuthoredMinMaxVerificationAliases =
+      normalizeEnvironmentProbeSemanticArguments({
+        descriptor: spatialDescriptor,
+        arguments: {
+          min: { x: -63, y: 69, z: -2 },
+          max: { x: -59, y: 71, z: -2 },
+          expected_block: "minecraft:stone_bricks",
+          freshness_ms: 5_000,
+          mutation: "none",
+        },
+      });
+    expect(modelAuthoredMinMaxVerificationAliases).toEqual({
+      target: "current_actor",
+      purpose: "structure_verification",
+      verification_from: { x: -63, y: 69, z: -2 },
+      verification_to: { x: -59, y: 71, z: -2 },
+      expected_block: "minecraft:stone_bricks",
+      freshness_requirement_ms: 5_000,
+    });
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        spatialDescriptor.input_schema,
+        modelAuthoredMinMaxVerificationAliases,
+      ),
+    ).toEqual([]);
+
+    const mutatingMinMaxVerificationAlias =
+      normalizeEnvironmentProbeSemanticArguments({
+        descriptor: spatialDescriptor,
+        arguments: {
+          min: { x: -63, y: 69, z: -2 },
+          max: { x: -59, y: 71, z: -2 },
+          expected_block: "minecraft:stone_bricks",
+          mutation: "setblock",
+        },
+      });
+    expect(mutatingMinMaxVerificationAlias).toHaveProperty(
+      "mutation",
+      "setblock",
+    );
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        spatialDescriptor.input_schema,
+        mutatingMinMaxVerificationAlias,
+      ),
+    ).not.toHaveLength(0);
+
+    const ambiguousExactVerificationAliases =
+      normalizeEnvironmentProbeSemanticArguments({
+        descriptor: spatialDescriptor,
+        arguments: {
+          purpose: "structure_verification",
+          from: { x: -63, y: 69, z: -2 },
+          verification_from: { x: -62, y: 69, z: -2 },
+          to: { x: -59, y: 71, z: -2 },
+          expected_block: "minecraft:stone_bricks",
+        },
+      });
+    expect(ambiguousExactVerificationAliases).toHaveProperty("from");
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        spatialDescriptor.input_schema,
+        ambiguousExactVerificationAliases,
+      ),
+    ).not.toHaveLength(0);
+  });
+
+  it("returns a frozen-schema retry affordance without executing rejected probe arguments", async () => {
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      capabilityId: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:schema-repair`,
+      arguments: {
+        scope: { radius: 7 },
+        purpose: "build_planning",
+      },
+      policy: {
+        ...policy(),
+        allowedCapabilities: [
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        ],
+      },
+      dependencies: dependencies({ dispatchProbe }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      error: "schema_validation_failed",
+      schemaRepair: {
+        schema: "helix.environment_probe_schema_repair.v1",
+        capability_id: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        failure_class: "invalid_args",
+        retryability: "retryable",
+        rejected_fields: ["scope"],
+        proposed_arguments: {
+          purpose: "build_planning",
+          target: "current_actor",
+        },
+      },
+    });
+    expect(result.schemaRepair?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "$.scope",
+          code: "additional_property",
+        }),
+      ]),
+    );
+    expect(result.schemaRepair?.next_affordances).toEqual([
+      expect.objectContaining({
+        capability_id: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        lane_request: {
+          capability: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          purpose: "build_planning",
+          target: "current_actor",
+        },
+        admissible: true,
+      }),
+    ]);
+    expect(result.observation.result).toMatchObject({
+      schema_repair: {
+        trusted_input_schema: expect.objectContaining({
+          type: "object",
+          additionalProperties: false,
+        }),
+      },
+    });
+    expect(dispatchProbe).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when structure verification omits its exact footprint", async () => {
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      capabilityId: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:missing-verification-footprint`,
+      arguments: {
+        target: "current_actor",
+        purpose: "structure_verification",
+        freshness_requirement_ms: 5_000,
+      },
+      policy: {
+        ...policy(),
+        allowedCapabilities: [
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        ],
+      },
+      dependencies: dependencies({ dispatchProbe }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "schema_validation_failed",
+      schemaRepair: {
+        issues: expect.arrayContaining([
+          expect.objectContaining({
+            path: "$.verification_from",
+            code: "required_for_purpose",
+          }),
+          expect.objectContaining({
+            path: "$.verification_to",
+            code: "required_for_purpose",
+          }),
+          expect.objectContaining({
+            path: "$.expected_block",
+            code: "required_for_purpose",
+          }),
+        ]),
+      },
+    });
+    expect(dispatchProbe).not.toHaveBeenCalled();
+  });
+
+  it("removes semantically conflicting verification fields from a fire-safety retry", async () => {
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      capabilityId: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:fire-safety-schema-repair`,
+      arguments: {
+        target: "current_actor",
+        horizontal_radius: 7,
+        vertical_radius: 6,
+        purpose: "fire_safety",
+        verification_from: { x: -50, y: 68, z: -2 },
+        verification_to: { x: -50, y: 68, z: -2 },
+        freshness_requirement_ms: 5_000,
+      },
+      policy: {
+        ...policy(),
+        allowedCapabilities: [
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        ],
+      },
+      dependencies: dependencies({ dispatchProbe }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "schema_validation_failed",
+      schemaRepair: {
+        rejected_fields: ["verification_from", "verification_to"],
+        proposed_arguments: {
+          target: "current_actor",
+          horizontal_radius: 7,
+          vertical_radius: 6,
+          purpose: "fire_safety",
+          freshness_requirement_ms: 5_000,
+        },
+      },
+    });
+    expect(result.schemaRepair?.next_affordances).toEqual([
+      expect.objectContaining({
+        capability_id: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        args: {
+          target: "current_actor",
+          horizontal_radius: 7,
+          vertical_radius: 6,
+          purpose: "fire_safety",
+          freshness_requirement_ms: 5_000,
+        },
+        admissible: true,
+      }),
+    ]);
+    expect(dispatchProbe).not.toHaveBeenCalled();
+  });
+
   it("advertises a semantic, read-only, nonterminal capability", () => {
     expect(environmentProbeMinecraftInventoryManifest).toMatchObject({
       capability_id: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
@@ -394,9 +755,7 @@ describe("environment probe workstation gateway", () => {
   });
 
   it("derives all connector identity server-side and returns only exact re-entry evidence", async () => {
-    const materializeConnector = vi.fn(
-      dependencies().materializeConnector!,
-    );
+    const materializeConnector = vi.fn(dependencies().materializeConnector!);
     const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
     const result = await executeEnvironmentProbeGatewayCapability({
       turnId: TURN_ID,
@@ -741,9 +1100,7 @@ describe("environment probe workstation gateway", () => {
         },
       ],
     };
-    const materializeConnector = vi.fn(
-      dependencies().materializeConnector!,
-    );
+    const materializeConnector = vi.fn(dependencies().materializeConnector!);
     const result = await executeEnvironmentProbeGatewayCapability({
       turnId: TURN_ID,
       toolCallId: `${TOOL_CALL_ID}:member`,
@@ -754,10 +1111,12 @@ describe("environment probe workstation gateway", () => {
       dependencies: dependencies({
         readMembership: async () => memberMembership,
         readRoom: async () => memberRoom,
-        listSourceCandidates: async () => [{
-          ...sourceCandidate,
-          ownerProfileId: "profile:room-owner",
-        }],
+        listSourceCandidates: async () => [
+          {
+            ...sourceCandidate,
+            ownerProfileId: "profile:room-owner",
+          },
+        ],
         materializeConnector,
       }),
     });
@@ -784,7 +1143,9 @@ describe("environment probe workstation gateway", () => {
       ok: false,
       error: "permission_revoked",
     });
-    expect(result.summary).toContain("exact server-scoped room conversation thread");
+    expect(result.summary).toContain(
+      "exact server-scoped room conversation thread",
+    );
     expect(dispatchProbe).not.toHaveBeenCalled();
   });
 
@@ -822,7 +1183,8 @@ describe("environment probe workstation gateway", () => {
       participants: room.participants.map((participant) =>
         participant.participant_id === membership.participantId
           ? { ...participant, presence: "left" as const }
-          : participant),
+          : participant,
+      ),
     };
     const result = await executeEnvironmentProbeGatewayCapability({
       turnId: TURN_ID,
@@ -861,7 +1223,8 @@ describe("environment probe workstation gateway", () => {
                 updated_at: "2026-07-27T12:01:00.000Z",
               },
             }
-          : participant),
+          : participant,
+      ),
     };
     const result = await executeEnvironmentProbeGatewayCapability({
       turnId: TURN_ID,
@@ -1078,9 +1441,7 @@ describe("environment probe workstation gateway", () => {
       adapterAdmission,
       capabilityDescriptors: [],
     });
-    const materializeConnector = vi.fn(
-      dependencies().materializeConnector!,
-    );
+    const materializeConnector = vi.fn(dependencies().materializeConnector!);
     const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
     const result = await executeEnvironmentProbeGatewayCapability({
       turnId: TURN_ID,
@@ -1128,6 +1489,69 @@ describe("environment probe workstation gateway", () => {
       status: "blocked",
       error: "target_ambiguous",
     });
+  });
+
+  it("selects the sole fresh exact-profile source when an older pairing is stale", async () => {
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const currentSource = {
+      ...sourceCandidate,
+      bindingId: "room_source_binding:current",
+      sourceId: "source:room-ingress:current",
+      requestReceivedAt: "2026-07-27T11:59:59.000Z",
+    };
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: TURN_ID,
+      toolCallId: TOOL_CALL_ID,
+      arguments: { target: "current_actor" },
+      policy: policy(),
+      dependencies: dependencies({
+        listSourceCandidates: async () => [
+          {
+            ...sourceCandidate,
+            bindingId: "room_source_binding:stale",
+            sourceId: "source:room-ingress:stale",
+            requestReceivedAt: "2026-07-27T11:40:00.000Z",
+          },
+          currentSource,
+        ],
+        dispatchProbe,
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(dispatchProbe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        roomId: ROOM_ID,
+        sourceId: currentSource.sourceId,
+      }),
+    );
+  });
+
+  it("returns a stale typed failure when every matching source is stale", async () => {
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: TURN_ID,
+      toolCallId: TOOL_CALL_ID,
+      arguments: { target: "current_actor" },
+      policy: policy(),
+      dependencies: dependencies({
+        listSourceCandidates: async () => [
+          {
+            ...sourceCandidate,
+            requestReceivedAt: "2026-07-27T11:40:00.000Z",
+          },
+        ],
+        dispatchProbe,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      error: "result_stale",
+    });
+    expect(result.summary).toContain("Every matching Minecraft connector");
+    expect(dispatchProbe).not.toHaveBeenCalled();
   });
 
   it("rejects a capability-lane call without exact tool-call identity", async () => {

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.casimirbot.helixsensor.HelixJsonTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-08-03T03:51:47.358Z" hostname="LAPTOP-FPCDI341" time="0.027">
+<testsuite name="com.casimirbot.helixsensor.HelixJsonTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-08-03T19:53:05.926Z" hostname="LAPTOP-FPCDI341" time="0.032">
   <properties/>
-  <testcase name="strictContractEncodingCanPreserveExplicitNullFields()" classname="com.casimirbot.helixsensor.HelixJsonTest" time="0.027"/>
+  <testcase name="strictContractEncodingCanPreserveExplicitNullFields()" classname="com.casimirbot.helixsensor.HelixJsonTest" time="0.032"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

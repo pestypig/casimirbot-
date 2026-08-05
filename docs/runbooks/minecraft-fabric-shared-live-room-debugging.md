@@ -4,11 +4,13 @@ Use this runbook to test the complete local Minecraft environment-capability
 path with a real player, the Fabric 1.21.8 sensor, a Shared Live Room, and GPT
 Live or another Helix reasoning provider.
 
-This is an observation-only acceptance workflow. The Fabric sensor can answer
-the eight admitted read-only probes documented in
-[`../minecraft-fabric-sensor-mod.md`](../minecraft-fabric-sensor-mod.md). It
-does not execute Minecraft commands, mutate the world, reveal its source
-credential to the model, or make a source receipt authoritative as an answer.
+This acceptance workflow has two explicit phases. The baseline phase exercises
+the admitted read-only probes documented in
+[`../minecraft-fabric-sensor-mod.md`](../minecraft-fabric-sensor-mod.md). The
+optional agency phase uses the separately credentialed command lane only after
+the room owner configures a time-bounded authority lease and completes command
+pairing in game. Neither phase reveals connector credentials to the model or
+makes a source receipt authoritative as an answer.
 
 ## What this test proves
 
@@ -28,6 +30,12 @@ must execute against the currently bound world, its fresh result must re-enter
 the same reasoning turn, and the provider must synthesize the answer after that
 observation. A room card, heartbeat, receipt, or previous observation is not a
 substitute for current-turn evidence.
+
+The optional command phase must additionally prove command admission,
+execution, observation re-entry, later Codex synthesis, and a fresh read-only
+verification of the intended world effect. Starting the command runtime or
+publishing its Brigadier catalog does not by itself prove that a mutation was
+authorized or executed.
 
 ## Local test assets
 
@@ -57,8 +65,10 @@ test to a Minecraft client on the same workstation.
   this repository.
 - Room-source credentials are bound to one room, source, world, adapter, and
   credential epoch. Do not copy a Paper binding into the Fabric sensor.
-- Keep `execution_enabled=false`. This runbook does not test a command or
-  mutation lane.
+- Keep the source's default observation credential read-only. Enable command
+  execution only through the distinct room-owner command-authority and
+  command-pairing workflow; never repurpose the source credential as command
+  authority.
 
 ## 1. Start or verify keyed CasimirBot
 
@@ -97,7 +107,7 @@ Expected server signals:
 
 ```text
 Loading Minecraft 1.21.8 with Fabric Loader 0.18.4
-helix_fabric_sensor 0.1.0
+helix_fabric_sensor 0.2.0
 Starting Minecraft server on 127.0.0.1:25565
 Preparing level "helix_fabric_test_world"
 Done (...)! For help, type "help"
@@ -280,6 +290,26 @@ provider performs a later reasoning step
 terminal eligibility checked
 one consistent text/voice answer completed
 ```
+
+For an authorized command scenario, extend the ordering with:
+
+```text
+owner command lease verified
+runtime proposes exact command capability and arguments
+Helix admits or rejects the command under the current lease
+Fabric executes one admitted command
+command result re-enters Codex
+Codex reports the result
+fresh read-only verification confirms or disproves the intended effect
+```
+
+Use `turn_lifecycle_differential_audit` to compare the verified re-entry and
+Codex message with the provider candidate, route-product materialization,
+terminal single writer, and visible answer. An explicit evidence-quality or
+policy failure with typed reason codes is a valid fail-closed boundary. A later
+rail silently replacing an authorized candidate is an
+`adapter_projection_contradiction` and must be fixed at the first divergent
+stage.
 
 The model-visible observation must retain these boundaries:
 

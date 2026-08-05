@@ -115,6 +115,63 @@ describe("compound capability synthesis readiness", () => {
     expect(readiness.support_refs).toEqual(["obs:doc-location", "obs:calculator"]);
   });
 
+  it("uses general compound synthesis for docs plus live Minecraft execution", () => {
+    const rows = [
+      {
+        subgoal_id: "subgoal:mechanics-doc",
+        requested_capability: "docs.search",
+        executed_capability: "docs.search",
+        observation_kind: "doc_location_matches",
+        observation_ref: "obs:mechanics-doc",
+        support_refs: ["obs:mechanics-doc"],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      },
+      {
+        subgoal_id: "subgoal:minecraft-fill",
+        requested_capability: "com.casimirbot.minecraft.command",
+        executed_capability: "com.casimirbot.minecraft.command",
+        observation_kind: "environment_command_observation",
+        observation_ref: "obs:minecraft-fill",
+        support_refs: ["obs:minecraft-fill"],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      },
+    ];
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {
+        compound_capability_contract: {
+          schema: "helix.compound_capability_contract.v1",
+          subgoal_identity_policy: "provider_call_occurrence",
+          requires_all_subgoals: true,
+          subgoals: rows.map((row) => ({
+            subgoal_id: row.subgoal_id,
+            requested_capability: row.requested_capability,
+            runtime_capability: row.requested_capability,
+            mandatory: true,
+          })),
+        },
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: true,
+          compound_subgoal_ledger: rows,
+        },
+      },
+      artifacts: [],
+    });
+
+    expect(readiness).toMatchObject({
+      applies: true,
+      complete: true,
+      synthesis_required: true,
+      has_docs_subgoal: true,
+      goal_kind: "compound_evidence_synthesis",
+      required_terminal_kind: "compound_evidence_synthesis_answer",
+      synthesis_terminal_kind: "compound_evidence_synthesis_answer",
+    });
+  });
+
   it("materializes docs plus calculator compounds as compound synthesis despite calculator route terminal", () => {
     const turnId = "ask:test:docs-calculator-materializer";
     const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;

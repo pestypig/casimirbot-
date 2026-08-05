@@ -67,6 +67,7 @@ import {
   providerBridgeCapabilityLaneEvidenceReentryCompatible,
 } from "./provider-evidence-reentry-compatibility";
 import { reconcileAuthoritativeTypedFailureLifecycle } from "./runtime/typed-failure-lifecycle-reconciliation";
+import { buildHelixTurnLifecycleDifferentialAudit } from "./runtime/turn-lifecycle-differential-audit";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -2472,6 +2473,20 @@ const currentTurnProviderBridgeAllowsCanonicalTerminalKind = (
     readConcreteTerminalKind(canonicalGoalFrame?.required_terminal_kind) ===
       kind,
   );
+  const reconciledCanonicalGoalProviderProjection = Boolean(
+    canonicalGoalSource === "committed_route_canonical_goal_reconciliation" &&
+      readString(canonicalGoalFrame?.requested_capability) &&
+      readConcreteTerminalKind(canonicalGoalFrame?.required_terminal_kind) ===
+        kind &&
+      readArray(canonicalGoalFrame?.allowed_terminal_artifact_kinds)
+        .map(readString)
+        .filter(Boolean)
+        .includes(kind) &&
+      !readArray(canonicalGoalFrame?.forbidden_terminal_artifact_kinds)
+        .map(readString)
+        .filter(Boolean)
+        .includes(kind),
+  );
   const capabilityLaneProviderAnswerHandoff = Boolean(
     kind === "agent_provider_terminal_candidate" &&
     canonicalGoalSource ===
@@ -2481,7 +2496,9 @@ const currentTurnProviderBridgeAllowsCanonicalTerminalKind = (
   );
   if (
     !turnId ||
-    (!providerGatewayTerminalProjection && !capabilityLaneProviderAnswerHandoff)
+    (!providerGatewayTerminalProjection &&
+      !reconciledCanonicalGoalProviderProjection &&
+      !capabilityLaneProviderAnswerHandoff)
   )
     return false;
 
@@ -3168,12 +3185,26 @@ const ensureLedgerBackedCompoundFinalAnswerDraft = (input: {
     );
     return `${index + 1}. ${capability}: ${summary}`;
   });
-  const hasDoc = summaries.some((summary) =>
-    /doc(?:s|-viewer)?|document evidence|citation|located/i.test(summary),
-  );
-  const hasCalculator = summaries.some((summary) =>
-    /calculator|calculation|expression|evaluated|result/i.test(summary),
-  );
+  const railCapabilityText = railRows
+    .flatMap((entry) => [
+      readString(entry.requested_capability),
+      readString(entry.executed_capability),
+      readString(entry.selected_capability),
+      readString(entry.capability_family),
+      readString(entry.plan_family),
+      readString(entry.route_family),
+      readString(entry.observation_kind),
+    ])
+    .filter((entry): entry is string => Boolean(entry))
+    .join(" ");
+  const hasDoc =
+    /docs?(?:-viewer)?\.|document[_-]evidence|doc[_-](?:location|summary|search)/i.test(
+      railCapabilityText,
+    );
+  const hasCalculator =
+    /scientific-calculator\.|\bcalculator\b|calculator_(?:result|receipt)/i.test(
+      railCapabilityText,
+    );
   const connection =
     hasDoc && hasCalculator
       ? "Connection: the document evidence supplies the policy or claim context, and the calculator observation supplies the numeric result used to check or illustrate that context."
@@ -10746,5 +10777,57 @@ export function applyHelixTerminalAuthoritySingleWriter(
     }
   }
 
+  // Diagnostics only: compare the verified Codex lifecycle with every
+  // downstream projection after the single writer has finished. This audit
+  // cannot authorize or rewrite an answer. Keeping it nested under the writer
+  // also prevents older debug exporters from replacing the richer comparison
+  // with the legacy lifecycle-only audit.
+  const lifecycleDifferentialAudit =
+    buildHelixTurnLifecycleDifferentialAudit({
+      payload: input.payload,
+      turnId: input.turnId,
+    });
+  result = {
+    ...result,
+    integrity: {
+      ...result.integrity,
+      lifecycle_differential_audit: lifecycleDifferentialAudit,
+    },
+  };
+  input.payload.turn_lifecycle_differential_audit =
+    lifecycleDifferentialAudit;
+  input.payload.terminal_authority_single_writer = result;
+  if (debug) {
+    debug.turn_lifecycle_differential_audit = lifecycleDifferentialAudit;
+    debug.terminal_authority_single_writer = result;
+  }
+
   return result;
+}
+
+/**
+ * Recomputes the diagnostic lifecycle differential after a provider has
+ * attached its final canonical runtime event log. This never selects or
+ * rewrites a terminal artifact; it only replaces an earlier incomplete audit
+ * that may have been produced before the lifecycle was materialized.
+ */
+export function refreshHelixTurnLifecycleDifferentialAudit(input: {
+  payload: Record<string, unknown>;
+  turnId: string;
+}): ReturnType<typeof buildHelixTurnLifecycleDifferentialAudit> {
+  const audit = buildHelixTurnLifecycleDifferentialAudit(input);
+  input.payload.turn_lifecycle_differential_audit = audit;
+  const writer = readRecord(input.payload.terminal_authority_single_writer);
+  const writerIntegrity = readRecord(writer?.integrity);
+  if (writerIntegrity) writerIntegrity.lifecycle_differential_audit = audit;
+  const debug = readRecord(input.payload.debug);
+  if (debug) {
+    debug.turn_lifecycle_differential_audit = audit;
+    const debugWriter = readRecord(debug.terminal_authority_single_writer);
+    const debugWriterIntegrity = readRecord(debugWriter?.integrity);
+    if (debugWriterIntegrity) {
+      debugWriterIntegrity.lifecycle_differential_audit = audit;
+    }
+  }
+  return audit;
 }

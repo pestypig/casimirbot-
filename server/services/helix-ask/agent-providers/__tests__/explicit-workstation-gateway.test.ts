@@ -27,6 +27,8 @@ import { resetInterimVoiceCalloutsForTest } from "../../interim-voice-callout-st
 import { runtimeMemoryGovernor } from "../../../runtime/runtime-memory-governor";
 import { ensureCodexPreGatewayRouteAuthority } from "../codex-provider";
 import { hasExplicitScholarlyProviderRecordAuditIntent } from "../prompt-named-tool-requests";
+import { buildMinecraftMechanicsDocsWorkstationGatewayCallRequests } from "../active-context-tool-requests";
+import { buildCommittedAskRoute } from "../../committed-ask-route";
 
 const docSnapshot = {
   activePanel: "scientific-calculator",
@@ -2187,6 +2189,285 @@ describe("explicit workstation gateway derived calls", () => {
       }),
     ]);
   });
+
+  it("grounds an affirmative natural Minecraft command with room-scoped mechanics evidence before the model authors the command", () => {
+    const question =
+      "Can you make me glow for ten seconds in the connected Minecraft world?";
+
+    expect(
+      buildMinecraftMechanicsDocsWorkstationGatewayCallRequests({ question }),
+    ).toEqual([
+      expect.objectContaining({
+        derivation_source: "helix_minecraft_command_mechanics_grounding",
+        capability_id: "docs.search",
+        mode: "read",
+        arguments: expect.objectContaining({
+          query: question,
+          environment_scope: "active_room_environment",
+          source_target_intent: expect.objectContaining({
+            target_kind: "environment_mechanics_docs",
+            execution_intent: "ground_model_authored_environment_command",
+            terminal_eligible: false,
+          }),
+        }),
+      }),
+    ]);
+  });
+
+  it("does not inject mechanics docs for a read-only Minecraft command-catalog query", () => {
+    const question =
+      'Use only com.casimirbot.minecraft.command.catalog against the paired live Fabric source. Query the current command tree with path_prefix "helixgame checkpoint" and limit 64. Report the fresh catalog entries. Do not execute any command and do not use another tool.';
+
+    expect(
+      buildMinecraftMechanicsDocsWorkstationGatewayCallRequests({
+        question,
+        trusted_room_environment_intent_context: {
+          schema: "helix.trusted_room_environment_intent_context.v1",
+          trusted_environment_domain: "minecraft",
+          source: "authenticated_room_environment_subject",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it("does not inject mechanics docs when an affirmative Minecraft command call is schema-complete", () => {
+    const question =
+      'Run exactly one command in the paired Minecraft Fabric environment. Use com.casimirbot.minecraft.command with command "helixgame checkpoint status", category "query", and effect "read_only". Do not run any other command.';
+
+    expect(
+      buildMinecraftMechanicsDocsWorkstationGatewayCallRequests({
+        question,
+        trusted_room_environment_intent_context: {
+          schema: "helix.trusted_room_environment_intent_context.v1",
+          trusted_environment_domain: "minecraft",
+          source: "authenticated_room_environment_subject",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it("honors an isolated exact command even when its redundant risk label needs server canonicalization", () => {
+    const question =
+      'Run exactly one command in the paired Minecraft Fabric environment. Use com.casimirbot.minecraft.command with command "time query daytime", category "server_query", and effect "read_only". Do not run any other command or tool.';
+
+    expect(
+      buildMinecraftMechanicsDocsWorkstationGatewayCallRequests({
+        question,
+        trusted_room_environment_intent_context: {
+          schema: "helix.trusted_room_environment_intent_context.v1",
+          trusted_environment_domain: "minecraft",
+          source: "authenticated_room_environment_subject",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it("grounds a semantic structure action from an authenticated Minecraft room even when the prompt omits the game name", () => {
+    const question =
+      "At my current safe plains site, build a freestanding stone-brick wall five blocks long north-south and three blocks high. Inspect first, capture a rollback checkpoint, and do not build if no safe site is verified.";
+    const trustedRoomEnvironment = {
+      schema: "helix.trusted_room_environment_intent_context.v1",
+      trusted_environment_domain: "minecraft",
+      source: "authenticated_room_environment_subject",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    expect(
+      buildMinecraftMechanicsDocsWorkstationGatewayCallRequests({
+        question,
+        trusted_room_environment_intent_context: trustedRoomEnvironment,
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        derivation_source: "helix_minecraft_command_mechanics_grounding",
+        capability_id: "docs.search",
+        mode: "read",
+        arguments: expect.objectContaining({
+          query: question,
+          environment_scope: "active_room_environment",
+          source_target_intent: expect.objectContaining({
+            target_kind: "environment_mechanics_docs",
+            execution_intent: "ground_model_authored_environment_command",
+            terminal_eligible: false,
+          }),
+        }),
+      }),
+    ]);
+  });
+
+  it("orders room-scoped mechanics evidence before runtime-authored Minecraft action observations", () => {
+    const question =
+      "At my current safe plains site, build a freestanding stone-brick wall five blocks long north-south and three blocks high. Inspect first, capture a rollback checkpoint, and do not build if no safe site is verified.";
+    const turnId = "ask:test:semantic-wall-mechanics-order";
+    const body: Record<string, unknown> = {
+      agent_runtime: "codex",
+      question,
+      trusted_room_environment_intent_context: {
+        schema: "helix.trusted_room_environment_intent_context.v1",
+        trusted_environment_domain: "minecraft",
+        source: "authenticated_room_environment_subject",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      source_target_intent: {
+        target_source: "live_environment",
+        target_kind: "live_environment",
+        strength: "hard",
+      },
+      capability_selection_result: {
+        selected_capability:
+          "com.casimirbot.minecraft.spatial_region.inspect",
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_evidence_synthesis",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      tool_call_admission_decision: {
+        source_target: "live_environment",
+        admitted_tool_families: ["live_environment"],
+        requested_capability:
+          "com.casimirbot.minecraft.spatial_region.inspect",
+        compound_requested_capabilities: [
+          "com.casimirbot.minecraft.spatial_region.inspect",
+          "com.casimirbot.minecraft.command.catalog",
+          "com.casimirbot.minecraft.command",
+        ],
+      },
+    };
+    body.committed_ask_route = buildCommittedAskRoute({
+      turnId,
+      promptText: question,
+      selectedRoute: "environment_connector_capability",
+      payload: body,
+    });
+
+    expect(
+      (body.committed_ask_route as {
+        capability_policy: { allowed_tool_families: string[] };
+      }).capability_policy.allowed_tool_families,
+    ).toEqual(expect.arrayContaining(["live_environment", "docs_viewer"]));
+    expect(
+      capabilities(
+        readWorkstationGatewayCallRequestsForTurn({
+          includePlannerDerived: true,
+          body,
+        }),
+      ),
+    ).toEqual(["docs.search"]);
+  });
+
+  it("retains read-only Minecraft mechanics grounding inside a committed live-environment command route", () => {
+    const question =
+      "Can you make me glow for ten seconds in the connected Minecraft world?";
+    const turnId = "ask:test:minecraft-command-mechanics-grounding";
+    const body: Record<string, unknown> = {
+      agent_runtime: "codex",
+      question,
+      source_target_intent: {
+        target_source: "live_environment",
+        target_kind: "live_environment",
+        strength: "hard",
+      },
+      canonical_goal_frame: {
+        goal_kind: "live_environment",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      tool_call_admission_decision: {
+        source_target: "live_environment",
+        admitted_tool_families: ["live_environment", "workstation_action"],
+        requested_capability: "com.casimirbot.minecraft.command",
+        admitted_capability: "com.casimirbot.minecraft.command",
+      },
+      capability_plan: {
+        selected_capability: "com.casimirbot.minecraft.command",
+        source_target: "live_environment",
+        family: "live_environment",
+      },
+    };
+    body.committed_ask_route = buildCommittedAskRoute({
+      turnId,
+      promptText: question,
+      selectedRoute: "environment_connector_capability",
+      payload: body,
+    });
+
+    expect(
+      (body.committed_ask_route as {
+        capability_policy: {
+          allowed_tool_families: string[];
+          required_capability_families: string[];
+        };
+      }).capability_policy,
+    ).toMatchObject({
+      allowed_tool_families: expect.arrayContaining([
+        "live_environment",
+        "docs_viewer",
+      ]),
+      required_capability_families: ["live_environment"],
+    });
+    expect(
+      capabilities(
+        readWorkstationGatewayCallRequestsForTurn({
+          includePlannerDerived: true,
+          body,
+        }),
+      ),
+    ).toContain("docs.search");
+  });
+
+  it.each([
+    "Do not make me glow in the connected Minecraft world.",
+    "Later I may ask you to make me glow in Minecraft.",
+    "If I join again, make me glow in Minecraft.",
+    'The screen says "Can you make me glow in Minecraft?"',
+    '"Make me glow in Minecraft" is only an example request.',
+    "Historically, I asked you to make me glow in Minecraft.",
+    "Can you explain how to make me glow in Minecraft?",
+    "Explain glowing in Minecraft, but do not apply it.",
+  ])(
+    "does not prefetch command mechanics for contextual or non-executing wording: %s",
+    (question) => {
+      expect(
+        buildMinecraftMechanicsDocsWorkstationGatewayCallRequests({ question }),
+      ).toEqual([]);
+    },
+  );
+
+  it.each([
+    'The room transcript contains "build a freestanding stone-brick wall beside me."',
+    "If the area is clear later, build a freestanding stone-brick wall beside me.",
+    "At my current site, do not build a freestanding stone-brick wall beside me.",
+    "Historically, we built a freestanding stone-brick wall beside me.",
+  ])(
+    "does not prefetch mechanics from trusted room scope for non-executing structure wording: %s",
+    (question) => {
+      expect(
+        buildMinecraftMechanicsDocsWorkstationGatewayCallRequests({
+          question,
+          trusted_room_environment_intent_context: {
+            schema: "helix.trusted_room_environment_intent_context.v1",
+            trusted_environment_domain: "minecraft",
+            source: "authenticated_room_environment_subject",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        }),
+      ).toEqual([]);
+    },
+  );
 
   it("maps structured capability catalog admissions onto the executable catalog gateway", () => {
     const requests = buildStructuredAdmissionWorkstationGatewayCallRequests({

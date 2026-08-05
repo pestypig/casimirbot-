@@ -32,6 +32,7 @@ import {
   evaluateEnvironmentCommandPreflightAdmission,
 } from "./authority-policy";
 import { readEnvironmentCommandAuthority } from "./authority-store";
+import { commandRequiresSelectedSubjectSource } from "./command-subject-policy";
 
 const DEFAULT_COMMAND_CREDENTIAL_TTL_MS = 24 * 60 * 60 * 1_000;
 const MAX_COMMAND_CREDENTIAL_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -825,6 +826,8 @@ export const enqueueEnvironmentCommand = async (input: {
     "player_inventory",
     "player_movement",
   ].includes(input.requestedCategory);
+  const selectedSubjectTargeted =
+    playerTargeted || commandRequiresSelectedSubjectSource(command);
   const preflightDb = await readSharedRealtimeRoomDatabase();
   const preflightCatalog = await latestCatalog(
     preflightDb,
@@ -838,7 +841,7 @@ export const enqueueEnvironmentCommand = async (input: {
     );
   }
   let subjectNativeId: string | null = null;
-  if (playerTargeted) {
+  if (selectedSubjectTargeted) {
     const membership = await readSharedRealtimeRoomMembership({
       roomId: input.roomId,
       profileId: input.profileId,
@@ -847,7 +850,7 @@ export const enqueueEnvironmentCommand = async (input: {
       throw new EnvironmentCommandBrokerError(
         "command_policy_denied",
         409,
-        "Select your online player identity in the room before using player-targeted commands.",
+        "Select your online player identity in the room before using player-targeted or @s commands.",
       );
     }
     try {

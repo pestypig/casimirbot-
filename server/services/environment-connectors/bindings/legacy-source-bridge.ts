@@ -48,11 +48,19 @@ export const materializeLegacyRoomSourceConnector = async (input: {
   if (input.capabilityDescriptors.length === 0) {
     throw new Error("environment_connector_capability_catalog_empty");
   }
+  const packageContentHash = environmentConnectorSha256({
+    adapter_profile_id: input.adapterAdmission.adapter_profile_id,
+    adapter_profile_version: input.adapterAdmission.adapter_profile_version,
+    adapter_contract_hash: input.adapterAdmission.adapter_contract_hash,
+    capability_descriptors: input.capabilityDescriptors,
+  });
+  const packageContentVersion = packageContentHash.slice("sha256:".length, 19);
   const packageVersionId =
     `connector_package_version:legacy:${shortHash([
       input.adapterAdmission.adapter_profile_id,
       input.adapterAdmission.adapter_profile_version,
       input.adapterAdmission.adapter_contract_hash,
+      packageContentHash,
     ])}`;
   const packageId =
     `com.casimirbot.legacy.${input.adapterAdmission.source_family}`;
@@ -95,8 +103,8 @@ export const materializeLegacyRoomSourceConnector = async (input: {
         packageVersionId,
         "publisher:casimirbot",
         packageId,
-        `adapter-${input.adapterAdmission.adapter_profile_version}`,
-        input.adapterAdmission.adapter_contract_hash,
+        `adapter-${input.adapterAdmission.adapter_profile_version}-${packageContentVersion}`,
+        packageContentHash,
         JSON.stringify(input.capabilityDescriptors),
       ],
     );

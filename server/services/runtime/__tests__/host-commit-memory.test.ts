@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseLinuxCommitMemory,
   parseWindowsVirtualMemoryOutput,
+  resolveHostCommitCacheUpdate,
 } from "../host-commit-memory";
 
 describe("host commit memory sampling", () => {
@@ -42,5 +43,31 @@ describe("host commit memory sampling", () => {
   it("rejects incomplete samples instead of inventing commit headroom", () => {
     expect(parseWindowsVirtualMemoryOutput("FreeVirtualMemory=1000\n")).toBeNull();
     expect(parseLinuxCommitMemory("CommitLimit: 1000 kB\n")).toBeNull();
+  });
+
+  it("retains the last valid reading across a transient sampler failure", () => {
+    const available = parseWindowsVirtualMemoryOutput(
+      "FreeVirtualMemory=1839856\r\nTotalVirtualMemorySize=19535160\r\n",
+      1234,
+    );
+    const unavailable = {
+      status: "unavailable" as const,
+      source: "sample_error" as const,
+      platform: "win32" as const,
+      errorCode: "windows_sample_invalid",
+    };
+
+    expect(resolveHostCommitCacheUpdate(available, unavailable)).toBe(available);
+  });
+
+  it("fails closed when the first sampler attempt is unavailable", () => {
+    const unavailable = {
+      status: "unavailable" as const,
+      source: "sample_error" as const,
+      platform: "win32" as const,
+      errorCode: "windows_sample_invalid",
+    };
+
+    expect(resolveHostCommitCacheUpdate(null, unavailable)).toEqual(unavailable);
   });
 });

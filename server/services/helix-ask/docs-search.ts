@@ -2,6 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { RepoSearchHit } from "./repo-search";
+import {
+  buildEvidenceUnitsFromText,
+  selectEvidencePassages,
+} from "./retrieval/evidence-passage-selection";
 
 export type DocsSearchDocumentCandidate = {
   path: string;
@@ -22,6 +26,20 @@ export type DocsSearchDocumentCandidate = {
   matched_terms: string[];
 };
 
+export type DocsEvidencePassage = {
+  passage_id: string;
+  path: string;
+  title: string;
+  section?: string;
+  line_start?: number;
+  line_end?: number;
+  text_excerpt: string;
+  relevance_score: number;
+  matched_terms: string[];
+  citation_ref: string;
+  citation_label: string;
+};
+
 const DOCS_SEARCH_QUERY_STOP_WORDS = new Set([
   "a",
   "an",
@@ -40,6 +58,29 @@ const DOCS_SEARCH_QUERY_STOP_WORDS = new Set([
   "the",
 ]);
 const DOCS_SEARCH_LOW_VALUE_TOKENS = new Set(["current", "status", "latest", "report", "memo", "plan"]);
+const DOCS_SEARCH_NUMBER_WORDS = new Map<string, string>([
+  ["zero", "0"],
+  ["one", "1"],
+  ["two", "2"],
+  ["three", "3"],
+  ["four", "4"],
+  ["five", "5"],
+  ["six", "6"],
+  ["seven", "7"],
+  ["eight", "8"],
+  ["nine", "9"],
+  ["ten", "10"],
+  ["eleven", "11"],
+  ["twelve", "12"],
+  ["thirteen", "13"],
+  ["fourteen", "14"],
+  ["fifteen", "15"],
+  ["sixteen", "16"],
+  ["seventeen", "17"],
+  ["eighteen", "18"],
+  ["nineteen", "19"],
+  ["twenty", "20"],
+]);
 const DOCS_TAXONOMY_PATH = path.resolve(process.cwd(), "docs", "doc-taxonomy.v1.json");
 
 type DocsTaxonomyDocumentEntry = {
@@ -79,6 +120,10 @@ const docsSearchAliases = (query: string): string[] => {
   if (/\bwhitepaper\b/i.test(query)) aliases.push("white paper");
   if (/\bnhm2\b/i.test(query)) aliases.push("needle hull mark 2", "needle hull mark2");
   if (/\bneedle\s+hull\s+mark\s*2\b/i.test(query)) aliases.push("nhm2");
+  for (const token of docsSearchQueryTokens(query)) {
+    const numericAlias = DOCS_SEARCH_NUMBER_WORDS.get(token);
+    if (numericAlias) aliases.push(numericAlias);
+  }
   return aliases;
 };
 
@@ -95,9 +140,9 @@ export const buildDocsSearchTerms = (query: string): string[] => {
     query.trim(),
     normalizedQuery,
     normalizedQuery.replace(/\s+/g, ""),
-    ...tokens,
     ...docsSearchAliases(query),
-  ].filter((term) => term.length >= 3);
+    ...tokens,
+  ].filter((term) => term.length >= 3 || /^\d{1,2}$/.test(term));
   return Array.from(new Set(terms.map((term) => term.toLowerCase()))).slice(0, 10);
 };
 
@@ -395,4 +440,55 @@ export const mergeDocsSearchPathCandidates = (
     merged.push(hit);
   }
   return merged;
+};
+
+export const buildDocsEvidencePassages = (
+  candidates: DocsSearchDocumentCandidate[],
+  query: string,
+  limit = 8,
+): DocsEvidencePassage[] => {
+  const workspaceRoot = process.cwd();
+  const docsRoot = path.resolve(workspaceRoot, "docs");
+  const passages: DocsEvidencePassage[] = [];
+
+  for (const candidate of candidates.slice(0, 4)) {
+    const absolutePath = path.resolve(workspaceRoot, candidate.path);
+    const relativeToDocs = path.relative(docsRoot, absolutePath);
+    if (relativeToDocs.startsWith("..") || path.isAbsolute(relativeToDocs)) continue;
+    let text = "";
+    try {
+      text = fs.readFileSync(absolutePath, "utf8");
+    } catch {
+      continue;
+    }
+    const selected = selectEvidencePassages({
+      units: buildEvidenceUnitsFromText({ text }),
+      query,
+      source_ref: `workspace://${candidate.path}`,
+      title: candidate.title,
+      max_passages: 3,
+      max_chars: 1200,
+    });
+    passages.push(...selected.map((passage) => ({
+      passage_id: passage.passage_id,
+      path: candidate.path,
+      title: candidate.title,
+      ...(passage.section ? { section: passage.section } : {}),
+      ...(passage.line_start ? { line_start: passage.line_start } : {}),
+      ...(passage.line_end ? { line_end: passage.line_end } : {}),
+      text_excerpt: passage.text,
+      relevance_score: Number(Math.min(1, passage.relevance_score + (candidate.canonical ? 0.05 : 0)).toFixed(3)),
+      matched_terms: passage.matched_terms,
+      citation_ref: passage.citation_ref,
+      citation_label: passage.citation_label,
+    })));
+  }
+
+  return passages
+    .sort((left, right) =>
+      right.relevance_score - left.relevance_score ||
+      left.path.localeCompare(right.path) ||
+      (left.line_start ?? 0) - (right.line_start ?? 0),
+    )
+    .slice(0, Math.max(1, limit));
 };

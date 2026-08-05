@@ -478,11 +478,29 @@ const cases: BenchmarkCase[] = [
   },
 ];
 
+const promptBenchmarkPreludeOnly = process.env.HELIX_PROMPT_BENCHMARK_PRELUDE_ONLY === "1";
+const promptBenchmarkCaseFilter = (() => {
+  const raw = process.env.HELIX_PROMPT_BENCHMARK_CASE_IDS?.trim();
+  if (!raw) return null;
+  const ids = raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return ids.length > 0 ? new Set(ids) : null;
+})();
+const enabledPromptBenchmarkCases = promptBenchmarkPreludeOnly
+  ? []
+  : promptBenchmarkCaseFilter
+    ? cases.filter((scenario) => promptBenchmarkCaseFilter.has(scenario.id))
+    : cases;
+
 describe("Helix Ask prompt-only adversarial problem-solving benchmark", () => {
   beforeEach(resetAll);
   afterAll(restorePromptBenchmarkLlmEnvironment);
 
-  it("demotes an anaphoric scholarly request with a failure-only antecedent before source admission", async () => {
+  const preludeTest = promptBenchmarkCaseFilter && !promptBenchmarkPreludeOnly ? it.skip : it;
+
+  preludeTest("demotes an anaphoric scholarly request with a failure-only antecedent before source admission", async () => {
     const app = createApp();
     const response = await request(app)
       .post("/api/agi/ask/turn")
@@ -520,7 +538,7 @@ describe("Helix Ask prompt-only adversarial problem-solving benchmark", () => {
     );
   }, 60_000);
 
-  it("preserves scholarly source admission when a blocked referent still names an explicit current-turn topic", async () => {
+  preludeTest("preserves scholarly source admission when a blocked referent still names an explicit current-turn topic", async () => {
     const app = createApp();
     const response = await request(app)
       .post("/api/agi/ask/turn")
@@ -557,7 +575,7 @@ describe("Helix Ask prompt-only adversarial problem-solving benchmark", () => {
     });
   }, 60_000);
 
-  it("does not demote an anaphoric scholarly request when the retained answer contains a scientific claim", async () => {
+  preludeTest("does not demote an anaphoric scholarly request when the retained answer contains a scientific claim", async () => {
     const app = createApp();
     const response = await request(app)
       .post("/api/agi/ask/turn")
@@ -589,11 +607,11 @@ describe("Helix Ask prompt-only adversarial problem-solving benchmark", () => {
     );
   }, 60_000);
 
-  it("contains at least 20 prompt-only cases", () => {
+  preludeTest("contains at least 20 prompt-only cases", () => {
     expect(cases.length).toBeGreaterThanOrEqual(20);
   });
 
-  it.each(cases)(
+  it.each(enabledPromptBenchmarkCases)(
     "$category: $id",
     async (scenario) => {
       const app = createApp();

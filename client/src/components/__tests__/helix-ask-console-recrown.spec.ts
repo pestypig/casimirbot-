@@ -8418,6 +8418,47 @@ describe("Helix Ask Console recrown boundary", () => {
     }
   });
 
+  it("keeps Minecraft read-aloud text exactly aligned with the authoritative visible terminal", () => {
+    const prompt =
+      "Inspect my paired Minecraft Fabric fireplace candidate and report only fresh verified evidence.";
+    const authoritativeAnswer =
+      "No safe fireplace ignition cell was observed within the fresh bounded region; no mutation was performed.";
+    const started = startHelixAskMinimalRuntimeTurn({
+      state: createHelixAskMinimalRuntimeInitialState(),
+      submitPlan: buildHelixAskMinimalRuntimeSubmitPlan({
+        draft: prompt,
+        selectedRuntime: "codex",
+        desktopUrl: "http://127.0.0.1:1498/desktop",
+      }),
+      turnId: "ask:minecraft-fireplace-parity",
+      startedAtMs: Date.UTC(2026, 7, 4, 16, 0, 0),
+    });
+    const completed = completeHelixAskMinimalRuntimeTurn({
+      state: started,
+      turnId: "ask:minecraft-fireplace-parity",
+      result: {
+        selected_final_answer: authoritativeAnswer,
+        answer: "A fireplace was probably lit successfully.",
+        turn_id: "ask:minecraft-fireplace-parity",
+        agent_runtime: "codex",
+        terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      },
+      completedAtMs: Date.UTC(2026, 7, 4, 16, 0, 5),
+    });
+    const [view] = buildHelixAskMinimalRuntimeTurnViews({
+      replies: completed.replies,
+    });
+    const [reply] = completed.replies;
+    const payload = buildHelixAskMinimalRuntimeControlPayload({
+      reply: reply!,
+      view: view!,
+    });
+
+    expect(payload.finalAnswerText).toBe(authoritativeAnswer);
+    expect(payload.readAloudText).toBe(authoritativeAnswer);
+    expect(payload.readAloudText).not.toContain("probably lit successfully");
+  });
+
   it("materializes minimal runtime debug copy from the matching backend export only", async () => {
     const payload = {
       replyId: "reply-latest",

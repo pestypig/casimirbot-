@@ -31,11 +31,25 @@ const minecraftCommandDiscussionScope =
 const explicitCommandNonExecution =
   /\b(?:do\s+not|don't|dont|never)\s+(?:actually\s+)?(?:execute|run|issue|send|apply|change|modify|mutate|use)\b|\bwithout\s+(?:actually\s+)?(?:executing|running|issuing|sending|applying|changing|modifying|mutating|using)\b/i;
 
+const scopedOtherCommandExclusion =
+  /\b(?:do\s+not|don't|dont|never)\s+(?:execute|run|issue|send|apply|use)\s+(?:any\s+)?(?:other|additional|unrelated)\s+(?:minecraft\s+)?commands?\b/i;
+
+const affirmativeExactCommandBefore =
+  /\b(?:run|execute|issue|send|apply|use)\b[\s\S]{0,140}(?:\b(?:exact|catalog|minecraft|fabric)\s+command\b|\/[a-z][a-z0-9:_-]*\b)/i;
+
 /** Keeps command education and quoted syntax out of the live execution lane. */
 export const isMinecraftCommandNonExecutionDiscussionPrompt = (
   promptText: string | null | undefined,
 ): boolean => {
   const prompt = String(promptText ?? "").trim();
+  const scopedExclusion = prompt.match(scopedOtherCommandExclusion);
+  if (
+    scopedExclusion &&
+    typeof scopedExclusion.index === "number" &&
+    affirmativeExactCommandBefore.test(prompt.slice(0, scopedExclusion.index))
+  ) {
+    return false;
+  }
   return Boolean(
     prompt &&
       minecraftCommandDiscussionScope.test(prompt) &&

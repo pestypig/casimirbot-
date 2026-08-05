@@ -3,6 +3,7 @@ package com.casimirbot.helixsensor.manifest;
 import com.casimirbot.helixsensor.HelixSensorConfig;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public final class EnvironmentSourceManifestFactory {
     public static final List<String> SUPPORTED_PROBE_TYPES = List.of(
@@ -33,6 +34,21 @@ public final class EnvironmentSourceManifestFactory {
         String adapterVersion,
         String createdAt
     ) {
+        return build(config, adapterVersion, createdAt, List.of());
+    }
+
+    public static Map<String, Object> build(
+        HelixSensorConfig config,
+        String adapterVersion,
+        String createdAt,
+        List<String> additionalSupportedProbeTypes
+    ) {
+        List<String> supportedProbeTypes = Stream.concat(
+            SUPPORTED_PROBE_TYPES.stream(),
+            additionalSupportedProbeTypes == null
+                ? Stream.empty()
+                : additionalSupportedProbeTypes.stream()
+        ).distinct().toList();
         return Map.ofEntries(
             Map.entry("schema", "helix.environment_source_manifest.v1"),
             Map.entry(
@@ -65,7 +81,7 @@ public final class EnvironmentSourceManifestFactory {
                     "domain_specific"
                 )
             ),
-            Map.entry("supported_probe_types", SUPPORTED_PROBE_TYPES),
+            Map.entry("supported_probe_types", supportedProbeTypes),
             Map.entry("forbidden_probe_types", FORBIDDEN_PROBE_TYPES),
             Map.entry(
                 "snapshot_policy",

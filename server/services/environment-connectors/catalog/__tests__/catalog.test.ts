@@ -9,6 +9,7 @@ import {
   HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
   HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
   HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
   HELIX_SYNTHETIC_REACHABILITY_CAPABILITY,
   helixEnvironmentCapabilityDescriptorSchema,
 } from "@shared/helix-environment-connector";
@@ -51,7 +52,7 @@ describe("environment connector capability catalog", () => {
     ]);
   });
 
-  it("publishes distinct first-party Paper and Fabric packages over the same Minecraft capability contract", () => {
+  it("publishes a Fabric spatial extension without claiming Paper implements it", () => {
     const packages = listBuiltinEnvironmentConnectorPackages();
     const minecraftPackages = packages.filter(
       (entry) => entry.adapterProfileId === "game.minecraft.readonly.v1",
@@ -60,14 +61,54 @@ describe("environment connector capability catalog", () => {
       "com.casimirbot.minecraft.fabric",
       "com.casimirbot.minecraft.paper",
     ]);
-    for (const pkg of minecraftPackages) {
-      expect(
-        pkg.capabilityDescriptors.map((entry) => entry.capability_id),
-      ).toEqual(HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS);
-    }
+    const paper = minecraftPackages.find(
+      (entry) => entry.packageId === "com.casimirbot.minecraft.paper",
+    );
+    const fabric = minecraftPackages.find(
+      (entry) => entry.packageId === "com.casimirbot.minecraft.fabric",
+    );
+    expect(paper?.capabilityDescriptors.map((entry) => entry.capability_id)).toEqual(
+      HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS.filter(
+        (capabilityId) =>
+          capabilityId !== HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      ),
+    );
+    expect(fabric?.capabilityDescriptors.map((entry) => entry.capability_id)).toEqual(
+      HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+    );
+    const spatialDescriptor = fabric?.capabilityDescriptors.find(
+      (entry) =>
+        entry.capability_id === HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    );
+    expect(spatialDescriptor?.capability_version).toBe(2);
+    expect(spatialDescriptor?.input_schema.properties?.purpose?.enum).toContain(
+      "structure_verification",
+    );
+    expect(spatialDescriptor?.input_schema.properties).toEqual(
+      expect.objectContaining({
+        verification_from: expect.any(Object),
+        verification_to: expect.any(Object),
+        expected_block: expect.any(Object),
+      }),
+    );
+    expect(
+      spatialDescriptor?.output_schema.properties
+        ?.target_geometry_verification,
+    ).toEqual(expect.any(Object));
+    expect(spatialDescriptor?.output_schema.required).toEqual(
+      expect.arrayContaining([
+        "columns_complete",
+        "palette_complete",
+        "anchors_complete",
+        "omitted_anchor_count",
+        "fireplace_candidates_complete",
+        "omitted_fireplace_candidate_count",
+        "wire_details_json_bytes",
+      ]),
+    );
     expect(
       readBuiltinEnvironmentConnectorPackage(
-        "connector_package_version:com.casimirbot.minecraft.fabric:0.1.0",
+        "connector_package_version:com.casimirbot.minecraft.fabric:0.2.0",
       )?.hostCompatibility,
     ).toContain("fabric:1.21.8");
   });
@@ -100,6 +141,7 @@ describe("environment connector capability catalog", () => {
         [HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY, "nearby_entities"],
         [HELIX_MINECRAFT_HAZARDS_SCAN_CAPABILITY, "hazard_check"],
         [HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY, "local_map_summary"],
+        [HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY, "spatial_region"],
         [HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY, "line_of_sight"],
         [HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY, "crop_state"],
         [HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY, "reachability"],

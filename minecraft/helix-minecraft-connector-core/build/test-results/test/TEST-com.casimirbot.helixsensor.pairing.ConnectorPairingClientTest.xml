@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-08-03T03:51:47.396Z" hostname="LAPTOP-FPCDI341" time="0.667">
+<testsuite name="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-08-03T19:53:05.973Z" hostname="LAPTOP-FPCDI341" time="0.497">
   <properties/>
-  <testcase name="acceptsCommandOnlyPairingWithoutReplacingTheSourceCredential()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.624"/>
-  <testcase name="rejectsNonTlsRemotePairingEndpoints()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.014"/>
-  <testcase name="redeemsAndSelfRevokesWithoutPuttingManagementInAgentState()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.025"/>
+  <testcase name="acceptsCommandOnlyPairingWithoutReplacingTheSourceCredential()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.46"/>
+  <testcase name="rejectsNonTlsRemotePairingEndpoints()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.012"/>
+  <testcase name="redeemsAndSelfRevokesWithoutPuttingManagementInAgentState()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.021"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

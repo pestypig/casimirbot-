@@ -309,6 +309,83 @@ describe("Shared Live Room environment panel", () => {
     ).toBe(false);
   });
 
+  it("makes a stale connector-epoch binding explicitly reselectable", async () => {
+    const staleEnvironment = {
+      ...environment,
+      identity_assignment: "reverification_required",
+      self_subject_binding: {
+        schema: "helix.room_environment_subject_binding.v1",
+        subject_binding_id: "environment_subject_binding:stale-alice",
+        room_id: environment.room_id,
+        participant_id: "participant:self",
+        environment_binding_id: environment.environment_binding_id,
+        room_source_binding_id: environment.room_source_binding_id,
+        source_id: environment.source_id,
+        world_id: environment.world_id,
+        subject_kind: "minecraft.player",
+        subject_ref: "environment_subject:alice",
+        subject_label: "Alice",
+        verification_method: "self_claim",
+        confidence: 0.75,
+        status: "stale",
+        producer_epoch_ref: "adapter_epoch:previous-fabric-session",
+        verified_at: "2026-08-01T12:00:00.000Z",
+        last_confirmed_at: "2026-08-01T12:00:00.000Z",
+        expires_at: null,
+        revoked_at: null,
+        content_role: "environment_subject_identity_not_assistant_answer",
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    } as const;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT") {
+        return jsonResponse({
+          ...environmentReceipt([]),
+          message: "Your room identity is now Alice in this environment.",
+          binding: {
+            ...staleEnvironment.self_subject_binding,
+            subject_binding_id: "environment_subject_binding:renewed-alice",
+            status: "active",
+            producer_epoch_ref: "adapter_epoch:current-fabric-session",
+          },
+        });
+      }
+      return jsonResponse(environmentReceipt([staleEnvironment]));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <SharedLiveRoomSourceBindingsPanel
+        roomId={environment.room_id}
+        roomClosed={false}
+        isOwner={false}
+        selfParticipantId="participant:self"
+      />,
+    );
+
+    expect(await screen.findByText("Reverify Alice")).toBeTruthy();
+    expect(screen.getByText(/connector session changed/i)).toBeTruthy();
+    const selector = screen.getByLabelText("Your identity in this environment");
+    expect(selector).toHaveValue("");
+    expect(screen.getByRole("option", { name: "Choose again to reverify" }))
+      .toBeTruthy();
+
+    fireEvent.change(selector, { target: { value: "environment_subject:alice" } });
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/environments/environment_binding%3Afabric-room/me"),
+        expect.objectContaining({
+          method: "PUT",
+          credentials: "include",
+          body: JSON.stringify({ subject_ref: "environment_subject:alice" }),
+        }),
+      ),
+    );
+  });
+
   it("refreshes an online subject roster without overlapping a pending request", async () => {
     vi.useFakeTimers();
     let resolveInitial: ((response: Response) => void) | null = null;

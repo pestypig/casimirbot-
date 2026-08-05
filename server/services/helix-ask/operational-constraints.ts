@@ -6,6 +6,8 @@ import {
   type HelixOperationalConstraintPacket,
   type HelixOperationalSatisfactionEvaluation,
 } from "@shared/helix-operational-constraints";
+import { HELIX_MINECRAFT_COMMAND_CAPABILITY } from "@shared/helix-environment-command";
+import { isExclusiveExplicitMinecraftCommandToolRequest } from "./explicit-capability-contract";
 
 type RecordLike = Record<string, unknown>;
 
@@ -144,12 +146,24 @@ export const buildTurnOperationalConstraints = (input: {
   const forbidden = detectForbiddenTools(input.promptText, negativeConstraints);
   const surface = detectRequestedSurface(input.promptText);
   const localTermBindings = detectLocalTermBindings(input.promptText);
+  const exclusiveMinecraftCommand =
+    isExclusiveExplicitMinecraftCommandToolRequest(input.promptText);
+  const exclusiveToolCapabilities = exclusiveMinecraftCommand
+    ? [HELIX_MINECRAFT_COMMAND_CAPABILITY]
+    : [];
+  const requestedToolCardinality = exclusiveMinecraftCommand ? 1 : null;
   const operatorConstraints = unique([
     ...negativeConstraints,
     ...forbidden.forbiddenTools.map((tool) => `forbidden_tool:${tool}`),
     ...forbidden.forbiddenFamilies.map((family) => `forbidden_tool_family:${family}`),
     ...(surface.requiredSurface ? [`required_surface:${surface.requiredSurface}`] : []),
     ...localTermBindings.map((binding) => `local_term:${binding.term}=${binding.meaning}`),
+    ...exclusiveToolCapabilities.map(
+      (capability) => `exclusive_tool_capability:${capability}`,
+    ),
+    ...(requestedToolCardinality !== null
+      ? [`requested_tool_cardinality:${requestedToolCardinality}`]
+      : []),
   ]);
 
   return {
@@ -159,6 +173,8 @@ export const buildTurnOperationalConstraints = (input: {
     required_surface: surface.requiredSurface,
     forbidden_tools: forbidden.forbiddenTools,
     forbidden_tool_families: forbidden.forbiddenFamilies,
+    exclusive_tool_capabilities: exclusiveToolCapabilities,
+    requested_tool_cardinality: requestedToolCardinality,
     allowed_fallback_surfaces: surface.allowedFallbackSurfaces,
     fallback_equivalence_policy: surface.fallbackPolicy,
     local_term_bindings: localTermBindings,

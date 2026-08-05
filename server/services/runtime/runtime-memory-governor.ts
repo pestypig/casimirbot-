@@ -248,6 +248,10 @@ export const scheduleRuntimeIdleMemorySettle = (): void => {
     hasActiveTasks: () => activeTasks.size > 0,
   });
 };
+const defaultForegroundMemoryRecovery = (): void => {
+  if (typeof global.gc === "function") global.gc();
+};
+let foregroundMemoryRecovery = defaultForegroundMemoryRecovery;
 const pausableTasks = new Map<string, PausableRuntimeTaskRegistration>();
 const pausedTaskIds = new Set<string>();
 const recentDecisions: RecentRuntimeDecision[] = [];
@@ -271,6 +275,10 @@ const readPositiveIntegerEnv = (name: string, fallback: number): number => {
 const envDisabled = (name: string): boolean => String(process.env[name] ?? "").trim() === "0";
 
 const envEnabled = (name: string): boolean => String(process.env[name] ?? "").trim() === "1";
+
+const lowMemoryDevelopmentModeEnabled = (): boolean =>
+  process.env.NODE_ENV === "development" &&
+  envEnabled("HELIX_LOW_MEMORY_IDLE_GC");
 
 const roundMiB = (value: number): number => Math.round(value * 10) / 10;
 
@@ -345,7 +353,17 @@ const classifyPressure = (
   host: RuntimeAdmissionDecision["host"],
   limits: RuntimeAdmissionDecision["limits"],
 ): { level: RuntimePressureLevel; reason: RuntimeAdmissionDecision["reason"] } => {
-  const hostFreeRatioMin = readPositiveNumberEnv("RUNTIME_MEMORY_HOST_FREE_RATIO_MIN", 0.08);
+  const lowMemoryDevelopmentMode = lowMemoryDevelopmentModeEnabled();
+  // The keyed low-memory launcher supplies an absolute Windows commit reserve.
+  // Keep the production physical-RAM floor unchanged, but do not let the
+  // generic 8% ratio contradict that explicit development reserve on a 16 GiB
+  // workstation. Treat physical free memory below 4% as the emergency floor
+  // in that explicitly paged development mode; commit pressure and the
+  // absolute 1 GiB reserve still fail closed independently.
+  const hostFreeRatioMin = readPositiveNumberEnv(
+    "RUNTIME_MEMORY_HOST_FREE_RATIO_MIN",
+    lowMemoryDevelopmentMode ? 0.04 : 0.08,
+  );
   const hostFreeRatioSoftMin = readPositiveNumberEnv("RUNTIME_MEMORY_HOST_FREE_RATIO_SOFT_MIN", 0.18);
   const hostCommitFreeMinMiB = readPositiveNumberEnv("RUNTIME_MEMORY_HOST_COMMIT_FREE_MIN_MB", 2048);
   const hostCommitFreeSoftMinMiB = readPositiveNumberEnv("RUNTIME_MEMORY_HOST_COMMIT_FREE_SOFT_MIN_MB", 4096);
@@ -382,6 +400,42 @@ const classifyPressure = (
     return { level: "soft_pressure", reason: "ok" };
   }
   return { level: "normal", reason: "ok" };
+};
+
+const recoverForegroundHostMemoryPressure = (
+  input: RuntimeAdmissionInput,
+  memory: RuntimeAdmissionDecision["memory"],
+  host: RuntimeAdmissionDecision["host"],
+  limits: RuntimeAdmissionDecision["limits"],
+  pressure: { level: RuntimePressureLevel; reason: RuntimeAdmissionDecision["reason"] },
+): {
+  memory: RuntimeAdmissionDecision["memory"];
+  host: RuntimeAdmissionDecision["host"];
+  pressure: { level: RuntimePressureLevel; reason: RuntimeAdmissionDecision["reason"] };
+} => {
+  if (
+    input.taskClass !== "active_user_turn" ||
+    pressure.level !== "hard_pressure" ||
+    pressure.reason !== "host_memory_limit" ||
+    !lowMemoryDevelopmentModeEnabled() ||
+    !envEnabled("HELIX_HOST_COMMIT_REQUIRED") ||
+    host?.commit?.status !== "available"
+  ) {
+    return { memory, host, pressure };
+  }
+  try {
+    foregroundMemoryRecovery();
+  } catch {
+    // A failed recovery attempt must retain the original fail-closed result.
+    return { memory, host, pressure };
+  }
+  const recoveredMemory = toMemorySnapshot(memoryReader());
+  const recoveredHost = hostMemoryReader();
+  return {
+    memory: recoveredMemory,
+    host: recoveredHost,
+    pressure: classifyPressure(recoveredMemory, recoveredHost, limits),
+  };
 };
 
 const pushRecentDecision = (
@@ -720,10 +774,17 @@ export const admitRuntimeTask = (
   input: RuntimeAdmissionInput,
 ): RuntimeAdmissionDecision => {
   void maybeResumePausedTasks();
-  const memory = toMemorySnapshot(memoryReader());
-  const host = hostMemoryReader();
+  let memory = toMemorySnapshot(memoryReader());
+  let host = hostMemoryReader();
   const limits = readLimits(input.taskClass);
-  const pressure = classifyPressure(memory, host, limits);
+  let pressure = classifyPressure(memory, host, limits);
+  ({ memory, host, pressure } = recoverForegroundHostMemoryPressure(
+    input,
+    memory,
+    host,
+    limits,
+    pressure,
+  ));
   const budget = DEFAULT_TASK_BUDGETS[input.taskClass];
 
   if (readGuardDisabled(input.taskClass)) {
@@ -842,10 +903,17 @@ export const recheckRuntimeTask = (
   lease: RuntimeTaskLease | undefined,
   input: RuntimeAdmissionInput,
 ): RuntimeAdmissionDecision => {
-  const memory = toMemorySnapshot(memoryReader());
-  const host = hostMemoryReader();
+  let memory = toMemorySnapshot(memoryReader());
+  let host = hostMemoryReader();
   const limits = readLimits(input.taskClass);
-  const pressure = classifyPressure(memory, host, limits);
+  let pressure = classifyPressure(memory, host, limits);
+  ({ memory, host, pressure } = recoverForegroundHostMemoryPressure(
+    input,
+    memory,
+    host,
+    limits,
+    pressure,
+  ));
   if (readGuardDisabled(input.taskClass)) {
     return makeDecision(input, "admit", true, "guard_disabled", pressure.level, memory, host, limits, lease);
   }
@@ -896,6 +964,7 @@ export const unregisterPausableRuntimeTask = (id: string): void => {
 export const resetRuntimeMemoryGovernorForTests = (options?: {
   memoryReader?: RuntimeMemoryReader;
   hostMemoryReader?: RuntimeHostMemoryReader;
+  foregroundMemoryRecovery?: () => void;
 }): void => {
   activeTasks.clear();
   pausableTasks.clear();
@@ -904,6 +973,7 @@ export const resetRuntimeMemoryGovernorForTests = (options?: {
   recentCompletions.length = 0;
   admittedTaskStartsByClass.clear();
   memoryReader = options?.memoryReader ?? (() => process.memoryUsage());
+  foregroundMemoryRecovery = options?.foregroundMemoryRecovery ?? defaultForegroundMemoryRecovery;
   hostMemoryReader = options?.hostMemoryReader ?? (() => {
     const totalMiB = os.totalmem() / BYTES_PER_MIB;
     const freeMiB = os.freemem() / BYTES_PER_MIB;

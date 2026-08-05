@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   attachCodexProviderExactCapabilityItinerary,
   ensureCodexPreGatewayRouteAuthority,
+  runtimeProviderRequiredGroundingCapabilityIdsFromBody,
 } from "../codex-provider";
 import { readWorkstationGatewayCallRequestsForTurn } from "../explicit-workstation-gateway";
 
@@ -740,5 +741,167 @@ describe("Codex provider pre-gateway route authority", () => {
       assistant_answer: false,
       terminal_eligible: false,
     });
+  });
+
+  it("repairs a stale model-only route from an authenticated selected Minecraft subject", () => {
+    const turnId = "ask:minecraft-trusted-room-followup";
+    const prompt =
+      "At my current safe plains site, build a freestanding stone-brick wall five blocks long north-south and three blocks high at the nearest safe level location at least three blocks away from me. Inspect first and avoid my player, entities, structures, foliage, paths, and water. Capture a rollback checkpoint before changing blocks, build only on verified solid support into verified air, inspect the finished wall, and report the exact endpoints plus checkpoint status. If no safe site is verified, do not build.";
+    const body: Record<string, unknown> = {
+      question: prompt,
+      session_id: "helix-ask:room:shared_realtime_room:trusted-wall",
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        turn_id: turnId,
+        thread_id: "helix-ask:room:shared_realtime_room:trusted-wall",
+        target_source: "model_only",
+        target_kind: "general_background",
+        strength: "hard",
+        allow_no_tool_direct: true,
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: turnId,
+        required: false,
+        admitted_tool_families: ["model_only"],
+      },
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId,
+      selectedRoute: "/ask/turn/stream",
+      trustedEnvironmentContext: {
+        schema: "helix.trusted_room_environment_intent_context.v1",
+        trusted_environment_domain: "minecraft",
+        room_id: "shared_realtime_room:trusted-wall",
+        participant_id: "room_participant:owner",
+        environment_binding_ref: "environment_binding:trusted-wall",
+        environment_label: "Local Fabric 1.21.8 source",
+        domain_adapter: "minecraft.fabric_mod.v1",
+        subject_kind: "minecraft.player",
+        subject_label: "DatDamPig",
+        source: "authenticated_room_environment_subject",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+
+    expect(body.source_target_intent).toMatchObject({
+      target_source: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+    });
+    expect(body.tool_call_admission_decision).toMatchObject({
+      required: true,
+      admitted_tool_families: expect.arrayContaining(["live_environment"]),
+      compound_requested_capabilities: expect.arrayContaining([
+        "com.casimirbot.minecraft.spatial_region.inspect",
+        "com.casimirbot.minecraft.command.catalog",
+        "com.casimirbot.minecraft.command",
+      ]),
+    });
+    expect(body.committed_ask_route).toMatchObject({
+      route: {
+        source_target: "live_environment",
+        strength: "hard",
+      },
+      terminal_product: {
+        evidence_reentry_required: true,
+        followup_reasoning_required: true,
+      },
+    });
+  });
+
+  it("puts room-scoped Minecraft mechanics grounding first in the native Codex itinerary", () => {
+    const turnId = "ask:minecraft-mechanics-first-itinerary";
+    const promptText =
+      "At my current safe plains site, build a freestanding stone-brick wall five blocks long north-south and three blocks high. Inspect first, capture a rollback checkpoint, and do not build if no safe site is verified.";
+    const trustedEnvironmentContext = {
+      schema: "helix.trusted_room_environment_intent_context.v1" as const,
+      trusted_environment_domain: "minecraft" as const,
+      room_id: "shared_realtime_room:trusted-wall",
+      participant_id: "room_participant:owner",
+      environment_binding_ref: "environment_binding:trusted-wall",
+      environment_label: "Local Fabric 1.21.8 source",
+      domain_adapter: "minecraft.fabric_mod.v1",
+      subject_kind: "minecraft.player",
+      subject_label: "DatDamPig",
+      source: "authenticated_room_environment_subject" as const,
+      terminal_eligible: false as const,
+      assistant_answer: false as const,
+      raw_content_included: false as const,
+    };
+    const body: Record<string, unknown> = {
+      question: promptText,
+      trusted_room_environment_intent_context: trustedEnvironmentContext,
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: turnId,
+        source_target: "live_environment",
+        requested_capability:
+          "com.casimirbot.minecraft.spatial_region.inspect",
+        selected_capability:
+          "com.casimirbot.minecraft.spatial_region.inspect",
+        admitted_capability:
+          "com.casimirbot.minecraft.spatial_region.inspect",
+        admitted_tool_families: ["live_environment", "docs_viewer"],
+      },
+    };
+
+    expect(
+      attachCodexProviderExactCapabilityItinerary({
+        body,
+        turnId,
+        promptText,
+        trustedEnvironmentContext,
+        availableCapabilities: {
+          capabilities: [
+            { capability_id: "docs.search" },
+            {
+              capability_id:
+                "com.casimirbot.minecraft.spatial_region.inspect",
+            },
+            { capability_id: "com.casimirbot.minecraft.command.catalog" },
+            { capability_id: "com.casimirbot.minecraft.command" },
+          ],
+        },
+      }),
+    ).toBe(true);
+
+    const subgoals = (
+      body.compound_capability_contract as {
+        subgoals: Array<{
+          subgoal_id: string;
+          runtime_capability: string;
+          depends_on_subgoal_ids: string[];
+          args_hint: Record<string, unknown>;
+        }>;
+      }
+    ).subgoals;
+    expect(subgoals.map((subgoal) => subgoal.runtime_capability)).toEqual([
+      "docs.search",
+      "com.casimirbot.minecraft.spatial_region.inspect",
+      "com.casimirbot.minecraft.command.catalog",
+      "com.casimirbot.minecraft.command",
+    ]);
+    expect(subgoals[0].args_hint).toMatchObject({
+      query: promptText,
+      environment_scope: "active_room_environment",
+    });
+    for (const subgoal of subgoals.slice(1)) {
+      expect(subgoal.depends_on_subgoal_ids).toContain(subgoals[0].subgoal_id);
+    }
+    expect(
+      runtimeProviderRequiredGroundingCapabilityIdsFromBody(body),
+    ).toEqual(
+      expect.arrayContaining([
+        "docs.search",
+        "com.casimirbot.minecraft.spatial_region.inspect",
+        "com.casimirbot.minecraft.command.catalog",
+        "com.casimirbot.minecraft.command",
+      ]),
+    );
   });
 });

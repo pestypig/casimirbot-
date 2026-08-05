@@ -125,6 +125,78 @@ const SCHOLARLY_TERMINAL_READY_EVIDENCE_STATE_SET = new Set<string>(
 const gatewayCapability = (result: HelixWorkstationGatewayCallResult): string =>
   result.gateway_admission.requested_capability || result.capability_id;
 
+export const hasSuccessfulLaterRetryForFailedGatewayCapability = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+  failedIndex: number,
+): boolean => {
+  const failed = gatewayCallResults[failedIndex];
+  if (!failed || failed.ok === true) return false;
+  const nextAction = readString(failed.tool_followup_decision?.next_action);
+  const retryRecommendation = readString(
+    failed.tool_lifecycle_trace?.retry_recommendation,
+  );
+  const observation = readRecord(failed.observation);
+  const failureCode =
+    readString(failed.error) ||
+    readString(failed.gateway_admission.blocked_reason) ||
+    readString(observation?.error_code);
+  const retryableInvalidArguments = [
+    "schema_validation_failed",
+    "invalid_arguments",
+    "invalid_args",
+  ].includes(failureCode);
+  const supersedableCurrentTurnReadFailure =
+    failureCode === "current_turn_reentry_ineligible" &&
+    ["read", "observe", "verify"].includes(failed.mode);
+  if (
+    failureCode === "current_turn_reentry_ineligible" &&
+    !supersedableCurrentTurnReadFailure
+  ) {
+    return false;
+  }
+  if (
+    nextAction !== "retry" &&
+    nextAction !== "alternate_probe" &&
+    retryRecommendation !== "retry_same_tool" &&
+    retryRecommendation !== "try_alternate_probe" &&
+    !retryableInvalidArguments &&
+    !supersedableCurrentTurnReadFailure
+  ) {
+    return false;
+  }
+  const failedCapability = gatewayCapability(failed);
+  return gatewayCallResults.some((candidate, index) => {
+    if (candidate.ok !== true) return false;
+    const observationStatus = readString(
+      candidate.observation_packet?.status,
+    ).toLowerCase();
+    const successfulSameCapability =
+      gatewayCapability(candidate) === failedCapability &&
+      (!observationStatus ||
+        /^(?:succeeded|completed|complete|observed|ok)$/.test(
+          observationStatus,
+        ));
+    if (!successfulSameCapability) return false;
+    if (supersedableCurrentTurnReadFailure) {
+      return (
+        index > failedIndex &&
+        ["read", "observe", "verify"].includes(candidate.mode)
+      );
+    }
+    // Gateway result arrays are a projection and can be reverse-ordered after
+    // bounded provider continuation. A read-only invalid-argument attempt is
+    // evidence-compatible once the same capability produced a successful
+    // current-turn observation, regardless of projection order. Mutating and
+    // non-schema failures still require an explicitly later successful retry.
+    return (
+      index > failedIndex ||
+      (retryableInvalidArguments &&
+        failed.mode === "read" &&
+        candidate.mode === "read")
+    );
+  });
+};
+
 const isScholarlyGatewayCapability = (
   result: HelixWorkstationGatewayCallResult,
 ): boolean => SCHOLARLY_GATEWAY_CAPABILITIES.has(gatewayCapability(result));
@@ -325,21 +397,30 @@ const isGatewayObservationCompatibleWithProviderReasoning = (
     selectedScholarlyResultIds?: string[];
     structuredNumericEvidenceRequired?: boolean;
   },
-): boolean =>
-  isRuntimeSelectedUsableScholarlyLookupResult({
-    result,
-    selectedResultIds: options.selectedScholarlyResultIds,
-  }) ||
-  isRuntimeSelectedUsableScholarlyFullTextResult({
-    result,
-    selectedResultIds: options.selectedScholarlyResultIds,
-  }) ||
-  isGatewayObservationReenteredForProviderReasoning(result) ||
-  scholarlyGatewayAttemptWasSupersededByUsableEvidence(
-    result,
-    gatewayCallResults,
-  ) ||
-  isOptionalScholarlyFailureObservation(result, gatewayCallResults, options);
+): boolean => {
+  const resultIndex = gatewayCallResults.indexOf(result);
+  return (
+    isRuntimeSelectedUsableScholarlyLookupResult({
+      result,
+      selectedResultIds: options.selectedScholarlyResultIds,
+    }) ||
+    isRuntimeSelectedUsableScholarlyFullTextResult({
+      result,
+      selectedResultIds: options.selectedScholarlyResultIds,
+    }) ||
+    isGatewayObservationReenteredForProviderReasoning(result) ||
+    scholarlyGatewayAttemptWasSupersededByUsableEvidence(
+      result,
+      gatewayCallResults,
+    ) ||
+    (resultIndex >= 0 &&
+      hasSuccessfulLaterRetryForFailedGatewayCapability(
+        gatewayCallResults,
+        resultIndex,
+      )) ||
+    isOptionalScholarlyFailureObservation(result, gatewayCallResults, options)
+  );
+};
 
 const isTextToSpeechReceiptObservation = (
   packet: HelixAgentStepObservationPacket,
@@ -402,8 +483,19 @@ export const buildHelixProviderReasoningReentry = (input: {
   structuredNumericEvidenceRequired?: boolean;
   committedSubgoalContract?: Record<string, unknown> | null;
 }) => {
-  const capabilityLaneObservationPackets =
-    input.capabilityLaneObservationPackets ?? [];
+  const gatewayObservationRefs = input.gatewayCallResults.flatMap(
+    (result) => result.artifact_refs,
+  );
+  const gatewayObservationRefSet = new Set(gatewayObservationRefs);
+  const capabilityLaneObservationPackets = (
+    input.capabilityLaneObservationPackets ?? []
+  ).filter((packet) => {
+    const refs = packet.produced_artifact_refs.filter(Boolean);
+    return (
+      refs.length === 0 ||
+      !refs.every((ref) => gatewayObservationRefSet.has(ref))
+    );
+  });
   const priorEvidenceObservationPackets =
     input.priorEvidenceObservationPackets ?? [];
   const successfulCapabilityLaneObservationPackets =
@@ -428,9 +520,6 @@ export const buildHelixProviderReasoningReentry = (input: {
     successfulCapabilityLaneObservationPackets.flatMap(
       (packet) => packet.produced_artifact_refs,
     );
-  const gatewayObservationRefs = input.gatewayCallResults.flatMap(
-    (result) => result.artifact_refs,
-  );
   const observationRefs = [
     ...gatewayObservationRefs,
     ...capabilityLaneObservationRefs,

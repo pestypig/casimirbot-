@@ -29,6 +29,36 @@ turn.started
 Events are append-only, ordered, current-turn scoped facts. Stored reductions
 and integrity summaries are always recomputed from the events before use.
 
+## Codex Reference Parity
+
+The ignored local Codex reference checkout provides the behavioral oracle for
+the provider-owned portion of this lifecycle. In
+`external/openai-codex-compare/codex-rs/core/src/session/turn.rs`, a requested
+function call is executed and its output is recorded for the next sampling
+request. The turn continues while the sampling result requires follow-up and
+is considered complete only when the model returns an assistant message with
+no remaining tool request. `tasks/regular.rs` then reports that last agent
+message as the turn result.
+
+Helix parity therefore requires all of the following:
+
+1. A tool result, including a rejected or failed result, is an observation for
+   Codex; it is not an adapter-authored answer.
+2. A recoverable admission, evidence, or quality rejection re-enters Codex as
+   a typed observation while continuation budget remains.
+3. Helix may fail closed immediately only for an unrecoverable permission,
+   identity, provenance, or evidence-integrity boundary, and the terminal
+   typed failure must retain the exact gate and stable reason codes.
+4. A deterministic rail may validate, admit, normalize, and select terminal
+   eligibility. It may not add an unrequested goal, reinterpret a successful
+   observation as non-execution, or compose competing prose after Codex has
+   authored an authorized candidate.
+5. Provider candidate text and current-turn support refs are immutable across
+   route-product materialization, the terminal single writer, and presentation.
+
+This is semantic parity, not a second implementation of Codex's sampler,
+approval system, tool runtime, retry loop, compaction, or terminal machinery.
+
 ## Scope
 
 `codex_native_provider_cycle` proves what happened inside one Codex provider
@@ -78,6 +108,13 @@ tool materially advances the goal. After an attempt, the generic proposal
 surface closes. Continued action then requires a concrete affordance or the
 bounded recovery rule. This preserves runtime initiative without allowing an
 open-ended adapter-owned tool loop.
+
+An explicit operator bound such as “run exactly one command and do not use any
+other tool” is materialized before semantic itinerary expansion. Its exclusive
+capability allowlist and requested cardinality constrain extraction, admission,
+provider continuation, execution, and the differential audit. Structure-aware
+helpers remain available for ordinary semantic requests, but cannot be added
+behind an exact operator boundary.
 
 ## Runtime Boundary Adoption
 
@@ -139,6 +176,73 @@ Policy projections do not lose authority. Route contracts, evidence gates,
 goal satisfaction, active continuation state, and terminal single-writer output
 remain Helix-owned.
 
+## Differential Lifecycle Audit
+
+Factual runtime completion is necessary but does not by itself prove that the
+same Codex result reached the user. For every applicable provider turn, the
+diagnostic differential audit follows one identity-preserving chain:
+
+```txt
+prompt
+-> admitted capability executions
+-> normalized observation refs
+-> verified observation re-entry
+-> Codex final message hash
+-> authorized provider candidate ref/hash/support refs
+-> route-product materialization ref/hash/support refs
+-> terminal single-writer ref/hash/support refs
+-> visible final hash
+```
+
+The audit reports the first divergent stage as `evidence_reentry`,
+`followup_reasoning`, `terminal_materialization`, `terminal_authority`, or
+`presentation`. It does not export raw model text, reconstruct reasoning, or
+grant terminal authority. Text continuity uses SHA-256 values; evidence
+continuity uses current-turn artifact refs. This makes a narrow downstream
+substitution observable without creating another answer-writing agent.
+
+Two dispositions must remain distinct:
+
+- `adapter_projection_contradiction` means a later rail changed, dropped, or
+  replaced an otherwise authorized runtime result. This is an implementation
+  defect and must not be explained as model failure.
+- `hard_evidence_boundary` or `hard_policy_boundary` means Helix rejected the
+  candidate under an explicit provenance, scientific-quality, permission, or
+  route-product contract. A typed failure with the gate's stable reason codes
+  is a successful fail-closed outcome, not a lifecycle contradiction.
+
+An evidence gate may constrain what Codex can claim, but it must not silently
+compose a competing answer. If a rejection is retryable and continuation
+budget remains, the typed rejection observation must re-enter Codex so the
+runtime can revise, gather more evidence, or return an actionable bounded
+failure. Terminalizing a recoverable rejection before that re-entry is itself
+an audit mismatch.
+
+Attempt history and current blockers are separate projections. A failed
+`read`, `observe`, or `verify` attempt with
+`current_turn_reentry_ineligible` remains in the immutable provenance record,
+but it no longer blocks terminal authority when a strictly later attempt of
+the same capability produces a successful current-turn observation. The later
+observation must still normalize, re-enter provider reasoning, and support the
+provider candidate. This exception never applies to `act` attempts, a
+different capability, reverse/stale ordering, or a failure with no later
+successful observation. In those cases Helix remains fail closed.
+
+Supersession changes only which attempts are effective blockers. It does not
+delete the failed attempt, fabricate success, select answer text, or permit a
+deterministic rail to replace Codex's post-observation answer.
+
+A `record_only` admission can have different policy meanings and is not by
+itself proof that execution is forbidden. The bounded terminal-failure reason
+`source_or_capability_terminal_failure_requires_runtime_loop_record` is the
+strict case: it may retain lifecycle and debug evidence but must not issue a
+tool call, synthesize a tool observation, retry, or change the settled failure.
+The differential audit reports
+`record_only_admission_executed_runtime_steps` at `tool_execution` if a
+`runtime_tool_call` or `runtime_tool_observation` appears under that reason.
+Other record-only reasons retain their existing Codex-owned procedural
+behavior and are judged by their own route and continuation contracts.
+
 Receipt and observation language is also exact:
 
 - `receipts_reentered` and `observation_reentry_refs` mean that a verified
@@ -157,6 +261,9 @@ Every applicable Ask debug export exposes:
 
 - `turn_lifecycle` with scope, events, recomputed reduction, and integrity;
 - `turn_lifecycle_projection_audit` for contradictory legacy mirrors;
+- `turn_lifecycle_differential_audit` and the same audit nested under
+  `terminal_authority_single_writer.integrity.lifecycle_differential_audit`
+  for end-to-end candidate, evidence, writer, and visible-output continuity;
 - `ask_turn_solver_trace.runtime_lifecycle_facts` for the facts used by gates;
 - `terminal_boundary_eligibility.runtime_lifecycle` for exact supported
   capability and observation references;
@@ -175,6 +282,11 @@ Deterministic verification must cover:
 - active continuation that must remain blocking;
 - capability and observation mismatch;
 - route and terminal denial despite provider completion;
+- authorized candidate loss, text substitution, and support-ref loss at each
+  downstream stage;
+- scientific/evidence-quality failures that fail closed with their exact
+  reason codes, plus adversarial attempts to bypass those gates;
+- recoverable terminal rejection re-entry while budget remains;
 - stream and non-stream terminal parity.
 
 Keyed-server acceptance then uses natural user prompts across the workstation

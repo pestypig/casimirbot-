@@ -605,6 +605,11 @@ export async function ensureDatabase(): Promise<void> {
     const activePool = getPool();
     migratePromise = runMigrations(activePool).then(async () => {
       await restoreLocalSnapshot(activePool);
+      void import("../services/runtime/runtime-memory-governor")
+        .then(({ scheduleRuntimeIdleMemorySettle }) =>
+          scheduleRuntimeIdleMemorySettle(),
+        )
+        .catch(() => undefined);
       localPersistenceReady = Boolean(localPersistencePath);
       if (
         localPersistenceReady &&

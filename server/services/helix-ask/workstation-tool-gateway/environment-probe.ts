@@ -5,6 +5,7 @@ import {
   HELIX_ENVIRONMENT_PROBE_OBSERVATION_SCHEMA,
   HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
   HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
   type HelixEnvironmentProbeObservation,
   type HelixEnvironmentProbeOutcome,
 } from "@shared/helix-environment-connector";
@@ -24,7 +25,10 @@ import {
   isRoomEnvironmentSubjectError,
   resolveRoomEnvironmentSubjectForProbe,
 } from "../../environment-connectors/subjects";
-import { validateEnvironmentConnectorSchemaValue } from "../../environment-connectors/conformance";
+import {
+  validateEnvironmentConnectorSchemaValue,
+  type EnvironmentConnectorSchemaIssue,
+} from "../../environment-connectors/conformance";
 import {
   awaitDurableEnvironmentProbeObservation,
   dispatchDurableEnvironmentProbe,
@@ -57,7 +61,31 @@ export type EnvironmentProbeGatewayExecution = {
   status: "completed" | "blocked" | "failed";
   summary: string;
   observation: Record<string, unknown>;
+  schemaRepair?: EnvironmentProbeSchemaRepair;
   error?: string;
+};
+
+export type EnvironmentProbeSchemaRepair = {
+  schema: "helix.environment_probe_schema_repair.v1";
+  capability_id: string;
+  failure_class: "invalid_args";
+  retryability: "retryable";
+  issues: EnvironmentConnectorSchemaIssue[];
+  rejected_fields: string[];
+  allowed_fields: string[];
+  required_fields: string[];
+  trusted_input_schema: NonNullable<
+    ReturnType<typeof readEnvironmentConnectorCapabilityDescriptor>
+  >["input_schema"];
+  proposed_arguments: Record<string, unknown> | null;
+  next_affordances: Array<{
+    affordance_id: string;
+    capability_id: string;
+    args: Record<string, unknown>;
+    lane_request: Record<string, unknown>;
+    admissible: true;
+    reason: string;
+  }>;
 };
 
 export type EnvironmentProbeGatewayDependencies = {
@@ -96,7 +124,7 @@ const dependencies = (
 
 const normalized = (value: string): string => value.trim().toLowerCase();
 
-const normalizeServerOwnedSemanticTarget = (input: {
+export const normalizeEnvironmentProbeSemanticArguments = (input: {
   descriptor: NonNullable<
     ReturnType<typeof readEnvironmentConnectorCapabilityDescriptor>
   >;
@@ -112,14 +140,197 @@ const normalizeServerOwnedSemanticTarget = (input: {
     !Array.isArray(wrappedInput)
       ? { ...(wrappedInput as Record<string, unknown>) }
       : input.arguments;
+  const spatialSemanticArguments =
+    input.descriptor.capability_id ===
+    HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY
+      ? { ...semanticArguments }
+      : semanticArguments;
+  if (
+    input.descriptor.capability_id ===
+    HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY
+  ) {
+    const aliasFrom = spatialSemanticArguments.from;
+    const aliasMin = spatialSemanticArguments.min;
+    const aliasTo = spatialSemanticArguments.to;
+    const aliasMax = spatialSemanticArguments.max;
+    const canonicalFrom = spatialSemanticArguments.verification_from;
+    const canonicalTo = spatialSemanticArguments.verification_to;
+    const hasExactVerificationShape =
+      typeof spatialSemanticArguments.expected_block === "string" &&
+      spatialSemanticArguments.expected_block.trim().length > 0 &&
+      Boolean(
+        (canonicalFrom &&
+          typeof canonicalFrom === "object" &&
+          !Array.isArray(canonicalFrom)) ||
+          (aliasFrom && typeof aliasFrom === "object" && !Array.isArray(aliasFrom)) ||
+          (aliasMin && typeof aliasMin === "object" && !Array.isArray(aliasMin)),
+      ) &&
+      Boolean(
+        (canonicalTo &&
+          typeof canonicalTo === "object" &&
+          !Array.isArray(canonicalTo)) ||
+          (aliasTo && typeof aliasTo === "object" && !Array.isArray(aliasTo)) ||
+          (aliasMax && typeof aliasMax === "object" && !Array.isArray(aliasMax)),
+      );
+    if (hasExactVerificationShape) {
+      if (
+        canonicalFrom === undefined &&
+        aliasFrom !== undefined &&
+        aliasMin === undefined
+      ) {
+        spatialSemanticArguments.verification_from = aliasFrom;
+        delete spatialSemanticArguments.from;
+      }
+      if (
+        canonicalFrom === undefined &&
+        aliasFrom === undefined &&
+        aliasMin !== undefined
+      ) {
+        spatialSemanticArguments.verification_from = aliasMin;
+        delete spatialSemanticArguments.min;
+      }
+      if (
+        canonicalTo === undefined &&
+        aliasTo !== undefined &&
+        aliasMax === undefined
+      ) {
+        spatialSemanticArguments.verification_to = aliasTo;
+        delete spatialSemanticArguments.to;
+      }
+      if (
+        canonicalTo === undefined &&
+        aliasTo === undefined &&
+        aliasMax !== undefined
+      ) {
+        spatialSemanticArguments.verification_to = aliasMax;
+        delete spatialSemanticArguments.max;
+      }
+      if (spatialSemanticArguments.purpose === undefined) {
+        spatialSemanticArguments.purpose = "structure_verification";
+      }
+      if (normalized(String(spatialSemanticArguments.mutation ?? "")) === "none") {
+        delete spatialSemanticArguments.mutation;
+      }
+    }
+    if (
+      spatialSemanticArguments.freshness_requirement_ms === undefined &&
+      spatialSemanticArguments.freshness_ms !== undefined
+    ) {
+      spatialSemanticArguments.freshness_requirement_ms =
+        spatialSemanticArguments.freshness_ms;
+      delete spatialSemanticArguments.freshness_ms;
+    }
+    const category = normalized(String(spatialSemanticArguments.category ?? ""));
+    const effect = normalized(String(spatialSemanticArguments.effect ?? ""));
+    const recognizedPlanningCategory = [
+      "prebuild_safety",
+      "build_planning",
+      "structure_planning",
+    ].includes(category);
+    if (
+      recognizedPlanningCategory &&
+      spatialSemanticArguments.purpose === undefined
+    ) {
+      spatialSemanticArguments.purpose =
+        category === "structure_planning"
+          ? "structure_planning"
+          : "build_planning";
+    }
+    if (recognizedPlanningCategory) {
+      delete spatialSemanticArguments.category;
+      if (
+        spatialSemanticArguments.center !== undefined &&
+        (spatialSemanticArguments.target === undefined ||
+          spatialSemanticArguments.target === "current_actor")
+      ) {
+        delete spatialSemanticArguments.center;
+      }
+    }
+    if (effect === "read_only") {
+      delete spatialSemanticArguments.effect;
+    }
+  }
+  const radius = spatialSemanticArguments.radius;
+  const hasHorizontalRadius = Object.prototype.hasOwnProperty.call(
+    spatialSemanticArguments,
+    "horizontal_radius",
+  );
+  const hasVerticalRadius = Object.prototype.hasOwnProperty.call(
+    spatialSemanticArguments,
+    "vertical_radius",
+  );
+  const canonicalArguments =
+    input.descriptor.capability_id ===
+      HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY &&
+    Number.isInteger(radius) &&
+    Number(radius) >= 1 &&
+    Number(radius) <= 7 &&
+    !hasHorizontalRadius &&
+    !hasVerticalRadius
+      ? Object.fromEntries([
+          ...Object.entries(spatialSemanticArguments).filter(
+            ([key]) => key !== "radius",
+          ),
+          ["horizontal_radius", Number(radius)],
+          ["vertical_radius", Number(radius)],
+        ])
+      : spatialSemanticArguments;
   const targetSchema = input.descriptor.input_schema.properties?.target;
   const serverOwnsCurrentActorTarget =
     targetSchema?.type === "string" &&
     targetSchema.enum?.length === 1 &&
     targetSchema.enum[0] === "current_actor";
   return serverOwnsCurrentActorTarget
-    ? { ...semanticArguments, target: "current_actor" }
-    : semanticArguments;
+    ? { ...canonicalArguments, target: "current_actor" }
+    : canonicalArguments;
+};
+
+const environmentProbeSemanticArgumentIssues = (input: {
+  capabilityId: string;
+  arguments: Record<string, unknown>;
+}): EnvironmentConnectorSchemaIssue[] => {
+  if (
+    input.capabilityId !==
+    HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY
+  ) {
+    return [];
+  }
+  const verificationFields = [
+    "verification_from",
+    "verification_to",
+    "expected_block",
+  ] as const;
+  const purpose = normalized(String(input.arguments.purpose ?? ""));
+  if (purpose === "structure_verification") {
+    const missing = verificationFields.filter(
+      (field) => input.arguments[field] === undefined,
+    );
+    const planningOnlyFields = [
+      "requested_length",
+      "requested_height",
+      "orientation",
+      "relative_side",
+    ].filter((field) => input.arguments[field] !== undefined);
+    return [
+      ...missing.map((field) => ({
+        path: `$.${field}`,
+        code: "required_for_purpose",
+        message: `${field} is required for structure_verification.`,
+      })),
+      ...planningOnlyFields.map((field) => ({
+        path: `$.${field}`,
+        code: "conflicting_property",
+        message: `${field} is a planning argument and cannot be mixed with structure_verification.`,
+      })),
+    ];
+  }
+  return verificationFields
+    .filter((field) => input.arguments[field] !== undefined)
+    .map((field) => ({
+      path: `$.${field}`,
+      code: "conflicting_property",
+      message: `${field} is admitted only when purpose is structure_verification.`,
+    }));
 };
 
 type EnvironmentProbeExecutionAuthority = {
@@ -308,6 +519,7 @@ const errorObservation = (input: {
   capabilityId: string;
   outcome: Exclude<HelixEnvironmentProbeOutcome, "succeeded">;
   summary: string;
+  result?: Record<string, unknown>;
 }): HelixEnvironmentProbeObservation => ({
   schema: HELIX_ENVIRONMENT_PROBE_OBSERVATION_SCHEMA,
   probe_request_ref: syntheticRef(
@@ -319,7 +531,7 @@ const errorObservation = (input: {
   capability_version: 1,
   outcome: input.outcome,
   summary: input.summary,
-  result: {},
+  result: input.result ?? {},
   evidence_ref: syntheticRef(
     "environment_probe_failure",
     `${input.turnId}\n${input.capabilityId}\n${input.outcome}`,
@@ -343,6 +555,7 @@ const failed = (input: {
   outcome: Exclude<HelixEnvironmentProbeOutcome, "succeeded">;
   summary: string;
   status?: "blocked" | "failed";
+  schemaRepair?: EnvironmentProbeSchemaRepair;
 }): EnvironmentProbeGatewayExecution => ({
   ok: false,
   status: input.status ?? "blocked",
@@ -353,9 +566,95 @@ const failed = (input: {
       input.capabilityId ?? HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
     outcome: input.outcome,
     summary: input.summary,
+    ...(input.schemaRepair
+      ? { result: { schema_repair: input.schemaRepair } }
+      : {}),
   }),
+  ...(input.schemaRepair ? { schemaRepair: input.schemaRepair } : {}),
   error: input.outcome,
 });
+
+const buildEnvironmentProbeSchemaRepair = (input: {
+  turnId: string;
+  capabilityId: string;
+  descriptor: NonNullable<
+    ReturnType<typeof readEnvironmentConnectorCapabilityDescriptor>
+  >;
+  arguments: Record<string, unknown>;
+  issues: EnvironmentConnectorSchemaIssue[];
+  dropPositionForCurrentFocusConflict?: boolean;
+}): EnvironmentProbeSchemaRepair => {
+  const properties = input.descriptor.input_schema.properties ?? {};
+  const allowedFields = Object.keys(properties).sort();
+  const allowed = new Set(allowedFields);
+  const proposedArguments = Object.fromEntries(
+    Object.entries(input.arguments).filter(([key]) => allowed.has(key)),
+  );
+  if (input.dropPositionForCurrentFocusConflict) {
+    delete proposedArguments.position;
+  }
+  const semanticConflictFields = input.issues.flatMap((issue) => {
+    if (issue.code !== "conflicting_property") {
+      return [];
+    }
+    const match = /^\$\.([A-Za-z0-9_]+)$/.exec(issue.path);
+    return match && Object.prototype.hasOwnProperty.call(proposedArguments, match[1])
+      ? [match[1]]
+      : [];
+  });
+  for (const field of semanticConflictFields) {
+    delete proposedArguments[field];
+  }
+  const proposedIssues = [
+    ...validateEnvironmentConnectorSchemaValue(
+      input.descriptor.input_schema,
+      proposedArguments,
+    ),
+    ...environmentProbeSemanticArgumentIssues({
+      capabilityId: input.capabilityId,
+      arguments: proposedArguments,
+    }),
+  ];
+  const proposedIsValid = proposedIssues.length === 0;
+  const affordanceId = syntheticRef(
+    "environment_probe_schema_repair",
+    `${input.turnId}\n${input.capabilityId}\n${JSON.stringify(proposedArguments)}`,
+  );
+  const nextAffordances = proposedIsValid
+    ? [
+        {
+          affordance_id: affordanceId,
+          capability_id: input.capabilityId,
+          args: proposedArguments,
+          lane_request: {
+            capability: input.capabilityId,
+            ...proposedArguments,
+          },
+          admissible: true as const,
+          reason:
+            "Retry the same admitted read-only probe with only fields admitted by the frozen schema and semantic contract; Helix will validate it again before execution.",
+        },
+      ]
+    : [];
+  return {
+    schema: "helix.environment_probe_schema_repair.v1",
+    capability_id: input.capabilityId,
+    failure_class: "invalid_args",
+    retryability: "retryable",
+    issues: input.issues.slice(0, 12),
+    rejected_fields: Array.from(
+      new Set([
+        ...Object.keys(input.arguments).filter((key) => !allowed.has(key)),
+        ...semanticConflictFields,
+      ]),
+    ).sort(),
+    allowed_fields: allowedFields,
+    required_fields: [...(input.descriptor.input_schema.required ?? [])].sort(),
+    trusted_input_schema: input.descriptor.input_schema,
+    proposed_arguments: proposedIsValid ? proposedArguments : null,
+    next_affordances: nextAffordances,
+  };
+};
 
 const environmentProbeManifestForCapability = (
   capabilityId: string,
@@ -430,10 +729,7 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
   const capabilityId =
     input.capabilityId?.trim() || HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY;
   const fail = (
-    entry: Omit<
-      Parameters<typeof failed>[0],
-      "turnId" | "capabilityId"
-    >,
+    entry: Omit<Parameters<typeof failed>[0], "turnId" | "capabilityId">,
   ): EnvironmentProbeGatewayExecution =>
     failed({ ...entry, turnId, capabilityId });
   const policy =
@@ -483,8 +779,7 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
   ) {
     return fail({
       outcome: "permission_revoked",
-      summary:
-        `The current continuation is not scoped to ${capabilityId}.`,
+      summary: `The current continuation is not scoped to ${capabilityId}.`,
     });
   }
   const accountPolicy = authority.accountPolicy;
@@ -517,18 +812,44 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       summary: `The Minecraft capability ${capabilityId} is not registered.`,
     });
   }
-  const args = normalizeServerOwnedSemanticTarget({
+  const args = normalizeEnvironmentProbeSemanticArguments({
     descriptor,
     arguments: input.arguments ?? {},
   });
-  const inputIssues = validateEnvironmentConnectorSchemaValue(
-    descriptor.input_schema,
-    args,
-  );
+  const inputIssues = [
+    ...validateEnvironmentConnectorSchemaValue(descriptor.input_schema, args),
+    ...environmentProbeSemanticArgumentIssues({
+      capabilityId,
+      arguments: args,
+    }),
+  ];
   if (
     inputIssues.length > 0 ||
     (args.target === "current_focus" && args.position !== undefined)
   ) {
+    const currentFocusConflict =
+      inputIssues.length === 0 &&
+      args.target === "current_focus" &&
+      args.position !== undefined;
+    const repairIssues: EnvironmentConnectorSchemaIssue[] =
+      inputIssues.length > 0
+        ? inputIssues
+        : [
+            {
+              path: "$.position",
+              code: "conflicting_property",
+              message:
+                "A current-focus crop probe cannot also supply a position.",
+            },
+          ];
+    const schemaRepair = buildEnvironmentProbeSchemaRepair({
+      turnId,
+      capabilityId,
+      descriptor,
+      arguments: args,
+      issues: repairIssues,
+      dropPositionForCurrentFocusConflict: currentFocusConflict,
+    });
     return fail({
       outcome: "schema_validation_failed",
       summary:
@@ -536,6 +857,7 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
           ? `The probe arguments failed the trusted schema at ${inputIssues[0].path}.`
           : "A current-focus crop probe cannot also supply a position.",
       status: "failed",
+      schemaRepair,
     });
   }
 
@@ -584,16 +906,18 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
     );
     const participantIdentityMismatch =
       !roomSelf || roomSelf.participant_id !== membership.participantId;
-    const consentIdentityMismatch = Boolean(roomSelf) && (
-      roomSelf!.consent.consent_version !== membership.consent.consent_version ||
-      roomSelf!.consent.consent_receipt_ref !==
-        membership.consent.consent_receipt_ref
-    );
-    const boundAuthorizationMismatch = Boolean(binding && roomSelf) && (
-      roomSelf!.participant_id !== binding!.participantIdAtBind ||
-      roomSelf!.consent.consent_version !== binding!.consentVersionAtBind ||
-      roomSelf!.consent.consent_receipt_ref !== binding!.consentReceiptRefAtBind
-    );
+    const consentIdentityMismatch =
+      Boolean(roomSelf) &&
+      (roomSelf!.consent.consent_version !==
+        membership.consent.consent_version ||
+        roomSelf!.consent.consent_receipt_ref !==
+          membership.consent.consent_receipt_ref);
+    const boundAuthorizationMismatch =
+      Boolean(binding && roomSelf) &&
+      (roomSelf!.participant_id !== binding!.participantIdAtBind ||
+        roomSelf!.consent.consent_version !== binding!.consentVersionAtBind ||
+        roomSelf!.consent.consent_receipt_ref !==
+          binding!.consentReceiptRefAtBind);
     const firstPartyPresenceMismatch =
       !binding && Boolean(roomSelf) && roomSelf!.presence !== "present";
     if (
@@ -605,13 +929,14 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
     ) {
       return fail({
         outcome: "permission_revoked",
-        summary: room.status === "closed"
-          ? "The exact server-validated Shared GPT Live Room is closed."
-          : participantIdentityMismatch
-            ? "The current room projection no longer matches the authenticated participant identity."
-            : consentIdentityMismatch || boundAuthorizationMismatch
-              ? "The current room consent identity no longer matches the authorizing membership."
-              : "The first-party room member is not currently present in the exact server-validated Shared GPT Live Room chat.",
+        summary:
+          room.status === "closed"
+            ? "The exact server-validated Shared GPT Live Room is closed."
+            : participantIdentityMismatch
+              ? "The current room projection no longer matches the authenticated participant identity."
+              : consentIdentityMismatch || boundAuthorizationMismatch
+                ? "The current room consent identity no longer matches the authorizing membership."
+                : "The first-party room member is not currently present in the exact server-validated Shared GPT Live Room chat.",
       });
     }
     const allCandidates = await deps.listSourceCandidates(roomId);
@@ -629,34 +954,37 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
         status: "failed",
       });
     }
-    if (candidates.length > 1) {
+    const now = deps.now();
+    const freshCandidates = candidates.filter((candidate) => {
+      const sourceAgeMs =
+        now.getTime() - new Date(candidate.requestReceivedAt).getTime();
+      return (
+        Number.isFinite(sourceAgeMs) &&
+        sourceAgeMs >= 0 &&
+        sourceAgeMs <= candidate.requestFreshnessMaxAgeMs
+      );
+    });
+    if (freshCandidates.length === 0) {
+      return fail({
+        outcome: "result_stale",
+        summary:
+          "Every matching Minecraft connector admission is stale and must send a fresh observation before probing.",
+        status: "failed",
+      });
+    }
+    if (freshCandidates.length > 1) {
       return fail({
         outcome: "target_ambiguous",
         summary:
-          "More than one admitted Minecraft environment matches this run; bind an exact environment before probing.",
+          "More than one fresh admitted Minecraft environment matches this run; bind an exact environment before probing.",
       });
     }
-    const source = candidates[0];
+    const source = freshCandidates[0];
     if (!source.credentialId) {
       return fail({
         outcome: "connector_offline",
         summary:
           "The admitted source does not expose a server-owned connector credential identity.",
-        status: "failed",
-      });
-    }
-    const now = deps.now();
-    const sourceAgeMs =
-      now.getTime() - new Date(source.requestReceivedAt).getTime();
-    if (
-      !Number.isFinite(sourceAgeMs) ||
-      sourceAgeMs < 0 ||
-      sourceAgeMs > source.requestFreshnessMaxAgeMs
-    ) {
-      return fail({
-        outcome: "result_stale",
-        summary:
-          "The Minecraft connector admission is stale and must send a fresh observation before probing.",
         status: "failed",
       });
     }
@@ -702,17 +1030,17 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       }));
     const trustedTurnActorContext =
       authority.kind === "first_party_shared_room"
-        ? input.accountContext?.trusted_turn_actor_context ?? null
+        ? (input.accountContext?.trusted_turn_actor_context ?? null)
         : null;
     let requestingParticipantId = membership.participantId;
     if (trustedTurnActorContext?.origin === "realtime_voice") {
       const frozenParticipant = trustedTurnActorContext.participant_id
-        ? room.participants.find(
+        ? (room.participants.find(
             (participant) =>
               participant.participant_id ===
                 trustedTurnActorContext.participant_id &&
               participant.presence === "present",
-          ) ?? null
+          ) ?? null)
         : null;
       if (
         trustedTurnActorContext.room_id !== roomId ||
@@ -745,23 +1073,20 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
         });
       } catch (error) {
         if (isRoomEnvironmentSubjectError(error)) {
-          const outcome: Exclude<
-            HelixEnvironmentProbeOutcome,
-            "succeeded"
-          > =
+          const outcome: Exclude<HelixEnvironmentProbeOutcome, "succeeded"> =
             error.code === "subject_offline"
               ? "subject_offline"
               : error.code === "subject_binding_required"
                 ? "subject_binding_required"
-              : error.code === "producer_epoch_mismatch"
-                ? "producer_epoch_mismatch"
-                : error.code === "wrong_environment"
-                  ? "wrong_environment"
-                  : error.code === "wrong_world"
-                    ? "wrong_world"
-                    : error.code === "subject_binding_forbidden"
-                      ? "permission_revoked"
-                      : "subject_binding_stale";
+                : error.code === "producer_epoch_mismatch"
+                  ? "producer_epoch_mismatch"
+                  : error.code === "wrong_environment"
+                    ? "wrong_environment"
+                    : error.code === "wrong_world"
+                      ? "wrong_world"
+                      : error.code === "subject_binding_forbidden"
+                        ? "permission_revoked"
+                        : "subject_binding_stale";
           return fail({
             outcome,
             summary: error.message,

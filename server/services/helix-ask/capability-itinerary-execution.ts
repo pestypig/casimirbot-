@@ -3,6 +3,15 @@ export type HelixCapabilityItineraryArtifactLike = {
   kind?: unknown;
   payload?: unknown;
   source_scope?: unknown;
+  turn_id?: unknown;
+  capability_key?: unknown;
+  source_capability_id?: unknown;
+  source_observation_schema?: unknown;
+  source_observation_status?: unknown;
+  status?: unknown;
+  assistant_answer?: unknown;
+  terminal_eligible?: unknown;
+  raw_content_included?: unknown;
   executed_args?: unknown;
 };
 
@@ -108,6 +117,113 @@ const normalizeCalculatorExpression = (value: string | null): string | null => {
 
 const artifactPayload = (artifact: HelixCapabilityItineraryArtifactLike): Record<string, unknown> | null =>
   readRecord(artifact.payload);
+
+type GuardedNoopSatisfaction = {
+  artifact: HelixCapabilityItineraryArtifactLike;
+  reason: "no_verified_safe_candidate";
+};
+
+const guardedNoopSatisfactionForSubgoal = (input: {
+  turnId: string | null;
+  subgoal: Record<string, unknown>;
+  artifacts: HelixCapabilityItineraryArtifactLike[];
+}): GuardedNoopSatisfaction | null => {
+  const policy = readRecord(input.subgoal.guarded_noop_policy);
+  if (
+    readString(policy?.schema) !==
+      "helix.compound_capability_guarded_noop.v1" ||
+    readString(policy?.mode) !== "no_verified_safe_candidate" ||
+    policy?.current_turn_only !== true ||
+    policy.requires_successful_observation !== true ||
+    policy.user_directed_noop_guard !== true
+  ) {
+    return null;
+  }
+  const guardCapability = readString(policy.guard_capability);
+  const requiredPurpose = readString(policy.required_purpose);
+  const acceptedObservationPurposes = readArray(
+    policy.accepted_observation_purposes,
+  )
+    .map(readString)
+    .filter((entry: string | null): entry is string => Boolean(entry));
+  const candidateField = readString(policy.candidate_field);
+  const completenessField = readString(policy.completeness_field);
+  const omittedCountField = readString(policy.omitted_count_field);
+  if (
+    guardCapability !==
+      "com.casimirbot.minecraft.spatial_region.inspect" ||
+    !["structure_planning", "fire_safety"].includes(
+      requiredPurpose ?? "",
+    ) ||
+    (requiredPurpose === "structure_planning"
+      ? acceptedObservationPurposes.length !== 2 ||
+        !acceptedObservationPurposes.includes("structure_planning") ||
+        !acceptedObservationPurposes.includes("build_planning")
+      : acceptedObservationPurposes.length !== 1 ||
+        acceptedObservationPurposes[0] !== "fire_safety") ||
+    !["build_line_candidates", "fireplace_candidates"].includes(
+      candidateField ?? "",
+    ) ||
+    ![
+      "build_line_candidates_complete",
+      "fireplace_candidates_complete",
+    ].includes(completenessField ?? "") ||
+    ![
+      "omitted_build_line_candidate_count",
+      "omitted_fireplace_candidate_count",
+    ].includes(omittedCountField ?? "")
+  ) {
+    return null;
+  }
+  const currentTurnObservations = input.artifacts.filter((artifact) => {
+    const payload = artifactPayload(artifact);
+    return (
+      input.turnId !== null &&
+      readString(artifact.turn_id) === input.turnId &&
+      readString(artifact.source_scope) === "current_turn_context" &&
+      artifactKind(artifact) === "live_environment_observation" &&
+      artifactCapability(artifact) === guardCapability &&
+      readString(artifact.source_observation_schema) ===
+        "helix.environment_connector.probe_observation.v1" &&
+      readString(artifact.status) === "succeeded" &&
+      artifact.assistant_answer === false &&
+      artifact.terminal_eligible === false &&
+      artifact.raw_content_included === false &&
+      readString(payload?.schema) === "helix.live_environment_observation.v1" &&
+      readString(payload?.source_capability_id) === guardCapability &&
+      readString(payload?.status) === "succeeded" &&
+      readString(payload?.observation_role) ===
+        "evidence_not_assistant_answer" &&
+      payload?.assistant_answer === false &&
+      payload.terminal_eligible === false &&
+      payload.raw_content_included === false
+    );
+  });
+  const latest = currentTurnObservations.at(-1);
+  if (!latest) return null;
+  const result = readRecord(artifactPayload(latest)?.result);
+  if (
+    !result ||
+    !acceptedObservationPurposes.includes(readString(result.purpose) ?? "") ||
+    result[completenessField as string] !== true ||
+    result[omittedCountField as string] !== 0 ||
+    !Array.isArray(result[candidateField as string])
+  ) {
+    return null;
+  }
+  const candidates = result[candidateField as string] as unknown[];
+  if (
+    candidates.some(
+      (candidate) => readRecord(candidate)?.safe_candidate === true,
+    )
+  ) {
+    return null;
+  }
+  return {
+    artifact: latest,
+    reason: "no_verified_safe_candidate",
+  };
+};
 
 const docLocationArtifactHasConcreteEvidence = (artifact: HelixCapabilityItineraryArtifactLike): boolean => {
   const payload = artifactPayload(artifact);
@@ -1003,8 +1119,12 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
   artifacts?: HelixCapabilityItineraryArtifactLike[] | null;
 }): HelixCapabilityItineraryExecutionState => {
   const itinerary = readRecord(args.capabilityItinerary);
+  const turnId = readString(itinerary?.turn_id);
   const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
   const compoundContract = readRecord(itinerary?.compound_capability_contract);
+  const occurrenceAwareSubgoals =
+    readString(compoundContract?.subgoal_identity_policy) ===
+    "provider_call_occurrence";
   const compoundSubgoals = readArray(compoundContract?.subgoals)
     .map(readRecord)
     .filter((entry: Record<string, unknown> | null): entry is Record<string, unknown> => Boolean(entry));
@@ -1047,6 +1167,7 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
   );
   const rawCompoundSubgoalLedger: Array<Record<string, unknown>> = compoundSubgoals.map((subgoal: Record<string, unknown>) => {
     const subgoalId = readString(subgoal.subgoal_id);
+    const preboundObservationRef = readString(subgoal.observation_ref);
     const requestedCapability = readString(subgoal.requested_capability) ?? "";
     const runtimeCapability = readString(subgoal.runtime_capability) ?? requestedCapability;
     const substitutions = readArray(subgoal.allowed_substitutions)
@@ -1074,6 +1195,11 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       .map(readString)
       .filter((entry: string | null): entry is string => Boolean(entry));
     const argsHint = readRecord(subgoal.args_hint);
+    const guardedNoopCandidate = guardedNoopSatisfactionForSubgoal({
+      turnId,
+      subgoal,
+      artifacts,
+    });
     const runtimeCalls = artifacts.filter((artifact: HelixCapabilityItineraryArtifactLike) =>
       artifactKind(artifact) === "runtime_tool_call" &&
       artifactMatchesCapability(artifact, requestedCapability, runtimeCapability, substitutions)
@@ -1082,17 +1208,38 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       artifactKind(artifact) === "runtime_tool_call_validation" &&
       artifactMatchesCapability(artifact, requestedCapability, runtimeCapability, substitutions)
     );
-    const observationArtifact = artifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
-      artifactSupportsSubgoalObservation(
-        artifact,
-        subgoalId,
-        requestedCapability,
-        runtimeCapability,
-        substitutions,
-        requiredObservationKinds,
-        argsHint,
-      )
-    ) ?? null;
+    const preboundObservationArtifact = preboundObservationRef
+      ? artifacts.find(
+          (artifact: HelixCapabilityItineraryArtifactLike) =>
+            artifactId(artifact) === preboundObservationRef,
+        ) ?? null
+      : null;
+    const observationArtifact = preboundObservationRef
+      ? preboundObservationArtifact &&
+        artifactSupportsSubgoalObservation(
+          preboundObservationArtifact,
+          subgoalId,
+          requestedCapability,
+          runtimeCapability,
+          substitutions,
+          requiredObservationKinds,
+          argsHint,
+        )
+        ? preboundObservationArtifact
+        : null
+      : occurrenceAwareSubgoals
+        ? null
+        : artifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
+            artifactSupportsSubgoalObservation(
+              artifact,
+              subgoalId,
+              requestedCapability,
+              runtimeCapability,
+              substitutions,
+              requiredObservationKinds,
+              argsHint,
+            )
+          ) ?? null;
     const runtimeArgs = runtimeCalls.length > 0
       ? artifactArgs(runtimeCalls[0] as HelixCapabilityItineraryArtifactLike)
       : null;
@@ -1117,14 +1264,19 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       runtimeCapability,
       requiredArgs,
       args: selectedArgs,
-    }).filter((requiredArg: string) => !bindingCoveredRequiredArgs.includes(requiredArg));
+    }).filter(
+      (requiredArg: string) =>
+        !bindingCoveredRequiredArgs.includes(requiredArg),
+    );
     const validationErrors = validations.flatMap(artifactValidationErrors);
-    const railErrors = uniqueStrings([
-      ...validationErrors,
-      ...missingRequiredArgs.map((arg) => `missing_required_arg:${arg}`),
-    ]);
+    const executionCandidateArtifacts =
+      occurrenceAwareSubgoals && preboundObservationRef
+        ? preboundObservationArtifact
+          ? [preboundObservationArtifact]
+          : []
+        : artifacts;
     const executedArtifact =
-      artifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
+      executionCandidateArtifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
         artifactProvesCompletedCapability(
           artifact,
           requestedCapability,
@@ -1144,22 +1296,42 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       )
         ? observationArtifact
         : null);
-    const missingRequiredArgsBlockExecution = missingRequiredArgs.length > 0;
-    const countedObservationArtifact = missingRequiredArgsBlockExecution ? null : observationArtifact;
+    const guardedNoopSatisfaction = executedArtifact
+      ? null
+      : guardedNoopCandidate;
+    const railErrors = guardedNoopSatisfaction
+      ? []
+      : uniqueStrings([
+          ...validationErrors,
+          ...missingRequiredArgs.map((arg) => `missing_required_arg:${arg}`),
+        ]);
+    const missingRequiredArgsBlockExecution =
+      missingRequiredArgs.length > 0 && !guardedNoopSatisfaction;
+    const countedObservationArtifact = guardedNoopSatisfaction
+      ? guardedNoopSatisfaction.artifact
+      : missingRequiredArgsBlockExecution
+        ? null
+        : observationArtifact;
     const executed = Boolean(executedArtifact) && !missingRequiredArgsBlockExecution;
-    const selectedCapability = runtimeCalls.length > 0
+    const selectedCapability = readString(subgoal.selected_capability) ?? (runtimeCalls.length > 0
       ? artifactCapability(runtimeCalls[0] as HelixCapabilityItineraryArtifactLike)
       : executedArtifact
         ? artifactCapability(executedArtifact as HelixCapabilityItineraryArtifactLike) ?? runtimeCapability
-        : null;
-    const executedCapability = executed ? artifactCapability(executedArtifact as HelixCapabilityItineraryArtifactLike) ?? runtimeCapability : null;
+        : null);
+    const executedCapability = executed
+      ? readString(subgoal.executed_capability) ??
+        artifactCapability(executedArtifact as HelixCapabilityItineraryArtifactLike) ??
+        runtimeCapability
+      : null;
     const attemptedRuntimeProgress = runtimeCalls.length > 0 || validations.length > 0 || Boolean(executedArtifact);
     const observationMissingAfterAttempt =
       attemptedRuntimeProgress &&
       railErrors.length === 0 &&
       !countedObservationArtifact;
-    const satisfaction = executed && countedObservationArtifact
+    const satisfaction = guardedNoopSatisfaction
       ? "satisfied"
+      : executed && countedObservationArtifact
+        ? "satisfied"
       : observationMissingAfterAttempt
         ? "failed"
         : railErrors.length > 0
@@ -1167,9 +1339,15 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
           : "pending";
     const railFailureCode = railErrors[0] ??
       (observationMissingAfterAttempt || satisfaction === "pending" ? "subgoal_observation_missing" : null);
-    const supportRefs = artifactSupportRefs(countedObservationArtifact);
-    const observationProvenance = countedObservationArtifact
-      ? artifactSubgoalObservationProvenance(
+    const supportRefs = uniqueStrings([
+      ...artifactSupportRefs(countedObservationArtifact),
+      ...readArray(subgoal.support_refs).map(readString),
+      ...readArray(subgoal.provider_gateway_packet_refs).map(readString),
+    ]);
+    const observationProvenance = guardedNoopSatisfaction
+      ? "current_turn_guarded_noop_observation"
+      : countedObservationArtifact
+        ? artifactSubgoalObservationProvenance(
           countedObservationArtifact,
           subgoalId,
           requestedCapability,
@@ -1177,7 +1355,7 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
           substitutions,
           argsHint,
         )
-      : null;
+        : null;
     return {
       subgoal_id: subgoalId,
       order: Number(subgoal.order) || 0,
@@ -1186,7 +1364,9 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       selected_capability: selectedCapability,
       executed_capability: executedCapability,
       args: selectedArgs,
-      args_source: argsSource,
+      args_source: guardedNoopSatisfaction
+        ? "guarded_noop_current_turn_observation"
+        : argsSource,
       planned_args: argsHint ?? {},
       selected_args: selectedArgs,
       required_args: requiredArgs,
@@ -1201,9 +1381,22 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       input_bindings: readArray(subgoal.input_bindings),
       observation_kind: countedObservationArtifact ? artifactKind(countedObservationArtifact) : null,
       observation_ref: countedObservationArtifact ? artifactId(countedObservationArtifact) : null,
+      subgoal_identity_policy:
+        readString(subgoal.subgoal_identity_policy) ??
+        (occurrenceAwareSubgoals ? "provider_call_occurrence" : null),
+      provider_call_id: readString(subgoal.provider_call_id),
+      capability_occurrence: Number(subgoal.capability_occurrence) || null,
       observation_provenance: observationProvenance,
       support_refs: supportRefs,
       satisfaction,
+      ...(guardedNoopSatisfaction
+        ? {
+            satisfaction_reason: guardedNoopSatisfaction.reason,
+            satisfied_without_execution: true,
+            mutation_performed: false,
+            guarded_noop_policy: subgoal.guarded_noop_policy,
+          }
+        : {}),
       rail_status: satisfaction === "satisfied" ? "complete" : satisfaction === "failed" ? "fail_closed" : "pending",
       first_broken_rail: subgoalFirstBrokenRailFor(railFailureCode, satisfaction),
       rail_failure_code: railFailureCode,
@@ -1344,10 +1537,24 @@ export const attachHelixCapabilityItineraryExecutionState = (
           raw_content_included: false,
         }
       : null;
-  const itinerary =
+  const baseItinerary =
     readRecord(payload.capability_itinerary) ??
     artifactPayloadByKind(artifacts, "capability_itinerary") ??
     committedRouteFallbackItinerary;
+  const currentProviderContract = readRecord(
+    payload.compound_capability_contract,
+  );
+  const preferCurrentProviderContract =
+    readString(currentProviderContract?.subgoal_identity_policy) ===
+      "provider_call_occurrence" ||
+    readString(currentProviderContract?.source) ===
+      "codex_provider_call_occurrence_normalization";
+  const itinerary = baseItinerary && preferCurrentProviderContract
+    ? {
+        ...baseItinerary,
+        compound_capability_contract: currentProviderContract,
+      }
+    : baseItinerary;
   const executionState = buildHelixCapabilityItineraryExecutionState({
     capabilityItinerary: itinerary,
     artifacts,

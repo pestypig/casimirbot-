@@ -18,6 +18,7 @@ import {
   extractExplicitCapabilityContract,
   extractExplicitCapabilityContracts,
   type ExplicitCapabilityContract,
+  type ExplicitCapabilityExtractionContext,
   explicitCapabilityContractForCapability,
 } from "./explicit-capability-contract";
 import {
@@ -359,6 +360,7 @@ export function buildToolCallAdmissionDecision(input: {
   canonicalGoalFrame?: Record<string, unknown> | null;
   mandatoryNextTool?: Record<string, unknown> | null;
   promptText?: string | null;
+  trustedEnvironmentContext?: ExplicitCapabilityExtractionContext | null;
 }): HelixToolCallAdmissionDecision {
   const sourceTargetIntentRecord = readRecord(input.sourceTargetIntent);
   const routeProductContractRecord = readRecord(input.routeProductContract);
@@ -399,6 +401,10 @@ export function buildToolCallAdmissionDecision(input: {
     operational_constraints_ref: `${input.turnId}:turn_operational_constraints`,
     forbidden_tools: operationalConstraints.forbidden_tools,
     forbidden_tool_families: operationalConstraints.forbidden_tool_families,
+    exclusive_tool_capabilities:
+      operationalConstraints.exclusive_tool_capabilities,
+    requested_tool_cardinality:
+      operationalConstraints.requested_tool_cardinality,
     required_surface: operationalConstraints.required_surface,
   };
   const contextualSuppression = detectContextualToolAdmissionSuppression(promptText);
@@ -420,11 +426,17 @@ export function buildToolCallAdmissionDecision(input: {
     );
   const calculatorSolveIntent = calculatorSolveRequested(promptText, input.sourceTargetIntent);
   const mandatoryToolName = readMandatoryToolName(mandatoryNextToolRecord);
-  const promptExplicitCapabilityMatches = extractExplicitCapabilityContracts(promptText);
+  const promptExplicitCapabilityMatches = extractExplicitCapabilityContracts(
+    promptText,
+    input.trustedEnvironmentContext,
+  );
   const promptExplicitCapabilityContracts = uniqueExplicitCapabilityContracts(
     promptExplicitCapabilityMatches.map((match) => match.contract),
   );
-  const promptExplicitCapabilityContract = extractExplicitCapabilityContract(promptText);
+  const promptExplicitCapabilityContract = extractExplicitCapabilityContract(
+    promptText,
+    input.trustedEnvironmentContext,
+  );
   const policySelectedCapabilityContract =
     unknownSourceArtifactDiscoveryRequested &&
     (sourceTarget === "docs_viewer" || sourceTarget === "active_doc")
@@ -1082,6 +1094,10 @@ export function buildToolCallAdmissionDecision(input: {
       ...extraForbiddenToolFamilies,
       ...forbiddenFamiliesForTurn,
     ]),
+    exclusive_tool_capabilities:
+      operationalFields.exclusive_tool_capabilities,
+    requested_tool_cardinality:
+      operationalFields.requested_tool_cardinality,
     required_surface: operationalFields.required_surface,
     reason,
     ...(routeArbitration

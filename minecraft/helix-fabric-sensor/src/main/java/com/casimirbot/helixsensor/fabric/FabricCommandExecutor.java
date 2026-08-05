@@ -233,16 +233,23 @@ final class FabricCommandExecutor {
         String requestedCategory,
         CapturingSource capture
     ) {
-        if (!FabricCommandAuthorityPolicy.playerSubjectRequired(
+        String subjectNativeId = text(request, "subject_native_id");
+        boolean restrictedPlayerCommand =
+            FabricCommandAuthorityPolicy.playerSubjectRequired(
+                authorityProfile,
+                requestedCategory
+            );
+        if (!FabricCommandAuthorityPolicy.selectedPlayerSourceRequired(
             authorityProfile,
-            requestedCategory
+            requestedCategory,
+            command,
+            !subjectNativeId.isBlank()
         )) {
             return new SourceResolution(
                 server.createCommandSourceStack(),
                 null
             );
         }
-        String subjectNativeId = text(request, "subject_native_id");
         ServerPlayer selected = server.getPlayerList().getPlayers().stream()
             .filter(player ->
                 player.getUUID().toString().equalsIgnoreCase(subjectNativeId)
@@ -258,7 +265,7 @@ final class FabricCommandExecutor {
         List<String> onlineNames = server.getPlayerList().getPlayers().stream()
             .map(player -> player.getGameProfile().getName())
             .toList();
-        if (!FabricCommandAuthorityPolicy.confinedToSelectedPlayer(
+        if (restrictedPlayerCommand && !FabricCommandAuthorityPolicy.confinedToSelectedPlayer(
             command,
             selected.getGameProfile().getName(),
             onlineNames

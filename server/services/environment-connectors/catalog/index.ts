@@ -9,6 +9,7 @@ import {
   HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
   HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
   HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
   HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
   HELIX_SYNTHETIC_REACHABILITY_CAPABILITY,
   HELIX_SYSTEM_CLOCK_READ_CAPABILITY,
@@ -43,6 +44,7 @@ export const environmentConnectorSha256 = (
 
 const descriptor = (input: {
   capabilityId: string;
+  capabilityVersion?: number;
   domain: string;
   adapterProfileIds: string[];
   label: string;
@@ -55,7 +57,7 @@ const descriptor = (input: {
   helixEnvironmentCapabilityDescriptorSchema.parse({
     schema: HELIX_ENVIRONMENT_CAPABILITY_DESCRIPTOR_SCHEMA,
     capability_id: input.capabilityId,
-    capability_version: 1,
+    capability_version: input.capabilityVersion ?? 1,
     capability_class: "probe",
     domain: input.domain,
     adapter_profile_ids: input.adapterProfileIds,
@@ -341,6 +343,428 @@ const minecraftLocalMapOutputSchema: HelixEnvironmentConstrainedJsonSchema = {
   additionalProperties: false,
 };
 
+const minecraftSpatialRegionInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    target: {
+      type: "string",
+      enum: ["current_actor"],
+      description: "Survey a bounded region centered on the selected Minecraft actor.",
+    },
+    horizontal_radius: {
+      type: "integer",
+      minimum: 1,
+      maximum: 7,
+      description: "Horizontal survey radius in blocks; defaults to 7.",
+    },
+    vertical_radius: {
+      type: "integer",
+      minimum: 1,
+      maximum: 8,
+      description: "Vertical survey radius in blocks; defaults to 6.",
+    },
+    purpose: {
+      type: "string",
+      enum: [
+        "general",
+        "structure_planning",
+        "build_planning",
+        "structure_verification",
+        "fire_safety",
+        "landing_safety",
+      ],
+      description:
+        "The bounded survey purpose. Use structure_verification only with exact verification endpoints and an expected block.",
+    },
+    requested_length: {
+      type: "integer",
+      minimum: 3,
+      maximum: 15,
+      description:
+        "Exact requested build-line length. When present, returned build-line candidates must have this length.",
+    },
+    requested_height: {
+      type: "integer",
+      minimum: 3,
+      maximum: 8,
+      description:
+        "Exact requested clear build height. Returned build-line candidates must verify at least this many strict-air cells vertically.",
+    },
+    orientation: {
+      type: "string",
+      enum: ["north_south", "east_west"],
+      description: "Requested build-line orientation.",
+    },
+    relative_side: {
+      type: "string",
+      enum: ["north", "south", "east", "west"],
+      description: "Requested side of the selected actor.",
+    },
+    verification_from: {
+      ...minecraftPositionSchema,
+      description:
+        "First inclusive corner of an exact post-action block footprint to verify.",
+    },
+    verification_to: {
+      ...minecraftPositionSchema,
+      description:
+        "Opposite inclusive corner of an exact post-action block footprint to verify.",
+    },
+    expected_block: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+      description:
+        "Canonical block identifier expected in every cell of the exact verification footprint.",
+    },
+    freshness_requirement_ms: {
+      type: "integer",
+      minimum: 1_000,
+      maximum: 120_000,
+      description: "Maximum acceptable observation age.",
+    },
+  },
+  required: ["target"],
+  additionalProperties: false,
+};
+
+const minecraftSpatialRegionOutputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    result_summary: { type: "string", maxLength: 2_000 },
+    purpose: {
+      type: "string",
+      enum: [
+        "general",
+        "structure_planning",
+        "build_planning",
+        "structure_verification",
+        "fire_safety",
+        "landing_safety",
+      ],
+    },
+    center: minecraftPositionSchema,
+    horizontal_radius: { type: "integer", minimum: 1, maximum: 7 },
+    vertical_radius: { type: "integer", minimum: 1, maximum: 8 },
+    requested_length: { type: "integer", minimum: 3, maximum: 15 },
+    requested_height: { type: "integer", minimum: 3, maximum: 8 },
+    requested_orientation: {
+      type: "string",
+      enum: ["north_south", "east_west"],
+    },
+    requested_relative_side: {
+      type: "string",
+      enum: ["north", "south", "east", "west"],
+    },
+    sample_count: { type: "integer", minimum: 1, maximum: 10_000 },
+    bounds: {
+      type: "object",
+      properties: {
+        min: minecraftPositionSchema,
+        max: minecraftPositionSchema,
+      },
+      required: ["min", "max"],
+      additionalProperties: false,
+    },
+    palette: {
+      type: "array",
+      maxItems: 128,
+      items: {
+        type: "object",
+        properties: {
+          block: { type: "string", maxLength: 160 },
+          count: { type: "integer", minimum: 1, maximum: 10_000 },
+        },
+        required: ["block", "count"],
+        additionalProperties: false,
+      },
+    },
+    palette_complete: { type: "boolean" },
+    omitted_palette_block_types: {
+      type: "integer",
+      minimum: 0,
+      maximum: 10_000,
+    },
+    column_encoding: {
+      type: "string",
+      enum: [
+        "expanded_relative_xz_relative_y_palette_flags_v1",
+        "absolute_xyz_verbose_v1",
+      ],
+    },
+    columns: {
+      type: "array",
+      maxItems: 225,
+      items: {
+        type: "object",
+        properties: {
+          x: { type: "integer", minimum: -30_000_000, maximum: 30_000_000 },
+          z: { type: "integer", minimum: -30_000_000, maximum: 30_000_000 },
+          runs: {
+            type: "array",
+            maxItems: 17,
+            items: {
+              type: "object",
+              properties: {
+                y_start: { type: "integer", minimum: -2_048, maximum: 2_048 },
+                y_end: { type: "integer", minimum: -2_048, maximum: 2_048 },
+                block: { type: "string", maxLength: 160 },
+                flags: {
+                  type: "array",
+                  maxItems: 7,
+                  items: {
+                    type: "string",
+                    enum: [
+                      "air",
+                      "fluid",
+                      "solid",
+                      "flammable",
+                      "replaceable",
+                      "hazard",
+                      "block_entity",
+                    ],
+                  },
+                },
+              },
+              required: ["y_start", "y_end", "block", "flags"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["x", "z", "runs"],
+        additionalProperties: false,
+      },
+    },
+    columns_complete: { type: "boolean" },
+    retained_column_count: { type: "integer", minimum: 0, maximum: 225 },
+    omitted_column_count: { type: "integer", minimum: 0, maximum: 225 },
+    omitted_run_count: { type: "integer", minimum: 0, maximum: 10_000 },
+    wire_details_json_bytes: {
+      type: "integer",
+      minimum: 0,
+      maximum: 34_000,
+    },
+    anchors: {
+      type: "array",
+      maxItems: 64,
+      items: {
+        type: "object",
+        properties: {
+          kind: {
+            type: "string",
+            enum: ["door", "bed", "container", "workstation", "portal", "hearth_base"],
+          },
+          block: { type: "string", maxLength: 160 },
+          position: minecraftPositionSchema,
+        },
+        required: ["kind", "block", "position"],
+        additionalProperties: false,
+      },
+    },
+    anchors_complete: { type: "boolean" },
+    retained_anchor_count: { type: "integer", minimum: 0, maximum: 10_000 },
+    omitted_anchor_count: { type: "integer", minimum: 0, maximum: 10_000 },
+    fireplace_candidates: {
+      type: "array",
+      maxItems: 16,
+      items: {
+        type: "object",
+        properties: {
+          base_position: minecraftPositionSchema,
+          fire_position: minecraftPositionSchema,
+          base_block: { type: "string", maxLength: 160 },
+          flammable_within_two: { type: "integer", minimum: 0, maximum: 125 },
+          solid_nonflammable_enclosure: { type: "integer", minimum: 0, maximum: 5 },
+          replaceable_fire_cell: { type: "boolean" },
+          safe_candidate: { type: "boolean" },
+        },
+        required: [
+          "base_position",
+          "fire_position",
+          "base_block",
+          "flammable_within_two",
+          "solid_nonflammable_enclosure",
+          "replaceable_fire_cell",
+          "safe_candidate",
+        ],
+        additionalProperties: false,
+      },
+    },
+    fireplace_candidates_complete: { type: "boolean" },
+    retained_fireplace_candidate_count: {
+      type: "integer",
+      minimum: 0,
+      maximum: 10_000,
+    },
+    omitted_fireplace_candidate_count: {
+      type: "integer",
+      minimum: 0,
+      maximum: 10_000,
+    },
+    build_line_candidates: {
+      type: "array",
+      maxItems: 16,
+      items: {
+        type: "object",
+        properties: {
+          orientation: {
+            type: "string",
+            enum: ["north_south", "east_west"],
+          },
+          relative_side: {
+            type: "string",
+            enum: ["north", "south", "east", "west", "overlap"],
+          },
+          from: minecraftPositionSchema,
+          to: minecraftPositionSchema,
+          length: { type: "integer", minimum: 3, maximum: 15 },
+          minimum_clear_height: {
+            type: "integer",
+            minimum: 3,
+            maximum: 17,
+          },
+          minimum_actor_distance: {
+            type: "integer",
+            minimum: 2,
+            maximum: 30,
+          },
+          nearest_anchor_distance: {
+            type: "integer",
+            minimum: 2,
+            maximum: 1_000_000,
+          },
+          ground_blocks: {
+            type: "array",
+            maxItems: 16,
+            items: { type: "string", maxLength: 160 },
+          },
+          target_cells_replaceable: { type: "boolean" },
+          target_cells_air: { type: "boolean" },
+          ground_solid_nonhazardous: { type: "boolean" },
+          fluid_cells: { type: "integer", minimum: 0, maximum: 10_000 },
+          flammable_cells: {
+            type: "integer",
+            minimum: 0,
+            maximum: 10_000,
+          },
+          block_entity_cells: {
+            type: "integer",
+            minimum: 0,
+            maximum: 10_000,
+          },
+          safe_candidate: { type: "boolean" },
+        },
+        required: [
+          "orientation",
+          "relative_side",
+          "from",
+          "to",
+          "length",
+          "minimum_clear_height",
+          "minimum_actor_distance",
+          "nearest_anchor_distance",
+          "ground_blocks",
+          "target_cells_replaceable",
+          "target_cells_air",
+          "ground_solid_nonhazardous",
+          "fluid_cells",
+          "flammable_cells",
+          "block_entity_cells",
+          "safe_candidate",
+        ],
+        additionalProperties: false,
+      },
+    },
+    build_line_candidates_complete: { type: "boolean" },
+    retained_build_line_candidate_count: {
+      type: "integer",
+      minimum: 0,
+      maximum: 16,
+    },
+    omitted_build_line_candidate_count: {
+      type: "integer",
+      minimum: 0,
+      maximum: 10_000,
+    },
+    target_geometry_verification: {
+      type: "object",
+      properties: {
+        from: minecraftPositionSchema,
+        to: minecraftPositionSchema,
+        expected_block: { type: "string", minLength: 1, maxLength: 160 },
+        total_cells: { type: "integer", minimum: 1, maximum: 4_096 },
+        sampled_cells: { type: "integer", minimum: 0, maximum: 4_096 },
+        matching_cells: { type: "integer", minimum: 0, maximum: 4_096 },
+        mismatched_cells: { type: "integer", minimum: 0, maximum: 4_096 },
+        unobserved_cells: { type: "integer", minimum: 0, maximum: 4_096 },
+        mismatch_samples: {
+          type: "array",
+          maxItems: 32,
+          items: {
+            type: "object",
+            properties: {
+              position: minecraftPositionSchema,
+              observed_block: { type: "string", minLength: 1, maxLength: 160 },
+            },
+            required: ["position", "observed_block"],
+            additionalProperties: false,
+          },
+        },
+        within_survey_bounds: { type: "boolean" },
+        complete: { type: "boolean" },
+        all_match: { type: "boolean" },
+      },
+      required: [
+        "from",
+        "to",
+        "expected_block",
+        "total_cells",
+        "sampled_cells",
+        "matching_cells",
+        "mismatched_cells",
+        "unobserved_cells",
+        "mismatch_samples",
+        "within_survey_bounds",
+        "complete",
+        "all_match",
+      ],
+      additionalProperties: false,
+    },
+  },
+  required: [
+    "result_summary",
+    "purpose",
+    "center",
+    "horizontal_radius",
+    "vertical_radius",
+    "sample_count",
+    "bounds",
+    "palette",
+    "palette_complete",
+    "omitted_palette_block_types",
+    "column_encoding",
+    "columns",
+    "columns_complete",
+    "retained_column_count",
+    "omitted_column_count",
+    "omitted_run_count",
+    "wire_details_json_bytes",
+    "anchors",
+    "anchors_complete",
+    "retained_anchor_count",
+    "omitted_anchor_count",
+    "fireplace_candidates",
+    "fireplace_candidates_complete",
+    "retained_fireplace_candidate_count",
+    "omitted_fireplace_candidate_count",
+    "build_line_candidates",
+    "build_line_candidates_complete",
+    "retained_build_line_candidate_count",
+    "omitted_build_line_candidate_count",
+  ],
+  additionalProperties: false,
+};
+
 const minecraftLineOfSightOutputSchema: HelixEnvironmentConstrainedJsonSchema =
   {
     type: "object",
@@ -474,6 +898,19 @@ const descriptors: HelixEnvironmentCapabilityDescriptor[] = [
     timeoutCeilingMs: 30_000,
   }),
   descriptor({
+    capabilityId: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    capabilityVersion: 2,
+    domain: "minecraft",
+    adapterProfileIds: [HELIX_MINECRAFT_ADAPTER_PROFILE_ID],
+    label: "Inspect a bounded Minecraft spatial region",
+    description:
+      "Read a compact, exact block-column survey around the current bound actor for structure, build, fireplace, or landing-safety planning, or verify an exact bounded post-action block footprint. Returns block palette, run-length encoded columns, semantic anchors, conservative fireplace candidates, non-authoritative safe straight-line build candidates, and exact material-match receipts without changing the world.",
+    inputSchema: minecraftSpatialRegionInputSchema,
+    outputSchema: minecraftSpatialRegionOutputSchema,
+    freshnessCeilingMs: 30_000,
+    timeoutCeilingMs: 30_000,
+  }),
+  descriptor({
     capabilityId: HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
     domain: "minecraft",
     adapterProfileIds: [HELIX_MINECRAFT_ADAPTER_PROFILE_ID],
@@ -561,14 +998,15 @@ const builtinPackages: BuiltinEnvironmentConnectorPackage[] = [
     capabilityDescriptors: descriptors.filter((entry) =>
       (HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS as readonly string[]).includes(
         entry.capability_id,
-      ),
+      ) &&
+      entry.capability_id !== HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
     ),
   },
   {
     packageVersionId:
-      "connector_package_version:com.casimirbot.minecraft.fabric:0.1.0",
+      "connector_package_version:com.casimirbot.minecraft.fabric:0.2.0",
     packageId: "com.casimirbot.minecraft.fabric",
-    packageVersion: "0.1.0",
+    packageVersion: "0.2.0",
     publisherId: "publisher:casimirbot",
     adapterProfileId: HELIX_MINECRAFT_ADAPTER_PROFILE_ID,
     hostCompatibility: [
@@ -655,6 +1093,8 @@ export const legacyProbeTypeForEnvironmentCapability = (
       return "hazard_check";
     case HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY:
       return "local_map_summary";
+    case HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY:
+      return "spatial_region";
     case HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY:
       return "line_of_sight";
     case HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY:

@@ -91,7 +91,7 @@ export const environmentCommandMinecraftManifest: HelixWorkstationCapabilityMani
   capability_id: HELIX_MINECRAFT_COMMAND_CAPABILITY,
   label: "Run a live Minecraft server command",
   description:
-    "Parse and execute one exact command against the bound Minecraft server's live Brigadier dispatcher under the room owner's active authority profile. For unfamiliar or intricate syntax, first use docs.search with a goal-shaped query and environment_scope=active_room_environment, then use the live command catalog when the exact path or arguments remain uncertain. Do not add unrelated probes: observe only state materially needed to compose or verify the user's requested action. The connector verifies the exact category and effect before dispatch. This capability never grants host shell, filesystem, RCON, process, credential, or operating-system access.",
+    "Parse and execute one exact command against the bound Minecraft server's live Brigadier dispatcher under the room owner's active authority profile. Issue multiple user-requested actions as sequential capability calls, one observed command at a time; never send a commands array. For a room member's bound player, use @s when the command runs from that player's source. Player-only arguments such as /title require @s, a literal player name, or a player selector such as @a; an @e selector remains an entity selector even when filtered by name. For unfamiliar or intricate syntax, first use docs.search with a goal-shaped query and environment_scope=active_room_environment, then use the live command catalog when the exact path or arguments remain uncertain. Do not add unrelated probes: observe only state materially needed to compose or verify the user's requested action. The connector verifies the exact category and effect before dispatch. This capability never grants host shell, filesystem, RCON, process, credential, or operating-system access.",
   panel_id: null,
   action_id: HELIX_ENVIRONMENT_COMMAND_GATEWAY_ACTION,
   mode: "act",
@@ -116,7 +116,7 @@ export const environmentCommandMinecraftManifest: HelixWorkstationCapabilityMani
         minLength: 1,
         maxLength: 16_000,
         description:
-          "One Minecraft command without a leading slash. Never supply a shell or RCON command.",
+          "Exactly one Minecraft command without a leading slash. Never supply an array, a command batch, a shell command, or an RCON command. For a room-bound player action, prefer @s; never use @e for a player-only argument.",
       },
       category: {
         type: "string",
@@ -181,6 +181,7 @@ export type EnvironmentCommandGatewayExecution = {
   summary: string;
   observation: Record<string, unknown>;
   executedArgs?: Record<string, unknown>;
+  idempotentReplay?: boolean;
   error?: string;
 };
 
@@ -505,8 +506,22 @@ export const executeEnvironmentCommandGatewayCapability = async (input: {
   const roomId = roomIdFromThread(input.conversationThreadId);
   const toolCallId = input.toolCallId?.trim() ?? "";
   const providerExecutionId = input.providerExecutionId?.trim() ?? "";
+  if (!command) {
+    const requestedCommands = Array.isArray(args.commands)
+      ? args.commands
+      : [];
+    return failed({
+      turnId: input.turnId,
+      command,
+      outcome: "command_parse_failed",
+      status: "failed",
+      summary:
+        requestedCommands.length > 0
+          ? "The Minecraft command capability accepts exactly one command string per tool call. Retry with the first command in `command`, observe it, then request each remaining command in a separate tool call."
+          : "The Minecraft command capability requires exactly one non-empty command string in `command`.",
+    });
+  }
   if (
-    !command ||
     !account?.trusted_account_session ||
     !session ||
     session.status !== "active" ||
@@ -520,7 +535,7 @@ export const executeEnvironmentCommandGatewayCapability = async (input: {
       command,
       outcome: "permission_revoked",
       summary:
-        "The Minecraft command requires an exact signed-in room turn, provider tool-call identity, and command.",
+        "The Minecraft command requires an exact signed-in room turn and provider tool-call identity.",
     });
   }
   if (!effectiveRisk) {
@@ -565,7 +580,10 @@ export const executeEnvironmentCommandGatewayCapability = async (input: {
       commandText: command,
       requestedCategory,
       expectedEffect,
-      idempotencyKey: `room-command:${crypto.createHash("sha256").update(`${input.turnId}\n${toolCallId}\n${command}`).digest("hex")}`,
+      // A provider retry must not physically execute the same command twice.
+      // The broker already scopes idempotency to the active command authority;
+      // turn + canonical command therefore identifies this execution attempt.
+      idempotencyKey: `room-command:${crypto.createHash("sha256").update(`${input.turnId}\n${command}`).digest("hex")}`,
       confirmationState: "not_required",
       deadlineMs: 15_000,
     });
@@ -573,20 +591,29 @@ export const executeEnvironmentCommandGatewayCapability = async (input: {
       requestId: request.command_request_id,
       deadlineAt: request.deadline_at,
     });
+    const idempotentReplay =
+      typeof request.tool_call_id === "string" &&
+      request.tool_call_id.trim().length > 0 &&
+      request.tool_call_id !== toolCallId;
     return {
       ok:
         observation.outcome === "succeeded" &&
         observation.provenance_valid &&
         observation.eligible_for_current_turn_reentry,
       status: observation.outcome === "succeeded" ? "completed" : "failed",
-      summary: observation.summary,
+      summary: idempotentReplay
+        ? `Helix did not execute the duplicate Minecraft command again; it re-entered the existing current-turn observation. ${observation.summary}`
+        : observation.summary,
       observation,
+      idempotentReplay,
       ...(observation.outcome === "succeeded"
         ? {
             executedArgs: {
               command,
               category: requestedCategory,
               effect: expectedEffect,
+              idempotent_replay: idempotentReplay,
+              physical_execution_performed: !idempotentReplay,
               ...(typeof args.environment_label === "string" &&
               args.environment_label.trim()
                 ? { environment_label: args.environment_label.trim() }

@@ -97,6 +97,7 @@ const minecraftProfile = helixEnvironmentAdapterProfileSchema.parse({
     "hazard_check",
     "inventory_check",
     "local_map_summary",
+    "spatial_region",
   ],
   required_probe_types: [
     "actor_status",

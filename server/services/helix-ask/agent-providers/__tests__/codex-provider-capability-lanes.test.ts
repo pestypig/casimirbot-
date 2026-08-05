@@ -33,6 +33,7 @@ import {
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
 import {
   buildCodexContinuationAffordanceRetryInstruction,
+  buildCodexChainedLaneCallPlan,
   buildCodexCapabilityLaneRetryInstruction,
   buildCodexCompoundSubgoalLedger,
   buildCodexNormalizedObservationArtifacts,
@@ -80,6 +81,9 @@ import {
   scholarlyFollowupRequestedModes,
   shouldRetryCodexCapabilityLaneRequest,
   shouldRetryCodexContinuationAffordance,
+  shouldReviewCodexEmptyPostToolResult,
+  shouldPreserveCoveredCompoundTerminalCandidate,
+  shouldRetryCodexPostObservationContinuationAffordance,
   stripCodexSemanticRouteProposalMarkers,
   stripCodexScholarlyEvidenceDecisionMarkers,
   validateCodexScholarlyEvidenceDecision,
@@ -288,6 +292,178 @@ describe("Codex provider capability lane adapter", () => {
     }
   };
 
+  it("retains an initial lane call in continuation history without executing it again", () => {
+    const malformedProbe = {
+      capability: "com.casimirbot.minecraft.spatial_region.inspect",
+      target: "current_actor",
+      source_target_intent: { user_request: "build a wall" },
+    };
+    const repairedProbe = {
+      capability: "com.casimirbot.minecraft.spatial_region.inspect",
+      target: "current_actor",
+      horizontal_radius: 7,
+      vertical_radius: 6,
+      purpose: "structure_planning",
+    };
+
+    expect(
+      buildCodexChainedLaneCallPlan({
+        initialCalls: [malformedProbe],
+        continuationCalls: [repairedProbe],
+        resetHistoryForSpecializedRecovery: false,
+      }),
+    ).toEqual({
+      historyCalls: [malformedProbe, repairedProbe],
+      executionCalls: [repairedProbe],
+    });
+  });
+
+  it("reviews only a successful empty post-tool model step", () => {
+    expect(
+      shouldReviewCodexEmptyPostToolResult({
+        stdout: "  ",
+        stderr: "",
+        exitCode: 0,
+        timedOut: false,
+        killed: false,
+        failReason: null,
+      }),
+    ).toBe(true);
+    expect(
+      shouldReviewCodexEmptyPostToolResult({
+        stdout: "The observation is sufficient for the final answer.",
+        stderr: "",
+        exitCode: 0,
+        timedOut: false,
+        killed: false,
+        failReason: null,
+      }),
+    ).toBe(false);
+    expect(
+      shouldReviewCodexEmptyPostToolResult({
+        stdout: "",
+        stderr: "",
+        exitCode: 1,
+        timedOut: false,
+        killed: false,
+        failReason: "provider_exit_nonzero",
+      }),
+    ).toBe(false);
+  });
+
+  it("preserves a substantive provider terminal candidate once Helix coverage is satisfied", () => {
+    expect(
+      shouldPreserveCoveredCompoundTerminalCandidate({
+        candidateText:
+          "The fresh fireplace observation verifies the candidate coordinates, containment, support, and nearby flammables.",
+        coverageGate: { applies: true, passed: true },
+      }),
+    ).toBe(true);
+    expect(
+      shouldPreserveCoveredCompoundTerminalCandidate({
+        candidateText: "",
+        coverageGate: { applies: true, passed: true },
+      }),
+    ).toBe(false);
+    expect(
+      shouldPreserveCoveredCompoundTerminalCandidate({
+        candidateText: "A partial answer.",
+        coverageGate: { applies: true, passed: false },
+      }),
+    ).toBe(false);
+  });
+
+  it("recovers an empty first re-entry and executes the next provider-selected step", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousCapturePromptPath =
+      process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "codex-provider-empty-post-tool-review-"),
+    );
+    const capturePromptPath = path.join(tempDir, "prompt.txt");
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"utility_text.normalize_text","text":"  FIRST  ","normalization_mode":"lowercase"}',
+        "",
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"utility_text.normalize_text","text":"  SECOND  ","normalization_mode":"lowercase"}',
+        "Both requested normalizations completed: first and second.",
+      ],
+    });
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = capturePromptPath;
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-empty-post-tool-review",
+          question:
+            'Use the text-normalization tool twice. First normalize " FIRST " to lowercase. After that fresh observation, normalize " SECOND " to lowercase.',
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const reviewPrompt = fs.readFileSync(
+        path.join(tempDir, "prompt.3.txt"),
+        "utf8",
+      );
+
+      expect(result).toMatchObject({
+        ok: true,
+        response_type: "final_answer",
+        answer: "Both requested normalizations completed: first and second.",
+      });
+      expect(
+        debug.runtime_lane_request_loop.candidate_chain.map(
+          (entry: Record<string, unknown>) => entry.text,
+        ),
+      ).toEqual([
+        "  FIRST  ",
+        "  SECOND  ",
+      ]);
+      expect(debug.runtime_lane_request_loop).toMatchObject({
+        chain_step_count: 2,
+        generic_provider_continuation: {
+          stop_reason: "no_next_request",
+        },
+      });
+      expect(debug.capability_lane_call_results).toEqual([
+        expect.objectContaining({
+          capability: "utility_text.normalize_text",
+          normalized_text: "second",
+        }),
+      ]);
+      expect(reviewPrompt).toContain(
+        "prior post-tool model step completed successfully but returned neither a capability request nor a substantive answer",
+      );
+      expect(reviewPrompt).toContain("Provider-selected requests already executed this turn:");
+      expect(reviewPrompt).toContain("FIRST");
+    } finally {
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined)
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined)
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined)
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousCapturePromptPath === undefined)
+        delete process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+      else
+        process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH =
+          previousCapturePromptPath;
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, 15_000);
+
   it("does not coerce an unbound calculator result referent into scholarly follow-up", () => {
     const question = "Now double that result and tell me the new value.";
 
@@ -429,6 +605,188 @@ describe("Codex provider capability lane adapter", () => {
         },
         runtime: {
           memory_pressure: "normal",
+        },
+      },
+    });
+  });
+
+  it("carries successful Minecraft observations forward with their structured result", () => {
+    const result = buildCodexNormalizedObservationArtifacts({
+      turnId: "ask:test:minecraft-observation-normalization",
+      gatewayCallResults: [{
+        capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+        ok: true,
+        observation: {
+          schema: "helix.environment_connector.probe_observation.v1",
+          capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+          status: "succeeded",
+          summary: "Bounded spatial-region read-only probe completed.",
+          result: {
+            center: { x: -38, y: 69, z: -13 },
+            block_palette: ["minecraft:air", "minecraft:stone_bricks"],
+            semantic_anchors: [{
+              kind: "container",
+              block_id: "minecraft:chest",
+              x: -37,
+              y: 69,
+              z: -12,
+            }],
+            fireplace_candidates: [],
+          },
+        },
+        observation_packet: {
+          call_id: "ask:test:minecraft-observation-normalization:call",
+          produced_artifact_refs: [
+            "ask:test:minecraft-observation-normalization:observation",
+          ],
+        },
+      } as never],
+    });
+
+    expect(result.missingNormalizationFailures).toEqual([]);
+    expect(result.artifacts).toHaveLength(1);
+    expect(result.artifacts[0]).toMatchObject({
+      kind: "live_environment_observation",
+      payload_schema: "helix.live_environment_observation.v1",
+      source_observation_schema:
+        "helix.environment_connector.probe_observation.v1",
+      status: "succeeded",
+      text_preview: "Bounded spatial-region read-only probe completed.",
+      payload: {
+        schema: "helix.live_environment_observation.v1",
+        source_capability_id:
+          "com.casimirbot.minecraft.spatial_region.inspect",
+        result: {
+          center: { x: -38, y: 69, z: -13 },
+          semantic_anchors: [{
+            block_id: "minecraft:chest",
+          }],
+        },
+        observation_role: "evidence_not_assistant_answer",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+
+    const reentry =
+      buildCodexNormalizedObservationReentryEvidenceLines(
+        result.artifacts,
+      ).join("\n");
+    expect(reentry).toContain('"x": -38');
+    expect(reentry).toContain('"block_id": "minecraft:chest"');
+    expect(reentry).toContain('"fireplace_candidates": []');
+  });
+
+  it("keeps verified Minecraft build endpoints visible while omitting dense raw columns", () => {
+    const lines = buildCodexNormalizedObservationReentryEvidenceLines([{
+      schema: "helix.current_turn_artifact.v1",
+      artifact_id: "ask:test:minecraft-spatial:model-view",
+      kind: "live_environment_observation",
+      status: "succeeded",
+      capability_key: "com.casimirbot.minecraft.spatial_region.inspect",
+      payload: {
+        schema: "helix.live_environment_observation.v1",
+        capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+        status: "succeeded",
+        result: {
+          purpose: "structure_planning",
+          center: { x: -38, y: 68, z: -11 },
+          columns: [{
+            x: -42,
+            z: -10,
+            runs: [{
+              y_start: 68,
+              y_end: 70,
+              block: "minecraft:dense_column_sentinel",
+            }],
+          }],
+          columns_complete: true,
+          omitted_column_count: 0,
+          build_line_candidates_complete: true,
+          omitted_build_line_candidate_count: 0,
+          build_line_candidates: [{
+            orientation: "north_south",
+            from: { x: -42, y: 68, z: -10 },
+            to: { x: -42, y: 68, z: -6 },
+            length: 5,
+            target_cells_air: true,
+            ground_solid_nonhazardous: true,
+            safe_candidate: true,
+          }],
+          target_geometry_verification: {
+            from: { x: -42, y: 68, z: -10 },
+            to: { x: -42, y: 70, z: -6 },
+            expected_block: "minecraft:stone_bricks",
+            total_cells: 15,
+            matching_cells: 15,
+            mismatched_cells: 0,
+            complete: true,
+            all_match: true,
+          },
+        },
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+    }]).join("\n");
+
+    expect(lines).toContain('"from"');
+    expect(lines).toContain('"x": -42');
+    expect(lines).toContain('"z": -6');
+    expect(lines).toContain('"build_line_candidates_complete": true');
+    expect(lines).toContain('"omitted_build_line_candidate_count": 0');
+    expect(lines).toContain('"target_geometry_verification"');
+    expect(lines).toContain('"all_match": true');
+    expect(lines).toContain(
+      '"schema": "helix.minecraft.spatial_region.model_visible_compaction.v1"',
+    );
+    expect(lines).toContain('"omitted_fields": [');
+    expect(lines).not.toContain("minecraft:dense_column_sentinel");
+  });
+
+  it("normalizes a successful connector result status when the source observation omits it", () => {
+    const result = buildCodexNormalizedObservationArtifacts({
+      turnId: "ask:test:minecraft-observation-status-fallback",
+      gatewayCallResults: [{
+        capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+        ok: true,
+        observation: {
+          schema: "helix.environment_connector.probe_observation.v1",
+          capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+          summary: "No safe build candidate was verified.",
+          result: {
+            purpose: "build_planning",
+            build_line_candidates: [],
+            build_line_candidates_complete: true,
+            omitted_build_line_candidate_count: 0,
+          },
+        },
+        observation_packet: {
+          call_id: "ask:test:minecraft-observation-status-fallback:call",
+          produced_artifact_refs: [
+            "ask:test:minecraft-observation-status-fallback:observation",
+          ],
+        },
+      } as never],
+    });
+
+    expect(result.missingNormalizationFailures).toEqual([]);
+    expect(result.artifacts).toHaveLength(1);
+    expect(result.artifacts[0]).toMatchObject({
+      kind: "live_environment_observation",
+      status: "succeeded",
+      payload: {
+        schema: "helix.live_environment_observation.v1",
+        status: "succeeded",
+        result: {
+          purpose: "build_planning",
+          build_line_candidates: [],
+          build_line_candidates_complete: true,
+          omitted_build_line_candidate_count: 0,
         },
       },
     });
@@ -1685,6 +2043,16 @@ describe("Codex provider capability lane adapter", () => {
     expect(instruction).toContain("scholarly-research.lookup_papers");
     expect(instruction).toContain("magnetar primary research observations");
     expect(instruction).toContain("Copy its capability and arguments exactly");
+    expect(shouldRetryCodexPostObservationContinuationAffordance({
+      state,
+      providerText:
+        "The documentation observation is useful, so I can answer now.",
+    })).toBe(true);
+    expect(shouldRetryCodexPostObservationContinuationAffordance({
+      state,
+      providerText:
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"scholarly-research.lookup_papers","query":"magnetar primary research observations"}',
+    })).toBe(false);
   });
 
   it("allows an initial runtime argument proposal only for a Helix-admitted capability", () => {
@@ -1754,6 +2122,61 @@ describe("Codex provider capability lane adapter", () => {
     })).toBe(false);
   });
 
+  it("admits an exact continuation affordance through the standard capability_id and args envelope", () => {
+    const capability = "com.casimirbot.minecraft.command.catalog";
+    const state = {
+      next_admissible_affordances: [{
+        admissible: true,
+        tried: false,
+        affordance_id: "minecraft:catalog:continuation",
+        lane_request: {
+          capability,
+          path_prefix: "helixgame",
+          limit: 64,
+        },
+      }],
+      capability_proposal: null,
+      allowed_decisions: ["act"],
+      last_attempt: null,
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+    const equivalentNestedRequest = {
+      capability_id: capability,
+      args: {
+        path_prefix: "helixgame",
+        limit: 64,
+      },
+    };
+
+    expect(continuationStateAdmitsPreparedLaneRequest({
+      state,
+      requestedCandidate: equivalentNestedRequest,
+      preparedCandidate: equivalentNestedRequest,
+    })).toBe(true);
+    expect(continuationStateAdmitsPreparedLaneRequest({
+      state,
+      requestedCandidate: {
+        ...equivalentNestedRequest,
+        args: { path_prefix: "helixgame", limit: 65 },
+      },
+      preparedCandidate: {
+        ...equivalentNestedRequest,
+        args: { path_prefix: "helixgame", limit: 65 },
+      },
+    })).toBe(false);
+    expect(continuationStateAdmitsPreparedLaneRequest({
+      state,
+      requestedCandidate: {
+        ...equivalentNestedRequest,
+        unexpected: "server-admin",
+      },
+      preparedCandidate: {
+        ...equivalentNestedRequest,
+        unexpected: "server-admin",
+      },
+    })).toBe(false);
+  });
+
   it("keeps a provider-selected generic next step available after a successful first observation", () => {
     const capability = "room.environment.command";
     const state = {
@@ -1789,6 +2212,47 @@ describe("Codex provider capability lane adapter", () => {
         command: "whoami",
       },
       admittedCapabilityIds: [capability],
+    })).toBe(false);
+  });
+
+  it("closes provider-selected side lanes after a schema-complete exact operator command", () => {
+    const state = {
+      next_admissible_affordances: [],
+      allowed_decisions: ["answer"],
+      last_attempt: {
+        attempt_id: "attempt:minecraft-command",
+        capability_id: "com.casimirbot.minecraft.command",
+        action_fingerprint: "minecraft-command:false",
+        status: "succeeded",
+        failure_class: null,
+        failure_code: null,
+        failure_message: null,
+        retryability: null,
+        observation_refs: ["observation:minecraft-command"],
+      },
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+
+    expect(continuationStateAdmitsGenericProviderLaneRequest({
+      state,
+      candidate: {
+        capability: "realtime_session.record_client_receipt",
+        receipt_kind: "played",
+      },
+      admittedCapabilityIds: [
+        "com.casimirbot.minecraft.command",
+        "realtime_session.record_client_receipt",
+      ],
+      providerSelectedExtensionAllowed: false,
+    })).toBe(false);
+    expect(continuationStateAdmitsGenericProviderLaneRequest({
+      state,
+      candidate: {
+        capability: "com.casimirbot.minecraft.command",
+        command: "/helixgame checkpoint status",
+      },
+      admittedCapabilityIds: ["com.casimirbot.minecraft.command"],
+      providerSelectedExtensionAllowed: false,
     })).toBe(false);
   });
 
@@ -1949,6 +2413,38 @@ describe("Codex provider capability lane adapter", () => {
       question: "Open the image tool.",
       admittedCapabilityIds,
     })).toContain("workstation.open_panel");
+  });
+
+  it("filters the runtime tool surface to route-admitted capability families", () => {
+    const admittedCapabilityIds = [
+      "docs.search",
+      "workstation.open_panel",
+      "com.casimirbot.minecraft.spatial_region.inspect",
+      "com.casimirbot.minecraft.command",
+    ];
+
+    expect(
+      runtimeProviderAdmittedCapabilityIdsForQuestion({
+        question:
+          "Inspect the live Minecraft world around my selected player; do not search documents.",
+        admittedCapabilityIds,
+        admittedToolFamilies: ["live_environment"],
+      }),
+    ).toEqual([
+      "com.casimirbot.minecraft.command",
+      "com.casimirbot.minecraft.spatial_region.inspect",
+    ]);
+    expect(
+      runtimeProviderAdmittedCapabilityIdsForQuestion({
+        question: "Compare the live Minecraft observation with the guide.",
+        admittedCapabilityIds,
+        admittedToolFamilies: ["docs_viewer", "live_environment"],
+      }),
+    ).toEqual([
+      "com.casimirbot.minecraft.command",
+      "com.casimirbot.minecraft.spatial_region.inspect",
+      "docs.search",
+    ]);
   });
 
   it("does not reopen continuation affordances after a validated runtime terminal decision", () => {
@@ -2810,6 +3306,69 @@ describe("Codex provider capability lane adapter", () => {
     });
 
     expect(ledger).toBeNull();
+  });
+
+  it("keeps repeated capability executions distinct by trusted provider call occurrence", () => {
+    const capability = "com.casimirbot.minecraft.command";
+    const spatialCapability = "com.casimirbot.minecraft.spatial_region.inspect";
+    const call = (capabilityId: string, callId: string) => ({
+      ok: true,
+      capability_id: capabilityId,
+      gateway_admission: { requested_capability: capabilityId },
+      observation_packet: {
+        call_id: callId,
+        observation_ref: `packet:${callId}`,
+        produced_artifact_refs: [`gateway:${callId}`],
+      },
+    }) as any;
+    const artifact = (
+      capabilityId: string,
+      callId: string,
+      kind: string,
+    ) => ({
+      artifact_id: `normalized:${callId}`,
+      producer_item_id: callId,
+      capability_key: capabilityId,
+      kind,
+      status: "succeeded",
+      provider_gateway_packet_refs: [`gateway:${callId}`],
+      payload: { status: "succeeded" },
+    });
+    const ledger = buildCodexCompoundSubgoalLedger({
+      turnId: "ask:minecraft-occurrence-ledger",
+      normalizedArtifacts: [
+        artifact(spatialCapability, "inspect-before", "live_environment_observation"),
+        artifact(capability, "checkpoint", "environment_command_observation"),
+        artifact(capability, "fill", "environment_command_observation"),
+        artifact(spatialCapability, "inspect-after", "live_environment_observation"),
+      ],
+      gatewayCallResults: [
+        call(spatialCapability, "inspect-before"),
+        call(capability, "checkpoint"),
+        call(capability, "fill"),
+        call(spatialCapability, "inspect-after"),
+      ],
+    });
+
+    expect(ledger).toMatchObject({
+      subgoal_identity_policy: "provider_call_occurrence",
+      subgoal_count: 4,
+      satisfied_subgoal_count: 4,
+      rail_status: "satisfied",
+    });
+    expect((ledger?.subgoals as any[]).map((entry) => ({
+      capability: entry.requested_capability,
+      call: entry.provider_call_id,
+      occurrence: entry.capability_occurrence,
+    }))).toEqual([
+      { capability: spatialCapability, call: "inspect-before", occurrence: 1 },
+      { capability, call: "checkpoint", occurrence: 1 },
+      { capability, call: "fill", occurrence: 2 },
+      { capability: spatialCapability, call: "inspect-after", occurrence: 2 },
+    ]);
+    expect((ledger?.subgoals as any[])[2].support_refs).toEqual(
+      expect.arrayContaining(["normalized:fill", "gateway:fill", "packet:fill"]),
+    );
   });
 
   it("keeps an affirmative saved-PDF Image Lens command admitted when only text inference and refetch are negated", () => {
@@ -5766,6 +6325,214 @@ describe("Codex provider capability lane adapter", () => {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it("corrects post-observation prose into the exact remaining continuation request", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousCapturePromptPath =
+      process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "codex-provider-post-observation-affordance-"),
+    );
+    const capturePromptPath = path.join(tempDir, "prompt.txt");
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"utility_text.normalize_text","text":"  HELLO WORLD  ","normalization_mode":"lowercase"}',
+        "The normalized text is hello world, so I can answer now.",
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"docs.search","query":"Minecraft commands"}',
+        "The normalized text is hello world, and the documentation search completed.",
+      ],
+    });
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = capturePromptPath;
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-post-observation-affordance-correction",
+          question:
+            "Normalize HELLO WORLD, then search the docs for Minecraft commands and report both results.",
+          runtime_continuation_hints: [
+            {
+              schema: "helix.runtime_continuation_hint.v1",
+              hint_id: "hint:normalize",
+              capability_id: "utility_text.normalize_text",
+              lane_request: {
+                capability: "utility_text.normalize_text",
+                text: "  HELLO WORLD  ",
+                normalization_mode: "lowercase",
+              },
+              reason: "The requested text normalization remains required.",
+              admissible: true,
+            },
+            {
+              schema: "helix.runtime_continuation_hint.v1",
+              hint_id: "hint:docs",
+              capability_id: "docs.search",
+              lane_request: {
+                capability: "docs.search",
+                query: "Minecraft commands",
+              },
+              reason: "The requested documentation evidence remains required.",
+              admissible: true,
+            },
+          ],
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+      const correctionPrompt = fs.readFileSync(
+        path.join(tempDir, "prompt.3.txt"),
+        "utf8",
+      );
+
+      expect(result).toMatchObject({
+        ok: true,
+        response_type: "final_answer",
+        answer:
+          "The normalized text is hello world, and the documentation search completed.",
+      });
+      expect(
+        debug.capability_lane_call_results.map(
+          (entry: Record<string, unknown>) => entry.capability,
+        ),
+      ).toEqual(["utility_text.normalize_text", "docs.search"]);
+      expect(debug.runtime_lane_request_loop).toMatchObject({
+        chain_step_count: 2,
+        post_observation_affordance_retry: {
+          schema:
+            "helix.runtime_agent_post_observation_affordance_retry.v1",
+          status: "runtime_provider_emitted_lane_request",
+          prior_response_preview:
+            "The normalized text is hello world, so I can answer now.",
+          terminal_eligible: false,
+          assistant_answer: false,
+        },
+      });
+      expect(correctionPrompt).toContain(
+        "prior post-observation response did not follow the required continuation affordance contract",
+      );
+      expect(correctionPrompt).toContain('"capability": "docs.search"');
+      expect(correctionPrompt).toContain('"query": "Minecraft commands"');
+      expect(correctionPrompt).toContain(
+        "Prior non-compliant post-observation response:",
+      );
+    } finally {
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined)
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined)
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined)
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+      if (previousCapturePromptPath === undefined)
+        delete process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
+      else
+        process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH =
+          previousCapturePromptPath;
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, 15_000);
+
+  it("fails closed when the post-observation continuation correction is ignored", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"utility_text.normalize_text","text":"  HELLO WORLD  ","normalization_mode":"lowercase"}',
+        "The normalized text is hello world, so I can answer now.",
+        "I will answer without the remaining documentation observation.",
+      ],
+    });
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-post-observation-affordance-exhausted",
+          question:
+            "Normalize HELLO WORLD, then search the docs for Minecraft commands and report both results.",
+          runtime_continuation_hints: [
+            {
+              schema: "helix.runtime_continuation_hint.v1",
+              hint_id: "hint:normalize",
+              capability_id: "utility_text.normalize_text",
+              lane_request: {
+                capability: "utility_text.normalize_text",
+                text: "  HELLO WORLD  ",
+                normalization_mode: "lowercase",
+              },
+              admissible: true,
+            },
+            {
+              schema: "helix.runtime_continuation_hint.v1",
+              hint_id: "hint:docs",
+              capability_id: "docs.search",
+              lane_request: {
+                capability: "docs.search",
+                query: "Minecraft commands",
+              },
+              admissible: true,
+            },
+          ],
+        },
+      });
+      const debug = result.debug as Record<string, any>;
+
+      expect(result).toMatchObject({
+        ok: true,
+        response_type: "final_answer",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+      });
+      expect(
+        debug.capability_lane_call_results.map(
+          (entry: Record<string, unknown>) => entry.capability,
+        ),
+      ).toEqual(["utility_text.normalize_text"]);
+      expect(debug.runtime_lane_request_loop).toMatchObject({
+        post_observation_affordance_retry: {
+          schema:
+            "helix.runtime_agent_post_observation_affordance_retry.v1",
+          status: "runtime_provider_did_not_emit_lane_request",
+          prior_response_preview:
+            "The normalized text is hello world, so I can answer now.",
+          terminal_eligible: false,
+          assistant_answer: false,
+        },
+      });
+      expect(result.answer).not.toContain(
+        "I will answer without the remaining documentation observation.",
+      );
+    } finally {
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined)
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined)
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined)
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+    }
+  }, 15_000);
 
   it("lets Codex collect a visible translation target before requesting the translation lane", async () => {
     const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;

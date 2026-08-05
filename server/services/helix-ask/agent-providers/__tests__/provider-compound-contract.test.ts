@@ -37,4 +37,25 @@ describe("provider compound contract projection", () => {
       }),
     ).toBe(existing);
   });
+
+  it("keeps inspect, checkpoint, mutation, verification, and fallback in a Minecraft build contract", () => {
+    const contract = resolveProviderCompoundPromptContract({
+      payload: {},
+      promptText:
+        "Build a short stone-brick wall west of me. Inspect first, avoid the chest and my player, capture a bounded checkpoint, place blocks only into air, then inspect again and leave the verified wall standing. If the location is unsafe, do not mutate and explain why.",
+    });
+
+    const requirementText =
+      contract?.requirements.map((requirement) => requirement.text).join(" | ") ??
+      "";
+    expect(contract?.requirements.length).toBeGreaterThanOrEqual(6);
+    expect(requirementText).toMatch(/Build a short stone-brick wall/i);
+    expect(requirementText).toMatch(/Inspect first/i);
+    expect(requirementText).toMatch(/avoid the chest/i);
+    expect(requirementText).toMatch(/capture a bounded checkpoint/i);
+    expect(requirementText).toMatch(/place blocks only into air/i);
+    expect(requirementText).toMatch(/inspect again/i);
+    expect(requirementText).toMatch(/leave the verified wall standing/i);
+    expect(requirementText).toMatch(/explain why/i);
+  });
 });

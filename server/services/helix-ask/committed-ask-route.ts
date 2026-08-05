@@ -15,7 +15,11 @@ import {
 import type { HelixPromptInterpretation } from "./prompt-interpretation";
 import type { HelixIntentArbitration } from "./intent-arbitration";
 import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
-import { explicitCapabilityContractForCapability } from "./explicit-capability-contract";
+import {
+  explicitCapabilityContractForCapability,
+  isAffirmativeNaturalMinecraftCommandCapabilityIntent,
+  readTrustedRoomEnvironmentCapabilityExtractionContext,
+} from "./explicit-capability-contract";
 import { buildToolUseRestatement } from "./internet-search-intent";
 import {
   asksForScientificImageEvidenceContinuity,
@@ -168,7 +172,7 @@ const sourceBackedTargets = new Set([
 ]);
 
 export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
-  if (/^com\.casimirbot\.minecraft\.inventory\.check$/i.test(capabilityId)) return "live_environment";
+  if (/^com\.casimirbot\.minecraft\./i.test(capabilityId)) return "live_environment";
   if (/^docs\.|docs[_-]?viewer|docs-viewer|doc[_-]?viewer/i.test(capabilityId)) return "docs_viewer";
   if (/research[-_.]?library|scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(capabilityId)) return "scholarly_research";
   if (/visual[-_.]?analysis|inspect[_-]?image[_-]?region|image[-_.]?lens/i.test(capabilityId)) return "visual_analysis";
@@ -1306,10 +1310,20 @@ export function buildCommittedAskRoute(input: {
     : rawSuppressedFamilies;
   const sourceTargetIntent = readRecord(input.payload.source_target_intent);
   const sourceTargetFamily = inferCommittedRouteToolFamilyFromSourceTarget(effectiveRoute.sourceTarget);
+  const trustedEnvironmentCapabilityContext =
+    readTrustedRoomEnvironmentCapabilityExtractionContext(
+      input.payload.trusted_room_environment_intent_context,
+    );
+  const admitsMinecraftCommandMechanicsGrounding =
+    isAffirmativeNaturalMinecraftCommandCapabilityIntent(
+      input.promptText,
+      trustedEnvironmentCapabilityContext,
+    );
   const unboundedAllowedFamilies = unique([
     ...allowedFamiliesFromPayload(input.payload, effectiveRoute.sourceTarget),
     ...(explicitCapabilityContract?.admission_families ?? []),
     ...(explicitCapabilityContract ? [explicitCapabilityContract.capability_family] : []),
+    ...(admitsMinecraftCommandMechanicsGrounding ? ["docs_viewer"] : []),
     ...toolUseRestatement.requiredToolFamilies,
     ...(affirmativeScholarlyPdfImageLensWorkflow ? ["scholarly_research", "visual_analysis"] : []),
   ])
@@ -1319,7 +1333,12 @@ export function buildCommittedAskRoute(input: {
     : effectiveRoute.strength === "hard" &&
     sourceTargetFamily &&
     !affirmativeScholarlyPdfImageLensWorkflow
-    ? unboundedAllowedFamilies.filter((family) => family === sourceTargetFamily)
+    ? unboundedAllowedFamilies.filter(
+        (family) =>
+          family === sourceTargetFamily ||
+          (admitsMinecraftCommandMechanicsGrounding &&
+            family === "docs_viewer"),
+      )
     : unboundedAllowedFamilies;
   const reusesRetainedScientificImageSidecar =
     effectiveRoute.sourceTarget === "scientific_image_evidence" &&

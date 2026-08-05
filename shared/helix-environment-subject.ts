@@ -153,6 +153,7 @@ export const helixRoomEnvironmentProjectionSchema = z
     identity_assignment: z.enum([
       "supported",
       "binding_required",
+      "reverification_required",
       "not_applicable",
     ]),
     owner_controls_visible: z.boolean(),

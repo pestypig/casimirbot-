@@ -304,9 +304,36 @@ export type HelixScholarlyFullTextChunk = {
   text_excerpt: string;
   relevance_score: number;
   citation_ref: string;
+  /** Human-readable locator suitable for a claim-adjacent citation. */
+  citation_label?: string;
   source_text_ref: string;
   char_start?: number;
   char_end?: number;
+  line_start?: number;
+  line_end?: number;
+  matched_terms?: string[];
+};
+
+export type HelixScholarlyCitationPacket = {
+  schema: "helix.scholarly_citation_packet.v1";
+  source: {
+    title?: string;
+    url?: string;
+    paper_result_id?: string;
+    integrity_hash?: string;
+  };
+  passages: Array<{
+    passage_id: string;
+    quote: string;
+    citation_ref: string;
+    citation_label: string;
+    page?: number;
+    section?: string;
+    matched_terms: string[];
+  }>;
+  citation_instruction: "cite_claims_with_passage_labels";
+  assistant_answer: false;
+  raw_content_included: false;
 };
 
 export type HelixScholarlyPdfVisualCandidate = {
@@ -341,6 +368,7 @@ export type HelixScholarlyFullTextObservation = {
   pages_parsed: number;
   page_text_refs: HelixScholarlyFullTextPage[];
   selected_chunks: HelixScholarlyFullTextChunk[];
+  citation_packet?: HelixScholarlyCitationPacket;
   visual_candidates: HelixScholarlyPdfVisualCandidate[];
   evidence_state: HelixScholarlyEvidenceState;
   full_text_fetch_attempts?: HelixScholarlyFullTextFetchAttempt[];

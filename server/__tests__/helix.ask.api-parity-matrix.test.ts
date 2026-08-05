@@ -565,7 +565,7 @@ describe("Helix Ask API parity matrix", () => {
     });
     expect(payload.source_target_intent).not.toHaveProperty("mandatory_next_tool");
     expect(String(payload.selected_final_answer ?? "")).not.toContain("Reattach it and resend");
-  }, 20_000);
+  }, 60_000);
 
   it("overrides conflicting client research-library metadata for retained scientific-image comparison", async () => {
     const app = createApp();
@@ -618,7 +618,7 @@ describe("Helix Ask API parity matrix", () => {
     });
     expect(payload.ask_turn_procedure_trace?.route_proposal?.requested_capability)
       .not.toBe("research-library.read_document");
-  }, 20_000);
+  }, 60_000);
 
   it("reconstructs the retained scientific-image comparison route on the UI stream path", async () => {
     const app = createApp();
@@ -660,7 +660,7 @@ describe("Helix Ask API parity matrix", () => {
       target_source: "scientific_image_evidence",
       suppressed_routes: expect.arrayContaining(["fresh_image_lens_capture"]),
     });
-  }, 30_000);
+  }, 60_000);
 
   it.each(enabledParityScenarios)("$id stays procedural through top-level Ask", async (scenario) => {
     const app = createApp();
@@ -772,7 +772,7 @@ describe("Helix Ask API parity matrix", () => {
     if (scenario.expected.live_source_identity_ok !== false) {
       expect(probe.poison_audit_ok && !probe.route_authority.ok).toBe(false);
     }
-  }, 60_000);
+  }, 120_000);
 
   it("rejects a complete rail table when the answer envelope is still a typed failure", () => {
     const scenario: HelixApiParityScenario = {

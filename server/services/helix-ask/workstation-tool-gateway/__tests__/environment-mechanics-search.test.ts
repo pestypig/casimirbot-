@@ -5,6 +5,10 @@ import {
   RoomEnvironmentMechanicsSearchError,
 } from "../environment-mechanics-search";
 import type { HelixWorkstationGatewayAccountContext } from "../types";
+import {
+  resolveEnvironmentMechanicsRetrievalPlan,
+  resolveEnvironmentMechanicsSearchScope,
+} from "../../../situation-room/environment-mechanics-registry";
 
 const PROFILE_ID = "profile:environment-mechanics-search";
 const ROOM_ID = "shared_realtime_room:environment-mechanics-search";
@@ -50,6 +54,49 @@ describe("room environment mechanics search scope", () => {
         mechanics_collection_ids: ["mechanics.minecraft.commands.v1"],
       },
     });
+  });
+
+  it("selects bounded goal-shaped sections inside an admitted mechanics collection", () => {
+    const scope = resolveEnvironmentMechanicsSearchScope({
+      collectionIds: ["mechanics.minecraft.commands.v1"],
+      adapterProfileId: "game.minecraft.readonly.v1",
+    });
+    const plan = resolveEnvironmentMechanicsRetrievalPlan({
+      collections: scope.collections,
+      query:
+        "Build a safe stone-brick wall, capture rollback, and verify the finished structure.",
+    });
+
+    expect(plan).toMatchObject({
+      collection_ids: ["mechanics.minecraft.commands.v1"],
+      topic_ids: [
+        "minecraft.command_foundation.v1",
+        "minecraft.spatial_agency.v1",
+      ],
+      section_headings: [
+        "Command construction",
+        "Composition ladder",
+        "Spatial agency, rollback, fire, and fall rescue",
+        "Common action commands",
+      ],
+      retrieval_role:
+        "mechanics_reference_selection_not_execution_admission",
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+  });
+
+  it("keeps generic mechanics retrieval bounded to foundation sections", () => {
+    const scope = resolveEnvironmentMechanicsSearchScope({
+      collectionIds: ["mechanics.minecraft.commands.v1"],
+      adapterProfileId: "game.minecraft.readonly.v1",
+    });
+    expect(
+      resolveEnvironmentMechanicsRetrievalPlan({
+        collections: scope.collections,
+        query: "Explain how an unfamiliar versioned command should be composed.",
+      }).section_headings,
+    ).toEqual(["Command construction", "Composition ladder"]);
   });
 
   it("fails closed when model arguments try to escape the selected environment scope", async () => {

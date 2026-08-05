@@ -404,7 +404,12 @@ function scanFiles(files: string[], messages: CheckMessage[]): void {
   }
 }
 
-function runCommand(label: string, command: string, commandArgs: string[]): boolean {
+function runCommand(
+  label: string,
+  command: string,
+  commandArgs: string[],
+  envOverrides: NodeJS.ProcessEnv = {},
+): boolean {
   console.log(`\n[helix:ask:discipline] ${label}`);
   console.log(`> ${command} ${commandArgs.join(" ")}`);
   const result =
@@ -414,11 +419,13 @@ function runCommand(label: string, command: string, commandArgs: string[]): bool
           encoding: "utf8",
           shell: true,
           stdio: "inherit",
+          env: { ...process.env, ...envOverrides },
         })
       : spawnSync(command, commandArgs, {
           cwd: repoRoot,
           encoding: "utf8",
           stdio: "inherit",
+          env: { ...process.env, ...envOverrides },
         });
   if (result.status === 0) return true;
   if (result.error) console.error(result.error.message);
@@ -515,17 +522,109 @@ if (checkOnly) {
   process.exit(0);
 }
 
-const testCommands: Array<[string, string, string[]]> = [
+type TestCommand = [string, string, string[], NodeJS.ProcessEnv?];
+
+const singleWorkerArgs = ["--pool=forks", "--maxWorkers=1", "--minWorkers=1"];
+const promptBenchmarkCaseShards = [
   [
-    "prompt-solving adversarial benchmark",
-    commandName("npx"),
-    ["vitest", "run", "server/__tests__/helix.ask.prompt-solving-benchmark.test.ts", "--pool=forks"],
+    "contextual_environment_probe_explanation",
+    "negated_minecraft_inventory_probe",
+    "future_conditional_environment_probe",
+    "historical_environment_probe",
+    "quoted_screen_environment_probe",
+    "mixed_environment_probe_explanation_only",
+    "negated_interval_check_first",
+    "negated_click_no_action",
   ],
   [
-    "API parity matrix",
-    commandName("npx"),
-    ["vitest", "run", "server/__tests__/helix.ask.api-parity-matrix.test.ts", "--pool=forks"],
+    "historical_set_rate_justified",
+    "historical_tool_call_without_repeat",
+    "conceptual_review_no_settings",
+    "explain_before_future_click",
+    "quoted_start_capture",
+    "screen_visible_start_button",
+    "negated_calculator_open_no_action",
+    "future_calculator_prefill_no_action",
   ],
+  [
+    "historical_calculator_tool_call_no_repeat",
+    "quoted_calculator_label_no_action",
+    "curly_quoted_theory_procedure_no_action",
+    "debug_facts_rank_failure",
+    "capture_running_no_evidence_causes",
+    "ambiguous_capture_status",
+    "ambiguous_it_failed",
+    "open_run_nothing_debug_export",
+  ],
+  [
+    "do_not_repair_reason_only",
+    "fresh_producer_no_selected_observations",
+    "counterfactual_field_empty",
+    "implementation_plan_no_runtime",
+    "implementation_question_no_receipt",
+    "helix_codex_policy_comparison",
+    "poison_clean_not_route_authority",
+  ],
+] as const;
+const apiParityScenarioShards = [
+  [
+    "visual_content_active_source",
+    "visual_content_negated_cadence",
+    "visual_content_original_interval_regression",
+    "procedure_epoch_interval_status",
+  ],
+  [
+    "affirmative_cadence_control",
+    "contextual_click",
+    "capability_catalog_runtime",
+    "screen_text_start_button",
+  ],
+  [
+    "historical_tool_mention",
+    "live_source_identity_active_bound",
+    "live_source_identity_fresh_unbound",
+    "live_source_identity_wrong_environment",
+  ],
+  [
+    "live_source_identity_missing_environment_source",
+    "live_source_identity_no_situation_run",
+    "live_source_identity_no_field_evaluations",
+    "live_source_identity_stale_interpretation",
+  ],
+] as const;
+
+const testCommands: TestCommand[] = [
+  [
+    "prompt-solving benchmark prelude",
+    commandName("npx"),
+    ["vitest", "run", "server/__tests__/helix.ask.prompt-solving-benchmark.test.ts", ...singleWorkerArgs],
+    { HELIX_PROMPT_BENCHMARK_PRELUDE_ONLY: "1" },
+  ],
+  ...promptBenchmarkCaseShards.map<TestCommand>((ids, index) => [
+    `prompt-solving adversarial benchmark shard ${index + 1}/${promptBenchmarkCaseShards.length}`,
+    commandName("npx"),
+    ["vitest", "run", "server/__tests__/helix.ask.prompt-solving-benchmark.test.ts", ...singleWorkerArgs],
+    { HELIX_PROMPT_BENCHMARK_CASE_IDS: ids.join(",") },
+  ]),
+  [
+    "API parity fixed rail and route contracts",
+    commandName("npx"),
+    ["vitest", "run", "server/__tests__/helix.ask.api-parity-matrix.test.ts", ...singleWorkerArgs],
+    { HELIX_API_PARITY_SCENARIO_IDS: "__none__" },
+  ],
+  ...apiParityScenarioShards.map<TestCommand>((ids, index) => [
+    `API parity scenario shard ${index + 1}/${apiParityScenarioShards.length}`,
+    commandName("npx"),
+    [
+      "vitest",
+      "run",
+      "server/__tests__/helix.ask.api-parity-matrix.test.ts",
+      ...singleWorkerArgs,
+      "-t",
+      "stays procedural through top-level Ask",
+    ],
+    { HELIX_API_PARITY_SCENARIO_IDS: ids.join(",") },
+  ]),
 ];
 
 if (runFull) {
@@ -533,12 +632,12 @@ if (runFull) {
     [
       "live source continuation routing",
       commandName("npx"),
-      ["vitest", "run", "server/__tests__/helix.ask.turn.live-source-continuation-routing.test.ts", "--pool=forks"],
+      ["vitest", "run", "server/__tests__/helix.ask.turn.live-source-continuation-routing.test.ts", ...singleWorkerArgs],
     ],
     [
       "live source identity audit",
       commandName("npx"),
-      ["vitest", "run", "server/__tests__/helix.ask.live-source-identity-audit.test.ts", "--pool=forks"],
+      ["vitest", "run", "server/__tests__/helix.ask.live-source-identity-audit.test.ts", ...singleWorkerArgs],
     ],
   );
 }
@@ -547,8 +646,8 @@ if (runRequired || runFull) {
   testCommands.push(["server build", commandName("npm"), ["run", "build:server"]]);
 }
 
-for (const [label, command, commandArgs] of testCommands) {
-  if (!runCommand(label, command, commandArgs)) process.exit(1);
+for (const [label, command, commandArgs, envOverrides] of testCommands) {
+  if (!runCommand(label, command, commandArgs, envOverrides)) process.exit(1);
 }
 
 console.log("\n[helix:ask:discipline] passed");

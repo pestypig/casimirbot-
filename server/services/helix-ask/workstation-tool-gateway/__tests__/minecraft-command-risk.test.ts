@@ -16,6 +16,8 @@ describe("Minecraft command risk canonicalization", () => {
     "scoreboard players get @s deaths",
     "locate structure minecraft:stronghold",
     "execute as @a run time query gametime",
+    "helixgame checkpoint status",
+    "helixgame fall_rescue status",
   ])("downgrades the unambiguous read form %s", (command) => {
     expect(classifyKnownMinecraftReadOnlyCommand(command)).toEqual({
       category: "query",
@@ -37,6 +39,8 @@ describe("Minecraft command risk canonicalization", () => {
     ["whitelist list", "server_administration", "server_administration"],
     ["say Helix admin test", "server_administration", "server_administration"],
     ["tellraw @a {\"text\":\"Helix admin test\"}", "server_administration", "server_administration"],
+    ["playsound minecraft:block.amethyst_block.chime master @s ~ ~ ~ 1 1 1", "server_administration", "server_administration"],
+    ["execute at @s run playsound minecraft:block.amethyst_block.chime master @s ~ ~ ~ 1 1 1", "server_administration", "server_administration"],
     ["give @s minecraft:torch", "player_inventory", "player_mutation"],
     ["tp @s 0 80 0", "player_movement", "player_mutation"],
     ["effect clear @s", "player_state", "player_mutation"],
@@ -44,6 +48,9 @@ describe("Minecraft command risk canonicalization", () => {
     ["setblock 0 80 0 minecraft:stone", "world_build", "world_mutation"],
     ["summon minecraft:pig", "entity_control", "world_mutation"],
     ["execute as @a run whitelist list", "server_administration", "server_administration"],
+    ["helixgame checkpoint capture cottage 7 5", "server_administration", "server_administration"],
+    ["helixgame checkpoint restore cottage", "world_build", "world_mutation"],
+    ["helixgame fall_rescue arm 30", "world_build", "world_mutation"],
   ])("aligns the known vanilla command %s", (command, category, effect) => {
     expect(classifyKnownMinecraftCommand(command)).toEqual({ category, effect });
   });

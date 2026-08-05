@@ -74,4 +74,70 @@ final class FabricCommandAuthorityPolicyTest {
             players
         ));
     }
+
+    @Test
+    void boundSelfSelectorsUseTheSelectedPlayerAsCommandSourceInFullMode() {
+        assertTrue(FabricCommandAuthorityPolicy.selectedPlayerSourceRequired(
+            "server_administrator",
+            "player_state",
+            "effect give @s minecraft:glowing 10 0 true",
+            true
+        ));
+        assertFalse(FabricCommandAuthorityPolicy.selectedPlayerSourceRequired(
+            "server_administrator",
+            "world_time_weather",
+            "time set day",
+            true
+        ));
+        assertFalse(FabricCommandAuthorityPolicy.selectedPlayerSourceRequired(
+            "server_administrator",
+            "player_state",
+            "effect give @a minecraft:glowing 10 0 true",
+            true
+        ));
+        assertFalse(FabricCommandAuthorityPolicy.selectedPlayerSourceRequired(
+            "server_administrator",
+            "player_state",
+            "effect give @s minecraft:glowing 10 0 true",
+            false
+        ));
+    }
+
+    @Test
+    void restrictedPlayerProfilesStillRequireTheBoundPlayerSource() {
+        assertTrue(FabricCommandAuthorityPolicy.selectedPlayerSourceRequired(
+            "player_assistant",
+            "player_inventory",
+            "give @s minecraft:torch 4",
+            true
+        ));
+        assertTrue(FabricCommandAuthorityPolicy.selectedPlayerSourceRequired(
+            "world_operator",
+            "player_movement",
+            "tp 0 80 0",
+            true
+        ));
+    }
+
+    @Test
+    void gameplayPrimitivesUseTheBoundPlayerAsCommandSource() {
+        assertTrue(FabricCommandAuthorityPolicy.selectedPlayerSourceRequired(
+            "server_administrator",
+            "server_administration",
+            "helixgame checkpoint capture cottage 7 5",
+            true
+        ));
+        assertTrue(FabricCommandAuthorityPolicy.selectedPlayerSourceRequired(
+            "server_administrator",
+            "world_build",
+            "helixgame fall_rescue arm 30",
+            true
+        ));
+        assertFalse(FabricCommandAuthorityPolicy.selectedPlayerSourceRequired(
+            "server_administrator",
+            "world_build",
+            "helixgame fall_rescue arm 30",
+            false
+        ));
+    }
 }

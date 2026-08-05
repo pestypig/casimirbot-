@@ -21,14 +21,25 @@ final class FabricManifestContractTest {
         Map<String, Object> manifest = EnvironmentSourceManifestFactory.build(
             config,
             FabricConnectorRuntime.ADAPTER_VERSION,
-            Instant.now().toString()
+            Instant.now().toString(),
+            List.of("spatial_region")
         );
 
         assertEquals(
-            EnvironmentSourceManifestFactory.SUPPORTED_PROBE_TYPES,
+            List.of(
+                "actor_status",
+                "nearby_entities",
+                "reachability",
+                "line_of_sight",
+                "crop_state",
+                "hazard_check",
+                "inventory_check",
+                "local_map_summary",
+                "spatial_region"
+            ),
             manifest.get("supported_probe_types")
         );
-        assertEquals(8, ((List<?>) manifest.get("supported_probe_types")).size());
+        assertEquals(9, ((List<?>) manifest.get("supported_probe_types")).size());
         Map<String, Object> execution = HelixJson.asObject(
             manifest.get("execution_policy")
         );

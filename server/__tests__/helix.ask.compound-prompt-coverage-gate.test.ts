@@ -106,6 +106,61 @@ describe("compound prompt coverage gate", () => {
     expect(result.non_visible_blocked_requirement_ids).toEqual(expect.arrayContaining(["R2", "R3"]));
   });
 
+  it("accepts trusted current-turn evidence resolutions without requiring procedural phrase repetition", () => {
+    const result = gate({
+      finalAnswerText: "The wall was built successfully and its final footprint was verified.",
+      proposedResolutions: [
+        {
+          requirement_id: "R1",
+          status: "answered",
+          reason: "successful build observation",
+          evidence_refs: ["obs:build"],
+        },
+        {
+          requirement_id: "R2",
+          status: "answered",
+          reason: "inspection preceded mutation",
+          evidence_refs: ["obs:inspect", "obs:build"],
+        },
+        {
+          requirement_id: "R3",
+          status: "answered",
+          reason: "post-mutation verification observation",
+          evidence_refs: ["obs:verify"],
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      applies: true,
+      passed: true,
+      decision: "PASS",
+      answered_count: 3,
+      unresolved_requirement_ids: [],
+    });
+  });
+
+  it("keeps unproven requirements fail-closed beside trusted resolutions", () => {
+    const result = gate({
+      finalAnswerText: "The wall was built successfully.",
+      proposedResolutions: [
+        {
+          requirement_id: "R1",
+          status: "answered",
+          evidence_refs: ["obs:build"],
+        },
+        {
+          requirement_id: "R2",
+          status: "answered",
+          evidence_refs: ["obs:inspect", "obs:build"],
+        },
+      ],
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.unresolved_requirement_ids).toEqual(["R3"]);
+  });
+
   it("fails closed on a visibly blocked required item when partial answers are disallowed", () => {
     const result = evaluateCompoundPromptCoverageGate({
       contract: contractWith(["R1", "R2"]),

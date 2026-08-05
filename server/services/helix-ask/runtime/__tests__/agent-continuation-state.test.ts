@@ -21,7 +21,9 @@ const artifact = (args: {
   payload: args.payload ?? {},
 });
 
-const budget = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+const budget = (
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> => ({
   schema: "helix.agent_loop_budget.v1",
   max_iterations: 3,
   max_tool_calls: 2,
@@ -45,7 +47,10 @@ describe("agent continuation state", () => {
         satisfaction: "unsatisfied",
         missing_requirement_ids: ["doc_evidence"],
       },
-      agent_loop_budget: budget({ consumed_iterations: 0, consumed_llm_decisions: 0 }),
+      agent_loop_budget: budget({
+        consumed_iterations: 0,
+        consumed_llm_decisions: 0,
+      }),
       current_turn_artifact_ledger: [],
       runtime_continuation_hints: [
         {
@@ -83,7 +88,11 @@ describe("agent continuation state", () => {
       admissible: true,
     });
     expect(payload.agent_continuation_state).toBe(state);
-    expect((payload.current_turn_artifact_ledger as Array<Record<string, unknown>>).at(-1)).toMatchObject({
+    expect(
+      (
+        payload.current_turn_artifact_ledger as Array<Record<string, unknown>>
+      ).at(-1),
+    ).toMatchObject({
       kind: "agent_continuation_state",
       payload: { terminal_eligible: false, assistant_answer: false },
     });
@@ -274,16 +283,18 @@ describe("agent continuation state", () => {
           required_next_capability: "docs-viewer.validate_doc_candidates",
           terminal_block_reason: "doc_candidate_validation missing",
         },
-        runtime_continuation_hints: [{
-          hint_id: "ask:continuation:provider_docs_continuation",
-          capability_id: "docs-viewer.validate_doc_candidates",
-          suggested_action: {
-            action: "run_panel_action",
-            panel_id: "docs-viewer",
-            action_id: "validate_doc_candidates",
-            args: { query: "Casimir Dp Quantum Foam Study" },
+        runtime_continuation_hints: [
+          {
+            hint_id: "ask:continuation:provider_docs_continuation",
+            capability_id: "docs-viewer.validate_doc_candidates",
+            suggested_action: {
+              action: "run_panel_action",
+              panel_id: "docs-viewer",
+              action_id: "validate_doc_candidates",
+              args: { query: "Casimir Dp Quantum Foam Study" },
+            },
           },
-        }],
+        ],
         current_turn_artifact_ledger: [],
       },
       turnId: "ask:continuation",
@@ -299,7 +310,9 @@ describe("agent continuation state", () => {
       satisfied: false,
       terminal_product_allowed: null,
     });
-    expect(state.missing_requirement_ids).toContain("doc_candidate_validation missing");
+    expect(state.missing_requirement_ids).toContain(
+      "doc_candidate_validation missing",
+    );
     expect(state.next_admissible_affordances[0]).toMatchObject({
       capability_id: "docs-viewer.validate_doc_candidates",
       admissible: true,
@@ -399,7 +412,9 @@ describe("agent continuation state", () => {
       },
     });
 
-    expect(second.observation_refs.new).toEqual(["ask:continuation:doc_evidence:1"]);
+    expect(second.observation_refs.new).toEqual([
+      "ask:continuation:doc_evidence:1",
+    ]);
     expect(second.progress).toMatchObject({
       made_progress: true,
       new_observation_count: 1,
@@ -420,11 +435,13 @@ describe("agent continuation state", () => {
           id: "ask:continuation:scholarly-lookup:1",
           kind: "scholarly_research_observation",
           payload: {
-            next_affordances: [{
-              capability: "scholarly-research.lookup_papers",
-              reason: "semantic_scholar_http_429",
-              query: "magnetar primary research observations",
-            }],
+            next_affordances: [
+              {
+                capability: "scholarly-research.lookup_papers",
+                reason: "semantic_scholar_http_429",
+                query: "magnetar primary research observations",
+              },
+            ],
           },
         }),
       ],
@@ -456,7 +473,9 @@ describe("agent continuation state", () => {
         tried: false,
       }),
     ]);
-    expect(state.allowed_decisions).toEqual(expect.arrayContaining(["act", "retry"]));
+    expect(state.allowed_decisions).toEqual(
+      expect.arrayContaining(["act", "retry"]),
+    );
     expect(state.allowed_decisions).not.toContain("answer");
   });
 
@@ -479,16 +498,14 @@ describe("agent continuation state", () => {
                 schema: "helix.provider_next_affordance.v1",
                 affordance_id:
                   "theory-artifact-producer:admit-lanyon:lanyon-request:test",
-                capability:
-                  "theory-artifact-producer.admit_lanyon_snapshot",
+                capability: "theory-artifact-producer.admit_lanyon_snapshot",
                 mode: "read",
                 reason:
                   "exact_current_turn_lanyon_request_ready_for_pinned_source_admission",
                 requires_confirmation: false,
                 executes_automatically: false,
                 lane_request: {
-                  capability:
-                    "theory-artifact-producer.admit_lanyon_snapshot",
+                  capability: "theory-artifact-producer.admit_lanyon_snapshot",
                   request_artifact_ref: requestArtifactRef,
                   case_id: "advection_diffusion_1d_periodic",
                 },
@@ -508,8 +525,7 @@ describe("agent continuation state", () => {
       trigger: "post_attempt",
       lastAttempt: {
         attempt_id: "attempt:lanyon-request",
-        capability_id:
-          "theory-artifact-producer.prepare_lanyon_request",
+        capability_id: "theory-artifact-producer.prepare_lanyon_request",
         status: "succeeded",
         observation_refs: [requestArtifactRef],
       },
@@ -517,15 +533,13 @@ describe("agent continuation state", () => {
 
     expect(state.next_admissible_affordances).toEqual([
       expect.objectContaining({
-        capability_id:
-          "theory-artifact-producer.admit_lanyon_snapshot",
+        capability_id: "theory-artifact-producer.admit_lanyon_snapshot",
         args: {
           request_artifact_ref: requestArtifactRef,
           case_id: "advection_diffusion_1d_periodic",
         },
         lane_request: {
-          capability:
-            "theory-artifact-producer.admit_lanyon_snapshot",
+          capability: "theory-artifact-producer.admit_lanyon_snapshot",
           request_artifact_ref: requestArtifactRef,
           case_id: "advection_diffusion_1d_periodic",
           mode: "read",
@@ -584,8 +598,7 @@ describe("agent continuation state", () => {
       trigger: "post_attempt",
       lastAttempt: {
         attempt_id: "attempt:initial-closure",
-        capability_id:
-          "theory-experiment-procedure.evaluate_closure",
+        capability_id: "theory-experiment-procedure.evaluate_closure",
         args: procedureArgs,
         status: "succeeded",
       },
@@ -604,36 +617,31 @@ describe("agent continuation state", () => {
     const evidenceRevisionSha256 = "b".repeat(64);
     const revisionIntent = {
       schema: "helix.theory_execution_closure_evidence_revision.v1",
-      source_capability_id:
-        "theory-artifact-producer.admit_lanyon_snapshot",
+      source_capability_id: "theory-artifact-producer.admit_lanyon_snapshot",
       admission_observation_ref: admissionArtifactRef,
       evidence_revision_ref: receiptEvidenceArtifactRef,
       evidence_revision_sha256: evidenceRevisionSha256,
     };
     const continuationArtifact = artifact({
       id: admissionArtifactRef,
-      kind:
-        "theory_artifact_producer_lanyon_continuation_observation",
+      kind: "theory_artifact_producer_lanyon_continuation_observation",
       payload: {
         next_affordances: [
           {
             schema: "helix.provider_next_affordance.v1",
-            affordance_id:
-              "theory-formal-verifier:prepare-after-lanyon",
+            affordance_id: "theory-formal-verifier:prepare-after-lanyon",
             capability: "theory-formal-verifier.prepare_request",
             mode: "read",
             requires_confirmation: false,
             executes_automatically: false,
             lane_request: {
               capability: "theory-formal-verifier.prepare_request",
-              procedure_artifact_ref:
-                procedureArgs.procedure_artifact_ref,
+              procedure_artifact_ref: procedureArgs.procedure_artifact_ref,
               procedure_id: procedureArgs.procedure_id,
               procedure_sha256: procedureArgs.procedure_sha256,
               semantic_admission_artifact_ref:
                 "ask:continuation:semantic-admission",
-              artifact_generation_artifact_ref:
-                admissionArtifactRef,
+              artifact_generation_artifact_ref: admissionArtifactRef,
             },
             terminal_eligible: false,
             assistant_answer: false,
@@ -643,14 +651,12 @@ describe("agent continuation state", () => {
             schema: "helix.provider_next_affordance.v1",
             affordance_id:
               "theory-experiment-procedure:evaluate-closure-after-lanyon",
-            capability:
-              "theory-experiment-procedure.evaluate_closure",
+            capability: "theory-experiment-procedure.evaluate_closure",
             mode: "read",
             requires_confirmation: false,
             executes_automatically: false,
             lane_request: {
-              capability:
-                "theory-experiment-procedure.evaluate_closure",
+              capability: "theory-experiment-procedure.evaluate_closure",
               ...procedureArgs,
               source_target_intent: revisionIntent,
             },
@@ -678,50 +684,39 @@ describe("agent continuation state", () => {
       previousState: beforeReceipt,
       lastAttempt: {
         attempt_id: "attempt:lanyon-admission",
-        capability_id:
-          "theory-artifact-producer.admit_lanyon_snapshot",
+        capability_id: "theory-artifact-producer.admit_lanyon_snapshot",
         args: {
-          request_artifact_ref:
-            "ask:continuation:lanyon-request",
+          request_artifact_ref: "ask:continuation:lanyon-request",
           case_id: "advection_diffusion_full_1d",
         },
         status: "succeeded",
-        observation_refs: [
-          receiptEvidenceArtifactRef,
-          admissionArtifactRef,
-        ],
+        observation_refs: [receiptEvidenceArtifactRef, admissionArtifactRef],
       },
     });
-    const formalPrepare =
-      afterReceipt.next_admissible_affordances.find(
-        (affordance) =>
-          affordance.capability_id ===
-          "theory-formal-verifier.prepare_request",
-      );
-    const closureAffordances =
-      afterReceipt.next_admissible_affordances.filter(
-        (affordance) =>
-          affordance.capability_id ===
-          "theory-experiment-procedure.evaluate_closure",
-      );
+    const formalPrepare = afterReceipt.next_admissible_affordances.find(
+      (affordance) =>
+        affordance.capability_id === "theory-formal-verifier.prepare_request",
+    );
+    const closureAffordances = afterReceipt.next_admissible_affordances.filter(
+      (affordance) =>
+        affordance.capability_id ===
+        "theory-experiment-procedure.evaluate_closure",
+    );
     const revisionClosure = closureAffordances.find(
       (affordance) =>
         (
           affordance.args.source_target_intent as
-            | Record<string, unknown>
-            | undefined
+            Record<string, unknown> | undefined
         )?.evidence_revision_ref === receiptEvidenceArtifactRef,
     );
     expect(formalPrepare).toMatchObject({
       tried: false,
       admissible: true,
       args: {
-        procedure_artifact_ref:
-          procedureArgs.procedure_artifact_ref,
+        procedure_artifact_ref: procedureArgs.procedure_artifact_ref,
         procedure_id: procedureArgs.procedure_id,
         procedure_sha256: procedureArgs.procedure_sha256,
-        semantic_admission_artifact_ref:
-          "ask:continuation:semantic-admission",
+        semantic_admission_artifact_ref: "ask:continuation:semantic-admission",
         artifact_generation_artifact_ref: admissionArtifactRef,
       },
       lane_request: {
@@ -736,8 +731,7 @@ describe("agent continuation state", () => {
         source_target_intent: revisionIntent,
       },
       lane_request: {
-        capability:
-          "theory-experiment-procedure.evaluate_closure",
+        capability: "theory-experiment-procedure.evaluate_closure",
         mode: "read",
         source_target_intent: revisionIntent,
       },
@@ -765,15 +759,17 @@ describe("agent continuation state", () => {
           id: "ask:continuation:full-text-affordance",
           kind: "scholarly_full_text_observation",
           payload: {
-            next_admissible_affordances: [{
-              affordance_id: "affordance:fetch-selected-paper",
-              lane_request: {
-                capability: "scholarly-research.fetch_full_text",
-                paper_result_id: "paper:magnetar:1",
-                source_url: "https://example.test/magnetar.pdf",
+            next_admissible_affordances: [
+              {
+                affordance_id: "affordance:fetch-selected-paper",
+                lane_request: {
+                  capability: "scholarly-research.fetch_full_text",
+                  paper_result_id: "paper:magnetar:1",
+                  source_url: "https://example.test/magnetar.pdf",
+                },
+                reason: "selected_paper_requires_full_text",
               },
-              reason: "selected_paper_requires_full_text",
-            }],
+            ],
           },
         }),
       ],
@@ -798,19 +794,33 @@ describe("agent continuation state", () => {
       },
     });
     const alternatePayload = structuredClone(payload);
-    const alternateLedger = alternatePayload.current_turn_artifact_ledger as Array<Record<string, unknown>>;
-    const alternateArtifactPayload = alternateLedger[0]?.payload as Record<string, unknown>;
-    const alternateAffordance = (alternateArtifactPayload.next_admissible_affordances as Array<Record<string, unknown>>)[0];
+    const alternateLedger =
+      alternatePayload.current_turn_artifact_ledger as Array<
+        Record<string, unknown>
+      >;
+    const alternateArtifactPayload = alternateLedger[0]?.payload as Record<
+      string,
+      unknown
+    >;
+    const alternateAffordance = (
+      alternateArtifactPayload.next_admissible_affordances as Array<
+        Record<string, unknown>
+      >
+    )[0];
     expect(alternateAffordance).toBeDefined();
-    if (!alternateAffordance) throw new Error("expected alternate scholarly affordance fixture");
-    (alternateAffordance.lane_request as Record<string, unknown>).paper_result_id = "paper:magnetar:2";
+    if (!alternateAffordance)
+      throw new Error("expected alternate scholarly affordance fixture");
+    (
+      alternateAffordance.lane_request as Record<string, unknown>
+    ).paper_result_id = "paper:magnetar:2";
     const alternateState = buildHelixAgentContinuationState({
       payload: alternatePayload,
       turnId: "ask:continuation",
       trigger: "post_attempt",
     });
-    expect(alternateState.next_admissible_affordances[0]?.action_fingerprint)
-      .not.toBe(state.next_admissible_affordances[0]?.action_fingerprint);
+    expect(
+      alternateState.next_admissible_affordances[0]?.action_fingerprint,
+    ).not.toBe(state.next_admissible_affordances[0]?.action_fingerprint);
   });
 
   it("keeps confirmation metadata out of exact verifier lane arguments and distinguishes poll attempts", () => {
@@ -878,12 +888,12 @@ describe("agent continuation state", () => {
         tried: false,
       }),
     ]);
-    expect(
-      state.next_admissible_affordances[0]?.args,
-    ).not.toHaveProperty("requires_confirmation");
-    expect(
-      state.next_admissible_affordances[0]?.args,
-    ).not.toHaveProperty("executes_automatically");
+    expect(state.next_admissible_affordances[0]?.args).not.toHaveProperty(
+      "requires_confirmation",
+    );
+    expect(state.next_admissible_affordances[0]?.args).not.toHaveProperty(
+      "executes_automatically",
+    );
     expect(state.allowed_decisions).toContain("act");
     expect(state.allowed_decisions).not.toContain("answer");
   });
@@ -932,7 +942,9 @@ describe("agent continuation state", () => {
       hard: { iterations: 8, tool_calls: 6, model_decisions: 8 },
     });
 
-    expect(state.allowed_decisions).toEqual(expect.arrayContaining(["act", "retry"]));
+    expect(state.allowed_decisions).toEqual(
+      expect.arrayContaining(["act", "retry"]),
+    );
     expect(state.allowed_decisions).not.toContain("answer");
     expect(extension).toEqual({
       extend: true,
@@ -993,14 +1005,187 @@ describe("agent continuation state", () => {
     });
 
     expect(third.progress.no_progress_repeat_count).toBe(2);
-    expect(resolveHelixContinuationBudgetExtension({
-      state: third,
-      current: { iterations: 3, tool_calls: 2, model_decisions: 3 },
-      hard: { iterations: 8, tool_calls: 6, model_decisions: 8 },
-    })).toMatchObject({
+    expect(
+      resolveHelixContinuationBudgetExtension({
+        state: third,
+        current: { iterations: 3, tool_calls: 2, model_decisions: 3 },
+        hard: { iterations: 8, tool_calls: 6, model_decisions: 8 },
+      }),
+    ).toMatchObject({
       extend: false,
       reason: "repeated_no_progress_boundary_reached",
     });
+  });
+
+  it("does not count repeated state publication for the same call as a new failed attempt", () => {
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: ["wall_not_built"],
+      },
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [],
+    };
+    const attempt = {
+      attempt_id: "call:spatial:3",
+      capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+      action_fingerprint: "same-spatial-read",
+      status: "succeeded" as const,
+      observation_refs: ["observation:spatial:3"],
+    };
+    const first = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: attempt,
+    });
+    const bookkeeping = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      previousState: first,
+      lastAttempt: attempt,
+    });
+    const finalReview = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "final_review",
+      previousState: bookkeeping,
+      lastAttempt: attempt,
+    });
+
+    expect(bookkeeping.progress.no_progress_repeat_count).toBe(0);
+    expect(finalReview.progress.no_progress_repeat_count).toBe(0);
+    expect(finalReview.progress.reason_codes).not.toContain(
+      "repeated_action_without_progress",
+    );
+  });
+
+  it("preserves a schema-repair affordance projected through observation state_delta", () => {
+    const capability = "com.casimirbot.minecraft.spatial_region.inspect";
+    const repairedArgs = {
+      target: "current_actor",
+      purpose: "build_planning",
+    };
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: ["schema_validation_failed"],
+      },
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [
+        artifact({
+          id: "ask:continuation:spatial-schema-repair",
+          kind: "provider_gateway_observation_packet",
+          payload: {
+            status: "failed",
+            state_delta: {
+              next_affordances: [
+                {
+                  affordance_id: "environment_probe_schema_repair:spatial",
+                  capability_id: capability,
+                  args: repairedArgs,
+                  lane_request: {
+                    capability,
+                    ...repairedArgs,
+                  },
+                  admissible: true,
+                  reason: "Retry using only frozen-schema fields.",
+                },
+              ],
+            },
+          },
+        }),
+      ],
+    };
+
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: {
+        attempt_id: "attempt:invalid-spatial-scope",
+        capability_id: capability,
+        action_fingerprint: "invalid-spatial-scope",
+        status: "failed",
+        failure_class: "invalid_args",
+        failure_code: "schema_validation_failed",
+        failure_message: "The probe arguments failed at $.scope.",
+        retryability: "retryable",
+      },
+    });
+
+    expect(state.next_admissible_affordances).toEqual([
+      expect.objectContaining({
+        capability_id: capability,
+        args: repairedArgs,
+        lane_request: { capability, ...repairedArgs },
+        admissible: true,
+        tried: false,
+      }),
+    ]);
+    expect(state.allowed_decisions).toEqual(
+      expect.arrayContaining(["act", "retry"]),
+    );
+    expect(state.allowed_decisions).not.toContain("answer");
+  });
+
+  it("retires a schema-repair affordance after the repaired capability succeeds", () => {
+    const capability = "com.casimirbot.minecraft.local_map.inspect";
+    const repairedArgs = { target: "current_actor" };
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: [],
+      },
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [
+        artifact({
+          id: "ask:continuation:local-map-schema-repair",
+          kind: "provider_gateway_observation_packet",
+          payload: {
+            status: "failed",
+            state_delta: {
+              next_affordances: [
+                {
+                  affordance_id: "environment_probe_schema_repair:local-map",
+                  capability_id: capability,
+                  args: repairedArgs,
+                  lane_request: { capability, ...repairedArgs },
+                  admissible: true,
+                  reason: "Retry using only frozen-schema fields.",
+                },
+              ],
+            },
+          },
+        }),
+      ],
+    };
+
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: {
+        attempt_id: "attempt:repaired-local-map",
+        capability_id: capability,
+        action_fingerprint: "runtime-normalized-success-fingerprint",
+        status: "succeeded",
+        observation_refs: ["observation:local-map:1"],
+      },
+    });
+
+    expect(state.next_admissible_affordances).toEqual([
+      expect.objectContaining({
+        capability_id: capability,
+        tried: true,
+      }),
+    ]);
+    expect(
+      state.next_admissible_affordances.some(
+        (affordance) => affordance.admissible && !affordance.tried,
+      ),
+    ).toBe(false);
   });
 
   it("treats tool-policy rejection as non-retryable bookkeeping rather than progress", () => {
@@ -1054,11 +1239,21 @@ describe("agent continuation state", () => {
     const firstPayload: Record<string, unknown> = {
       goal_satisfaction_evaluation: {
         satisfaction: "unsatisfied",
-        missing_requirement_ids: ["docs_observation", "calculator_observation", "synthesis"],
+        missing_requirement_ids: [
+          "docs_observation",
+          "calculator_observation",
+          "synthesis",
+        ],
       },
-      agent_loop_budget: budget({ consumed_iterations: 1, consumed_llm_decisions: 1 }),
+      agent_loop_budget: budget({
+        consumed_iterations: 1,
+        consumed_llm_decisions: 1,
+      }),
       current_turn_artifact_ledger: [
-        artifact({ id: "ask:continuation:docs:1", kind: "doc_evidence_observation" }),
+        artifact({
+          id: "ask:continuation:docs:1",
+          kind: "doc_evidence_observation",
+        }),
       ],
     };
     const first = buildHelixAgentContinuationState({
@@ -1071,17 +1266,28 @@ describe("agent continuation state", () => {
         satisfaction: "unsatisfied",
         missing_requirement_ids: ["synthesis"],
       },
-      agent_loop_budget: budget({ consumed_iterations: 2, consumed_tool_calls: 2, consumed_llm_decisions: 2 }),
+      agent_loop_budget: budget({
+        consumed_iterations: 2,
+        consumed_tool_calls: 2,
+        consumed_llm_decisions: 2,
+      }),
       current_turn_artifact_ledger: [
-        artifact({ id: "ask:continuation:docs:1", kind: "doc_evidence_observation" }),
-        artifact({ id: "ask:continuation:calculator:1", kind: "calculator_receipt" }),
+        artifact({
+          id: "ask:continuation:docs:1",
+          kind: "doc_evidence_observation",
+        }),
+        artifact({
+          id: "ask:continuation:calculator:1",
+          kind: "calculator_receipt",
+        }),
       ],
       runtime_continuation_hints: [
         {
           hint_id: "ask:continuation:hint:synthesis",
           suggested_capability: "model.synthesize_current_evidence",
           suggested_args: {},
-          reason: "All required tool observations are present; synthesize them.",
+          reason:
+            "All required tool observations are present; synthesize them.",
         },
       ],
     };
@@ -1092,16 +1298,28 @@ describe("agent continuation state", () => {
       previousState: first,
     });
 
-    expect(second.observation_refs.existing).toEqual(["ask:continuation:docs:1"]);
-    expect(second.observation_refs.new).toEqual(["ask:continuation:calculator:1"]);
-    expect(second.progress.resolved_requirement_ids).toEqual(["docs_observation", "calculator_observation"]);
+    expect(second.observation_refs.existing).toEqual([
+      "ask:continuation:docs:1",
+    ]);
+    expect(second.observation_refs.new).toEqual([
+      "ask:continuation:calculator:1",
+    ]);
+    expect(second.progress.resolved_requirement_ids).toEqual([
+      "docs_observation",
+      "calculator_observation",
+    ]);
     expect(second.missing_requirement_ids).toEqual(["synthesis"]);
     expect(second.next_admissible_affordances).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ capability_id: "model.synthesize_current_evidence", tried: false }),
+        expect.objectContaining({
+          capability_id: "model.synthesize_current_evidence",
+          tried: false,
+        }),
       ]),
     );
-    expect(second.allowed_decisions).toEqual(expect.arrayContaining(["act", "answer"]));
+    expect(second.allowed_decisions).toEqual(
+      expect.arrayContaining(["act", "answer"]),
+    );
   });
 
   it("offers the next admitted pending compound subgoal after an observation re-enters", () => {
@@ -1124,19 +1342,15 @@ describe("agent continuation state", () => {
         compound_subgoal_ledger: [
           {
             subgoal_id: "minecraft:actor",
-            requested_capability:
-              "com.casimirbot.minecraft.actor.status.read",
-            runtime_capability:
-              "com.casimirbot.minecraft.actor.status.read",
+            requested_capability: "com.casimirbot.minecraft.actor.status.read",
+            runtime_capability: "com.casimirbot.minecraft.actor.status.read",
             satisfaction: "satisfied",
             rail_failure_code: null,
           },
           {
             subgoal_id: "minecraft:inventory",
-            requested_capability:
-              "com.casimirbot.minecraft.inventory.check",
-            runtime_capability:
-              "com.casimirbot.minecraft.inventory.check",
+            requested_capability: "com.casimirbot.minecraft.inventory.check",
+            runtime_capability: "com.casimirbot.minecraft.inventory.check",
             selected_args: {},
             satisfaction: "pending",
             rail_failure_code: "subgoal_observation_missing",
@@ -1206,7 +1420,9 @@ describe("agent continuation state", () => {
       failure_class: "permission",
       retryability: "requires_user_input",
     });
-    expect(state.allowed_decisions).toEqual(expect.arrayContaining(["ask_user", "answer", "fail"]));
+    expect(state.allowed_decisions).toEqual(
+      expect.arrayContaining(["ask_user", "answer", "fail"]),
+    );
     expect(state.allowed_decisions).not.toContain("retry");
   });
 
@@ -1322,7 +1538,8 @@ describe("agent continuation state", () => {
         status: "failed",
         failure_class: "missing_evidence",
         failure_code: "scholarly_pdf_cache_unavailable",
-        failure_message: "Fetch the exact paper full text before rendering page 2.",
+        failure_message:
+          "Fetch the exact paper full text before rendering page 2.",
         retryability: "retryable",
       },
     });
@@ -1330,9 +1547,15 @@ describe("agent continuation state", () => {
     expect(state.allowed_decisions).toEqual(["retry"]);
     expect(state.next_admissible_affordances).toEqual([]);
     const runtimeText = formatHelixAgentContinuationStateForRuntime(state);
-    expect(runtimeText).toContain("propose exactly one bounded recovery capability");
-    expect(runtimeText).toContain("Helix must independently admit the capability and arguments");
-    expect(runtimeText).not.toContain("Tools and retries require an admitted affordance");
+    expect(runtimeText).toContain(
+      "propose exactly one bounded recovery capability",
+    );
+    expect(runtimeText).toContain(
+      "Helix must independently admit the capability and arguments",
+    );
+    expect(runtimeText).not.toContain(
+      "Tools and retries require an admitted affordance",
+    );
   });
 
   it("treats the hard boundary as a resource stop while retaining answer authority", () => {
@@ -1358,12 +1581,16 @@ describe("agent continuation state", () => {
     });
 
     expect(state.budget.hard.exhausted).toBe(true);
-    expect(state.allowed_decisions).toEqual(expect.arrayContaining(["answer", "fail"]));
-    expect(resolveHelixContinuationBudgetExtension({
-      state,
-      current: { iterations: 3, tool_calls: 1, model_decisions: 3 },
-      hard: { iterations: 3, tool_calls: 1, model_decisions: 3 },
-    })).toMatchObject({
+    expect(state.allowed_decisions).toEqual(
+      expect.arrayContaining(["answer", "fail"]),
+    );
+    expect(
+      resolveHelixContinuationBudgetExtension({
+        state,
+        current: { iterations: 3, tool_calls: 1, model_decisions: 3 },
+        hard: { iterations: 3, tool_calls: 1, model_decisions: 3 },
+      }),
+    ).toMatchObject({
       extend: false,
       reason: "hard_resource_boundary_exhausted",
     });
@@ -1397,10 +1624,16 @@ describe("agent continuation state", () => {
   it("bounds continuation and rejection histories without dropping domain observations", () => {
     const payload: Record<string, unknown> = {
       debug: {},
-      goal_satisfaction_evaluation: { satisfaction: "unsatisfied", missing_requirement_ids: ["answer"] },
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: ["answer"],
+      },
       agent_loop_budget: budget(),
       current_turn_artifact_ledger: [
-        artifact({ id: "ask:continuation:domain:1", kind: "doc_evidence_observation" }),
+        artifact({
+          id: "ask:continuation:domain:1",
+          kind: "doc_evidence_observation",
+        }),
       ],
     };
     const seed = buildHelixAgentContinuationState({
@@ -1431,14 +1664,28 @@ describe("agent continuation state", () => {
       });
     }
 
-    const states = payload.agent_continuation_states as Array<Record<string, unknown>>;
-    const rejections = payload.terminal_rejection_observations as Array<Record<string, unknown>>;
-    const ledger = payload.current_turn_artifact_ledger as Array<Record<string, unknown>>;
+    const states = payload.agent_continuation_states as Array<
+      Record<string, unknown>
+    >;
+    const rejections = payload.terminal_rejection_observations as Array<
+      Record<string, unknown>
+    >;
+    const ledger = payload.current_turn_artifact_ledger as Array<
+      Record<string, unknown>
+    >;
     expect(states).toHaveLength(24);
     expect(states[0]?.sequence).toBe(7);
     expect(rejections).toHaveLength(12);
-    expect(ledger.filter((entry) => entry.kind === "agent_continuation_state")).toHaveLength(24);
-    expect(ledger.filter((entry) => entry.kind === "terminal_rejection_observation")).toHaveLength(12);
-    expect(ledger).toEqual(expect.arrayContaining([expect.objectContaining({ artifact_id: "ask:continuation:domain:1" })]));
+    expect(
+      ledger.filter((entry) => entry.kind === "agent_continuation_state"),
+    ).toHaveLength(24);
+    expect(
+      ledger.filter((entry) => entry.kind === "terminal_rejection_observation"),
+    ).toHaveLength(12);
+    expect(ledger).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ artifact_id: "ask:continuation:domain:1" }),
+      ]),
+    );
   });
 });

@@ -9,6 +9,7 @@ import {
   explicitCapabilityContractForCapability,
   extractExplicitCapabilityContracts,
 } from "../services/helix-ask/explicit-capability-contract";
+import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "../services/helix-ask/workstation-context-feed-query-tool-contracts";
 
 describe("Helix capability contract arbitration", () => {
@@ -194,6 +195,64 @@ describe("Helix capability contract arbitration", () => {
         capability: expectedCapability,
         source: "natural_capability_intent",
       });
+    }
+  });
+
+  it("maps a bounded natural Minecraft structure survey despite an explicit no-mutation constraint", () => {
+    const promptText =
+      "Look around my selected Minecraft player in the paired Fabric world. Without changing anything, inspect a bounded area large enough to find any stone-brick wall within 16 blocks, and tell me the exact endpoints and dimensions of every freestanding stone-brick wall you can verify. If there is no such wall, say so.";
+    const extracted = extractExplicitCapabilityContracts(promptText, {
+      trusted_environment_domain: "minecraft",
+    });
+
+    expect(
+      extracted.map((entry) => ({
+        capability: entry.contract.capability,
+        source: entry.source,
+      })),
+    ).toContainEqual({
+      capability: "com.casimirbot.minecraft.spatial_region.inspect",
+      source: "natural_capability_intent",
+    });
+    expect(
+      extracted.map((entry) => entry.contract.capability),
+    ).not.toContain("com.casimirbot.minecraft.command");
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:natural-minecraft-structure-survey",
+        threadId: "helix-ask:room:natural-minecraft-structure-survey",
+        promptText,
+        trustedEnvironmentContext: {
+          trusted_environment_domain: "minecraft",
+        },
+      }),
+    ).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+      explicit_cues: [
+        "explicit_capability:com.casimirbot.minecraft.spatial_region.inspect",
+      ],
+    });
+  });
+
+  it("keeps contextual Minecraft structure-survey language out of execution", () => {
+    const prompts = [
+      "Do not inspect for a stone-brick wall within 16 blocks; only explain what that survey would return.",
+      "Later, inspect for a stone-brick wall within 16 blocks, but do not do it now.",
+      "Earlier I asked you to inspect for a stone-brick wall within 16 blocks; explain why.",
+      'The screen says "inspect for a stone-brick wall within 16 blocks"; explain that text.',
+      "If I ask later, inspect for a stone-brick wall within 16 blocks.",
+    ];
+
+    for (const promptText of prompts) {
+      expect(
+        extractExplicitCapabilityContracts(promptText, {
+          trusted_environment_domain: "minecraft",
+        }).map((entry) => entry.contract.capability),
+        promptText,
+      ).not.toContain("com.casimirbot.minecraft.spatial_region.inspect");
     }
   });
 

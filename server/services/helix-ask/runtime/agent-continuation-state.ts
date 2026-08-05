@@ -273,7 +273,7 @@ const collectMissingRequirementIds = (payload: RecordLike): string[] => {
     values.push(
       readString(docsContinuationContract.terminal_block_reason) ??
         readString(docsContinuationContract.required_next_capability) ??
-      "docs_continuation_pending",
+        "docs_continuation_pending",
     );
   }
   if (
@@ -312,20 +312,20 @@ const normalizeGoalStatus = (
   const compoundPromptCoveragePending = Boolean(
     readString(compoundPromptCoverageGate?.schema) ===
       "helix.compound_prompt_coverage_gate.v1" &&
-      compoundPromptCoverageGate?.applies === true &&
-      compoundPromptCoverageGate?.passed !== true,
+    compoundPromptCoverageGate?.applies === true &&
+    compoundPromptCoverageGate?.passed !== true,
   );
   const itinerary =
     readRecord(payload.capability_itinerary_execution_state) ??
     readRecord(readRecord(payload.capability_itinerary)?.execution_state);
   const itineraryHasRequirements = Boolean(
     itinerary &&
-      [
-        itinerary.required_observation_families,
-        itinerary.required_observation_kinds,
-        itinerary.required_capabilities,
-        itinerary.compound_subgoal_ledger,
-      ].some((value) => Array.isArray(value) && value.length > 0),
+    [
+      itinerary.required_observation_families,
+      itinerary.required_observation_kinds,
+      itinerary.required_capabilities,
+      itinerary.compound_subgoal_ledger,
+    ].some((value) => Array.isArray(value) && value.length > 0),
   );
   const itineraryPending =
     itineraryHasRequirements && readBoolean(itinerary?.complete) !== true;
@@ -374,7 +374,9 @@ const normalizeGoalStatus = (
     ].includes(raw);
   let status: HelixAgentContinuationGoalStatus = satisfied
     ? "satisfied"
-    : docsContinuationPending || compoundPromptCoveragePending || itineraryPending
+    : docsContinuationPending ||
+        compoundPromptCoveragePending ||
+        itineraryPending
       ? "in_progress"
       : "unknown";
   if (/needs_user_input|pending_input|ask_user|clarif/.test(raw))
@@ -394,10 +396,12 @@ const normalizeGoalStatus = (
       itineraryPending || compoundPromptCoveragePending
         ? false
         : providerTerminalAllowed || completedSolverTerminalAllowed
-        ? true
-        : (readBoolean(authority?.terminal_product_allowed) ??
-          readBoolean(readRecord(payload.terminal_answer_authority)?.allowed) ??
-          null),
+          ? true
+          : (readBoolean(authority?.terminal_product_allowed) ??
+            readBoolean(
+              readRecord(payload.terminal_answer_authority)?.allowed,
+            ) ??
+            null),
   };
 };
 
@@ -796,8 +800,11 @@ const collectAffordances = (
   }
   for (const artifact of currentTurnArtifacts(payload, turnId)) {
     const artifactPayload = readRecord(artifact.payload);
+    const artifactStateDelta = readRecord(artifactPayload?.state_delta);
     push(artifactPayload?.next_affordances, artifact.artifact_id);
     push(artifactPayload?.next_admissible_affordances, artifact.artifact_id);
+    push(artifactStateDelta?.next_affordances, artifact.artifact_id);
+    push(artifactStateDelta?.next_admissible_affordances, artifact.artifact_id);
   }
   const itinerary =
     readRecord(payload.capability_itinerary_execution_state) ??
@@ -873,6 +880,27 @@ const collectAffordances = (
         (entry: HelixAgentContinuationAffordance) =>
           entry.action_fingerprint === candidate.action_fingerprint,
       ) === index,
+  );
+};
+
+const isSchemaRepairAffordance = (
+  affordance: HelixAgentContinuationAffordance,
+): boolean =>
+  /schema[_-]?repair/i.test(affordance.affordance_id) ||
+  /schema|frozen-schema|valid arguments/i.test(affordance.reason ?? "");
+
+const retireSuccessfulSchemaRepairAffordances = (
+  affordances: HelixAgentContinuationAffordance[],
+  lastAttempt: HelixAgentContinuationAttempt | null,
+): HelixAgentContinuationAffordance[] => {
+  if (lastAttempt?.status !== "succeeded" || !lastAttempt.capability_id) {
+    return affordances;
+  }
+  return affordances.map((affordance) =>
+    affordance.capability_id === lastAttempt.capability_id &&
+    isSchemaRepairAffordance(affordance)
+      ? { ...affordance, tried: true }
+      : affordance,
   );
 };
 
@@ -1079,11 +1107,14 @@ export const buildHelixAgentContinuationState = (
     previousState,
     lastAttempt,
   );
-  const collectedAffordances = collectAffordances(
-    args.payload,
-    args.turnId,
-    triedFingerprints,
-    args.capabilityProposal?.admittedCapabilityIds ?? [],
+  const collectedAffordances = retireSuccessfulSchemaRepairAffordances(
+    collectAffordances(
+      args.payload,
+      args.turnId,
+      triedFingerprints,
+      args.capabilityProposal?.admittedCapabilityIds ?? [],
+    ),
+    lastAttempt,
   );
   const affordances = authoritativeTypedFailureSettled
     ? []
@@ -1114,11 +1145,17 @@ export const buildHelixAgentContinuationState = (
     previousState.last_attempt.action_fingerprint ===
       lastAttempt.action_fingerprint,
   );
+  const sameAttemptIdentity = Boolean(
+    previousState?.last_attempt?.attempt_id &&
+    lastAttempt?.attempt_id &&
+    previousState.last_attempt.attempt_id === lastAttempt.attempt_id,
+  );
+  const newAttemptObserved = Boolean(lastAttempt && !sameAttemptIdentity);
   const noProgressRepeatCount = madeProgress
     ? 0
     : previousState
       ? (previousState.progress?.no_progress_repeat_count ?? 0) +
-        (repeatedFingerprint || lastAttempt ? 1 : 0)
+        (newAttemptObserved ? 1 : 0)
       : 0;
   const normalizedGoal = normalizeGoalStatus(args.payload);
   const recoverableTerminalRejectionPending = Boolean(
@@ -1133,12 +1170,12 @@ export const buildHelixAgentContinuationState = (
         terminalProductAllowed: true,
       }
     : recoverableTerminalRejectionPending
-    ? {
-        status: "in_progress" as const,
-        satisfied: false,
-        terminalProductAllowed: false,
-      }
-    : normalizedGoal;
+      ? {
+          status: "in_progress" as const,
+          satisfied: false,
+          terminalProductAllowed: false,
+        }
+      : normalizedGoal;
   const budget = readBudget(args.payload);
   const capabilityProposal = {
     allowed:
@@ -1156,7 +1193,7 @@ export const buildHelixAgentContinuationState = (
     resolvedRequirements.length > 0 ? "requirements_resolved" : null,
     addedRequirements.length > 0 ? "requirements_added" : null,
     newAffordanceCount > 0 ? "new_affordance" : null,
-    repeatedFingerprint && !madeProgress
+    repeatedFingerprint && newAttemptObserved && !madeProgress
       ? "repeated_action_without_progress"
       : null,
     failedAttemptHasOnlyBookkeepingObservations

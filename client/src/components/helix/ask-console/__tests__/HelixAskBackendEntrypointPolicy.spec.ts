@@ -141,6 +141,104 @@ describe("Helix Ask backend entrypoint policy", () => {
     }
   });
 
+  it("routes an affirmative Minecraft relocation through the live-environment backend", () => {
+    const question =
+      "Move my selected Minecraft player DatDamPig to a safe random surface near this base. Use the built-in spreadplayers command centered at x=-38 z=-11 with minimum separation 20 and maximum range 36. Do not respect teams and make no other changes.";
+
+    expect(requiresHelixAskBackendEntrypoint(question)).toBe(true);
+    expect(resolveHelixAskBackendEntrypointFamily(question)).toMatchObject({
+      family: "environment_connector",
+      sourceTarget: "live_environment",
+      targetKind: "minecraft_environment",
+      requiredToolFamily: "environment_connector",
+      selectedCapability: "com.casimirbot.minecraft.command",
+      explicitCue: "affirmative_minecraft_environment_operation",
+      requestedOutputs: expect.arrayContaining([
+        "environment_command_receipt",
+        "post_action_observation",
+        "rollback_receipt",
+      ]),
+    });
+
+    expect(buildHelixAskHardBackendEntrypointRouteMetadata({
+      question,
+      turnId: "turn-minecraft-relocation",
+      threadId: "thread-minecraft-relocation",
+    })).toMatchObject({
+      source: "hard_tool_backend_entrypoint",
+      sourceTarget: "live_environment",
+      requiredToolFamily: "environment_connector",
+      mandatory_next_tool: {
+        tool_name: "com.casimirbot.minecraft.command",
+        required_tool_family: "environment_connector",
+        selected_capability: "com.casimirbot.minecraft.command",
+        terminal_forbidden: true,
+      },
+      source_target_intent: {
+        target_source: "live_environment",
+        target_kind: "minecraft_environment",
+        must_enter_backend_ask: true,
+        allow_client_shortcut: false,
+        allow_no_tool_direct: false,
+        requested_outputs: expect.arrayContaining([
+          "environment_command_receipt",
+          "post_action_observation",
+        ]),
+      },
+    });
+  });
+
+  it("routes natural Minecraft reads and structure actions without forcing a read capability", () => {
+    const readQuestion =
+      "Using my paired Minecraft Fabric environment and selected player, check my current health, food, dimension, exact position, and game mode now.";
+    expect(requiresHelixAskBackendEntrypoint(readQuestion)).toBe(true);
+    expect(resolveHelixAskBackendEntrypointFamily(readQuestion)).toMatchObject({
+      family: "environment_connector",
+      sourceTarget: "live_environment",
+      selectedCapability: null,
+      explicitCue: "affirmative_minecraft_environment_read",
+    });
+    expect(buildHelixAskHardBackendEntrypointRouteMetadata({
+      question: readQuestion,
+      turnId: "turn-minecraft-read",
+      threadId: "thread-minecraft-read",
+    })?.mandatory_next_tool).toBeUndefined();
+
+    const postActionReadQuestion =
+      "Using my paired Minecraft Fabric environment and selected player, read DatDamPig current exact position, dimension, health, food, and game mode now as fresh post-action verification of the immediately preceding spreadplayers command. Do not mutate anything. Report the observation timestamp and freshness.";
+    expect(resolveHelixAskBackendEntrypointFamily(postActionReadQuestion)).toMatchObject({
+      family: "environment_connector",
+      selectedCapability: null,
+      explicitCue: "affirmative_minecraft_environment_read",
+    });
+    expect(buildHelixAskHardBackendEntrypointRouteMetadata({
+      question: postActionReadQuestion,
+      turnId: "turn-minecraft-post-action-read",
+      threadId: "thread-minecraft-post-action-read",
+    })?.mandatory_next_tool).toBeUndefined();
+
+    const wallQuestion =
+      "At a safe open location near my selected Minecraft player, build a five-block-wide stone-brick wall and verify the exact structure.";
+    expect(resolveHelixAskBackendEntrypointFamily(wallQuestion)).toMatchObject({
+      family: "environment_connector",
+      selectedCapability: "com.casimirbot.minecraft.command",
+      explicitCue: "affirmative_minecraft_environment_operation",
+    });
+  });
+
+  it.each([
+    "Do not move my selected Minecraft player; explain spreadplayers.",
+    "If we move DatDamPig later, use spreadplayers.",
+    "Previously I asked you to build a Minecraft wall.",
+    'The screen says "Move my selected Minecraft player with spreadplayers."',
+    'The phrase "Build a wall in Minecraft" is only an example.',
+    "Can the Minecraft environment tool teleport players? Explain conceptually.",
+    "Why did the previous Minecraft command fail?",
+  ])("does not execute a contextual Minecraft environment mention: %s", (question) => {
+    expect(requiresHelixAskBackendEntrypoint(question)).toBe(false);
+    expect(resolveHelixAskBackendEntrypointFamily(question)).toBeNull();
+  });
+
   it("routes bounded Research Library enrichment through a read-first compound Ask path", () => {
     const question =
       "Using the saved Research Library document for https://arxiv.org/pdf/gr-qc/9510071.pdf, read only PDF page 4 and its current paper-evidence sidecar. Create a Calculator-ready prefill, but do not run the Calculator. Persist the enrichment using research-library.apply_evidence_enrichment. Do not mutate the Theory Badge Graph.";

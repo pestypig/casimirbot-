@@ -8,10 +8,16 @@ const RETRIEVAL_PATTERN =
   /\b(?:look\s+up|search|find|consult|check|review|read|cite|quote|extract)\b/i;
 
 const MINECRAFT_SCOPE_PATTERN =
-  /\b(?:minecraft|fabric|paper|minehut|mine\s*hut|in[-\s]?game)\b|\bconnected\s+(?:environment|game|world|server)\b/i;
+  /\b(?:minecraft|fabric|minehut|mine\s*hut|in[-\s]?game)\b|\bpaper\s+(?:minecraft\s+)?(?:server|plugin|adapter|connector|environment)\b|\bconnected\s+(?:environment|game|world|server)\b/i;
 
 const MECHANICS_EVIDENCE_PATTERN =
-  /\b(?:mechanics|commands?|syntax|documentation|docs?|guide|playbook|source|citations?|lines?|evidence)\b/i;
+  /\b(?:mechanics|commands?|syntax|documentation|docs?|guide|playbook|citations?|references?)\b|\b(?:source|evidence)\s+lines?\b/i;
+
+const LIVE_ENVIRONMENT_STATE_PATTERN =
+  /\b(?:paired\s+(?:minecraft\s+)?(?:fabric\s+)?environment|selected\s+(?:minecraft\s+)?player|current\s+(?:player\s+)?(?:exact\s+)?position|exact\s+position|health|food|dimension|game\s+mode|inventory|line\s+of\s+sight|nearby\s+(?:entities|hazards|blocks)|fresh\s+(?:live\s+)?(?:state|evidence|observation)|post[-\s]?action\s+verification|right\s+now)\b/i;
+
+const EXPLICIT_MECHANICS_DOCUMENT_TARGET_PATTERN =
+  /\b(?:mechanics|syntax|documentation|docs?|guide|playbook|citations?|references?)\b|\b(?:source|evidence)\s+lines?\b/i;
 
 /**
  * Recognizes an immediate request to retrieve Minecraft mechanics guidance.
@@ -26,6 +32,16 @@ export const minecraftMechanicsDocsPromptMatch = (
     !prompt ||
     !MINECRAFT_SCOPE_PATTERN.test(prompt) ||
     !MECHANICS_EVIDENCE_PATTERN.test(prompt)
+  ) {
+    return null;
+  }
+
+  // A live state read remains an environment request even when it names the
+  // command whose effect is being verified. Only an explicit document or
+  // mechanics target may recrown that wording as retrieval.
+  if (
+    LIVE_ENVIRONMENT_STATE_PATTERN.test(prompt) &&
+    !EXPLICIT_MECHANICS_DOCUMENT_TARGET_PATTERN.test(prompt)
   ) {
     return null;
   }

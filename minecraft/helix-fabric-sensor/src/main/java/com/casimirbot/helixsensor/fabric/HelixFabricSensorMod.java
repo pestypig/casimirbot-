@@ -30,8 +30,10 @@ public final class HelixFabricSensorMod implements ModInitializer {
         ServerTickEvents.END_SERVER_TICK.register(tickingServer -> {
             FabricConnectorRuntime current = runtime;
             if (current != null) current.tick(tickingServer);
+            FabricGameplayCommands.tick(tickingServer);
         });
         ServerLifecycleEvents.SERVER_STOPPING.register(stoppingServer -> {
+            FabricGameplayCommands.clear(stoppingServer);
             FabricConnectorRuntime current = runtime;
             if (current != null) current.close();
             runtime = null;

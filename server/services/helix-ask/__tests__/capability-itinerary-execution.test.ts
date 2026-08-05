@@ -1,10 +1,154 @@
 import { describe, expect, it } from "vitest";
 import {
+  attachHelixCapabilityItineraryExecutionState,
   buildHelixCapabilityItineraryExecutionState,
   isHelixCapabilityItineraryFamilyObserved,
 } from "../capability-itinerary-execution";
 
 describe("Helix capability itinerary execution", () => {
+  it("binds repeated capability subgoals to their exact provider-call observation refs", () => {
+    const capability = "com.casimirbot.minecraft.command";
+    const observation = (ref: string, callId: string) => ({
+      artifact_id: ref,
+      producer_item_id: callId,
+      kind: "environment_command_observation",
+      capability_key: capability,
+      status: "succeeded",
+      payload: {
+        schema: "helix.environment_command.observation.v1",
+        status: "succeeded",
+      },
+    });
+    const capabilityItinerary = {
+      turn_id: "ask:test:occurrence-binding",
+      admitted_tool_families: ["live_environment"],
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        required_observation_families: ["live_environment"],
+        required_capabilities: [capability],
+      },
+      compound_capability_contract: {
+        subgoal_identity_policy: "provider_call_occurrence",
+        subgoals: [
+          {
+            subgoal_id: "subgoal:checkpoint",
+            requested_capability: capability,
+            runtime_capability: capability,
+            selected_capability: capability,
+            executed_capability: capability,
+            provider_call_id: "call:checkpoint",
+            capability_occurrence: 1,
+            observation_ref: "obs:checkpoint",
+            support_refs: ["obs:checkpoint", "packet:checkpoint"],
+            required_args: [],
+            required_observation_kinds: ["environment_command_observation"],
+          },
+          {
+            subgoal_id: "subgoal:fill",
+            requested_capability: capability,
+            runtime_capability: capability,
+            selected_capability: capability,
+            executed_capability: capability,
+            provider_call_id: "call:fill",
+            capability_occurrence: 2,
+            observation_ref: "obs:fill",
+            support_refs: ["obs:fill", "packet:fill"],
+            required_args: [],
+            required_observation_kinds: ["environment_command_observation"],
+          },
+        ],
+      },
+    };
+    const artifacts = [
+      observation("obs:checkpoint", "call:checkpoint"),
+      observation("obs:fill", "call:fill"),
+    ];
+
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary,
+      artifacts,
+    });
+    expect(state.complete).toBe(true);
+    expect(state.compound_subgoal_ledger.map((entry) => entry.observation_ref)).toEqual([
+      "obs:checkpoint",
+      "obs:fill",
+    ]);
+    expect(state.compound_subgoal_ledger[1].support_refs).toEqual(
+      expect.arrayContaining(["obs:fill", "packet:fill"]),
+    );
+
+    const missingFill = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary,
+      artifacts: [artifacts[0]],
+    });
+    expect(missingFill.complete).toBe(false);
+    expect(missingFill.compound_subgoal_ledger[1]).toMatchObject({
+      observation_ref: null,
+      satisfaction: "pending",
+    });
+  });
+
+  it("replaces a stale itinerary contract with the current occurrence-aware provider contract", () => {
+    const capability = "com.casimirbot.minecraft.command";
+    const payload: Record<string, unknown> = {
+      capability_itinerary: {
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["live_environment"],
+          required_capabilities: [capability],
+        },
+        compound_capability_contract: {
+          source: "pre_gateway_static_plan",
+          subgoals: [{
+            subgoal_id: "stale:command",
+            requested_capability: capability,
+            runtime_capability: capability,
+          }],
+        },
+      },
+      compound_capability_contract: {
+        source: "codex_provider_call_occurrence_normalization",
+        subgoal_identity_policy: "provider_call_occurrence",
+        subgoals: [
+          {
+            subgoal_id: "current:checkpoint",
+            requested_capability: capability,
+            runtime_capability: capability,
+            selected_capability: capability,
+            executed_capability: capability,
+            observation_ref: "obs:checkpoint",
+            required_observation_kinds: ["environment_command_observation"],
+          },
+          {
+            subgoal_id: "current:fill",
+            requested_capability: capability,
+            runtime_capability: capability,
+            selected_capability: capability,
+            executed_capability: capability,
+            observation_ref: "obs:fill",
+            required_observation_kinds: ["environment_command_observation"],
+          },
+        ],
+      },
+    };
+    const artifacts = ["checkpoint", "fill"].map((name) => ({
+      artifact_id: `obs:${name}`,
+      kind: "environment_command_observation",
+      capability_key: capability,
+      payload: { status: "succeeded" },
+    }));
+
+    expect(
+      attachHelixCapabilityItineraryExecutionState(payload, artifacts),
+    ).toEqual([]);
+    expect((payload.capability_itinerary as any).compound_capability_contract).toMatchObject({
+      subgoal_identity_policy: "provider_call_occurrence",
+    });
+    expect((payload.capability_itinerary_execution_state as any).compound_subgoal_ledger.map(
+      (entry: any) => entry.observation_ref,
+    )).toEqual(["obs:checkpoint", "obs:fill"]);
+  });
+
   it("counts only a successful exact live-pipeline cadence observation", () => {
     const capability = "situation-room.live-source.set_rate";
     const artifact = {
@@ -489,6 +633,240 @@ describe("Helix capability itinerary execution", () => {
         rail_failure_code: null,
       }],
     });
+  });
+
+  it("satisfies a guarded Minecraft command subgoal without mutation only from a fresh complete no-candidate observation", () => {
+    const turnId = "ask:test:minecraft-guarded-noop";
+    const spatialCapability =
+      "com.casimirbot.minecraft.spatial_region.inspect";
+    const commandCapability = "com.casimirbot.minecraft.command";
+    const spatialSubgoalId = "subgoal:minecraft-spatial";
+    const observationRef = `${turnId}:spatial-observation`;
+    const spatialArtifact = {
+      artifact_id: observationRef,
+      turn_id: turnId,
+      kind: "live_environment_observation",
+      source_scope: "current_turn_context",
+      capability_key: spatialCapability,
+      source_capability_id: spatialCapability,
+      source_observation_schema:
+        "helix.environment_connector.probe_observation.v1",
+      source_observation_status: "succeeded",
+      status: "succeeded",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      payload: {
+        schema: "helix.live_environment_observation.v1",
+        capability_key: spatialCapability,
+        source_capability_id: spatialCapability,
+        status: "succeeded",
+        observation_role: "evidence_not_assistant_answer",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        result: {
+          purpose: "structure_planning",
+          build_line_candidates: [],
+          build_line_candidates_complete: true,
+          retained_build_line_candidate_count: 0,
+          omitted_build_line_candidate_count: 0,
+        },
+      },
+    };
+    const capabilityItinerary = {
+      turn_id: turnId,
+      admitted_tool_families: ["live_environment"],
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        required_observation_families: ["live_environment"],
+        required_capabilities: [spatialCapability, commandCapability],
+      },
+      compound_capability_contract: {
+        subgoals: [
+          {
+            subgoal_id: spatialSubgoalId,
+            requested_capability: spatialCapability,
+            runtime_capability: spatialCapability,
+            required_args: [],
+            args_hint: { purpose: "structure_planning" },
+            required_observation_kinds: [
+              "live_environment_observation",
+              "helix.environment_connector.probe_observation.v1",
+            ],
+          },
+          {
+            subgoal_id: "subgoal:minecraft-command",
+            requested_capability: commandCapability,
+            runtime_capability: commandCapability,
+            required_args: ["command", "category", "effect"],
+            args_hint: {},
+            required_observation_kinds: [
+              "helix.environment_command.observation.v1",
+            ],
+            guarded_noop_policy: {
+              schema: "helix.compound_capability_guarded_noop.v1",
+              mode: "no_verified_safe_candidate",
+              guard_subgoal_id: spatialSubgoalId,
+              guard_capability: spatialCapability,
+              required_purpose: "structure_planning",
+              accepted_observation_purposes: [
+                "structure_planning",
+                "build_planning",
+              ],
+              candidate_field: "build_line_candidates",
+              completeness_field: "build_line_candidates_complete",
+              omitted_count_field: "omitted_build_line_candidate_count",
+              current_turn_only: true,
+              requires_successful_observation: true,
+              user_directed_noop_guard: true,
+            },
+          },
+        ],
+      },
+    };
+
+    expect(
+      buildHelixCapabilityItineraryExecutionState({
+        capabilityItinerary,
+        artifacts: [spatialArtifact],
+      }),
+    ).toMatchObject({
+      complete: true,
+      missing_required_capabilities: [],
+      missing_compound_subgoal_ids: [],
+      compound_subgoal_ledger: [
+        {
+          requested_capability: spatialCapability,
+          satisfaction: "satisfied",
+        },
+        {
+          requested_capability: commandCapability,
+          selected_capability: null,
+          executed_capability: null,
+          observation_ref: observationRef,
+          observation_provenance: "current_turn_guarded_noop_observation",
+          satisfaction: "satisfied",
+          satisfaction_reason: "no_verified_safe_candidate",
+          satisfied_without_execution: true,
+          mutation_performed: false,
+          rail_status: "complete",
+          rail_failure_code: null,
+        },
+      ],
+    });
+
+    const liveAliasArtifact = {
+      ...spatialArtifact,
+      source_observation_status: undefined,
+      payload: {
+        ...spatialArtifact.payload,
+        result: {
+          ...spatialArtifact.payload.result,
+          purpose: "build_planning",
+        },
+      },
+    };
+    expect(
+      buildHelixCapabilityItineraryExecutionState({
+        capabilityItinerary,
+        artifacts: [liveAliasArtifact],
+      }),
+    ).toMatchObject({
+      complete: true,
+      compound_subgoal_ledger: [
+        { satisfaction: "satisfied" },
+        {
+          satisfaction: "satisfied",
+          satisfaction_reason: "no_verified_safe_candidate",
+          satisfied_without_execution: true,
+          mutation_performed: false,
+        },
+      ],
+    });
+
+    const rejectedArtifacts = [
+      {
+        name: "incomplete candidate list",
+        artifact: {
+          ...spatialArtifact,
+          payload: {
+            ...spatialArtifact.payload,
+            result: {
+              ...spatialArtifact.payload.result,
+              build_line_candidates_complete: false,
+            },
+          },
+        },
+      },
+      {
+        name: "omitted candidate",
+        artifact: {
+          ...spatialArtifact,
+          payload: {
+            ...spatialArtifact.payload,
+            result: {
+              ...spatialArtifact.payload.result,
+              omitted_build_line_candidate_count: 1,
+            },
+          },
+        },
+      },
+      {
+        name: "verified safe candidate",
+        artifact: {
+          ...spatialArtifact,
+          payload: {
+            ...spatialArtifact.payload,
+            result: {
+              ...spatialArtifact.payload.result,
+              build_line_candidates: [{ safe_candidate: true }],
+              retained_build_line_candidate_count: 1,
+            },
+          },
+        },
+      },
+      {
+        name: "prior-turn evidence",
+        artifact: {
+          ...spatialArtifact,
+          turn_id: "ask:test:prior-turn",
+          source_scope: "prior_turn_context",
+        },
+      },
+      {
+        name: "failed observation",
+        artifact: {
+          ...spatialArtifact,
+          source_observation_status: "failed",
+          status: "failed",
+          payload: {
+            ...spatialArtifact.payload,
+            status: "failed",
+          },
+        },
+      },
+    ];
+    for (const rejected of rejectedArtifacts) {
+      const state = buildHelixCapabilityItineraryExecutionState({
+        capabilityItinerary,
+        artifacts: [rejected.artifact],
+      });
+      const commandSubgoal = state.compound_subgoal_ledger.find(
+        (subgoal) =>
+          subgoal.requested_capability === commandCapability,
+      );
+      expect(commandSubgoal, rejected.name).toMatchObject({
+        satisfaction: "failed",
+      });
+      expect(commandSubgoal, rejected.name).not.toHaveProperty(
+        "satisfied_without_execution",
+      );
+      expect(state.missing_required_capabilities, rejected.name).toContain(
+        commandCapability,
+      );
+      expect(state.complete, rejected.name).toBe(false);
+    }
   });
 
   it("counts only the exact broker-revalidated prior environment evidence schema", () => {

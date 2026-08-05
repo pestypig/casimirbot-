@@ -151,7 +151,39 @@ export type HelixTurnLifecycleProjectionMismatchCode =
   | "legacy_provider_completion_disagrees_with_runtime"
   | "continuation_pending_after_runtime_completion"
   | "terminal_rejection_after_eligible_runtime_completion"
-  | "pending_lane_request_projected_as_terminal_candidate";
+  | "pending_lane_request_projected_as_terminal_candidate"
+  | "provider_candidate_disagrees_with_runtime_message"
+  | "authorized_provider_candidate_not_materialized"
+  | "provider_candidate_ref_lost_during_materialization"
+  | "provider_candidate_text_changed_during_materialization"
+  | "provider_candidate_evidence_refs_dropped"
+  | "provider_candidate_ref_lost_by_terminal_writer"
+  | "provider_candidate_text_changed_by_terminal_writer"
+  | "provider_candidate_evidence_refs_dropped_by_terminal_writer"
+  | "materialized_text_changed_by_terminal_writer"
+  | "materialized_evidence_refs_dropped_by_terminal_writer"
+  | "terminal_writer_text_changed_in_visible_projection"
+  | "typed_failure_selected_after_authorized_provider_candidate"
+  | "recoverable_rejection_terminalized_before_reentry"
+  | "record_only_admission_executed_runtime_steps"
+  | "exact_tool_cardinality_violated"
+  | "forbidden_extra_tool_executed"
+  | "failed_evidence_quality_gate_bypassed";
+
+export type HelixTurnLifecycleAuditStage =
+  | "tool_execution"
+  | "evidence_reentry"
+  | "followup_reasoning"
+  | "terminal_materialization"
+  | "terminal_authority"
+  | "presentation"
+  | "scientific_evidence";
+
+export type HelixTurnLifecycleAuditDisposition =
+  | "adapter_projection_contradiction"
+  | "hard_evidence_boundary"
+  | "hard_policy_boundary"
+  | "informational";
 
 export type HelixTurnLifecycleProjectionMismatch = {
   code: HelixTurnLifecycleProjectionMismatchCode;
@@ -159,12 +191,55 @@ export type HelixTurnLifecycleProjectionMismatch = {
   projection_path: string;
   lifecycle_value: boolean | string | null;
   projection_value: boolean | string | null;
+  stage?: HelixTurnLifecycleAuditStage;
+  disposition?: HelixTurnLifecycleAuditDisposition;
+};
+
+export type HelixTurnLifecycleContinuityCheck = {
+  stage: HelixTurnLifecycleAuditStage;
+  check:
+    | "runtime_observation_reentry"
+    | "requested_tool_cardinality"
+    | "forbidden_other_tools_absent"
+    | "runtime_followup_reasoning"
+    | "record_only_admission_did_not_execute"
+    | "runtime_message_matches_provider_candidate"
+    | "provider_candidate_authorized"
+    | "provider_candidate_materialized"
+    | "provider_candidate_ref_preserved"
+    | "provider_candidate_text_preserved"
+    | "provider_candidate_evidence_refs_preserved"
+    | "provider_candidate_ref_preserved_by_terminal_writer"
+    | "provider_candidate_text_preserved_by_terminal_writer"
+    | "provider_candidate_evidence_refs_preserved_by_terminal_writer"
+    | "materialized_text_preserved_by_terminal_writer"
+    | "materialized_evidence_refs_preserved_by_terminal_writer"
+    | "terminal_writer_text_preserved_in_visible_projection"
+    | "recoverable_rejection_reentered"
+    | "evidence_quality_gate";
+  status: "passed" | "failed" | "failed_closed" | "not_observed" | "not_applicable";
+  disposition: HelixTurnLifecycleAuditDisposition;
+  source_ref?: string | null;
+  target_ref?: string | null;
+  source_sha256?: string | null;
+  target_sha256?: string | null;
+  expected_support_ref_count?: number;
+  observed_support_ref_count?: number;
+  missing_support_refs?: string[];
+  reason_codes?: string[];
 };
 
 export type HelixTurnLifecycleProjectionAudit = {
   schema: "helix.turn_lifecycle_projection_audit.v1";
   ok: boolean;
   mismatches: HelixTurnLifecycleProjectionMismatch[];
+  first_divergence_stage?: HelixTurnLifecycleAuditStage | null;
+  continuity_checks?: HelixTurnLifecycleContinuityCheck[];
+  scientific_evidence_disposition?:
+    | "passed"
+    | "failed_closed"
+    | "bypassed"
+    | "not_observed";
   assistant_answer: false;
   raw_content_included: false;
 };

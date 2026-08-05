@@ -16,7 +16,36 @@ final class FabricGameplayCommandsTest {
         );
         FabricCommandClassifier.Classification classification =
             FabricCommandClassifier.classify("helixgame ping");
-        assertEquals("mod_command", classification.category());
-        assertEquals("unknown", classification.effectClass());
+        assertEquals("query", classification.category());
+        assertEquals("read_only", classification.effectClass());
+    }
+
+    @Test
+    void classifiesCheckpointAndFallRescuePrimitivesByTheirActualEffects() {
+        assertEquals(
+            new FabricCommandClassifier.Classification("query", "read_only"),
+            FabricCommandClassifier.classify("helixgame checkpoint status")
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification(
+                "server_administration",
+                "server_administration"
+            ),
+            FabricCommandClassifier.classify("helixgame checkpoint capture cottage 7 5")
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification(
+                "world_build",
+                "world_mutation"
+            ),
+            FabricCommandClassifier.classify("helixgame checkpoint restore cottage")
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification(
+                "world_build",
+                "world_mutation"
+            ),
+            FabricCommandClassifier.classify("helixgame fall_rescue arm 30")
+        );
     }
 }

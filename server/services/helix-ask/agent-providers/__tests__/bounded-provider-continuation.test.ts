@@ -182,6 +182,53 @@ describe("bounded provider-selected continuation", () => {
     });
   });
 
+  it("gives a repeated duplicate one bounded completeness review before stopping", async () => {
+    const executed: string[] = [];
+    let reviews = 0;
+    const result = await runBoundedProviderSelectedContinuation<
+      Result,
+      Request,
+      { capability: string; ok: true }
+    >({
+      initialResult: { request: { capability: "tool.inspect" } },
+      maxSteps: 5,
+      maxTerminalReviews: 1,
+      requestFromResult: (entry) => entry.request,
+      requestFingerprint: (request) => request.capability,
+      priorRequestFingerprints: ["tool.inspect"],
+      admitRequest: () => true,
+      reenterRejection: async () => ({
+        request: { capability: "tool.inspect" },
+      }),
+      reviewTerminalCandidate: async (currentResult) => {
+        reviews += 1;
+        return currentResult.answer === "Mutation and verification complete."
+          ? currentResult
+          : { request: { capability: "tool.mutate" } };
+      },
+      executeAndReenter: async (request) => {
+        executed.push(request.capability);
+        return {
+          observation: { capability: request.capability, ok: true },
+          result: {
+            request: null,
+            answer: "Mutation and verification complete.",
+          },
+        };
+      },
+    });
+
+    expect(executed).toEqual(["tool.mutate"]);
+    expect(reviews).toBe(2);
+    expect(result).toMatchObject({
+      stop_reason: "no_next_request",
+      pending_request: null,
+      terminal_reviewed: true,
+      terminal_review_count: 2,
+      result: { answer: "Mutation and verification complete." },
+    });
+  });
+
   it("gives a compound terminal candidate one bounded provider-owned completeness review", async () => {
     const executed: string[] = [];
     let reviews = 0;

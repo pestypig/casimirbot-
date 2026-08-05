@@ -363,6 +363,21 @@ export const evaluateCompoundPromptCoverageGate = (
       };
     }
 
+    if (proposedResolution?.status === "answered") {
+      return {
+        requirement_id: requirement.id,
+        status: "answered",
+        reason:
+          readString(proposedResolution.reason) ||
+          "trusted current-turn evidence resolved the requirement",
+        evidence_refs:
+          proposedResolution.evidence_refs ?? input.selectedEvidenceRefs ?? [],
+        terminal_visible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+
     if (tagged?.state === "answered" || isAnsweredByText(requirement.text, normalizedAnswer)) {
       return {
         requirement_id: requirement.id,

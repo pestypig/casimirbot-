@@ -517,9 +517,11 @@ export const listRoomEnvironmentProjections = async (input: {
       identity_assignment:
         native.length === 0
           ? "not_applicable"
-          : selfBinding
+          : selfBinding?.status === "active"
             ? "supported"
-            : "binding_required",
+            : selfBinding
+              ? "reverification_required"
+              : "binding_required",
       owner_controls_visible: membership.role === "owner",
       content_role: "room_environment_projection_not_assistant_answer",
       answer_authority: false,
@@ -735,6 +737,23 @@ const bindSubject = async (input: {
         now,
       ],
     );
+    await db.query(
+      `
+        UPDATE helix_environment_command_member_grants
+        SET subject_binding_id = $4, updated_at = $5
+        WHERE room_id = $1
+          AND environment_binding_id = $2
+          AND participant_id = $3
+          AND status = 'active';
+      `,
+      [
+        input.roomId,
+        environment.environment_binding_id,
+        targetParticipantId,
+        bindingId,
+        now,
+      ],
+    );
     await insertAuditEvent({
       db,
       roomId: input.roomId,
@@ -813,6 +832,17 @@ export const revokeOwnRoomEnvironmentSubject = async (input: {
       `
         UPDATE helix_room_environment_subject_bindings
         SET status = 'revoked', revoked_at = $4, updated_at = $4
+        WHERE room_id = $1
+          AND environment_binding_id = $2
+          AND participant_id = $3
+          AND status = 'active';
+      `,
+      [input.roomId, input.environmentBindingId, member.participant_id, now],
+    );
+    await db.query(
+      `
+        UPDATE helix_environment_command_member_grants
+        SET subject_binding_id = NULL, updated_at = $4
         WHERE room_id = $1
           AND environment_binding_id = $2
           AND participant_id = $3

@@ -866,6 +866,40 @@ describe("Helix terminal authority single writer", () => {
     (conditionalVisualPayload.terminal_presentation as Record<string, unknown>).concise_text =
       conditionalVisualAnswer;
 
+    const reconciledCanonicalGoalPayload = structuredClone(payload);
+    delete reconciledCanonicalGoalPayload.committed_ask_route;
+    delete reconciledCanonicalGoalPayload.route_evidence_authority;
+    reconciledCanonicalGoalPayload.canonical_goal_frame = {
+      schema: "helix.canonical_goal_frame.v1",
+      turn_id: turnId,
+      goal_kind: "live_environment",
+      required_terminal_kind: "model_synthesized_answer",
+      requested_capability:
+        "com.casimirbot.minecraft.spatial_region.inspect",
+      allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+      forbidden_terminal_artifact_kinds: [],
+      source: "committed_route_canonical_goal_reconciliation",
+    };
+    reconciledCanonicalGoalPayload.provider_terminal_authority_bridge = {
+      ...(reconciledCanonicalGoalPayload.provider_terminal_authority_bridge as Record<
+        string,
+        unknown
+      >),
+      solver_completed: true,
+      goal_satisfaction_compatible: true,
+      all_gateway_calls_succeeded: true,
+      all_capability_lane_observations_reentry_compatible: true,
+      all_observations_reentry_compatible: true,
+      normalized_observations_ready: true,
+      normalized_observation_packet_count: observationRefs.length,
+      evidence_reentry_required: true,
+      provider_terminal_candidate_ref: providerCandidateRef,
+      terminal_answer_authority:
+        reconciledCanonicalGoalPayload.terminal_answer_authority,
+      terminal_presentation:
+        reconciledCanonicalGoalPayload.terminal_presentation,
+    };
+
     const qualityBlockedPayload = structuredClone(payload);
     qualityBlockedPayload.active_prompt =
       "Return the page count with page-grounded evidence locations.";
@@ -912,6 +946,17 @@ describe("Helix terminal authority single writer", () => {
       }),
     ]));
     expect(result.integrity.post_tool_model_step_satisfied).toBe(true);
+    expect(result.integrity.lifecycle_differential_audit).toMatchObject({
+      schema: "helix.turn_lifecycle_projection_audit.v1",
+      ok: true,
+      first_divergence_stage: null,
+      scientific_evidence_disposition: "passed",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(payload.turn_lifecycle_differential_audit).toEqual(
+      result.integrity.lifecycle_differential_audit,
+    );
     const artifactIndex = buildArtifactQueryIndex({ turnId, payload });
     expect(artifactIndex.tool_turn_chain_audit).toMatchObject({
       reentry_executed: true,
@@ -961,6 +1006,27 @@ describe("Helix terminal authority single writer", () => {
       solver_short_circuit_flags: [],
     });
 
+    const reconciledCanonicalGoalResult =
+      applyHelixTerminalAuthoritySingleWriter({
+        turnId,
+        threadId: "thread:test",
+        payload: reconciledCanonicalGoalPayload,
+        artifactLedger: artifacts,
+      });
+    expect(reconciledCanonicalGoalResult).toMatchObject({
+      selected_terminal_artifact_kind: "model_synthesized_answer",
+      source: "final_answer_draft",
+      visible_text: answerText,
+    });
+    expect(
+      reconciledCanonicalGoalPayload.provider_route_product_materialization,
+    ).toMatchObject({
+      schema: "helix.provider_route_product_materialization.v1",
+      materialized_terminal_artifact_kind: "model_synthesized_answer",
+      selected_observation_refs: observationRefs,
+      status: "materialized",
+    });
+
     const blockedResult = applyHelixTerminalAuthoritySingleWriter({
       turnId,
       threadId: "thread:test",
@@ -994,6 +1060,20 @@ describe("Helix terminal authority single writer", () => {
       rejected_terminal_artifact_kind: "model_synthesized_answer",
       quality_gate_violations: expect.arrayContaining([
         "invalid_page_evidence_links",
+      ]),
+    });
+    expect(
+      qualityBlockedResult.integrity.lifecycle_differential_audit,
+    ).toMatchObject({
+      ok: true,
+      first_divergence_stage: null,
+      scientific_evidence_disposition: "failed_closed",
+      continuity_checks: expect.arrayContaining([
+        expect.objectContaining({
+          check: "evidence_quality_gate",
+          status: "failed_closed",
+          disposition: "hard_evidence_boundary",
+        }),
       ]),
     });
     expect(qualityBlockedResult.rejected_candidates).toEqual(expect.arrayContaining([
@@ -7361,6 +7441,243 @@ describe("Helix terminal authority single writer", () => {
     });
     expect(payload.final_answer_source).toBe("final_answer_draft");
     expect(payload.terminal_artifact_kind).toBe("compound_evidence_synthesis_answer");
+  });
+
+  it("refreshes a stale Minecraft itinerary and preserves a grounded guarded no-op terminal", () => {
+    const turnId = "ask:test:minecraft-guarded-noop-terminal";
+    const spatialCapability =
+      "com.casimirbot.minecraft.spatial_region.inspect";
+    const catalogCapability =
+      "com.casimirbot.minecraft.command.catalog";
+    const commandCapability = "com.casimirbot.minecraft.command";
+    const spatialSubgoalId = `${turnId}:compound_capability_subgoal:1:spatial`;
+    const catalogSubgoalId = `${turnId}:compound_capability_subgoal:2:catalog`;
+    const commandSubgoalId = `${turnId}:compound_capability_subgoal:3:command`;
+    const spatialObservationRef = `${turnId}:live_environment_observation:1`;
+    const catalogObservationRef = `${turnId}:live_environment_observation:2`;
+    const draftRef = `${turnId}:final_answer_draft`;
+    const draftText =
+      "I did not build the wall because the complete current-area survey verified no safe build-line candidate; no world mutation was performed.";
+    const artifacts = [
+      {
+        artifact_id: spatialObservationRef,
+        turn_id: turnId,
+        kind: "live_environment_observation",
+        source_scope: "current_turn_context",
+        capability_key: spatialCapability,
+        source_capability_id: spatialCapability,
+        source_observation_schema:
+          "helix.environment_connector.probe_observation.v1",
+        status: "succeeded",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        payload: {
+          schema: "helix.live_environment_observation.v1",
+          kind: "live_environment_observation",
+          status: "succeeded",
+          capability_key: spatialCapability,
+          source_capability_id: spatialCapability,
+          observation_role: "evidence_not_assistant_answer",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          result: {
+            purpose: "build_planning",
+            build_line_candidates: [],
+            build_line_candidates_complete: true,
+            omitted_build_line_candidate_count: 0,
+          },
+        },
+      },
+      {
+        artifact_id: catalogObservationRef,
+        turn_id: turnId,
+        kind: "live_environment_observation",
+        source_scope: "current_turn_context",
+        capability_key: catalogCapability,
+        source_capability_id: catalogCapability,
+        source_observation_schema:
+          "helix.environment_command.catalog_observation.v1",
+        status: "succeeded",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        payload: {
+          schema: "helix.live_environment_observation.v1",
+          kind: "live_environment_observation",
+          status: "succeeded",
+          capability_key: catalogCapability,
+          source_capability_id: catalogCapability,
+          observation_role: "evidence_not_assistant_answer",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          result: { command_count: 64 },
+        },
+      },
+      {
+        artifact_id: draftRef,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          support_refs: [spatialObservationRef, catalogObservationRef],
+          artifact_refs: [spatialObservationRef, catalogObservationRef],
+          authority: "llm_post_observation_composer",
+        },
+      },
+    ];
+    const capabilityItinerary = {
+      schema: "helix.capability_itinerary.v1",
+      turn_id: turnId,
+      prompt_shape: "compound_tool",
+      relevant_tool_families: ["live_environment"],
+      terminal_success_criteria: {
+        required_observation_families: ["live_environment"],
+        required_capabilities: [
+          spatialCapability,
+          catalogCapability,
+          commandCapability,
+        ],
+        requires_post_observation_synthesis: true,
+      },
+      compound_capability_contract: {
+        schema: "helix.compound_capability_contract.v1",
+        turn_id: turnId,
+        prompt_shape: "compound_capability",
+        requires_all_subgoals: true,
+        terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+        subgoals: [
+          {
+            subgoal_id: spatialSubgoalId,
+            order: 1,
+            requested_capability: spatialCapability,
+            runtime_capability: spatialCapability,
+            required_args: [],
+            required_observation_kinds: ["live_environment_observation"],
+            allowed_substitutions: [],
+            args_hint: { purpose: "structure_planning" },
+          },
+          {
+            subgoal_id: catalogSubgoalId,
+            order: 2,
+            requested_capability: catalogCapability,
+            runtime_capability: catalogCapability,
+            required_args: [],
+            required_observation_kinds: ["live_environment_observation"],
+            allowed_substitutions: [],
+            args_hint: {},
+          },
+          {
+            subgoal_id: commandSubgoalId,
+            order: 3,
+            requested_capability: commandCapability,
+            runtime_capability: commandCapability,
+            required_args: ["command", "category", "effect"],
+            required_observation_kinds: [
+              "helix.environment_command.observation.v1",
+            ],
+            allowed_substitutions: [],
+            args_hint: {},
+            guarded_noop_policy: {
+              schema: "helix.compound_capability_guarded_noop.v1",
+              mode: "no_verified_safe_candidate",
+              guard_subgoal_id: spatialSubgoalId,
+              guard_capability: spatialCapability,
+              required_purpose: "structure_planning",
+              accepted_observation_purposes: [
+                "structure_planning",
+                "build_planning",
+              ],
+              candidate_field: "build_line_candidates",
+              completeness_field: "build_line_candidates_complete",
+              omitted_count_field: "omitted_build_line_candidate_count",
+              current_turn_only: true,
+              requires_successful_observation: true,
+              user_directed_noop_guard: true,
+            },
+          },
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      execution_state: {
+        complete: false,
+        missing_required_capabilities: [commandCapability],
+        missing_compound_subgoal_ids: [commandSubgoalId],
+      },
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt:
+        "Build the wall only if a safe site is verified. If no safe site is verified, do not build.",
+      source_target_intent: {
+        target_source: "live_environment",
+        target_kind: "live_environment",
+        strength: "hard",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "live_environment",
+        allowed_terminal_artifact_kinds: [
+          "compound_evidence_synthesis_answer",
+          "typed_failure",
+        ],
+        forbidden_terminal_artifact_kinds: [
+          "agent_step_observation_packet",
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_evidence_synthesis",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      capability_itinerary: capabilityItinerary,
+      capability_itinerary_execution_state: capabilityItinerary.execution_state,
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(result.selected_terminal_artifact_kind).toBe(
+      "compound_evidence_synthesis_answer",
+    );
+    expect(result.visible_text).toBe(draftText);
+    expect(payload.capability_itinerary_execution_state).toMatchObject({
+      complete: true,
+      missing_required_capabilities: [],
+      missing_compound_subgoal_ids: [],
+      compound_subgoal_ledger: [
+        { requested_capability: spatialCapability, satisfaction: "satisfied" },
+        { requested_capability: catalogCapability, satisfaction: "satisfied" },
+        {
+          requested_capability: commandCapability,
+          satisfaction: "satisfied",
+          satisfaction_reason: "no_verified_safe_candidate",
+          satisfied_without_execution: true,
+          mutation_performed: false,
+          observation_ref: spatialObservationRef,
+        },
+      ],
+    });
   });
 
   it.each([

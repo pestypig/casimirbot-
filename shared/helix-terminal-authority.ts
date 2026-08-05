@@ -341,5 +341,6 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     terminal_projection_guard_action?:
       "project_authority_artifact" | "fail_closed" | null;
     terminal_projection_failure_code?: "terminal_projection_mismatch" | null;
+    lifecycle_differential_audit?: import("./helix-turn-lifecycle").HelixTurnLifecycleProjectionAudit;
   };
 };

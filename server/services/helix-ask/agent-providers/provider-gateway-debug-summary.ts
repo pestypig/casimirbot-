@@ -104,6 +104,8 @@ export const buildProviderGatewayDebugSummary = (input: {
     observation_packet_refs: observationRefs,
     realtime_conversation_context_materialization:
       realtimeConversationContext?.audit ?? null,
+    trusted_room_environment_intent_context_audit:
+      readRecord(input.body.trusted_room_environment_intent_context_audit),
     observation_packet_invariants: input.gatewayCallResults.map((result) => ({
       capability_id: result.capability_id,
       assistant_answer: result.observation_packet.assistant_answer,

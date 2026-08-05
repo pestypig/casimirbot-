@@ -22,6 +22,7 @@ type HelixAskBackendEntrypointFamily =
   | "internet_search"
   | "scholarly_research"
   | "research_library"
+  | "environment_connector"
   | "live_pipeline"
   | "helix_ask"
   | "visual_capture"
@@ -66,6 +67,29 @@ const HELIX_ASK_NOTE_CREATE_NEGATED_OR_CONTEXTUAL_RE =
 
 const HELIX_ASK_NOTE_CREATE_COMMAND_RE =
   /^\s*(?:(?:please|pls|hey\s+helix|helix|can\s+you|could\s+you|would\s+you|will\s+you|i\s+need\s+you\s+to|i\s+want\s+you\s+to)\s+)?(?:write|make|create|save|take|add)\s+(?:me\s+)?(?:a\s+|the\s+|new\s+)?note\b/i;
+
+const HELIX_ASK_MINECRAFT_ENVIRONMENT_CONTEXT_RE =
+  /\b(?:minecraft|fabric\s+(?:server|world|environment|source|mod)|paper\s+(?:server|world|environment|source|plugin)|paired\s+(?:game|world|environment|source)|selected\s+(?:minecraft\s+)?player|stone[-\s]?bricks?|overworld|nether|end\s+portal|spreadplayers|helixgame|rollback\s+checkpoint)\b/i;
+
+const HELIX_ASK_MINECRAFT_CONTEXTUAL_ONLY_RE =
+  /^\s*(?:do\s+not|don't|dont|never|without|avoid|stop|cancel|next\s+time|later|in\s+the\s+future|if\b|when\b|before\b|after\b|previously|earlier|last\s+time|why\s+did|what\s+is|what\s+does|how\s+does|explain|describe|define|could\s+the|would\s+the|can\s+the|the\s+(?:screen|button|message|prompt|debug|trace)\s+(?:says?|shows?|mentions?))\b/i;
+
+const HELIX_ASK_MINECRAFT_AFFIRMATIVE_OPERATION_RE =
+  /^\s*(?:(?:please|pls|hey\s+helix|helix|can\s+you|could\s+you|would\s+you|will\s+you|i\s+need\s+you\s+to|i\s+want\s+you\s+to)\s+)?(?:using\b[\s\S]{0,180}\b)?(?:move|relocate|teleport|spread|build|construct|place|set|fill|summon|ignite|light|extinguish|give|clear|kill|apply|arm|restore|capture|discard|run|execute|use|check|inspect|read|show|find|locate|report)\b|^\s*(?:at|around|near)\b[\s\S]{0,180}\b(?:move|relocate|teleport|build|construct|place|set|fill|summon|ignite|light|extinguish|check|inspect|read|find|locate)\b|^\s*continue\b[\s\S]{0,220}\b(?:move|relocate|teleport|build|construct|place|set|fill|summon|ignite|light|extinguish|check|inspect|read|find|locate|restore|capture)\b/i;
+
+const HELIX_ASK_MINECRAFT_AFFIRMATIVE_MUTATION_RE =
+  /^\s*(?:(?:please|pls|hey\s+helix|helix|can\s+you|could\s+you|would\s+you|will\s+you|i\s+need\s+you\s+to|i\s+want\s+you\s+to)\s+)?(?:using\b[\s\S]{0,180}\b)?(?:move|relocate|teleport|spread|build|construct|place|set|fill|summon|ignite|light|extinguish|give|clear|kill|apply|arm|restore|capture|discard|run|execute|use)\b|^\s*(?:at|around|near)\b[\s\S]{0,180}\b(?:move|relocate|teleport|build|construct|place|set|fill|summon|ignite|light|extinguish|restore|capture)\b|^\s*continue\b[\s\S]{0,220}\b(?:move|relocate|teleport|build|construct|place|set|fill|summon|ignite|light|extinguish|restore|capture|discard)\b/i;
+
+function isAffirmativeMinecraftEnvironmentPrompt(question: string): boolean {
+  const normalized = question.trim();
+  if (!normalized || !HELIX_ASK_MINECRAFT_ENVIRONMENT_CONTEXT_RE.test(normalized)) return false;
+  if (HELIX_ASK_MINECRAFT_CONTEXTUAL_ONLY_RE.test(normalized)) return false;
+  if (/^\s*(?:the\s+phrase|the\s+command|the\s+request)\s+["'`]/i.test(normalized)) return false;
+  return (
+    HELIX_ASK_MINECRAFT_AFFIRMATIVE_OPERATION_RE.test(normalized) ||
+    /^\s*(?:use|run|execute)\b[\s\S]{0,160}\bcom\.casimirbot\.minecraft\.[a-z0-9_.-]+\b/i.test(normalized)
+  );
+}
 
 function isExplicitWorkstationNoteCreatePrompt(question: string): boolean {
   const normalized = question.trim();
@@ -329,6 +353,33 @@ export function resolveHelixAskBackendEntrypointFamily(
         ...(requestsCurrentTheoryBadgeGraphContext
           ? ["theory_badge_graph_current_context_observation"]
           : ["theory_context_reflection_observation"]),
+        "model_authored_synthesis",
+        "typed_failure",
+      ],
+    };
+  }
+  if (isAffirmativeMinecraftEnvironmentPrompt(normalized)) {
+    const explicitCapability =
+      normalized.match(/\bcom\.casimirbot\.minecraft\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
+    const requestsMutation = HELIX_ASK_MINECRAFT_AFFIRMATIVE_MUTATION_RE.test(normalized);
+    const selectedCapability = explicitCapability ?? (
+      requestsMutation ? "com.casimirbot.minecraft.command" : null
+    );
+    return {
+      family: "environment_connector",
+      sourceTarget: "live_environment",
+      targetKind: "minecraft_environment",
+      requiredToolFamily: "environment_connector",
+      selectedCapability,
+      explicitCue: requestsMutation
+        ? "affirmative_minecraft_environment_operation"
+        : "affirmative_minecraft_environment_read",
+      requestedOutputs: [
+        "tool_call_eligibility",
+        "live_environment_observation",
+        ...(requestsMutation
+          ? ["environment_command_receipt", "post_action_observation", "rollback_receipt"]
+          : []),
         "model_authored_synthesis",
         "typed_failure",
       ],

@@ -39,7 +39,8 @@ export type HelixEnvironmentManifestProbeType =
   | "crop_state"
   | "hazard_check"
   | "inventory_check"
-  | "local_map_summary";
+  | "local_map_summary"
+  | "spatial_region";
 
 export type HelixEnvironmentForbiddenProbeType =
   | "move_actor"
@@ -181,6 +182,7 @@ export const helixEnvironmentSourceManifestSchema = z.object({
     "hazard_check",
     "inventory_check",
     "local_map_summary",
+    "spatial_region",
   ])).max(32),
   forbidden_probe_types: z.array(z.enum([
     "move_actor",

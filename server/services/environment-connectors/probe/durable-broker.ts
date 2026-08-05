@@ -829,6 +829,48 @@ export const leaseDurableEnvironmentProbesForClaim = async (input: {
                 args.target === "current_actor"
                   ? {
                       target_ref: "current_actor",
+                      ...(Number.isInteger(args.horizontal_radius)
+                        ? { horizontal_radius: Number(args.horizontal_radius) }
+                        : {}),
+                      ...(Number.isInteger(args.vertical_radius)
+                        ? { vertical_radius: Number(args.vertical_radius) }
+                        : {}),
+                      ...(typeof args.purpose === "string"
+                        ? { purpose: args.purpose }
+                        : {}),
+                      ...(Number.isInteger(args.requested_length)
+                        ? { requested_length: Number(args.requested_length) }
+                        : {}),
+                      ...(Number.isInteger(args.requested_height)
+                        ? { requested_height: Number(args.requested_height) }
+                        : {}),
+                      ...(typeof args.orientation === "string"
+                        ? { orientation: args.orientation }
+                        : {}),
+                      ...(typeof args.relative_side === "string"
+                        ? { relative_side: args.relative_side }
+                        : {}),
+                      ...(args.verification_from &&
+                      typeof args.verification_from === "object" &&
+                      !Array.isArray(args.verification_from)
+                        ? {
+                            verification_from: asRecord(
+                              args.verification_from,
+                            ) as { x: number; y: number; z: number },
+                          }
+                        : {}),
+                      ...(args.verification_to &&
+                      typeof args.verification_to === "object" &&
+                      !Array.isArray(args.verification_to)
+                        ? {
+                            verification_to: asRecord(
+                              args.verification_to,
+                            ) as { x: number; y: number; z: number },
+                          }
+                        : {}),
+                      ...(typeof args.expected_block === "string"
+                        ? { expected_block: args.expected_block }
+                        : {}),
                       ...(row.resolved_subject_native_id
                         ? { actor_id: row.resolved_subject_native_id }
                         : {}),
@@ -958,6 +1000,451 @@ const normalizeLegacyResult = (
       y: position.y,
       z: position.z,
     };
+  }
+  const spatialPurposes = new Set([
+    "general",
+    "structure_planning",
+    "build_planning",
+    "structure_verification",
+    "fire_safety",
+    "landing_safety",
+  ]);
+  const spatialFlagOrder = [
+    "air",
+    "fluid",
+    "solid",
+    "flammable",
+    "replaceable",
+    "hazard",
+    "block_entity",
+  ] as const;
+  const spatialFlags = new Set<string>(spatialFlagOrder);
+  const anchorKinds = new Set([
+    "door",
+    "bed",
+    "container",
+    "workstation",
+    "portal",
+    "hearth_base",
+  ]);
+  const spatialPosition = (value: unknown): Record<string, number> | null => {
+    const candidate = asRecord(value);
+    if (
+      !Number.isInteger(candidate.x) ||
+      !Number.isInteger(candidate.y) ||
+      !Number.isInteger(candidate.z)
+    ) {
+      return null;
+    }
+    return {
+      x: Number(candidate.x),
+      y: Number(candidate.y),
+      z: Number(candidate.z),
+    };
+  };
+  const spatialCenter = spatialPosition(details.center);
+  const spatialBounds = asRecord(details.bounds);
+  const spatialMin = spatialPosition(spatialBounds.min);
+  const spatialMax = spatialPosition(spatialBounds.max);
+  if (
+    spatialPurposes.has(String(details.purpose)) &&
+    spatialCenter &&
+    spatialMin &&
+    spatialMax &&
+    Number.isInteger(details.horizontal_radius) &&
+    Number.isInteger(details.vertical_radius) &&
+    Number.isInteger(details.sample_count) &&
+    Array.isArray(details.palette) &&
+    Array.isArray(details.columns) &&
+    Array.isArray(details.anchors) &&
+    Array.isArray(details.fireplace_candidates)
+  ) {
+    normalized.purpose = String(details.purpose);
+    normalized.center = spatialCenter;
+    normalized.horizontal_radius = Number(details.horizontal_radius);
+    normalized.vertical_radius = Number(details.vertical_radius);
+    if (
+      Number.isInteger(details.requested_length) &&
+      Number(details.requested_length) >= 3 &&
+      Number(details.requested_length) <= 15
+    ) {
+      normalized.requested_length = Number(details.requested_length);
+    }
+    if (
+      Number.isInteger(details.requested_height) &&
+      Number(details.requested_height) >= 3 &&
+      Number(details.requested_height) <= 8
+    ) {
+      normalized.requested_height = Number(details.requested_height);
+    }
+    if (["north_south", "east_west"].includes(String(details.requested_orientation))) {
+      normalized.requested_orientation = String(details.requested_orientation);
+    }
+    if (["north", "south", "east", "west"].includes(String(details.requested_relative_side))) {
+      normalized.requested_relative_side = String(details.requested_relative_side);
+    }
+    normalized.sample_count = Number(details.sample_count);
+    normalized.bounds = { min: spatialMin, max: spatialMax };
+    normalized.palette = details.palette
+      .slice(0, 128)
+      .map(asRecord)
+      .filter(
+        (entry) =>
+          typeof entry.block === "string" &&
+          entry.block.trim().length > 0 &&
+          entry.block.trim().length <= 160 &&
+          Number.isInteger(entry.count) &&
+          Number(entry.count) > 0,
+      )
+      .map((entry) => ({
+        block: String(entry.block).trim(),
+        count: Number(entry.count),
+      }));
+    const compactColumns =
+      details.column_encoding ===
+      "relative_xz_relative_y_palette_flags_v1";
+    normalized.columns = compactColumns
+      ? details.columns
+          .map((column) => {
+            if (Array.isArray(column)) return column;
+            const encodedColumn = asRecord(column);
+            const offset = encodedColumn.offset;
+            const encodedRuns = encodedColumn.runs;
+            if (!Array.isArray(offset) || !Array.isArray(encodedRuns)) {
+              return [];
+            }
+            return [
+              offset[0],
+              offset[1],
+              encodedRuns.map((run) => {
+                const encodedRun = asRecord(run);
+                const y = encodedRun.y;
+                return Array.isArray(y)
+                  ? [y[0], y[1], encodedRun.p, encodedRun.f]
+                  : [];
+              }),
+            ];
+          })
+          .slice(0, 225)
+          .filter(
+            (column): column is unknown[] =>
+              Array.isArray(column) &&
+              column.length === 3 &&
+              Number.isInteger(column[0]) &&
+              Number.isInteger(column[1]) &&
+              Math.abs(Number(column[0])) <= Number(details.horizontal_radius) &&
+              Math.abs(Number(column[1])) <= Number(details.horizontal_radius) &&
+              Array.isArray(column[2]),
+          )
+          .map((column) => ({
+            x: spatialCenter.x + Number(column[0]),
+            z: spatialCenter.z + Number(column[1]),
+            runs: (column[2] as unknown[])
+              .slice(0, 17)
+              .filter(
+                (run): run is unknown[] =>
+                  Array.isArray(run) &&
+                  run.length === 4 &&
+                  run.every(Number.isInteger) &&
+                  Number(run[0]) <= Number(run[1]) &&
+                  Math.abs(Number(run[0])) <= Number(details.vertical_radius) &&
+                  Math.abs(Number(run[1])) <= Number(details.vertical_radius) &&
+                  Number(run[2]) >= 0 &&
+                  Number(run[2]) <
+                    (normalized.palette as Array<Record<string, unknown>>).length &&
+                  Number(run[3]) >= 0 &&
+                  Number(run[3]) <= 127,
+              )
+              .map((run) => ({
+                y_start: spatialCenter.y + Number(run[0]),
+                y_end: spatialCenter.y + Number(run[1]),
+                block: String(
+                  (normalized.palette as Array<Record<string, unknown>>)[
+                    Number(run[2])
+                  ].block,
+                ),
+                flags: spatialFlagOrder.filter(
+                  (_flag, bit) => (Number(run[3]) & (1 << bit)) !== 0,
+                ),
+              })),
+          }))
+      : details.columns
+          .slice(0, 225)
+          .map(asRecord)
+          .filter(
+            (column) =>
+              Number.isInteger(column.x) &&
+              Number.isInteger(column.z) &&
+              Array.isArray(column.runs),
+          )
+          .map((column) => ({
+            x: Number(column.x),
+            z: Number(column.z),
+            runs: (column.runs as unknown[])
+              .slice(0, 17)
+              .map(asRecord)
+              .filter(
+                (run) =>
+                  Number.isInteger(run.y_start) &&
+                  Number.isInteger(run.y_end) &&
+                  typeof run.block === "string" &&
+                  run.block.trim().length > 0 &&
+                  run.block.trim().length <= 160 &&
+                  Array.isArray(run.flags),
+              )
+              .map((run) => ({
+                y_start: Number(run.y_start),
+                y_end: Number(run.y_end),
+                block: String(run.block).trim(),
+                flags: (run.flags as unknown[])
+                  .filter(
+                    (flag): flag is string =>
+                      typeof flag === "string" && spatialFlags.has(flag),
+                  )
+                  .slice(0, 7),
+              })),
+          }));
+    normalized.column_encoding = compactColumns
+      ? "expanded_relative_xz_relative_y_palette_flags_v1"
+      : "absolute_xyz_verbose_v1";
+    normalized.columns_complete = details.columns_complete !== false;
+    normalized.palette_complete = details.palette_complete !== false;
+    normalized.anchors_complete = details.anchors_complete !== false;
+    normalized.fireplace_candidates_complete =
+      details.fireplace_candidates_complete !== false;
+    const rawBuildLineCandidates = Array.isArray(
+      details.build_line_candidates,
+    )
+      ? details.build_line_candidates
+      : [];
+    normalized.build_line_candidates_complete =
+      details.build_line_candidates_complete !== false;
+    for (const countField of [
+      "retained_column_count",
+      "omitted_column_count",
+      "omitted_run_count",
+      "omitted_palette_block_types",
+      "retained_anchor_count",
+      "omitted_anchor_count",
+      "retained_fireplace_candidate_count",
+      "omitted_fireplace_candidate_count",
+      "retained_build_line_candidate_count",
+      "omitted_build_line_candidate_count",
+      "wire_details_json_bytes",
+    ] as const) {
+      if (Number.isInteger(details[countField]) && Number(details[countField]) >= 0) {
+        normalized[countField] = Number(details[countField]);
+      }
+    }
+    normalized.anchors = details.anchors
+      .slice(0, 64)
+      .map(asRecord)
+      .map((anchor) => ({
+        anchor,
+        position: spatialPosition(anchor.position),
+      }))
+      .filter(
+        ({ anchor, position }) =>
+          position !== null &&
+          anchorKinds.has(String(anchor.kind)) &&
+          typeof anchor.block === "string" &&
+          anchor.block.trim().length > 0 &&
+          anchor.block.trim().length <= 160,
+      )
+      .map(({ anchor, position }) => ({
+        kind: String(anchor.kind),
+        block: String(anchor.block).trim(),
+        position: position!,
+      }));
+    normalized.fireplace_candidates = details.fireplace_candidates
+      .slice(0, 16)
+      .map(asRecord)
+      .map((candidate) => ({
+        candidate,
+        basePosition: spatialPosition(candidate.base_position),
+        firePosition: spatialPosition(candidate.fire_position),
+      }))
+      .filter(
+        ({ candidate, basePosition, firePosition }) =>
+          basePosition !== null &&
+          firePosition !== null &&
+          typeof candidate.base_block === "string" &&
+          candidate.base_block.trim().length > 0 &&
+          candidate.base_block.trim().length <= 160 &&
+          Number.isInteger(candidate.flammable_within_two) &&
+          Number.isInteger(candidate.solid_nonflammable_enclosure) &&
+          typeof candidate.replaceable_fire_cell === "boolean" &&
+          typeof candidate.safe_candidate === "boolean",
+      )
+      .map(({ candidate, basePosition, firePosition }) => ({
+        base_position: basePosition!,
+        fire_position: firePosition!,
+        base_block: String(candidate.base_block).trim(),
+        flammable_within_two: Number(candidate.flammable_within_two),
+        solid_nonflammable_enclosure: Number(
+          candidate.solid_nonflammable_enclosure,
+        ),
+        replaceable_fire_cell: Boolean(candidate.replaceable_fire_cell),
+        safe_candidate: Boolean(candidate.safe_candidate),
+      }));
+    normalized.build_line_candidates = rawBuildLineCandidates
+      .slice(0, 16)
+      .map(asRecord)
+      .map((candidate) => ({
+        candidate,
+        from: spatialPosition(candidate.from),
+        to: spatialPosition(candidate.to),
+      }))
+      .filter(({ candidate, from, to }) => {
+        const groundBlocks = candidate.ground_blocks;
+        return (
+          from !== null &&
+          to !== null &&
+          (candidate.orientation === "north_south" ||
+            candidate.orientation === "east_west") &&
+          ["north", "south", "east", "west", "overlap"].includes(
+            String(candidate.relative_side),
+          ) &&
+          Number.isInteger(candidate.length) &&
+          Number(candidate.length) >= 3 &&
+          Number(candidate.length) <= 15 &&
+          Number.isInteger(candidate.minimum_clear_height) &&
+          Number(candidate.minimum_clear_height) >= 3 &&
+          Number.isInteger(candidate.minimum_actor_distance) &&
+          Number(candidate.minimum_actor_distance) >= 2 &&
+          Number.isInteger(candidate.nearest_anchor_distance) &&
+          Number(candidate.nearest_anchor_distance) >= 2 &&
+          Array.isArray(groundBlocks) &&
+          groundBlocks.every(
+            (block) =>
+              typeof block === "string" &&
+              block.trim().length > 0 &&
+              block.trim().length <= 160,
+          ) &&
+          typeof candidate.target_cells_replaceable === "boolean" &&
+          typeof candidate.target_cells_air === "boolean" &&
+          typeof candidate.ground_solid_nonhazardous === "boolean" &&
+          Number.isInteger(candidate.fluid_cells) &&
+          Number.isInteger(candidate.flammable_cells) &&
+          Number.isInteger(candidate.block_entity_cells) &&
+          typeof candidate.safe_candidate === "boolean"
+        );
+      })
+      .map(({ candidate, from, to }) => ({
+        orientation: String(candidate.orientation),
+        relative_side: String(candidate.relative_side),
+        from: from!,
+        to: to!,
+        length: Number(candidate.length),
+        minimum_clear_height: Number(candidate.minimum_clear_height),
+        minimum_actor_distance: Number(candidate.minimum_actor_distance),
+        nearest_anchor_distance: Number(candidate.nearest_anchor_distance),
+        ground_blocks: (candidate.ground_blocks as unknown[]).map((block) =>
+          String(block).trim(),
+        ),
+        target_cells_replaceable: Boolean(candidate.target_cells_replaceable),
+        target_cells_air: Boolean(candidate.target_cells_air),
+        ground_solid_nonhazardous: Boolean(
+          candidate.ground_solid_nonhazardous,
+        ),
+        fluid_cells: Number(candidate.fluid_cells),
+        flammable_cells: Number(candidate.flammable_cells),
+        block_entity_cells: Number(candidate.block_entity_cells),
+        safe_candidate: Boolean(candidate.safe_candidate),
+      }));
+    if (!Number.isInteger(details.retained_build_line_candidate_count)) {
+      normalized.retained_build_line_candidate_count = (
+        normalized.build_line_candidates as unknown[]
+      ).length;
+    }
+    if (!Number.isInteger(details.omitted_build_line_candidate_count)) {
+      normalized.omitted_build_line_candidate_count = 0;
+    }
+    const rawTargetVerification = asRecord(
+      details.target_geometry_verification,
+    );
+    const verificationFrom = spatialPosition(rawTargetVerification.from);
+    const verificationTo = spatialPosition(rawTargetVerification.to);
+    const expectedBlock =
+      typeof rawTargetVerification.expected_block === "string"
+        ? rawTargetVerification.expected_block.trim()
+        : "";
+    const totalCells = Number(rawTargetVerification.total_cells);
+    const sampledCells = Number(rawTargetVerification.sampled_cells);
+    const matchingCells = Number(rawTargetVerification.matching_cells);
+    const mismatchedCells = Number(rawTargetVerification.mismatched_cells);
+    const unobservedCells = Number(rawTargetVerification.unobserved_cells);
+    const verificationCountsValid =
+      Number.isInteger(totalCells) &&
+      totalCells >= 1 &&
+      totalCells <= 4_096 &&
+      Number.isInteger(sampledCells) &&
+      sampledCells >= 0 &&
+      sampledCells <= totalCells &&
+      Number.isInteger(matchingCells) &&
+      matchingCells >= 0 &&
+      Number.isInteger(mismatchedCells) &&
+      mismatchedCells >= 0 &&
+      matchingCells + mismatchedCells === sampledCells &&
+      Number.isInteger(unobservedCells) &&
+      unobservedCells === totalCells - sampledCells;
+    if (
+      verificationFrom &&
+      verificationTo &&
+      expectedBlock.length > 0 &&
+      expectedBlock.length <= 160 &&
+      verificationCountsValid &&
+      typeof rawTargetVerification.within_survey_bounds === "boolean" &&
+      typeof rawTargetVerification.complete === "boolean" &&
+      typeof rawTargetVerification.all_match === "boolean" &&
+      Array.isArray(rawTargetVerification.mismatch_samples)
+    ) {
+      const mismatchSamples = rawTargetVerification.mismatch_samples
+        .slice(0, 32)
+        .map(asRecord)
+        .map((sample) => ({
+          position: spatialPosition(sample.position),
+          observedBlock:
+            typeof sample.observed_block === "string"
+              ? sample.observed_block.trim()
+              : "",
+        }))
+        .filter(
+          (sample) =>
+            sample.position !== null &&
+            sample.observedBlock.length > 0 &&
+            sample.observedBlock.length <= 160,
+        )
+        .map((sample) => ({
+          position: sample.position!,
+          observed_block: sample.observedBlock,
+        }));
+      const complete =
+        rawTargetVerification.within_survey_bounds === true &&
+        rawTargetVerification.complete === true &&
+        sampledCells === totalCells &&
+        unobservedCells === 0;
+      const allMatch =
+        complete &&
+        rawTargetVerification.all_match === true &&
+        matchingCells === totalCells &&
+        mismatchedCells === 0;
+      normalized.target_geometry_verification = {
+        from: verificationFrom,
+        to: verificationTo,
+        expected_block: expectedBlock,
+        total_cells: totalCells,
+        sampled_cells: sampledCells,
+        matching_cells: matchingCells,
+        mismatched_cells: mismatchedCells,
+        unobserved_cells: unobservedCells,
+        mismatch_samples: mismatchSamples,
+        within_survey_bounds:
+          rawTargetVerification.within_survey_bounds === true,
+        complete,
+        all_match: allMatch,
+      };
+    }
   }
   if (Array.isArray(details.status_flags)) {
     normalized.status_flags = details.status_flags

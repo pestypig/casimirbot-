@@ -4041,7 +4041,8 @@ describe("Helix workstation tool gateway", () => {
       mode: "read",
       capabilityId: DOCS_SEARCH_CAPABILITY,
       arguments: {
-        query: "make the bound player glow temporarily",
+        query:
+          "Can you make me glow for ten seconds in the connected Minecraft world?",
         mechanics_collection_ids: ["mechanics.minecraft.commands.v1"],
         adapter_profile_id: "game.minecraft.readonly.v1",
         max_hits: 4,

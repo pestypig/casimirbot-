@@ -88,6 +88,12 @@ Useful compositions for the active Java 1.21.8 server include:
   @e[type=minecraft:zombie,distance=..12,limit=1] run effect give @s
   minecraft:glowing 5 0 true`.
 
+Issue one command per environment capability call and wait for its observation
+before requesting the next command. For the room-bound player, prefer `@s`.
+Player-only arguments such as `title <targets>` accept `@s`, a literal player
+name, or a player selector such as `@a`; do not substitute `@e`, because an
+entity selector does not become a player selector when filtered by name.
+
 These are construction patterns, not a static allowlist. Selectors, registry
 IDs, NBT/data components, and mod roots must still match the live tree. Prefer
 tags created for the current workflow over broad selectors, and clean up only
@@ -174,6 +180,112 @@ For “I am lost in the End; help me leave,” read the bound player's dimension
 position, equipment, and hazards. Minecraft has no general vanilla `locate`
 target for the generated End exit portal. Use versioned mechanics plus a native
 Fabric portal/block or route probe; do not fabricate a locate command.
+
+## Spatial agency, rollback, fire, and fall rescue
+
+Fabric adapters that advertise
+`com.casimirbot.minecraft.spatial_region.inspect` can return a bounded exact
+block survey around the selected player. The observation includes a block
+palette, run-length encoded vertical columns, doors/beds/containers/workstations
+and other semantic anchors, plus conservative fireplace candidates. It is
+evidence for Codex planning, not a structure detector with answer authority.
+Use `purpose=structure_planning` or `build_planning` for walls and structures,
+`purpose=fire_safety` for a hearth, and `purpose=landing_safety` when examining
+a possible landing area. The maximum current survey is a 15 by 15 horizontal
+area and 17 vertical blocks; ask the user to move or identify a location when
+the intended structure does not fit in that bound.
+
+Build-line `from` and `to` coordinates are placement cells, not the supporting
+ground below them. A retained build-line candidate guarantees at least three
+strictly air-filled cells above every supporting block and reports
+`target_cells_air: true`. Replaceable vegetation is not treated as air. This
+lets an agent safely use air-only placement commands; a plan that intentionally
+clears vegetation must inspect the compact column evidence and request that
+different mutation explicitly.
+
+Before a bounded build, query the live `helixgame checkpoint` subtree and, when
+available, capture an in-memory rollback region centered on the selected
+player:
+
+```text
+execute as @s at @s run helixgame checkpoint capture agency_build 12 8
+```
+
+The checkpoint is temporary, bounded, held only in game memory, and never
+writes a structure file. Restore consumes it:
+
+```text
+execute as @s at @s run helixgame checkpoint restore agency_build
+```
+
+Restore deliberately skips current or original block-entity positions so it
+cannot overwrite chest or other container contents. `checkpoint status` is
+read-only, and `checkpoint discard <name>` removes an unused checkpoint.
+
+`helixgame` does not provide a generic build, wall, fill, or set-block branch.
+Do not invent `helixgame build`. After checkpoint capture, use the versioned
+vanilla `fill` or `setblock` syntax exposed by the live dispatcher. For a
+one-block-thick rectangular wall over a verified strict-air build-line, use:
+
+```text
+fill <x1> <base_y> <z1> <x2> <top_y> <z2> minecraft:stone_bricks keep
+```
+
+Set `top_y = base_y + requested_height - 1`. Preserve the candidate's exact
+orientation and endpoints. For example, a north-south candidate from
+`(10, 64, 20)` to `(10, 64, 24)` with height `3` becomes:
+
+```text
+fill 10 64 20 10 66 24 minecraft:stone_bricks keep
+```
+
+The `keep` mode changes only air. It is appropriate only when the fresh spatial
+observation says the complete target volume is strict air on verified solid
+support. Use `minecraft:stone_bricks`, not the informal material phrase
+"stone brick". Re-inspect the same geometry after the command; a checkpoint
+receipt plus a successful `fill` receipt is still not proof that the requested
+wall exists.
+
+For “build a wall around my house,” first inspect the spatial region. Infer a
+candidate house boundary from the complete geometry together with doors, beds,
+workstations, and containers; do not equate the edge of the scan with the edge
+of the house. If more than one structure or boundary is plausible, ask one
+location question instead of mutating. Capture a checkpoint that contains the
+planned perimeter, preserve doors and paths, then use separate `fill ... keep`
+or `setblock` operations for the required wall segments. Wait for every command
+observation. Re-inspect the region and check continuity, clearance, entrances,
+and unintended replacements before claiming completion. Restore the checkpoint
+if verification proves that the bounded edit was wrong.
+
+For “start a fire in my fireplace,” inspect with `purpose=fire_safety`. A
+candidate is eligible only when its fire cell is replaceable, its intended
+hearth base is persistent (for example netherrack), the bounded observation
+reports no flammable blocks within two blocks, and at least three of the four
+sides plus ceiling are solid nonflammable enclosure surfaces. The open side can
+serve as the fireplace mouth. Reject an ambiguous or unsafe candidate; never
+turn the nearest netherrack block into a fireplace merely because it is close.
+After a safe exact coordinate is selected, capture a checkpoint, place one
+`minecraft:fire` block, and re-inspect for the fire plus nearby flammability.
+
+The Fabric `helixgame fall_rescue` branch is a short-lived local safety lease:
+
+```text
+execute as @s at @s run helixgame fall_rescue arm 120
+execute as @s at @s run helixgame fall_rescue status
+execute as @s at @s run helixgame fall_rescue disarm
+```
+
+Arming is a world-mutation capability because it may later place water. The
+connector watches the selected player on the server tick, predicts the nearby
+landing column, and places water only into an air/replaceable, non-fluid,
+non-block-entity cell above a solid surface when the player is in a dangerous
+bounded fall. It never runs in ultra-warm dimensions, creative/spectator flight,
+or elytra flight, never waits for another model round trip, and removes only the
+source block it placed after landing or timeout. `fall_rescue status` reports
+the trigger count and last outcome; actor-status evidence also carries the
+short-lived `fall_rescue_armed` and `fall_rescue_triggered` flags. An armed
+receipt proves only that the lease is active. A later status or actor observation
+is required to claim that a fall was actually rescued.
 
 ## Costs, retries, and after-state
 

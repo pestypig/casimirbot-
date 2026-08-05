@@ -31,6 +31,26 @@ describe("Helix Ask operational constraints", () => {
     expect(packet.assistant_answer).toBe(false);
   });
 
+  it("materializes an exact Minecraft command as an exclusive one-tool constraint", () => {
+    const promptText =
+      'Ignite the surveyed hearth in my paired Minecraft Fabric world. Run exactly one command: use com.casimirbot.minecraft.command with command "setblock -50 68 -2 minecraft:fire", category "world_build", and effect "world_mutation". Do not run any other command or tool.';
+    const packet = buildTurnOperationalConstraints({
+      turnId: "ask:test:exclusive-command",
+      promptText,
+    });
+
+    expect(packet.exclusive_tool_capabilities).toEqual([
+      "com.casimirbot.minecraft.command",
+    ]);
+    expect(packet.requested_tool_cardinality).toBe(1);
+    expect(packet.operator_constraints).toEqual(
+      expect.arrayContaining([
+        "exclusive_tool_capability:com.casimirbot.minecraft.command",
+        "requested_tool_cardinality:1",
+      ]),
+    );
+  });
+
   it("keeps a negated tool clause from forbidding a later explicit repo command", () => {
     const promptText =
       "Do not call scientific-calculator.solve_expression. Use repo-code.search_concept to find where terminal authority selects the answer.";

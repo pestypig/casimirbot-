@@ -225,7 +225,7 @@ export const compactAgentStepObservationPacketForModel = (input: {
   };
 };
 
-const compactDocsEvidenceArtifactForModel = (input: {
+export const compactDocsEvidenceArtifactForModel = (input: {
   turnId: string;
   artifact: unknown;
   userRequested?: string;
@@ -244,6 +244,8 @@ const compactDocsEvidenceArtifactForModel = (input: {
   const snippets = readArray(payload.snippets).map(readRecord).filter(Boolean) as Record<string, unknown>[];
   const locations = readArray(payload.locations).map(readRecord).filter(Boolean) as Record<string, unknown>[];
   const lineSpans = readArray(payload.line_spans).map(readRecord).filter(Boolean) as Record<string, unknown>[];
+  const evidencePassages = readArray(payload.evidence_passages).map(readRecord).filter(Boolean) as Record<string, unknown>[];
+  const documentCandidates = readArray(payload.document_candidates).map(readRecord).filter(Boolean) as Record<string, unknown>[];
   const matchCount = Number(payload.match_count);
   const hasConcreteLocation =
     (Number.isFinite(matchCount) && matchCount > 0) ||
@@ -251,6 +253,8 @@ const compactDocsEvidenceArtifactForModel = (input: {
     snippets.length > 0 ||
     locations.length > 0 ||
     lineSpans.length > 0 ||
+    evidencePassages.length > 0 ||
+    documentCandidates.length > 0 ||
     readString(payload.status) === "located";
   const compactMatch = (record: Record<string, unknown>, fallback: string): string => {
     const path = readString(record.path) ?? readString(record.source_path);
@@ -272,6 +276,14 @@ const compactDocsEvidenceArtifactForModel = (input: {
         ...snippets.map((entry, index) => compactMatch(entry, `Document snippet ${index + 1}`)),
         ...locations.map((entry, index) => compactMatch(entry, `Document location ${index + 1}`)),
         ...lineSpans.map((entry, index) => compactMatch(entry, `Document line span ${index + 1}`)),
+        ...evidencePassages.map((entry, index) => compactText([
+          readString(entry.citation_label) ?? readString(entry.path),
+          readString(entry.text_excerpt) ?? `Document evidence passage ${index + 1}`,
+        ].filter(Boolean).join(" - "), 620)),
+        ...documentCandidates.map((entry, index) => compactText([
+          readString(entry.title) ?? `Document candidate ${index + 1}`,
+          readString(entry.path),
+        ].filter(Boolean).join(" - "), 260)),
       ].filter(Boolean).slice(0, cfg.observationMaxFindings)
     : [
         compactText(
@@ -291,6 +303,8 @@ const compactDocsEvidenceArtifactForModel = (input: {
     ...snippets.map((entry) => readString(entry.ref)),
     ...locations.map((entry) => readString(entry.ref)),
     ...lineSpans.map((entry) => readString(entry.ref)),
+    ...evidencePassages.flatMap((entry) => [readString(entry.citation_ref), readString(entry.path)]),
+    ...documentCandidates.map((entry) => readString(entry.path)),
   ], 96);
   return {
     schema: HELIX_MODEL_OBSERVATION_PACKET_SCHEMA,
@@ -303,12 +317,14 @@ const compactDocsEvidenceArtifactForModel = (input: {
     user_requested: compactText(input.userRequested ?? readString(payload.query) ?? readString(payload.locate_query) ?? "", 320),
     found,
     proves: hasConcreteLocation
-      ? ["Document location evidence is available for final synthesis."]
+      ? evidencePassages.length > 0
+        ? ["Query-focused document passages with line-level citation labels are available for final synthesis."]
+        : ["Document location evidence is available for final synthesis."]
       : ["The docs locate tool executed but returned no concrete matches."],
     support_refs: supportRefs,
     missing_or_uncertain: hasConcreteLocation
       ? []
-      : ["No doc match, snippet, location, or line span was returned."],
+      : ["No doc match, snippet, location, line span, evidence passage, or document candidate was returned."],
     suggested_next_steps: hasConcreteLocation ? ["answer", "repair"] : ["repair", "use_another_tool", "fail_closed"],
     raw_debug_ref: `${observationRef}:raw_doc_location_payload`,
     terminal_eligible: false,
@@ -553,11 +569,12 @@ export const compactScholarlyFullTextArtifactForModel = (input: {
           ].filter((entry): entry is string => Boolean(entry));
         }),
         ...chunks.slice(0, cfg.observationMaxFindings).map((chunk: Record<string, unknown>) => {
-        const page = typeof chunk.page_start === "number" ? `p. ${chunk.page_start}` : "page unknown";
-        const section = readString(chunk.section_hint);
-        const excerpt = readString(chunk.text_excerpt) ?? "";
-        return compactText([page, section, excerpt].filter(Boolean).join(" - "), 520);
-      }),
+          const page = typeof chunk.page_start === "number" ? `p. ${chunk.page_start}` : "page unknown";
+          const section = readString(chunk.section_hint);
+          const citation = readString(chunk.citation_label) ?? readString(chunk.citation_ref);
+          const excerpt = readString(chunk.text_excerpt) ?? "";
+          return compactText([citation, page, section, excerpt].filter(Boolean).join(" - "), 620);
+        }),
       ].slice(0, cfg.observationMaxFindings)
     : [compactText(
         completedSavedSearch
@@ -568,8 +585,8 @@ export const compactScholarlyFullTextArtifactForModel = (input: {
   const proves = chunks.length
     ? chunks.slice(0, cfg.observationMaxProves).map((chunk: Record<string, unknown>) => {
         const page = typeof chunk.page_start === "number" ? `page ${chunk.page_start}` : "selected page";
-        const ref = readString(chunk.citation_ref) ?? readString(chunk.source_text_ref) ?? "full-text evidence";
-        return compactText(`${ref} provides selected full-text evidence from ${page}.`, 260);
+        const ref = readString(chunk.citation_label) ?? readString(chunk.citation_ref) ?? readString(chunk.source_text_ref) ?? "full-text evidence";
+        return compactText(`${ref} provides selected full-text evidence from ${page}; cite this label next to supported claims.`, 320);
       })
     : [];
   const visualUncertainty = visualCandidates.map((candidate: Record<string, unknown>) => {

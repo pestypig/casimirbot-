@@ -12,6 +12,12 @@ final class FabricCommandAuthorityPolicy {
     private static final Pattern NON_SELF_SELECTOR = Pattern.compile(
         "(?i)(?<![a-z0-9_])@[aenpr](?:\\[[^\\r\\n]*?\\])?"
     );
+    private static final Pattern SELF_SELECTOR = Pattern.compile(
+        "(?i)(?<![a-z0-9_])@s(?:\\[[^\\r\\n]*?\\])?"
+    );
+    private static final Pattern HELIX_GAMEPLAY_ROOT = Pattern.compile(
+        "(?i)^/?(?:[a-z0-9_.-]+:)?helixgame(?:\\s|$)"
+    );
 
     private FabricCommandAuthorityPolicy() {}
 
@@ -38,6 +44,20 @@ final class FabricCommandAuthorityPolicy {
     static boolean playerSubjectRequired(String profile, String category) {
         return !"server_administrator".equals(profile) &&
             PLAYER_CATEGORIES.contains(category);
+    }
+
+    static boolean selectedPlayerSourceRequired(
+        String profile,
+        String category,
+        String command,
+        boolean selectedPlayerBound
+    ) {
+        if (playerSubjectRequired(profile, category)) return true;
+        return selectedPlayerBound &&
+            (
+                SELF_SELECTOR.matcher(command).find() ||
+                HELIX_GAMEPLAY_ROOT.matcher(command.trim()).find()
+            );
     }
 
     static boolean confinedToSelectedPlayer(

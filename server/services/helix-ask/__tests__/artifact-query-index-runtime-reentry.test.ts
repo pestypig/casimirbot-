@@ -99,6 +99,94 @@ const buildVerifiedLifecycle = (
 };
 
 describe("artifact query index runtime re-entry authority", () => {
+  it("keeps an observed requested action authoritative across a later supporting inspection", () => {
+    const turnId = "ask:test:minecraft-inspect-act-chain";
+    const commandCapability = "com.casimirbot.minecraft.command";
+    const spatialCapability =
+      "com.casimirbot.minecraft.spatial_region.inspect";
+    const commandRef = `${turnId}:workstation_gateway:${commandCapability}:1`;
+    const failedSpatialRef = `${turnId}:workstation_gateway:${spatialCapability}:2`;
+    const successfulSpatialRef = `${turnId}:workstation_gateway:${spatialCapability}:3`;
+    const index = buildArtifactQueryIndex({
+      turnId,
+      payload: {
+        active_prompt:
+          "Inspect, build a wall with Minecraft commands, then inspect again.",
+        tool_call_admission_decision: {
+          schema: "helix.tool_call_admission_decision.v1",
+          turn_id: turnId,
+          requested_capability: commandCapability,
+          admitted_capability: commandCapability,
+          requested_capability_family: "live_environment",
+          requested_capability_source: "explicit_user_command",
+          requested_capability_confidence: 0.99,
+          required_observation_kinds_for_requested_capability: [
+            "provider_gateway_observation_packet",
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        capability_plan: {
+          schema: "helix.capability_plan.v1",
+          turn_id: turnId,
+          requested_capability: commandCapability,
+          selected_capability: spatialCapability,
+          capability_family: "live_environment",
+          admission_status: "admitted",
+        },
+        tool_lifecycle_trace: {
+          schema: "helix.tool_lifecycle_trace.v1",
+          turn_id: turnId,
+          requested_capability: spatialCapability,
+          admitted_capability: spatialCapability,
+          executed_capability: spatialCapability,
+          lifecycle_stage: "completed",
+          status: "completed",
+          observation_refs: [successfulSpatialRef],
+        },
+        runtime_tool_call: {
+          capability_key: spatialCapability,
+          status: "completed",
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: commandRef,
+            kind: "provider_gateway_observation_packet",
+            payload_schema: "helix.agent_step_observation_packet.v1",
+            capability_key: commandCapability,
+            status: "succeeded",
+          },
+          {
+            artifact_id: failedSpatialRef,
+            kind: "provider_gateway_observation_packet",
+            payload_schema: "helix.agent_step_observation_packet.v1",
+            capability_key: spatialCapability,
+            status: "failed",
+          },
+          {
+            artifact_id: successfulSpatialRef,
+            kind: "provider_gateway_observation_packet",
+            payload_schema: "helix.agent_step_observation_packet.v1",
+            capability_key: spatialCapability,
+            status: "succeeded",
+          },
+        ],
+      },
+    });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      requested_capability: commandCapability,
+      selected_capability: spatialCapability,
+      executed_capability: spatialCapability,
+      requested_selected_match: true,
+      observed_multi_step_transition_authorized: true,
+      observation_ref: successfulSpatialRef,
+    });
+    expect(index.tool_turn_chain_audit?.rail_failure_code).not.toBe(
+      "explicit_capability_not_selected",
+    );
+  });
+
   it("does not downgrade verified native observation re-entry to a missing compatibility projection", () => {
     const turnId = "ask:test:docs-native-reentry";
     const gatewayObservationRef = `${turnId}:workstation_gateway:docs.search:1`;

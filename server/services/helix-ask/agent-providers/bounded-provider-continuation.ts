@@ -80,6 +80,24 @@ export const runBoundedProviderSelectedContinuation = async <
   const maxTerminalReviews = input.reviewTerminalCandidate
     ? Math.max(1, Math.floor(input.maxTerminalReviews ?? 1))
     : 0;
+  const reviewRejectedContinuationBeforeStop = async (
+    iteration: number,
+  ): Promise<boolean> => {
+    if (
+      !input.reviewTerminalCandidate ||
+      terminalReviewsSinceProgress >= maxTerminalReviews
+    ) {
+      return false;
+    }
+    terminalReviewCount += 1;
+    terminalReviewsSinceProgress += 1;
+    result = await input.reviewTerminalCandidate(result, {
+      iteration,
+      steps: [...steps],
+      rejections: [...rejections],
+    });
+    return true;
+  };
 
   for (
     let iteration = 1;
@@ -144,6 +162,9 @@ export const runBoundedProviderSelectedContinuation = async <
         );
         continue;
       }
+      if (await reviewRejectedContinuationBeforeStop(iteration)) {
+        continue;
+      }
       return {
         result,
         steps,
@@ -170,6 +191,9 @@ export const runBoundedProviderSelectedContinuation = async <
           "request_rejected",
           iteration,
         );
+        continue;
+      }
+      if (await reviewRejectedContinuationBeforeStop(iteration)) {
         continue;
       }
       return {

@@ -98,6 +98,7 @@ public final class FabricProbeExecutor {
             case "crop_state" -> cropState(probe, player);
             case "hazard_check" -> hazardCheck(probe, player);
             case "local_map_summary" -> localMapSummary(probe, player);
+            case "spatial_region" -> spatialRegion(probe, player);
             default -> blocked(probe, "Probe type is not implemented.");
         };
     }
@@ -196,6 +197,7 @@ public final class FabricProbeExecutor {
         if (player.isOnFire()) flags.add("on_fire");
         if (player.isFreezing()) flags.add("freezing");
         if (player.isDeadOrDying()) flags.add("dead");
+        flags.addAll(FabricFallRescueController.statusFlags(player));
 
         List<Map<String, Object>> effects = player
             .getActiveEffects()
@@ -626,6 +628,143 @@ public final class FabricProbeExecutor {
         );
     }
 
+    private Map<String, Object> spatialRegion(
+        Map<String, Object> probe,
+        ServerPlayer player
+    ) {
+        Object rawTarget = probe.get("target");
+        Map<?, ?> target = rawTarget instanceof Map<?, ?> map
+            ? map
+            : Map.of();
+        int horizontalRadius = boundedInteger(
+            target.get("horizontal_radius"),
+            FabricSpatialSurvey.DEFAULT_HORIZONTAL_RADIUS,
+            1,
+            FabricSpatialSurvey.MAX_HORIZONTAL_RADIUS
+        );
+        int verticalRadius = boundedInteger(
+            target.get("vertical_radius"),
+            FabricSpatialSurvey.DEFAULT_VERTICAL_RADIUS,
+            1,
+            FabricSpatialSurvey.MAX_VERTICAL_RADIUS
+        );
+        String purpose = target.get("purpose") instanceof String text
+            ? text.trim()
+            : "general";
+        Integer requestedLength = optionalBoundedInteger(
+            target.get("requested_length"),
+            3,
+            15
+        );
+        Integer requestedHeight = optionalBoundedInteger(
+            target.get("requested_height"),
+            3,
+            8
+        );
+        String requestedOrientation = switch (
+            String.valueOf(target.get("orientation"))
+        ) {
+            case "north_south", "east_west" ->
+                String.valueOf(target.get("orientation"));
+            default -> null;
+        };
+        String requestedRelativeSide = switch (
+            String.valueOf(target.get("relative_side"))
+        ) {
+            case "north", "south", "east", "west" ->
+                String.valueOf(target.get("relative_side"));
+            default -> null;
+        };
+        BlockPos verificationFrom = exactBlockPosition(
+            target.get("verification_from")
+        );
+        BlockPos verificationTo = exactBlockPosition(
+            target.get("verification_to")
+        );
+        String expectedBlock = target.get("expected_block") instanceof String text
+            ? text.trim()
+            : null;
+        Map<String, Object> details = FabricSpatialSurvey.inspect(
+            serverLevel(player),
+            player.blockPosition(),
+            horizontalRadius,
+            verticalRadius,
+            purpose,
+            requestedLength,
+            requestedHeight,
+            requestedOrientation,
+            requestedRelativeSide,
+            verificationFrom,
+            verificationTo,
+            expectedBlock
+        );
+        return success(
+            probe,
+            spatialRegionSummary(purpose, details),
+            SensorScope.SENSOR_OBSERVABLE,
+            Map.of("confidence", 0.95, "details", details)
+        );
+    }
+
+    static String spatialRegionSummary(
+        String purpose,
+        Map<String, Object> details
+    ) {
+        if ("structure_verification".equals(purpose)) {
+            Object rawVerification = details.get("target_geometry_verification");
+            if (!(rawVerification instanceof Map<?, ?> verification)) {
+                return "No exact target geometry verification was produced. " +
+                    "Do not claim the requested structure was verified.";
+            }
+            boolean complete = Boolean.TRUE.equals(verification.get("complete"));
+            boolean allMatch = Boolean.TRUE.equals(verification.get("all_match"));
+            int totalCells = verification.get("total_cells") instanceof Number number
+                ? number.intValue()
+                : 0;
+            int mismatchedCells = verification.get("mismatched_cells") instanceof Number number
+                ? number.intValue()
+                : 0;
+            if (complete && allMatch && totalCells > 0) {
+                return "Exact post-action geometry verification confirmed all " +
+                    totalCells + " requested cells match " +
+                    String.valueOf(verification.get("expected_block")) +
+                    " between the inclusive from/to coordinates.";
+            }
+            if (!complete) {
+                return "Exact post-action geometry verification was incomplete " +
+                    "or outside the bounded actor-centered survey. Do not claim " +
+                    "the requested structure was verified.";
+            }
+            return "Exact post-action geometry verification found " +
+                mismatchedCells + " mismatched cell(s). Do not claim the " +
+                "requested structure was verified; use the mismatch samples " +
+                "for bounded repair or report the mismatch.";
+        }
+        if (
+            "build_planning".equals(purpose) ||
+            "structure_planning".equals(purpose)
+        ) {
+            Object rawCandidates = details.get("build_line_candidates");
+            int candidateCount = rawCandidates instanceof List<?> candidates
+                ? candidates.size()
+                : 0;
+            if (candidateCount == 0) {
+                return "No strictly air-filled build-line candidate was " +
+                "verified for the requested geometry and side in this bounded " +
+                "spatial survey. Do not infer exact " +
+                "build endpoints from compact columns; report that no safe " +
+                "candidate was verified or request another bounded survey.";
+            }
+            return "Bounded spatial-region read-only probe verified " +
+            candidateCount +
+            " conservative strict-air build-line candidate(s) matching the " +
+            "requested geometry and side. For air-only " +
+            "construction, use only build_line_candidates from/to coordinates " +
+            "and do not infer alternative endpoints from compact columns.";
+        }
+        return "Bounded spatial-region read-only probe completed.";
+    }
+
     static String hazardType(BlockState state) {
         if (state.is(Blocks.LAVA)) return "lava";
         if (state.is(Blocks.FIRE) || state.is(Blocks.SOUL_FIRE)) return "fire";
@@ -672,6 +811,50 @@ public final class FabricProbeExecutor {
 
     private static Number number(Object value) {
         return value instanceof Number number ? number : null;
+    }
+
+    private static int boundedInteger(
+        Object value,
+        int fallback,
+        int minimum,
+        int maximum
+    ) {
+        int parsed = value instanceof Number number
+            ? number.intValue()
+            : fallback;
+        return Math.max(minimum, Math.min(maximum, parsed));
+    }
+
+    private static Integer optionalBoundedInteger(
+        Object value,
+        int minimum,
+        int maximum
+    ) {
+        if (!(value instanceof Number number)) return null;
+        int parsed = number.intValue();
+        return parsed >= minimum && parsed <= maximum ? parsed : null;
+    }
+
+    private static BlockPos exactBlockPosition(Object value) {
+        if (!(value instanceof Map<?, ?> position)) return null;
+        Number x = number(position.get("x"));
+        Number y = number(position.get("y"));
+        Number z = number(position.get("z"));
+        if (x == null || y == null || z == null) return null;
+        double exactX = x.doubleValue();
+        double exactY = y.doubleValue();
+        double exactZ = z.doubleValue();
+        if (
+            !Double.isFinite(exactX) ||
+            !Double.isFinite(exactY) ||
+            !Double.isFinite(exactZ) ||
+            Math.rint(exactX) != exactX ||
+            Math.rint(exactY) != exactY ||
+            Math.rint(exactZ) != exactZ
+        ) {
+            return null;
+        }
+        return new BlockPos((int) exactX, (int) exactY, (int) exactZ);
     }
 
     private Map<String, Object> success(

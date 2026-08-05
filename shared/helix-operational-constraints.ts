@@ -21,6 +21,8 @@ export type HelixOperationalConstraintPacket = {
 
   forbidden_tools: string[];
   forbidden_tool_families: string[];
+  exclusive_tool_capabilities: string[];
+  requested_tool_cardinality: number | null;
 
   allowed_fallback_surfaces: string[];
   fallback_equivalence_policy: HelixOperationalFallbackEquivalencePolicy;

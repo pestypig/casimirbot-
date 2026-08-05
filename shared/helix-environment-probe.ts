@@ -20,7 +20,8 @@ export type HelixEnvironmentProbeType =
   | "crop_state"
   | "hazard_check"
   | "inventory_check"
-  | "local_map_summary";
+  | "local_map_summary"
+  | "spatial_region";
 
 export type HelixEnvironmentProbeRequest = {
   schema: typeof HELIX_ENVIRONMENT_PROBE_REQUEST_SCHEMA;
@@ -37,6 +38,15 @@ export type HelixEnvironmentProbeRequest = {
     target_type?: string | null;
     position?: { x: number; y: number; z?: number | null } | null;
     actor_id?: string | null;
+    horizontal_radius?: number | null;
+    vertical_radius?: number | null;
+    purpose?:
+      | "general"
+      | "structure_planning"
+      | "build_planning"
+      | "fire_safety"
+      | "landing_safety"
+      | null;
   };
   constraints: {
     read_only: true;
@@ -105,6 +115,7 @@ const probeTypeSchema = z.enum([
   "hazard_check",
   "inventory_check",
   "local_map_summary",
+  "spatial_region",
 ]);
 
 export const helixEnvironmentProbeResultSchema = z.object({

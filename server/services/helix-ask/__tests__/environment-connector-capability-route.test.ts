@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   explicitCapabilityContractForCapability,
   extractExplicitCapabilityContracts,
+  isExclusiveExplicitMinecraftCommandToolRequest,
+  isIsolatedExplicitMinecraftCommandCapabilityIntent,
 } from "../explicit-capability-contract";
 import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
 import { buildToolCallAdmissionDecision } from "../tool-call-admission";
@@ -23,8 +25,12 @@ import {
   HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
   HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
   HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
 } from "@shared/helix-environment-connector";
-import { HELIX_MINECRAFT_COMMAND_CAPABILITY } from "@shared/helix-environment-command";
+import {
+  HELIX_MINECRAFT_COMMAND_CAPABILITY,
+  HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+} from "@shared/helix-environment-command";
 
 const CAPABILITY = "com.casimirbot.minecraft.inventory.check";
 
@@ -62,6 +68,14 @@ describe("Minecraft environment connector capability routing", () => {
       ]),
     });
     expect(inferCommittedRouteToolFamily(CAPABILITY)).toBe("live_environment");
+    expect(
+      inferCommittedRouteToolFamily(
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      ),
+    ).toBe("live_environment");
+    expect(inferCommittedRouteToolFamily(HELIX_MINECRAFT_COMMAND_CAPABILITY)).toBe(
+      "live_environment",
+    );
     expect(resolveToolFamilyContract({ toolName: CAPABILITY })).toMatchObject({
       toolFamily: "live_environment",
       authority: "evidence_only",
@@ -109,6 +123,26 @@ describe("Minecraft environment connector capability routing", () => {
       HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
     ],
     [
+      "Inspect the blocks around my selected Minecraft player right now. Describe any nearby structure boundary and any safe fireplace candidate you can actually verify, but do not change the world.",
+      HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    ],
+    [
+      "Inspect the live Minecraft Fabric world around my selected player right now for the nearest safe existing fireplace ignition cell. Use a fresh fire_safety spatial-region observation with a 5000 ms freshness ceiling. Do not mutate anything and do not search documents.",
+      HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    ],
+    [
+      "Before building anything, inspect the area west of my selected Minecraft player and identify the nearest safe level site for a freestanding stone-brick wall five blocks long north-south and three blocks high. Avoid my player, the chest, crafting table, paths, foliage, water, and other structures. Report the exact candidate endpoints and protected anchors, but do not change the world.",
+      HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    ],
+    [
+      "Verify the existing Minecraft wall volume from x=-63 y=69 z=-2 through x=-59 y=71 z=-2 as exactly minecraft:stone_bricks using a fresh structure_verification environment observation with a 5000 ms freshness ceiling. Do not mutate anything and do not search documents.",
+      HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    ],
+    [
+      "Recheck the existing Minecraft block at x=-50 y=68 z=-2 as exactly minecraft:fire using one fresh structure_verification environment observation with a 5000 ms freshness ceiling. Report total, matched, mismatched, and mismatch samples. Do not mutate anything and do not search documents.",
+      HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    ],
+    [
       "In Minecraft, check whether I have line of sight to that position.",
       HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
     ],
@@ -132,6 +166,252 @@ describe("Minecraft environment connector capability routing", () => {
     },
   );
 
+  it("uses only canonical spatial arguments for the exact read-only gameplay request", () => {
+    const prompt =
+      "Inspect the blocks around my selected Minecraft player right now. Describe any nearby structure boundary and any safe fireplace candidate you can actually verify, but do not change the world.";
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:test:read-only-spatial-inspection",
+      promptText: prompt,
+    });
+
+    expect(compound?.subgoals).toHaveLength(1);
+    expect(compound?.subgoals[0]).toMatchObject({
+      requested_capability:
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      args_hint: {
+        target: "current_actor",
+        horizontal_radius: 7,
+        vertical_radius: 6,
+        purpose: "fire_safety",
+      },
+    });
+    expect(compound?.subgoals[0]?.args_hint).not.toHaveProperty("radius");
+  });
+
+  it("keeps a natural selected-player build-site inspection on the hard live-environment route", () => {
+    const prompt =
+      "Before building anything, inspect the area west of my selected Minecraft player and identify the nearest safe level site for a freestanding stone-brick wall five blocks long north-south and three blocks high. Avoid my player, the chest, crafting table, paths, foliage, water, and other structures. Report the exact candidate endpoints and protected anchors, but do not change the world.";
+
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:selected-player-build-site",
+        threadId: "helix-ask:room:shared_realtime_room:build-site",
+        promptText: prompt,
+      }),
+    ).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+      precedence_reason:
+        "explicit_minecraft_environment_capability_source_target",
+    });
+    expect(
+      buildHelixCompoundCapabilityContract({
+        turnId: "ask:test:selected-player-build-site",
+        promptText: prompt,
+      })?.subgoals,
+    ).toEqual([
+      expect.objectContaining({
+        requested_capability:
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        args_hint: {
+          target: "current_actor",
+          horizontal_radius: 7,
+          vertical_radius: 6,
+          purpose: "structure_planning",
+          requested_length: 5,
+          requested_height: 3,
+          orientation: "north_south",
+          relative_side: "west",
+        },
+      }),
+    ]);
+  });
+
+  it("keeps scoped no-mutation and no-docs constraints on an exact Minecraft verification route", () => {
+    const prompt =
+      "Verify the existing Minecraft wall volume from x=-63 y=69 z=-2 through x=-59 y=71 z=-2 as exactly minecraft:stone_bricks using a fresh structure_verification environment observation with a 5000 ms freshness ceiling. Do not mutate anything and do not search documents.";
+    const turnId = "ask:test:exact-wall-verification";
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId,
+      threadId: "helix-ask:room:shared_realtime_room:exact-wall-verification",
+      promptText: prompt,
+    });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+      precedence_reason:
+        "explicit_minecraft_environment_capability_source_target",
+    });
+    const admission = buildToolCallAdmissionDecision({
+      turnId,
+      sourceTargetIntent,
+      promptText: prompt,
+    });
+    expect(admission).toMatchObject({
+      source_target: "live_environment",
+      required: true,
+      admitted_tool_families: expect.arrayContaining(["live_environment"]),
+      requested_capability:
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    });
+    expect(admission.tool_admission_suppressed).not.toBe(true);
+    expect(
+      buildHelixCompoundCapabilityContract({
+        turnId,
+        promptText: prompt,
+      })?.subgoals,
+    ).toEqual([
+      expect.objectContaining({
+        requested_capability:
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        args_hint: {
+          target: "current_actor",
+          purpose: "structure_verification",
+          verification_from: { x: -63, y: 69, z: -2 },
+          verification_to: { x: -59, y: 71, z: -2 },
+          expected_block: "minecraft:stone_bricks",
+          freshness_requirement_ms: 5_000,
+        },
+      }),
+    ]);
+  });
+
+  it("treats a scoped no-docs clause as a family constraint during exact single-block recheck", () => {
+    const prompt =
+      "Recheck the existing Minecraft block at x=-50 y=68 z=-2 as exactly minecraft:fire using one fresh structure_verification environment observation with a 5000 ms freshness ceiling. Report total, matched, mismatched, and mismatch samples. Do not mutate anything and do not search documents.";
+    const turnId = "ask:test:exact-single-block-recheck";
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId,
+      threadId: "helix-ask:room:shared_realtime_room:single-block-recheck",
+      promptText: prompt,
+    });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+      precedence_reason:
+        "explicit_minecraft_environment_capability_source_target",
+    });
+    const admission = buildToolCallAdmissionDecision({
+      turnId,
+      sourceTargetIntent,
+      promptText: prompt,
+    });
+    expect(admission).toMatchObject({
+      source_target: "live_environment",
+      required: true,
+      admitted_tool_families: expect.arrayContaining(["live_environment"]),
+      requested_capability:
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    });
+    expect(admission.tool_admission_suppressed).not.toBe(true);
+    expect(
+      buildHelixCompoundCapabilityContract({
+        turnId,
+        promptText: prompt,
+      })?.subgoals,
+    ).toEqual([
+      expect.objectContaining({
+        requested_capability:
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        args_hint: {
+          target: "current_actor",
+          purpose: "structure_verification",
+          verification_from: { x: -50, y: 68, z: -2 },
+          verification_to: { x: -50, y: 68, z: -2 },
+          expected_block: "minecraft:fire",
+          freshness_requirement_ms: 5_000,
+        },
+      }),
+    ]);
+  });
+
+  it("keeps scoped no-mutation and no-docs constraints on a live fireplace-safety route", () => {
+    const prompt =
+      "Inspect the live Minecraft Fabric world around my selected player right now for the nearest safe existing fireplace ignition cell. Use a fresh fire_safety spatial-region observation with a 5000 ms freshness ceiling. Do not mutate anything and do not search documents.";
+    const turnId = "ask:test:fireplace-safety-inspection";
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId,
+      threadId: "helix-ask:room:shared_realtime_room:fireplace-safety",
+      promptText: prompt,
+    });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+      precedence_reason:
+        "explicit_minecraft_environment_capability_source_target",
+    });
+    const admission = buildToolCallAdmissionDecision({
+      turnId,
+      sourceTargetIntent,
+      promptText: prompt,
+    });
+    expect(admission).toMatchObject({
+      source_target: "live_environment",
+      required: true,
+      admitted_tool_families: expect.arrayContaining(["live_environment"]),
+      requested_capability:
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    });
+    expect(admission.tool_admission_suppressed).not.toBe(true);
+    expect(
+      buildHelixCompoundCapabilityContract({
+        turnId,
+        promptText: prompt,
+      })?.subgoals,
+    ).toEqual([
+      expect.objectContaining({
+        requested_capability:
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        args_hint: {
+          target: "current_actor",
+          horizontal_radius: 7,
+          vertical_radius: 6,
+          purpose: "fire_safety",
+        },
+      }),
+    ]);
+  });
+
+  it.each([
+    "Do not inspect the area west of my selected Minecraft player for a wall site.",
+    "Later, inspect the area west of my selected Minecraft player for a wall site.",
+    'The screen says "Inspect the area west of my selected Minecraft player for a wall site."',
+    "Historically, before building anything, I inspected the area west of my selected Minecraft player for a wall site.",
+    "Explain how to inspect the area west of my selected Minecraft player for a wall site without running the probe.",
+    "Do not verify the Minecraft wall volume from x=-63 y=69 z=-2 through x=-59 y=71 z=-2 as exactly minecraft:stone_bricks.",
+    "Later, verify the Minecraft wall volume from x=-63 y=69 z=-2 through x=-59 y=71 z=-2 as exactly minecraft:stone_bricks.",
+    'The screen says "Verify the Minecraft wall volume from x=-63 y=69 z=-2 through x=-59 y=71 z=-2 as exactly minecraft:stone_bricks."',
+    "Historically, we verified the Minecraft wall volume from x=-63 y=69 z=-2 through x=-59 y=71 z=-2 as exactly minecraft:stone_bricks.",
+    "Explain how to verify the Minecraft wall volume from x=-63 y=69 z=-2 through x=-59 y=71 z=-2 as exactly minecraft:stone_bricks without running the probe.",
+    "Do not recheck the existing Minecraft block at x=-50 y=68 z=-2 as exactly minecraft:fire.",
+    "Later, recheck the existing Minecraft block at x=-50 y=68 z=-2 as exactly minecraft:fire.",
+    'The screen says "Recheck the existing Minecraft block at x=-50 y=68 z=-2 as exactly minecraft:fire."',
+    "Historically, we rechecked the existing Minecraft block at x=-50 y=68 z=-2 as exactly minecraft:fire.",
+    "Explain how to recheck the existing Minecraft block at x=-50 y=68 z=-2 as exactly minecraft:fire without running the probe.",
+    "Do not inspect the live Minecraft Fabric world around my selected player for a fireplace ignition cell.",
+    "Later, inspect the live Minecraft Fabric world around my selected player for a fireplace ignition cell.",
+    'The screen says "Inspect the live Minecraft Fabric world around my selected player for a fireplace ignition cell."',
+    "Historically, I inspected the live Minecraft Fabric world around my selected player for a fireplace ignition cell.",
+    "Explain how to inspect the live Minecraft Fabric world around my selected player for a fireplace ignition cell without running the probe.",
+  ])("does not admit contextual selected-player build-site inspection: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt).map(
+        (entry) => entry.capability,
+      ),
+    ).not.toContain(HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY);
+  });
+
   it("can admit several evidence probes for one situation question without making any observation terminal", () => {
     const capabilities = extractExplicitCapabilityContracts(
       "In Minecraft, check my health and current Minecraft inventory, then tell me whether hostile mobs are nearby right now.",
@@ -145,6 +425,231 @@ describe("Minecraft environment connector capability routing", () => {
       ]),
     );
   });
+
+  it.each([
+    ["In the connected Minecraft world, build a wall around my house.", "fill"],
+    ["In the current Minecraft world, light the fireplace safely.", "setblock"],
+    [
+      "In the live Minecraft world, protect me from a dangerous fall.",
+      "helixgame fall_rescue",
+    ],
+  ])(
+    "admits spatial evidence and command authority for a structure-aware action: %s",
+    (prompt, expectedCatalogPrefix) => {
+      const capabilities = extractExplicitCapabilityContracts(prompt).map(
+        (entry) => entry.capability,
+      );
+      expect(capabilities).toContain(
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      );
+      expect(capabilities).toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+      expect(capabilities).toContain(
+        HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+      );
+      expect(capabilities.indexOf(
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      )).toBeLessThan(capabilities.indexOf(HELIX_MINECRAFT_COMMAND_CAPABILITY));
+      expect(
+        capabilities.indexOf(HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY),
+      ).toBeLessThan(capabilities.indexOf(HELIX_MINECRAFT_COMMAND_CAPABILITY));
+      const compound = buildHelixCompoundCapabilityContract({
+        turnId: "ask:test:spatial-before-action",
+        promptText: prompt,
+      });
+      expect(compound?.subgoals.map((subgoal) => subgoal.requested_capability)).toEqual(
+        capabilities,
+      );
+      expect(compound?.subgoals[0]?.args_hint).toMatchObject({
+        target: "current_actor",
+        horizontal_radius: 7,
+        vertical_radius: 6,
+      });
+      expect(compound?.subgoals[1]?.args_hint).toEqual({
+        path_prefix: expectedCatalogPrefix,
+        limit: 64,
+      });
+    },
+  );
+
+  it("routes an ordinary bounded fall-rescue request through landing inspection and the local rescue command tree", () => {
+    const prompt =
+      "In the current Minecraft world, protect my selected player from a dangerous fall for the next 60 seconds. Arm the local water rescue now, but do not make me fall yet.";
+    const capabilities = extractExplicitCapabilityContracts(prompt).map(
+      (entry) => entry.capability,
+    );
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:test:natural-fall-rescue",
+      promptText: prompt,
+    });
+
+    expect(capabilities).toEqual(
+      expect.arrayContaining([
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+        HELIX_MINECRAFT_COMMAND_CAPABILITY,
+      ]),
+    );
+    expect(compound?.subgoals[0]?.args_hint).toMatchObject({
+      target: "current_actor",
+      purpose: "landing_safety",
+    });
+    expect(compound?.subgoals[1]?.args_hint).toEqual({
+      path_prefix: "helixgame fall_rescue",
+      limit: 64,
+    });
+  });
+
+  it.each([
+    "Do not arm fall rescue in my current Minecraft world.",
+    "Later, protect me from a dangerous fall in my current Minecraft world.",
+    'The room transcript says "Arm fall rescue in my current Minecraft world."',
+    "Historically, you protected me from a dangerous fall in Minecraft.",
+    "Explain how to arm fall rescue in Minecraft without running anything.",
+  ])("does not admit contextual or non-immediate fall-rescue mutation: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt).map(
+        (entry) => entry.capability,
+      ),
+    ).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+  });
+
+  it("uses only trusted selected-room Minecraft scope for an ordinary wall follow-up", () => {
+    const turnId = "ask:test:trusted-room-wall-followup";
+    const prompt =
+      "At my current safe plains site, build a freestanding stone-brick wall five blocks long north-south and three blocks high at the nearest safe level location at least three blocks away from me. Inspect first and avoid my player, entities, structures, foliage, paths, and water. Capture a rollback checkpoint before changing blocks, build only on verified solid support into verified air, inspect the finished wall, and report the exact endpoints plus checkpoint status. If no safe site is verified, do not build.";
+    const trustedEnvironmentContext = {
+      trusted_environment_domain: "minecraft" as const,
+    };
+
+    expect(
+      extractExplicitCapabilityContracts(prompt).map(
+        (entry) => entry.capability,
+      ),
+    ).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+    const capabilities = extractExplicitCapabilityContracts(
+      prompt,
+      trustedEnvironmentContext,
+    ).map((entry) => entry.capability);
+    expect(capabilities).toEqual(
+      expect.arrayContaining([
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+        HELIX_MINECRAFT_COMMAND_CAPABILITY,
+      ]),
+    );
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId,
+      threadId: "helix-ask:room:shared_realtime_room:trusted-wall",
+      promptText: prompt,
+      trustedEnvironmentContext,
+    });
+    const admission = buildToolCallAdmissionDecision({
+      turnId,
+      sourceTargetIntent,
+      promptText: prompt,
+      trustedEnvironmentContext,
+    });
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+    });
+    expect(admission).toMatchObject({
+      source_target: "live_environment",
+      required: true,
+      admitted_tool_families: expect.arrayContaining(["live_environment"]),
+      compound_requested_capabilities: expect.arrayContaining(capabilities),
+    });
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId,
+      promptText: prompt,
+      trustedEnvironmentContext,
+    });
+    expect(
+      compound?.subgoals.map((subgoal) => subgoal.requested_capability),
+    ).toEqual(capabilities);
+    const spatialSubgoal = compound?.subgoals.find(
+      (subgoal) =>
+        subgoal.requested_capability ===
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    );
+    const commandSubgoal = compound?.subgoals.find(
+      (subgoal) =>
+        subgoal.requested_capability === HELIX_MINECRAFT_COMMAND_CAPABILITY,
+    );
+    expect(commandSubgoal?.guarded_noop_policy).toMatchObject({
+      schema: "helix.compound_capability_guarded_noop.v1",
+      mode: "no_verified_safe_candidate",
+      guard_subgoal_id: spatialSubgoal?.subgoal_id,
+      guard_capability:
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      required_purpose: "structure_planning",
+      accepted_observation_purposes: [
+        "structure_planning",
+        "build_planning",
+      ],
+      candidate_field: "build_line_candidates",
+      completeness_field: "build_line_candidates_complete",
+      omitted_count_field: "omitted_build_line_candidate_count",
+      current_turn_only: true,
+      requires_successful_observation: true,
+      user_directed_noop_guard: true,
+    });
+  });
+
+  it.each([
+    "At my current safe plains site, build a wall after inspecting it.",
+    'The room transcript says "If no safe site is verified, do not build."',
+    "If no safe site is verified later, explain why a builder should not build.",
+  ])("does not invent guarded no-op authority for %s", (prompt) => {
+    const commandSubgoal = buildHelixCompoundCapabilityContract({
+      turnId: "ask:test:no-guarded-noop-shortcut",
+      promptText: prompt,
+      trustedEnvironmentContext: {
+        trusted_environment_domain: "minecraft",
+      },
+    })?.subgoals.find(
+      (subgoal) =>
+        subgoal.requested_capability === HELIX_MINECRAFT_COMMAND_CAPABILITY,
+    );
+    expect(commandSubgoal?.guarded_noop_policy).toBeUndefined();
+  });
+
+  it.each([
+    'The room transcript contains "build a freestanding stone-brick wall beside me."',
+    "If the area is clear later, build a freestanding stone-brick wall beside me.",
+    "At my current site, do not build a freestanding stone-brick wall beside me.",
+  ])(
+    "does not turn trusted room scope into execution for contextual wording: %s",
+    (prompt) => {
+      expect(
+        extractExplicitCapabilityContracts(prompt, {
+          trusted_environment_domain: "minecraft",
+        }).map((entry) => entry.capability),
+      ).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+    },
+  );
+
+  it.each([
+    "Do not build a wall around my house in the connected Minecraft world.",
+    "Later, light the fireplace in the current Minecraft world.",
+    'The screen says "Protect me from a fall in the live Minecraft world."',
+    "Historically, we built a wall around my house in the connected Minecraft world.",
+    "Explain how to light a Minecraft fireplace, but do not execute anything.",
+    'The room transcript contains "At my current safe plains site, build a wall beside my selected Minecraft player."',
+    "If the area is clear later, build a wall beside my selected Minecraft player.",
+    "At my current safe plains site, do not build a wall beside my selected Minecraft player.",
+  ])(
+    "never admits mutation for contextual structure-aware wording: %s",
+    (prompt) => {
+      expect(
+        extractExplicitCapabilityContracts(prompt).map(
+          (entry) => entry.capability,
+        ),
+      ).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+    },
+  );
 
   it("routes an affirmative live Fabric dispatcher request to the exact Minecraft command capability", () => {
     const prompt =
@@ -175,6 +680,12 @@ describe("Minecraft environment connector capability routing", () => {
     "Can you make me glow for ten seconds in the connected Minecraft world?",
     "Please give me night vision for one minute in Minecraft.",
     "In the live Fabric world, bring that pig over here.",
+    "In the connected Minecraft world, create a glowing allay named HELIX GUIDE about three blocks in front of me and tag it helix_guide_demo.",
+    "In the connected Minecraft world, create a glowing allay named HELIX GUIDE about three blocks in front of me, safely frozen in place, and tag it helix_guide_demo so we can remove only this demo later.",
+    "Build a temporary stone arch beside me in the connected Minecraft world.",
+    "Construct a tagged demonstration platform near me in Minecraft.",
+    "Yes—continue now with exactly the two remaining live-world actions from your last answer: show DatDamPig the aqua title HELIX GUIDE ONLINE, then play the bright amethyst-block chime at DatDamPig's current position. Use the connected Fabric environment, and report only fresh observed outcomes.",
+    "In the connected Fabric environment, display a title for DatDamPig now.",
     "Clear the weather in the connected Minecraft world.",
     "I want you to save the current Minecraft server world now.",
     "In Minecraft, set the time to noon and tell me what happened.",
@@ -212,6 +723,16 @@ describe("Minecraft environment connector capability routing", () => {
     "Can you explain how to make me glow in Minecraft?",
     "Explain glowing in Minecraft, but do not apply it.",
     "Can the Minecraft connector make me glow?",
+    "Do not create a glowing allay in the connected Minecraft world.",
+    "Later, create a tagged allay in Minecraft.",
+    'The screen says "Build a temporary stone arch in Minecraft."',
+    "Historically, we constructed a tagged demonstration platform in Minecraft.",
+    "Can you explain how to create a named allay in Minecraft?",
+    "Can the Minecraft connector build structures?",
+    'The screen says: "show DatDamPig the title HELIX GUIDE ONLINE in the Fabric world."',
+    "The Fabric guide says to play an amethyst chime, but do not run it.",
+    "Later, display HELIX GUIDE ONLINE for DatDamPig in Minecraft.",
+    '"Then play a chime in the connected Fabric environment" is only an example.',
   ])(
     "does not propose a mutating Minecraft command for contextual wording: %s",
     (prompt) => {
@@ -245,6 +766,30 @@ describe("Minecraft environment connector capability routing", () => {
     );
     expect(capabilities).toContain("docs-viewer.search_docs");
     expect(capabilities).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:minecraft-mechanics-docs",
+        threadId: "helix-ask:room:shared_realtime_room:mechanics-docs",
+        promptText: prompt,
+      }),
+    ).toMatchObject({
+      target_source: "docs_viewer",
+      target_kind: "docs_viewer",
+      strength: "hard",
+      requested_outputs: expect.arrayContaining([
+        "file_path",
+        "line_backed_source",
+        "tool_call_eligibility",
+      ]),
+      suppressed_routes: expect.arrayContaining([
+        "scholarly_research_lookup",
+        "workstation_action",
+        "model_only_concept",
+      ]),
+      allow_no_tool_direct: false,
+      precedence_reason:
+        "minecraft_environment_mechanics_docs_source_target",
+    });
   });
 
   it.each([
@@ -284,6 +829,136 @@ describe("Minecraft environment connector capability routing", () => {
     });
   });
 
+  it("keeps an exact paired-world command affirmative when a later clause excludes every other command", () => {
+    const prompt =
+      "In my paired Minecraft Fabric world, run the exact catalog command /helixgame checkpoint capture helixbindtest 1 1 for my selected player. Then run /helixgame checkpoint status and report the fresh observations. Do not run any other command.";
+    expect(extractExplicitCapabilityContracts(prompt)).toContainEqual(
+      expect.objectContaining({
+        capability: HELIX_MINECRAFT_COMMAND_CAPABILITY,
+        source: "natural_capability_intent",
+      }),
+    );
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:paired-exact-command-with-scoped-exclusion",
+        threadId: "helix-ask:room:shared_realtime_room:paired-exact-command",
+        promptText: prompt,
+        trustedEnvironmentContext: {
+          trusted_environment_domain: "minecraft",
+        },
+      }),
+    ).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+    });
+  });
+
+  it("binds a schema-complete exact Minecraft command into the compound itinerary", () => {
+    const prompt =
+      'Run exactly one command in the paired Minecraft Fabric environment. Use com.casimirbot.minecraft.command with command "/helixgame checkpoint status", category "query", and effect "read_only". Do not run any other command.';
+    const commandSubgoal = buildHelixCompoundCapabilityContract({
+      turnId: "ask:test:exact-minecraft-command-args",
+      promptText: prompt,
+      trustedEnvironmentContext: {
+        trusted_environment_domain: "minecraft",
+      },
+    })?.subgoals.find(
+      (subgoal) =>
+        subgoal.requested_capability === HELIX_MINECRAFT_COMMAND_CAPABILITY,
+    );
+
+    expect(commandSubgoal?.args_hint).toEqual({
+      command: "helixgame checkpoint status",
+      category: "query",
+      effect: "read_only",
+    });
+  });
+
+  it("isolates an affirmative exact command from excluded helper tools without admitting contextual variants", () => {
+    const prompt =
+      'Run exactly one command in the paired Minecraft Fabric environment. Use com.casimirbot.minecraft.command with command "time query daytime", category "server_query", and effect "read_only". Do not run any other command or tool.';
+    expect(isIsolatedExplicitMinecraftCommandCapabilityIntent(prompt)).toBe(true);
+
+    for (const contextual of [
+      `Do not ${prompt}`,
+      `Later, ${prompt}`,
+      `The transcript says "${prompt}"`,
+      `Explain this instruction without executing it: ${prompt}`,
+    ]) {
+      expect(
+        isIsolatedExplicitMinecraftCommandCapabilityIntent(contextual),
+      ).toBe(false);
+    }
+  });
+
+  it("keeps a semantic mutation preface inside an explicit one-command boundary", () => {
+    const prompt =
+      'Ignite the already surveyed fire-safe hearth cell in my paired Minecraft Fabric world. Run exactly one command: use com.casimirbot.minecraft.command with command "setblock -50 68 -2 minecraft:fire", category "world_build", and effect "world_mutation". Do not run any other command or tool.';
+    const context = { trusted_environment_domain: "minecraft" as const };
+
+    expect(isExclusiveExplicitMinecraftCommandToolRequest(prompt)).toBe(true);
+    expect(isIsolatedExplicitMinecraftCommandCapabilityIntent(prompt, context)).toBe(true);
+    expect(
+      extractExplicitCapabilityContracts(prompt, context).map(
+        (entry) => entry.capability,
+      ),
+    ).toEqual([HELIX_MINECRAFT_COMMAND_CAPABILITY]);
+
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:test:exclusive-fireplace-command",
+      promptText: prompt,
+      trustedEnvironmentContext: context,
+    });
+    expect(compound?.required_capabilities).toEqual([
+      HELIX_MINECRAFT_COMMAND_CAPABILITY,
+    ]);
+    expect(compound?.requires_all_subgoals).toBe(false);
+
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "ask:test:exclusive-fireplace-command",
+      promptText: prompt,
+      sourceTargetIntent: {
+        target_source: "live_environment",
+        target_kind: "live_environment",
+      },
+      trustedEnvironmentContext: context,
+    });
+    expect(admission.compound_requested_capabilities).toEqual([
+      HELIX_MINECRAFT_COMMAND_CAPABILITY,
+    ]);
+    expect(admission.exclusive_tool_capabilities).toEqual([
+      HELIX_MINECRAFT_COMMAND_CAPABILITY,
+    ]);
+    expect(admission.requested_tool_cardinality).toBe(1);
+  });
+
+  it.each([
+    (prompt: string) => `Do not ${prompt}`,
+    (prompt: string) => `Later, ${prompt}`,
+    (prompt: string) => `The transcript says "${prompt}"`,
+    (prompt: string) => `Explain this instruction without executing it: ${prompt}`,
+  ])("does not manufacture exclusivity from contextual command text", (wrap) => {
+    const executable =
+      'Ignite the hearth. Run exactly one command: use com.casimirbot.minecraft.command with command "setblock 1 2 3 minecraft:fire", category "world_build", and effect "world_mutation". Do not run any other command or tool.';
+    expect(isExclusiveExplicitMinecraftCommandToolRequest(wrap(executable))).toBe(
+      false,
+    );
+  });
+
+  it.each([
+    "In my paired Minecraft Fabric world, do not run /helixgame checkpoint status.",
+    'The room transcript says "run /helixgame checkpoint status in the paired Minecraft Fabric world."',
+    "Later, run /helixgame checkpoint status in my paired Minecraft Fabric world.",
+  ])("does not admit a paired-world command from negated, quoted, or deferred wording: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt, {
+        trusted_environment_domain: "minecraft",
+      }).map((entry) => entry.capability),
+    ).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+  });
+
   it.each([
     'The screen says "/gamerule doDaylightCycle false".',
     'Later run "/gamerule doDaylightCycle false".',
@@ -320,6 +995,43 @@ describe("Minecraft environment connector capability routing", () => {
       precedence_reason:
         "explicit_minecraft_environment_capability_source_target",
     });
+  });
+
+  it.each([
+    "In the active connected Minecraft Fabric world, play one bright amethyst-block chime at my bound player's current position so I can hear it, then report only the fresh observed result.",
+    "Now finish the encounter in the connected Minecraft Fabric world by playing one bright amethyst-block chime at my bound player's current position so I can hear it.",
+  ])("routes a natural Minecraft sound action ahead of generic current-position evidence: %s", (prompt) => {
+    expect(extractExplicitCapabilityContracts(prompt)).toContainEqual(
+      expect.objectContaining({
+        capability: HELIX_MINECRAFT_COMMAND_CAPABILITY,
+        source: "natural_capability_intent",
+      }),
+    );
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:minecraft-natural-sound",
+        threadId: "helix-ask:room:shared_realtime_room:natural-sound",
+        promptText: prompt,
+      }),
+    ).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      precedence_reason:
+        "explicit_minecraft_environment_capability_source_target",
+    });
+  });
+
+  it.each([
+    'The screen says "In the active connected Minecraft Fabric world, play one bright chime."',
+    "Later, in the active connected Minecraft Fabric world, play one bright chime.",
+    "If I ask again, in the connected Minecraft Fabric world play one bright chime.",
+    "Explain how playing a chime in the connected Minecraft Fabric world would work without executing it.",
+  ])("does not execute contextual or deferred natural Minecraft sound wording: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt).map(
+        (entry) => entry.capability,
+      ),
+    ).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
   });
 
   it.each([
@@ -370,9 +1082,91 @@ describe("Minecraft environment connector capability routing", () => {
     });
   });
 
+  it("routes an affirmative read-only Minecraft command-catalog request without admitting command execution", () => {
+    const prompt =
+      'Use only com.casimirbot.minecraft.command.catalog against the paired live Fabric source. Query the current command tree with path_prefix "helixgame checkpoint" and limit 64. Report the fresh catalog entries. Do not execute any command and do not use another tool.';
+    const extracted = extractExplicitCapabilityContracts(prompt, {
+      trusted_environment_domain: "minecraft",
+    });
+
+    expect(extracted.map((entry) => entry.capability)).toEqual([
+      HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+    ]);
+    expect(extracted[0]?.source).toBe("natural_capability_intent");
+    expect(
+      buildHelixCompoundCapabilityContract({
+        turnId: "ask:test:minecraft-command-catalog-only",
+        promptText: prompt,
+        trustedEnvironmentContext: {
+          trusted_environment_domain: "minecraft",
+        },
+      })?.subgoals,
+    ).toEqual([
+      expect.objectContaining({
+        requested_capability:
+          HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+        args_hint: {
+          path_prefix: "helixgame checkpoint",
+          limit: 64,
+        },
+      }),
+    ]);
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:minecraft-command-catalog-only",
+        threadId: "helix-ask:room:shared_realtime_room:catalog-only",
+        promptText: prompt,
+        trustedEnvironmentContext: {
+          trusted_environment_domain: "minecraft",
+        },
+      }),
+    ).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      explicit_cues: [
+        `explicit_capability:${HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY}`,
+      ],
+      allow_no_tool_direct: false,
+      precedence_reason:
+        "explicit_minecraft_environment_capability_source_target",
+    });
+  });
+
+  it.each([
+    "Explain how the Minecraft command catalog works without querying it.",
+    'The room transcript says "query the current Minecraft command catalog."',
+    "Later, query the current Minecraft command catalog.",
+    "If I pair a server, query its Minecraft command catalog.",
+  ])("does not admit a contextual Minecraft command-catalog request: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt, {
+        trusted_environment_domain: "minecraft",
+      }).map((entry) => entry.capability),
+    ).not.toContain(HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY);
+  });
+
+  it("bounds an explicitly requested Minecraft command-catalog limit", () => {
+    const prompt =
+      'Query the paired Minecraft command catalog with path_prefix "helixgame" and limit 999. Do not execute a command.';
+    expect(
+      buildHelixCompoundCapabilityContract({
+        turnId: "ask:test:minecraft-command-catalog-bounded-limit",
+        promptText: prompt,
+        trustedEnvironmentContext: {
+          trusted_environment_domain: "minecraft",
+        },
+      })?.subgoals[0]?.args_hint,
+    ).toEqual({
+      path_prefix: "helixgame",
+      limit: 64,
+    });
+  });
+
   it.each([
     "What is my Minecraft status right now?",
     "Can you check my Minecraft health now?",
+    "Using my paired Minecraft Fabric environment, check my current player health and exact position now. If my selected player is offline, fail accurately instead of using stale evidence.",
     "Given the inventory you just observed, check my current Minecraft status again now. Clearly separate what is freshly observed from your advice.",
     "Recheck my current Minecraft status now for me. Require a new current-turn actor observation from the room-bound Fabric source.",
   ])("treats first-person current Minecraft state as a live actor probe: %s", (prompt) => {
@@ -382,6 +1176,25 @@ describe("Minecraft environment connector capability routing", () => {
         source: "natural_capability_intent",
       }),
     );
+  });
+
+  it("keeps live player status authoritative when the prompt mentions stale evidence", () => {
+    const prompt =
+      "Using my paired Minecraft Fabric environment, check my current player health and exact position now. Do not mutate anything. If my selected player is offline, fail accurately and actionably instead of using stale evidence.";
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:minecraft-offline-current-state",
+        threadId: "helix-ask:room:shared_realtime_room:offline-current-state",
+        promptText: prompt,
+      }),
+    ).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      precedence_reason:
+        "explicit_minecraft_environment_capability_source_target",
+      allow_no_tool_direct: false,
+    });
   });
 
   it.each([
@@ -657,6 +1470,24 @@ describe("Minecraft environment connector capability routing", () => {
         }),
       }),
     );
+  });
+
+  it("keeps selected-player live-tool wording on the Minecraft environment source", () => {
+    const prompt =
+      "Check my selected Minecraft player's current status and exact position using the live environment tool. Report only fresh observed state.";
+    expect(extractExplicitCapabilityContracts(prompt)).toContainEqual(
+      expect.objectContaining({
+        capability: HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+        source: "natural_capability_intent",
+      }),
+    );
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:selected-minecraft-player-status",
+        threadId: "thread:test",
+        promptText: prompt,
+      }).target_source,
+    ).toBe("live_environment");
   });
 
   it.each([

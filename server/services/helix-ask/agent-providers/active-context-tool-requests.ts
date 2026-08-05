@@ -59,6 +59,12 @@ import {
 import { resolveHelixAskConversationalReferent } from "../referent-resolution";
 import { materializeRealtimeConversationContext } from "./realtime-conversation-context";
 import { isMinecraftMechanicsDocsPrompt } from "../minecraft-mechanics-docs-intent";
+import {
+  isAffirmativeNaturalMinecraftCommandCapabilityIntent,
+  isIsolatedExplicitMinecraftCommandCapabilityIntent,
+  isSchemaCompleteExplicitMinecraftCommandCapabilityIntent,
+  readTrustedRoomEnvironmentCapabilityExtractionContext,
+} from "../explicit-capability-contract";
 
 const HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY = "helix_ask.inspect_capability_catalog" as const;
 const SCIENTIFIC_CALCULATOR_THEORY_RUN_CONTEXT_CAPABILITY =
@@ -744,12 +750,33 @@ export const buildMinecraftMechanicsDocsWorkstationGatewayCallRequests = (
   body: Record<string, unknown>,
 ): Record<string, unknown>[] => {
   const prompt = readPrompt(body);
-  if (!prompt || !isMinecraftMechanicsDocsPrompt(prompt)) return [];
+  if (!prompt) return [];
+  const explicitMechanicsLookup = isMinecraftMechanicsDocsPrompt(prompt);
+  const trustedEnvironmentContext =
+    readTrustedRoomEnvironmentCapabilityExtractionContext(
+      body.trusted_room_environment_intent_context,
+    );
+  const naturalCommandNeedsGrounding =
+    isAffirmativeNaturalMinecraftCommandCapabilityIntent(
+      prompt,
+      trustedEnvironmentContext,
+    ) &&
+    !isSchemaCompleteExplicitMinecraftCommandCapabilityIntent(
+      prompt,
+      trustedEnvironmentContext,
+    ) &&
+    !isIsolatedExplicitMinecraftCommandCapabilityIntent(
+      prompt,
+      trustedEnvironmentContext,
+    );
+  if (!explicitMechanicsLookup && !naturalCommandNeedsGrounding) return [];
   return [
     {
       schema:
         "helix.workstation_gateway.minecraft_mechanics_docs_call_request.v1",
-      derivation_source: "helix_minecraft_mechanics_docs_intent",
+      derivation_source: explicitMechanicsLookup
+        ? "helix_minecraft_mechanics_docs_intent"
+        : "helix_minecraft_command_mechanics_grounding",
       capability_id: DOCS_SEARCH_CAPABILITY,
       mode: "read",
       arguments: {
@@ -760,6 +787,9 @@ export const buildMinecraftMechanicsDocsWorkstationGatewayCallRequests = (
           target_source: "docs",
           target_kind: "environment_mechanics_docs",
           environment_scope: "active_room_environment",
+          execution_intent: naturalCommandNeedsGrounding
+            ? "ground_model_authored_environment_command"
+            : "none",
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,

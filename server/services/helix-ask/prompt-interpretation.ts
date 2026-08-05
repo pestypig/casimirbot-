@@ -382,7 +382,7 @@ const classifyCompoundRequirementKind = (
 };
 
 const compoundActionCuePattern =
-  /\b(?:use|find|locate|place|synthesi[sz]e|explain|compare|identify|include|propose|write|implement|test|diagnose|analy[sz]e|research|cite|verify|summari[sz]e|map)\b/i;
+  /\b(?:use|find|locate|build|create|inspect|capture|avoid|execute|run|check|read|restore|start|stop|remove|ignite|light|extinguish|summon|teleport|give|set|fill|break|clear|observe|report|leave|place|synthesi[sz]e|explain|compare|identify|include|propose|write|implement|test|diagnose|analy[sz]e|research|cite|verify|summari[sz]e|map)\b/i;
 
 const negativeOnlyRequirementPattern =
   /^(?:do\s+not|don't|never|without|no\s+(?:file|files|write|writing|mutat|mutation|notes?))\b/i;
@@ -408,7 +408,7 @@ const isCompoundRequirementCandidate = (text: string): boolean => {
 const extractCoordinatedCompoundClauses = (prompt: string): string[] => {
   const clauses = prompt
     .split(
-      /\s*(?:;|,\s*(?:and\s+)?|\band\s+|\bthen\s+|\.\s+then\s+)\s*(?=(?:use|find|locate|place|synthesi[sz]e|explain|compare|identify|include|propose|write|implement|test|diagnose|analy[sz]e|research|cite|verify|summari[sz]e|map)\b)/i,
+      /\s*(?:;|\.\s+|,\s*(?:and\s+)?|\band\s+|\bthen\s+)\s*(?=(?:use|find|locate|build|create|inspect|capture|avoid|execute|run|check|read|restore|start|stop|remove|ignite|light|extinguish|summon|teleport|give|set|fill|break|clear|observe|report|leave|place|synthesi[sz]e|explain|compare|identify|include|propose|write|implement|test|diagnose|analy[sz]e|research|cite|verify|summari[sz]e|map)\b)/i,
     )
     .map(cleanCompoundRequirementText)
     .filter(isCompoundRequirementCandidate);
@@ -470,6 +470,8 @@ export const buildHelixCompoundPromptContract = (
   const rawPromptHash = hashShort(prompt);
   const requirements = requirementTexts.map((text, index) => {
     const start = prompt.indexOf(text);
+    const precedingText =
+      start > 0 ? prompt.slice(Math.max(0, start - 32), start) : "";
     return {
       id: `R${index + 1}`,
       text,
@@ -478,7 +480,10 @@ export const buildHelixCompoundPromptContract = (
       required: !/\b(?:optional|if useful|if needed|if relevant)\b/i.test(text),
       depends_on:
         index > 0 &&
-        /\b(?:then|after|based on|from that|therefore)\b/i.test(text)
+        (/\b(?:then|after|based on|from that|therefore)\b/i.test(text) ||
+          /\b(?:then|after|based on|from that|therefore)\s*$/i.test(
+            precedingText,
+          ))
           ? [`R${index}`]
           : [],
       status: "pending" as const,

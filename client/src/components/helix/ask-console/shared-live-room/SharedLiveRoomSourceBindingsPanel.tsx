@@ -934,7 +934,9 @@ export function SharedLiveRoomSourceBindingsPanel({
                         ? "bg-emerald-400/15 text-emerald-200"
                         : "bg-amber-400/15 text-amber-200"
                     }`}>
-                      You are {environment.self_subject_binding.subject_label}
+                      {environment.self_subject_binding.status === "active"
+                        ? `You are ${environment.self_subject_binding.subject_label}`
+                        : `Reverify ${environment.self_subject_binding.subject_label}`}
                     </span>
                   ) : null}
                 </div>
@@ -951,7 +953,11 @@ export function SharedLiveRoomSourceBindingsPanel({
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <select
                         id={`environment-subject-${environment.environment_binding_id}`}
-                        value={environment.self_subject_binding?.subject_ref ?? ""}
+                        value={
+                          environment.self_subject_binding?.status === "active"
+                            ? environment.self_subject_binding.subject_ref
+                            : ""
+                        }
                         disabled={
                           identityBusy ||
                           directory.freshness !== "fresh" ||
@@ -966,6 +972,9 @@ export function SharedLiveRoomSourceBindingsPanel({
                         <option value="">
                           {directory.subjects.length === 0
                             ? "No online subjects reported"
+                            : environment.identity_assignment ===
+                                "reverification_required"
+                              ? "Choose again to reverify"
                             : "Choose who you are"}
                         </option>
                         {directory.subjects.map((subject) => {
@@ -997,8 +1006,9 @@ export function SharedLiveRoomSourceBindingsPanel({
                       ) : null}
                     </div>
                     <p className="mt-1 text-[9px] text-cyan-100/55">
-                      Only a safe display name and presence are shown here. The
-                      game identity and connector credential remain server-side.
+                      {environment.identity_assignment === "reverification_required"
+                        ? "The connector session changed. Choose the online player again before environment tools can act for you."
+                        : "Only a safe display name and presence are shown here. The game identity and connector credential remain server-side."}
                     </p>
                   </div>
                 ) : null}

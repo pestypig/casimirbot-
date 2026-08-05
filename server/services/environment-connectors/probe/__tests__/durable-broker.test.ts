@@ -11,6 +11,8 @@ import {
   HELIX_ENVIRONMENT_PROBE_RESULT_V1_SCHEMA,
   HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
   HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+  type HelixEnvironmentCapabilityDescriptor,
   type HelixEnvironmentConnectorProbeResult,
   type HelixEnvironmentProbeOutcome,
 } from "@shared/helix-environment-connector";
@@ -434,6 +436,54 @@ describe("durable environment probe broker", () => {
   afterEach(async () => {
     await resetDbClient();
     vi.unstubAllEnvs();
+  });
+
+  it("versions legacy connector packages when the admitted capability catalog changes", async () => {
+    const original = await seed();
+    const descriptors = listEnvironmentConnectorCapabilityDescriptors({
+      adapterProfileId: admission.adapter_profile_id,
+    });
+    const syntheticAdditionalDescriptor = {
+      ...descriptors[0],
+      capability_id: "com.casimirbot.minecraft.synthetic.additional",
+      trusted_model_label: "Synthetic additional Minecraft observation",
+      trusted_model_description:
+        "Test-only descriptor proving that immutable legacy package identity changes with catalog content.",
+    } satisfies HelixEnvironmentCapabilityDescriptor;
+
+    const expanded = await materializeLegacyRoomSourceConnector({
+      ownerProfileId: PROFILE_ID,
+      roomSourceBindingId: BINDING_ID,
+      credentialId: CREDENTIAL_ID,
+      roomId: ROOM_ID,
+      sourceId: SOURCE_ID,
+      worldId: WORLD_ID,
+      producerEpochRef,
+      adapterAdmission: admission,
+      capabilityDescriptors: [...descriptors, syntheticAdditionalDescriptor],
+    });
+
+    expect(expanded.packageVersionId).not.toBe(original.packageVersionId);
+    expect(expanded.environmentBindingId).not.toBe(original.environmentBindingId);
+    expect(expanded.catalogSnapshot.capability_descriptors).toHaveLength(
+      descriptors.length + 1,
+    );
+
+    const packages = await getPool().query<{
+      package_version_id: string;
+      package_version: string;
+      content_hash: string;
+    }>(
+      `
+        SELECT package_version_id, package_version, content_hash
+        FROM helix_environment_connector_packages
+        WHERE package_id = 'com.casimirbot.legacy.minecraft'
+        ORDER BY package_version_id;
+      `,
+    );
+    expect(packages.rows).toHaveLength(2);
+    expect(new Set(packages.rows.map((row) => row.package_version)).size).toBe(2);
+    expect(new Set(packages.rows.map((row) => row.content_hash)).size).toBe(2);
   });
 
   it("persists exact correlation, leases once, hashes the lease token, and normalizes an idempotent result", async () => {
@@ -1286,7 +1336,7 @@ describe("durable environment probe broker", () => {
     });
   });
 
-  it("injects a frozen native subject only into the connector lease", async () => {
+  it("injects a frozen native subject and exact structure verification only into the connector lease", async () => {
     const connector = await seed();
     const subjectNativeId = "123e4567-e89b-12d3-a456-426614174000";
     const subjectBindingId = "environment_subject_binding:durable-probe";
@@ -1349,10 +1399,16 @@ describe("durable environment probe broker", () => {
       adapterAdmission: admission,
       connector,
       descriptor: readEnvironmentConnectorCapabilityDescriptor(
-        HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
       )!,
       arguments: {
         target: "current_actor",
+        horizontal_radius: 7,
+        vertical_radius: 8,
+        purpose: "structure_verification",
+        verification_from: { x: -52, y: 69, z: 4 },
+        verification_to: { x: -48, y: 71, z: 4 },
+        expected_block: "minecraft:stone_bricks",
         freshness_requirement_ms: 5_000,
       },
       freshnessRequirementMs: 5_000,
@@ -1369,6 +1425,12 @@ describe("durable environment probe broker", () => {
 
     expect(lease.capability_request.arguments).toEqual({
       target: "current_actor",
+      horizontal_radius: 7,
+      vertical_radius: 8,
+      purpose: "structure_verification",
+      verification_from: { x: -52, y: 69, z: 4 },
+      verification_to: { x: -48, y: 71, z: 4 },
+      expected_block: "minecraft:stone_bricks",
       freshness_requirement_ms: 5_000,
     });
     expect(JSON.stringify(lease.capability_request)).not.toContain(
@@ -1378,6 +1440,12 @@ describe("durable environment probe broker", () => {
       probe_request_id: dispatched.requestId,
       target: {
         target_ref: "current_actor",
+        horizontal_radius: 7,
+        vertical_radius: 8,
+        purpose: "structure_verification",
+        verification_from: { x: -52, y: 69, z: 4 },
+        verification_to: { x: -48, y: 71, z: 4 },
+        expected_block: "minecraft:stone_bricks",
         actor_id: subjectNativeId,
       },
     });

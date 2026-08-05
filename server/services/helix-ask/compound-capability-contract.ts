@@ -1,6 +1,7 @@
 import {
   extractExplicitCapabilityContracts,
   type ExplicitCapabilityContract,
+  type ExplicitCapabilityExtractionContext,
   type ExtractedExplicitCapabilityContract,
 } from "./explicit-capability-contract";
 import type { HelixWorkstationTypedAffordanceKind } from "../../../shared/helix-agent-step-observation-packet";
@@ -17,7 +18,12 @@ import {
   HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
   HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
   HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
 } from "@shared/helix-environment-connector";
+import {
+  HELIX_MINECRAFT_COMMAND_CAPABILITY,
+  HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+} from "@shared/helix-environment-command";
 
 type RecordLike = Record<string, unknown>;
 
@@ -98,6 +104,26 @@ export type HelixCompoundCapabilitySubgoal = {
     required: boolean;
     status: "pending";
   }>;
+  guarded_noop_policy?: {
+    schema: "helix.compound_capability_guarded_noop.v1";
+    mode: "no_verified_safe_candidate";
+    guard_subgoal_id: string;
+    guard_capability: typeof HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY;
+    required_purpose: "structure_planning" | "fire_safety";
+    accepted_observation_purposes:
+      | ["structure_planning", "build_planning"]
+      | ["fire_safety"];
+    candidate_field: "build_line_candidates" | "fireplace_candidates";
+    completeness_field:
+      | "build_line_candidates_complete"
+      | "fireplace_candidates_complete";
+    omitted_count_field:
+      | "omitted_build_line_candidate_count"
+      | "omitted_fireplace_candidate_count";
+    current_turn_only: true;
+    requires_successful_observation: true;
+    user_directed_noop_guard: true;
+  };
   status: "pending";
   mandatory: true;
 };
@@ -433,6 +459,174 @@ const minecraftPositionFromPrompt = (
   return { x, y, z };
 };
 
+const minecraftVerificationEndpointsFromPrompt = (
+  promptText: string,
+): {
+  from: { x: number; y: number; z: number };
+  to: { x: number; y: number; z: number };
+} | null => {
+  const positions = Array.from(
+    promptText.matchAll(
+      /\bx\s*[:=]?\s*(-?\d+(?:\.\d+)?)\s*[,;]?\s*y\s*[:=]?\s*(-?\d+(?:\.\d+)?)\s*[,;]?\s*z\s*[:=]?\s*(-?\d+(?:\.\d+)?)/gi,
+    ),
+  )
+    .slice(0, 2)
+    .map((match) => {
+      const [x, y, z] = match.slice(1).map(Number);
+      return { x, y, z };
+    });
+  // An exact single-block verification is the degenerate one-cell volume.
+  // Preserve the canonical inclusive from/to contract so the connector and
+  // provenance gates do not need a second argument shape.
+  if (positions.length === 1) {
+    positions.push({ ...positions[0]! });
+  }
+  if (
+    positions.length !== 2 ||
+    positions.some(
+      ({ x, y, z }) =>
+        !Number.isFinite(x) ||
+        !Number.isFinite(y) ||
+        !Number.isFinite(z) ||
+        Math.abs(x) > 30_000_000 ||
+        y < -2_048 ||
+        y > 2_048 ||
+        Math.abs(z) > 30_000_000,
+    )
+  ) {
+    return null;
+  }
+  return { from: positions[0]!, to: positions[1]! };
+};
+
+const minecraftExpectedVerificationBlockFromPrompt = (
+  promptText: string,
+): string | null => {
+  const match = promptText.match(
+    /\b(?:as\s+)?exact(?:ly)?\s+(minecraft:[a-z0-9_./-]+)\b|\bexpected(?:[_\s-]+block)?\s*[:=]\s*(minecraft:[a-z0-9_./-]+)\b/i,
+  );
+  return (match?.[1] ?? match?.[2] ?? "").toLowerCase() || null;
+};
+
+const minecraftFreshnessRequirementFromPrompt = (
+  promptText: string,
+): number | null => {
+  const match = promptText.match(
+    /\b(\d{3,6})\s*ms\b[\s\S]{0,40}\b(?:freshness|fresh)\b|\b(?:freshness|fresh)\b[\s\S]{0,40}\b(\d{3,6})\s*ms\b/i,
+  );
+  const freshnessMs = Number(match?.[1] ?? match?.[2]);
+  return Number.isInteger(freshnessMs) &&
+    freshnessMs >= 1_000 &&
+    freshnessMs <= 120_000
+    ? freshnessMs
+    : null;
+};
+
+const minecraftBuildNumberWords = new Map<string, number>([
+  ["one", 1],
+  ["two", 2],
+  ["three", 3],
+  ["four", 4],
+  ["five", 5],
+  ["six", 6],
+  ["seven", 7],
+  ["eight", 8],
+  ["nine", 9],
+  ["ten", 10],
+  ["eleven", 11],
+  ["twelve", 12],
+  ["thirteen", 13],
+  ["fourteen", 14],
+  ["fifteen", 15],
+]);
+
+const minecraftBuildDimensionFromPrompt = (
+  promptText: string,
+  dimension: "long" | "high",
+): number | null => {
+  const match = promptText.match(
+    new RegExp(
+      `\\b(\\d{1,2}|${Array.from(minecraftBuildNumberWords.keys()).join("|")})\\s+blocks?\\s+${dimension}\\b`,
+      "i",
+    ),
+  );
+  if (!match?.[1]) return null;
+  const normalizedValue = match[1].toLowerCase();
+  const numeric = /^\d+$/.test(normalizedValue)
+    ? Number(normalizedValue)
+    : minecraftBuildNumberWords.get(normalizedValue);
+  return Number.isInteger(numeric) ? Number(numeric) : null;
+};
+
+const minecraftGuardedNoopFamilyFromPrompt = (
+  promptText: string,
+): "structure_planning" | "fire_safety" | null => {
+  const guardedNoopClause = promptText.match(
+    /\bif\s+(?:no\s+safe\s+(?:site|location|spot|place|candidate|build(?:ing)?\s+line|fireplace|hearth)(?:\s+(?:is|can\s+be))?\s+(?:verified|found|available|identified)|a\s+safe\s+(?:site|location|spot|place|candidate|build(?:ing)?\s+line|fireplace|hearth)\s+(?:is|can\s+be)\s+not\s+(?:verified|found|available|identified))\s*[,]?[^.!?]{0,100}\b(?:do\s+not|don['’]t|must\s+not)\s+(?:build|construct|place|fill|set|change|modify|mutate|light|ignite|start)\b/i,
+  );
+  if (!guardedNoopClause) return null;
+  if (/\b(?:fire|fireplace|hearth|ignite|light)\b/i.test(guardedNoopClause[0])) {
+    return "fire_safety";
+  }
+  if (
+    /\b(?:build|construct|wall|house|base|surround|enclose|site|location|spot|place|build(?:ing)?\s+line)\b/i.test(
+      guardedNoopClause[0],
+    )
+  ) {
+    return "structure_planning";
+  }
+  return null;
+};
+
+const minecraftGuardedNoopPolicyForSubgoal = (input: {
+  turnId: string;
+  promptText: string;
+  match: ExtractedExplicitCapabilityContract;
+  ordered: ExtractedExplicitCapabilityContract[];
+}): HelixCompoundCapabilitySubgoal["guarded_noop_policy"] => {
+  if (input.match.contract.capability !== HELIX_MINECRAFT_COMMAND_CAPABILITY) {
+    return undefined;
+  }
+  const family = minecraftGuardedNoopFamilyFromPrompt(input.promptText);
+  if (!family) return undefined;
+  const guardIndex = input.ordered.findIndex(
+    (candidate) =>
+      candidate.contract.capability ===
+      HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+  );
+  if (guardIndex < 0) return undefined;
+  return {
+    schema: "helix.compound_capability_guarded_noop.v1",
+    mode: "no_verified_safe_candidate",
+    guard_subgoal_id: subgoalIdFor(
+      input.turnId,
+      guardIndex + 1,
+      HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    ),
+    guard_capability: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    required_purpose: family,
+    accepted_observation_purposes:
+      family === "fire_safety"
+        ? ["fire_safety"]
+        : ["structure_planning", "build_planning"],
+    candidate_field:
+      family === "fire_safety"
+        ? "fireplace_candidates"
+        : "build_line_candidates",
+    completeness_field:
+      family === "fire_safety"
+        ? "fireplace_candidates_complete"
+        : "build_line_candidates_complete",
+    omitted_count_field:
+      family === "fire_safety"
+        ? "omitted_fireplace_candidate_count"
+        : "omitted_build_line_candidate_count",
+    current_turn_only: true,
+    requires_successful_observation: true,
+    user_directed_noop_guard: true,
+  };
+};
+
 const argsHintForSubgoal = (input: {
   turnId: string;
   promptText: string;
@@ -454,6 +648,88 @@ const argsHintForSubgoal = (input: {
   }
   if (minecraftSituationCapabilities.has(capability)) {
     const position = minecraftPositionFromPrompt(input.promptText);
+    if (capability === HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY) {
+      const verificationEndpoints =
+        minecraftVerificationEndpointsFromPrompt(input.promptText);
+      const expectedVerificationBlock =
+        minecraftExpectedVerificationBlockFromPrompt(input.promptText);
+      const exactStructureVerification = Boolean(
+        verificationEndpoints &&
+          expectedVerificationBlock &&
+          /\b(?:verify|verification|exact(?:ly)?|mismatches?)\b/i.test(
+            input.promptText,
+          ),
+      );
+      const freshnessRequirementMs =
+        minecraftFreshnessRequirementFromPrompt(input.promptText);
+      if (
+        exactStructureVerification &&
+        verificationEndpoints &&
+        expectedVerificationBlock
+      ) {
+        return {
+          target: "current_actor",
+          purpose: "structure_verification",
+          verification_from: verificationEndpoints.from,
+          verification_to: verificationEndpoints.to,
+          expected_block: expectedVerificationBlock,
+          ...(freshnessRequirementMs
+            ? { freshness_requirement_ms: freshnessRequirementMs }
+            : {}),
+        };
+      }
+      const purpose = /\b(?:fire|fireplace|hearth|ignite|light)\b/i.test(
+        input.promptText,
+      )
+        ? "fire_safety"
+        : /\b(?:fall|landing|rescue)\b/i.test(input.promptText)
+          ? "landing_safety"
+          : /\b(?:build|construct|structure|wall|house|base|surround|enclose)\b/i.test(
+                input.promptText,
+              )
+            ? "structure_planning"
+            : "general";
+      const requestedLength = minecraftBuildDimensionFromPrompt(
+        input.promptText,
+        "long",
+      );
+      const requestedHeight = minecraftBuildDimensionFromPrompt(
+        input.promptText,
+        "high",
+      );
+      const orientation = /\bnorth[\s-]*south\b/i.test(input.promptText)
+        ? "north_south"
+        : /\beast[\s-]*west\b/i.test(input.promptText)
+          ? "east_west"
+          : null;
+      const relativeSide = /\bwest\s+of\b/i.test(input.promptText)
+        ? "west"
+        : /\beast\s+of\b/i.test(input.promptText)
+          ? "east"
+          : /\bnorth\s+of\b/i.test(input.promptText)
+            ? "north"
+            : /\bsouth\s+of\b/i.test(input.promptText)
+              ? "south"
+              : null;
+      return {
+        target: "current_actor",
+        horizontal_radius: 7,
+        vertical_radius: 6,
+        purpose,
+        ...(Number.isInteger(requestedLength) &&
+        requestedLength >= 3 &&
+        requestedLength <= 15
+          ? { requested_length: requestedLength }
+          : {}),
+        ...(Number.isInteger(requestedHeight) &&
+        requestedHeight >= 3 &&
+        requestedHeight <= 8
+          ? { requested_height: requestedHeight }
+          : {}),
+        ...(orientation ? { orientation } : {}),
+        ...(relativeSide ? { relative_side: relativeSide } : {}),
+      };
+    }
     if (
       capability === HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY ||
       capability === HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY
@@ -466,6 +742,69 @@ const argsHintForSubgoal = (input: {
         : { target: "current_focus" };
     }
     return { target: "current_actor" };
+  }
+  if (capability === HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY) {
+    const explicitPathPrefixMatch = input.promptText.match(
+      /\bpath[_\s-]*prefix\b\s*(?:[:=]\s*)?(?:"([^"\r\n]{1,1000})"|'([^'\r\n]{1,1000})'|`([^`\r\n]{1,1000})`)/i,
+    );
+    const explicitPathPrefix = String(
+      explicitPathPrefixMatch?.[1] ??
+        explicitPathPrefixMatch?.[2] ??
+        explicitPathPrefixMatch?.[3] ??
+        "",
+    ).trim();
+    const explicitLimitMatch = input.promptText.match(
+      /\blimit\b\s*(?:[:=]\s*)?(\d{1,3})\b/i,
+    );
+    const explicitLimit = Number.parseInt(explicitLimitMatch?.[1] ?? "", 10);
+    if (explicitPathPrefix) {
+      return {
+        path_prefix: explicitPathPrefix,
+        limit:
+          Number.isInteger(explicitLimit) &&
+          explicitLimit >= 1 &&
+          explicitLimit <= 128
+            ? explicitLimit
+            : 64,
+      };
+    }
+    if (/\b(?:wall|house|base|build|construct|structure)\b/i.test(input.promptText)) {
+      return { path_prefix: "fill", limit: 64 };
+    }
+    if (/\b(?:fire|fireplace|hearth|ignite|light)\b/i.test(input.promptText)) {
+      return { path_prefix: "setblock", limit: 64 };
+    }
+    if (/\b(?:fall|landing|rescue)\b/i.test(input.promptText)) {
+      return { path_prefix: "helixgame fall_rescue", limit: 64 };
+    }
+    if (
+      Number.isInteger(explicitLimit) &&
+      explicitLimit >= 1 &&
+      explicitLimit <= 128
+    ) {
+      return { limit: explicitLimit };
+    }
+  }
+  if (capability === HELIX_MINECRAFT_COMMAND_CAPABILITY) {
+    const quotedField = (field: string): string => {
+      const match = input.promptText.match(
+        new RegExp(
+          String.raw`\b${field}\b\s*(?:[:=]\s*)?(?:"([^"\r\n]+)"|'([^'\r\n]+)'|\x60([^\x60\r\n]+)\x60)`,
+          "i",
+        ),
+      );
+      return String(match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
+    };
+    const command = quotedField("command").replace(/^\/+/, "");
+    const category = quotedField("category");
+    const effect = quotedField("effect");
+    if (command) {
+      return {
+        command,
+        ...(category ? { category } : {}),
+        ...(effect ? { effect } : {}),
+      };
+    }
   }
   if (capability === "workspace_os.status") return {};
   if (capability === "helix_ask.inspect_capability_catalog") return {};
@@ -1061,8 +1400,12 @@ const inputBindingsForSubgoal = (input: {
 export const buildHelixCompoundCapabilityContract = (input: {
   turnId: string;
   promptText: string;
+  trustedEnvironmentContext?: ExplicitCapabilityExtractionContext | null;
 }): HelixCompoundCapabilityContract | null => {
-  const ordered = extractExplicitCapabilityContracts(input.promptText);
+  const ordered = extractExplicitCapabilityContracts(
+    input.promptText,
+    input.trustedEnvironmentContext,
+  );
   if (ordered.length === 0) return null;
   const subgoals = ordered.map((match: ExtractedExplicitCapabilityContract, index: number): HelixCompoundCapabilitySubgoal => {
     const contract = match.contract;
@@ -1073,6 +1416,12 @@ export const buildHelixCompoundCapabilityContract = (input: {
       match,
       ordered,
       index,
+    });
+    const guardedNoopPolicy = minecraftGuardedNoopPolicyForSubgoal({
+      turnId: input.turnId,
+      promptText: input.promptText,
+      match,
+      ordered,
     });
     return {
       subgoal_id: subgoalId,
@@ -1102,6 +1451,9 @@ export const buildHelixCompoundCapabilityContract = (input: {
       forbidden_nearby_capabilities: [...contract.forbidden_nearby_capabilities],
       depends_on_subgoal_ids: inputBindings.map((binding) => binding.from_subgoal_id),
       input_bindings: inputBindings,
+      ...(guardedNoopPolicy
+        ? { guarded_noop_policy: guardedNoopPolicy }
+        : {}),
       status: "pending",
       mandatory: true,
     };
@@ -1183,6 +1535,61 @@ export const buildHelixSingleCapabilityContractFromAdmission = (input: {
     terminal_policy: "synthesize_from_satisfied_subgoal_observations",
     assistant_answer: false,
     raw_content_included: false,
+  };
+};
+
+/**
+ * Adds a policy-required read-only grounding observation ahead of an existing
+ * semantic capability program. The grounding step is part of the itinerary
+ * presented to Codex; Helix does not privately execute it. Later subgoals are
+ * blocked on its current-turn observation so command authoring cannot outrun
+ * the mechanics evidence that makes it safe and syntactically valid.
+ */
+export const prependHelixRequiredGroundingCapability = (input: {
+  turnId: string;
+  promptText: string;
+  compoundContract: HelixCompoundCapabilityContract;
+  groundingContract: ExplicitCapabilityContract;
+  argsHint: RecordLike;
+}): HelixCompoundCapabilityContract => {
+  const runtimeCapability = runtimeCapabilityForContract(
+    input.groundingContract,
+  );
+  if (
+    input.compoundContract.subgoals.some(
+      (subgoal) =>
+        subgoal.requested_capability === input.groundingContract.capability ||
+        subgoal.runtime_capability === runtimeCapability,
+    )
+  ) {
+    return input.compoundContract;
+  }
+  const groundingSubgoal = buildHelixSingleCapabilityContractFromAdmission({
+    turnId: input.turnId,
+    promptText: input.promptText,
+    contract: input.groundingContract,
+    argsHint: input.argsHint,
+  }).subgoals[0];
+  const groundingSubgoalId = groundingSubgoal.subgoal_id;
+  const rebasedSubgoals = input.compoundContract.subgoals.map(
+    (subgoal, index): HelixCompoundCapabilitySubgoal => ({
+      ...subgoal,
+      order: index + 2,
+      depends_on_subgoal_ids: unique([
+        groundingSubgoalId,
+        ...subgoal.depends_on_subgoal_ids,
+      ]),
+    }),
+  );
+  return {
+    ...input.compoundContract,
+    prompt_shape: "compound_capability",
+    subgoals: [groundingSubgoal, ...rebasedSubgoals],
+    required_capabilities: unique([
+      input.groundingContract.capability,
+      ...input.compoundContract.required_capabilities,
+    ]),
+    requires_all_subgoals: true,
   };
 };
 

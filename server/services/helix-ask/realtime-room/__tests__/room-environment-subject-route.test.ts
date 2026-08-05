@@ -288,6 +288,42 @@ describe("Shared Realtime room environment subjects", () => {
     });
     expect(JSON.stringify(ownerBound.body)).not.toContain(aliceNativeId);
 
+    const commandAuthorityPath =
+      `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}` +
+      `/environments/${encodeURIComponent(connector.environmentBindingId)}` +
+      "/command-authority";
+    const configuredAuthority = await owner.agent
+      .put(commandAuthorityPath)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({
+        authority_profile: "server_administrator",
+        autonomy_mode: "autonomous",
+        approved_categories: [],
+        expires_at: null,
+      })
+      .expect(200);
+    expect(configuredAuthority.body.member_grant.subject_binding_id).toBe(
+      ownerBound.body.binding.subject_binding_id,
+    );
+
+    const ownerRebound = await owner.agent
+      .put(
+        `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/environments/${encodeURIComponent(connector.environmentBindingId)}/me`,
+      )
+      .set(SAME_ORIGIN_HEADERS)
+      .send({ subject_ref: aliceRef })
+      .expect(200);
+    expect(ownerRebound.body.binding.subject_binding_id).not.toBe(
+      ownerBound.body.binding.subject_binding_id,
+    );
+    const authorityAfterRebind = await owner.agent
+      .get(commandAuthorityPath)
+      .set(SAME_ORIGIN_HEADERS)
+      .expect(200);
+    expect(authorityAfterRebind.body.member_grant.subject_binding_id).toBe(
+      ownerRebound.body.binding.subject_binding_id,
+    );
+
     await guest.agent
       .put(
         `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/environments/${encodeURIComponent(connector.environmentBindingId)}/me`,
@@ -465,5 +501,143 @@ describe("Shared Realtime room environment subjects", () => {
       status: "active",
     });
     expect(JSON.stringify(ownerAssigned.body)).not.toContain(bobNativeId);
+
+    const restartedProducerEpoch = `${producerEpoch}-restarted`;
+    const restartedProducerEpochRef = projectEnvironmentAdapterProducerEpoch({
+      bindingId,
+      producerEpoch: restartedProducerEpoch,
+    });
+    const restartedAdmission: HelixEnvironmentAdapterAdmissionProjection = {
+      ...admission,
+      admission_id: `${admission.admission_id}-restarted`,
+      manifest_id: `${admission.manifest_id}-restarted`,
+      manifest_hash: `sha256:${"c".repeat(64)}`,
+      producer_epoch_ref: restartedProducerEpochRef,
+      admitted_at: new Date().toISOString(),
+    };
+    await db.query(
+      `
+        INSERT INTO helix_environment_adapter_admissions (
+          admission_id, binding_id, credential_id, producer_epoch, room_id,
+          source_id, world_id, domain_adapter, adapter_profile_id,
+          adapter_profile_version, adapter_contract_hash, manifest_id,
+          manifest_hash, source_family, mechanics_collection_ids, admitted_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+          $14, $15::jsonb, $16
+        );
+      `,
+      [
+        restartedAdmission.admission_id,
+        bindingId,
+        credentialId,
+        restartedProducerEpoch,
+        roomId,
+        sourceId,
+        worldId,
+        domainAdapter,
+        restartedAdmission.adapter_profile_id,
+        restartedAdmission.adapter_profile_version,
+        restartedAdmission.adapter_contract_hash,
+        restartedAdmission.manifest_id,
+        restartedAdmission.manifest_hash,
+        restartedAdmission.source_family,
+        JSON.stringify(restartedAdmission.mechanics_collection_ids),
+        restartedAdmission.admitted_at,
+      ],
+    );
+    const restartedConnector = await materializeLegacyRoomSourceConnector({
+      ownerProfileId: owner.profileId,
+      roomSourceBindingId: bindingId,
+      credentialId,
+      roomId,
+      sourceId,
+      worldId,
+      producerEpochRef: restartedProducerEpochRef,
+      adapterAdmission: restartedAdmission,
+      capabilityDescriptors: listEnvironmentConnectorCapabilityDescriptors({
+        adapterProfileId: restartedAdmission.adapter_profile_id,
+      }),
+    });
+    expect(restartedConnector.environmentBindingId).toBe(
+      connector.environmentBindingId,
+    );
+    const restartedHeartbeat: HelixEnvironmentSourceHeartbeat = {
+      ...renamedHeartbeat,
+      heartbeat_id: "heartbeat:environment-subject-route:restarted",
+      created_at: new Date().toISOString(),
+    };
+    recordEnvironmentSourceHeartbeat(restartedHeartbeat, {
+      sourceAdmission: {
+        ...sourceAdmission,
+        request_id: "request:environment-subject-route:restarted",
+        adapter_admission: restartedAdmission,
+        evidence_refs: [
+          bindingId,
+          `room_source_request:${bindingId}:request:environment-subject-route:restarted`,
+          restartedAdmission.admission_id,
+        ],
+      },
+    });
+
+    const staleOwnerList = await owner.agent
+      .get(`/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/environments`)
+      .expect(200);
+    expect(staleOwnerList.body.environments[0]).toMatchObject({
+      identity_assignment: "reverification_required",
+      self_subject_binding: {
+        subject_label: "Alice",
+        status: "stale",
+        producer_epoch_ref: producerEpochRef,
+      },
+    });
+    const ownerMembership = await readSharedRealtimeRoomMembership({
+      roomId,
+      profileId: owner.profileId,
+    });
+    expect(ownerMembership).not.toBeNull();
+    await expect(resolveRoomEnvironmentSubjectForProbe({
+      membership: ownerMembership!,
+      environmentBindingId: connector.environmentBindingId,
+      sourceId,
+      worldId,
+      producerEpochRef: restartedProducerEpochRef,
+    })).rejects.toMatchObject({ code: "producer_epoch_mismatch" });
+
+    const renewedOwner = await owner.agent
+      .put(
+        `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/environments/${encodeURIComponent(connector.environmentBindingId)}/me`,
+      )
+      .set(SAME_ORIGIN_HEADERS)
+      .send({ subject_ref: aliceRef })
+      .expect(200);
+    expect(renewedOwner.body.binding).toMatchObject({
+      subject_label: "Alice",
+      status: "active",
+      producer_epoch_ref: restartedProducerEpochRef,
+    });
+    const renewedOwnerList = await owner.agent
+      .get(`/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/environments`)
+      .expect(200);
+    expect(renewedOwnerList.body.environments[0]).toMatchObject({
+      identity_assignment: "supported",
+      self_subject_binding: {
+        subject_label: "Alice",
+        status: "active",
+        producer_epoch_ref: restartedProducerEpochRef,
+      },
+    });
+
+    await owner.agent
+      .delete(
+        `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/environments/${encodeURIComponent(connector.environmentBindingId)}/me`,
+      )
+      .set(SAME_ORIGIN_HEADERS)
+      .expect(200);
+    const authorityAfterRevoke = await owner.agent
+      .get(commandAuthorityPath)
+      .set(SAME_ORIGIN_HEADERS)
+      .expect(200);
+    expect(authorityAfterRevoke.body.member_grant.subject_binding_id).toBeNull();
   });
 });

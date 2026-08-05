@@ -4,6 +4,8 @@ import { readVerifiedHelixTurnLifecycle } from "../turn-lifecycle";
 import { readVerifiedHelixRuntimeLifecycleFromPayload } from "../turn-lifecycle";
 import { resolveHelixRuntimeObservationReentry } from "../turn-lifecycle";
 import { auditHelixTurnLifecycleProjection } from "../turn-lifecycle-projection-audit";
+import { buildHelixTurnLifecycleDifferentialAudit } from "../turn-lifecycle-differential-audit";
+import { refreshHelixTurnLifecycleDifferentialAudit } from "../../terminal-authority-single-writer";
 
 const buildCompletedLifecycle = () => {
   const recorder = createHelixTurnLifecycleRecorder({
@@ -510,5 +512,462 @@ describe("Helix factual turn lifecycle", () => {
         call_id: "call:paper",
       }),
     ]));
+  });
+});
+
+describe("Helix turn lifecycle differential audit", () => {
+  const buildProviderProjectionPayload = () => {
+    const lifecycle = buildCompletedLifecycle();
+    const turnId = lifecycle.turn_id;
+    const answerText =
+      "The fresh observation supports the bounded Minecraft fireplace candidate.";
+    const candidateRef = `${turnId}:agent_provider_terminal_candidate:codex:test`;
+    const routeProductRef = `${candidateRef}:route_product:model_synthesized_answer`;
+    const observationRef = "paper:full-text:1";
+    const routeProduct = {
+      schema: "helix.provider_route_product.v1",
+      artifact_id: routeProductRef,
+      turn_id: turnId,
+      answer_text: answerText,
+      text: answerText,
+      support_refs: [observationRef],
+      selected_observation_refs: [observationRef],
+      provider_terminal_candidate_ref: candidateRef,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const payload: Record<string, unknown> = {
+      turn_lifecycle: lifecycle,
+      canonical_goal_frame: {
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      route_evidence_authority: { terminal_product_allowed: true },
+      provider_terminal_candidate: {
+        schema: "helix.agent_provider_terminal_candidate.v1",
+        candidate_id: candidateRef,
+        candidate_text: answerText,
+        grounded_in_observation_refs: [observationRef],
+        normalized_observation_refs: [observationRef],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      provider_terminal_authority_bridge: {
+        schema: "helix.provider_terminal_authority_bridge.v1",
+        turn_id: turnId,
+        provider_terminal_candidate_ref: candidateRef,
+        terminal_authority_granted: true,
+        final_visible_answer_authorized: true,
+      },
+      provider_route_product_materialization: {
+        schema: "helix.provider_route_product_materialization.v1",
+        turn_id: turnId,
+        provider_terminal_candidate_ref: candidateRef,
+        materialized_terminal_artifact_kind: "model_synthesized_answer",
+        materialized_terminal_artifact_ref: routeProductRef,
+        selected_observation_refs: [observationRef],
+        status: "materialized",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      provider_route_product_quality_gate: {
+        schema: "helix.final_answer_draft_quality_gate.v1",
+        ok: true,
+        violations: [],
+      },
+      model_synthesized_answer: routeProduct,
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: observationRef,
+          kind: "provider_gateway_observation_packet",
+          payload: { turn_id: turnId, status: "succeeded" },
+        },
+        {
+          artifact_id: routeProductRef,
+          kind: "model_synthesized_answer",
+          payload: routeProduct,
+        },
+      ],
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        turn_id: turnId,
+        selected_terminal_artifact_kind: "model_synthesized_answer",
+        selected_terminal_artifact_ref: routeProductRef,
+        selected_terminal_support_refs: [observationRef],
+        visible_text: answerText,
+        integrity: { single_writer_applied: true },
+      },
+      terminal_artifact_id: routeProductRef,
+      selected_final_answer: answerText,
+      answer: answerText,
+      text: answerText,
+    };
+    return {
+      payload,
+      turnId,
+      answerText,
+      candidateRef,
+      routeProductRef,
+      observationRef,
+    };
+  };
+
+  it("proves provider text and evidence continuity through the visible answer", () => {
+    const fixture = buildProviderProjectionPayload();
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+
+    expect(audit).toMatchObject({
+      ok: true,
+      first_divergence_stage: null,
+      scientific_evidence_disposition: "passed",
+      mismatches: [],
+    });
+    expect(audit.continuity_checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          check: "provider_candidate_materialized",
+          status: "passed",
+        }),
+        expect.objectContaining({
+          check: "provider_candidate_text_preserved",
+          status: "passed",
+        }),
+        expect.objectContaining({
+          check: "materialized_text_preserved_by_terminal_writer",
+          status: "passed",
+        }),
+        expect.objectContaining({
+          check: "terminal_writer_text_preserved_in_visible_projection",
+          status: "passed",
+        }),
+      ]),
+    );
+  });
+
+  it("refreshes an early writer audit after the canonical runtime lifecycle is attached", () => {
+    const fixture = buildProviderProjectionPayload();
+    const lifecycle = fixture.payload.turn_lifecycle;
+    delete fixture.payload.turn_lifecycle;
+
+    const early = refreshHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+    expect(early.continuity_checks).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          check: "runtime_observation_reentry",
+          status: "passed",
+        }),
+      ]),
+    );
+
+    fixture.payload.turn_lifecycle = lifecycle;
+    const refreshed = refreshHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+    expect(refreshed.continuity_checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          check: "runtime_observation_reentry",
+          status: "passed",
+        }),
+        expect.objectContaining({
+          check: "runtime_followup_reasoning",
+          status: "passed",
+        }),
+      ]),
+    );
+    expect(
+      (fixture.payload.terminal_authority_single_writer as Record<string, any>)
+        .integrity.lifecycle_differential_audit,
+    ).toEqual(refreshed);
+  });
+
+  it("locates the old fireplace failure at downstream materialization", () => {
+    const fixture = buildProviderProjectionPayload();
+    delete fixture.payload.provider_route_product_materialization;
+    delete fixture.payload.model_synthesized_answer;
+    fixture.payload.terminal_authority_single_writer = {
+      schema: "helix.terminal_authority_single_writer_result.v1",
+      turn_id: fixture.turnId,
+      selected_terminal_artifact_kind: "typed_failure",
+      selected_terminal_artifact_ref: `${fixture.turnId}:typed_failure`,
+      selected_terminal_support_refs: [],
+      visible_text: "The lifecycle was incorrectly classified as not executed.",
+      integrity: { single_writer_applied: true },
+    };
+    fixture.payload.selected_final_answer =
+      "The lifecycle was incorrectly classified as not executed.";
+
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+
+    expect(audit.ok).toBe(false);
+    expect(audit.first_divergence_stage).toBe("terminal_materialization");
+    expect(audit.mismatches.map((entry) => entry.code)).toEqual(
+      expect.arrayContaining([
+        "authorized_provider_candidate_not_materialized",
+        "typed_failure_selected_after_authorized_provider_candidate",
+      ]),
+    );
+  });
+
+  it("preserves a scientific evidence rejection as an explicit fail-closed boundary", () => {
+    const fixture = buildProviderProjectionPayload();
+    delete fixture.payload.provider_route_product_materialization;
+    delete fixture.payload.model_synthesized_answer;
+    fixture.payload.provider_route_product_quality_gate = {
+      schema: "helix.final_answer_draft_quality_gate.v1",
+      ok: false,
+      violations: ["invalid_page_evidence_links"],
+    };
+    fixture.payload.provider_route_product_materialization_diagnostic = {
+      quality_gate_ok: false,
+      quality_gate_violations: ["invalid_page_evidence_links"],
+    };
+    fixture.payload.terminal_authority_single_writer = {
+      schema: "helix.terminal_authority_single_writer_result.v1",
+      turn_id: fixture.turnId,
+      selected_terminal_artifact_kind: "typed_failure",
+      selected_terminal_artifact_ref: `${fixture.turnId}:typed_failure`,
+      selected_terminal_support_refs: [],
+      visible_text: "The evidence link failed validation.",
+      integrity: { single_writer_applied: true },
+    };
+    fixture.payload.selected_final_answer =
+      "The evidence link failed validation.";
+
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+
+    expect(audit.ok).toBe(true);
+    expect(audit.first_divergence_stage).toBeNull();
+    expect(audit.scientific_evidence_disposition).toBe("failed_closed");
+    expect(audit.continuity_checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          check: "evidence_quality_gate",
+          status: "failed_closed",
+          disposition: "hard_evidence_boundary",
+          reason_codes: ["invalid_page_evidence_links"],
+        }),
+      ]),
+    );
+  });
+
+  it("detects changed candidate text without exporting the raw answer", () => {
+    const fixture = buildProviderProjectionPayload();
+    const routeProduct = fixture.payload
+      .model_synthesized_answer as Record<string, unknown>;
+    routeProduct.answer_text = "A deterministic rail substituted different text.";
+    routeProduct.text = "A deterministic rail substituted different text.";
+    const writer = fixture.payload
+      .terminal_authority_single_writer as Record<string, unknown>;
+    writer.visible_text = "A deterministic rail substituted different text.";
+    fixture.payload.selected_final_answer =
+      "A deterministic rail substituted different text.";
+
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+
+    expect(audit.mismatches.map((entry) => entry.code)).toContain(
+      "provider_candidate_text_changed_during_materialization",
+    );
+    expect(JSON.stringify(audit)).not.toContain(fixture.answerText);
+    expect(JSON.stringify(audit)).not.toContain(
+      "A deterministic rail substituted different text.",
+    );
+  });
+
+  it("detects support references dropped after materialization", () => {
+    const fixture = buildProviderProjectionPayload();
+    const writer = fixture.payload
+      .terminal_authority_single_writer as Record<string, unknown>;
+    writer.selected_terminal_support_refs = [];
+
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+
+    expect(audit.mismatches.map((entry) => entry.code)).toContain(
+      "materialized_evidence_refs_dropped_by_terminal_writer",
+    );
+    expect(audit.first_divergence_stage).toBe("terminal_authority");
+  });
+
+  it("locates duplicate physical execution before evidence re-entry or terminal materialization", () => {
+    const fixture = buildProviderProjectionPayload();
+    fixture.payload.question =
+      'Run exactly one command in the paired Minecraft Fabric environment. Use com.casimirbot.minecraft.command with command "time query daytime", category "query", and effect "read_only". Do not run any other command or tool.';
+    const commandResult = (callId: string, executionRef: string) => ({
+      ok: true,
+      capability_id: "com.casimirbot.minecraft.command",
+      gateway_admission: {
+        requested_capability: "com.casimirbot.minecraft.command",
+      },
+      observation_packet: { call_id: callId },
+      observation: {
+        command_execution_ref: executionRef,
+        command_hash: `sha256:${"a".repeat(64)}`,
+      },
+    });
+    fixture.payload.workstation_gateway_call_results = [
+      commandResult("call:command:1", "command_execution:1"),
+      commandResult("call:command:2", "command_execution:2"),
+      {
+        ok: true,
+        capability_id: "com.casimirbot.minecraft.command.catalog",
+        gateway_admission: {
+          requested_capability: "com.casimirbot.minecraft.command.catalog",
+        },
+        observation_packet: { call_id: "call:catalog:1" },
+        observation: {},
+      },
+    ];
+
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+
+    expect(audit.ok).toBe(false);
+    expect(audit.first_divergence_stage).toBe("tool_execution");
+    expect(audit.mismatches.map((entry) => entry.code)).toEqual(
+      expect.arrayContaining([
+        "exact_tool_cardinality_violated",
+        "forbidden_extra_tool_executed",
+      ]),
+    );
+  });
+
+  it("reports executable runtime artifacts under a record-only admission", () => {
+    const fixture = buildProviderProjectionPayload();
+    fixture.payload.agent_runtime_loop_admission = {
+      schema: "helix.agent_runtime_loop_admission.v1",
+      turn_id: fixture.turnId,
+      admitted: true,
+      mode: "record_only",
+      reason:
+        "source_or_capability_terminal_failure_requires_runtime_loop_record",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    (fixture.payload.current_turn_artifact_ledger as unknown[]).push({
+      artifact_id: `${fixture.turnId}:runtime_tool_call:unexpected`,
+      kind: "runtime_tool_call",
+      payload: { capability_id: "repo-code.search_concept" },
+    });
+
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+
+    expect(audit.ok).toBe(false);
+    expect(audit.first_divergence_stage).toBe("tool_execution");
+    expect(audit.mismatches.map((entry) => entry.code)).toContain(
+      "record_only_admission_executed_runtime_steps",
+    );
+    expect(audit.continuity_checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          check: "record_only_admission_did_not_execute",
+          status: "failed",
+          observed_support_ref_count: 1,
+        }),
+      ]),
+    );
+  });
+
+  it("treats an idempotent command replay as one physical execution", () => {
+    const fixture = buildProviderProjectionPayload();
+    fixture.payload.question =
+      'Run exactly one command in the paired Minecraft Fabric environment. Use com.casimirbot.minecraft.command with command "time query daytime", category "query", and effect "read_only". Do not run any other command or tool.';
+    fixture.payload.workstation_gateway_call_results = [1, 2].map((ordinal) => ({
+      ok: true,
+      capability_id: "com.casimirbot.minecraft.command",
+      gateway_admission: {
+        requested_capability: "com.casimirbot.minecraft.command",
+      },
+      observation_packet: {
+        call_id: `call:command:${ordinal}`,
+        executed_args: {
+          idempotent_replay: ordinal === 2,
+          physical_execution_performed: ordinal === 1,
+        },
+      },
+      observation: {
+        command_execution_ref: "command_execution:stable",
+        command_hash: `sha256:${"a".repeat(64)}`,
+      },
+    }));
+
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+
+    expect(audit.ok).toBe(true);
+    expect(audit.continuity_checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          check: "requested_tool_cardinality",
+          status: "passed",
+          expected_support_ref_count: 1,
+          observed_support_ref_count: 1,
+        }),
+      ]),
+    );
+  });
+
+  it("reports even a failed helper attempt outside an exclusive command contract", () => {
+    const fixture = buildProviderProjectionPayload();
+    fixture.payload.question =
+      'Ignite the surveyed hearth in my paired Minecraft Fabric world. Run exactly one command: use com.casimirbot.minecraft.command with command "setblock -50 68 -2 minecraft:fire", category "world_build", and effect "world_mutation". Do not run any other command or tool.';
+    fixture.payload.workstation_gateway_call_results = [
+      {
+        ok: true,
+        capability_id: "com.casimirbot.minecraft.command",
+        gateway_admission: {
+          requested_capability: "com.casimirbot.minecraft.command",
+        },
+        observation_packet: { call_id: "call:command:exclusive" },
+        observation: {
+          command_execution_ref: "command_execution:exclusive",
+          command_hash: `sha256:${"b".repeat(64)}`,
+        },
+      },
+      {
+        ok: false,
+        capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+        gateway_admission: {
+          requested_capability:
+            "com.casimirbot.minecraft.spatial_region.inspect",
+        },
+        typed_failure: { code: "producer_epoch_mismatch" },
+      },
+    ];
+
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+
+    expect(audit.ok).toBe(false);
+    expect(audit.first_divergence_stage).toBe("tool_execution");
+    expect(audit.mismatches.map((entry) => entry.code)).toContain(
+      "forbidden_extra_tool_executed",
+    );
   });
 });
