@@ -47,7 +47,7 @@ const classifyKnownHelixGameplayCommand = (
   if (/^helixgame\s+fall_rescue\s+(?:arm|disarm)(?:\s|$)/u.test(command)) {
     return { category: "world_build", effect: "world_mutation" };
   }
-  if (/^helixgame\s+checkpoint\s+(?:capture|discard)(?:\s|$)/u.test(command)) {
+  if (/^helixgame\s+checkpoint\s+(?:capture(?:_box)?|discard)(?:\s|$)/u.test(command)) {
     return {
       category: "server_administration",
       effect: "server_administration",

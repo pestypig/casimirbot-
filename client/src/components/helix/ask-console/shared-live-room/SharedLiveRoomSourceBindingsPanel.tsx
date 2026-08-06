@@ -35,6 +35,7 @@ import type {
 import type {
   HelixSharedRealtimeRoomParticipant,
 } from "@shared/helix-shared-realtime-room";
+import { SharedLiveRoomPlayerEmbodimentPanel } from "./SharedLiveRoomPlayerEmbodimentPanel";
 
 const sourceBindingsPath = (roomId: string): string =>
   `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/source-bindings`;
@@ -1273,6 +1274,16 @@ export function SharedLiveRoomSourceBindingsPanel({
                     </p>
                   )}
                 </div>
+                {environment.domain_adapter === "minecraft.fabric_mod.v1" &&
+                environment.self_subject_binding?.status === "active" ? (
+                  <SharedLiveRoomPlayerEmbodimentPanel
+                    roomId={roomId}
+                    environment={environment}
+                    selfParticipantId={selfParticipantId}
+                    sourceBinding={sourceBinding}
+                    isOwner={isOwner}
+                  />
+                ) : null}
               </article>
             );
           })}

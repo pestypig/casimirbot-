@@ -44,6 +44,9 @@ import { migration042 } from "./migrations/042_room_environment_subject_bindings
 import { migration043 } from "./migrations/043_environment_command_authority";
 import { migration044 } from "./migrations/044_connector_pairing_bootstrap";
 import { migration045 } from "./migrations/045_connector_command_pairing";
+import { migration046 } from "./migrations/046_environment_action_plane";
+import { migration047 } from "./migrations/047_environment_action_result_replay_identity";
+import { migration048 } from "./migrations/048_environment_event_ledger_identity";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -92,6 +95,9 @@ const MIGRATIONS = [
   migration043,
   migration044,
   migration045,
+  migration046,
+  migration047,
+  migration048,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

@@ -4,13 +4,15 @@ Use this runbook to test the complete local Minecraft environment-capability
 path with a real player, the Fabric 1.21.8 sensor, a Shared Live Room, and GPT
 Live or another Helix reasoning provider.
 
-This acceptance workflow has two explicit phases. The baseline phase exercises
+This acceptance workflow has three explicit phases. The baseline phase exercises
 the admitted read-only probes documented in
 [`../minecraft-fabric-sensor-mod.md`](../minecraft-fabric-sensor-mod.md). The
-optional agency phase uses the separately credentialed command lane only after
+World Authority agency phase uses the separately credentialed command lane only after
 the room owner configures a time-bounded authority lease and completes command
-pairing in game. Neither phase reveals connector credentials to the model or
-makes a source receipt authoritative as an answer.
+pairing in game. The Player Embodiment phase separately pairs the Fabric client
+companion and exercises admitted player workflows. No phase reveals connector
+credentials to the model or makes a source/action receipt authoritative as an
+answer.
 
 ## What this test proves
 
@@ -42,6 +44,8 @@ authorized or executed.
 - CasimirBot: `http://localhost:1522`
 - Minecraft direct-connect address: `localhost:25565`
 - Fabric project: `minecraft/helix-fabric-sensor`
+- Fabric player companion project: `minecraft/helix-fabric-player-agent`
+- Fabric player companion version: `0.2.0`
 - Dedicated-server directory: `minecraft/helix-fabric-sensor/run`
 - Existing world: `helix_fabric_test_world`
 - Fabric sensor config: `minecraft/helix-fabric-sensor/run/config/helix-fabric-sensor.json`
@@ -69,6 +73,9 @@ test to a Minecraft client on the same workstation.
   execution only through the distinct room-owner command-authority and
   command-pairing workflow; never repurpose the source credential as command
   authority.
+- Treat player-action authority and pairing as a third credential lane. Never
+  install it in the dedicated server connector or expose it in room chat,
+  prompts, debug exports, screenshots or test artifacts.
 
 ## 1. Start or verify keyed CasimirBot
 
@@ -102,6 +109,27 @@ $helixJava21 = 'C:\Users\dan\curseforge\minecraft\Install\java\Jre_21\bin\java.e
 Set-Location 'minecraft\helix-fabric-sensor\run'
 & $helixJava21 -Xms512M -Xmx1536M -jar .\fabric-server-launch.jar nogui
 ```
+
+On a 16 GiB workstation, treat 90% memory use as a warning and 95% as a stop
+condition for new builds or broad suites. Keep only one keyed Node tree and one
+Fabric server tree. Preserve the active Codex app and Minecraft client. Before
+ending anything else, verify its exact PID, parent/child tree and listening
+ports without reading process command lines or credential-bearing environment
+variables. Park polling localhost workstation tabs on `about:blank` between
+UI steps; reopening the same local URL retains the browser profile. Do not
+fight auto-restarting services such as TeamViewer when their settled footprint
+is negligible. Run one heavy build or test process at a time.
+
+For a repository-standard production client build on a constrained host, use
+this sequence instead of overlapping every runtime: close the Minecraft client,
+leave the low-memory Fabric server/world running, park the localhost browser
+page, verify and stop only the exact keyed Node listener tree, run
+`npm run build:client`, then restart keyed CasimirBot only through the opaque
+launcher and recheck `/api/account/session`, `/api/helix/pipeline`, and
+`/api/agi/agent-providers`. Confirm that Codex is listed and launchable before
+resuming the room. This preserves the world while giving the production build
+temporary headroom, and keeps process/resource failure distinct from product
+failure.
 
 Expected server signals:
 
@@ -238,6 +266,71 @@ Verify that the new binding names `minecraft.fabric_mod.v1`, has the intended
 world identity and label, and was installed in the Fabric config rather than a
 Paper plugin config.
 
+## 5A. Pair the Player Embodiment companion
+
+This is separate from `/helix pair`, server command pairing and the room-source
+credential. Build or install `HelixFabricPlayerAgent-0.2.0.jar` in the Fabric
+1.21.8 **client** instance alongside Fabric API. Do not install this client-only
+mod in the dedicated server.
+
+Before generating the one-time code, prove the current Minecraft process
+actually loaded the companion. If the JAR was installed or replaced after
+Minecraft started, close Minecraft completely and relaunch the Fabric 1.21.8
+instance. The client log must contain `Helix Fabric Player Agent loaded`; an
+already-running client cannot discover a newly installed mod. Treat the older
+`Helix pairing succeeded and the connector started` message as World Authority
+pairing, not Player Embodiment readiness.
+
+1. Keep the read-only Fabric source active and select the current player under
+   the room's environment identity controls.
+2. As room owner, configure a time-bounded player-action authority for that
+   participant, `minecraft.fabric_client.v1`, the exact allowed capability IDs,
+   an autonomy mode and a `pause` or `cancel` manual-override policy. The owner
+   room dialog exposes this as **Minecraft Player Embodiment** after the owner
+   selects and verifies their player. **Save player authority** creates the
+   finite lease. The underlying owner API is
+   `PUT /api/agi/realtime/rooms/:roomId/environments/:environmentBindingId/action-authorities`.
+   `approved_capabilities` is the normal live-test mode; `approve_each` remains
+   blocked until a current-request approval surface is available.
+   Saving is also the canonicalization point: it must revoke every older active
+   lease for the same environment and participant, including leases created
+   under an earlier player-binding epoch. After saving, the selected room/API
+   projection and action broker must name the same newest policy. If they do
+   not, stop before creating a pairing code.
+3. Create an action-only connector pairing for that authority through
+   **Pair player client in game**. It calls
+   `POST /api/agi/realtime/rooms/:roomId/connector-pairings` with
+   `action_credential_requested=true` and the exact `action_authority_id`.
+   Use the authenticated owner UI/API response only long enough to copy the
+   one-time command. Never copy the returned code or setup material into a
+   prompt, test artifact or debug export.
+4. Run the returned `/helix-player pair <one-time-code>` command in the paired
+   Minecraft **client chat**. Do not run it in the dedicated-server console.
+   The expected success message names the separate plane: `Helix player-action
+   pairing succeeded. The client companion is publishing its capabilities.` If
+   chat instead reports generic Helix pairing, `/helix` pairing, or command
+   access pairing, stop: the wrong connector consumed a different code or the
+   client companion was not loaded.
+5. Run `/helix-player status`. Confirm a fresh client manifest and heartbeat by
+   their sanitized room/API projections. The manifest must list all 13 native
+   actions. It may list `baritone` only when Baritone was actually discovered
+   in this client.
+6. Keep `/helix-player emergency-stop` available throughout the test. Manual
+   movement, view, mouse or inventory input must pause or cancel the active
+   workflow according to the owner policy and release connector-owned controls.
+
+Pairing proves only identity and transport. It does not prove that a natural
+prompt selected, executed or synthesized any capability.
+
+The room intentionally reports authority and connector readiness separately.
+`authority active` means an owner-created finite lease exists; it is not a
+transport signal. `client ready` requires the exact action authority's admitted
+manifest plus a fresh heartbeat. `waiting for client`, `stale`, `degraded`,
+`paused`, `error`, and `emergency stopped` are all non-ready states. These
+sanitized projections exclude pairing codes, bearer credentials, installation
+IDs, manifest IDs and private endpoint details, and they never become answer
+authority.
+
 ## 6. Run the natural-language probe battery
 
 Start with one probe per turn so failures are easy to classify.
@@ -275,6 +368,64 @@ that evidence. A useful answer may instead explain what the observed state
 supports, retrieve relevant Minecraft mechanics, and identify the missing
 probe precisely.
 
+## 6A. Run the Player Embodiment battery
+
+Use ordinary prompts through Helix Ask first. GPT Live may read the same
+authorized result only after text-path parity is proven. Keep each fixture
+reversible and one workflow at a time:
+
+| Scenario | Natural request | Required proof |
+| --- | --- | --- |
+| Look | "Turn me toward the center of that safe test marker." | admitted `player.look`, bounded view-error measurement, current-turn re-entry |
+| Walk/jump | "Walk forward for one second, then jump once." | two Codex-selected actions, measured motion and confirmed airborne transition |
+| Native navigate | "Move me to the marked safe coordinate without breaking or placing blocks." | destination-radius measurement; no server-command fallback |
+| Optional Baritone | "Use Baritone to reach the marked coordinate without digging or placing." | admitted only when the live manifest declares Baritone; otherwise typed `control_engine_unavailable` |
+| Follow | "Follow the other selected player for 20 seconds, but stop if my health drops below 10." | exact server-resolved subject, bounded interval and health-floor evidence; typed identity failure when no second bound player exists |
+| Collect | "Collect five dropped cobblestone items within 12 blocks." | loaded dropped-item target and player-inventory increase at or above the request but within the admitted overshoot ceiling |
+| Mine | "Mine two nearby stone blocks within eight blocks." | explicit world-mutation authority, removed-block count, mutation count no greater than two |
+| Place | "Place stone at these exact two test positions." | explicit mutation authority, exact positions, held-block/support checks and verified block states |
+| Craft | "Craft four sticks from my current inventory." | current player grid/open table, produced inventory delta; an exact `recipe_id` currently returns the documented typed limitation |
+| Transfer | "Deposit exactly eight cobblestone into the chest I am looking at." | server menu, bounded clicks and exact player-side transfer delta |
+| Manual interruption | Start a 30-second follow or navigation, then move or turn manually. | `manual_override_detected`, pause/cancel policy, and all controls released |
+| Cancel/emergency | Cancel the exact active workflow; separately exercise room/client emergency stop. | exact workflow identity or global authority stop, idempotent result and released controls |
+| Hybrid | "Inspect my status and nearby hazards, move to the safe marker, then check me again." | world observation, player action, fresh post-action observation and one post-re-entry Codex synthesis |
+
+For each scenario, also perform a direct reference-Codex diagnostic from the
+same starting state when a safe direct actuator is available. Record only
+public requests and events—not hidden reasoning—and compare:
+
+```text
+prompt and admitted constraints
+-> requested capability and arguments
+-> physical execution/progress
+-> terminal measurements and observation refs
+-> post-observation provider candidate
+-> route-product and terminal-writer hashes
+-> visible text/voice result
+```
+
+Stop at the first mismatch. A direct result proves the game operation was
+possible; only the full Helix chain proves adapter acceptance.
+
+After normalizing the two public traces to
+`helix.environment_action.differential_trace.v1`, run the observer-only audit:
+
+```powershell
+npm run helix:minecraft:player-differential -- `
+  --reference <direct-codex-trace.json> `
+  --helix <helix-trace.json> `
+  --out <differential-audit.json>
+```
+
+The audit records hashes and the first divergence. It never reads hidden model
+reasoning, admits an action, changes a result, or grants terminal authority.
+For Helix success, require non-empty final observation refs, current-turn
+re-entry, the same refs in candidate support, the same candidate support in the
+route product and terminal writer, and one canonical public-text hash across
+candidate, route product, terminal writer and visible answer. When voice is
+marked consistent, its canonical text hash must match too. Do not accept a
+pair of equally incomplete traces as parity.
+
 ## 7. Evidence and trace acceptance
 
 For each probe, confirm this logical ordering:
@@ -302,6 +453,26 @@ command result re-enters Codex
 Codex reports the result
 fresh read-only verification confirms or disproves the intended effect
 ```
+
+For a Player Embodiment scenario, require this separate chain:
+
+```text
+active participant-to-player binding and action authority verified
+fresh client manifest/heartbeat and frozen 13-action catalog admitted
+Codex requests one semantic action
+Fabric client leases the exact one-shot request
+ordered progress plus raw player-embodiment events are retained
+terminal workflow event carries action-specific measurements
+Helix validates postconditions and side-effect ceilings
+current-turn action observation re-enters Codex
+Codex selects answer, repair, cancellation or typed failure
+Helix publishes the same authorized product to text and voice
+```
+
+Do not count a pairing receipt, manifest, heartbeat, leased request or generic
+`workflow.succeeded` event as completion. The terminal measurement event and
+the resulting current-turn observation must share the exact request, workflow,
+participant, player, source, world, authority and connector epoch identities.
 
 Use `turn_lifecycle_differential_audit` to compare the verified re-entry and
 Codex message with the provider candidate, route-product materialization,
@@ -336,10 +507,17 @@ architectural failure by hard-coding one prompt.
 | A player-state prompt that says `Report my player...` requests `docs_viewer` | Prompt interpretation | Treat `report` as an output verb unless the surrounding phrase identifies an actual report document. The Minecraft prompt must admit `live_environment`. |
 | Active Fabric source returns `subject_binding_required` | Participant-to-subject binding | Confirm the player is online, refresh the sanitized subject directory, then select that player under **Your identity in this environment**. Do not bypass identity selection or expose a raw player UUID. |
 | Probe waits indefinitely | Connector poll/result lane | Confirm Fabric is running, manifest-admitted, and polling after heartbeat startup. |
+| Player action says no paired client | Player Embodiment pairing | Confirm the action authority is active, redeem a fresh action-only code with `/helix-player pair`, then check the sanitized client manifest/heartbeat. Do not reuse source or command pairing. |
+| `/helix-player` is unknown or pairing prints the generic connector success message | Client companion lifecycle | Close Minecraft completely, verify `HelixFabricPlayerAgent-0.2.0.jar` is in the active instance's client `mods` directory, relaunch Fabric 1.21.8, and confirm the dedicated player-agent load message before rotating another one-time code. |
+| Room says `authority active` but `waiting for client` | Action readiness | The lease exists but no matching admitted manifest plus fresh heartbeat exists. Check the loaded client mod, exact paired player identity and `/helix-player status`; do not count this as ready. |
+| Room/API and action execution refer to different active authority IDs | Authority supersession/projection | Save player authority once through the current owner UI. Confirm only the newest policy/newest-created lease remains active for the environment and participant before rotating an action-only pairing. Do not pair against whichever row happened to be returned first. |
+| Baritone was requested but not admitted | Control-engine admission | Confirm Baritone is installed in the client and declared in that exact live manifest; otherwise use native navigation or retain the typed limitation. |
+| Workflow reports success but Helix returns `postcondition_failed` | Measurement/evidence normalization | Inspect the exact terminal action event for required measurements, evidence refs and admitted count ceilings. Do not weaken postcondition authority. |
+| Manual input does not stop movement | Client override safety | Use `/helix-player emergency-stop`, verify controls released, preserve the trace, and do not continue mutating tests until fixed. |
 | Tool completed but answer is missing | Evidence re-entry or continuation | Look for the current-turn observation and the required post-tool model step. |
 | Answer describes old state | Freshness/current-turn authority | Move again and require a new probe with a bounded freshness requirement. |
 | GPT Live fails while text succeeds | Realtime provider route | Diagnose Realtime separately; do not infer that the shared API key must be replaced. |
-| Worker exits or the machine approaches its memory limit | Local resource pressure | Keep the Fabric heap bounded, avoid broad parallel suites, and separate infrastructure failure from product failure. |
+| Worker exits or the machine approaches its memory limit | Local resource pressure | Stop new heavy work at 95%, park polling localhost tabs, keep one keyed Node tree and one Fabric tree, remove only verified redundant helper trees, serialize builds/suites, and separate infrastructure failure from product failure. The opaque launcher is the only permitted keyed-server restart path. |
 
 ## 9. Test closure
 
@@ -381,6 +559,39 @@ admitted read capabilities. After the owner selected the online player under
 observation, re-entered that observation into provider reasoning, and produced
 the Helix-authorized answer. Replaying the consumed command failed closed while
 the admitted connector remained active.
+
+### Reversible environment-agency closure protocol
+
+Use ordinary user language for the agency proof. Do not replace these journeys
+with direct server-console commands; the purpose is to verify Codex planning,
+Helix admission, observation re-entry, and terminal authority together.
+
+1. **Catalog/read control:** “Check the paired Minecraft server's live command
+   capabilities, then tell me the current daytime without changing the world.”
+   Require an admitted catalog plus one fresh read-only command observation.
+2. **Structure-aware reversible wall:** “For a reversible test, inspect the
+   nearby house and build a three-block-high stone-brick wall along one clearly
+   identified safe side. Preserve doors, paths, and containers; capture only the
+   exact mutation footprint first; verify the finished wall; then restore the
+   checkpoint and verify the original blocks returned. If the boundary is
+   ambiguous, ask me instead of building.” Require spatial evidence,
+   `capture_box`, bounded sequential mutation observations, exact after-state,
+   restore, and exact restored-state evidence.
+3. **Locally reactive fall rescue:** “Arm a 120-second fall rescue for my
+   selected player and confirm only that it is armed.” Once armed, use a
+   separately confirmed controlled fall above an inspected safe landing column.
+   The Fabric tick loop—not another model round trip—must trigger the rescue.
+   After landing, ask Helix to inspect rescue status and confirm safe landing,
+   trigger count, and removal of only the temporary water source.
+4. **Text/voice parity:** present the authoritative wall or rescue result through
+   text and the room's voice/read-aloud path. Voice may summarize but must retain
+   the same success/failure status, freshness boundary, and uncertainty as the
+   selected terminal artifact.
+
+Record the Ask turn IDs, exact observation refs, mutation execution IDs,
+checkpoint name, pre/post/restore geometry counts, fall-rescue trigger outcome,
+temporary-water cleanup result, terminal candidate hash, and visible/voice
+projection hash. Never record pairing codes or credentials.
 
 Related contracts:
 

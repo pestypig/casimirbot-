@@ -321,3 +321,71 @@ export function buildLiveSourceIdentityAudit(input: {
     raw_content_included: false,
   };
 }
+
+export function attachLiveSourceIdentityAudit(input: {
+  payload: RecordLike;
+  threadId: string;
+  turnId: string;
+  promptText: string;
+  selectedRoute: string;
+  terminalArtifactKind: string;
+}): HelixLiveSourceIdentityAudit | null {
+  const sourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const capabilityPlan = readRecord(input.payload.capability_plan);
+  const sourceTarget =
+    readString(sourceTargetIntent?.target_source) ??
+    readString(sourceTargetIntent?.targetSource) ??
+    readString(capabilityPlan?.source_target) ??
+    readString(capabilityPlan?.sourceTarget);
+  if (!isLiveSourceIdentityAuditRelevant({
+    promptText: input.promptText,
+    sourceTarget,
+    selectedRoute: input.selectedRoute,
+    terminalArtifactKind: input.terminalArtifactKind,
+    payload: input.payload,
+  })) {
+    return null;
+  }
+
+  const audit = buildLiveSourceIdentityAudit({
+    turnId: input.turnId,
+    threadId: input.threadId,
+    payload: input.payload,
+  });
+  input.payload.live_source_identity_audit = audit;
+
+  const debug = readRecord(input.payload.debug);
+  if (debug) debug.live_source_identity_audit = audit;
+  const solverTrace = readRecord(input.payload.ask_turn_solver_trace);
+  if (solverTrace) solverTrace.live_source_identity_audit = audit;
+  const debugSolverTrace = readRecord(debug?.ask_turn_solver_trace);
+  if (debugSolverTrace) debugSolverTrace.live_source_identity_audit = audit;
+
+  const ledger = Array.isArray(input.payload.current_turn_artifact_ledger)
+    ? input.payload.current_turn_artifact_ledger
+    : null;
+  const artifactId = `${input.turnId}:live_source_identity_audit:${audit.audit_id}`;
+  if (
+    ledger &&
+    !ledger.some(
+      (entry) => readString(readRecord(entry)?.artifact_id) === artifactId,
+    )
+  ) {
+    ledger.push({
+      artifact_id: artifactId,
+      kind: "validation",
+      turn_id: input.turnId,
+      producer_item_id: "live_source_identity_audit",
+      created_at_ms: Date.now(),
+      source_scope: "current_turn",
+      payload: {
+        ...audit,
+        item_id: audit.audit_id,
+        item_type: "validation",
+        deterministic_content_role: "evidence_not_assistant_answer",
+        context_role: "evidence_not_assistant_answer",
+      },
+    });
+  }
+  return audit;
+}

@@ -711,7 +711,20 @@ export const environmentProbeMinecraftInventoryManifest =
   environmentProbeMinecraftManifests.find(
     (manifest) =>
       manifest.capability_id === HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
-  )!;
+    )!;
+
+export const environmentProbeFailureRepairAction = (
+  error: string | null | undefined,
+): "retry" | "ask_user" =>
+  [
+    "connector_offline",
+    "probe_timeout",
+    "schema_validation_failed",
+    "current_turn_reentry_ineligible",
+    "result_stale",
+  ].includes(String(error ?? "").trim())
+    ? "retry"
+    : "ask_user";
 
 export const executeEnvironmentProbeGatewayCapability = async (input: {
   capabilityId?: string | null;

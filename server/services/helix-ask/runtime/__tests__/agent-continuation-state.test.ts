@@ -370,6 +370,52 @@ describe("agent continuation state", () => {
     expect(state.allowed_decisions).not.toContain("answer");
   });
 
+  it("does not authorize an answer when an incomplete itinerary has no concrete recovery affordance", () => {
+    const state = buildHelixAgentContinuationState({
+      payload: {
+        final_status: "completed",
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: false,
+          required_capabilities: [
+            "com.casimirbot.minecraft.spatial_region.inspect",
+            "com.casimirbot.minecraft.command.catalog",
+            "com.casimirbot.minecraft.command",
+          ],
+          missing_required_capabilities: [
+            "com.casimirbot.minecraft.command",
+          ],
+          missing_compound_subgoal_ids: [
+            "ask:continuation:compound:command",
+          ],
+        },
+        current_turn_artifact_ledger: [],
+      },
+      turnId: "ask:continuation:incomplete-action",
+      trigger: "final_review",
+      lastAttempt: {
+        attempt_id: "ask:continuation:catalog:1",
+        capability_id: "com.casimirbot.minecraft.command.catalog",
+        status: "succeeded",
+        retryability: "not_applicable",
+      },
+    });
+
+    expect(state.goal).toMatchObject({
+      status: "in_progress",
+      satisfied: false,
+      terminal_product_allowed: false,
+    });
+    expect(state.missing_requirement_ids).toEqual(
+      expect.arrayContaining([
+        "com.casimirbot.minecraft.command",
+        "ask:continuation:compound:command",
+      ]),
+    );
+    expect(state.allowed_decisions).not.toContain("answer");
+  });
+
   it("marks new observations and resolved requirements as progress after an attempt", () => {
     const firstPayload: Record<string, unknown> = {
       goal_satisfaction_evaluation: {
@@ -1426,6 +1472,37 @@ describe("agent continuation state", () => {
     expect(state.allowed_decisions).not.toContain("retry");
   });
 
+  it("keeps model-authored Minecraft command metadata repair inside the bounded retry loop", () => {
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: ["com.casimirbot.minecraft.command"],
+      },
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [],
+    };
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: {
+        capability_id: "com.casimirbot.minecraft.command",
+        status: "failed",
+        failure_code: "command_category_mismatch",
+        failure_message:
+          "Unknown installed-mod commands require an explicit category and effect.",
+        retryability: "requires_user_input",
+      },
+    });
+
+    expect(state.last_attempt).toMatchObject({
+      failure_code: "command_category_mismatch",
+      retryability: "retryable",
+    });
+    expect(state.allowed_decisions).toContain("retry");
+    expect(state.allowed_decisions).not.toContain("ask_user");
+  });
+
   it("turns a recoverable terminal rejection into another non-terminal observation", () => {
     const payload: Record<string, unknown> = {
       debug: {},
@@ -1481,6 +1558,9 @@ describe("agent continuation state", () => {
       candidateKind: "scholarly_research_answer",
       candidateRef: "ask:continuation:scholarly_research_answer:1",
       reason: "route_requires_synthesis",
+      gate: "provider_route_product_quality_gate",
+      reasonCodes: ["invalid_page_evidence_links"],
+      evidenceRefs: ["ask:continuation:scholarly_full_text:1"],
     });
     appendHelixTerminalRejectionObservationToPayload({ payload, observation });
     const state = buildHelixAgentContinuationState({
@@ -1494,6 +1574,13 @@ describe("agent continuation state", () => {
       status: "in_progress",
       satisfied: false,
       terminal_product_allowed: false,
+    });
+    expect(observation).toMatchObject({
+      gate: "provider_route_product_quality_gate",
+      reason_codes: ["invalid_page_evidence_links"],
+      evidence_refs: ["ask:continuation:scholarly_full_text:1"],
+      recoverable: true,
+      retryability: "retryable",
     });
     expect(state.last_attempt).toMatchObject({
       failure_class: "terminal_authority",

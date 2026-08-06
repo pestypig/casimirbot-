@@ -455,6 +455,18 @@ const classifyRetryability = (args: {
   ) {
     return "non_retryable";
   }
+  // These failures describe model-authored Minecraft command arguments, not
+  // missing operator authority. The connector has performed no eligible
+  // mutation, so Codex may repair the command envelope within the existing
+  // bounded retry budget. Policy, approval, and permission failures retain
+  // their separate fail-closed classifications below.
+  if (
+    /^(?:command_parse_failed|command_category_mismatch|command_effect_mismatch)$/.test(
+      args.code ?? "",
+    )
+  ) {
+    return "retryable";
+  }
   const explicit = readString(args.record?.retryability);
   if (
     ["retryable", "non_retryable", "requires_user_input", "unknown"].includes(
@@ -1031,7 +1043,7 @@ const resolveAllowedDecisions = (args: {
   // unsatisfied post-tool path while a concrete act/retry decision remains.
   if (
     (!args.lastAttempt && args.terminalProductAllowed !== false) ||
-    (!canAct && !canRetry)
+    (!canAct && !canRetry && args.terminalProductAllowed !== false)
   )
     decisions.add("answer");
   if (
@@ -1324,8 +1336,39 @@ export const buildHelixTerminalRejectionObservation = (args: {
   candidateKind?: string | null;
   candidateRef?: string | null;
   reason: string;
+  gate?: string | null;
+  reasonCodes?: string[];
+  evidenceRefs?: string[];
 }): HelixTerminalRejectionObservation => {
   const recoverable = terminalRejectionIsRecoverable(args.reason);
+  const defaultGate = (() => {
+    switch (args.reason) {
+      case "missing_post_tool_model_step":
+        return "post_tool_model_step_gate";
+      case "missing_evidence_reentry":
+        return "evidence_reentry_gate";
+      case "missing_required_observation":
+        return "required_observation_gate";
+      case "visible_answer_policy_repair_required":
+        return "visible_answer_policy_gate";
+      case "route_requires_synthesis":
+        return "route_product_quality_gate";
+      case "compound_prompt_coverage_incomplete":
+        return "compound_goal_coverage_gate";
+      case "solver_continuation_pending":
+        return "solver_continuation_gate";
+      case "pending_tool_call":
+        return "runtime_tool_completion_gate";
+      default:
+        return "terminal_authority_gate";
+    }
+  })();
+  const reasonCodes = uniqueStrings(
+    args.reasonCodes && args.reasonCodes.length > 0
+      ? args.reasonCodes
+      : [args.reason],
+  );
+  const evidenceRefs = uniqueStrings(args.evidenceRefs ?? []);
   return {
     schema: HELIX_TERMINAL_REJECTION_OBSERVATION_SCHEMA,
     turn_id: args.turnId,
@@ -1337,6 +1380,9 @@ export const buildHelixTerminalRejectionObservation = (args: {
     rejected_candidate_kind: args.candidateKind ?? null,
     rejected_candidate_ref: args.candidateRef ?? null,
     rejection_reason: args.reason,
+    gate: args.gate ?? defaultGate,
+    reason_codes: reasonCodes,
+    evidence_refs: evidenceRefs,
     recoverable,
     failure_class: "terminal_authority",
     retryability: recoverable ? "retryable" : "non_retryable",

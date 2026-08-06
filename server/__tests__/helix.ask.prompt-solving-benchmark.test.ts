@@ -178,6 +178,21 @@ const cases: BenchmarkCase[] = [
     requireNoGatewayCalls: true,
   },
   {
+    id: "minecraft_command_syntax_documentation_only",
+    category: "Minecraft command-text documentation",
+    prompt:
+      "Before doing anything in Minecraft, look up the connected environment mechanics for how to capture only the exact wall footprint as a rollback checkpoint. Cite the exact source file and line range and give the exact command form. Do not execute any Minecraft command.",
+    primary: [
+      "implementation_question",
+      "content_question",
+      "general_reasoning",
+      "debug_diagnosis",
+    ],
+    negativeConstraints: [/do not execute/i],
+    forbidRoutes: ["workspace_action", "live_pipeline_control"],
+    forbidArtifacts: forbiddenControlArtifacts,
+  },
+  {
     id: "future_conditional_environment_probe",
     category: "future/conditional environment probe",
     prompt:

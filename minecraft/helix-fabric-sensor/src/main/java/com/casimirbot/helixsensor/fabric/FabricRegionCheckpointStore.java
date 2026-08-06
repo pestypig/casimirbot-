@@ -19,6 +19,7 @@ import net.minecraft.world.level.block.state.BlockState;
 final class FabricRegionCheckpointStore {
     static final int MAX_HORIZONTAL_RADIUS = 12;
     static final int MAX_VERTICAL_RADIUS = 8;
+    static final int MAX_BOX_DISTANCE = 32;
     static final int MAX_BLOCKS = 16_384;
     private static final int MAX_CHECKPOINTS_PER_PLAYER = 4;
     private static final long TTL_TICKS = 20L * 60L * 15L;
@@ -29,9 +30,8 @@ final class FabricRegionCheckpointStore {
         UUID playerId,
         String name,
         ResourceKey<Level> dimension,
-        BlockPos center,
-        int horizontalRadius,
-        int verticalRadius,
+        BlockPos minimum,
+        BlockPos maximum,
         Map<BlockPos, BlockState> states,
         int blockEntityPositions,
         long expiresAtTick
@@ -71,6 +71,91 @@ final class FabricRegionCheckpointStore {
                 "Checkpoint region exceeds the bounded in-memory block limit."
             );
         }
+        BlockPos center = player.blockPosition().immutable();
+        BlockPos minimum = center.offset(
+            -horizontalRadius,
+            -verticalRadius,
+            -horizontalRadius
+        );
+        BlockPos maximum = center.offset(
+            horizontalRadius,
+            verticalRadius,
+            horizontalRadius
+        );
+        return captureRegion(player, name, minimum, maximum);
+    }
+
+    static Operation captureBox(
+        ServerPlayer player,
+        String requestedName,
+        int firstX,
+        int firstY,
+        int firstZ,
+        int secondX,
+        int secondY,
+        int secondZ
+    ) {
+        String name = normalizedName(requestedName);
+        if (name == null) {
+            return new Operation(
+                false,
+                "Checkpoint names must use 1-24 letters, numbers, underscores, or hyphens."
+            );
+        }
+        BlockPos minimum = new BlockPos(
+            Math.min(firstX, secondX),
+            Math.min(firstY, secondY),
+            Math.min(firstZ, secondZ)
+        );
+        BlockPos maximum = new BlockPos(
+            Math.max(firstX, secondX),
+            Math.max(firstY, secondY),
+            Math.max(firstZ, secondZ)
+        );
+        ServerLevel level = (ServerLevel) player.level();
+        if (
+            minimum.getY() < level.getMinY() ||
+            maximum.getY() >= level.getMaxY()
+        ) {
+            return new Operation(
+                false,
+                "Checkpoint box is outside the current dimension build height."
+            );
+        }
+        BlockPos playerPosition = player.blockPosition();
+        if (
+            maximumAxisDistance(playerPosition, minimum) > MAX_BOX_DISTANCE ||
+            maximumAxisDistance(playerPosition, maximum) > MAX_BOX_DISTANCE
+        ) {
+            return new Operation(
+                false,
+                "Checkpoint box must remain within " + MAX_BOX_DISTANCE +
+                " blocks of the selected player."
+            );
+        }
+        long blockCount = boxVolume(
+            minimum.getX(),
+            minimum.getY(),
+            minimum.getZ(),
+            maximum.getX(),
+            maximum.getY(),
+            maximum.getZ()
+        );
+        if (blockCount > MAX_BLOCKS) {
+            return new Operation(
+                false,
+                "Checkpoint box exceeds the bounded in-memory block limit."
+            );
+        }
+        return captureRegion(player, name, minimum, maximum);
+    }
+
+    private static Operation captureRegion(
+        ServerPlayer player,
+        String name,
+        BlockPos minimum,
+        BlockPos maximum
+    ) {
         long existingForPlayer = CHECKPOINTS.values().stream()
             .filter(checkpoint -> checkpoint.playerId().equals(player.getUUID()))
             .filter(checkpoint -> !checkpoint.name().equals(name))
@@ -81,19 +166,35 @@ final class FabricRegionCheckpointStore {
                 "Discard or restore an existing checkpoint before capturing another."
             );
         }
+        int blockCount = (int) boxVolume(
+            minimum.getX(),
+            minimum.getY(),
+            minimum.getZ(),
+            maximum.getX(),
+            maximum.getY(),
+            maximum.getZ()
+        );
+        if (blockCount > MAX_BLOCKS) {
+            return new Operation(
+                false,
+                "Checkpoint region exceeds the bounded in-memory block limit."
+            );
+        }
         ServerLevel level = (ServerLevel) player.level();
-        BlockPos center = player.blockPosition().immutable();
         Map<BlockPos, BlockState> states = new LinkedHashMap<>(blockCount);
         int blockEntityPositions = 0;
-        for (int dx = -horizontalRadius; dx <= horizontalRadius; dx++) {
-            for (int dz = -horizontalRadius; dz <= horizontalRadius; dz++) {
-                for (int dy = -verticalRadius; dy <= verticalRadius; dy++) {
-                    BlockPos position = center.offset(dx, dy, dz).immutable();
+        for (int x = minimum.getX();; x++) {
+            for (int z = minimum.getZ();; z++) {
+                for (int y = minimum.getY();; y++) {
+                    BlockPos position = new BlockPos(x, y, z);
                     BlockState state = level.getBlockState(position);
                     states.put(position, state);
                     if (state.hasBlockEntity()) blockEntityPositions++;
+                    if (y == maximum.getY()) break;
                 }
+                if (z == maximum.getZ()) break;
             }
+            if (x == maximum.getX()) break;
         }
         CHECKPOINTS.put(
             key(player.getUUID(), name),
@@ -101,9 +202,8 @@ final class FabricRegionCheckpointStore {
                 player.getUUID(),
                 name,
                 level.dimension(),
-                center,
-                horizontalRadius,
-                verticalRadius,
+                minimum.immutable(),
+                maximum.immutable(),
                 Map.copyOf(states),
                 blockEntityPositions,
                 level.getGameTime() + TTL_TICKS
@@ -112,7 +212,8 @@ final class FabricRegionCheckpointStore {
         return new Operation(
             true,
             "Captured checkpoint '" + name + "' with " + blockCount +
-            " blocks around " + coordinates(center) + "; " +
+            " blocks from " + coordinates(minimum) + " through " +
+            coordinates(maximum) + "; " +
             blockEntityPositions +
             " block-entity positions will be skipped during restore."
         );
@@ -200,6 +301,24 @@ final class FabricRegionCheckpointStore {
         return width * width * height;
     }
 
+    static long boxVolume(
+        int firstX,
+        int firstY,
+        int firstZ,
+        int secondX,
+        int secondY,
+        int secondZ
+    ) {
+        long width = Math.abs((long) secondX - firstX) + 1L;
+        long height = Math.abs((long) secondY - firstY) + 1L;
+        long depth = Math.abs((long) secondZ - firstZ) + 1L;
+        try {
+            return Math.multiplyExact(Math.multiplyExact(width, height), depth);
+        } catch (ArithmeticException overflow) {
+            return Long.MAX_VALUE;
+        }
+    }
+
     private static String normalizedName(String value) {
         String name = value == null ? "" : value.trim().toLowerCase();
         return name.matches("[a-z0-9_-]{1,24}") ? name : null;
@@ -211,6 +330,16 @@ final class FabricRegionCheckpointStore {
 
     private static String coordinates(BlockPos position) {
         return position.getX() + "," + position.getY() + "," + position.getZ();
+    }
+
+    private static long maximumAxisDistance(BlockPos first, BlockPos second) {
+        return Math.max(
+            Math.max(
+                Math.abs((long) first.getX() - second.getX()),
+                Math.abs((long) first.getY() - second.getY())
+            ),
+            Math.abs((long) first.getZ() - second.getZ())
+        );
     }
 
     private static int clamp(int value, int minimum, int maximum) {

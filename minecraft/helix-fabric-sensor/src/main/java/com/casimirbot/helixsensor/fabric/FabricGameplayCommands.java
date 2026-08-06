@@ -93,6 +93,62 @@ final class FabricGameplayCommands {
                                         )
                                 )
                                 .then(
+                                    Commands.literal("capture_box")
+                                        .then(
+                                            Commands.argument(
+                                                "name",
+                                                StringArgumentType.word()
+                                            ).then(
+                                                Commands.argument(
+                                                    "x1",
+                                                    IntegerArgumentType.integer()
+                                                ).then(
+                                                    Commands.argument(
+                                                        "y1",
+                                                        IntegerArgumentType.integer()
+                                                    ).then(
+                                                        Commands.argument(
+                                                            "z1",
+                                                            IntegerArgumentType.integer()
+                                                        ).then(
+                                                            Commands.argument(
+                                                                "x2",
+                                                                IntegerArgumentType.integer()
+                                                            ).then(
+                                                                Commands.argument(
+                                                                    "y2",
+                                                                    IntegerArgumentType.integer()
+                                                                ).then(
+                                                                    Commands.argument(
+                                                                        "z2",
+                                                                        IntegerArgumentType.integer()
+                                                                    ).executes(context -> {
+                                                                        FabricRegionCheckpointStore.Operation operation =
+                                                                            FabricRegionCheckpointStore.captureBox(
+                                                                                context.getSource().getPlayerOrException(),
+                                                                                StringArgumentType.getString(context, "name"),
+                                                                                IntegerArgumentType.getInteger(context, "x1"),
+                                                                                IntegerArgumentType.getInteger(context, "y1"),
+                                                                                IntegerArgumentType.getInteger(context, "z1"),
+                                                                                IntegerArgumentType.getInteger(context, "x2"),
+                                                                                IntegerArgumentType.getInteger(context, "y2"),
+                                                                                IntegerArgumentType.getInteger(context, "z2")
+                                                                            );
+                                                                        return emit(
+                                                                            context.getSource(),
+                                                                            operation.ok(),
+                                                                            operation.message()
+                                                                        );
+                                                                    })
+                                                                )
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                )
+                                .then(
                                     Commands.literal("restore")
                                         .then(
                                             Commands.argument(

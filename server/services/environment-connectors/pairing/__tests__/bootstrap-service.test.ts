@@ -192,4 +192,43 @@ describe("connector bootstrap pairing", () => {
     expect(dbText).not.toContain(redeemedConfig.bearer_token);
     expect(dbText).not.toContain(rotatedConfig.bearer_token);
   });
+
+  it("revokes an expired unredeemed create binding before issuing its replacement", async () => {
+    const stale = await createConnectorBootstrapPairing({
+      roomId: ROOM_ID,
+      ownerProfileId: PROFILE_ID,
+      purpose: "create",
+      domainAdapter: "minecraft.fabric_mod.v1",
+      sourceLabel: "Expired Fabric source",
+      idempotencyKey: "pairing-expired-create-one",
+    });
+    const db = getPool();
+    await db.query(
+      `
+        UPDATE helix_connector_pairing_codes
+        SET expires_at = '2000-01-01T00:00:00.000Z'
+        WHERE pairing_id = $1;
+      `,
+      [stale.pairing.pairing_id],
+    );
+
+    const replacement = await createConnectorBootstrapPairing({
+      roomId: ROOM_ID,
+      ownerProfileId: PROFILE_ID,
+      purpose: "create",
+      domainAdapter: "minecraft.fabric_mod.v1",
+      sourceLabel: "Replacement Fabric source",
+      idempotencyKey: "pairing-expired-create-two",
+    });
+
+    expect(replacement.pairing.status).toBe("pending");
+    expect(
+      (
+        await db.query<{ status: string }>(
+          `SELECT status FROM helix_room_source_bindings WHERE binding_id = $1;`,
+          [stale.pairing.binding_id],
+        )
+      ).rows[0]?.status,
+    ).toBe("revoked");
+  });
 });

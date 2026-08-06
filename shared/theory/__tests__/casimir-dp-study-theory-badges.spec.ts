@@ -46,11 +46,15 @@ describe("Casimir / DP quantum-foam study badges", () => {
         "study.casimir_dp.maxwell_macroscopic_qed_closure_stage4_2f",
         "study.casimir_dp.empirical_feasibility_pilot_stage4_2g",
         "study.casimir_dp.commissioning_intake_stage4_2h",
+        "study.casimir_dp.boundary_branch_interaction_stage4_2i",
+        "study.casimir_dp.empirical_authority_stage4_2l",
+        "study.casimir_dp.apparatus_search_stage4_2m",
+        "study.casimir_dp.material_thermal_ordinary_null_stage4_2n",
         "study.casimir_dp.claim_boundary",
       ]),
     );
-    expect(branch.badges).toHaveLength(33);
-    expect(branch.edges).toHaveLength(98);
+    expect(branch.badges).toHaveLength(39);
+    expect(branch.edges).toHaveLength(110);
     expect(branch.badges.every((badge) => badge.claimBoundary.diagnosticOnly)).toBe(true);
     expect(branch.badges.every((badge) => badge.claimBoundary.promotionAllowed === false)).toBe(true);
   });
@@ -1054,15 +1058,217 @@ describe("Casimir / DP quantum-foam study badges", () => {
       expect.arrayContaining([
         "casimir_dp_stage4_2g_requires_stage4_2h_commissioning_intake",
         "casimir_dp_stage4_2h_uncommissioned_dossier_blocks_claim_boundary",
+        "casimir_dp_stage4_2h_requires_stage4_2i_boundary_branch_interaction",
       ]),
     );
-    expect(incidentEdges).toHaveLength(2);
+    expect(incidentEdges).toHaveLength(3);
     expect(
       incidentEdges.some((edge) => edge.observableBridge != null),
     ).toBe(false);
     expect(
       incidentEdges.some((edge) => edge.relation === "derives"),
     ).toBe(false);
+  });
+
+  it("registers Stage-4.2I as a non-promotable interaction and packet-custody diagnostic", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find(
+      (candidate) =>
+        candidate.id ===
+          "study.casimir_dp.boundary_branch_interaction_stage4_2i",
+    );
+    const incidentEdges = branch.edges.filter(
+      (edge) => edge.from === badge?.id || edge.to === badge?.id,
+    );
+    const assumptions = badge?.assumptions.join(" ") ?? "";
+
+    expect(badge?.status).toBe("diagnostic");
+    expect(badge?.calculatorPayloads).toEqual([]);
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "synthetic_recovery_only",
+      "wavepacket_metrology_not_ready",
+      "measured_contrast_not_ready",
+      "transfer_kernel_not_registered",
+      "collapse_identification_blocked",
+      "zero_observable_bridge",
+    ]));
+    expect(badge?.equations.map((equation) => equation.id)).toEqual([
+      "casimir_dp_stage4_2i_complex_cross_ratio",
+      "casimir_dp_stage4_2i_ordinary_corrected_interaction",
+      "casimir_dp_stage4_2i_wavepacket_custody",
+    ]);
+    expect(assumptions).toContain(
+      "Standard boundary-independent DP cancels from the primary cross-ratio",
+    );
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_stage4_2h_requires_stage4_2i_boundary_branch_interaction",
+      "casimir_dp_stage4_2i_interaction_nonbridge_blocks_claim_boundary",
+      "casimir_dp_stage4_2i_requires_stage4_2j_schrodinger_mass_density",
+    ]));
+    expect(incidentEdges).toHaveLength(3);
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
+  });
+
+  it("registers Stage-4.2J as a fail-closed Schrödinger, density, and environment diagnostic", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find(
+      (candidate) =>
+        candidate.id ===
+          "study.casimir_dp.schrodinger_mass_density_stage4_2j",
+    );
+    const incidentEdges = branch.edges.filter(
+      (edge) => edge.from === badge?.id || edge.to === badge?.id,
+    );
+    const assumptions = badge?.assumptions.join(" ") ?? "";
+
+    expect(badge?.status).toBe("diagnostic");
+    expect(badge?.calculatorPayloads).toEqual([]);
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "registered_gaussian_recovery_pass",
+      "complete_representation_robustness_blocked",
+      "declared_equilibrium_gas_screen_no_go",
+      "state_preparation_not_ready",
+      "external_bound_mapping_not_ready",
+      "collapse_identification_blocked",
+      "zero_observable_bridge",
+    ]));
+    expect(badge?.equations.map((equation) => equation.id)).toEqual([
+      "casimir_dp_stage4_2j_schrodinger_coherence_factorization",
+      "casimir_dp_stage4_2j_dp_equivalent_energy_inverse",
+      "casimir_dp_stage4_2j_homogeneous_sphere_energy",
+      "casimir_dp_stage4_2j_residual_gas_screen",
+    ]);
+    expect(assumptions).toContain(
+      "conditional model inference, not directly collected gravitational energy",
+    );
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_stage4_2i_requires_stage4_2j_schrodinger_mass_density",
+      "casimir_dp_stage4_2j_no_go_blocks_claim_boundary",
+      "casimir_dp_stage4_2j_requires_stage4_2k_microscopic_em_closure",
+    ]));
+    expect(incidentEdges).toHaveLength(3);
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
+  });
+
+  it("registers Stage-4.2K as a non-promotable ordinary-EM closure gate", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find((candidate) =>
+      candidate.id === "study.casimir_dp.microscopic_em_closure_stage4_2k");
+    const incidentEdges = branch.edges.filter(
+      (edge) => edge.from === badge?.id || edge.to === badge?.id,
+    );
+    const assumptions = badge?.assumptions.join(" ") ?? "";
+
+    expect(badge?.status).toBe("diagnostic");
+    expect(badge?.calculatorPayloads).toEqual([]);
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "analytic_material_recovery_pass",
+      "orientation_authority_not_ready",
+      "finite_geometry_green_not_ready",
+      "qlbe_not_ready",
+      "residual_attribution_blocked",
+      "zero_observable_bridge",
+    ]));
+    expect(badge?.equations).toHaveLength(4);
+    expect(assumptions).toContain("Virtual photons");
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_stage4_2j_requires_stage4_2k_microscopic_em_closure",
+      "casimir_dp_stage4_2k_em_no_go_blocks_claim_boundary",
+      "casimir_dp_stage4_2k_requires_stage4_2l_empirical_authority",
+    ]));
+    expect(incidentEdges).toHaveLength(3);
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
+  });
+
+  it("registers Stage-4.2L as a non-promotable empirical-authority redesign gate", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find((candidate) =>
+      candidate.id === "study.casimir_dp.empirical_authority_stage4_2l");
+    const incidentEdges = branch.edges.filter(
+      (edge) => edge.from === badge?.id || edge.to === badge?.id,
+    );
+    const assumptions = badge?.assumptions.join(" ") ?? "";
+
+    expect(badge?.status).toBe("diagnostic");
+    expect(badge?.calculatorPayloads).toEqual([]);
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "apparatus_reference_frozen",
+      "phase_covariance_no_go",
+      "qlbe_proxy_no_go",
+      "state_preparation_not_ready",
+      "external_bound_partial_scalar_screen",
+      "confirmatory_campaign_not_authorized",
+      "zero_observable_bridge",
+    ]));
+    expect(badge?.equations).toHaveLength(4);
+    expect(assumptions).toContain("engineering reference");
+    expect(assumptions).toContain("does not demonstrate the proposed silica sphere");
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_stage4_2k_requires_stage4_2l_empirical_authority",
+      "casimir_dp_stage4_2l_redesign_no_go_blocks_claim_boundary",
+      "casimir_dp_stage4_2l_requires_stage4_2m_apparatus_search",
+    ]));
+    expect(incidentEdges).toHaveLength(3);
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
+  });
+
+  it("registers Stage-4.2M as a synthetic commissioning region with no observable bridge", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find((candidate) =>
+      candidate.id === "study.casimir_dp.apparatus_search_stage4_2m");
+    const incidentEdges = branch.edges.filter(
+      (edge) => edge.from === badge?.id || edge.to === badge?.id,
+    );
+
+    expect(badge?.status).toBe("diagnostic");
+    expect(badge?.calculatorPayloads).toEqual([]);
+    expect(badge?.equations).toHaveLength(2);
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "bounded_synthetic_search_pass",
+      "three_candidate_region",
+      "candidate_002_leading_design",
+      "commissioning_target_only",
+      "measured_evidence_not_ready",
+      "zero_observable_bridge",
+    ]));
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_stage4_2l_requires_stage4_2m_apparatus_search",
+      "casimir_dp_stage4_2m_synthetic_region_blocks_claim_boundary",
+      "casimir_dp_stage4_2m_requires_stage4_2n_ordinary_null",
+    ]));
+    expect(incidentEdges).toHaveLength(3);
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
+  });
+
+  it("registers Stage-4.2N as a non-promotable ordinary-null response chain", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find((candidate) =>
+      candidate.id === "study.casimir_dp.material_thermal_ordinary_null_stage4_2n");
+    const incidentEdges = branch.edges.filter(
+      (edge) => edge.from === badge?.id || edge.to === badge?.id,
+    );
+
+    expect(badge?.status).toBe("diagnostic");
+    expect(badge?.calculatorPayloads).toEqual([]);
+    expect(badge?.equations).toHaveLength(3);
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "synthetic_pipeline_pass",
+      "ordinary_null_authority_not_ready",
+      "residual_attribution_blocked",
+      "zero_observable_bridge",
+    ]));
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_stage4_2m_requires_stage4_2n_ordinary_null",
+      "casimir_dp_stage4_2n_empirical_gaps_block_claim_boundary",
+    ]));
+    expect(incidentEdges).toHaveLength(2);
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
   });
 
   it("keeps Compton, DP, and cavity frequencies separate until a transfer kernel exists", () => {

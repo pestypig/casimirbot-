@@ -1,0 +1,156 @@
+{
+  "schema_version": "casimir_dp_microscopic_em_closure_stage4_2k_verification_receipt/1",
+  "campaign_id": "casimir-dp-microscopic-em-closure-stage4-2k-v1",
+  "campaign_run_id": "casimir-dp-microscopic-em-closure-stage4-2k-v1-20260806T050000000Z",
+  "verified_at": "2026-08-06T04:20:00.000Z",
+  "evidence_class": "synthetic_microscopic_em_closure_and_residual_attribution_only",
+  "claim_ceiling": "ordinary_em_phase_loss_and_readiness_diagnostic_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-microscopic-em-closure-stage4-2k.v1.json",
+    "config_sha256": "917e0edc0fecd80ce30cfa775fa5d354a273825253a693a4be5de025ff29fa33",
+    "authority_manifest_path": "configs/research/casimir-dp-stage4-2k-authorities.v1.json",
+    "authority_manifest_sha256": "a3bd921056d106fd093568b7679db60303037aafd2239e8e5a56d3df76533541",
+    "fixture_path": "configs/research/fixtures/casimir-dp-stage4-2k.synthetic.v1.json",
+    "fixture_sha256": "34efaf814a40839dce6d51ff04c5802d8a8c7027ce7dbe844cb21b3d98244486",
+    "report_json_path": "artifacts/research/casimir-dp-microscopic-em-closure-stage4-2k/casimir-dp-microscopic-em-closure-stage4-2k-v1-20260806T050000000Z/microscopic-em-closure-stage4-2k-report.json",
+    "report_json_sha256": "53afcf057f272e191bea1d6218c7656f8d3a4d1b0647a057c87ce7ea4bb093bb",
+    "report_markdown_path": "artifacts/research/casimir-dp-microscopic-em-closure-stage4-2k/casimir-dp-microscopic-em-closure-stage4-2k-v1-20260806T050000000Z/microscopic-em-closure-stage4-2k-report.md",
+    "report_markdown_sha256": "b450590727c4e01717f115662f02adc6295295d03683e91669e501f423b19811",
+    "campaign_trace_path": "artifacts/research/casimir-dp-microscopic-em-closure-stage4-2k/casimir-dp-microscopic-em-closure-stage4-2k-v1-20260806T050000000Z/microscopic-em-closure-stage4-2k-trace.jsonl",
+    "campaign_trace_sha256": "4f881dd35300ae5f5537ebcb3e18fa66cd801559de1bc7e1af7ea53ae757a3e7",
+    "campaign_receipt_path": "artifacts/research/casimir-dp-microscopic-em-closure-stage4-2k/casimir-dp-microscopic-em-closure-stage4-2k-v1-20260806T050000000Z/microscopic-em-closure-stage4-2k-receipt.json",
+    "campaign_receipt_sha256": "4a9697c0dd290820dc782b5a5706e8b7bb7a3fd24a9965ea5a9043eefcc18e12",
+    "maintained_report_path": "docs/research/casimir-dp-microscopic-em-closure-stage4-2k-report.md",
+    "maintained_report_sha256": "b450590727c4e01717f115662f02adc6295295d03683e91669e501f423b19811",
+    "maintained_report_matches_immutable_markdown": true,
+    "git_head": "f0dfd07085af214797458081b246ab87f1175c72",
+    "worktree_state": "dirty_uncommitted_stage4_2k_source_and_content_hashes_authoritative",
+    "authority_mode": "role_path_and_content_hash_tuple"
+  },
+  "immutable_upstream": {
+    "stage4_2j_run_id": "casimir-dp-schrodinger-mass-density-stage4-2j-v1-20260806T040000000Z",
+    "stage4_2j_verification_receipt_path": "docs/research/casimir-dp-schrodinger-mass-density-stage4-2j-verification-receipt.json",
+    "stage4_2j_verification_receipt_sha256": "fbe99aa93085b12ebba7a59328993174015a0a4dcb83db3e5c531990c025cedd",
+    "mutation_detected": false
+  },
+  "verification_inputs": {
+    "adapter_command": "npm run casimir:verify -- --ci --trace-out artifacts/training-trace-stage4-2k-20260806T050000000Z.jsonl --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export",
+    "telemetry_mode": "standard_cli_repository_telemetry",
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-2k-20260806T050000000Z-bound-validated.jsonl",
+      "sha256": "d642c446042f5453f6b3afd563c89081969eafc560a5ce9166e330bd1413177d",
+      "bytes": 986,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true,
+      "validated_exporter_path": "scripts/research/export-casimir-dp-stage4-verification-trace.ts"
+    }
+  },
+  "local_gates": {
+    "stage4_2k_runtime_campaign_paper_graph_and_root": {
+      "files": 5,
+      "tests": 60,
+      "status": "pass"
+    },
+    "downstream_stage4_2c_through_stage4_2k_campaign_replay": {
+      "files": 21,
+      "tests": 88,
+      "status": "pass"
+    },
+    "required_gr_warp_replay": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    },
+    "production_build": {
+      "status": "pass_with_pre_existing_warnings",
+      "commands": ["npm run build:client", "npm run build:server"],
+      "exit_codes": [0, 0],
+      "warnings_present": true
+    },
+    "dependency_coherence": {
+      "status": "pass_from_adapter_trace",
+      "package_lock_sha256": "b33d68312713d5b1fe14568aa551e63dc42fc60486f30f86237f06098aa806db"
+    },
+    "equation_sidecars": {
+      "main_marker_source_generated": [20, 20, 20],
+      "supplement_marker_source_generated": [73, 73, 73],
+      "main_source_sha256": "a2580f741af0020d133bdd6f83cd462e7c0ee28f1f42d383d67a6aa0ef49b33c",
+      "main_generated_sha256": "21479a8362e8ab244164653fa086d5c05ca21bf0383b1ab4e3bda0e6fab11265",
+      "supplement_source_sha256": "4506f546305c885115ac335f815da8f202d0b7b191bf49f32136223ef9d7309e",
+      "supplement_generated_sha256": "6c8f0811206b04d024d0ebc70172b6f21437401514a8fd38715354491ae5bf8b",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 36,
+      "edges": 104,
+      "stage4_2k_badges": 1,
+      "calculator_payloads": 0,
+      "observable_bridge_edges": 0,
+      "graph_path": "shared/theory/casimir-dp-study-theory-badges.ts",
+      "graph_sha256": "88d4fb104219954ff3c42130f05b8cb71a69f0da41f57fcb8301fd9a089ccb00",
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 219,
+      "validation": "pass",
+      "stage4_2k_manual_registry_row": "MATH_STATUS.md",
+      "report_json_sha256": "87f0ae7ef1625c03f4af5446b5de2058f37fa6aea853ff3695de40e06269dcbe",
+      "report_markdown_sha256": "de5f8961281a02232268b38d639cb0aecf88a39d589f4f2cf7869ce874329c45"
+    },
+    "physics_root_to_leaf_manifest": {
+      "status": "pass",
+      "manifest_sha256": "0e8759570c11ac229f79f9ad5c625a2ccd019cb5940ad1508476dab529237371",
+      "stage4_2k_readiness_and_falsifier_rules_present": true
+    }
+  },
+  "adapter_result": {
+    "trace_id": "adapter:21b78d81-ede2-4160-959d-661ed230fa2a",
+    "run_id": "2371",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate": {
+      "status": "GREEN",
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+      "integrity_ok": true
+    },
+    "scientific_scope": "none"
+  },
+  "scientific_standing": {
+    "software_contract": "pass",
+    "synthetic_recovery": "pass",
+    "epsilon_static": 3.8,
+    "sphere_polarizability_static_SI": 1.1330326534463766e-30,
+    "atomic_ground_state_polarizability_static_SI": 1.6193248164613698e-41,
+    "ideal_planar_normal_delta_energy_J": 3.5591611008000276e-24,
+    "ideal_planar_normal_phase_250_ms_rad": 8437455475.827559,
+    "ideal_planar_normal_delta_energy_to_dp_ratio": 1405996295710.9043,
+    "ideal_planar_tangential_phase_rad": 0,
+    "dp_exponent_250_ms": 0.006001050995935658,
+    "maximum_phase_jitter_rad_for_tenth_dp_exponent": 0.03464404998245921,
+    "required_normal_fractional_stability": 4.1059831464249905e-12,
+    "required_normal_fractional_unwrap_accuracy": 1.185191439368062e-13,
+    "measured_material_spectrum": "not_ready",
+    "finite_geometry_green_authority": "not_ready",
+    "branch_orientation_authority": "not_ready",
+    "ordinary_phase_covariance": "not_ready",
+    "qlbe_environment_model": "not_ready",
+    "residual_attribution": "blocked",
+    "confirmatory_campaign_authorized": false,
+    "transfer_kernel": "not_registered",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "explanation": "The certificate validates repository convergence and the Stage-4.2K microscopic electromagnetic closure contract, synthetic material-response recovery, ideal-planar orientation screen, phase-jitter budget, four-cell ordinary-null subtraction, quantum-linear-Boltzmann readiness audit, sidecars, Theory Badge graph, math registry, root-to-leaf graph, build, and required GR/WARP software path. The large normal-screen phase is an ideal-conductor retarded-dipole diagnostic, not a finite-apparatus prediction; the tangential zero follows ideal infinite-plane translational symmetry. The result supplies no measured material spectra, registered boundary-relative branch orientation, CAD or mesh, finite-geometry Green tensor, measured phase covariance, quantum gas-scattering kernel, prepared massive superposition, observed residual, Casimir-to-collapse transfer kernel, collapse identification, manifold dynamics, or physical viability."
+  }
+}

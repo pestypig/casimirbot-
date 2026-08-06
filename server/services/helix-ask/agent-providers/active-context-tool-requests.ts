@@ -692,9 +692,26 @@ export const readCapabilitySelection = (record: Record<string, unknown> | null):
 
 export const collectStructuredAdmissionRecords = (body: Record<string, unknown>): Record<string, unknown>[] => {
   const routeMetadata = readRecord(body.route_metadata ?? body.routeMetadata);
+  const sourceTargetIntent = readRecord(
+    body.source_target_intent ?? body.sourceTargetIntent,
+  );
+  const toolCallAdmission = readRecord(
+    body.tool_call_admission_decision ?? body.toolCallAdmissionDecision,
+  );
+  const hardVisualCaptureAdmission =
+    readString(sourceTargetIntent?.strength) === "hard" &&
+    [
+      readString(sourceTargetIntent?.target_source),
+      readString(sourceTargetIntent?.target_kind),
+    ].includes("visual_capture") &&
+    readString(toolCallAdmission?.admitted_capability) ===
+      "situation-room.describe_visual_capture"
+      ? toolCallAdmission
+      : null;
   return [
-    readRecord(body.source_target_intent ?? body.sourceTargetIntent),
+    sourceTargetIntent,
     readRecord(body.capability_selection_result ?? body.capabilitySelectionResult),
+    hardVisualCaptureAdmission,
     routeMetadata,
     readRecord(routeMetadata?.source_target_intent ?? routeMetadata?.sourceTargetIntent),
     readRecord(routeMetadata?.capability_selection_result ?? routeMetadata?.capabilitySelectionResult),
@@ -963,7 +980,25 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
       selectedCapability === "docs-viewer.doc_equation_context" ||
       selectedCapability === DOCS_SEARCH_CAPABILITY
     ) {
-      const key = `${DOCS_SEARCH_CAPABILITY}:${query}`;
+      const promptText = prompt ?? "";
+      const explicitDocPath = normalizeDocPath(
+        extractUnquotedDocsMarkdownPaths(promptText)[0],
+      );
+      const exactLocateTerms = explicitDocPath
+        ? extractExplicitDocsLocateTerms(promptText)
+        : [];
+      const sectionRequest = explicitDocPath
+        ? extractExplicitDocsSectionRequest(promptText)
+        : null;
+      const boundedQuery =
+        sectionRequest?.headings.join(" ") ??
+        (exactLocateTerms.length > 0
+          ? exactLocateTerms.join(" ")
+          : query);
+      const boundedPaths = explicitDocPath
+        ? [explicitDocPath]
+        : paths;
+      const key = `${DOCS_SEARCH_CAPABILITY}:${boundedQuery}:${boundedPaths.join(",")}`;
       if (seen.has(key)) continue;
       seen.add(key);
       requests.push({
@@ -972,8 +1007,20 @@ export const buildStructuredAdmissionWorkstationGatewayCallRequests = (
         capability_id: DOCS_SEARCH_CAPABILITY,
         mode: "read",
         arguments: {
-          query,
-          ...(paths.length > 0 ? { paths } : {}),
+          query: boundedQuery,
+          ...(boundedPaths.length > 0 ? { paths: boundedPaths } : {}),
+          ...(exactLocateTerms.length > 0
+            ? { exact_terms: exactLocateTerms, max_hits: 40 }
+            : {}),
+          ...(sectionRequest
+            ? {
+                section_heading: sectionRequest.heading,
+                section_headings: sectionRequest.headings,
+                section_contains_terms: sectionRequest.contains_terms,
+                section_match_unit: sectionRequest.match_unit,
+                max_hits: 40,
+              }
+            : {}),
           ...(roomEnvironmentMechanicsSearch
             ? { environment_scope: "active_room_environment" }
             : {}),

@@ -365,12 +365,38 @@ Required behavior for future patches:
 1. Run static/unit/build checks that do not require secrets from the agent shell.
 2. For live agent parity, first check whether a suitable localhost server is
    already running at `HELIX_ASK_BASE_URL`.
-3. If no suitable server is running, report that live agent parity is blocked and
-   ask the user to start the normal keyed local server.
-4. After the user-started server is available, run `npm run helix:ask:api-parity`
-   or the relevant live probe against that server.
-5. Do not treat a self-started, unkeyed, fallback, mock, or non-LLM server as
+3. If the user or active repository contract authorizes the configured opaque
+   launcher, Codex Desktop may invoke only:
+
+   ```powershell
+   & 'C:\Users\dan\.local\bin\start-myapp-for-codex.cmd' '<canonical-workspace-path>'
+   ```
+
+   Do not read or patch the launcher, inspect credential-bearing environment
+   variables, print secret-bearing process command lines, or start the keyed
+   server by another command. Wait for `[express] app ready` and verify the
+   reported local URL's account session, Helix pipeline, and agent-provider
+   endpoints without exposing credentials.
+4. If neither a suitable server nor opaque-launch authorization exists, report
+   live parity as blocked and ask the user to start the normal keyed server.
+5. Run `npm run helix:ask:api-parity` or the relevant live probe against that
+   same server.
+6. Do not treat a self-started, unkeyed, fallback, mock, or non-LLM server as
    proof of agent-path correctness.
+
+On a memory-constrained workstation, run focused fixtures before broad
+batteries, keep only one heavy build or Vitest worker tree active, and monitor
+host committed memory as well as per-process working sets. Do not print command
+lines or environment blocks while attributing memory. Stop only a verified test
+worker tree when a run stalls; preserve a healthy keyed server, browser room,
+and environment connector so identity epochs are not invalidated unnecessarily.
+
+For adapter-parity diagnosis, use the first-authority-divergence method and the
+direct Codex / Helix A-B comparison in
+`docs/helix-ask-readiness-debug-loop.md`. Direct environment access may prove
+that the requested operation is possible; acceptance still requires the same
+natural prompt to traverse Helix admission, observation re-entry, provider
+synthesis, and terminal projection.
 
 Report disabled/frontier scenarios separately. Do not present a disabled
 scenario as proof of the current contract.

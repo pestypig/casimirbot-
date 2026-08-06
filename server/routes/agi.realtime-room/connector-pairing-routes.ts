@@ -207,17 +207,23 @@ sharedRealtimeRoomConnectorPairingRouter.post(
       sourceLabel: parsed.data.source_label,
       credentialTtlMs: parsed.data.credential_ttl_ms,
       commandCredentialRequested: parsed.data.command_credential_requested,
+      actionCredentialRequested: parsed.data.action_credential_requested,
+      actionAuthorityId: parsed.data.action_authority_id,
       idempotencyKey: idempotencyKey(req),
     });
     res.status(201).json(
       receipt({
         ok: true,
         message: parsed.data.command_credential_requested
-          ? "Command pairing code created. Run it in Minecraft as an operator; the separate command credential is delivered directly to the Fabric connector."
-          : "Pairing code created. Run the command from the game server console or as a Minecraft operator before it expires.",
+          ? "Command pairing code created. Run it in Minecraft as an operator; the separate command credential is delivered directly to the Fabric server connector."
+          : parsed.data.action_credential_requested
+            ? "Player-action pairing code created. Run it in the Fabric client companion; the separate action credential is delivered only to that client connector."
+            : "Pairing code created. Run the command from the game server console or as a Minecraft operator before it expires.",
         pairing: created.pairing,
         pairing_code: created.pairingCode,
-        pairing_command: `/helix pair ${created.pairingCode}`,
+        pairing_command: parsed.data.action_credential_requested
+          ? `/helix-player pair ${created.pairingCode}`
+          : `/helix pair ${created.pairingCode}`,
         pairing_code_shown_once: true,
       }),
     );

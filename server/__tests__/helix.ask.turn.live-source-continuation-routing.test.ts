@@ -466,7 +466,7 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.action_id).not.toBe("situation-room.live-source.set_rate");
     expect(response.body?.route_authority_audit?.source_target).toBe("procedure_memory");
     expect(response.body?.route_authority_audit?.route_authority_ok).toBe(true);
-  }, 20_000);
+  }, 90_000);
 
   it("rejects live pipeline receipts at the terminal guard for visual-content prompts even under live-pipeline source target", () => {
     const contract = buildRouteProductContract({

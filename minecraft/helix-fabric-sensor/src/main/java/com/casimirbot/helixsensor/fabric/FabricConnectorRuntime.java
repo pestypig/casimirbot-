@@ -175,8 +175,8 @@ public final class FabricConnectorRuntime implements AutoCloseable {
                     }
                     FabricCommandRuntime currentCommandRuntime = commandRuntime;
                     if (currentCommandRuntime != null) {
-                        if (recovered && currentCommandRuntime.active()) {
-                            currentCommandRuntime.refreshAfterSourceRecovery();
+                        if (currentCommandRuntime.active()) {
+                            currentCommandRuntime.refreshAfterManifestAdmission();
                         } else {
                             currentCommandRuntime.start(server);
                         }

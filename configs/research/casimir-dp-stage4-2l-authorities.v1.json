@@ -1,0 +1,88 @@
+{
+  "schema_version": "casimir_dp_stage4_2l_authorities/1",
+  "campaign_id": "casimir-dp-empirical-authority-stage4-2l-v1",
+  "immutable_upstream": [
+    {
+      "role": "stage4_2k_config",
+      "path": "configs/research/casimir-dp-microscopic-em-closure-stage4-2k.v1.json",
+      "sha256": "917e0edc0fecd80ce30cfa775fa5d354a273825253a693a4be5de025ff29fa33",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2k_report",
+      "path": "artifacts/research/casimir-dp-microscopic-em-closure-stage4-2k/casimir-dp-microscopic-em-closure-stage4-2k-v1-20260806T050000000Z/microscopic-em-closure-stage4-2k-report.json",
+      "sha256": "53afcf057f272e191bea1d6218c7656f8d3a4d1b0647a057c87ce7ea4bb093bb",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2k_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-microscopic-em-closure-stage4-2k/casimir-dp-microscopic-em-closure-stage4-2k-v1-20260806T050000000Z/microscopic-em-closure-stage4-2k-receipt.json",
+      "sha256": "4a9697c0dd290820dc782b5a5706e8b7bb7a3fd24a9965ea5a9043eefcc18e12",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2k_verification_receipt",
+      "path": "docs/research/casimir-dp-microscopic-em-closure-stage4-2k-verification-receipt.json",
+      "sha256": "86842783941186f532d23ae2ee8de70f21a888b0ea70b71a12b50bdf005ac614",
+      "required_at_runtime": true
+    }
+  ],
+  "method_authorities": [
+    {
+      "role": "stage4_2k_microscopic_em_evaluator",
+      "path": "shared/casimir-dp-microscopic-em-closure-stage4-2k.ts",
+      "sha256": "091f43c89f236fb4656e1773fefa5d9c7adc40f15fec38c90e9c794a87dc6968",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2j_schrodinger_mass_density_evaluator",
+      "path": "shared/casimir-dp-schrodinger-mass-density-stage4-2j.ts",
+      "sha256": "eea077423bd3dfa650b4e0a58fc6fc35dec9c948331bdb993935045010d9c860",
+      "required_at_runtime": true
+    }
+  ],
+  "literature_authorities": [
+    {
+      "source_id": "cleek_1966_fused_silica_ir",
+      "doi": "10.1364/AO.5.000771",
+      "url": "https://doi.org/10.1364/AO.5.000771",
+      "supports": "Measured room-temperature fused-silica optical constants in the strong infrared absorption region.",
+      "does_not_support": "Specimen-specific or 4 K dielectric authority for the proposed sphere and boundary."
+    },
+    {
+      "source_id": "emig_etal_2007",
+      "doi": "10.1103/PhysRevLett.99.170403",
+      "url": "https://doi.org/10.1103/PhysRevLett.99.170403",
+      "supports": "Finite-object Casimir calculations through material and geometry scattering data.",
+      "does_not_support": "The Stage-4.2L solid-angle surrogate as a full Maxwell Green-tensor solution."
+    },
+    {
+      "source_id": "hornberger_2006",
+      "doi": "10.1103/PhysRevLett.97.060601",
+      "url": "https://doi.org/10.1103/PhysRevLett.97.060601",
+      "supports": "Quantum-linear-Boltzmann dynamics built from gas distributions and scattering amplitudes.",
+      "does_not_support": "Replacing measured differential scattering and gas composition with an isotropic proxy."
+    },
+    {
+      "source_id": "pedalino_etal_2026",
+      "doi": "10.1038/s41586-025-09917-9",
+      "url": "https://doi.org/10.1038/s41586-025-09917-9",
+      "supports": "Observed matter-wave interference for sodium nanoparticles above 170 kDa with 133 nm path separation.",
+      "does_not_support": "Preparation of a 1.17e11 Da, 552.6 nm-diameter levitated silica sphere in the proposed integrated sequence."
+    },
+    {
+      "source_id": "seta_etal_2026",
+      "doi": "10.1103/y1q9-pnlc",
+      "url": "https://doi.org/10.1103/y1q9-pnlc",
+      "supports": "Measured shot-to-shot displacement noise and electric/mechanical limitations in levitated-particle state expansion.",
+      "does_not_support": "The Stage-4.2L design tolerances as achieved hardware performance."
+    },
+    {
+      "source_id": "xenonnt_2026",
+      "doi": "10.1103/2jm3-4976",
+      "url": "https://doi.org/10.1103/2jm3-4976",
+      "supports": "A 90% CL lower bound R0 greater than 4.9e-10 m for the Markovian Diósi-convention DP model.",
+      "does_not_support": "A full likelihood recast for the paper's composite effective-particle representation or evidence for collapse."
+    }
+  ]
+}

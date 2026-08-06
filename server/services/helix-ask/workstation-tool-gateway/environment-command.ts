@@ -91,7 +91,7 @@ export const environmentCommandMinecraftManifest: HelixWorkstationCapabilityMani
   capability_id: HELIX_MINECRAFT_COMMAND_CAPABILITY,
   label: "Run a live Minecraft server command",
   description:
-    "Parse and execute one exact command against the bound Minecraft server's live Brigadier dispatcher under the room owner's active authority profile. Issue multiple user-requested actions as sequential capability calls, one observed command at a time; never send a commands array. For a room member's bound player, use @s when the command runs from that player's source. Player-only arguments such as /title require @s, a literal player name, or a player selector such as @a; an @e selector remains an entity selector even when filtered by name. For unfamiliar or intricate syntax, first use docs.search with a goal-shaped query and environment_scope=active_room_environment, then use the live command catalog when the exact path or arguments remain uncertain. Do not add unrelated probes: observe only state materially needed to compose or verify the user's requested action. The connector verifies the exact category and effect before dispatch. This capability never grants host shell, filesystem, RCON, process, credential, or operating-system access.",
+    "Parse and execute one exact command against the bound Minecraft server's live Brigadier dispatcher under the room owner's active authority profile. Issue multiple user-requested actions as sequential capability calls, one observed command at a time; never send a commands array or join commands with semicolons. The installed rollback syntax is `helixgame checkpoint capture_box <name> <x1> <y1> <z1> <x2> <y2> <z2>`, `helixgame checkpoint restore <name>`, and `helixgame checkpoint status`. For a room member's bound player, use @s when the command runs from that player's source. Player-only arguments such as /title require @s, a literal player name, or a player selector such as @a; an @e selector remains an entity selector even when filtered by name. For unfamiliar or intricate syntax, first use docs.search with a goal-shaped query and environment_scope=active_room_environment, then use the live command catalog when the exact path or arguments remain uncertain. Do not add unrelated probes: observe only state materially needed to compose or verify the user's requested action. The connector verifies the exact category and effect before dispatch. This capability never grants host shell, filesystem, RCON, process, credential, or operating-system access.",
   panel_id: null,
   action_id: HELIX_ENVIRONMENT_COMMAND_GATEWAY_ACTION,
   mode: "act",
@@ -116,7 +116,7 @@ export const environmentCommandMinecraftManifest: HelixWorkstationCapabilityMani
         minLength: 1,
         maxLength: 16_000,
         description:
-          "Exactly one Minecraft command without a leading slash. Never supply an array, a command batch, a shell command, or an RCON command. For a room-bound player action, prefer @s; never use @e for a player-only argument.",
+          "Exactly one Minecraft command without a leading slash. Never supply an array, join commands with semicolons, send a command batch, a shell command, or an RCON command. Checkpoint capture uses `helixgame checkpoint capture_box <name> <x1> <y1> <z1> <x2> <y2> <z2>`. For a room-bound player action, prefer @s; never use @e for a player-only argument.",
       },
       category: {
         type: "string",
@@ -182,7 +182,33 @@ export type EnvironmentCommandGatewayExecution = {
   observation: Record<string, unknown>;
   executedArgs?: Record<string, unknown>;
   idempotentReplay?: boolean;
+  repairAction?: "repair" | "retry" | "ask_user";
   error?: string;
+};
+
+export const environmentCommandFailureRepairAction = (
+  outcome: HelixEnvironmentCommandObservation["outcome"],
+): "repair" | "retry" | "ask_user" => {
+  if (
+    [
+      "command_parse_failed",
+      "command_category_mismatch",
+      "command_catalog_changed",
+    ].includes(outcome)
+  ) {
+    return "repair";
+  }
+  if (
+    [
+      "failed",
+      "connector_offline",
+      "command_timeout",
+      "command_outcome_unknown",
+    ].includes(outcome)
+  ) {
+    return "retry";
+  }
+  return "ask_user";
 };
 
 export type EnvironmentCommandGatewayDependencies = {
@@ -247,23 +273,23 @@ const selectAuthorizedMinecraftEnvironment = async (input: {
   }
 
   const requestedLabel = input.requestedLabel.trim().toLowerCase();
-  const labelMatches = requestedLabel
+  const exactLabelMatches = requestedLabel
     ? activeEnvironments.filter(
         (environment) =>
           environment.source_label.trim().toLowerCase() === requestedLabel,
       )
-    : activeEnvironments;
-  if (labelMatches.length === 0) {
-    return {
-      ok: false,
-      error: "wrong_environment",
-      summary:
-        "The requested Minecraft environment label does not match an active room source.",
-    };
-  }
-
+    : [];
+  // The model-visible label is a disambiguation hint, not a provenance key.
+  // Exact room, account, binding, and grant identity are resolved server-side.
+  // A natural phrase such as "my paired Fabric world" must not block the sole
+  // authorized environment, while multiple authorized worlds still require an
+  // exact visible label and therefore fail closed on ambiguity.
+  const authorityCandidates =
+    requestedLabel && exactLabelMatches.length > 0
+      ? exactLabelMatches
+      : activeEnvironments;
   const authorized: AuthorizedMinecraftEnvironment[] = [];
-  for (const environment of labelMatches) {
+  for (const environment of authorityCandidates) {
     const authority = await input.deps.readAuthority({
       roomId: input.roomId,
       profileId: input.profileId,
@@ -291,6 +317,18 @@ const selectAuthorizedMinecraftEnvironment = async (input: {
       ok: false,
       error: "wrong_environment",
       summary: `More than one Minecraft environment grants ${input.accessKind} access; select the exact environment label.`,
+    };
+  }
+  if (
+    requestedLabel &&
+    exactLabelMatches.length === 0 &&
+    authorized.length !== 1
+  ) {
+    return {
+      ok: false,
+      error: "wrong_environment",
+      summary:
+        "The requested Minecraft environment label does not match one uniquely authorized active room source.",
     };
   }
   return { ok: true, target: authorized[0] };
@@ -476,6 +514,7 @@ const failed = (input: {
   status: input.status ?? "blocked",
   summary: input.summary,
   observation: syntheticFailure(input),
+  repairAction: environmentCommandFailureRepairAction(input.outcome),
   error: input.outcome,
 });
 
@@ -543,6 +582,7 @@ export const executeEnvironmentCommandGatewayCapability = async (input: {
       turnId: input.turnId,
       command,
       outcome: "command_category_mismatch",
+      status: "failed",
       summary:
         "Unknown and installed-mod Minecraft commands require an explicit category and effect; recognized vanilla commands are classified server-side.",
     });
@@ -623,7 +663,12 @@ export const executeEnvironmentCommandGatewayCapability = async (input: {
         : {}),
       ...(observation.outcome === "succeeded"
         ? {}
-        : { error: observation.outcome }),
+        : {
+            error: observation.outcome,
+            repairAction: environmentCommandFailureRepairAction(
+              observation.outcome,
+            ),
+          }),
     };
   } catch (error) {
     return failed({

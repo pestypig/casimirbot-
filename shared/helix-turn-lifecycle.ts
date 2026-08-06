@@ -149,6 +149,9 @@ export type HelixTurnLifecycleProjectionMismatchCode =
   | "legacy_evidence_reentry_disagrees_with_runtime"
   | "legacy_followup_reasoning_disagrees_with_runtime"
   | "legacy_provider_completion_disagrees_with_runtime"
+  | "provider_observation_reentry_disagrees_with_runtime"
+  | "capability_lane_reentry_disagrees_with_provider"
+  | "capability_lane_reentry_disagrees_with_runtime"
   | "continuation_pending_after_runtime_completion"
   | "terminal_rejection_after_eligible_runtime_completion"
   | "pending_lane_request_projected_as_terminal_candidate"
@@ -199,6 +202,8 @@ export type HelixTurnLifecycleContinuityCheck = {
   stage: HelixTurnLifecycleAuditStage;
   check:
     | "runtime_observation_reentry"
+    | "capability_lane_observation_reentry"
+    | "provider_observation_reentry"
     | "requested_tool_cardinality"
     | "forbidden_other_tools_absent"
     | "runtime_followup_reasoning"
@@ -237,6 +242,7 @@ export type HelixTurnLifecycleProjectionAudit = {
   continuity_checks?: HelixTurnLifecycleContinuityCheck[];
   scientific_evidence_disposition?:
     | "passed"
+    | "repair_pending"
     | "failed_closed"
     | "bypassed"
     | "not_observed";

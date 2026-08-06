@@ -49,6 +49,7 @@ describe("Minecraft command risk canonicalization", () => {
     ["summon minecraft:pig", "entity_control", "world_mutation"],
     ["execute as @a run whitelist list", "server_administration", "server_administration"],
     ["helixgame checkpoint capture cottage 7 5", "server_administration", "server_administration"],
+    ["helixgame checkpoint capture_box cottage -53 68 0 -49 70 0", "server_administration", "server_administration"],
     ["helixgame checkpoint restore cottage", "world_build", "world_mutation"],
     ["helixgame fall_rescue arm 30", "world_build", "world_mutation"],
   ])("aligns the known vanilla command %s", (command, category, effect) => {

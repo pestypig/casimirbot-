@@ -1696,6 +1696,24 @@ export function evaluateAskTurnSolverHardGate(input: {
       "hard source-target cannot use no_tool_direct",
     );
   }
+  const liveSourceIdentityAudit = readRecord(
+    input.payload.live_source_identity_audit,
+  );
+  if (
+    hardSourceTarget &&
+    !nonAnswerTerminal &&
+    readString(liveSourceIdentityAudit?.schema) ===
+      "helix.live_source_identity_audit.v1" &&
+    liveSourceIdentityAudit?.identity_ok === false
+  ) {
+    const diagnosis =
+      readString(liveSourceIdentityAudit.diagnosis) ?? "identity_unresolved";
+    pushHardFailure(
+      details,
+      "terminal_authority_before_solver_completion",
+      `live-source identity must reconcile before terminal authority (${diagnosis})`,
+    );
+  }
   if (
     !typedFailureTerminal &&
     routeAuthority?.route_authority_ok === false &&

@@ -1,0 +1,149 @@
+{
+  "schema_version": "casimir_dp_boundary_branch_interaction_stage4_2i_verification_receipt/1",
+  "campaign_id": "casimir-dp-boundary-branch-interaction-stage4-2i-v1",
+  "campaign_run_id": "casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z",
+  "verified_at": "2026-08-06T02:34:04.000Z",
+  "evidence_class": "synthetic_interaction_diagnostic_and_wavepacket_contract_only",
+  "claim_ceiling": "boundary_branch_nonfactorization_diagnostic_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-boundary-branch-interaction-stage4-2i.v1.json",
+    "config_sha256": "6f66903a470f14314166c755b080208cf0942d6bb382077d6e44b953252d234e",
+    "authority_manifest_path": "configs/research/casimir-dp-stage4-2i-authorities.v1.json",
+    "authority_manifest_sha256": "8078f2b05998ad145901444433296d244651a06ab1f75c3aa70b9d5ae2cb7423",
+    "fixture_path": "configs/research/fixtures/casimir-dp-stage4-2i-factorial.synthetic.v1.json",
+    "fixture_sha256": "36c38578b6df5e73c4441cb3f509cf10931f72249425e798e9e2c4f8d362eaa7",
+    "report_json_path": "artifacts/research/casimir-dp-boundary-branch-interaction-stage4-2i/casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z/boundary-branch-interaction-stage4-2i-report.json",
+    "report_json_sha256": "a879a9110a18011ab3bdd8c3ebc224532eb67de3d15cfdc511b40f1006b06c65",
+    "report_markdown_path": "artifacts/research/casimir-dp-boundary-branch-interaction-stage4-2i/casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z/boundary-branch-interaction-stage4-2i-report.md",
+    "report_markdown_sha256": "d8bd040356cf42971e39209769b638e1d9ebbea923fc87c73e26a805bdf00ad4",
+    "campaign_trace_path": "artifacts/research/casimir-dp-boundary-branch-interaction-stage4-2i/casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z/boundary-branch-interaction-stage4-2i-trace.jsonl",
+    "campaign_trace_sha256": "020f647319fb416aa7fcb97e670a6106731a2efd512b64393967ccc090a0fe91",
+    "campaign_receipt_path": "artifacts/research/casimir-dp-boundary-branch-interaction-stage4-2i/casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z/boundary-branch-interaction-stage4-2i-receipt.json",
+    "campaign_receipt_sha256": "7ffe144e8bffc95c92edad45f8385642a8aa0ce8553cc50380ba816d734df35c",
+    "maintained_report_path": "docs/research/casimir-dp-boundary-branch-interaction-stage4-2i-report.md",
+    "maintained_report_sha256": "d8bd040356cf42971e39209769b638e1d9ebbea923fc87c73e26a805bdf00ad4",
+    "maintained_report_matches_immutable_markdown": true,
+    "git_head": "f0dfd07085af214797458081b246ab87f1175c72",
+    "worktree_state": "dirty_uncommitted_stage4_2i_source_and_content_hashes_authoritative",
+    "authority_mode": "role_path_and_content_hash_tuple"
+  },
+  "immutable_upstream": {
+    "stage4_2h_run_id": "casimir-dp-commissioning-intake-stage4-2h-v1-20260730T050000000Z",
+    "stage4_2h_verification_receipt_path": "docs/research/casimir-dp-commissioning-intake-stage4-2h-verification-receipt.json",
+    "stage4_2h_verification_receipt_sha256": "acbab1f786e688fe04ad2d5cae15219166368e41b01b8df5949617ef150ce364",
+    "stage4_2g_run_id": "casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z",
+    "mutation_detected": false
+  },
+  "verification_inputs": {
+    "adapter_command": "npm run casimir:verify -- --ci --trace-out artifacts/training-trace-stage4-2i-20260806T023300000Z.jsonl --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export",
+    "telemetry_mode": "standard_cli_repository_telemetry",
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-2i-20260806T023300000Z-bound-validated.jsonl",
+      "sha256": "97d3cfcc1be7c29946a300eba705fc245def0fc86b8e3d3c09c79a9f6f9dadaf",
+      "bytes": 986,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true,
+      "validated_exporter_path": "scripts/research/export-casimir-dp-stage4-verification-trace.ts"
+    }
+  },
+  "local_gates": {
+    "stage4_2i_runtime_campaign_paper_graph_and_root": {
+      "files": 5,
+      "tests": 59,
+      "status": "pass"
+    },
+    "downstream_stage4_2c_through_stage4_2h_campaign_replay": {
+      "tests": 19,
+      "status": "pass"
+    },
+    "historical_stage4_2b_cold_runner": {
+      "tests_passed": 1,
+      "tests_blocked": 2,
+      "status": "immutable_tracking_transition_exception",
+      "reason": "The frozen Stage-4.2B config records its authority manifest as tracked=false; that historical manifest is now tracked. Later certified Stage-4.2C-H consumers recover the immutable Stage-4.2B artifact and pass. Stage-4.2B was not rewritten."
+    },
+    "required_gr_warp_replay": {
+      "files": 17,
+      "tests": 179,
+      "status": "pass"
+    },
+    "production_build": {
+      "status": "pass_with_pre_existing_warnings",
+      "commands": ["npm run build:client", "npm run build:server"],
+      "exit_codes": [0, 0],
+      "client_modules_transformed": 7063,
+      "warnings_present": true
+    },
+    "dependency_coherence": {
+      "status": "pass_from_adapter_trace",
+      "package_lock_sha256": "b33d68312713d5b1fe14568aa551e63dc42fc60486f30f86237f06098aa806db"
+    },
+    "equation_sidecars": {
+      "main_marker_source_generated": [12, 12, 12],
+      "supplement_marker_source_generated": [65, 65, 65],
+      "main_source_sha256": "b9869825e6564154ed178e43b391daba39c9d6151f1f9251cd72bfe2c3b60cbc",
+      "main_generated_sha256": "deeec064573c2e12da48a5cb0543b2ce6b7051de6689c53068a97dedfcc9dc16",
+      "supplement_source_sha256": "e4b0d5beabb3d938bae6f64a99dc579cb150463d7f2678efa5241e2865d6bb90",
+      "supplement_generated_sha256": "7b636a60fcbc726c9e6a472a69441db5aa7bef40d70dbf19d1558b45bbce62fa",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 34,
+      "edges": 100,
+      "stage4_2i_badges": 1,
+      "calculator_payloads": 0,
+      "observable_bridge_edges": 0,
+      "graph_path": "shared/theory/casimir-dp-study-theory-badges.ts",
+      "graph_sha256": "ffef55ef0d16d22673c7f30de902cf375097d8b78ed6e8b1fa36e6f922f2227d",
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 217,
+      "validation": "pass",
+      "stage4_2i_manual_registry_row": "MATH_STATUS.md",
+      "report_json_sha256": "6b655d863f634ecfe207c2a53af0191fe14182d5b2eb8c75179af8769f85d8ca",
+      "report_markdown_sha256": "063cd27c11c67013f5bb4009b11a51d83c6b0baec69d4ae5305145253955971c"
+    },
+    "physics_root_to_leaf_manifest": {
+      "status": "pass",
+      "manifest_sha256": "46a11b5dda7abc10683d1568271d8d32763685f719cf81f2ef71fa7b3a501d3a",
+      "stage4_2i_readiness_and_falsifier_rules_present": true
+    }
+  },
+  "adapter_result": {
+    "trace_id": "adapter:47f5ee16-a11c-4d8b-9953-dba211929f14",
+    "run_id": "2369",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate": {
+      "status": "GREEN",
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+      "integrity_ok": true
+    },
+    "scientific_scope": "none"
+  },
+  "scientific_standing": {
+    "software_contract": "pass",
+    "synthetic_recovery": "pass",
+    "branch_control_empirical_authority": "not_ready",
+    "wavepacket_custody_empirical_authority": "not_ready",
+    "ordinary_interaction_model_empirical_authority": "not_ready",
+    "measured_interaction_contrast": "not_ready",
+    "transfer_kernel": "not_registered",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "explanation": "The certificate validates repository convergence and the Stage-4.2I estimator, covariance, packet-custody, sidecar, graph, math-status, root-to-leaf, build, and GR/WARP software path. It supplies no prepared superposition, measured packet equivalence, measured ordinary response, measured four-cell coherence, DP preference, boundary-to-collapse transfer kernel, collapse identification, manifold dynamics, or physical viability."
+  }
+}

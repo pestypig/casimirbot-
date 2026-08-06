@@ -3200,13 +3200,18 @@ const naturalMinecraftCommandActionPromptMatch = (
     /\b(?:save|write|copy|record|export)\b[\s\S]{0,100}\b(?:text|wording|example|snippet)\b[\s\S]{0,100}\b(?:command|file|disk|document|note)\b/i.test(
       clauseWindow,
     );
+  const requestsCommandDescriptionInsteadOfExecution =
+    /\b(?:give|show|provide|return|report|write|quote|cite)\s+(?:me\s+)?(?:the\s+)?(?:exact\s+)?(?:minecraft\s+)?(?:command\s+(?:form|syntax|text|example|snippet)|syntax\s+for\s+(?:the\s+)?command)\b/i.test(
+      clauseWindow,
+    );
 
   if (
     explainsInsteadOfActs ||
     negatedOrNoChange ||
     deferredOrConditional ||
     contextualDiscussion ||
-    targetsCommandTextOrHostArtifact
+    targetsCommandTextOrHostArtifact ||
+    requestsCommandDescriptionInsteadOfExecution
   ) {
     return null;
   }
@@ -3360,6 +3365,7 @@ const naturalMinecraftSituationProbePromptMatches = (
       capability: HELIX_MINECRAFT_COMMAND_CAPABILITY,
       patterns: [
         BARE_MINECRAFT_SLASH_COMMAND_PROMPT,
+        /\b(?:check|read|query|inspect|tell\s+me|what(?:'s|\s+is))\b(?=[\s\S]{0,280}\b(?:minecraft|fabric|minehut|mine\s*hut|paired|connected)\b)(?=[\s\S]{0,280}\b(?:current|live)\s+(?:minecraft\s+)?(?:daytime|time|weather|difficulty|game\s*rules?|world\s*border|tick(?:ing)?\s+state)\b)[\s\S]{0,280}/i,
         /\b(?:use|using|run|execute|issue|send|set|change)\b[\s\S]{0,100}\b(?:live\s+)?(?:minecraft|fabric|minehut|mine\s*hut|game)\b[\s\S]{0,100}\b(?:server\s+)?(?:command(?!\.catalog\b|\s+(?:tree|catalog)\b)(?:\s+(?:dispatcher|surface))?|dispatcher)\b/i,
         /\b(?:save|flush)\b[\s\S]{0,120}\b(?:connected\s+|live\s+)?(?:minecraft|fabric|minehut|mine\s*hut)\b[\s\S]{0,100}\b(?:server|world)\b[\s\S]{0,100}\b(?:using|with|via)\b[\s\S]{0,60}(?:\bcommand\b|\/save-all\b)/i,
       ],

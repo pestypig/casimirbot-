@@ -1166,3 +1166,72 @@ export const resolveRoomEnvironmentSubjectForProbe = async (input: {
     producerEpochRef: row.producer_epoch_ref,
   };
 };
+
+export const resolveActiveRoomEnvironmentSubjectByRef = async (input: {
+  roomId: string;
+  profileId: string;
+  environmentBindingId: string;
+  sourceId: string;
+  worldId: string;
+  subjectRef: string;
+}): Promise<ResolvedRoomEnvironmentSubject> => {
+  const membership = await readSharedRealtimeRoomMembership({
+    roomId: input.roomId,
+    profileId: input.profileId,
+  });
+  if (!membership || membership.roomStatus === "closed") {
+    throw new RoomEnvironmentSubjectError(
+      "subject_binding_forbidden",
+      403,
+      "The current account is not an active member of this room.",
+    );
+  }
+  const db = await readSharedRealtimeRoomDatabase();
+  const result = await db.query<{
+    participant_id: string;
+    producer_epoch_ref: string;
+  }>(
+    `
+      SELECT participant_id, producer_epoch_ref
+      FROM helix_room_environment_subject_bindings
+      WHERE room_id = $1
+        AND environment_binding_id = $2
+        AND source_id = $3
+        AND world_id = $4
+        AND subject_ref = $5
+        AND status = 'active'
+      LIMIT 1;
+    `,
+    [
+      input.roomId,
+      input.environmentBindingId,
+      input.sourceId,
+      input.worldId,
+      input.subjectRef.trim(),
+    ],
+  );
+  const target = result.rows[0];
+  if (!target) {
+    throw new RoomEnvironmentSubjectError(
+      "subject_binding_required",
+      409,
+      "The requested follow target is not an active, room-bound environment subject.",
+    );
+  }
+  const resolved = await resolveRoomEnvironmentSubjectForProbe({
+    membership,
+    participantId: target.participant_id,
+    environmentBindingId: input.environmentBindingId,
+    sourceId: input.sourceId,
+    worldId: input.worldId,
+    producerEpochRef: target.producer_epoch_ref,
+  });
+  if (!resolved) {
+    throw new RoomEnvironmentSubjectError(
+      "subject_binding_required",
+      409,
+      "The requested follow target could not be resolved to a live player.",
+    );
+  }
+  return resolved;
+};

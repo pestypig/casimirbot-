@@ -76,6 +76,7 @@ import {
 import {
   listEnvironmentConnectorCapabilityDescriptors,
 } from "../services/environment-connectors/catalog";
+import { recordWorldAuthorityEventBatch } from "../services/environment-connectors/events";
 
 type RequestWithRawBody = Request & { rawBody?: Buffer };
 
@@ -721,6 +722,20 @@ roomSourceIngressRouter.post(
           domain_adapter: activeClaim.binding.domain_adapter,
         },
       }));
+      const ledger = await recordWorldAuthorityEventBatch({
+        claim: activeClaim,
+        adapterAdmission,
+        sourceAdmission: admission,
+        events: admittedEvents,
+      }).catch((error: unknown) => {
+        payloadError(
+          "room_source_payload_invalid",
+          409,
+          error instanceof Error
+            ? `Typed environment ledger rejected the world-event batch: ${error.message}`
+            : "Typed environment ledger rejected the world-event batch.",
+        );
+      });
       const ingested = ingestProtectedRoomSourceWorldEventBatch(
         admittedEvents,
         admission,
@@ -738,6 +753,10 @@ roomSourceIngressRouter.post(
             .filter((value: string | null | undefined): value is string =>
               Boolean(value),
             ),
+          environment_event_batch_ref: ledger.batch.batch_id,
+          situation_digest_refs: ledger.digests.map(
+            (digest) => digest.digest_id,
+          ),
           source_admission: admission,
           content_role: "observation_not_assistant_answer",
           model_invoked: false,

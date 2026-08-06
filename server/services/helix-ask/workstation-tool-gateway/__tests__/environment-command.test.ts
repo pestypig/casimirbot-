@@ -128,7 +128,11 @@ describe("Minecraft command workstation gateway", () => {
       turnId: "ask:command-catalog:turn-1",
       toolCallId: "tool_call:command-catalog",
       providerExecutionId: "provider_execution:command-catalog",
-      arguments: { query: "time query", limit: 32 },
+      arguments: {
+        query: "time query",
+        limit: 32,
+        environment_label: "paired Minecraft Fabric world",
+      },
       accountContext: accountContext(),
       conversationThreadId: `helix-ask:room:${ROOM_ID}`,
       dependencies: dependencies(),
@@ -240,6 +244,7 @@ describe("Minecraft command workstation gateway", () => {
       ok: false,
       status: "failed",
       error: "command_parse_failed",
+      repairAction: "repair",
       summary: expect.stringContaining("exactly one command string per tool call"),
       observation: {
         outcome: "command_parse_failed",
@@ -248,6 +253,21 @@ describe("Minecraft command workstation gateway", () => {
       },
     });
     expect(listRoomEnvironments).not.toHaveBeenCalled();
+  });
+
+  it("classifies a permission failure as user-repairable rather than model-repairable", async () => {
+    const result = await executeEnvironmentCommandGatewayCapability({
+      turnId: "ask:command-test:untrusted-repair-owner",
+      arguments: { command: "time query daytime" },
+      accountContext: null,
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "permission_revoked",
+      repairAction: "ask_user",
+    });
   });
 
   it("derives environment and lifecycle identity server-side and re-enters the result", async () => {
@@ -386,7 +406,7 @@ describe("Minecraft command workstation gateway", () => {
 
     expect(result).toMatchObject({
       ok: false,
-      status: "blocked",
+      status: "failed",
       error: "command_category_mismatch",
       observation: {
         outcome: "command_category_mismatch",
@@ -559,20 +579,67 @@ describe("Minecraft command workstation gateway", () => {
     expect(enqueueCommand).not.toHaveBeenCalled();
   });
 
-  it("diagnoses an exact environment-label mismatch separately from permission", async () => {
-    const readAuthority = vi.fn();
+  it("uses the sole authorized environment when Codex supplies a natural room-environment phrase", async () => {
+    const readAuthority = vi.fn(async () => ({
+      authority: { status: "active" },
+      memberGrant: { status: "active" },
+      memberGrants: [],
+    }) as never);
+    const enqueueCommand = vi.fn(async () => ({
+      schema: HELIX_ENVIRONMENT_COMMAND_REQUEST_SCHEMA,
+      command_request_id: "command_request:natural-label",
+      deadline_at: "2026-08-02T12:00:15.000Z",
+    }) as never);
+    const awaitObservation = vi.fn(async () => observation);
+    const result = await executeEnvironmentCommandGatewayCapability({
+      turnId: "ask:command-test:natural-label",
+      toolCallId: "tool_call:command-natural-label",
+      providerExecutionId: "provider_execution:command-natural-label",
+      arguments: {
+        command: "time query daytime",
+        environment_label: "my paired Minecraft Fabric world",
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: dependencies({
+        readAuthority,
+        enqueueCommand,
+        awaitObservation,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: "completed",
+      observation: { outcome: "succeeded" },
+    });
+    expect(readAuthority).toHaveBeenCalledWith(
+      expect.objectContaining({ environmentBindingId: ENVIRONMENT_ID }),
+    );
+    expect(enqueueCommand).toHaveBeenCalledWith(
+      expect.objectContaining({ environmentBindingId: ENVIRONMENT_ID }),
+    );
+  });
+
+  it("still rejects an unmatched label when more than one authorized environment is active", async () => {
     const enqueueCommand = vi.fn();
     const result = await executeEnvironmentCommandGatewayCapability({
-      turnId: "ask:command-test:wrong-label",
-      toolCallId: "tool_call:command-wrong-label",
-      providerExecutionId: "provider_execution:command-wrong-label",
+      turnId: "ask:command-test:wrong-label-ambiguous",
+      toolCallId: "tool_call:command-wrong-label-ambiguous",
+      providerExecutionId: "provider_execution:command-wrong-label-ambiguous",
       arguments: {
-        command: "gamerule doDaylightCycle",
+        command: "time query daytime",
         environment_label: "A different Fabric server",
       },
       accountContext: accountContext(),
       conversationThreadId: `helix-ask:room:${ROOM_ID}`,
-      dependencies: dependencies({ readAuthority, enqueueCommand }),
+      dependencies: dependencies({
+        listRoomEnvironments: vi.fn(async () => [
+          environment("environment_binding:first", "Fabric one"),
+          environment("environment_binding:second", "Fabric two"),
+        ] as never),
+        enqueueCommand,
+      }),
     });
 
     expect(result).toMatchObject({
@@ -581,7 +648,6 @@ describe("Minecraft command workstation gateway", () => {
       error: "wrong_environment",
       observation: { outcome: "wrong_environment" },
     });
-    expect(readAuthority).not.toHaveBeenCalled();
     expect(enqueueCommand).not.toHaveBeenCalled();
   });
 

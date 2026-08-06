@@ -10,6 +10,8 @@ import java.util.logging.Logger;
 import net.minecraft.server.MinecraftServer;
 
 final class FabricCommandRuntime implements AutoCloseable {
+    static final long CATALOG_REPUBLISH_INTERVAL_MILLIS = 30_000L;
+
     private final FabricCommandConfig config;
     private final Logger logger;
     private final AtomicBoolean active = new AtomicBoolean(false);
@@ -22,6 +24,7 @@ final class FabricCommandRuntime implements AutoCloseable {
     private FabricCommandHttpClient httpClient;
     private FabricCommandExecutor executor;
     private long ticks;
+    private volatile long lastCatalogPublishAttemptAtMillis;
 
     FabricCommandRuntime(
         FabricCommandConfig config,
@@ -55,13 +58,33 @@ final class FabricCommandRuntime implements AutoCloseable {
         );
     }
 
-    void refreshAfterSourceRecovery() {
+    void refreshAfterManifestAdmission() {
         if (!active.get() || server == null || httpClient == null) return;
-        // A successful manifest after a failed admission/transport interval can
-        // represent a restarted Helix API. Pause polling until that API has
-        // acknowledged this process epoch's dispatcher catalog again.
-        catalogReady.set(false);
+        long nowMillis = System.currentTimeMillis();
+        if (
+            !catalogRepublishDue(
+                lastCatalogPublishAttemptAtMillis,
+                nowMillis
+            )
+        ) return;
+        // Manifest admission can succeed after a fast Helix API restart that
+        // was shorter than the connector's refresh interval. The source may
+        // never have observed a failed manifest, while the restarted API no
+        // longer has its catalog snapshot. Periodically republish the bounded
+        // catalog without pausing an already-valid command lane; the broker
+        // idempotently replays the same tree/producer epoch when it still has
+        // the snapshot.
         publishCatalog();
+    }
+
+    static boolean catalogRepublishDue(
+        long lastAttemptAtMillis,
+        long nowMillis
+    ) {
+        return lastAttemptAtMillis <= 0L ||
+            nowMillis < lastAttemptAtMillis ||
+            nowMillis - lastAttemptAtMillis >=
+                CATALOG_REPUBLISH_INTERVAL_MILLIS;
     }
 
     boolean active() {
@@ -81,6 +104,7 @@ final class FabricCommandRuntime implements AutoCloseable {
 
     private void publishCatalog() {
         if (!catalogInFlight.compareAndSet(false, true)) return;
+        lastCatalogPublishAttemptAtMillis = System.currentTimeMillis();
         Map<String, Object> catalog = FabricCommandCatalogBuilder.build(
             server,
             config,
@@ -244,6 +268,7 @@ final class FabricCommandRuntime implements AutoCloseable {
         catalogReady.set(false);
         catalogInFlight.set(false);
         pollInFlight.set(false);
+        lastCatalogPublishAttemptAtMillis = 0L;
         if (httpClient != null) httpClient.close();
         httpClient = null;
         executor = null;

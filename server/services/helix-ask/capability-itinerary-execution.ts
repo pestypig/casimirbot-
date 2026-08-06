@@ -1299,7 +1299,13 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     const guardedNoopSatisfaction = executedArtifact
       ? null
       : guardedNoopCandidate;
-    const railErrors = guardedNoopSatisfaction
+    const attemptedRuntimeProgress =
+      runtimeCalls.length > 0 ||
+      validations.length > 0 ||
+      Boolean(executedArtifact);
+    const optionalNotSelected =
+      subgoal.mandatory === false && !attemptedRuntimeProgress;
+    const railErrors = guardedNoopSatisfaction || optionalNotSelected
       ? []
       : uniqueStrings([
           ...validationErrors,
@@ -1323,13 +1329,14 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
         artifactCapability(executedArtifact as HelixCapabilityItineraryArtifactLike) ??
         runtimeCapability
       : null;
-    const attemptedRuntimeProgress = runtimeCalls.length > 0 || validations.length > 0 || Boolean(executedArtifact);
     const observationMissingAfterAttempt =
       attemptedRuntimeProgress &&
       railErrors.length === 0 &&
       !countedObservationArtifact;
     const satisfaction = guardedNoopSatisfaction
       ? "satisfied"
+      : optionalNotSelected
+        ? "optional_not_selected"
       : executed && countedObservationArtifact
         ? "satisfied"
       : observationMissingAfterAttempt
@@ -1338,7 +1345,9 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
           ? "failed"
           : "pending";
     const railFailureCode = railErrors[0] ??
-      (observationMissingAfterAttempt || satisfaction === "pending" ? "subgoal_observation_missing" : null);
+      (observationMissingAfterAttempt || satisfaction === "pending"
+        ? "subgoal_observation_missing"
+        : null);
     const supportRefs = uniqueStrings([
       ...artifactSupportRefs(countedObservationArtifact),
       ...readArray(subgoal.support_refs).map(readString),
@@ -1359,6 +1368,7 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     return {
       subgoal_id: subgoalId,
       order: Number(subgoal.order) || 0,
+      mandatory: subgoal.mandatory !== false,
       requested_capability: requestedCapability,
       runtime_capability: runtimeCapability,
       selected_capability: selectedCapability,
@@ -1397,7 +1407,14 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
             guarded_noop_policy: subgoal.guarded_noop_policy,
           }
         : {}),
-      rail_status: satisfaction === "satisfied" ? "complete" : satisfaction === "failed" ? "fail_closed" : "pending",
+      rail_status:
+        satisfaction === "satisfied"
+          ? "complete"
+          : satisfaction === "optional_not_selected"
+            ? "not_required"
+            : satisfaction === "failed"
+              ? "fail_closed"
+              : "pending",
       first_broken_rail: subgoalFirstBrokenRailFor(railFailureCode, satisfaction),
       rail_failure_code: railFailureCode,
       repair_target: subgoalRepairTargetFor(railFailureCode, satisfaction),
@@ -1476,8 +1493,10 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       unresolved_input_bindings: unresolvedInputBindings,
     };
   });
-  const missingSubgoals = compoundSubgoalLedger.filter((entry: Record<string, unknown>) =>
-    !subgoalHasSatisfiedObservation(entry)
+  const missingSubgoals = compoundSubgoalLedger.filter(
+    (entry: Record<string, unknown>) =>
+      (entry.mandatory !== false && !subgoalHasSatisfiedObservation(entry)) ||
+      (entry.mandatory === false && readString(entry.satisfaction) === "failed"),
   );
   const missingFamilies = requiredFamilies.filter((family: string) => !observedFamilies.includes(family));
   const missingSubgoalIds = missingSubgoals

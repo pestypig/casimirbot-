@@ -1,0 +1,201 @@
+{
+  "schema_version": "casimir_dp_boundary_branch_fixture_stage4_2i/1",
+  "campaign_id": "casimir-dp-boundary-branch-interaction-stage4-2i-v1",
+  "fixture_id": "stage4_2i_boundary_independent_dp_factorial_null_v1",
+  "evidence_class": "synthetic_validation",
+  "generated_at": "2026-08-05T16:00:00.000Z",
+  "apparatus_identity": {
+    "identity_id": "silica_high_mass_identifiable_single_object_v1",
+    "mass_kg": 1.94385e-16,
+    "sphere_radius_m": 2.76302362398029e-7,
+    "dp_regularization_length_m": 1e-7,
+    "separated_branch_distance_m": 1.6e-7,
+    "hold_time_s": 0.25
+  },
+  "cell_order": [
+    "reference__branch_control",
+    "reference__separated",
+    "active__branch_control",
+    "active__separated"
+  ],
+  "observed_cells": [
+    {
+      "cell_id": "reference__branch_control",
+      "boundary_state": "reference",
+      "branch_state": "branch_control",
+      "coherence_t0": { "re": 1, "im": 0 },
+      "coherence_t": { "re": 0.9900478536501606, "im": 0.001980098347432155 }
+    },
+    {
+      "cell_id": "reference__separated",
+      "boundary_state": "reference",
+      "branch_state": "separated",
+      "coherence_t0": { "re": 1, "im": 0 },
+      "coherence_t": { "re": 0.9743307051041346, "im": 0.002923000884320318 }
+    },
+    {
+      "cell_id": "active__branch_control",
+      "boundary_state": "active",
+      "branch_state": "branch_control",
+      "coherence_t0": { "re": 1, "im": 0 },
+      "coherence_t": { "re": 0.9850996257294715, "im": 0.004925539174875559 }
+    },
+    {
+      "cell_id": "active__separated",
+      "boundary_state": "active",
+      "branch_state": "separated",
+      "coherence_t0": { "re": 1, "im": 0 },
+      "coherence_t": { "re": 0.9694581225680622, "im": 0.005816818537398347 }
+    }
+  ],
+  "ordinary_prediction_cells": [
+    {
+      "cell_id": "reference__branch_control",
+      "boundary_state": "reference",
+      "branch_state": "branch_control",
+      "coherence_t0": { "re": 1, "im": 0 },
+      "coherence_t": { "re": 0.9900478536501606, "im": 0.001980098347432155 }
+    },
+    {
+      "cell_id": "reference__separated",
+      "boundary_state": "reference",
+      "branch_state": "separated",
+      "coherence_t0": { "re": 1, "im": 0 },
+      "coherence_t": { "re": 0.9801942624160336, "im": 0.002940591609028221 }
+    },
+    {
+      "cell_id": "active__branch_control",
+      "boundary_state": "active",
+      "branch_state": "branch_control",
+      "coherence_t0": { "re": 1, "im": 0 },
+      "coherence_t": { "re": 0.9850996257294715, "im": 0.004925539174875559 }
+    },
+    {
+      "cell_id": "active__separated",
+      "boundary_state": "active",
+      "branch_state": "separated",
+      "coherence_t0": { "re": 1, "im": 0 },
+      "coherence_t": { "re": 0.9752923565025828, "im": 0.005851824361076363 }
+    }
+  ],
+  "joint_covariance_coordinate_order": [
+    "observed.reference__branch_control.re",
+    "observed.reference__branch_control.im",
+    "observed.reference__separated.re",
+    "observed.reference__separated.im",
+    "observed.active__branch_control.re",
+    "observed.active__branch_control.im",
+    "observed.active__separated.re",
+    "observed.active__separated.im",
+    "ordinary.reference__branch_control.re",
+    "ordinary.reference__branch_control.im",
+    "ordinary.reference__separated.re",
+    "ordinary.reference__separated.im",
+    "ordinary.active__branch_control.re",
+    "ordinary.active__branch_control.im",
+    "ordinary.active__separated.re",
+    "ordinary.active__separated.im"
+  ],
+  "joint_observed_ordinary_covariance": [
+    [1e-8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1e-8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 1e-8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 1e-8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 1e-8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 1e-8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 1e-8, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 1e-8, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 1e-8, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 1e-8, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1e-8, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1e-8, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1e-8, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1e-8, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1e-8, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1e-8]
+  ],
+  "wavepacket_states": [
+    {
+      "wavepacket_id": "reference_branch_control",
+      "boundary_state": "reference",
+      "branch_state": "branch_control",
+      "authority_class": "synthetic_validation",
+      "center_a_m": [0, 0, 0],
+      "center_b_m": [0, 0, 0],
+      "covariance_a_m2": [[1e-16, 0, 0], [0, 1e-16, 0], [0, 0, 1e-16]],
+      "covariance_b_m2": [[1e-16, 0, 0], [0, 1e-16, 0], [0, 0, 1e-16]],
+      "overlap_abs": 1,
+      "separation_standard_uncertainty_m": 1e-9,
+      "hold_time_s": 0.25,
+      "hold_time_jitter_s": 1e-5,
+      "preparation_fidelity": 0.99,
+      "momentum_difference_kg_m_s": [0, 0, 0],
+      "trajectory_ref": "synthetic://stage4-2i/trajectory/reference-control",
+      "tomography_artifact_ref": "synthetic://stage4-2i/tomography/reference-control",
+      "tomography_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "wavepacket_id": "reference_separated",
+      "boundary_state": "reference",
+      "branch_state": "separated",
+      "authority_class": "synthetic_validation",
+      "center_a_m": [-8e-8, 0, 0],
+      "center_b_m": [8e-8, 0, 0],
+      "covariance_a_m2": [[1e-16, 0, 0], [0, 1e-16, 0], [0, 0, 1e-16]],
+      "covariance_b_m2": [[1e-16, 0, 0], [0, 1e-16, 0], [0, 0, 1e-16]],
+      "overlap_abs": 1.2664165549094176e-14,
+      "separation_standard_uncertainty_m": 1e-9,
+      "hold_time_s": 0.25,
+      "hold_time_jitter_s": 1e-5,
+      "preparation_fidelity": 0.99,
+      "momentum_difference_kg_m_s": [0, 0, 0],
+      "trajectory_ref": "synthetic://stage4-2i/trajectory/reference-separated",
+      "tomography_artifact_ref": "synthetic://stage4-2i/tomography/reference-separated",
+      "tomography_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "wavepacket_id": "active_branch_control",
+      "boundary_state": "active",
+      "branch_state": "branch_control",
+      "authority_class": "synthetic_validation",
+      "center_a_m": [0, 0, 0],
+      "center_b_m": [0, 0, 0],
+      "covariance_a_m2": [[1e-16, 0, 0], [0, 1e-16, 0], [0, 0, 1e-16]],
+      "covariance_b_m2": [[1e-16, 0, 0], [0, 1e-16, 0], [0, 0, 1e-16]],
+      "overlap_abs": 1,
+      "separation_standard_uncertainty_m": 1e-9,
+      "hold_time_s": 0.25,
+      "hold_time_jitter_s": 1e-5,
+      "preparation_fidelity": 0.99,
+      "momentum_difference_kg_m_s": [0, 0, 0],
+      "trajectory_ref": "synthetic://stage4-2i/trajectory/active-control",
+      "tomography_artifact_ref": "synthetic://stage4-2i/tomography/active-control",
+      "tomography_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "wavepacket_id": "active_separated",
+      "boundary_state": "active",
+      "branch_state": "separated",
+      "authority_class": "synthetic_validation",
+      "center_a_m": [-8e-8, 0, 0],
+      "center_b_m": [8e-8, 0, 0],
+      "covariance_a_m2": [[1e-16, 0, 0], [0, 1e-16, 0], [0, 0, 1e-16]],
+      "covariance_b_m2": [[1e-16, 0, 0], [0, 1e-16, 0], [0, 0, 1e-16]],
+      "overlap_abs": 1.2664165549094176e-14,
+      "separation_standard_uncertainty_m": 1e-9,
+      "hold_time_s": 0.25,
+      "hold_time_jitter_s": 1e-5,
+      "preparation_fidelity": 0.99,
+      "momentum_difference_kg_m_s": [0, 0, 0],
+      "trajectory_ref": "synthetic://stage4-2i/trajectory/active-separated",
+      "tomography_artifact_ref": "synthetic://stage4-2i/tomography/active-separated",
+      "tomography_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ],
+  "dp_loss_exponent_by_boundary": {
+    "reference": 0.006001050995935658,
+    "active": 0.006001050995935658
+  },
+  "registered_transfer_kernel": false,
+  "expected_case": "boundary_independent_dp_null"
+}

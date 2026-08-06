@@ -1,0 +1,142 @@
+{
+  "schema_version": "casimir_dp_apparatus_search_stage4_2m_verification_receipt/1",
+  "campaign_id": "casimir-dp-apparatus-search-stage4-2m-v1",
+  "campaign_run_id": "casimir-dp-apparatus-search-stage4-2m-v1-20260806T070000000Z",
+  "verified_at": "2026-08-06T05:36:47.7916357Z",
+  "evidence_class": "bounded_synthetic_apparatus_search_only",
+  "claim_ceiling": "bounded_synthetic_commissioning_region_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-apparatus-search-stage4-2m.v1.json",
+    "config_sha256": "d3981ab6a725378ff8ff8881c1d303d426b59a46c5f1ed2af81d916bf4e51d08",
+    "contract_path": "shared/contracts/casimir-dp-apparatus-search-stage4-2m.v1.ts",
+    "contract_sha256": "3a0085a5293032e72adf53eaf8a9041a129ffcfc102de46f7d90c97e9fd088db",
+    "evaluator_path": "shared/casimir-dp-apparatus-search-stage4-2m.ts",
+    "evaluator_sha256": "e11dedfce0ef2abf55c87447dd5cb1fa3d401eff30251708be818cc07a2537ee",
+    "runner_path": "scripts/research/run-casimir-dp-apparatus-search-stage4-2m.ts",
+    "runner_sha256": "fe562e353b64aedc9616403a1e4d88c5fe0a8fbe62d5384af7908a69525c408c",
+    "report_json_path": "artifacts/research/casimir-dp-apparatus-search-stage4-2m/casimir-dp-apparatus-search-stage4-2m-v1-20260806T070000000Z/apparatus-search-stage4-2m-report.json",
+    "report_json_sha256": "01aedffa92c2c857d868965a6456d20a16a63e806f3c61e567ee0c3a792f7001",
+    "report_markdown_path": "artifacts/research/casimir-dp-apparatus-search-stage4-2m/casimir-dp-apparatus-search-stage4-2m-v1-20260806T070000000Z/apparatus-search-stage4-2m-report.md",
+    "report_markdown_sha256": "372a98aa9539a04751776e9639c70a9263cf752932460c9bc21791a923edad26",
+    "campaign_trace_path": "artifacts/research/casimir-dp-apparatus-search-stage4-2m/casimir-dp-apparatus-search-stage4-2m-v1-20260806T070000000Z/apparatus-search-stage4-2m-trace.jsonl",
+    "campaign_trace_sha256": "beafd38d83e5cc4ab20b4336a8d871f7017f820b152d92c7d1f65cc732059b2b",
+    "campaign_receipt_path": "artifacts/research/casimir-dp-apparatus-search-stage4-2m/casimir-dp-apparatus-search-stage4-2m-v1-20260806T070000000Z/apparatus-search-stage4-2m-receipt.json",
+    "campaign_receipt_sha256": "8b1f865e904298b3f89a33fb4c531719b687f19eab3dcf7b74b788e672367c9e",
+    "maintained_report_path": "docs/research/casimir-dp-apparatus-search-stage4-2m-report.md",
+    "maintained_report_sha256": "372a98aa9539a04751776e9639c70a9263cf752932460c9bc21791a923edad26",
+    "maintained_report_matches_immutable_markdown": true,
+    "git_head": "f0dfd07085af214797458081b246ab87f1175c72",
+    "worktree_state": "dirty_uncommitted_stage4_2m_source_and_content_hashes_authoritative",
+    "authority_mode": "role_path_and_content_hash_tuple"
+  },
+  "immutable_upstream": {
+    "stage4_2l_run_id": "casimir-dp-empirical-authority-stage4-2l-v1-20260806T060000000Z",
+    "stage4_2l_verification_receipt_path": "docs/research/casimir-dp-empirical-authority-stage4-2l-verification-receipt.json",
+    "stage4_2l_verification_receipt_sha256": "7ff5ed544ec33fcd8022dd0f80cae5168a5486cc2f4414e14137806b46fdb19f",
+    "mutation_detected": false
+  },
+  "verification_inputs": {
+    "adapter_command": "npm run casimir:verify -- --ci --trace-out artifacts/training-trace-stage4-2m-20260806T070000000Z.jsonl --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export",
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-2m-run2373-exclusive.jsonl",
+      "sha256": "d1ad9f72aacd099fe0a903947e7569c69fde3eb17b2d17ef7f48d07e95c3a44b",
+      "bytes": 986,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true,
+      "validated_exporter_path": "scripts/research/export-casimir-dp-stage4-verification-trace.ts"
+    }
+  },
+  "local_gates": {
+    "stage4_2m_runtime_campaign_paper_graph_and_root": { "files": 5, "tests": 61, "status": "pass" },
+    "inherited_stage4_2c_through_stage4_2m_campaign_replay": { "files": 25, "tests": 101, "status": "pass" },
+    "required_gr_warp_replay": { "files": 18, "tests": 179, "status": "pass" },
+    "production_build": {
+      "status": "pass_with_pre_existing_warnings",
+      "commands": ["npm run build:client", "npm run build:server"],
+      "exit_codes": [0, 0],
+      "warnings_present": true
+    },
+    "dependency_coherence": {
+      "status": "pass_from_adapter_trace",
+      "package_lock_sha256": "b33d68312713d5b1fe14568aa551e63dc42fc60486f30f86237f06098aa806db"
+    },
+    "equation_sidecars": {
+      "main_marker_source_generated": [26, 26, 26],
+      "supplement_marker_source_generated": [79, 79, 79],
+      "main_source_sha256": "06c2b95e75e548a689c96646d167bdc538ce763077c1524a6ad634cb02eebbf5",
+      "main_generated_sha256": "3e0460a4ba3ef74fb06edaa73ff6c21748a7a8d229e98856603a5e85cb02cd92",
+      "supplement_source_sha256": "b01b036edaef39f394040494dc3ce5f4d33fc03a6a9e804b5aa86451596311b1",
+      "supplement_generated_sha256": "2c04a4bf748085d7e1a4647c843334a816ba37b875109df060a26f08093c58f8",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 38,
+      "edges": 108,
+      "stage4_2m_badges": 1,
+      "calculator_payloads": 0,
+      "observable_bridge_edges": 0,
+      "graph_sha256": "ea3a551b004574bd177a8b38dae129554531d65dcd53c0d19224c49971a2c44b",
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 221,
+      "validation": "pass",
+      "report_json_sha256": "5e67764e8fd7a419b605cbfca92d32a73202674f3abce8f8254d7fc8e257315d",
+      "report_markdown_sha256": "3f47b05bfb129fb686e4ebe6ad54c81b52d03c2b301b444f5adb2325365d532a"
+    },
+    "physics_root_to_leaf_manifest": {
+      "status": "pass",
+      "manifest_sha256": "363fe581ae7030900e85d402eea351d747d36702daf518e05f63e83f02d2b6cb",
+      "stage4_2m_readiness_and_falsifier_rules_present": true
+    },
+    "document_integration": {
+      "main_paper_sha256": "6d693f1360138d6c6dd2aa16a5c9b97559d7955d4b0f7fbd82fd86fc1f19d076",
+      "proposal_sha256": "a09040d297ef34b71cc2a9e810e951513f5f077e5e64c14ba117e49b609c96ca",
+      "supplement_sha256": "16d60b2c4fef7e51b628ba01490efcef790c3e46c60deba7b7abbdd654e7d2f1"
+    }
+  },
+  "adapter_result": {
+    "trace_id": "adapter:fe06c92c-b10a-4aad-953b-6ef3b78a3661",
+    "run_id": "2373",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate": {
+      "status": "GREEN",
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+      "integrity_ok": true
+    },
+    "scientific_scope": "none"
+  },
+  "scientific_standing": {
+    "software_contract": "pass",
+    "candidate_count": 200,
+    "eligible_synthetic_candidate_count": 3,
+    "search_outcome": "bounded_configuration_region_found",
+    "commissioning_eligibility": "candidate_region_for_measured_subsystem_commissioning_only",
+    "best_candidate_id": "stage4_2m_candidate_002",
+    "best_candidate_dp_rate_s": 0.11804585888857813,
+    "best_candidate_gaussian_loss_fraction": 0.0290802537,
+    "best_candidate_conservative_loss_fraction": 0.0043490317,
+    "best_candidate_required_paired_windows": 1028,
+    "best_candidate_power_at_1600": 0.92738577,
+    "physical_pilot_authorized": false,
+    "confirmatory_campaign_authorized": false,
+    "transfer_kernel": "not_registered",
+    "measured_evidence": "not_ready",
+    "residual_attribution": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "explanation": "The certificate validates repository convergence and the Stage-4.2M bounded deterministic search, immutable Stage-4.2L recovery, registered Diósi generator, transported ordinary-background gates, equation sidecars, Theory Badge graph, math registry, root-to-leaf manifest, production builds, and required GR/WARP software path. It supplies no measured material response, as-built Maxwell geometry, measured covariance, measured gas scattering, prepared massive superposition, instrument-level companion, exact external-bound recast, observed residual, collapse identification, manifold dynamics, or physical viability."
+  }
+}

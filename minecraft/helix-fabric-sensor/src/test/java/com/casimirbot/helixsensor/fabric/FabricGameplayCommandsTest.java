@@ -35,6 +35,15 @@ final class FabricGameplayCommandsTest {
         );
         assertEquals(
             new FabricCommandClassifier.Classification(
+                "server_administration",
+                "server_administration"
+            ),
+            FabricCommandClassifier.classify(
+                "helixgame checkpoint capture_box cottage -53 68 0 -49 70 0"
+            )
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification(
                 "world_build",
                 "world_mutation"
             ),

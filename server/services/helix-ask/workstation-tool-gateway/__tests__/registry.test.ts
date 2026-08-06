@@ -4085,6 +4085,53 @@ describe("Helix workstation tool gateway", () => {
     });
   });
 
+  it("retrieves the exact-box rollback syntax from a title-free build goal", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query:
+          "Before building an exact wall, how do I capture only its exact rollback footprint?",
+        mechanics_collection_ids: ["mechanics.minecraft.commands.v1"],
+        adapter_profile_id: "game.minecraft.readonly.v1",
+        max_hits: 6,
+      },
+      turnId: "ask:test:gateway-docs-mechanics-exact-checkpoint",
+      iteration: 4,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation: {
+        mechanics_scope: {
+          content_role: "mechanics_reference_not_live_observation",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+        evidence_passages: expect.arrayContaining([
+          expect.objectContaining({
+            path:
+              "docs/game-mechanics/minecraft-command-playbook-v1.md",
+            text_excerpt: expect.stringContaining(
+              "helixgame checkpoint capture_box agency_build",
+            ),
+            citation_ref: expect.stringContaining(
+              "workspace://docs/game-mechanics/minecraft-command-playbook-v1.md#line=",
+            ),
+          }),
+        ]),
+        evidence_observations: expect.arrayContaining([
+          expect.objectContaining({
+            content_role: "evidence_not_assistant_answer",
+          }),
+        ]),
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
+    });
+  });
+
   it("fails closed when a mechanics collection does not match the named adapter profile", async () => {
     const result = await callWorkstationGatewayCapability({
       agentRuntime: "codex",

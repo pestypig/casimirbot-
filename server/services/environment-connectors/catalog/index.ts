@@ -22,6 +22,22 @@ import {
   HELIX_SYNTHETIC_GAME_ADAPTER_PROFILE_ID,
   HELIX_SYSTEM_CLOCK_ADAPTER_PROFILE_ID,
 } from "@shared/helix-environment-adapter-profile";
+import { HELIX_MINECRAFT_FABRIC_PLAYER_ACTION_PROFILE_ID } from "@shared/helix-environment-action-adapter-profile";
+import {
+  HELIX_MINECRAFT_PLAYER_COLLECT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_FOLLOW_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_NAVIGATE_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_PLACE_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+} from "@shared/helix-minecraft-player-capabilities";
 import type { HelixEnvironmentProbeType } from "@shared/helix-environment-probe";
 
 const canonicalize = (value: unknown): unknown => {
@@ -77,6 +93,36 @@ const descriptor = (input: {
     raw_content_included: false,
   });
 
+const actionDescriptor = (input: {
+  capabilityId: string;
+  label: string;
+  description: string;
+  inputSchema: HelixEnvironmentConstrainedJsonSchema;
+  timeoutCeilingMs: number;
+}): HelixEnvironmentCapabilityDescriptor =>
+  helixEnvironmentCapabilityDescriptorSchema.parse({
+    schema: HELIX_ENVIRONMENT_CAPABILITY_DESCRIPTOR_SCHEMA,
+    capability_id: input.capabilityId,
+    capability_version: 1,
+    capability_class: "act",
+    domain: "minecraft",
+    adapter_profile_ids: [HELIX_MINECRAFT_FABRIC_PLAYER_ACTION_PROFILE_ID],
+    trusted_model_label: input.label,
+    trusted_model_description: input.description,
+    input_schema: input.inputSchema,
+    input_schema_hash: environmentConnectorSha256(input.inputSchema),
+    output_schema: minecraftPlayerActionOutputSchema,
+    output_schema_hash: environmentConnectorSha256(minecraftPlayerActionOutputSchema),
+    freshness_ceiling_ms: 30_000,
+    timeout_ceiling_ms: input.timeoutCeilingMs,
+    read_only: false,
+    side_effects_allowed: true,
+    requires_current_turn_reentry: true,
+    publisher_metadata_lane: "ui_only_untrusted",
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+
 const semanticTargetSchema: HelixEnvironmentConstrainedJsonSchema = {
   type: "object",
   properties: {
@@ -102,6 +148,17 @@ const minecraftPositionSchema: HelixEnvironmentConstrainedJsonSchema = {
     x: { type: "number", minimum: -30_000_000, maximum: 30_000_000 },
     y: { type: "number", minimum: -2_048, maximum: 2_048 },
     z: { type: "number", minimum: -30_000_000, maximum: 30_000_000 },
+  },
+  required: ["x", "y", "z"],
+  additionalProperties: false,
+};
+
+const minecraftBlockPositionSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    x: { type: "integer", minimum: -30_000_000, maximum: 30_000_000 },
+    y: { type: "integer", minimum: -2_048, maximum: 2_048 },
+    z: { type: "integer", minimum: -30_000_000, maximum: 30_000_000 },
   },
   required: ["x", "y", "z"],
   additionalProperties: false,
@@ -836,6 +893,258 @@ const systemClockOutputSchema: HelixEnvironmentConstrainedJsonSchema = {
   additionalProperties: false,
 };
 
+const minecraftPlayerActionOutputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    workflow_id: { type: "string", minLength: 1, maxLength: 320 },
+    outcome: {
+      type: "string",
+      enum: [
+        "succeeded",
+        "failed",
+        "request_canceled",
+        "manual_override",
+        "emergency_stopped",
+        "connector_offline",
+        "workflow_timeout",
+        "authority_stale",
+        "precondition_failed",
+        "postcondition_failed",
+      ],
+    },
+    summary: { type: "string", minLength: 1, maxLength: 4_000 },
+    postconditions_verified: { type: "boolean" },
+    controls_released: { type: "boolean" },
+    evidence_refs: {
+      type: "array",
+      items: { type: "string", minLength: 1, maxLength: 320 },
+      maxItems: 256,
+    },
+  },
+  required: [
+    "workflow_id",
+    "outcome",
+    "summary",
+    "postconditions_verified",
+    "controls_released",
+    "evidence_refs",
+  ],
+  additionalProperties: false,
+};
+
+const minecraftNavigateInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["navigate_to"] },
+    destination: minecraftPositionSchema,
+    arrival_radius: { type: "number", minimum: 0.25, maximum: 16 },
+    allow_sprint: { type: "boolean" },
+    allow_dig: { type: "boolean", enum: [false] },
+    allow_place: { type: "boolean", enum: [false] },
+    engine_preference: {
+      type: "string",
+      enum: ["adapter_selected", "native_fabric", "baritone"],
+    },
+  },
+  required: [
+    "action_kind",
+    "destination",
+    "arrival_radius",
+    "allow_sprint",
+    "allow_dig",
+    "allow_place",
+    "engine_preference",
+  ],
+  additionalProperties: false,
+};
+
+const minecraftLookInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["look_at"] },
+    target_kind: { type: "string", enum: ["position", "current_focus"] },
+    position: minecraftPositionSchema,
+    max_turn_degrees_per_tick: { type: "number", minimum: 0.1, maximum: 180 },
+  },
+  required: ["action_kind", "target_kind", "max_turn_degrees_per_tick"],
+  additionalProperties: false,
+};
+
+const minecraftWalkInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["walk"] },
+    direction: { type: "string", enum: ["forward", "back", "left", "right"] },
+    duration_ms: { type: "integer", minimum: 50, maximum: 10_000 },
+    sprint: { type: "boolean" },
+  },
+  required: ["action_kind", "direction", "duration_ms", "sprint"],
+  additionalProperties: false,
+};
+
+const minecraftJumpInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["jump"] },
+    count: { type: "integer", minimum: 1, maximum: 10 },
+  },
+  required: ["action_kind", "count"],
+  additionalProperties: false,
+};
+
+const minecraftInteractInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["interact"] },
+    target: {
+      type: "string",
+      enum: ["current_focus", "looked_at_block", "looked_at_entity"],
+    },
+    hand: { type: "string", enum: ["main_hand", "off_hand"] },
+    interaction: { type: "string", enum: ["use", "interact"] },
+  },
+  required: ["action_kind", "target", "hand", "interaction"],
+  additionalProperties: false,
+};
+
+const minecraftHotbarInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["hotbar_select"] },
+    slot: { type: "integer", minimum: 0, maximum: 8 },
+  },
+  required: ["action_kind", "slot"],
+  additionalProperties: false,
+};
+
+const minecraftEquipInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["equip"] },
+    item_id: { type: "string", minLength: 3, maxLength: 320 },
+    destination: {
+      type: "string",
+      enum: ["main_hand", "off_hand", "head", "chest", "legs", "feet"],
+    },
+  },
+  required: ["action_kind", "item_id", "destination"],
+  additionalProperties: false,
+};
+
+const minecraftFollowInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["follow"] },
+    subject_ref: {
+      type: "string",
+      minLength: 1,
+      maxLength: 320,
+      description:
+        "Exact visible subject_ref from the active room environment directory; Helix resolves its native identity server-side.",
+    },
+    distance: { type: "number", minimum: 1, maximum: 64 },
+    max_duration_ms: {
+      type: "integer",
+      minimum: 1_000,
+      maximum: 30 * 60_000,
+    },
+    stop_below_health: { type: "number", minimum: 1, maximum: 20 },
+  },
+  required: [
+    "action_kind",
+    "subject_ref",
+    "distance",
+    "max_duration_ms",
+    "stop_below_health",
+  ],
+  additionalProperties: false,
+};
+
+const minecraftCollectInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["collect"] },
+    item_or_block_id: {
+      type: "string",
+      minLength: 3,
+      maxLength: 320,
+      description: "Exact item identifier for a dropped item in loaded client range.",
+    },
+    count: { type: "integer", minimum: 1, maximum: 2_304 },
+    search_radius: { type: "number", minimum: 1, maximum: 128 },
+  },
+  required: ["action_kind", "item_or_block_id", "count", "search_radius"],
+  additionalProperties: false,
+};
+
+const minecraftMineInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["mine"] },
+    block_id: { type: "string", minLength: 3, maxLength: 320 },
+    count: { type: "integer", minimum: 1, maximum: 4_096 },
+    search_radius: {
+      type: "integer",
+      minimum: 1,
+      maximum: 32,
+      description:
+        "Bounded loaded-client search radius for the native Fabric engine.",
+    },
+  },
+  required: ["action_kind", "block_id", "count", "search_radius"],
+  additionalProperties: false,
+};
+
+const minecraftPlaceInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["place"] },
+    block_id: { type: "string", minLength: 3, maxLength: 320 },
+    positions: {
+      type: "array",
+      minItems: 1,
+      maxItems: 256,
+      items: minecraftBlockPositionSchema,
+    },
+  },
+  required: ["action_kind", "block_id", "positions"],
+  additionalProperties: false,
+};
+
+const minecraftCraftInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["craft"] },
+    output_item_id: { type: "string", minLength: 3, maxLength: 320 },
+    count: { type: "integer", minimum: 1, maximum: 2_304 },
+    recipe_id: {
+      type: "string",
+      minLength: 3,
+      maxLength: 320,
+      description:
+        "Optional exact recipe resource key. Use null to allow the client to select a known craftable recipe by output.",
+    },
+  },
+  required: ["action_kind", "output_item_id", "count"],
+  additionalProperties: false,
+};
+
+const minecraftInventoryTransferInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["inventory_transfer"] },
+    direction: { type: "string", enum: ["deposit", "withdraw"] },
+    item_id: { type: "string", minLength: 3, maxLength: 320 },
+    count: { type: "integer", minimum: 1, maximum: 2_304 },
+    container_target: {
+      type: "string",
+      enum: ["current_open_container", "looked_at_container"],
+    },
+  },
+  required: ["action_kind", "direction", "item_id", "count", "container_target"],
+  additionalProperties: false,
+};
+
 const descriptors: HelixEnvironmentCapabilityDescriptor[] = [
   descriptor({
     capabilityId: HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
@@ -970,6 +1279,110 @@ const descriptors: HelixEnvironmentCapabilityDescriptor[] = [
     freshnessCeilingMs: 10_000,
     timeoutCeilingMs: 5_000,
   }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_NAVIGATE_CAPABILITY,
+    label: "Navigate the paired Minecraft player",
+    description:
+      "Move the separately paired player toward an exact position with bounded duration and distance. Native Fabric navigation never digs or places blocks; Baritone is selectable only when its manifest capability is live.",
+    inputSchema: minecraftNavigateInputSchema,
+    timeoutCeilingMs: 5 * 60_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY,
+    label: "Turn the paired Minecraft player's view",
+    description:
+      "Turn the paired player's view toward a resolved position or retain the current focus, with manual input taking precedence.",
+    inputSchema: minecraftLookInputSchema,
+    timeoutCeilingMs: 15_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+    label: "Walk the paired Minecraft player",
+    description:
+      "Hold one movement direction for a bounded duration, optionally sprinting, and release every key on completion, cancellation, disconnect, or manual override.",
+    inputSchema: minecraftWalkInputSchema,
+    timeoutCeilingMs: 15_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+    label: "Jump with the paired Minecraft player",
+    description:
+      "Issue a bounded sequence of jump inputs for the separately paired player and report observed completion evidence.",
+    inputSchema: minecraftJumpInputSchema,
+    timeoutCeilingMs: 15_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
+    label: "Use the paired Minecraft player's current focus",
+    description:
+      "Use or interact with the block or entity currently under the paired player's crosshair using the selected hand.",
+    inputSchema: minecraftInteractInputSchema,
+    timeoutCeilingMs: 15_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
+    label: "Select a Minecraft hotbar slot",
+    description:
+      "Select one exact zero-based hotbar slot for the separately paired player and verify the selected slot afterward.",
+    inputSchema: minecraftHotbarInputSchema,
+    timeoutCeilingMs: 10_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
+    label: "Equip an item for the paired Minecraft player",
+    description:
+      "Move an exact item identifier from the player's inventory into the requested hand or armor destination and verify the resulting equipment slot.",
+    inputSchema: minecraftEquipInputSchema,
+    timeoutCeilingMs: 15_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_FOLLOW_CAPABILITY,
+    label: "Follow a bound Minecraft player",
+    description:
+      "Follow one exact active room subject for a bounded interval, maintain the requested distance, and stop if measured health crosses the admitted floor.",
+    inputSchema: minecraftFollowInputSchema,
+    timeoutCeilingMs: 30 * 60_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_COLLECT_CAPABILITY,
+    label: "Collect dropped Minecraft items",
+    description:
+      "Move the paired player toward matching dropped items in loaded client range until the requested inventory increase is measured.",
+    inputSchema: minecraftCollectInputSchema,
+    timeoutCeilingMs: 10 * 60_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY,
+    label: "Mine matching Minecraft blocks",
+    description:
+      "Find and mine a bounded number of matching loaded blocks through the normal client game-mode controller, verifying each removed block. Requires explicit owner-granted world-mutation authority.",
+    inputSchema: minecraftMineInputSchema,
+    timeoutCeilingMs: 30 * 60_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_PLACE_CAPABILITY,
+    label: "Place Minecraft blocks at exact positions",
+    description:
+      "Place the requested inventory block at exact integer positions through legitimate support-face interactions and verify every resulting block. Requires explicit owner-granted world-mutation authority.",
+    inputSchema: minecraftPlaceInputSchema,
+    timeoutCeilingMs: 30 * 60_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
+    label: "Craft a Minecraft item",
+    description:
+      "Select a known craftable client recipe in the active inventory or crafting-table grid, take server-presented results, and verify the output inventory increase.",
+    inputSchema: minecraftCraftInputSchema,
+    timeoutCeilingMs: 10 * 60_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
+    label: "Transfer Minecraft container inventory",
+    description:
+      "Deposit or withdraw an exact item count through an active or looked-at container menu and verify the player inventory delta.",
+    inputSchema: minecraftInventoryTransferInputSchema,
+    timeoutCeilingMs: 10 * 60_000,
+  }),
 ];
 
 const descriptorById = new Map(
@@ -1018,6 +1431,25 @@ const builtinPackages: BuiltinEnvironmentConnectorPackage[] = [
     capabilityDescriptors: descriptors.filter((entry) =>
       (HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS as readonly string[]).includes(
         entry.capability_id,
+      ),
+      ),
+  },
+  {
+    packageVersionId:
+      "connector_package_version:com.casimirbot.minecraft.fabric-player:0.2.0",
+    packageId: "com.casimirbot.minecraft.fabric-player",
+    packageVersion: "0.2.0",
+    publisherId: "publisher:casimirbot",
+    adapterProfileId: HELIX_MINECRAFT_FABRIC_PLAYER_ACTION_PROFILE_ID,
+    hostCompatibility: [
+      "fabric-client:1.21.8",
+      "fabric-loader:0.18.4+",
+      "fabric-api:0.136.1+1.21.8",
+      "java:21",
+    ],
+    capabilityDescriptors: descriptors.filter((entry) =>
+      entry.adapter_profile_ids.includes(
+        HELIX_MINECRAFT_FABRIC_PLAYER_ACTION_PROFILE_ID,
       ),
     ),
   },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildAskTurnSolverTrace } from "../../ask-turn-solver";
+import { refreshToolLifecycleRecords } from "../../tool-lifecycle-trace";
 import {
   authoritativeTypedFailureRequiresNoContinuation,
   reconcileAuthoritativeTypedFailureLifecycle,
@@ -368,6 +369,266 @@ describe("authoritative typed-failure lifecycle reconciliation", () => {
         reason: "authoritative_source_observation_typed_failure",
         violation_codes: [],
       },
+    });
+    (
+      payload.loop_parity_trace as Record<string, unknown>
+    ).actual_tool_calls = [
+      {
+        tool_id: "procedure_memory:retrieve_procedure_evidence",
+        status: "failed",
+      },
+    ];
+    expect(authoritativeTypedFailureRequiresNoContinuation(payload)).toBe(
+      true,
+    );
+  });
+
+  it("settles a connector-offline turn after verified post-observation reasoning and clears stale rail projections", () => {
+    const payload = basePayload();
+    const turnId = "ask:test:connector-offline-after-reentry";
+    const observationRef = `${turnId}:provider_gateway_observation_packet:1`;
+    payload.terminal_error_code = "connector_offline";
+    payload.typed_failure = {
+      schema: "helix.typed_failure.v1",
+      error_code: "connector_offline",
+      message:
+        "No currently credentialed, registry-admitted Minecraft connector is available for the bound room.",
+      next_required_action: "pair_environment_connector",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.source_target_intent = {
+      schema: "helix.ask_source_target_intent.v1",
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    };
+    payload.route_product_contract = {
+      schema: "helix.route_product_contract.v1",
+      source_target: "live_environment",
+      allowed_terminal_artifact_kinds: [
+        "model_synthesized_answer",
+        "typed_failure",
+      ],
+      forbidden_terminal_artifact_kinds: [],
+    };
+    payload.current_turn_artifact_ledger = [
+      {
+        artifact_id: observationRef,
+        kind: "provider_gateway_observation_packet",
+        payload: {
+          status: "failed",
+          error_code: "connector_offline",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:typed_failure:connector_offline`,
+        kind: "typed_failure",
+        payload: payload.typed_failure,
+      },
+    ];
+    payload.loop_parity_trace = {
+      ...(payload.loop_parity_trace as Record<string, unknown>),
+      selected_route: "/ask/turn/stream",
+      actual_tool_calls: [
+        {
+          tool_id: "com.casimirbot.minecraft.inventory.check",
+          result_ref: observationRef,
+        },
+      ],
+      // The production workstation gateway can leave this legacy projection
+      // empty even though the authoritative runtime lifecycle proves that the
+      // rejected tool observation was re-entered.
+      observations_created: [],
+      route_authority_ok: true,
+    };
+    payload.turn_lifecycle = {
+      schema: "helix.turn_lifecycle.v1",
+      authority: "runtime_event_log",
+      events: [
+        {
+          kind: "observation.reentered",
+          status: "succeeded",
+          observation_refs: [observationRef],
+        },
+      ],
+      reduction: {
+        tool_calls: [
+          {
+            observation_refs: [observationRef],
+            reentry_observation_refs: [observationRef],
+            reentered: true,
+          },
+        ],
+        post_observation_reasoning_completed: true,
+        runtime_turn_completed: true,
+        terminal_eligible: true,
+      },
+      integrity: { ok: true, violations: [] },
+    };
+    payload.route_authority_audit = {
+      schema: "helix.route_authority_audit.v1",
+      route_authority_ok: true,
+    };
+    payload.terminal_answer_authority = {
+      schema: "helix.turn_terminal_authority.v1",
+      server_authoritative: true,
+    };
+    payload.terminal_authority_single_writer = {
+      schema: "helix.terminal_authority_single_writer_result.v1",
+      selected_terminal_artifact_kind: "typed_failure",
+      selected_terminal_artifact_ref: `${turnId}:typed_failure:connector_offline`,
+      source: "typed_failure",
+      integrity: { single_writer_applied: true },
+    };
+    payload.codex_parity_agent_spine_rail_table = {
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      first_broken_rail: "terminal_materialization",
+      repair_target: "terminal_materializer",
+      codex_parity_class: "goal_contract_mismatch",
+      rail_status: "fail_closed",
+      rail_failure_code: "terminal_not_materialized",
+      terminal_eligible: false,
+    };
+    payload.tool_turn_chain_audit = {
+      rail_status: "fail_closed",
+      rail_failure_code: "terminal_not_materialized",
+      terminal_eligible: false,
+    };
+    payload.tool_rail_failure_triage = {
+      first_broken_rail: "terminal_materialization",
+      failure_bucket: "E_terminal_materializer_gap",
+      repair_target: "terminal_materializer",
+      rail_status: "fail_closed",
+      rail_failure_code: "terminal_not_materialized",
+      terminal_eligible: false,
+    };
+    payload.active_terminal_rail_status = {
+      rail_status: "fail_closed",
+      rail_failure_code: "terminal_not_materialized",
+      first_broken_rail: "terminal_materialization",
+      repair_target: "terminal_materializer",
+      terminal_eligible: false,
+    };
+    payload.provider_reasoning_reentry = {
+      schema: "helix.provider_reasoning_reentry.v1",
+      status: "not_run",
+      observation_reentered: true,
+      evidence_reentered: false,
+      solver_completed: false,
+      goal_satisfaction_compatible: false,
+      terminal_eligible: false,
+    };
+    payload.tool_followup_decision = {
+      schema: "helix.tool_followup_decision.v1",
+      next_action: "retry",
+      reason: "connector_offline",
+      external_change_required: false,
+      terminal_blockers: ["post_tool_model_step_required"],
+      evidence_reentered: false,
+      terminal_eligible: false,
+    };
+    payload.canonical_goal_frame = {
+      // A pre-observation reconciliation pass can establish this projection;
+      // the authoritative lifecycle must replace it once re-entry is proven.
+      authoritative_zero_observation_typed_failure: true,
+    };
+
+    expect(authoritativeTypedFailureRequiresNoContinuation(payload)).toBe(
+      true,
+    );
+    expect(
+      reconcileAuthoritativeTypedFailureLifecycle({
+        payload,
+        turnId,
+        promptText: "Check my current Minecraft inventory.",
+        selectedTerminalArtifactKind: "typed_failure",
+        finalAnswerSource: "typed_failure",
+      }),
+    ).toBe(true);
+    expect(payload.canonical_goal_frame).toMatchObject({
+      authoritative_source_observation_typed_failure: true,
+    });
+    expect(payload.canonical_goal_frame).not.toHaveProperty(
+      "authoritative_zero_observation_typed_failure",
+    );
+    expect(payload.codex_parity_agent_spine_rail_table).toMatchObject({
+      first_broken_rail: null,
+      repair_target: null,
+      codex_parity_class: "complete",
+      rail_status: "complete",
+      rail_failure_code: null,
+      terminal_eligible: false,
+    });
+    expect(payload.tool_turn_chain_audit).toMatchObject({
+      rail_status: "complete",
+      rail_failure_code: null,
+      terminal_eligible: false,
+    });
+    expect(payload.tool_rail_failure_triage).toMatchObject({
+      first_broken_rail: null,
+      failure_bucket: null,
+      repair_target: null,
+      rail_status: "complete",
+      rail_failure_code: null,
+      terminal_eligible: false,
+    });
+    expect(payload.active_terminal_rail_status).toMatchObject({
+      rail_status: "complete",
+      rail_failure_code: null,
+      first_broken_rail: null,
+      repair_target: null,
+      terminal_eligible: false,
+    });
+    expect(payload.provider_reasoning_reentry).toMatchObject({
+      status: "completed",
+      observation_reentered: true,
+      evidence_reentered: true,
+      solver_completed: true,
+      goal_satisfaction_compatible: true,
+      terminal_eligible: false,
+      completion_source: "turn_lifecycle.runtime_event_log",
+    });
+    expect(payload.tool_followup_decision).toMatchObject({
+      next_action: "stop",
+      reason: "connector_offline",
+      external_change_required: true,
+      terminal_blockers: [],
+      evidence_reentered: true,
+      terminal_eligible: false,
+      completion_source: "turn_lifecycle.runtime_event_log",
+    });
+
+    Object.assign(
+      payload.provider_reasoning_reentry as Record<string, unknown>,
+      {
+        status: "not_run",
+        evidence_reentered: false,
+        solver_completed: false,
+        goal_satisfaction_compatible: false,
+        completion_source: null,
+      },
+    );
+    refreshToolLifecycleRecords({ payload, turnId });
+    expect(payload.provider_reasoning_reentry).toMatchObject({
+      status: "completed",
+      evidence_reentered: true,
+      solver_completed: true,
+      goal_satisfaction_compatible: true,
+      completion_source: "turn_lifecycle.runtime_event_log",
+    });
+    expect(payload.tool_followup_decision).toMatchObject({
+      next_action: "stop",
+      reason: "connector_offline",
+      external_change_required: true,
+      terminal_blockers: [],
+      evidence_reentered: true,
+      completion_source: "turn_lifecycle.runtime_event_log",
     });
   });
 

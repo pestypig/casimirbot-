@@ -502,6 +502,201 @@ and the downstream verification-receipt SHA-256 is
 `acbab1f786e688fe04ad2d5cae15219166368e41b01b8df5949617ef150ce364`.
 This is software/certificate verification, not empirical evidence.
 
+The implemented Stage-4.2I boundary--branch interaction and wave-packet
+custody campaign is maintained in:
+
+- `casimir-dp-boundary-branch-interaction-stage4-2i-plan.md`
+- `casimir-dp-boundary-branch-interaction-stage4-2i-report.md`
+- `casimir-dp-boundary-branch-interaction-stage4-2i-verification-receipt.json`
+- `../../configs/research/casimir-dp-stage4-2i-authorities.v1.json`
+- `../../configs/research/casimir-dp-boundary-branch-interaction-stage4-2i.v1.json`
+- `../../configs/research/fixtures/casimir-dp-stage4-2i-factorial.synthetic.v1.json`
+- `../../shared/contracts/casimir-dp-boundary-branch-interaction-stage4-2i.v1.ts`
+- `../../shared/casimir-dp-boundary-branch-interaction-stage4-2i.ts`
+- `../../scripts/research/run-casimir-dp-boundary-branch-interaction-stage4-2i.ts`
+
+Run the canonical synthetic recovery and adversarial campaign with:
+
+```text
+npm run casimir:dp:stage4-2i
+```
+
+The authoritative run
+`casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z`
+uses a frozen four-cell branch/boundary order and propagates the joint
+observed/ordinary covariance into a normalized complex cross-ratio. Standard
+boundary-independent DP cancels, the nominal corrected interaction is
+consistent with zero, and an injected (0.002) loss plus (0.004\,\mathrm{rad})
+phase interaction is recovered. Five adversarial cases fail closed as
+registered. All cells and wave-packet data are synthetic: empirical packet
+equivalence, ordinary response, and measured contrast remain `not_ready`; no
+transfer kernel exists; collapse/manifold claims remain `blocked`; and
+physical viability remains `not_evaluated`.
+
+Fresh adapter run `2369` (`adapter:47f5ee16-a11c-4d8b-9953-dba211929f14`)
+passes with first failure `null`, empty deltas, certificate status `GREEN`, and
+integrity `true`. The certificate SHA-256 is
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`;
+the exclusive validated-trace SHA-256 is
+`97d3cfcc1be7c29946a300eba705fc245def0fc86b8e3d3c09c79a9f6f9dadaf`;
+and the Stage-4.2I verification-receipt SHA-256 is
+`67163dddefc4205c6c591a8a0bbd693453a8e398ba5309a8ecf8676fd6888bc9`.
+This is repository/software certification with scientific scope `none`.
+
+The implemented Stage-4.2J Schrödinger, mass-density, and environmental
+screening campaign is maintained in:
+
+- `casimir-dp-schrodinger-mass-density-stage4-2j-plan.md`
+- `casimir-dp-schrodinger-mass-density-stage4-2j-report.md`
+- `casimir-dp-schrodinger-mass-density-stage4-2j-verification-receipt.json`
+- `../../configs/research/casimir-dp-stage4-2j-authorities.v1.json`
+- `../../configs/research/casimir-dp-schrodinger-mass-density-stage4-2j.v1.json`
+- `../../configs/research/fixtures/casimir-dp-stage4-2j.synthetic.v1.json`
+- `../../shared/contracts/casimir-dp-schrodinger-mass-density-stage4-2j.v1.ts`
+- `../../shared/casimir-dp-schrodinger-mass-density-stage4-2j.ts`
+- `../../scripts/research/run-casimir-dp-schrodinger-mass-density-stage4-2j.ts`
+
+Run its canonical synthetic and adversarial campaign with:
+
+```text
+npm run casimir:dp:stage4-2j
+```
+
+The authoritative run
+`casimir-dp-schrodinger-mass-density-stage4-2j-v1-20260806T040000000Z`
+
+## Stage-4.2K microscopic electromagnetic closure
+
+- `casimir-dp-microscopic-em-closure-stage4-2k-plan.md`
+- `casimir-dp-microscopic-em-closure-stage4-2k-report.md`
+- `casimir-dp-microscopic-em-closure-stage4-2k-verification-receipt.json`
+- `../../configs/research/casimir-dp-stage4-2k-authorities.v1.json`
+- `../../configs/research/casimir-dp-microscopic-em-closure-stage4-2k.v1.json`
+- `../../configs/research/fixtures/casimir-dp-stage4-2k.synthetic.v1.json`
+- `../../shared/contracts/casimir-dp-microscopic-em-closure-stage4-2k.v1.ts`
+- `../../shared/casimir-dp-microscopic-em-closure-stage4-2k.ts`
+- `../../scripts/research/run-casimir-dp-microscopic-em-closure-stage4-2k.ts`
+
+Run:
+
+```bash
+npm run casimir:dp:stage4-2k
+```
+
+Authoritative synthetic run:
+`casimir-dp-microscopic-em-closure-stage4-2k-v1-20260806T050000000Z`.
+It recovers the ground-state/material-response chain and ideal-plane orientation
+screen, but returns finite-geometry electromagnetic closure, QLBE environment,
+and residual attribution as blocked. It adds zero Casimir-to-collapse bridge
+edges and supplies no measured evidence.
+
+## Stage-4.2L empirical-authority closure and redesign
+
+- `casimir-dp-empirical-authority-stage4-2l-plan.md`
+- `casimir-dp-empirical-authority-stage4-2l-report.md`
+- `casimir-dp-empirical-authority-stage4-2l-verification-receipt.json`
+- `../../configs/research/casimir-dp-stage4-2l-authorities.v1.json`
+- `../../configs/research/casimir-dp-stage4-2l-apparatus-design-manifest.v1.json`
+- `../../configs/research/casimir-dp-empirical-authority-stage4-2l.v1.json`
+- `../../configs/research/fixtures/casimir-dp-stage4-2l.synthetic-authority.v1.json`
+- `../../shared/contracts/casimir-dp-empirical-authority-stage4-2l.v1.ts`
+- `../../shared/casimir-dp-empirical-authority-stage4-2l.ts`
+- `../../scripts/research/run-casimir-dp-empirical-authority-stage4-2l.ts`
+
+Run:
+
+```bash
+npm run casimir:dp:stage4-2l
+```
+
+Authoritative synthetic/literature-bound run:
+`casimir-dp-empirical-authority-stage4-2l-v1-20260806T060000000Z`.
+It freezes the engineering coordinate system, checks a finite-rectangle
+electromagnetic surrogate, propagates the phase-response covariance, screens a
+species-resolved isotropic QLBE proxy, compares state-preparation scales,
+registers the current external Diósi bound, and evaluates four mass-density
+representations. The nominal candidate returns
+`redesign_required_before_empirical_pilot`; all as-built, measured-material,
+measured-covariance, measured-environment, state-preparation, and exact-bound
+authorities remain `not_ready`; and no Casimir-to-collapse bridge is added.
+Fresh adapter run `2372` (`adapter:009256f1-e3a5-4214-a5d2-0b054f644d0f`)
+is `PASS`, with first failure `null`, empty deltas, certificate status `GREEN`,
+and integrity `true`. The certificate SHA-256 is
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`,
+and the exclusive identity-bound trace SHA-256 is
+`42548212d9566413031bff64ddd73909a2a1383f62a05d3bd9dc17fb3c221957`.
+The Stage-4.2L verification-receipt SHA-256 is
+`7ff5ed544ec33fcd8022dd0f80cae5168a5486cc2f4414e14137806b46fdb19f`.
+This is repository/software certification with scientific scope `none`.
+
+## Stage-4.2M leading bounded commissioning design
+
+Run `npm run casimir:dp:stage4-2m` to replay the deterministic bounded search
+that consumes the Stage-4.2L verification receipt byte-for-byte. The 200-point
+campaign returns three synthetic-only candidates. Candidate
+`stage4_2m_candidate_002` is the current leading design represented in the
+white paper and proposal. Its configuration
+uses diamond density, radius 276.302 nm, mass
+`3.0925052683774525e-16 kg`, 250 nm separation, 250 ms hold, 10 micrometre gap,
+4 K, and `1e-15 Pa`. The registered Gaussian loss is 2.908%; the conservative
+density-envelope loss is 0.434903%; it requires 1,028 paired windows, and its
+transported power is 0.927386 at 1,600 paired windows.
+
+The result is a commissioning target, not empirical feasibility. Measured
+material, as-built finite geometry, phase covariance, QLBE inputs, preparation,
+companion detection, and exact bound mapping remain open. The canonical report
+is `docs/research/casimir-dp-apparatus-search-stage4-2m-report.md`; focused tests
+run with `npm run test:casimir:dp:stage4-2m`.
+
+The fresh leading-design publication-rebase adapter run `2374` is `PASS` with
+certificate integrity `GREEN`; the
+certificate SHA-256 is
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
+and the exclusive trace SHA-256 is
+`866eec434c58b84cc2fcb5df9bd6a4136fbb0c87d04532e89b9f90b3c5464998`.
+
+## Stage-4.2N material/Green/FDT ordinary-null chain
+
+Run `npx tsx scripts/research/run-casimir-dp-material-thermal-ordinary-null-stage4-2n.ts`
+to replay the provenance-bound synthetic ordinary-response chain for leading
+candidate `stage4_2m_candidate_002`. It converts the registered loss table to
+imaginary-axis response, evaluates finite-geometry mean phase and two-sided
+Green/FDT loss, recovers zero-coupling and infinite-distance limits, checks
+Planck--Stefan--Boltzmann and detailed balance without double counting, replays
+five calibration interventions, and emits the four-cell complex cross-ratio.
+
+The software pipeline passes with phase `0.01999999999248688 rad`, echo
+contraction exponent `1.3416495394050548e-6`, and a Planck--Stefan--Boltzmann
+relative error of `1.3770845459661169e-14`. This is a synthetic recovery only.
+Measured specimen response, as-built geometry, a full-Maxwell Green tensor,
+independent solver agreement, measured calibration response, and measured
+covariance remain `not_ready`; zero observable bridge edges are added. The
+canonical report is
+`docs/research/casimir-dp-material-thermal-ordinary-null-stage4-2n-report.md`.
+
+The earlier Stage-4.2J Schrödinger/mass-density campaign recovers the frozen
+effective-Gaussian prediction, proves that a Hamiltonian
+branch-energy difference rotates phase rather than generating DP contraction,
+and inverts the synthetic contraction to a conditional DP-equivalent energy.
+The same-(R_0) homogeneous sphere gives 0.249896 of the effective-Gaussian
+energy. Three constituent-density representations remain unavailable. The
+declared ideal-gas screen returns `no_go`, state preparation and external-bound
+mapping remain `not_ready`, physical candidate selection is false, and no
+observable bridge is added. Report and campaign-receipt SHA-256 values are
+`02ea5911d809480df2763c2381314fd2c7637940b958a78abd0cdde6ae923ed8`
+and
+`54358d0294652a457d1c628147ace2acbc337b45a546ae7e2fdb443a563f74a9`.
+Fresh adapter run `2370`
+(`adapter:1211c4a1-9ebf-4288-a867-1240fabd8adb`) is `PASS`, with first failure
+`null`, no deltas, certificate status `GREEN`, integrity `true`, and certificate
+SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+The exclusive validated-trace SHA-256 is
+`161cd8268093e8b7563f1b78541945c074503ffa440323667fceb178e434b6a8`.
+The Stage-4.2I certificate was not reused. The generated math registry contains
+218 validated entries, including the explicit Stage-4.2J diagnostic. This is
+repository/software verification with scientific scope `none`.
+
 The implemented Stage-4.2A runtime sources are:
 
 - `../../shared/casimir-dp-electron-mass-higgs-anchor-stage4-2a.ts`

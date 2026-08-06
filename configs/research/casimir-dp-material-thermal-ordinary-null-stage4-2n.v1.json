@@ -1,0 +1,65 @@
+{
+  "schema_version": "casimir_dp_material_thermal_ordinary_null_stage4_2n/1",
+  "campaign_id": "casimir-dp-material-thermal-ordinary-null-stage4-2n-v1",
+  "evidence_class": "synthetic_material_green_fdt_pipeline_validation_only",
+  "claim_ceiling": "material_resolved_ordinary_null_commissioning_requirements_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "run_order": [
+    "verify_immutable_stage4_2m_leading_candidate",
+    "validate_specimen_loss_table_and_imaginary_axis_response",
+    "evaluate_finite_geometry_green_mean_phase_and_fdt_noise",
+    "recover_zero_coupling_and_infinite_distance_limits",
+    "recover_planck_stefan_boltzmann_and_near_field_thermal_accounting",
+    "reconstruct_phase_and_contraction_from_calibration_interventions",
+    "assemble_four_cell_ordinary_complex_coherence_null",
+    "compare_without_combining_the_frozen_dp_exponents",
+    "return_empirical_readiness_or_explicit_not_ready"
+  ],
+  "upstream_stage4_2m": {
+    "verification_receipt_path": "docs/research/casimir-dp-apparatus-search-stage4-2m-verification-receipt.json",
+    "verification_receipt_sha256": "bf89dc469b7d5770c69d01eec80acc312816ef8e054b2fbd7e74af7e77f95a3f",
+    "run_id": "casimir-dp-apparatus-search-stage4-2m-v1-20260806T070000000Z",
+    "candidate_id": "stage4_2m_candidate_002"
+  },
+  "fixture_path": "configs/research/fixtures/casimir-dp-stage4-2n.synthetic.v1.json",
+  "fixture_sha256": "e7443a412036ace2bb7a580962693b73d8109ff506638a29d6ca00a062d19fe8",
+  "leading_design": {
+    "material_id": "diamond",
+    "radius_m": 2.76302362398029e-7,
+    "mass_kg": 3.0925052683774525e-16,
+    "branch_separation_m": 2.5e-7,
+    "hold_time_s": 0.25,
+    "gap_m": 1e-5,
+    "plate_size_m": 8e-5,
+    "temperature_K": 4,
+    "pressure_Pa": 1e-15
+  },
+  "frozen_dp_comparator": {
+    "model_id": "diosi_1989_gaussian_regularized_nondissipative",
+    "R0_m": 1e-7,
+    "conservative_density_envelope_exponent": 0.004358516271770489,
+    "gaussian_exponent": 0.029511464722144533,
+    "combined_with_ordinary_null": false
+  },
+  "gates": {
+    "maximum_kramers_kronig_relative_uncertainty": 0.005,
+    "maximum_phase_sigma_rad": 0.03464404998245921,
+    "maximum_calibration_mahalanobis2": 25,
+    "maximum_limit_magnitude": 0,
+    "require_planck_stefan_boltzmann_recovery": true,
+    "require_zero_coupling_recovery": true,
+    "require_infinite_distance_recovery": true,
+    "require_single_counted_thermal_channel": true
+  },
+  "standing": {
+    "measured_evidence": "not_ready",
+    "ordinary_null_authority": "not_ready",
+    "residual_attribution": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "physical_pilot_authorized": false,
+    "confirmatory_campaign_authorized": false
+  }
+}

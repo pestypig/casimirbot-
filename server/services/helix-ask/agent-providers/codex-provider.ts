@@ -10023,6 +10023,20 @@ const continuationStateRequiresLaneRequest = (
     state.allowed_decisions.includes("retry")) &&
   untriedContinuationLaneRequests(state).length > 0;
 
+const continuationStateRequiresModelAuthoredRetryRequest = (
+  state: HelixAgentContinuationState,
+): boolean =>
+  !state.allowed_decisions.includes("answer") &&
+  state.allowed_decisions.includes("retry") &&
+  state.last_attempt?.retryability === "retryable" &&
+  state.budget.hard.exhausted !== true;
+
+export const shouldEnterCodexPostObservationContinuation = (
+  state: HelixAgentContinuationState,
+): boolean =>
+  continuationStateRequiresLaneRequest(state) ||
+  continuationStateRequiresModelAuthoredRetryRequest(state);
+
 const continuationStateAdmitsLaneRequest = (
   state: HelixAgentContinuationState,
   candidate: Record<string, unknown> | null,
@@ -10109,6 +10123,30 @@ export const continuationStateAdmitsPreparedLaneRequest = (input: {
   return continuationStateAdmitsLaneRequest(state, requestedCandidate);
 };
 
+export const continuationStateAdmitsModelAuthoredRetryLaneRequest = (input: {
+  state: HelixAgentContinuationState;
+  candidate: Record<string, unknown> | null;
+  admittedCapabilityIds: string[];
+}): boolean => {
+  if (
+    !input.candidate ||
+    !continuationStateRequiresModelAuthoredRetryRequest(input.state)
+  ) {
+    return false;
+  }
+  const failedCapability = input.state.last_attempt?.capability_id ?? null;
+  const candidateCapability = capabilityLaneCandidateCapability(
+    input.candidate,
+  );
+  if (!failedCapability || candidateCapability !== failedCapability) {
+    return false;
+  }
+  return runtimeLaneRequestCandidateUsesAdmittedCapabilities({
+    candidate: input.candidate,
+    admittedCapabilityIds: input.admittedCapabilityIds,
+  });
+};
+
 export const continuationStateAdmitsGenericProviderLaneRequest = (input: {
   state: HelixAgentContinuationState;
   candidate: Record<string, unknown> | null;
@@ -10191,7 +10229,8 @@ export const shouldRetryCodexPostObservationContinuationAffordance = (input: {
   state: HelixAgentContinuationState;
   providerText: string;
 }): boolean =>
-  Boolean(buildCodexContinuationAffordanceRetryInstruction(input.state)) &&
+  (Boolean(buildCodexContinuationAffordanceRetryInstruction(input.state)) ||
+    continuationStateRequiresModelAuthoredRetryRequest(input.state)) &&
   extractCodexCapabilityLaneRequestCandidate(input.providerText) === null;
 
 export const shouldRetryCodexContinuationAffordance = (input: {
@@ -10237,6 +10276,10 @@ export const runtimeProviderAdmittedCapabilityIdsForQuestion = (input: {
   question: string;
   admittedCapabilityIds: string[];
   admittedToolFamilies?: string[];
+  mutatingCapabilityIds?: string[];
+  explicitlyAdmittedMutatingCapabilityIds?: string[];
+  operatorCommandAdmitted?: boolean;
+  restrictAllCapabilitiesToAdmittedToolFamilies?: boolean;
 }): string[] => {
   const asksForVisualContent =
     /\b(?:page\s*(?:number\s*)?\d{1,4}|(?:this|that|the|current|selected)\s+page|crop|bbox|bounding\s+box|region|equation|figure|ocr|latex|inspect|read)\b/i.test(
@@ -10251,17 +10294,36 @@ export const runtimeProviderAdmittedCapabilityIdsForQuestion = (input: {
   const admittedToolFamilies = new Set(
     uniqueStrings(input.admittedToolFamilies ?? []),
   );
+  const mutatingCapabilityIds = new Set(
+    uniqueStrings(input.mutatingCapabilityIds ?? []),
+  );
+  const explicitlyAdmittedMutatingCapabilityIds = new Set(
+    uniqueStrings(input.explicitlyAdmittedMutatingCapabilityIds ?? []),
+  );
+  const restrictAllCapabilitiesToAdmittedToolFamilies =
+    input.restrictAllCapabilitiesToAdmittedToolFamilies ??
+    input.admittedToolFamilies !== undefined;
   return uniqueStrings(input.admittedCapabilityIds)
     .filter(
       (capabilityId) =>
         !requiresPageMaterialization ||
         capabilityId !== "workstation.open_panel",
     )
-    .filter(
-      (capabilityId) =>
+    .filter((capabilityId) => {
+      const familyAllowed =
         admittedToolFamilies.size === 0 ||
-        admittedToolFamilies.has(inferCommittedRouteToolFamily(capabilityId)),
-    )
+        admittedToolFamilies.has(
+          inferCommittedRouteToolFamily(capabilityId),
+        );
+      if (restrictAllCapabilitiesToAdmittedToolFamilies && !familyAllowed) {
+        return false;
+      }
+      if (!mutatingCapabilityIds.has(capabilityId)) return true;
+      if (explicitlyAdmittedMutatingCapabilityIds.has(capabilityId)) {
+        return true;
+      }
+      return input.operatorCommandAdmitted === true && familyAllowed;
+    })
     .sort();
 };
 
@@ -13492,6 +13554,10 @@ const compactCodexModelVisibleDocHit = (
     occurrence_index: readNumber(hit.occurrence_index),
     line: readNumber(hit.line),
     heading: readString(hit.heading),
+    text: truncateCodexModelVisibleText(
+      hit.text,
+      CODEX_MODEL_VISIBLE_DOC_SNIPPET_LIMIT,
+    ),
     sentence: truncateCodexModelVisibleText(
       hit.sentence,
       CODEX_MODEL_VISIBLE_DOC_SNIPPET_LIMIT,
@@ -13504,6 +13570,29 @@ const compactCodexModelVisibleDocHit = (
       hit.excerpt,
       CODEX_MODEL_VISIBLE_DOC_SNIPPET_LIMIT,
     ),
+  };
+};
+
+const compactCodexModelVisibleDocsEvidencePassage = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  const passage = readRecord(value);
+  if (!passage) return null;
+  return {
+    passage_id: readString(passage.passage_id),
+    path: readString(passage.path),
+    title: readString(passage.title),
+    section: readString(passage.section),
+    line_start: readNumber(passage.line_start),
+    line_end: readNumber(passage.line_end),
+    text_excerpt: truncateCodexModelVisibleText(
+      passage.text_excerpt,
+      4_000,
+    ),
+    relevance_score: readNumber(passage.relevance_score),
+    matched_terms: readArray(passage.matched_terms).slice(0, 24),
+    citation_ref: readString(passage.citation_ref),
+    citation_label: readString(passage.citation_label),
   };
 };
 
@@ -13636,6 +13725,10 @@ const compactCodexModelVisibleDocsPayload = (
     document_candidates: readArray(payload.document_candidates)
       .slice(0, 8)
       .map(compactCodexModelVisibleDocCandidate)
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry)),
+    evidence_passages: readArray(payload.evidence_passages)
+      .slice(0, 8)
+      .map(compactCodexModelVisibleDocsEvidencePassage)
       .filter((entry): entry is Record<string, unknown> => Boolean(entry)),
     active_document_path: readString(payload.active_document_path),
   };
@@ -13805,6 +13898,31 @@ export const continuationStateRequiresCodexModelAuthoredCapabilityProposal = (
 export const buildCodexGenericContinuationDecisionInstruction = (
   state: HelixAgentContinuationState,
 ): string => {
+  const capability =
+    state.last_attempt?.capability_id ?? "the failed capability";
+  const failureCode =
+    state.last_attempt?.failure_code ?? "retryable_failure";
+  const minecraftCommandEnvelopeRepair = Boolean(
+    continuationStateRequiresModelAuthoredRetryRequest(state) &&
+      capability === HELIX_MINECRAFT_COMMAND_CAPABILITY &&
+      [
+        "command_parse_failed",
+        "command_category_mismatch",
+        "command_effect_mismatch",
+      ].includes(failureCode),
+  );
+  if (minecraftCommandEnvelopeRepair) {
+    const minecraftCommandRepair =
+      failureCode === "command_parse_failed"
+        ? ` For ${HELIX_MINECRAFT_COMMAND_CAPABILITY}, the corrected request must include exactly one non-empty command string in arguments.command; semantic intent fields are not executable command arguments. Use this exact outer shape: {"capability_id":"${HELIX_MINECRAFT_COMMAND_CAPABILITY}","arguments":{"command":"<one concrete Minecraft command>","category":"<schema enum>","effect":"<schema enum>"}}. If the rejected request contained args.commands or arguments.commands, treat that array only as an unfinished plan: translate only its first unfinished action into the single concrete command string, wait for its observation, and leave every later action for a subsequent tool call. Never emit commands, an array-valued command, target, purpose, action, position, block, region, or name as executable arguments unless the selected capability input schema explicitly declares that field.`
+        : ` For ${HELIX_MINECRAFT_COMMAND_CAPABILITY}, replace the malformed request with exactly one valid command string and add schema-valid category and effect fields that match the command's actual risk. Never join commands with semicolons. Installed checkpoint capture syntax is helixgame checkpoint capture_box <name> <x1> <y1> <z1> <x2> <y2> <z2>; use server_administration/server_administration for capture or discard, world_build/world_mutation for restore, and query/read_only for status. Do not ask the user to supply this model-authored metadata.`;
+    return [
+      "The latest capability attempt failed retryably, and the continuation state does not allow a terminal answer yet.",
+      `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for exactly one corrected or retried ${capability} request.`,
+      `Repair the failure ${failureCode} using the model-visible capability input contract and the re-entered observations.${minecraftCommandRepair}`,
+      "Do not answer, ask the user to author tool arguments, repeat the same invalid arguments, or present the failed observation as the result. Helix will independently validate and execute the repaired request.",
+    ].join("\n");
+  }
   const exactAffordanceInstruction =
     buildCodexContinuationAffordanceRetryInstruction(state);
   if (exactAffordanceInstruction) {
@@ -13812,6 +13930,24 @@ export const buildCodexGenericContinuationDecisionInstruction = (
       "The current procedure is unfinished and the continuation state does not allow a terminal answer yet.",
       exactAffordanceInstruction,
       "Do not replace the admitted next observation step with a refusal, deferral, plan, or user instruction. The request is still subject to normal Helix admission and execution checks.",
+    ].join("\n");
+  }
+  if (continuationStateRequiresModelAuthoredRetryRequest(state)) {
+    const minecraftCommandRepair =
+      capability === HELIX_MINECRAFT_COMMAND_CAPABILITY &&
+      failureCode === "command_parse_failed"
+        ? ` For ${HELIX_MINECRAFT_COMMAND_CAPABILITY}, the corrected request must include exactly one non-empty command string in arguments.command; semantic intent fields are not executable command arguments. Use this exact outer shape: {"capability_id":"${HELIX_MINECRAFT_COMMAND_CAPABILITY}","arguments":{"command":"<one concrete Minecraft command>","category":"<schema enum>","effect":"<schema enum>"}}. If the rejected request contained args.commands or arguments.commands, treat that array only as an unfinished plan: translate only its first unfinished action into the single concrete command string, wait for its observation, and leave every later action for a subsequent tool call. Never emit commands, an array-valued command, target, purpose, action, position, block, region, or name as executable arguments unless the selected capability input schema explicitly declares that field.`
+        : capability === HELIX_MINECRAFT_COMMAND_CAPABILITY &&
+            ["command_category_mismatch", "command_effect_mismatch"].includes(
+              failureCode,
+            )
+          ? ` For ${HELIX_MINECRAFT_COMMAND_CAPABILITY}, replace the malformed request with exactly one valid command string and add schema-valid category and effect fields that match the command's actual risk. Never join commands with semicolons. Installed Helix gameplay checkpoint commands use server_administration/server_administration for capture or discard, world_build/world_mutation for restore, and query/read_only for status. Do not ask the user to supply this model-authored metadata.`
+          : "";
+    return [
+      "The latest capability attempt failed retryably, and the continuation state does not allow a terminal answer yet.",
+      `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON for exactly one corrected or retried ${capability} request.`,
+      `Repair the failure ${failureCode} using the model-visible capability input contract and the re-entered observations.${minecraftCommandRepair}`,
+      "Do not answer, ask the user to author tool arguments, repeat the same invalid arguments, or present the failed observation as the result. Helix will independently validate and execute the repaired request.",
     ].join("\n");
   }
   if (continuationStateRequiresCodexModelAuthoredCapabilityProposal(state)) {
@@ -13833,7 +13969,13 @@ export const shouldAllowCodexObservationDependentCapabilityProposal = (input: {
   admittedCapabilityIds: string[];
   lastAttempt: Record<string, unknown> | null | undefined;
 }): boolean => {
-  if (input.trigger !== "post_attempt") return false;
+  if (
+    input.trigger !== "post_attempt" &&
+    input.trigger !== "final_review" &&
+    input.trigger !== "terminal_rejection"
+  ) {
+    return false;
+  }
   const lastAttempt = readRecord(input.lastAttempt);
   if (readString(lastAttempt?.status) !== "succeeded") return false;
   const attemptedCapability = readString(lastAttempt?.capability_id);
@@ -13893,6 +14035,9 @@ const normalizeDocsContentObservationsForHelix = (input: {
   const documentCandidates = readArray(observation.document_candidates)
     .map(readRecord)
     .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const evidencePassages = readArray(observation.evidence_passages)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
   const hits = readArray(observation.hits);
   const paths = readArray(observation.paths);
   const matches =
@@ -13919,6 +14064,9 @@ const normalizeDocsContentObservationsForHelix = (input: {
   const evidenceExcerpt =
     sectionExcerpt ??
     excerpt ??
+    evidencePassages
+      .map((entry) => readString(entry.text_excerpt))
+      .find((entry): entry is string => Boolean(entry)) ??
     compactObservationTextPreview(observation) ??
     "";
   const sourceRef = readGatewayObservationRef(input.result, input.turnId);
@@ -13978,6 +14126,7 @@ const normalizeDocsContentObservationsForHelix = (input: {
       section_observations: sectionObservations,
       section_lookups: sectionLookups,
       document_candidates: documentCandidates,
+      evidence_passages: evidencePassages,
       ...(documentPath ? { active_document_path: documentPath } : {}),
     }),
   ];
@@ -20908,13 +21057,39 @@ export const codexProvider: HelixAgentProvider = {
     const runtimeSourceTargetIntent =
       readRecord(request.body.source_target_intent) ??
       readRecord(runtimeRouteMetadata?.source_target_intent);
-    const hardLiveEnvironmentRoute = Boolean(
+    const hardRuntimeToolSurfaceSourceRoute = Boolean(
       readString(runtimeSourceTargetIntent?.strength) === "hard" &&
         [
           readString(runtimeSourceTargetIntent?.target_source),
           readString(runtimeSourceTargetIntent?.target_kind),
-        ].includes("live_environment"),
+        ].some((sourceTarget) =>
+          ["live_environment", "visual_capture"].includes(
+            sourceTarget ?? "",
+          ),
+        ),
     );
+    const runtimeToolCallAdmission = readRecord(
+      request.body.tool_call_admission_decision,
+    );
+    const runtimePromptInterpretation =
+      readRecord(
+        readRecord(request.body.ask_turn_solver_trace)
+          ?.prompt_interpretation,
+      ) ?? readRecord(request.body.prompt_interpretation);
+    const runtimeAdmittedToolFamilies = readStringArray(
+      runtimeToolCallAdmission?.admitted_tool_families,
+    );
+    const currentTurnOperatorCommandAdmitted =
+      runtimePromptInterpretation?.control_command_detected === true &&
+      readArray(
+        runtimePromptInterpretation?.executable_operator_commands,
+      ).length > 0;
+    const explicitlyAdmittedMutatingCapabilityIds = uniqueStrings([
+      readString(runtimeToolCallAdmission?.admitted_capability),
+      ...readStringArray(
+        runtimeToolCallAdmission?.exclusive_tool_capabilities,
+      ),
+    ]);
     const runtimeProviderAdmittedCapabilityIds =
       runtimeProviderAdmittedCapabilityIdsForQuestion({
         question,
@@ -20925,14 +21100,14 @@ export const codexProvider: HelixAgentProvider = {
               lane.capabilities.map((capability) => capability.capability_id),
           ),
         ],
-        ...(hardLiveEnvironmentRoute
-          ? {
-              admittedToolFamilies: readStringArray(
-                readRecord(request.body.tool_call_admission_decision)
-                  ?.admitted_tool_families,
-              ),
-            }
-          : {}),
+        admittedToolFamilies: runtimeAdmittedToolFamilies,
+        restrictAllCapabilitiesToAdmittedToolFamilies:
+          hardRuntimeToolSurfaceSourceRoute,
+        mutatingCapabilityIds: gatewayManifest.capabilities
+          .filter((capability) => capability.mutating)
+          .map((capability) => capability.capability_id),
+        explicitlyAdmittedMutatingCapabilityIds,
+        operatorCommandAdmitted: currentTurnOperatorCommandAdmitted,
       });
     const runtimeProviderRequiredGroundingCapabilityIds =
       runtimeProviderRequiredGroundingCapabilityIdsFromBody(
@@ -21717,6 +21892,20 @@ export const codexProvider: HelixAgentProvider = {
       ...actionReceiptResults,
       ...noteCreateActionReceiptResults,
     ];
+    const initialRuntimeLaneDelegatedGatewayResults =
+      delegatedGatewayCallResultsFromCapabilityLaneContext(
+        capabilityLaneContext,
+      );
+    if (initialRuntimeLaneDelegatedGatewayResults.length > 0) {
+      evidenceGatewayCallResults = mergeUniqueGatewayCallResults(
+        evidenceGatewayCallResults,
+        initialRuntimeLaneDelegatedGatewayResults,
+      );
+      gatewayCallResults = mergeUniqueGatewayCallResults(
+        gatewayCallResults,
+        initialRuntimeLaneDelegatedGatewayResults,
+      );
+    }
     const initiallyObservedCapabilityIds = new Set([
       ...gatewayCallResults
         .filter((result) => result.ok === true)
@@ -22134,8 +22323,12 @@ export const codexProvider: HelixAgentProvider = {
         );
       const hardVisualCaptureRouteRequiresObservation =
         !visualCaptureObservationAlreadyPresent &&
-        readString(canonicalGoalFrame?.requested_capability) ===
-          requiredVisualCaptureCapability &&
+        (readString(toolCallAdmissionDecision?.admitted_capability) ===
+          requiredVisualCaptureCapability ||
+          readString(canonicalGoalFrame?.requested_capability) ===
+            "image_lens.inspect" ||
+          readString(canonicalGoalFrame?.requested_capability) ===
+            requiredVisualCaptureCapability) &&
         readString(sourceTargetIntent?.target_source) === "visual_capture" &&
         readBoolean(toolCallAdmissionDecision?.required) === true &&
         runtimeProviderAdmittedCapabilityIds.includes(
@@ -22170,6 +22363,15 @@ export const codexProvider: HelixAgentProvider = {
             raw_content_included: false,
           },
         ];
+      } else if (visualCaptureObservationAlreadyPresent) {
+        const hintId = `${turnId}:provider_required_visual_capture_observation`;
+        request.body.runtime_continuation_hints = Array.isArray(
+          request.body.runtime_continuation_hints,
+        )
+          ? request.body.runtime_continuation_hints.filter(
+              (entry) => readString(readRecord(entry)?.hint_id) !== hintId,
+            )
+          : [];
       }
       const previousState =
         request.body.agent_continuation_state &&
@@ -23492,10 +23694,31 @@ export const codexProvider: HelixAgentProvider = {
       emittedIds: emittedLiveTranscriptEventIds,
     });
 
+    const hardVisualCaptureAlreadyObserved =
+      readString(
+        readRecord(request.body.source_target_intent)?.target_source,
+      ) === "visual_capture" &&
+      readString(
+        readRecord(request.body.source_target_intent)?.strength,
+      ) === "hard" &&
+      gatewayCallResults.some(
+        (gatewayResult) =>
+          gatewayResult.ok === true &&
+          gatewayResult.capability_id ===
+            "situation-room.describe_visual_capture",
+      );
     const compatibilityGatewayRecoveryRequests =
       readWorkstationGatewayCallRequestsForTurn({
         body: request.body,
         includePlannerDerived: true,
+      }).filter((gatewayRequest) => {
+        const capabilityId =
+          readString(gatewayRequest.capability_id) ??
+          readString(gatewayRequest.capabilityId);
+        return !(
+          hardVisualCaptureAlreadyObserved &&
+          capabilityId === "situation-room.describe_visual_capture"
+        );
       });
     const nativeProviderBridgeAttempt = await runCodexNativeProviderBridge({
       eligible: !modelOnlyDirectAnswerForPrompt,
@@ -24681,8 +24904,20 @@ export const codexProvider: HelixAgentProvider = {
           (requirement): requirement is Record<string, unknown> =>
             Boolean(requirement) && readBoolean(requirement?.required) !== false,
         );
+      const committedCompoundCapabilityContract = readRecord(
+        request.body.compound_capability_contract,
+      );
+      const committedCompoundCapabilitySubgoals = readArray(
+        committedCompoundCapabilityContract?.subgoals,
+      )
+        .map(readRecord)
+        .filter(
+          (subgoal): subgoal is Record<string, unknown> =>
+            Boolean(subgoal) && readBoolean(subgoal.mandatory) !== false,
+        );
       const genericCompoundTerminalReviewEnabled =
-        genericCompoundRequiredRequirements.length > 1 &&
+        (genericCompoundRequiredRequirements.length > 1 ||
+          committedCompoundCapabilitySubgoals.length > 1) &&
         !firstLaneWasScholarlyGateway &&
         !firstLaneWasImageLens &&
         !firstLaneWasVisibleTargetCollector &&
@@ -25196,7 +25431,7 @@ export const codexProvider: HelixAgentProvider = {
           };
         }
       } else if (
-        continuationStateRequiresLaneRequest(providerContinuationState)
+        shouldEnterCodexPostObservationContinuation(providerContinuationState)
       ) {
         let firstReentryText =
           result.stdout.trim() || result.stderr.trim() || "";
@@ -25211,6 +25446,9 @@ export const codexProvider: HelixAgentProvider = {
           const priorResponsePreview = firstReentryText.slice(0, 500);
           const continuationInstruction =
             buildCodexContinuationAffordanceRetryInstruction(
+              providerContinuationState,
+            ) ??
+            buildCodexGenericContinuationDecisionInstruction(
               providerContinuationState,
             );
           const retryPrompt = [
@@ -25261,11 +25499,16 @@ export const codexProvider: HelixAgentProvider = {
             candidate: requestedContinuationCandidate,
             admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
           }) &&
-          continuationStateAdmitsPreparedLaneRequest({
+          (continuationStateAdmitsPreparedLaneRequest({
             state: providerContinuationState,
             requestedCandidate: requestedContinuationCandidate,
             preparedCandidate: requestedContinuationCandidate,
-          })
+          }) ||
+            continuationStateAdmitsModelAuthoredRetryLaneRequest({
+              state: providerContinuationState,
+              candidate: requestedContinuationCandidate,
+              admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
+            }))
         ) {
           chainedRuntimeLaneRequestCandidate = requestedContinuationCandidate;
         } else if (requestedContinuationCandidate) {
@@ -26715,6 +26958,8 @@ export const codexProvider: HelixAgentProvider = {
                   candidate,
                   priorRequests: chainedLaneCalls,
                   gatewayCallResults,
+                  compoundCapabilityContract:
+                    committedCompoundCapabilityContract,
                 });
                 if (!sequenceDecision.admitted) {
                   genericContinuationPolicyRejectionReason =
@@ -27584,6 +27829,27 @@ export const codexProvider: HelixAgentProvider = {
       !providerOutputHasPendingCapabilityLaneRequest &&
       !boundedMissingSourceGuardActive &&
       docsContentEvidenceSatisfied;
+    const providerCommittedExecutionState = readRecord(
+      request.body.capability_itinerary_execution_state,
+    );
+    const providerCommittedCapabilityRailCount = Math.max(
+      readArray(providerCommittedExecutionState?.compound_subgoal_ledger).length,
+      readArray(providerCommittedExecutionState?.required_capabilities).length,
+    );
+    const providerCommittedCapabilityRailsIncomplete = Boolean(
+      providerCommittedExecutionState?.applies === true &&
+        providerCommittedCapabilityRailCount > 1 &&
+        (providerCommittedExecutionState.complete !== true ||
+          readArray(
+            providerCommittedExecutionState.missing_required_capabilities,
+          ).length > 0 ||
+          readArray(
+            providerCommittedExecutionState.missing_compound_subgoal_ids,
+          ).length > 0),
+    );
+    const providerGoalSatisfied =
+      providerSolverPathCompleted &&
+      !providerCommittedCapabilityRailsIncomplete;
     const scientificImageContinuationSidecarForProvider =
       scientificImageCrossEvidenceComparison
         ? scholarlyWorkbenchSidecar()
@@ -27648,8 +27914,10 @@ export const codexProvider: HelixAgentProvider = {
             ],
       providerText: authorityGuardedText,
       ok: processOk,
+      providerObservationReentryCompleted:
+        result.exitCode === 0 && !result.timedOut && !result.killed,
       solverCompleted: providerSolverPathCompleted,
-      goalSatisfied: providerSolverPathCompleted,
+      goalSatisfied: providerGoalSatisfied,
       modelOnlyDirectAnswerAllowed: routeAllowsModelOnlyDirectAnswer(
         request.body,
       ),
@@ -27691,7 +27959,8 @@ export const codexProvider: HelixAgentProvider = {
         livePipelineControlTerminalProjection.receiptArtifact,
       ];
     }
-    const compoundAnswer = processOk
+    const compoundAnswer =
+      processOk && !providerCommittedCapabilityRailsIncomplete
       ? buildCodexCompoundEvidenceSynthesisAnswer({
           turnId,
           providerText: authorityGuardedText,
@@ -29639,6 +29908,7 @@ export const codexProvider: HelixAgentProvider = {
               terminalRecoveryText,
             ) &&
             !boundedMissingSourceGuardActive &&
+            !providerCommittedCapabilityRailsIncomplete &&
             (docsContentEvidenceSatisfied ||
               genericCurrentTurnToolRecoveryReady);
           const retryProviderReentry = buildHelixProviderReasoningReentry({
@@ -29672,6 +29942,10 @@ export const codexProvider: HelixAgentProvider = {
                   ],
             providerText: terminalRecoveryText,
             ok: true,
+            providerObservationReentryCompleted:
+              terminalRecoveryResult.exitCode === 0 &&
+              !terminalRecoveryResult.timedOut &&
+              !terminalRecoveryResult.killed,
             solverCompleted: terminalRecoverySolverPathCompleted,
             goalSatisfied: terminalRecoverySolverPathCompleted,
             modelOnlyDirectAnswerAllowed: routeAllowsModelOnlyDirectAnswer(

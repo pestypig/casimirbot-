@@ -10,11 +10,11 @@
   <text x="305" y="245" class="s" fill="#1d4ed8">candidate</text>
   <text x="75" y="175" class="s">max |cos| = 0.999977</text><text x="75" y="201" class="s">κ = 1.79×10⁵</text><text x="75" y="227" class="s" font-weight="700">Power withheld</text>
   <rect x="575" y="95" width="480" height="390" rx="16" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
-  <text x="605" y="135" class="l">Bounded synthetic redesign</text>
+  <text x="605" y="135" class="l">Parent whitened geometry</text>
   <path d="M635 405 C720 345 790 320 860 255" fill="none" stroke="#94a3b8" stroke-width="55" opacity=".55"/>
   <text x="650" y="455" class="s">modeled nuisance span</text>
   <line x1="650" y1="405" x2="990" y2="170" stroke="#2563eb" stroke-width="5" marker-end="url(#a)"/>
   <text x="885" y="220" class="s" fill="#1d4ed8">candidate</text>
-  <text x="605" y="175" class="s">max |cos| = 0.717724</text><text x="605" y="201" class="s">κ = 6.53169</text><text x="605" y="227" class="s">nominal power = 0.997858</text>
-  <text x="45" y="540" class="s">The right panel is not empirical. Finite-pilot covariance, response error, missing channels, drift, tails, and selection optimism remain unstressed.</text>
+  <text x="605" y="175" class="s">max |cos| = 0.717724</text><text x="605" y="201" class="s">κ = 6.53169</text><text x="605" y="227" class="s">Stage-4.2M power = 0.927 at 1,600</text>
+  <text x="45" y="540" class="s">The right panel is transported, not empirical. Finite-pilot covariance, response error, missing channels, drift, tails, and selection optimism remain unstressed.</text>
 </svg>

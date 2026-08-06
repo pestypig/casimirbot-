@@ -5,7 +5,7 @@
 > supplement. The concise canonical research article is
 > `docs/research/casimir-dp-quantum-foam-study.md`. Apparatus descriptions in
 > this supplement are historical records unless the canonical article's
-> Current Authoritative Apparatus Manifest explicitly admits them.
+> Leading Synthetic Commissioning Design explicitly admits them.
 
 ## Experiment-first proposal with a separated-lane evidence record
 
@@ -56,13 +56,14 @@ larger QED propagation correction in a separate material/electromagnetic lane.
 It therefore supplies a causal-consistency and scale-separation result, not a
 Casimir curvature measurement and not a derivation of DP collapse.
 
-Stage 4.2G now performs the empirical handoff. It freezes one selected silica
-sphere rather than treating the strongest point in a multi-mass design grid as
-the apparatus, regenerates the coherence and heating-companion predictions
-from that single identity, and supplies a hash- and custody-bound pilot packet.
-The packet ingestion and whitened-space gate recomputation pass on synthetic
-validation data, but the authoritative packet remains unacquired. This resolves
-the prediction identity; it does not resolve physical apparatus readiness.
+Stage 4.2M now supplies the leading synthetic commissioning design. It searches
+200 bounded material, geometry, environment, control, and readout combinations
+under the unchanged Diósi law and transported whitened geometry. Three pass all
+twelve synthetic gates. The best-ranked point predicts 2.908% loss under the
+effective-Gaussian model and a 0.435% transported density-envelope floor, with
+1,028 required paired windows and power 0.927 at 1,600 windows. Stage 4.2G's
+packet remains the custody template, but its silica numerical identity is
+superseded and must be rebound. No measured packet exists.
 
 The theoretical work therefore warrants a measured feasibility pilot, not an
 unconditional claim that the confirmatory experiment is ready. A blinded
@@ -94,7 +95,7 @@ requires an independently sourced and registered transfer law.
 | Layer | Present result | Scientific status |
 |---|---|---|
 | Registered DP phenomenology | The frozen \(\Delta\rho\rightarrow E_G/\hbar\) model produces a definite mass–branch-separation–hold-time coherence signature | Executable conditional prediction; not evidence that DP is true |
-| Apparatus identifiability | Stage 4.2B rejected the original nearly collinear design; Stage 4.2C found one bounded synthetic region passing the cosine, conditioning, power, false-positive, and companion-SNR gates | Synthetic design result; must be re-evaluated with measured pilot inputs |
+| Apparatus identifiability | Stage 4.2B rejected the original nearly collinear design; Stage 4.2C established the parent whitened geometry; Stage 4.2M found three of 200 configurations passing the transported multigate screen | Synthetic design result; must be re-evaluated with measured pilot inputs |
 | Cross-scale equation audit | Stage 4.2D recovers the Stark, Zeeman, polarization, blackbody, compactness, material-yield, Jeans, and spinor-representation benchmarks with zero new collapse-rate bridges | Calibration, dimensional-consistency, and regime-recovery result only |
 | Causal geometry audit | Stage 4.2E reconstructs ADM null cones and timelike clock rates, recovers Schwarzschild radial-null propagation, and separates an ideal Casimir curvature screen from the QED propagation lane | Causal-notation recovery and scale separation only; no measured apparatus metric or collapse bridge |
 | Experimental warrant | The frozen DP projection reaches percent-scale additional attenuation in the strongest registered cells and is no longer synthetically degenerate with the registered controls | Sufficient reason to attempt the feasibility pilot; insufficient reason to claim physical readiness |
@@ -155,57 +156,81 @@ factor \(C_{\rm DP}(t)=\exp[-\int_0^t\Gamma_{\rm DP}(t')dt']\). No DP amplitude,
 regularization scale, response vector, covariance correction, or exclusion
 rule may be fitted from confirmatory data.
 
-### Frozen Stage-4.2G pilot design
+### Leading Stage-4.2M commissioning design
 
-| Quantity | Single-apparatus design value |
+| Quantity | Leading synthetic value |
 |---|---:|
-| Object | one silica sphere |
-| Mass | \(1.94385\times10^{-16}\ {\rm kg}\) |
+| Object | one diamond-density sphere; specimen not selected |
+| Mass | \(3.0925053\times10^{-16}\ {\rm kg}\) |
 | Radius | \(2.76302362398029\times10^{-7}\ {\rm m}\) |
-| Branch separation | \(160\ {\rm nm}\) |
+| Branch separation | \(250\ {\rm nm}\), tangential |
 | Hold time | \(250\ {\rm ms}\) |
 | Primary sequence | Ramsey, with path-swap and echo controls |
-| Cavity gap | \(1.2\times10^{-6}\ {\rm m}\) |
+| Cavity gap | \(1.0\times10^{-5}\ {\rm m}\) |
+| Finite plate size | \(8.0\times10^{-5}\ {\rm m}\) square |
 | Boundary modulation | \(0.5\ {\rm Hz}\) |
-| Environment | \(4\ {\rm K}\), \(2\times10^{-11}\ {\rm Pa}\) |
+| Environment | \(4\ {\rm K}\), \(1\times10^{-15}\ {\rm Pa}\) |
 | Polarization control | circular-control pair |
 | Planned acquisition | 1,600 paired windows |
-| Stage-4.2C synthetic forecast minimum | 542 paired windows |
+| Stage-4.2M synthetic forecast minimum | 1,028 paired windows |
+| Stage-4.2M power at 1,600 | 0.927386 |
 
 These are bounded design inputs, not achieved apparatus specifications.
 An authentic mass/geometry, state-preparation, or branch-metrology receipt does
-not yet exist. The Stage-4.2C multi-mass and multi-separation grid is retained
-only as a sensitivity/design-search record.
+not yet exist. The Stage-4.2C silica identity and the multi-mass grid are
+retained only as design ancestry.
+
+### Stage-4.2N material/Green/FDT ordinary-null recovery
+
+The leading identity is now propagated through a provenance-bound synthetic
+ordinary-response runtime. The fixture contains a passive diamond-like loss
+table, finite-geometry dyadic Green samples, two-sided FDT energy/force spectra,
+Ramsey and echo filters, equal-temperature near-field thermal accounting, and
+five known calibration interventions. It produces the following recovery
+record:
+
+| Quantity | Synthetic result | Authority |
+|---|---:|---|
+| electromagnetic phase | (0.0199999999925 {m rad}) | synthetic finite-geometry table |
+| phase standard uncertainty | (6.30354\times10^{-5} {m rad}) | propagated synthetic table uncertainty |
+| Ramsey (chi) | (3.57773\times10^{-4}) | synthetic two-sided FDT spectrum |
+| echo (chi) | (1.34165\times10^{-6}) | synthetic two-sided FDT spectrum |
+| maximum (epsilon(i\xi)) propagated relative uncertainty | (3.15010\times10^{-3}) | synthetic loss-table diagonal propagation |
+| Planck--Stefan--Boltzmann relative error | (1.37708\times10^{-14}) | numerical recovery |
+| zero-coupling / infinite-distance limits | exact zero / exact zero | software recovery |
+| measured ordinary-null authority | `not_ready` | specimen, CAD, solver, calibration, covariance absent |
+
+The four-cell statistic is
+(mathcal R_4=(C_{a,s}C_{r,c})/(C_{a,c}C_{r,s})). It is sensitive to a
+boundary-by-superposition interaction after reference and compact controls.
+The registered boundary-independent Diósi factor cancels from this ratio, so a
+nonzero corrected ratio is not automatically a Diósi signal. The frozen Diósi
+exponents remain a separate comparator and are not added to the ordinary
+Green/FDT exponent. The thermal closure is a recovery cross-check and is not
+double counted. The runtime adds zero observable bridge edges.
 
 ### Projection if the frozen DP model is true
 
-For the registered \(r_0=100\ {\rm nm}\) model point, the Stage-4.2C
-multi-mass transport receipts span
-\(1.56052136200008\times10^{-4}\ {\rm s^{-1}}\leq\Gamma_{\rm DP}
-\leq1.34871682598635\times10^{-1}\ {\rm s^{-1}}\). The corresponding
-characteristic times range from approximately \(6408\ {\rm s}\) to
-\(7.41\ {\rm s}\).
+For the registered \(r_0=100\ {\rm nm}\) model point, the leading Stage-4.2M
+identity gives
+\(E_G=1.2448784\times10^{-35}\ {\rm J}\),
+\(\Gamma_{\rm DP}=0.1180458589\ {\rm s^{-1}}\), and characteristic time
+8.47128 s. Transporting the registered density-representation envelope gives
+the conservative exponent 0.00435852 at 250 ms. These are the current design
+values; the Stage-4.2C grid and Stage-4.2G 0.5983% silica value remain ancestry
+records.
 
-The upper rate is not the frozen Stage-4.2G apparatus prediction. It is the
-largest transported Stage-4.2C sensitivity-grid cell:
-\(m=4.60765\times10^{-16}\ {\rm kg}\) and
-\(\Delta x=160\ {\rm nm}\). At the same separation, the declared reference
-mass \(1.94385\times10^{-16}\ {\rm kg}\) gives
-\(\Gamma_{\rm DP}=2.400420398374263\times10^{-2}\ {\rm s^{-1}}\) and
-\(e^{-\Gamma t}=0.9940169\) for \(t=250\ {\rm ms}\), a conditional
-\(0.5983\%\) DP-only loss. That lower rate is the frozen Stage-4.2G
-single-apparatus prediction. Any future multi-mass scaling campaign requires a
-separate preparation and metrology receipt for every object.
+For the leading geometry, the two DP-only coherence projections are:
 
-At the strongest registered geometry, the DP-only coherence projection is:
+| Effective exposure | Effective-Gaussian loss | Conservative density-floor loss |
+|---:|---:|---:|
+| \(100\ {\rm ms}\) | 1.1735% | 0.1742% |
+| \(200\ {\rm ms}\) | 2.3333% | 0.3481% |
+| \(250\ {\rm ms}\) | 2.9080% | 0.4349% |
+| \(400\ {\rm ms}\) | 4.6121% | 0.6949% |
 
-| Effective exposure | \(\chi_{\rm DP}\) | \(e^{-\chi_{\rm DP}}\) | Additional DP-only loss |
-|---:|---:|---:|---:|
-| \(62.5\ {\rm ms}\) | 0.00842948 | 0.991606 | 0.84% |
-| \(125\ {\rm ms}\) | 0.01685896 | 0.983282 | 1.67% |
-| \(250\ {\rm ms}\) | 0.03371792 | 0.966844 | 3.32% |
-
-These percentages are conditional DP-only multipliers. The observed coherence
+These percentages are conditional DP-only multipliers. The interval is model
+sensitivity, not a confidence band. The observed coherence
 also contains state-preparation loss and ordinary thermal, electromagnetic,
 gas, vibration, and readout decoherence. Stage 4.2B showed that a rate-only
 measurement is numerically inaccessible when those effects are not separated.
@@ -840,6 +865,98 @@ independent replication. Manifold dynamics additionally requires a complete
 relativistic stress-energy model. No Casimir-to-collapse transfer kernel is
 registered.
 
+## Boundary--branch interaction: Stage-4.2I four-cell diagnostic
+
+Stage 4.2I turns the paper's boundary comparison into an explicit factorial
+observable while preserving Stage 4.2B--H as immutable upstream evidence. It
+uses four normalized complex-coherence cells: reference boundary with an
+identical-branch control, reference boundary with separated branches, active
+boundary with an identical-branch control, and active boundary with separated
+branches. For each cell (C_{bq}=C_{bq}(t)/C_{bq}(0)), the primary statistic is
+the multiplicative interaction cross-ratio
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2i-complex-cross-ratio -->
+
+\[
+R_\times=\frac{C_{11}C_{00}}{C_{01}C_{10}},\qquad
+I_\times=-\ln|R_\times|,\qquad
+\Phi_\times=\arg R_\times .
+\]
+
+Multiplicative boundary-only and branch-only effects cancel in this ratio. A
+standard boundary-independent DP contribution is branch dependent but common
+to the two boundary states, so it also cancels. Therefore (R_\times\ne1)
+does not by itself identify DP collapse; it first identifies a boundary--branch
+interaction that must be compared with ordinary electromagnetic, thermal,
+mechanical, gas, and readout mechanisms.
+
+The registered ordinary-physics prediction is removed only through its frozen
+complex response, not by fitting confirmatory data:
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2i-ordinary-corrected-interaction -->
+
+\[
+R_{\times,{\rm corr}}
+=\frac{R_{\times,{\rm obs}}}{R_{\times,H_0}},\qquad
+I_{\times,{\rm corr}}=-\ln|R_{\times,{\rm corr}}|,
+\qquad
+\Phi_{\times,{\rm corr}}=\arg R_{\times,{\rm corr}}.
+\]
+
+The runtime propagates the frozen sixteen-coordinate observed/ordinary
+covariance into ((I_\times,\Phi_\times)), rejects nonsymmetric or non-positive
+covariance, and checks the result against a saturated four-cell generalized
+least-squares interaction in the Stage-4.2B whitened complex-coherence space.
+The additive complex double contrast is retained as a diagnostic, but the
+cross-ratio is primary because the additive form does not cancel general
+multiplicative main effects.
+
+The same campaign makes the center-of-mass packet an auditable experimental
+object rather than an abstract label. Each cell carries packet-center vectors,
+three-by-three covariance matrices, overlap, separation uncertainty, hold-time
+jitter, preparation fidelity, relative momentum, and content-addressed
+trajectory/tomography authority:
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2i-wavepacket-custody -->
+
+\[
+G_{\rm packet}
+=I_{q=0}\land I_{q=1}\land I_{\rm boundary\ equivalence}
+\land I_{\rm custody},
+\qquad
+\{R_{\rm sphere},R_0,\sigma_{\rm CM}\}
+\ \text{have distinct physical and model roles}.
+\]
+
+Here (R_{\rm sphere}) is the object's bulk radius, (R_0) is the registered
+Diósi regularization length, and (sigma_{\rm CM}) is a measured or bounded
+wave-packet width. Passing numerical packet gates with a synthetic fixture is
+not evidence that the laboratory prepared those packets.
+
+The authoritative synthetic run
+`casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z`
+returns a boundary-independent DP exponent difference of zero,
+(I_{\times,{\rm corr}}=1.11\times10^{-16}),
+(\Phi_{\times,{\rm corr}}=-9.30\times10^{-19}\ {m rad}), and maximum
+interaction significance (3.85\times10^{-13}). The saturated-GLS and simple
+factorial estimators agree within (3.47\times10^{-18}). An adversarial
+injection recovers a loss interaction of (0.002) and a phase interaction of
+(0.004\ {m rad}); low-coherence, packet-mismatch, non-positive-covariance,
+and boundary-dependent-DP fixtures fail closed as registered.
+
+These are software-recovery results only. Branch-control preparation,
+wave-packet metrology, ordinary-response authority, and measured four-cell
+contrast remain `not_ready`; no transfer kernel is registered; measured
+evidence remains `not_ready`; collapse identification and manifold dynamics
+remain `blocked`; and physical viability remains `not_evaluated`.
+
+Fresh adapter run `2369` returns `PASS`, first failure `null`, empty deltas,
+`GREEN` certificate status, and integrity `OK`. Its certificate SHA-256 is
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+The exclusive one-record validated trace SHA-256 is
+`97d3cfcc1be7c29946a300eba705fc245def0fc86b8e3d3c09c79a9f6f9dadaf`.
+The certificate's scientific scope is `none`.
+
 ## How the Casimir part fits
 
 The Casimir apparatus supplies a controlled QED boundary perturbation, not the
@@ -914,12 +1031,12 @@ and artifact ledger is retained here for independent replay.
 
 **Study id:** `casimir-dp-quantum-foam-study`  
 **Short id:** `CDP-QF-1`  
-**Status:** bounded Stage-4.2C redesign plus Stage-4.2D cross-scale, Stage-4.2E causal, and Stage-4.2F Maxwell/macroscopic-QED audits available; physical pilot readiness and measured evidence not ready<br>
+**Status:** bounded Stage-4.2M leading-design search plus inherited cross-scale, causal, Maxwell/macroscopic-QED, microscopic-EM, and empirical-authority audits available; physical pilot readiness and measured evidence not ready<br>
 **Current / maximum claim tier:** diagnostic / diagnostic  
 **Manifold-response math maturity:** Stage 0 exploratory / noncomputable  
 **Current theoretical result:** conditional, falsifiable apparatus-level DP model comparison with zero registered Casimir-to-collapse transfer edges<br>
-**Current apparatus-DP forecast:** one Stage-4.2G silica design identity is frozen and its DP/coherence/heating predictions are internally consistent; physical pilot inputs absent; no DP exclusion<br>
-**Evidence cutoff:** 2026-07-30<br>
+**Current apparatus-DP forecast:** Stage-4.2M candidate `stage4_2m_candidate_002` is the leading synthetic commissioning target, with 2.908% registered-Gaussian loss, a 0.434903% transported density-envelope floor, 1,028 required paired windows, and 0.927386 nominal power at 1,600 windows; physical pilot inputs absent; no DP exclusion<br>
+**Evidence cutoff:** 2026-08-06<br>
 **Run config:** `configs/research/casimir-dp-quantum-foam-study.v1.json`  
 **Runner:** `scripts/research/run-casimir-dp-quantum-foam-study.ts`  
 **Experiment-design config:** `configs/research/casimir-dp-experiment-design.v1.json`  
@@ -996,6 +1113,13 @@ and artifact ledger is retained here for independent replay.
 **Stage-4.2H verification receipt:** `docs/research/casimir-dp-commissioning-intake-stage4-2h-verification-receipt.json`<br>
 **Stage-4.2H blank dossier:** `configs/research/fixtures/casimir-dp-stage4-2h-commissioning-blank.v1.json`<br>
 **Stage-4.2H authoritative run:** `artifacts/research/casimir-dp-commissioning-intake-stage4-2h/casimir-dp-commissioning-intake-stage4-2h-v1-20260730T050000000Z/` (blank intake and synthetic dry run only; physical commissioning remains no-go)<br>
+**Stage-4.2I plan:** `docs/research/casimir-dp-boundary-branch-interaction-stage4-2i-plan.md`<br>
+**Stage-4.2I config:** `configs/research/casimir-dp-boundary-branch-interaction-stage4-2i.v1.json`<br>
+**Stage-4.2I runner:** `scripts/research/run-casimir-dp-boundary-branch-interaction-stage4-2i.ts`<br>
+**Stage-4.2I maintained report:** `docs/research/casimir-dp-boundary-branch-interaction-stage4-2i-report.md`<br>
+**Stage-4.2I verification receipt:** `docs/research/casimir-dp-boundary-branch-interaction-stage4-2i-verification-receipt.json`<br>
+**Stage-4.2I fixture:** `configs/research/fixtures/casimir-dp-stage4-2i-factorial.synthetic.v1.json`<br>
+**Stage-4.2I authoritative run:** `artifacts/research/casimir-dp-boundary-branch-interaction-stage4-2i/casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z/` (synthetic interaction recovery and packet-custody software only)<br>
 **Equation-action sidecar:** `docs/research/casimir-dp-quantum-foam-study.equation-actions.json`  
 **Equation-action source:** `docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json`  
 **Theory-badge graph:** `shared/theory/casimir-dp-study-theory-badges.ts`
@@ -1489,7 +1613,7 @@ has been experimentally demonstrated.
 | \(cR_\infty=\alpha_{\rm fs}^2\nu_C/2\) supplies a Casimir/DP mechanism | This is a QED/atomic scale identity. \(\alpha_{\rm fs}\) is a coupling, not a universal emission probability, and \(cR_\infty\) is not a complete measured line. | Stage-4.1 source/algebra/covariance calibration only; semantic state `same_dimension_not_connected`. | Constants, convention, uncertainty, and leading reduced-mass checks only. |
 | \(m_ec^2=y_ev_F/\sqrt2\) and CERN Higgs data independently validate the electron anchor | The tree relation parameterizes the electron mass in the minimal Standard Model; \(y_e\) remains a free parameter. Heavier-particle measurements support the broader pattern, while direct \(H\to e^+e^-\) searches currently provide an upper bound only. | Stage-4.2A source-backed metrology replay and conditional tree mapping `pass`; direct electron-Yukawa observation `not_ready`; live badge non-promotable. | Electron-mass provenance, conditional tree mapping, and collider-bound compatibility only; no Casimir/DP transfer. |
 | \(m_e\rightarrow\nu_C,R_\infty\rightarrow\) Planck spectrum \(\rightarrow T_\odot\rightarrow\Gamma_{\rm DP}\) is one physical ladder | The electron/atomic and thermal/solar relations form separate calibration branches. The implemented TSIS result is a coarse frozen-window Wien-peak color diagnostic, not a full spectral fit; the IAU value is a nominal bolometric conversion; the DP rate consumes an independently prepared \(\Delta\rho\). | Stage-4.2A Planck/Stefan-Boltzmann and distinct color/bolometric temperature closures `pass`; measured spectral-fit significance and the measured DP gate remain `not_ready`, while transfer/collapse gates remain `blocked`. | Source, unit, spectral, and normalization regression only; only a measured DP residual and scaling test may advance collapse evidence. |
-| The current apparatus is ready to exclude DP | Stage-4.2B couples the proposed apparatus into one frozen synthetic observable/covariance space, but the DP and nuisance signatures are nearly collinear and the controls lack numerical response/covariance authority. | Campaign/content integrity `pass`; A–E `pass`; F `blocked` as `signature_not_identifiable`; required windows and power `not_estimable_until_identifiable`; measured evidence `not_ready`. | Apparatus redesign and calibration target only. It excludes no DP region and supplies no collapse or manifold evidence. |
+| The leading apparatus is ready to exclude DP | Stage-4.2M identifies a bounded synthetic commissioning region after the Stage-4.2B no-go and Stage-4.2C redesign, but all material, field, covariance, gas, preparation, companion, and external-bound inputs remain synthetic or transported. | All twelve Stage-4.2M synthetic design gates pass for 3 of 200 candidates; the leading candidate forecasts 1,028 windows and 0.927386 power at 1,600, while measured evidence remains `not_ready`. | Empirical commissioning target only. It excludes no DP region and supplies no collapse or manifold evidence. |
 | DP reduction is a beat between two manifolds | Penrose motivates an incompatibility between alternative mass geometries; the repository implements a nonrelativistic mass-density self-energy proxy, not an acoustic mode. | DP rate-only diagnostic; covariant manifold dynamics `blocked`. | Metaphor only; no resonance or spectral-line claim. |
 | Collapse accelerates merely in a stronger ambient gravitational field | Standard OR/DP uses the branch-relative self-energy, not the shared field magnitude. Different path potentials can create a large ordinary unitary phase. | Ambient-gravity phase/tilt runtime `pass`; measured alignment receipts `not_ready`. | Treat as a phase and systematics control, not an OR rate. |
 | Constructive/destructive interference or gravitational-wave reality proves quantum manifolds | Interference measures phase and visibility; gravitational-wave observations establish classical metric dynamics. Neither result establishes superposed quantum geometries or objective reduction. | Four-quadrature readout runnable; measured evidence `not_ready`; collapse and manifold gates `blocked`. | Instrument/readout motivation only. |
@@ -3029,7 +3153,7 @@ definition.
 ### 7.4 Cross-runtime authority order
 
 The thirteen stages above govern the base study runner. The repository also
-contains sixteen maintained authority layers. Their paper-level authority order
+contains nineteen maintained authority layers. Their paper-level authority order
 is:
 
 1. **Base diagnostic scaffold** — freezes the separated observables, runs the
@@ -3092,7 +3216,16 @@ is:
     coherence and same-identity companion forecasts, validates acquisition
     packet integrity, and recomputes the inherited whitened identifiability
     gates without promoting synthetic readiness to measured evidence.
-17. **Document synchronization** — regenerates equation actions, validates the
+17. **Stage-4.2H commissioning intake** — binds the Stage-4.2G packet to a
+    strict instrument, calibration, custody, partition, raw-column, and
+    replication dossier; its blank and synthetic dry runs have zero empirical
+    authority.
+18. **Stage-4.2I boundary--branch interaction and packet custody** — preserves
+    Stage 4.2B--H, freezes the four-cell branch/boundary comparison, propagates
+    the observed/ordinary covariance into a complex cross-ratio, and enforces
+    packet-equivalence and adversarial fail-closed gates without registering a
+    Casimir-to-collapse bridge.
+19. **Document synchronization** — regenerates equation actions, validates the
     theory-badge graph and paper actions, and then updates this ledger.
 
 This is an **authority dependency rail**, not an assertion that every CLI
@@ -3219,6 +3352,17 @@ measured artifact and calibration by hash, and pass its repository-relative
 path with `--dossier`. Never edit the immutable blank template or synthetic dry
 run in place.
 
+Only after the immutable Stage-4.2H tuple is present, run the Stage-4.2I
+boundary--branch interaction and packet-custody campaign:
+
+```text
+npm run casimir:dp:stage4-2i
+```
+
+The maintained fixture is synthetic and boundary-independent by construction.
+A future measured four-cell packet must preserve the frozen cell order,
+covariance coordinates, packet equivalence, hashes, and blind/custody rules.
+
 ### 8.1 Runtime-to-artifact contract
 
 | Runtime | Frozen input and SHA-256 | Outputs / sidecars | Current receipt or maintained evidence | Claim ceiling |
@@ -3239,7 +3383,8 @@ run in place.
 | Stage-4.2F Maxwell/macroscopic-QED closure | `casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.v1.json`; `421f9d4c570c135cf2bb4a92849868c2862074696911dc7cb139608a4b5f60dd`; authority manifest `e0eab3f58a8b5c10ca91ef28232d4fda2392bbfceb02bc6822ef4e3290e4f19b`; fixture `fe81cda1ed30dfce8b58e8eeaeb13ceddad4c353aa95ad185e448a5bdf961128` | covariant Maxwell, polarization, Green/FDT, ideal-Casimir, named-DP, mass-transport, companion, readiness, and nonbridge diagnostics; 12 executed fixtures | authoritative run `casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z`; JSON `f832e7081abcbd54b9b9879e80257c6f064cf5c78c7779cf9a181400d848e176`; Markdown `e8e976840db8a6dd421364eead3f233d84fc5cfa127babe1eb3bea7749edfc27`; trace `1f73089b5d5c9528d8c9914ab6d706ba96383d8e25dde7134360479ed70acdce`; campaign receipt `b33689bc4c2fc751219a2af33fee9cf00cbe38477b2134d90c684e9eb7465f89` | equation/provenance recovery only; all finite-geometry, material, detector/model-identity, preparation, modulation, stress-energy, measured, collapse, manifold, and viability gates remain closed; zero observable bridge |
 | Stage-4.2G empirical-feasibility pilot | `casimir-dp-empirical-feasibility-pilot-stage4-2g.v1.json`; `a9516529a7c2f935c777fc4c1b29c207457a8f1618f1df580bff89ee27692487`; authority manifest `7bce49cd2c49028321aa591b1571c88a1418d2e2a125631f810bc966f49b8fff`; unacquired packet `f06425aa1355f3fee13e02fdbd97ca5493f65138ec8f835e6e03fb21d5d5ba43`; synthetic-validation packet `251ae42ac6e60454d1af850fec591febd104b9d5c33093a61569f6b8dddae7a8` | one frozen apparatus/mass-density identity; named regularized-DP and same-identity companion forecasts; 13 product contracts; provenance, custody, blinding, replication, packet-class, whitening, covariance, and identifiability checks | authoritative unacquired run `casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z`; JSON `0de543b66dc6e79f523b10083f7712bebbfd0dc2857f51d72337af7c8e600a4b`; Markdown `848cb5c19c5db4df3be38b2e55b8bbe6cddc669259ab6d9c3437cd11652a7509`; trace `30abd0e70eaca3e0b9998a999d4b4e6c16b61124008edd6cb2ab95954b3d944c`; campaign receipt `d53405187bb494aa8db3b83a68f0f4ea746fb36ffd70ede127d95cdc8e1e1f6c`; downstream verification receipt `3530465e24ef861bd84cbd258cff153e39823e4329e7461a216ef978e712821b` | acquisition-ready contract and software gate replay only; measured evidence `not_ready`, collapse/manifold `blocked`, physical viability `not_evaluated`, and zero observable bridge |
 | Stage-4.2H commissioning intake | `casimir-dp-commissioning-intake-stage4-2h.v1.json`; `d1021844f62adadfe3b77f9b36b742a27b7c086c56008778ae2c01dcf6daaa42`; authority manifest `d607691158c0156903f7f79f2970b7f5021b9350047c988279a938435a30ba3d`; blank dossier `57318b8bc2986530154fb02bb2765e5dc5a711920d8c88483bc19772625bad65` | 12 instrument roles, 13 product slots, 4 frozen partitions, 28 raw columns, measured-artifact/custody checks, synthetic dry run, and Stage-4.2G packet compilation | authoritative blank run `casimir-dp-commissioning-intake-stage4-2h-v1-20260730T050000000Z`; JSON `d5954986d73d7eb9d5d9a07ad4f945d9b636d1c6a37efe28c2de6b5ad1fd32aa`; Markdown `7eec6b9cbd7ff714f0ae89c5151748d4a3fab40a248f04e6d6f4459093d46ee7`; trace `9bd74a2fc42d93856a4f4656f95668ffb885e07d67f3afd344adcda511e2846f`; receipt `d0aacee6611e5aec1c75934a24fc709c434107e3e685eba0f96fc1addd1be56b`; synthetic dossier `de337a193fb34e41b6aab792cb758d7f29102a225b1cff584d5cafb75eb3d1c0` | commissioning software and packet-preflight only; all physical intake, measured, collapse, manifold, and viability gates remain closed; zero observable bridge |
-| Paper / workstation synchronization | paper plus `.equation-actions.source.json`; theory-badge module | generated `.equation-actions.json`, document-action tests, badge-graph tests | 62 equation markers = 62 source entries = 62 generated entries; 33 study badges and 98 edges | navigation and provenance only |
+| Stage-4.2I boundary--branch interaction | `casimir-dp-boundary-branch-interaction-stage4-2i.v1.json`; `6f66903a470f14314166c755b080208cf0942d6bb382077d6e44b953252d234e`; authority manifest `8078f2b05998ad145901444433296d244651a06ab1f75c3aa70b9d5ae2cb7423`; fixture `36c38578b6df5e73c4441cb3f509cf10931f72249425e798e9e2c4f8d362eaa7` | frozen four-cell order, normalized complex cross-ratio, observed/ordinary 16-coordinate covariance propagation, saturated-GLS comparison, packet-custody/equivalence gates, and five adversarial cases | authoritative synthetic run `casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z`; JSON `a879a9110a18011ab3bdd8c3ebc224532eb67de3d15cfdc511b40f1006b06c65`; Markdown `d8bd040356cf42971e39209769b638e1d9ebbea923fc87c73e26a805bdf00ad4`; trace `020f647319fb416aa7fcb97e670a6106731a2efd512b64393967ccc090a0fe91`; receipt `7ffe144e8bffc95c92edad45f8385642a8aa0ce8553cc50380ba816d734df35c` | synthetic interaction-estimator and wave-packet-custody recovery only; empirical packet, ordinary response, measured contrast, transfer kernel, collapse/manifold identification, and viability remain closed |
+| Paper / workstation synchronization | paper plus `.equation-actions.source.json`; theory-badge module | generated `.equation-actions.json`, document-action tests, badge-graph tests | main `12/12/12`, supplement `65/65/65`, 34 badges, 100 edges | navigation and provenance only |
 
 The input hashes identify the exact frozen configuration bytes in this
 checkout. Timestamped receipts identify a particular execution. A maintained
@@ -3282,8 +3427,11 @@ evidence.
 | Stage-4.2E causal-cone/clock campaign | receipt `633b07c4f2d769b4701612bd4e112e5a2e12e111f60f7405f1f752b3e260d2c2`; JSON report `d75857f22e0a95b4302e61d60d25c9fa689182ce8c9ef31eabfd15e64f66ed58`; Markdown report `fd3463408012bc168832167159641bc30a87a627bf26ec2d9d3ebd9bfe0af5c0`; trace `c20f9c95594c2b2b47f4bbcb8360e6eee032a22e77db21fdf9b379c21f451e57` | immutable Stage-4.2D standing recovered; ADM cone/clock, Schwarzschild null propagation, Casimir gravity screen, QED-control separation, and 10/10 fail-closed fixtures pass; observable bridge count stays zero | measured light paths or clocks, a complete apparatus metric, physical pilot readiness, DP evidence, collapse, manifold dynamics, or physical viability |
 | Stage-4.2F Maxwell/macroscopic-QED campaign | receipt `b33689bc4c2fc751219a2af33fee9cf00cbe38477b2134d90c684e9eb7465f89`; JSON report `f832e7081abcbd54b9b9879e80257c6f064cf5c78c7779cf9a181400d848e176`; Markdown report `e8e976840db8a6dd421364eead3f233d84fc5cfa127babe1eb3bea7749edfc27`; trace `1f73089b5d5c9528d8c9914ab6d706ba96383d8e25dde7134360479ed70acdce` | immutable Stage-4.2E standing recovered; Maxwell/polarization, Green/FDT, ideal-Casimir, named-DP, transport-identity, companion-identity, readiness, and 12/12 fail-closed fixtures pass; observable bridge count stays zero | finite apparatus Maxwell/Green/stress authority, model-identity-matched detector companion, prepared state, validated modulation, measured evidence, collapse, manifold dynamics, or physical viability |
 | Stage-4.2G empirical-feasibility campaign | receipt `d53405187bb494aa8db3b83a68f0f4ea746fb36ffd70ede127d95cdc8e1e1f6c`; JSON report `0de543b66dc6e79f523b10083f7712bebbfd0dc2857f51d72337af7c8e600a4b`; Markdown report `848cb5c19c5db4df3be38b2e55b8bbe6cddc669259ab6d9c3437cd11652a7509`; trace `30abd0e70eaca3e0b9998a999d4b4e6c16b61124008edd6cb2ab95954b3d944c` | immutable Stage-4.2F tuple recovered; the single apparatus identity, DP/coherence/heating forecasts, packet-class semantics, provenance gates, and two-file/nine-test focused implementation replay pass; the synthetic packet can exercise identifiability but cannot open empirical gates | any acquired apparatus product, measured evidence, DP preference or exclusion, collapse identification, manifold dynamics, physical viability, or a Casimir-to-collapse bridge |
-| Equation and Theory Badge sidecars | `62/62/62` equation parity; 33 badges and 98 edges | paper navigation and claim-boundary provenance are synchronized | empirical support for any badge hypothesis |
-| Math-stage registry | 217 entries; validation `pass`; strict congruence errors/warnings `0/0` | Stage-2, seven Stage-3, four Stage-4, Stage-4.1, both Stage-4.2A calibration lanes, six Stage-4.2B responsibilities, three Stage-4.2C runtime modules, and the Stage-4.2D/4.2E/4.2F/4.2G diagnostics are declared at their stated maturity; untracked Stage-4.2F and Stage-4.2G sources remain represented in `MATH_STATUS.md` until repository tracking advances the generated registry count | certified manifold dynamics |
+| Stage-4.2K microscopic-EM campaign | receipt `4a9697c0dd290820dc782b5a5706e8b7bb7a3fd24a9965ea5a9043eefcc18e12`; JSON report `53afcf057f272e191bea1d6218c7656f8d3a4d1b0647a057c87ce7ea4bb093bb`; Markdown report `b450590727c4e01717f115662f02adc6295295d03683e91669e501f423b19811`; trace `4f881dd35300ae5f5537ebcb3e18fa66cd801559de1bc7e1af7ea53ae757a3e7` | immutable Stage-4.2J standing recovered; analytic material/ground-state chain, ideal-plane orientation screen, phase-jitter budget, and synthetic four-cell subtraction pass; finite geometry, measured covariance, QLBE, and attribution fail closed | measured material response, apparatus phase forecast, gas closure, residual attribution, DP evidence, collapse, manifold dynamics, or physical viability |
+| Stage-4.2L empirical-authority campaign | receipt `7ea2a782fa277f427d892f8c9abdb48c7c8a2fb3dd87a84f9c5c91be1566f092`; JSON report `0dbf612a3e1df2e19245f9cda21afa5fa7cfca50f9f32eaf58312dd884ab7220`; Markdown report `e3f6f11dd2779dbf9d84452db5772373ec828690ad19fecbbbc313c2f5b38a68`; trace `aed1d17abd3077efc20d259bb70d26b8f339ad108b937bb78d29b0b23b45f834` | immutable Stage-4.2K standing recovered; frozen engineering frame, finite-rectangle surrogate, phase Jacobian/covariance, QLBE proxy, state-preparation scale comparison, scalar current-bound screen, and four-profile density envelope execute; both phase and gas design screens return no-go; observable bridge count stays zero | as-built geometry, measured spectra or covariance, full Maxwell/Green authority, measured QLBE inputs, prepared state, exact composite-bound mapping, complete density authority, DP evidence, collapse, manifold dynamics, or physical viability |
+| Stage-4.2M bounded leading-design search | receipt `bf89dc469b7d5770c69d01eec80acc312816ef8e054b2fbd7e74af7e77f95a3f`; JSON report `01aedffa92c2c857d868965a6456d20a16a63e806f3c61e567ee0c3a792f7001`; Markdown report `372a98aa9539a04751776e9639c70a9263cf752932460c9bc21791a923edad26`; trace `beafd38d83e5cc4ab20b4336a8d871f7017f820b152d92c7d1f65cc732059b2b` | immutable Stage-4.2L standing recovered; 200 candidates evaluated; 3 pass all twelve synthetic gates; candidate 002 becomes the leading commissioning target with 2.908% registered-Gaussian loss, 0.434903% transported density floor, 1,028 windows, and 0.927386 nominal power at 1,600 | any measured apparatus authority, prepared superposition, observed residual, DP evidence, transfer kernel, collapse identification, manifold dynamics, or physical viability |
+| Equation and Theory Badge sidecars | main article `26/26/26` and supplement `79/79/79` marker/source/generated parity; 38 badges and 108 edges | paper navigation and claim-boundary provenance are synchronized | empirical support for any badge hypothesis |
+| Math-stage registry | 221 entries; validation `pass`; strict congruence errors/warnings `0/0` | The Stage-4.2M bounded apparatus search joins the declared Stage-2 through Stage-4.2L modules at diagnostic maturity | certified manifold dynamics |
 | Required GR/warp regression battery | 18 files, 179 tests `pass` | this revision does not break the repository's required GR/constraint contracts | physical viability of the Casimir-DP extension |
 | Prior Casimir adapter certificate | pre-Stage-3 verdict `PASS`; SHA-256 `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`; explicitly not reused by the Stage-3 receipt | adapter and constraint-pack integrity at the earlier certified revision only | certificate authority for the integrated Stage-3 patch |
 | Stage-3 Casimir adapter certificate | fresh trace `casimir-dp-evidence-map-stage3-v1-20260725T134544Z`; run `2314`; verdict `PASS`; first failure null; deltas empty; integrity `true`; status `GREEN`; certificate SHA-256 `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`; downstream receipt `2cf09b5c5f6d0a584a0c3fd56d8e53834b78f938814ac2ff5500651349930082` | a new Stage-3 adapter execution and exported trace pass; the repeated content hash is expected because the unchanged `repo-convergence` payload is content-addressed | experimental evidence, physical viability of the hypothesis, or permission to reuse the Stage-2 trace as Stage-3 authority |
@@ -3297,6 +3445,10 @@ evidence.
 | Stage-4.2F Casimir adapter certificate | exact trace `adapter:7d6fd3b0-9cd6-4634-a501-51352bb1c53d`; run `2348`; verdict `PASS`; first failure null; deltas empty; integrity `true`; status `GREEN`; certificate SHA-256 `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`; validated trace `13ea52a95383b5e2f6cb80322a4321ad28dbc52bf5533a5771386fc6fbc0f0c8`; downstream receipt `f1b8219b7c74bc25db9cc3137aeec97b714bfc3193052a94e3929326eb858f73` | a fresh explicit-endpoint execution over the content-addressed campaign, production client/server build, 69-test focused paper/graph/sidecar/root replay, 179-test GR/WARP replay, Stage-4.2F schema, 217-entry math registry, and standard repository telemetry | finite-geometry Maxwell/Green/stress authority, measured material response, a prepared state, a model-identity-matched or measured companion, validated modulation, DP evidence, collapse identification, a boundary modifier, manifold dynamics, WARP admissibility, or physical viability |
 | Stage-4.2G Casimir adapter certificate | exact trace `adapter:74bf6a09-8aac-40f1-b2bf-19851531eed1`; run `2349`; verdict `PASS`; first failure null; deltas empty; integrity `true`; status `GREEN`; certificate SHA-256 `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`; exclusive validated trace `cf4c1f72bbcd7cbac83694cd6d2d981cd0813070e461fbc9835712b1f42d3f53`; downstream receipt `3530465e24ef861bd84cbd258cff153e39823e4329e7461a216ef978e712821b` | a fresh explicit-endpoint execution over the content-addressed campaign, production client/server build, 80-test inherited/focused paper/graph/sidecar/root replay, 179-test GR/WARP replay, Stage-4.2G packet schema, 217-entry math registry, and standard repository telemetry | any acquired apparatus product, measured evidence, a DP preference or exclusion, collapse identification, a boundary modifier, manifold dynamics, WARP admissibility, or physical viability |
 | Stage-4.2H Casimir adapter certificate | exact trace `adapter:8c24aa23-edd5-4380-b071-24dc62613d88`; run `2350`; verdict `PASS`; first failure null; deltas empty; integrity `true`; status `GREEN`; certificate SHA-256 `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`; exclusive validated trace `8d71d21a3f3eb4d2d386d53100bf07009ac65d29280eaf64dccbfde37ce03a13`; downstream receipt `acbab1f786e688fe04ad2d5cae15219166368e41b01b8df5949617ef150ce364` | fresh explicit-endpoint execution over the content-addressed campaign, 72-test focused/inherited paper/graph/sidecar/root replay, 179-test GR/WARP replay, production client/server build, 62-entry sidecar, 33-badge/98-edge graph, and 217-entry math registry | any commissioned instrument or calibration, measured response/covariance, prepared superposition, pilot readiness, measured evidence, DP preference/exclusion, collapse identification, manifold dynamics, or physical viability |
+| Stage-4.2I Casimir adapter certificate | exact trace `adapter:47f5ee16-a11c-4d8b-9953-dba211929f14`; run `2369`; verdict `PASS`; first failure null; deltas empty; integrity `true`; status `GREEN`; certificate SHA-256 `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`; exclusive validated trace `97d3cfcc1be7c29946a300eba705fc245def0fc86b8e3d3c09c79a9f6f9dadaf` | fresh explicit-endpoint execution over the Stage-4.2I content-addressed campaign, 59-test focused paper/graph/root replay, downstream Stage-4.2C-H campaign replay, 179-test GR/WARP replay, production client/server build, main 12-entry and supplement 65-entry sidecars, 34-badge/100-edge graph, and 217-entry generated math registry plus explicit Stage-4.2I `MATH_STATUS.md` row | any measured four-cell contrast, empirical packet equivalence, ordinary-response authority, DP preference/exclusion, transfer kernel, collapse identification, manifold dynamics, or physical viability |
+| Stage-4.2J Casimir adapter certificate | exact trace `adapter:1211c4a1-9ebf-4288-a867-1240fabd8adb`; run `2370`; verdict `PASS`; first failure null; deltas empty; integrity `true`; status `GREEN`; certificate SHA-256 `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`; exclusive validated trace `161cd8268093e8b7563f1b78541945c074503ffa440323667fceb178e434b6a8`; downstream receipt `docs/research/casimir-dp-schrodinger-mass-density-stage4-2j-verification-receipt.json` | fresh explicit-endpoint execution over the content-addressed Stage-4.2J campaign, 60-test focused paper/graph/root replay, 81-test Stage-4.2C-J replay, 179-test GR/WARP replay, production client/server build, main 16-entry and supplement 69-entry sidecars, 35-badge/102-edge graph, 218-entry generated math registry, and root-to-leaf validation | any measured coherence, empirical state preparation or environment, complete constituent-density robustness, external-bound admission, DP preference/exclusion, transfer kernel, collapse identification, manifold dynamics, or physical viability |
+| Stage-4.2K Casimir adapter certificate | exact trace `adapter:21b78d81-ede2-4160-959d-661ed230fa2a`; run `2371`; verdict `PASS`; first failure null; deltas empty; integrity `true`; status `GREEN`; certificate SHA-256 `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`; exclusive validated trace `d642c446042f5453f6b3afd563c89081969eafc560a5ce9166e330bd1413177d`; downstream receipt `docs/research/casimir-dp-microscopic-em-closure-stage4-2k-verification-receipt.json` | fresh explicit-endpoint execution over the content-addressed Stage-4.2K campaign, 60-test focused paper/graph/root replay, 88-test Stage-4.2C-K replay, 179-test GR/WARP replay, production client/server build, main 20-entry and supplement 73-entry sidecars, 36-badge/104-edge graph, 219-entry math registry, and root-to-leaf validation | any measured material/Green response, registered branch orientation, phase covariance, QLBE environment, residual attribution, DP evidence, collapse identification, manifold dynamics, or physical viability |
+| Stage-4.2L Casimir adapter certificate | exact trace `adapter:009256f1-e3a5-4214-a5d2-0b054f644d0f`; run `2372`; verdict `PASS`; first failure null; deltas empty; integrity `true`; status `GREEN`; certificate SHA-256 `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`; exclusive validated trace `42548212d9566413031bff64ddd73909a2a1383f62a05d3bd9dc17fb3c221957`; downstream receipt `docs/research/casimir-dp-empirical-authority-stage4-2l-verification-receipt.json` | fresh explicit-endpoint execution over the content-addressed Stage-4.2L campaign, 61-test focused paper/graph/root replay, 95-test Stage-4.2C-L replay, 179-test GR/WARP replay, production client/server build, main 24-entry and supplement 77-entry sidecars, 37-badge/106-edge graph, 220-entry math registry, and root-to-leaf validation | any measured apparatus authority, prepared superposition, observed residual, DP evidence, transfer kernel, collapse identification, manifold dynamics, or physical viability |
 | Scientific promotion gates | measured evidence `not_ready`; collapse identification `blocked`; manifold dynamics `blocked` | the proposal remains fail-closed while apparatus receipts and bridge dynamics are absent | permission to state the central hypothesis as a result |
 
 ## 9. Runtime plan
@@ -3327,7 +3479,8 @@ evidence.
 | Stage-4.2F Maxwell/macroscopic-QED closure | Maxwell/Green/FDT recovery, named-DP audit, inherited-method preflight, apparatus-identity/companion/readiness gates, and strict immutable-authority orchestrator | bounded synthetic campaign; 12 fixtures and 10 initial focused tests | software/equation recovery passes; apparatus Maxwell, material, detector, preparation, modulation, complete-stress-energy, and measured authority remain not ready; zero observable bridge |
 | Stage-4.2G empirical-feasibility handoff | frozen-identity forecast, strict packet validator, measured-artifact hash checks, inherited whitening/identifiability replay, and content-addressed report/trace/receipt | one unacquired authoritative packet plus a non-authoritative synthetic validation packet; 13 product contracts and 9 initial focused tests | acquisition schemas and ingestion software pass; empirical acquisition, collapse/manifold identification, and physical viability remain closed; zero observable bridge |
 | Stage-4.2H commissioning intake | strict instrument/calibration/product/custody dossier, local artifact validation, packet compiler, and synthetic dry run | one blank authoritative dossier plus a non-authoritative synthetic dry run; 12 roles, 13 products, 4 partitions, 28 raw columns, and 9 initial focused tests | commissioning contract and software replay pass; physical commissioning and empirical pilot readiness remain not ready; zero observable bridge |
-| Equation-sidecar synchronization | small document build | <30 s | 62/62/62 marker/source/generated parity |
+| Stage-4.2I boundary--branch interaction | four-cell complex cross-ratio, covariance propagation, saturated-GLS comparison, wave-packet custody, and adversarial fail-closed replay | one authoritative synthetic null plus five adversarial cases and 9 focused tests | estimator and custody software pass; all empirical and mechanism gates remain closed; zero registered transfer kernel |
+| Equation-sidecar synchronization | small document build | <30 s | main `12/12/12`; supplement `65/65/65` marker/source/generated parity |
 
 Long sweeps must use a request manifest, bounded output directory, timeout,
 freshness hashes, and explicit cancellation/failure state. A `latest` alias is
@@ -3379,6 +3532,8 @@ not a single maintained measurement run.
 | casimir-dp-causal-cone-clock-stage4-2e-v1-20260729T193000000Z | local synthetic causal recovery and scale-separation diagnostic | `1279c8e23fb033237a79c29546ef5c210a9405d21604ad844ae801e55d5732e5` | immutable Stage-4.2D recovery, ADM local-null/timelike clocks, bounded paths, Schwarzschild null recovery, ideal Casimir GR screen, QED propagation control, and zero-bridge gate | campaign/content integrity pass / promotion prohibited / physical pilot not ready | 10/10 fixtures execute; max local-null residual `1.11e-16`; Schwarzschild relative error `2.08e-16`; ideal 100-nm GR fractional screen `9.00e-57`; QED proxy `4.76e-28`; standard DP unchanged; zero observable bridges | the Casimir source is an incomplete scalar screen; no apparatus metric, measured timing/control packet, or boundary-to-collapse kernel exists | immutable JSON `d75857f22e0a95b4302e61d60d25c9fa689182ce8c9ef31eabfd15e64f66ed58`; Markdown `fd3463408012bc168832167159641bc30a87a627bf26ec2d9d3ebd9bfe0af5c0`; trace `c20f9c95594c2b2b47f4bbcb8360e6eee032a22e77db21fdf9b379c21f451e57`; receipt `633b07c4f2d769b4701612bd4e112e5a2e12e111f60f7405f1f752b3e260d2c2` | establishes causal consistency and scale separation only; excludes no DP region and adds no measured, collapse, manifold, bridge, or physical-viability evidence |
 | casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f-v1-20260730T023000000Z | local synthetic equation/provenance and apparatus-readiness audit | `421f9d4c570c135cf2bb4a92849868c2862074696911dc7cb139608a4b5f60dd` | immutable Stage-4.2E recovery, covariant Maxwell and polarization recovery, Green/FDT/passivity and ideal-Casimir identities, exact named-DP and \(r_0\) sensitivity, Stage-4.2C transport identity, companion-detector/model-identity disclosure, inherited NHM2 method-only preflight, and zero-bridge gate | campaign/content integrity pass / promotion prohibited / physical pilot not ready | 12/12 fixtures execute; maximum Maxwell residual \(2.17\times10^{-14}\); polarization norm error \(2.22\times10^{-16}\); all 11 finite-geometry apparatus checks correctly block; reference and strongest-grid DP projections are separated; zero observable bridges | all scientific fields and detector values are synthetic or absent; the Stage-4.2B companion signal matches neither Stage-4.2C mass identity; no apparatus Green tensor, finite-geometry stress solve, measured material response, prepared superposition, valid detector SNR, complete apparatus stress-energy, or boundary-to-collapse kernel exists | immutable JSON `f832e7081abcbd54b9b9879e80257c6f064cf5c78c7779cf9a181400d848e176`; Markdown `e8e976840db8a6dd421364eead3f233d84fc5cfa127babe1eb3bea7749edfc27`; trace `1f73089b5d5c9528d8c9914ab6d706ba96383d8e25dde7134360479ed70acdce`; receipt `b33689bc4c2fc751219a2af33fee9cf00cbe38477b2134d90c684e9eb7465f89` | establishes the shared ordinary-physics equation chain, exact DP model definition, corrected forecast provenance, and readiness no-go only; excludes no DP region and adds no measured, collapse, manifold, bridge, or physical-viability evidence |
 | casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z | local unacquired empirical-handoff diagnostic | `a9516529a7c2f935c777fc4c1b29c207457a8f1618f1df580bff89ee27692487` | immutable Stage-4.2F recovery, one provenance-bound apparatus/mass-density identity, exact named-DP coherence and same-identity companion predictions, 13 acquisition-product contracts, measured-artifact ingestion, custody/blinding/replication policy, and inherited whitened identifiability replay | campaign/content integrity pass / `no_go_until_provenance_bound_measured_packet_passes` / promotion prohibited | \(\Gamma_{\rm DP}=0.02400420398374263\ {\rm s^{-1}}\), \(V(0.25\,{\rm s})=0.9940169192982985\), and \(P_{\rm DP}=1.9297884642410306\times10^{-40}\ {\rm W}\) come from the same silica identity; unacquired and synthetic-validation packets execute with correct class semantics; zero observable bridges | no acquisition product is measured; finite-geometry fields/material response, state preparation, branch metrology, modulation, environmental covariance, companion detector, custody, and independent replication remain absent; complete apparatus stress-energy is a separate manifold gate | immutable JSON `0de543b66dc6e79f523b10083f7712bebbfd0dc2857f51d72337af7c8e600a4b`; Markdown `848cb5c19c5db4df3be38b2e55b8bbe6cddc669259ab6d9c3437cd11652a7509`; trace `30abd0e70eaca3e0b9998a999d4b4e6c16b61124008edd6cb2ab95954b3d944c`; receipt `d53405187bb494aa8db3b83a68f0f4ea746fb36ffd70ede127d95cdc8e1e1f6c`; adapter run `2349` PASS/integrity OK; downstream verification receipt `3530465e24ef861bd84cbd258cff153e39823e4329e7461a216ef978e712821b` | establishes acquisition-ready packet and gate-recomputation software only; measured evidence remains `not_ready`, collapse/manifold remain `blocked`, physical viability remains `not_evaluated`, and no Casimir-to-collapse transfer law is registered |
+| casimir-dp-commissioning-intake-stage4-2h-v1-20260730T050000000Z | local blank commissioning intake and synthetic dry run | `d1021844f62adadfe3b77f9b36b742a27b7c086c56008778ae2c01dcf6daaa42` | immutable Stage-4.2G recovery, strict instrument/calibration/product/custody dossier, and packet compilation | software/content integrity pass / `no_go_until_provenance_bound_measured_dossier_passes` | 12 roles, 13 products, 4 partitions, and 28 raw columns are frozen; synthetic packet replay passes with zero empirical authority | every physical commissioning product remains absent | JSON `d5954986d73d7eb9d5d9a07ad4f945d9b636d1c6a37efe28c2de6b5ad1fd32aa`; receipt `d0aacee6611e5aec1c75934a24fc709c434107e3e685eba0f96fc1addd1be56b`; adapter run `2350` PASS/integrity OK | establishes commissioning intake software only; all scientific promotion gates remain closed |
+| casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z | local synthetic interaction/custody diagnostic | `6f66903a470f14314166c755b080208cf0942d6bb382077d6e44b953252d234e` | immutable Stage-4.2H recovery, four-cell cross-ratio, ordinary correction, covariance/GLS comparison, packet custody, and adversarial gates | software and synthetic recovery pass / promotion prohibited | boundary-independent DP cancels; corrected loss (1.11\times10^{-16}), corrected phase (-9.30\times10^{-19}\ {\rm rad}), max (z=3.85\times10^{-13}); injected (0.002) loss and (0.004\ {\rm rad}) phase recover exactly | all cells and packet metrology are synthetic; ordinary empirical response and measured contrast absent | JSON `a879a9110a18011ab3bdd8c3ebc224532eb67de3d15cfdc511b40f1006b06c65`; Markdown `d8bd040356cf42971e39209769b638e1d9ebbea923fc87c73e26a805bdf00ad4`; trace `020f647319fb416aa7fcb97e670a6106731a2efd512b64393967ccc090a0fe91`; receipt `7ffe144e8bffc95c92edad45f8385642a8aa0ce8553cc50380ba816d734df35c` | establishes a runnable boundary--branch interaction estimator and wave-packet custody contract only; no measured evidence, collapse/manifold identification, physical viability, or transfer kernel |
 
 ## 12. Claim boundaries
 
@@ -3893,13 +4048,15 @@ scalar calculator can reconstruct the required field, dataset, or provenance.
 | `cdp-stage4-2g-companion-threshold` | artifact-backed path | Stage-4.2G companion detector requirement | target one-shot uncertainty for the same object only; no demonstrated detector sensitivity |
 | `cdp-stage4-2g-whitened-pilot-gates` | artifact-backed path | Stage-4.2G strict packet ingester and Stage-4.2B identifiability evaluator | measured-pilot go/no-go contract; bundled synthetic pass has zero empirical authority |
 | `cdp-stage4-2h-commissioning-gate` | artifact-backed path | Stage-4.2H strict dossier validator and Stage-4.2G packet compiler | measured-commissioning conjunction and pilot-preflight contract; blank/synthetic passes have zero empirical authority |
+| `cdp-stage4-2i-complex-cross-ratio` | artifact-backed path | Stage-4.2I frozen four-cell evaluator | normalized complex boundary--branch interaction; standard boundary-independent DP cancels |
+| `cdp-stage4-2i-ordinary-corrected-interaction` | artifact-backed path | Stage-4.2I covariance propagation and saturated-GLS comparator | ordinary-corrected amplitude/phase interaction with fail-closed covariance; no collapse identification |
+| `cdp-stage4-2i-wavepacket-custody` | artifact-backed path | Stage-4.2I structured packet schema and equivalence gates | center/covariance/overlap/timing/fidelity/provenance custody only; synthetic pass has zero empirical authority |
 | `cdp-observable-separation-gate` | artifact-backed path | protocol, observable-separation, and claim-boundary badges | blocks any Casimir-residual-to-DP promotion |
 | `cdp-decoherence-collapse-gate` | artifact-backed path | decoherence, manifold-response, and claim-boundary badges | blocks objective-collapse identification |
 
-Sidecar parity is exact for this revision: 62 paper markers, 62 source entries,
-and 62 generated entries. The graph layer exposes 33 study badges connected by
-98 dependency, requirement, documentation, and blocking edges. Those counts
-are navigation-integrity evidence; they are not physical evidence.
+Sidecar and graph counts are regenerated and checked after Stage-4.2I
+integration. Those counts are navigation-integrity evidence; they are not
+physical evidence.
 
 ## Appendix B. Worked calculations and reproducibility ledger
 
@@ -4449,3 +4606,397 @@ the DP forecast.
 only. A future \(G_{\rm comm}=1\) authorizes the empirical pilot but does not
 establish objective collapse, a Casimir modifier, manifold dynamics, or
 physical viability.
+
+### B.11 Stage-4.2I four-cell interaction recovery
+
+**Equation-action anchors:** `cdp-stage4-2i-complex-cross-ratio`,
+`cdp-stage4-2i-ordinary-corrected-interaction`, and
+`cdp-stage4-2i-wavepacket-custody`.
+
+Write the four normalized cells in the frozen order as
+((C_{00},C_{01},C_{10},C_{11})). Taking a logarithm of the cross-ratio gives
+
+\[
+\ln R_\times
+=\ln C_{11}+\ln C_{00}-\ln C_{01}-\ln C_{10}.
+\]
+
+Thus the real log-loss interaction uses (c=(1,-1,-1,1)^{\mathsf T}),
+
+\[
+I_\times=c^{\mathsf T}Y,
+\qquad
+\operatorname{Var}(I_\times)=c^{\mathsf T}\Sigma_Yc,
+\]
+
+with the corresponding wrapped phase contrast using the same signs. The
+runtime evaluates the full complex Jacobian in the sixteen-coordinate
+observed/ordinary covariance rather than assuming independent cells. Dividing
+the observed and ordinary cross-ratios is equivalent to subtracting their
+log-loss and phase interactions.
+
+For the maintained boundary-independent-DP fixture, the separated cells both
+receive the same DP exponent. Their difference is zero, so the DP factor
+cancels algebraically. The runtime returns
+
+\[
+I_{\times,{\rm corr}}=1.1102230246251565\times10^{-16},
+\quad
+\Phi_{\times,{\rm corr}}=-9.30252560099439\times10^{-19}\ {\rm rad},
+\quad
+z_{\max}=3.8511514561668573\times10^{-13}.
+\]
+
+The residual values are floating-point recovery around the exact null, not a
+physical prediction of a tiny interaction. The saturated-GLS/simple-factorial
+difference is (3.469446951953614\times10^{-18}). An injected fixture adds
+(0.002) to log-loss and (0.004\ {\rm rad}) to phase and recovers both.
+
+The maintained packet has zero control separation, (160\ {\rm nm})
+separated-branch distance in both boundary states, and a synthetic
+(10\ {\rm nm}) packet width. Those values pass software equivalence only.
+Until their trajectory/tomography and covariance artifacts are measured and
+hash-bound, (G_{\rm packet}) has no empirical authority.
+
+**Claim ceiling:** boundary--branch interaction estimator and wave-packet
+custody software only. The statistic cancels standard boundary-independent DP
+and supplies no Casimir-to-collapse transfer kernel.
+
+### B.12 Stage-4.2J Schrödinger, mass-density, and environment recovery
+
+**Equation-action anchors:**
+`cdp-stage4-2j-schrodinger-coherence-factorization`,
+`cdp-stage4-2j-dp-equivalent-energy-inverse`,
+`cdp-stage4-2j-homogeneous-sphere-energy`, and
+`cdp-stage4-2j-residual-gas-screen`.
+
+The runtime first recovers the registered single-effective-Gaussian point and
+keeps Hamiltonian phase distinct from DP contraction:
+
+\[
+|\psi(t)\rangle=\sum_n c_ne^{-iE_nt/\hbar}|E_n\rangle,
+\qquad
+\rho_{mn}(t)=c_mc_n^*e^{-i(E_m-E_n)t/\hbar}.
+\]
+
+In the unitary baseline the off-diagonal magnitude is constant. The transition
+or beat frequency \((E_m-E_n)/\hbar\) and the Hamiltonian variance
+\(\langle H^2\rangle-\langle H\rangle^2\) do not equal the registered
+gravitational mass-density difference energy.
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2j-schrodinger-coherence-factorization -->
+\[
+C(t)=C(0)e^{-i\Delta E_Ht/\hbar}
+e^{-\chi_{\rm env}(t)}e^{-E_Gt/\hbar}.
+\]
+
+An adversarial nonzero \(\Delta E_H\) rotates the complex phase while leaving
+the DP loss unchanged. Inverting the synthetic DP-only contraction,
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2j-dp-equivalent-energy-inverse -->
+\[
+E_{\rm D,eq}=-\frac{\hbar}{t}
+\ln\!\left(\frac{|C(t)|}{|C(0)|}\right),
+\]
+
+recovers the registered energy to floating-point precision when the evaluator's
+own constant convention is retained. The fixture's display-rounded \(\hbar\)
+is reported separately so it cannot create a false discrepancy.
+
+For the homogeneous sphere with the same physical Gaussian regularization,
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2j-homogeneous-sphere-energy -->
+\[
+E_G^{\rm sphere}
+=\frac{2Gm^2}{\pi R_0}\int_0^\infty du\,e^{-u^2}
+\left[\frac{3(\sin q-q\cos q)}{q^3}\right]^2
+\left[1-\operatorname{sinc}(ud/R_0)\right],
+\quad q=uR/R_0,
+\]
+
+the 2,000, 4,000, and 8,000 interval Simpson sequence converges to
+\(6.3258955\times10^{-37}\) J. This is 0.249896 of the effective-Gaussian
+energy and predicts a 0.149851% loss at 250 ms. The complete representation
+gate remains blocked because the layered, coarse-grained, and atomistic inputs
+are absent.
+
+The conservative equilibrium-gas screen is
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2j-residual-gas-screen -->
+\[
+\Gamma_{\rm coll}^{\rm screen}
+=\frac{P}{k_BT}
+\sqrt{\frac{8k_BT}{\pi m_g}}\,\pi R^2.
+\]
+
+At the frozen 4 K and \(2\times10^{-11}\) Pa conditions it returns about
+17.8 s\(^{-1}\) for H2 and 12.6 s\(^{-1}\) for He-4. Both exceed the
+registered DP rate by hundreds, so the declared-equilibrium gas gate is
+`no_go`. This screen is deliberately conservative and is neither a complete
+scattering kernel nor measured vacuum authority.
+
+The apparatus mass is approximately \(1.17\times10^{11}\) Da, or about
+\(6.89\times10^5\) times the 170 kDa cross-platform state-preparation
+benchmark. Hydrogen/Rydberg comparison gives a DP-to-Rydberg energy ratio of
+about \(1.16\times10^{-18}\), but remains a dimensional non-bridge.
+
+**Authoritative run:**
+`casimir-dp-schrodinger-mass-density-stage4-2j-v1-20260806T040000000Z`.
+Report JSON SHA-256:
+`02ea5911d809480df2763c2381314fd2c7637940b958a78abd0cdde6ae923ed8`.
+Campaign receipt SHA-256:
+`54358d0294652a457d1c628147ace2acbc337b45a546ae7e2fdb443a563f74a9`.
+
+**Claim ceiling:** Schrödinger/open-system separation, conditional DP-energy
+inversion, two-representation diagnostic, and conservative environment/scale
+screens only. Physical candidate selection is false; measured evidence,
+state preparation, and external-bound mapping remain not ready; collapse and
+manifold identification remain blocked; zero observable bridge edges are
+added.
+
+Fresh adapter run `2370` is `PASS` with no first failure or deltas, certificate
+status `GREEN`, integrity true, and certificate SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+The exclusive one-line trace SHA-256 is
+`161cd8268093e8b7563f1b78541945c074503ffa440323667fceb178e434b6a8`.
+Its scientific scope is `none`; in particular it does not convert the gas
+screen, constituent-density gaps, or preparation-scale gap into measured
+evidence.
+
+### B.13 Stage-4.2K microscopic electromagnetic closure
+
+**Equation-action anchors:**
+`cdp-stage4-2k-ground-state-green-chain`,
+`cdp-stage4-2k-sphere-polarizability`,
+`cdp-stage4-2k-phase-jitter-loss`, and
+`cdp-stage4-2k-qlbe-decoherence`.
+
+The campaign binds the ordinary boundary prediction to the causal response
+chain rather than a literal virtual-photon number density:
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2k-ground-state-green-chain -->
+\[
+\alpha_g(i\xi)=\frac{2}{3\hbar}\sum_n
+\frac{\omega_{ng}|\langle n|\hat{\mathbf d}|g\rangle|^2}{\omega_{ng}^2+\xi^2},
+\qquad
+U_{\rm CP}=\frac{\hbar\mu_0}{2\pi}\int_0^\infty d\xi\,
+\xi^2\alpha_g(i\xi)\operatorname{Tr}\mathbf G^{(1)}.
+\]
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2k-sphere-polarizability -->
+\[
+\alpha_{\rm sph}(i\xi)=4\pi\epsilon_0R^3
+\frac{\epsilon(i\xi)-1}{\epsilon(i\xi)+2}.
+\]
+
+The synthetic Lorentz model recovers \(\epsilon(0)=3.8\) and
+\(\alpha_{\rm sph}(0)=1.1330327\times10^{-30}\) SI. Under the explicitly
+bounded ideal-conductor retarded-dipole screen, a normal split gives
+\(\Delta U=3.5591611\times10^{-24}\) J and
+\(\Delta\phi=8.4374555\times10^9\) rad; a tangential split gives zero in the
+infinite-plane limit. The branch orientation is not registered and actual
+finite geometry is absent, so neither value is an apparatus forecast.
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2k-phase-jitter-loss -->
+\[
+\langle e^{i\delta\phi}\rangle=e^{-\sigma_\phi^2/2},
+\qquad \chi_\phi=\sigma_\phi^2/2.
+\]
+
+The normal screen requires \(\sigma_\phi\le0.034644\) rad to keep this loss
+below one tenth of the registered DP exponent. Measured echo rejection and
+phase covariance remain absent.
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2k-qlbe-decoherence -->
+\[
+\Gamma_{\rm gas}(\Delta\mathbf x)=n_g\int d^3v\,\mu(\mathbf v)v
+\int d\Omega\,|f|^2[1-e^{i\mathbf q\cdot\Delta\mathbf x/\hbar}].
+\]
+
+Every registered QLBE input is absent, so the geometric Stage-4.2J gas screen
+is not replaced. The synthetic four-cell ordinary subtraction recovers zero;
+standard boundary-independent DP cancels; zero bridge edges are added.
+
+**Authoritative run:**
+`casimir-dp-microscopic-em-closure-stage4-2k-v1-20260806T050000000Z`.
+Report JSON SHA-256:
+`53afcf057f272e191bea1d6218c7656f8d3a4d1b0647a057c87ce7ea4bb093bb`.
+Campaign receipt SHA-256:
+`4a9697c0dd290820dc782b5a5706e8b7bb7a3fd24a9965ea5a9043eefcc18e12`.
+
+**Claim ceiling:** analytic ordinary-EM and orientation screening only.
+Measured material, finite-geometry Green response, branch orientation,
+ordinary covariance, QLBE environment, and residual attribution remain not
+ready or blocked; collapse, manifold dynamics, and physical viability are not
+promoted.
+
+Fresh adapter run `2371` (`adapter:21b78d81-ede2-4160-959d-661ed230fa2a`)
+returns `PASS`, first failure `null`, empty deltas, certificate status `GREEN`,
+and integrity true. The certificate SHA-256 is
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`;
+the exclusive validated-trace SHA-256 is
+`d642c446042f5453f6b3afd563c89081969eafc560a5ce9166e330bd1413177d`.
+Its scientific scope is none and it does not close any empirical gate.
+
+### B.14 Stage-4.2L empirical-authority closure and redesign
+
+**Equation-action anchors:**
+`cdp-stage4-2l-finite-rectangle-surrogate`,
+`cdp-stage4-2l-phase-covariance`,
+`cdp-stage4-2l-qlbe-isotropic-proxy`, and
+`cdp-stage4-2l-density-regularization-envelope`.
+
+The campaign freezes `casimir-dp-stage4-2l-reference-geometry-v1` as an
+engineering reference only. Its coordinate frame has plate normal
+\((0,0,1)\), sphere center \((0,0,1.4763023624\times10^{-6})\) m, and
+tangential branch vector \((1.6\times10^{-7},0,0)\) m. The plate is a 40 by
+40 micrometre rectangle. As-built CAD, coordinate metrology, branch-vector
+metrology, plate-normal metrology, coating identity, and nearby-conductor
+survey are all absent.
+
+The finite-geometry surrogate is
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2l-finite-rectangle-surrogate -->
+\[
+\Omega(\mathbf r)=\iint_A\frac{z\,dA'}
+{[(x'-x)^2+(y'-y)^2+z^2]^{3/2}},\qquad
+U_{\rm rect}=\frac{\Omega}{2\pi}U_{\rm CP}^{\infty}.
+\]
+
+Analytic solid angle and midpoint quadrature agree to
+\(1.1450\times10^{-6}\) relative branch-energy error. The analytic nominal
+phase is zero by centered tangential symmetry. The midpoint phase residual
+\(-2.264\times10^{-4}\) rad records finite quadrature cancellation error and
+is not treated as a physical residual. Neither method includes the full
+frequency-dependent dyadic Green tensor, finite thickness, coatings, patches,
+roughness, apertures, or the nearby-conductor ledger.
+
+The phase-covariance calculation is
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2l-phase-covariance -->
+\[
+J_i=\partial\Phi_{\rm EM}/\partial\theta_i,\qquad
+\sigma_\phi^2=\mathbf J\boldsymbol\Sigma_\theta\mathbf J^{\mathsf T}.
+\]
+
+The finite-difference surrogate returns
+\(J_{x_c}=6.2991\times10^{11}\ {m rad,m^{-1}}\),
+\(J_{\vartheta_b}=7.9003\times10^9\ {m rad,rad^{-1}}\), and the opposite
+plate-angle derivative. The frozen synthetic tolerances yield
+\(\sigma_\phi=1.2826\times10^4\) rad, so the design fails the 0.034644 rad
+allowance. One-at-a-time requirements are
+\(\sigma_{x_c}\le5.50\times10^{-14}\) m and
+\(\sigma_\vartheta\le4.39\times10^{-12}\) rad. The gap derivative vanishes
+at the exact centered symmetry point; this does not remove mixed derivatives
+or real-geometry sensitivity.
+
+The executable gas proxy reduces the QLBE angular dependence to
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2l-qlbe-isotropic-proxy -->
+\[
+\Gamma_{\rm gas}(d)=\sum_s n_s\bar v_s\sigma_s\frac12
+\int_{-1}^{1}d\mu\left[1-\operatorname{sinc}\left(
+\frac{m_s\bar v_s d\sqrt{2(1-\mu)}}{\hbar}\right)\right].
+\]
+
+For the frozen H2/He isotropic proxy it gives
+\(\Gamma_{\rm gas}=17.2824\ {m s^{-1}}\),
+\(\Gamma_{\rm gas}/\Gamma_{\rm DP}=719.97\), and
+\(P_{0.1\rm DP}=2.778\times10^{-15}\) Pa. The measured QLBE authority remains
+not ready because the total-cross-section proxy is not a differential
+scattering receipt and composition, confinement, and pressure calibration are
+unmeasured.
+
+The representation/regularization grid uses
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2l-density-regularization-envelope -->
+\[
+E_G^{(a)}=\frac{2Gm^2}{\pi r_0}\int_0^\infty du\,
+e^{-u^2}|F_a(uR/r_0)|^2[1-\operatorname{sinc}(ud/r_0)].
+\]
+
+At 100 nm, the four representation energies are
+\(2.5314\times10^{-36}\), \(6.3259\times10^{-37}\),
+\(3.7386\times10^{-37}\), and \(6.3539\times10^{-37}\) J for effective
+Gaussian, homogeneous sphere, thin shell, and 5% core-shell sensitivity,
+respectively. The factor-6.771 envelope is computational sensitivity only.
+
+XENONnT's Markovian Diósi-convention 90% confidence lower bound
+\(R_0>4.9\times10^{-10}\) m does not exclude the registered 100 nm scalar
+point. Exact composite normalization and likelihood recasting remain absent.
+The state-preparation audit compares the 1.17061e11 Da reference sphere with
+the 2026 170 kDa, 133 nm sodium-cluster interference benchmark: the mass ratio
+is 688,596, the separation ratio is 1.203, and the diameter ratio is 69.08.
+Different material and platform prevent inheritance of preparation authority.
+
+**Authoritative run:**
+`casimir-dp-empirical-authority-stage4-2l-v1-20260806T060000000Z`.
+Report JSON SHA-256:
+`0dbf612a3e1df2e19245f9cda21afa5fa7cfca50f9f32eaf58312dd884ab7220`.
+Campaign receipt SHA-256:
+`7ea2a782fa277f427d892f8c9abdb48c7c8a2fb3dd87a84f9c5c91be1566f092`.
+
+**Standing:** software and reduced-order numerical diagnostics pass; the
+reference apparatus requires redesign before a pilot. Measured material,
+as-built geometry, full Maxwell Green response, empirical phase covariance,
+measured QLBE environment, state preparation, exact external-bound mapping,
+and complete mass-density authority remain not ready. Residual attribution and
+collapse/manifold identification remain blocked, confirmatory acquisition is
+not authorized, physical viability is not evaluated, and zero observable
+bridge edges are added.
+
+### B.15 Stage-4.2M bounded apparatus-configuration search
+
+Stage 4.2M verifies the Stage-4.2L downstream receipt SHA-256
+`7ff5ed544ec33fcd8022dd0f80cae5168a5486cc2f4414e14137806b46fdb19f`
+before evaluating any candidate. The deterministic 200-point domain spans
+material, radius, separation, hold time, gap, plate size, orientation,
+temperature, pressure, alignment, echo, modulation, and readout variables.
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2m-multigate-objective -->
+\[
+G_M(q)=G_{\rm DP}\wedge G_{\rho}\wedge G_{\phi}\wedge G_{\rm gas}
+\wedge G_{\rm prep}\wedge G_{\rm bound}\wedge G_{\rm id}
+\wedge G_{\rm power}\wedge G_{\rm companion}.
+\]
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2m-transported-backgrounds -->
+\[
+\sigma_{\phi,\rm echo}^2=\eta_{\rm echo}^2\mathbf J_\phi
+\boldsymbol\Sigma_q\mathbf J_\phi^{\mathsf T},\qquad
+\Gamma_{\rm gas}(q)=\Gamma_{\rm gas,L}\mathcal T_{P,T,R,d}(q).
+\]
+
+Three candidates pass all twelve synthetic gates. The best result is candidate
+`stage4_2m_candidate_002`: diamond density, radius
+\(2.7630236\times10^{-7}\) m, mass \(3.0925053\times10^{-16}\) kg,
+250 nm tangential separation, 250 ms hold, 10 micrometre gap, 80 micrometre
+plate, 4 K, and \(10^{-15}\) Pa. It returns
+\(E_G=1.2448784\times10^{-35}\) J,
+\(\Gamma_{\rm DP}=0.1180459\ {\rm s^{-1}}\), Gaussian exponent 0.0295115,
+conservative density-envelope exponent 0.00435852, gas-to-DP ratio 0.007320,
+echoed phase sigma \(1.1091\times10^{-8}\) rad, cosine 0.717724, condition
+6.53169, 1,028 required paired windows, power 0.927386 at 1,600 windows, and
+synthetic companion SNR 8.668.
+
+Canonical report JSON, Markdown, and trace SHA-256 values are
+`01aedffa92c2c857d868965a6456d20a16a63e806f3c61e567ee0c3a792f7001`,
+`372a98aa9539a04751776e9639c70a9263cf752932460c9bc21791a923edad26`,
+and `beafd38d83e5cc4ab20b4336a8d871f7017f820b152d92c7d1f65cc732059b2b`.
+The config SHA-256 is
+`d3981ab6a725378ff8ff8881c1d303d426b59a46c5f1ed2af81d916bf4e51d08`.
+All material response, finite geometry, covariance, gas, preparation,
+companion, and external-bound inputs remain synthetic or transported.
+Promotion is false, measured evidence is not ready, and no observable bridge
+edge is added.
+
+The fresh leading-design publication-rebase adapter run `2374`
+(`adapter:1d8a8433-4f7a-4f8e-81d7-19ac5f0fcbfc`)
+returns `PASS`, first failure null, empty deltas, certificate status `GREEN`,
+integrity true, and certificate SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+The exclusive validated trace SHA-256 is
+`866eec434c58b84cc2fcb5df9bd6a4136fbb0c87d04532e89b9f90b3c5464998`.
+Focused integration is 62/62, inherited Stage-4.2C-through-M replay is 101/101,
+required GR/WARP replay is 179/179, math validation covers 221 entries, and
+production client/server builds pass with pre-existing warnings.

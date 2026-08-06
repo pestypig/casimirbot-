@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="620" viewBox="0 0 1100 620" role="img" aria-labelledby="title desc">
-  <title id="title">Reference Casimir-Diósi apparatus</title>
-  <desc id="desc">Two spatial branches of a silica sphere near a conducting boundary, with readout and environmental witnesses.</desc>
+  <title id="title">Leading Casimir-Diósi commissioning design</title>
+  <desc id="desc">Two spatial branches of a diamond-density sphere near a conducting boundary, with readout and environmental witnesses.</desc>
   <defs>
     <linearGradient id="plate" x1="0" x2="1"><stop stop-color="#64748b"/><stop offset="0.5" stop-color="#dbeafe"/><stop offset="1" stop-color="#475569"/></linearGradient>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6 Z" fill="#334155"/></marker>
@@ -9,21 +9,21 @@
     </style>
   </defs>
   <rect width="1100" height="620" fill="#ffffff"/>
-  <text x="45" y="48" class="h">Current authoritative apparatus manifest</text>
+  <text x="45" y="48" class="h">Leading synthetic commissioning design</text>
   <rect x="55" y="105" width="46" height="390" rx="8" fill="url(#plate)" stroke="#334155" stroke-width="2"/>
   <text x="40" y="525" class="l">conducting boundary</text>
   <line x1="101" y1="115" x2="101" y2="487" stroke="#0f172a" stroke-dasharray="6 6"/>
   <circle cx="350" cy="250" r="68" class="blue" opacity="0.88"/>
   <circle cx="350" cy="410" r="68" class="amber" opacity="0.82"/>
   <text x="327" y="244" class="l">A</text><text x="327" y="404" class="l">B</text>
-  <text x="290" y="270" class="s">silica sphere</text><text x="290" y="430" class="s">same object</text>
+  <text x="275" y="270" class="s">diamond-density sphere</text><text x="290" y="430" class="s">same object</text>
   <line x1="275" y1="330" x2="275" y2="395" stroke="#334155" stroke-width="2" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
-  <text x="145" y="366" class="l">branch separation</text><text x="194" y="389" class="l">160 nm</text>
+  <text x="145" y="366" class="l">branch separation</text><text x="194" y="389" class="l">250 nm</text>
   <line x1="105" y1="170" x2="280" y2="170" stroke="#334155" stroke-width="2" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
-  <text x="125" y="150" class="l">1.2 μm surface gap</text>
+  <text x="125" y="150" class="l">10 μm surface gap</text>
   <rect x="520" y="105" width="520" height="100" rx="14" class="box"/>
   <text x="545" y="140" class="l" font-weight="700">Registered Diósi input</text>
-  <text x="545" y="170" class="s">m = 1.94385×10⁻¹⁶ kg  •  R₀ = 100 nm  •  hold = 250 ms</text>
+  <text x="545" y="170" class="s">m = 3.09251×10⁻¹⁶ kg  •  R₀ = 100 nm  •  hold = 250 ms</text>
   <text x="545" y="194" class="s">No cavity gap, polarization, or boundary state enters ΓD.</text>
   <rect x="520" y="230" width="245" height="125" rx="14" class="green"/>
   <text x="545" y="266" class="l" font-weight="700">Complex-coherence readout</text>
@@ -33,7 +33,7 @@
   <text x="820" y="296" class="s">thermal • gas • charge</text><text x="820" y="322" class="s">patch • vibration • readout</text>
   <rect x="520" y="385" width="520" height="110" rx="14" fill="#fff1f2" stroke="#e11d48" stroke-width="2"/>
   <text x="545" y="422" class="l" font-weight="700">Interpretation-limiting companion channel</text>
-  <text x="545" y="452" class="s">Predicted center-of-mass heating: 1.93×10⁻⁴⁰ W</text>
+  <text x="545" y="452" class="s">Predicted center-of-mass heating: 3.07×10⁻⁴⁰ W</text>
   <text x="545" y="478" class="s">No detector authority exists; strongest positive claim is therefore capped.</text>
   <line x1="420" y1="330" x2="515" y2="285" stroke="#334155" stroke-width="2" marker-end="url(#arrow)"/>
   <line x1="420" y1="330" x2="515" y2="425" stroke="#334155" stroke-width="2" marker-end="url(#arrow)"/>

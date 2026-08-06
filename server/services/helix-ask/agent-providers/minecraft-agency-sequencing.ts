@@ -55,8 +55,16 @@ const minecraftCommandText = (request: RecordLike): string | null =>
     : null;
 
 const isCheckpointCaptureCommand = (command: string): boolean =>
-  /(?:^|\brun\s+)helixgame\s+checkpoint\s+capture\b/iu.test(
+  /(?:^|\brun\s+)helixgame\s+checkpoint\s+capture(?:_box)?\b/iu.test(
     command.trim().replace(/^\/+/, ""),
+  );
+
+const referencesCheckpointCommand = (command: string): boolean =>
+  /(?:^|\s)checkpoint(?:\s|$)/iu.test(command.trim().replace(/^\/+/, ""));
+
+const containsLikelyMinecraftCommandBatch = (command: string): boolean =>
+  /(?:;|[\r\n])\s*\/?(?:execute|fill|setblock|clone|data|summon|kill|give|clear|tp|teleport|effect|gamemode|gamerule|time|weather|worldborder|helixgame)\b/iu.test(
+    command,
   );
 
 const isStateChangingMinecraftCommand = (request: RecordLike): boolean => {
@@ -403,13 +411,41 @@ export const buildMinecraftAgencyCompoundCoverageResolutions = (input: {
 
 export const requiresCurrentTurnCheckpointBeforeMinecraftMutation = (
   prompt: string,
-): boolean =>
-  /\b(?:capture|create|take|save)\b[\s\S]{0,80}\b(?:rollback\s+)?checkpoint\b[\s\S]{0,100}\bbefore\b[\s\S]{0,100}\b(?:chang|mutat|build|place|set|fill|ignite|light|break|remove)/iu.test(
-    prompt,
-  ) ||
-  /\b(?:do\s+not|don't|never)\b[\s\S]{0,80}\b(?:chang|mutat|build|place|set|fill|ignite|light|break|remove)[\s\S]{0,100}\b(?:without|until)\b[\s\S]{0,80}\bcheckpoint\b/iu.test(
-    prompt,
+): boolean => {
+  // Ordering policy must be derived from the user's operative prose, not from
+  // a quoted example or screen-visible instruction. The wider workstation
+  // admission layer already suppresses contextual tool mentions; keeping the
+  // same boundary here prevents a quoted safety recipe from manufacturing a
+  // recovery tool request if a malformed provider candidate reaches this
+  // final sequence guard.
+  const operativePrompt = prompt.replace(
+    /"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/gu,
+    " ",
   );
+  const contextualCheckpointClause =
+    /\b(?:if|when|later|eventually|hypothetically|in\s+the\s+future|tomorrow|previously|earlier|historically|yesterday|last\s+time)\b[^.!?;\n]{0,140}\b(?:capture|captured|create|created|take|took|save|saved)\b[^.!?;\n]{0,100}\b(?:rollback\s+|bounded\s+|exact\s+bounded\s+)?checkpoint\b/iu.test(
+      operativePrompt,
+    ) ||
+    /\b(?:screen|page|button|label|ui|text|sentence|phrase|example|documentation|transcript)\b[^.!?;\n]{0,120}\b(?:says|shows|reads|contains|mentions|describes)\b[^.!?;\n]{0,140}\bcheckpoint\b/iu.test(
+      operativePrompt,
+    ) ||
+    /(?:^|[.!?;]\s*)\b(?:explain|describe|quote|summari[sz]e|discuss)\b[^.!?;\n]{0,180}\bcheckpoint\b/iu.test(
+      operativePrompt,
+    );
+  if (contextualCheckpointClause) return false;
+
+  return (
+    /\b(?:capture|create|take|save)\b[\s\S]{0,100}\b(?:rollback\s+|bounded\s+|exact\s+bounded\s+)?checkpoint\b[\s\S]{0,120}\bbefore\b[\s\S]{0,100}\b(?:chang|mutat|build|place|set|fill|ignite|light|break|remove)/iu.test(
+      operativePrompt,
+    ) ||
+    /\b(?:capture|create|take|save)\b[\s\S]{0,100}\b(?:rollback\s+|bounded\s+|exact\s+bounded\s+)?checkpoint\b[^.!?\n]{0,160}(?:;|\bthen\b|\bfollowed\s+by\b)[^.!?\n]{0,100}\b(?:chang|mutat|build|place|set|fill|ignite|light|break|remove)/iu.test(
+      operativePrompt,
+    ) ||
+    /\b(?:do\s+not|don't|never)\b[\s\S]{0,80}\b(?:chang|mutat|build|place|set|fill|ignite|light|break|remove)[\s\S]{0,100}\b(?:without|until)\b[\s\S]{0,80}\bcheckpoint\b/iu.test(
+      operativePrompt,
+    )
+  );
+};
 
 const successfulCheckpointCaptureExists = (input: {
   priorRequests: RecordLike[];
@@ -433,6 +469,60 @@ const successfulCheckpointCaptureExists = (input: {
   return false;
 };
 
+const contractInspectBeforeMinecraftCommandRequest = (
+  contract: RecordLike | null | undefined,
+): RecordLike | null => {
+  const subgoals = readArray(contract?.subgoals)
+    .map(readRecord)
+    .filter(
+      (subgoal): subgoal is RecordLike =>
+        Boolean(subgoal),
+    )
+    .sort((left, right) => Number(left.order) - Number(right.order));
+  const commandIndex = subgoals.findIndex(
+    (subgoal) =>
+      readString(
+        subgoal.requested_capability ?? subgoal.runtime_capability,
+      ) === HELIX_MINECRAFT_COMMAND_CAPABILITY,
+  );
+  if (commandIndex < 0) return null;
+  const inspectSubgoal = subgoals
+    .slice(0, commandIndex)
+    .reverse()
+    .find(
+      (subgoal) =>
+        readString(
+          subgoal.requested_capability ?? subgoal.runtime_capability,
+        ) === HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    );
+  if (!inspectSubgoal) return null;
+  const argsHint = readRecord(inspectSubgoal.args_hint) ?? {};
+  return {
+    capability: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    arguments: { ...argsHint },
+  };
+};
+
+const successfulRequiredSpatialInspectionExists = (input: {
+  requiredRequest: RecordLike;
+  priorRequests: RecordLike[];
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): boolean => {
+  const requiredArgs = requestArguments(input.requiredRequest);
+  const requiredPurpose = readString(requiredArgs.purpose);
+  return alignMinecraftAgencyExecutedSteps(input).some((step) => {
+    if (
+      step.result.ok !== true ||
+      requestCapability(step.request) !==
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY
+    ) {
+      return false;
+    }
+    const executedPurpose = readString(requestArguments(step.request).purpose);
+    return !requiredPurpose || executedPurpose === requiredPurpose;
+  });
+};
+
 export type MinecraftAgencySequenceDecision = {
   admitted: boolean;
   reason: string | null;
@@ -450,7 +540,53 @@ export const evaluateMinecraftAgencySequence = (input: {
   candidate: RecordLike;
   priorRequests: RecordLike[];
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
+  compoundCapabilityContract?: RecordLike | null;
 }): MinecraftAgencySequenceDecision => {
+  const candidateCommand = minecraftCommandText(input.candidate);
+  if (
+    requestCapability(input.candidate) === HELIX_MINECRAFT_COMMAND_CAPABILITY &&
+    candidateCommand &&
+    (containsLikelyMinecraftCommandBatch(candidateCommand) ||
+      (referencesCheckpointCommand(candidateCommand) &&
+        !/(?:^|\brun\s+)helixgame\s+checkpoint\s+(?:capture(?:_box)?|restore|discard|status)\b/iu.test(
+          candidateCommand.trim().replace(/^\/+/, ""),
+        )))
+  ) {
+    return {
+      admitted: false,
+      reason:
+        "The proposed Minecraft request is not one exact installed checkpoint command. Minecraft command capability calls must execute one command at a time and cannot join checkpoint and mutation commands. Inspect the live helixgame checkpoint subtree, then let Codex issue one exact checkpoint command with the required category and effect metadata.",
+      recovery_lane_request: {
+        capability: HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+        arguments: {
+          path_prefix: "helixgame checkpoint",
+          limit: 64,
+        },
+      },
+    };
+  }
+  const requiredPreInspection = contractInspectBeforeMinecraftCommandRequest(
+    input.compoundCapabilityContract,
+  );
+  if (
+    requiredPreInspection &&
+    requestCapability(input.candidate) ===
+      HELIX_MINECRAFT_COMMAND_CAPABILITY &&
+    isStateChangingMinecraftCommand(input.candidate) &&
+    !successfulRequiredSpatialInspectionExists({
+      requiredRequest: requiredPreInspection,
+      priorRequests: input.priorRequests,
+      gatewayCallResults: input.gatewayCallResults,
+    })
+  ) {
+    return {
+      admitted: false,
+      reason:
+        "The committed Minecraft action route requires a successful current-turn spatial inspection observation before any state-changing command. That observation has not re-entered provider reasoning yet. Run the committed inspection next, then let Codex decide from the fresh evidence whether the requested action remains appropriate.",
+      recovery_lane_request: requiredPreInspection,
+    };
+  }
+
   if (
     requiresCurrentTurnCheckpointBeforeMinecraftMutation(input.prompt) &&
     requestCapability(input.candidate) ===

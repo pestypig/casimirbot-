@@ -2445,6 +2445,75 @@ describe("Codex provider capability lane adapter", () => {
       "com.casimirbot.minecraft.spatial_region.inspect",
       "docs.search",
     ]);
+
+    expect(
+      runtimeProviderAdmittedCapabilityIdsForQuestion({
+        question: "What is happening right now in the visual screen capture?",
+        admittedCapabilityIds: [
+          "situation-room.describe_visual_capture",
+          "workstation.active_context",
+          "workstation.readable_surface.observe",
+          "visual_analysis.inspect_image_region",
+        ],
+        admittedToolFamilies: ["situation_run"],
+      }),
+    ).toEqual(["situation-room.describe_visual_capture"]);
+  });
+
+  it("keeps account-wide mutations out of historical and contextual runtime turns", () => {
+    const admittedCapabilityIds = [
+      "debug.inspect_current_turn",
+      "situation-room.live-source.set_rate",
+      "com.casimirbot.minecraft.command",
+    ];
+    const mutatingCapabilityIds = [
+      "situation-room.live-source.set_rate",
+      "com.casimirbot.minecraft.command",
+    ];
+
+    expect(
+      runtimeProviderAdmittedCapabilityIdsForQuestion({
+        question: "Why did the last turn call set_rate?",
+        admittedCapabilityIds,
+        admittedToolFamilies: ["runtime_evidence", "repo_code"],
+        restrictAllCapabilitiesToAdmittedToolFamilies: false,
+        mutatingCapabilityIds,
+        explicitlyAdmittedMutatingCapabilityIds: [],
+        operatorCommandAdmitted: false,
+      }),
+    ).toEqual(["debug.inspect_current_turn"]);
+
+    expect(
+      runtimeProviderAdmittedCapabilityIdsForQuestion({
+        question: "Set the visual capture interval to 10 seconds.",
+        admittedCapabilityIds,
+        admittedToolFamilies: ["live_pipeline"],
+        restrictAllCapabilitiesToAdmittedToolFamilies: false,
+        mutatingCapabilityIds,
+        explicitlyAdmittedMutatingCapabilityIds: [
+          "situation-room.live-source.set_rate",
+        ],
+        operatorCommandAdmitted: true,
+      }),
+    ).toEqual([
+      "debug.inspect_current_turn",
+      "situation-room.live-source.set_rate",
+    ]);
+
+    expect(
+      runtimeProviderAdmittedCapabilityIdsForQuestion({
+        question: "Build a wall around my house.",
+        admittedCapabilityIds,
+        admittedToolFamilies: ["live_environment"],
+        restrictAllCapabilitiesToAdmittedToolFamilies: false,
+        mutatingCapabilityIds,
+        explicitlyAdmittedMutatingCapabilityIds: [],
+        operatorCommandAdmitted: true,
+      }),
+    ).toEqual([
+      "com.casimirbot.minecraft.command",
+      "debug.inspect_current_turn",
+    ]);
   });
 
   it("does not reopen continuation affordances after a validated runtime terminal decision", () => {

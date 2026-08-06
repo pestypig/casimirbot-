@@ -1828,6 +1828,213 @@ function syncSuccessfulTerminalStatusMirrors(
   };
 }
 
+const terminalEnvelopeArtifactText = (
+  artifact: Record<string, unknown>,
+): string | null => {
+  const artifactPayload = readRecord(artifact.payload);
+  return (
+    readString(artifact.answer_text) ??
+    readString(artifact.text) ??
+    readString(artifact.terminal_text) ??
+    readString(artifactPayload?.answer_text) ??
+    readString(artifactPayload?.text) ??
+    readString(artifactPayload?.terminal_text)
+  );
+};
+
+const resolveMaterializedTerminalEnvelopeArtifactRef = (
+  payload: Record<string, unknown>,
+  envelope: HelixTerminalAnswerEnvelope,
+): string | null => {
+  const artifacts = readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .filter((artifact): artifact is Record<string, unknown> =>
+      Boolean(artifact),
+    );
+  const matchingArtifacts = artifacts.filter(
+    (artifact) =>
+      readString(artifact.kind) === envelope.terminal_artifact_kind &&
+      terminalEnvelopeArtifactText(artifact) === envelope.terminal_text,
+  );
+  const explicitArtifactId = readString(payload.terminal_artifact_id);
+  if (explicitArtifactId) {
+    const explicitArtifact = matchingArtifacts.find(
+      (artifact) => readString(artifact.artifact_id) === explicitArtifactId,
+    );
+    if (explicitArtifact) return explicitArtifactId;
+  }
+  return readString(matchingArtifacts.at(-1)?.artifact_id);
+};
+
+const synchronizeTerminalAuthorityWriterWithEnvelope = (
+  payload: Record<string, unknown>,
+  envelope: HelixTerminalAnswerEnvelope,
+): void => {
+  const writer = readRecord(payload.terminal_authority_single_writer);
+  if (!writer) return;
+  const previousKind =
+    readString(writer.selected_terminal_artifact_kind) ??
+    readString(writer.selectedArtifactKind);
+  const previousRef =
+    readString(writer.selected_terminal_artifact_ref) ??
+    readString(writer.selectedArtifactRef);
+  const previousSource = readString(writer.source);
+  if (
+    previousKind === envelope.terminal_artifact_kind &&
+    previousSource === envelope.final_answer_source &&
+    readString(writer.visible_text) === envelope.terminal_text
+  ) {
+    return;
+  }
+
+  const errorCode = readString(payload.terminal_error_code);
+  const terminalRef =
+    resolveMaterializedTerminalEnvelopeArtifactRef(payload, envelope) ??
+    `${envelope.turn_id}:terminal_envelope:${envelope.terminal_artifact_kind}${
+      errorCode ? `:${errorCode}` : ""
+    }`;
+  const rejection =
+    previousKind && previousRef
+      ? {
+          ref: previousRef,
+          kind: previousKind,
+          reason: "superseded_by_terminal_policy_envelope",
+        }
+      : null;
+  const rejectedCandidates = [
+    ...readArray(writer.rejected_candidates),
+    ...(rejection ? [rejection] : []),
+  ];
+  const audit = readRecord(writer.audit);
+  const integrity = readRecord(writer.integrity);
+  const integrityAudit = readRecord(
+    integrity?.terminal_authority_single_writer_audit,
+  );
+  const wroteVisibleFields = [
+    "payload.text",
+    "payload.answer",
+    "payload.assistant_answer",
+    "payload.selected_final_answer",
+    "terminal_presentation.concise_text",
+  ];
+  const synchronizedAudit = audit
+    ? {
+        ...audit,
+        selectedArtifactKind: envelope.terminal_artifact_kind,
+        selectedArtifactRef: terminalRef,
+        wroteVisibleFields,
+        terminal_policy_override: {
+          previous_artifact_kind: previousKind,
+          previous_artifact_ref: previousRef,
+          previous_source: previousSource,
+          replacement_artifact_kind: envelope.terminal_artifact_kind,
+          replacement_artifact_ref: terminalRef,
+          replacement_source: envelope.final_answer_source,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      }
+    : null;
+  const synchronizedIntegrityAudit = integrityAudit
+    ? {
+        ...integrityAudit,
+        selectedArtifactKind: envelope.terminal_artifact_kind,
+        selectedArtifactRef: terminalRef,
+        wroteVisibleFields,
+      }
+    : synchronizedAudit;
+  const synchronizedWriter = {
+    ...writer,
+    selectedArtifactKind: envelope.terminal_artifact_kind,
+    selectedArtifactRef: terminalRef,
+    selected_terminal_artifact_ref: terminalRef,
+    selected_terminal_artifact_kind: envelope.terminal_artifact_kind,
+    visible_text: envelope.terminal_text,
+    source: envelope.final_answer_source,
+    rejected_candidates: rejectedCandidates,
+    writes: {
+      ...(readRecord(writer.writes) ?? {}),
+      payload_text: envelope.terminal_text,
+      payload_answer: envelope.terminal_text,
+      payload_assistant_answer: envelope.terminal_text,
+      payload_selected_final_answer: envelope.terminal_text,
+      terminal_presentation_concise_text: envelope.terminal_text,
+      debug_selected_final_answer: envelope.terminal_text,
+    },
+    wroteVisibleFields,
+    ...(synchronizedAudit ? { audit: synchronizedAudit } : {}),
+    integrity: {
+      ...(integrity ?? {}),
+      single_writer_applied: true,
+      ...(synchronizedIntegrityAudit
+        ? {
+            terminal_authority_single_writer_audit:
+              synchronizedIntegrityAudit,
+          }
+        : {}),
+      visible_matches_selected_artifact: true,
+      materialized_terminal_artifact_kind:
+        envelope.terminal_artifact_kind,
+      materialized_terminal_artifact_ref: terminalRef,
+      terminal_projection_kind_match: true,
+      terminal_policy_override_applied: true,
+      terminal_policy_override_reason:
+        envelope.terminal_kind === "failure"
+          ? errorCode ?? "typed_failure"
+          : "terminal_envelope_reconciliation",
+    },
+  };
+  payload.terminal_authority_single_writer = synchronizedWriter;
+  payload.terminal_artifact_id = terminalRef;
+  payload.terminal_authority_policy_override = {
+    schema: "helix.terminal_authority_policy_override.v1",
+    turn_id: envelope.turn_id,
+    previous_artifact_kind: previousKind,
+    previous_artifact_ref: previousRef,
+    previous_source: previousSource,
+    replacement_artifact_kind: envelope.terminal_artifact_kind,
+    replacement_artifact_ref: terminalRef,
+    replacement_source: envelope.final_answer_source,
+    terminal_error_code: errorCode,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+
+  if (
+    envelope.terminal_kind === "failure" ||
+    envelope.final_answer_source === "typed_failure"
+  ) {
+    const ledger = readArray(payload.current_turn_artifact_ledger);
+    if (
+      !ledger.some(
+        (entry) => readString(readRecord(entry)?.artifact_id) === terminalRef,
+      )
+    ) {
+      payload.current_turn_artifact_ledger = [
+        ...ledger,
+        {
+          artifact_id: terminalRef,
+          kind: "typed_failure",
+          turn_id: envelope.turn_id,
+          created_at: new Date().toISOString(),
+          payload: {
+            ...(readRecord(payload.typed_failure) ?? {}),
+            schema: "helix.typed_failure.v1",
+            error_code: errorCode ?? "typed_failure",
+            message: envelope.terminal_text,
+            text: envelope.terminal_text,
+            answer_text: envelope.terminal_text,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ];
+    }
+  }
+};
+
 export function applyTerminalAnswerEnvelope(
   payload: Record<string, unknown>,
   envelope: HelixTerminalAnswerEnvelope,
@@ -2066,6 +2273,7 @@ export function applyTerminalAnswerEnvelope(
     assistant_answer: false,
   });
   payload.terminal_answer_authority = terminalAuthority;
+  synchronizeTerminalAuthorityWriterWithEnvelope(payload, envelope);
   payload.current_turn_events = upsertCurrentTurnEvents(
     payload.current_turn_events,
     envelope,

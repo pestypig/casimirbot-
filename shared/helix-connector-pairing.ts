@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { HelixEnvironmentCommandConnectorConfig } from "./helix-environment-command";
+import type { HelixEnvironmentActionConnectorConfig } from "./helix-environment-action";
 import type { HelixRoomSourcePluginConfig } from "./helix-room-source-ingress";
 
 export const HELIX_CONNECTOR_PAIRING_SCHEMA =
@@ -43,6 +44,8 @@ export const helixConnectorPairingCreateRequestSchema = z
     domain_adapter: identifierSchema,
     source_label: z.string().trim().min(1).max(160).optional(),
     command_credential_requested: z.boolean().default(false),
+    action_credential_requested: z.boolean().default(false),
+    action_authority_id: identifierSchema.optional(),
     credential_ttl_ms: z
       .number()
       .int()
@@ -71,6 +74,34 @@ export const helixConnectorPairingCreateRequestSchema = z
         code: z.ZodIssueCode.custom,
         path: ["command_credential_requested"],
         message: "Command access can be paired only to an existing source binding.",
+      });
+    }
+    if (value.action_credential_requested && value.purpose !== "rotate") {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["action_credential_requested"],
+        message: "Player-action access can be paired only to an existing source binding.",
+      });
+    }
+    if (value.action_credential_requested && !value.action_authority_id) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["action_authority_id"],
+        message: "Player-action pairing requires an exact player authority.",
+      });
+    }
+    if (!value.action_credential_requested && value.action_authority_id) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["action_authority_id"],
+        message: "An action authority may be supplied only for player-action pairing.",
+      });
+    }
+    if (value.command_credential_requested && value.action_credential_requested) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["action_credential_requested"],
+        message: "Server-command and player-action credentials must be paired separately.",
       });
     }
     if (
@@ -122,6 +153,8 @@ export type HelixConnectorPairing = {
   world_id: string;
   source_label: string;
   command_credential_requested: boolean;
+  action_credential_requested: boolean;
+  action_authority_id: string | null;
   status: HelixConnectorPairingStatus;
   expires_at: string;
   redeemed_at: string | null;
@@ -171,6 +204,15 @@ export type HelixConnectorPairingRedemptionReceipt = {
         world_id: string;
         domain_adapter: string;
         command: HelixEnvironmentCommandConnectorConfig;
+      }
+    | {
+        pairing_mode: "action_only";
+        pairing_endpoint: string;
+        source_id: string;
+        room_id: string;
+        world_id: string;
+        domain_adapter: string;
+        action: HelixEnvironmentActionConnectorConfig;
       }
     | null;
   replayed: boolean;

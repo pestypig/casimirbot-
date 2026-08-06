@@ -14,6 +14,7 @@ import {
   isCodexParityAgentSpineRailFailureCode,
 } from "./codex-parity-agent-spine-contract";
 import { HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION } from "./terminal-rail-failure-reconciliation";
+import { authoritativeTypedFailureRequiresNoContinuation } from "./runtime/typed-failure-lifecycle-reconciliation";
 
 type RecordLike = Record<string, unknown>;
 
@@ -850,6 +851,8 @@ const addRailTableFailures = (input: {
       ? railTable.compound_incomplete_subgoal_did_tool_run
       : null;
   const railStatus = readString(railTable.rail_status);
+  const sourceIdentityPolicyFailure =
+    readString(railTable.rail_failure_code) === "source_identity_mismatch";
   const compoundMirrorDeclared =
     railTable.compound_subgoal_count !== undefined ||
     firstIncompleteCompoundSubgoalId !== null ||
@@ -1006,7 +1009,8 @@ const addRailTableFailures = (input: {
   if (
     compoundSubgoalCount !== null &&
     compoundSubgoalCount > 0 &&
-    railStatus !== "complete"
+    railStatus !== "complete" &&
+    !sourceIdentityPolicyFailure
   ) {
     if (!firstIncompleteCompoundSubgoalId)
       failures.push(
@@ -1200,6 +1204,7 @@ const addCompleteRailEnvelopeFailures = (input: {
   railTable: RecordLike | null;
   ask: RecordLike;
   debug: RecordLike | null;
+  authoritativeTypedFailure: boolean;
 }): void => {
   if (!input.railTable) return;
   const railComplete =
@@ -1242,6 +1247,39 @@ const addCompleteRailEnvelopeFailures = (input: {
     readString(input.debug?.selected_final_answer) ??
     readString(input.debug?.answer) ??
     "";
+
+  // A completed procedural rail can truthfully terminate as a typed failure
+  // when the route contract explicitly permits it and current authority proves
+  // that no further model/tool continuation can repair the evidence boundary.
+  // This is distinct from an unexplained typed failure replacing a completed
+  // provider answer, which remains a parity defect below.
+  if (input.authoritativeTypedFailure) {
+    if (!terminalErrorCode)
+      input.failures.push(
+        "complete_authoritative_typed_failure_missing_terminal_error_code",
+      );
+    if (
+      finalAnswerSource !== "typed_failure" ||
+      terminalArtifactKind !== "typed_failure"
+    ) {
+      input.failures.push(
+        `complete_authoritative_typed_failure_projection_mismatch:${finalAnswerSource ?? "missing"}/${terminalArtifactKind ?? "missing"}`,
+      );
+    }
+    if (
+      (finalStatus && finalStatus !== "final_failure") ||
+      (responseType && responseType !== "final_failure")
+    ) {
+      input.failures.push(
+        `complete_authoritative_typed_failure_non_failure_response:${finalStatus ?? "missing"}/${responseType ?? "missing"}`,
+      );
+    }
+    if (!selectedText)
+      input.failures.push(
+        "complete_authoritative_typed_failure_missing_failure_text",
+      );
+    return;
+  }
 
   if (terminalErrorCode)
     input.failures.push(`complete_rail_terminal_error:${terminalErrorCode}`);
@@ -1608,6 +1646,10 @@ export function buildApiParityProbeResult(input: {
       finalAnswerSource === "typed_failure" ||
       solverContinuationNextStep !== "typed_failure");
   const failures: string[] = [];
+  const authoritativeTypedFailure =
+    authoritativeTypedFailureRequiresNoContinuation(ask) ||
+    (debug !== null &&
+      authoritativeTypedFailureRequiresNoContinuation(debug));
   const expectedIdentityDiagnosis =
     typeof input.scenario.expected.live_source_identity_ok === "boolean" &&
     input.scenario.expected.live_source_identity_ok === false;
@@ -1631,7 +1673,13 @@ export function buildApiParityProbeResult(input: {
     prompt: input.scenario.prompt,
   });
   addRailMirrorFailures({ failures, railTables });
-  addCompleteRailEnvelopeFailures({ failures, railTable, ask, debug });
+  addCompleteRailEnvelopeFailures({
+    failures,
+    railTable,
+    ask,
+    debug,
+    authoritativeTypedFailure,
+  });
   addFailClosedRailEnvelopeFailures({ failures, railTable, ask, debug });
   addRailEnvelopeProjectionFailures({
     failures,

@@ -64,6 +64,15 @@ const committedSubgoalsAreSatisfied = (value: unknown): boolean => {
   });
 };
 
+const committedSubgoalContractApplies = (value: unknown): boolean => {
+  const contract = readRecord(value);
+  return Boolean(
+    readString(contract?.schema) ===
+      "helix.compound_capability_contract.v1" &&
+      readArray(contract?.subgoals).length > 1,
+  );
+};
+
 const isActionableBlockedCapabilityLaneObservation = (input: {
   packet: HelixAgentStepObservationPacket;
   turnId: string;
@@ -475,6 +484,7 @@ export const buildHelixProviderReasoningReentry = (input: {
   normalizedObservationPackets?: HelixAgentStepObservationPacket[];
   providerText: string;
   ok: boolean;
+  providerObservationReentryCompleted?: boolean;
   solverCompleted?: boolean;
   goalSatisfied?: boolean;
   modelOnlyDirectAnswerAllowed?: boolean;
@@ -525,6 +535,9 @@ export const buildHelixProviderReasoningReentry = (input: {
     ...capabilityLaneObservationRefs,
     ...priorEvidenceObservationRefs,
   ];
+  const transportObservationRefs = Array.from(
+    new Set(observationRefs.filter((ref) => ref.trim().length > 0)),
+  );
   const successfulGatewayObservationRefs = input.gatewayCallResults
     .filter((result) =>
       isGatewayObservationCompatibleWithProviderReasoning(
@@ -553,6 +566,11 @@ export const buildHelixProviderReasoningReentry = (input: {
   const requiredCommittedSubgoalsSatisfied = committedSubgoalsAreSatisfied(
     input.committedSubgoalContract,
   );
+  const committedSubgoalsRequired = committedSubgoalContractApplies(
+    input.committedSubgoalContract,
+  );
+  const committedSubgoalsCompatible =
+    !committedSubgoalsRequired || requiredCommittedSubgoalsSatisfied;
   const actionableBlockedCapabilityLaneObservationPackets =
     input.solverCompleted === true &&
     input.goalSatisfied === true &&
@@ -629,6 +647,21 @@ export const buildHelixProviderReasoningReentry = (input: {
       ? `${input.turnId}:agent_provider_terminal_candidate:${input.runtime}:${sha256(input.providerText).slice(0, 16)}`
       : null;
   const providerReasoningCompleted = Boolean(candidateId);
+  // Transport re-entry and evidentiary success are different facts. A typed
+  // blocked/failed observation can still be normalized and supplied to the
+  // next Codex step, even though it cannot support a success claim or grant
+  // terminal answer authority. Transport must not depend on whether that
+  // later step produced a terminal candidate: Codex may instead request a
+  // retry, choose another capability, or end without a candidate.
+  const observationReentered = Boolean(
+    (input.providerObservationReentryCompleted ?? input.ok) &&
+    evidenceReentryRequired &&
+      normalizedObservationPackets.length >= evidenceSourceCount &&
+      transportObservationRefs.length > 0 &&
+      transportObservationRefs.every((ref) =>
+        normalizedObservationRefs.includes(ref),
+      ),
+  );
   const evidenceReentered = Boolean(
     noEvidenceDirectAnswerReady ||
     (evidenceReentryRequired &&
@@ -638,7 +671,8 @@ export const buildHelixProviderReasoningReentry = (input: {
   const solverAuthoritySatisfied =
     providerReasoningCompleted &&
     input.solverCompleted === true &&
-    input.goalSatisfied !== false;
+    input.goalSatisfied !== false &&
+    committedSubgoalsCompatible;
   const currentTurnObservationPresent =
     input.gatewayCallResults.length > 0 ||
     capabilityLaneObservationPackets.length > 0;
@@ -685,10 +719,12 @@ export const buildHelixProviderReasoningReentry = (input: {
           ? ["current_turn_observation_required"]
         : !allGatewayCallsSucceeded
           ? ["gateway_observation_missing_or_failed"]
-          : !allCapabilityLaneObservationsReentryCompatible
+        : !allCapabilityLaneObservationsReentryCompatible
             ? ["capability_lane_observation_missing_or_failed"]
             : !normalizedObservationsReady
               ? ["normalized_observation_packet_missing"]
+              : !committedSubgoalsCompatible
+                ? ["committed_subgoal_observation_missing"]
               : ["helix_solver_completion_required"]
     : ["provider_terminal_candidate_missing"];
   const providerTerminalCandidate = candidateId
@@ -764,9 +800,16 @@ export const buildHelixProviderReasoningReentry = (input: {
     post_tool_model_step_required: Boolean(
       candidateId && !providerReasoningCompleted,
     ),
+    observation_reentered: observationReentered,
+    reentered_observation_refs: observationReentered
+      ? transportObservationRefs
+      : [],
     evidence_reentered: evidenceReentered,
     solver_completed: input.solverCompleted === true,
-    goal_satisfaction_compatible: input.goalSatisfied === true,
+    goal_satisfaction_compatible:
+      input.goalSatisfied === true && committedSubgoalsCompatible,
+    committed_subgoals_required: committedSubgoalsRequired,
+    committed_subgoals_compatible: committedSubgoalsCompatible,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -858,6 +901,8 @@ export const buildHelixProviderReasoningReentry = (input: {
       allCapabilityLaneObservationsReentryCompatible,
     all_observations_reentry_compatible: allEvidenceReentryCompatible,
     required_committed_subgoals_satisfied: requiredCommittedSubgoalsSatisfied,
+    committed_subgoals_required: committedSubgoalsRequired,
+    committed_subgoals_compatible: committedSubgoalsCompatible,
     normalized_observations_ready: normalizedObservationsReady,
     evidence_reentry_required: evidenceReentryRequired,
     model_only_direct_answer_allowed:
@@ -866,7 +911,8 @@ export const buildHelixProviderReasoningReentry = (input: {
       input.currentTurnEvidenceRequired === true,
     current_turn_observation_present: currentTurnObservationPresent,
     solver_completed: input.solverCompleted === true,
-    goal_satisfaction_compatible: input.goalSatisfied === true,
+    goal_satisfaction_compatible:
+      input.goalSatisfied === true && committedSubgoalsCompatible,
     route_authority_status: terminalAnswerAuthority
       ? "provider_gateway_read_observe_contract_satisfied"
       : "not_authorized",

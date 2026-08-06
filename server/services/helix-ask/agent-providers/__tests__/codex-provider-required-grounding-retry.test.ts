@@ -6,14 +6,18 @@ import {
   buildCapabilityLaneMutationEpochHistory,
   buildCodexGenericContinuationDecisionInstruction,
   continuationStateRequiresCodexModelAuthoredCapabilityProposal,
+  continuationStateAdmitsModelAuthoredRetryLaneRequest,
   providerMentionedAdmittedCapabilityIds,
   runtimeProviderRequiredGroundingCapabilityIdsFromBody,
   shouldAllowCodexObservationDependentCapabilityProposal,
+  shouldEnterCodexPostObservationContinuation,
   shouldExtractCodexInitialCapabilityLaneRequest,
   shouldRetryCodexCapabilityLaneRequest,
+  shouldRetryCodexPostObservationContinuationAffordance,
 } from "../codex-provider";
 import { environmentCommandMinecraftManifest } from "../../workstation-tool-gateway/environment-command";
 import { environmentProbeMinecraftManifests } from "../../workstation-tool-gateway/environment-probe";
+import type { HelixAgentContinuationState } from "../../runtime/agent-continuation-state";
 
 const environmentSpatialRegionMinecraftManifest =
   environmentProbeMinecraftManifests.find(
@@ -321,6 +325,188 @@ describe("Codex required-grounding correction", () => {
       '"capability": "com.casimirbot.minecraft.command.catalog"',
     );
     expect(instruction).toContain("Do not replace");
+  });
+
+  it("requires Codex to repair a retryable malformed Minecraft command request", () => {
+    const state = {
+      schema: "helix.agent_continuation_state.v1",
+      turn_id: "ask:test:minecraft-command-repair",
+      state_id: "state:test:minecraft-command-repair",
+      sequence: 3,
+      trigger: "post_attempt",
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: false,
+      },
+      observation_refs: { existing: [], new: [], all: [] },
+      missing_requirement_ids: [],
+      last_attempt: {
+        attempt_id: "attempt:malformed-command",
+        capability_id: "com.casimirbot.minecraft.command",
+        action_fingerprint: "sha256:malformed-command",
+        status: "failed",
+        failure_class: "invalid_args",
+        failure_code: "command_parse_failed",
+        failure_message:
+          "The Minecraft command capability requires exactly one non-empty command string in command.",
+        retryability: "retryable",
+        observation_refs: ["observation:malformed-command"],
+      },
+      next_admissible_affordances: [],
+      capability_proposal: {
+        allowed: false,
+        admitted_capability_ids: ["com.casimirbot.minecraft.command"],
+        authority: "helix_policy_admits_runtime_proposal",
+      },
+      tried_action_fingerprints: ["sha256:malformed-command"],
+      progress: {
+        made_progress: false,
+        new_observation_count: 0,
+        resolved_requirement_ids: [],
+        added_requirement_ids: [],
+        new_affordance_count: 0,
+        no_progress_repeat_count: 0,
+        reason_codes: ["failed_attempt_observation_only"],
+      },
+      budget: {
+        soft: { pressure: "none", exhausted: false },
+        hard: { exhausted: false },
+        extension_count: 0,
+        max_extensions: 2,
+      },
+      allowed_decisions: ["retry"],
+      authority: "runtime_agent_decides_within_admitted_boundaries",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    } as unknown as HelixAgentContinuationState;
+
+    const instruction = buildCodexGenericContinuationDecisionInstruction(state);
+
+    expect(instruction).toContain("failed retryably");
+    expect(instruction).toContain("command_parse_failed");
+    expect(instruction).toContain("exactly one non-empty command string");
+    expect(instruction).toContain("semantic intent fields are not executable");
+    expect(instruction).toContain('"arguments":{"command":"<one concrete Minecraft command>"');
+    expect(instruction).toContain("translate only its first unfinished action");
+    expect(instruction).toContain("Never emit commands, an array-valued command");
+    expect(instruction).not.toContain("Otherwise produce the final grounded answer");
+    expect(
+      shouldRetryCodexPostObservationContinuationAffordance({
+        state,
+        providerText:
+          "The command arguments were invalid, so the user must provide the exact command.",
+      }),
+    ).toBe(true);
+    expect(
+      shouldRetryCodexPostObservationContinuationAffordance({
+        state,
+        providerText:
+          'HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"com.casimirbot.minecraft.command","arguments":{"command":"setblock -50 68 -2 minecraft:fire"}}',
+      }),
+    ).toBe(false);
+    expect(shouldEnterCodexPostObservationContinuation(state)).toBe(true);
+  });
+
+  it("does not force a provider retry after the hard boundary is exhausted", () => {
+    const state = {
+      allowed_decisions: ["retry", "fail"],
+      last_attempt: {
+        capability_id: "com.casimirbot.minecraft.command",
+        failure_code: "command_parse_failed",
+        retryability: "retryable",
+      },
+      next_admissible_affordances: [],
+      budget: { hard: { exhausted: true } },
+    } as unknown as HelixAgentContinuationState;
+
+    expect(
+      shouldRetryCodexPostObservationContinuationAffordance({
+        state,
+        providerText: "The bounded command repair budget is exhausted.",
+      }),
+    ).toBe(false);
+  });
+
+  it("admits only the failed capability for a model-authored retry without a precomputed affordance", () => {
+    const state = {
+      allowed_decisions: ["retry"],
+      last_attempt: {
+        capability_id: "com.casimirbot.minecraft.actor.status.read",
+        failure_code: "current_turn_reentry_ineligible",
+        retryability: "retryable",
+      },
+      next_admissible_affordances: [],
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+
+    expect(
+      continuationStateAdmitsModelAuthoredRetryLaneRequest({
+        state,
+        candidate: {
+          capability: "com.casimirbot.minecraft.actor.status.read",
+          target: "current_actor",
+          freshness_requirement_ms: 5_000,
+        },
+        admittedCapabilityIds: [
+          "com.casimirbot.minecraft.actor.status.read",
+          "com.casimirbot.minecraft.inventory.read",
+        ],
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsModelAuthoredRetryLaneRequest({
+        state,
+        candidate: {
+          capability: "com.casimirbot.minecraft.inventory.read",
+          target: "current_actor",
+        },
+        admittedCapabilityIds: [
+          "com.casimirbot.minecraft.actor.status.read",
+          "com.casimirbot.minecraft.inventory.read",
+        ],
+      }),
+    ).toBe(false);
+    expect(
+      continuationStateAdmitsModelAuthoredRetryLaneRequest({
+        state: {
+          ...state,
+          budget: { hard: { exhausted: true } },
+        } as unknown as HelixAgentContinuationState,
+        candidate: {
+          capability: "com.casimirbot.minecraft.actor.status.read",
+          target: "current_actor",
+          freshness_requirement_ms: 5_000,
+        },
+        admittedCapabilityIds: [
+          "com.casimirbot.minecraft.actor.status.read",
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it("teaches Codex to repair installed command category and effect metadata", () => {
+    const state = {
+      allowed_decisions: ["retry"],
+      last_attempt: {
+        capability_id: "com.casimirbot.minecraft.command",
+        failure_code: "command_category_mismatch",
+        retryability: "retryable",
+      },
+      next_admissible_affordances: [],
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+
+    const instruction = buildCodexGenericContinuationDecisionInstruction(state);
+
+    expect(instruction).toContain("category and effect fields");
+    expect(instruction).toContain("server_administration/server_administration");
+    expect(instruction).toContain("world_build/world_mutation");
+    expect(instruction).toContain("query/read_only");
+    expect(instruction).toContain("helixgame checkpoint capture_box");
+    expect(instruction).toContain("Never join commands with semicolons");
+    expect(instruction).toContain("Do not ask the user");
   });
 
   it("requires a model-authored next request for act-only observation-dependent continuation", () => {

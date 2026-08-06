@@ -7,7 +7,7 @@
 **Claim tier:** diagnostic protocol  
 **Proposal package:** pass  
 **Commissioning entry:** conditional pass  
-**Apparatus-DP sensitivity forecast:** one bounded Stage-4.2C synthetic region passes design gates; physical pilot inputs absent; no DP exclusion<br>
+**Apparatus-DP sensitivity forecast:** three of 200 Stage-4.2M configurations pass transported design gates; leading point requires 1,028 paired windows with power 0.927 at 1,600; physical pilot inputs absent; no DP exclusion<br>
 **Measured evidence:** not ready  
 **Collapse identification:** blocked pending a source-backed dynamics signature  
 **Manifold dynamics:** blocked pending a complete causal model  
@@ -45,6 +45,10 @@
 **Stage-4.2G config/runner:** `configs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g.v1.json`; `scripts/research/run-casimir-dp-empirical-feasibility-pilot-stage4-2g.ts`
 **Stage-4.2G verification receipt:** `docs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g-verification-receipt.json`
 **Stage-4.2G authoritative run:** `artifacts/research/casimir-dp-empirical-feasibility-pilot-stage4-2g/casimir-dp-empirical-feasibility-pilot-stage4-2g-v1-20260730T030000000Z/` (single-apparatus prediction and packet-ingestion validation only; empirical pilot no-go)
+**Leading Stage-4.2M plan/report:** `docs/research/casimir-dp-apparatus-search-stage4-2m-plan.md`; `docs/research/casimir-dp-apparatus-search-stage4-2m-report.md`
+**Leading Stage-4.2M verification receipt:** `docs/research/casimir-dp-apparatus-search-stage4-2m-verification-receipt.json`
+**Stage-4.2N material/thermal ordinary-null report:** `docs/research/casimir-dp-material-thermal-ordinary-null-stage4-2n-report.md`
+**Stage-4.2N config/runner:** `configs/research/casimir-dp-material-thermal-ordinary-null-stage4-2n.v1.json`; `scripts/research/run-casimir-dp-material-thermal-ordinary-null-stage4-2n.ts`
 
 ## Executive summary
 
@@ -60,16 +64,15 @@ reduction, quantum foam, or a spacetime-manifold mechanism unless a
 source-backed model predicts a distinct preregistered joint signature and the
 data discriminate that model from its competitors.
 
-The frozen architecture uses a silica nanoparticle whose spatial branches are
-separated transverse to the normal of one electrically tunable two-dimensional
-boundary. The boundary state is randomized between shots, allowed to settle,
-and held static during coherent evolution. This removes the earlier dependence
-on implausibly exact cancellation of two large normal forces. A separate
-cofabricated nanomechanical reference must first establish a repeatable
-gate-dependent force contrast. Only then does the project advance through
-classical particle transfer functions, a boundary-free coherence pilot, a
-blinded 400-window boundary pilot, and a powered main run of at least 1,600
-paired windows.
+The leading architecture is the best-ranked point in the bounded Stage-4.2M
+search: a diamond-density 276.302 nm-radius sphere with mass
+\(3.09251\times10^{-16}\) kg, a 250 nm branch parallel to the boundary, a
+250 ms hold, 10 micrometre gap, 4 K, and \(10^{-15}\) Pa. The boundary state
+is randomized between shots, allowed to settle, and held static during coherent
+evolution. A separate cofabricated nanomechanical reference must first establish
+a repeatable boundary contrast. The 1,028-window forecast lies within a
+1,600-window planning ceiling, but neither number authorizes acquisition until
+the transported response and covariance are measured.
 
 The implemented Stage-4.2B forecast now qualifies that last sentence. The
 1,600-window count remains a planned acquisition envelope, but the present
@@ -78,11 +81,12 @@ and DP power are not estimable until numerical control-response vectors and
 their block covariance are calibrated. This is a redesign/commissioning gate,
 not a DP exclusion.
 
-Stage 4.2C resolves the corresponding synthetic redesign question. It compiles
+Stage 4.2C supplies the parent whitened geometry. It compiles
 numerical design-assumption control responses and block covariance, transports
 a frozen candidate catalogue through the unchanged registered DP law, and
 finds one bounded silica candidate that clears the preregistered numerical
-gates with 542 required paired windows. That does not close commissioning:
+gates with 542 required paired windows. That value is development ancestry, not
+the current acquisition forecast. It did not close commissioning:
 measured response, covariance, and state-preparation receipts are absent, so
 physical pilot readiness remains `not_ready`.
 
@@ -107,18 +111,32 @@ therefore remains the primary collapse discriminator; optical timing and
 polarization remain ordinary-physics controls unless a future complete
 apparatus metric predicts a measurable differential signal.
 
-Stage 4.2G closes the apparatus-identity ambiguity and opens the empirical
-intake. The proposed pilot now refers to one silica sphere with mass
-\(1.94385\times10^{-16}\ {\rm kg}\), radius
-\(2.76302362398029\times10^{-7}\ {\rm m}\), 160 nm branch separation, and
-250 ms hold time. The same registered DP manifest predicts
-\(\Gamma_{\rm DP}=0.02400420398374263\ {\rm s^{-1}}\), visibility
-0.9940169193, and heating
-\(1.9297884642410306\times10^{-40}\ {\rm W}\). A strict pilot packet now
-binds all material, finite-geometry, preparation, metrology, modulation,
-background, covariance, companion, blinding, custody, and replication
-products. The synthetic ingestion path passes, but no measured packet exists;
-the present decision remains an empirical pilot no-go.
+Stage 4.2M closes the current design-selection loop. Of 200 bounded
+configurations, three pass the frozen synthetic gates. The leading point
+predicts \(\Gamma_{\rm DP}=0.1180458589\ {\rm s^{-1}}\), 2.908% loss under the
+registered effective-Gaussian model, and a 0.435% transported density-envelope
+floor. Its gas-to-DP proxy ratio is 0.00732, echoed phase uncertainty is
+\(1.11\times10^{-8}\) rad, companion SNR is 8.67, and forecast power is 0.927
+at 1,600 paired windows. A strict pilot packet must now be rebound to this
+leading identity. No measured packet exists, so the result is a subsystem-
+commissioning target rather than physical pilot readiness.
+
+Stage 4.2N gives that leading identity an executable ordinary-null chain in
+the same complex-coherence coordinates as the proposed readout. A synthetic
+specimen loss table is converted to imaginary-axis response; a finite-geometry
+Green table produces the mean electromagnetic phase; a two-sided FDT spectrum
+produces Ramsey/echo contraction and covariance; and known electric,
+temperature, gap, optical, and sham interventions are replayed. The synthetic
+recovery gives phase \(0.0200\) rad, echo exponent
+\(1.34165\times10^{-6}\), and passes zero-coupling, infinite-distance,
+detailed-balance, and Planck--Stefan--Boltzmann limits. It also emits the
+four-cell ratio
+\(\mathcal R_4=(C_{a,s}C_{r,c})/(C_{a,c}C_{r,s})\), which is the direct
+boundary-by-superposition diagnostic. Because every response and covariance
+input is synthetic, this closes only the software chain. Specimen-specific
+spectra, as-built CAD/alignment, an independently checked full-Maxwell Green
+solution, and measured intervention covariance are mandatory before the
+ordinary-null prediction can be subtracted from data.
 
 ## Scientific premise
 
@@ -1082,13 +1100,14 @@ and
 `f1b8219b7c74bc25db9cc3137aeec97b714bfc3193052a94e3929326eb858f73`.
 This certifies repository convergence only; its scientific scope is `none`.
 
-### Implemented Stage-4.2G empirical-feasibility packet
+### Stage-4.2G packet ancestry retained for rebinding
 
-The proposal now freezes a single apparatus rather than carrying a
-multi-object sensitivity grid into commissioning. The pilot identity is one
-silica sphere:
+Stage 4.2G first froze a single silica apparatus rather than carrying a
+multi-object sensitivity grid into commissioning. Stage 4.2M supersedes its
+numerical identity, but its packet and custody requirements remain the template
+that must be rebound to the leading design. The historical identity was:
 
-| Quantity | Frozen design |
+| Quantity | Superseded Stage-4.2G design |
 |---|---:|
 | Radius | \(2.76302362398029\times10^{-7}\ {\rm m}\) |
 | Mass | \(1.94385\times10^{-16}\ {\rm kg}\) |
@@ -1099,13 +1118,15 @@ silica sphere:
 | Environment | \(4\ {\rm K}\), \(2\times10^{-11}\ {\rm Pa}\) |
 | Planned windows | 1,600 paired |
 
-The registered 100 nm-regularized nondissipative DP model predicts a 0.5983%
+For that historical identity, the registered 100 nm-regularized nondissipative
+DP model predicted a 0.5983%
 DP-only visibility loss over the frozen hold time. The same mass-density
-manifest predicts the heating companion
+manifest predicted the heating companion
 \(1.9297884642410306\times10^{-40}\ {\rm W}\); for 100 independent samples,
 SNR 5 requires one-shot uncertainty no larger than
-\(3.859576928482061\times10^{-40}\ {\rm W}\). These numbers are conditional
-instrument targets, not achieved specifications.
+\(3.859576928482061\times10^{-40}\ {\rm W}\). These numbers are ancestry
+checks, not current instrument targets or achieved specifications. The current
+targets are the Stage-4.2M values above.
 
 Commissioning must fill the Stage-4.2G packet with provenance-bound products
 for mass/geometry, material response, finite-geometry Maxwell/Green fields,
@@ -1183,6 +1204,241 @@ and the downstream verification-receipt SHA-256 is
 This verifies repository, runtime-contract, and certificate integrity only. It
 does not commission the apparatus or change any scientific promotion gate.
 
+### Implemented Stage-4.2I boundary--branch interaction diagnostic
+
+Stage 4.2I freezes the transparent four-cell comparison: reference/active
+boundary crossed with identical-branch control/separated branches. Its
+normalized complex cross-ratio cancels the boundary-independent registered
+Diósi factor and tests whether the boundary and branch preparation fail to
+factorize after the measured ordinary response is removed. It therefore
+answers a different question from the primary DP test. A nonzero corrected
+interaction first challenges the ordinary joint-system model; it does not by
+itself identify collapse or a Casimir-to-collapse mechanism.
+
+The maintained synthetic null and injected-signal recovery pass, as do the
+wave-packet custody and adversarial fail-closed checks. No physical four-cell
+coherence, packet-equivalence, or ordinary-response data have been acquired.
+Stage 4.2I consequently adds zero observable bridge edges and preserves all
+empirical and mechanism gates.
+
+### Implemented Stage-4.2J Schrödinger, constituent-density, and environment screen
+
+Stage 4.2J makes explicit what the apparatus actually observes:
+
+\[
+C(t)=C(0)e^{-i\Delta E_Ht/\hbar}
+e^{-\chi_{\rm env}(t)}e^{-E_Gt/\hbar}.
+\]
+
+The first factor is Hamiltonian phase, the second is ordinary reduced-system
+loss, and the third is the registered model's additional contraction. A
+remaining magnitude loss may be translated to a DP-equivalent energy only
+conditionally on that frozen exponential law; it is not a direct weighing or
+calorimetric collection of gravitational self-energy.
+
+The diagnostic changes the proposal in two material ways. First, a converged
+homogeneous silica sphere convolved with the same 100 nm Gaussian gives
+(E_G=6.32590\times10^{-37}\) J and 0.149851% loss at 250 ms, about one quarter
+of the single-effective-Gaussian forecast. The layered, coarse-grained, and
+atomistic density representations remain missing, so model-robust sensitivity
+is blocked. Second, the ideal-equilibrium geometric residual-gas screen at 4 K
+and \(2\times10^{-11}\) Pa gives approximately 17.8 s\(^{-1}\) for H2 and
+12.6 s\(^{-1}\) for He-4, versus the registered DP rate 0.0240 s\(^{-1}\).
+Although this is a conservative screen rather than a complete measured
+scattering model, it returns an apparatus no-go at the declared conditions.
+The corresponding simple-model pressures for a gas rate no larger than 10% of
+the DP rate are approximately \(2.70\times10^{-15}\) Pa for H2 and
+\(3.80\times10^{-15}\) Pa for He-4. They are redesign-screen targets, not
+achieved or sufficient vacuum specifications.
+
+The immediate proposal exit criteria are therefore revised. Before the
+response/covariance pilot is powered, the team must:
+
+1. demonstrate the registered center-of-mass state or select a feasible lower
+   mass/separation/hold-time design;
+2. measure the vacuum composition and pressure and register a complete
+   collisional-decoherence kernel, collision veto, or redesigned sequence;
+3. provide provenance-bound layered or constituent density maps and repeat the
+   sensitivity forecast;
+4. complete the exact external-bound convention map;
+5. only then measure the boundary/control response vectors and covariance.
+
+Hydrogen, Rydberg, Compton, Higgs, QED, and blackbody relations remain
+calibration or dimensional authorities only. Their shared energy/frequency
+notation adds no cavity-to-collapse transfer law. Stage 4.2J passes as
+diagnostic software while measured evidence and state preparation remain
+`not_ready`, collapse and manifold identification remain `blocked`, physical
+viability remains `not_evaluated`, and the declared gas screen is `no_go`.
+
+Fresh adapter run `2370` (`adapter:1211c4a1-9ebf-4288-a867-1240fabd8adb`)
+returns `PASS`, first failure `null`, empty deltas, certificate status `GREEN`,
+and integrity `true`. The certificate SHA-256 is
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`;
+the exclusive validated-trace SHA-256 is
+`161cd8268093e8b7563f1b78541945c074503ffa440323667fceb178e434b6a8`.
+This verifies repository convergence and the diagnostic software path only. It
+does not overturn the environmental no-go or supply empirical authority.
+
+### Implemented Stage-4.2K microscopic electromagnetic closure
+
+Stage 4.2K makes the ordinary Casimir lane operational: ground-state transition
+sums determine polarizability, measured causal material response determines
+\(\epsilon(i\xi)\), and the registered finite-geometry Green/scattering solve
+must determine branch energy, phase, loss, and covariance. Virtual-photon
+language is not used as a local particle-density observable.
+
+The maintained synthetic screen recovers \(\epsilon(0)=3.8\) and the silica
+sphere polarizability, but it deliberately withholds apparatus closure because
+temperature-matched spectra, CAD/mesh, finite-geometry Green response,
+independent solver, and branch-orientation receipts do not exist. In the
+ideal-conductor retarded-dipole screen the normal 160 nm separation accumulates
+about \(8.44\times10^9\) rad over 250 ms, while the tangential ideal-plane
+limit has zero differential phase. This is an orientation sensitivity bound,
+not a finite-apparatus prediction.
+
+The proposal must therefore freeze branch orientation; measure phase, echo
+rejection, drift, and covariance; and keep phase-jitter loss below its
+preregistered fraction of the DP exponent. It must also replace the geometric
+gas count with a species- and momentum-transfer-resolved quantum-linear-
+Boltzmann model. The synthetic four-cell ordinary subtraction passes, standard
+boundary-independent DP cancels from that statistic, and zero bridge edges are
+added. Residual attribution, measured evidence, collapse identification,
+manifold dynamics, and physical viability remain blocked or not ready.
+
+Fresh adapter run `2371` returns `PASS` with certificate status `GREEN`,
+integrity true, and certificate SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+This certifies repository convergence only; it does not authorize acquisition
+or convert the orientation screen into an apparatus prediction.
+
+### Implemented Stage-4.2L empirical-authority and redesign screen
+
+Stage 4.2L freezes a single engineering coordinate frame: a 40-by-40
+micrometre finite rectangular plate, outward normal along \(z\), sphere center
+1.476302 micrometres above the surface, and a 160 nm tangential branch along
+\(x\). The manifest is now authoritative for computations, but every as-built
+CAD, coordinate, branch-vector, plate-normal, and nearby-conductor receipt is
+still absent.
+
+The reduced-order finite-plate calculation crosschecks analytic rectangular
+solid angle against surface quadrature at \(1.15\times10^{-6}\) relative
+energy error. Centered tangential branches give zero nominal phase by symmetry.
+The phase-response Jacobian nevertheless rejects the design tolerances: its
+synthetic covariance gives \(\sigma_\phi\approx1.28\times10^4\) rad versus a
+0.03464 rad allowance. Single-axis screens require approximately
+\(5.50\times10^{-14}\) m lateral stability or
+\(4.39\times10^{-12}\) rad relative angular stability. A full Maxwell
+Green/scattering solve and measured Jacobian/covariance must replace this
+surrogate, but the present reference geometry cannot proceed unchanged to a
+coherence pilot.
+
+The executable isotropic QLBE proxy gives \(17.28\ {\rm s^{-1}}\) at 4 K and
+\(2\times10^{-11}\) Pa, about 720 times the DP rate. Under that proxy, the
+pressure for a one-tenth-DP gas contribution is
+\(2.78\times10^{-15}\) Pa. Species-resolved pressure, differential scattering,
+confinement, and independent calibration remain required; the proxy is a
+redesign no-go, not a vacuum prediction.
+
+<!-- Superseded malformed rendering retained outside rendered prose.
+
+The executable isotropic QLBE proxy gives (17.28 {m s^{-1}}) at 4 K and
+(2	imes10^{-11}) Pa, about 720 times the DP rate. Under that proxy, the
+pressure for a one-tenth-DP gas contribution is
+(2.78	imes10^{-15}) Pa. Species-resolved pressure, differential scattering,
+confinement, and independent calibration remain required; the proxy is a
+redesign no-go, not a vacuum prediction.
+
+-->
+
+The state-preparation comparison is also explicit. The proposed
+\(1.1706\times10^{11}\) Da sphere is about \(6.89\times10^5\) times more massive
+than the 2026 170 kDa matter-wave benchmark. Its 160 nm split is only 1.20 times
+the demonstrated 133 nm split, but the particle diameter is about 69 times
+larger and the material/platform differ. No integrated preparation receipt is
+available.
+
+<!-- Superseded malformed rendering retained outside rendered prose.
+(1.1706	imes10^{11}) Da sphere is about (6.89	imes10^5) times more massive
+than the 2026 170 kDa matter-wave benchmark. Its 160 nm split is only 1.20 times
+the demonstrated 133 nm split, but the particle diameter is about 69 times
+larger and the material/platform differ. No integrated preparation receipt is
+available.
+
+-->
+
+The frozen \(R_0=100\) nm point is not excluded by the XENONnT 90% confidence
+scalar lower bound \(R_0>4.9\times10^{-10}\) m, but a full convention and
+composite-likelihood recast remains open. At the same 100 nm cutoff, four mass
+profiles span a factor 6.77 in \(E_G\). The proposal must therefore redesign
+phase control and vacuum conditions, then acquire specimen spectra, as-built
+geometry, a full finite Maxwell solution, measured covariance, QLBE inputs,
+state preparation, and internal-density metrology before WP3 or any blinded
+campaign. Measured evidence remains `not_ready`, residual attribution and
+collapse/manifold identification remain `blocked`, and confirmatory
+acquisition is `not_authorized`.
+
+<!-- Superseded malformed rendering retained outside rendered prose.
+scalar lower bound (R_0>4.9	imes10^{-10}) m, but a full convention and
+composite-likelihood recast remains open. At the same 100 nm cutoff, four mass
+profiles span a factor 6.77 in (E_G). The proposal must therefore redesign
+phase control and vacuum conditions, then acquire specimen spectra, as-built
+geometry, a full finite Maxwell solution, measured covariance, QLBE inputs,
+state preparation, and internal-density metrology before WP3 or any blinded
+campaign. Measured evidence remains `not_ready`, residual attribution and
+collapse/manifold identification remain `blocked`, and confirmatory
+acquisition is `not_authorized`.
+
+-->
+
+Fresh explicit-endpoint adapter run `2372`
+(`adapter:009256f1-e3a5-4214-a5d2-0b054f644d0f`) returns `PASS`, first
+failure `null`, empty deltas, certificate status `GREEN`, and integrity
+`true`. The certificate SHA-256 is
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`;
+the exclusive identity-bound trace SHA-256 is
+`42548212d9566413031bff64ddd73909a2a1383f62a05d3bd9dc17fb3c221957`.
+The verification receipt is
+`docs/research/casimir-dp-empirical-authority-stage4-2l-verification-receipt.json`.
+This certifies repository convergence only and does not override any empirical
+no-go or `not_ready` status.
+
+### Implemented Stage-4.2M bounded apparatus-configuration search
+
+Stage 4.2M preserves the certified Stage-4.2L result as immutable upstream
+evidence and searches 200 preregistered combinations of material, radius,
+branch separation and orientation, hold time, gap and plate size, temperature,
+pressure, alignment covariance, echo rejection, boundary cadence, and readout
+efficiency. It never changes the named Diósi generator and never fits
+confirmatory data.
+
+Three synthetic candidates satisfy the joint density-robustness,
+electromagnetic phase, gas-to-DP, preparation-scale, external-bound,
+identifiability, power, and companion gates. The best-ranked candidate is a
+diamond-density 276.302 nm-radius sphere with mass
+\(3.09251\times10^{-16}\) kg, 250 nm tangential separation, 250 ms hold,
+10 micrometre gap, 80 micrometre plate, 4 K, \(10^{-15}\) Pa, and a registered
+echo residual of \(10^{-4}\). It predicts a frozen-Gaussian DP loss of 2.908%
+and a conservative mass-density-envelope loss of 0.435%, with 1,028 paired
+windows and forecast power 0.927 at 1,600 windows in the transported Stage-4.2C
+whitened space.
+
+This outcome is `candidate_region_for_measured_subsystem_commissioning_only`.
+It is not an instrument design or empirical feasibility result. Before a pilot,
+the selected neighborhood must be rebuilt from measured material spectra,
+as-built CAD/mesh Green response, phase-transfer covariance, species-resolved
+gas scattering, demonstrated state preparation, and an instrument-level
+companion channel. Standard boundary-independent DP remains separate from the
+Casimir control and zero bridge edges are added.
+
+The fresh leading-design publication-rebase adapter run `2374`
+(`adapter:1d8a8433-4f7a-4f8e-81d7-19ac5f0fcbfc`)
+returns `PASS`, certificate status `GREEN`, integrity true, and certificate
+SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+The identity-bound exported trace SHA-256 is
+`866eec434c58b84cc2fcb5df9bd6a4136fbb0c87d04532e89b9f90b3c5464998`.
+This is software/provenance certification and supplies no measured authority.
+
 ## Work plan and milestones
 
 | Work package | Indicative interval | Exit artifact |
@@ -1190,6 +1446,8 @@ does not commission the apparatus or change any scientific promotion gate.
 | WP0 materials, surfaces, metrology | months 0-6 | measured optical/surface receipt pack |
 | WP0P polarization and thermal sidecars | months 0-9 | Jones/Stokes, mirror, emissivity, thermometry, and Green/FDT receipt pack |
 | WP0M Maxwell/macroscopic-QED apparatus closure | months 0-12 | measured dielectric, CAD/mesh, boundary, Green-tensor, Maxwell-stress, convergence, covariance, and independent-solver receipt pack |
+| WP0L Stage-4.2L redesign closure | months 0-12 | revised gap/geometry/orientation manifest, phase-control demonstration, QLBE environment receipt, state-preparation down-select, current-bound recast, and density-metrology envelope |
+| WP0S Stage-4.2M selected-neighborhood commissioning | months 0-16 | as-built and measured replacements for every transported surrogate in the three-point synthetic region, or an explicit empirical no-go |
 | WP0G Stage-4.2G packet binding | months 0-12 | hash- and custody-bound single-apparatus mass/geometry, calibration, instrument, operator, and uncertainty receipts |
 | WP0H Stage-4.2H commissioning intake | months 0-16 | commissioned instrument registry, calibration ancestry, raw-column/cell-order contract, blind freeze, measured dossier, and packet-compilation preflight |
 | WP1 force calibrator and finite geometry | months 4-12 | validated boundary-contrast report |

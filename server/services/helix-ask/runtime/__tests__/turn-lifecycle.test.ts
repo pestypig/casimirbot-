@@ -646,6 +646,184 @@ describe("Helix turn lifecycle differential audit", () => {
     );
   });
 
+  it("reports a provider observation that re-entered after a blocked tool call when the runtime log drops it", () => {
+    const recorder = createHelixTurnLifecycleRecorder({
+      turnId: "ask:test:blocked-reentry-projection",
+      now: () => 100,
+    });
+    const started = recorder.append({
+      kind: "turn.started",
+      producer: "helix_adapter",
+      status: "started",
+    });
+    const rejectedCapability = recorder.append({
+      kind: "capability.rejected",
+      producer: "helix_policy",
+      status: "blocked",
+      causation_id: started.event_id,
+      capability_id: "com.casimirbot.minecraft.command.catalog",
+      reason_code: "wrong_environment",
+    });
+    const rejectedCall = recorder.append({
+      kind: "tool.call.rejected",
+      producer: "helix_policy",
+      status: "blocked",
+      causation_id: rejectedCapability.event_id,
+      call_id: "call:minecraft-catalog",
+      capability_id: "com.casimirbot.minecraft.command.catalog",
+      observation_refs: ["observation:minecraft:wrong-environment"],
+      reason_code: "wrong_environment",
+    });
+    const message = recorder.append({
+      kind: "agent.message.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: rejectedCall.event_id,
+      message_sha256: "hash:blocked-observation-answer",
+    });
+    const runtime = recorder.append({
+      kind: "runtime.turn.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: message.event_id,
+    });
+    const eligibility = recorder.append({
+      kind: "terminal.eligibility.checked",
+      producer: "helix_terminal_authority",
+      status: "succeeded",
+      causation_id: runtime.event_id,
+      terminal_kind: "typed_failure",
+      terminal_eligible: true,
+    });
+    recorder.append({
+      kind: "turn.failed",
+      producer: "helix_adapter",
+      status: "failed",
+      causation_id: eligibility.event_id,
+      terminal_kind: "typed_failure",
+      terminal_eligible: true,
+      reason_code: "wrong_environment",
+    });
+
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      turnId: "ask:test:blocked-reentry-projection",
+      payload: {
+        turn_lifecycle: recorder.snapshot(),
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          observation_reentered: true,
+          reentered_observation_refs: [
+            "observation:minecraft:wrong-environment",
+          ],
+          evidence_reentered: false,
+          provider_terminal_candidate_ref: "candidate:blocked-observation",
+        },
+      },
+    });
+
+    expect(audit.ok).toBe(false);
+    expect(audit.first_divergence_stage).toBe("evidence_reentry");
+    expect(audit.mismatches.map((entry) => entry.code)).toContain(
+      "provider_observation_reentry_disagrees_with_runtime",
+    );
+    expect(audit.continuity_checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          check: "provider_observation_reentry",
+          status: "failed",
+          missing_support_refs: [
+            "observation:minecraft:wrong-environment",
+          ],
+        }),
+      ]),
+    );
+  });
+
+  it("fails the audit when a capability lane records re-entry but provider and runtime projections drop it", () => {
+    const turnId = "ask:test:lane-reentry-projection";
+    const observationRef = "observation:minecraft:catalog-unavailable";
+    const recorder = createHelixTurnLifecycleRecorder({
+      turnId,
+      now: () => 100,
+    });
+    const started = recorder.append({
+      kind: "turn.started",
+      producer: "helix_adapter",
+      status: "started",
+    });
+    const rejectedCapability = recorder.append({
+      kind: "capability.rejected",
+      producer: "helix_policy",
+      status: "blocked",
+      causation_id: started.event_id,
+      capability_id: "com.casimirbot.minecraft.command.catalog",
+      reason_code: "command_catalog_changed",
+    });
+    const rejectedCall = recorder.append({
+      kind: "tool.call.rejected",
+      producer: "helix_policy",
+      status: "blocked",
+      causation_id: rejectedCapability.event_id,
+      call_id: "call:minecraft-catalog",
+      capability_id: "com.casimirbot.minecraft.command.catalog",
+      observation_refs: [observationRef],
+      reason_code: "command_catalog_changed",
+    });
+    const message = recorder.append({
+      kind: "agent.message.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: rejectedCall.event_id,
+      message_sha256: "hash:catalog-unavailable",
+    });
+    recorder.append({
+      kind: "runtime.turn.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: message.event_id,
+    });
+
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      turnId,
+      payload: {
+        turn_lifecycle: recorder.snapshot(),
+        capability_lane_turn_timeline: [
+          {
+            schema: "helix.capability_lane.provider_timeline_event.v1",
+            stage: "lane_reentered",
+            observation_reentered: true,
+            observation_ref: observationRef,
+          },
+        ],
+        provider_reasoning_reentry: {
+          schema: "helix.provider_reasoning_reentry.v1",
+          observation_reentered: false,
+          reentered_observation_refs: [],
+          evidence_reentered: false,
+          provider_terminal_candidate_ref: null,
+        },
+      },
+    });
+
+    expect(audit.ok).toBe(false);
+    expect(audit.first_divergence_stage).toBe("evidence_reentry");
+    expect(audit.mismatches.map((entry) => entry.code)).toEqual(
+      expect.arrayContaining([
+        "capability_lane_reentry_disagrees_with_provider",
+        "capability_lane_reentry_disagrees_with_runtime",
+      ]),
+    );
+    expect(audit.continuity_checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          check: "capability_lane_observation_reentry",
+          status: "failed",
+          missing_support_refs: [observationRef],
+        }),
+      ]),
+    );
+  });
+
   it("refreshes an early writer audit after the canonical runtime lifecycle is attached", () => {
     const fixture = buildProviderProjectionPayload();
     const lifecycle = fixture.payload.turn_lifecycle;
@@ -758,6 +936,85 @@ describe("Helix turn lifecycle differential audit", () => {
           status: "failed_closed",
           disposition: "hard_evidence_boundary",
           reason_codes: ["invalid_page_evidence_links"],
+        }),
+      ]),
+    );
+  });
+
+  it("keeps a repairable answer-quality rejection in Codex dialogue instead of calling it a hard scientific boundary", () => {
+    const fixture = buildProviderProjectionPayload();
+    delete fixture.payload.provider_route_product_materialization;
+    delete fixture.payload.model_synthesized_answer;
+    fixture.payload.provider_route_product_quality_gate = {
+      schema: "helix.final_answer_draft_quality_gate.v1",
+      ok: false,
+      violations: ["invalid_page_evidence_links"],
+    };
+    fixture.payload.provider_route_product_materialization_diagnostic = {
+      quality_gate_ok: false,
+      quality_gate_violations: ["invalid_page_evidence_links"],
+      quality_gate_rejection_classification: "recoverable_synthesis_rejection",
+    };
+    fixture.payload.terminal_rejection_observations = [
+      {
+        schema: "helix.terminal_rejection_observation.v1",
+        turn_id: fixture.turnId,
+        observation_id: `${fixture.turnId}:terminal_rejection_observation:quality`,
+        rejected_candidate_kind: "model_synthesized_answer",
+        rejected_candidate_ref: fixture.routeProductRef,
+        rejection_reason: "route_requires_synthesis",
+        gate: "provider_route_product_quality_gate",
+        reason_codes: ["invalid_page_evidence_links"],
+        evidence_refs: [fixture.observationRef],
+        recoverable: true,
+        failure_class: "terminal_authority",
+        retryability: "retryable",
+        next_affordances: [],
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    ];
+    fixture.payload.agent_continuation_state = {
+      schema: "helix.agent_continuation_state.v1",
+      allowed_decisions: ["retry"],
+      budget: { hard: { exhausted: false } },
+    };
+    fixture.payload.terminal_authority_single_writer = {
+      schema: "helix.terminal_authority_single_writer_result.v1",
+      turn_id: fixture.turnId,
+      selected_terminal_artifact_kind: "typed_failure",
+      selected_terminal_artifact_ref: `${fixture.turnId}:typed_failure`,
+      selected_terminal_support_refs: [],
+      visible_text: "The first synthesis needs evidence-link repair.",
+      integrity: { single_writer_applied: true },
+    };
+    fixture.payload.selected_final_answer =
+      "The first synthesis needs evidence-link repair.";
+
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+
+    expect(audit.ok).toBe(false);
+    expect(audit.first_divergence_stage).toBe("followup_reasoning");
+    expect(audit.scientific_evidence_disposition).toBe("repair_pending");
+    expect(audit.mismatches.map((entry) => entry.code)).toContain(
+      "recoverable_rejection_terminalized_before_reentry",
+    );
+    expect(audit.continuity_checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          check: "evidence_quality_gate",
+          status: "failed",
+          disposition: "informational",
+          reason_codes: ["invalid_page_evidence_links"],
+        }),
+        expect.objectContaining({
+          check: "recoverable_rejection_reentered",
+          status: "failed",
+          disposition: "adapter_projection_contradiction",
         }),
       ]),
     );

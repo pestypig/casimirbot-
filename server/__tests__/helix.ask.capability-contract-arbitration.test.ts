@@ -256,6 +256,32 @@ describe("Helix capability contract arbitration", () => {
     }
   });
 
+  it("keeps requested Minecraft command syntax as documentation rather than execution", () => {
+    const documentationPrompt =
+      "Before doing anything in Minecraft, look up the connected environment mechanics for how to capture only the exact wall footprint as a rollback checkpoint. Cite the exact source file and line range and give the exact command form. Do not execute any Minecraft command.";
+    const documentationCapabilities = extractExplicitCapabilityContracts(
+      documentationPrompt,
+      { trusted_environment_domain: "minecraft" },
+    ).map((entry) => entry.contract.capability);
+
+    expect(documentationCapabilities).toContain("docs-viewer.search_docs");
+    expect(documentationCapabilities).not.toContain(
+      "com.casimirbot.minecraft.command",
+    );
+
+    for (const executionPrompt of [
+      "Give my selected Minecraft player a diamond now.",
+      "Give my selected Minecraft player a temporary glowing effect now.",
+    ]) {
+      expect(
+        extractExplicitCapabilityContracts(executionPrompt, {
+          trusted_environment_domain: "minecraft",
+        }).map((entry) => entry.contract.capability),
+        executionPrompt,
+      ).toContain("com.casimirbot.minecraft.command");
+    }
+  });
+
   it("does not execute natural notes or voice capabilities from contextual mentions", () => {
     const cases = [
       ["Do not check my workstation notes; just explain what notes are.", "workstation-notes.list_notes"],

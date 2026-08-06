@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-30T16:31:57.345Z",
-  "registryCount": 217,
+  "generatedAt": "2026-08-06T07:33:28.997Z",
+  "registryCount": 222,
   "coverage": {
     "exploratory": {
       "count": 21,
@@ -79,7 +79,7 @@
       ]
     },
     "diagnostic": {
-      "count": 144,
+      "count": 149,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -224,7 +224,12 @@
         "server/routes/halobank-solar.ts",
         "shared/curvature-leverage.ts",
         "scripts/curvature-leverage-full-solve-report.ts",
-        "scripts/curvature-leverage-benchmark-ladder.ts"
+        "scripts/curvature-leverage-benchmark-ladder.ts",
+        "shared/casimir-dp-schrodinger-mass-density-stage4-2j.ts",
+        "shared/casimir-dp-microscopic-em-closure-stage4-2k.ts",
+        "shared/casimir-dp-empirical-authority-stage4-2l.ts",
+        "shared/casimir-dp-apparatus-search-stage4-2m.ts",
+        "shared/casimir-dp-material-thermal-ordinary-null-stage4-2n.ts"
       ]
     },
     "certified": {
@@ -313,7 +318,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 217,
+    "entriesWithUnits": 222,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -327,8 +332,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 144,
-        "withUnits": 144,
+        "total": 149,
+        "withUnits": 149,
         "missing": []
       },
       "certified": {
@@ -349,8 +354,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 2894,
-    "edgeCount": 7013
+    "nodeCount": 2967,
+    "edgeCount": 7282
   },
   "evidenceProfiles": [
     {

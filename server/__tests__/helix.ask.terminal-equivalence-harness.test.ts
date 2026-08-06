@@ -60,7 +60,27 @@ describe("Helix stream/UI/backend terminal equivalence harness", () => {
       },
       requireControllerParity: true,
     });
-    expect(result).toMatchObject({
+    const divergenceDiagnostic = JSON.stringify(
+      {
+        failure_codes: result.failure_codes,
+        turn_id: turnFinal?.turn_id ?? null,
+        final_answer_source: turnFinal?.final_answer_source ?? null,
+        terminal_artifact_kind: turnFinal?.terminal_artifact_kind ?? null,
+        route: turnFinal?.route ?? null,
+        ask_turn_admission: turnFinal?.ask_turn_admission ?? null,
+        runtime_memory_governor_admission:
+          turnFinal?.runtime_memory_governor_admission ?? null,
+        turn_has_route_authority: Boolean(turnFinal?.route_authority_audit),
+        turn_has_solver_trace: Boolean(turnFinal?.ask_turn_solver_trace),
+        debug_has_route_authority: Boolean(debug.body?.route_authority_audit),
+        debug_has_solver_trace: Boolean(debug.body?.ask_turn_solver_trace),
+        turn_keys: Object.keys(turnFinal ?? {}).sort(),
+        debug_keys: Object.keys(debug.body ?? {}).sort(),
+      },
+      null,
+      2,
+    );
+    expect(result, divergenceDiagnostic).toMatchObject({
       schema: "helix.terminal_equivalence_harness_result.v1",
       ok: true,
       failure_codes: [],

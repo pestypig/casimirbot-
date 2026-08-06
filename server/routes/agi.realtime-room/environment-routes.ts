@@ -19,6 +19,11 @@ import {
   type HelixEnvironmentCommandAuthorityReceipt,
 } from "@shared/helix-environment-command";
 import {
+  HELIX_ENVIRONMENT_ACTION_AUTHORITY_RECEIPT_SCHEMA,
+  helixEnvironmentActionAuthoritySettingsSchema,
+  type HelixEnvironmentActionAuthorityReceipt,
+} from "@shared/helix-environment-action";
+import {
   assignRoomEnvironmentSubject,
   bindOwnRoomEnvironmentSubject,
   isRoomEnvironmentSubjectError,
@@ -34,6 +39,16 @@ import {
   issueEnvironmentCommandConnectorCredential,
   readEnvironmentCommandAuthority,
 } from "../../services/environment-connectors/commands";
+import {
+  configureEnvironmentActionAuthority,
+  emergencyStopEnvironmentActionAuthority,
+  isEnvironmentActionAuthorityError,
+  isEnvironmentActionBrokerError,
+  issueEnvironmentActionConnectorCredential,
+  readEnvironmentActionAuthorities,
+  readEnvironmentActionConnectorReadiness,
+  requestEnvironmentActionWorkflowControl,
+} from "../../services/environment-connectors/actions";
 import { resolveCasimirPublicBaseUrl } from "../../services/public-base-url";
 import {
   isSharedRealtimeRoomDomainError,
@@ -97,6 +112,26 @@ const commandReceipt = (
   raw_content_included: false,
 });
 
+const actionReceipt = (
+  input: Omit<
+    HelixEnvironmentActionAuthorityReceipt,
+    | "schema"
+    | "action_credential_included"
+    | "answer_authority"
+    | "assistant_answer"
+    | "terminal_eligible"
+    | "raw_content_included"
+  >,
+): HelixEnvironmentActionAuthorityReceipt => ({
+  schema: HELIX_ENVIRONMENT_ACTION_AUTHORITY_RECEIPT_SCHEMA,
+  ...input,
+  action_credential_included: false,
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
 const sendError = (res: Response, error: unknown): void => {
   if (error instanceof FirstPartyCookieBoundaryError) {
     res.status(error.statusCode).json(receipt({
@@ -133,6 +168,31 @@ const sendError = (res: Response, error: unknown): void => {
       error: error.code,
       message: error.message,
       command_config: null,
+      token_value_shown_once: false,
+      secret_stored_raw: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    return;
+  }
+  if (isEnvironmentActionAuthorityError(error)) {
+    res.status(error.statusCode).json(actionReceipt({
+      ok: false,
+      error: error.code,
+      message: error.message,
+      authority: null,
+    }));
+    return;
+  }
+  if (isEnvironmentActionBrokerError(error)) {
+    res.status(error.statusCode).json({
+      schema: "helix.environment_action.connector_credential_receipt.v1",
+      ok: false,
+      error: error.code,
+      message: error.message,
+      action_config: null,
       token_value_shown_once: false,
       secret_stored_raw: false,
       answer_authority: false,
@@ -344,6 +404,190 @@ sharedRealtimeRoomEnvironmentRouter.delete(
       authority,
       member_grant: null,
       member_grants: [],
+    }));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.post(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/action-authorities/:actionAuthorityId/controls",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const parsed = z.object({
+      workflow_id: z.string().trim().min(1).max(320),
+      control_kind: z.enum(["status", "resume", "cancel"]),
+      reason: z.string().trim().min(1).max(1_000),
+    }).strict().safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({
+        schema: "helix.environment_action.control_request_receipt.v1",
+        ok: false,
+        error: "action_control_invalid",
+        message: "An exact workflow, control kind, and reason are required.",
+        control_request: null,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+      return;
+    }
+    const controlRequest = await requestEnvironmentActionWorkflowControl({
+      roomId: req.params.roomId,
+      profileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+      actionAuthorityId: req.params.actionAuthorityId,
+      workflowId: parsed.data.workflow_id,
+      controlKind: parsed.data.control_kind,
+      reason: parsed.data.reason,
+    });
+    res.json({
+      schema: "helix.environment_action.control_request_receipt.v1",
+      ok: true,
+      error: null,
+      message: "Player workflow control queued for the separately paired client.",
+      control_request: controlRequest,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.get(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/action-authorities",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const authorities = await readEnvironmentActionAuthorities({
+      roomId: req.params.roomId,
+      profileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+    });
+    const connectorReadiness = await readEnvironmentActionConnectorReadiness({
+      roomId: req.params.roomId,
+      profileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+    });
+    res.json(actionReceipt({
+      ok: true,
+      error: null,
+      message: authorities.length > 0
+        ? "Player-action authorities loaded."
+        : "No player-action authority is configured.",
+      authority: authorities[0] ?? null,
+      authorities,
+      connector_readiness: connectorReadiness,
+    }));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.put(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/action-authorities",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const parsed = helixEnvironmentActionAuthoritySettingsSchema.safeParse(
+      req.body ?? {},
+    );
+    if (!parsed.success) {
+      res.status(400).json(actionReceipt({
+        ok: false,
+        error: "action_authority_invalid",
+        message: "A valid player, action adapter, capability set, and autonomy policy are required.",
+        authority: null,
+      }));
+      return;
+    }
+    const authority = await configureEnvironmentActionAuthority({
+      roomId: req.params.roomId,
+      ownerProfileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+      participantId: parsed.data.participant_id,
+      domainAdapter: parsed.data.domain_adapter,
+      allowedCapabilityIds: parsed.data.allowed_capability_ids,
+      autonomyMode: parsed.data.autonomy_mode,
+      manualOverridePolicy: parsed.data.manual_override_policy,
+      expiresAt: parsed.data.expires_at,
+    });
+    res.json(actionReceipt({
+      ok: true,
+      error: null,
+      message: "Player-action authority configured; pair the client companion separately before use.",
+      authority,
+      authorities: [authority],
+    }));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.post(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/action-authorities/:actionAuthorityId/credential",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const parsed = z.object({
+      ttl_ms: z.number().int().min(60_000).max(7 * 24 * 60 * 60_000).optional(),
+    }).strict().safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({
+        schema: "helix.environment_action.connector_credential_receipt.v1",
+        ok: false,
+        error: "action_credential_invalid",
+        message: "Player-action credential lifetime is invalid.",
+        action_config: null,
+        token_value_shown_once: false,
+        secret_stored_raw: false,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+      return;
+    }
+    const config = await issueEnvironmentActionConnectorCredential({
+      roomId: req.params.roomId,
+      ownerProfileId: account.profileId,
+      actionAuthorityId: req.params.actionAuthorityId,
+      publicBaseUrl: resolveCasimirPublicBaseUrl(),
+      ttlMs: parsed.data.ttl_ms,
+    });
+    res.json({
+      schema: "helix.environment_action.connector_credential_receipt.v1",
+      ok: true,
+      error: null,
+      message:
+        "Separate player-action credential created. Install it only in the paired Fabric client companion; only its hash is retained.",
+      action_config: config,
+      token_value_shown_once: true,
+      secret_stored_raw: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.delete(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/action-authorities/:actionAuthorityId",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const stopped = await emergencyStopEnvironmentActionAuthority({
+      roomId: req.params.roomId,
+      profileId: account.profileId,
+      environmentBindingId: req.params.environmentBindingId,
+      actionAuthorityId: req.params.actionAuthorityId,
+      reason: "The room operator activated player-action emergency stop.",
+    });
+    res.json(actionReceipt({
+      ok: true,
+      error: null,
+      message: "Emergency stop queued; ordinary player actions are suspended immediately.",
+      authority: stopped.authority,
+      authorities: [stopped.authority],
+      emergency_control_request: stopped.controlRequest,
     }));
   }),
 );

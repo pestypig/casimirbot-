@@ -133,6 +133,9 @@ export type HelixTerminalRejectionObservation = {
   rejected_candidate_kind: string | null;
   rejected_candidate_ref: string | null;
   rejection_reason: string;
+  gate: string;
+  reason_codes: string[];
+  evidence_refs: string[];
   recoverable: boolean;
   failure_class: "terminal_authority";
   retryability: "retryable" | "non_retryable";

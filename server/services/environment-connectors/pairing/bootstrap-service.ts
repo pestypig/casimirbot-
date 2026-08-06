@@ -12,6 +12,7 @@ import type {
   HelixRoomSourcePluginConfig,
 } from "@shared/helix-room-source-ingress";
 import type { HelixEnvironmentCommandConnectorConfig } from "@shared/helix-environment-command";
+import type { HelixEnvironmentActionConnectorConfig } from "@shared/helix-environment-action";
 import {
   createSharedRealtimeRoomSourceBindingWithoutCredential,
   listSharedRealtimeRoomSourceBindings,
@@ -26,6 +27,7 @@ import {
 import type { Queryable } from "../../helix-ask/realtime-room/room-store/types";
 import { listEnvironmentAdapterProfiles } from "../../situation-room/environment-adapter-registry";
 import { issueEnvironmentCommandConnectorCredentialForPairing } from "../commands";
+import { issueEnvironmentActionConnectorCredentialForPairing } from "../actions";
 
 const DEFAULT_CREDENTIAL_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 const MAX_REDEEM_ATTEMPTS = 8;
@@ -63,6 +65,9 @@ type PairingRow = {
   world_id: string;
   source_label: string;
   command_credential_requested: boolean;
+  action_credential_requested: boolean;
+  action_authority_id: string | null;
+  action_connector_installation_id: string | null;
   code_hash: string;
   create_idempotency_key_hash: string;
   create_request_hash: string;
@@ -164,6 +169,21 @@ const deriveCommandCredential = (input: {
     .update(input.redemptionNonce, "utf8")
     .digest("base64url")}`;
 
+const deriveActionCredential = (input: {
+  pairingId: string;
+  pairingCode: string;
+  redemptionNonce: string;
+}): string =>
+  `helix_env_action_${crypto
+    .createHash("sha256")
+    .update("helix.connector_pairing.action_credential.v1\0", "utf8")
+    .update(input.pairingId, "utf8")
+    .update("\0", "utf8")
+    .update(input.pairingCode.toUpperCase(), "utf8")
+    .update("\0", "utf8")
+    .update(input.redemptionNonce, "utf8")
+    .digest("base64url")}`;
+
 const publicBaseUrlForPairing = (pairingEndpoint: string): string => {
   try {
     const endpoint = new URL(normalize(pairingEndpoint));
@@ -213,6 +233,8 @@ const projectPairing = (row: PairingRow): HelixConnectorPairing => ({
   world_id: row.world_id,
   source_label: row.source_label,
   command_credential_requested: row.command_credential_requested === true,
+  action_credential_requested: row.action_credential_requested === true,
+  action_authority_id: row.action_authority_id,
   status: row.status as HelixConnectorPairing["status"],
   expires_at: iso(row.expires_at),
   redeemed_at: isoOrNull(row.redeemed_at),
@@ -275,13 +297,13 @@ const expireStalePairings = async (db: Queryable, now: Date): Promise<void> => {
   for (const bindingId of abandonedCreateBindings) {
     await db.query(
       `
-        UPDATE helix_room_source_bindings b
+        UPDATE helix_room_source_bindings
         SET status = 'revoked', revoked_at = $2, updated_at = $2
-        WHERE b.binding_id = $1
-          AND b.status = 'active'
+        WHERE binding_id = $1
+          AND status = 'active'
           AND NOT EXISTS (
             SELECT 1 FROM helix_room_source_credentials c
-            WHERE c.binding_id = b.binding_id AND c.status = 'active'
+            WHERE c.binding_id = $1 AND c.status = 'active'
           );
       `,
       [bindingId, now.toISOString()],
@@ -321,6 +343,8 @@ export const createConnectorBootstrapPairing = async (input: {
   sourceLabel?: string | null;
   credentialTtlMs?: number | null;
   commandCredentialRequested?: boolean;
+  actionCredentialRequested?: boolean;
+  actionAuthorityId?: string | null;
   idempotencyKey: string;
   now?: Date;
 }): Promise<{ pairing: HelixConnectorPairing; pairingCode: string }> => {
@@ -344,6 +368,36 @@ export const createConnectorBootstrapPairing = async (input: {
       "Command access can be paired only to an existing Fabric source binding.",
     );
   }
+  if (
+    input.actionCredentialRequested === true &&
+    (input.purpose !== "rotate" || domainAdapter !== "minecraft.fabric_mod.v1")
+  ) {
+    throw new ConnectorBootstrapPairingError(
+      "connector_pairing_invalid",
+      400,
+      "Player-action access can be paired only to an existing Fabric source binding.",
+    );
+  }
+  if (
+    input.actionCredentialRequested === true &&
+    !normalize(input.actionAuthorityId)
+  ) {
+    throw new ConnectorBootstrapPairingError(
+      "connector_pairing_invalid",
+      400,
+      "Player-action pairing requires an exact player authority.",
+    );
+  }
+  if (
+    input.commandCredentialRequested === true &&
+    input.actionCredentialRequested === true
+  ) {
+    throw new ConnectorBootstrapPairingError(
+      "connector_pairing_invalid",
+      400,
+      "Server-command and player-action credentials must be paired separately.",
+    );
+  }
   const credentialTtlMs = Math.min(
     Math.max(1, input.credentialTtlMs ?? DEFAULT_CREDENTIAL_TTL_MS),
     30 * 24 * 60 * 60 * 1_000,
@@ -358,6 +412,8 @@ export const createConnectorBootstrapPairing = async (input: {
       domain_adapter: domainAdapter,
       source_label: normalize(input.sourceLabel) || null,
       command_credential_requested: input.commandCredentialRequested === true,
+      action_credential_requested: input.actionCredentialRequested === true,
+      action_authority_id: normalize(input.actionAuthorityId) || null,
       credential_ttl_ms: credentialTtlMs,
     }),
   );
@@ -430,7 +486,45 @@ export const createConnectorBootstrapPairing = async (input: {
     createdBinding = true;
   }
 
+  if (input.actionCredentialRequested === true) {
+    const db = await readSharedRealtimeRoomDatabase();
+    const actionAuthority = await db.query<{ action_authority_id: string }>(
+      `
+        SELECT a.action_authority_id
+        FROM helix_environment_action_authorities a
+        JOIN helix_environment_connector_bindings e
+          ON e.environment_binding_id = a.environment_binding_id
+        WHERE a.action_authority_id = $1
+          AND a.owner_profile_id = $2
+          AND a.room_id = $3
+          AND a.room_source_binding_id = $4
+          AND a.domain_adapter = 'minecraft.fabric_client.v1'
+          AND a.status = 'active'
+          AND (a.expires_at IS NULL OR a.expires_at > $5)
+          AND e.status = 'active'
+        LIMIT 1;
+      `,
+      [
+        normalize(input.actionAuthorityId),
+        input.ownerProfileId,
+        input.roomId,
+        binding.binding_id,
+        now.toISOString(),
+      ],
+    );
+    if (!actionAuthority.rows[0]) {
+      throw new ConnectorBootstrapPairingError(
+        "connector_pairing_unavailable",
+        409,
+        "The selected Minecraft player authority is not active for this room environment.",
+      );
+    }
+  }
+
   const pairingId = `connector_pairing:${crypto.randomUUID()}`;
+  const actionConnectorInstallationId = input.actionCredentialRequested === true
+    ? `environment_action_connector_installation:${crypto.randomUUID()}`
+    : null;
   const pairingCode = generatePairingCode({ pairingId, idempotencyKey });
   const expiresAt = new Date(
     now.getTime() + HELIX_CONNECTOR_PAIRING_CODE_TTL_MS,
@@ -454,9 +548,12 @@ export const createConnectorBootstrapPairing = async (input: {
               domain_adapter, world_id, source_label, code_hash,
               create_idempotency_key_hash, create_request_hash,
               credential_ttl_ms, command_credential_requested,
+              action_credential_requested, action_authority_id,
+              action_connector_installation_id,
               expires_at, created_at, updated_at
             ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+              $14, $15, $16, $17, $18, $18
             )
             RETURNING *;
           `,
@@ -474,6 +571,9 @@ export const createConnectorBootstrapPairing = async (input: {
             requestHash,
             credentialTtlMs,
             input.commandCredentialRequested === true,
+            input.actionCredentialRequested === true,
+            normalize(input.actionAuthorityId) || null,
+            actionConnectorInstallationId,
             expiresAt,
             now.toISOString(),
           ],
@@ -625,6 +725,15 @@ export const redeemConnectorBootstrapPairing = async (input: {
         world_id: string;
         domain_adapter: string;
         command: HelixEnvironmentCommandConnectorConfig;
+      }
+    | {
+        pairing_mode: "action_only";
+        pairing_endpoint: string;
+        source_id: string;
+        room_id: string;
+        world_id: string;
+        domain_adapter: string;
+        action: HelixEnvironmentActionConnectorConfig;
       };
   replayed: boolean;
 }> => {
@@ -679,9 +788,12 @@ export const redeemConnectorBootstrapPairing = async (input: {
           "The pairing code was revoked.",
         );
       }
+      const expectedConnectorKind = row.action_credential_requested
+        ? "minecraft.fabric_client.v1"
+        : row.domain_adapter;
       if (
-        row.domain_adapter !== normalize(input.domainAdapter) ||
-        normalize(input.connectorKind) !== row.domain_adapter
+        normalize(input.domainAdapter) !== expectedConnectorKind ||
+        normalize(input.connectorKind) !== expectedConnectorKind
       ) {
         const nextAttempts = Number(row.attempt_count) + 1;
         await db.query(
@@ -715,7 +827,9 @@ export const redeemConnectorBootstrapPairing = async (input: {
           row.connector_version !== normalize(input.connectorVersion) ||
           !row.replay_expires_at ||
           Date.parse(iso(row.replay_expires_at)) <= now.getTime() ||
-          (!row.command_credential_requested && !row.redeemed_credential_id)
+          (!row.command_credential_requested &&
+            !row.action_credential_requested &&
+            !row.redeemed_credential_id)
         ) {
           throw new ConnectorBootstrapPairingError(
             "connector_pairing_already_redeemed",
@@ -723,7 +837,7 @@ export const redeemConnectorBootstrapPairing = async (input: {
             "The one-time pairing code was already redeemed.",
           );
         }
-        if (row.command_credential_requested) {
+        if (row.command_credential_requested || row.action_credential_requested) {
           return { row, binding: null, tokenValue: "", replayed: true };
         }
         const credential = await db.query<{ credential_id: string }>(
@@ -750,7 +864,7 @@ export const redeemConnectorBootstrapPairing = async (input: {
         }
         return { row, binding: null, tokenValue, replayed: true };
       }
-      if (row.command_credential_requested) {
+      if (row.command_credential_requested || row.action_credential_requested) {
         const replayExpiresAt = new Date(
           now.getTime() + HELIX_CONNECTOR_PAIRING_REPLAY_TTL_MS,
         ).toISOString();
@@ -868,6 +982,30 @@ export const redeemConnectorBootstrapPairing = async (input: {
       ttlMs: Number(outcome.row.credential_ttl_ms),
     });
   }
+  let actionConfig;
+  if (outcome.row.action_credential_requested === true) {
+    if (!outcome.row.action_authority_id || !outcome.row.action_connector_installation_id) {
+      throw new ConnectorBootstrapPairingError(
+        "connector_pairing_unavailable",
+        409,
+        "The player-action pairing identity is incomplete. Create a new pairing code.",
+      );
+    }
+    actionConfig = await issueEnvironmentActionConnectorCredentialForPairing({
+      roomId: binding.room_id,
+      ownerProfileId: outcome.row.owner_profile_id,
+      actionAuthorityId: outcome.row.action_authority_id,
+      publicBaseUrl: publicBaseUrlForPairing(input.pairingEndpoint),
+      pairingId: outcome.row.pairing_id,
+      connectorInstallationId: outcome.row.action_connector_installation_id,
+      trustedCredentialSecret: deriveActionCredential({
+        pairingId: outcome.row.pairing_id,
+        pairingCode,
+        redemptionNonce: input.redemptionNonce,
+      }),
+      ttlMs: Number(outcome.row.credential_ttl_ms),
+    });
+  }
   if (commandConfig) {
     return {
       pairingId: outcome.row.pairing_id,
@@ -881,6 +1019,22 @@ export const redeemConnectorBootstrapPairing = async (input: {
         world_id: binding.world_id,
         domain_adapter: binding.domain_adapter,
         command: commandConfig,
+      },
+    };
+  }
+  if (actionConfig) {
+    return {
+      pairingId: outcome.row.pairing_id,
+      binding,
+      replayed: outcome.replayed,
+      pluginConfig: {
+        pairing_mode: "action_only",
+        pairing_endpoint: input.pairingEndpoint,
+        source_id: binding.source_id,
+        room_id: binding.room_id,
+        world_id: binding.world_id,
+        domain_adapter: actionConfig.domain_adapter,
+        action: actionConfig,
       },
     };
   }

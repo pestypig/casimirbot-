@@ -382,6 +382,135 @@ export const buildHelixTurnLifecycleDifferentialAudit = (input: {
       source_ref: lifecycle.reduction.final_agent_message_event_id,
     });
   }
+  const providerReentry =
+    readRecord(payload.provider_reasoning_reentry) ??
+    readRecord(debug?.provider_reasoning_reentry);
+  const providerObservationReentered =
+    readBoolean(providerReentry?.observation_reentered) ??
+    readBoolean(providerReentry?.evidence_reentered);
+  const providerReenteredRefs = readStringArray(
+    providerReentry?.reentered_observation_refs ??
+      providerReentry?.input_observation_refs,
+  );
+  const capabilityLaneTimeline = [
+    ...(Array.isArray(payload.capability_lane_turn_timeline)
+      ? payload.capability_lane_turn_timeline
+      : []),
+    ...(Array.isArray(debug?.capability_lane_turn_timeline)
+      ? (debug.capability_lane_turn_timeline as unknown[])
+      : []),
+  ]
+    .map(readRecord)
+    .filter((entry): entry is RecordLike => Boolean(entry));
+  const capabilityLaneReenteredRefs = Array.from(
+    new Set(
+      capabilityLaneTimeline
+        .filter(
+          (event) =>
+            readString(event.stage) === "lane_reentered" &&
+            readBoolean(event.observation_reentered) === true,
+        )
+        .map((event) => readString(event.observation_ref))
+        .filter((ref): ref is string => Boolean(ref)),
+    ),
+  );
+  if (capabilityLaneReenteredRefs.length > 0) {
+    const runtimeReenteredRefs =
+      lifecycle?.reduction.observation_reentry_refs ?? [];
+    const missingProviderRefs = missingRefs(
+      capabilityLaneReenteredRefs,
+      providerObservationReentered ? providerReenteredRefs : [],
+    );
+    const missingRuntimeRefs = missingRefs(
+      capabilityLaneReenteredRefs,
+      runtimeReenteredRefs,
+    );
+    const laneAgreesWithProvider =
+      providerObservationReentered === true &&
+      missingProviderRefs.length === 0;
+    const laneAgreesWithRuntime =
+      Boolean(lifecycle) && missingRuntimeRefs.length === 0;
+    checks.push({
+      stage: "evidence_reentry",
+      check: "capability_lane_observation_reentry",
+      status:
+        laneAgreesWithProvider && laneAgreesWithRuntime
+          ? "passed"
+          : "failed",
+      disposition:
+        laneAgreesWithProvider && laneAgreesWithRuntime
+          ? "informational"
+          : "adapter_projection_contradiction",
+      source_ref: capabilityLaneReenteredRefs[0] ?? null,
+      target_ref: lifecycle?.reduction.latest_reentry_event_id ?? null,
+      expected_support_ref_count: capabilityLaneReenteredRefs.length,
+      observed_support_ref_count: runtimeReenteredRefs.length,
+      missing_support_refs: Array.from(
+        new Set([...missingProviderRefs, ...missingRuntimeRefs]),
+      ),
+    });
+    if (!laneAgreesWithProvider) {
+      mismatches.push(
+        mismatch({
+          code: "capability_lane_reentry_disagrees_with_provider",
+          lifecycleEventId: null,
+          projectionPath:
+            "provider_reasoning_reentry.observation_reentered",
+          lifecycleValue: true,
+          projectionValue: providerObservationReentered,
+          stage: "evidence_reentry",
+        }),
+      );
+    }
+    if (!laneAgreesWithRuntime) {
+      mismatches.push(
+        mismatch({
+          code: "capability_lane_reentry_disagrees_with_runtime",
+          lifecycleEventId:
+            lifecycle?.reduction.latest_reentry_event_id ?? null,
+          projectionPath: "turn_lifecycle.observation.reentered",
+          lifecycleValue: runtimeReenteredRefs.length > 0,
+          projectionValue: true,
+          stage: "evidence_reentry",
+        }),
+      );
+    }
+  }
+  if (lifecycle && providerObservationReentered !== null) {
+    const runtimeReenteredRefs = lifecycle.reduction.observation_reentry_refs;
+    const missingRuntimeRefs = missingRefs(
+      providerObservationReentered ? providerReenteredRefs : [],
+      runtimeReenteredRefs,
+    );
+    const reentryProjectionAgrees = providerObservationReentered
+      ? providerReenteredRefs.length > 0 && missingRuntimeRefs.length === 0
+      : runtimeReenteredRefs.length === 0;
+    checks.push({
+      stage: "evidence_reentry",
+      check: "provider_observation_reentry",
+      status: reentryProjectionAgrees ? "passed" : "failed",
+      disposition: reentryProjectionAgrees
+        ? "informational"
+        : "adapter_projection_contradiction",
+      source_ref: lifecycle.reduction.latest_reentry_event_id,
+      target_ref: readString(providerReentry?.provider_terminal_candidate_ref),
+      expected_support_ref_count: providerReenteredRefs.length,
+      observed_support_ref_count: runtimeReenteredRefs.length,
+      missing_support_refs: missingRuntimeRefs,
+    });
+    if (!reentryProjectionAgrees) {
+      mismatches.push(
+        mismatch({
+          code: "provider_observation_reentry_disagrees_with_runtime",
+          lifecycleEventId: lifecycle.reduction.latest_reentry_event_id,
+          projectionPath: "provider_reasoning_reentry.observation_reentered",
+          lifecycleValue: runtimeReenteredRefs.length > 0,
+          projectionValue: providerObservationReentered,
+          stage: "evidence_reentry",
+        }),
+      );
+    }
+  }
 
   const prompt = promptTextForAudit(payload, debug);
   const gatewayResults = uniqueGatewayCallResults(payload, debug);
@@ -569,8 +698,36 @@ export const buildHelixTurnLifecycleDifferentialAudit = (input: {
     payload.provider_route_product_materialization_diagnostic,
   );
   const qualityGateFailed = qualityGate?.ok === false;
+  const rejectionObservations = Array.isArray(
+    payload.terminal_rejection_observations,
+  )
+    ? payload.terminal_rejection_observations
+        .map(readRecord)
+        .filter(
+          (entry): entry is RecordLike => Boolean(entry?.recoverable === true),
+        )
+    : [];
+  const continuationState = readRecord(payload.agent_continuation_state);
+  const allowedDecisions = readStringArray(continuationState?.allowed_decisions);
+  const hardBudgetExhausted =
+    readRecord(readRecord(continuationState?.budget)?.hard)?.exhausted === true;
+  const recoverablePending =
+    rejectionObservations.length > 0 &&
+    !hardBudgetExhausted &&
+    allowedDecisions.some((decision) =>
+      ["act", "retry", "answer"].includes(decision),
+    );
+  const qualityGateRepairPending = Boolean(
+    qualityGateFailed &&
+      recoverablePending &&
+      rejectionObservations.some(
+        (entry) =>
+          readString(entry.rejection_reason) === "route_requires_synthesis" &&
+          readString(entry.gate) === "provider_route_product_quality_gate",
+      ),
+  );
   const evidenceBoundary = Boolean(
-    qualityGateFailed ||
+    (qualityGateFailed && !qualityGateRepairPending) ||
       materializationDiagnostic?.itinerary_observation_criteria_satisfied ===
         false ||
       materializationDiagnostic?.compound_support_missing === true,
@@ -589,10 +746,14 @@ export const buildHelixTurnLifecycleDifferentialAudit = (input: {
       check: "provider_candidate_materialized",
       status: materialized
         ? "passed"
+        : qualityGateRepairPending
+          ? "failed"
         : evidenceBoundary || policyBoundary
           ? "failed_closed"
           : "failed",
-      disposition: evidenceBoundary
+      disposition: qualityGateRepairPending
+        ? "informational"
+        : evidenceBoundary
         ? "hard_evidence_boundary"
         : policyBoundary
           ? "hard_policy_boundary"
@@ -602,7 +763,12 @@ export const buildHelixTurnLifecycleDifferentialAudit = (input: {
       source_ref: candidateRef,
       target_ref: materializedRef,
     });
-    if (!materialized && !evidenceBoundary && !policyBoundary) {
+    if (
+      !materialized &&
+      !qualityGateRepairPending &&
+      !evidenceBoundary &&
+      !policyBoundary
+    ) {
       mismatches.push(
         mismatch({
           code: "authorized_provider_candidate_not_materialized",
@@ -904,11 +1070,14 @@ export const buildHelixTurnLifecycleDifferentialAudit = (input: {
 
   let scientificEvidenceDisposition:
     | "passed"
+    | "repair_pending"
     | "failed_closed"
     | "bypassed"
     | "not_observed" = "not_observed";
   if (qualityGate) {
     if (qualityGate.ok === true) scientificEvidenceDisposition = "passed";
+    else if (qualityGateRepairPending)
+      scientificEvidenceDisposition = "repair_pending";
     else if (qualityGateFailed && writerKind === "typed_failure")
       scientificEvidenceDisposition = "failed_closed";
     else if (qualityGateFailed) scientificEvidenceDisposition = "bypassed";
@@ -918,6 +1087,8 @@ export const buildHelixTurnLifecycleDifferentialAudit = (input: {
       status:
         scientificEvidenceDisposition === "passed"
           ? "passed"
+          : scientificEvidenceDisposition === "repair_pending"
+            ? "failed"
           : scientificEvidenceDisposition === "failed_closed"
             ? "failed_closed"
             : "failed",
@@ -946,6 +1117,7 @@ export const buildHelixTurnLifecycleDifferentialAudit = (input: {
   if (
     candidateAuthorized &&
     writerKind === "typed_failure" &&
+    !qualityGateRepairPending &&
     !evidenceBoundary &&
     !policyBoundary
   ) {
@@ -962,23 +1134,6 @@ export const buildHelixTurnLifecycleDifferentialAudit = (input: {
     );
   }
 
-  const rejectionObservations = Array.isArray(
-    payload.terminal_rejection_observations,
-  )
-    ? payload.terminal_rejection_observations
-        .map(readRecord)
-        .filter((entry): entry is RecordLike => Boolean(entry?.recoverable === true))
-    : [];
-  const continuationState = readRecord(payload.agent_continuation_state);
-  const allowedDecisions = readStringArray(continuationState?.allowed_decisions);
-  const hardBudgetExhausted =
-    readRecord(readRecord(continuationState?.budget)?.hard)?.exhausted === true;
-  const recoverablePending =
-    rejectionObservations.length > 0 &&
-    !hardBudgetExhausted &&
-    allowedDecisions.some((decision) =>
-      ["act", "retry", "answer"].includes(decision),
-    );
   if (recoverablePending && writerKind === "typed_failure" && !evidenceBoundary) {
     checks.push({
       stage: "followup_reasoning",

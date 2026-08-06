@@ -1,0 +1,87 @@
+{
+  "schema_version": "casimir_dp_apparatus_search_stage4_2m/1",
+  "campaign_id": "casimir-dp-apparatus-search-stage4-2m-v1",
+  "evidence_class": "synthetic_bounded_apparatus_search_only",
+  "claim_ceiling": "bounded_configuration_for_measured_commissioning_or_explicit_no_go_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "max_candidates": 200,
+  "upstream_stage4_2l": {
+    "verification_receipt_path": "docs/research/casimir-dp-empirical-authority-stage4-2l-verification-receipt.json",
+    "verification_receipt_sha256": "7ff5ed544ec33fcd8022dd0f80cae5168a5486cc2f4414e14137806b46fdb19f",
+    "run_id": "casimir-dp-empirical-authority-stage4-2l-v1-20260806T060000000Z"
+  },
+  "frozen_dp": {
+    "model_id": "diosi_1989_gaussian_regularized_nondissipative",
+    "R0_m": 1e-7,
+    "numerical_softening_m": 1e-12,
+    "integration_upper_u": 8,
+    "even_intervals": 2048,
+    "crosscheck_relative_tolerance": 0.0001
+  },
+  "materials": [
+    { "id": "silica", "density_kg_m3": 2200 },
+    { "id": "silicon", "density_kg_m3": 2330 },
+    { "id": "diamond", "density_kg_m3": 3500 }
+  ],
+  "axes": {
+    "radius_m": [8e-8, 1.2e-7, 1.8e-7, 2.76302362398029e-7],
+    "separation_m": [5e-8, 1e-7, 1.6e-7, 2.5e-7],
+    "hold_time_s": [0.05, 0.1, 0.25, 0.5],
+    "gap_m": [1.2e-6, 3e-6, 5e-6, 1e-5],
+    "plate_size_m": [2e-5, 4e-5, 8e-5],
+    "branch_orientation_tilt_rad": [0, 0.0001, 0.001],
+    "temperature_K": [4, 10],
+    "pressure_Pa": [1e-15, 3e-15, 1e-14],
+    "lateral_sigma_m": [1e-12, 1e-11, 1e-10],
+    "angular_sigma_rad": [1e-10, 1e-9, 1e-8],
+    "echo_residual_fraction": [0.0001, 0.001, 0.01],
+    "modulation_frequency_Hz": [0.1, 0.5, 1],
+    "readout_efficiency": [0.5, 0.8, 0.95]
+  },
+  "reference": {
+    "radius_m": 2.76302362398029e-7,
+    "mass_kg": 1.94385e-16,
+    "separation_m": 1.6e-7,
+    "hold_time_s": 0.25,
+    "gap_m": 1.2e-6,
+    "pressure_Pa": 2e-11,
+    "temperature_K": 4,
+    "dp_exponent": 0.006001050995935658,
+    "dp_rate_s": 0.02400420398374263,
+    "phase_lateral_jacobian_rad_per_m": 629906417722.9656,
+    "phase_angular_jacobian_rad_per_rad": 7900258233.290041,
+    "gas_rate_s": 17.28236105118056,
+    "density_envelope_factor": 6.770988768193029,
+    "stage4_2c_required_windows": 542,
+    "stage4_2c_maximum_cosine": 0.7177243227022941,
+    "stage4_2c_condition_number": 6.531693613125537,
+    "companion_snr": 5,
+    "demonstrated_mass_Da": 170000,
+    "dalton_kg": 1.6605390666e-27
+  },
+  "gates": {
+    "maximum_phase_sigma_rad": 0.03464404998245921,
+    "maximum_echoed_nominal_phase_rad": 0.1,
+    "maximum_gas_to_dp_ratio": 0.1,
+    "minimum_worst_density_dp_exponent": 0.001,
+    "maximum_gaussian_dp_exponent": 0.05,
+    "maximum_required_windows": 1600,
+    "minimum_power": 0.8,
+    "maximum_signature_cosine": 0.97,
+    "maximum_condition_number": 100,
+    "minimum_companion_snr": 5,
+    "maximum_state_preparation_mass_ratio": 1200000,
+    "maximum_separation_to_diameter": 0.6
+  },
+  "empirical_authorities": {
+    "measured_material_spectrum": false,
+    "as_built_geometry": false,
+    "full_maxwell_green": false,
+    "measured_phase_covariance": false,
+    "measured_qlbe_environment": false,
+    "integrated_state_preparation": false,
+    "measured_companion_detector": false,
+    "independent_replication": false
+  }
+}

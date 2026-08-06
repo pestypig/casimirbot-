@@ -1,0 +1,133 @@
+{
+  "schema_version": "casimir_dp_schrodinger_mass_density_stage4_2j/1",
+  "study_id": "casimir-dp-quantum-foam-study-v1",
+  "campaign_id": "casimir-dp-schrodinger-mass-density-stage4-2j-v1",
+  "implementation_version": "stage4.2j-v1",
+  "evidence_cutoff": "2026-08-06T04:00:00.000Z",
+  "evidence_class": "synthetic_schrodinger_mass_density_and_environmental_screen_only",
+  "claim_ceiling": "schrodinger_open_system_mass_density_and_environmental_diagnostic_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "authority_manifest": {
+    "path": "configs/research/casimir-dp-stage4-2j-authorities.v1.json",
+    "sha256": "e2da246e05d9fd797f0d114204dc3880619785edb52ad23d10099e57428c0f9b"
+  },
+  "upstream_authorities": [
+    {
+      "role": "stage4_2i_config",
+      "path": "configs/research/casimir-dp-boundary-branch-interaction-stage4-2i.v1.json",
+      "sha256": "6f66903a470f14314166c755b080208cf0942d6bb382077d6e44b953252d234e",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2i_report",
+      "path": "artifacts/research/casimir-dp-boundary-branch-interaction-stage4-2i/casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z/boundary-branch-interaction-stage4-2i-report.json",
+      "sha256": "a879a9110a18011ab3bdd8c3ebc224532eb67de3d15cfdc511b40f1006b06c65",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2i_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-boundary-branch-interaction-stage4-2i/casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z/boundary-branch-interaction-stage4-2i-receipt.json",
+      "sha256": "7ffe144e8bffc95c92edad45f8385642a8aa0ce8553cc50380ba816d734df35c",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2i_verification_receipt",
+      "path": "docs/research/casimir-dp-boundary-branch-interaction-stage4-2i-verification-receipt.json",
+      "sha256": "67163dddefc4205c6c591a8a0bbd693453a8e398ba5309a8ecf8676fd6888bc9",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_single_apparatus_config",
+      "path": "configs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g.v1.json",
+      "sha256": "a9516529a7c2f935c777fc4c1b29c207457a8f1618f1df580bff89ee27692487",
+      "required_at_runtime": true
+    }
+  ],
+  "method_authorities": [
+    {
+      "role": "registered_dp_companion_evaluator",
+      "path": "shared/casimir-dp-dp-companion.ts",
+      "sha256": "6432f931dd465624291c4cd7c33eda6a780d4b9687f89f6e76a2794d8708b5ac",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2i_complex_coherence_evaluator",
+      "path": "shared/casimir-dp-boundary-branch-interaction-stage4-2i.ts",
+      "sha256": "2b8c430861fdbf1967b9760127751a77f56cb173ac8fe8bde17c5bb2ece0ca46",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_qed_scale_report",
+      "path": "docs/research/casimir-dp-qed-scale-hierarchy-stage4-1-report.md",
+      "sha256": "6ae9530701fc35aa544b438709e789929b45eaf53ae950ec93ed976bb9703ba6",
+      "required_at_runtime": true
+    }
+  ],
+  "immutable_stage4_2i": {
+    "campaign_run_id": "casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z",
+    "report_sha256": "a879a9110a18011ab3bdd8c3ebc224532eb67de3d15cfdc511b40f1006b06c65",
+    "campaign_receipt_sha256": "7ffe144e8bffc95c92edad45f8385642a8aa0ce8553cc50380ba816d734df35c",
+    "verification_receipt_sha256": "67163dddefc4205c6c591a8a0bbd693453a8e398ba5309a8ecf8676fd6888bc9",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  },
+  "fixture": {
+    "path": "configs/research/fixtures/casimir-dp-stage4-2j.synthetic.v1.json",
+    "sha256": "db8781fe158ea354b363daadf022f7e8e43dc42526a66130506900a8cee14d8d"
+  },
+  "numerical": {
+    "integration_upper_u": 10,
+    "convergence_intervals": [2000, 4000, 8000],
+    "maximum_relative_convergence_error": 1e-9,
+    "registered_point_relative_tolerance": 1e-8,
+    "inverse_energy_relative_tolerance": 1e-12,
+    "phase_absolute_tolerance_rad": 1e-12
+  },
+  "environmental_screen": {
+    "maximum_gas_to_dp_rate_ratio_for_candidate": 1,
+    "target_gas_fraction_of_dp": 0.1,
+    "minimum_separation_to_thermal_wavelength_for_full_localization": 10
+  },
+  "required_complete_representations": [
+    "single_effective_gaussian",
+    "homogeneous_sphere_gaussian_convolved",
+    "layered_sphere_gaussian_convolved",
+    "coarse_grained_constituents_gaussian_convolved",
+    "atomistic_constituents_gaussian_convolved"
+  ],
+  "run_order": [
+    "verify_immutable_stage4_2i_authority_tuples",
+    "freeze_schrodinger_environment_dp_hypothesis_lanes",
+    "recover_registered_effective_gaussian_dp_point",
+    "separate_hamiltonian_phase_from_nonunitary_contraction",
+    "compute_homogeneous_sphere_with_identical_gaussian_regularization",
+    "evaluate_representation_coverage_and_spread",
+    "invert_synthetic_coherence_residual_to_dp_equivalent_energy",
+    "compute_hydrogen_and_qed_dimensional_nonbridge",
+    "screen_residual_gas_collision_decoherence",
+    "screen_state_preparation_scale_transport",
+    "preserve_external_bound_mapping_as_unresolved",
+    "preserve_boundary_independent_dp_and_zero_transfer_edges",
+    "run_adversarial_recovery_and_fail_closed_cases",
+    "write_content_addressed_report_trace_and_receipt"
+  ],
+  "final_status_policy": {
+    "software_contract": "pass",
+    "schrodinger_dp_separation": "pass",
+    "registered_gaussian_recovery": "pass",
+    "homogeneous_convolved_representation": "diagnostic_ready",
+    "complete_representation_robustness": "blocked",
+    "declared_equilibrium_gas_screen": "no_go",
+    "measured_environment_model": "not_ready",
+    "state_preparation": "not_ready",
+    "external_bound_mapping": "not_ready",
+    "transfer_kernel": "not_registered",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  }
+}

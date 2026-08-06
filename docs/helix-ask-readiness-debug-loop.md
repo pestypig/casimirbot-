@@ -18,26 +18,35 @@ Required context anchor for current malfunction class:
 
 ## Runtime Preconditions
 
-1. Start local server with live LLM path enabled.
+1. Use the already-running keyed localhost server when the test requires a live
+   provider, Shared Live Room, GPT Realtime, account binding, or environment
+   connector. With explicit user or active repository authorization, Codex
+   Desktop may start it only through the configured opaque launcher:
 
 ```powershell
-$env:PORT="5050"
-$env:NODE_ENV="development"
-$env:ENABLE_AGI="1"
-$env:LLM_POLICY="http"
-$env:LLM_RUNTIME="http"
-$env:HULL_MODE="0"
-$env:HULL_OUTBOUND_GUARD="0"
-$env:LLM_HTTP_BASE="https://api.openai.com"
-$env:OPENAI_API_KEY="<set real key>"
-npm run dev
+& 'C:\Users\dan\.local\bin\start-myapp-for-codex.cmd' '<canonical-workspace-path>'
 ```
 
-2. Confirm ask endpoint responds:
+   Treat the launcher as opaque. Do not read, patch, print, or reverse engineer
+   it; do not inspect provider credential environment variables; and do not
+   start a substitute keyed server. Wait for `[express] app ready` and use the
+   reported local URL.
+
+2. Verify the representative server surfaces without printing credentials:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing http://localhost:5050/api/agi/ask
+Invoke-WebRequest -UseBasicParsing http://localhost:1522/api/account/session
+Invoke-WebRequest -UseBasicParsing http://localhost:1522/api/helix/pipeline
+Invoke-WebRequest -UseBasicParsing http://localhost:1522/api/agi/agent-providers
 ```
+
+   Confirm the configured Codex provider is launchable. A healthy text-only
+   provider call does not prove GPT Realtime routing is healthy, and a generic
+   Realtime error does not by itself prove the shared provider credential is
+   invalid. Diagnose the failing route.
+
+3. Static and deterministic unit tests may run without the keyed server. Do not
+   present a mock, fallback, unkeyed, or ad hoc server as live-provider parity.
 
 ## Single-Prompt Success Checklist (Current)
 
@@ -93,6 +102,145 @@ fail-safe with explicit insufficient-evidence language if missing.
 1. final answer text
 2. full `debugContext` JSON
 3. event log lines around `LLM answer` and any `composerV2:*` markers
+
+## Loop A0: First-Authority-Divergence Audit
+
+Run this before changing prompt wording whenever Codex appears to have used a
+tool correctly but Helix shows a failure, a different answer, or no answer.
+The purpose is to find the first rail that changed a current-turn fact; later
+symptoms are consequences, not separate model failures.
+
+Capture this identity chain for the same Ask turn:
+
+```txt
+prompt and operator constraints
+-> admitted capability and physical execution
+-> settled observation refs
+-> exact observation.reentered refs
+-> post-observation Codex message hash
+-> authorized provider candidate ref, text hash, and support refs
+-> route-product materialization ref, text hash, and support refs
+-> terminal single-writer ref, text hash, and support refs
+-> visible/API/voice terminal hash
+```
+
+At each boundary, compare exact references and hashes. Do not infer re-entry
+from a ledger entry, selected evidence, a successful receipt, or agreement
+between mutable summary booleans. A failed or blocked observation may still
+have re-entered Codex; transport re-entry and evidence admissibility are
+separate facts.
+
+Classify the first mismatch as one of:
+
+```txt
+tool execution
+evidence normalization
+evidence re-entry
+follow-up reasoning
+terminal materialization
+terminal authority
+presentation or voice relay
+```
+
+Then choose exactly one disposition:
+
+- `adapter_projection_contradiction`: a later rail dropped, replaced, or
+  relabeled a valid current-turn runtime fact. Add a focused poisoned-projection
+  fixture, fix the shared contract, and rerun the original natural keyed turn.
+- `repairable_evidence_rejection`: a claim lacks required support but an
+  admitted measurement, calculation, retrieval, or clarification can repair
+  it. Emit a non-terminal typed rejection observation with `gate`, stable
+  `reason_codes`, `evidence_refs`, and `retryability`, then return control to
+  Codex while budget remains.
+- `hard_evidence_or_policy_boundary`: permission, identity, freshness,
+  provenance, integrity, route policy, or exhausted repair budget forbids the
+  candidate. Fail closed with the exact gate and reason codes; do not compose
+  substitute explanatory prose downstream.
+
+Scientific conventions remain hard where they protect measured values, units,
+uncertainty, provenance, and claim support. They constrain what the Codex
+candidate may claim; they do not become a competing answer writer. A repair is
+accepted only when the focused synthetic fixture and the original natural
+keyed-server/API or UI turn both preserve the same candidate and evidence
+identity through terminal presentation.
+
+### Loop A0.1: Direct Codex / Helix A-B differential
+
+Use this comparison when the defect might be adapter-introduced and a direct
+Codex path can operate against the same environment safely.
+
+1. Freeze the user prompt, operator constraints, permission lease, capability
+   descriptions, source/player/world identity, and starting environment state.
+2. Run a reference Codex attempt. Give it the same capability documentation and
+   observations Helix would expose. Record proposed calls, admitted calls,
+   retries, settled observations, and final synthesis; do not export hidden
+   reasoning or credentials.
+3. Restore or checkpoint the environment when mutations would make the second
+   run incomparable.
+4. Run the same prompt through Helix Ask using the real keyed API or UI path.
+5. Compare the traces at prompt interpretation, request/proposal, admission,
+   execution, normalization, re-entry, follow-up message, provider candidate,
+   route-product materialization, terminal selection, and presentation.
+6. Treat direct success plus Helix failure as adapter-parity evidence only when
+   the inputs and starting state were equivalent. Locate the first divergence
+   before changing any boundary.
+
+Direct console, server, or game commands are valuable for preflight and for
+proving the environment can satisfy a request. They bypass Helix admission,
+re-entry, and terminal projection, so they are not end-to-end acceptance by
+themselves.
+
+Keep security and scientific evidence boundaries. Remove or repair only
+adapter-owned logic that duplicates model step choice, invents goals, retries
+privately, treats stale snapshots as runtime facts, or writes substitute prose.
+A valid hard-boundary failure is parity; an unexplained downstream substitution
+is not.
+
+### Loop A0.2: Superseded failures
+
+Failed attempts remain in provenance and debug history. They stop being active
+terminal blockers only when current-turn evidence proves the corresponding
+required subgoals later succeeded. The repair must preserve capability and
+subgoal identity, strict attempt ordering, successful observation
+normalization, provider re-entry, and candidate support refs.
+
+Do not apply this rule to mutating attempts, a different capability, stale or
+reverse ordering, or a final candidate that does not cover every required
+observation. The candidate must still pass route-product, scientific/evidence
+quality, and terminal-authority gates.
+
+## Memory-Bounded Keyed Test Discipline
+
+The Helix server, a Fabric server/client, browsers, builds, and Vitest workers
+share one host resource budget. Preserve the validity of the test by keeping
+that budget observable.
+
+1. Record available and committed host memory before a broad run. Monitor host
+   commit plus the relevant process working sets; one process's working set is
+   not the full pressure signal.
+2. Use the compiled-client low-memory server unless HMR is required. Run the
+   smallest targeted fixture first, then one representative live prompt, then
+   the broader battery.
+3. Run only one heavy build or Vitest worker tree at a time. Avoid duplicate
+   Helix, Fabric, browser, tunnel, and build processes.
+4. Never print credential-bearing environment blocks or full process command
+   lines while attributing memory. Do not disable application memory guards to
+   make a test pass.
+5. When a test stalls or a worker exits, identify its exact process tree and
+   stop only that tree. Keep a healthy keyed server, Fabric server, and connector
+   running so source epochs and room state are not needlessly invalidated.
+6. Classify OS commit exhaustion, paging pressure, worker crashes, server
+   crashes, provider transport errors, and product assertion failures
+   separately. Rerun narrowly before assigning a product regression.
+7. Keep periodic checks brief enough to continue reporting progress to the
+   operator. Do not start a second monitoring runtime that materially increases
+   pressure.
+
+For environment connectors, use direct server-console status, checkpoint,
+read-only probes, and reconnect operations for preflight when allowed. The
+acceptance proof remains the natural prompt through Helix Ask/API or UI, with
+the exact room, participant, player, source, connector epoch, and turn IDs in
+the debug bundle.
 
 ## Loop A: Contract Battery
 

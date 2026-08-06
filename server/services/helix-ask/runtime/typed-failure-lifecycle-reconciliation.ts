@@ -1,6 +1,7 @@
 import { auditRouteAuthority } from "../route-authority-audit";
 import { buildRouteProductContract } from "../route-product-contract";
 import { resolveToolFamilyContract } from "../tool-family-contract";
+import { readCommittedAskRoute } from "../committed-ask-route";
 
 type RecordLike = Record<string, unknown>;
 
@@ -12,7 +13,49 @@ const readRecord = (value: unknown): RecordLike | null =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const hasRuntimeLifecycleObservation = (payload: RecordLike): boolean => {
+  const lifecycle = readRecord(payload.turn_lifecycle);
+  const integrity = readRecord(lifecycle?.integrity);
+  if (
+    lifecycle?.authority !== "runtime_event_log" ||
+    integrity?.ok !== true
+  ) {
+    return false;
+  }
+
+  const events = Array.isArray(lifecycle.events) ? lifecycle.events : [];
+  if (
+    events.some((value) => {
+      const event = readRecord(value);
+      return Boolean(
+        event?.kind === "observation.reentered" &&
+          event?.status === "succeeded" &&
+          Array.isArray(event.observation_refs) &&
+          event.observation_refs.length > 0,
+      );
+    })
+  ) {
+    return true;
+  }
+
+  const reduction = readRecord(lifecycle.reduction);
+  const toolCalls = Array.isArray(reduction?.tool_calls)
+    ? reduction.tool_calls
+    : [];
+  return toolCalls.some((value) => {
+    const call = readRecord(value);
+    return Boolean(
+      call?.reentered === true &&
+        ((Array.isArray(call.observation_refs) &&
+          call.observation_refs.length > 0) ||
+          (Array.isArray(call.reentry_observation_refs) &&
+            call.reentry_observation_refs.length > 0)),
+    );
+  });
+};
+
 const hasCurrentTurnObservation = (payload: RecordLike): boolean => {
+  if (hasRuntimeLifecycleObservation(payload)) return true;
   const loopTrace = readRecord(payload.loop_parity_trace);
   if (
     Array.isArray(loopTrace?.observations_created) &&
@@ -47,10 +90,80 @@ const readTypedFailure = (payload: RecordLike): RecordLike | null => {
   return null;
 };
 
+const SETTLED_ENVIRONMENT_FAILURE_CODES = new Set([
+  "connector_offline",
+  "probe_timeout",
+  "capability_unavailable",
+  "capability_version_changed",
+  "target_unavailable",
+  "target_ambiguous",
+  "subject_binding_required",
+  "subject_binding_stale",
+  "subject_offline",
+  "wrong_environment",
+  "wrong_world",
+  "permission_revoked",
+  "binding_revoked",
+  "schema_validation_failed",
+  "result_stale",
+  "request_canceled",
+  "request_superseded",
+  "producer_epoch_mismatch",
+  "environment_adapter_contract_changed",
+  "probe_failed",
+  "command_timeout",
+  "command_outcome_unknown",
+  "authority_stale",
+  "connector_management_forbidden",
+  "command_catalog_changed",
+  "command_parse_failed",
+  "command_category_mismatch",
+  "host_escape_rejected",
+  "duplicate_request",
+]);
+
+const hasRuntimeVerifiedPostObservationCompletion = (
+  payload: RecordLike,
+): boolean => {
+  const lifecycle = readRecord(payload.turn_lifecycle);
+  const reduction = readRecord(lifecycle?.reduction);
+  const integrity = readRecord(lifecycle?.integrity);
+  return Boolean(
+    lifecycle?.authority === "runtime_event_log" &&
+      integrity?.ok === true &&
+      reduction?.post_observation_reasoning_completed === true &&
+      reduction?.runtime_turn_completed === true &&
+      reduction?.terminal_eligible === true,
+  );
+};
+
 const isSettledSourceObservationTypedFailure = (
   payload: RecordLike,
 ): boolean => {
   if (!hasCurrentTurnObservation(payload)) return false;
+  const identityAudit = readRecord(payload.live_source_identity_audit);
+  const identityDiagnosis = readString(identityAudit?.diagnosis);
+  const failure = readTypedFailure(payload);
+  const errorCode =
+    readString(failure?.error_code) ?? readString(payload.terminal_error_code);
+  const authoritativeIdentityFailure = Boolean(
+    identityAudit?.identity_ok === false &&
+      identityDiagnosis &&
+      errorCode === identityDiagnosis &&
+      [
+        "fresh_source_unbound",
+        "wrong_environment",
+        "interpretations_missing",
+      ].includes(identityDiagnosis),
+  );
+  if (authoritativeIdentityFailure) return true;
+  if (
+    errorCode &&
+    SETTLED_ENVIRONMENT_FAILURE_CODES.has(errorCode) &&
+    hasRuntimeVerifiedPostObservationCompletion(payload)
+  ) {
+    return true;
+  }
   const loopTrace = readRecord(payload.loop_parity_trace);
   if (
     Array.isArray(loopTrace?.actual_tool_calls) &&
@@ -58,9 +171,6 @@ const isSettledSourceObservationTypedFailure = (
   ) {
     return false;
   }
-  const failure = readTypedFailure(payload);
-  const errorCode =
-    readString(failure?.error_code) ?? readString(payload.terminal_error_code);
   const nextRequiredAction = readString(failure?.next_required_action);
   return Boolean(
     errorCode &&
@@ -99,6 +209,9 @@ export const authoritativeTypedFailureRequiresNoContinuation = (
   const errorCode =
     readString(failure?.error_code) ?? readString(payload.terminal_error_code);
   if (!errorCode) return false;
+  const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
+  const settledSourceFailureAlreadyAuthorized =
+    canonicalGoalFrame?.authoritative_source_observation_typed_failure === true;
 
   const routeProductContract = readRecord(payload.route_product_contract);
   const allowedTerminalKinds = Array.isArray(
@@ -139,13 +252,21 @@ export const authoritativeTypedFailureRequiresNoContinuation = (
 
   return (
     !hasCurrentTurnObservation(payload) ||
+    settledSourceFailureAlreadyAuthorized ||
     isSettledSourceObservationTypedFailure(payload)
   );
 };
 
+export const authoritativeSourceObservationTypedFailureRequiresNoContinuation = (
+  payload: RecordLike,
+): boolean =>
+  authoritativeTypedFailureRequiresNoContinuation(payload) &&
+  isSettledSourceObservationTypedFailure(payload);
+
 const selectedRouteForPayload = (payload: RecordLike): string =>
   readString(readRecord(payload.loop_parity_trace)?.selected_route) ??
   readString(readRecord(payload.route_authority_audit)?.selected_route) ??
+  readString(readCommittedAskRoute(payload)?.route.selected_route) ??
   readString(readRecord(payload.committed_ask_route)?.route_id) ??
   readString(payload.route_reason_code) ??
   readString(payload.route) ??
@@ -253,6 +374,101 @@ const reconcileAgentRuntimeLoopAdmission = (payload: RecordLike): void => {
   settle(debug?.agent_runtime_loop_admission);
 };
 
+const mirroredRecords = (
+  payload: RecordLike,
+  key: string,
+): RecordLike[] => {
+  const debug = readRecord(payload.debug);
+  const artifactQueryIndex = readRecord(payload.artifact_query_index);
+  const debugArtifactQueryIndex = readRecord(debug?.artifact_query_index);
+  const records = [
+    readRecord(payload[key]),
+    readRecord(debug?.[key]),
+    readRecord(artifactQueryIndex?.[key]),
+    readRecord(debugArtifactQueryIndex?.[key]),
+  ].filter((entry): entry is RecordLike => Boolean(entry));
+  return [...new Set(records)];
+};
+
+const reconcileSettledSourceFailureRails = (
+  payload: RecordLike,
+): void => {
+  const identityAudit = readRecord(payload.live_source_identity_audit);
+  if (identityAudit?.identity_ok === false) return;
+
+  for (const rail of mirroredRecords(
+    payload,
+    "codex_parity_agent_spine_rail_table",
+  )) {
+    rail.first_broken_rail = null;
+    rail.repair_target = null;
+    rail.codex_parity_class = "complete";
+    rail.rail_status = "complete";
+    rail.rail_failure_code = null;
+    rail.terminal_authority_proven = true;
+    rail.visible_projection_proven = true;
+  }
+  for (const key of [
+    "tool_turn_chain_audit",
+    "final_tool_turn_chain_audit",
+  ]) {
+    for (const audit of mirroredRecords(payload, key)) {
+      audit.rail_status = "complete";
+      audit.rail_failure_code = null;
+      audit.terminal_authority_proven = true;
+      audit.visible_projection_proven = true;
+    }
+  }
+  for (const key of [
+    "tool_rail_failure_triage",
+    "final_tool_rail_failure_triage",
+  ]) {
+    for (const triage of mirroredRecords(payload, key)) {
+      triage.first_broken_rail = null;
+      triage.failure_bucket = null;
+      triage.repair_target = null;
+      triage.rail_status = "complete";
+      triage.rail_failure_code = null;
+    }
+  }
+  for (const status of mirroredRecords(
+    payload,
+    "active_terminal_rail_status",
+  )) {
+    status.rail_status = "complete";
+    status.rail_failure_code = null;
+    status.first_broken_rail = null;
+    status.repair_target = null;
+  }
+};
+
+const reconcileVerifiedProviderReasoning = (
+  payload: RecordLike,
+  errorCode: string | null,
+): void => {
+  if (!hasRuntimeVerifiedPostObservationCompletion(payload)) return;
+  for (const projection of mirroredRecords(
+    payload,
+    "provider_reasoning_reentry",
+  )) {
+    projection.status = "completed";
+    projection.observation_reentered = true;
+    projection.evidence_reentered = true;
+    projection.solver_completed = true;
+    projection.goal_satisfaction_compatible = true;
+    projection.post_tool_model_step_required = false;
+    projection.completion_source = "turn_lifecycle.runtime_event_log";
+  }
+  for (const followup of mirroredRecords(payload, "tool_followup_decision")) {
+    followup.next_action = "stop";
+    followup.reason = errorCode ?? "authoritative_typed_failure_terminal";
+    followup.external_change_required = true;
+    followup.terminal_blockers = [];
+    followup.evidence_reentered = true;
+    followup.completion_source = "turn_lifecycle.runtime_event_log";
+  }
+};
+
 export const reconcileAuthoritativeTypedFailureLifecycle = (args: {
   payload: RecordLike;
   turnId: string;
@@ -344,8 +560,10 @@ export const reconcileAuthoritativeTypedFailureLifecycle = (args: {
     readRecord(args.payload.canonical_goal_frame) ?? {};
   if (settledSourceObservationFailure) {
     canonicalGoalFrame.authoritative_source_observation_typed_failure = true;
+    delete canonicalGoalFrame.authoritative_zero_observation_typed_failure;
   } else {
     canonicalGoalFrame.authoritative_zero_observation_typed_failure = true;
+    delete canonicalGoalFrame.authoritative_source_observation_typed_failure;
   }
   args.payload.canonical_goal_frame = canonicalGoalFrame;
   args.payload.route_authority_audit = effectiveRouteAuthorityAudit;
@@ -405,6 +623,14 @@ export const reconcileAuthoritativeTypedFailureLifecycle = (args: {
     args.payload,
     readString(sourceTargetIntent?.target_source),
   );
+  if (settledSourceObservationFailure) {
+    reconcileSettledSourceFailureRails(args.payload);
+    reconcileVerifiedProviderReasoning(
+      args.payload,
+      readString(readTypedFailure(args.payload)?.error_code) ??
+        readString(args.payload.terminal_error_code),
+    );
+  }
   reconcileAgentRuntimeLoopAdmission(args.payload);
 
   const debug = readRecord(args.payload.debug);

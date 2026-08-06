@@ -20,6 +20,7 @@ final class ConnectorPairingClientTest {
     private String baseUrl;
     private final AtomicBoolean unpairAuthorized = new AtomicBoolean(false);
     private final AtomicBoolean commandOnlyResponse = new AtomicBoolean(false);
+    private final AtomicBoolean actionOnlyResponse = new AtomicBoolean(false);
 
     @BeforeEach
     void startServer() throws IOException {
@@ -108,7 +109,72 @@ final class ConnectorPairingClientTest {
         }
     }
 
+    @Test
+    void acceptsSeparatelyPairedPlayerActionConfiguration() throws Exception {
+        actionOnlyResponse.set(true);
+        try (ConnectorPairingClient client = new ConnectorPairingClient()) {
+            ConnectorPairingClient.PairedSourceConfig paired = client.redeem(
+                baseUrl + ConnectorPairingClient.REDEEM_PATH,
+                "ABCD-2345",
+                ConnectorPairingClient.newRedemptionNonce(),
+                "minecraft.fabric_client.v1",
+                "0.1.0"
+            );
+            assertTrue(paired.actionOnly());
+            assertTrue(paired.bearerToken().isBlank());
+            assertTrue(paired.commandConfig().isEmpty());
+            assertEquals(
+                "environment_action_authority:test",
+                paired.actionConfig().get("action_authority_id")
+            );
+            assertEquals(Boolean.FALSE, paired.actionConfig().get("host_access_enabled"));
+            assertEquals(Boolean.FALSE, paired.actionConfig().get("automatic_replay_enabled"));
+        }
+    }
+
     private void redeem(HttpExchange exchange) throws IOException {
+        if (actionOnlyResponse.get()) {
+            String response = """
+                {
+                  "schema":"helix.connector_pairing_redemption.v1",
+                  "ok":true,
+                  "error":null,
+                  "replayed":false,
+                  "plugin_config":{
+                    "pairing_mode":"action_only",
+                    "pairing_endpoint":"%s/api/environment-connectors/v1/pairing/redeem",
+                    "source_id":"source:room-ingress:test",
+                    "room_id":"room:test",
+                    "world_id":"minecraft:fabric:test",
+                    "domain_adapter":"minecraft.fabric_client.v1",
+                    "action":{
+                      "schema":"helix.environment_action.connector_config.v1",
+                      "endpoint":"%s/api/environment-action/v1/authorities/environment_action_authority%%3Atest",
+                      "bearer_token":"helix_env_action_%s",
+                      "action_authority_id":"environment_action_authority:test",
+                      "connector_installation_id":"environment_action_connector_installation:test",
+                      "environment_binding_id":"environment_binding:test",
+                      "room_id":"room:test",
+                      "source_id":"source:room-ingress:test",
+                      "world_id":"minecraft:fabric:test",
+                      "adapter_profile_id":"game.minecraft.player.fabric.v1",
+                      "domain_adapter":"minecraft.fabric_client.v1",
+                      "participant_id":"participant:test",
+                      "subject_binding_id":"subject_binding:test",
+                      "subject_native_id":"minecraft-player-uuid",
+                      "policy_version":1,
+                      "action_execution_enabled":true,
+                      "host_access_enabled":false,
+                      "automatic_replay_enabled":false,
+                      "emergency_stop_required":true,
+                      "expires_at":"2099-01-01T00:00:00.000Z"
+                    }
+                  }
+                }
+                """.formatted(baseUrl, baseUrl, "d".repeat(43));
+            send(exchange, 200, response);
+            return;
+        }
         if (commandOnlyResponse.get()) {
             String response = """
                 {

@@ -116,6 +116,12 @@ provider continuation, execution, and the differential audit. Structure-aware
 helpers remain available for ordinary semantic requests, but cannot be added
 behind an exact operator boundary.
 
+A request to retrieve, cite, quote, explain, or return command text or syntax
+has `execution_intent=none`. An action-shaped token inside that documentation
+request, such as “give the exact command form,” is not permission to materialize
+the game's `give` action or any other mutating capability. Prompt interpretation
+must preserve this distinction through compound planning and tool admission.
+
 ## Runtime Boundary Adoption
 
 A verified lifecycle may replace stale legacy projections only for factual
@@ -200,6 +206,82 @@ The audit reports the first divergent stage as `evidence_reentry`,
 grant terminal authority. Text continuity uses SHA-256 values; evidence
 continuity uses current-turn artifact refs. This makes a narrow downstream
 substitution observable without creating another answer-writing agent.
+
+### First-divergence diagnostic method
+
+Use the same method for a synthetic regression, a keyed API turn, and a UI
+turn. Do not start from the visible failure text and guess backward.
+
+1. Capture the immutable current-turn lifecycle and verify its sequence,
+   causation, route, admitted capability, settled call, and exact observation
+   re-entry refs. Treat mutable summary booleans only as projections.
+2. Record the post-observation Codex message hash, provider candidate ref, and
+   support refs. Never place raw credentials or hidden reasoning in the audit.
+3. At route-product materialization, terminal single-writer selection, and
+   presentation, compare the candidate ref, text hash, and support refs with
+   the immediately preceding stage.
+4. Stop at the first mismatch. Later failures are consequences and must not be
+   reported as independent model failures.
+5. Classify the mismatch as either an adapter projection contradiction or an
+   explicit hard boundary. The debug record must name the gate and stable
+   reason codes that made the distinction.
+6. For a recoverable contradiction, append a typed rejection observation and
+   return control to Codex while continuation budget remains. For an
+   unrecoverable identity, permission, provenance, freshness, integrity,
+   scientific-quality, or route denial, fail closed without composing a
+   substitute answer.
+7. Reproduce the first divergence with a focused synthetic fixture, then rerun
+   the original natural prompt through the real keyed route. A repair is not
+   accepted when only the synthetic projection passes.
+
+A typed rejection observation must identify `failure_class`, `gate`, stable
+`reason_codes`, `recoverable`, `retryability`, `terminal_eligible`, and the
+relevant current-turn evidence refs. This gives Codex enough structured state
+to retry or explain the block without allowing deterministic adapter prose to
+become a competing answer.
+
+Observation transport and evidentiary success are separate invariants. A
+blocked or failed tool call may still produce a typed observation that is
+normalized and re-entered into the next Codex step. In that case
+`provider_reasoning_reentry.observation_reentered=true` and the canonical
+lifecycle records `observation.reentered` for the exact settled refs, while
+`evidence_reentered` may remain false because the observation cannot support a
+success claim. No projection may turn “blocked observation re-entered” into
+“no observation was executed,” and no terminal rail may turn transport
+re-entry into proof that the requested world action succeeded.
+
+The differential audit therefore treats re-entry as an identity-preserving
+cross-projection invariant, not a vote among booleans. For every exact
+observation ref it compares:
+
+1. the settled gateway observation packet;
+2. the capability-lane `lane_reentered` event;
+3. `provider_reasoning_reentry.reentered_observation_refs`;
+4. the canonical `observation.reentered` lifecycle event; and
+5. the terminal writer's selected support refs when an answer is authorized.
+
+A lane event that records re-entry while the provider bridge and canonical
+lifecycle both omit it is still a contradiction even though those two stale
+projections agree with each other. The audit reports
+`capability_lane_reentry_disagrees_with_provider` and/or
+`capability_lane_reentry_disagrees_with_runtime` at the first
+`evidence_reentry` divergence. This diagnostic never upgrades the observation
+to successful evidence and never grants terminal authority.
+
+Scientific-evidence gates have the same boundary. They preserve measured
+values, units, uncertainty, provenance, and claim-support refs, but they do not
+author explanatory prose. An evidence-quality shortfall that can be repaired
+by an admitted calculation, retrieval, measurement, or clarification is a
+recoverable rejection observation for Codex. Only evidence-integrity or
+provenance violations, or an exhausted bounded repair path, may terminalize
+directly with the exact scientific gate and reason codes.
+
+The lifecycle differential reports the first case as
+`scientific_evidence_disposition=repair_pending`, not `failed_closed`. Its
+terminal rejection observation carries `gate`, `reason_codes`, and
+`evidence_refs` into the next Codex sampling step. `failed_closed` is reserved
+for a non-retryable hard boundary or a bounded repair path whose hard budget is
+actually exhausted.
 
 Two dispositions must remain distinct:
 

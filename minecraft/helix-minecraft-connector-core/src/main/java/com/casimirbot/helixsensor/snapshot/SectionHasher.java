@@ -9,9 +9,17 @@ public final class SectionHasher {
     private SectionHasher() {}
 
     public static String hash(Object value) {
+        return hashJson(HelixJson.stringify(value));
+    }
+
+    public static String hashIncludingNulls(Object value) {
+        return hashJson(HelixJson.stringifyIncludingNulls(value));
+    }
+
+    private static String hashJson(String json) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] bytes = digest.digest(HelixJson.stringify(value).getBytes(StandardCharsets.UTF_8));
+            byte[] bytes = digest.digest(json.getBytes(StandardCharsets.UTF_8));
             StringBuilder builder = new StringBuilder("sha256:");
             for (byte b : bytes) builder.append(String.format("%02x", b));
             return builder.toString();

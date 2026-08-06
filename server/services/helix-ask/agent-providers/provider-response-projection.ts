@@ -7,11 +7,21 @@ import type {
 } from "@shared/helix-capability-lane-goal-binding";
 import { buildHelixCapabilityLaneGoalDispatchAdmission } from "../capability-lanes/goal-dispatch-admission";
 import { buildHelixCapabilityLaneGoalDispatchReadiness } from "../capability-lanes/goal-dispatch-readiness";
+import { attachLiveSourceIdentityAudit } from "../live-source-identity-audit";
+import { liveSourceModelSynthesisMissingFailure } from "../live-source-terminal-failure-repair";
+import {
+  applyTerminalAnswerEnvelope,
+  resolveTerminalAnswerEnvelope,
+} from "../terminal-answer-envelope";
+import { reconcileAuthoritativeTypedFailureLifecycle } from "../runtime/typed-failure-lifecycle-reconciliation";
 import type { HelixAgentRuntimeSelectionTrace } from "./runtime-debug";
 import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
 
 const toDebugRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+const readString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
 
 const INLINE_IMAGE_DATA_URL_PATTERN =
   /data:(image\/[a-z0-9.+-]+);base64,[a-z0-9+/_=\r\n-]+(?:#[^\s"'\\}\]]+)?/gi;
@@ -338,5 +348,99 @@ export const buildHelixAgentProviderAskPayload = (input: {
       runtime_continuation_hints: runtimeContinuationHints,
     },
   };
+  const threadId =
+    readString(payload.thread_id) ??
+    readString(input.requestBody?.thread_id) ??
+    readString(input.requestBody?.session_id) ??
+    "helix-ask:desktop";
+  const promptText =
+    readString(input.requestBody?.question) ??
+    readString(input.requestBody?.prompt) ??
+    readString(input.requestBody?.transcript) ??
+    "";
+  const selectedRoute =
+    readString(payload.route_reason_code) ??
+    readString(payload.route) ??
+    "/ask/turn";
+  const identityAudit = attachLiveSourceIdentityAudit({
+    payload,
+    threadId,
+    turnId: input.turnId,
+    promptText,
+    selectedRoute,
+    terminalArtifactKind:
+      readString(payload.terminal_artifact_kind) ?? "unknown",
+  });
+  if (identityAudit?.identity_ok === false) {
+    const failure = liveSourceModelSynthesisMissingFailure(
+      payload,
+      readString(payload.selected_final_answer) ??
+        readString(payload.answer) ??
+        readString(payload.text) ??
+        "",
+    );
+    if (failure) {
+      payload.ok = false;
+      payload.response_type = "final_failure";
+      payload.final_status = "final_failure";
+      payload.final_answer_source = "typed_failure";
+      payload.terminal_artifact_kind = "typed_failure";
+      payload.terminal_error_code = failure.code;
+      payload.terminal_failure_text = failure.text;
+      payload.typed_failure = {
+        schema: "helix.typed_failure.v1",
+        error_code: failure.code,
+        failure_code: failure.code,
+        message: failure.text,
+        text: failure.text,
+        answer_text: failure.text,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      payload.selected_final_answer = failure.text;
+      payload.answer = failure.text;
+      payload.text = failure.text;
+      payload.finalAnswer = failure.text;
+      payload.content = failure.text;
+      payload.terminal_presentation = {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: input.turnId,
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        concise_text: failure.text,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      const envelope = resolveTerminalAnswerEnvelope(payload, {
+        threadId,
+        turnId: input.turnId,
+        prompt: promptText,
+      });
+      applyTerminalAnswerEnvelope(payload, envelope);
+      reconcileAuthoritativeTypedFailureLifecycle({
+        payload,
+        turnId: input.turnId,
+        promptText,
+        selectedTerminalArtifactKind: "typed_failure",
+        finalAnswerSource: "typed_failure",
+      });
+      Object.assign(payload.debug, {
+        ok: payload.ok,
+        response_type: payload.response_type,
+        final_status: payload.final_status,
+        final_answer_source: payload.final_answer_source,
+        terminal_artifact_kind: payload.terminal_artifact_kind,
+        terminal_error_code: payload.terminal_error_code,
+        terminal_failure_text: payload.terminal_failure_text,
+        typed_failure: payload.typed_failure,
+        selected_final_answer: payload.selected_final_answer,
+        answer: payload.answer,
+        text: payload.text,
+        terminal_presentation: payload.terminal_presentation,
+        terminal_answer_authority: payload.terminal_answer_authority,
+        terminal_answer_envelope: payload.terminal_answer_envelope,
+      });
+    }
+  }
   return sanitizeHelixAgentProviderPublicPayload(payload);
 };

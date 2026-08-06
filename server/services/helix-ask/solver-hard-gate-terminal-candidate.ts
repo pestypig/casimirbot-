@@ -1,4 +1,5 @@
 import { resolveCompoundCoverageRouteScope } from "./compound-coverage-route-scope";
+import { attachLiveSourceIdentityAudit } from "./live-source-identity-audit";
 
 type RecordLike = Record<string, unknown>;
 
@@ -102,6 +103,15 @@ export const applyAskTurnSolverHardGateFailure = (input: {
     refreshSolverRetryPoliciesForPayload,
   } = input.dependencies;
   const payload = input.payload;
+  attachLiveSourceIdentityAudit({
+    payload,
+    threadId: input.threadId,
+    turnId: input.turnId,
+    promptText: input.prompt,
+    selectedRoute: input.route,
+    terminalArtifactKind:
+      readAskTurnString(payload.terminal_artifact_kind) ?? "unknown",
+  });
   const canonicalGoalFrameForCompoundGate =
     payload.canonical_goal_frame && typeof payload.canonical_goal_frame === "object" && !Array.isArray(payload.canonical_goal_frame)
       ? (payload.canonical_goal_frame as Record<string, unknown>)

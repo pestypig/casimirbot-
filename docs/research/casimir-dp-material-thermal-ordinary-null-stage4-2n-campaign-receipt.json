@@ -1,0 +1,18 @@
+{
+  "schema_version": "casimir_dp_material_thermal_ordinary_null_stage4_2n_campaign_receipt/1",
+  "run_id": "casimir-dp-material-thermal-ordinary-null-stage4-2n-v1-20260806T120000000Z",
+  "generated_at": "2026-08-06T12:00:00.000Z",
+  "config_path": "configs/research/casimir-dp-material-thermal-ordinary-null-stage4-2n.v1.json",
+  "config_sha256": "296f5273793283841311a2c5554d55ad62610533bf911048b495e4ba39c167a6",
+  "upstream_verification_receipt_sha256": "bf89dc469b7d5770c69d01eec80acc312816ef8e054b2fbd7e74af7e77f95a3f",
+  "fixture_sha256": "e7443a412036ace2bb7a580962693b73d8109ff506638a29d6ca00a062d19fe8",
+  "optical_table_sha256": "f7806ae50a589fc1f46321a6dbe60007f76045ec34621c408a23cd21cdbde3b9",
+  "report_json_sha256": "c6c0834f0651ce1e1bd4fffd8834e431ce49a05b3f0056a133eea851a3e8fcb3",
+  "report_markdown_sha256": "9a2263b351de6b9dff74497f6ec418aacac49bc4ffcc95e9ae9e75b2bed956d7",
+  "trace_sha256": "0a8ff8e290e04e9d8eebd4bb2a0c764f5ee23a0be6fbc192669a20d9fcc2374b",
+  "software_pipeline": "pass",
+  "measured_evidence": "not_ready",
+  "ordinary_null_authority": "not_ready",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0
+}

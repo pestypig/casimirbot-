@@ -1,0 +1,165 @@
+{
+  "schema_version": "casimir_dp_material_thermal_ordinary_null_fixture_stage4_2n/1",
+  "evidence_class": "synthetic_fixture",
+  "optical_response": {
+    "material_id": "diamond_candidate_002_synthetic_response",
+    "label": "Synthetic passive diamond-like loss table at the Stage-4.2M design temperature",
+    "source_ref": "synthetic://casimir-dp-stage4-2n/diamond-loss-table-v1",
+    "raw_artifact_path": "configs/research/fixtures/casimir-dp-stage4-2n-diamond-loss.synthetic.csv",
+    "expected_sha256": "f7806ae50a589fc1f46321a6dbe60007f76045ec34621c408a23cd21cdbde3b9",
+    "actual_sha256": "f7806ae50a589fc1f46321a6dbe60007f76045ec34621c408a23cd21cdbde3b9",
+    "calibration_refs": [],
+    "points": [
+      { "omega_rad_s": 1e10, "epsilon_imag": 1e-6, "standard_uncertainty": 1e-8 },
+      { "omega_rad_s": 1e11, "epsilon_imag": 2e-6, "standard_uncertainty": 2e-8 },
+      { "omega_rad_s": 1e12, "epsilon_imag": 8e-6, "standard_uncertainty": 8e-8 },
+      { "omega_rad_s": 1e13, "epsilon_imag": 4e-5, "standard_uncertainty": 4e-7 },
+      { "omega_rad_s": 1e14, "epsilon_imag": 2e-4, "standard_uncertainty": 2e-6 },
+      { "omega_rad_s": 1e15, "epsilon_imag": 8e-3, "standard_uncertainty": 8e-5 },
+      { "omega_rad_s": 1e16, "epsilon_imag": 0.15, "standard_uncertainty": 0.0015 },
+      { "omega_rad_s": 1e17, "epsilon_imag": 0.02, "standard_uncertainty": 0.0002 }
+    ],
+    "required_coverage": { "min_omega_rad_s": 1e10, "max_omega_rad_s": 1e17 },
+    "tails": { "low_frequency_model": null, "high_frequency_model": null },
+    "xi_rad_s": [1e10, 1e11, 1e12, 1e13, 1e14, 1e15]
+  },
+  "green_response": {
+    "source_ref": "synthetic://casimir-dp-stage4-2n/finite-rectangle-green-table-v1",
+    "solver_name": "stage4_2n_synthetic_finite_geometry_recovery",
+    "solver_version": "1",
+    "independent_solver_receipt_available": false,
+    "reciprocity_relative_tolerance": 1e-12,
+    "interpolation_relative_error": 1e-7,
+    "maximum_interpolation_relative_error": 1e-5,
+    "samples": [
+      {
+        "omega_rad_s": 1e11,
+        "real_m_inv": [[0.8, 0.02, 0], [0.02, 0.9, 0], [0, 0, 1.2]],
+        "imaginary_m_inv": [[0.01, 0.0002, 0], [0.0002, 0.012, 0], [0, 0, 0.018]]
+      },
+      {
+        "omega_rad_s": 1e13,
+        "real_m_inv": [[0.6, 0.015, 0], [0.015, 0.7, 0], [0, 0, 1.0]],
+        "imaginary_m_inv": [[0.02, 0.0004, 0], [0.0004, 0.024, 0], [0, 0, 0.036]]
+      },
+      {
+        "omega_rad_s": 1e15,
+        "real_m_inv": [[0.3, 0.008, 0], [0.008, 0.35, 0], [0, 0, 0.5]],
+        "imaginary_m_inv": [[0.04, 0.0008, 0], [0.0008, 0.048, 0], [0, 0, 0.072]]
+      }
+    ]
+  },
+  "probe": {
+    "state_ref": "synthetic://casimir-dp-stage4-2n/diamond-sphere-polarizability-v1",
+    "polarizability_SI": [[5e-31, 0, 0], [0, 5e-31, 0], [0, 0, 5e-31]],
+    "oscillator_omega_rad_s": 6283.185307179586
+  },
+  "branch_trace": {
+    "time_s": [0, 0.125, 0.25],
+    "branch_a_potential_J": [-1e-35, -1e-35, -1e-35],
+    "branch_b_potential_J": [-1.563425462e-36, -1.563425462e-36, -1.563425462e-36],
+    "branch_a_potential_standard_uncertainty_J": [1e-39, 1e-39, 1e-39],
+    "branch_b_potential_standard_uncertainty_J": [1e-39, 1e-39, 1e-39],
+    "branch_a_force_N": [[-1e-22, 0, 0], [-1e-22, 0, 0], [-1e-22, 0, 0]],
+    "branch_b_force_N": [[-8e-23, 0, 0], [-8e-23, 0, 0], [-8e-23, 0, 0]],
+    "branch_a_force_standard_uncertainty_N": [[1e-24, 1e-25, 1e-25], [1e-24, 1e-25, 1e-25], [1e-24, 1e-25, 1e-25]],
+    "branch_b_force_standard_uncertainty_N": [[8e-25, 1e-25, 1e-25], [8e-25, 1e-25, 1e-25], [8e-25, 1e-25, 1e-25]],
+    "differential_force_gradient_N_m": [1e-17, 1e-17, 1e-17],
+    "differential_force_gradient_standard_uncertainty_N_m": [1e-19, 1e-19, 1e-19],
+    "path_swap": true
+  },
+  "noise": {
+    "source_ref": "synthetic://casimir-dp-stage4-2n/green-fdt-noise-v1",
+    "omega_rad_s": [-2000, -1000, 0, 1000, 2000],
+    "energy_difference_psd_J2_s": [1e-73, 2e-73, 3e-73, 2e-73, 1e-73],
+    "energy_difference_psd_standard_uncertainty_J2_s": [1e-75, 2e-75, 3e-75, 2e-75, 1e-75],
+    "force_noise_psd_N2_s": [
+      [[1e-50, 0, 0], [0, 5e-51, 0], [0, 0, 5e-51]],
+      [[2e-50, 0, 0], [0, 1e-50, 0], [0, 0, 1e-50]],
+      [[3e-50, 0, 0], [0, 1.5e-50, 0], [0, 0, 1.5e-50]],
+      [[2e-50, 0, 0], [0, 1e-50, 0], [0, 0, 1e-50]],
+      [[1e-50, 0, 0], [0, 5e-51, 0], [0, 0, 5e-51]]
+    ],
+    "force_noise_psd_standard_uncertainty_N2_s": [
+      [[1e-52, 0, 0], [0, 5e-53, 0], [0, 0, 5e-53]],
+      [[2e-52, 0, 0], [0, 1e-52, 0], [0, 0, 1e-52]],
+      [[3e-52, 0, 0], [0, 1.5e-52, 0], [0, 0, 1.5e-52]],
+      [[2e-52, 0, 0], [0, 1e-52, 0], [0, 0, 1e-52]],
+      [[1e-52, 0, 0], [0, 5e-53, 0], [0, 0, 5e-53]]
+    ],
+    "ramsey_filter_abs2_s2": [0.0625, 0.0625, 0.0625, 0.0625, 0.0625],
+    "echo_filter_abs2_s2": [0.000625, 0.0003125, 0, 0.0003125, 0.000625]
+  },
+  "thermal_recovery": {
+    "source_temperature_K": 4,
+    "environment_temperature_K": 4,
+    "source_emissivity": 0.02,
+    "environment_emissivity": 0.02,
+    "gross_thermal_power_W": 1e-20,
+    "energy_transfer_variance_rate_J2_s": 1e-42,
+    "recoil_force_N": [0, 0, 0],
+    "occupation_heating_rate_s": 1e-6,
+    "decoherence_rate_s": 0.00001,
+    "accumulated_covariance": [
+      [1e-42, 0, 0, 0],
+      [0, 1e-44, 0, 0],
+      [0, 0, 1e-12, 0],
+      [0, 0, 0, 1e-12]
+    ]
+  },
+  "calibration_interventions": [
+    {
+      "intervention_id": "known-electric-phase",
+      "kind": "electric_phase",
+      "expected_phase_rad": 0.01,
+      "expected_chi": 0.000001,
+      "observed_complex": [0.9999490004671648, 0.009999823334338331],
+      "covariance": [[1e-8, 0], [0, 1e-8]],
+      "evidence_class": "synthetic_fixture"
+    },
+    {
+      "intervention_id": "controlled-temperature-step",
+      "kind": "temperature",
+      "expected_phase_rad": 0.002,
+      "expected_chi": 0.0002,
+      "observed_complex": [0.9997980203992932, 0.0019995987069309066],
+      "covariance": [[1e-8, 0], [0, 1e-8]],
+      "evidence_class": "synthetic_fixture"
+    },
+    {
+      "intervention_id": "controlled-gap-step",
+      "kind": "gap",
+      "expected_phase_rad": -0.005,
+      "expected_chi": 0.00005,
+      "observed_complex": [0.9999375019010038, -0.004999729173984243],
+      "covariance": [[1e-8, 0], [0, 1e-8]],
+      "evidence_class": "synthetic_fixture"
+    },
+    {
+      "intervention_id": "known-optical-recoil",
+      "kind": "optical_recoil",
+      "expected_phase_rad": 0.0001,
+      "expected_chi": 0.001,
+      "observed_complex": [0.9990004948383725, 0.00009990004981683743],
+      "covariance": [[1e-8, 0], [0, 1e-8]],
+      "evidence_class": "synthetic_fixture"
+    },
+    {
+      "intervention_id": "sham-switch",
+      "kind": "sham",
+      "expected_phase_rad": 0,
+      "expected_chi": 0,
+      "observed_complex": [1, 0],
+      "covariance": [[1e-8, 0], [0, 1e-8]],
+      "evidence_class": "synthetic_fixture"
+    }
+  ],
+  "empirical_authorities": {
+    "specimen_specific_temperature_matched_spectrum": false,
+    "as_built_cad_and_alignment": false,
+    "full_maxwell_green_tensor": false,
+    "independent_green_solver": false,
+    "measured_phase_loss_calibrations": false,
+    "measured_block_covariance": false
+  }
+}

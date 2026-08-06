@@ -1,0 +1,117 @@
+{
+  "schema_version": "casimir_dp_boundary_branch_interaction_stage4_2i/1",
+  "study_id": "casimir-dp-quantum-foam-study-v1",
+  "campaign_id": "casimir-dp-boundary-branch-interaction-stage4-2i-v1",
+  "implementation_version": "stage4.2i-v1",
+  "evidence_cutoff": "2026-08-05T16:00:00.000Z",
+  "evidence_class": "synthetic_interaction_diagnostic_and_wavepacket_contract_only",
+  "claim_ceiling": "boundary_branch_nonfactorization_diagnostic_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "authority_manifest": {
+    "path": "configs/research/casimir-dp-stage4-2i-authorities.v1.json",
+    "sha256": "8078f2b05998ad145901444433296d244651a06ab1f75c3aa70b9d5ae2cb7423"
+  },
+  "upstream_authorities": [
+    {
+      "role": "stage4_2h_config",
+      "path": "configs/research/casimir-dp-commissioning-intake-stage4-2h.v1.json",
+      "sha256": "d1021844f62adadfe3b77f9b36b742a27b7c086c56008778ae2c01dcf6daaa42",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2h_blank_dossier",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2h-commissioning-blank.v1.json",
+      "sha256": "57318b8bc2986530154fb02bb2765e5dc5a711920d8c88483bc19772625bad65",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2h_report",
+      "path": "artifacts/research/casimir-dp-commissioning-intake-stage4-2h/casimir-dp-commissioning-intake-stage4-2h-v1-20260730T050000000Z/commissioning-intake-stage4-2h-report.json",
+      "sha256": "d5954986d73d7eb9d5d9a07ad4f945d9b636d1c6a37efe28c2de6b5ad1fd32aa",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2h_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-commissioning-intake-stage4-2h/casimir-dp-commissioning-intake-stage4-2h-v1-20260730T050000000Z/commissioning-intake-stage4-2h-receipt.json",
+      "sha256": "d0aacee6611e5aec1c75934a24fc709c434107e3e685eba0f96fc1addd1be56b",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2h_verification_receipt",
+      "path": "docs/research/casimir-dp-commissioning-intake-stage4-2h-verification-receipt.json",
+      "sha256": "acbab1f786e688fe04ad2d5cae15219166368e41b01b8df5949617ef150ce364",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_single_apparatus_config",
+      "path": "configs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g.v1.json",
+      "sha256": "a9516529a7c2f935c777fc4c1b29c207457a8f1618f1df580bff89ee27692487",
+      "required_at_runtime": true
+    }
+  ],
+  "method_authorities": [
+    {
+      "role": "stage4_2h_commissioning_evaluator",
+      "path": "shared/casimir-dp-commissioning-intake-stage4-2h.ts",
+      "sha256": "9592b76fec71b25ecf180634afe0a4ba3c74b5edc69906320b41e382bf8ea8d7",
+      "required_at_runtime": true
+    }
+  ],
+  "immutable_stage4_2h": {
+    "campaign_run_id": "casimir-dp-commissioning-intake-stage4-2h-v1-20260730T050000000Z",
+    "report_sha256": "d5954986d73d7eb9d5d9a07ad4f945d9b636d1c6a37efe28c2de6b5ad1fd32aa",
+    "campaign_receipt_sha256": "d0aacee6611e5aec1c75934a24fc709c434107e3e685eba0f96fc1addd1be56b",
+    "verification_receipt_sha256": "acbab1f786e688fe04ad2d5cae15219166368e41b01b8df5949617ef150ce364",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  },
+  "fixture": {
+    "path": "configs/research/fixtures/casimir-dp-stage4-2i-factorial.synthetic.v1.json",
+    "sha256": "36c38578b6df5e73c4441cb3f509cf10931f72249425e798e9e2c4f8d362eaa7"
+  },
+  "tolerances": {
+    "minimum_coherence_magnitude": 0.05,
+    "dp_boundary_exponent_absolute": 1e-15,
+    "branch_center_equivalence_m": 1e-12,
+    "packet_covariance_equivalence_m2": 1e-24,
+    "overlap_equivalence_absolute": 1e-12,
+    "hold_time_equivalence_s": 1e-9,
+    "momentum_equivalence_kg_m_s": 1e-30,
+    "projection_equivalence_absolute": 1e-10,
+    "covariance_symmetry_absolute": 1e-18,
+    "cholesky_positive_pivot": 1e-20,
+    "interaction_z_threshold": 1.96
+  },
+  "run_order": [
+    "verify_immutable_stage4_2h_authority_tuples",
+    "freeze_factorial_cell_and_complex_coordinate_order",
+    "validate_structured_wavepacket_custody",
+    "validate_boundary_to_boundary_branch_equivalence",
+    "validate_joint_complex_covariance",
+    "recover_boundary_independent_dp_cancellation",
+    "compute_raw_complex_interaction_contrast",
+    "compute_complex_cross_ratio_amplitude_and_phase",
+    "subtract_registered_ordinary_physics_interaction",
+    "propagate_joint_covariance_without_postfreeze_refit",
+    "compare_factorial_contrast_with_whitened_projection",
+    "run_adversarial_recovery_and_fail_closed_cases",
+    "preserve_zero_unregistered_transfer_edges",
+    "write_content_addressed_report_trace_and_receipt"
+  ],
+  "final_status_policy": {
+    "software_contract": "pass",
+    "synthetic_recovery": "pass",
+    "branch_control_empirical_authority": "not_ready",
+    "wavepacket_custody_empirical_authority": "not_ready",
+    "ordinary_interaction_model_empirical_authority": "not_ready",
+    "measured_interaction_contrast": "not_ready",
+    "transfer_kernel": "not_registered",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  }
+}

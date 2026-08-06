@@ -1,27 +1,24 @@
 {
-  "schema": "casimir_dp_print_pdf_validation/1",
+  "schema": "casimir_dp_print_pdf_validation/2",
   "pdf_path": "output/pdf/casimir-dp-quantum-foam-study-print.pdf",
-  "sha256": "0323efa166447b59030f2f353060e4af08d9ab748a97c9fcd19a82e740f29de8",
-  "bytes": 2846390,
-  "pages": 107,
-  "page_sizes_points": [
-    [
-      612.0,
-      792.0
-    ]
-  ],
-  "all_pages_letter": true,
-  "tagged": true,
-  "outline_entries": 110,
-  "outline_titles_nonempty": true,
-  "link_annotations": 111,
-  "external_links": 21,
-  "internal_links": 90,
-  "empty_text_pages": [],
-  "replacement_characters": 0,
-  "outside_page_characters": [],
-  "missing_expected_text": [],
-  "has_acroform": false,
-  "has_javascript": false,
-  "pass": true
+  "source_path": "docs/research/casimir-dp-quantum-foam-study.md",
+  "filename_from_service": "an-identifiability-first-feasibility-protocol-for-a-gaussian-regularized-diosi-collapse-test-with-a-casimir-boundary-con-print.pdf",
+  "sha256": "c242b319f8c863005edd0b6d6b946088a3f60173e62d63181e37e50d60f07f92",
+  "source_sha256": "a6f50805b23580f199067168893ce42a7e385dcc9c2dcdaff8e6cac27c4d6204",
+  "bytes": 849941,
+  "pages": 29,
+  "equations": 123,
+  "tables": 9,
+  "diagnostics": {
+    "headings": 49,
+    "toc_links": 45,
+    "tables": 9,
+    "display_math": 36,
+    "inline_math": 87,
+    "katex_errors": 0,
+    "broken_images": 0,
+    "overflow_count": 0,
+    "omitted_remote_images": 0
+  },
+  "validation": "pass"
 }

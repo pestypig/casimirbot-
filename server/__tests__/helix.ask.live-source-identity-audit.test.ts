@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { buildLiveSourceIdentityAudit } from "../services/helix-ask/live-source-identity-audit";
+import {
+  attachLiveSourceIdentityAudit,
+  buildLiveSourceIdentityAudit,
+} from "../services/helix-ask/live-source-identity-audit";
 import { createLiveAnswerEnvironment, resetLiveAnswerEnvironments } from "../services/situation-room/live-answer-environment-store";
 import { recordLiveFieldEvaluation, resetLiveFieldEvaluationsForTest } from "../services/situation-room/live-field-evaluation-store";
 import { appendInterpretationCard, resetInterpretationCardsForTest } from "../services/situation-room/interpretation-card-store";
@@ -153,6 +156,60 @@ describe("Helix live source identity audit", () => {
       source_id: "visual_source:fresh",
       mutating: false,
     });
+  });
+
+  it("attaches one non-answer identity artifact at the shared terminal boundary", () => {
+    const seed = seedBackendLiveVisualSourceForAskTest({
+      thread_id: threadId,
+      source_id: "visual_source:attached",
+    });
+    const payload: Record<string, unknown> = {
+      source_target_intent: {
+        target_source: "visual_capture",
+        strength: "hard",
+      },
+      situation_evidence_selection: {
+        situation_run_id: seed.situation_run_id,
+        selected_observation_refs: [seed.observation_ref],
+      },
+      current_turn_artifact_ledger: [],
+      ask_turn_solver_trace: {},
+      debug: { ask_turn_solver_trace: {} },
+    };
+
+    const first = attachLiveSourceIdentityAudit({
+      payload,
+      threadId,
+      turnId: "turn:attach",
+      promptText: "What is happening in the visual capture?",
+      selectedRoute: "/ask/turn",
+      terminalArtifactKind: "situation_context_pack",
+    });
+    const second = attachLiveSourceIdentityAudit({
+      payload,
+      threadId,
+      turnId: "turn:attach",
+      promptText: "What is happening in the visual capture?",
+      selectedRoute: "/ask/turn",
+      terminalArtifactKind: "situation_context_pack",
+    });
+
+    expect(first).toMatchObject({ diagnosis: "ok", identity_ok: true });
+    expect(second?.audit_id).toBe(first?.audit_id);
+    expect(payload.live_source_identity_audit).toEqual(second);
+    expect((payload.debug as Record<string, unknown>).live_source_identity_audit)
+      .toEqual(second);
+    expect((payload.current_turn_artifact_ledger as unknown[])).toHaveLength(1);
+    expect(payload.current_turn_artifact_ledger).toEqual([
+      expect.objectContaining({
+        kind: "validation",
+        producer_item_id: "live_source_identity_audit",
+        payload: expect.objectContaining({
+          assistant_answer: false,
+          raw_content_included: false,
+        }),
+      }),
+    ]);
   });
 
   it("diagnoses missing active environment and missing active source separately", () => {

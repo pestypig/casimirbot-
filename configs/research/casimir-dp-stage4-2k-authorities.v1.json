@@ -1,0 +1,22 @@
+{
+  "schema_version": "casimir_dp_stage4_2k_authorities/1",
+  "campaign_id": "casimir-dp-microscopic-em-closure-stage4-2k-v1",
+  "immutable_upstream": [
+    { "role": "stage4_2j_config", "path": "configs/research/casimir-dp-schrodinger-mass-density-stage4-2j.v1.json", "sha256": "eb55b4b8aeeedc7e32feddab4a4c86a4917a61c97b227581ff8efd3cc6fa1280", "required_at_runtime": true },
+    { "role": "stage4_2j_report", "path": "artifacts/research/casimir-dp-schrodinger-mass-density-stage4-2j/casimir-dp-schrodinger-mass-density-stage4-2j-v1-20260806T040000000Z/schrodinger-mass-density-stage4-2j-report.json", "sha256": "02ea5911d809480df2763c2381314fd2c7637940b958a78abd0cdde6ae923ed8", "required_at_runtime": true },
+    { "role": "stage4_2j_campaign_receipt", "path": "artifacts/research/casimir-dp-schrodinger-mass-density-stage4-2j/casimir-dp-schrodinger-mass-density-stage4-2j-v1-20260806T040000000Z/schrodinger-mass-density-stage4-2j-receipt.json", "sha256": "54358d0294652a457d1c628147ace2acbc337b45a546ae7e2fdb443a563f74a9", "required_at_runtime": true },
+    { "role": "stage4_2j_verification_receipt", "path": "docs/research/casimir-dp-schrodinger-mass-density-stage4-2j-verification-receipt.json", "sha256": "fbe99aa93085b12ebba7a59328993174015a0a4dcb83db3e5c531990c025cedd", "required_at_runtime": true }
+  ],
+  "method_authorities": [
+    { "role": "stage4_2j_schrodinger_mass_density_evaluator", "path": "shared/casimir-dp-schrodinger-mass-density-stage4-2j.ts", "sha256": "eea077423bd3dfa650b4e0a58fc6fc35dec9c948331bdb993935045010d9c860", "required_at_runtime": true },
+    { "role": "stage4_2i_four_cell_evaluator", "path": "shared/casimir-dp-boundary-branch-interaction-stage4-2i.ts", "sha256": "2b8c430861fdbf1967b9760127751a77f56cb173ac8fe8bde17c5bb2ece0ca46", "required_at_runtime": true },
+    { "role": "stage4_2f_maxwell_green_fdt_evaluator", "path": "shared/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.ts", "sha256": "3db6cd0776167bde3ad5a0a63103f90a349dac4861acd30970a3d5467e9fbcbb", "required_at_runtime": true }
+  ],
+  "literature_authorities": [
+    { "source_id": "lifshitz_1956", "url": "https://www.jetp.ras.ru/cgi-bin/index/e/2/1/p73?a=list", "supports": "Causal material response as the authority for forces between real bodies.", "does_not_support": "A boundary-conditioned collapse generator." },
+    { "source_id": "jaffe_2005", "doi": "10.1103/PhysRevD.72.021301", "url": "https://doi.org/10.1103/PhysRevD.72.021301", "supports": "Casimir forces can be formulated as QED interactions of charges and currents without literal vacuum-particle density.", "does_not_support": "Treating virtual photons as a measurable local number density." },
+    { "source_id": "emig_etal_2007", "doi": "10.1103/PhysRevLett.99.170403", "url": "https://doi.org/10.1103/PhysRevLett.99.170403", "supports": "Finite-object Casimir energies from material and geometry scattering matrices.", "does_not_support": "The ideal-plane dipole screen as a final apparatus solve." },
+    { "source_id": "le_kien_etal_2022", "doi": "10.1103/PhysRevA.105.042817", "url": "https://doi.org/10.1103/PhysRevA.105.042817", "supports": "Ground-state transition sums enter polarizability and the scattering Green tensor enters Casimir-Polder energy.", "does_not_support": "Replacing a silica solid with an isolated two-level atom." },
+    { "source_id": "hornberger_2006", "doi": "10.1103/PhysRevLett.97.060601", "url": "https://doi.org/10.1103/PhysRevLett.97.060601", "supports": "Quantum linear-Boltzmann treatment of gas-induced decoherence and dissipation.", "does_not_support": "A QLBE forecast without measured species and scattering inputs." }
+  ]
+}

@@ -99,6 +99,221 @@ const buildVerifiedLifecycle = (
 };
 
 describe("artifact query index runtime re-entry authority", () => {
+  it("keeps a runtime-verified connector-offline typed failure off the terminal-materializer rail", () => {
+    const turnId = "ask:test:connector-offline-typed-failure-rail";
+    const capability = "com.casimirbot.minecraft.inventory.check";
+    const observationRef = `${turnId}:workstation_gateway:${capability}:1`;
+    const lifecycle = createHelixTurnLifecycleRecorder({
+      turnId,
+      scope: "codex_native_provider_cycle",
+      now: () => 200,
+    });
+    const started = lifecycle.append({
+      kind: "turn.started",
+      producer: "helix_adapter",
+      status: "started",
+    });
+    const route = lifecycle.append({
+      kind: "route.committed",
+      producer: "helix_policy",
+      status: "succeeded",
+      causation_id: started.event_id,
+      route_commit_id: "route:live_environment",
+      capability_ids: [capability],
+    });
+    const rejected = lifecycle.append({
+      kind: "tool.call.rejected",
+      producer: "helix_policy",
+      status: "blocked",
+      causation_id: route.event_id,
+      route_commit_id: "route:live_environment",
+      call_id: `call:${capability}`,
+      capability_id: capability,
+      observation_refs: [observationRef],
+      reason_code: "connector_offline",
+    });
+    const reentered = lifecycle.append({
+      kind: "observation.reentered",
+      producer: "helix_adapter",
+      status: "succeeded",
+      causation_id: rejected.event_id,
+      route_commit_id: "route:live_environment",
+      call_id: `call:${capability}`,
+      capability_id: capability,
+      observation_refs: [observationRef],
+    });
+    const message = lifecycle.append({
+      kind: "agent.message.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: reentered.event_id,
+      message_sha256: "hash:connector-offline",
+    });
+    const completed = lifecycle.append({
+      kind: "runtime.turn.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: message.event_id,
+    });
+    const eligibility = lifecycle.append({
+      kind: "terminal.eligibility.checked",
+      producer: "helix_terminal_authority",
+      status: "succeeded",
+      causation_id: completed.event_id,
+      terminal_kind: "typed_failure",
+      terminal_eligible: true,
+    });
+    lifecycle.append({
+      kind: "turn.failed",
+      producer: "helix_adapter",
+      status: "failed",
+      causation_id: eligibility.event_id,
+      terminal_kind: "typed_failure",
+      terminal_eligible: true,
+      reason_code: "connector_offline",
+    });
+
+    const index = buildArtifactQueryIndex({
+      turnId,
+      payload: {
+        active_prompt: "Check my current Minecraft inventory.",
+        response_type: "final_failure",
+        final_status: "final_failure",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        terminal_error_code: "connector_offline",
+        typed_failure: {
+          schema: "helix.typed_failure.v1",
+          error_code: "connector_offline",
+          message:
+            "No currently credentialed, registry-admitted Minecraft connector is available for the bound room.",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          target_source: "live_environment",
+          target_kind: "live_environment",
+          strength: "hard",
+          must_enter_backend_ask: true,
+          allow_client_shortcut: false,
+          allow_no_tool_direct: false,
+        },
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          source_target: "live_environment",
+          required_terminal_artifact_kind: "model_synthesized_answer",
+          allowed_terminal_artifact_kinds: [
+            "model_synthesized_answer",
+            "typed_failure",
+          ],
+          forbidden_terminal_artifact_kinds: [],
+        },
+        tool_call_admission_decision: {
+          schema: "helix.tool_call_admission_decision.v1",
+          requested_capability: capability,
+          admitted_capability: capability,
+          requested_capability_family: "live_environment",
+          requested_capability_source: "explicit_user_command",
+          required_observation_kinds_for_requested_capability: [
+            "provider_gateway_observation_packet",
+          ],
+        },
+        capability_plan: {
+          requested_capability: capability,
+          selected_capability: capability,
+          capability_family: "live_environment",
+          admission_status: "admitted",
+        },
+        tool_lifecycle_trace: {
+          schema: "helix.tool_lifecycle_trace.v1",
+          requested_capability: capability,
+          admitted_capability: capability,
+          executed_capability: capability,
+          lifecycle_stage: "completed",
+          observation_refs: [observationRef],
+        },
+        runtime_tool_call: {
+          capability_key: capability,
+          status: "failed",
+        },
+        loop_parity_trace: {
+          schema: "helix.loop_parity_trace.v1",
+          selected_route: "/ask/turn/stream",
+          actual_tool_calls: [
+            { tool_id: capability, result_ref: observationRef },
+          ],
+          observations_created: [
+            {
+              observation_id: observationRef,
+              source_kind: "provider_gateway_observation_packet",
+            },
+          ],
+          route_authority_ok: true,
+        },
+        turn_lifecycle: lifecycle.snapshot(),
+        route_authority_audit: { route_authority_ok: true },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          terminal_artifact_kind: "typed_failure",
+          server_authoritative: true,
+        },
+        terminal_authority_single_writer: {
+          schema: "helix.terminal_authority_single_writer_result.v1",
+          selected_terminal_artifact_kind: "typed_failure",
+          selected_terminal_artifact_ref: `${turnId}:typed_failure:connector_offline`,
+          source: "typed_failure",
+          integrity: { single_writer_applied: true },
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          terminal_artifact_kind: "typed_failure",
+          final_answer_source: "typed_failure",
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: observationRef,
+            kind: "provider_gateway_observation_packet",
+            payload_schema: "helix.agent_step_observation_packet.v1",
+            capability_key: capability,
+            status: "failed",
+            error_code: "connector_offline",
+          },
+          {
+            artifact_id: `${turnId}:typed_failure:connector_offline`,
+            kind: "typed_failure",
+            payload: {
+              schema: "helix.typed_failure.v1",
+              error_code: "connector_offline",
+            },
+          },
+        ],
+      },
+    });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      observation_ref: observationRef,
+      reentry_proven: true,
+      materialized_terminal_artifact_kind: "typed_failure",
+      terminal_authority_kind: "typed_failure",
+      visible_terminal_kind: "typed_failure",
+      rail_status: "complete",
+      rail_failure_code: null,
+      terminal_eligible: false,
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      reentry_status: "reentered",
+      selected_terminal_kind: "typed_failure",
+      visible_terminal_kind: "typed_failure",
+      first_broken_rail: null,
+      repair_target: null,
+      codex_parity_class: "complete",
+      rail_status: "complete",
+      rail_failure_code: null,
+      terminal_eligible: false,
+    });
+  });
+
   it("keeps an observed requested action authoritative across a later supporting inspection", () => {
     const turnId = "ask:test:minecraft-inspect-act-chain";
     const commandCapability = "com.casimirbot.minecraft.command";

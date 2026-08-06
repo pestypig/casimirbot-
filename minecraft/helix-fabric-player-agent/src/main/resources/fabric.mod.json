@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "helix_fabric_player_agent",
+  "version": "${version}",
+  "name": "Helix Fabric Player Agent",
+  "description": "Separately paired, capability-scoped player embodiment for Helix.",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.casimirbot.helixplayer.fabric.HelixFabricPlayerAgentClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "minecraft": "~1.21.8",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

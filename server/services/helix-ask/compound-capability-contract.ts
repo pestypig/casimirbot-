@@ -125,7 +125,7 @@ export type HelixCompoundCapabilitySubgoal = {
     user_directed_noop_guard: true;
   };
   status: "pending";
-  mandatory: true;
+  mandatory: boolean;
 };
 
 export type HelixCompoundCapabilityContract = {
@@ -625,6 +625,33 @@ const minecraftGuardedNoopPolicyForSubgoal = (input: {
     requires_successful_observation: true,
     user_directed_noop_guard: true,
   };
+};
+
+const minecraftCommandIsConditionalOnPriorInspection = (input: {
+  promptText: string;
+  match: ExtractedExplicitCapabilityContract;
+  ordered: ExtractedExplicitCapabilityContract[];
+}): boolean => {
+  if (input.match.contract.capability !== HELIX_MINECRAFT_COMMAND_CAPABILITY) {
+    return false;
+  }
+  const commandIndex = input.ordered.indexOf(input.match);
+  const inspectionPrecedesCommand = input.ordered
+    .slice(0, commandIndex)
+    .some(
+      (candidate) =>
+        candidate.contract.capability ===
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    );
+  if (!inspectionPrecedesCommand) return false;
+  return (
+    /\b(?:if|only\s+if|provided\s+that)\b[^.!?]{0,120}\b(?:safe|suitable|clear|appropriate|acceptable)\b[^.!?]{0,140}\b(?:arm|build|construct|place|set|fill|ignite|light|start|change|mutate|execute|run)\b/iu.test(
+      input.promptText,
+    ) ||
+    /\b(?:arm|build|construct|place|set|fill|ignite|light|start|change|mutate|execute|run)\b[^.!?]{0,100}\bonly\s+if\b[^.!?]{0,120}\b(?:safe|suitable|clear|appropriate|acceptable)\b/iu.test(
+      input.promptText,
+    )
+  );
 };
 
 const argsHintForSubgoal = (input: {
@@ -1423,6 +1450,12 @@ export const buildHelixCompoundCapabilityContract = (input: {
       match,
       ordered,
     });
+    const conditionalOnPriorInspection =
+      minecraftCommandIsConditionalOnPriorInspection({
+        promptText: input.promptText,
+        match,
+        ordered,
+      });
     return {
       subgoal_id: subgoalId,
       order: index + 1,
@@ -1455,16 +1488,26 @@ export const buildHelixCompoundCapabilityContract = (input: {
         ? { guarded_noop_policy: guardedNoopPolicy }
         : {}),
       status: "pending",
-      mandatory: true,
+      mandatory: !conditionalOnPriorInspection,
     };
   });
+  const mandatorySubgoals = subgoals.filter(
+    (subgoal) => subgoal.mandatory !== false,
+  );
   return {
     schema: HELIX_COMPOUND_CAPABILITY_CONTRACT_SCHEMA,
     turn_id: input.turnId,
     prompt_shape: subgoals.length > 1 ? "compound_capability" : "single_capability",
     subgoals,
-    required_capabilities: unique(subgoals.map((subgoal: HelixCompoundCapabilitySubgoal) => subgoal.requested_capability)),
-    requires_all_subgoals: subgoals.length > 1,
+    required_capabilities: unique(
+      mandatorySubgoals.map(
+        (subgoal: HelixCompoundCapabilitySubgoal) =>
+          subgoal.requested_capability,
+      ),
+    ),
+    requires_all_subgoals:
+      subgoals.length > 1 &&
+      subgoals.every((subgoal) => subgoal.mandatory !== false),
     terminal_policy: "synthesize_from_satisfied_subgoal_observations",
     assistant_answer: false,
     raw_content_included: false,

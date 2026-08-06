@@ -3,7 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { codexProvider } from "../codex-provider";
+import {
+  codexProvider,
+  shouldAllowCodexObservationDependentCapabilityProposal,
+} from "../codex-provider";
 
 const ENV_KEYS = [
   "CODEX_AGENT_FAKE_STDOUT",
@@ -24,6 +27,36 @@ afterEach(() => {
 });
 
 describe("Codex provider continuation state", () => {
+  it.each(["post_attempt", "final_review", "terminal_rejection"] as const)(
+    "keeps a missing admitted action proposal open during %s",
+    (trigger) => {
+      expect(
+        shouldAllowCodexObservationDependentCapabilityProposal({
+          trigger,
+          payload: {
+            capability_itinerary_execution_state: {
+              schema: "helix.capability_itinerary_execution_state.v1",
+              applies: true,
+              complete: false,
+              missing_required_capabilities: [
+                "com.casimirbot.minecraft.command",
+              ],
+            },
+          },
+          admittedCapabilityIds: [
+            "com.casimirbot.minecraft.spatial_region.inspect",
+            "com.casimirbot.minecraft.command.catalog",
+            "com.casimirbot.minecraft.command",
+          ],
+          lastAttempt: {
+            status: "succeeded",
+            capability_id: "com.casimirbot.minecraft.command.catalog",
+          },
+        }),
+      ).toBe(true);
+    },
+  );
+
   it("supplies a non-terminal continuation state to a model-only Codex turn and returns it in debug", async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "codex-continuation-state-"));
     const promptPath = path.join(directory, "prompt.txt");

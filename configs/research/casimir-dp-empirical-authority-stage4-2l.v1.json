@@ -1,0 +1,100 @@
+{
+  "schema_version": "casimir_dp_empirical_authority_stage4_2l/1",
+  "study_id": "casimir-dp-quantum-foam-study-v1",
+  "campaign_id": "casimir-dp-empirical-authority-stage4-2l-v1",
+  "implementation_version": "stage4.2l-v1",
+  "evidence_cutoff": "2026-08-06T06:00:00.000Z",
+  "evidence_class": "synthetic_and_literature_bound_empirical_readiness_only",
+  "claim_ceiling": "apparatus_redesign_and_empirical_acquisition_requirements_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "authority_manifest": {
+    "path": "configs/research/casimir-dp-stage4-2l-authorities.v1.json",
+    "sha256": "ba08403bad2024759cac00e4228ef106fc238dc9ec81c3d6eccf5e4691bd5f42"
+  },
+  "apparatus_manifest": {
+    "path": "configs/research/casimir-dp-stage4-2l-apparatus-design-manifest.v1.json",
+    "sha256": "17e37ad4ddaadf7026f7e9b4f431133cbb5dd1cbf1c2d7d921b8fee2af007f68"
+  },
+  "upstream_authorities": [
+    {
+      "role": "stage4_2k_config",
+      "path": "configs/research/casimir-dp-microscopic-em-closure-stage4-2k.v1.json",
+      "sha256": "917e0edc0fecd80ce30cfa775fa5d354a273825253a693a4be5de025ff29fa33",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2k_report",
+      "path": "artifacts/research/casimir-dp-microscopic-em-closure-stage4-2k/casimir-dp-microscopic-em-closure-stage4-2k-v1-20260806T050000000Z/microscopic-em-closure-stage4-2k-report.json",
+      "sha256": "53afcf057f272e191bea1d6218c7656f8d3a4d1b0647a057c87ce7ea4bb093bb",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2k_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-microscopic-em-closure-stage4-2k/casimir-dp-microscopic-em-closure-stage4-2k-v1-20260806T050000000Z/microscopic-em-closure-stage4-2k-receipt.json",
+      "sha256": "4a9697c0dd290820dc782b5a5706e8b7bb7a3fd24a9965ea5a9043eefcc18e12",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2k_verification_receipt",
+      "path": "docs/research/casimir-dp-microscopic-em-closure-stage4-2k-verification-receipt.json",
+      "sha256": "86842783941186f532d23ae2ee8de70f21a888b0ea70b71a12b50bdf005ac614",
+      "required_at_runtime": true
+    }
+  ],
+  "method_authorities": [
+    {
+      "role": "stage4_2k_microscopic_em_evaluator",
+      "path": "shared/casimir-dp-microscopic-em-closure-stage4-2k.ts",
+      "sha256": "091f43c89f236fb4656e1773fefa5d9c7adc40f15fec38c90e9c794a87dc6968",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2j_schrodinger_mass_density_evaluator",
+      "path": "shared/casimir-dp-schrodinger-mass-density-stage4-2j.ts",
+      "sha256": "eea077423bd3dfa650b4e0a58fc6fc35dec9c948331bdb993935045010d9c860",
+      "required_at_runtime": true
+    }
+  ],
+  "fixture": {
+    "path": "configs/research/fixtures/casimir-dp-stage4-2l.synthetic-authority.v1.json",
+    "sha256": "530891e1eb58612021667fa997da2ac750e48b31e50d45cff51a81bf8d997b0f"
+  },
+  "numerical": {
+    "density_integration_upper_u": 8,
+    "density_integration_intervals": 16384,
+    "geometry_crosscheck_relative_tolerance": 0.0001
+  },
+  "run_order": [
+    "verify_immutable_stage4_2k_authority_tuples",
+    "freeze_three_dimensional_apparatus_design_manifest",
+    "validate_material_spectrum_ingestion_and_provenance",
+    "crosscheck_finite_rectangle_green_surrogate",
+    "propagate_phase_response_jacobian_and_covariance",
+    "evaluate_quantum_linear_boltzmann_proxy",
+    "audit_state_preparation_scale_and_sequence",
+    "map_current_external_dp_bound",
+    "evaluate_mass_density_and_regularization_envelope",
+    "preserve_empirical_not_ready_and_zero_bridge_edges",
+    "write_content_addressed_report_trace_and_receipt"
+  ],
+  "final_status_policy": {
+    "software_contract": "pass",
+    "apparatus_design_manifest": "frozen_reference_only",
+    "as_built_geometry": "not_ready",
+    "full_finite_geometry_green_authority": "not_ready",
+    "measured_material_spectrum": "not_ready",
+    "empirical_phase_covariance": "not_ready",
+    "measured_qlbe_environment": "not_ready",
+    "state_preparation": "not_ready",
+    "external_bound_mapping": "partial_scalar_screen_only",
+    "complete_mass_density_authority": "not_ready",
+    "residual_attribution": "blocked",
+    "confirmatory_campaign": "not_authorized",
+    "transfer_kernel": "not_registered",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  }
+}

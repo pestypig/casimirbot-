@@ -53,8 +53,13 @@ export const buildCodexProviderTurnLifecycle = (input: {
     });
   }
 
-  const reentryCompleted = input.providerReasoningReentry?.evidence_reentered === true;
+  const reentryCompleted =
+    input.providerReasoningReentry?.observation_reentered === true ||
+    input.providerReasoningReentry?.evidence_reentered === true;
   const reenteredObservationRefs = new Set([
+    ...readStringArray(
+      input.providerReasoningReentry?.reentered_observation_refs,
+    ),
     ...readStringArray(input.providerReasoningReentry?.input_observation_refs),
     ...readStringArray(input.providerReasoningReentry?.normalized_observation_refs),
   ]);
@@ -128,7 +133,7 @@ export const buildCodexProviderTurnLifecycle = (input: {
         capability_id: capabilityId,
         reason_code: observation.reasonCode ?? "capability_not_admitted",
       });
-      prior = recorder.append({
+      const rejectedCall = recorder.append({
         kind: "tool.call.rejected",
         producer: "helix_policy",
         status: "blocked",
@@ -138,6 +143,24 @@ export const buildCodexProviderTurnLifecycle = (input: {
         observation_refs: observation.observationRefs,
         reason_code: observation.reasonCode ?? "tool_call_rejected",
       });
+      prior = rejectedCall;
+      const exactObservationReentry =
+        reentryCompleted &&
+        observation.observationRefs.length > 0 &&
+        observation.observationRefs.every((ref) =>
+          reenteredObservationRefs.has(ref),
+        );
+      if (exactObservationReentry) {
+        prior = recorder.append({
+          kind: "observation.reentered",
+          producer: "helix_adapter",
+          status: "succeeded",
+          causation_id: rejectedCall.event_id,
+          call_id: callId,
+          capability_id: capabilityId,
+          observation_refs: observation.observationRefs,
+        });
+      }
       continue;
     }
     const started = recorder.append({

@@ -190,7 +190,7 @@ export const helixEnvironmentCapabilityDescriptorSchema = z
     output_schema: helixEnvironmentConstrainedJsonSchema,
     output_schema_hash: sha256Schema,
     freshness_ceiling_ms: z.number().int().positive().max(60 * 60 * 1_000),
-    timeout_ceiling_ms: z.number().int().positive().max(5 * 60 * 1_000),
+    timeout_ceiling_ms: z.number().int().positive().max(30 * 60 * 1_000),
     read_only: z.boolean(),
     side_effects_allowed: z.boolean(),
     requires_current_turn_reentry: z.literal(true),

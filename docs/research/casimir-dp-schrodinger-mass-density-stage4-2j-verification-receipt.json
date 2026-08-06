@@ -1,0 +1,148 @@
+{
+  "schema_version": "casimir_dp_schrodinger_mass_density_stage4_2j_verification_receipt/1",
+  "campaign_id": "casimir-dp-schrodinger-mass-density-stage4-2j-v1",
+  "campaign_run_id": "casimir-dp-schrodinger-mass-density-stage4-2j-v1-20260806T040000000Z",
+  "verified_at": "2026-08-06T03:50:00.000Z",
+  "evidence_class": "synthetic_schrodinger_mass_density_and_environmental_screen_only",
+  "claim_ceiling": "schrodinger_open_system_mass_density_and_environmental_diagnostic_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "campaign_authority": {
+    "config_path": "configs/research/casimir-dp-schrodinger-mass-density-stage4-2j.v1.json",
+    "config_sha256": "eb55b4b8aeeedc7e32feddab4a4c86a4917a61c97b227581ff8efd3cc6fa1280",
+    "authority_manifest_path": "configs/research/casimir-dp-stage4-2j-authorities.v1.json",
+    "authority_manifest_sha256": "e2da246e05d9fd797f0d114204dc3880619785edb52ad23d10099e57428c0f9b",
+    "fixture_path": "configs/research/fixtures/casimir-dp-stage4-2j.synthetic.v1.json",
+    "fixture_sha256": "db8781fe158ea354b363daadf022f7e8e43dc42526a66130506900a8cee14d8d",
+    "report_json_path": "artifacts/research/casimir-dp-schrodinger-mass-density-stage4-2j/casimir-dp-schrodinger-mass-density-stage4-2j-v1-20260806T040000000Z/schrodinger-mass-density-stage4-2j-report.json",
+    "report_json_sha256": "02ea5911d809480df2763c2381314fd2c7637940b958a78abd0cdde6ae923ed8",
+    "report_markdown_path": "artifacts/research/casimir-dp-schrodinger-mass-density-stage4-2j/casimir-dp-schrodinger-mass-density-stage4-2j-v1-20260806T040000000Z/schrodinger-mass-density-stage4-2j-report.md",
+    "report_markdown_sha256": "9d9f702a43c186abcd546db86e801a0756b94a3eb90391ec512b789657aaf276",
+    "campaign_trace_path": "artifacts/research/casimir-dp-schrodinger-mass-density-stage4-2j/casimir-dp-schrodinger-mass-density-stage4-2j-v1-20260806T040000000Z/schrodinger-mass-density-stage4-2j-trace.jsonl",
+    "campaign_trace_sha256": "74c2df8f05bc7f98e4ca564b6758baea8eb906adb55a5ada0ba5081e23ba7a43",
+    "campaign_receipt_path": "artifacts/research/casimir-dp-schrodinger-mass-density-stage4-2j/casimir-dp-schrodinger-mass-density-stage4-2j-v1-20260806T040000000Z/schrodinger-mass-density-stage4-2j-receipt.json",
+    "campaign_receipt_sha256": "54358d0294652a457d1c628147ace2acbc337b45a546ae7e2fdb443a563f74a9",
+    "maintained_report_path": "docs/research/casimir-dp-schrodinger-mass-density-stage4-2j-report.md",
+    "maintained_report_sha256": "9d9f702a43c186abcd546db86e801a0756b94a3eb90391ec512b789657aaf276",
+    "maintained_report_matches_immutable_markdown": true,
+    "git_head": "f0dfd07085af214797458081b246ab87f1175c72",
+    "worktree_state": "dirty_uncommitted_stage4_2j_source_and_content_hashes_authoritative",
+    "authority_mode": "role_path_and_content_hash_tuple"
+  },
+  "immutable_upstream": {
+    "stage4_2i_run_id": "casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z",
+    "stage4_2i_verification_receipt_path": "docs/research/casimir-dp-boundary-branch-interaction-stage4-2i-verification-receipt.json",
+    "stage4_2i_verification_receipt_sha256": "67163dddefc4205c6c591a8a0bbd693453a8e398ba5309a8ecf8676fd6888bc9",
+    "mutation_detected": false
+  },
+  "verification_inputs": {
+    "adapter_command": "npm run casimir:verify -- --ci --trace-out artifacts/training-trace-stage4-2j-20260806T040000000Z.jsonl --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export",
+    "telemetry_mode": "standard_cli_repository_telemetry",
+    "validated_training_trace": {
+      "path": "artifacts/training-trace-stage4-2j-20260806T040000000Z-bound-validated.jsonl",
+      "sha256": "161cd8268093e8b7563f1b78541945c074503ffa440323667fceb178e434b6a8",
+      "bytes": 986,
+      "line_count": 1,
+      "nul_byte_count": 0,
+      "all_lines_parse_as_json": true,
+      "exclusive_creation": true,
+      "run_and_trace_identity_validated": true,
+      "pass_and_certificate_shape_validated": true,
+      "validated_exporter_path": "scripts/research/export-casimir-dp-stage4-verification-trace.ts"
+    }
+  },
+  "local_gates": {
+    "stage4_2j_runtime_campaign_paper_graph_and_root": {
+      "files": 5,
+      "tests": 60,
+      "status": "pass"
+    },
+    "downstream_stage4_2c_through_stage4_2j_campaign_replay": {
+      "files": 19,
+      "tests": 81,
+      "status": "pass"
+    },
+    "required_gr_warp_replay": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    },
+    "production_build": {
+      "status": "pass_with_pre_existing_warnings",
+      "commands": ["npm run build:client", "npm run build:server"],
+      "exit_codes": [0, 0],
+      "warnings_present": true
+    },
+    "dependency_coherence": {
+      "status": "pass_from_adapter_trace",
+      "package_lock_sha256": "b33d68312713d5b1fe14568aa551e63dc42fc60486f30f86237f06098aa806db"
+    },
+    "equation_sidecars": {
+      "main_marker_source_generated": [16, 16, 16],
+      "supplement_marker_source_generated": [69, 69, 69],
+      "main_source_sha256": "10f90a1f0d8ed237f31df762e67d0d4f1268911b6711cef9ed3ea3776a930130",
+      "main_generated_sha256": "e3c7573413a41abee79a0890394fad8be7f17d830786699d1fb1ac6cde92b8a1",
+      "supplement_source_sha256": "b6edefde91f7674b5fd2f2f554c23927647ac9ac40a1bccf6669d9dbb84d3eef",
+      "supplement_generated_sha256": "4b9d9335b9a67156db12692f875a3bcbaca1a5baaa72ca2d70cc9b4d69b766bf",
+      "status": "pass"
+    },
+    "theory_badges": {
+      "badges": 35,
+      "edges": 102,
+      "stage4_2j_badges": 1,
+      "calculator_payloads": 0,
+      "observable_bridge_edges": 0,
+      "graph_path": "shared/theory/casimir-dp-study-theory-badges.ts",
+      "graph_sha256": "a96ebfabe956f0c97fe53f5d9dc396700fb8e718546857422a7c2fb37387e429",
+      "status": "pass"
+    },
+    "math_stage": {
+      "entries": 218,
+      "validation": "pass",
+      "stage4_2j_manual_registry_row": "MATH_STATUS.md",
+      "report_json_sha256": "3d0d0e45ad3d448a00a02538c9bf175f554f76e980776c182f7b91bce19fb602",
+      "report_markdown_sha256": "96ad58aa6c53db0e483cc962b2df150c99368880ee93f6dbcd63a6cf32c06a4b"
+    },
+    "physics_root_to_leaf_manifest": {
+      "status": "pass",
+      "manifest_sha256": "f27efbbda94eb56a08d28bd3f91676847004cdcba07f4af0a5e839dbcfc6cdc1",
+      "stage4_2j_readiness_and_falsifier_rules_present": true
+    }
+  },
+  "adapter_result": {
+    "trace_id": "adapter:1211c4a1-9ebf-4288-a867-1240fabd8adb",
+    "run_id": "2370",
+    "verdict": "PASS",
+    "pass": true,
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate": {
+      "status": "GREEN",
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+      "integrity_ok": true
+    },
+    "scientific_scope": "none"
+  },
+  "scientific_standing": {
+    "software_contract": "pass",
+    "synthetic_recovery": "pass",
+    "registered_gaussian_visibility_loss_250_ms": 0.005983080654355932,
+    "homogeneous_sphere_visibility_loss_250_ms": 0.0014985121274316837,
+    "mass_density_forecast_spread_factor": 4.001671686322442,
+    "complete_mass_density_robustness": "blocked",
+    "declared_equilibrium_gas_screen": "no_go",
+    "hydrogen_rate_ratio_to_dp_range": [526.338, 741.657],
+    "required_pressure_for_tenth_dp_rate_pa_range": [2.69666e-15, 3.79984e-15],
+    "measured_environment_model": "not_ready",
+    "state_preparation": "not_ready",
+    "external_bound_mapping": "not_ready",
+    "transfer_kernel": "not_registered",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "explanation": "The certificate validates repository convergence and the Stage-4.2J Schrödinger/coherence separation, conditional DP inverse, mass-density representation envelope, conservative residual-gas screen, hydrogen-scale nonbridge, sidecars, Theory Badge graph, math registry, root-to-leaf graph, build, and required GR/WARP software path. It supplies no prepared massive superposition, measured environmental response or covariance, external-bound closure, observed excess decoherence, Casimir-to-collapse transfer kernel, collapse identification, manifold dynamics, or physical viability."
+  }
+}

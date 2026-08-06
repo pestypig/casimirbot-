@@ -2002,6 +2002,97 @@ describe("helix ask runtime authority contract", () => {
     expect(report.blocking_reasons).toEqual([]);
   });
 
+  it("accepts a compact ledger projection when the full supported compound draft is top-level", () => {
+    const turnId = "turn-compound-environment-compact-ledger-authority";
+    const inspectRef = `${turnId}:live-environment:inspect`;
+    const commandRef = `${turnId}:live-environment:command`;
+    const draftRef = `${turnId}:final-answer-draft`;
+    const answerText =
+      "The fireplace was changed, verified, restored, and verified again.";
+    const report = evaluateTerminalBoundaryEligibility({
+      turn_id: turnId,
+      source_target_intent: {
+        target_source: "live_environment",
+        target_kind: "live_environment",
+        strength: "hard",
+      },
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "live_environment",
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+      },
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      final_answer_source: "final_answer_draft",
+      compound_subgoal_ledger: [
+        {
+          subgoal_id: `${turnId}:subgoal:inspect`,
+          selected_capability:
+            "com.casimirbot.minecraft.spatial_region.inspect",
+          executed_capability:
+            "com.casimirbot.minecraft.spatial_region.inspect",
+          observation_ref: inspectRef,
+          satisfaction: "satisfied",
+          rail_status: "complete",
+        },
+        {
+          subgoal_id: `${turnId}:subgoal:command`,
+          selected_capability: "com.casimirbot.minecraft.command",
+          executed_capability: "com.casimirbot.minecraft.command",
+          observation_ref: commandRef,
+          satisfaction: "satisfied",
+          rail_status: "complete",
+        },
+      ],
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: draftRef,
+        text: answerText,
+        support_refs: [inspectRef, commandRef],
+      },
+      ledger_backed_compound_final_answer_draft: {
+        schema: "helix.ledger_backed_compound_final_answer_draft.v1",
+        turn_id: turnId,
+        final_answer_draft_ref: draftRef,
+        support_refs: [inspectRef, commandRef],
+        subgoal_observation_refs: [inspectRef, commandRef],
+        terminal_artifact_kind: "compound_evidence_synthesis_answer",
+        reason: "compound_subgoals_satisfied_without_final_answer_draft",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: inspectRef,
+          kind: "live_environment_observation",
+          source_scope: "current_turn",
+        },
+        {
+          artifact_id: commandRef,
+          kind: "live_environment_observation",
+          source_scope: "current_turn",
+        },
+        {
+          artifact_id: draftRef,
+          kind: "final_answer_draft",
+          source_scope: "current_turn",
+          payload_schema: "helix.final_answer_draft.v1",
+          text_preview: answerText,
+        },
+      ],
+    });
+
+    expect(report.checks).toMatchObject({
+      agent_runtime_loop: true,
+      agent_step_decision: true,
+      selected_capability_observation: true,
+      post_observation_model_decision: true,
+      goal_satisfaction_allows_terminal: true,
+    });
+    expect(report.eligible).toBe(true);
+    expect(report.blocking_reasons).toEqual([]);
+  });
+
   it("rejects a compound environment draft that omits one required subgoal observation ref", () => {
     const turnId = "turn-compound-environment-missing-support";
     const inspectRef = `${turnId}:live-environment:inspect`;

@@ -353,6 +353,7 @@ import {
   buildHelixAgentContinuationState,
   resolveHelixContinuationBudgetExtension,
 } from "../services/helix-ask/runtime/agent-continuation-state";
+import { summarizeHelixTerminalRejectionObservationForDebugExport } from "../services/helix-ask/runtime/terminal-rejection-debug-export";
 import { authoritativeTypedFailureRequiresNoContinuation } from "../services/helix-ask/runtime/typed-failure-lifecycle-reconciliation";
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
 import {
@@ -441,7 +442,7 @@ import {
   type HelixRichModelOnlyConceptSignal,
 } from "../services/helix-ask/model-only-rich-concept";
 import {
-  hashAskTurnGoalFrame,
+  hashAskTurnGoalFrame, isAskTurnVisualCaptureGoalKind,
   readAskTurnGoalFrameString,
   readAskTurnGoalFrameMutationTarget,
 } from "../services/helix-ask/goals/goal-frame-readers";
@@ -49576,7 +49577,7 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
         ? Boolean(matchingArtifact && hasFieldEvaluationEvidence(matchingPayload))
         : kind === "selected_visual_evidence"
         ? Boolean(matchingArtifact && (hasVisualObservationEvidence(matchingPayload) || hasFieldEvaluationEvidence(matchingPayload)))
-        : kind === "situation_context_pack" && terminalContract.goal_kind === "visual_capture_describe"
+        : kind === "situation_context_pack" && isAskTurnVisualCaptureGoalKind(terminalContract.goal_kind)
         ? Boolean(matchingArtifact && isVisualEvidenceArtifactKind(matchingArtifact.kind))
         : terminalContract.goal_kind === "scholarly_research_lookup" &&
           (kind === "scholarly_research_observation" || kind === "scholarly_full_text_observation")
@@ -49626,7 +49627,7 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
     const status = readAskTurnString(payload?.status) ?? (artifact.kind === "typed_failure" ? "failed" : "observed");
     const rejected = rejectedById.get(artifact.artifact_id);
     const supportsVisualGoal =
-      terminalContract.goal_kind !== "visual_capture_describe" ||
+      !isAskTurnVisualCaptureGoalKind(terminalContract.goal_kind) ||
       (isVisualEvidenceArtifactKind(artifact.kind) &&
         hasVisualObservationEvidence(payload) &&
         hasFieldEvaluationEvidence(payload));
@@ -49722,7 +49723,7 @@ const buildHelixGoalSatisfactionEvaluation = (args: {
     requiredEvidence.every((evidence) => evidence.satisfied) &&
     successfulLiveEnvironmentToolObservation;
   const visualCaptureEvidenceOnlySatisfied =
-    terminalContract.goal_kind === "visual_capture_describe" &&
+    isAskTurnVisualCaptureGoalKind(terminalContract.goal_kind) &&
     requiredActions.length === 0 &&
     requiredEvidence.length > 0 &&
     requiredEvidence.every((evidence) => evidence.satisfied) &&
@@ -96134,27 +96135,6 @@ const summarizeHelixAgentContinuationStateForDebugExport = (value: unknown): Rec
     budget: record.budget ?? null,
     allowed_decisions: Array.isArray(record.allowed_decisions) ? record.allowed_decisions.slice(0, 6) : [],
     authority: readDebugExportString(record.authority),
-    terminal_eligible: record.terminal_eligible === true,
-    assistant_answer: record.assistant_answer === true,
-  };
-};
-
-const summarizeHelixTerminalRejectionObservationForDebugExport = (
-  value: unknown,
-): Record<string, unknown> | null => {
-  const record = asDebugExportRecord(value);
-  if (!record) return null;
-  return {
-    schema: readDebugExportString(record.schema),
-    turn_id: readDebugExportString(record.turn_id),
-    observation_id: readDebugExportString(record.observation_id),
-    rejected_candidate_kind: readDebugExportString(record.rejected_candidate_kind),
-    rejected_candidate_ref: readDebugExportString(record.rejected_candidate_ref),
-    rejection_reason: readDebugExportString(record.rejection_reason),
-    recoverable: record.recoverable === true,
-    failure_class: readDebugExportString(record.failure_class),
-    retryability: readDebugExportString(record.retryability),
-    next_affordances: Array.isArray(record.next_affordances) ? record.next_affordances.slice(0, 6) : [],
     terminal_eligible: record.terminal_eligible === true,
     assistant_answer: record.assistant_answer === true,
   };

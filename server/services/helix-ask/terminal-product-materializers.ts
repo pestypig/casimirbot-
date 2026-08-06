@@ -59,6 +59,7 @@ const PROVIDER_AUTHORED_ROUTE_PRODUCT_KINDS = new Set([
   "workspace_status_answer",
   "capability_help_summary",
   "workstation_tool_evaluation",
+  "situation_context_pack",
   "theory_context_reflection_answer",
   "situation_room_live_job_setup_answer",
 ]);

@@ -33,12 +33,16 @@ adapter directories.
   act → fresh inspect workflow. Each Minecraft command request contains exactly
   one command, and Helix cannot terminalize a success before the resulting
   observation re-enters provider reasoning.
-- `helixgame checkpoint capture|restore|discard|status` supplies bounded,
-  in-memory rollback for local builds. Restore skips block-entity cells rather
-  than overwriting container state.
+- `helixgame checkpoint capture|capture_box|restore|discard|status` supplies
+  bounded, in-memory rollback for local builds. `capture_box` records the exact
+  inclusive mutation envelope selected by Codex rather than an approximate
+  player-centered radius. Restore skips block-entity cells rather than
+  overwriting container state.
 - `helixgame fall_rescue arm|status|disarm` supplies a short-lived local
   tick-driven rescue lease. It can place a temporary water source for an
-  unprotected survival fall and removes only the source it placed.
+  unprotected survival fall and removes only the source it placed. Settled or
+  expired leases retain a read-only result for ten minutes so a slow agent
+  follow-up cannot erase trigger, cleanup, or no-trigger evidence.
 - The mechanics collection explains structure planning, safe fireplace
   qualification, rollback, ambiguous command outcomes, and fall rescue without
   itself granting command authority.
@@ -67,7 +71,7 @@ typed limitation; absence in incomplete evidence is not proof of absence.
 | Evidence | Result |
 | --- | --- |
 | Fabric Java test/build after exact completeness accounting | PASS |
-| Focused Fabric spatial survey, rollback checkpoint, and fall-rescue tests (Java 21) | PASS |
+| Focused Fabric spatial survey, exact-box rollback checkpoint, and fall-rescue tests (Java 21) | PASS |
 | Fabric exact wire-size and explicit omission tests | PASS |
 | Connector catalog, legacy normalization, and environment probe tests | 38/38 PASS |
 | Environment agency contract battery (12 files: command risk, subject binding, probe ingress, mechanics retrieval, compound contract, continuation authority) | 308/308 PASS |
@@ -85,24 +89,63 @@ typed limitation; absence in incomplete evidence is not proof of absence.
 | Provider attempt-supersession and terminal pass-through subset | 43/43 PASS |
 | Deterministic API-parity rail/terminal subset | 12/12 PASS |
 | Helix Ask discipline quick check | PASS |
+| Command-text documentation adversary | Focused capability, gateway, and prompt benchmark PASS; live keyed UI lifecycle PASS with zero mismatches |
 | Keyed Ask API parity, current enabled matrix | 3/16 procedural PASS; current failures remain in the separately known visual/live-source admission and identity-diagnosis fixture lane |
 | Casimir adapter verification | PASS; certificate `GREEN`, integrity OK, hash `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45` |
 | Direct-Codex versus Helix live teleport comparison | PASS; prerequisite check, mutation, verification, evidence re-entry, and single-writer terminal authority matched |
 
-Current candidate artifact:
+Current tested build output:
 
 - path: `minecraft/helix-fabric-sensor/build/libs/HelixFabricSensor-0.2.0.jar`
-- size: `193163` bytes
-- SHA-256: `a85044547417764825abd8be74d38494c49271e53ba4ec6a8e0031db9f3ba495`
-- source-tree SHA-256: pending final clean-build receipt refresh
+- size: `198995` bytes
+- SHA-256: `bb6427cb49f19155021917dabe21f21adc3dae4abc99c28234c6255d35656c60`
+- source-tree SHA-256: `1c2d0c063d7cc0aba70511813c5856e02b49be51672b753ea6a18bc3a5f3b98e`
 
-The deployed `run/mods` JAR has the same byte length and SHA-256. These
-fingerprints remain candidates until the final clean build and live journey
-close without another source patch. The running Fabric process still has the
-preceding JAR loaded; the staged candidate takes effect only after the planned
-graceful world save and restart. The checked-in build receipt still describes
-the earlier `183085`-byte candidate and must not be treated as the receipt for
-this newer JAR.
+The exact same `198995`-byte JAR and SHA-256 is staged in `run/mods` and loaded
+by the current Java 21 Fabric process. A Java 21 `test build` passed before the
+staged copy, the server saved all three dimensions cleanly, and the restarted
+connector admitted both its observation manifest and live Brigadier catalog.
+The final resource-capped Java 21 `clean test build` passed on 2026-08-05 with
+one worker and reproduced that exact staged JAR. Live fall-rescue and
+text/voice closure remain pending.
+
+### Exact mutation-envelope checkpoint
+
+The original rollback command captured a symmetric volume around the player.
+That was useful for small experiments but could not honestly prove rollback of
+an exact wall or structure footprint. The command tree now includes
+`helixgame checkpoint capture_box <name> <x1> <y1> <z1> <x2> <y2> <z2>`.
+Corners are order-independent, inclusive, restricted to the current dimension
+build height, no more than 32 blocks from the selected player on any axis, and
+capped at 16,384 in-memory block states. Helix and Fabric independently
+classify the command as server-administration authority. Exact-volume,
+coordinate-reversal, overflow, and classifier tests pass; the live wall journey
+must still prove capture, mutation, verification, and restore receipts through
+the real Ask/Codex loop.
+
+The Ask sequence guard also recognizes both `checkpoint capture` and
+`checkpoint capture_box` as checkpoint-producing observations. This prevents
+the exact-box command's server-administration classification from being
+mistaken for an ordinary mutation that itself requires a prior checkpoint. The
+focused sequencing and risk-classification battery passes 46/46.
+
+### Mechanics evidence preservation
+
+A title-free retrieval regression exposed an evidence-projection defect. The
+room-scoped mechanics search selected the correct rollback section and built a
+bounded cited passage containing the adjacent `capture_box` code example, but
+the Codex model-visible document projection omitted `hit.text` and all
+`evidence_passages`. Codex could therefore receive the correct document and
+still not receive the exact command syntax.
+
+The model-visible projection now retains bounded hit text plus up to eight
+cited evidence passages with path, section, exact line range, relevance,
+matched terms, and citation reference. These remain non-terminal evidence and
+cannot grant command or answer authority. Focused gateway and provider
+normalization regressions prove that the natural query "how do I capture only
+its exact rollback footprint?" delivers the exact
+`helixgame checkpoint capture_box` line to the post-tool Codex step without
+mentioning a document title.
 
 ## Direct oracle and runtime comparison - 2026-08-04
 
@@ -226,6 +269,23 @@ and the complete resource-bounded Fabric build pass under Java 21. Natural
 fall-rescue routing plus contextual, negated, deferred, quoted, historical, and
 explanatory adversaries pass in the 214/214 environment route battery. Live
 trigger, landing, and cleanup evidence remains pending.
+
+An additional offline-player audit found that the tick loop previously skipped
+the entire lease when the player disconnected. A source of rescue water could
+therefore remain until the player rejoined even after its cleanup deadline or
+lease expiry. Offline leases now continue to advance against their recorded
+dimension: cleanup restores the replaced block at the bounded deadline, expiry
+restores and removes the lease, and a missing dimension remains fail-closed for
+later safe cleanup. The focused offline cleanup/expiry regression and complete
+Fabric build pass under Java 21. The rebuilt remapped artifact has SHA-256
+`D0B4D3AA6A80E5A0940CC4C921189969865C3E0ABD720E86DEFC2A362B1C8BA2`.
+Live trigger, safe landing, water cleanup, and an optional disconnect-after-
+placement adversary remain direct-current-run evidence requirements.
+
+The `D0B4...` fingerprint above records that intermediate non-clean Gradle
+build, not the current release candidate. It is superseded by the staged and
+running `4F5157...` artifact identified in **Artifact status**. The current JAR
+contains the offline cleanup repair and its passing tests.
 
 ### Live offline-subject regression
 
@@ -417,22 +477,183 @@ procedure-memory route regression. That route retains the actionable Auntie
 Dot explanation, exposes the original source failure, and records the terminal
 state without sampling an unrelated capability loop.
 
+The committed-HEAD discipline rerun then passed all prompt cases (4/4 prelude
+plus 31/31 enabled adversarial cases), the fixed API matrix (15/15), all four
+API scenario shards (16/16), live-source continuation (26/26), and live-source
+identity (8/8). The production server build also passed at commit
+`f0dfd07085af214797458081b246ab87f1175c72`; its four warnings are pre-existing
+duplicate-key/case diagnostics outside this environment and lifecycle scope.
+One full-route continuation fixture required its timeout to rise from 20 to 90
+seconds after an isolated run demonstrated 65 seconds of valid processing and
+all assertions passed. No application behavior was relaxed for that timing
+adjustment.
+
+### Fabric catalog restart-gap repair
+
+A live catalog prompt exposed a separate connector recovery gap. Helix had an
+active Fabric source and the failed catalog observation reached the capability
+lane, but the keyed server had restarted quickly enough that its persisted
+command catalog was empty while Fabric never observed a failed manifest. The
+old connector republished the command tree only after an observed source
+failure, so a clean short restart could leave the source active but command
+inspection unavailable indefinitely.
+
+The Fabric runtime now performs an idempotent catalog republish after successful
+manifest admission, bounded to once per 30 seconds. A valid command lane is not
+paused during republish. The focused `FabricCommandRuntimeTest` passed under
+Java 21, and the complete Fabric Gradle build passed. The initial non-clean
+build of that repair emitted SHA-256
+`D5E2DFB56F12E308E21E235ECF10A733BEA183F8A0696601CFCF02046EA2984A`.
+That chronological fingerprint is superseded by the current staged and loaded
+`4F5157...` candidate described in **Artifact status**; its source receipt also
+records the catalog-republish regression as passing. The previous JAR remains
+recoverable as
+`HelixFabricSensor-0.2.0.jar.pre-catalog-republish-20260805`. A deliberate
+Fabric restart and real post-restart catalog prompt are still required before
+this recovery path is accepted as live proof.
+
+The pre-restart natural catalog turn
+`ask:9b2624b1-5383-49eb-b106-57854cbd9e2a` then established the expected old
+state. Two bounded catalog attempts returned
+`command_catalog_changed` / "server has not published its live command
+catalog." The failed observation was present in the capability-lane
+`lane_reentered` event and Codex received it before terminal selection. Helix
+returned the actionable catalog failure instead of relabeling the observation
+as never executed or inventing a command path. An exact one-command
+`save-all flush` turn, `ask:03a24060-b99f-4849-b61c-2c9bb2ca1f63`, was also
+blocked by the same catalog boundary; its failed observation re-entered Codex
+and no save success was claimed.
+
+The local Fabric server was restarted from the staged JAR after a current
+`level.dat` save was verified. The new connector reached `Done`, published an
+admitted manifest, and started its command lane. Its first catalog publish
+correctly returned `http_409_command_authority_inactive`: the restart did not
+silently inherit command authority into the connector. The owner UI now shows
+the source active with nine read capabilities and preserves the configured
+full/autonomous ceiling, but pairing is disabled until the selected player is
+online. Post-restart catalog admission therefore remains pending one player
+join and one-time in-game command pairing.
+
+After the later keyed-server restart, the same active Fabric process resumed
+manifest admission and continued bounded catalog publication. With no current
+room command-authority record it now fails closed as
+`http_404_command_authority_not_found`; zero players are online. This is the
+expected pre-pairing state, not catalog-admission proof.
+
+### Mechanics command-text intent and answer-identity repair - 2026-08-05
+
+The real UI prompt “give the exact command form” exposed another deterministic
+expansion defect. Turn `ask:e4202f2b-fbec-4257-8ac3-5398ee106259` explicitly
+asked Helix to retrieve and cite rollback mechanics and prohibited Minecraft
+execution. `docs.search` succeeded, its exact passage re-entered Codex, and
+Codex authored a supported answer. The natural Minecraft action detector then
+misread the documentation phrase's word `give` as the game's mutating `give`
+verb. It injected a second `com.casimirbot.minecraft.command` subgoal that the
+operator had neither requested nor authorized.
+
+That invented subgoal failed for missing command arguments and a missing live
+catalog, and a downstream rail surfaced the helper failure instead of the
+supported Codex answer. The independent lifecycle differential correctly
+reported `provider_candidate_disagrees_with_runtime_message` with first
+divergence `followup_reasoning`. The provider candidate hash was
+`933328...`; the later typed-failure hash was `7bbb17...`. Evidence re-entry
+and the scientific evidence disposition were green, so this was prompt
+interpretation plus follow-up reconciliation failure, not an evidence-quality,
+provenance, or model-reasoning failure.
+
+The shared action detector now treats requests to give, show, provide, return,
+report, write, quote, or cite command form, syntax, text, examples, or snippets
+as documentation intent with `execution_intent=none`. The boundary is narrow:
+affirmative requests such as “Give my selected Minecraft player a diamond now”
+and “Give my selected Minecraft player a temporary glowing effect now” still
+admit the Minecraft command capability. Focused capability-arbitration and
+gateway regressions prove both sides.
+
+The identical natural prompt was then replayed through the real keyed in-app
+Ask UI as turn `ask:76661899-a140-443e-93cc-b5a82dd1881d`. Only `docs.search`
+was proposed, admitted, executed, and re-entered. Codex cited
+`docs/game-mechanics/minecraft-command-playbook-v1.md#L213-L229` and returned:
+
+```text
+execute as @s at @s run helixgame checkpoint capture_box agency_build <x1> <y1> <z1> <x2> <y2> <z2>
+```
+
+No Minecraft command executed. The canonical lifecycle audit was green with
+zero mismatches; no first broken rail or stale failure was visible; the terminal
+writer selected `model_synthesized_answer`; the visible text matched the
+selected candidate; and the only compound subgoal was the mechanics document
+search. This is the required natural keyed proof that command-language evidence
+can inform Codex without a deterministic rail converting the text into an
+unrequested game action or discarding the supported answer.
+
+### Live exact-wall rollback proof - 2026-08-05
+
+The current keyed room and paired Fabric world completed the exact reversible
+wall journey through normal Ask/Codex turns:
+
+- `ask:95c1316e-71ae-4dd5-9078-402dc90813e3` captured checkpoint
+  `helix_wall_closure_1` for exactly `(-53,67,0)` through `(-49,69,0)`: 15
+  blocks, with zero block-entity positions skipped.
+- `ask:4e6967a9-3cc1-4dd4-b84c-51da4667b5f0` filled only that inclusive volume
+  with `minecraft:stone_bricks`; the command receipt reported 15 changed
+  blocks.
+- `ask:b42b620f-2999-410e-a4f8-cd2f5856d654` performed a fresh read-only
+  spatial verification: 15 of 15 cells matched and zero mismatches were
+  reported.
+- `ask:f90d2ad3-7b37-49bb-81c4-d897130609b5` restored the checkpoint: 15
+  blocks changed back, zero already matched, and zero block-entity positions
+  skipped.
+- `ask:dc5c8b75-7608-4307-a49e-03f4c4a9f8d3` performed the fresh rollback
+  verification: all 15 cells again matched `minecraft:air`, with zero
+  mismatches.
+
+Each command or spatial observation reached `lane_observation`, re-entered
+Codex at `lane_reentered`, and preceded the selected terminal answer. This is
+direct current-run evidence of exact inspection, checkpoint capture, bounded
+mutation, after-state verification, restore, and restored-state verification.
+
+### Fall-rescue settled-result preservation - 2026-08-05
+
+The first live rescue attempt proved arming and controlled movement but exposed
+an evidence-lifetime contradiction. Turn
+`ask:fd691653-fb2e-4715-ae4e-4d1ee869e3be` inspected the landing area, armed
+the local lease, and re-entered fresh actor status. Turn
+`ask:0adb6576-9864-4917-a44c-9194e56d07cf` renewed it to 300 seconds, and turn
+`ask:140e64c0-39d5-40c2-a901-6c25402feb64` teleported the selected Survival
+player from Y=68 to Y=75 through the governed command lane. The later read-only
+status turn `ask:35f0e19c-98d2-4add-b84f-bfb73a679d0a` correctly re-entered
+`Water fall rescue is not armed`, but the old controller had already removed
+the expired lease and with it every trigger/outcome field. The evidence could
+not distinguish a completed rescue from no trigger, so no rescue success is
+claimed.
+
+The shared adapter now settles every expired or dimension-ended lease only
+after water cleanup, then retains a read-only result for ten minutes. Status
+reports `remaining_seconds=0`, `trigger_count`, `last_outcome`,
+`last_position`, and `result_age_seconds`; a new arm or server stop clears it.
+This is evidence preservation only: it cannot place water, extend the lease,
+or grant command authority. Java 21 `test build` passes, and the rebuilt JAR
+was staged and loaded after a clean world save. A post-restart live trigger and
+cleanup observation remains required.
+
 ## Required live closure
 
 The following evidence is deliberately pending and must not be inferred from
 unit tests:
 
-1. **Complete:** Join the local Fabric server as the intended room player and
-   renew the participant binding against the current connector producer epoch.
-2. **Complete:** Re-establish the explicit server-administrator command lease
-   through the room-owner UI and one-time in-game pairing.
+1. Rejoin the restarted local Fabric server as the intended room player and
+   renew the participant binding against the new connector producer epoch.
+2. **Complete:** The explicit server-administrator command lease and separate
+   in-game command credential remain scoped to the room/source, and the
+   restarted connector's live catalog was admitted. Current-player binding is
+   renewed with item 1 rather than inherited across the producer epoch.
 3. **Complete:** Send a natural read-only prompt that inspects nearby blocks, structure
    boundaries, and fireplace candidates. Confirm the compact observation is
    admitted, expanded, re-entered, and terminalized without a 413 or schema
    rejection.
-4. Send a natural wall-building prompt against a controlled candidate
-   structure. Prove inspection, rollback capture, bounded sequential commands,
-   fresh spatial verification, and checkpoint restore.
+4. **Complete:** The exact 15-block wall journey proved inspection, rollback
+   capture, bounded mutation, fresh spatial verification, checkpoint restore,
+   and fresh restored-state verification through the real Ask/Codex loop.
 5. **Complete:** Send a natural fireplace prompt. Prove that an unsafe or ambiguous candidate
    is rejected, then prove one safe nonflammable hearth ignition and fresh
    post-state inspection.

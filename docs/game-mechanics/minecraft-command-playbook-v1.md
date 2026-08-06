@@ -203,16 +203,26 @@ lets an agent safely use air-only placement commands; a plan that intentionally
 clears vegetation must inspect the compact column evidence and request that
 different mutation explicitly.
 
-Before a bounded build, query the live `helixgame checkpoint` subtree and, when
-available, capture an in-memory rollback region centered on the selected
-player:
+Before a bounded build, query the live `helixgame checkpoint` subtree. Prefer
+an exact inclusive rollback box when the live catalog exposes `capture_box`:
+
+```text
+execute as @s at @s run helixgame checkpoint capture_box agency_build <x1> <y1> <z1> <x2> <y2> <z2>
+```
+
+Use the planned mutation's exact absolute footprint. When the intended command
+tree exposes only the older bounded radial form, capture an in-memory rollback
+region centered on the selected player:
 
 ```text
 execute as @s at @s run helixgame checkpoint capture agency_build 12 8
 ```
 
-The checkpoint is temporary, bounded, held only in game memory, and never
-writes a structure file. Restore consumes it:
+Both forms are temporary, bounded, held only in game memory, and never write a
+structure file. `capture_box` is order-independent, inclusive, limited to the
+current dimension build height, capped at 16,384 block states, and must remain
+within 32 blocks of the selected player on every axis. Restore consumes the
+named checkpoint:
 
 ```text
 execute as @s at @s run helixgame checkpoint restore agency_build
@@ -286,6 +296,14 @@ the trigger count and last outcome; actor-status evidence also carries the
 short-lived `fall_rescue_armed` and `fall_rescue_triggered` flags. An armed
 receipt proves only that the lease is active. A later status or actor observation
 is required to claim that a fall was actually rescued.
+
+When a lease expires or ends after a dimension change, the connector removes
+all active rescue state and water first, then retains only a bounded read-only
+result for ten minutes. A later `fall_rescue status` can therefore distinguish
+`expired_without_trigger` from a completed trigger and reports
+`remaining_seconds=0`, `trigger_count`, `last_outcome`, `last_position`, and
+`result_age_seconds`. This retained result grants no command authority, cannot
+place water, and is cleared when a new lease is armed or the server stops.
 
 ## Costs, retries, and after-state
 

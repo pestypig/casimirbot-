@@ -158,6 +158,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "moral-graph.reflect_context",
     "moral-graph.reflect_living_substrate_context",
     "postulate.submit_proposal",
+    "situation-room.describe_visual_capture",
     "text_to_speech.speak_text",
     "live_env.narrator_say",
     "situation-room.live-source.set_rate",

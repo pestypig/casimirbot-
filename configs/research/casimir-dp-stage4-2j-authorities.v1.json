@@ -1,0 +1,106 @@
+{
+  "schema_version": "casimir_dp_stage4_2j_authorities/1",
+  "campaign_id": "casimir-dp-schrodinger-mass-density-stage4-2j-v1",
+  "immutable_upstream": [
+    {
+      "role": "stage4_2i_config",
+      "path": "configs/research/casimir-dp-boundary-branch-interaction-stage4-2i.v1.json",
+      "sha256": "6f66903a470f14314166c755b080208cf0942d6bb382077d6e44b953252d234e",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2i_report",
+      "path": "artifacts/research/casimir-dp-boundary-branch-interaction-stage4-2i/casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z/boundary-branch-interaction-stage4-2i-report.json",
+      "sha256": "a879a9110a18011ab3bdd8c3ebc224532eb67de3d15cfdc511b40f1006b06c65",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2i_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-boundary-branch-interaction-stage4-2i/casimir-dp-boundary-branch-interaction-stage4-2i-v1-20260805T160000000Z/boundary-branch-interaction-stage4-2i-receipt.json",
+      "sha256": "7ffe144e8bffc95c92edad45f8385642a8aa0ce8553cc50380ba816d734df35c",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2i_verification_receipt",
+      "path": "docs/research/casimir-dp-boundary-branch-interaction-stage4-2i-verification-receipt.json",
+      "sha256": "67163dddefc4205c6c591a8a0bbd693453a8e398ba5309a8ecf8676fd6888bc9",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_single_apparatus_config",
+      "path": "configs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g.v1.json",
+      "sha256": "a9516529a7c2f935c777fc4c1b29c207457a8f1618f1df580bff89ee27692487",
+      "required_at_runtime": true
+    }
+  ],
+  "method_authorities": [
+    {
+      "role": "registered_dp_companion_evaluator",
+      "path": "shared/casimir-dp-dp-companion.ts",
+      "sha256": "6432f931dd465624291c4cd7c33eda6a780d4b9687f89f6e76a2794d8708b5ac",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2i_complex_coherence_evaluator",
+      "path": "shared/casimir-dp-boundary-branch-interaction-stage4-2i.ts",
+      "sha256": "2b8c430861fdbf1967b9760127751a77f56cb173ac8fe8bde17c5bb2ece0ca46",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_1_qed_scale_report",
+      "path": "docs/research/casimir-dp-qed-scale-hierarchy-stage4-1-report.md",
+      "sha256": "6ae9530701fc35aa544b438709e789929b45eaf53ae950ec93ed976bb9703ba6",
+      "required_at_runtime": true
+    }
+  ],
+  "literature_authorities": [
+    {
+      "source_id": "diosi_1989_mass_density_master_equation",
+      "doi": "10.1103/PhysRevA.40.1165",
+      "url": "https://doi.org/10.1103/PhysRevA.40.1165",
+      "supports": "A mass-density dynamical-reduction model and its nonunitary coherence term.",
+      "does_not_support": "A Casimir-boundary modifier or a representation-independent apparatus forecast."
+    },
+    {
+      "source_id": "hornberger_sipe_2003_collisional_decoherence",
+      "doi": "10.1103/PhysRevA.68.012105",
+      "url": "https://doi.org/10.1103/PhysRevA.68.012105",
+      "supports": "Gas-scattering decoherence of a massive particle.",
+      "does_not_support": "The present geometric-cross-section screen as a measured apparatus gas model."
+    },
+    {
+      "source_id": "hornberger_etal_2003_collision_experiment",
+      "doi": "10.1103/PhysRevLett.90.160401",
+      "url": "https://doi.org/10.1103/PhysRevLett.90.160401",
+      "supports": "Pressure-dependent loss of matter-wave coherence from background-gas collisions.",
+      "does_not_support": "The cryogenic local gas composition or pressure calibration of this apparatus."
+    },
+    {
+      "source_id": "tomaz_mattos_barbatti_2024_atomistic_dp",
+      "doi": "10.1039/D4CP02364A",
+      "url": "https://doi.org/10.1039/D4CP02364A",
+      "supports": "Atomistic and homogeneous-medium DP self-energy calculations and representation caveats.",
+      "does_not_support": "A completed atomistic map for the proposed silica sphere."
+    },
+    {
+      "source_id": "codata_2022_constants",
+      "url": "https://physics.nist.gov/cuu/pdf/wall_2022.pdf",
+      "supports": "Fundamental constants and Rydberg energy/frequency calibration.",
+      "does_not_support": "A hydrogen-to-collapse or atomic-to-Casimir transfer kernel."
+    },
+    {
+      "source_id": "pedalino_etal_2026_170kda_interference",
+      "doi": "10.1038/s41586-025-09917-9",
+      "url": "https://doi.org/10.1038/s41586-025-09917-9",
+      "supports": "A 170 kDa free-particle matter-wave benchmark.",
+      "does_not_support": "Preparation feasibility for a 1.17e11 Da trapped silica superposition."
+    },
+    {
+      "source_id": "xenonnt_2026_collapse_bounds",
+      "doi": "10.1103/2jm3-4976",
+      "url": "https://doi.org/10.1103/2jm3-4976",
+      "supports": "Current noninterferometric constraints on a specified Markovian DP implementation.",
+      "does_not_support": "Automatic admission of the present composite-object convention without an exact normalization map."
+    }
+  ]
+}

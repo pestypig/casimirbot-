@@ -1,11 +1,27 @@
 package com.casimirbot.helixsensor.fabric;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 final class FabricCommandRuntimeTest {
+    @Test
+    void boundsCatalogRepublishAcrossManifestAdmissions() {
+        long interval = FabricCommandRuntime.CATALOG_REPUBLISH_INTERVAL_MILLIS;
+
+        assertTrue(FabricCommandRuntime.catalogRepublishDue(0L, 1L));
+        assertFalse(
+            FabricCommandRuntime.catalogRepublishDue(10_000L, 10_000L + interval - 1L)
+        );
+        assertTrue(
+            FabricCommandRuntime.catalogRepublishDue(10_000L, 10_000L + interval)
+        );
+        assertTrue(FabricCommandRuntime.catalogRepublishDue(20_000L, 19_999L));
+    }
+
     @Test
     void reportsOnlyBoundedCatalogFailureMetadata() {
         assertEquals(

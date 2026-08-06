@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  agentContinuationDisallowsAnswer,
   applyHelixTerminalAuthoritySingleWriter,
   applyTerminalProjectionKindGuard,
   shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal,
@@ -10,6 +11,7 @@ import {
 import { buildArtifactQueryIndex } from "../services/helix-ask/artifact-query-index";
 import {
   inspectAgentProviderRouteProductEligibility,
+  isProviderAuthoredRouteProductKind,
   materializeAgentProviderRouteProductTerminal,
 } from "../services/helix-ask/terminal-product-materializers";
 import { buildAskTurnSolverTrace } from "../services/helix-ask/ask-turn-solver";
@@ -30,6 +32,39 @@ const makePostToolObservation = (turnId: string) => ({
   },
 });
 describe("Helix terminal authority single writer", () => {
+  it("blocks deterministic compound drafting while authoritative continuation disallows answer", () => {
+    expect(
+      agentContinuationDisallowsAnswer({
+        agent_continuation_state: {
+          schema: "helix.agent_continuation_state.v1",
+          goal: {
+            status: "needs_user_input",
+            satisfied: false,
+            terminal_product_allowed: false,
+          },
+          allowed_decisions: ["ask_user", "fail"],
+        },
+      }),
+    ).toBe(true);
+    expect(
+      agentContinuationDisallowsAnswer({
+        agent_continuation_state: {
+          schema: "helix.agent_continuation_state.v1",
+          goal: {
+            status: "satisfied",
+            satisfied: true,
+            terminal_product_allowed: true,
+          },
+          allowed_decisions: ["answer"],
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("admits model-synthesized SituationRun context as a provider-authored route product", () => {
+    expect(isProviderAuthoredRouteProductKind("situation_context_pack")).toBe(true);
+  });
+
   it("selects a Postulate runtime review candidate through terminal authority", () => {
     const turnId = "ask:test:postulate-runtime-review";
     const answerText = "Postulate review: submit at 91%.\nSubmitted: yes.\nBoundary: accepted means constructive review candidate, not proof, physical viability, or certification.";
@@ -1054,6 +1089,12 @@ describe("Helix terminal authority single writer", () => {
     expect(qualityBlockedPayload.terminal_error_code).not.toBe(
       "post_tool_model_step_missing",
     );
+    expect(
+      qualityBlockedPayload.provider_route_product_materialization_diagnostic,
+    ).toMatchObject({
+      quality_gate_rejection_classification:
+        "recoverable_synthesis_rejection",
+    });
     expect(qualityBlockedPayload.typed_failure).toMatchObject({
       schema: "helix.typed_failure.v1",
       error_code: "provider_route_product_quality_gate_failed",
@@ -1065,16 +1106,39 @@ describe("Helix terminal authority single writer", () => {
     expect(
       qualityBlockedResult.integrity.lifecycle_differential_audit,
     ).toMatchObject({
-      ok: true,
-      first_divergence_stage: null,
-      scientific_evidence_disposition: "failed_closed",
+      ok: false,
+      first_divergence_stage: "followup_reasoning",
+      scientific_evidence_disposition: "repair_pending",
       continuity_checks: expect.arrayContaining([
         expect.objectContaining({
           check: "evidence_quality_gate",
-          status: "failed_closed",
-          disposition: "hard_evidence_boundary",
+          status: "failed",
+          disposition: "informational",
+        }),
+        expect.objectContaining({
+          check: "recoverable_rejection_reentered",
+          status: "failed",
+          disposition: "adapter_projection_contradiction",
         }),
       ]),
+    });
+    expect(qualityBlockedPayload.terminal_rejection_observations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rejection_reason: "route_requires_synthesis",
+          gate: "provider_route_product_quality_gate",
+          reason_codes: expect.arrayContaining([
+            "invalid_page_evidence_links",
+          ]),
+          evidence_refs: expect.arrayContaining(observationRefs),
+          recoverable: true,
+          retryability: "retryable",
+        }),
+      ]),
+    );
+    expect(qualityBlockedPayload.agent_continuation_state).toMatchObject({
+      trigger: "terminal_rejection",
+      allowed_decisions: ["retry"],
     });
     expect(qualityBlockedResult.rejected_candidates).toEqual(expect.arrayContaining([
       expect.objectContaining({ reason: "route_requires_synthesis" }),
@@ -3597,7 +3661,6 @@ describe("Helix terminal authority single writer", () => {
       terminal_artifact_kind: "workstation_tool_evaluation",
       final_answer_source: "workstation_tool_evaluation",
     };
-
     const result = applyHelixTerminalAuthoritySingleWriter({
       turnId,
       threadId: "thread:test",
@@ -5514,7 +5577,7 @@ describe("Helix terminal authority single writer", () => {
     });
   });
 
-  it("surfaces a same-turn provider candidate authorized after evidence re-entry even when top-level authority is stale", () => {
+  it("surfaces a same-turn provider candidate authorized after a retry even when the top-level typed failure is stale", () => {
     const turnId = "ask:test:authorized-provider-bridge-after-tool";
     const observation = makePostToolObservation(turnId);
     const observationRef = String(observation.artifact_id);
@@ -5559,6 +5622,29 @@ describe("Helix terminal authority single writer", () => {
     const payload: Record<string, unknown> = {
       turn_id: turnId,
       thread_id: "thread:test",
+      ok: false,
+      status: "final_failure",
+      final_status: "final_failure",
+      response_type: "final_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "schema_validation_failed",
+      terminal_failure_text:
+        "The probe arguments failed the trusted schema at $.requested_length.",
+      selected_final_answer:
+        "The probe arguments failed the trusted schema at $.requested_length.",
+      answer:
+        "The probe arguments failed the trusted schema at $.requested_length.",
+      text: "The probe arguments failed the trusted schema at $.requested_length.",
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        turn_id: turnId,
+        error_code: "schema_validation_failed",
+        message:
+          "The probe arguments failed the trusted schema at $.requested_length.",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
       current_turn_artifact_ledger: artifacts,
       committed_ask_route: {
         schema: "helix.committed_ask_route.v1",
@@ -5644,8 +5730,15 @@ describe("Helix terminal authority single writer", () => {
     expect(result.source).toBe("agent_provider_terminal_candidate");
     expect(result.visible_text).toBe(answerText);
     expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.typed_failure).toBeUndefined();
     expect(payload.final_status).toBe("final_answer");
     expect(payload.selected_final_answer).toBe(answerText);
+    expect(payload.terminal_answer_authority).toMatchObject({
+      terminal_kind: "answer",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_text_preview: answerText,
+    });
     expect(payload.provider_terminal_runtime_authority).toMatchObject({
       schema: "helix.provider_terminal_runtime_authority.v1",
       turn_id: turnId,
@@ -6186,6 +6279,7 @@ describe("Helix terminal authority single writer", () => {
     });
 
     expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.selected_terminal_artifact_ref).toMatch(/typed_failure/);
     expect(payload.terminal_error_code).toBe("permission_revoked");
     expect(payload.selected_final_answer).toBe(failureText);
     expect(payload.selected_final_answer).not.toContain(
@@ -7858,6 +7952,48 @@ describe("Helix terminal authority single writer", () => {
       },
     };
 
+    if (includeSecondObservation) {
+      payload.workstation_gateway_call_results = [
+        {
+          schema: "helix.workstation_tool_gateway.call_result.v1",
+          ok: false,
+          capability_id: "workspace_os.status",
+          error: "schema_validation_failed",
+          gateway_admission: {
+            admission_status: "admitted",
+            requested_capability: "workspace_os.status",
+          },
+          observation: {
+            schema: "helix.environment_connector.probe_observation.v1",
+            capability_id: "workspace_os.status",
+            outcome: "schema_validation_failed",
+            summary:
+              "The probe arguments failed the trusted schema at $.center.",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        },
+      ];
+      payload.tool_rail_failure_triage = {
+        schema: "helix.tool_rail_failure_triage.v1",
+        rail_status: "fail_closed",
+        rail_failure_code: "schema_validation_failed",
+        first_broken_rail: "capability_execution",
+        repair_target: "subgoal_argument_extraction",
+        selected_capability: "workspace_os.status",
+        executed_capability: null,
+      };
+      payload.terminal_artifact_kind = "typed_failure";
+      payload.final_answer_source = "typed_failure";
+      payload.terminal_error_code = "schema_validation_failed";
+      payload.terminal_failure_text =
+        "The probe arguments failed the trusted schema at $.center.";
+      payload.selected_final_answer =
+        "The probe arguments failed the trusted schema at $.center.";
+    }
+
     const result = applyHelixTerminalAuthoritySingleWriter({
       turnId,
       threadId: "thread:test",
@@ -7880,6 +8016,11 @@ describe("Helix terminal authority single writer", () => {
         ok: true,
         missing_observation_refs: [],
       });
+      expect(result.integrity).toMatchObject({
+        provider_route_product_materialized: true,
+        provider_route_product_can_surface: true,
+        provider_route_product_superseded_repaired_compound_tool_failure: true,
+      });
     } else {
       expect(payload.provider_route_product_compound_support_coverage).toMatchObject({
         applies: true,
@@ -7890,7 +8031,7 @@ describe("Helix terminal authority single writer", () => {
     }
   });
 
-  it("allows compound calculator drafts grounded through workstation evaluation evidence refs", () => {
+  it("allows a grounded compound draft after a repairable gateway attempt is superseded", () => {
     const turnId = "ask:test:compound-calculator-support-aliases";
     const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;
     const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
@@ -8043,6 +8184,29 @@ describe("Helix terminal authority single writer", () => {
         assistant_answer: false,
         raw_content_included: false,
       },
+      workstation_gateway_call_results: [
+        {
+          schema: "helix.workstation_tool_gateway.call_result.v1",
+          ok: false,
+          capability_id: "scientific-calculator.solve_expression",
+          error: "invalid_arg:expression",
+          gateway_admission: {
+            requested_capability: "scientific-calculator.solve_expression",
+            admission_status: "admitted",
+          },
+          observation: {
+            status: "blocked",
+            terminal_eligible: false,
+            assistant_answer: false,
+          },
+          tool_followup_decision: {
+            next_action: "repair",
+            reason: "invalid_arg:expression",
+            observation_summary:
+              "The first calculator request had an invalid expression argument.",
+          },
+        },
+      ],
       current_turn_artifact_ledger: artifacts,
       selected_final_answer: draftText,
       terminal_artifact_kind: "model_synthesized_answer",
@@ -8587,6 +8751,18 @@ describe("Helix terminal authority single writer", () => {
       terminal_artifact_kind: "workstation_tool_evaluation",
       final_answer_source: "workstation_tool_evaluation",
     };
+    const answerBlockedArtifacts = structuredClone(artifacts);
+    const answerBlockedPayload = structuredClone(payload);
+    answerBlockedPayload.agent_continuation_state = {
+      schema: "helix.agent_continuation_state.v1",
+      goal: {
+        status: "needs_user_input",
+        satisfied: false,
+        terminal_product_allowed: false,
+      },
+      missing_requirement_ids: ["com.casimirbot.minecraft.command"],
+      allowed_decisions: ["ask_user", "fail"],
+    };
 
     const result = applyHelixTerminalAuthoritySingleWriter({
       turnId,
@@ -8614,6 +8790,20 @@ describe("Helix terminal authority single writer", () => {
       terminal_artifact_kind: "doc_evidence_synthesis_answer",
       support_refs: expect.arrayContaining([docObservationRef, calculatorObservationRef]),
     });
+
+    const answerBlockedResult = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload: answerBlockedPayload,
+      artifactLedger: answerBlockedArtifacts,
+    });
+    expect(
+      answerBlockedPayload.ledger_backed_compound_final_answer_draft_applied,
+    ).not.toBe(true);
+    expect(answerBlockedPayload.ledger_backed_compound_final_answer_draft).toBeUndefined();
+    expect(answerBlockedResult.selected_terminal_artifact_kind).not.toBe(
+      "doc_evidence_synthesis_answer",
+    );
   });
 
   it("fails closed with typed affordance diagnostics when calculator bindings are missing", () => {

@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo.helix-environment-actions",
+    "types": ["node", "vite/client", "vitest/globals"]
+  },
+  "include": [
+    "shared/helix-environment-action.ts",
+    "shared/helix-environment-action-adapter-profile.ts",
+    "shared/helix-environment-event-stream.ts",
+    "shared/helix-environment-connector.ts",
+    "shared/helix-minecraft-player-capabilities.ts",
+    "server/services/environment-connectors/actions/**/*.ts",
+    "server/services/environment-connectors/catalog/index.ts",
+    "server/services/environment-connectors/subjects/subject-binding-store.ts",
+    "server/services/situation-room/environment-action-adapter-registry.ts",
+    "server/services/helix-ask/workstation-tool-gateway/environment-action.ts",
+    "server/services/helix-ask/workstation-tool-gateway/environment-action-control.ts",
+    "server/services/helix-ask/workstation-tool-gateway/__tests__/environment-action*.test.ts",
+    "server/__tests__/environment-action*.test.ts",
+    "scripts/helix-minecraft-player-differential-audit.ts"
+  ],
+  "exclude": []
+}

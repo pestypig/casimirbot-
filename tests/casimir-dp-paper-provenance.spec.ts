@@ -25,9 +25,19 @@ const supplementGeneratedPath = path.resolve(
   root,
   "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.equation-actions.json",
 );
+const apparatusFigurePath = path.resolve(
+  root,
+  "docs/research/figures/casimir-dp/apparatus-schematic.svg",
+);
+const coherenceFigurePath = path.resolve(
+  root,
+  "docs/research/figures/casimir-dp/coherence-forecast.svg",
+);
 
 const main = readFileSync(mainPath, "utf8");
 const supplement = readFileSync(supplementPath, "utf8");
+const apparatusFigure = readFileSync(apparatusFigurePath, "utf8");
+const coherenceFigure = readFileSync(coherenceFigurePath, "utf8");
 
 type Sidecar = {
   docPath: string;
@@ -56,30 +66,42 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     expect(main).toContain("not a representation-independent or generic DP test");
   });
 
-  it("freezes one authoritative apparatus and demotes older geometries", () => {
-    expect(main).toContain("## 3. Current Authoritative Apparatus Manifest");
+  it("leads with one synthetic commissioning design and demotes older geometries", () => {
+    expect(main).toContain("## 3. Leading Synthetic Commissioning Design");
+    expect(main).toContain("`stage4_2m_candidate_002`");
+    expect(main).toContain("diamond-density sphere");
     expect(main).toContain("276.302 nm");
-    expect(main).toContain("1.94385×10^-16 kg");
-    expect(main).toContain("160 nm");
+    expect(main).toContain("3.0925053×10^-16 kg");
+    expect(main).toContain("250 nm");
     expect(main).toContain("250 ms");
-    expect(main).toContain("1.2 μm");
+    expect(main).toContain("10 μm");
+    expect(main).toContain("1×10^-15 Pa");
     expect(main).toContain("`superseded_design_record`");
+    expect(main).toContain("`superseded_search_parent`");
     expect(main).toContain(
       "75 nm radius, 20 nm separation, 0.1 s, 5 μm nominal gap, 10–4 μm commissioning ladder",
     );
-    expect(main).toMatch(/about\s+\\\(6\.89\\times10\^5\\\) times more massive/);
+    expect(main).toMatch(/\\\(1\.0955\\times10\^6\\\) times more massive/);
     expect(main).toContain("State preparation is the first physical go/no-go");
   });
 
-  it("makes the two coherence-loss values impossible to conflate", () => {
-    expect(main).toContain("0.598308\\%");
-    expect(main).toMatch(
-      /This is the only headline coherence-loss forecast for the authoritative\s+apparatus/,
-    );
-    expect(main).toContain("3.32% loss");
-    expect(main).toMatch(
-      /It is a\s+different point, not a second estimate of Eq\. \(4\)\./,
-    );
+  it("makes the leading named-model and density-floor forecasts impossible to conflate", () => {
+    expect(main).toContain("2.90803\\%");
+    expect(main).toContain("0.434903% as the design floor");
+    expect(main).toMatch(/neither is a total measured-visibility forecast/);
+    expect(main).toContain("1,028 paired windows");
+    expect(main).toContain("power 0.927 at 1,600 windows");
+  });
+
+  it("keeps the leading design synchronized in the human-facing figures", () => {
+    expect(apparatusFigure).toContain("Leading synthetic commissioning design");
+    expect(apparatusFigure).toContain("diamond-density sphere");
+    expect(apparatusFigure).toContain("250 nm");
+    expect(apparatusFigure).toContain("10 μm surface gap");
+    expect(apparatusFigure).toContain("3.09251×10⁻¹⁶ kg");
+    expect(coherenceFigure).toContain("effective Gaussian: 2.908% at 250 ms");
+    expect(coherenceFigure).toContain("density floor: 0.435% at 250 ms");
+    expect(coherenceFigure).not.toContain("reference: 0.598%");
   });
 
   it("preserves hypothesis and observable separation", () => {
@@ -106,15 +128,17 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     );
   });
 
-  it("reports nominal identifiability honestly and requires a robustness envelope", () => {
+  it("separates parent identifiability from the leading selected-candidate forecast", () => {
     expect(main).toContain("0.999977");
     expect(main).toContain("179,104");
     expect(main).toContain("0.717724");
     expect(main).toContain("6.53169");
     expect(main).toContain("0.997858");
     expect(main).toContain("542");
+    expect(main).toContain("0.927386");
+    expect(main).toContain("1,028");
     expect(main).toMatch(
-      /The next computation must report an envelope rather than a single\s+number/,
+      /The next empirical computation\s+must report an envelope rather than a single number/,
     );
     for (const requiredStress of [
       "finite-pilot covariance",
@@ -130,6 +154,54 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     }
   });
 
+  it("exposes the Stage-4.2I four-cell interaction without promoting it to collapse", () => {
+    expect(main).toContain("### 5.1 Boundary--branch interaction diagnostic");
+    expect(main).toContain("cdp-stage4-2i-complex-cross-ratio");
+    expect(main).toContain("cdp-stage4-2i-ordinary-corrected-interaction");
+    expect(main).toContain("cdp-stage4-2i-wavepacket-custody");
+    expect(main).toMatch(/That factor cancels from Eq\. \(9a\)/);
+    expect(main).toContain("not the primary standard-Diosi test");
+    expect(supplement).toContain("floating-point recovery");
+    expect(main).toContain("the four cells, packet metrology,");
+    expect(supplement).toContain("### B.11 Stage-4.2I four-cell interaction recovery");
+  });
+
+  it("integrates Stage-4.2N as the leading material/Green/FDT ordinary-null chain", () => {
+    expect(main).toContain("### 5.5 Material-resolved ordinary complex-coherence null");
+    expect(main).toContain("cdp-stage4-2n-complex-ordinary-null");
+    expect(main).toContain("cdp-stage4-2n-four-cell-cross-ratio");
+    expect(main).toContain("0.01999999999");
+    expect(main).toContain("1.34165\\times10^{-6}");
+    expect(main).toContain("does not add them to the ordinary");
+    expect(main).toContain("supplies no Casimir-to-collapse kernel");
+    expect(supplement).toContain("### Stage-4.2N material/Green/FDT ordinary-null recovery");
+    expect(supplement).toContain("The runtime adds zero observable bridge edges");
+  });
+
+  it("integrates Stage-4.2J as a Schrödinger, density, and environment no-go diagnostic", () => {
+    for (const id of [
+      "cdp-stage4-2j-schrodinger-coherence-factorization",
+      "cdp-stage4-2j-dp-equivalent-energy-inverse",
+      "cdp-stage4-2j-homogeneous-sphere-energy",
+      "cdp-stage4-2j-residual-gas-screen",
+    ]) {
+      expect(main).toContain(id);
+      expect(supplement).toContain(id);
+    }
+    expect(main).toContain("0.249896");
+    expect(main).toContain("0.434903% conservative design floor");
+    expect(main).toContain("8.64118\\times10^{-4}");
+    expect(main).toContain("0.007320 of the");
+    expect(supplement).toContain("0.149851%");
+    expect(supplement).toContain("declared-equilibrium gas gate");
+    expect(main).toContain("not a calorimetric measurement of gravitational energy");
+    expect(main).toMatch(/The full\s+whitened complex estimator/);
+    expect(supplement).toContain(
+      "### B.12 Stage-4.2J Schrödinger, mass-density, and environment recovery",
+    );
+    expect(supplement).toMatch(/declared-equilibrium gas gate is\s+`no_go`/);
+  });
+
   it("states the external-bound screen and its convention limitation", () => {
     expect(main).toContain("\\(R_0>4.9\\times10^{-10}\\) m at 90% confidence");
     expect(main).toContain("\\(R_0>4.5\\times10^{-10}\\) m at 95% confidence");
@@ -140,8 +212,8 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
   });
 
   it("downgrades positive interpretation while the companion is infeasible", () => {
-    expect(main).toContain("1.92979\\times10^{-40}");
-    expect(main).toContain("3.85958\\times10^{-40}");
+    expect(main).toContain("3.07013\\times10^{-40}");
+    expect(main).toContain("6.14027\\times10^{-40}");
     expect(main).toContain("Equation (13) is not an instrument model");
     expect(main).toContain(
       "replicated DP-shaped coherence residual may be reported as unexplained",
@@ -232,8 +304,8 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
 
   it("keeps the canonical article connected to the live Theory Badge graph", () => {
     const graph = buildCasimirDpStudyTheoryBadgesV1();
-    expect(graph.badges).toHaveLength(33);
-    expect(graph.edges).toHaveLength(98);
+    expect(graph.badges).toHaveLength(39);
+    expect(graph.edges).toHaveLength(110);
     expect(
       graph.badges.some((badge) =>
         badge.sourceRefs.some((source) =>

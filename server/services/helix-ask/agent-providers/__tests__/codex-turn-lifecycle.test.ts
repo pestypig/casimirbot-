@@ -207,4 +207,49 @@ describe("Codex provider outer turn lifecycle", () => {
     ]));
     expect(lifecycle.events.map((event) => event.kind)).not.toContain("tool.call.started");
   });
+
+  it("records a blocked observation re-entering Codex without recasting it as successful execution", () => {
+    const blocked = gatewayResult("com.casimirbot.minecraft.command.catalog", 1);
+    blocked.ok = false;
+    blocked.gateway_admission.admission_status = "blocked";
+    blocked.gateway_admission.blocked_reason = "wrong_environment";
+
+    const lifecycle = buildCodexProviderTurnLifecycle({
+      turnId: "ask:test:blocked-observation-reentry",
+      routeCommitId: "route:test:minecraft",
+      gatewayCallResults: [blocked],
+      providerReasoningReentry: {
+        observation_reentered: true,
+        reentered_observation_refs: ["observation:1", "artifact:1"],
+        evidence_reentered: false,
+      },
+      providerText:
+        "The catalog request was blocked because its label did not resolve to the active environment.",
+      terminalArtifactKind: "typed_failure",
+      terminalEligible: true,
+      ok: false,
+      terminalReasonCode: "wrong_environment",
+    });
+
+    expect(lifecycle.events.map((event) => event.kind)).toEqual(
+      expect.arrayContaining([
+        "capability.rejected",
+        "tool.call.rejected",
+        "observation.reentered",
+        "agent.message.completed",
+      ]),
+    );
+    expect(lifecycle.events.map((event) => event.kind)).not.toContain(
+      "tool.call.started",
+    );
+    expect(lifecycle.reduction.tool_calls[0]).toMatchObject({
+      completion_kind: "tool.call.rejected",
+      reentered: true,
+      reentry_observation_refs: expect.arrayContaining([
+        "observation:1",
+        "artifact:1",
+      ]),
+    });
+    expect(lifecycle.integrity).toMatchObject({ ok: true, violations: [] });
+  });
 });

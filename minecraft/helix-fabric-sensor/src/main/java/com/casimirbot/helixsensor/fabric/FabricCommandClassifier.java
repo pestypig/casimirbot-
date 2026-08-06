@@ -63,7 +63,7 @@ final class FabricCommandClassifier {
                 return new Classification("world_build", "world_mutation");
             }
             if (
-                lower.matches("^helixgame\\s+checkpoint\\s+(?:capture|discard)(?:\\s|$).*$")
+                lower.matches("^helixgame\\s+checkpoint\\s+(?:capture(?:_box)?|discard)(?:\\s|$).*$")
             ) {
                 return new Classification(
                     "server_administration",

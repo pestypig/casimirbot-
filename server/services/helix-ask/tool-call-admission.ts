@@ -437,9 +437,15 @@ export function buildToolCallAdmissionDecision(input: {
     promptText,
     input.trustedEnvironmentContext,
   );
-  const policySelectedCapabilityContract =
-    unknownSourceArtifactDiscoveryRequested &&
-    (sourceTarget === "docs_viewer" || sourceTarget === "active_doc")
+  const hardVisualCaptureSource =
+    sourceTarget === "visual_capture" &&
+    readString(sourceTargetIntentRecord?.strength) === "hard";
+  const policySelectedCapabilityContract = hardVisualCaptureSource
+    ? explicitCapabilityContractForCapability(
+        "situation-room.describe_visual_capture",
+      )
+    : unknownSourceArtifactDiscoveryRequested &&
+        (sourceTarget === "docs_viewer" || sourceTarget === "active_doc")
       ? explicitCapabilityContractForCapability("docs.search")
       : null;
   const candidateExplicitCapabilityContract =
@@ -1141,6 +1147,9 @@ export function buildToolCallAdmissionDecision(input: {
           tool_admission_reason: routeArbitration.tool_admission_reason,
           tool_admission_dominance_reason: routeArbitration.tool_admission_dominance_reason,
           selected_capability: routeArbitration.selected_capability,
+          admitted_capability: routeArbitration.mandatory_capability_admitted
+            ? routeArbitration.selected_capability
+            : null,
           executed_capability: null,
           runtime_capability_rejection_reason:
             routeArbitration.runtime_capability_rejection_reason,

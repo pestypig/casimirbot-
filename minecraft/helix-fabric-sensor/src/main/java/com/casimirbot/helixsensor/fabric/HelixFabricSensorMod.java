@@ -186,6 +186,8 @@ public final class HelixFabricSensorMod implements ModInitializer {
                 config.worldId(),
                 config.domainAdapter(),
                 java.util.Map.of(),
+                java.util.Map.of(),
+                false,
                 false,
                 false
             );

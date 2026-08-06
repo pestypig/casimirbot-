@@ -392,6 +392,8 @@ environmentConnectorPublicRouter.post(
         ? "The idempotent connector pairing redemption was replayed."
         : redeemed.pluginConfig.pairing_mode === "command_only"
           ? "The connector command lane is paired. Its separate command credential was delivered only to the connector."
+          : redeemed.pluginConfig.pairing_mode === "action_only"
+            ? "The player embodiment lane is paired. Its separate action credential was delivered only to the client connector."
           : "The connector is paired. Its room-source credential was delivered only to the connector.",
       pairing_id: redeemed.pairingId,
       binding_id: redeemed.binding.binding_id,

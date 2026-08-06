@@ -727,6 +727,12 @@ describe("Shared Realtime room source ingress", () => {
       request_id: requestProjectionId,
       observation_ref: {
         event_count: 1,
+        environment_event_batch_ref: expect.stringMatching(
+          /^environment_event_batch:world:/u,
+        ),
+        situation_digest_refs: [
+          expect.stringMatching(/^environment_situation_digest:/u),
+        ],
         model_invoked: false,
         assistant_answer: false,
         terminal_eligible: false,

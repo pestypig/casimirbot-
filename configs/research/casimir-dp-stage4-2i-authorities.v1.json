@@ -1,0 +1,50 @@
+{
+  "schema_version": "casimir_dp_stage4_2i_authority_manifest/1",
+  "campaign_id": "casimir-dp-boundary-branch-interaction-stage4-2i-v1",
+  "immutable_upstream": [
+    {
+      "role": "stage4_2h_config",
+      "path": "configs/research/casimir-dp-commissioning-intake-stage4-2h.v1.json",
+      "sha256": "d1021844f62adadfe3b77f9b36b742a27b7c086c56008778ae2c01dcf6daaa42",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2h_blank_dossier",
+      "path": "configs/research/fixtures/casimir-dp-stage4-2h-commissioning-blank.v1.json",
+      "sha256": "57318b8bc2986530154fb02bb2765e5dc5a711920d8c88483bc19772625bad65",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2h_report",
+      "path": "artifacts/research/casimir-dp-commissioning-intake-stage4-2h/casimir-dp-commissioning-intake-stage4-2h-v1-20260730T050000000Z/commissioning-intake-stage4-2h-report.json",
+      "sha256": "d5954986d73d7eb9d5d9a07ad4f945d9b636d1c6a37efe28c2de6b5ad1fd32aa",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2h_campaign_receipt",
+      "path": "artifacts/research/casimir-dp-commissioning-intake-stage4-2h/casimir-dp-commissioning-intake-stage4-2h-v1-20260730T050000000Z/commissioning-intake-stage4-2h-receipt.json",
+      "sha256": "d0aacee6611e5aec1c75934a24fc709c434107e3e685eba0f96fc1addd1be56b",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2h_verification_receipt",
+      "path": "docs/research/casimir-dp-commissioning-intake-stage4-2h-verification-receipt.json",
+      "sha256": "acbab1f786e688fe04ad2d5cae15219166368e41b01b8df5949617ef150ce364",
+      "required_at_runtime": true
+    },
+    {
+      "role": "stage4_2g_single_apparatus_config",
+      "path": "configs/research/casimir-dp-empirical-feasibility-pilot-stage4-2g.v1.json",
+      "sha256": "a9516529a7c2f935c777fc4c1b29c207457a8f1618f1df580bff89ee27692487",
+      "required_at_runtime": true
+    }
+  ],
+  "method_authorities": [
+    {
+      "role": "stage4_2h_commissioning_evaluator",
+      "path": "shared/casimir-dp-commissioning-intake-stage4-2h.ts",
+      "sha256": "9592b76fec71b25ecf180634afe0a4ba3c74b5edc69906320b41e382bf8ea8d7",
+      "required_at_runtime": true
+    }
+  ]
+}

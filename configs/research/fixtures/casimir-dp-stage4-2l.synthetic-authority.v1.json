@@ -1,0 +1,103 @@
+{
+  "schema_version": "casimir_dp_empirical_authority_fixture_stage4_2l/1",
+  "campaign_id": "casimir-dp-empirical-authority-stage4-2l-v1",
+  "fixture_id": "stage4_2l_synthetic_and_literature_bound_authority_v1",
+  "evidence_class": "synthetic_and_literature_bound_diagnostic",
+  "generated_at": "2026-08-06T06:00:00.000Z",
+  "constants": {
+    "G_m3_kg_s2": 6.6743e-11,
+    "hbar_J_s": 1.054571817e-34,
+    "c_m_s": 299792458,
+    "epsilon0_F_m": 8.8541878128e-12,
+    "k_B_J_K": 1.380649e-23,
+    "dalton_kg": 1.66053906892e-27
+  },
+  "registered_dp": {
+    "model_id": "diosi_1989_gaussian_regularized_nondissipative",
+    "regularization_m": 1e-7,
+    "rate_s": 0.02400420398374263,
+    "energy_J": 2.5314157026284577e-36,
+    "maximum_phase_jitter_rad": 0.03464404998245921
+  },
+  "material_response": {
+    "ingestion_schema": "frequency_hz_epsilon_real_epsilon_imaginary_covariance_v1",
+    "specimen_measured_rows": [],
+    "literature_proxy_source_id": "cleek_1966_fused_silica_ir",
+    "literature_proxy_static_permittivity": 3.8,
+    "literature_proxy_temperature_K": 293.15,
+    "apparatus_temperature_K": 4,
+    "specimen_identity_matches": false,
+    "cryogenic_temperature_matches": false
+  },
+  "finite_geometry": {
+    "surrogate_model": "solid_angle_weighted_retarded_cp_finite_rectangle",
+    "quadrature_panels_per_axis": 160,
+    "crosscheck_relative_tolerance": 0.0001,
+    "full_maxwell_green_receipt_available": false,
+    "independent_solver_receipt_available": false
+  },
+  "phase_covariance": {
+    "finite_difference": {
+      "lateral_centering_m": 1e-9,
+      "gap_m": 1e-10,
+      "branch_tilt_rad": 1e-9,
+      "plate_tilt_rad": 1e-9
+    },
+    "design_standard_deviations": {
+      "lateral_centering_m": 1e-8,
+      "gap_m": 1e-9,
+      "branch_tilt_rad": 1e-6,
+      "plate_tilt_rad": 1e-6
+    },
+    "empirical_jacobian_receipt_available": false,
+    "empirical_covariance_receipt_available": false
+  },
+  "gas_environment": {
+    "temperature_K": 4,
+    "total_pressure_Pa": 2e-11,
+    "species": [
+      {
+        "id": "H2",
+        "pressure_fraction": 0.9,
+        "molecular_mass_kg": 3.3474475e-27,
+        "total_cross_section_m2": 2.398e-13
+      },
+      {
+        "id": "He",
+        "pressure_fraction": 0.1,
+        "molecular_mass_kg": 6.64647699e-27,
+        "total_cross_section_m2": 2.398e-13
+      }
+    ],
+    "angular_quadrature_points": 1024,
+    "target_fraction_of_dp_rate": 0.1,
+    "measured_species_receipt_available": false,
+    "measured_temperature_receipt_available": false,
+    "measured_differential_scattering_receipt_available": false,
+    "confinement_kernel_receipt_available": false,
+    "independent_pressure_calibration_available": false
+  },
+  "state_preparation": {
+    "demonstrated_mass_Da": 170000,
+    "demonstrated_separation_m": 1.33e-7,
+    "demonstrated_particle_diameter_m": 8e-9,
+    "source_id": "pedalino_etal_2026",
+    "same_material": false,
+    "same_platform": false,
+    "integrated_sequence_receipt_available": false
+  },
+  "external_dp_bound": {
+    "source_id": "xenonnt_2026",
+    "convention": "diosi_markovian",
+    "lower_R0_m_90CL": 4.9e-10,
+    "lower_R0_m_95CL": 4.5e-10,
+    "exact_composite_mapping_receipt_available": false
+  },
+  "density_representations": [
+    { "id": "single_effective_gaussian", "shell_mass_fraction": 0 },
+    { "id": "homogeneous_sphere", "shell_mass_fraction": 0 },
+    { "id": "thin_shell", "shell_mass_fraction": 1 },
+    { "id": "core_shell_sensitivity", "shell_mass_fraction": 0.05 }
+  ],
+  "regularization_grid_m": [5e-10, 1e-9, 1e-8, 1e-7, 1e-6]
+}

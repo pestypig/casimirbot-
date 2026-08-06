@@ -218,6 +218,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   const { profileIngressRouter } = await import("./routes/profile-ingress");
   const { roomSourceIngressRouter } = await import("./routes/room-source-ingress");
   const { environmentCommandRouter } = await import("./routes/environment-command-routes");
+  const { environmentActionRouter } = await import("./routes/environment-action-routes");
   app.use("/api/auth", googleAuthRouter);
   app.use("/api/account", accountSessionRouter);
   app.use("/api/docs", docsPrintPdfRouter);
@@ -226,6 +227,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/profile-ingress", profileIngressRouter);
   app.use("/api/room-ingress", roomSourceIngressRouter);
   app.use("/api/environment-command", environmentCommandRouter);
+  app.use("/api/environment-action", environmentActionRouter);
   app.use("/api/mission-board", missionBoardRouter);
   app.use("/api", halobankSolarRouter);
   const evolutionAuthEnabled = flagEnabled(

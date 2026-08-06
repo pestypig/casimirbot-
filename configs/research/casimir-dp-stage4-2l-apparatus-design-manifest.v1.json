@@ -1,0 +1,59 @@
+{
+  "schema_version": "casimir_dp_apparatus_design_manifest_stage4_2l/1",
+  "manifest_id": "casimir-dp-stage4-2l-reference-geometry-v1",
+  "authority_class": "frozen_engineering_reference_not_as_built_metrology",
+  "coordinate_frame": {
+    "origin": "plate_geometric_center_on_particle_facing_surface",
+    "axes": {
+      "x": "plate_long_axis",
+      "y": "plate_short_axis",
+      "z": "surface_outward_normal"
+    },
+    "handedness": "right_handed"
+  },
+  "object": {
+    "identity_id": "silica_high_mass_identifiable_single_object_v1",
+    "material": "fused_silica_design_proxy",
+    "mass_kg": 1.94385e-16,
+    "radius_m": 2.76302362398029e-7,
+    "nominal_center_m": [0, 0, 1.476302362398029e-6]
+  },
+  "superposition": {
+    "branch_vector_m": [1.6e-7, 0, 0],
+    "separation_m": 1.6e-7,
+    "orientation": "tangential_to_plate_along_x",
+    "hold_time_s": 0.25,
+    "path_swap_required": true,
+    "echo_required": true
+  },
+  "boundary": {
+    "model": "finite_rectangular_plate_design_reference",
+    "center_m": [0, 0, 0],
+    "normal": [0, 0, 1],
+    "size_x_m": 4e-5,
+    "size_y_m": 4e-5,
+    "thickness_m": 5e-7,
+    "aperture_radius_m": 0,
+    "coating": "unregistered_actual_coating"
+  },
+  "nearby_conductors": [
+    {
+      "id": "reference_shield_envelope",
+      "minimum_distance_m": 1e-4,
+      "included_in_surrogate": false
+    }
+  ],
+  "design_tolerances": {
+    "branch_tilt_rad": 1e-6,
+    "plate_tilt_rad": 1e-6,
+    "lateral_centering_m": 1e-8,
+    "gap_m": 1e-9
+  },
+  "receipts": {
+    "as_built_cad_mesh": false,
+    "coordinate_metrology": false,
+    "branch_vector_metrology": false,
+    "plate_normal_metrology": false,
+    "nearby_conductor_survey": false
+  }
+}

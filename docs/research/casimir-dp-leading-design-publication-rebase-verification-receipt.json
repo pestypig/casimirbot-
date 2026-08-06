@@ -1,0 +1,143 @@
+{
+  "schema_version": "casimir_dp_leading_design_publication_rebase_verification_receipt/1",
+  "campaign_id": "casimir-dp-leading-design-publication-rebase-20260806",
+  "verified_at": "2026-08-06T06:10:42Z",
+  "evidence_class": "publication_and_repository_convergence_only",
+  "claim_ceiling": "leading_synthetic_commissioning_design_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "immutable_upstream": {
+    "stage4_2m_receipt_path": "docs/research/casimir-dp-apparatus-search-stage4-2m-verification-receipt.json",
+    "stage4_2m_receipt_sha256": "bf89dc469b7d5770c69d01eec80acc312816ef8e054b2fbd7e74af7e77f95a3f",
+    "stage4_2m_run_id": "casimir-dp-apparatus-search-stage4-2m-v1-20260806T070000000Z",
+    "mutation_detected": false
+  },
+  "leading_design": {
+    "candidate_id": "stage4_2m_candidate_002",
+    "material_lane": "diamond_density_synthetic_candidate",
+    "radius_m": 2.76302362398029e-7,
+    "mass_kg": 3.0925052683774525e-16,
+    "branch_separation_m": 2.5e-7,
+    "hold_time_s": 0.25,
+    "surface_gap_m": 1e-5,
+    "temperature_K": 4,
+    "pressure_Pa": 1e-15,
+    "registered_gaussian_loss_fraction": 0.029080253747730156,
+    "transported_density_envelope_floor_loss_fraction": 0.004349031724246499,
+    "required_paired_windows": 1028,
+    "power_at_1600": 0.92738577,
+    "standing": "synthetic_commissioning_target_not_empirical_feasibility"
+  },
+  "publication_artifacts": {
+    "main_paper": {
+      "path": "docs/research/casimir-dp-quantum-foam-study.md",
+      "sha256": "ff7bd9586ca85fc4c4807fdace5d5067d3ae1be704d47a5d36ae97247ffd8d2e"
+    },
+    "proposal": {
+      "path": "docs/research/casimir-dp-experiment-proposal.md",
+      "sha256": "816dd97328f9214259cc7e13262e4062672fe496cc14d8407b6c2c8a2a236dc7"
+    },
+    "reproducibility_supplement": {
+      "path": "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.md",
+      "sha256": "bc931d7e4cc8c28590eabb27edbf9968e45825d70c8d118258f9dbe7bfce3291"
+    },
+    "research_readme": {
+      "path": "docs/research/README.md",
+      "sha256": "572576ce403e6e868376eb7eee1c0b15d47ba15d073fbdc614e96e0cd0f649fe"
+    },
+    "figures": [
+      {
+        "path": "docs/research/figures/casimir-dp/apparatus-schematic.svg",
+        "sha256": "8fc2c36cf6162c62a952545a7433c784194f8387f29f50b839397ef06b6ecfb6"
+      },
+      {
+        "path": "docs/research/figures/casimir-dp/coherence-forecast.svg",
+        "sha256": "66a7bcb0d942f3e192f3eb7b84e06a23b6ecf8acfe03008a6d16d5564b535d0f"
+      },
+      {
+        "path": "docs/research/figures/casimir-dp/identifiability-geometry.svg",
+        "sha256": "1524abad2d39580200983da961fa15d0df8a5ebfc1adc67ab642d37000c4986f"
+      }
+    ]
+  },
+  "navigation_and_math": {
+    "main_sidecar": {
+      "marker_source_generated": [26, 26, 26],
+      "source_sha256": "07ffa33ae41584a988d4f4bd8aa9835527a292b235a5497762c8be6dcbb2133a",
+      "generated_sha256": "06f0f011fd101fd4efc94687462195aad33b3660c4829a060e8ca93d4551ac7a"
+    },
+    "supplement_sidecar": {
+      "marker_source_generated": [79, 79, 79],
+      "source_sha256": "946cf94cf4a3b7ae72434d95f6700417332249730af08675d570dbcf5bac9e08",
+      "generated_sha256": "60bcd067318ead799841552f7f57226fde08749ff2320e1b71012441d6e198ad"
+    },
+    "theory_badges": {
+      "badges": 38,
+      "edges": 108,
+      "observable_bridge_edges": 0,
+      "source_sha256": "027a353e3286d8f1297446a6f558f177b0b3b372d38430719a8a56348710ae05"
+    },
+    "math_registry": {
+      "entries": 221,
+      "validation": "pass",
+      "source_sha256": "e98016f3173370aea7488b76ce49e8624c05a15188202b88c6b136540bf09e81",
+      "report_json_sha256": "e6c3596884566c1368c1002c1ec3923b38941a70f563165bb8ad671d887ed530",
+      "report_markdown_sha256": "dedece6ae8c55572dbf1deb9dbbfa81918c31211e89bdebf5bf4e37ef3cf687e"
+    },
+    "root_to_leaf_manifest": {
+      "validation": "pass",
+      "sha256": "363fe581ae7030900e85d402eea351d747d36702daf518e05f63e83f02d2b6cb"
+    }
+  },
+  "local_gates": {
+    "focused_stage4_2m_publication_graph_and_root": {
+      "files": 5,
+      "tests": 62,
+      "status": "pass"
+    },
+    "inherited_stage4_2c_through_stage4_2m": {
+      "files": 25,
+      "tests": 101,
+      "status": "pass"
+    },
+    "required_gr_warp": {
+      "files": 18,
+      "tests": 179,
+      "status": "pass"
+    },
+    "production_build": {
+      "command": "npm run build",
+      "status": "pass_with_pre_existing_warnings"
+    }
+  },
+  "adapter_result": {
+    "trace_id": "adapter:1d8a8433-4f7a-4f8e-81d7-19ac5f0fcbfc",
+    "run_id": "2374",
+    "verdict": "PASS",
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate": {
+      "status": "GREEN",
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "integrity_ok": true
+    },
+    "exclusive_trace": {
+      "path": "artifacts/training-trace-stage4-2m-leading-design-rebase-run2374-exclusive.jsonl",
+      "sha256": "866eec434c58b84cc2fcb5df9bd6a4136fbb0c87d04532e89b9f90b3c5464998",
+      "bytes": 986,
+      "line_count": 1,
+      "identity_validated": true
+    },
+    "scientific_scope": "none"
+  },
+  "scientific_standing": {
+    "measured_evidence": "not_ready",
+    "residual_attribution": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "transfer_kernel": "not_registered",
+    "explanation": "The rebase makes the Stage-4.2M candidate the unambiguous leading synthetic commissioning design and preserves the older silica apparatus as derivation ancestry. It does not supply measured material response, as-built geometry, empirical covariance, measured gas scattering, a prepared massive superposition, an instrument-level companion, an exact external-bound recast, an observed residual, collapse identification, manifold dynamics, or physical viability."
+  }
+}

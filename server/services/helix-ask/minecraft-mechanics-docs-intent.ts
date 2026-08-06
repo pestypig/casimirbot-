@@ -14,7 +14,7 @@ const MECHANICS_EVIDENCE_PATTERN =
   /\b(?:mechanics|commands?|syntax|documentation|docs?|guide|playbook|citations?|references?)\b|\b(?:source|evidence)\s+lines?\b/i;
 
 const LIVE_ENVIRONMENT_STATE_PATTERN =
-  /\b(?:paired\s+(?:minecraft\s+)?(?:fabric\s+)?environment|selected\s+(?:minecraft\s+)?player|current\s+(?:player\s+)?(?:exact\s+)?position|exact\s+position|health|food|dimension|game\s+mode|inventory|line\s+of\s+sight|nearby\s+(?:entities|hazards|blocks)|fresh\s+(?:live\s+)?(?:state|evidence|observation)|post[-\s]?action\s+verification|right\s+now)\b/i;
+  /\b(?:paired\s+(?:minecraft\s+)?(?:fabric\s+)?environment|selected\s+(?:minecraft\s+)?player|current\s+(?:player\s+)?(?:exact\s+)?position|exact\s+position|current\s+(?:minecraft\s+)?(?:daytime|time|weather|difficulty|game\s*rules?|world\s*border|tick(?:ing)?\s+state)|health|food|dimension|game\s+mode|inventory|line\s+of\s+sight|nearby\s+(?:entities|hazards|blocks)|fresh\s+(?:live\s+)?(?:state|evidence|observation)|post[-\s]?action\s+verification|right\s+now)\b/i;
 
 const EXPLICIT_MECHANICS_DOCUMENT_TARGET_PATTERN =
   /\b(?:mechanics|syntax|documentation|docs?|guide|playbook|citations?|references?)\b|\b(?:source|evidence)\s+lines?\b/i;

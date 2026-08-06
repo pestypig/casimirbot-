@@ -29,3 +29,14 @@ export const hashAskTurnGoalFrame = (frame: HelixAskGoalFrameHashSource): string
 
 export const readAskTurnGoalFrameString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+/**
+ * `visual_capture_describe` is the legacy solver goal while
+ * `visual_capture` is the canonical committed-route goal. They share one
+ * evidence contract; terminal state must not decide whether an already
+ * admitted visual observation satisfies that contract.
+ */
+export const isAskTurnVisualCaptureGoalKind = (value: unknown): boolean => {
+  const goalKind = readAskTurnGoalFrameString(value);
+  return goalKind === "visual_capture" || goalKind === "visual_capture_describe";
+};

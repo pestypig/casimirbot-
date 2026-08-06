@@ -1,7 +1,7 @@
 # An Identifiability-First Feasibility Protocol for a Gaussian-Regularized Diósi Collapse Test with a Casimir-Boundary Control
 
 **Document type:** theoretical design study and empirical-feasibility protocol  
-**Version:** referee-response draft, 30 July 2026  
+**Version:** leading-design draft, 6 August 2026
 **Authors and affiliations:** to be supplied before external submission  
 **Corresponding author:** to be supplied before external submission
 
@@ -22,23 +22,45 @@ master equation used for the forecast. A nearby conducting boundary is treated
 as a secondary, independently controlled quantum-electrodynamic perturbation.
 No Casimir variable enters the registered collapse generator.
 
-The methodological result is a design progression. An initial synthetic
-apparatus was rejected because its candidate collapse signature was nearly
-collinear with modeled nuisance responses: the maximum covariance-whitened
-signature cosine was 0.999977 and the normalized Gram condition number was
-1.79×10^5. A bounded synthetic redesign reduced those nominal values to
-0.7177 and 6.53. Under that same assumed response and covariance model, the
-forecast power was 0.9979 and the nominal minimum was 542 paired windows.
-These power values are not empirical and are not treated as robust until a
-finite-pilot covariance and response-uncertainty campaign is completed.
+The methodological result is a design progression ending in a bounded leading
+design. An initial synthetic apparatus was rejected because its candidate
+collapse signature was nearly collinear with modeled nuisance responses. A
+first bounded redesign established a usable covariance-whitened geometry, with
+maximum signature cosine 0.7177 and normalized Gram condition number 6.53, but
+its 0.9979 power and 542-window forecast belonged to that parent synthetic
+world. A subsequent 200-candidate apparatus search retained the same whitened
+geometry and frozen collapse law while applying mass-density, phase, gas,
+preparation-scale, external-bound, power, and companion gates. Three candidates
+survived. The leading candidate requires 1,028 paired windows and has forecast
+power 0.927 at 1,600 windows. None of these power values is empirical.
 
-The current reference manifest freezes a 276.3 nm-radius silica sphere with
-mass 1.94385×10^-16 kg, branch separation 160 nm, 250 ms hold time, 1.2 μm
-boundary gap, 4 K temperature, and 2×10^-11 Pa pressure. At the selected
+A downstream synthetic diagnostic now makes the boundary question explicit:
+a normalized four-cell complex cross-ratio tests boundary--branch
+nonfactorization while canceling the boundary-independent registered Diósi
+factor. Its null recovery and injected-signal tests pass, but no measured
+branch-control, wave-packet, ordinary-response, or interaction data exist.
+
+The leading design is now also bound to a material/Green/FDT ordinary-null
+runtime. In its synthetic recovery fixture, the finite-geometry response gives
+an electromagnetic phase of 0.0200 rad and an echo contraction exponent of
+\(1.34\times10^{-6}\); zero-coupling, infinite-distance, detailed-balance,
+Planck--Stefan--Boltzmann, and intervention-recovery gates pass. These are
+software-recovery values, not apparatus forecasts: the specimen spectrum,
+as-built geometry, full-Maxwell solution, independent solver check, and
+measured response covariance remain absent.
+
+A constituent and environmental diagnostic separates Hamiltonian phase from
+nonunitary contraction and stress-tests the mass model. The leading synthetic
+commissioning design uses a diamond-density 276.302 nm-radius sphere with mass
+3.09251×10^-16 kg, 250 nm tangential branch separation, 250 ms hold time,
+10 μm boundary gap, 4 K temperature, and 10^-15 Pa pressure. At the selected
 regularization length R0=100 nm, the registered effective-particle model
-predicts a conditional collapse rate of 0.0240 s^-1 and a DP-only visibility
-loss of 0.598% at 250 ms. A separate 3.32% value belongs to a stronger
-sensitivity-grid cell and is not the reference-apparatus prediction.
+predicts a conditional rate of 0.118046 s^-1 and 2.908% DP-only visibility
+loss. Transporting the registered mass-density sensitivity envelope lowers the
+design floor to 0.435%. The ordinary-background surrogates yield gas-to-DP
+ratio 0.00732 and echoed phase uncertainty 1.11×10^-8 rad, but they remain
+unmeasured. The design is therefore a commissioning target, not a physically
+admitted apparatus.
 
 The proposal remains an empirical no-go until the stated mass can be prepared
 in a verified spatial superposition, finite-geometry electromagnetic and
@@ -72,15 +94,19 @@ spacetime interpretation.
 The present result is conditional:
 
 1. a first synthetic design is non-identifiable and is rejected;
-2. a bounded redesign is identifiable in its nominal synthetic world;
-3. a single reference apparatus produces a 0.598% conditional DP-only
-   coherence loss at 250 ms;
-4. no measured response, covariance, state-preparation, or companion-detector
-   receipt yet authorizes the acquisition-power forecast.
+2. a bounded parent redesign establishes a usable nominal whitened geometry;
+3. three of 200 downstream configurations pass every transported synthetic
+   gate;
+4. the leading configuration predicts 2.908% effective-Gaussian loss and a
+   0.435% conservative density-envelope loss at 250 ms;
+5. its selected-candidate acquisition forecast is 1,028 paired windows and
+   power 0.927 at 1,600 windows;
+6. no measured response, covariance, state-preparation, or companion-detector
+   receipt yet authorizes a physical pilot or confirmatory campaign.
 
 Figure 1 gives the proposed geometry. Figure 2 shows the acquisition sequence.
 
-![Figure 1. Reference apparatus and observables.](figures/casimir-dp/apparatus-schematic.svg)
+![Figure 1. Leading commissioning apparatus and observables.](figures/casimir-dp/apparatus-schematic.svg)
 
 *Figure 1. The boundary is an electromagnetic control, not a term in the
 registered Diósi generator. The two center-of-mass branches are separated
@@ -137,16 +163,16 @@ The d→0 limit is evaluated analytically. A Fourier-space Simpson quadrature is
 used only as a numerical cross-check; its softening parameter is not the
 physical cutoff.
 
-For the current reference point,
+For the leading synthetic commissioning point,
 
 \[
 \begin{aligned}
-m &=1.94385\times10^{-16}\ {\rm kg},\\
-d &=1.60\times10^{-7}\ {\rm m},\\
+m &=3.0925053\times10^{-16}\ {\rm kg},\\
+d &=2.50\times10^{-7}\ {\rm m},\\
 R_0&=1.00\times10^{-7}\ {\rm m},\\
-E_G&=2.53142\times10^{-36}\ {\rm J},\\
-\Gamma_{\rm D}&=2.40042\times10^{-2}\ {\rm s^{-1}},\\
-\tau_{\rm D}&=41.6594\ {\rm s}.
+E_G&=1.2448784\times10^{-35}\ {\rm J},\\
+\Gamma_{\rm D}&=1.1804586\times10^{-1}\ {\rm s^{-1}},\\
+\tau_{\rm D}&=8.47128\ {\rm s}.
 \end{aligned}
 \tag{3}
 \]
@@ -156,16 +182,132 @@ At t=0.25 s,
 \[
 1-\mathcal V_{\rm D}
 =1-e^{-\Gamma_{\rm D}t}
-=5.98308\times10^{-3}
-=0.598308\%.
+=2.90803\times10^{-2}
+=2.90803\%.
 \tag{4}
 \]
 
-This is the only headline coherence-loss forecast for the authoritative
-apparatus. The 3.32% loss reported in the development record belongs to the
-strongest transported sensitivity-grid cell, where
-\(\Gamma_{\rm D}=0.134872\ {\rm s^{-1}}\) at the same hold time. It is a
-different point, not a second estimate of Eq. (4).
+This is the registered effective-Gaussian forecast for the leading design. A
+second value is required because the mass-density representation is not yet an
+empirical authority. Transporting the Stage-4.2L representation envelope gives
+an exponent of 0.00435852, or a conservative 0.434903% loss at the same hold
+time. The paper therefore carries 2.90803% as the named-model prediction and
+0.434903% as the design floor; neither is a total measured-visibility forecast.
+
+#### 2.1.1 From Schrödinger evolution to the measured residual
+
+The experiment does not measure \(E_G\) directly. It reconstructs the
+off-diagonal center-of-mass coherence \(C(t)=\langle A|\hat\rho(t)|B\rangle\).
+For two Hamiltonian energy eigenstates, ordinary Schrödinger evolution gives
+
+\[
+|\psi(t)\rangle
+=c_1e^{-iE_1t/\hbar}|E_1\rangle
++c_2e^{-iE_2t/\hbar}|E_2\rangle,
+\qquad
+\rho_{12}(t)=c_1c_2^*e^{-i(E_1-E_2)t/\hbar}.
+\]
+
+Thus the beat frequency is \((E_1-E_2)/\hbar\), while
+\(|\rho_{12}(t)|=|c_1c_2^*|\) remains constant in an ideal closed system. The
+energy variance
+\(\sigma_H^2=\langle H^2\rangle-\langle H\rangle^2\) describes the outcome
+spread of Hamiltonian-energy measurements; it is not the gravitational
+mass-density difference energy \(E_G\). The localized apparatus branches
+\(|A\rangle\) and \(|B\rangle\) need not themselves be stationary energy
+eigenstates, so the experiment reconstructs their projected complex coherence
+rather than assuming a literal two-line atomic spectrum.
+
+For the registered hypothesis lanes, the transparent scalar form is
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2j-schrodinger-coherence-factorization -->
+\[
+C(t)=C(0)
+e^{-i\Delta E_Ht/\hbar}
+e^{-\chi_{\rm env}(t)}
+e^{-E_Gt/\hbar}.
+\tag{4a}
+\]
+
+The Hamiltonian energy difference \(\Delta E_H\) rotates phase. The ordinary
+open-system functional \(\chi_{\rm env}\) represents environmental contraction
+after the environment is traced out. The final factor is the additional
+nonunitary contraction of the frozen Diósi model. Equal units do not make these
+three objects interchangeable: in particular, a Schrödinger energy variance,
+a photon frequency, and the gravitational mass-density difference energy are
+not the same source term.
+
+After ordinary loss has been estimated from blinded controls, a remaining
+scalar contraction can be expressed as
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2j-dp-equivalent-energy-inverse -->
+\[
+E_{\rm D,eq}
+=-\frac{\hbar}{t}
+\ln\!\left(\frac{|C_{\rm residual}(t)|}{|C(0)|}\right).
+\tag{4b}
+\]
+
+Equation (4b) is a conditional inference under the registered exponential
+model, not a calorimetric measurement of gravitational energy. The full
+whitened complex estimator in Eqs. (8)--(9), rather than this scalar summary,
+remains authoritative for distinguishing phase, loss, and correlated nuisance
+responses.
+
+#### 2.1.2 Constituent mass density changes the forecast
+
+Equation (2) treats the apparatus as one effective Gaussian particle. Stage
+4.2J also evaluates a homogeneous sphere of physical radius \(R\), convolved
+with the identical Gaussian regularization \(R_0\). Its radial Fourier form is
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2j-homogeneous-sphere-energy -->
+\[
+E_G^{\rm sphere}
+=\frac{2Gm^2}{\pi R_0}\int_0^\infty du\,e^{-u^2}
+\left[\frac{3(\sin q-q\cos q)}{q^3}\right]^2
+\left[1-\frac{\sin(ud/R_0)}{ud/R_0}\right],
+\qquad q=\frac{uR}{R_0}.
+\tag{4c}
+\]
+
+For the earlier silica reference, the converged homogeneous-sphere diagnostic
+was 0.249896 of its effective-Gaussian energy. Stage 4.2L subsequently widened
+the registered representation envelope to a factor of 6.77099. Stage 4.2M
+transports that factor to the leading candidate rather than pretending that a
+diamond-density label supplies an atomistic density map. This yields the
+0.434903% conservative design floor quoted above. A direct homogeneous,
+layered, coarse-grained, and atomistic calculation for the selected specimen
+remains blocked pending provenance-bound density and coating inputs.
+
+#### 2.1.3 Cheap feasibility screens precede power
+
+For an ideal equilibrium residual gas, the Stage-4.2J conservative screen uses
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2j-residual-gas-screen -->
+\[
+n=\frac{P}{k_BT},\qquad
+\bar v=\sqrt{\frac{8k_BT}{\pi m_g}},\qquad
+\Gamma_{\rm coll}^{\rm screen}=n\bar v\,\pi R^2.
+\tag{4d}
+\]
+
+The earlier \(2\times10^{-11}\) Pa silica reference failed this screen. The
+leading design therefore registers 4 K and \(10^{-15}\) Pa. Its transported
+Stage-4.2L QLBE proxy gives
+\(\Gamma_{\rm gas}=8.64118\times10^{-4}\ {\rm s^{-1}}\), or 0.007320 of the
+registered DP rate. This clears the synthetic one-tenth-DP gate, but it is not
+a measured vacuum receipt or a complete collisional decoherence kernel [13].
+Species-resolved differential scattering, confinement, pressure calibration,
+and collision-veto performance must replace the proxy. The leading mass is
+also about \(1.0955\times10^6\) times the 170 kDa cross-platform benchmark
+cited in Ref. [6], so state preparation remains the first independent hardware
+gate.
+
+Hydrogen and Rydberg scales remain useful dimensional calibration checks. The
+registered \(E_G\) is about \(5.71\times10^{-18}\) of the Rydberg energy, but
+that ratio supplies neither a cavity coupling nor a collapse mechanism. It
+only states the scale of the residual that the coherence estimator would infer
+if the frozen Diósi model were selected after ordinary channels were excluded.
 
 ### 2.2 Penrose OR motivation, notation, and scope
 
@@ -189,44 +331,48 @@ spacetime “snapping” or manifold instability.
 
 ### 2.3 Mass-density representation is part of the hypothesis
 
-The reference object's geometric radius is 276.3 nm, but Eq. (2) treats its
+The leading object's geometric radius is 276.3 nm, but Eq. (2) treats its
 center of mass as one Gaussian-smeared effective particle. This is not
-equivalent to resolving the silica sphere's atomic or layered density. The
+equivalent to resolving a selected specimen's atomic or layered density. The
 current representation audit is:
 
 | Representation of the same apparatus | Current standing | Consequence |
 |---|---|---|
-| single effective Gaussian particle | executable; Eq. (2) | 0.598% reference forecast |
-| homogeneous rigid sphere | previous spatial calculation failed the registered convergence gate | no accepted comparative rate |
-| coated or layered sphere | not computed | coating dependence unknown |
-| coarse-grained internal density | not computed with admissible density provenance | granularity dependence unknown |
-| R0 sweep with converged representations | sensitivity-only calculations exist; no unified robustness receipt | parameter stability unresolved |
+| single effective Gaussian particle | executable; Eq. (2) | 2.90803% leading-design forecast |
+| transported Stage-4.2L density envelope | executable sensitivity floor | 0.434903% leading-design floor; not a selected specimen map |
+| homogeneous selected sphere | not yet recomputed for the Stage-4.2M material identity | bulk-profile dependence unresolved |
+| coated or layered selected sphere | not computed | coating dependence unknown |
+| coarse-grained or atomistic selected density | no admissible density provenance | granularity dependence unknown |
+| R0 sweep with converged selected representations | sensitivity-only calculations exist | parameter stability unresolved |
 
 Therefore this article proposes a test of the effective-particle Diósi model,
 not a representation-independent or generic DP test. A revised confirmatory
 analysis must either demonstrate stability across physically defensible mass
 representations or preserve that narrower claim in its title and conclusion.
 
-## 3. Current Authoritative Apparatus Manifest
+## 3. Leading Synthetic Commissioning Design
 
-The following manifest supersedes all earlier candidate geometries in the
-development record.
+The following manifest is the current target for measured subsystem
+commissioning. It supersedes earlier design assumptions for forward planning,
+but it does not claim an as-built apparatus or physical feasibility.
 
-| Field | Authoritative value | Evidence role |
+| Field | Leading design value | Evidence role |
 |---|---:|---|
-| identity | `silica_high_mass_identifiable_single_object_v1` | frozen design identity |
-| material and geometry | silica sphere | design assumption |
+| identity | `stage4_2m_candidate_002` | frozen synthetic search identity |
+| material and geometry | diamond-density sphere | bounded-search assumption; specimen not selected |
 | radius | 276.302 nm | derived from frozen mass/material identity |
-| mass | 1.94385×10^-16 kg = 1.17061×10^11 Da | frozen model input |
-| branch separation | 160 nm, parallel to boundary | frozen model input |
+| mass | 3.0925053×10^-16 kg = 1.86235×10^11 Da | frozen model input |
+| branch separation | 250 nm, parallel to boundary | frozen model input |
 | principal hold time | 250 ms | frozen model input |
 | hold-time requirement | include preregistered shorter and longer cells | identifiability check |
-| nominal surface gap | 1.2 μm, common to both branches | boundary-control input |
+| nominal surface gap | 10 μm, common to both branches | boundary-control input |
+| finite plate size | 80 μm × 80 μm | transported finite-geometry input |
 | boundary program | static randomized cells; nominal cadence label 0.5 Hz | transfer function unmeasured |
 | primary sequence | Ramsey-type branch preparation/recombination | design assumption |
-| control sequences | echo, path swap, sham switch, detuned boundary | required nuisance discrimination |
+| control sequences | identical-branch/sham splitter, echo, path swap, sham switch, detuned boundary | required nuisance and interaction discrimination |
 | temperature | 4 K | design target, unmeasured in integrated apparatus |
-| pressure | 2×10^-11 Pa | design target, unmeasured in integrated apparatus |
+| pressure | 1×10^-15 Pa | design target, unmeasured in integrated apparatus |
+| registered echo residual | 1×10^-4 | synthetic control assumption |
 | vibration target | 5×10^-10 m s^-2 Hz^-1/2 | design target |
 | readout | 1550 nm, 5 nW nominal | design assumption |
 | polarization | circular-control pair plus linear-basis checks | electromagnetic witness |
@@ -246,7 +392,8 @@ default pilot implementation.
 | original symmetric-force candidate | early Casimir-force-centered architecture | `superseded_design_record` |
 | proposal-closure architecture | 75 nm radius, 20 nm separation, 0.1 s, 5 μm nominal gap, 10–4 μm commissioning ladder | `superseded_design_record` |
 | synthetic identifiability candidate | high-mass parameter-search result | parent of current manifest |
-| present reference manifest | 276.3 nm radius, 160 nm separation, 0.25 s, 1.2 μm gap | `current_authoritative_design_assumption` |
+| Stage-4.2C silica parent | 276.3 nm radius, 160 nm separation, 0.25 s, 1.2 μm gap | `superseded_search_parent` |
+| leading Stage-4.2M design | diamond-density, 276.3 nm radius, 250 nm separation, 0.25 s, 10 μm gap | `current_synthetic_commissioning_target` |
 
 “Frozen” means immutable within a particular run. It does not mean that an
 older run remains the current proposal after an explicit downstream
@@ -254,10 +401,10 @@ supersession.
 
 ### 3.2 The dominant scale gap
 
-The reference mass is approximately \(1.17\times10^{11}\) Da. Matter-wave
+The leading mass is approximately \(1.86235\times10^{11}\) Da. Matter-wave
 interference has recently been demonstrated for sodium clusters above
 170,000 Da [6]. The proposed object is therefore about
-\(6.89\times10^5\) times more massive than that free-particle interference
+\(1.0955\times10^6\) times more massive than that free-particle interference
 benchmark. The comparison is not a universal impossibility theorem—trapped
 mechanical systems use different state-preparation strategies—but it prevents
 the manuscript from treating preparation as an ordinary checklist item.
@@ -272,8 +419,9 @@ State preparation is the first physical go/no-go:
 5. show that the preparation procedure does not itself generate the fitted
    nuisance signature.
 
-Until these steps are demonstrated, neither 542 nor 1,600 paired windows is an
-actionable acquisition duration.
+Until these steps are demonstrated, the leading 1,028-window requirement and
+1,600-window planning ceiling are not actionable acquisition durations. The
+older 542-window value remains only a Stage-4.2C parent-design record.
 
 ## 4. Hypotheses separated before data
 
@@ -390,6 +538,94 @@ s_\perp=(I-P_{\tilde X})\tilde s_{\rm D}.
 \tag{9}
 \]
 
+### 5.1 Boundary--branch interaction diagnostic
+
+The full whitened estimator remains primary, but the boundary question has a
+transparent four-cell projection. Let \(\beta=0,1\) denote reference and active
+boundary states, and let \(q=0,1\) denote a measured identical-branch (or
+preregistered sham-split) control and the separated material superposition.
+Normalize each cell without discarding phase,
+
+\[
+\bar C_{\beta q}(t)=\frac{C_{\beta q}(t)}{C_{\beta q}(0)}.
+\]
+
+The Stage-4.2I diagnostic freezes the complex cross-ratio
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2i-complex-cross-ratio -->
+\[
+\mathcal R_\times=
+\frac{\bar C_{11}\bar C_{00}}
+     {\bar C_{01}\bar C_{10}},
+\qquad
+I_\times=-\ln|\mathcal R_\times|,
+\qquad
+\Phi_\times=\arg\mathcal R_\times .
+\tag{9a}
+\]
+
+The registered ordinary-physics prediction is not assumed to factorize
+perfectly. Its measured response model supplies \(\mathcal R_{\times,0}\), and
+the corrected interaction is
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2i-ordinary-corrected-interaction -->
+\[
+\mathcal R_{\times,\mathrm{corr}}=
+\frac{\mathcal R_{\times,\mathrm{obs}}}
+     {\mathcal R_{\times,0}},
+\quad
+I_{\times,\mathrm{corr}}=I_{\times,\mathrm{obs}}-I_{\times,0},
+\quad
+\Phi_{\times,\mathrm{corr}}=
+\operatorname{wrap}(\Phi_{\times,\mathrm{obs}}-\Phi_{\times,0}).
+\tag{9b}
+\]
+
+Standard \(H_{\rm D}\) multiplies both separated-branch boundary cells by the
+same \(e^{-\Gamma_{\rm D}t}\). That factor cancels from Eq. (9a), so this
+statistic is not the primary standard-Diosi test. It asks the separate
+question: does the boundary change branch-dependent coherence? A nonzero
+corrected interaction first challenges \(H_0\) or complete-joint-system
+equivalence. It cannot identify a Casimir-to-collapse mechanism without the
+separate kernel prohibited by Eq. (6).
+
+For log-loss cells \(Y=(Y_{00},Y_{01},Y_{10},Y_{11})\), the elementary
+contrast is \(c^{\mathsf T}Y\) with \(c=(1,-1,-1,1)^{\mathsf T}\) and variance
+\(c^{\mathsf T}\Sigma_Yc\). Stage 4.2I recovers this as the saturated four-cell
+special case of covariance-weighted projection; Eq. (8), with all controls and
+quadratures retained, remains the general estimator. If any normalized
+coherence is outside the registered log-coverage domain, Eq. (9a) is withheld
+and the raw complex cells remain authoritative.
+
+The same campaign replaces an opaque wave-packet receipt with explicit
+center-of-mass custody:
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2i-wavepacket-custody -->
+\[
+\mathbf d=\mathbf x_B-\mathbf x_A,
+\qquad
+\sigma_{\rm CM}=\sqrt{\frac{\operatorname{tr}\Sigma_{\rm CM}}{3}},
+\qquad
+\{R_{\rm sphere},R_0,\sigma_{\rm CM}\}
+\quad\text{have distinct physical and model roles}.
+\tag{9c}
+\]
+
+Centers, packet covariance, overlap, momentum difference, separation
+uncertainty, hold jitter, preparation fidelity, trajectory, and tomography
+provenance must agree across boundary states within frozen tolerances. The
+maintained Stage-4.2I fixture exercises this contract synthetically with
+\(\sigma_{\rm CM}=10\ \mathrm{nm}\); it is not a prepared-state measurement.
+In that boundary-independent-DP recovery,
+\(I_{\times,\mathrm{corr}}=1.11\times10^{-16}\),
+\(\Phi_{\times,\mathrm{corr}}=-9.30\times10^{-19}\ \mathrm{rad}\), and the
+maximum interaction significance is \(3.85\times10^{-13}\). An adversarial
+fixture recovers an injected (0.002) loss interaction and
+(0.004\ \mathrm{rad}) phase interaction, while low coherence, packet
+mismatch, non-positive covariance, and boundary-dependent DP fail closed.
+These are software-recovery results only; the four cells, packet metrology,
+and ordinary response are not measured.
+
 The preregistered nominal design gates are
 
 <!-- helix-doc-equation-action/v1 id=cdp-stage4-2c-identifiability-power-gates -->
@@ -404,7 +640,7 @@ The preregistered nominal design gates are
 These are design-admission gates, not proof that the modeled nuisance set is
 complete.
 
-### 5.1 Rejected design
+### 5.2 Rejected design
 
 The initial synthetic design produced
 
@@ -417,9 +653,9 @@ The initial synthetic design produced
 The correct result was an apparatus-design no-go. It was not a null result on
 the Diósi model.
 
-### 5.2 Nominal synthetic redesign
+### 5.3 Parent synthetic redesign
 
-The bounded redesign produced
+The Stage-4.2C parent redesign produced
 
 | Diagnostic | Nominal synthetic value | Gate |
 |---|---:|---|
@@ -432,17 +668,91 @@ The bounded redesign produced
 ![Figure 4. Identifiability progression.](figures/casimir-dp/identifiability-geometry.svg)
 
 *Figure 4. The first design's candidate direction lies almost inside the
-nuisance span. The redesign is separated in the nominal whitened geometry.
-The right panel is still conditional on synthetic response vectors and an
-assumed covariance.*
+nuisance span. The parent redesign establishes the nominal whitened geometry
+later transported by Stage 4.2M. Both panels remain conditional on synthetic
+response vectors and an assumed covariance.*
 
-### 5.3 Why the nominal power is not the headline
+### 5.4 Leading Stage-4.2M design
 
-The same synthetic response/covariance world was used to search candidates and
-evaluate the selected candidate. Finite-pilot covariance uncertainty was not
-propagated. Accordingly, 0.997858 is a conditional calculation, not a robust
-power claim. The next computation must report an envelope rather than a single
-number.
+The downstream search evaluates 200 bounded configurations under the frozen
+Diósi law and the same registered whitened geometry. Three pass all twelve
+synthetic gates. The leading point is:
+
+| Diagnostic | Leading synthetic value | Gate |
+|---|---:|---|
+| maximum absolute whitened cosine | 0.717724 | pass; transported geometry |
+| normalized Gram condition number | 6.53169 | pass; transported geometry |
+| effective-Gaussian visibility loss at 250 ms | 2.90803% | pass |
+| conservative density-envelope loss at 250 ms | 0.434903% | pass |
+| gas-to-DP proxy ratio | 0.007320 | pass synthetically |
+| echoed phase uncertainty | 1.109×10^-8 rad | pass synthetically |
+| synthetic companion SNR | 8.668 | pass synthetically |
+| required paired windows | 1,028 | within 1,600 ceiling |
+| forecast power at 1,600 windows | 0.927386 | pass |
+
+This table, not the 542-window parent result, is the current acquisition
+forecast. It remains a subsystem-commissioning target because its response,
+covariance, gas, phase, preparation, and companion inputs are transported
+surrogates rather than measurements.
+
+### 5.5 Material-resolved ordinary complex-coherence null
+
+Stage 4.2N replaces the transported electromagnetic scalar with an executable
+ordinary-response chain for the leading design. A passive specimen loss table
+is converted to \(\epsilon(i\xi)\), a finite-geometry Green table supplies the
+mean branch potential, and a two-sided fluctuation--dissipation spectrum
+supplies phase/loss covariance. The transparent ordinary prediction is
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2n-complex-ordinary-null -->
+\[
+C_{0,\beta}(t)=C(0)
+\exp\!\left[i\Phi_{{\rm EM},\beta}(t)-\chi_{0,\beta}(t)\right].
+\tag{16a}
+\]
+
+The boundary-by-superposition control is represented by the normalized
+four-cell ratio
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2n-four-cell-cross-ratio -->
+\[
+\mathcal R_4=
+\frac{C_{{\rm active},{\rm separated}}
+      C_{{\rm reference},{\rm compact}}}
+     {C_{{\rm active},{\rm compact}}
+      C_{{\rm reference},{\rm separated}}},
+\qquad
+\Phi_4=\arg\mathcal R_4,
+\qquad
+\chi_4=-\ln|\mathcal R_4|.
+\tag{16b}
+\]
+
+This is the explicit form of the comparison already motivated by the Stage
+4.2I estimator. A nonzero corrected \(\mathcal R_4\) challenges factorization of
+the boundary and branch responses; it does not by itself identify collapse.
+The boundary-independent registered Diósi factor is identical in active and
+reference cells and therefore cancels from this interaction statistic. The
+separate Diósi exponents remain the mass--separation--time comparator for the
+primary coherence analysis; Stage 4.2N does not add them to the ordinary
+Green/FDT exponent and supplies no Casimir-to-collapse kernel.
+
+The current synthetic fixture recovers
+\(\Phi_4=0.01999999999\ {\rm rad}\) and
+\(\chi_4=1.34165\times10^{-6}\), with propagated phase uncertainty
+\(6.30\times10^{-5}\ {\rm rad}\). It also recovers zero response at zero
+coupling and infinite distance and a Stefan--Boltzmann relative error of
+\(1.38\times10^{-14}\). These values validate executable bookkeeping only.
+Measured evidence and ordinary-null authority remain `not_ready`; residual
+attribution, collapse identification, and manifold dynamics remain `blocked`.
+
+### 5.6 Why the selected power is still conditional
+
+The response/covariance geometry used by Stage 4.2M was transported from the
+same synthetic world used to establish the parent candidate family.
+Finite-pilot covariance uncertainty was not propagated. Accordingly, 0.927386
+is a conditional calculation, not a robust power claim. The 0.997858 value is
+retained only as the Stage-4.2C parent result. The next empirical computation
+must report an envelope rather than a single number.
 
 The preregistered stress family must include:
 
@@ -501,17 +811,17 @@ The current reach statement is therefore limited:
 - a boundary-correlated excess would first challenge H0 and the joint-system
   equivalence assumption, not prove HB.
 
-## 7. Final reference-apparatus forecast
+## 7. Leading-design forecast
 
 Figure 6 shows the conditional coherence curve from Eq. (2). It contains no
 ordinary-decoherence band because that band must be learned from pilot data.
 
 ![Figure 6. Conditional Diósi-only coherence forecast.](figures/casimir-dp/coherence-forecast.svg)
 
-*Figure 6. The authoritative reference curve reaches a 0.598% loss at 250 ms.
-The sensitivity-grid curve reaches 3.32% and is shown only to prevent those
-predictions from being conflated. Neither curve is a total visibility
-forecast.*
+*Figure 6. The registered effective-Gaussian curve reaches 2.908% loss at
+250 ms, while the transported conservative density envelope reaches 0.435%.
+The interval is model sensitivity, not a statistical confidence band. Neither
+curve is a total visibility forecast.*
 
 ### 7.1 Companion observable and interpretation ceiling
 
@@ -530,15 +840,15 @@ and a center-of-mass energy increase
 \tag{12}
 \]
 
-For the reference manifest,
-\(\dot E=1.92979\times10^{-40}\) W. If 100 independent samples and SNR≥5
+For the leading manifest,
+\(\dot E=3.07013\times10^{-40}\) W. If 100 independent samples and SNR≥5
 were demanded, the algebraic maximum one-shot standard uncertainty would be
 
 <!-- helix-doc-equation-action/v1 id=cdp-stage4-2g-companion-threshold -->
 \[
 \sigma_{\dot E,\mathrm{one\ shot}}
 \le \frac{\dot E\sqrt{100}}{5}
-=3.85958\times10^{-40}\ {\rm W}.
+=6.14027\times10^{-40}\ {\rm W}.
 \tag{13}
 \]
 
@@ -566,8 +876,10 @@ The feasibility pilot is a hardware-characterization campaign, not a search for
 collapse. It must deliver provenance-bound measurements of:
 
 1. object mass, geometry, material, coating, and internal-density model;
-2. state-preparation fidelity and branch separation;
-3. hold-time and recombination metrology;
+2. state-preparation fidelity, an explicit identical-branch or sham-split
+   control, and separated-branch metrology;
+3. center-of-mass packet centers/covariances, overlap, momentum difference,
+   hold-time jitter, and recombination metrology in both boundary states;
 4. finite-geometry electromagnetic Green response and material permittivity;
 5. boundary-switching transfer functions and settling time;
 6. thermal, gas, vibration, tilt, patch, charge, optical, and sensor responses;
@@ -618,6 +930,8 @@ pass. An independent replication is required for any positive interpretation.
 | pilot fails cosine/conditioning gates | current design non-identifiable | collapse model false |
 | measured null with demonstrated sensitivity | registered point disfavored/excluded at stated confidence | all DP or Penrose OR false |
 | residual follows ordinary control | H0 response model repaired | collapse |
+| corrected four-cell interaction is null | no resolved boundary--branch nonfactorization at demonstrated sensitivity | standard boundary-independent DP false |
+| corrected four-cell interaction is nonzero | H0 or complete-joint-system equivalence challenged | Casimir-modified collapse without a registered kernel |
 | boundary-correlated residual without transfer kernel | anomaly eligible for a new bridge study | Casimir-induced collapse |
 | replicated Diósi-shaped coherence residual, no companion | unexplained model-consistent phenomenology | generator identified |
 | replicated shape plus independent companion | tested generator gains support within registered alternatives | manifold dynamics or universal objective collapse |
@@ -654,15 +968,17 @@ energy-frequency conversion is insufficient. In particular:
 
 The main limitations are scientific, not typographic:
 
-1. **State preparation:** the reference mass is nearly 690,000 times the
-   170 kDa free-particle interference benchmark.
+1. **State preparation:** the leading mass is approximately 1.10 million times the
+   170 kDa free-particle interference benchmark; measured packet width,
+   overlap, trajectory, and boundary-to-boundary branch equivalence are absent.
 2. **Synthetic optimization:** the selected design was evaluated in the same
    assumed response/covariance world in which it was found.
 3. **External-bound mapping:** the selected R0 passes a numerical lower-bound
    screen, but the exact convention/composite mapping is not certified.
-4. **Mass representation:** the 0.598% prediction is specific to one effective
-   Gaussian particle; rigid, layered, and coarse-grained comparisons are
-   incomplete.
+4. **Mass representation:** the 2.908% prediction is specific to one effective
+   Gaussian particle; the transported representation envelope lowers the
+   design floor to 0.435%, while selected-specimen homogeneous, layered,
+   coarse-grained, and atomistic calculations are incomplete.
 5. **Companion channel:** the heating signal lacks a physically credible
    detector receipt, lowering the maximum positive interpretation.
 6. **Ordinary physics:** finite-geometry material and environmental responses
@@ -755,20 +1071,243 @@ the apparatus before costly acquisition:
 
 1. demonstrate or reject state preparation at the registered mass, separation,
    and hold time;
-2. complete the exact external-bound convention and composite-particle map;
-3. measure finite-geometry material and boundary transfer functions;
-4. obtain pilot response vectors and covariance;
-5. run the registered robustness envelope and repeat candidate selection in
+2. replace the conservative residual-gas no-go with a measured composition,
+   pressure, and scattering/collision-veto model or redesign the apparatus;
+3. complete provenance-bound layered and constituent density maps;
+4. complete the exact external-bound convention and composite-particle map;
+5. measure finite-geometry material and boundary transfer functions;
+6. obtain pilot response vectors and covariance;
+7. run the registered robustness envelope and repeat candidate selection in
    independent synthetic worlds;
-6. compare mass-density representations on a converged numerical grid;
-7. either demonstrate a companion instrument or retain the lower
+8. either demonstrate a companion instrument or retain the lower
    interpretation ceiling;
-8. only then freeze a blinded confirmatory campaign.
+9. only then freeze a blinded confirmatory campaign.
 
 This sequence keeps the paper's methodological core useful even if the present
 apparatus is rejected. The estimator, hypothesis separation, packet custody,
 and design gates can be carried into a lower-mass or otherwise redesigned
 platform without preserving the current sphere as a favored physical object.
+
+### 11.6 Microscopic electromagnetic closure and orientation no-go
+
+Stage 4.2K replaces the literal "missing virtual photons" picture with the
+ordinary macroscopic-QED chain that the apparatus must actually calibrate. For
+an isotropic ground state, transition frequencies and dipole matrix elements
+define the polarizability, while the boundary enters through the scattering
+Green tensor:
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2k-ground-state-green-chain -->
+\[
+\alpha_g(i\xi)=\frac{2}{3\hbar}\sum_n
+\frac{\omega_{ng}|\langle n|\hat{\mathbf d}|g\rangle|^2}
+{\omega_{ng}^2+\xi^2},\qquad
+U_{\rm CP}(\mathbf r)=\frac{\hbar\mu_0}{2\pi}\int_0^\infty d\xi\,
+\xi^2\alpha_g(i\xi)\operatorname{Tr}\mathbf G^{(1)}(\mathbf r,\mathbf r;i\xi).
+\]
+
+For the silica sphere, the diagnostic small-particle response is
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2k-sphere-polarizability -->
+\[
+\alpha_{\rm sph}(i\xi)=4\pi\epsilon_0R^3
+\frac{\epsilon(i\xi)-1}{\epsilon(i\xi)+2}.
+\]
+
+Charge/current response therefore controls the Casimir lane; total mass density
+controls the registered Diósi lane. A common composition and geometry manifest
+must bind them, but the two operators are not interchangeable.
+
+The synthetic two-oscillator recovery gives \(\epsilon(0)=3.8\) and
+\(\alpha_{\rm sph}(0)=1.13303\times10^{-30}\) in SI units. These are software
+fixtures, not measured cryogenic silica data. More importantly, this
+superseded-parent calculation exposed the orientation constraint used by the
+later redesign. At a 1.2 micrometre surface gap, a 160 nm split normal to the plane gives
+\(\Delta U_{\rm CP}=3.55916\times10^{-24}\) J and an accumulated 250 ms phase
+of \(8.43746\times10^9\) rad. The tangential split gives zero differential
+phase in the translationally invariant ideal-plane limit. Neither is the final
+finite-geometry forecast; their difference shows that branch orientation must
+be registered before residual attribution.
+
+Phase noise also contracts averaged coherence. For Gaussian phase jitter,
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2k-phase-jitter-loss -->
+\[
+\left\langle e^{i\delta\phi}\right\rangle
+=e^{-\sigma_\phi^2/2},\qquad
+\chi_\phi=\frac{\sigma_\phi^2}{2}.
+\]
+
+Keeping this contribution below one tenth of the registered DP exponent needs
+\(\sigma_\phi\le 0.03464\) rad in the normal screen, corresponding to roughly
+\(4.11\times10^{-12}\) fractional stability relative to its phase. Echoes may
+cancel a static phase, but their measured rejection and residual covariance
+must replace this screening calculation.
+
+Finally, the Stage-4.2J collision count cannot be promoted into a complete gas
+decoherence rate. That replacement requires the quantum-linear-Boltzmann
+kernel
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2k-qlbe-decoherence -->
+\[
+\Gamma_{\rm gas}(\Delta\mathbf x)=n_g\!\int d^3v\,\mu(\mathbf v)v
+\int d\Omega\,|f(\mathbf q,\mathbf v)|^2
+\left[1-e^{i\mathbf q\cdot\Delta\mathbf x/\hbar}\right],
+\]
+
+with measured species-resolved pressure and temperature, differential
+scattering amplitudes, confinement geometry, momentum-transfer quadrature, and
+independent pressure calibration. All are currently absent. Stage 4.2K thus
+passes as an analytic diagnostic while finite-geometry electromagnetic closure,
+the QLBE environment, and residual attribution remain blocked.
+
+### 11.7 Derivation ancestry: empirical-authority no-go
+
+Stage 4.2L froze the previously missing silica-parent geometry as a design
+authority for its own run. In a
+right-handed frame whose origin is the plate center, the reference sphere is at
+\((0,0,1.476302\ \mu{\rm m})\), the plate normal is
+\(\hat{\mathbf n}=(0,0,1)\), and the 160 nm branch vector is
+\(\Delta\mathbf x=(160\ {\rm nm},0,0)\). Thus
+\(\Delta\mathbf x\cdot\hat{\mathbf n}=0\): the registered design branch is
+tangential. This is now a superseded search-parent manifest, retained because
+its no-go result defines the requirements applied by Stage 4.2M; it was never
+as-built CAD, branch metrology, or plate-normal metrology.
+
+To test the geometry pipeline before a full Maxwell solve, Stage 4.2L uses a
+finite rectangular-plate surrogate. The plate's solid angle and the screened
+retarded energy are
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2l-finite-rectangle-surrogate -->
+\[
+\Omega(\mathbf r)=\iint_A
+\frac{z\,dA'}{[(x'-x)^2+(y'-y)^2+z^2]^{3/2}},\qquad
+U_{\rm rect}(\mathbf r)=\frac{\Omega(\mathbf r)}{2\pi}
+U_{\rm CP}^{\infty}(z).
+\]
+
+Analytic rectangular solid angle and 160-by-160 midpoint surface quadrature
+agree in branch energy to \(1.15\times10^{-6}\) relative error. The centered
+tangential branches have equal analytic energies, and hence zero nominal
+differential phase. This is a symmetry diagnostic, not a full Green tensor:
+finite thickness, coatings, apertures, roughness, patches, and nearby conductors
+remain outside the surrogate.
+
+The useful quantity is therefore not the nominal zero but its response
+Jacobian. For control coordinates
+\(\boldsymbol\theta=(x_c,z,\vartheta_b,\vartheta_p)\),
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2l-phase-covariance -->
+\[
+J_i=\frac{\partial\Phi_{\rm EM}}{\partial\theta_i},\qquad
+\sigma_\phi^2=\mathbf J\,\boldsymbol\Sigma_\theta\mathbf J^{\mathsf T}.
+\]
+
+The frozen synthetic design tolerances return
+\(\sigma_\phi\simeq1.28\times10^4\) rad, far above the registered
+\(0.03464\) rad allowance. Considered one at a time, the surrogate requires
+about \(5.50\times10^{-14}\) m lateral centering or
+\(4.39\times10^{-12}\) rad branch/plate angular stability. These values do
+not assert that such stability has been measured; they reject the current
+reference tolerances and require a geometry, gap, modulation, echo, or
+mass/separation redesign before a pilot.
+
+For residual gas, Stage 4.2L evaluates the isotropic reduction of the QLBE
+kernel,
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2l-qlbe-isotropic-proxy -->
+\[
+\Gamma_{\rm gas}(d)=\sum_s n_s\bar v_s\sigma_s
+\frac12\int_{-1}^{1}d\mu\,
+\left[1-\operatorname{sinc}\!\left(
+\frac{m_s\bar v_s d\sqrt{2(1-\mu)}}{\hbar}\right)\right].
+\]
+
+At 4 K and \(2\times10^{-11}\) Pa, the registered H2/He isotropic proxy gives
+\(17.28\ {\rm s^{-1}}\), about 720 times the registered DP rate. Reaching one
+tenth of that rate would require approximately
+\(2.78\times10^{-15}\) Pa under the same proxy. Because measured species,
+differential scattering, confinement, and pressure calibration are absent,
+this is a redesign no-go rather than an empirical environmental forecast.
+
+Stage 4.2L also expands the DP representation screen. For a normalized radial
+form factor \(F_a\),
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2l-density-regularization-envelope -->
+\[
+E_G^{(a)}(d,r_0)=\frac{2Gm^2}{\pi r_0}
+\int_0^\infty du\,e^{-u^2}|F_a(uR/r_0)|^2
+\left[1-\operatorname{sinc}(ud/r_0)\right].
+\]
+
+At \(r_0=100\) nm, the effective Gaussian, homogeneous sphere, thin shell,
+and a 5% shell sensitivity profile span
+\(3.74\times10^{-37}\) to \(2.53\times10^{-36}\) J, a factor of 6.77.
+This confirms material-representation dependence; it does not choose the
+correct representation without internal-density and coating metrology.
+
+The current external-bound ledger is now partly closed. XENONnT reports, in
+the Markovian Diósi convention, \(R_0>4.9\times10^{-10}\) m at 90% confidence.
+The frozen \(R_0=10^{-7}\) m point is about 204 times above that scalar lower
+bound and is not excluded by this one-dimensional screen. A source-level
+likelihood and composite-representation recast remain required before calling
+the parameter point fully mapped.
+
+Finally, the reference object's mass is \(1.1706\times10^{11}\) Da. The 2026
+matter-wave benchmark demonstrates more than 170 kDa with 133 nm separation,
+so the proposed mass is about \(6.89\times10^5\) times larger even though the
+separation is only 1.20 times larger. The material, diameter, trapping, and
+interferometer platform also differ. State preparation therefore remains an
+unclosed physical-feasibility gate.
+
+### 11.8 Selection of the leading bounded design
+
+Stage 4.2M defines the paper's leading design by asking whether any point in
+a frozen, bounded apparatus domain can simultaneously make the registered DP
+signal resolvable while keeping the transported electromagnetic, gas,
+preparation, identifiability, power, and companion constraints within their
+preregistered limits. The search does not refit the DP generator, use
+confirmatory data, or introduce a Casimir-to-collapse transfer law.
+
+For each candidate \(q\), the registered decision is the conjunction
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2m-multigate-objective -->
+\[
+G_M(q)=G_{\rm DP}\wedge G_{\rho}\wedge G_{\phi}\wedge G_{\rm gas}
+\wedge G_{\rm prep}\wedge G_{\rm bound}\wedge G_{\rm id}
+\wedge G_{\rm power}\wedge G_{\rm companion}.
+\]
+
+The ordinary-background quantities are transported as explicit design
+surrogates rather than declared measured authorities. In particular,
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2m-transported-backgrounds -->
+\[
+\sigma_{\phi,\rm echo}^2
+=\eta_{\rm echo}^2\mathbf J_{\phi}(q)\boldsymbol\Sigma_q
+\mathbf J_{\phi}^{\mathsf T}(q),\qquad
+\Gamma_{\rm gas}(q)=\Gamma_{\rm gas,L}\,\mathcal T_{P,T,R,d}(q).
+\]
+
+The deterministic 200-candidate search returns three points that pass every
+synthetic gate. The best-ranked point uses a diamond-density sphere with radius
+276.302 nm and mass \(3.09251\times10^{-16}\) kg, a 250 nm tangential branch,
+a 250 ms hold, a 10 micrometre gap, 4 K, and \(10^{-15}\) Pa. Under the frozen
+effective-Gaussian Diósi law it gives
+\(\Gamma_{\rm DP}=0.118046\ {\rm s^{-1}}\), a 2.908% Gaussian-model loss, and
+a conservative density-envelope loss of 0.435%. Its transported diagnostics
+give \(\Gamma_{\rm gas}/\Gamma_{\rm DP}=0.00732\), echoed phase uncertainty
+\(1.11\times10^{-8}\) rad, maximum whitened cosine 0.7177, condition number
+6.53, 1,028 required paired windows, power 0.927 at 1,600 windows, and synthetic
+companion SNR 8.67.
+
+This is a bounded commissioning target, not a solved apparatus. The full
+finite-geometry Maxwell response, measured material spectra, measured phase
+covariance, species-resolved QLBE inputs, state preparation, companion detector,
+and exact external-bound recast remain absent. The mass is still approximately
+\(1.10\times10^6\) times the 170 kDa matter-wave benchmark. Accordingly,
+measured evidence remains not ready; residual attribution, collapse
+identification, and manifold dynamics remain blocked; and physical viability
+remains unevaluated.
 
 ## 12. Claim boundaries
 
@@ -777,7 +1316,24 @@ This paper establishes:
 - the exact model and parameter point used by the forecast;
 - the failure of the first synthetic identifiability design;
 - the nominal separability of a bounded redesign under stated assumptions;
-- a single, unambiguous 0.598% reference-apparatus prediction;
+- a leading synthetic design with a 2.908% effective-Gaussian prediction and
+  a 0.435% transported density-envelope floor;
+- a selected-candidate forecast of 1,028 paired windows and power 0.927 at the
+  1,600-window ceiling;
+- a representation envelope showing that the effective-Gaussian prediction is
+  not representation-independent;
+- a transported gas screen that passes at the leading \(10^{-15}\) Pa target
+  while remaining unmeasured;
+- an ideal-plane orientation screen showing that boundary phase and phase
+  jitter can dominate the target residual unless geometry is frozen and
+  empirically calibrated;
+- a frozen 3D search geometry, a crosschecked finite-plate surrogate, and
+  explicit phase-control tolerances that define the selected echo/alignment
+  target;
+- a QLBE-structured gas proxy, current scalar external-bound screen, and
+  four-representation DP sensitivity envelope;
+- a bounded 200-candidate redesign search with three synthetic-only points that
+  pass the frozen multigate screen;
 - a fail-closed pilot and confirmatory decision structure;
 - the empirical and computational work still required.
 
@@ -799,12 +1355,37 @@ experiment must operate in raw complex-coherence space, measure the nuisance
 responses and covariance, project the frozen candidate away from that span,
 and fail closed when the geometry is ill-conditioned.
 
-The current synthetic redesign satisfies nominal identifiability gates and
-maps one effective-particle Diósi model to a 0.598% loss at 250 ms. That result
-is scientifically useful because it identifies exactly what hardware would
-need to resolve. It is not yet a physically viable proposal: the
-state-preparation scale, response/covariance robustness, exact external-bound
-mapping, mass-density dependence, and companion detector remain open.
+The leading design is the three-point Stage-4.2M region, not the earlier silica
+reference. Its best-ranked point is a diamond-density 276.302 nm-radius sphere,
+250 nm tangential split, 250 ms hold, 10 μm gap, 4 K, and \(10^{-15}\) Pa. The
+frozen effective-Gaussian model predicts 2.908% loss; the transported
+mass-density envelope sets a 0.435% design floor. In the registered whitened
+space, the point retains cosine 0.7177 and condition number 6.53, requires 1,028
+paired windows, and reaches forecast power 0.927 at 1,600 windows.
+
+The earlier no-go calculations are the evidence that shaped this design. They
+showed that the first signature was non-identifiable, the silica parent was gas
+dominated at its declared pressure, normal boundary orientation created an
+overwhelming phase screen, centered tangential cancellation was tolerance
+sensitive, and the DP energy varied by a factor of 6.77 across registered mass
+profiles. Those results are retained as derivation ancestry rather than
+presented as competing current apparatuses.
+
+The leading design is still not physically viable evidence. Its electromagnetic
+response, covariance, gas kernel, echo rejection, state preparation, material
+density, external-bound mapping, and companion detector are transported or
+unmeasured. It therefore authorizes measured subsystem commissioning only, not
+a physical pilot, confirmatory campaign, collapse claim, or manifold claim.
+
+The integrated Stage-4.2M software path passes 62 focused tests, the 101-test
+Stage-4.2C-through-M campaign replay, the 179-test required GR/WARP battery,
+the 221-entry math registry, equation-sidecar and root-to-leaf validation, and
+both production builds. The fresh leading-design publication-rebase adapter run
+`2374` (`adapter:1d8a8433-4f7a-4f8e-81d7-19ac5f0fcbfc`) returns `PASS`, no first
+failure, empty deltas, certificate status `GREEN`, integrity true, and
+certificate SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+That certificate establishes repository convergence only.
 
 The appropriate next action is therefore a measured feasibility pilot. If the
 pilot reproduces the response geometry and survives the registered robustness

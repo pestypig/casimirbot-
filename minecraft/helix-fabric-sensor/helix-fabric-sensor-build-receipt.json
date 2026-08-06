@@ -1,6 +1,6 @@
 {
   "schema": "helix.fabric_sensor_build_receipt.v1",
-  "created_at": "2026-08-03T22:12:13.280Z",
+  "created_at": "2026-08-05T08:42:07.9877454Z",
   "status": "candidate_live_closure_pending",
   "mod": {
     "name": "HelixFabricSensor",
@@ -13,11 +13,11 @@
     "loom_version": "1.11.8"
   },
   "source": {
-    "commit": "b3fcf3735635192a13e24b5f69d76f9bdc56587b",
+    "commit": "f0dfd07085af214797458081b246ab87f1175c72",
     "worktree_clean": false,
-    "tree_sha256": "7d0dd7fe3a11433f8e1c895e3df6d01690ba538f0f6a58cb525807c1b53c1e10",
+    "tree_sha256": "1c2d0c063d7cc0aba70511813c5856e02b49be51672b753ea6a18bc3a5f3b98e",
     "tree_hash_algorithm": "sha256(sorted utf8 relative-path + tab + file-sha256 + lf)",
-    "file_count": 39,
+    "file_count": 40,
     "tree_hash_excludes": [
       "build/",
       ".gradle/",
@@ -27,8 +27,15 @@
   },
   "artifact": {
     "path": "minecraft/helix-fabric-sensor/build/libs/HelixFabricSensor-0.2.0.jar",
-    "size_bytes": 183085,
-    "sha256": "c2dbdc2b7c98bcfa3edcd8d1ed5691c0bef845504f3694dfea9e2345b932dc02"
+    "size_bytes": 198995,
+    "sha256": "bb6427cb49f19155021917dabe21f21adc3dae4abc99c28234c6255d35656c60"
+  },
+  "active_runtime_artifact": {
+    "path": "minecraft/helix-fabric-sensor/run/mods/HelixFabricSensor-0.2.0.jar",
+    "size_bytes": 198995,
+    "sha256": "bb6427cb49f19155021917dabe21f21adc3dae4abc99c28234c6255d35656c60",
+    "entry_content_equivalence": "exact_sha256_match",
+    "archive_byte_difference": "none"
   },
   "defaults": {
     "enabled": false,
@@ -36,8 +43,14 @@
     "execution_enabled": false
   },
   "verification": {
-    "gradle_test_build": "pass",
-    "gradle_clean_build": "pending_final_gate",
+    "gradle_test_build": "pass_java_21_2026-08-05T08:38Z",
+    "gradle_clean_build": "pass_java_21_2026-08-05T15:00Z",
+    "bounded_manifest_catalog_republish_test": "pass",
+    "exact_box_checkpoint_volume_and_command_classification_test": "pass",
+    "offline_fall_rescue_cleanup_test": "pass",
+    "settled_fall_rescue_result_retention_test": "pass",
+    "staged_artifact_loaded_local_runtime": "pass",
+    "post_restart_command_catalog_admission": "pass",
     "fabric_1_21_8_local_runtime": "pass",
     "manifest_received": true,
     "heartbeat_received": true,
@@ -46,8 +59,8 @@
     "exact_spatial_wire_size_test": "pass",
     "explicit_spatial_completeness_test": "pass",
     "connector_schema_and_normalization_tests": "38/38_pass",
-    "selected_player_live_spatial_reentry": "pending",
-    "wall_checkpoint_and_rollback_live_journey": "pending",
+    "selected_player_live_spatial_reentry": "pass",
+    "wall_checkpoint_and_rollback_live_journey": "pass",
     "safe_fireplace_live_journey": "pending",
     "fall_rescue_live_journey": "pending",
     "text_voice_terminal_parity": "pending",

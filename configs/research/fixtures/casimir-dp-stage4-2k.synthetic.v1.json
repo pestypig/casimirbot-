@@ -1,0 +1,63 @@
+{
+  "schema_version": "casimir_dp_microscopic_em_closure_fixture_stage4_2k/1",
+  "campaign_id": "casimir-dp-microscopic-em-closure-stage4-2k-v1",
+  "fixture_id": "stage4_2k_synthetic_material_green_residual_v1",
+  "evidence_class": "synthetic_diagnostic",
+  "generated_at": "2026-08-06T05:00:00.000Z",
+  "apparatus": {
+    "identity_id": "silica_high_mass_identifiable_single_object_v1",
+    "sphere_radius_m": 2.76302362398029e-7,
+    "branch_separation_m": 1.6e-7,
+    "hold_time_s": 0.25,
+    "surface_gap_m": 1.2e-6,
+    "dp_energy_J": 2.5314157026284577e-36,
+    "dp_rate_s": 0.02400420398374263
+  },
+  "constants": {
+    "hbar_J_s": 1.054571817e-34,
+    "c_m_s": 299792458,
+    "epsilon0_F_m": 8.8541878128e-12
+  },
+  "silica_response": {
+    "model": "synthetic_two_oscillator_lorentz",
+    "oscillators": [
+      { "strength": 1.5, "omega0_rad_s": 2e14 },
+      { "strength": 1.3, "omega0_rad_s": 2e16 }
+    ],
+    "expected_static_relative_permittivity": 3.8,
+    "measured_spectrum_receipt_available": false,
+    "temperature_matched_receipt_available": false
+  },
+  "ground_state_benchmark": {
+    "transition_frequency_Hz": 2466038423660000,
+    "dipole_matrix_element_C_m": 6.3e-30,
+    "role": "atomic_polarizability_to_green_tensor_recovery_only"
+  },
+  "geometry": {
+    "screen_model": "ideal_conductor_planar_retarded_dipole",
+    "registered_branch_orientation": "unregistered",
+    "evaluate_orientations": ["normal", "tangential"],
+    "finite_cad_mesh_receipt_available": false,
+    "finite_geometry_green_receipt_available": false,
+    "independent_solver_receipt_available": false
+  },
+  "ordinary_loss": {
+    "synthetic_active_separated_log_loss": 0.002,
+    "empirical_response_receipt_available": false,
+    "empirical_covariance_receipt_available": false,
+    "maximum_allowed_model_fractional_uncertainty": 0.01
+  },
+  "qlbe_readiness": {
+    "measured_species_resolved_pressure": false,
+    "measured_temperature": false,
+    "differential_scattering_amplitudes": false,
+    "confinement_geometry_kernel": false,
+    "momentum_transfer_quadrature": false,
+    "independent_pressure_calibration": false
+  },
+  "interaction_fixture": {
+    "injected_bridge_log_amplitude": 0,
+    "injected_bridge_phase_rad": 0,
+    "phase_unwrap_custody": "synthetic_only"
+  }
+}

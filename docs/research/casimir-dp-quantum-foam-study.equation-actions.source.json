@@ -234,6 +234,286 @@
         "Pilot-ready inputs are not confirmatory collapse evidence.",
         "Complete apparatus stress-energy is a separate manifold prerequisite."
       ]
+    },
+    {
+      "equationId": "cdp-stage4-2i-complex-cross-ratio",
+      "label": "Four-cell complex boundary–branch cross-ratio",
+      "aliases": ["R_cross=(C11 C00)/(C01 C10); I_cross=-ln|R_cross|; Phi_cross=arg R_cross"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2i-complex-cross-ratio",
+        "kind": "artifact_backed_theory_run",
+        "label": "Open four-cell interaction diagnostic",
+        "badgeIds": ["study.casimir_dp.complex_coherence_discriminator", "study.casimir_dp.boundary_branch_interaction_stage4_2i", "study.casimir_dp.claim_boundary"],
+        "preferredBadgeId": "study.casimir_dp.boundary_branch_interaction_stage4_2i",
+        "compoundRunMode": "dependency_path",
+        "atlasLensId": "casimir_dp_quantum_foam",
+        "atlasGroupId": "casimir_dp.stage4_2i",
+        "openPanels": ["theory-badge-graph", "scientific-calculator"],
+        "alsoIngestLatex": false,
+        "claimBoundaryNote": "Standard boundary-independent DP cancels from this interaction; a nonzero value is not by itself collapse evidence."
+      }],
+      "claimBoundaryNotes": ["Multiplicative branch-only and boundary-only effects cancel.", "Ordinary joint-system interactions must be defeated before mechanism interpretation."]
+    },
+    {
+      "equationId": "cdp-stage4-2i-ordinary-corrected-interaction",
+      "label": "Ordinary-corrected amplitude and phase interaction",
+      "aliases": ["R_cross,corr=R_cross,obs/R_cross,H0"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2i-ordinary-corrected-interaction",
+        "kind": "artifact_backed_theory_run",
+        "label": "Open corrected interaction and covariance",
+        "badgeIds": ["study.casimir_dp.qed_green_noise_budget", "study.casimir_dp.boundary_branch_interaction_stage4_2i", "study.casimir_dp.claim_boundary"],
+        "preferredBadgeId": "study.casimir_dp.boundary_branch_interaction_stage4_2i",
+        "compoundRunMode": "dependency_path",
+        "atlasLensId": "casimir_dp_quantum_foam",
+        "atlasGroupId": "casimir_dp.stage4_2i",
+        "openPanels": ["theory-badge-graph"],
+        "alsoIngestLatex": false,
+        "claimBoundaryNote": "The ordinary response and covariance are frozen inputs; synthetic correction supplies no empirical authority."
+      }],
+      "claimBoundaryNotes": ["Invalid covariance fails closed.", "Saturated four-cell GLS checks the simple factorial estimator."]
+    },
+    {
+      "equationId": "cdp-stage4-2i-wavepacket-custody",
+      "label": "Center-of-mass wave-packet custody and equivalence gate",
+      "aliases": ["G_packet=I_q0 AND I_q1 AND I_boundary_equivalence AND I_custody"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2i-wavepacket-custody",
+        "kind": "artifact_backed_theory_run",
+        "label": "Open packet-custody contract",
+        "badgeIds": ["study.casimir_dp.penrose_or_branch_geometry_context", "study.casimir_dp.boundary_branch_interaction_stage4_2i", "study.casimir_dp.claim_boundary"],
+        "preferredBadgeId": "study.casimir_dp.boundary_branch_interaction_stage4_2i",
+        "compoundRunMode": "dependency_path",
+        "atlasLensId": "casimir_dp_quantum_foam",
+        "atlasGroupId": "casimir_dp.stage4_2i",
+        "openPanels": ["theory-badge-graph"],
+        "alsoIngestLatex": false,
+        "claimBoundaryNote": "Synthetic packet centers and covariances test software only; empirical branch preparation remains not ready."
+      }],
+      "claimBoundaryNotes": ["Object radius, DP regularization length, and packet width have distinct roles.", "Trajectory and tomography artifacts must be content-addressed."]
+    },
+    {
+      "equationId": "cdp-stage4-2j-schrodinger-coherence-factorization",
+      "label": "Schrödinger, environment, and Diósi coherence factors",
+      "aliases": ["C=C0 exp(-i Delta_E_H t/hbar) exp(-chi_env) exp(-E_G t/hbar)"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2j-schrodinger-coherence-factorization",
+        "kind": "artifact_backed_theory_run",
+        "label": "Open Stage-4.2J hypothesis-lane separation",
+        "badgeIds": ["study.casimir_dp.complex_coherence_discriminator", "study.casimir_dp.schrodinger_mass_density_stage4_2j", "study.casimir_dp.claim_boundary"],
+        "preferredBadgeId": "study.casimir_dp.schrodinger_mass_density_stage4_2j",
+        "compoundRunMode": "dependency_path",
+        "atlasLensId": "casimir_dp_quantum_foam",
+        "atlasGroupId": "casimir_dp.stage4_2j",
+        "openPanels": ["theory-badge-graph"],
+        "alsoIngestLatex": false,
+        "claimBoundaryNote": "Hamiltonian phase, ordinary contraction, and registered Diósi contraction remain separate hypothesis lanes."
+      }],
+      "claimBoundaryNotes": ["A shared energy unit does not identify a common mechanism.", "The scalar factorization does not replace whitened complex analysis."]
+    },
+    {
+      "equationId": "cdp-stage4-2j-dp-equivalent-energy-inverse",
+      "label": "Conditional DP-equivalent energy inversion",
+      "aliases": ["E_D,eq=-(hbar/t) ln(|C_residual|/|C0|)"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2j-dp-equivalent-energy-inverse",
+        "kind": "artifact_backed_theory_run",
+        "label": "Open conditional residual-energy mapping",
+        "badgeIds": ["study.casimir_dp.schrodinger_mass_density_stage4_2j", "study.casimir_dp.observable_separation_gate", "study.casimir_dp.claim_boundary"],
+        "preferredBadgeId": "study.casimir_dp.schrodinger_mass_density_stage4_2j",
+        "compoundRunMode": "dependency_path",
+        "atlasLensId": "casimir_dp_quantum_foam",
+        "atlasGroupId": "casimir_dp.stage4_2j",
+        "openPanels": ["theory-badge-graph"],
+        "alsoIngestLatex": false,
+        "claimBoundaryNote": "This is model-conditional inference, not directly collected gravitational energy."
+      }],
+      "claimBoundaryNotes": ["Ordinary loss must be controlled before inversion.", "No calorimetric or manifold claim follows from the scalar."]
+    },
+    {
+      "equationId": "cdp-stage4-2j-homogeneous-sphere-energy",
+      "label": "Gaussian-convolved homogeneous-sphere difference energy",
+      "aliases": ["E_G sphere radial Fourier integral"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2j-homogeneous-sphere-energy",
+        "kind": "artifact_backed_theory_run",
+        "label": "Open mass-density robustness diagnostic",
+        "badgeIds": ["study.casimir_dp.dp_mass_density_collapse", "study.casimir_dp.schrodinger_mass_density_stage4_2j", "study.casimir_dp.claim_boundary"],
+        "preferredBadgeId": "study.casimir_dp.schrodinger_mass_density_stage4_2j",
+        "compoundRunMode": "dependency_path",
+        "atlasLensId": "casimir_dp_quantum_foam",
+        "atlasGroupId": "casimir_dp.stage4_2j",
+        "openPanels": ["theory-badge-graph"],
+        "alsoIngestLatex": false,
+        "claimBoundaryNote": "Two ready representations do not satisfy the complete constituent-density robustness gate."
+      }],
+      "claimBoundaryNotes": ["The same physical R0 is applied in both representations.", "Layered, coarse-grained, and atomistic maps remain absent."]
+    },
+    {
+      "equationId": "cdp-stage4-2j-residual-gas-screen",
+      "label": "Ideal-equilibrium residual-gas collision screen",
+      "aliases": ["Gamma_coll=(P/kBT) vbar pi R^2"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2j-residual-gas-screen",
+        "kind": "artifact_backed_theory_run",
+        "label": "Open environmental feasibility no-go",
+        "badgeIds": ["study.casimir_dp.schrodinger_mass_density_stage4_2j", "study.casimir_dp.empirical_feasibility_pilot_stage4_2g", "study.casimir_dp.claim_boundary"],
+        "preferredBadgeId": "study.casimir_dp.schrodinger_mass_density_stage4_2j",
+        "compoundRunMode": "dependency_path",
+        "atlasLensId": "casimir_dp_quantum_foam",
+        "atlasGroupId": "casimir_dp.stage4_2j",
+        "openPanels": ["theory-badge-graph"],
+        "alsoIngestLatex": false,
+        "claimBoundaryNote": "A conservative synthetic screen can reject a candidate but cannot substitute for measured gas composition or a complete scattering model."
+      }],
+      "claimBoundaryNotes": ["The declared Stage-4.2G pressure and temperature return no-go.", "Physical viability remains not evaluated."]
+    },
+    {
+      "equationId": "cdp-stage4-2k-ground-state-green-chain",
+      "label": "Ground-state polarizability to Casimir-Polder Green response",
+      "aliases": ["alpha_g(i xi) transition sum and U_CP Green tensor integral"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2k-ground-state-green-chain",
+        "kind": "artifact_backed_theory_run",
+        "label": "Open microscopic electromagnetic closure",
+        "badgeIds": ["study.casimir_dp.microscopic_em_closure_stage4_2k", "study.casimir_dp.maxwell_macroscopic_qed_closure_stage4_2f", "study.casimir_dp.claim_boundary"],
+        "preferredBadgeId": "study.casimir_dp.microscopic_em_closure_stage4_2k",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2k", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "Ground-state spectra determine ordinary polarizability and boundary response, not a collapse kernel."
+      }],
+      "claimBoundaryNotes": ["The Green tensor is the boundary-response authority.", "Virtual photons are not assigned a measurable number density."]
+    },
+    {
+      "equationId": "cdp-stage4-2k-sphere-polarizability",
+      "label": "Small-sphere imaginary-axis polarizability",
+      "aliases": ["alpha_sph=4 pi epsilon0 R^3 (epsilon-1)/(epsilon+2)"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2k-sphere-polarizability", "kind": "artifact_backed_theory_run", "label": "Open silica response diagnostic",
+        "badgeIds": ["study.casimir_dp.microscopic_em_closure_stage4_2k", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.microscopic_em_closure_stage4_2k",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2k", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "The analytic sphere response is a screening approximation until measured spectra and finite geometry are bound."
+      }],
+      "claimBoundaryNotes": ["Charge response and DP mass density remain distinct operators."]
+    },
+    {
+      "equationId": "cdp-stage4-2k-phase-jitter-loss",
+      "label": "Gaussian phase jitter to coherence loss",
+      "aliases": ["chi_phi=sigma_phi^2/2"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2k-phase-jitter-loss", "kind": "artifact_backed_theory_run", "label": "Open boundary-phase stability screen",
+        "badgeIds": ["study.casimir_dp.microscopic_em_closure_stage4_2k", "study.casimir_dp.complex_coherence_discriminator", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.microscopic_em_closure_stage4_2k",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2k", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "Unresolved ordinary phase jitter can contract averaged coherence and imitate excess loss."
+      }],
+      "claimBoundaryNotes": ["Echo rejection and covariance require measured receipts."]
+    },
+    {
+      "equationId": "cdp-stage4-2k-qlbe-decoherence",
+      "label": "Quantum-linear-Boltzmann gas decoherence kernel",
+      "aliases": ["Gamma_gas(Delta x) momentum transfer scattering integral"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2k-qlbe-decoherence", "kind": "artifact_backed_theory_run", "label": "Open QLBE readiness gate",
+        "badgeIds": ["study.casimir_dp.microscopic_em_closure_stage4_2k", "study.casimir_dp.schrodinger_mass_density_stage4_2j", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.microscopic_em_closure_stage4_2k",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2k", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "The geometric collision screen is not replaced until species, scattering, geometry, and calibration inputs are measured."
+      }],
+      "claimBoundaryNotes": ["The current QLBE gate is blocked.", "Physical viability remains not evaluated."]
+    },
+    {
+      "equationId": "cdp-stage4-2l-finite-rectangle-surrogate",
+      "label": "Finite rectangular-plate solid-angle response surrogate",
+      "aliases": ["U_rect=(Omega/2pi) U_CP infinity"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2l-finite-rectangle-surrogate", "kind": "artifact_backed_theory_run", "label": "Open finite-geometry redesign screen",
+        "badgeIds": ["study.casimir_dp.empirical_authority_stage4_2l", "study.casimir_dp.microscopic_em_closure_stage4_2k", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.empirical_authority_stage4_2l",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2l", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "The solid-angle model is a reduced-order geometry surrogate, not a full Maxwell Green tensor or as-built apparatus prediction."
+      }],
+      "claimBoundaryNotes": ["Centered tangential zero is a symmetry result.", "Finite thickness, coatings, patches, roughness, and nearby conductors remain open."]
+    },
+    {
+      "equationId": "cdp-stage4-2l-phase-covariance",
+      "label": "Boundary-phase Jacobian and covariance propagation",
+      "aliases": ["sigma_phi^2=J Sigma_theta J^T"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2l-phase-covariance", "kind": "artifact_backed_theory_run", "label": "Open phase-control no-go",
+        "badgeIds": ["study.casimir_dp.empirical_authority_stage4_2l", "study.casimir_dp.complex_coherence_discriminator", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.empirical_authority_stage4_2l",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2l", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "Synthetic phase tolerances reject the reference design but do not constitute measured covariance."
+      }],
+      "claimBoundaryNotes": ["Measured response Jacobians and block covariance remain not ready."]
+    },
+    {
+      "equationId": "cdp-stage4-2l-qlbe-isotropic-proxy",
+      "label": "Isotropic quantum-linear-Boltzmann gas proxy",
+      "aliases": ["Gamma_gas=sum n v sigma localization factor"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2l-qlbe-isotropic-proxy", "kind": "artifact_backed_theory_run", "label": "Open gas-environment redesign screen",
+        "badgeIds": ["study.casimir_dp.empirical_authority_stage4_2l", "study.casimir_dp.microscopic_em_closure_stage4_2k", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.empirical_authority_stage4_2l",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2l", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "The isotropic cross-section proxy is not measured species-resolved differential scattering or confinement authority."
+      }],
+      "claimBoundaryNotes": ["The registered pressure is a proxy no-go.", "Physical viability remains not evaluated."]
+    },
+    {
+      "equationId": "cdp-stage4-2l-density-regularization-envelope",
+      "label": "DP mass-density and regularization sensitivity envelope",
+      "aliases": ["E_G radial form factor grid"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2l-density-regularization-envelope", "kind": "artifact_backed_theory_run", "label": "Open mass-density robustness envelope",
+        "badgeIds": ["study.casimir_dp.empirical_authority_stage4_2l", "study.casimir_dp.dp_mass_density_collapse", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.empirical_authority_stage4_2l",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2l", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "The representation envelope quantifies sensitivity and does not choose a physical density without internal metrology."
+      }],
+      "claimBoundaryNotes": ["The scalar external-bound screen does not supply a full likelihood recast."]
+    },
+    {
+      "equationId": "cdp-stage4-2m-multigate-objective",
+      "label": "Stage-4.2M bounded multigate apparatus objective",
+      "aliases": ["G_M conjunction of apparatus gates"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2m-multigate-objective", "kind": "artifact_backed_theory_run", "label": "Open leading-design selection",
+        "badgeIds": ["study.casimir_dp.apparatus_search_stage4_2m", "study.casimir_dp.empirical_authority_stage4_2l", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.apparatus_search_stage4_2m",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2m", "openPanels": ["theory-badge-graph", "scientific-calculator"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "Passing the multigate synthetic search authorizes measured subsystem commissioning only."
+      }],
+      "claimBoundaryNotes": ["The search does not establish physical feasibility or collapse."]
+    },
+    {
+      "equationId": "cdp-stage4-2m-transported-backgrounds",
+      "label": "Stage-4.2M transported phase and gas backgrounds",
+      "aliases": ["sigma_phi_echo and Gamma_gas transport"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2m-transported-backgrounds", "kind": "artifact_backed_theory_run", "label": "Open transported-background audit",
+        "badgeIds": ["study.casimir_dp.apparatus_search_stage4_2m", "study.casimir_dp.complex_coherence_discriminator", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.apparatus_search_stage4_2m",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2m", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "Transported surrogates must be replaced by measured response and covariance before a physical pilot."
+      }],
+      "claimBoundaryNotes": ["No Casimir-to-collapse transfer kernel is registered."]
+    },
+    {
+      "equationId": "cdp-stage4-2n-complex-ordinary-null",
+      "label": "Stage-4.2N ordinary complex-coherence prediction",
+      "aliases": ["C_0_beta=C0 exp(i Phi_EM_beta-chi_0_beta)"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2n-complex-ordinary-null", "kind": "artifact_backed_theory_run", "label": "Open material/Green/FDT ordinary-null chain",
+        "badgeIds": ["study.casimir_dp.material_thermal_ordinary_null_stage4_2n", "study.casimir_dp.complex_coherence_discriminator", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.material_thermal_ordinary_null_stage4_2n",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2n", "openPanels": ["theory-badge-graph", "scientific-calculator"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "The current phase and contraction are synthetic response-chain recoveries, not a measured ordinary-null authority."
+      }],
+      "claimBoundaryNotes": ["The Green/FDT loss is single counted.", "The frozen Diósi comparator is not combined with this ordinary prediction."]
+    },
+    {
+      "equationId": "cdp-stage4-2n-four-cell-cross-ratio",
+      "label": "Stage-4.2N four-cell boundary-by-superposition cross-ratio",
+      "aliases": ["R4=(C_as C_rc)/(C_ac C_rs)"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2n-four-cell-cross-ratio", "kind": "artifact_backed_theory_run", "label": "Open four-cell ordinary-null diagnostic",
+        "badgeIds": ["study.casimir_dp.material_thermal_ordinary_null_stage4_2n", "study.casimir_dp.boundary_branch_interaction_stage4_2i", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.material_thermal_ordinary_null_stage4_2n",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2n", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "A nonzero corrected cross-ratio identifies boundary--branch nonfactorization, not collapse or a Casimir-to-collapse bridge."
+      }],
+      "claimBoundaryNotes": ["Boundary-independent Diósi contraction cancels from this ratio.", "Measured cell response and covariance remain not ready."]
     }
   ]
 }

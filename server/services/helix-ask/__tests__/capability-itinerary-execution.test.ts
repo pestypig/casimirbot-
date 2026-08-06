@@ -869,6 +869,93 @@ describe("Helix capability itinerary execution", () => {
     }
   });
 
+  it("allows a model-decided conditional command to remain unexecuted after its mandatory inspection", () => {
+    const turnId = "ask:test:conditional-minecraft-command";
+    const spatialCapability =
+      "com.casimirbot.minecraft.spatial_region.inspect";
+    const commandCapability = "com.casimirbot.minecraft.command";
+    const observationRef = `${turnId}:landing-observation`;
+    const spatialArtifact = {
+      artifact_id: observationRef,
+      turn_id: turnId,
+      kind: "live_environment_observation",
+      source_scope: "current_turn_context",
+      capability_key: spatialCapability,
+      source_capability_id: spatialCapability,
+      source_observation_schema:
+        "helix.environment_connector.probe_observation.v1",
+      status: "succeeded",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      payload: {
+        schema: "helix.live_environment_observation.v1",
+        source_capability_id: spatialCapability,
+        status: "succeeded",
+        observation_role: "evidence_not_assistant_answer",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        result: { purpose: "landing_safety" },
+      },
+    };
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: {
+        turn_id: turnId,
+        admitted_tool_families: ["live_environment"],
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["live_environment"],
+          required_capabilities: [spatialCapability],
+        },
+        compound_capability_contract: {
+          subgoals: [
+            {
+              subgoal_id: "subgoal:landing-inspection",
+              requested_capability: spatialCapability,
+              runtime_capability: spatialCapability,
+              mandatory: true,
+              required_args: [],
+              args_hint: { purpose: "landing_safety" },
+              required_observation_kinds: ["live_environment_observation"],
+            },
+            {
+              subgoal_id: "subgoal:conditional-command",
+              requested_capability: commandCapability,
+              runtime_capability: commandCapability,
+              mandatory: false,
+              required_args: ["command", "category", "effect"],
+              args_hint: {},
+              required_observation_kinds: [
+                "helix.environment_command.observation.v1",
+              ],
+            },
+          ],
+        },
+      },
+      artifacts: [spatialArtifact],
+    });
+
+    expect(state).toMatchObject({
+      complete: true,
+      missing_required_capabilities: [],
+      missing_compound_subgoal_ids: [],
+      compound_subgoal_ledger: [
+        {
+          requested_capability: spatialCapability,
+          mandatory: true,
+          satisfaction: "satisfied",
+        },
+        {
+          requested_capability: commandCapability,
+          mandatory: false,
+          satisfaction: "optional_not_selected",
+          rail_status: "not_required",
+        },
+      ],
+    });
+  });
+
   it("counts only the exact broker-revalidated prior environment evidence schema", () => {
     const artifact = {
       artifact_id: "ask:turn-2:prior-environment-evidence",

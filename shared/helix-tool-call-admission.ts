@@ -106,6 +106,7 @@ export type HelixToolCallAdmissionDecision = {
   tool_admission_reason?: string;
   tool_admission_dominance_reason?: string | null;
   selected_capability?: string | null;
+  admitted_capability?: string | null;
   executed_capability?: string | null;
   runtime_capability_rejection_reason?: string | null;
   first_broken_rail?: "capability_execution" | null;

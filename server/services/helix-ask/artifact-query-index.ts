@@ -28,7 +28,10 @@ import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 import { readCommittedAskRoute } from "./committed-ask-route";
 import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "./workstation-context-feed-query-tool-contracts";
 import { resolveHelixRuntimeObservationReentry } from "./runtime/turn-lifecycle";
-import { authoritativeTypedFailureRequiresNoContinuation } from "./runtime/typed-failure-lifecycle-reconciliation";
+import {
+  authoritativeSourceObservationTypedFailureRequiresNoContinuation,
+  authoritativeTypedFailureRequiresNoContinuation,
+} from "./runtime/typed-failure-lifecycle-reconciliation";
 
 type RecordLike = Record<string, unknown>;
 
@@ -46,7 +49,8 @@ type FailureBucket =
   | "E_terminal_materializer_gap"
   | "F_terminal_projection_mismatch"
   | "G_config_missing"
-  | "H_route_tool_family_contract_mismatch";
+  | "H_route_tool_family_contract_mismatch"
+  | "I_source_identity_mismatch";
 
 type RepairTarget = CodexParityAgentSpineRepairTarget;
 
@@ -2077,6 +2081,12 @@ const buildToolTurnChainAudit = (input: {
       return readString(payload?.error_code) === "repo_evidence_weak_after_repair";
     });
   const terminalErrorCode = readString(input.payload.terminal_error_code);
+  const liveSourceIdentityAudit = readRecord(
+    input.payload.live_source_identity_audit,
+  );
+  const liveSourceIdentityDiagnosis = readString(
+    liveSourceIdentityAudit?.diagnosis,
+  );
   const typedFailureSelected = Boolean(
     normalizedEqual(materializedTerminal, "typed_failure") ||
       normalizedEqual(authorityTerminal, "typed_failure") ||
@@ -2084,6 +2094,16 @@ const buildToolTurnChainAudit = (input: {
   );
   const authoritativeTypedFailureTerminal =
     authoritativeTypedFailureRequiresNoContinuation(input.payload);
+  const authoritativeSourceObservationFailure =
+    authoritativeSourceObservationTypedFailureRequiresNoContinuation(
+      input.payload,
+    );
+  const authoritativeSourceIdentityFailure = Boolean(
+    authoritativeTypedFailureTerminal &&
+      liveSourceIdentityAudit?.identity_ok === false &&
+      liveSourceIdentityDiagnosis &&
+      terminalErrorCode === liveSourceIdentityDiagnosis,
+  );
   const typedFailureInsteadOfRequiredTerminal = Boolean(
     terminalErrorCode &&
       typedFailureSelected &&
@@ -2123,6 +2143,12 @@ const buildToolTurnChainAudit = (input: {
   const railFailureCode: RailFailureCode | null =
     configMissing
       ? "config_missing"
+      : authoritativeSourceIdentityFailure
+        ? "source_identity_mismatch"
+      : authoritativeSourceObservationFailure
+        ? requestedCapability
+          ? "required_observation_missing"
+          : "observation_missing"
       : contextualSuppressionComplete
         ? null
         : compoundRailFailureCode
@@ -2196,7 +2222,9 @@ const buildToolTurnChainAudit = (input: {
     first_incomplete_compound_selected_capability: readNullableString(firstIncompleteCompoundSubgoal?.selected_capability),
     first_incomplete_compound_executed_capability: readNullableString(firstIncompleteCompoundSubgoal?.executed_capability),
     compound_first_broken_rail: compoundFirstBrokenRail,
-    compound_rail_failure_code: compoundRailFailureCodeRaw,
+    compound_rail_failure_code: typedFailureSelected
+      ? compoundRailFailureCode
+      : compoundRailFailureCodeRaw,
     compound_repair_target: compoundRepairTarget,
     requested_selected_match: requestedSelectedMatch,
     requested_selected_direct_match: requestedSelectedDirectMatch,
@@ -2428,6 +2456,13 @@ const triageFromAudit = (audit: RecordLike): {
   if (railFailureCode === "config_missing") {
     return { first_broken_rail: "config", failure_bucket: "G_config_missing", repair_target: "operator_config" };
   }
+  if (railFailureCode === "source_identity_mismatch") {
+    return {
+      first_broken_rail: "source_identity",
+      failure_bucket: "I_source_identity_mismatch",
+      repair_target: "source_binding",
+    };
+  }
   if (railFailureCode === "explicit_capability_not_selected") {
     return {
       first_broken_rail: "route_admission",
@@ -2630,10 +2665,14 @@ const withFinalRailSnapshot = (
 const historicalRailCandidateArrays = (payload: RecordLike, finalRailStatuses: RecordLike[]): RecordLike[] => {
   const debug = readRecord(payload.debug);
   const artifactIndex = readRecord(payload.artifact_query_index);
+  const executionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(readRecord(payload.capability_itinerary)?.execution_state);
   const sources = [
     ...readArray(payload.compound_subgoal_rail_statuses),
     ...readArray(debug?.compound_subgoal_rail_statuses),
     ...readArray(artifactIndex?.compound_subgoal_rail_statuses),
+    ...readArray(executionState?.compound_subgoal_ledger),
     ...finalRailStatuses,
   ];
   const seen = new Set<string>();
@@ -2980,6 +3019,7 @@ const codexParityClassFromAudit = (input: {
   const repairTarget = readString(input.triage.repair_target);
   if (!failureCode && railStatus === "complete") return "complete";
   if (failureCode === "config_missing") return "provider_config_missing";
+  if (failureCode === "source_identity_mismatch") return "source_identity_mismatch";
   if (failureCode === "explicit_capability_not_selected" || failureCode === "wrong_capability_executed") {
     return "explicit_capability_demoted";
   }
@@ -3237,6 +3277,18 @@ export const buildArtifactQueryIndex = (input: {
   const compoundSubgoalLedger = readArray(capabilityItineraryExecutionState?.compound_subgoal_ledger)
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
+  const terminalAnswerAuthority = readRecord(
+    input.payload.terminal_answer_authority,
+  );
+  const terminalPresentation = readRecord(input.payload.terminal_presentation);
+  const finalTypedFailureSelected = [
+    readNullableString(input.payload.terminal_artifact_kind),
+    readNullableString(terminalAnswerAuthority?.terminal_artifact_kind),
+    readNullableString(
+      terminalAnswerAuthority?.selected_terminal_artifact_kind,
+    ),
+    readNullableString(terminalPresentation?.terminal_artifact_kind),
+  ].some((kind) => normalizedEqual(kind, "typed_failure"));
   const compoundContractSubgoals = readArray(compoundCapabilityContract?.subgoals)
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
@@ -3284,6 +3336,37 @@ export const buildArtifactQueryIndex = (input: {
     return mode === "any"
       ? requiredCoverage.some(Boolean)
       : requiredCoverage.every(Boolean);
+  };
+  const canonicalFinalSubgoalFailureCode = (input: {
+    rawFailureCode: string | null;
+    requestedCapability: string | null;
+    executedCapability: string | null;
+  }): RailFailureCode => {
+    if (input.rawFailureCode === "input_binding_missing") {
+      return "reentry_step_not_executed";
+    }
+    if (
+      input.rawFailureCode === "compound_subgoal_dropped" ||
+      input.rawFailureCode?.startsWith("invalid_arg:") ||
+      input.rawFailureCode?.startsWith("missing_required_arg:")
+    ) {
+      return "tool_execution_rejected";
+    }
+    if (input.rawFailureCode === "subgoal_observation_missing") {
+      return input.requestedCapability
+        ? "required_observation_missing"
+        : "observation_missing";
+    }
+    if (
+      (TOOL_TURN_CHAIN_FAILURE_CODES as readonly string[]).includes(
+        input.rawFailureCode ?? "",
+      )
+    ) {
+      return input.rawFailureCode as RailFailureCode;
+    }
+    return input.executedCapability
+      ? "observation_missing"
+      : "tool_execution_rejected";
   };
   const compoundSubgoalRailStatusFromLedgerEntry = (entry: RecordLike): RecordLike => {
     const requestedCapability = readNullableString(entry.requested_capability);
@@ -3341,16 +3424,68 @@ export const buildArtifactQueryIndex = (input: {
     const canReconcileFromArtifacts =
       Boolean(observedRef && effectiveCapability && artifactSupportsSubgoal) &&
       subgoalObservationCoverageSatisfied(effectiveCapability, requiredObservationKinds);
+    const lifecycleRequestedCapability = readNullableString(
+      lifecycleTrace?.requested_capability,
+    );
+    const lifecycleAdmittedCapability = readNullableString(
+      lifecycleTrace?.admitted_capability,
+    );
+    const lifecycleExecutedCapability = readNullableString(
+      lifecycleTrace?.executed_capability,
+    );
+    const lifecycleMatchesSubgoal = Boolean(
+      effectiveCapability &&
+        [
+          lifecycleRequestedCapability,
+          lifecycleAdmittedCapability,
+          lifecycleExecutedCapability,
+        ].some((capability) => normalizedEqual(capability, effectiveCapability)),
+    );
     const selectedCapability =
       readNullableString(entry.selected_capability) ??
+      (lifecycleMatchesSubgoal
+        ? lifecycleAdmittedCapability ?? lifecycleRequestedCapability
+        : null) ??
       (canReconcileFromArtifacts ? effectiveCapability : null);
     const executedCapability =
       readNullableString(entry.executed_capability) ??
+      (lifecycleMatchesSubgoal ? lifecycleExecutedCapability : null) ??
       (canReconcileFromArtifacts ? effectiveCapability : null);
+    const rawRailStatus = readNullableString(entry.rail_status);
+    const rawRailFailureCode = readNullableString(entry.rail_failure_code);
+    const observationComplete = Boolean(
+      canReconcileFromArtifacts && selectedCapability && executedCapability,
+    );
     const railStatus =
-      canReconcileFromArtifacts && selectedCapability && executedCapability
+      observationComplete
         ? "complete"
-        : readNullableString(entry.rail_status);
+        : finalTypedFailureSelected
+          ? "fail_closed"
+          : rawRailStatus;
+    const finalRailFailureCode =
+      railStatus === "complete"
+        ? null
+        : finalTypedFailureSelected
+          ? canonicalFinalSubgoalFailureCode({
+              rawFailureCode: rawRailFailureCode,
+              requestedCapability,
+              executedCapability,
+            })
+          : rawRailFailureCode;
+    const finalFirstBrokenRail =
+      railStatus === "complete"
+        ? null
+        : readNullableString(entry.first_broken_rail) ??
+          (selectedCapability || executedCapability
+            ? "observation_artifact"
+            : "capability_execution");
+    const finalRepairTarget =
+      railStatus === "complete"
+        ? null
+        : readNullableString(entry.repair_target) ??
+          (selectedCapability || executedCapability
+            ? "observation_materializer"
+            : "agent_step_selection");
 
     return {
       subgoal_id: readNullableString(entry.subgoal_id),
@@ -3400,13 +3535,17 @@ export const buildArtifactQueryIndex = (input: {
       unresolved_input_bindings: readArray(entry.unresolved_input_bindings)
         .map((binding) => readRecord(binding))
         .filter((binding): binding is RecordLike => Boolean(binding)),
-      satisfaction: canReconcileFromArtifacts ? "satisfied" : readNullableString(entry.satisfaction),
+      satisfaction: observationComplete
+        ? "satisfied"
+        : finalTypedFailureSelected
+          ? "not_satisfied"
+          : readNullableString(entry.satisfaction),
       contribution_role: contributionRole,
       terminal_contribution_kind: terminalContributionKind,
       rail_status: railStatus,
-      first_broken_rail: railStatus === "complete" ? null : readNullableString(entry.first_broken_rail),
-      rail_failure_code: railStatus === "complete" ? null : readNullableString(entry.rail_failure_code),
-      repair_target: railStatus === "complete" ? null : readNullableString(entry.repair_target),
+      first_broken_rail: finalFirstBrokenRail,
+      rail_failure_code: finalRailFailureCode,
+      repair_target: finalRepairTarget,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,

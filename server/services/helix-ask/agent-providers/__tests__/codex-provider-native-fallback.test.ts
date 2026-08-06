@@ -16,6 +16,7 @@ vi.mock("../codex-native/provider-bridge", () => ({
 import {
   applyWorkstationContextAuthorityGuard,
   buildCodexModelVisibleObservationArtifacts,
+  buildCodexNormalizedObservationArtifacts,
   codexProvider,
   hasBoundedScholarlyFollowupSourceEvidence,
   isSuccessfulImageLensObservationPacket,
@@ -216,6 +217,54 @@ describe("Codex native compatibility fallback", () => {
       artifact_id: "ask:test:docs-search",
       capability_key: "docs.search",
       provider_gateway_observation_ref: "ask:test:docs-search:observation",
+    });
+  });
+
+  it("preserves goal-relevant mechanics command context through gateway normalization and model compaction", async () => {
+    const gatewayResult = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: "docs.search",
+      arguments: {
+        query:
+          "Before building an exact wall, how do I capture only its exact rollback footprint?",
+        mechanics_collection_ids: ["mechanics.minecraft.commands.v1"],
+        adapter_profile_id: "game.minecraft.readonly.v1",
+        max_hits: 6,
+      },
+      turnId: "ask:test:model-visible-exact-checkpoint",
+      iteration: 1,
+    });
+    const normalized = buildCodexNormalizedObservationArtifacts({
+      turnId: "ask:test:model-visible-exact-checkpoint",
+      gatewayCallResults: [gatewayResult],
+    });
+    const modelVisible = buildCodexModelVisibleObservationArtifacts(
+      normalized.artifacts,
+    );
+    const docsArtifact = modelVisible.find(
+      (artifact) => artifact.kind === "doc_search_results",
+    );
+    const payload = docsArtifact?.payload as Record<string, unknown>;
+    const serialized = JSON.stringify(payload);
+
+    expect(gatewayResult.ok).toBe(true);
+    expect(normalized.missingNormalizationFailures).toEqual([]);
+    expect(serialized).toContain("helixgame checkpoint capture_box agency_build");
+    expect(payload).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+      evidence_passages: expect.arrayContaining([
+        expect.objectContaining({
+          path: "docs/game-mechanics/minecraft-command-playbook-v1.md",
+          text_excerpt: expect.stringContaining(
+            "helixgame checkpoint capture_box agency_build",
+          ),
+          citation_ref: expect.stringContaining(
+            "workspace://docs/game-mechanics/minecraft-command-playbook-v1.md#line=",
+          ),
+        }),
+      ]),
     });
   });
 

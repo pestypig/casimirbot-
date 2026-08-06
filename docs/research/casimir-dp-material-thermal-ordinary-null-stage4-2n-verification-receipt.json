@@ -1,0 +1,80 @@
+{
+  "schema_version": "casimir_dp_material_thermal_ordinary_null_stage4_2n_verification_receipt/1",
+  "campaign_id": "casimir-dp-material-thermal-ordinary-null-stage4-2n-v1",
+  "campaign_run_id": "casimir-dp-material-thermal-ordinary-null-stage4-2n-v1-20260806T120000000Z",
+  "verified_at": "2026-08-06T07:36:55.3599997Z",
+  "evidence_class": "synthetic_material_green_fdt_pipeline_validation_only",
+  "claim_ceiling": "material_resolved_ordinary_null_commissioning_requirements_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_added": 0,
+  "scientific_scope": "none",
+  "campaign_authority": {
+    "config": { "path": "configs/research/casimir-dp-material-thermal-ordinary-null-stage4-2n.v1.json", "sha256": "296f5273793283841311a2c5554d55ad62610533bf911048b495e4ba39c167a6" },
+    "contract": { "path": "shared/contracts/casimir-dp-material-thermal-ordinary-null-stage4-2n.v1.ts", "sha256": "67b736dd419571c74ed500f7dd4598b66b5a0f01193839c11dce3e4e7f9d1232" },
+    "evaluator": { "path": "shared/casimir-dp-material-thermal-ordinary-null-stage4-2n.ts", "sha256": "1c3d1d9cd271bf8d625fefd5b2eda2943aea5d0d8ea2bc9e01757c685bbcc534" },
+    "runner": { "path": "scripts/research/run-casimir-dp-material-thermal-ordinary-null-stage4-2n.ts", "sha256": "ab438a994d3cd34b77615126cef4894bb450ec45fd2f2b5395966862f8716d86" },
+    "fixture": { "path": "configs/research/fixtures/casimir-dp-stage4-2n.synthetic.v1.json", "sha256": "e7443a412036ace2bb7a580962693b73d8109ff506638a29d6ca00a062d19fe8" },
+    "optical_table": { "path": "configs/research/fixtures/casimir-dp-stage4-2n-diamond-loss.synthetic.csv", "sha256": "f7806ae50a589fc1f46321a6dbe60007f76045ec34621c408a23cd21cdbde3b9" },
+    "report_json": { "path": "artifacts/research/casimir-dp-material-thermal-ordinary-null-stage4-2n/casimir-dp-material-thermal-ordinary-null-stage4-2n-v1-20260806T120000000Z/material-thermal-ordinary-null-stage4-2n-report.json", "sha256": "c6c0834f0651ce1e1bd4fffd8834e431ce49a05b3f0056a133eea851a3e8fcb3" },
+    "report_markdown": { "path": "artifacts/research/casimir-dp-material-thermal-ordinary-null-stage4-2n/casimir-dp-material-thermal-ordinary-null-stage4-2n-v1-20260806T120000000Z/material-thermal-ordinary-null-stage4-2n-report.md", "sha256": "9a2263b351de6b9dff74497f6ec418aacac49bc4ffcc95e9ae9e75b2bed956d7" },
+    "campaign_trace": { "path": "artifacts/research/casimir-dp-material-thermal-ordinary-null-stage4-2n/casimir-dp-material-thermal-ordinary-null-stage4-2n-v1-20260806T120000000Z/material-thermal-ordinary-null-stage4-2n-trace.jsonl", "sha256": "0a8ff8e290e04e9d8eebd4bb2a0c764f5ee23a0be6fbc192669a20d9fcc2374b" },
+    "campaign_receipt": { "path": "artifacts/research/casimir-dp-material-thermal-ordinary-null-stage4-2n/casimir-dp-material-thermal-ordinary-null-stage4-2n-v1-20260806T120000000Z/material-thermal-ordinary-null-stage4-2n-receipt.json", "sha256": "a01dda0e038251f6cceb78d6bf7ba0a848a6dc9d65541e9e89c09f1f3be40cba" },
+    "maintained_report_matches_immutable_markdown": true,
+    "git_head": "f0dfd07085af214797458081b246ab87f1175c72",
+    "worktree_state": "dirty_uncommitted_stage4_2n_role_path_and_content_hashes_authoritative"
+  },
+  "immutable_upstream": {
+    "stage4_2m_candidate_id": "stage4_2m_candidate_002",
+    "stage4_2m_run_id": "casimir-dp-apparatus-search-stage4-2m-v1-20260806T070000000Z",
+    "stage4_2m_verification_receipt_path": "docs/research/casimir-dp-apparatus-search-stage4-2m-verification-receipt.json",
+    "stage4_2m_verification_receipt_sha256": "bf89dc469b7d5770c69d01eec80acc312816ef8e054b2fbd7e74af7e77f95a3f",
+    "mutation_detected": false
+  },
+  "runtime_result": {
+    "software_pipeline": "pass",
+    "mean_electromagnetic_phase_rad": 0.01999999999248688,
+    "phase_standard_uncertainty_rad": 0.00006303538879220067,
+    "ramsey_chi": 0.00035777321050801464,
+    "echo_chi": 0.0000013416495394050548,
+    "maximum_propagated_imaginary_axis_relative_uncertainty": 0.0031500973504121083,
+    "planck_stefan_boltzmann_relative_error": 1.3770845459661169e-14,
+    "zero_coupling_recovery": "pass",
+    "infinite_distance_recovery": "pass",
+    "calibration_intervention_recovery": "pass",
+    "thermal_channel_added_twice": false,
+    "dp_comparator_combined_with_ordinary_null": false
+  },
+  "local_gates": {
+    "stage4_2n_focused_campaign_paper_graph_and_root": { "files": 5, "tests": 63, "status": "pass" },
+    "inherited_optical_green_thermal_stage4_2k_through_stage4_2n": { "files": 16, "tests": 118, "status": "pass" },
+    "math_stage": { "entries": 222, "validation": "pass", "strict_congruence_errors": 0, "strict_congruence_warnings": 0, "report_json_sha256": "599d61f5ca669c44fabcd0c396808e30f9b33b08e0315169834f0fe1d0902ac2", "report_markdown_sha256": "afc1e98681c75c440af9fe0705991f88a687d0fa165ad680ff22ccd9717b447e" },
+    "physics_root_to_leaf": { "status": "pass", "manifest_sha256": "bf65ce3ec811a88cac73a1f14432a6b16b2c39efc27579cb76091a645a5a902c", "stage4_2n_readiness_rules_present": true },
+    "equation_sidecars": { "main_marker_source_generated": [28, 28, 28], "main_source_sha256": "ddfbae6110234cb60a8f6c89c086de66ddd7099527ff66b3ce4403b67d0b3c17", "main_generated_sha256": "9f47883fcc40c9d613a233ad31f6163946fc9141062370ea5e51812bd26ecc20", "status": "pass" },
+    "theory_badges": { "badges": 39, "edges": 110, "stage4_2n_badges": 1, "calculator_payloads": 0, "observable_bridge_edges": 0, "source_sha256": "065e82cfffb3cdd915314f7d139e0dc8eb66f42bcd1ceb83e031d723c5fc08e2", "status": "pass" },
+    "documents": { "paper_sha256": "a6f50805b23580f199067168893ce42a7e385dcc9c2dcdaff8e6cac27c4d6204", "proposal_sha256": "9efad1c06c95258c1fdd9a44e596c7ee4c9ae5e2299cd7575a9772ffcfc01c5d", "supplement_sha256": "43fb205a66b828b18732e64cbe292e1532e3ab6e1143fbcb0a37ba2f4ff048f0" },
+    "production_build": { "client": "pass_with_existing_warnings", "server": "pass_with_existing_warnings" }
+  },
+  "casimir_verification": {
+    "command": "npm run casimir:verify -- --ci --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace-stage4-2n-20260806T120000000Z.jsonl --trace-limit 200",
+    "trace_id": "adapter:636ba42b-6b95-4b1b-84f0-756519cdfd05",
+    "run_id": "2375",
+    "verdict": "PASS",
+    "first_fail": null,
+    "deltas": [],
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_integrity_ok": true,
+    "certificate_status": "GREEN",
+    "exported_trace": { "path": "artifacts/training-trace-stage4-2n-20260806T120000000Z.jsonl", "sha256": "9b850be63967b4f32be9ab33c433b58934e9960a6bb3d7936ade2530934c6faa", "bytes": 4594321, "line_count": 2514, "exclusive_to_run": false }
+  },
+  "standing": {
+    "measured_evidence": "not_ready",
+    "ordinary_null_authority": "not_ready",
+    "residual_attribution": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "physical_pilot_authorized": false,
+    "confirmatory_campaign_authorized": false
+  },
+  "receipt_boundary": "This post-run receipt records software and repository verification. It is not measured evidence and does not certify objective collapse, a Casimir-to-collapse mechanism, manifold dynamics, or apparatus viability."
+}

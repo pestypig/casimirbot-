@@ -1175,6 +1175,67 @@ describe("provider terminal authority for capability lanes", () => {
     });
   });
 
+  it("does not authorize a provider candidate while a committed action subgoal is unobserved", () => {
+    const packet = buildLanePacket();
+    const turnId = "turn-lane-authority";
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId,
+      threadId: "thread-lane-authority-incomplete-action",
+      route: "/ask/turn",
+      gatewayCallResults: [],
+      capabilityLaneObservationPackets: [packet],
+      normalizedObservationPackets: [packet],
+      committedSubgoalContract: {
+        schema: "helix.compound_capability_contract.v1",
+        turn_id: turnId,
+        rail_status: "missing_observation",
+        subgoals: [
+          {
+            subgoal_id: `${turnId}:inspect`,
+            requested_capability: "utility_text.normalize_text",
+            satisfaction: "satisfied",
+            satisfied: true,
+            rail_status: "satisfied",
+            observation_ref: "ask:lane:utility:authority-obs",
+          },
+          {
+            subgoal_id: `${turnId}:act`,
+            requested_capability: "com.casimirbot.minecraft.command",
+            satisfaction: "not_satisfied",
+            satisfied: false,
+            rail_status: "missing_observation",
+            observation_ref: null,
+          },
+        ],
+      },
+      providerText: "I am executing the missing action now.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      evidence_reentered: true,
+      required_committed_subgoals_satisfied: false,
+      committed_subgoals_required: true,
+      committed_subgoals_compatible: false,
+      goal_satisfaction_compatible: false,
+    });
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_granted: false,
+      blockers: ["committed_subgoal_observation_missing"],
+    });
+    expect(result.providerTerminalAuthorityBridge).toMatchObject({
+      terminal_authority_granted: false,
+      goal_satisfaction_compatible: false,
+      committed_subgoals_required: true,
+      committed_subgoals_compatible: false,
+    });
+    expect(result.terminalAnswerAuthority).toBeNull();
+  });
+
   it("re-enters an actionable blocked extra lane observation after every committed subgoal is satisfied", () => {
     const turnId = "turn-theory-actionable-blocker-reentry";
     const packet = buildActionableBlockedTheoryPacket(turnId);
@@ -1432,6 +1493,10 @@ describe("provider terminal authority for capability lanes", () => {
     });
     expect(result.providerReasoningReentry).toMatchObject({
       status: "completed_not_terminal",
+      observation_reentered: true,
+      reentered_observation_refs: [
+        "ask:scholarly:numeric:missing-vars",
+      ],
       evidence_reentered: false,
       post_tool_model_step_required: false,
       terminal_eligible: false,
@@ -1454,6 +1519,39 @@ describe("provider terminal authority for capability lanes", () => {
       terminal_authority_granted: false,
       final_answer_source: null,
       terminal_artifact_kind: null,
+    });
+    expect(result.terminalAnswerAuthority).toBeNull();
+  });
+
+  it("records failed observation transport even when Codex produces no terminal candidate", () => {
+    const gatewayResult = buildScholarlyNumericObservationResult();
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-failed-observation-transport",
+      threadId: "thread-failed-observation-transport",
+      route: "/ask/turn",
+      gatewayCallResults: [gatewayResult as never],
+      normalizedObservationPackets: [gatewayResult.observation_packet],
+      providerText: "",
+      ok: false,
+      providerObservationReentryCompleted: true,
+      solverCompleted: false,
+      goalSatisfied: false,
+    });
+
+    expect(result.providerReasoningReentry).toMatchObject({
+      status: "not_run",
+      provider_terminal_candidate_present: false,
+      observation_reentered: true,
+      reentered_observation_refs: [
+        "ask:scholarly:numeric:missing-vars",
+      ],
+      evidence_reentered: false,
+    });
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_granted: false,
+      blockers: ["provider_terminal_candidate_missing"],
     });
     expect(result.terminalAnswerAuthority).toBeNull();
   });
@@ -1542,6 +1640,10 @@ describe("provider terminal authority for capability lanes", () => {
 
     expect(result.providerReasoningReentry).toMatchObject({
       status: "completed_not_terminal",
+      observation_reentered: true,
+      reentered_observation_refs: [
+        "ask:scholarly:full-text:recovery",
+      ],
       evidence_reentered: false,
       post_tool_model_step_required: false,
     });

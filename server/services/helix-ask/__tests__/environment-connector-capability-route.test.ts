@@ -497,6 +497,38 @@ describe("Minecraft environment connector capability routing", () => {
       path_prefix: "helixgame fall_rescue",
       limit: 64,
     });
+    expect(compound?.subgoals[2]?.mandatory).toBe(true);
+  });
+
+  it("keeps a safety-conditional fall-rescue command model-decided after inspection", () => {
+    const prompt =
+      "Protect my selected Minecraft player from a dangerous fall for the next 300 seconds. First inspect my current landing area. If it is safe, arm the local fall rescue; otherwise report why you stopped.";
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:test:conditional-fall-rescue",
+      promptText: prompt,
+    });
+
+    expect(compound?.subgoals.map((subgoal) => ({
+      capability: subgoal.requested_capability,
+      mandatory: subgoal.mandatory,
+    }))).toEqual(expect.arrayContaining([
+      {
+        capability: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        mandatory: true,
+      },
+      {
+        capability: HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
+        mandatory: true,
+      },
+      {
+        capability: HELIX_MINECRAFT_COMMAND_CAPABILITY,
+        mandatory: false,
+      },
+    ]));
+    expect(compound?.required_capabilities).not.toContain(
+      HELIX_MINECRAFT_COMMAND_CAPABILITY,
+    );
+    expect(compound?.requires_all_subgoals).toBe(false);
   });
 
   it.each([
@@ -756,6 +788,55 @@ describe("Minecraft environment connector capability routing", () => {
         }),
       }),
     );
+  });
+
+  it.each([
+    "Check the paired Minecraft server's live command capabilities, then tell me the current daytime without changing the world.",
+    "What is the current daytime value in our Minecraft world? Please read it directly from the live Fabric server before you answer.",
+  ])("admits an affirmative natural live-world property read: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt, {
+        trusted_environment_domain: "minecraft",
+      }),
+    ).toContainEqual(
+      expect.objectContaining({
+        capability: HELIX_MINECRAFT_COMMAND_CAPABILITY,
+        source: "natural_capability_intent",
+      }),
+    );
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: `ask:test:minecraft-live-world-property:${prompt.length}`,
+        threadId: "helix-ask:room:shared_realtime_room:live-world-property",
+        promptText: prompt,
+        trustedEnvironmentContext: {
+          trusted_environment_domain: "minecraft",
+        },
+      }),
+    ).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      precedence_reason:
+        "explicit_minecraft_environment_capability_source_target",
+      allow_no_tool_direct: false,
+    });
+  });
+
+  it.each([
+    "Do not check the current daytime in the paired Minecraft server.",
+    "Later, check the current daytime in our Minecraft world, but not now.",
+    "If I reconnect, check the current Minecraft weather.",
+    "Historically, we checked the current daytime in the Fabric server.",
+    'The room transcript says "check the current daytime in Minecraft."',
+    '"Check the current Minecraft daytime" is only an example request.',
+    "Explain how to check the current daytime in Minecraft without running anything.",
+  ])("does not execute a contextual live-world property read: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt, {
+        trusted_environment_domain: "minecraft",
+      }).map((entry) => entry.capability),
+    ).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
   });
 
   it("admits goal-shaped Minecraft mechanics retrieval without requiring a document title and keeps execution suppressed", () => {

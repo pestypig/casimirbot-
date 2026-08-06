@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { listWorkstationGatewayCapabilities } from "../../workstation-tool-gateway/registry";
+import { seedBackendLiveVisualSourceSwitchForAskTest } from "../../../situation-room/live-visual-test-harness";
 import { buildHelixAgentRuntimeSelectionTrace } from "../runtime-debug";
 import { buildHelixAgentProviderAskPayload } from "../provider-response-projection";
 import type { HelixAgentProvider, HelixAgentRunRoute, HelixAgentRunResult } from "../types";
@@ -1358,6 +1359,134 @@ describe("agent provider response projection", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+  });
+
+  it("replaces a stale provider answer with an authoritative fresh-source identity failure", () => {
+    const provider = buildProvider("codex");
+    const threadId = "helix-ask:provider-projection:fresh-unbound";
+    const turnId = "turn-provider-projection-fresh-unbound";
+    const seed = seedBackendLiveVisualSourceSwitchForAskTest({
+      thread_id: threadId,
+      bound_source_id: "visual_source:provider-bound",
+      unbound_source_id: "visual_source:provider-fresh",
+    });
+    const staleAnswer = "This answer must not survive the identity boundary.";
+    const staleRef = `${turnId}:situation_context_pack`;
+    const payload = buildPayload({
+      provider,
+      route: "/ask/turn",
+      turnId,
+      requestBody: {
+        thread_id: threadId,
+        question: "What is happening right now in the visual screen capture?",
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          source_target: "visual_capture",
+          required_terminal_kind: "situation_context_pack",
+          allowed_terminal_artifact_kinds: [
+            "situation_context_pack",
+            "typed_failure",
+          ],
+        },
+      },
+      providerResult: {
+        ok: true,
+        runtime: "codex",
+        response_type: "final_answer",
+        final_status: "completed",
+        answer: staleAnswer,
+        text: staleAnswer,
+        selected_final_answer: staleAnswer,
+        final_answer_source: "situation_context_pack",
+        terminal_artifact_kind: "situation_context_pack",
+        source_target_intent: {
+          target_source: "visual_capture",
+          strength: "hard",
+        },
+        situation_evidence_selection: {
+          situation_run_id: seed.bound_seed.situation_run_id,
+          selected_observation_refs: [seed.bound_seed.observation_ref],
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: `${turnId}:observation`,
+            kind: "situation_context_pack",
+            turn_id: turnId,
+            payload: {},
+          },
+        ],
+        loop_parity_trace: {
+          actual_tool_calls: ["situation-room.describe_visual_capture"],
+          observations_created: [{ ref: `${turnId}:observation` }],
+        },
+        ask_turn_solver_trace: {
+          completed_solver_path: false,
+          evidence_reentry: { required: true, completed: true },
+          followup_reasoning: { required: true, completed: true },
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          turn_id: turnId,
+          terminal_kind: "answer",
+          final_answer_source: "situation_context_pack",
+          terminal_artifact_kind: "situation_context_pack",
+          terminal_text_preview: staleAnswer,
+          server_authoritative: true,
+        },
+        terminal_authority_single_writer: {
+          schema: "helix.terminal_authority_single_writer_result.v1",
+          turn_id: turnId,
+          selectedArtifactKind: "situation_context_pack",
+          selectedArtifactRef: staleRef,
+          selected_terminal_artifact_kind: "situation_context_pack",
+          selected_terminal_artifact_ref: staleRef,
+          visible_text: staleAnswer,
+          source: "situation_context_pack",
+          integrity: { single_writer_applied: true },
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          turn_id: turnId,
+          terminal_artifact_kind: "situation_context_pack",
+          concise_text: staleAnswer,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      } as HelixAgentRunResult,
+    });
+    const writer = payload.terminal_authority_single_writer as Record<string, unknown>;
+    const audit = payload.live_source_identity_audit as Record<string, unknown>;
+    const solver = payload.ask_turn_solver_trace as Record<string, unknown>;
+
+    expect(audit).toMatchObject({
+      identity_ok: false,
+      diagnosis: "fresh_source_unbound",
+    });
+    expect(payload).toMatchObject({
+      ok: false,
+      response_type: "final_failure",
+      final_status: "final_failure",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "fresh_source_unbound",
+    });
+    expect(payload.selected_final_answer).not.toBe(staleAnswer);
+    expect(writer).toMatchObject({
+      selectedArtifactKind: "typed_failure",
+      selected_terminal_artifact_kind: "typed_failure",
+      source: "typed_failure",
+    });
+    expect(solver.completed_solver_path).toBe(true);
+    expect(payload.current_turn_artifact_ledger).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "typed_failure",
+          payload: expect.objectContaining({
+            error_code: "fresh_source_unbound",
+          }),
+        }),
+      ]),
+    );
   });
 
   it("keeps route-local provider projection out of agi.plan.ts", () => {

@@ -637,6 +637,7 @@ describe("Helix Ask tool lifecycle trace", () => {
       "tool_admission_rejected",
       "selected_not_executed",
       "observation_missing",
+      "source_identity_mismatch",
       "observation_not_reentered",
       "goal_contract_mismatch",
       "terminal_product_not_allowed",
@@ -4613,6 +4614,171 @@ describe("Helix Ask tool lifecycle trace", () => {
         }),
       ]),
     );
+  });
+
+  it("canonicalizes final typed-failure subgoal rails without erasing their pending history", () => {
+    const turnId = "ask:test:compound-final-fail-closed";
+    const observationRef = `${turnId}:visual-observation`;
+    const subgoalId = `${turnId}:compound_capability_subgoal:1:image_lens_inspect`;
+    const compoundContract = {
+      schema: "helix.compound_capability_contract.v1",
+      turn_id: turnId,
+      subgoals: [
+        {
+          subgoal_id: subgoalId,
+          order: 1,
+          requested_capability: "image_lens.inspect",
+          runtime_capability: "situation-room.describe_visual_capture",
+          required_observation_kinds: ["visual_frame_evidence"],
+          required_terminal_kind: "situation_context_pack",
+          allowed_substitutions: ["situation-room.describe_visual_capture"],
+          mandatory: true,
+        },
+      ],
+    };
+    const pendingSubgoal = {
+      subgoal_id: subgoalId,
+      order: 1,
+      requested_capability: "image_lens.inspect",
+      runtime_capability: "situation-room.describe_visual_capture",
+      selected_capability: null,
+      executed_capability: null,
+      args: {},
+      required_observation_kinds: ["visual_frame_evidence"],
+      required_terminal_kind: "situation_context_pack",
+      allowed_substitutions: ["situation-room.describe_visual_capture"],
+      observation_kind: "provider_gateway_observation_packet",
+      observation_ref: observationRef,
+      observation_provenance: "capability_key",
+      support_refs: [observationRef],
+      satisfaction: "pending",
+      rail_status: "pending",
+      first_broken_rail: "observation_artifact",
+      rail_failure_code: "subgoal_observation_missing",
+      repair_target: "observation_materializer",
+    };
+    const index = buildArtifactQueryIndex({
+      turnId,
+      payload: {
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "solver_continuation_pending",
+        terminal_answer_authority: {
+          selected_terminal_artifact_kind: "typed_failure",
+        },
+        terminal_presentation: { terminal_artifact_kind: "typed_failure" },
+        compound_capability_contract: compoundContract,
+        capability_itinerary_execution_state: {
+          applies: true,
+          complete: false,
+          compound_subgoal_ledger: [pendingSubgoal],
+        },
+        tool_lifecycle_trace: {
+          requested_capability: "situation-room.describe_visual_capture",
+          admitted_capability: "situation-room.describe_visual_capture",
+          executed_capability: "situation-room.describe_visual_capture",
+          lifecycle_stage: "failed",
+          observation_refs: [observationRef],
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: observationRef,
+            kind: "provider_gateway_observation_packet",
+            capability_key: "situation-room.describe_visual_capture",
+            payload: { assistant_answer: false, raw_content_included: false },
+          },
+        ],
+      },
+    });
+
+    expect(index.compound_subgoal_rail_statuses).toEqual([
+      expect.objectContaining({
+        subgoal_id: subgoalId,
+        selected_capability: "situation-room.describe_visual_capture",
+        executed_capability: "situation-room.describe_visual_capture",
+        observation_ref: observationRef,
+        satisfaction: "not_satisfied",
+        rail_status: "fail_closed",
+        rail_failure_code: "required_observation_missing",
+      }),
+    ]);
+    expect(index.final_tool_turn_chain_audit).toMatchObject({
+      rail_status: "fail_closed",
+      compound_rail_failure_code: "required_observation_missing",
+    });
+    expect(index.historical_rail_events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subgoal_id: subgoalId,
+          rail_status: "pending",
+          rail_failure_code: "subgoal_observation_missing",
+          snapshot_role: "historical_intermediate",
+        }),
+      ]),
+    );
+  });
+
+  it("projects an authoritative source-observation typed failure as fail closed", () => {
+    const turnId = "ask:test:procedure-epoch-source-failure";
+    const index = buildArtifactQueryIndex({
+      turnId,
+      payload: {
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        terminal_error_code: "procedure_epoch_previous_unavailable",
+        typed_failure: {
+          error_code: "procedure_epoch_previous_unavailable",
+          missing_evidence: ["previous_observation_missing"],
+          next_required_action: "wait_for_scene_memory_index",
+        },
+        canonical_goal_frame: {
+          authoritative_source_observation_typed_failure: true,
+        },
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          source_target: "procedure_memory",
+          allowed_terminal_artifact_kinds: [
+            "procedure_epoch_replay",
+            "typed_failure",
+          ],
+          forbidden_terminal_artifact_kinds: [],
+        },
+        route_authority_audit: { route_authority_ok: true },
+        tool_call_admission_decision: {
+          requested_capability: "procedure_memory",
+          selected_capability: "procedure_memory",
+          required_observation_kinds_for_requested_capability: [
+            "previous_visual_observation",
+          ],
+        },
+        capability_plan: {
+          requested_capability: "procedure_memory",
+          selected_capability: "procedure_memory",
+        },
+        terminal_answer_authority: {
+          selected_terminal_artifact_kind: "typed_failure",
+        },
+        terminal_presentation: { terminal_artifact_kind: "typed_failure" },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: `${turnId}:source-observation`,
+            kind: "source_observation",
+            payload: { status: "observed" },
+          },
+        ],
+      },
+    });
+
+    expect(index.final_tool_turn_chain_audit).toMatchObject({
+      requested_capability: "procedure_memory",
+      selected_capability: "procedure_memory",
+      rail_status: "fail_closed",
+      rail_failure_code: "required_observation_missing",
+    });
+    expect(index.active_terminal_rail_status).toMatchObject({
+      rail_status: "fail_closed",
+      rail_failure_code: "required_observation_missing",
+      terminal_error_code: "procedure_epoch_previous_unavailable",
+    });
   });
 
   it("does not complete compound rail mirrors from satisfied rows without observation refs", () => {

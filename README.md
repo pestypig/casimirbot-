@@ -36,9 +36,28 @@ Remember these rules:
   authority.
 - The latest assistant answer is bounded conversational context, not permission
   to run a tool or proof that a hard evidence requirement is satisfied.
+- Asking to see, cite, explain, or return command text, syntax, an example, or a
+  mechanics document is not an operator request to execute that command. Tool
+  admission must preserve the prompt's execution intent instead of expanding a
+  lexical action word into a new mutating goal.
 - A tool result must re-enter the runtime before it can support a final answer.
   Hard workflows with missing identity or evidence fail closed with a typed
   recovery path.
+- Verified current-turn lifecycle events outrank stale compatibility snapshots
+  for factual runtime questions such as whether a tool executed or an
+  observation re-entered Codex. A repairable evidence or answer-quality
+  rejection returns to Codex as a typed observation with its gate, stable
+  reason codes, and evidence refs; deterministic rails never compose substitute
+  prose. Hard permission, identity, provenance, integrity, and exhausted-repair
+  boundaries still fail closed with their exact reasons.
+- Keep observation transport distinct from result success: a blocked or failed
+  observation can re-enter Codex and support an accurate failure explanation
+  without authorizing a claim that the requested action succeeded.
+- Re-entry is cross-checked by exact observation ref across the capability-lane
+  event, provider bridge, canonical runtime lifecycle, and terminal audit. If
+  any one rail says re-entered while another says not executed, the turn is an
+  adapter projection contradiction; agreement between two stale summaries is
+  not proof that the lifecycle is healthy.
 - Voice presentation is downstream from terminal authority. A completed
   model-direct answer may be spoken without tool evidence; an answer that
   claims workstation or source grounding must carry current-turn observation
@@ -61,8 +80,74 @@ This ownership and lifecycle are frozen. Tool implementations may be repaired
 to conform, but must not introduce a competing planner, model loop, retry
 system, context format, or terminal path. The normative specifications are
 `docs/helix-ask-codex-loop-discipline.md`,
+`docs/architecture/helix-ask-canonical-turn-lifecycle.md`,
 `docs/helix-ask-turn-solver-spine.md`, and
-`docs/helix-ask-api-parity-matrix.md`.
+`docs/helix-ask-api-parity-matrix.md`. The repeatable diagnostic procedure is
+`docs/helix-ask-readiness-debug-loop.md`.
+
+### Adapter parity and first-divergence debugging
+
+When Codex appears to finish a grounded tool workflow but Helix shows a
+failure, an older receipt, or different prose, do not tune the prompt first.
+Audit one current-turn identity chain:
+
+```text
+prompt -> model requests -> admitted executions -> normalized observations
+-> observation re-entry -> Codex candidate -> route-product materialization
+-> terminal single writer -> visible/API/voice presentation
+```
+
+Compare exact turn, call, artifact, candidate, and support references plus text
+hashes. Stop at the first mismatch. The differential audit is an observer: it
+may identify `adapter_projection_contradiction`, `hard_evidence_boundary`, or
+`hard_policy_boundary`, but it must never approve, rewrite, reject, or replace
+an answer.
+
+Use a direct Codex reference run when it is possible to give Codex the same
+prompt, capability descriptions, observations, and permission boundary. Record
+its proposed actions, retries, and final synthesis, then compare that trace with
+the Helix run. Direct success is evidence that the adapter introduced the
+divergence; it is not permission to bypass identity, authorization, provenance,
+freshness, scientific-units/claim-maturity, route-product, or terminal-eligibility
+gates.
+
+Failed attempts stay in immutable provenance and debug history. A prior failed
+read/observe/verify attempt stops blocking only when strictly later current-turn
+evidence proves the same required subgoal succeeded. The final Codex candidate
+must still cover the required observations, pass route and quality gates, and
+receive Helix terminal authority. Mutating attempts are never silently
+superseded.
+
+### Keyed and memory-bounded agent testing
+
+Tests that require provider keys, Shared Live Room state, GPT Realtime, or the
+real workstation account must use the configured keyed server. With explicit
+user or repository authorization, Codex Desktop may invoke only this opaque
+launcher:
+
+```powershell
+& 'C:\Users\dan\.local\bin\start-myapp-for-codex.cmd' '<canonical-workspace-path>'
+```
+
+Do not read or patch the launcher, inspect credential-bearing environment
+variables, print secret-bearing command lines, or start the keyed server by a
+different command. Wait for `[express] app ready`, then verify
+`/api/account/session`, `/api/helix/pipeline`, and
+`/api/agi/agent-providers`; confirm the configured Codex provider is launchable
+without exposing credentials. Keep the reported local URL and exact turn/room
+identity through the test.
+
+On a memory-constrained workstation, prefer the compiled-client `npm run dev`
+profile over HMR, run focused tests before broad batteries, and allow only one
+heavy build or Vitest worker tree at a time. Monitor total committed memory and
+the relevant process working sets without printing process command lines or
+environment blocks. Do not launch duplicate Helix, Fabric, browser, or build
+processes. If a test stalls, identify and stop only its exact worker tree; keep
+the keyed server and game connector alive when they remain healthy. Record OS
+memory pressure separately from a reproducible product failure. Direct game or
+server-console probes are useful preflight evidence, but end-to-end agent
+acceptance still requires the same prompt to succeed through the Helix Ask/API
+or UI route.
 
 ## Research Paper Evidence Workflow
 
@@ -100,7 +185,7 @@ sequence without contacting a server. Tool-specific contracts live under
 
 | Area | Why it matters | Entry points |
 | --- | --- | --- |
-| Helix Ask + Live Answer loop | Primary user and agent interface. Handles prompt interpretation, tool admission, evidence re-entry, terminal authority, streamed debug, and the visible answer. | `server/routes/agi.plan.ts`, `docs/helix-ask-agentic-loop-current-overview.md`, `docs/helix-ask-codex-loop-discipline.md`, `npm run helix:ask:regression:light` |
+| Helix Ask + Live Answer loop | Primary user and agent interface. Handles prompt interpretation, tool admission, evidence re-entry, terminal authority, streamed debug, and the visible answer. | `server/services/helix-ask/`, `server/routes/agi.plan.ts` (retired compatibility wiring; do not grow), `docs/helix-ask-agentic-loop-current-overview.md`, `docs/helix-ask-codex-loop-discipline.md`, `npm run helix:ask:regression:light` |
 | GPT Realtime + Codex handoff | Live voice can answer locally, converse while Codex reasons in parallel, or present a worker-grounded result without receiving workstation authority. Final relay grounding comes from the canonical terminal certificate, not a voice-owned tool evaluator. | `docs/architecture/voice-service-contract.md#gpt-realtime-grounded-worker-relay-additive`, `server/services/helix-ask/terminal-grounding-authority.ts`, `server/services/helix-ask/realtime-session/`, `shared/helix-terminal-grounding-authority.ts` |
 | Agent runtime adapter | Provider edge for Codex Workstation Mode. Future providers must conform to the same edge and are not user options by default. | `server/services/helix-ask/agent-providers/`, `server/services/helix-ask/workstation-tool-gateway/`, `shared/helix-agent-runtime.ts`, `docs/helix-ask-codex-loop-discipline.md` |
 | External agent API and MCP | Provider-neutral, tenant-owned durable runs for outside agents. REST and Streamable HTTP MCP share the same bounded completion, evidence, account-binding, and terminal-authority contract. | `docs/architecture/helix-agent-api-v1.md`, `server/services/helix-agent-api/`, `server/routes/helix-agent-api.ts`, `server/mcp/helix-mcp-server.ts` |
@@ -515,7 +600,8 @@ Contract (Read First)**. Their output is non-terminal until it re-enters Codex
 and passes Helix terminal eligibility. Current lane implementation status
 belongs in `docs/helix-ask-provider-capability-contracts.md`, not in this README.
 
-Important paths:
+Important paths (new lifecycle behavior belongs under `server/services/helix-ask/`;
+`server/routes/agi.plan.ts` is retired compatibility wiring and should not grow):
 
 - `server/routes/agi.plan.ts`
 - `server/services/helix-ask/`

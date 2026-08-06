@@ -35,6 +35,8 @@ describe("Minecraft mechanics docs intent", () => {
     "Review my current Minecraft inventory and health right now.",
     "Using my paired Minecraft Fabric environment and selected player, read DatDamPig current exact position, dimension, health, food, and game mode now as fresh post-action verification of the immediately preceding spreadplayers command. Do not mutate anything. Report the observation timestamp and freshness.",
     "Move my selected Minecraft player with the built-in spreadplayers command, then read the exact position from fresh live evidence and report the command receipt.",
+    "Check the paired Minecraft server's live command capabilities, then tell me the current daytime without changing the world.",
+    "What is the current daytime value in our Minecraft world? Please read it directly from the live Fabric server before you answer.",
   ])("does not reinterpret a live environment read as mechanics retrieval: %s", (prompt) => {
     expect(isMinecraftMechanicsDocsPrompt(prompt)).toBe(false);
   });

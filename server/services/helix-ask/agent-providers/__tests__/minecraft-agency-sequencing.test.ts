@@ -41,6 +41,44 @@ const observedResult = (
   }) as any;
 
 describe("Minecraft agency sequencing", () => {
+  it("rejects a guessed batched checkpoint command and returns the live checkpoint catalog affordance", () => {
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt:
+          "Capture a rollback checkpoint, extinguish the fire, verify it, restore, and verify again.",
+        candidate: command(
+          "checkpoint create fireplace_rollback -50 67 -2 -50 68 -2; setblock -50 68 -2 air",
+          "server_administration",
+        ),
+        priorRequests: [],
+        gatewayCallResults: [],
+      }),
+    ).toMatchObject({
+      admitted: false,
+      recovery_lane_request: {
+        capability: "com.casimirbot.minecraft.command.catalog",
+        arguments: {
+          path_prefix: "helixgame checkpoint",
+          limit: 64,
+        },
+      },
+    });
+  });
+
+  it("admits an exact single installed checkpoint capture request", () => {
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt: "Capture the exact rollback checkpoint before changing blocks.",
+        candidate: command(
+          "helixgame checkpoint capture_box fireplace_rollback -50 67 -2 -50 68 -2",
+          "server_administration",
+        ),
+        priorRequests: [],
+        gatewayCallResults: [],
+      }),
+    ).toMatchObject({ admitted: true, recovery_lane_request: null });
+  });
+
   const prompt =
     "Inspect the site. Capture a rollback checkpoint before changing blocks. Build the wall, then verify it.";
 
@@ -58,6 +96,27 @@ describe("Minecraft agency sequencing", () => {
         "Build a wall and report its endpoints.",
       ),
     ).toBe(false);
+    expect(
+      requiresCurrentTurnCheckpointBeforeMinecraftMutation(
+        "Build a small wall: first inspect the site; capture an exact bounded checkpoint for the planned footprint; build only into air; then verify every block.",
+      ),
+    ).toBe(true);
+  });
+
+  it("does not turn contextual checkpoint wording into a recovery tool request", () => {
+    const contextualPrompts = [
+      'Explain the example "capture a checkpoint; build the wall" without running it.',
+      "If we later capture a checkpoint, then we could build a wall.",
+      "Previously we captured a checkpoint and then built the wall.",
+      "The screen says capture a checkpoint; then build the wall.",
+      "Summarize why a checkpoint should come before a build.",
+    ];
+    for (const contextualPrompt of contextualPrompts) {
+      expect(
+        requiresCurrentTurnCheckpointBeforeMinecraftMutation(contextualPrompt),
+        contextualPrompt,
+      ).toBe(false);
+    }
   });
 
   it("blocks a mutation until a successful checkpoint observation exists", () => {
@@ -109,6 +168,34 @@ describe("Minecraft agency sequencing", () => {
     ).toBe(true);
   });
 
+  it("treats an exact capture_box as the checkpoint rather than a mutation that requires one", () => {
+    const checkpoint = command(
+      "execute as @s at @s run helixgame checkpoint capture_box wall_exact -46 69 -16 -42 71 -16",
+      "server_administration",
+    );
+    const mutation = command(
+      "fill -46 69 -16 -42 71 -16 minecraft:stone_bricks keep",
+      "world_mutation",
+    );
+
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt,
+        candidate: checkpoint,
+        priorRequests: [],
+        gatewayCallResults: [],
+      }),
+    ).toMatchObject({ admitted: true, recovery_lane_request: null });
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt,
+        candidate: mutation,
+        priorRequests: [checkpoint],
+        gatewayCallResults: [result(true)],
+      }),
+    ).toMatchObject({ admitted: true, recovery_lane_request: null });
+  });
+
   it("does not treat a failed checkpoint or a read-only command as mutation authority", () => {
     const checkpoint = command(
       "helixgame checkpoint capture agency_build 12 8",
@@ -135,13 +222,158 @@ describe("Minecraft agency sequencing", () => {
     ).toBe(true);
   });
 
+  it("recovers the committed landing inspection before admitting fall-rescue mutation", () => {
+    const landingInspection = {
+      capability: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      arguments: {
+        target: "current_actor",
+        horizontal_radius: 7,
+        vertical_radius: 6,
+        purpose: "landing_safety",
+      },
+    };
+    const compoundCapabilityContract = {
+      subgoals: [
+        {
+          order: 1,
+          requested_capability:
+            HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          args_hint: landingInspection.arguments,
+          mandatory: true,
+        },
+        {
+          order: 2,
+          requested_capability: "com.casimirbot.minecraft.command.catalog",
+          args_hint: { path_prefix: "helixgame fall_rescue", limit: 64 },
+          mandatory: true,
+        },
+        {
+          order: 3,
+          requested_capability: "com.casimirbot.minecraft.command",
+          args_hint: {},
+          mandatory: true,
+        },
+      ],
+    };
+    const arm = command(
+      "helixgame fall_rescue arm 300",
+      "server_administration",
+    );
+
+    const blocked = evaluateMinecraftAgencySequence({
+      prompt:
+        "First inspect the landing area. If it is safe, arm fall rescue for 300 seconds.",
+      candidate: arm,
+      priorRequests: [],
+      gatewayCallResults: [],
+      compoundCapabilityContract,
+    });
+    expect(blocked).toMatchObject({
+      admitted: false,
+      recovery_lane_request: landingInspection,
+    });
+    expect(blocked.reason).toContain("before any state-changing command");
+
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt:
+          "First inspect the landing area. If it is safe, arm fall rescue for 300 seconds.",
+        candidate: arm,
+        priorRequests: [landingInspection],
+        gatewayCallResults: [
+          observedResult(
+            HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+            "landing-inspection",
+          ),
+        ],
+        compoundCapabilityContract,
+      }).admitted,
+    ).toBe(true);
+  });
+
+  it("does not treat a failed or wrong-purpose inspection as action authority", () => {
+    const arm = command(
+      "helixgame fall_rescue arm 300",
+      "server_administration",
+    );
+    const contract = {
+      subgoals: [
+        {
+          order: 1,
+          requested_capability:
+            HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          args_hint: { target: "current_actor", purpose: "landing_safety" },
+          mandatory: true,
+        },
+        {
+          order: 2,
+          requested_capability: "com.casimirbot.minecraft.command",
+          mandatory: true,
+        },
+      ],
+    };
+    for (const [request, gatewayResult] of [
+      [
+        {
+          capability: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          arguments: { target: "current_actor", purpose: "landing_safety" },
+        },
+        observedResult(
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          "failed-landing-inspection",
+          false,
+        ),
+      ],
+      [
+        {
+          capability: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          arguments: { target: "current_actor", purpose: "general" },
+        },
+        observedResult(
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          "wrong-purpose-inspection",
+        ),
+      ],
+    ] as const) {
+      expect(
+        evaluateMinecraftAgencySequence({
+          prompt:
+            "Inspect the landing area before arming fall rescue for 300 seconds.",
+          candidate: arm,
+          priorRequests: [request],
+          gatewayCallResults: [gatewayResult],
+          compoundCapabilityContract: contract,
+        }).admitted,
+      ).toBe(false);
+    }
+  });
+
+  it.each([
+    "The screen says `inspect first, then arm fall rescue`; explain that text without acting.",
+    "Earlier we inspected before arming fall rescue; summarize the prior plan.",
+    "Later we might inspect before arming fall rescue, but do nothing now.",
+    "Do not inspect or arm fall rescue; just explain the feature.",
+  ])("does not invent an inspect-order rail from contextual text: %s", (text) => {
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt: text,
+        candidate: command(
+          "helixgame fall_rescue arm 300",
+          "server_administration",
+        ),
+        priorRequests: [],
+        gatewayCallResults: [],
+      }).admitted,
+    ).toBe(true);
+  });
+
   it("proves inspect-first and checkpoint-before-mutation from ordered observations", () => {
     const inspect = {
       capability: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
       arguments: { purpose: "build_planning" },
     };
     const checkpoint = command(
-      "helixgame checkpoint capture wall_rollback 12 8",
+      "helixgame checkpoint capture_box wall_rollback 1 64 1 5 66 1",
       "server_administration",
     );
     const mutation = command(

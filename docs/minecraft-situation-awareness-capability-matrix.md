@@ -1,7 +1,9 @@
 # Minecraft Situation-Awareness Capability Matrix
 
 Status: release-baseline contract and live acceptance record for the first
-read-only Minecraft environment adapters, verified 2026-07-29.
+read-only Minecraft environment adapters, verified 2026-07-29, plus the
+deterministically verified dual-plane action extension awaiting keyed live
+Player Embodiment acceptance.
 
 ## Boundary
 
@@ -12,8 +14,14 @@ capabilities to use, combines their observations with versioned mechanics
 evidence, and writes the final advice.
 
 No observation is an assistant answer. No source credential, connector lease,
-room binding secret, private route, or raw NBT enters model context. This
-baseline does not execute Minecraft commands or mutate the world.
+room binding secret, private route, or raw NBT enters model context. The
+read-only baseline does not execute Minecraft commands or mutate the world.
+
+The dual-plane extension preserves that source boundary. World Authority and
+Player Embodiment have separate credentials, manifests, heartbeats, leases and
+receipts. A read-only source becoming active does not activate client control,
+and an owner-created player-action lease does not prove the client companion is
+online.
 
 ## Completion rule
 
@@ -53,6 +61,68 @@ pathfinding or safe route authority. `route_feasibility`, closed-container
 freshness, and `com.casimirbot.minecraft.container_contents.read` are not
 advertised. The closed-container identifier is recognized only so a request
 can fail with one stable, actionable typed limitation.
+
+## Dual-plane action extension
+
+The separately paired Fabric 1.21.8 client companion advertises the following
+13 action capabilities only after exact participant/player authority and
+manifest admission:
+
+```text
+com.casimirbot.minecraft.player.navigate
+com.casimirbot.minecraft.player.look
+com.casimirbot.minecraft.player.walk
+com.casimirbot.minecraft.player.jump
+com.casimirbot.minecraft.player.interact
+com.casimirbot.minecraft.player.hotbar.select
+com.casimirbot.minecraft.player.equipment.equip
+com.casimirbot.minecraft.player.follow
+com.casimirbot.minecraft.player.collect
+com.casimirbot.minecraft.player.mine
+com.casimirbot.minecraft.player.place
+com.casimirbot.minecraft.player.craft
+com.casimirbot.minecraft.player.inventory.transfer
+```
+
+Workflow status, resume, cancellation and emergency stop use the separately
+typed control lane rather than inflating the executable action catalog.
+Baritone navigation is optional and is admitted only when the exact live
+manifest declares the discovered `baritone` control engine. Native navigation
+must remain available independently.
+
+The provider catalog exposes all 13 action IDs above, the six reusable
+workflow IDs among them, and the typed `workflow.status`, `workflow.resume`,
+`workflow.cancel` and `emergency_stop` controls. The emergency control resolves
+an exact prior workflow to server-owned authority and suspends that authority;
+it is not a general process-control or host-execution tool. Every successful
+action still requires its own canonical terminal measurements. A generic
+`workflow.succeeded` event is insufficient evidence.
+
+| Plane | Capability family | Deterministic evidence | Keyed live status |
+| --- | --- | --- | --- |
+| World Authority | read-only source observations | eight-capability matrix and 2026-07-29 live records below | proven |
+| World Authority | governed Brigadier commands and world mutation | exact command catalog, finite command authority, one-shot result and post-mutation probe contracts | representative live journeys still required for this goal |
+| Player Embodiment | look, walk, jump, interact, hotbar, equipment and native navigation | Fabric client controller, typed broker, progress events and measured postconditions | implementation/tests pass; fresh client manifest/heartbeat and natural live journeys required |
+| Player Embodiment | follow, collect, mine, place, craft and inventory transfer | bounded native workflows, cancellation/manual override and action-specific terminal measurements | implementation/tests pass; workflow-by-workflow live acceptance required |
+| Player Embodiment | optional Baritone navigation | runtime discovery plus manifest-declared control engine | typed unavailable path proven; installed-engine live acceptance remains external |
+
+Readiness is deliberately stricter than pairing:
+
+```text
+owner action lease active
+  + exact client companion loaded
+  + action-only /helix-player pairing redeemed
+  + matching connector manifest admitted
+  + fresh heartbeat for the same authority and connector epoch
+  = client ready
+```
+
+The sanitized room/API projection may report `authority_inactive`,
+`awaiting_manifest`, `awaiting_heartbeat`, `ready`, `degraded`, `paused`,
+`stale`, `error`, or `emergency_stopped`. Only `ready` admits new actions.
+Pairing codes, bearer credentials, installation identifiers, manifest
+identifiers and private routing data are excluded. Readiness is a policy and
+transport observation, never an assistant answer or terminal product.
 
 ## Player-question matrix
 
@@ -138,5 +208,11 @@ Credentials are excluded from prompts, traces, evidence and artifacts.
 - item durability, enchantments and richer mod-component interpretation;
 - projectile velocity/time-to-contact and wider physical danger modeling;
 - durable account-to-player identity binding for multiplayer servers;
-- Minecraft action/command capabilities, which require a separate credential,
-  allowlist, approval, idempotency and action-result re-entry design.
+- keyed live acceptance for the separately credentialed World Authority command
+  lane and Player Embodiment action lane. Their implementation contract and
+  13-action deterministic baseline now live in
+  `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md`; they do not
+  weaken or become part of this read-only source credential. The Shared Live
+  Room owner surface now creates a finite exact-capability player lease and
+  the separately scoped `/helix-player` pairing; live client execution remains
+  the acceptance boundary.

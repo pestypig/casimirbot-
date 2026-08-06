@@ -143,6 +143,7 @@ import {
 } from "./bound-room-evidence";
 import {
   environmentProbeMinecraftManifests,
+  environmentProbeFailureRepairAction,
   executeEnvironmentProbeGatewayCapability,
 } from "./environment-probe";
 import {
@@ -151,6 +152,21 @@ import {
   executeEnvironmentCommandCatalogGatewayCapability,
   executeEnvironmentCommandGatewayCapability,
 } from "./environment-command";
+import {
+  environmentActionFailureRepairAction,
+  environmentActionMinecraftManifests,
+  executeEnvironmentActionGatewayCapability,
+} from "./environment-action";
+import {
+  environmentActionControlFailureRepairAction,
+  environmentActionControlMinecraftManifests,
+  executeEnvironmentActionControlGatewayCapability,
+} from "./environment-action-control";
+import {
+  environmentSituationDigestFailureRepairAction,
+  environmentSituationDigestMinecraftManifest,
+  executeEnvironmentSituationDigestGatewayCapability,
+} from "./environment-situation-digest";
 import {
   executeVisualSituationObservationCapability,
   visualSituationObservationManifest,
@@ -5710,6 +5726,16 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
     environmentCommandMinecraftManifest.capability_id,
     environmentCommandMinecraftManifest,
   ],
+  ...environmentActionMinecraftManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  ...environmentActionControlMinecraftManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
+  [
+    environmentSituationDigestMinecraftManifest.capability_id,
+    environmentSituationDigestMinecraftManifest,
+  ],
   [
     visualSituationObservationManifest.capability_id,
     visualSituationObservationManifest,
@@ -6166,12 +6192,9 @@ export const callWorkstationGatewayCapability = async (
               {
                 code: gatewayResult.error,
                 message: gatewayResult.summary,
-                repair_action:
-                  gatewayResult.error === "connector_offline" ||
-                  gatewayResult.error === "probe_timeout" ||
-                  gatewayResult.error === "schema_validation_failed"
-                    ? "retry"
-                    : "ask_user",
+                repair_action: environmentProbeFailureRepairAction(
+                  gatewayResult.error,
+                ),
               },
             ],
           }
@@ -6327,7 +6350,250 @@ export const callWorkstationGatewayCapability = async (
               {
                 code: gatewayResult.error,
                 message: gatewayResult.summary,
-                repair_action: "ask_user" as const,
+                repair_action: gatewayResult.repairAction ?? "ask_user",
+              },
+            ],
+          }
+        : {}),
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: gatewayResult.error,
+      terminalEligible: false,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
+    };
+  }
+
+  if (
+    manifest.capability_id ===
+    environmentSituationDigestMinecraftManifest.capability_id
+  ) {
+    const gatewayResult = await executeEnvironmentSituationDigestGatewayCapability({
+      turnId,
+      arguments: readArguments(input.arguments),
+      accountContext: input.accountContext,
+      conversationThreadId: input.conversationThreadId,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.ok ? "admitted" : "blocked",
+      reason: gatewayResult.ok
+        ? "authenticated_environment_situation_digest_admitted"
+        : "authenticated_environment_situation_digest_blocked",
+      blockedReason: gatewayResult.error,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "workstation-gateway",
+      action: manifest.action_id,
+      executedArgs: gatewayResult.executedArgs,
+      status:
+        gatewayResult.status === "completed"
+          ? "succeeded"
+          : gatewayResult.status,
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      ...(gatewayResult.error
+        ? {
+            missingRequirements: [
+              {
+                code: gatewayResult.error,
+                message: gatewayResult.summary,
+                repair_action:
+                  gatewayResult.repairAction ??
+                  environmentSituationDigestFailureRepairAction(
+                    gatewayResult.observation.outcome,
+                  ),
+              },
+            ],
+          }
+        : {}),
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: gatewayResult.error,
+      terminalEligible: false,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
+    };
+  }
+
+  if (
+    environmentActionMinecraftManifests.some(
+      (entry) => entry.capability_id === manifest.capability_id,
+    )
+  ) {
+    const gatewayResult = await executeEnvironmentActionGatewayCapability({
+      capabilityId: manifest.capability_id,
+      turnId,
+      toolCallId: input.toolCallId,
+      providerExecutionId: input.providerExecutionId,
+      arguments: readArguments(input.arguments),
+      accountContext: input.accountContext,
+      conversationThreadId: input.conversationThreadId,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.ok ? "admitted" : "blocked",
+      reason: gatewayResult.ok
+        ? "authenticated_environment_player_action_admitted"
+        : "authenticated_environment_player_action_blocked",
+      blockedReason: gatewayResult.error,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "workstation-gateway",
+      action: manifest.action_id,
+      executedArgs: gatewayResult.executedArgs,
+      status:
+        gatewayResult.status === "completed"
+          ? "succeeded"
+          : gatewayResult.status,
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      ...(gatewayResult.error
+        ? {
+            missingRequirements: [
+              {
+                code: gatewayResult.error,
+                message: gatewayResult.summary,
+                repair_action:
+                  gatewayResult.repairAction ??
+                  environmentActionFailureRepairAction(
+                    gatewayResult.observation.outcome,
+                  ),
+              },
+            ],
+          }
+        : {}),
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: gatewayResult.error,
+      terminalEligible: false,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
+    };
+  }
+
+  if (
+    environmentActionControlMinecraftManifests.some(
+      (entry) => entry.capability_id === manifest.capability_id,
+    )
+  ) {
+    const gatewayResult = await executeEnvironmentActionControlGatewayCapability({
+      capabilityId: manifest.capability_id,
+      turnId,
+      arguments: readArguments(input.arguments),
+      accountContext: input.accountContext,
+      conversationThreadId: input.conversationThreadId,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.ok ? "admitted" : "blocked",
+      reason: gatewayResult.ok
+        ? "authenticated_environment_player_control_admitted"
+        : "authenticated_environment_player_control_blocked",
+      blockedReason: gatewayResult.error,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "workstation-gateway",
+      action: manifest.action_id,
+      executedArgs: gatewayResult.executedArgs,
+      status:
+        gatewayResult.status === "completed"
+          ? "succeeded"
+          : gatewayResult.status,
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      ...(gatewayResult.error
+        ? {
+            missingRequirements: [
+              {
+                code: gatewayResult.error,
+                message: gatewayResult.summary,
+                repair_action:
+                  gatewayResult.repairAction ??
+                  environmentActionControlFailureRepairAction(
+                    gatewayResult.observation.outcome,
+                  ),
               },
             ],
           }

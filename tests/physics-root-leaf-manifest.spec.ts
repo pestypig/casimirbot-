@@ -904,6 +904,83 @@ describe("validatePhysicsRootLeafManifest", () => {
     expect(readinessBlockRule).toContain(
       "stage4_2hZeroBridgePreserved != true",
     );
+    expect(readinessBlockRule).toContain(
+      "stage4_2iFourCellContractReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2iWavepacketEmpiricalReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2iOrdinaryInteractionResponseReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2iMeasuredContrastReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2iStandardDpBoundaryIndependence != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2iTransferKernelRegistered != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2jSoftwareDiagnosticReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2jCompleteDensityRepresentationReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2jMeasuredEnvironmentModelReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2jEnvironmentalCandidateReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2jStatePreparationReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2jExternalBoundMappingReady != true",
+    );
+    expect(readinessBlockRule).toContain(
+      "stage4_2jZeroBridgePreserved != true",
+    );
+    expect(readinessBlockRule).toContain("stage4_2kSoftwareDiagnosticReady != true");
+    expect(readinessBlockRule).toContain("stage4_2kMeasuredMaterialSpectrumReady != true");
+    expect(readinessBlockRule).toContain("stage4_2kFiniteGeometryGreenReady != true");
+    expect(readinessBlockRule).toContain("stage4_2kBranchOrientationReady != true");
+    expect(readinessBlockRule).toContain("stage4_2kOrdinaryPhaseCovarianceReady != true");
+    expect(readinessBlockRule).toContain("stage4_2kQlbeEnvironmentReady != true");
+    expect(readinessBlockRule).toContain("stage4_2kResidualAttributionReady != true");
+    expect(readinessBlockRule).toContain("stage4_2kZeroBridgePreserved != true");
+    expect(readinessBlockRule).toContain("stage4_2lSoftwareDiagnosticReady != true");
+    expect(readinessBlockRule).toContain("stage4_2lAsBuiltGeometryReady != true");
+    expect(readinessBlockRule).toContain("stage4_2lFullFiniteGeometryGreenReady != true");
+    expect(readinessBlockRule).toContain("stage4_2lMeasuredMaterialSpectrumReady != true");
+    expect(readinessBlockRule).toContain("stage4_2lEmpiricalPhaseCovarianceReady != true");
+    expect(readinessBlockRule).toContain("stage4_2lMeasuredQlbeEnvironmentReady != true");
+    expect(readinessBlockRule).toContain("stage4_2lStatePreparationReady != true");
+    expect(readinessBlockRule).toContain("stage4_2lExactExternalBoundMappingReady != true");
+    expect(readinessBlockRule).toContain("stage4_2lCompleteMassDensityAuthorityReady != true");
+    expect(readinessBlockRule).toContain("stage4_2lZeroBridgePreserved != true");
+    expect(readinessBlockRule).toContain("stage4_2mSoftwareSearchReady != true");
+    expect(readinessBlockRule).toContain("stage4_2mSyntheticRegionReady != true");
+    expect(readinessBlockRule).toContain("stage4_2mMeasuredMaterialReady != true");
+    expect(readinessBlockRule).toContain("stage4_2mAsBuiltGeometryReady != true");
+    expect(readinessBlockRule).toContain("stage4_2mFullMaxwellReady != true");
+    expect(readinessBlockRule).toContain("stage4_2mMeasuredPhaseCovarianceReady != true");
+    expect(readinessBlockRule).toContain("stage4_2mMeasuredQlbeReady != true");
+    expect(readinessBlockRule).toContain("stage4_2mStatePreparationReady != true");
+    expect(readinessBlockRule).toContain("stage4_2mMeasuredCompanionReady != true");
+    expect(readinessBlockRule).toContain("stage4_2mIndependentReplicationReady != true");
+    expect(readinessBlockRule).toContain("stage4_2mZeroBridgePreserved != true");
+    expect(readinessBlockRule).toContain("stage4_2nSoftwarePipelineReady != true");
+    expect(readinessBlockRule).toContain("stage4_2nSpecimenMaterialReady != true");
+    expect(readinessBlockRule).toContain("stage4_2nAsBuiltGeometryReady != true");
+    expect(readinessBlockRule).toContain("stage4_2nFullMaxwellGreenReady != true");
+    expect(readinessBlockRule).toContain("stage4_2nIndependentSolverReady != true");
+    expect(readinessBlockRule).toContain("stage4_2nMeasuredCalibrationReady != true");
+    expect(readinessBlockRule).toContain("stage4_2nMeasuredCovarianceReady != true");
+    expect(readinessBlockRule).toContain("stage4_2nOrdinaryNullAuthorityReady != true");
+    expect(readinessBlockRule).toContain("stage4_2nZeroBridgePreserved != true");
     const rejectRule = pathEntry?.falsifier?.reject_rule ?? "";
     expect(rejectRule).toContain("heldOutReplicationReady == true");
     expect(rejectRule).toContain("apparatusDpPowerReady == true");
@@ -923,6 +1000,26 @@ describe("validatePhysicsRootLeafManifest", () => {
         "bridge-stage4-transverse-polarization-to-qed-null",
         "bridge-stage4-planck-fdt-to-thermal-null",
         "bridge-stage4-congruence-to-model-admission",
+        "bridge-stage4-2i-four-cell-to-boundary-branch-interaction",
+        "bridge-stage4-2i-ordinary-covariance-to-corrected-cross-ratio",
+        "bridge-stage4-2i-wavepacket-custody-to-branch-equivalence",
+        "bridge-stage4-2i-boundary-independent-dp-to-interaction-nonbridge",
+        "bridge-stage4-2j-schrodinger-phase-to-coherence-separation",
+        "bridge-stage4-2j-density-representation-to-forecast-envelope",
+        "bridge-stage4-2j-gas-screen-to-apparatus-no-go",
+        "bridge-stage4-2j-hydrogen-scale-to-semantic-nonbridge",
+        "bridge-stage4-2k-ground-state-response-to-ordinary-casimir-null",
+        "bridge-stage4-2k-orientation-phase-to-residual-attribution-gate",
+        "bridge-stage4-2k-phase-jitter-to-coherence-loss-budget",
+        "bridge-stage4-2k-qlbe-readiness-to-environmental-no-go",
+        "bridge-stage4-2n-material-loss-to-imaginary-axis-response",
+        "bridge-stage4-2n-green-fdt-to-ordinary-complex-coherence",
+        "bridge-stage4-2n-four-cell-ratio-to-boundary-superposition-control",
+        "bridge-stage4-2n-zero-bridge-to-claim-boundary",
+        "bridge-stage4-2l-authoritative-geometry-to-finite-em-model",
+        "bridge-stage4-2l-material-and-geometry-to-phase-covariance",
+        "bridge-stage4-2l-qlbe-and-state-preparation-to-redesign-no-go",
+        "bridge-stage4-2l-density-envelope-and-external-bound-to-model-region",
         "bridge-stage4-expanded-null-to-prediction-residual",
         "bridge-stage4-same-dimension-to-nonbridge",
         "bridge-stage4-1-qed-scale-hierarchy-to-semantic-nonbridge",
@@ -990,6 +1087,12 @@ describe("validatePhysicsRootLeafManifest", () => {
         "tests/casimir-dp-stage4-2g-campaign.spec.ts",
         "tests/casimir-dp-commissioning-intake-stage4-2h.spec.ts",
         "tests/casimir-dp-stage4-2h-campaign.spec.ts",
+        "tests/casimir-dp-schrodinger-mass-density-stage4-2j.spec.ts",
+        "tests/casimir-dp-stage4-2j-campaign.spec.ts",
+        "tests/casimir-dp-microscopic-em-closure-stage4-2k.spec.ts",
+        "tests/casimir-dp-stage4-2k-campaign.spec.ts",
+        "tests/casimir-dp-empirical-authority-stage4-2l.spec.ts",
+        "tests/casimir-dp-stage4-2l-campaign.spec.ts",
       ]),
     );
 

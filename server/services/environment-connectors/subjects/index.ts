@@ -6,6 +6,7 @@ export {
   listRoomEnvironmentProjections,
   listRoomEnvironmentParticipantSubjectContexts,
   resolveRoomEnvironmentSubjectForProbe,
+  resolveActiveRoomEnvironmentSubjectByRef,
   revokeOwnRoomEnvironmentSubject,
   type ResolvedRoomEnvironmentSubject,
   type RoomEnvironmentParticipantSubjectContext,

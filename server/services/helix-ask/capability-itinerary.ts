@@ -580,6 +580,7 @@ export function buildHelixCapabilityItinerary(input: {
     ...(compoundSubgoals.length > 1 ? ["compound_subgoal_observation_missing"] : []),
   ];
   const compoundRequiredCapabilities = compoundSubgoals
+    .filter((subgoal) => subgoal.mandatory !== false)
     .map((subgoal) => readString(subgoal.requested_capability))
     .filter(Boolean);
   const scholarlyIntent = compoundSubgoals.length === 0 && researchFamilies.includes("scholarly_research")

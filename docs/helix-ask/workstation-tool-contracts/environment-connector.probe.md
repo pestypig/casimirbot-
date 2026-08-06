@@ -9,6 +9,7 @@ Capabilities:
 - `com.casimirbot.minecraft.nearby_entities.list`
 - `com.casimirbot.minecraft.hazards.scan`
 - `com.casimirbot.minecraft.local_map.inspect`
+- `com.casimirbot.minecraft.spatial_region.inspect`
 - `com.casimirbot.minecraft.line_of_sight.check`
 - `com.casimirbot.minecraft.crop_state.read`
 - `com.casimirbot.minecraft.reachability.check`
@@ -54,8 +55,9 @@ The model may provide:
 ```
 
 `target` is required. Actor, inventory, entity, hazard, and local-map reads use
-`current_actor`. Line of sight and geometric reachability use `position` plus
-an exact `{x,y,z}` object. Crop state uses either `current_focus` or
+`current_actor`. The spatial-region probe returns a bounded block volume around
+that actor. Line of sight and geometric reachability use `position` plus an
+exact `{x,y,z}` object. Crop state uses either `current_focus` or
 `position`; a position object is required only for the positioned form.
 `freshness_requirement_ms` is optional.
 

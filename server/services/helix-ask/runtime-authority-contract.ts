@@ -1649,7 +1649,7 @@ export function hasPostObservationModelDecision(
   return false;
 }
 
-const hasLedgerBackedPostObservationAnswerDraft = (
+export const hasLedgerBackedPostObservationAnswerDraft = (
   payload: Record<string, unknown>,
 ): boolean => {
   const terminalArtifactKind = readString(payload.terminal_artifact_kind);
@@ -1663,11 +1663,31 @@ const hasLedgerBackedPostObservationAnswerDraft = (
     return false;
   const canonicalGoal = readRecord(payload.canonical_goal_frame);
   const routeProduct = readRecord(payload.route_product_contract);
+  const ledgerBackedCompoundDraft = readRecord(
+    payload.ledger_backed_compound_final_answer_draft,
+  );
   const requiredTerminalKind =
     readString(canonicalGoal?.required_terminal_kind) ??
     readString(routeProduct?.required_terminal_kind) ??
     readString(routeProduct?.required_terminal_artifact_kind);
-  if (requiredTerminalKind !== terminalArtifactKind) return false;
+  const topLevelFinalAnswerDraft = readRecord(payload.final_answer_draft);
+  const ledgerBackedCompoundTerminalReconciliation = Boolean(
+    terminalArtifactKind === "compound_evidence_synthesis_answer" &&
+      readString(ledgerBackedCompoundDraft?.schema) ===
+        "helix.ledger_backed_compound_final_answer_draft.v1" &&
+      readString(ledgerBackedCompoundDraft?.turn_id) ===
+        readString(payload.turn_id) &&
+      readString(ledgerBackedCompoundDraft?.terminal_artifact_kind) ===
+        terminalArtifactKind &&
+      readString(ledgerBackedCompoundDraft?.final_answer_draft_ref) ===
+        readString(topLevelFinalAnswerDraft?.artifact_id),
+  );
+  if (
+    requiredTerminalKind !== terminalArtifactKind &&
+    !ledgerBackedCompoundTerminalReconciliation
+  ) {
+    return false;
+  }
 
   const artifacts = readArray(payload.current_turn_artifact_ledger)
     .map(readRecord)
@@ -1733,10 +1753,17 @@ const hasLedgerBackedPostObservationAnswerDraft = (
     );
     return artifacts.slice(latestObservationIndex + 1).some((artifact) => {
       const artifactPayload = readRecord(artifact.payload);
+      const artifactId = readString(artifact.artifact_id);
+      const matchingTopLevelDraft =
+        artifactId &&
+        artifactId === readString(topLevelFinalAnswerDraft?.artifact_id)
+          ? topLevelFinalAnswerDraft
+          : null;
       const kind = readString(artifact.kind);
       const schema =
         readString(artifactPayload?.schema) ??
-        readString(artifact.payload_schema);
+        readString(artifact.payload_schema) ??
+        readString(matchingTopLevelDraft?.schema);
       if (
         kind !== "final_answer_draft" &&
         schema !== "helix.final_answer_draft.v1"
@@ -1746,6 +1773,8 @@ const hasLedgerBackedPostObservationAnswerDraft = (
       const text =
         readString(artifactPayload?.text) ??
         readString(artifactPayload?.answer_text) ??
+        readString(matchingTopLevelDraft?.text) ??
+        readString(matchingTopLevelDraft?.answer_text) ??
         readString(artifact.text) ??
         readString(artifact.text_preview) ??
         readString(materializedCompoundAnswer?.text) ??
@@ -1757,6 +1786,13 @@ const hasLedgerBackedPostObservationAnswerDraft = (
         ...readStringArray(artifactPayload?.observation_refs),
         ...readStringArray(artifactPayload?.grounded_observation_refs),
         ...readStringArray(artifactPayload?.grounded_in_observation_refs),
+        ...readStringArray(matchingTopLevelDraft?.support_refs),
+        ...readStringArray(matchingTopLevelDraft?.evidence_refs),
+        ...readStringArray(matchingTopLevelDraft?.observation_refs),
+        ...readStringArray(matchingTopLevelDraft?.grounded_observation_refs),
+        ...readStringArray(
+          matchingTopLevelDraft?.grounded_in_observation_refs,
+        ),
         ...readStringArray(materializedCompoundAnswer?.support_refs),
         ...readStringArray(
           materializedCompoundAnswer?.subgoal_observation_refs,

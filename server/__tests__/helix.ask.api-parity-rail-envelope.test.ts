@@ -415,6 +415,68 @@ describe("Helix Ask API parity rail envelope invariants", () => {
       ]),
     );
   });
+
+  it("accepts a source-identity policy failure after every compound tool rail completed", () => {
+    const scenario = liveSourceFailClosedScenario();
+    const askTurn = buildLiveSourceFailClosedTurn({ projectAsTypedFailure: true });
+    askTurn.terminal_error_code = "fresh_source_unbound";
+    askTurn.live_source_identity_audit = {
+      schema: "helix.live_source_identity_audit.v1",
+      identity_ok: false,
+      diagnosis: "fresh_source_unbound",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    askTurn.codex_parity_agent_spine_rail_table = {
+      ...(askTurn.codex_parity_agent_spine_rail_table as Record<string, unknown>),
+      compound_subgoal_count: 1,
+      first_incomplete_compound_subgoal_id: null,
+      first_incomplete_compound_requested_capability: null,
+      first_incomplete_compound_runtime_capability: null,
+      first_incomplete_compound_selected_capability: null,
+      first_incomplete_compound_executed_capability: null,
+      compound_first_broken_rail: null,
+      compound_rail_failure_code: null,
+      compound_repair_target: null,
+      compound_incomplete_subgoal_did_tool_run: null,
+      observed_artifact_supports_requested_capability: true,
+      first_broken_rail: "source_identity",
+      repair_target: "source_binding",
+      codex_parity_class: "source_identity_mismatch",
+      rail_status: "fail_closed",
+      rail_failure_code: "source_identity_mismatch",
+    };
+    askTurn.compound_subgoal_rail_statuses = [
+      {
+        subgoal_id: "ask:test:subgoal:visual-capture",
+        order: 1,
+        requested_capability: "live_env.read_processed_live_source_mail",
+        runtime_capability: "live_env.read_processed_live_source_mail",
+        selected_capability: "live_env.read_processed_live_source_mail",
+        executed_capability: "live_env.read_processed_live_source_mail",
+        args: {},
+        observation_kind: "reasoning_context",
+        observation_ref: "ask:test:reasoning_context:1",
+        observation_provenance: "capability_key",
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        first_broken_rail: null,
+        rail_failure_code: null,
+        repair_target: null,
+      },
+    ];
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(true);
+    expect(probe.failures).toEqual([]);
+  });
 });
 
 const liveSourceFailClosedScenario = (): HelixApiParityScenario => ({

@@ -34,6 +34,7 @@ import type { HelixWorkstationGatewayAccountContext } from "../account-policy";
 import {
   environmentProbeMinecraftInventoryManifest,
   environmentProbeMinecraftManifests,
+  environmentProbeFailureRepairAction,
   executeEnvironmentProbeGatewayCapability,
   normalizeEnvironmentProbeSemanticArguments,
   type EnvironmentProbeGatewayDependencies,
@@ -357,6 +358,19 @@ const dependencies = (
 });
 
 describe("environment probe workstation gateway", () => {
+  it("keeps stale current-turn probe results on the model-owned retry path", () => {
+    expect(
+      environmentProbeFailureRepairAction(
+        "current_turn_reentry_ineligible",
+      ),
+    ).toBe("retry");
+    expect(environmentProbeFailureRepairAction("result_stale")).toBe(
+      "retry",
+    );
+    expect(environmentProbeFailureRepairAction("wrong_world")).toBe(
+      "ask_user",
+    );
+  });
   it("canonicalizes a bounded spatial radius alias without weakening the trusted schema", () => {
     const spatialDescriptor = readEnvironmentConnectorCapabilityDescriptor(
       HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,

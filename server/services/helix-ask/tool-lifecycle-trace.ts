@@ -13,6 +13,7 @@ import {
   type ToolFamilyContract,
 } from "./tool-family-contract";
 import { resolveHelixRuntimeObservationReentry } from "./runtime/turn-lifecycle";
+import { reconcileAuthoritativeTypedFailureLifecycle } from "./runtime/typed-failure-lifecycle-reconciliation";
 
 type RecordLike = Record<string, unknown>;
 
@@ -521,4 +522,12 @@ export const refreshToolLifecycleRecords = (input: {
     debug.tool_lifecycle_trace = input.payload.tool_lifecycle_trace;
     debug.tool_followup_decision = input.payload.tool_followup_decision;
   }
+  reconcileAuthoritativeTypedFailureLifecycle({
+    payload: input.payload,
+    turnId: input.turnId,
+    promptText:
+      readString(input.payload.question) ||
+      readString(input.payload.prompt) ||
+      readString(input.payload.user_prompt),
+  });
 };

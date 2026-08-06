@@ -1650,6 +1650,36 @@ describe("explicit workstation gateway derived calls", () => {
     ]);
   });
 
+  it("preserves exact document bounds when structured source admission selects docs search", () => {
+    const question =
+      "Open docs/research/nhm2-current-status-whitepaper.md. Find every occurrence of alpha = 0.7 and alpha = 0.995. For each occurrence, provide the enclosing sentence and its nearest section heading. Do not summarize or infer.";
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      body: {
+        question,
+        source_target_intent: {
+          selected_capability: "docs-viewer.search_docs",
+          mandatory_next_tool: {
+            args: { query: question, paths: ["docs"] },
+          },
+        },
+      },
+      includePlannerDerived: true,
+    });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        capability_id: "docs.search",
+        derivation_source: "helix_structured_source_target_admission",
+        arguments: expect.objectContaining({
+          query: "alpha = 0.7 alpha = 0.995",
+          paths: ["docs/research/nhm2-current-status-whitepaper.md"],
+          exact_terms: ["alpha = 0.7", "alpha = 0.995"],
+          max_hits: 40,
+        }),
+      }),
+    ]);
+  });
+
   it("binds a zero-result locator request even when it asks only for count and evidence locations", () => {
     const question =
       "Open docs/research/nhm2-current-status-whitepaper.md. Find every occurrence of alpha = 0.123456. Return only the occurrence count and evidence locations. Do not infer alternatives.";
@@ -2184,10 +2214,40 @@ describe("explicit workstation gateway derived calls", () => {
           environment_scope: "active_room_environment",
           source_target_intent: expect.objectContaining({
             target_kind: "environment_mechanics_docs",
+            execution_intent: "none",
           }),
         }),
       }),
     ]);
+  });
+
+  it("does not append a Minecraft action request when the user asks only for exact command syntax", () => {
+    const question =
+      "Before doing anything in Minecraft, look up the connected environment mechanics for how to capture only the exact wall footprint as a rollback checkpoint. Cite the exact source file and line range and give the exact command form. Do not execute any Minecraft command.";
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question,
+        trusted_room_environment_intent_context: {
+          schema: "helix.trusted_room_environment_intent_context.v1",
+          trusted_environment_domain: "minecraft",
+          source: "authenticated_room_environment_subject",
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual(["docs.search"]);
+    expect(requests[0]).toMatchObject({
+      arguments: {
+        source_target_intent: {
+          execution_intent: "none",
+        },
+      },
+    });
   });
 
   it("grounds an affirmative natural Minecraft command with room-scoped mechanics evidence before the model authors the command", () => {
