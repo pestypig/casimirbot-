@@ -397,7 +397,10 @@ describe("NHM2 semiclassical-v2 server-owned content replay", () => {
     expect(result.blockers).toContain(
       "noise_exchange_symmetry_exceeds_tolerance",
     );
-    expect(result.metrics.noise?.exchangeResidualUpper95SI).toBe(1e-4);
+    expect(result.metrics.noise?.exchangeResidualUpper95SI).toBeCloseTo(
+      (1e-4 * Math.sqrt(2)) / SAMPLE_COUNT,
+      18,
+    );
     expectLocked(result);
   });
 
