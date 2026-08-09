@@ -186,6 +186,12 @@ describe("Minecraft command workstation gateway", () => {
     expect(environmentCommandMinecraftManifest.description).toContain(
       "Player-only arguments such as /title require @s",
     );
+    expect(environmentCommandMinecraftManifest.description).toContain(
+      "World Authority plane",
+    );
+    expect(environmentCommandMinecraftManifest.description).toContain(
+      "Do not substitute a server command such as teleport or effect",
+    );
     expect(environmentCommandMinecraftManifest.safety_tags).toEqual(
       expect.arrayContaining([
         "live_dispatcher_parse_required",

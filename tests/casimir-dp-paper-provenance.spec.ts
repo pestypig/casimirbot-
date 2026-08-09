@@ -65,7 +65,9 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     expect(main).toContain("single effective particle");
     expect(main).toContain("Penrose's objective-reduction argument motivates");
     expect(main).toMatch(/they\s+are not the same theory object/);
-    expect(main).toContain("not a representation-independent or generic DP test");
+    expect(main).toContain(
+      "not a representation-independent test of the broader collapse-model family",
+    );
   });
 
   it("leads with one synthetic commissioning design and demotes older geometries", () => {
@@ -73,26 +75,30 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     expect(main).toContain("`stage4_2m_candidate_002`");
     expect(main).toContain("diamond-density sphere");
     expect(main).toContain("276.302 nm");
-    expect(main).toContain("3.0925053×10^-16 kg");
+    expect(main).toContain("3.0925053\\times10^{-16}\\ {\\rm kg}");
     expect(main).toContain("250 nm");
     expect(main).toContain("250 ms");
     expect(main).toContain("10 μm");
-    expect(main).toContain("1×10^-15 Pa");
-    expect(main).toContain("`superseded_design_record`");
-    expect(main).toContain("`superseded_search_parent`");
-    expect(main).toContain(
-      "75 nm radius, 20 nm separation, 0.1 s, 5 μm nominal gap, 10–4 μm commissioning ladder",
+    expect(main).toContain("1\\times10^{-15}\\ {\\rm Pa}");
+    expect(main).toMatch(
+      /The complete stage-by-stage\s+crosswalk is preserved in Section 8\.1/,
     );
+    expect(supplement).toContain("### 8.1 Runtime-to-artifact contract");
+    expect(supplement).toContain(
+      "frozen proposal supersedes its symmetric-force candidate",
+    );
+    expect(supplement).toContain("Stage-4.2M bounded leading-design search");
     expect(main).toMatch(/\\\(1\.0955\\times10\^6\\\) times more massive/);
     expect(main).toContain("State preparation is the first physical go/no-go");
   });
 
   it("makes the leading named-model and density-floor forecasts impossible to conflate", () => {
     expect(main).toContain("2.90803\\%");
-    expect(main).toContain("0.434903% as the design floor");
-    expect(main).toMatch(/neither is a total measured-visibility forecast/);
-    expect(main).toContain("1,028 paired windows");
-    expect(main).toContain("power 0.927 at 1,600 windows");
+    expect(main).toContain("lowest transported diagnostic forecast");
+    expect(main).toContain("not a physical lower bound");
+    expect(main).toMatch(/Neither value is a total\s+measured-visibility forecast/);
+    expect(main).toContain("1,028 dimensionless paired allocation units");
+    expect(main).toContain("power 0.927 at 1,600 units");
   });
 
   it("keeps the leading design synchronized in the human-facing figures", () => {
@@ -102,7 +108,8 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     expect(apparatusFigure).toContain("10 μm surface gap");
     expect(apparatusFigure).toContain("3.09251×10⁻¹⁶ kg");
     expect(coherenceFigure).toContain("effective Gaussian: 2.908% at 250 ms");
-    expect(coherenceFigure).toContain("density floor: 0.435% at 250 ms");
+    expect(coherenceFigure).toContain("lowest diagnostic: 0.435% at 250 ms");
+    expect(coherenceFigure).toContain("transported density diagnostic");
     expect(coherenceFigure).not.toContain("reference: 0.598%");
   });
 
@@ -119,8 +126,8 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     ]) {
       expect(main).toContain(heading);
     }
-    expect(main).toContain(
-      "No Casimir variable enters the registered collapse generator",
+    expect(main).toMatch(
+      /No Casimir variable enters the registered collapse\s+generator/,
     );
     expect(main).toMatch(
       /A Casimir-correlated residual cannot move from the left branch to\s+the right branch without a registered transfer kernel/,
@@ -161,8 +168,8 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     expect(main).toContain("cdp-stage4-2i-complex-cross-ratio");
     expect(main).toContain("cdp-stage4-2i-ordinary-corrected-interaction");
     expect(main).toContain("cdp-stage4-2i-wavepacket-custody");
-    expect(main).toMatch(/That factor cancels from Eq\. \(9a\)/);
-    expect(main).toContain("not the primary standard-Diosi test");
+    expect(main).toMatch(/factor cancels from Eq\. \(14\)/);
+    expect(main).toMatch(/not the primary\s+standard-Diósi test/);
     expect(supplement).toContain("floating-point recovery");
     expect(main).toContain("the four cells, packet metrology,");
     expect(supplement).toContain("### B.11 Stage-4.2I four-cell interaction recovery");
@@ -212,7 +219,8 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     expect(main).toContain("### 5.9 Integrated empirical-pilot closure");
     expect(main).toContain("cdp-stage4-2r-diosi-precision-target");
     expect(main).toContain("cdp-stage4-2r-four-cell-cross-ratio");
-    expect(main).toContain("all eight joint authorities are absent");
+    expect(main).toContain("all eight joint");
+    expect(main).toContain("authorities are absent");
     expect(main).toContain("zero cross-apparatus covariance fusion");
     expect(supplement).toContain("### B.18 Stage-4.2R integrated feasibility-pilot readiness");
     expect(supplement).toContain("0/8 ready authorities");
@@ -231,7 +239,7 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
       expect(supplement).toContain(id);
     }
     expect(main).toContain("0.249896");
-    expect(main).toContain("0.434903% conservative design floor");
+    expect(main).toContain("0.434903% transported diagnostic benchmark");
     expect(main).toContain("8.64118\\times10^{-4}");
     expect(main).toContain("0.007320 of the");
     expect(supplement).toContain("0.149851%");
@@ -256,9 +264,9 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
   it("downgrades positive interpretation while the companion is infeasible", () => {
     expect(main).toContain("3.07013\\times10^{-40}");
     expect(main).toContain("6.14027\\times10^{-40}");
-    expect(main).toContain("Equation (13) is not an instrument model");
+    expect(main).toContain("Equation (32) is not an instrument model");
     expect(main).toContain(
-      "replicated DP-shaped coherence residual may be reported as unexplained",
+      "replicated Diósi-shaped coherence residual may be reported as unexplained",
     );
     expect(main).toContain(
       "model-consistent phenomenology, but not as support-eligible identification",

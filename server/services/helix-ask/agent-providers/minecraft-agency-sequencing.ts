@@ -3,8 +3,12 @@ import {
   HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
 } from "@shared/helix-environment-command";
 import { HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY } from "@shared/helix-environment-connector";
+import { HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS } from "@shared/helix-minecraft-player-capabilities";
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
 import { classifyKnownMinecraftCommand } from "../workstation-tool-gateway/minecraft-command-risk";
+import { resolveMinecraftExecutionPlaneConstraint } from "../minecraft-execution-plane-intent";
+
+export { resolveMinecraftExecutionPlaneConstraint } from "../minecraft-execution-plane-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -523,6 +527,10 @@ const successfulRequiredSpatialInspectionExists = (input: {
   });
 };
 
+const MINECRAFT_PLAYER_ACTION_CAPABILITY_SET = new Set<string>(
+  HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+);
+
 export type MinecraftAgencySequenceDecision = {
   admitted: boolean;
   reason: string | null;
@@ -542,6 +550,34 @@ export const evaluateMinecraftAgencySequence = (input: {
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
   compoundCapabilityContract?: RecordLike | null;
 }): MinecraftAgencySequenceDecision => {
+  const requestedExecutionPlane = resolveMinecraftExecutionPlaneConstraint(
+    input.prompt,
+  );
+  const candidateCapability = requestCapability(input.candidate);
+  if (
+    requestedExecutionPlane === "player_embodiment" &&
+    candidateCapability === HELIX_MINECRAFT_COMMAND_CAPABILITY &&
+    isStateChangingMinecraftCommand(input.candidate)
+  ) {
+    return {
+      admitted: false,
+      reason:
+        "minecraft_execution_plane_mismatch: the user explicitly required the Player Embodiment plane, but the proposed state-changing Minecraft command belongs to the World Authority plane. A command-side teleport or mutation is not equivalent to walking, jumping, interacting, or navigating through the paired player client. No tool ran. Codex must choose a different admitted com.casimirbot.minecraft.player.* capability or return an accurate typed capability-unavailable reason.",
+      recovery_lane_request: null,
+    };
+  }
+  if (
+    requestedExecutionPlane === "world_authority" &&
+    candidateCapability &&
+    MINECRAFT_PLAYER_ACTION_CAPABILITY_SET.has(candidateCapability)
+  ) {
+    return {
+      admitted: false,
+      reason:
+        "minecraft_execution_plane_mismatch: the user explicitly required the World Authority plane, but the proposed capability belongs to the Player Embodiment plane. Player simulation is not equivalent to executing the requested server command. No tool ran. Codex must choose an admitted World Authority capability or return an accurate typed capability-unavailable reason.",
+      recovery_lane_request: null,
+    };
+  }
   const candidateCommand = minecraftCommandText(input.candidate);
   if (
     requestCapability(input.candidate) === HELIX_MINECRAFT_COMMAND_CAPABILITY &&

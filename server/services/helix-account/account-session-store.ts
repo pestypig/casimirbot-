@@ -20,6 +20,9 @@ import {
   HELIX_MINECRAFT_COMMAND_CAPABILITY,
   HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
 } from "@shared/helix-environment-command";
+import {
+  HELIX_MINECRAFT_PLAYER_CAPABILITY_IDS,
+} from "@shared/helix-minecraft-player-capabilities";
 import { ensureDatabase, getPool, resetDbClient } from "../../db/client";
 import { getHelixThreadLedgerEvents } from "../helix-thread/ledger";
 import { listDiscordVoiceSessions } from "../situation-room/discord-session-store";
@@ -173,6 +176,7 @@ const PUBLIC_ROOM_SOURCE_CAPABILITY_IDS = [
   ...HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
   HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
   HELIX_MINECRAFT_COMMAND_CAPABILITY,
+  ...HELIX_MINECRAFT_PLAYER_CAPABILITY_IDS,
 ] as const;
 
 const buildSharedRealtimeRoomsSessionPolicy = (

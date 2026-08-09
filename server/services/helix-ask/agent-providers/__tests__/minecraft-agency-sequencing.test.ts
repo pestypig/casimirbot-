@@ -3,6 +3,7 @@ import {
   buildMinecraftAgencyCompoundCoverageResolutions,
   buildMinecraftPostMutationVerificationRequest,
   evaluateMinecraftAgencySequence,
+  resolveMinecraftExecutionPlaneConstraint,
   requiresCurrentTurnCheckpointBeforeMinecraftMutation,
 } from "../minecraft-agency-sequencing";
 import { HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY } from "@shared/helix-environment-connector";
@@ -41,6 +42,114 @@ const observedResult = (
   }) as any;
 
 describe("Minecraft agency sequencing", () => {
+  it("keeps an explicit paired-client request on the Player Embodiment plane", () => {
+    const prompt =
+      "Using the paired Minecraft player client, take one careful step forward, jump once, stop, and verify my final position.";
+    expect(resolveMinecraftExecutionPlaneConstraint(prompt)).toBe(
+      "player_embodiment",
+    );
+    const decision = evaluateMinecraftAgencySequence({
+      prompt,
+      candidate: command(
+        "tp DatDamPig -47.8 68.2 -1.3",
+        "player_mutation",
+      ),
+      priorRequests: [],
+      gatewayCallResults: [],
+    });
+    expect(decision).toMatchObject({
+      admitted: false,
+      recovery_lane_request: null,
+    });
+    expect(decision.reason).toContain("minecraft_execution_plane_mismatch");
+    expect(decision.reason).toContain("Player Embodiment");
+  });
+
+  it("admits Codex-selected player actions and neutral evidence under a Player Embodiment constraint", () => {
+    const prompt =
+      "Use Player Embodiment to walk forward and jump, then verify where I landed.";
+    for (const candidate of [
+      {
+        capability: "com.casimirbot.minecraft.player.walk",
+        arguments: { direction: "forward", distance_blocks: 1 },
+      },
+      {
+        capability: "com.casimirbot.minecraft.player.jump",
+        arguments: { count: 1 },
+      },
+      {
+        capability: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        arguments: { target: "current_actor", purpose: "landing_safety" },
+      },
+      command("data get entity DatDamPig Pos", "read_only"),
+    ]) {
+      expect(
+        evaluateMinecraftAgencySequence({
+          prompt,
+          candidate,
+          priorRequests: [],
+          gatewayCallResults: [],
+        }).admitted,
+      ).toBe(true);
+    }
+  });
+
+  it("symmetrically preserves an explicit World Authority command request", () => {
+    const prompt =
+      "Using the Minecraft server command, teleport DatDamPig to 0 80 0.";
+    expect(resolveMinecraftExecutionPlaneConstraint(prompt)).toBe(
+      "world_authority",
+    );
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt,
+        candidate: {
+          capability: "com.casimirbot.minecraft.player.navigate",
+          arguments: { x: 0, y: 80, z: 0 },
+        },
+        priorRequests: [],
+        gatewayCallResults: [],
+      }),
+    ).toMatchObject({
+      admitted: false,
+      recovery_lane_request: null,
+    });
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt,
+        candidate: command("tp DatDamPig 0 80 0", "player_mutation"),
+        priorRequests: [],
+        gatewayCallResults: [],
+      }).admitted,
+    ).toBe(true);
+  });
+
+  it.each([
+    'Explain the example "use the paired Minecraft player client" without acting.',
+    "If we later use the paired Minecraft player client, walking would be safer.",
+    "Previously I used the Player Embodiment plane to jump.",
+    "The screen says use the paired Minecraft player client.",
+    "Do not use the paired Minecraft player client; teleport me with a Minecraft server command.",
+  ])("does not mistake contextual player-plane text for current authority: %s", (prompt) => {
+    expect(resolveMinecraftExecutionPlaneConstraint(prompt)).not.toBe(
+      "player_embodiment",
+    );
+  });
+
+  it("allows an explicitly requested hybrid to use either execution plane", () => {
+    const prompt =
+      "Use Player Embodiment to walk, then use a Minecraft server command to set the time.";
+    expect(resolveMinecraftExecutionPlaneConstraint(prompt)).toBe("hybrid");
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt,
+        candidate: command("time set day", "world_mutation"),
+        priorRequests: [],
+        gatewayCallResults: [],
+      }).admitted,
+    ).toBe(true);
+  });
+
   it("rejects a guessed batched checkpoint command and returns the live checkpoint catalog affordance", () => {
     expect(
       evaluateMinecraftAgencySequence({

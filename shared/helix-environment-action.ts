@@ -1010,6 +1010,8 @@ export const helixEnvironmentActionDifferentialTraceSchema = z
     prompt_hash: sha256Schema,
     starting_state_hash: sha256Schema,
     capability_contract_hash: sha256Schema,
+    source_artifact_refs: z.array(identifierSchema).min(1).max(128),
+    public_capture_hash: sha256Schema,
     selected_capability_id: identifierSchema.nullable(),
     normalized_arguments_hash: sha256Schema.nullable(),
     admission_status: z.enum([

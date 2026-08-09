@@ -24,6 +24,10 @@ import {
   HELIX_MINECRAFT_COMMAND_CAPABILITY,
   HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
 } from "@shared/helix-environment-command";
+import {
+  HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+} from "@shared/helix-minecraft-player-capabilities";
 
 type RecordLike = Record<string, unknown>;
 
@@ -769,6 +773,38 @@ const argsHintForSubgoal = (input: {
         : { target: "current_focus" };
     }
     return { target: "current_actor" };
+  }
+  if (capability === HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY) {
+    const direction = /\b(?:backward|back)\b/iu.test(input.promptText)
+      ? "back"
+      : /\bleft\b/iu.test(input.promptText)
+        ? "left"
+        : /\bright\b/iu.test(input.promptText)
+          ? "right"
+          : "forward";
+    const explicitDuration = input.promptText.match(
+      /\b(\d{2,5})\s*(?:ms|milliseconds?)\b/iu,
+    );
+    const durationMs = Number(explicitDuration?.[1]);
+    return {
+      direction,
+      duration_ms:
+        Number.isInteger(durationMs) && durationMs >= 50 && durationMs <= 10_000
+          ? durationMs
+          : 250,
+      sprint: /\bsprint(?:ing)?\b/iu.test(input.promptText),
+    };
+  }
+  if (capability === HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY) {
+    const numericCount = Number(
+      input.promptText.match(/\bjump\s+(\d{1,2})\s+times?\b/iu)?.[1],
+    );
+    const count = Number.isInteger(numericCount) && numericCount >= 1
+      ? Math.min(10, numericCount)
+      : /\bjump\s+twice\b/iu.test(input.promptText)
+        ? 2
+        : 1;
+    return { count };
   }
   if (capability === HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY) {
     const explicitPathPrefixMatch = input.promptText.match(

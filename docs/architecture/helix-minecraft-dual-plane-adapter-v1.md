@@ -85,6 +85,14 @@ debug export or the browser.
 Pairing the client companion does not automatically grant actions. An active,
 time-bounded authority lease and member ceiling remain required.
 
+For same-host agent-run setup, the Fabric companion may consume an exact
+`/helix-player pair ...` command from the bounded local pairing inbox in its
+instance config directory. This is only an opaque delivery alternative to
+client chat: it creates no authority, uses the same room-generated one-time
+code, accepts only a small fresh regular file, atomically claims and deletes it
+before redemption, and never exposes its contents to model/debug context. The
+inbox cannot contain actions, server commands, credentials or host operations.
+
 ## Capability families
 
 Initial client actions:
@@ -158,6 +166,25 @@ re-enters Codex before any user-facing success claim.
 
 Mutating or ambiguous operations are never automatically replayed. A new user
 request is a new action identity.
+
+A bounded provider retry of the same semantic current-turn request is not a
+new action. The broker's idempotency comparison covers authority, exact
+environment/player identity, catalog capability/version, arguments,
+preconditions, postconditions, approval and constraints. It deliberately
+excludes delivery-only workflow/request/condition/tool-call ids and timestamps.
+The retry therefore resolves to the original admitted request; changing any
+semantic action content under the same key remains a typed conflict. This
+deduplication never authorizes the client to execute an ambiguous action again.
+
+Once the client has executed an admitted action, its workflow event, raw
+player-embodiment event batch and terminal result enter a bounded ordered
+outbox. The client removes each item only after the corresponding Helix
+endpoint acknowledges it. A transport failure retries delivery with the same
+event/result identities, not physical execution, and blocks the next action
+lease until the outbox drains. Only one network flusher is scheduled at a time,
+so an unavailable Helix endpoint cannot create an unbounded executor backlog.
+Sanitized diagnostics identify the failed delivery stage and typed error code
+without logging payloads or credentials.
 
 ## Manual override and emergency stop
 

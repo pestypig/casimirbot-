@@ -319,6 +319,51 @@ pairing, not Player Embodiment readiness.
    movement, view, mouse or inventory input must pause or cancel the active
    workflow according to the owner policy and release connector-owned controls.
 
+### Opaque local pairing handoff for agent-run acceptance
+
+During a local keyed acceptance run, the test agent may streamline pairing so
+the player can remain in the game. The authenticated owner UI remains the only
+place that creates a one-time pairing. The agent clicks the UI copy control and
+transports the copied value opaquely; the pairing command must never be read
+into a model prompt, printed in a terminal transcript, persisted in an
+artifact, or included in a debug export.
+
+Send each command to its exact execution plane:
+
+- `/helix pair ...` goes to the verified Fabric dedicated-server console (or
+  an authorized operator chat). This is the World Authority/source and command
+  authority pairing surface.
+- `/helix-player pair ...` goes only to the verified Fabric 1.21.8 Minecraft
+  client chat. It is a client-only command and will not pair Player Embodiment
+  when sent to the dedicated-server console.
+
+`HelixFabricPlayerAgent-0.2.0` also supports a local-agent handoff when native
+GLFW input is unavailable. Write the exact copied `/helix-player pair ...`
+line atomically to
+`<Fabric instance>/config/helix-fabric-player-agent.pairing-inbox`. The
+companion accepts only a regular file no larger than 512 bytes and no older
+than two minutes, atomically renames it to a processing file, validates the
+exact client-command shape, and deletes the claimed file before redemption.
+Malformed, oversized, stale and non-regular entries are deleted with a
+sanitized typed reason; neither the command nor the code is logged. Use an
+opaque stdin/clipboard bridge to create this file, never a command-line
+argument, prompt, artifact or debug field. This is the preferred agent-run
+fallback when Windows can focus Minecraft but the game rejects injected
+keystrokes. The repository helper
+`scripts/helix-minecraft-player-pairing-inbox.ps1` implements that exact
+stdin-only atomic handoff and emits only `player_pairing_inbox_staged`.
+
+Before the handoff, verify the current room, environment binding, Fabric
+adapter kind, intended authority, and exact target process/session. Do not paste
+over unrelated player text. After the handoff, use sanitized room/API state and
+connector status to prove that the one-time code was consumed by the intended
+plane. Clear or overwrite the local clipboard when the transport permits it.
+
+If the agent cannot activate the native Launcher from its execution desktop,
+the player may perform only the minimal launch action for the already-selected
+Fabric profile. That limitation does not require the player to relay pairing
+material; continue with the opaque handoff after the verified client is open.
+
 Pairing proves only identity and transport. It does not prove that a natural
 prompt selected, executed or synthesized any capability.
 
@@ -410,7 +455,26 @@ possible; only the full Helix chain proves adapter acceptance.
 After normalizing the two public traces to
 `helix.environment_action.differential_trace.v1`, run the observer-only audit:
 
+Start from
+`docs/runbooks/fixtures/helix-minecraft-player-differential-capture.example.json`.
+Replace every example ref and public-text placeholder with values from the exact
+turn. For the `direct_codex` lane, set admission and terminal-authority fields
+to `not_applicable`, and leave route-product, terminal-writer, visible and voice
+text fields `null` unless that direct harness actually publishes those public
+stages. Never fill a missing stage from a later projection merely to make the
+audit pass. `source_artifact_refs` must name the exact direct-run public record
+or Helix Ask debug export used to construct the capture; the generated
+`public_capture_hash` binds the normalized trace to that operator input.
+
 ```powershell
+npm run helix:minecraft:player-trace -- `
+  --input <direct-codex-public-capture.json> `
+  --out <direct-codex-trace.json>
+
+npm run helix:minecraft:player-trace -- `
+  --input <helix-public-capture.json> `
+  --out <helix-trace.json>
+
 npm run helix:minecraft:player-differential -- `
   --reference <direct-codex-trace.json> `
   --helix <helix-trace.json> `
@@ -508,6 +572,9 @@ architectural failure by hard-coding one prompt.
 | Active Fabric source returns `subject_binding_required` | Participant-to-subject binding | Confirm the player is online, refresh the sanitized subject directory, then select that player under **Your identity in this environment**. Do not bypass identity selection or expose a raw player UUID. |
 | Probe waits indefinitely | Connector poll/result lane | Confirm Fabric is running, manifest-admitted, and polling after heartbeat startup. |
 | Player action says no paired client | Player Embodiment pairing | Confirm the action authority is active, redeem a fresh action-only code with `/helix-player pair`, then check the sanitized client manifest/heartbeat. Do not reuse source or command pairing. |
+| A semantic retry returns `action_request_conflict` after the first action timed out | Player-action broker idempotency projection | Compare the stored and retried semantic projections, excluding request/workflow/condition/tool-call ids and timestamps. The same turn/capability/arguments must resolve to the original request; changed authority, identity, capability, arguments, conditions, approval or constraints must still conflict. Do not generate a new physical action to hide the contradiction. |
+| A workflow physically settles but its gateway wait expires | Player-embodiment delivery outbox | Inspect sanitized `action_delivery_<stage>_*` status and verify the same workflow event, event batch and terminal result identities remain queued in that order until acknowledged. Do not replay player input. The next action must remain blocked while delivery evidence is pending. |
+| First player action settles, then later actions time out while the client log repeats `action_event_invalid` | Player-embodiment event normalization/provenance backpressure | Keep the provenance backpressure enabled. Compare the connector's canonical event-batch bytes/hash with the Node event-store canonicalization, including floating-point spellings such as zero, whole values and scientific notation. Relaunch the rebuilt client after repairing parity so the rejected in-memory batch is cleared, then rerun the same natural prompt. |
 | `/helix-player` is unknown or pairing prints the generic connector success message | Client companion lifecycle | Close Minecraft completely, verify `HelixFabricPlayerAgent-0.2.0.jar` is in the active instance's client `mods` directory, relaunch Fabric 1.21.8, and confirm the dedicated player-agent load message before rotating another one-time code. |
 | Room says `authority active` but `waiting for client` | Action readiness | The lease exists but no matching admitted manifest plus fresh heartbeat exists. Check the loaded client mod, exact paired player identity and `/helix-player status`; do not count this as ready. |
 | Room/API and action execution refer to different active authority IDs | Authority supersession/projection | Save player authority once through the current owner UI. Confirm only the newest policy/newest-created lease remains active for the environment and participant before rotating an action-only pairing. Do not pair against whichever row happened to be returned first. |

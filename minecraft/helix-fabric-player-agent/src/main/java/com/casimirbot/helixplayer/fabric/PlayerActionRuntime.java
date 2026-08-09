@@ -8,8 +8,6 @@ import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.State;
 import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.WorkflowEvent;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,9 +24,8 @@ final class PlayerActionRuntime implements AutoCloseable {
     static final String ADAPTER_VERSION = "0.2.0";
     private static final int POLL_INTERVAL_TICKS = 20;
     private static final int HEARTBEAT_INTERVAL_TICKS = 100;
-    private static final int MAX_PENDING_ENVIRONMENT_EVENT_BATCHES = 256;
-    private static final int MAX_NONTERMINAL_PENDING_EVENT_BATCHES =
-        MAX_PENDING_ENVIRONMENT_EVENT_BATCHES - 1;
+    private static final int MAX_PENDING_DELIVERIES = 768;
+    private static final int RESERVED_TERMINAL_DELIVERIES = 3;
 
     private record ActiveEnvelope(
         Map<String, Object> wire,
@@ -49,6 +46,7 @@ final class PlayerActionRuntime implements AutoCloseable {
     private final String manifestId = id("environment_action_manifest");
     private final AtomicBoolean cyclePending = new AtomicBoolean(false);
     private final AtomicBoolean manifestPending = new AtomicBoolean(false);
+    private final AtomicBoolean deliveryFlushPending = new AtomicBoolean(false);
     private volatile boolean manifestReady;
     private volatile boolean heartbeatReady;
     private volatile boolean emergencyStopLatched;
@@ -56,8 +54,8 @@ final class PlayerActionRuntime implements AutoCloseable {
     private volatile long latestEventSequence = -1;
     private volatile String lastTransportError = "";
     private volatile ActiveEnvelope activeEnvelope;
-    private final Deque<Map<String, Object>> pendingEnvironmentEventBatches =
-        new ArrayDeque<>();
+    private final PlayerActionDeliveryOutbox deliveryOutbox =
+        new PlayerActionDeliveryOutbox(MAX_PENDING_DELIVERIES);
     private long ticks;
 
     PlayerActionRuntime(
@@ -161,7 +159,7 @@ final class PlayerActionRuntime implements AutoCloseable {
                 heartbeatReady = false;
                 recordTransportError(response.error());
             } else {
-                clearTransportError();
+                clearTransportErrorIfDeliveryComplete();
                 // Establish a fresh active heartbeat before the first work poll.
                 // Otherwise the broker correctly rejects the poll as stale and
                 // the transient bootstrap error can become self-sustaining.
@@ -180,7 +178,7 @@ final class PlayerActionRuntime implements AutoCloseable {
             PlayerActionHttpClient.Response response = http.post("/heartbeat", heartbeat());
             heartbeatReady = response.ok();
             if (!response.ok()) recordTransportError(response.error());
-            else clearTransportError();
+            else clearTransportErrorIfDeliveryComplete();
         } catch (Exception error) {
             heartbeatReady = false;
             recordTransportError("heartbeat_unreachable");
@@ -204,11 +202,11 @@ final class PlayerActionRuntime implements AutoCloseable {
                     return;
                 }
             }
-            flushPendingEnvironmentEventBatches();
+            flushDeliveryOutbox();
             if (
                 emergencyStopLatched ||
                 activeEnvelope != null ||
-                !pendingEnvironmentEventBatches.isEmpty()
+                !deliveryOutbox.isEmpty()
             ) return;
             PlayerActionHttpClient.Response actions = http.get("/requests/pending?limit=1");
             if (!actions.ok()) {
@@ -223,7 +221,7 @@ final class PlayerActionRuntime implements AutoCloseable {
                     return Boolean.TRUE;
                 });
             }
-            clearTransportError();
+            clearTransportErrorIfDeliveryComplete();
         } catch (Exception error) {
             recordTransportError("action_poll_unreachable");
             if (error instanceof InterruptedException) Thread.currentThread().interrupt();
@@ -340,53 +338,94 @@ final class PlayerActionRuntime implements AutoCloseable {
         );
 
         boolean terminal = terminal(event.state());
+        Map<String, Object> settledResult = terminal
+            ? result(
+                envelope.wire(),
+                envelope.actionExecutionId(),
+                envelope.startedAt(),
+                outcome(event.state()),
+                event.summary(),
+                envelope.progressEventRefs(),
+                event.state() == State.SUCCEEDED,
+                event.manualOverrideDetected(),
+                event.measurements()
+            )
+            : null;
         if (terminal) activeEnvelope = null;
+        List<PlayerActionDeliveryOutbox.Delivery> deliveries = new ArrayList<>();
+        deliveries.add(new PlayerActionDeliveryOutbox.Delivery(
+            PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT,
+            payload
+        ));
+        deliveries.add(new PlayerActionDeliveryOutbox.Delivery(
+            PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH,
+            eventBatch
+        ));
+        if (settledResult != null) {
+            deliveries.add(new PlayerActionDeliveryOutbox.Delivery(
+                PlayerActionDeliveryOutbox.Stage.ACTION_RESULT,
+                settledResult
+            ));
+        }
+        int reserve = terminal ? 0 : RESERVED_TERMINAL_DELIVERIES;
+        if (!deliveryOutbox.enqueueSequence(deliveries, reserve)) {
+            recordTransportError("action_delivery_outbox_full");
+            emergencyStopLatched = true;
+            minecraft.execute(() -> controller.emergencyStop(
+                "The bounded evidence outbox filled; controls were released rather than losing workflow provenance."
+            ));
+            return;
+        }
+        logger.debug(
+            "Helix player-action delivery queued: stage={} pending={}",
+            deliveries.get(0).stage().diagnosticName(),
+            deliveryOutbox.size()
+        );
+        scheduleDeliveryFlush();
+    }
+
+    private void scheduleDeliveryFlush() {
+        if (!deliveryFlushPending.compareAndSet(false, true)) return;
         network.execute(() -> {
             try {
-                PlayerActionHttpClient.Response eventReceipt = http.post("/requests/event", payload);
-                if (!eventReceipt.ok()) {
-                    recordTransportError(eventReceipt.error());
-                    return;
-                }
-                int ceiling = terminal
-                    ? MAX_PENDING_ENVIRONMENT_EVENT_BATCHES
-                    : MAX_NONTERMINAL_PENDING_EVENT_BATCHES;
-                if (pendingEnvironmentEventBatches.size() >= ceiling) {
-                    recordTransportError("environment_event_backlog_full");
-                    if (!terminal) {
-                        emergencyStopLatched = true;
-                        minecraft.execute(() -> controller.emergencyStop(
-                            "The bounded evidence backlog filled; controls were released rather than losing workflow provenance."
-                        ));
-                    }
-                    return;
-                }
-                pendingEnvironmentEventBatches.addLast(eventBatch);
-                flushPendingEnvironmentEventBatches();
-                if (terminal) submitSettledResult(envelope, event);
-            } catch (Exception error) {
-                recordTransportError("action_event_unreachable");
-                if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+                flushDeliveryOutbox();
+            } finally {
+                deliveryFlushPending.set(false);
             }
         });
     }
 
-    private boolean flushPendingEnvironmentEventBatches() {
-        while (!pendingEnvironmentEventBatches.isEmpty()) {
-            Map<String, Object> batch = pendingEnvironmentEventBatches.peekFirst();
+    private boolean flushDeliveryOutbox() {
+        while (!deliveryOutbox.isEmpty()) {
+            PlayerActionDeliveryOutbox.Delivery delivery = deliveryOutbox.peek();
             try {
-                PlayerActionHttpClient.Response receipt = http.post("/events/batch", batch);
+                PlayerActionHttpClient.Response receipt = http.post(
+                    delivery.stage().endpointSuffix(),
+                    delivery.payload()
+                );
                 if (!receipt.ok()) {
-                    recordTransportError(receipt.error());
+                    recordTransportError(PlayerActionDeliveryOutbox.transportErrorCode(
+                        delivery.stage(),
+                        receipt.statusCode(),
+                        receipt.error()
+                    ));
                     return false;
                 }
-                pendingEnvironmentEventBatches.removeFirst();
+                deliveryOutbox.acknowledge(delivery);
+                logger.debug(
+                    "Helix player-action delivery acknowledged: stage={} pending={}",
+                    delivery.stage().diagnosticName(),
+                    deliveryOutbox.size()
+                );
             } catch (Exception error) {
-                recordTransportError("environment_event_batch_unreachable");
+                recordTransportError(
+                    "action_delivery_" + delivery.stage().diagnosticName() + "_unreachable"
+                );
                 if (error instanceof InterruptedException) Thread.currentThread().interrupt();
                 return false;
             }
         }
+        clearTransportError();
         return true;
     }
 
@@ -468,47 +507,28 @@ final class PlayerActionRuntime implements AutoCloseable {
         return batch;
     }
 
-    private void submitSettledResult(ActiveEnvelope envelope, WorkflowEvent event)
-        throws java.io.IOException, InterruptedException {
-        Map<String, Object> result = result(
-            envelope.wire(),
-            envelope.actionExecutionId(),
-            envelope.startedAt(),
-            outcome(event.state()),
-            event.summary(),
-            envelope.progressEventRefs(),
-            event.state() == State.SUCCEEDED,
-            event.manualOverrideDetected(),
-            event.measurements()
-        );
-        PlayerActionHttpClient.Response response = http.post("/requests/result", result);
-        if (!response.ok()) recordTransportError(response.error());
-        else clearTransportError();
-    }
-
     private void submitWithoutExecution(Map<String, Object> wire, String outcome, String summary) {
-        network.execute(() -> {
-            try {
-                PlayerActionHttpClient.Response response = http.post(
-                    "/requests/result",
-                    result(
-                        wire,
-                        id("environment_action_execution"),
-                        null,
-                        outcome,
-                        summary,
-                        List.of(),
-                        false,
-                        false,
-                        Map.of()
-                    )
-                );
-                if (!response.ok()) recordTransportError(response.error());
-            } catch (Exception error) {
-                recordTransportError("action_result_unreachable");
-                if (error instanceof InterruptedException) Thread.currentThread().interrupt();
-            }
-        });
+        Map<String, Object> payload = result(
+            wire,
+            id("environment_action_execution"),
+            null,
+            outcome,
+            summary,
+            List.of(),
+            false,
+            false,
+            Map.of()
+        );
+        PlayerActionDeliveryOutbox.Delivery delivery =
+            new PlayerActionDeliveryOutbox.Delivery(
+                PlayerActionDeliveryOutbox.Stage.ACTION_RESULT,
+                payload
+            );
+        if (!deliveryOutbox.enqueueSequence(List.of(delivery), 0)) {
+            recordTransportError("action_delivery_outbox_full");
+            return;
+        }
+        scheduleDeliveryFlush();
     }
 
     private Map<String, Object> result(
@@ -784,6 +804,10 @@ final class PlayerActionRuntime implements AutoCloseable {
 
     private void clearTransportError() {
         lastTransportError = "";
+    }
+
+    private void clearTransportErrorIfDeliveryComplete() {
+        if (deliveryOutbox.isEmpty()) clearTransportError();
     }
 
     static boolean actionPollingReady(

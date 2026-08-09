@@ -31,6 +31,10 @@ const trace = (input: {
     prompt_hash: hash("a"),
     starting_state_hash: hash("b"),
     capability_contract_hash: hash("c"),
+    source_artifact_refs: [
+      `${input.lane}_public_trace:${input.actionKind}`,
+    ],
+    public_capture_hash: hash(input.lane === "helix" ? "9" : "0"),
     selected_capability_id: minecraftPlayerCapabilityForActionKind(input.actionKind),
     normalized_arguments_hash: hash("d"),
     admission_status: input.lane === "helix" ? "admitted" : "not_applicable",

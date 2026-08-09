@@ -31,10 +31,103 @@ import {
   HELIX_MINECRAFT_COMMAND_CAPABILITY,
   HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
 } from "@shared/helix-environment-command";
+import {
+  HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+} from "@shared/helix-minecraft-player-capabilities";
 
 const CAPABILITY = "com.casimirbot.minecraft.inventory.check";
 
 describe("Minecraft environment connector capability routing", () => {
+  it("builds the explicit paired-client walk/jump/verify itinerary without substituting World Authority", () => {
+    const prompt =
+      "Using the paired Minecraft player client, take one careful step forward no farther than 1.5 blocks, jump once, stop, and then verify my final position from fresh Minecraft environment evidence. If manual input is detected or the landing path is unsafe, cancel and return the exact typed reason. Do not place or break blocks.";
+    const context = { trusted_environment_domain: "minecraft" as const };
+    const capabilities = extractExplicitCapabilityContracts(prompt, context).map(
+      (entry) => entry.capability,
+    );
+
+    expect(capabilities).toEqual([
+      HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+      HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+      HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+    ]);
+    expect(capabilities).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+
+    const contract = buildHelixCompoundCapabilityContract({
+      turnId: "ask:test:paired-client-walk-jump-verify",
+      promptText: prompt,
+      trustedEnvironmentContext: context,
+    });
+    expect(contract?.required_capabilities).toEqual(capabilities);
+    expect(contract?.subgoals).toEqual([
+      expect.objectContaining({
+        requested_capability: HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+        args_hint: {
+          direction: "forward",
+          duration_ms: 250,
+          sprint: false,
+        },
+      }),
+      expect.objectContaining({
+        requested_capability: HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+        args_hint: { count: 1 },
+      }),
+      expect.objectContaining({
+        requested_capability: HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+        args_hint: { target: "current_actor" },
+      }),
+    ]);
+
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "ask:test:paired-client-walk-jump-verify",
+      promptText: prompt,
+      sourceTargetIntent: {
+        target_source: "live_environment",
+        target_kind: "live_environment",
+      },
+      trustedEnvironmentContext: context,
+    });
+    expect(admission.compound_requested_capabilities).toEqual(capabilities);
+  });
+
+  it("keeps an immediate player safety precondition executable", () => {
+    const prompt =
+      "Using only the paired Minecraft Player Embodiment client, if the player controls are idle, walk forward for 250 milliseconds, jump exactly once, stop, and then use fresh actor status evidence to report the final position. Do not use Minecraft server commands, teleport, place blocks, or break blocks. If manual input or an unsafe landing is detected, cancel and return the exact typed reason.";
+    const context = { trusted_environment_domain: "minecraft" as const };
+
+    expect(
+      extractExplicitCapabilityContracts(prompt, context).map(
+        (entry) => entry.capability,
+      ),
+    ).toEqual([
+      HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+      HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+      HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+    ]);
+  });
+
+  it.each([
+    'Explain the example "use the paired Minecraft player client to walk and jump" without acting.',
+    "Later, use the paired Minecraft player client to walk and jump.",
+    "Previously I used the paired Minecraft player client to walk and jump.",
+    "If I reconnect later, use the paired Minecraft player client to walk and jump.",
+    "The screen says use the paired Minecraft player client to walk and jump.",
+    "Do not use the paired Minecraft player client to walk or jump.",
+  ])("does not admit Player Embodiment from contextual wording: %s", (prompt) => {
+    const capabilities = extractExplicitCapabilityContracts(prompt, {
+      trusted_environment_domain: "minecraft",
+    }).map((entry) => entry.capability);
+    expect(
+      capabilities.some((capability) =>
+        HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS.includes(
+          capability as (typeof HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS)[number],
+        ),
+      ),
+    ).toBe(false);
+  });
+
   it.each([
     "Monitor my Minecraft session and only tell me about danger or progress.",
     "Set up a Minecraft Cortana live environment using the active visual source.",

@@ -40,3 +40,18 @@ stage hashes are hashes of the same canonicalized public answer text, not of
 private reasoning or structurally different envelopes. A missing re-entry in
 both lanes is still a lifecycle defect; symmetric omission cannot produce a
 passing audit.
+
+`workflow-differential-trace-capture.ts` supplies the missing normalization
+step for real acceptance evidence. It accepts only operator-selected public
+lifecycle facts, explicitly rejects hidden-reasoning claims, hashes structured
+fixture/argument/progress values canonically, and emits the existing
+non-authoritative differential trace contract. Every capture must retain at
+least one exact public source-artifact ref and receives a canonical capture
+hash, so a later edit cannot remain silently attached to the older trace
+identity. Use
+`npm run helix:minecraft:player-trace -- --input <public-capture.json> --out
+<trace.json>` for each lane before running the observer audit. A schema-valid
+operator example lives at
+`docs/runbooks/fixtures/helix-minecraft-player-differential-capture.example.json`;
+its placeholder refs/text are never acceptance evidence and must be replaced
+from the exact turn without backfilling a missing stage from a later one.

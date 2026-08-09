@@ -224,6 +224,77 @@ const parseStringArray = (value: unknown): string[] => {
     : [];
 };
 
+/**
+ * Projects an action request onto the operator-visible meaning of the action.
+ *
+ * Provider/tool invocation ids, workflow ids, condition ids, and timestamps are
+ * delivery metadata. They are intentionally excluded so a bounded provider
+ * retry of the same current-turn action resolves to the original admitted
+ * request instead of becoming a false idempotency conflict. Identity, policy,
+ * capability, arguments, conditions, and approval remain part of the hash.
+ */
+export const projectEnvironmentActionIdempotencyContent = (
+  request: HelixEnvironmentActionRequest,
+) => ({
+  schema: request.schema,
+  action_authority_id: request.action_authority_id,
+  environment_binding_id: request.environment_binding_id,
+  room_id: request.room_id,
+  source_id: request.source_id,
+  world_id: request.world_id,
+  participant_id: request.participant_id,
+  subject_binding_id: request.subject_binding_id,
+  subject_native_id: request.subject_native_id,
+  run_id: request.run_id,
+  turn_id: request.turn_id,
+  catalog_snapshot_id: request.catalog_snapshot_id,
+  capability_id: request.capability_id,
+  capability_version: request.capability_version,
+  action_kind: request.action_kind,
+  effect_class: request.effect_class,
+  workflow_mode: request.workflow_mode,
+  requested_control_engine: request.requested_control_engine,
+  arguments: request.arguments,
+  preconditions: request.preconditions.map((condition) => ({
+    condition_kind: condition.condition_kind,
+    required: condition.required,
+    parameters: condition.parameters,
+  })),
+  postconditions: request.postconditions.map((condition) => ({
+    condition_kind: condition.condition_kind,
+    required: condition.required,
+    parameters: condition.parameters,
+  })),
+  confirmation_state: request.confirmation_state,
+  approval_ref: request.approval_ref,
+  constraints: request.constraints,
+  answer_authority: request.answer_authority,
+  assistant_answer: request.assistant_answer,
+  terminal_eligible: request.terminal_eligible,
+  raw_content_included: request.raw_content_included,
+});
+
+export const hashEnvironmentActionIdempotencyContent = (
+  request: HelixEnvironmentActionRequest,
+): `sha256:${string}` =>
+  environmentConnectorSha256(
+    projectEnvironmentActionIdempotencyContent(request),
+  );
+
+export const storedEnvironmentActionMatchesIdempotencyContent = (input: {
+  storedPayload: unknown;
+  storedRequestHash: string;
+  request: HelixEnvironmentActionRequest;
+}): boolean => {
+  const storedRequest = helixEnvironmentActionRequestSchema.safeParse(
+    parseJson<unknown>(input.storedPayload, null),
+  );
+  const storedRequestHash = storedRequest.success
+    ? hashEnvironmentActionIdempotencyContent(storedRequest.data)
+    : input.storedRequestHash;
+  return storedRequestHash === hashEnvironmentActionIdempotencyContent(input.request);
+};
+
 const readAuthorityConnectorRow = async (
   db: Queryable,
   authorityId: string,
@@ -1623,7 +1694,7 @@ export const enqueueEnvironmentAction = async (input: {
       "The action catalog changed; compose a current-turn request from the latest connector manifest.",
     );
   }
-  const requestHash = environmentConnectorSha256(request);
+  const requestHash = hashEnvironmentActionIdempotencyContent(request);
   return withSharedRealtimeRoomTransaction(async (tx) => {
     const duplicate = await tx.query<ActionRequestRow>(
       `SELECT * FROM helix_environment_action_requests
@@ -1631,7 +1702,11 @@ export const enqueueEnvironmentAction = async (input: {
       [request.action_authority_id, request.idempotency_key],
     );
     if (duplicate.rows[0]) {
-      if (duplicate.rows[0].request_hash !== requestHash) {
+      if (!storedEnvironmentActionMatchesIdempotencyContent({
+        storedPayload: duplicate.rows[0].request_payload,
+        storedRequestHash: duplicate.rows[0].request_hash,
+        request,
+      })) {
         throw new EnvironmentActionBrokerError(
           "action_request_conflict",
           409,

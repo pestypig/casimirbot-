@@ -29,6 +29,7 @@ import {
   type Nhm2PrimaryProducerBundleBuildMetadataV1,
   type Nhm2PrimaryProducerBundleRefV1,
 } from "../../../shared/contracts/nhm2-primary-producer-bundle.v1";
+import { NHM2_SEMICLASSICAL_V2_RAW_REPLAY_SCIENTIFIC_INPUT_IDS } from "../../../shared/contracts/nhm2-semiclassical-v2-raw-replay-manifest.v1";
 import { getTheoryRuntimeEntrypoint } from "../../../shared/theory/runtime-entrypoints";
 import { THEORY_RUNTIME_WORKSTATION_GRAPH_ID } from "../../../shared/theory/runtime-execution-policy";
 import {
@@ -50,7 +51,7 @@ import {
 export const NHM2_INDEPENDENT_NUMERICAL_EXECUTION_OBSERVATION_VERSION =
   "nhm2_independent_numerical_execution_observation/v1" as const;
 export const NHM2_INDEPENDENT_NUMERICAL_PRESEALED_RUN_SPEC_VERSION =
-  "nhm2_independent_numerical_presealed_run_spec/v1" as const;
+  "nhm2_independent_numerical_presealed_run_spec/v2" as const;
 export const NHM2_INDEPENDENT_NUMERICAL_APPROVED_TOOLCHAIN_POLICY_VERSION =
   NHM2_INDEPENDENT_NUMERICAL_APPROVED_TOOLCHAIN_POLICY_CONTRACT_VERSION;
 export const NHM2_INDEPENDENT_NUMERICAL_SOLVER_FAMILY =
@@ -63,6 +64,8 @@ const RUNTIME_ID = "nhm2.experiment_ready_theory.independent" as const;
 const PRIMARY_RUNTIME_ID = "nhm2.experiment_ready_theory.primary" as const;
 const NPM_SCRIPT = "warp:full-solve:nhm2:theory-candidate:independent" as const;
 const SHA256 = /^[a-f0-9]{64}$/;
+const SEMICLASSICAL_V2_INPUT_CLOSURE_BLOCKER =
+  "independent_semiclassical_v2_scientific_input_closure_not_integrated" as const;
 
 const PRIMARY_RECEIPT_SCALAR_KEYS = [
   "expectedEvidenceCount",
@@ -129,6 +132,50 @@ const CLAIM_BOUNDARY = Object.freeze({
   speedAuthorityClaimAllowed: false as const,
 });
 
+const INPUT_ISOLATION_SAFEGUARD = Object.freeze({
+  childInputAuthority:
+    "frozen_candidate_manifest_administrative_closure" as const,
+  presealPrimaryReceiptForbidden: true as const,
+  presealPrimaryOutputInventoryForbidden: true as const,
+  primaryOutputPathsGrantedToChild: false as const,
+  primaryOutputHashesGrantedToChild: false as const,
+  primaryOutputBytesGrantedToChild: false as const,
+  serverRetainsPrimaryOutputsForPostRunComparisonOnly: true as const,
+  presealMustPredatePrimaryExecution: true as const,
+  semiclassicalV2ScientificInputClosureRequired: true as const,
+  semiclassicalV2ScientificInputClosureIntegrated: false as const,
+  semiclassicalV2RequiredScientificInputCount:
+    NHM2_SEMICLASSICAL_V2_RAW_REPLAY_SCIENTIFIC_INPUT_IDS.length,
+  admittedAdministrativeInputCount: 8 as const,
+  operatingSystemPrimaryOutputIsolationAsserted: false as const,
+});
+
+const CANDIDATE_INPUT_LAYOUT = [
+  {
+    role: "candidate_manifest",
+    inputRelativePath: "candidate/manifest.json",
+  },
+  {
+    role: "candidate_definition",
+    inputRelativePath: "candidate/definition.json",
+  },
+  { role: "profile", inputRelativePath: "candidate/profile.json" },
+  { role: "chart", inputRelativePath: "candidate/chart.json" },
+  { role: "atlas", inputRelativePath: "candidate/atlas.json" },
+  { role: "units", inputRelativePath: "candidate/units.json" },
+  {
+    role: "normalization",
+    inputRelativePath: "candidate/normalization.json",
+  },
+  {
+    role: "numeric_policy_set",
+    inputRelativePath: "candidate/numeric-policy-set.json",
+  },
+] as const;
+
+export type Nhm2IndependentNumericalCandidateInputRole =
+  (typeof CANDIDATE_INPUT_LAYOUT)[number]["role"];
+
 export type Nhm2IndependentNumericalApprovedToolchainPolicyV1 = {
   artifactId: typeof NHM2_INDEPENDENT_NUMERICAL_APPROVED_TOOLCHAIN_POLICY_ARTIFACT_ID;
   contractVersion: typeof NHM2_INDEPENDENT_NUMERICAL_APPROVED_TOOLCHAIN_POLICY_CONTRACT_VERSION;
@@ -161,14 +208,22 @@ export type Nhm2IndependentNumericalApprovedToolchainPolicyV1 = {
   claimBoundary: typeof CLAIM_BOUNDARY;
 };
 
-export type Nhm2IndependentNumericalPrimaryOutputBindingV1 = {
-  primaryPath: string;
+export type Nhm2IndependentNumericalCandidateInputBindingV2 = {
+  role: Nhm2IndependentNumericalCandidateInputRole;
+  sourcePath: string;
   inputRelativePath: string;
   sha256: string;
   sizeBytes: number;
 };
 
-export type Nhm2IndependentNumericalPresealedRunSpecV1 = {
+export type Nhm2IndependentNumericalCandidateInputClosureV2 = {
+  authority: "frozen_candidate_manifest_administrative_closure";
+  semanticSha256: string;
+  inputLedgerSha256: string;
+  entries: Nhm2IndependentNumericalCandidateInputBindingV2[];
+};
+
+export type Nhm2IndependentNumericalPresealedRunSpecV2 = {
   artifactId: "nhm2.independent_numerical_presealed_run_spec";
   contractVersion: typeof NHM2_INDEPENDENT_NUMERICAL_PRESEALED_RUN_SPEC_VERSION;
   generatedAt: string;
@@ -179,15 +234,10 @@ export type Nhm2IndependentNumericalPresealedRunSpecV1 = {
     receiptId: string;
     runtimeId: string;
   };
-  primaryReceipt: {
-    requestId: string;
-    receiptId: string;
-    path: string;
-    sha256: string;
-  };
-  primaryOutputs: Nhm2IndependentNumericalPrimaryOutputBindingV1[];
+  candidateInputClosure: Nhm2IndependentNumericalCandidateInputClosureV2;
   approvedPolicy: { policyId: string; semanticSha256: string };
   kernel: Nhm2ExternalNumericalKernelRunSpecV1;
+  inputIsolation: typeof INPUT_ISOLATION_SAFEGUARD;
   claimBoundary: typeof CLAIM_BOUNDARY;
 };
 
@@ -228,6 +278,12 @@ export type Nhm2IndependentNumericalExecutionObservationV1 = {
     sha256: string | null;
     writtenAt: string | null;
     hashAddressVerified: boolean;
+  };
+  inputIsolation: typeof INPUT_ISOLATION_SAFEGUARD & {
+    candidateInputClosureVerified: boolean;
+    kernelInputLedgerCandidateOnlyVerified: boolean;
+    presealPredatesPrimaryExecutionVerified: boolean;
+    serverPostRunComparisonAccessVerified: boolean;
   };
   kernelObservation: Nhm2ExternalNumericalKernelObservationV1 | null;
   failedProcessObservation: Nhm2ExternalNumericalKernelProcessObservationV1 | null;
@@ -376,6 +432,20 @@ const stable = (value: unknown): unknown => {
 const sha256 = (value: Uint8Array | string): string =>
   createHash("sha256").update(value).digest("hex");
 
+export function computeNhm2IndependentNumericalCandidateInputClosureSha256(
+  closure: Omit<
+    Nhm2IndependentNumericalCandidateInputClosureV2,
+    "semanticSha256"
+  >,
+): string {
+  return sha256(
+    JSON.stringify({
+      domain: "nhm2_independent_candidate_input_closure_semantic/v2",
+      closure: stable(closure),
+    }),
+  );
+}
+
 const exactIso = (value: unknown): value is string =>
   typeof value === "string" &&
   Number.isFinite(Date.parse(value)) &&
@@ -409,8 +479,15 @@ const samePath = (left: string, right: string): boolean => {
   return normalize(left) === normalize(right);
 };
 
+const absolutePathsOverlap = (left: string, right: string): boolean =>
+  samePath(left, right) || inside(left, right) || inside(right, left);
+
 const exactClaimBoundary = (value: unknown): boolean =>
   JSON.stringify(stable(value)) === JSON.stringify(stable(CLAIM_BOUNDARY));
+
+const exactInputIsolationSafeguard = (value: unknown): boolean =>
+  JSON.stringify(stable(value)) ===
+  JSON.stringify(stable(INPUT_ISOLATION_SAFEGUARD));
 
 export function computeNhm2IndependentNumericalApprovedToolchainPolicySemanticSha256(
   policy: Omit<
@@ -831,6 +908,8 @@ async function loadPrimaryBundleLineage(input: {
       implementationId: primaryPlan.solver.implementationId,
       solverDescriptorSha256: primaryPlan.solver.sha256,
       environmentLockSha256: primaryPlan.environmentLock.sha256,
+      producerBundleSha256: lineage.producerBundle.sha256,
+      sourceClosureSha256: lineage.buildMetadata.sourceSnapshotSha256,
     },
     producerBundle: {
       path: candidateBundleRef.path,
@@ -1073,6 +1152,8 @@ function assertExternalDescriptor(input: {
       environmentLockSha256: plan.environmentLock.sha256,
       implementationSourceClosureSha256:
         descriptor.implementationSourceClosure.closureSha256,
+      toolchainLedgerSha256: descriptor.toolchain.ledger.sha256,
+      executableSha256: descriptor.toolchain.executable.sha256,
       independenceGroup: descriptor.solver.independenceGroup,
     },
   });
@@ -1091,6 +1172,8 @@ export function nhm2IndependentNumericalFingerprintBlockers(input: {
     implementationId: string;
     solverDescriptorSha256: string;
     environmentLockSha256: string;
+    producerBundleSha256: string;
+    sourceClosureSha256: string;
   };
   independent: {
     solverId: string;
@@ -1098,10 +1181,12 @@ export function nhm2IndependentNumericalFingerprintBlockers(input: {
     solverDescriptorSha256: string;
     environmentLockSha256: string;
     implementationSourceClosureSha256: string;
+    toolchainLedgerSha256: string;
+    executableSha256: string;
     independenceGroup: string;
   };
 }): string[] {
-  const comparisons = [
+  const identityComparisons = [
     [
       "independent_solver_id_not_distinct",
       input.independent.solverId,
@@ -1122,16 +1207,34 @@ export function nhm2IndependentNumericalFingerprintBlockers(input: {
       input.independent.environmentLockSha256,
       input.primary.environmentLockSha256,
     ],
-    [
-      "independent_source_closure_hash_aliases_primary_solver_descriptor",
-      input.independent.implementationSourceClosureSha256,
-      input.primary.solverDescriptorSha256,
-    ],
   ] as const;
+  const primaryContentFingerprints = [
+    ["primary_solver_descriptor", input.primary.solverDescriptorSha256],
+    ["primary_producer_bundle", input.primary.producerBundleSha256],
+    ["primary_source_closure", input.primary.sourceClosureSha256],
+  ] as const;
+  const independentContentFingerprints = [
+    [
+      "source_closure",
+      input.independent.implementationSourceClosureSha256,
+    ],
+    ["toolchain", input.independent.toolchainLedgerSha256],
+    ["executable", input.independent.executableSha256],
+  ] as const;
+  const contentAliasBlockers = independentContentFingerprints.flatMap(
+    ([independentLabel, independentSha256]) =>
+      primaryContentFingerprints
+        .filter(([, primarySha256]) => independentSha256 === primarySha256)
+        .map(
+          ([primaryLabel]) =>
+            `independent_${independentLabel}_hash_aliases_${primaryLabel}`,
+        ),
+  );
   return [
-    ...comparisons
+    ...identityComparisons
       .filter(([, independent, primary]) => independent === primary)
       .map(([blocker]) => blocker),
+    ...contentAliasBlockers,
     ...(input.independent.independenceGroup === input.primary.solverId ||
     input.independent.independenceGroup === input.primary.implementationId
       ? ["independent_group_not_distinct"]
@@ -1139,22 +1242,72 @@ export function nhm2IndependentNumericalFingerprintBlockers(input: {
   ];
 }
 
+function expectedCandidateInputBindings(input: {
+  context: Nhm2IndependentNumericalCandidateContext;
+  manifestPath: string;
+}): Array<Omit<Nhm2IndependentNumericalCandidateInputBindingV2, "sizeBytes">> {
+  const { manifest } = input.context;
+  const sources = {
+    candidate_manifest: {
+      sourcePath: input.manifestPath,
+      sha256: input.context.manifestSha256,
+    },
+    candidate_definition: {
+      sourcePath: manifest.bindings.candidate.path,
+      sha256: manifest.bindings.candidate.sha256,
+    },
+    profile: {
+      sourcePath: manifest.bindings.profile.path,
+      sha256: manifest.bindings.profile.sha256,
+    },
+    chart: {
+      sourcePath: manifest.bindings.chart.path,
+      sha256: manifest.bindings.chart.sha256,
+    },
+    atlas: {
+      sourcePath: manifest.bindings.atlas.path,
+      sha256: manifest.bindings.atlas.sha256,
+    },
+    units: {
+      sourcePath: manifest.bindings.units.path,
+      sha256: manifest.bindings.units.sha256,
+    },
+    normalization: {
+      sourcePath: manifest.bindings.normalization.path,
+      sha256: manifest.bindings.normalization.sha256,
+    },
+    numeric_policy_set: {
+      sourcePath: manifest.numericCheckPolicySet.artifactPath,
+      sha256: manifest.numericCheckPolicySet.artifactRawSha256,
+    },
+  } satisfies Record<
+    Nhm2IndependentNumericalCandidateInputRole,
+    { sourcePath: string; sha256: string }
+  >;
+  return CANDIDATE_INPUT_LAYOUT.map((layout) => ({
+    role: layout.role,
+    sourcePath: sources[layout.role].sourcePath,
+    inputRelativePath: layout.inputRelativePath,
+    sha256: sources[layout.role].sha256.toLowerCase(),
+  }));
+}
+
 function parsePresealedRunSpec(
   value: unknown,
-): Nhm2IndependentNumericalPresealedRunSpecV1 {
+): Nhm2IndependentNumericalPresealedRunSpecV2 {
   if (
     !isRecord(value) ||
     !hasExactKeys(value, [
       "approvedPolicy",
       "artifactId",
       "candidateManifest",
+      "candidateInputClosure",
       "claimBoundary",
       "contractVersion",
       "generatedAt",
       "independentPlan",
+      "inputIsolation",
       "kernel",
-      "primaryOutputs",
-      "primaryReceipt",
     ]) ||
     value.artifactId !== "nhm2.independent_numerical_presealed_run_spec" ||
     value.contractVersion !==
@@ -1175,35 +1328,41 @@ function parsePresealedRunSpec(
     Object.values(value.independentPlan).some(
       (entry) => typeof entry !== "string" || entry.trim().length === 0,
     ) ||
-    !isRecord(value.primaryReceipt) ||
-    !hasExactKeys(value.primaryReceipt, [
-      "path",
-      "receiptId",
-      "requestId",
-      "sha256",
+    !isRecord(value.candidateInputClosure) ||
+    !hasExactKeys(value.candidateInputClosure, [
+      "authority",
+      "entries",
+      "inputLedgerSha256",
+      "semanticSha256",
     ]) ||
-    !isPortableRepoPath(value.primaryReceipt.path) ||
-    typeof value.primaryReceipt.sha256 !== "string" ||
-    !SHA256.test(value.primaryReceipt.sha256) ||
-    typeof value.primaryReceipt.requestId !== "string" ||
-    typeof value.primaryReceipt.receiptId !== "string" ||
-    !Array.isArray(value.primaryOutputs) ||
-    value.primaryOutputs.length === 0 ||
-    !value.primaryOutputs.every(
-      (entry) =>
+    value.candidateInputClosure.authority !==
+      "frozen_candidate_manifest_administrative_closure" ||
+    typeof value.candidateInputClosure.semanticSha256 !== "string" ||
+    !SHA256.test(value.candidateInputClosure.semanticSha256) ||
+    typeof value.candidateInputClosure.inputLedgerSha256 !== "string" ||
+    !SHA256.test(value.candidateInputClosure.inputLedgerSha256) ||
+    !Array.isArray(value.candidateInputClosure.entries) ||
+    value.candidateInputClosure.entries.length !==
+      CANDIDATE_INPUT_LAYOUT.length ||
+    !value.candidateInputClosure.entries.every(
+      (entry, index) =>
         isRecord(entry) &&
         hasExactKeys(entry, [
           "inputRelativePath",
-          "primaryPath",
+          "role",
           "sha256",
           "sizeBytes",
+          "sourcePath",
         ]) &&
-        isPortableRepoPath(entry.primaryPath) &&
+        entry.role === CANDIDATE_INPUT_LAYOUT[index]?.role &&
+        entry.inputRelativePath ===
+          CANDIDATE_INPUT_LAYOUT[index]?.inputRelativePath &&
+        isPortableRepoPath(entry.sourcePath) &&
         isPortableRepoPath(entry.inputRelativePath) &&
         typeof entry.sha256 === "string" &&
         SHA256.test(entry.sha256) &&
         Number.isSafeInteger(entry.sizeBytes) &&
-        (entry.sizeBytes as number) >= 0,
+        (entry.sizeBytes as number) > 0,
     ) ||
     !isRecord(value.approvedPolicy) ||
     !hasExactKeys(value.approvedPolicy, ["policyId", "semanticSha256"]) ||
@@ -1242,6 +1401,7 @@ function parsePresealedRunSpec(
     ]) ||
     !isRecord(value.kernel.ledgers) ||
     !hasExactKeys(value.kernel.ledgers, ["input", "toolchain"]) ||
+    !exactInputIsolationSafeguard(value.inputIsolation) ||
     !exactClaimBoundary(value.claimBoundary)
   ) {
     fail(
@@ -1249,13 +1409,13 @@ function parsePresealedRunSpec(
       "Independent presealed run specification is malformed or incomplete.",
     );
   }
-  return value as unknown as Nhm2IndependentNumericalPresealedRunSpecV1;
+  return value as unknown as Nhm2IndependentNumericalPresealedRunSpecV2;
 }
 
 function parsePersistedPresealedRunSpec(input: {
   persisted: PersistedIndependentPreseal;
   executionStartsAt: string;
-}): Nhm2IndependentNumericalPresealedRunSpecV1 {
+}): Nhm2IndependentNumericalPresealedRunSpecV2 {
   const { artifact } = input.persisted;
   if (
     !isRecord(artifact) ||
@@ -1392,14 +1552,17 @@ function assertDedicatedPrimaryReceiptAuthority(input: {
 
 function assertPresealedBindings(input: {
   context: Nhm2IndependentNumericalCandidateContext;
-  spec: Nhm2IndependentNumericalPresealedRunSpecV1;
+  spec: Nhm2IndependentNumericalPresealedRunSpecV2;
   policy: Nhm2IndependentNumericalApprovedToolchainPolicyV1;
   persisted: PersistedPrimaryReceipt;
   verification: TheoryRuntimeReceiptFilesystemVerificationV1;
+  primaryLineage: Nhm2IndependentNumericalPrimaryBundleLineageV1;
+  presealWrittenAt: string;
   projectRoot: string;
   executionStartsAt: string;
 }): void {
-  const { context, spec, policy, persisted, verification } = input;
+  const { context, spec, policy, persisted, verification, primaryLineage } =
+    input;
   const plan = context.independentPlan;
   const primary = context.primaryPlan;
   const primaryReceipt = persisted.receipt;
@@ -1414,16 +1577,23 @@ function assertPresealedBindings(input: {
     spec.independentPlan.runId !== plan.runId ||
     spec.independentPlan.receiptId !== plan.receiptId ||
     spec.independentPlan.runtimeId !== plan.runtimeId ||
-    spec.primaryReceipt.requestId !== primary.requestId ||
-    spec.primaryReceipt.receiptId !== primary.receiptId ||
-    spec.primaryReceipt.path !== persisted.artifact.path ||
-    spec.primaryReceipt.sha256 !== persisted.artifact.sha256 ||
     spec.approvedPolicy.policyId !== policy.policyId ||
     spec.approvedPolicy.semanticSha256 !== policy.semanticSha256
   ) {
     fail(
       "independent_presealed_binding_mismatch",
       "Presealed independent run does not match the candidate, primary receipt, or approved policy.",
+    );
+  }
+  if (
+    !exactIso(startedAt) ||
+    !exactIso(input.presealWrittenAt) ||
+    Date.parse(spec.generatedAt) >= Date.parse(startedAt) ||
+    Date.parse(input.presealWrittenAt) >= Date.parse(startedAt)
+  ) {
+    fail(
+      "independent_preseal_not_frozen_before_primary_execution",
+      "Independent candidate inputs must be sealed and persisted before primary execution starts.",
     );
   }
   if (
@@ -1448,10 +1618,10 @@ function assertPresealedBindings(input: {
     primaryReceipt.args.normalizationSha256 !==
       context.manifest.bindings.normalization.sha256 ||
     primaryReceipt.provenance.gitSha !== primary.sourceCommitSha ||
-    !exactIso(startedAt) ||
     !exactIso(completedAt) ||
-    Date.parse(completedAt) > Date.parse(spec.generatedAt) ||
-    Date.parse(persisted.artifact.writtenAt) > Date.parse(spec.generatedAt) ||
+    Date.parse(completedAt) > Date.parse(persisted.artifact.writtenAt) ||
+    Date.parse(persisted.artifact.writtenAt) >=
+      Date.parse(input.executionStartsAt) ||
     primaryManifest == null ||
     primaryManifest.requestId !== primary.requestId ||
     primaryManifest.runtimeId !== primary.runtimeId ||
@@ -1476,54 +1646,114 @@ function assertPresealedBindings(input: {
       "Independent execution requires a completed, fresh, filesystem-verified primary run.",
     );
   }
-  const expected = [...verification.files]
-    .sort((left, right) => left.path.localeCompare(right.path))
-    .map((entry) => ({
-      primaryPath: entry.path,
-      sha256: entry.sha256.toLowerCase(),
-      sizeBytes: entry.sizeBytes,
-    }));
-  const supplied = [...spec.primaryOutputs].sort((left, right) =>
-    left.primaryPath.localeCompare(right.primaryPath),
-  );
+  const expectedInputs = expectedCandidateInputBindings({
+    context,
+    manifestPath: spec.candidateManifest.path,
+  });
+  const suppliedInputs = spec.candidateInputClosure.entries;
   if (
-    supplied.length !== expected.length ||
-    supplied.some(
+    suppliedInputs.length !== expectedInputs.length ||
+    suppliedInputs.some(
       (entry, index) =>
-        entry.primaryPath !== expected[index]?.primaryPath ||
-        entry.sha256 !== expected[index]?.sha256 ||
-        entry.sizeBytes !== expected[index]?.sizeBytes,
-    ) ||
-    new Set(supplied.map((entry) => entry.inputRelativePath)).size !==
-      supplied.length
+        entry.role !== expectedInputs[index]?.role ||
+        entry.sourcePath !== expectedInputs[index]?.sourcePath ||
+        entry.inputRelativePath !== expectedInputs[index]?.inputRelativePath ||
+        entry.sha256.toLowerCase() !== expectedInputs[index]?.sha256,
+    )
   ) {
     fail(
-      "independent_primary_output_inventory_mismatch",
-      "Presealed independent input does not bind the complete verified primary output inventory.",
+      "independent_candidate_input_closure_mismatch",
+      "Presealed independent input is not the exact frozen candidate-manifest closure.",
     );
   }
-  const inputByPath = new Map(
-    spec.kernel.ledgers?.input?.entries?.map((entry) => [
-      entry.relativePath,
-      entry,
-    ]) ?? [],
-  );
+  const { semanticSha256, ...closureSemantic } = spec.candidateInputClosure;
   if (
-    supplied.some((binding) => {
-      const entry = inputByPath.get(binding.inputRelativePath);
-      return (
-        entry == null ||
-        entry.sha256 !== binding.sha256 ||
-        entry.sizeBytes !== binding.sizeBytes
-      );
-    })
+    semanticSha256 !==
+    computeNhm2IndependentNumericalCandidateInputClosureSha256(closureSemantic)
   ) {
     fail(
-      "independent_primary_outputs_not_input_ledger_bound",
-      "Verified primary outputs are not exact entries in the sealed independent input ledger.",
+      "independent_candidate_input_closure_digest_mismatch",
+      "Frozen candidate-input closure semantic digest is invalid.",
     );
   }
   const kernel = spec.kernel;
+  const expectedInputLedgerEntries = suppliedInputs.map((entry) => ({
+    relativePath: entry.inputRelativePath,
+    sha256: entry.sha256.toLowerCase(),
+    sizeBytes: entry.sizeBytes,
+  }));
+  const expectedArguments = [
+    ...suppliedInputs.map((entry) => ({
+      kind: "input_path" as const,
+      relativePath: entry.inputRelativePath,
+    })),
+    { kind: "output_root" as const },
+  ];
+  if (
+    kernel.ledgers.input.kind !== "input" ||
+    kernel.ledgers.input.ledgerSha256 !==
+      spec.candidateInputClosure.inputLedgerSha256 ||
+    JSON.stringify(kernel.ledgers.input.entries) !==
+      JSON.stringify(expectedInputLedgerEntries) ||
+    JSON.stringify(kernel.arguments) !== JSON.stringify(expectedArguments)
+  ) {
+    fail(
+      "independent_kernel_input_not_candidate_closure_only",
+      "Independent child input ledger and arguments must expose exactly the frozen candidate closure and output root.",
+    );
+  }
+  const primaryHashes = new Set(
+    verification.files.map((entry) => entry.sha256.toLowerCase()),
+  );
+  const primaryPaths = verification.files.map((entry) =>
+    path.resolve(entry.absolutePath),
+  );
+  const inputRoot = path.resolve(kernel.ledgers.input.rootPath);
+  const toolchainRoot = path.resolve(kernel.ledgers.toolchain.rootPath);
+  const executablePath = path.resolve(kernel.executable.absolutePath);
+  const toolchainEntryPaths = kernel.ledgers.toolchain.entries.map((entry) =>
+    path.resolve(toolchainRoot, ...entry.relativePath.split("/")),
+  );
+  if (verification.outputDirectory == null) {
+    fail(
+      "independent_primary_receipt_not_verified",
+      "Verified primary output directory is unavailable for server-side isolation checks.",
+    );
+  }
+  const primaryOutputRoot = path.resolve(
+    input.projectRoot,
+    verification.outputDirectory,
+  );
+  const serializedEnvironment = JSON.stringify(stable(kernel.environment));
+  if (
+    absolutePathsOverlap(inputRoot, primaryOutputRoot) ||
+    absolutePathsOverlap(toolchainRoot, primaryOutputRoot) ||
+    absolutePathsOverlap(executablePath, primaryOutputRoot) ||
+    primaryPaths.some(
+      (primaryPath) =>
+        absolutePathsOverlap(inputRoot, primaryPath) ||
+        absolutePathsOverlap(toolchainRoot, primaryPath) ||
+        absolutePathsOverlap(executablePath, primaryPath) ||
+        toolchainEntryPaths.some((toolchainPath) =>
+          absolutePathsOverlap(toolchainPath, primaryPath),
+        ),
+    ) ||
+    primaryHashes.has(kernel.ledgers.toolchain.ledgerSha256.toLowerCase()) ||
+    kernel.ledgers.toolchain.entries.some((entry) =>
+      primaryHashes.has(entry.sha256.toLowerCase()),
+    ) ||
+    primaryHashes.has(kernel.executable.sha256.toLowerCase()) ||
+    verification.files.some(
+      (entry) =>
+        serializedEnvironment.includes(entry.sha256) ||
+        serializedEnvironment.includes(entry.path),
+    )
+  ) {
+    fail(
+      "independent_primary_output_disclosure_detected",
+      "Independent launch was denied because an input mount, toolchain, executable, or environment exposes primary output material.",
+    );
+  }
   if (
     kernel.lane !== "independent_numerical_replication" ||
     kernel.solver.family !== policy.solver.family ||
@@ -1557,6 +1787,8 @@ function assertPresealedBindings(input: {
   const primaryFingerprints = new Set([
     primary.solver.sha256,
     primary.environmentLock.sha256,
+    primaryLineage.producerBundle.sha256,
+    primaryLineage.buildMetadata.sourceSnapshotSha256,
   ]);
   if (
     primaryFingerprints.has(kernel.ledgers.toolchain.ledgerSha256) ||
@@ -1581,6 +1813,7 @@ const emptyObservation = (input: {
   persistedPreseal?: PersistedIndependentPreseal | null;
   presealHashVerified?: boolean;
   primaryVerified?: boolean;
+  candidateInputIsolationVerified?: boolean;
   blockers: string[];
   kernelObservation?: Nhm2ExternalNumericalKernelObservationV1 | null;
   failedProcessObservation?: Nhm2ExternalNumericalKernelProcessObservationV1 | null;
@@ -1620,6 +1853,16 @@ const emptyObservation = (input: {
     writtenAt: input.persistedPreseal?.artifact.writtenAt ?? null,
     hashAddressVerified: input.presealHashVerified === true,
   },
+  inputIsolation: {
+    ...INPUT_ISOLATION_SAFEGUARD,
+    candidateInputClosureVerified:
+      input.candidateInputIsolationVerified === true,
+    kernelInputLedgerCandidateOnlyVerified:
+      input.candidateInputIsolationVerified === true,
+    presealPredatesPrimaryExecutionVerified:
+      input.candidateInputIsolationVerified === true,
+    serverPostRunComparisonAccessVerified: input.primaryVerified === true,
+  },
   kernelObservation: input.kernelObservation ?? null,
   failedProcessObservation: input.failedProcessObservation ?? null,
   independentReplicationArtifact: null,
@@ -1656,16 +1899,35 @@ export async function nhm2IndependentNumericalExecutableBlocker(
 export function nhm2IndependentNumericalOutputCopyBlockers(input: {
   primarySha256: readonly string[];
   outputs: readonly { role: string; sha256: string }[];
+  verifiedIndependenceAuthority?: {
+    authority: "server_verified_os_isolation_and_audited_lineage";
+    operatingSystemPrimaryOutputIsolationVerified: true;
+    auditedIndependentImplementationLineageVerified: true;
+  };
 }): string[] {
-  // Exact whole-file equality is only a fail-closed tripwire. A non-match does
-  // not establish content lineage because wrapping, reserialization, or copied
-  // field arrays require the later field-level replay to detect.
+  // Exact whole-file equality is scientific agreement, not proof of copying.
+  // Until the server has both OS isolation and audited implementation lineage,
+  // equality remains a temporary fail-closed lineage blocker. A future server-
+  // verified authority may admit equality; producer/caller metadata cannot.
+  if (
+    input.verifiedIndependenceAuthority?.authority ===
+      "server_verified_os_isolation_and_audited_lineage" &&
+    input.verifiedIndependenceAuthority
+      .operatingSystemPrimaryOutputIsolationVerified === true &&
+    input.verifiedIndependenceAuthority
+      .auditedIndependentImplementationLineageVerified === true
+  ) {
+    return [];
+  }
   const primary = new Set(
     input.primarySha256.map((entry) => entry.toLowerCase()),
   );
   return input.outputs
     .filter((entry) => primary.has(entry.sha256.toLowerCase()))
-    .map((entry) => `independent_output_copies_primary_artifact:${entry.role}`);
+    .map(
+      (entry) =>
+        `independent_content_lineage_not_established:exact_output_hash_match:${entry.role}`,
+    );
 }
 
 async function executeNhm2IndependentNumericalReplicationCore(
@@ -1677,6 +1939,7 @@ async function executeNhm2IndependentNumericalReplicationCore(
   let policy: Nhm2IndependentNumericalApprovedToolchainPolicyV1 | null = null;
   let persistedPreseal: PersistedIndependentPreseal | null = null;
   let presealHashVerified = false;
+  let candidateInputIsolationVerified = false;
   let persisted: PersistedPrimaryReceipt | null = null;
   let verification: TheoryRuntimeReceiptFilesystemVerificationV1 | null = null;
   let independenceGroup: string | null = null;
@@ -1803,9 +2066,12 @@ async function executeNhm2IndependentNumericalReplicationCore(
       policy,
       persisted,
       verification,
+      primaryLineage,
+      presealWrittenAt: persistedPreseal.artifact.writtenAt,
       projectRoot,
       executionStartsAt,
     });
+    candidateInputIsolationVerified = true;
     const executableBlocker = await nhm2IndependentNumericalExecutableBlocker(
       spec.kernel.executable.absolutePath,
     );
@@ -1842,6 +2108,7 @@ async function executeNhm2IndependentNumericalReplicationCore(
         presealHashVerified,
         persisted,
         primaryVerified: true,
+        candidateInputIsolationVerified,
         kernelObservation,
         blockers: copyBlockers,
       });
@@ -1857,6 +2124,7 @@ async function executeNhm2IndependentNumericalReplicationCore(
       presealHashVerified,
       persisted,
       primaryVerified: true,
+      candidateInputIsolationVerified,
       kernelObservation,
       status: "execution_observed_scientific_replay_required",
       blockers: [
@@ -1865,6 +2133,8 @@ async function executeNhm2IndependentNumericalReplicationCore(
         "independent_implementation_lineage_not_established",
         "independent_exact_copy_check_tripwire_only",
         "independent_primary_content_lineage_exclusion_not_established",
+        "independent_operating_system_primary_output_isolation_not_established",
+        SEMICLASSICAL_V2_INPUT_CLOSURE_BLOCKER,
         "independent_field_level_content_replay_required",
         "independent_replication_evidence_not_emitted",
       ],
@@ -1882,6 +2152,7 @@ async function executeNhm2IndependentNumericalReplicationCore(
       persisted,
       primaryVerified:
         verification?.ok === true && verification.freshnessProofVerified,
+      candidateInputIsolationVerified,
       failedProcessObservation,
       blockers: [admissionCode(error)],
     });
@@ -1891,8 +2162,10 @@ async function executeNhm2IndependentNumericalReplicationCore(
 /**
  * Production entrypoint. It accepts no dependency injection and therefore
  * cannot receive policy, clock, receipt, preseal, verification, or process
- * authority from a request caller. No policy or persisted-preseal loader is
- * installed yet, so the lane remains typed not-ready by default.
+ * authority from a request caller. There is no installed store that can prove
+ * a v2 candidate-input preseal was persisted before primary execution, so the
+ * production lane fails before any policy, receipt, filesystem, or process
+ * admission is attempted. The test-only seam below cannot alter that fact.
  *
  * A clean future process observation would establish only server-observed
  * process provenance, freshness, and policy-declared identity/hash bindings.
@@ -1902,7 +2175,13 @@ async function executeNhm2IndependentNumericalReplicationCore(
 export async function executeNhm2IndependentNumericalReplication(
   input: ExecuteNhm2IndependentNumericalReplicationInput,
 ): Promise<Nhm2IndependentNumericalExecutionObservationV1> {
-  return executeNhm2IndependentNumericalReplicationCore(input, {});
+  return emptyObservation({
+    manifestPath: input.candidateManifestPath,
+    blockers: [
+      "independent_preprimary_candidate_preseal_not_configured",
+      SEMICLASSICAL_V2_INPUT_CLOSURE_BLOCKER,
+    ],
+  });
 }
 
 const TEST_WORKSPACE_PREFIX = "nhm2-independent-executor-spec-";

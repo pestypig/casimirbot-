@@ -157,6 +157,10 @@ describe("Minecraft player-action workstation gateway", () => {
         post_tool_model_step_required: true,
         assistant_answer: false,
       });
+      expect(manifest.description).toContain("Player Embodiment plane");
+      expect(manifest.description).toContain(
+        "World Authority server command, including teleport, is not an equivalent substitute",
+      );
       expect(
         (manifest.input_schema as { properties: Record<string, unknown> }).properties,
       ).not.toHaveProperty("action_kind");

@@ -1,5 +1,6 @@
 package com.casimirbot.helixsensor;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -45,6 +46,8 @@ public final class HelixJson {
             builder.append("null");
         } else if (value instanceof String text) {
             writeString(builder, text);
+        } else if (value instanceof Float || value instanceof Double) {
+            writeFloatingNumber(builder, (Number) value);
         } else if (value instanceof Number || value instanceof Boolean) {
             builder.append(value);
         } else if (value instanceof Map<?, ?> map) {
@@ -73,6 +76,31 @@ public final class HelixJson {
         } else {
             writeString(builder, String.valueOf(value));
         }
+    }
+
+    /**
+     * Mirrors the finite-number representation used by JSON.stringify closely
+     * enough for cross-language canonical hashes. Java's Double.toString keeps
+     * values such as 0.0 and 3.0E7, while JavaScript normalizes those to 0 and
+     * 30000000 before hashing the parsed contract. The wire value is unchanged;
+     * only the canonical JSON spelling is normalized.
+     */
+    private static void writeFloatingNumber(StringBuilder builder, Number value) {
+        double number = value.doubleValue();
+        if (!Double.isFinite(number)) {
+            builder.append("null");
+            return;
+        }
+        if (number == 0.0D) {
+            builder.append('0');
+            return;
+        }
+        BigDecimal decimal = new BigDecimal(value.toString()).stripTrailingZeros();
+        double magnitude = Math.abs(number);
+        String encoded = magnitude >= 1.0E-6D && magnitude < 1.0E21D
+            ? decimal.toPlainString()
+            : decimal.toString().replace('E', 'e');
+        builder.append(encoded);
     }
 
     private static void writeString(StringBuilder builder, String value) {

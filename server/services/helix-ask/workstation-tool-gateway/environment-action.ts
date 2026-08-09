@@ -58,7 +58,7 @@ export const environmentActionMinecraftManifests: HelixWorkstationCapabilityMani
     capability_id: descriptor.capability_id,
     label: descriptor.trusted_model_label,
     description:
-      `${descriptor.trusted_model_description} Helix resolves the exact room, active speaker/player binding, authority, world, live client manifest, and catalog snapshot server-side. The connector releases controls on manual input, disconnect, cancellation, or emergency stop. This tool returns evidence for Codex re-entry; it is never the final answer.`,
+      `Player Embodiment plane: ${descriptor.trusted_model_description} Use this plane when the user asks the paired client to play through normal player controls or requires manual-input override semantics. A World Authority server command, including teleport, is not an equivalent substitute unless the user explicitly authorizes changing execution planes. Helix resolves the exact room, active speaker/player binding, authority, world, live client manifest, and catalog snapshot server-side. The connector releases controls on manual input, disconnect, cancellation, or emergency stop. This tool returns evidence for Codex re-entry; it is never the final answer.`,
     panel_id: null,
     action_id: HELIX_ENVIRONMENT_ACTION_GATEWAY_ACTION,
     mode: "act",

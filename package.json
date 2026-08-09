@@ -158,6 +158,7 @@
     "helix:ask:ui-debug-parity": "tsx scripts/helix-ask-ui-debug-parity-harness.ts",
     "helix:ask:api-parity": "tsx scripts/helix-ask-api-parity-probe.ts",
     "helix:minecraft:player-differential": "tsx scripts/helix-minecraft-player-differential-audit.ts",
+    "helix:minecraft:player-trace": "tsx scripts/helix-minecraft-player-differential-capture.ts",
     "mcp:provider-conformance": "tsx scripts/casimirbot-mcp-provider-conformance.ts",
     "helix:shared-room:live-acceptance": "tsx scripts/helix-shared-live-room-live-acceptance.ts",
     "helix:environment-connectors:live-acceptance": "tsx scripts/helix-environment-connector-live-acceptance.ts",

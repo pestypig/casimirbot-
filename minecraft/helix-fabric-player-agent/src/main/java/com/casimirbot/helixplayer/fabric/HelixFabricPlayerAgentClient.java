@@ -8,6 +8,7 @@ import net.minecraft.network.chat.Component;
 import com.casimirbot.helixsensor.pairing.ConnectorPairingClient;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,6 +19,7 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
     private Minecraft minecraft;
     private volatile PlayerActionRuntime runtime;
     private final AtomicBoolean connectorOperation = new AtomicBoolean(false);
+    private int pairingInboxTicks;
 
     @Override
     public void onInitializeClient() {
@@ -25,7 +27,10 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
         PlayerActionConfig initialConfig = PlayerActionConfigLoader.load(LOGGER);
         replaceRuntime(initialConfig);
         PlayerActionClientCommands.register(this);
-        ClientTickEvents.END_CLIENT_TICK.register(client -> runtime.tick());
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            runtime.tick();
+            pollPairingInbox();
+        });
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             PlayerActionRuntime active = runtime;
             if (active != null) active.close();
@@ -112,6 +117,25 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
             message("The local Helix player connector is disconnected. Revoke or expire the room authority separately if it should no longer exist.");
         } catch (java.io.IOException error) {
             message("The local player connector could not clear its saved pairing state.");
+        }
+    }
+
+    private void pollPairingInbox() {
+        pairingInboxTicks = (pairingInboxTicks + 1) % 20;
+        if (pairingInboxTicks != 0 || connectorOperation.get()) return;
+        try {
+            PlayerActionPairingInbox.PollResult result =
+                PlayerActionPairingInbox.consumeDefault(System.currentTimeMillis());
+            if (result.request() != null) {
+                pairAsync(result.request().code(), result.request().endpointOverride());
+            } else if (!result.failureCode().isBlank()) {
+                LOGGER.warn(
+                    "Ignored a local Helix player-pairing inbox entry: {}.",
+                    result.failureCode()
+                );
+            }
+        } catch (IOException error) {
+            LOGGER.warn("Could not claim the local Helix player-pairing inbox.");
         }
     }
 

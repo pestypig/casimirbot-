@@ -1,0 +1,67 @@
+{
+  "scenario_id": "minecraft_player_workflow:walk_safe_marker",
+  "lane": "helix",
+  "action_kind": "walk",
+  "prompt": "Walk forward for 250 milliseconds, stop, and verify the final position.",
+  "starting_state": {
+    "dimension": "minecraft:overworld",
+    "position": {
+      "x": -0.5,
+      "y": 69,
+      "z": 18.5
+    }
+  },
+  "capability_contract": {
+    "capability_id": "com.casimirbot.minecraft.player.walk",
+    "capability_version": 1,
+    "manual_override_required": true,
+    "postcondition_verification_required": true
+  },
+  "source_artifact_refs": [
+    "helix_ask_debug_export:replace-with-exact-turn-ref"
+  ],
+  "selected_capability_id": "com.casimirbot.minecraft.player.walk",
+  "normalized_arguments": {
+    "direction": "forward",
+    "duration_ms": 250,
+    "sprint": false
+  },
+  "admission_status": "admitted",
+  "execution_outcome": "succeeded",
+  "normalized_progress": [
+    {
+      "sequence": 0,
+      "event_type": "workflow.started",
+      "progress_fraction": 0
+    },
+    {
+      "sequence": 1,
+      "event_type": "workflow.succeeded",
+      "progress_fraction": 1
+    }
+  ],
+  "postcondition_status": "satisfied",
+  "observation_refs": [
+    "environment_action_observation:replace-with-current-turn-ref"
+  ],
+  "observation_reentered": true,
+  "final_candidate_text": "Replace with the exact public Codex candidate text.",
+  "final_candidate_support_refs": [
+    "environment_action_observation:replace-with-current-turn-ref"
+  ],
+  "route_product_text": "Replace with the exact public Codex candidate text.",
+  "route_product_support_refs": [
+    "environment_action_observation:replace-with-current-turn-ref"
+  ],
+  "terminal_outcome": "success",
+  "terminal_authority_status": "passed",
+  "terminal_writer_text": "Replace with the exact public Codex candidate text.",
+  "terminal_writer_support_refs": [
+    "environment_action_observation:replace-with-current-turn-ref"
+  ],
+  "visible_text": "Replace with the exact public Codex candidate text.",
+  "voice_projection_status": "not_observed",
+  "voice_text": null,
+  "created_at": "2026-08-09T10:30:00.000Z",
+  "hidden_reasoning_included": false
+}

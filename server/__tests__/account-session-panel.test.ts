@@ -208,6 +208,9 @@ describe("account session panel API", () => {
         "room.evidence.read_bound",
         "com.casimirbot.minecraft.inventory.check",
         "com.casimirbot.minecraft.command",
+        "com.casimirbot.minecraft.player.walk",
+        "com.casimirbot.minecraft.player.jump",
+        "com.casimirbot.minecraft.player.emergency_stop",
       ]),
     });
   });
@@ -250,6 +253,9 @@ describe("account session panel API", () => {
           "room.evidence.read_bound",
           "com.casimirbot.minecraft.inventory.check",
           "com.casimirbot.minecraft.command",
+          "com.casimirbot.minecraft.player.walk",
+          "com.casimirbot.minecraft.player.jump",
+          "com.casimirbot.minecraft.player.emergency_stop",
         ]),
       },
     });
@@ -300,6 +306,9 @@ describe("account session panel API", () => {
         "room.evidence.read_bound",
         "com.casimirbot.minecraft.inventory.check",
         "com.casimirbot.minecraft.command",
+        "com.casimirbot.minecraft.player.walk",
+        "com.casimirbot.minecraft.player.jump",
+        "com.casimirbot.minecraft.player.emergency_stop",
       ]),
     });
   });

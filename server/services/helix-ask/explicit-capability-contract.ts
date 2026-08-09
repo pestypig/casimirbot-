@@ -26,6 +26,12 @@ import {
   HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
   HELIX_MINECRAFT_COMMAND_CAPABILITY,
 } from "@shared/helix-environment-command";
+import { HELIX_ENVIRONMENT_ACTION_OBSERVATION_SCHEMA } from "@shared/helix-environment-action";
+import {
+  HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+} from "@shared/helix-minecraft-player-capabilities";
 import {
   askCapabilityCatalogPromptMatchIndex,
   isAskCapabilityCatalogPrompt,
@@ -53,6 +59,7 @@ import {
   isMinecraftSituationSessionSetupPrompt,
 } from "./minecraft-situation-intent";
 import { minecraftMechanicsDocsPromptMatch } from "./minecraft-mechanics-docs-intent";
+import { resolveMinecraftExecutionPlaneConstraint } from "./minecraft-execution-plane-intent";
 
 const THEORY_EXPERIMENT_PROCEDURE_EVALUATE_CLOSURE_CAPABILITY =
   "theory-experiment-procedure.evaluate_closure" as const;
@@ -88,6 +95,109 @@ const THEORY_INDEPENDENT_NUMERICAL_START_CAPABILITY =
   "theory-independent-numerical-verifier.start" as const;
 const THEORY_INDEPENDENT_NUMERICAL_READ_RESULT_CAPABILITY =
   "theory-independent-numerical-verifier.read_result" as const;
+
+const MINECRAFT_PLAYER_ACTION_CONTRACT_ARGS = new Map<
+  string,
+  { required: string[]; optional: string[] }
+>([
+  [
+    "com.casimirbot.minecraft.player.navigate",
+    {
+      required: [
+        "destination",
+        "arrival_radius",
+        "allow_sprint",
+        "allow_dig",
+        "allow_place",
+        "engine_preference",
+      ],
+      optional: ["environment_label"],
+    },
+  ],
+  [
+    "com.casimirbot.minecraft.player.look",
+    {
+      required: ["target", "max_turn_degrees_per_tick"],
+      optional: ["environment_label"],
+    },
+  ],
+  [
+    HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+    {
+      required: ["direction", "duration_ms", "sprint"],
+      optional: ["environment_label"],
+    },
+  ],
+  [
+    HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+    { required: ["count"], optional: ["environment_label"] },
+  ],
+  [
+    "com.casimirbot.minecraft.player.interact",
+    {
+      required: ["target", "hand", "interaction"],
+      optional: ["environment_label"],
+    },
+  ],
+  [
+    "com.casimirbot.minecraft.player.hotbar.select",
+    { required: ["slot"], optional: ["environment_label"] },
+  ],
+  [
+    "com.casimirbot.minecraft.player.equipment.equip",
+    {
+      required: ["item_id", "destination"],
+      optional: ["environment_label"],
+    },
+  ],
+  [
+    "com.casimirbot.minecraft.player.follow",
+    {
+      required: [
+        "subject_ref",
+        "distance",
+        "max_duration_ms",
+        "stop_below_health",
+      ],
+      optional: ["environment_label"],
+    },
+  ],
+  [
+    "com.casimirbot.minecraft.player.collect",
+    {
+      required: ["item_or_block_id", "count", "search_radius"],
+      optional: ["environment_label"],
+    },
+  ],
+  [
+    "com.casimirbot.minecraft.player.mine",
+    {
+      required: ["block_id", "count", "search_radius"],
+      optional: ["environment_label"],
+    },
+  ],
+  [
+    "com.casimirbot.minecraft.player.place",
+    {
+      required: ["block_id", "positions"],
+      optional: ["environment_label"],
+    },
+  ],
+  [
+    "com.casimirbot.minecraft.player.craft",
+    {
+      required: ["output_item_id", "count"],
+      optional: ["recipe_id", "environment_label"],
+    },
+  ],
+  [
+    "com.casimirbot.minecraft.player.inventory.transfer",
+    {
+      required: ["direction", "item_id", "count", "container_target"],
+      optional: ["environment_label"],
+    },
+  ],
+]);
 export type ExplicitCapabilityContract = {
   schema: "helix.explicit_capability_contract.v1";
   capability: string;
@@ -1932,6 +2042,25 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
             : ["freshness_requirement_ms"],
       }),
     ),
+    ...HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS.map((capability) => {
+      const args = MINECRAFT_PLAYER_ACTION_CONTRACT_ARGS.get(capability) ?? {
+        required: [],
+        optional: ["environment_label"],
+      };
+      return liveEnvironmentEvidenceContract({
+        capability,
+        aliases: [
+          capability.replace(/^com\.casimirbot\./, "").replaceAll(".", " "),
+        ],
+        requiredObservationKinds: [
+          HELIX_ENVIRONMENT_ACTION_OBSERVATION_SCHEMA,
+          "helix.agent_step_observation_packet.v1",
+          "provider_gateway_observation_packet",
+        ],
+        requiredArgs: args.required,
+        optionalArgs: args.optional,
+      });
+    }),
     liveEnvironmentEvidenceContract({
       capability: HELIX_MINECRAFT_CONTAINER_CONTENTS_READ_CAPABILITY,
       aliases: ["minecraft closed container contents"],
@@ -2720,10 +2849,16 @@ const capabilityMentionIsDeferredAt = (
 ): boolean => {
   const before = prompt.slice(Math.max(0, matchIndex - 160), matchIndex);
   const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
+  const immediateExecutionGuard =
+    /\b(?:if|when|unless)\b[^,.!?;\n]{0,120}\b(?:controls?\s+(?:are\s+)?idle|manual\s+input|landing\s+(?:path|area|site)|safe|unsafe|ready|available|online|connected|reachable|within\s+(?:range|reach))\b/i.test(
+      clausePrefix,
+    );
   return (
-    /\b(?:later|eventually|someday|in\s+the\s+future|if|when|unless)\b[\s\S]{0,120}$/i.test(
+    /\b(?:later|eventually|someday|in\s+the\s+future)\b[\s\S]{0,120}$/i.test(
       clausePrefix,
     ) ||
+    (!immediateExecutionGuard &&
+      /\b(?:if|when|unless)\b[\s\S]{0,120}$/i.test(clausePrefix)) ||
     /\b(?:may|might|could|would|plan\s+to|intend\s+to)\s+(?:then\s+)?(?:call|use|run|invoke|execute)\b[\s\S]{0,80}$/i.test(
       clausePrefix,
     )
@@ -3106,6 +3241,11 @@ const naturalMinecraftCommandActionPromptMatch = (
     ) || context?.trusted_environment_domain === "minecraft";
   if (!hasMinecraftScope) return null;
   if (isMinecraftSituationSessionSetupPrompt(prompt)) return null;
+  if (
+    resolveMinecraftExecutionPlaneConstraint(prompt) === "player_embodiment"
+  ) {
+    return null;
+  }
 
   const directRequestPatterns = [
     new RegExp(
@@ -3233,6 +3373,8 @@ const naturalMinecraftSituationProbePromptMatches = (
 }> => {
   const minecraftCommandActionMatch =
     naturalMinecraftCommandActionPromptMatch(prompt, context);
+  const playerEmbodimentPlane =
+    resolveMinecraftExecutionPlaneConstraint(prompt) === "player_embodiment";
   const hasMinecraftCommandSurfaceIntent =
     /\b(?:use|using|run|execute|issue|send|set|change)\b[\s\S]{0,100}\b(?:live\s+)?(?:minecraft|fabric|minehut|mine\s*hut|game)\b[\s\S]{0,100}\b(?:server\s+)?(?:command(?!\.catalog\b|\s+(?:tree|catalog)\b)(?:\s+(?:dispatcher|surface))?|dispatcher)\b/i.test(
       prompt,
@@ -3278,11 +3420,25 @@ const naturalMinecraftSituationProbePromptMatches = (
     patterns: RegExp[];
   }> = [
     {
+      capability: HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+      patterns: playerEmbodimentPlane
+        ? [
+            /\b(?:walk|take)\b[\s\S]{0,80}\b(?:step|steps|forward|backward|back|left|right)\b/iu,
+            /\b(?:move|walk)\b[\s\S]{0,60}\b(?:forward|backward|back|left|right)\b/iu,
+          ]
+        : [],
+    },
+    {
+      capability: HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+      patterns: playerEmbodimentPlane ? [/\bjump(?:s|ed|ing)?\b/iu] : [],
+    },
+    {
       capability: HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
       patterns: [
         /\b(?:where\s+am\s+i|what(?:'s|\s+is)\s+my\s+(?:current\s+)?(?:minecraft\s+)?(?:location|position|dimension)|how\s+am\s+i\s+doing)\b[\s\S]{0,120}\bminecraft\b|\bminecraft\b[\s\S]{0,120}\b(?:where\s+am\s+i|what(?:'s|\s+is)\s+my\s+(?:current\s+)?(?:location|position|dimension)|how\s+am\s+i\s+doing)\b/i,
         /\b(?:what(?:'s|\s+is)|recheck|check|read|show|inspect|tell\s+me)\b[\s\S]{0,40}\bmy\s+(?:(?:current\s+)?(?:minecraft\s+)?|minecraft\s+(?:current\s+)?)(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position)\b/i,
-        /\b(?:recheck|check|read|show|inspect|tell\s+me)\b[\s\S]{0,50}\b(?:my|the\s+player'?s?|current\s+actor'?s?)\s+(?:current\s+)?(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position)\b/i,
+        /\b(?:verify|recheck|check|read|show|inspect|tell\s+me)\b[\s\S]{0,50}\b(?:my|the\s+player'?s?|current\s+actor'?s?)\s+(?:current\s+|final\s+)?(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position)\b/i,
+        /\b(?:use|obtain|require)\b[\s\S]{0,50}\b(?:fresh|current)\s+(?:minecraft\s+)?actor\s+status\s+evidence\b[\s\S]{0,80}\b(?:report|verify|check|read|show)\b[\s\S]{0,40}\b(?:final\s+)?position\b/i,
         /\b(?:my|the\s+player'?s?|current\s+actor'?s?)\s+(?:current\s+)?(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position)\b/i,
         /\b(?:check|read|show|inspect|tell\s+me)\b[\s\S]{0,80}\b(?:my\s+)?(?:selected|bound|current)\s+(?:minecraft\s+)?player'?s?\s+(?:current\s+)?(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position)\b/i,
         /\b(?:check|read|show|inspect|tell\s+me|what(?:'s|\s+is))\b[\s\S]{0,70}\b(?:crimson\s+curse|infection)\b[\s\S]{0,40}\b(?:phase|mass|points?|state|status)\b/i,
@@ -3378,6 +3534,11 @@ const naturalMinecraftSituationProbePromptMatches = (
     match_end_index: number;
   }> = [];
   const semanticAnchorPatterns = new Map<string, RegExp>([
+    [
+      HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+      /\b(?:walk|take|move|step|forward|backward|back|left|right)\b/iu,
+    ],
+    [HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY, /\bjump(?:s|ed|ing)?\b/iu],
     [
       HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
       /\b(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position|crimson\s+curse|infection)\b/i,

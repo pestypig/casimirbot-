@@ -1548,6 +1548,52 @@ export const mathStageRegistry: MathStageEntry[] = [
   },
   {
     tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-semiclassical-v2-raw-replay-manifest.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Exact pre-frozen semiclassical-v2 raw replay manifest for paired primary and independent runs. It binds a nondegenerate metric-demand tensor, state-derived non-lever source provenance, the complete field/state/renormalization/constraint input closure, raw bilocal noise and algebra operands, run timing, hashes, freshness, isolated implementation identities, and immutable diagnostic-only claim locks. The manifest cannot declare replay success.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-semiclassical-v2-raw-replay-manifest.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      metricDemandFrobenius: "M L^-1 T^-2",
+      noiseKernel: "M^2 L^-2 T^-4",
+      meanRset: "M L^-1 T^-2",
+      normalizedConstraintResidual: "1",
+      regulatorConvergenceOrder: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-semiclassical-v2-content-replay.ts",
+    stage: "diagnostic",
+    notes:
+      "Pure server-owned calculation kernel over already secured float64 snapshots. It independently recomputes finiteness, nondegeneracy, bilocal exchange symmetry, a conservative weighted PSD certificate and fluctuation ratio, bracket residuals, antisymmetry, Jacobi identity, and regulator convergence. A single-run pass remains calculation-only and cannot promote Theory Graph lamps without distinct independent-run agreement.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-semiclassical-v2-content-replay.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      metricDemandFrobenius: "M L^-1 T^-2",
+      exchangeResidualUpper95: "M^2 L^-2 T^-4",
+      psdCertificateLowerBound: "M^2 L^-2 T^-4",
+      fluctuationToMeanRatioUpper95: "1",
+      normalizedConstraintResidualUpper95: "1",
+      regulatorConvergenceOrder: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
     module: "shared/contracts/nhm2-prediction-falsifier-freeze.v1.ts",
     stage: "diagnostic",
     notes:
@@ -1915,7 +1961,7 @@ export const mathStageRegistry: MathStageEntry[] = [
       "server/services/theory/nhm2-independent-numerical-replication-executor.ts",
     stage: "diagnostic",
     notes:
-      "Server-owned independent external-process observer requiring an immutable installed toolchain policy, hash-addressed preseal, verified primary receipt, exact source/toolchain/environment identities, and fresh closed output inventory. Process observation alone cannot establish implementation independence or scientific agreement.",
+      "Server-owned independent external-process observer requiring an immutable installed toolchain policy, a pre-primary hash-addressed candidate-input-only preseal, verified primary receipt retained exclusively for post-run comparison, exact source/toolchain/environment identities, and fresh closed output inventory. Primary output paths, hashes, and bytes are forbidden from the child ledger; production remains fail-closed until the pre-primary store and OS-level output isolation are configured. Process observation alone cannot establish implementation independence or scientific agreement.",
     checks: [
       {
         type: "stability",
@@ -1924,7 +1970,7 @@ export const mathStageRegistry: MathStageEntry[] = [
       { type: "policy", path: "WARP_AGENTS.md" },
     ],
     units: {
-      primaryOutputCount: "1",
+      frozenCandidateInputCount: "1",
       executableSizeBytes: "1",
       processDuration: "T",
       outputInventorySha256: "1",

@@ -7,7 +7,7 @@
       "equationId": "cdp-casimir-energy-per-area",
       "label": "Ideal Casimir energy per area and pressure",
       "sectionAnchor": "43-lane-c-boundary-conditioned-extension-hb",
-      "latex": "\\frac{E_{\\rm C}}{A}=-\\frac{\\pi^2\\hbar c}{720a^3}, \\qquad P_{\\rm C}=-\\frac{\\pi^2\\hbar c}{240a^4}, \\tag{5}",
+      "latex": "\\frac{E_{\\rm C}}{A}=-\\frac{\\pi^2\\hbar c}{720a^3}, \\qquad P_{\\rm C}=-\\frac{\\pi^2\\hbar c}{240a^4}, \\tag{9}",
       "aliases": [
         "E_A=-(pi^2 hbar c)/(720 a^3)"
       ],
@@ -38,7 +38,7 @@
       "equationId": "cdp-frequency-cavity-bridge-gate",
       "label": "Frequency-to-cavity bridge gate",
       "sectionAnchor": "45-compton-frequency-non-bridge",
-      "latex": "\\mathcal K_{\\mathrm{boundary}\\rightarrow \\mathrm{branch/coherence}}\\quad\\text{is not registered}. \\tag{6}",
+      "latex": "\\mathcal K_{\\mathrm{boundary}\\rightarrow \\mathrm{branch/coherence}}\\quad\\text{is not registered}. \\tag{10}",
       "aliases": [
         "K_boundary_to_branch_coherence not registered"
       ],
@@ -72,7 +72,7 @@
       "equationId": "cdp-observable-separation-gate",
       "label": "Observable-separation gate",
       "sectionAnchor": "9-observable-separation-gate",
-      "latex": "\\text{observable A}\\rightarrow\\text{observable B} \\quad\\Longrightarrow\\quad \\{\\text{transfer law, units, source, parameters, test}\\}. \\tag{15}",
+      "latex": "\\text{observable A}\\rightarrow\\text{observable B} \\quad\\Longrightarrow\\quad \\{\\text{transfer law, units, source, parameters, test}\\}. \\tag{34}",
       "aliases": [
         "observable A to observable B requires a transfer law"
       ],
@@ -107,7 +107,7 @@
       "equationId": "cdp-stage4-2c-control-response-whitening",
       "label": "Complex-coherence covariance whitening",
       "sectionAnchor": "5-complex-coherence-estimator-and-identifiability",
-      "latex": "\\tilde y=L^{-1}y,\\qquad \\tilde X=L^{-1}X,\\qquad \\tilde s_{\\rm D}=L^{-1}s_{\\rm D}, \\qquad LL^{\\mathsf T}=\\Sigma. \\tag{8}",
+      "latex": "\\tilde y=L^{-1}y,\\qquad \\tilde X=L^{-1}X,\\qquad \\tilde s_{\\rm D}=L^{-1}s_{\\rm D}, \\qquad LL^{\\mathsf T}=\\Sigma. \\tag{12}",
       "aliases": [
         "s_tilde=L^-1 s; L L^T=Sigma"
       ],
@@ -142,7 +142,7 @@
       "equationId": "cdp-stage4-2c-identifiability-power-gates",
       "label": "Identifiability and power gates",
       "sectionAnchor": "51-boundary--branch-interaction-diagnostic",
-      "latex": "\\max_j|\\cos(\\tilde s_{\\rm D},\\tilde x_j)|\\le0.97,\\quad \\kappa(G_{\\rm norm})\\le100,\\quad \\mathrm{power}\\ge0.80,\\quad \\mathrm{FPR}\\le0.05. \\tag{10}",
+      "latex": "\\max_j|\\cos(\\tilde s_{\\rm D},\\tilde x_j)|\\le0.97,\\quad \\kappa(G_{\\rm norm})\\le100,\\quad \\mathrm{power}\\ge0.80,\\quad \\mathrm{FPR}\\le0.05. \\tag{17}",
       "aliases": [
         "cosine<=0.97; condition<=100; power>=0.80; FPR<=0.05"
       ],
@@ -246,7 +246,7 @@
       "equationId": "cdp-stage4-2g-companion-threshold",
       "label": "Companion detector uncertainty requirement",
       "sectionAnchor": "71-companion-observable-and-interpretation-ceiling",
-      "latex": "\\sigma_{\\dot E,\\mathrm{one\\ shot}} \\le \\frac{\\dot E\\sqrt{100}}{5} =6.14027\\times10^{-40}\\ {\\rm W}. \\tag{13}",
+      "latex": "\\sigma_{\\dot E,\\mathrm{one\\ shot}} \\le \\frac{\\dot E\\sqrt{100}}{5} =6.14027\\times10^{-40}\\ {\\rm W}. \\tag{32}",
       "aliases": [
         "sigma_one_shot<=Edot sqrt(N)/SNR"
       ],
@@ -279,8 +279,8 @@
     {
       "equationId": "cdp-stage4-2g-whitened-pilot-gates",
       "label": "Measured pilot conjunction",
-      "sectionAnchor": "82-pilot-admission-rule",
-      "latex": "\\mathcal G_{\\rm pilot}= \\mathcal G_{\\rm preparation}\\land \\mathcal G_{\\rm response}\\land \\mathcal G_{\\rm covariance}\\land \\mathcal G_{\\rm identifiability}\\land \\mathcal G_{\\rm power}\\land \\mathcal G_{\\rm custody}. \\tag{14}",
+      "sectionAnchor": "82-integrated-feasibility-pilot-admission-rule",
+      "latex": "\\mathcal G_{\\rm pilot}= \\mathcal G_{\\rm preparation}\\land \\mathcal G_{\\rm response}\\land \\mathcal G_{\\rm covariance}\\land \\mathcal G_{\\rm identifiability}\\land \\mathcal G_{\\rm power}\\land \\mathcal G_{\\rm custody}. \\tag{33}",
       "aliases": [
         "preparation and response and covariance and identifiability and power and custody"
       ],
@@ -314,7 +314,7 @@
       "equationId": "cdp-stage4-2i-complex-cross-ratio",
       "label": "Four-cell complex boundary–branch cross-ratio",
       "sectionAnchor": "51-boundary--branch-interaction-diagnostic",
-      "latex": "\\mathcal R_\\times= \\frac{\\bar C_{11}\\bar C_{00}} {\\bar C_{01}\\bar C_{10}}, \\qquad I_\\times=-\\ln|\\mathcal R_\\times|, \\qquad \\Phi_\\times=\\arg\\mathcal R_\\times . \\tag{9a}",
+      "latex": "R_4= \\frac{\\bar C_{11}\\bar C_{00}} {\\bar C_{01}\\bar C_{10}}, \\qquad I_4=-\\ln|R_4|, \\qquad \\Phi_4=\\arg R_4 . \\tag{14}",
       "aliases": [
         "R_cross=(C11 C00)/(C01 C10); I_cross=-ln|R_cross|; Phi_cross=arg R_cross"
       ],
@@ -349,7 +349,7 @@
       "equationId": "cdp-stage4-2i-ordinary-corrected-interaction",
       "label": "Ordinary-corrected amplitude and phase interaction",
       "sectionAnchor": "51-boundary--branch-interaction-diagnostic",
-      "latex": "\\mathcal R_{\\times,\\mathrm{corr}}= \\frac{\\mathcal R_{\\times,\\mathrm{obs}}} {\\mathcal R_{\\times,0}}, \\quad I_{\\times,\\mathrm{corr}}=I_{\\times,\\mathrm{obs}}-I_{\\times,0}, \\quad \\Phi_{\\times,\\mathrm{corr}}= \\operatorname{wrap}(\\Phi_{\\times,\\mathrm{obs}}-\\Phi_{\\times,0}). \\tag{9b}",
+      "latex": "R_{4,\\mathrm{corr}}= \\frac{R_{4,\\mathrm{obs}}} {R_{4,0}}, \\quad I_{4,\\mathrm{corr}}=I_{4,\\mathrm{obs}}-I_{4,0}, \\quad \\Phi_{4,\\mathrm{corr}}= \\operatorname{wrap}(\\Phi_{4,\\mathrm{obs}}-\\Phi_{4,0}). \\tag{15}",
       "aliases": [
         "R_cross,corr=R_cross,obs/R_cross,H0"
       ],
@@ -383,7 +383,7 @@
       "equationId": "cdp-stage4-2i-wavepacket-custody",
       "label": "Center-of-mass wave-packet custody and equivalence gate",
       "sectionAnchor": "51-boundary--branch-interaction-diagnostic",
-      "latex": "\\mathbf d=\\mathbf x_B-\\mathbf x_A, \\qquad \\sigma_{\\rm CM}=\\sqrt{\\frac{\\operatorname{tr}\\Sigma_{\\rm CM}}{3}}, \\qquad \\{R_{\\rm sphere},R_0,\\sigma_{\\rm CM}\\} \\quad\\text{have distinct physical and model roles}. \\tag{9c}",
+      "latex": "\\mathbf d=\\mathbf x_B-\\mathbf x_A, \\qquad \\sigma_{\\rm CM}=\\sqrt{\\frac{\\operatorname{tr}\\Sigma_{\\rm CM}}{3}}, \\qquad \\{R_{\\rm sphere},R_0,\\sigma_{\\rm CM}\\} \\quad\\text{have distinct physical and model roles}. \\tag{16}",
       "aliases": [
         "G_packet=I_q0 AND I_q1 AND I_boundary_equivalence AND I_custody"
       ],
@@ -417,7 +417,7 @@
       "equationId": "cdp-stage4-2j-schrodinger-coherence-factorization",
       "label": "Schrödinger, environment, and Diósi coherence factors",
       "sectionAnchor": "211-from-schrdinger-evolution-to-the-measured-residual",
-      "latex": "C(t)=C(0) e^{-i\\Delta E_Ht/\\hbar} e^{-\\chi_{\\rm env}(t)} e^{-E_Gt/\\hbar}. \\tag{4a}",
+      "latex": "c_{AB}(t)= e^{-i\\Delta E_Ht/\\hbar} e^{-\\chi_{\\rm env}(t)} e^{-E_Gt/\\hbar}. \\tag{5}",
       "aliases": [
         "C=C0 exp(-i Delta_E_H t/hbar) exp(-chi_env) exp(-E_G t/hbar)"
       ],
@@ -451,7 +451,7 @@
       "equationId": "cdp-stage4-2j-dp-equivalent-energy-inverse",
       "label": "Conditional DP-equivalent energy inversion",
       "sectionAnchor": "211-from-schrdinger-evolution-to-the-measured-residual",
-      "latex": "E_{\\rm D,eq} =-\\frac{\\hbar}{t} \\ln\\!\\left(\\frac{|C_{\\rm residual}(t)|}{|C(0)|}\\right). \\tag{4b}",
+      "latex": "E_{\\rm D,eq} =-\\frac{\\hbar}{t} \\ln\\!\\left|c_{AB,{\\rm residual}}(t)\\right|. \\tag{6}",
       "aliases": [
         "E_D,eq=-(hbar/t) ln(|C_residual|/|C0|)"
       ],
@@ -485,7 +485,7 @@
       "equationId": "cdp-stage4-2j-homogeneous-sphere-energy",
       "label": "Gaussian-convolved homogeneous-sphere difference energy",
       "sectionAnchor": "212-constituent-mass-density-changes-the-forecast",
-      "latex": "E_G^{\\rm sphere} =\\frac{2Gm^2}{\\pi R_0}\\int_0^\\infty du\\,e^{-u^2} \\left[\\frac{3(\\sin q-q\\cos q)}{q^3}\\right]^2 \\left[1-\\frac{\\sin(ud/R_0)}{ud/R_0}\\right], \\qquad q=\\frac{uR}{R_0}. \\tag{4c}",
+      "latex": "E_G^{\\rm sphere} =\\frac{2Gm^2}{\\pi R_0}\\int_0^\\infty du\\,e^{-u^2} \\left[\\frac{3(\\sin q-q\\cos q)}{q^3}\\right]^2 \\left[1-\\frac{\\sin(ud/R_0)}{ud/R_0}\\right], \\qquad q=\\frac{uR}{R_0}. \\tag{7}",
       "aliases": [
         "E_G sphere radial Fourier integral"
       ],
@@ -519,7 +519,7 @@
       "equationId": "cdp-stage4-2j-residual-gas-screen",
       "label": "Ideal-equilibrium residual-gas collision screen",
       "sectionAnchor": "213-cheap-feasibility-screens-precede-power",
-      "latex": "n=\\frac{P}{k_BT},\\qquad \\bar v=\\sqrt{\\frac{8k_BT}{\\pi m_g}},\\qquad \\Gamma_{\\rm coll}^{\\rm screen}=n\\bar v\\,\\pi R^2. \\tag{4d}",
+      "latex": "n=\\frac{P}{k_BT},\\qquad \\bar v=\\sqrt{\\frac{8k_BT}{\\pi m_g}},\\qquad \\Gamma_{\\rm coll}^{\\rm screen}=n\\bar v\\,\\pi R^2. \\tag{8}",
       "aliases": [
         "Gamma_coll=(P/kBT) vbar pi R^2"
       ],
@@ -552,7 +552,7 @@
     {
       "equationId": "cdp-stage4-2k-ground-state-green-chain",
       "label": "Ground-state polarizability to Casimir-Polder Green response",
-      "sectionAnchor": "116-microscopic-electromagnetic-closure-and-orientation-no-go",
+      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
       "latex": "\\alpha_g(i\\xi)=\\frac{2}{3\\hbar}\\sum_n \\frac{\\omega_{ng}|\\langle n|\\hat{\\mathbf d}|g\\rangle|^2} {\\omega_{ng}^2+\\xi^2},\\qquad U_{\\rm CP}(\\mathbf r)=\\frac{\\hbar\\mu_0}{2\\pi}\\int_0^\\infty d\\xi\\, \\xi^2\\alpha_g(i\\xi)\\operatorname{Tr}\\mathbf G^{(1)}(\\mathbf r,\\mathbf r;i\\xi).",
       "aliases": [
         "alpha_g(i xi) transition sum and U_CP Green tensor integral"
@@ -586,7 +586,7 @@
     {
       "equationId": "cdp-stage4-2k-sphere-polarizability",
       "label": "Small-sphere imaginary-axis polarizability",
-      "sectionAnchor": "116-microscopic-electromagnetic-closure-and-orientation-no-go",
+      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
       "latex": "\\alpha_{\\rm sph}(i\\xi)=4\\pi\\epsilon_0R^3 \\frac{\\epsilon(i\\xi)-1}{\\epsilon(i\\xi)+2}.",
       "aliases": [
         "alpha_sph=4 pi epsilon0 R^3 (epsilon-1)/(epsilon+2)"
@@ -618,7 +618,7 @@
     {
       "equationId": "cdp-stage4-2k-phase-jitter-loss",
       "label": "Gaussian phase jitter to coherence loss",
-      "sectionAnchor": "116-microscopic-electromagnetic-closure-and-orientation-no-go",
+      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
       "latex": "\\left\\langle e^{i\\delta\\phi}\\right\\rangle =e^{-\\sigma_\\phi^2/2},\\qquad \\chi_\\phi=\\frac{\\sigma_\\phi^2}{2}.",
       "aliases": [
         "chi_phi=sigma_phi^2/2"
@@ -651,8 +651,8 @@
     {
       "equationId": "cdp-stage4-2k-qlbe-decoherence",
       "label": "Quantum-linear-Boltzmann gas decoherence kernel",
-      "sectionAnchor": "116-microscopic-electromagnetic-closure-and-orientation-no-go",
-      "latex": "\\Gamma_{\\rm gas}(\\Delta\\mathbf x)=n_g\\!\\int d^3v\\,\\mu(\\mathbf v)v \\int d\\Omega\\,|f(\\mathbf q,\\mathbf v)|^2 \\left[1-e^{i\\mathbf q\\cdot\\Delta\\mathbf x/\\hbar}\\right],",
+      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
+      "latex": "\\Gamma_{\\rm gas}(\\Delta\\mathbf x)=n_g\\!\\int d^3v\\,\\mu(\\mathbf v)v \\int d\\Omega\\,|f(\\mathbf q,\\mathbf v)|^2 \\left[1-e^{i\\mathbf q\\cdot\\Delta\\mathbf x/\\hbar}\\right].",
       "aliases": [
         "Gamma_gas(Delta x) momentum transfer scattering integral"
       ],
@@ -685,7 +685,7 @@
     {
       "equationId": "cdp-stage4-2l-finite-rectangle-surrogate",
       "label": "Finite rectangular-plate solid-angle response surrogate",
-      "sectionAnchor": "117-derivation-ancestry-empirical-authority-no-go",
+      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
       "latex": "\\Omega(\\mathbf r)=\\iint_A \\frac{z\\,dA'}{[(x'-x)^2+(y'-y)^2+z^2]^{3/2}},\\qquad U_{\\rm rect}(\\mathbf r)=\\frac{\\Omega(\\mathbf r)}{2\\pi} U_{\\rm CP}^{\\infty}(z).",
       "aliases": [
         "U_rect=(Omega/2pi) U_CP infinity"
@@ -719,7 +719,7 @@
     {
       "equationId": "cdp-stage4-2l-phase-covariance",
       "label": "Boundary-phase Jacobian and covariance propagation",
-      "sectionAnchor": "117-derivation-ancestry-empirical-authority-no-go",
+      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
       "latex": "J_i=\\frac{\\partial\\Phi_{\\rm EM}}{\\partial\\theta_i},\\qquad \\sigma_\\phi^2=\\mathbf J\\,\\boldsymbol\\Sigma_\\theta\\mathbf J^{\\mathsf T}.",
       "aliases": [
         "sigma_phi^2=J Sigma_theta J^T"
@@ -752,7 +752,7 @@
     {
       "equationId": "cdp-stage4-2l-qlbe-isotropic-proxy",
       "label": "Isotropic quantum-linear-Boltzmann gas proxy",
-      "sectionAnchor": "117-derivation-ancestry-empirical-authority-no-go",
+      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
       "latex": "\\Gamma_{\\rm gas}(d)=\\sum_s n_s\\bar v_s\\sigma_s \\frac12\\int_{-1}^{1}d\\mu\\, \\left[1-\\operatorname{sinc}\\!\\left( \\frac{m_s\\bar v_s d\\sqrt{2(1-\\mu)}}{\\hbar}\\right)\\right].",
       "aliases": [
         "Gamma_gas=sum n v sigma localization factor"
@@ -786,7 +786,7 @@
     {
       "equationId": "cdp-stage4-2l-density-regularization-envelope",
       "label": "DP mass-density and regularization sensitivity envelope",
-      "sectionAnchor": "117-derivation-ancestry-empirical-authority-no-go",
+      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
       "latex": "E_G^{(a)}(d,r_0)=\\frac{2Gm^2}{\\pi r_0} \\int_0^\\infty du\\,e^{-u^2}|F_a(uR/r_0)|^2 \\left[1-\\operatorname{sinc}(ud/r_0)\\right].",
       "aliases": [
         "E_G radial form factor grid"
@@ -819,8 +819,8 @@
     {
       "equationId": "cdp-stage4-2m-multigate-objective",
       "label": "Stage-4.2M bounded multigate apparatus objective",
-      "sectionAnchor": "118-selection-of-the-leading-bounded-design",
-      "latex": "G_M(q)=G_{\\rm DP}\\wedge G_{\\rho}\\wedge G_{\\phi}\\wedge G_{\\rm gas} \\wedge G_{\\rm prep}\\wedge G_{\\rm bound}\\wedge G_{\\rm id} \\wedge G_{\\rm power}\\wedge G_{\\rm companion}.",
+      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
+      "latex": "G_M(q)=G_{\\rm D}\\wedge G_{\\rho}\\wedge G_{\\phi}\\wedge G_{\\rm gas} \\wedge G_{\\rm prep}\\wedge G_{\\rm bound}\\wedge G_{\\rm id} \\wedge G_{\\rm power}\\wedge G_{\\rm companion},",
       "aliases": [
         "G_M conjunction of apparatus gates"
       ],
@@ -853,7 +853,7 @@
     {
       "equationId": "cdp-stage4-2m-transported-backgrounds",
       "label": "Stage-4.2M transported phase and gas backgrounds",
-      "sectionAnchor": "118-selection-of-the-leading-bounded-design",
+      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
       "latex": "\\sigma_{\\phi,\\rm echo}^2 =\\eta_{\\rm echo}^2\\mathbf J_{\\phi}(q)\\boldsymbol\\Sigma_q \\mathbf J_{\\phi}^{\\mathsf T}(q),\\qquad \\Gamma_{\\rm gas}(q)=\\Gamma_{\\rm gas,L}\\,\\mathcal T_{P,T,R,d}(q).",
       "aliases": [
         "sigma_phi_echo and Gamma_gas transport"
@@ -887,7 +887,7 @@
       "equationId": "cdp-stage4-2n-complex-ordinary-null",
       "label": "Stage-4.2N ordinary complex-coherence prediction",
       "sectionAnchor": "55-material-resolved-ordinary-complex-coherence-null",
-      "latex": "C_{0,\\beta}(t)=C(0) \\exp\\!\\left[i\\Phi_{{\\rm EM},\\beta}(t)-\\chi_{0,\\beta}(t)\\right]. \\tag{16a}",
+      "latex": "C_{0,\\beta}(t)=C(0) \\exp\\!\\left[i\\Phi_{{\\rm EM},\\beta}(t)-\\chi_{0,\\beta}(t)\\right]. \\tag{18}",
       "aliases": [
         "C_0_beta=C0 exp(i Phi_EM_beta-chi_0_beta)"
       ],
@@ -922,7 +922,7 @@
       "equationId": "cdp-stage4-2n-four-cell-cross-ratio",
       "label": "Stage-4.2N four-cell boundary-by-superposition cross-ratio",
       "sectionAnchor": "55-material-resolved-ordinary-complex-coherence-null",
-      "latex": "\\mathcal R_4= \\frac{C_{{\\rm active},{\\rm separated}} C_{{\\rm reference},{\\rm compact}}} {C_{{\\rm active},{\\rm compact}} C_{{\\rm reference},{\\rm separated}}}, \\qquad \\Phi_4=\\arg\\mathcal R_4, \\qquad \\chi_4=-\\ln|\\mathcal R_4|. \\tag{16b}",
+      "latex": "R_4= \\frac{\\bar C_{{\\rm active},{\\rm separated}} \\bar C_{{\\rm reference},{\\rm compact}}} {\\bar C_{{\\rm active},{\\rm compact}} \\bar C_{{\\rm reference},{\\rm separated}}}, \\qquad \\Phi_4=\\arg R_4, \\qquad I_4=-\\ln|R_4|. \\tag{19}",
       "aliases": [
         "R4=(C_as C_rc)/(C_ac C_rs)"
       ],
@@ -956,7 +956,7 @@
       "equationId": "cdp-stage4-2o-public-fringe-coefficient",
       "label": "Stage-4.2O public sodium-cluster complex fringe coefficient",
       "sectionAnchor": "56-public-data-component-validation",
-      "latex": "S_\\ell=\\frac{1}{N}\\sum_{j=0}^{N-1}n_j e^{-2\\pi i\\ell j/N}, \\qquad \\widetilde C_1=2\\frac{S_1}{S_0}=V e^{i\\phi}. \\tag{16c}",
+      "latex": "S_\\ell=\\frac{1}{N}\\sum_{j=0}^{N-1}n_j e^{-2\\pi i\\ell j/N}, \\qquad \\widetilde C_1=2\\frac{S_1}{S_0}=V e^{i\\phi}. \\tag{20}",
       "aliases": [
         "C_tilde_1=2 S_1/S_0=V exp(i phi)"
       ],
@@ -990,7 +990,7 @@
       "equationId": "cdp-stage4-2o-heldout-covariance-residual",
       "label": "Stage-4.2O held-out multichannel covariance residual",
       "sectionAnchor": "56-public-data-component-validation",
-      "latex": "\\widehat\\Sigma_{\\rm tr}=\\operatorname{Cov}(\\mathbf z_{\\rm tr}), \\qquad \\mathbf r_{\\rm ho}=\\mathbf z_{1,\\rm ho} -\\mathbf X_{\\rm ho}\\widehat{\\boldsymbol\\beta}_{\\rm tr}. \\tag{16d}",
+      "latex": "\\widehat\\Sigma_{\\rm tr}=\\operatorname{Cov}(\\mathbf z_{\\rm tr}), \\qquad \\mathbf r_{\\rm ho}=\\mathbf z_{1,\\rm ho} -\\mathbf X_{\\rm ho}\\widehat{\\boldsymbol\\beta}_{\\rm tr}. \\tag{21}",
       "aliases": [
         "Sigma_train=Cov(z_train); r_holdout=z1-X beta_train"
       ],
@@ -1024,7 +1024,7 @@
       "equationId": "cdp-stage4-2p-weak-field-proper-time",
       "label": "Stage-4.2P weak-field branch proper time",
       "sectionAnchor": "57-proper-time-worldlines-and-the-ordinary-phase-budget",
-      "latex": "\\Delta\\tau= \\int_0^T\\!\\left[ \\frac{\\Phi_A(t)-\\Phi_B(t)}{c^2} -\\frac{v_A^2(t)-v_B^2(t)}{2c^2} \\right]dt, \\tag{16e}",
+      "latex": "\\Delta\\tau= \\int_0^T\\!\\left[ \\frac{\\Phi_A(t)-\\Phi_B(t)}{c^2} -\\frac{v_A^2(t)-v_B^2(t)}{2c^2} \\right]dt, \\tag{22}",
       "aliases": [
         "Delta tau integral of potential and velocity differences"
       ],
@@ -1059,7 +1059,7 @@
       "equationId": "cdp-stage4-2p-matter-wave-phase",
       "label": "Stage-4.2P branch-action matter-wave phase",
       "sectionAnchor": "57-proper-time-worldlines-and-the-ordinary-phase-budget",
-      "latex": "\\Delta\\phi_{\\rm prop} =-\\frac{mc^2}{\\hbar}\\Delta\\tau. \\tag{16f}",
+      "latex": "\\Delta\\phi_{\\rm prop} =-\\frac{mc^2}{\\hbar}\\Delta\\tau. \\tag{23}",
       "aliases": [
         "Delta phi equals minus m c squared Delta tau over hbar"
       ],
@@ -1094,7 +1094,7 @@
       "equationId": "cdp-stage4-2p-internal-time-dilation-coherence",
       "label": "Stage-4.2P internal-energy time-dilation coherence bound",
       "sectionAnchor": "57-proper-time-worldlines-and-the-ordinary-phase-budget",
-      "latex": "C_{\\rm int}(\\Delta\\tau) =\\operatorname{Tr}\\!\\left[ \\rho_{\\rm int}e^{-iH_{\\rm int}\\Delta\\tau/\\hbar} \\right],\\qquad |C_{\\rm int}|\\simeq \\exp\\!\\left[-\\frac{\\operatorname{Var}(H_{\\rm int})\\Delta\\tau^2} {2\\hbar^2}\\right]. \\tag{16g}",
+      "latex": "C_{\\rm int}(\\Delta\\tau) =\\operatorname{Tr}\\!\\left[ \\rho_{\\rm int}e^{-iH_{\\rm int}\\Delta\\tau/\\hbar} \\right],\\qquad |C_{\\rm int}|\\simeq \\exp\\!\\left[-\\frac{\\operatorname{Var}(H_{\\rm int})\\Delta\\tau^2} {2\\hbar^2}\\right]. \\tag{24}",
       "aliases": [
         "C internal trace rho exp minus i H internal Delta tau over hbar"
       ],
@@ -1128,7 +1128,7 @@
       "equationId": "cdp-stage4-2q-london-screening",
       "label": "Stage-4.2Q London screening and in-medium photon mass scale",
       "sectionAnchor": "58-superconducting-boundary-control-bridge-and-nonbridges",
-      "latex": "\\lambda_L^{-2}=\\mu_0\\frac{n_s(q^*)^2}{m^*}, \\qquad m_{\\gamma,{\\rm eff}}=\\frac{\\hbar}{\\lambda_Lc}. \\tag{16h}",
+      "latex": "\\lambda_L^{-2}=\\mu_0\\frac{n_s(q^*)^2}{m^*}, \\qquad m_{\\gamma,{\\rm eff}}=\\frac{\\hbar}{\\lambda_Lc}. \\tag{25}",
       "aliases": [
         "lambda L inverse squared equals mu0 ns qstar squared over mstar"
       ],
@@ -1162,7 +1162,7 @@
       "equationId": "cdp-stage4-2q-finite-impedance",
       "label": "Stage-4.2Q finite-frequency superconducting surface impedance",
       "sectionAnchor": "58-superconducting-boundary-control-bridge-and-nonbridges",
-      "latex": "Z_s(\\omega)=R_s(\\omega)+iX_s(\\omega), \\qquad X_s(\\omega)\\simeq\\mu_0\\omega\\lambda_L \\tag{16i}",
+      "latex": "Z_s(\\omega)=R_s(\\omega)+iX_s(\\omega), \\qquad X_s(\\omega)\\simeq\\mu_0\\omega\\lambda_L \\tag{26}",
       "aliases": [
         "Zs equals Rs plus i Xs"
       ],
@@ -1196,7 +1196,7 @@
       "equationId": "cdp-stage4-2q-boundary-ratio",
       "label": "Stage-4.2Q normal/superconducting coherence ratio",
       "sectionAnchor": "58-superconducting-boundary-control-bridge-and-nonbridges",
-      "latex": "C_\\beta(t)=C(0)e^{i\\Phi_{{\\rm EM},\\beta}(t) -\\chi_{{\\rm EM},\\beta}(t)-\\Gamma_Dt}, \\qquad \\frac{C_S}{C_N} =e^{i(\\Phi_S-\\Phi_N)-(\\chi_S-\\chi_N)}. \\tag{16j}",
+      "latex": "C_\\beta(t)=C(0)e^{i\\Phi_{{\\rm EM},\\beta}(t) -\\chi_{{\\rm EM},\\beta}(t)-\\Gamma_Dt}, \\qquad \\frac{C_S}{C_N} =e^{i(\\Phi_S-\\Phi_N)-(\\chi_S-\\chi_N)}. \\tag{27}",
       "aliases": [
         "CS over CN cancels Gamma D"
       ],
@@ -1231,7 +1231,7 @@
       "equationId": "cdp-stage4-2r-diosi-precision-target",
       "label": "Stage-4.2R primary Diósi acquisition precision",
       "sectionAnchor": "59-integrated-empirical-pilot-closure",
-      "latex": "V_{\\rm D}=e^{-\\Gamma_{\\rm D}t}=e^{-0.0295115}=0.970920, \\qquad \\sigma_{|C|}\\leq \\frac{1-e^{-\\Gamma_{\\rm D}t}}{\\mathrm{SNR}_{\\min}} =5.816\\times10^{-3}. \\tag{16k}",
+      "latex": "V_{\\rm D}=e^{-\\Gamma_{\\rm D}t}=e^{-0.0295115}=0.970920, \\qquad \\sigma_{|C|}\\leq \\frac{1-e^{-\\Gamma_{\\rm D}t}}{\\mathrm{SNR}_{\\min}} =5.816\\times10^{-3}. \\tag{28}",
       "aliases": [
         "sigma coherence magnitude less than Diósi visibility loss over SNR"
       ],
@@ -1266,7 +1266,7 @@
       "equationId": "cdp-stage4-2r-four-cell-cross-ratio",
       "label": "Stage-4.2R four-cell boundary interaction",
       "sectionAnchor": "59-integrated-empirical-pilot-closure",
-      "latex": "R_4= \\frac{C_{\\mathrm{active,sep}}C_{\\mathrm{reference,compact}}} {C_{\\mathrm{active,compact}}C_{\\mathrm{reference,sep}}}. \\tag{16l}",
+      "latex": "R_4= \\frac{\\bar C_{\\mathrm{active,sep}}\\bar C_{\\mathrm{reference,compact}}} {\\bar C_{\\mathrm{active,compact}}\\bar C_{\\mathrm{reference,sep}}}. \\tag{29}",
       "aliases": [
         "R4 active separated reference compact over active compact reference separated"
       ],

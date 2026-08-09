@@ -27,6 +27,10 @@ import {
   helixMinecraftPlayerActionArgumentsSchema,
   minecraftPlayerCapabilityForActionKind,
 } from "@shared/helix-minecraft-player-capabilities";
+import {
+  hashEnvironmentActionIdempotencyContent,
+  storedEnvironmentActionMatchesIdempotencyContent,
+} from "../services/environment-connectors/actions/action-broker";
 
 const now = "2026-08-05T12:00:00.000Z";
 const later = "2026-08-05T12:01:00.000Z";
@@ -137,6 +141,51 @@ const settledResult = () => ({
 });
 
 describe("provider-neutral environment player-action contract", () => {
+  it("treats bounded delivery retries as the same semantic action", () => {
+    const original = helixEnvironmentActionRequestSchema.parse(baseActionRequest());
+    const retry = helixEnvironmentActionRequestSchema.parse({
+      ...baseActionRequest(),
+      action_request_id: "environment_action_request:retry",
+      workflow_id: "environment_action_workflow:retry",
+      provider_execution_id: "provider_execution:retry",
+      tool_call_id: "tool_call:retry",
+      preconditions: original.preconditions.map((condition) => ({
+        ...condition,
+        condition_id: `${condition.condition_id}:retry`,
+      })),
+      postconditions: original.postconditions.map((condition) => ({
+        ...condition,
+        condition_id: `${condition.condition_id}:retry`,
+      })),
+      created_at: "2026-08-05T12:00:02.000Z",
+      deadline_at: "2026-08-05T12:01:02.000Z",
+    });
+
+    expect(hashEnvironmentActionIdempotencyContent(retry)).toBe(
+      hashEnvironmentActionIdempotencyContent(original),
+    );
+    expect(storedEnvironmentActionMatchesIdempotencyContent({
+      storedPayload: JSON.stringify(original),
+      storedRequestHash: "sha256:legacy-full-request-hash",
+      request: retry,
+    })).toBe(true);
+  });
+
+  it("rejects semantic changes hidden behind the same idempotency key", () => {
+    const original = helixEnvironmentActionRequestSchema.parse(baseActionRequest());
+    const changed = helixEnvironmentActionRequestSchema.parse({
+      ...baseActionRequest(),
+      arguments: {
+        ...baseActionRequest().arguments,
+        destination: { x: 11, y: 64, z: 12 },
+      },
+    });
+
+    expect(hashEnvironmentActionIdempotencyContent(changed)).not.toBe(
+      hashEnvironmentActionIdempotencyContent(original),
+    );
+  });
+
   it("declares the initial and reusable Minecraft player capability families", () => {
     expect(HELIX_MINECRAFT_PLAYER_CAPABILITY_IDS).toContain(
       HELIX_MINECRAFT_PLAYER_NAVIGATE_CAPABILITY,
