@@ -1128,6 +1128,7 @@ describe("NHM2 independent numerical execution lane", () => {
         "independent_implementation_lineage_not_established",
         "independent_exact_copy_check_tripwire_only",
         "independent_primary_content_lineage_exclusion_not_established",
+        "independent_semiclassical_v2_scientific_input_closure_not_integrated",
         "independent_field_level_content_replay_required",
         "independent_replication_evidence_not_emitted",
       ]),
@@ -1293,10 +1294,17 @@ describe("NHM2 independent numerical execution lane", () => {
       primaryOutputHashesGrantedToChild: false,
       primaryOutputBytesGrantedToChild: false,
       serverPostRunComparisonAccessVerified: true,
+      semiclassicalV2ScientificInputClosureRequired: true,
+      semiclassicalV2ScientificInputClosureIntegrated: false,
+      semiclassicalV2RequiredScientificInputCount: 21,
+      admittedAdministrativeInputCount: 8,
       operatingSystemPrimaryOutputIsolationAsserted: false,
     });
     expect(result.blockers).toContain(
       "independent_operating_system_primary_output_isolation_not_established",
+    );
+    expect(result.blockers).toContain(
+      "independent_semiclassical_v2_scientific_input_closure_not_integrated",
     );
   });
 });

@@ -100,7 +100,18 @@ export const NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY = Object.freeze({
   policyId: NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_ID,
   authority: "server_owned" as const,
   maturity: "diagnostic_only" as const,
+  minimumSampleCount:
+    NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MINIMUM_SAMPLE_COUNT,
+  minimumRegulatorLevelCount:
+    NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MINIMUM_REGULATOR_LEVELS,
   minimumMetricDemandFrobeniusSI: 1e-12,
+  units: Object.freeze({
+    noiseKernel: "(J/m^3)^2" as const,
+    meanRset: "J/m^3" as const,
+    smearingWeights: "dimensionless" as const,
+    normalizedConstraints: "dimensionless" as const,
+    regulatorScale: "dimensionless" as const,
+  }),
   symmetricTensorMultiplicities:
     NHM2_SEMICLASSICAL_V2_ORTHONORMAL_SYMMETRIC_TENSOR_MULTIPLICITIES,
   formulas: NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORMULAS,
@@ -144,6 +155,16 @@ export const NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_SIZE_BYTES =
     NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_CANONICAL_JSON,
     "utf8",
   );
+export const NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_RAW_BINDING =
+  Object.freeze({
+    artifactId: NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_ARTIFACT_ID,
+    contractVersion:
+      NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_CONTRACT_VERSION,
+    policyId: NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_ID,
+    sha256: NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_SHA256,
+    sizeBytes: NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_SIZE_BYTES,
+    mediaType: "application/json" as const,
+  });
 
 export type Nhm2SemiclassicalV2RawReplayImplementationRole =
   | "primary"
@@ -830,18 +851,24 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         numericalPolicy.frozenAt !== value.manifestFrozenAt ||
         formulas == null ||
         !hasExactKeys(formulas, FORMULA_KEYS) ||
-        !sameJson(formulas, NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORMULAS)
+        !FORMULA_KEYS.every(
+          (key) =>
+            formulas[key] ===
+            NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY.formulas[
+              key as keyof typeof NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY.formulas
+            ],
+        )
       ) {
         violations.push("numerical_policy_formula_binding_invalid");
       }
       if (
         units == null ||
         !hasExactKeys(units, UNIT_KEYS) ||
-        units.noiseKernel !== "(J/m^3)^2" ||
-        units.meanRset !== "J/m^3" ||
-        units.smearingWeights !== "dimensionless" ||
-        units.normalizedConstraints !== "dimensionless" ||
-        units.regulatorScale !== "dimensionless"
+        !UNIT_KEYS.every(
+          (key) =>
+            units[key] ===
+            NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY.units[key],
+        )
       ) {
         violations.push("numerical_policy_units_invalid");
       }

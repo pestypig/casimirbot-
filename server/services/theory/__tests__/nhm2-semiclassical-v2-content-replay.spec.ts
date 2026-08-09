@@ -288,6 +288,55 @@ describe("NHM2 semiclassical-v2 server-owned content replay", () => {
     expectLocked(result);
   });
 
+  it("certifies a correlated PSD block that is not diagonally dominant", () => {
+    const input = mutable(buildInput());
+    for (const matrixIndex of [0, 1, 2]) {
+      input.arrays.noiseKernel[noiseOffset(matrixIndex, matrixIndex)] = 1;
+    }
+    for (const [left, right] of [
+      [0, 1],
+      [0, 2],
+      [1, 2],
+    ] as const) {
+      input.arrays.noiseKernel[noiseOffset(left, right)] = 0.75;
+      input.arrays.noiseKernel[noiseOffset(right, left)] = 0.75;
+    }
+
+    const result = replayNhm2SemiclassicalV2Content(input);
+
+    expect(result.status).toBe("pass");
+    expect(result.metrics.noise).toMatchObject({
+      psdCertificationDisposition: "certified",
+      covariancePositiveSemidefiniteCertified: true,
+      factorizationResidualLInfSI: 0,
+    });
+    expect(
+      result.metrics.noise?.maximumGershgorinRadiusUpper95SI,
+    ).toBeGreaterThan(1 / SAMPLE_COUNT);
+    expectLocked(result);
+  });
+
+  it("blocks a zero-pivot row violation without mislabeling it a negative witness", () => {
+    const input = mutable(buildInput());
+    input.arrays.noiseKernel[noiseOffset(0, 0)] = 0;
+    input.arrays.noiseKernel[noiseOffset(0, 1)] = 1e-6;
+    input.arrays.noiseKernel[noiseOffset(1, 0)] = 1e-6;
+
+    const result = replayNhm2SemiclassicalV2Content(input);
+
+    expect(result.status).toBe("blocked");
+    expect(result.blockers).toContain("noise_psd_numerically_inconclusive");
+    expect(result.blockers).not.toContain("noise_psd_negative_witness");
+    expect(result.metrics.noise).toMatchObject({
+      psdCertificationDisposition: "numerically_inconclusive",
+      covariancePositiveSemidefiniteCertified: false,
+    });
+    expect(
+      result.metrics.noise?.maximumZeroPivotRowResidualSI,
+    ).toBeGreaterThan(0);
+    expectLocked(result);
+  });
+
   it("fails an exact-zero metric-demand screen as degenerate", () => {
     const input = mutable(buildInput());
     input.arrays.metricDemandRset.fill(0);
@@ -463,6 +512,47 @@ describe("NHM2 semiclassical-v2 server-owned content replay", () => {
       2 * BASE_RESIDUAL,
     );
     expect(result.metrics.jacobi?.tolerance).toBe(2 * BASE_RESIDUAL);
+    expectLocked(result);
+  });
+
+  it("uses pointwise residual-plus-uncertainty maxima for brackets and regulator levels", () => {
+    const input = mutable(buildInput());
+    input.policy = buildPolicy({
+      bracketResidualTolerance: 2,
+      regulatorFinalResidualTolerance: 0.3,
+    });
+    const bracket = input.arrays.brackets.H_H;
+    bracket.computed.set(bracket.classicalTarget);
+    bracket.computed[0] += 1;
+    bracket.producerResidual.fill(0);
+    bracket.producerResidual[0] = 1;
+    bracket.absoluteUncertainty95.fill(0);
+    bracket.absoluteUncertainty95[1] = 2;
+
+    const regulatorResiduals = [4, 1, 0.25] as const;
+    const regulatorUncertainties = [3, 0.75, 0.1875] as const;
+    for (let level = 0; level < 3; level += 1) {
+      input.arrays.regulator.levels[level].residual.fill(0);
+      input.arrays.regulator.levels[level].absoluteUncertainty95.fill(0);
+      input.arrays.regulator.levels[level].residual[0] =
+        regulatorResiduals[level];
+      input.arrays.regulator.levels[level].absoluteUncertainty95[1] =
+        regulatorUncertainties[level];
+    }
+
+    const result = replayNhm2SemiclassicalV2Content(input);
+
+    expect(result.status).toBe("pass");
+    expect(result.metrics.brackets.H_H).toMatchObject({
+      residualLInf: 1,
+      absoluteUncertainty95: 2,
+      residualUpper95: 2,
+    });
+    expect(result.metrics.regulator).toMatchObject({
+      residualUpper95ByLevel: [4, 1, 0.25],
+      observedOrders: [2, 2],
+      finalResidualUpper95: 0.25,
+    });
     expectLocked(result);
   });
 
