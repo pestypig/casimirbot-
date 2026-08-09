@@ -28,15 +28,18 @@ export const NHM2_INDEPENDENT_NUMERICAL_REPLICATION_DIAGNOSTIC_MINIMA = {
  * These blockers are derived authority limits, not producer-supplied facts.
  * The current content assessor only re-hashes opaque executor outputs and is
  * deliberately `not_evaluable`; it does not read the declared float64 arrays
- * or recompute the nine relative-L-infinity comparisons. Until a server-owned
- * replay receipt implements and binds every item below, metadata can remain
- * diagnostically useful but cannot establish independent replication.
+ * or recompute the nine relative-L-infinity comparisons. The v2
+ * semiclassical noise-kernel and constraint-algebra outputs are also outside
+ * that legacy comparison surface. Until a server-owned replay receipt
+ * implements and binds every item below, metadata can remain diagnostically
+ * useful but cannot establish independent replication.
  */
 export const NHM2_INDEPENDENT_NUMERICAL_REPLICATION_SERVER_REPLAY_BLOCKERS = [
   "server_owned_float64_array_readback_recomputation_receipt_missing",
   "server_replay_primary_comparison_projection_manifest_binding_missing",
   "server_replay_independent_field_array_manifest_binding_missing",
   "server_replay_all_nine_field_comparisons_not_recomputed",
+  "server_replay_semiclassical_v2_noise_kernel_and_constraint_algebra_not_recomputed",
 ] as const;
 
 /**

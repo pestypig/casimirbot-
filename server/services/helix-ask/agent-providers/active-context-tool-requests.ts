@@ -42,6 +42,7 @@ import { isTheoryBadgeGraphCurrentContextPrompt } from "../theory-badge-graph-cu
 import { isActiveWorkstationContextPrompt } from "../workstation-active-context-intent";
 import {
   resolveAskTurnNamedDocSummaryQueryArg,
+  resolveAskTurnTitleLikeOpenDocQueryArg,
   resolveAskTurnTopicDocQueryArg,
 } from "../doc-args";
 import { appendDedupe } from "./gateway-request-dedupe";
@@ -212,9 +213,17 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
       "active_doc_evidence_followup_source_target";
   const deicticPrompt = isActiveDocsViewerDeicticPrompt(prompt);
   const explicitPathSummaryPrompt = isImmediateExplicitDocsPathSummaryPrompt(prompt);
-  const namedDocQuery = resolveAskTurnNamedDocSummaryQueryArg(prompt);
-  const topicDocQuery = namedDocQuery ? null : resolveAskTurnTopicDocQueryArg(prompt);
-  const standaloneDocQuery = namedDocQuery ?? topicDocQuery;
+  const namedDocQuery = explicitPathSummaryPrompt
+    ? null
+    : resolveAskTurnNamedDocSummaryQueryArg(prompt);
+  const titleLikeOpenDocQuery = namedDocQuery || explicitPathSummaryPrompt
+    ? null
+    : resolveAskTurnTitleLikeOpenDocQueryArg(prompt);
+  const topicDocQuery = namedDocQuery || titleLikeOpenDocQuery || explicitPathSummaryPrompt
+    ? null
+    : resolveAskTurnTopicDocQueryArg(prompt);
+  const standaloneDocQuery =
+    namedDocQuery ?? titleLikeOpenDocQuery ?? topicDocQuery;
   if (
     !deicticPrompt &&
     !explicitPathSummaryPrompt &&
@@ -292,7 +301,11 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
       source_target_intent: {
         source: derivationSource,
         target_source: standaloneDocQuery ? "docs_viewer" : "active_doc",
-        target_kind: namedDocQuery ? "named_doc" : topicDocQuery ? "topic_doc" : "active_doc",
+        target_kind: namedDocQuery || titleLikeOpenDocQuery
+          ? "named_doc"
+          : topicDocQuery
+            ? "topic_doc"
+            : "active_doc",
         focused_panel: activePanel,
         active_panel: activePanel,
         active_doc_path: activeDocPath,
@@ -300,6 +313,7 @@ export const buildActiveDocsContextWorkstationGatewayCallRequests = (
         deictic_prompt: deicticPrompt,
         explicit_doc_path: explicitDocPath,
         named_doc_query: namedDocQuery,
+        title_like_open_doc_query: titleLikeOpenDocQuery,
         topic_doc_query: topicDocQuery,
         active_doc_evidence_followup: activeDocEvidenceFollowup,
         active_doc_required_observation: hardActiveDocObservationRequired,

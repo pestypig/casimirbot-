@@ -34,9 +34,9 @@ import {
   type Nhm2PrimaryRawOutputHashedInputV1,
 } from "../../../shared/contracts/nhm2-primary-raw-output-manifest.v1";
 import {
-  buildNhm2SemiclassicalStateRealizability,
-  type Nhm2SemiclassicalStateRealizabilityV1,
-} from "../../../shared/contracts/nhm2-semiclassical-state-realizability.v1";
+  buildNhm2SemiclassicalStateRealizabilityV2 as buildNhm2SemiclassicalStateRealizability,
+  type Nhm2SemiclassicalStateRealizabilityV2 as Nhm2SemiclassicalStateRealizabilityV1,
+} from "../../../shared/contracts/nhm2-semiclassical-state-realizability.v2";
 import {
   buildNhm2WorldlineQeiCoverage,
   type Nhm2WorldlineQeiCoverageV1,
@@ -1554,6 +1554,8 @@ const CURRENT_KERNEL_BLOCKERS = {
     "hadamard_state_admissibility_unreplayed",
     "renormalization_counterterm_and_ward_identity_unreplayed",
     "qei_semiclassical_state_identity_binding_unresolved",
+    "connected_stress_noise_kernel_replay_unimplemented",
+    "semiclassical_constraint_algebra_replay_unimplemented",
   ],
   covariant_conservation: [
     "cartesian_domain_coverage_proof_unresolved",

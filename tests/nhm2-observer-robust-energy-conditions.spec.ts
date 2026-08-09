@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  NHM2_REQUIRED_OBSERVER_FAMILY_IDS,
   buildNhm2ObserverRobustEnergyConditionArtifact,
   buildNhm2ObserverRobustEnergyConditionFromTensor,
   isNhm2ObserverRobustEnergyConditionArtifact,
@@ -143,5 +144,52 @@ describe("nhm2 observer-robust energy-condition artifact", () => {
         (family) => family.familyId === "algebraic_type_i",
       )?.status,
     ).toBe("fail");
+  });
+
+  it.each(NHM2_REQUIRED_OBSERVER_FAMILY_IDS)(
+    "rejects artifacts missing required observer family %s",
+    (familyId) => {
+      const artifact = buildNhm2ObserverRobustEnergyConditionArtifact({
+        observerFamilies: [
+          {
+            familyId: "eulerian",
+            status: "pass",
+            blockers: [],
+          },
+        ],
+      });
+      const tampered = structuredClone(artifact);
+      tampered.observerFamilies = tampered.observerFamilies.filter(
+        (family) => family.familyId !== familyId,
+      );
+
+      expect(isNhm2ObserverRobustEnergyConditionArtifact(tampered)).toBe(false);
+    },
+  );
+
+  it("rejects duplicate families, forged summaries, and blockers on passing families", () => {
+    const artifact = buildNhm2ObserverRobustEnergyConditionArtifact({
+      observerFamilies: [
+        {
+          familyId: "eulerian",
+          status: "pass",
+          blockers: [],
+        },
+      ],
+    });
+
+    const duplicate = structuredClone(artifact);
+    duplicate.observerFamilies.push(
+      structuredClone(duplicate.observerFamilies[0]),
+    );
+    expect(isNhm2ObserverRobustEnergyConditionArtifact(duplicate)).toBe(false);
+
+    const forgedSummary = structuredClone(artifact);
+    forgedSummary.summary.robustCheckComplete = true;
+    expect(isNhm2ObserverRobustEnergyConditionArtifact(forgedSummary)).toBe(false);
+
+    const passWithBlocker = structuredClone(artifact);
+    passWithBlocker.observerFamilies[0].blockers.push("hidden_observer_blocker");
+    expect(isNhm2ObserverRobustEnergyConditionArtifact(passWithBlocker)).toBe(false);
   });
 });

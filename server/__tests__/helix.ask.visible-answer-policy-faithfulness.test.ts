@@ -634,6 +634,76 @@ describe("Helix Ask theory execution-closure claim ceiling", () => {
     expect(gate.ok).toBe(true);
   });
 
+  it("uses an exact materialized terminal instead of treating earlier projection kinds as ambiguous", () => {
+    const text =
+      "Under the admitted semantic definition and graph relation, candidate A is the current evidence-coverage preference. Pinned Lanyon artifact admission, formal replay, independent numerical closure, and empirical grounding remain open; this is not a truth probability.";
+    const activePayload = terminalPayload(text);
+    const compoundRef = `${turnId}:compound_evidence_synthesis_answer`;
+    activePayload.terminal_authority_single_writer = {
+      selected_terminal_artifact_kind: "agent_provider_terminal_candidate",
+      selected_terminal_artifact_ref: `${turnId}:provider_candidate`,
+    };
+    activePayload.provider_route_product_materialization = {
+      materialized_terminal_artifact_kind:
+        "compound_evidence_synthesis_answer",
+      materialized_terminal_artifact_ref: compoundRef,
+    };
+    activePayload.compound_evidence_synthesis_answer = {
+      schema: "helix.compound_evidence_synthesis_answer.v1",
+      artifact_id: compoundRef,
+      support_refs: [closureArtifact.artifact_id, semanticSupportRef],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    const gate = evaluateVisibleAnswerPolicyFaithfulnessGate({
+      turnId,
+      text,
+      payload: activePayload,
+    });
+
+    expect(gate.ok).toBe(true);
+    expect(gate.violations).not.toContain(
+      "theory_execution_closure_terminal_binding_invalid",
+    );
+    expect(gate.theory_execution_closure_invalid_terminal_ref).toBeFalsy();
+  });
+
+  it("binds the latest supported closure retry for the same prepared procedure", () => {
+    const text =
+      "Under the admitted semantic definition and graph relation, candidate A is the current evidence-coverage preference. Pinned Lanyon artifact admission, formal replay, independent numerical closure, and empirical grounding remain open; this is not a truth probability.";
+    const activePayload = terminalPayload(text);
+    const retryClosure = structuredClone(closureArtifact);
+    retryClosure.artifact_id = `${turnId}:execution_closure:retry`;
+    const retryClosurePayload = record(retryClosure.payload);
+    const retryClosureBody = record(retryClosurePayload.closure);
+    retryClosureBody.generatedAt = "2099-01-01T00:00:00.000Z";
+    activePayload.current_turn_artifact_ledger = [
+      ...structuredClone(readyArtifacts),
+      retryClosure,
+    ];
+    (
+      activePayload.model_synthesized_answer as Record<string, unknown>
+    ).support_refs = [
+      closureArtifact.artifact_id,
+      retryClosure.artifact_id,
+      semanticSupportRef,
+    ];
+
+    const gate = evaluateVisibleAnswerPolicyFaithfulnessGate({
+      turnId,
+      text,
+      payload: activePayload,
+    });
+
+    expect(gate.violations).not.toContain(
+      "theory_execution_closure_terminal_binding_invalid",
+    );
+    expect(gate.violations).toContain(
+      "theory_execution_closure_artifact_invalid",
+    );
+  });
+
   it("rejects a physical-truth probability even when phrased as calibrated confidence", () => {
     const text = [
       "Under the admitted semantic definition, candidate A has the strongest current evidence coverage.",
@@ -770,6 +840,30 @@ describe("Helix Ask theory execution-closure claim ceiling", () => {
         ]),
       },
     });
+  });
+
+  it("allows an authenticated blocked-status report that names every exact open requirement", () => {
+    const closure = record(record(blockedClosureArtifact.payload).closure);
+    const readiness = record(closure.synthesisReadiness);
+    const openRequirementCodes = (readiness.openRequirementCodes as unknown[])
+      .filter((value): value is string => typeof value === "string");
+    const text = [
+      "Model synthesis is blocked and remains procedure_only; no code was run.",
+      "Exact open requirements:",
+      ...openRequirementCodes.map((code) => `- ${code}`),
+    ].join("\n");
+    const activePayload = blockedTerminalPayload(text);
+
+    const gate = evaluateVisibleAnswerPolicyFaithfulnessGate({
+      turnId: blockedTurnId,
+      text,
+      payload: activePayload,
+    });
+
+    expect(gate.violations).not.toContain(
+      "theory_execution_closure_synthesis_blocked",
+    );
+    expect(gate.ok).toBe(true);
   });
 
   it("fails closed when a bounded comparison omits an exact required support ref", () => {

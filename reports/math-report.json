@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-06T07:33:28.997Z",
-  "registryCount": 222,
+  "generatedAt": "2026-08-08T07:31:29.042Z",
+  "registryCount": 227,
   "coverage": {
     "exploratory": {
       "count": 21,
@@ -79,7 +79,7 @@
       ]
     },
     "diagnostic": {
-      "count": 149,
+      "count": 154,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -103,6 +103,7 @@
         "shared/contracts/nhm2-experiment-ready-theory-closure.v1.ts",
         "shared/contracts/nhm2-experiment-ready-theory-candidate-manifest.v1.ts",
         "shared/contracts/nhm2-semiclassical-state-realizability.v1.ts",
+        "shared/contracts/nhm2-semiclassical-state-realizability.v2.ts",
         "shared/contracts/nhm2-prediction-falsifier-freeze.v1.ts",
         "shared/contracts/nhm2-numerical-observable-prediction.v1.ts",
         "shared/contracts/nhm2-full-apparatus-source-tensor.v1.ts",
@@ -229,7 +230,11 @@
         "shared/casimir-dp-microscopic-em-closure-stage4-2k.ts",
         "shared/casimir-dp-empirical-authority-stage4-2l.ts",
         "shared/casimir-dp-apparatus-search-stage4-2m.ts",
-        "shared/casimir-dp-material-thermal-ordinary-null-stage4-2n.ts"
+        "shared/casimir-dp-material-thermal-ordinary-null-stage4-2n.ts",
+        "shared/casimir-dp-public-data-component-validation-stage4-2o.ts",
+        "shared/casimir-dp-proper-time-worldline-closure-stage4-2p.ts",
+        "shared/casimir-dp-superconducting-boundary-control-stage4-2q.ts",
+        "shared/casimir-dp-integrated-feasibility-pilot-stage4-2r.ts"
       ]
     },
     "certified": {
@@ -318,7 +323,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 222,
+    "entriesWithUnits": 227,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -332,8 +337,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 149,
-        "withUnits": 149,
+        "total": 154,
+        "withUnits": 154,
         "missing": []
       },
       "certified": {
@@ -354,7 +359,7 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 2967,
+    "nodeCount": 2976,
     "edgeCount": 7282
   },
   "evidenceProfiles": [

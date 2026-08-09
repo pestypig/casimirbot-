@@ -7,7 +7,10 @@ import {
   buildNhm2DynamicGeometrySamples,
   isNhm2DynamicGeometrySamplesArtifact,
 } from "../shared/contracts/nhm2-dynamic-geometry-samples.v1";
-import type { Nhm2ObserverRobustEnergyConditionArtifactV1 } from "../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
+import {
+  NHM2_REQUIRED_OBSERVER_FAMILY_IDS,
+  type Nhm2ObserverRobustEnergyConditionArtifactV1,
+} from "../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
 import type { Nhm2QeiWorldlineDossierV1 } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
 import { buildNhm2RegionalSupportFunctionAtlas } from "../shared/contracts/nhm2-regional-support-function-atlas.v1";
 import {
@@ -778,14 +781,22 @@ const observerArtifact = (): Nhm2ObserverRobustEnergyConditionArtifactV1 =>
     selectedProfileId: "stage1_centerline_alpha_0p995_v1",
     tensorRef: "source.json",
     observerFamilies: [
+      { familyId: "eulerian", status: "pass", blockers: [] },
       { familyId: "boosted_timelike_grid", status: "pass", blockers: [] },
       { familyId: "null_direction_grid", status: "pass", blockers: [] },
+      { familyId: "algebraic_type_i", status: "pass", blockers: [] },
+      {
+        familyId: "continuous_optimizer",
+        status: "not_run",
+        optimizerUsed: false,
+        blockers: ["continuous_optimizer_not_implemented"],
+      },
     ],
     summary: {
       eulerianOnly: false,
       robustCheckComplete: true,
       anyViolation: false,
-      missedViolationRisk: "low",
+      missedViolationRisk: "medium",
     },
     literatureRefs: [
       "le_2026_observer_robust_warp_energy_conditions",
@@ -1932,7 +1943,27 @@ describe("NHM2 time-dependent source campaign", () => {
       qeiReceiptsPass: true,
       stabilityPass: true,
       firstBlocker: "none",
+      blockerCount: 0,
     });
+    const observerGate = artifact.gates.find(
+      (entry) => entry.gateId === "observer_family_energy_conditions",
+    );
+    expect(observerGate).toMatchObject({
+      status: "pass",
+      pass: true,
+      blockers: [],
+      warnings: [
+        "continuous_optimizer:continuous_optimizer_not_implemented",
+      ],
+    });
+    expect(observerGate?.primaryMetric).toContain("observerScope=finite_family");
+    expect(observerGate?.primaryMetric).toContain(
+      "continuousOptimizerStatus=not_run",
+    );
+    expect(observerGate?.primaryMetric).toContain(
+      "continuousOptimizerUsed=false",
+    );
+    expect(isNhm2TimeDependentSourceCampaignArtifact(artifact)).toBe(true);
     expect(artifact.claimBoundary).toMatchObject({
       diagnosticOnly: true,
       physicalViabilityClaimAllowed: false,
@@ -1941,5 +1972,220 @@ describe("NHM2 time-dependent source campaign", () => {
       propulsionClaimAllowed: false,
     });
   });
-});
 
+  it("keeps non-continuous observer-family limitations as blockers", () => {
+    const observer = observerArtifact();
+    const algebraic = observer.observerFamilies.find(
+      (family) => family.familyId === "algebraic_type_i",
+    );
+    if (algebraic == null) throw new Error("algebraic observer fixture missing");
+    algebraic.status = "not_run";
+    algebraic.blockers = ["algebraic_type_i_not_implemented"];
+
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
+      regionalFullTensorResidual: fullTensorResidual(),
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservation: switchingEvidence(),
+      dynamicEffectiveGeometry: dynamicGeometryEvidence(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observer,
+      campaignStability: stabilityEvidence(),
+    });
+    const observerGate = artifact.gates.find(
+      (entry) => entry.gateId === "observer_family_energy_conditions",
+    );
+
+    expect(observerGate).toMatchObject({
+      status: "review",
+      pass: false,
+      blockers: [
+        "algebraic_type_i:algebraic_type_i_not_implemented",
+      ],
+      warnings: [
+        "continuous_optimizer:continuous_optimizer_not_implemented",
+      ],
+    });
+    expect(artifact.summary).toMatchObject({
+      campaignPass: false,
+      observerFamilyPass: false,
+      firstBlocker: "algebraic_type_i:algebraic_type_i_not_implemented",
+      blockerCount: 1,
+    });
+    expect(isNhm2TimeDependentSourceCampaignArtifact(artifact)).toBe(true);
+  });
+
+  it.each(
+    NHM2_REQUIRED_OBSERVER_FAMILY_IDS.filter(
+      (familyId) => familyId !== "continuous_optimizer",
+    ),
+  )("does not pass when required finite observer family %s is absent", (familyId) => {
+    const observer = observerArtifact();
+    observer.observerFamilies = observer.observerFamilies.filter(
+      (family) => family.familyId !== familyId,
+    );
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
+      regionalFullTensorResidual: fullTensorResidual(),
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservation: switchingEvidence(),
+      dynamicEffectiveGeometry: dynamicGeometryEvidence(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observer,
+      campaignStability: stabilityEvidence(),
+    });
+    const observerGate = artifact.gates.find(
+      (entry) => entry.gateId === "observer_family_energy_conditions",
+    );
+
+    expect(observerGate?.status).toBe("review");
+    expect(observerGate?.blockers).toContain(
+      `${familyId}:observer_family_missing`,
+    );
+    expect(artifact.summary.campaignPass).toBe(false);
+    expect(isNhm2TimeDependentSourceCampaignArtifact(artifact)).toBe(true);
+  });
+
+  it("imports blockers and corrections even from an inconsistent passing coupled gate", () => {
+    const coupled = coupledClosureWithTileSourceCorrections();
+    coupled.gates[0].status = "pass";
+    coupled.gates[0].pass = true;
+    coupled.gates[0].blockers = ["hidden_nested_coupled_blocker"];
+    coupled.summary.passCandidate = true;
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
+      regionalFullTensorResidual: fullTensorResidual(),
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservation: switchingEvidence(),
+      dynamicEffectiveGeometry: dynamicGeometryEvidence(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observerArtifact(),
+      campaignStability: stabilityEvidence(),
+      coupledClosurePassCandidate: coupled,
+    });
+    const sourceGate = artifact.gates.find(
+      (entry) => entry.gateId === "source_independence",
+    );
+
+    expect(sourceGate).toMatchObject({
+      status: "review",
+      pass: false,
+      blockers: [
+        "tile_source_authority_handoff:hidden_nested_coupled_blocker",
+      ],
+    });
+    expect(sourceGate?.requiredCorrections).toMatchObject({
+      "tile_source_authority_handoff.effectiveSourceTensorLayerCountShortfall":
+        88.506,
+    });
+    expect(artifact.summary).toMatchObject({
+      campaignPass: false,
+      firstBlocker:
+        "tile_source_authority_handoff:hidden_nested_coupled_blocker",
+    });
+    expect(artifact.summary.firstRequiredCorrections).toMatchObject({
+      "tile_source_authority_handoff.effectiveSourceTensorLayerCountShortfall":
+        88.506,
+    });
+    expect(artifact.summary.coupledClosureRequiredCorrections).toMatchObject({
+      "tile_source_authority_handoff.effectiveSourceTensorLayerCountShortfall":
+        88.506,
+    });
+    expect(isNhm2TimeDependentSourceCampaignArtifact(artifact)).toBe(true);
+  });
+
+  it.each([
+    [
+      "regional_support_function_atlas",
+      "regional_support_function_atlas_not_eligible",
+    ],
+    [
+      "source_closure_readiness",
+      "source_closure_pass_readiness_incomplete",
+    ],
+  ] as const)(
+    "propagates coupled %s review into full regional tensor closure",
+    (coupledGateId, nestedBlocker) => {
+      const coupled = coupledClosureWithTileSourceCorrections();
+      coupled.gates = [
+        {
+          ...coupled.gates[0],
+          gateId: coupledGateId,
+          status: "review",
+          pass: false,
+          blockers: [nestedBlocker],
+          warnings: [],
+          requiredCorrections: {},
+        },
+      ];
+      const artifact = buildNhm2TimeDependentSourceCampaign({
+        sourceComponentAuthorityLedger: completeLedger(),
+        sourceSideSameBasisTensorAuthority: sourceAuthority(),
+        regionalFullTensorResidual: fullTensorResidual(),
+        frequencyConvergence: frequencyEvidence(),
+        switchingConservation: switchingEvidence(),
+        dynamicEffectiveGeometry: dynamicGeometryEvidence(),
+        qeiWorldlineDossier: qeiDossier(),
+        observerRobustEnergyConditions: observerArtifact(),
+        campaignStability: stabilityEvidence(),
+        coupledClosurePassCandidate: coupled,
+      });
+      const closureGate = artifact.gates.find(
+        (entry) => entry.gateId === "full_regional_tensor_closure",
+      );
+
+      expect(closureGate).toMatchObject({
+        status: "review",
+        pass: false,
+      });
+      expect(closureGate?.blockers).toContain(
+        `${coupledGateId}:${nestedBlocker}`,
+      );
+      expect(artifact.summary.campaignPass).toBe(false);
+      expect(artifact.summary.firstBlocker).toBe(
+        `${coupledGateId}:${nestedBlocker}`,
+      );
+      expect(isNhm2TimeDependentSourceCampaignArtifact(artifact)).toBe(true);
+    },
+  );
+
+  it("rejects pass gates with blockers and summaries inconsistent with their gates", () => {
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
+      regionalFullTensorResidual: fullTensorResidual(),
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservation: switchingEvidence(),
+      dynamicEffectiveGeometry: dynamicGeometryEvidence(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observerArtifact(),
+      campaignStability: stabilityEvidence(),
+    });
+    const passGateTamper = structuredClone(artifact);
+    passGateTamper.gates[0].blockers.push("tampered_pass_gate_blocker");
+    expect(isNhm2TimeDependentSourceCampaignArtifact(passGateTamper)).toBe(false);
+
+    const summaryTamper = structuredClone(artifact);
+    summaryTamper.summary.blockerCount = 1;
+    expect(isNhm2TimeDependentSourceCampaignArtifact(summaryTamper)).toBe(false);
+
+    const passCorrectionTamper = structuredClone(artifact);
+    passCorrectionTamper.gates[0].requiredCorrections = {
+      hiddenCorrection: 1,
+    };
+    expect(isNhm2TimeDependentSourceCampaignArtifact(passCorrectionTamper)).toBe(
+      false,
+    );
+
+    const firstCorrectionTamper = structuredClone(artifact);
+    firstCorrectionTamper.summary.firstRequiredCorrections = {
+      hiddenCorrection: 1,
+    };
+    expect(
+      isNhm2TimeDependentSourceCampaignArtifact(firstCorrectionTamper),
+    ).toBe(false);
+  });
+});

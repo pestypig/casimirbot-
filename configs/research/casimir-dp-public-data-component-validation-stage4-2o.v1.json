@@ -1,0 +1,57 @@
+{
+  "schema_version": "casimir_dp_public_data_component_validation_stage4_2o/1",
+  "campaign_id": "casimir-dp-public-data-component-validation-stage4-2o-v1",
+  "evidence_class": "external_public_component_validation_only",
+  "claim_ceiling": "separate_public_dataset_recovery_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "cross_apparatus_covariance_fusion_allowed": false,
+  "run_order": [
+    "verify_immutable_stage4_2n_leading_design",
+    "authenticate_public_source_archives",
+    "recover_sodium_complex_fringe_coefficients",
+    "recover_measured_superconducting_drum_response",
+    "recover_lisa_pathfinder_covariance_and_heldout_residual",
+    "authenticate_gran_sasso_external_dp_bound",
+    "enforce_no_cross_apparatus_covariance_fusion",
+    "return_component_validation_without_joint_protocol_promotion"
+  ],
+  "upstream_stage4_2n": {
+    "campaign_receipt_path": "docs/research/casimir-dp-material-thermal-ordinary-null-stage4-2n-campaign-receipt.json",
+    "campaign_receipt_sha256": "a01dda0e038251f6cceb78d6bf7ba0a848a6dc9d65541e9e89c09f1f3be40cba",
+    "run_id": "casimir-dp-material-thermal-ordinary-null-stage4-2n-v1-20260806T120000000Z"
+  },
+  "fixture_path": "configs/research/fixtures/casimir-dp-stage4-2o.public-data.v1.json",
+  "fixture_sha256": "526d910d47d83921fd2eed945fb2f2b551964263e126cf69bb7d60302ecd9f2a",
+  "leading_design": {
+    "material_id": "diamond",
+    "radius_m": 2.76302362398029e-7,
+    "mass_kg": 3.0925052683774525e-16,
+    "branch_separation_m": 2.5e-7,
+    "hold_time_s": 0.25,
+    "gap_m": 1e-5,
+    "plate_size_m": 8e-5,
+    "temperature_K": 4,
+    "pressure_Pa": 1e-15
+  },
+  "gates": {
+    "minimum_sodium_scan_count": 90,
+    "maximum_sodium_split_mahalanobis2": 1,
+    "minimum_casimir_trace_count": 100,
+    "minimum_casimir_shift_rms_Hz": 1,
+    "maximum_lisa_shrunk_condition_number": 10,
+    "maximum_lisa_relative_covariance_drift": 0.25,
+    "maximum_lisa_holdout_to_train_rmse_ratio": 1.5,
+    "minimum_gran_sasso_fig4_bins": 100,
+    "minimum_gran_sasso_data_simulation_pearson": 0.9
+  },
+  "standing": {
+    "measured_evidence": "not_ready",
+    "joint_protocol_validation": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "physical_pilot_authorized": false,
+    "confirmatory_campaign_authorized": false
+  }
+}

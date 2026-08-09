@@ -10,6 +10,14 @@ export const NHM2_OBSERVER_FAMILY_IDS = [
   "not_available",
 ] as const;
 
+export const NHM2_REQUIRED_OBSERVER_FAMILY_IDS = [
+  "eulerian",
+  "boosted_timelike_grid",
+  "null_direction_grid",
+  "algebraic_type_i",
+  "continuous_optimizer",
+] as const;
+
 export const NHM2_OBSERVER_ROBUST_ENERGY_CONDITION_STATUS_VALUES = [
   "pass",
   "fail",
@@ -291,13 +299,7 @@ const ensureRequiredFamilies = (
   for (const family of families) {
     if (!byId.has(family.familyId)) byId.set(family.familyId, family);
   }
-  for (const familyId of [
-    "eulerian",
-    "boosted_timelike_grid",
-    "null_direction_grid",
-    "algebraic_type_i",
-    "continuous_optimizer",
-  ] as const) {
+  for (const familyId of NHM2_REQUIRED_OBSERVER_FAMILY_IDS) {
     if (!byId.has(familyId)) byId.set(familyId, requiredFamily(familyId));
   }
   return [
@@ -537,7 +539,34 @@ const isFamily = (
         (worstCase.observerParams === undefined ||
           isNumberRecord(worstCase.observerParams)))) &&
     Array.isArray(record.blockers) &&
-    record.blockers.every((entry) => typeof entry === "string")
+    record.blockers.every((entry) => typeof entry === "string") &&
+    (record.status !== "pass" || record.blockers.length === 0)
+  );
+};
+
+const hasRequiredObserverFamilyIdentity = (
+  value: unknown,
+): value is Nhm2ObserverRobustEnergyConditionFamilyV1[] => {
+  if (!Array.isArray(value) || !value.every(isFamily)) return false;
+  const familyIds = value.map((family) => family.familyId);
+  return (
+    new Set(familyIds).size === familyIds.length &&
+    NHM2_REQUIRED_OBSERVER_FAMILY_IDS.every((familyId) =>
+      familyIds.includes(familyId),
+    )
+  );
+};
+
+const summaryMatchesObserverFamilies = (
+  families: Nhm2ObserverRobustEnergyConditionFamilyV1[],
+  summary: Record<string, unknown>,
+): boolean => {
+  const derived = summarizeFamilies(families);
+  return (
+    summary.eulerianOnly === derived.eulerianOnly &&
+    summary.robustCheckComplete === derived.robustCheckComplete &&
+    summary.anyViolation === derived.anyViolation &&
+    summary.missedViolationRisk === derived.missedViolationRisk
   );
 };
 
@@ -561,14 +590,14 @@ export const isNhm2ObserverRobustEnergyConditionArtifact = (
     (record.atlasRef === undefined || record.atlasRef === null || asText(record.atlasRef) != null) &&
     (record.atlasHash === undefined || record.atlasHash === null || asText(record.atlasHash) != null) &&
     (record.sampleRegionCoverage === undefined || isNumberRecord(record.sampleRegionCoverage)) &&
-    Array.isArray(record.observerFamilies) &&
-    record.observerFamilies.every((entry) => isFamily(entry)) &&
+    hasRequiredObserverFamilyIdentity(record.observerFamilies) &&
     typeof summary.eulerianOnly === "boolean" &&
     typeof summary.robustCheckComplete === "boolean" &&
     typeof summary.anyViolation === "boolean" &&
     NHM2_OBSERVER_MISSED_VIOLATION_RISK_VALUES.includes(
       summary.missedViolationRisk as Nhm2ObserverMissedViolationRisk,
     ) &&
+    summaryMatchesObserverFamilies(record.observerFamilies, summary) &&
     Array.isArray(record.literatureRefs) &&
     record.literatureRefs[0] ===
       "le_2026_observer_robust_warp_energy_conditions" &&

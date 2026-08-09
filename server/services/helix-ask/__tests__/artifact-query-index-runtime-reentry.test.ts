@@ -473,6 +473,89 @@ describe("artifact query index runtime re-entry authority", () => {
     });
   });
 
+  it("keeps a compound Docs search rail complete when results exist without an opened-document retrieval context", () => {
+    const turnId = "ask:test:compound-docs-search-with-external-failure";
+    const docsObservationRef = `${turnId}:codex_normalized:doc_search_results:1`;
+    const scholarlyObservationRef = `${turnId}:codex_normalized:scholarly_research_observation:2`;
+    const docsSubgoal = {
+      subgoal_id: `${turnId}:subgoal:docs`,
+      order: 1,
+      requested_capability: "docs.search",
+      runtime_capability: "docs.search",
+      selected_capability: "docs.search",
+      executed_capability: "docs.search",
+      required_observation_kinds: ["doc_search_results", "retrieval_context"],
+      observation_kind: "doc_search_results",
+      observation_ref: docsObservationRef,
+      satisfaction: "satisfied",
+      rail_status: "complete",
+    };
+    const scholarlySubgoal = {
+      subgoal_id: `${turnId}:subgoal:scholarly`,
+      order: 2,
+      requested_capability: "scholarly-research.lookup_papers",
+      runtime_capability: "scholarly-research.lookup_papers",
+      selected_capability: "scholarly-research.lookup_papers",
+      executed_capability: "scholarly-research.lookup_papers",
+      required_observation_kinds: ["scholarly_research_observation"],
+      observation_kind: "scholarly_research_observation",
+      observation_ref: scholarlyObservationRef,
+      satisfaction: "not_satisfied",
+      rail_status: "fail_closed",
+      rail_failure_code: "semantic_scholar_http_429",
+    };
+    const index = buildArtifactQueryIndex({
+      turnId,
+      payload: {
+        active_prompt: "Find the local whitepaper and compare it with a primary paper.",
+        terminal_artifact_kind: "typed_failure",
+        capability_itinerary: {
+          compound_capability_contract: {
+            subgoal_identity_policy: "provider_call_occurrence",
+            subgoals: [docsSubgoal, scholarlySubgoal],
+          },
+        },
+        capability_itinerary_execution_state: {
+          compound_subgoal_ledger: [docsSubgoal, scholarlySubgoal],
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: docsObservationRef,
+            kind: "doc_search_results",
+            capability_key: "docs.search",
+            status: "succeeded",
+            payload: {
+              schema: "helix.doc_search_results.v1",
+              capability_key: "docs.search",
+              matches: [{ path: "docs/research/nhm2-current-status-whitepaper.md" }],
+            },
+          },
+          {
+            artifact_id: scholarlyObservationRef,
+            kind: "scholarly_research_observation",
+            capability_key: "scholarly-research.lookup_papers",
+            status: "failed",
+            payload: { status: "failed", error: "semantic_scholar_http_429" },
+          },
+        ],
+      },
+    });
+
+    expect(index.compound_subgoal_rail_statuses).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        requested_capability: "docs.search",
+        rail_status: "complete",
+        rail_failure_code: null,
+        observation_ref: docsObservationRef,
+      }),
+      expect.objectContaining({
+        requested_capability: "scholarly-research.lookup_papers",
+        rail_status: "complete",
+        observation_ref: scholarlyObservationRef,
+      }),
+    ]));
+  });
+
   it("reconciles a registered docs runtime capability with its requested canonical capability", () => {
     const turnId = "ask:test:docs-runtime-alias-reentry";
     const requestedCapability = "docs-viewer.search_docs";

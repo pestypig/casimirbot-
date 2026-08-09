@@ -1,7 +1,7 @@
 # An Identifiability-First Feasibility Protocol for a Gaussian-Regularized Diósi Collapse Test with a Casimir-Boundary Control
 
 **Document type:** theoretical design study and empirical-feasibility protocol  
-**Version:** leading-design draft, 6 August 2026
+**Version:** leading-design draft, 8 August 2026
 **Authors and affiliations:** to be supplied before external submission  
 **Corresponding author:** to be supplied before external submission
 
@@ -48,6 +48,25 @@ Planck--Stefan--Boltzmann, and intervention-recovery gates pass. These are
 software-recovery values, not apparatus forecasts: the specimen spectrum,
 as-built geometry, full-Maxwell solution, independent solver check, and
 measured response covariance remain absent.
+
+The leading design is also bound to an explicit ordinary relativistic phase
+closure. A nominal horizontal branch has no linear Earth-redshift phase, but a
+small vertical projection can create a large signed matter-wave phase. The
+synthetic worldline/echo screen closes at 0.018007 rad against the frozen
+0.034644 rad limit. Measured worldlines, gravity covariance, and echo transfer
+remain absent, so this is not an apparatus forecast and does not modify the
+registered Diósi loss law.
+
+A public-data component campaign now tests the analysis machinery against real
+measurements without pretending that any one archive is the proposed
+experiment. It recovers 95 complex sodium-cluster fringe coefficients, 108
+paired spectral responses from a superconducting-drum boundary experiment, a
+16-channel train/held-out covariance replay from 421,912 active LISA Pathfinder
+rows, and the published Gran Sasso source-data record used to constrain the
+parameter-free natural Diósi--Penrose model. All source-integrity and bounded
+component gates pass. Because the apparatuses, transfer functions, and noise
+processes differ, no covariance or residual is transported among them; joint
+protocol validation and measured evidence for this study remain absent.
 
 A constituent and environmental diagnostic separates Hamiltonian phase from
 nonunitary contraction and stress-tests the mass model. The leading synthetic
@@ -745,7 +764,279 @@ coupling and infinite distance and a Stefan--Boltzmann relative error of
 Measured evidence and ordinary-null authority remain `not_ready`; residual
 attribution, collapse identification, and manifold dynamics remain `blocked`.
 
-### 5.6 Why the selected power is still conditional
+### 5.6 Public-data component validation
+
+Stage 4.2O asks a deliberately narrower question than the proposed experiment:
+can the registered analysis code recover its constituent operations from real,
+open measurements? Four independent archives are assigned one role each.
+
+| Public record | Recovered operation | Result | Claim ceiling |
+|---|---|---:|---|
+| sodium-cluster interference | complex fringe coefficient | 95 scans; alternating-split mean Mahalanobis squared 0.01143 | measured matter-wave fringe reconstruction only |
+| superconducting drum | paired nonlinear boundary/drive response | 108 traces; RMS up/down centroid shift 7.358 kHz | measured boundary-response replay only |
+| LISA Pathfinder | multichannel covariance and held-out residual | 421,912 active rows; 16 channels; shrunk condition numbers 3.323 and 3.338 | classical covariance/re-entry replay only |
+| Gran Sasso underground spectrum | external Diósi-bound source record | 4,000-bin spectrum and 140-bin data/simulation comparison authenticated | parameter-free bound authority only |
+
+For the sodium record, the importer reconstructs the first normalized Fourier
+coefficient
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2o-public-fringe-coefficient -->
+\[
+S_\ell=\frac{1}{N}\sum_{j=0}^{N-1}n_j
+e^{-2\pi i\ell j/N},
+\qquad
+\widetilde C_1=2\frac{S_1}{S_0}=V e^{i\phi}.
+\tag{16c}
+\]
+
+Here \(n_j\) is the binned detected count and the registered finite-bin phase
+correction is applied after the transform. The symbol \(\widetilde C_1\) is a
+fringe-transfer observable. It is not identified with
+\(\rho_{AB}=\langle A|\hat\rho|B\rangle\) for the proposed diamond sphere.
+
+The LISA replay standardizes each channel on the training half, forms a
+regularized covariance, and evaluates a frozen linear residual on held-out
+windows:
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2o-heldout-covariance-residual -->
+\[
+\widehat\Sigma_{\rm tr}=\operatorname{Cov}(\mathbf z_{\rm tr}),
+\qquad
+\mathbf r_{\rm ho}=\mathbf z_{1,\rm ho}
+-\mathbf X_{\rm ho}\widehat{\boldsymbol\beta}_{\rm tr}.
+\tag{16d}
+\]
+
+This validates covariance ancestry and held-out residual handling in a real
+multichannel physical system; it does not validate quantum coherence, Casimir
+subtraction, or collapse. The superconducting-drum replay likewise establishes
+a measured paired spectral response but does not independently identify the
+force or calibrate this apparatus. The Gran Sasso replay authenticates the
+parameter-free exclusion record, but the registered \(R_0=100\) nm comparator
+remains `not_adjudicated` until a variant-matched recast is supplied.
+
+The separation rule is absolute: the four archives have different apparatuses,
+state spaces, transfer functions, and covariance ancestry. Stage 4.2O therefore
+constructs no shared likelihood, cross-apparatus covariance, transported
+residual, or observable bridge. Its component replay passes while
+`measured_evidence` and `joint_protocol_validation` remain `not_ready`, and
+collapse identification and manifold dynamics remain `blocked`.
+
+### 5.7 Proper time, worldlines, and the ordinary phase budget
+
+The Schrödinger Hamiltonian baseline must include the phase generated by the
+actual branch worldlines. In a stationary weak field, the branch difference is
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2p-weak-field-proper-time -->
+\[
+\Delta\tau=
+\int_0^T\!\left[
+\frac{\Phi_A(t)-\Phi_B(t)}{c^2}
+-\frac{v_A^2(t)-v_B^2(t)}{2c^2}
+\right]dt,
+\tag{16e}
+\]
+
+and the corresponding propagation phase follows from the branch action:
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2p-matter-wave-phase -->
+\[
+\Delta\phi_{\rm prop}
+=-\frac{mc^2}{\hbar}\Delta\tau.
+\tag{16f}
+\]
+
+This is a physical transfer law from proper time to an ordinary **signed
+unitary phase**. It is not the unsupported Compton-frequency bridge rejected
+elsewhere in this paper: the experiment does not claim that the sphere exposes
+a directly readable Compton clock, and Equations (16e)--(16f) do not terminate
+in a collapse rate [14,15]. Spatial separation alone is insufficient. If the branches
+sample equal potentials and equal squared velocities, then
+\(\Delta\tau=\Delta\phi_{\rm prop}=0\) even when their centers are distinct.
+
+For the leading apparatus, the registered separation vector is nominally
+horizontal with respect to local gravity. Its linear Earth-potential difference
+is therefore zero. The fully vertical reference makes the sensitivity clear:
+
+\[
+\frac{\Delta\tau}{T}=\frac{gd}{c^2}
+=2.72784\times10^{-23},\qquad
+\Delta\tau=6.81961\times10^{-24}\ {\rm s},
+\]
+
+\[
+\left|\Delta\phi_g\right|=\frac{mgdT}{\hbar}
+=1.79736\times10^{12}\ {\rm rad}.
+\]
+
+Consequently, the declared \(10^{-10}\) rad vertical-tilt sigma would be about
+180 rad before cancellation. Stage 4.2P transports the Stage-4.2M
+\(10^{-4}\) signed-phase echo residual and adds a small frequency-binned tilt
+response, giving an Earth-tilt contribution of 0.017979 rad. After gravity
+gradient, balanced local-mass, kinematic, Earth-rotation/Sagnac, laboratory
+clock, control-phase, and electromagnetic terms are added in quadrature, the
+synthetic total is 0.018007 rad. That is below the frozen 0.034644 rad limit by
+0.016638 rad. The margin is useful but not generous: without the assumed echo
+rejection the design fails by orders of magnitude.
+
+Internal energy supplies a separate ordinary reduced-state bound:
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2p-internal-time-dilation-coherence -->
+\[
+C_{\rm int}(\Delta\tau)
+=\operatorname{Tr}\!\left[
+\rho_{\rm int}e^{-iH_{\rm int}\Delta\tau/\hbar}
+\right],\qquad
+|C_{\rm int}|\simeq
+\exp\!\left[-\frac{\operatorname{Var}(H_{\rm int})\Delta\tau^2}
+{2\hbar^2}\right].
+\tag{16g}
+\]
+
+The synthetic variance screen is negligible, but no specimen heat-capacity or
+internal-spectrum receipt exists. It therefore remains an ordinary-background
+requirement rather than evidence. Echo and path swap are applied only to
+signed ordinary phases; the positive frozen Diósi exponent is copied unchanged
+and is never echo-scaled or added to the phase covariance [16,17]. Optical-clock
+redshift measurements establish the underlying proper-time metrology principle
+but do not supply the apparatus's matter-wave worldlines or covariance [18].
+
+Stage 4.2P passes its software recoveries and synthetic total-phase screen.
+Measured three-dimensional worldlines, the local gravity-gradient map, the
+as-built local-mass CAD, tilt spectra, frequency-dependent echo transfer,
+clock/control covariance, and internal-energy variance remain `not_ready`.
+Measured evidence remains `not_ready`; collapse identification and manifold
+dynamics remain `blocked`; physical viability remains `not_evaluated`; and no
+proper-time-to-collapse or Casimir-to-collapse bridge is registered.
+
+### 5.8 Superconducting boundary control: bridge and nonbridges
+
+A superconducting boundary is useful here as an **ordinary-response control**,
+not as a proposed origin of Diósi collapse. For a charged condensate, London
+screening gives
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2q-london-screening -->
+\[
+\lambda_L^{-2}=\mu_0\frac{n_s(q^*)^2}{m^*},
+\qquad
+m_{\gamma,{\rm eff}}=\frac{\hbar}{\lambda_Lc}.
+\tag{16h}
+\]
+
+The second quantity is an in-medium electromagnetic mass scale. It is not a
+vacuum photon rest mass and does not identify the Standard-Model Higgs field.
+Likewise, zero DC resistance does not imply zero finite-frequency impedance:
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2q-finite-impedance -->
+\[
+Z_s(\omega)=R_s(\omega)+iX_s(\omega),
+\qquad
+X_s(\omega)\simeq\mu_0\omega\lambda_L
+\tag{16i}
+\]
+
+in the declared London-limit recovery. The experimentally meaningful chain is
+(Z_s,\sigma,\epsilon\rightarrow\mathbf G_{\rm EM}\rightarrow
+(\Phi_{\rm EM},\chi_{\rm EM})\rightarrow C\). That is an ordinary observable
+bridge into the Stage-4.2N null. It is not a condensate-to-collapse bridge
+[19--23].
+
+For software recovery, Stage 4.2Q freezes a linearized weighted impedance-
+contrast surrogate and requires it to reproduce every supplied
+((Delta\Phi_{EM},\Delta\chi_{EM})) point. That numerical transfer passes, but
+it is explicitly a synthetic stand-in for the missing specimen-specific,
+finite-geometry Maxwell/Green calculation.
+
+Writing the normal and superconducting boundary states as (N) and (S),
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2q-boundary-ratio -->
+\[
+C_\beta(t)=C(0)e^{i\Phi_{{\rm EM},\beta}(t)
+-\chi_{{\rm EM},\beta}(t)-\Gamma_Dt},
+\qquad
+\frac{C_S}{C_N}
+=e^{i(\Phi_S-\Phi_N)-(\chi_S-\chi_N)}.
+\tag{16j}
+\]
+
+The frozen boundary-independent Diósi factor cancels. This ratio therefore
+tests ordinary boundary response or an additional boundary-conditioned
+interaction; it cannot replace the primary mass--separation--hold-time Diósi
+contrast. Stage 4.2Q recovers that cancellation to
+(2.22\times10^{-16}) in its synthetic fixture.
+
+The bounded strategy result is deliberately asymmetric. Crossing (T_c)
+fails because the thermal nuisance is collinear with the intended contrast.
+A matched static pair fails its SNR and fabrication-degeneracy gates. A
+fixed-temperature magnetic toggle is the only synthetic candidate, with
+contrast SNR 10.04, maximum nuisance cosine 0.367, and augmented condition
+number 1.47. This is not an apparatus selection: magnetic pickup, trap
+transfer, vortex state, field-sham covariance, specimen impedance, and the
+state-conditioned Green response have not been measured.
+
+For the hypothetical niobium coating, the condensation-energy screen
+(B_c^2V/(2\mu_0c^2)) gives a mass equivalent
+(2.27\times10^{-28}\ {m kg}), or (7.33\times10^{-13}) of the probe mass.
+It is retained as an ordinary stress-energy upper bound, not inserted into the
+Diósi generator. The Anderson--Higgs/Standard-Model Higgs relation remains a
+structural analogy; BEC coherence remains a conditional replication-platform
+relation requiring a new many-body density contract. Neither supplies a
+collapse kernel.
+
+### 5.9 Integrated empirical-pilot closure
+
+Stage 4.2R turns the remaining feasibility questions into one fail-closed
+same-apparatus packet contract. It preserves the Stage-4.2M leading design,
+the Stage-4.2O public component replays, the Stage-4.2P proper-time budget, and
+the Stage-4.2Q boundary control as immutable upstream evidence. Public
+measurements from different instruments remain useful component checks, but
+they are not fused into the proposed apparatus covariance or likelihood.
+
+Two estimands are now made impossible to confuse. The primary Diósi test is a
+held-out contraction that follows the frozen mass--separation--hold-time law.
+For the leading apparatus,
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2r-diosi-precision-target -->
+\[
+V_{\rm D}=e^{-\Gamma_{\rm D}t}=e^{-0.0295115}=0.970920,
+\qquad
+\sigma_{|C|}\leq
+\frac{1-e^{-\Gamma_{\rm D}t}}{\mathrm{SNR}_{\min}}
+=5.816\times10^{-3}.
+\tag{16k}
+\]
+
+The 2.908% contraction and precision target at the registered SNR floor of
+five are conditional predictions of the frozen effective-Gaussian model, not
+measured evidence.
+
+The boundary-by-superposition estimator is instead the four-cell cross-ratio
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2r-four-cell-cross-ratio -->
+\[
+R_4=
+\frac{C_{\mathrm{active,sep}}C_{\mathrm{reference,compact}}}
+{C_{\mathrm{active,compact}}C_{\mathrm{reference,sep}}}.
+\tag{16l}
+\]
+
+A standard boundary-independent Diósi factor multiplies both separated cells
+and cancels exactly from (R_4). Therefore the primary contraction tests the
+registered Diósi law, whereas non-unit (R_4) tests boundary--superposition
+nonfactorization after the ordinary electromagnetic response is calibrated.
+Neither statistic alone establishes a Casimir-to-collapse mechanism.
+
+The pilot remains unauthorized because all eight joint authorities are absent:
+state preparation/recombination; as-built geometry and finite Green response;
+measured material spectra; worldline and phase covariance; the quantum gas-
+collision kernel; four-cell complex coherence; an independently powered
+companion channel; and an exact external-bound recast for the registered
+(R_0=100\) nm normalization. The phase ceiling remains 0.034644 rad and the
+pilot covariance-drift ceiling is 0.10 unless its uncertainty is explicitly
+propagated under a preregistered redesign. Blinding, train/holdout separation,
+custody, and zero cross-apparatus covariance fusion are mandatory.
+
+### 5.10 Why the selected power is still conditional
 
 The response/covariance geometry used by Stage 4.2M was transported from the
 same synthetic world used to establish the parent candidate family.
@@ -1334,6 +1625,13 @@ This paper establishes:
   four-representation DP sensitivity envelope;
 - a bounded 200-candidate redesign search with three synthetic-only points that
   pass the frozen multigate screen;
+- a synthetic normal/superconducting control assessment that preserves finite-
+  frequency impedance, rejects thermally collinear and fabrication-degenerate
+  toggles, and verifies cancellation of standard boundary-independent Diósi
+  attenuation from the boundary ratio;
+- an executable integrated pilot contract that separates the primary Diósi
+  contraction from the four-cell boundary interaction and records an empirical
+  no-go while all eight same-apparatus authorities are absent;
 - a fail-closed pilot and confirmatory decision structure;
 - the empirical and computational work still required.
 
@@ -1343,6 +1641,9 @@ This paper does not establish:
 - that the nominal power survives model uncertainty;
 - that the selected point is fully admitted by all external constraints;
 - that a Casimir boundary changes a collapse rate;
+- that a superconducting condensate, the Standard-Model Higgs field, or a BEC
+  order parameter changes the registered Diósi rate;
+- that the synthetic magnetic-toggle candidate is apparatus-ready;
 - that objective collapse occurs;
 - that Penrose's geometric interpretation is observed;
 - that spacetime manifold dynamics have been measured or simulated.
@@ -1372,7 +1673,8 @@ profiles. Those results are retained as derivation ancestry rather than
 presented as competing current apparatuses.
 
 The leading design is still not physically viable evidence. Its electromagnetic
-response, covariance, gas kernel, echo rejection, state preparation, material
+response, covariance, gas kernel, echo rejection, measured worldlines and
+gravity covariance, state preparation, material
 density, external-bound mapping, and companion detector are transported or
 unmeasured. It therefore authorizes measured subsystem commissioning only, not
 a physical pilot, confirmatory campaign, collapse claim, or manifold claim.
@@ -1387,8 +1689,54 @@ certificate SHA-256
 `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
 That certificate establishes repository convergence only.
 
-The appropriate next action is therefore a measured feasibility pilot. If the
-pilot reproduces the response geometry and survives the registered robustness
+The downstream Stage-4.2P closure adds 69 passing focused/graph/provenance
+tests, a 35-test causal-clock-through-worldline replay, the complete 179-test
+required GR/WARP battery, a 224-entry math registry, current equation sidecars,
+root-to-leaf validation, and passing production builds. Fresh adapter run
+`2380` (`adapter:f3cbd258-82d2-4965-8a19-329600427b6a`) returns `PASS`, no
+first failure, empty deltas, certificate status `GREEN`, integrity true, and
+certificate SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+This verifies repository execution, not the synthetic worldline inputs or a
+physical collapse claim.
+
+Stage 4.2Q adds a separate ordinary boundary-control result. In its synthetic
+fixture, the temperature transition is non-identifiable against thermal
+response, a matched specimen pair is underpowered and fabrication-degenerate,
+and only a fixed-temperature magnetic toggle passes the numerical screen. The
+normal/superconducting ratio cancels the unchanged Diósi exponent to numerical
+precision, so this control is complementary to--not a replacement for--the
+mass--separation--time discriminator. Until specimen impedance, the
+state-conditioned Green response, magnetic/trap transfer, vortex state, sham
+covariance, and joint coherence cells are measured, the toggle remains a
+commissioning hypothesis and adds no collapse, Higgs, condensate, BEC, or
+manifold evidence.
+
+The Stage 4.2Q implementation closes its repository gates with 69/69 focused
+tests, 90/90 inherited Stage 4.2N--Q tests, 179/179 required GR/WARP tests, a
+225-entry math registry, current equation sidecars, root-to-leaf validation,
+and passing production builds. Fresh adapter run `2381`
+(`adapter:6d1b7163-e47e-446c-88a5-4bba0925da9d`) returns `PASS`, with no first
+failure or deltas, certificate status `GREEN`, integrity true, and certificate
+SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+This is software provenance for the bounded synthetic control campaign, not
+evidence that a superconducting boundary changes collapse.
+
+Stage 4.2R closes the executable empirical-input contract with 93/93 focused
+and inherited Stage-4.2O--R/graph/paper/root tests, 179/179 required GR/WARP
+tests, a 226-entry math registry, current equation sidecars, root-to-leaf
+validation, and passing production builds. Fresh adapter run `2382`
+(`adapter:07bb55ec-067c-4e8f-80a3-b60e9e9b6127`) returns `PASS`, no first
+failure, empty deltas, certificate status `GREEN`, integrity true, and
+certificate SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+It certifies the fail-closed software handoff, not any of the eight missing
+physical authorities.
+
+The appropriate next action is therefore to complete the eight Stage-4.2R
+authority packets. If the resulting measured feasibility pilot reproduces the
+response geometry and survives the registered robustness
 family, a blinded confirmatory campaign becomes justified. If it does not, the
 apparatus is redesigned or rejected without converting an engineering failure
 into a claim about nature.
@@ -1452,3 +1800,36 @@ submission.
 13. M. Arndt and K. Hornberger, “Testing the limits of quantum mechanical
     superpositions,” *Nature Physics* **10**, 271–277 (2014).
     https://doi.org/10.1038/nphys2863
+14. R. Colella, A. W. Overhauser, and S. A. Werner, “Observation of
+    Gravitationally Induced Quantum Interference,” *Physical Review Letters*
+    **34**, 1472–1474 (1975).
+    https://doi.org/10.1103/PhysRevLett.34.1472
+15. A. Roura, “Gravitational redshift in quantum-clock interferometry,”
+    *Physical Review X* **10**, 021014 (2020).
+    https://doi.org/10.1103/PhysRevX.10.021014
+16. M. Zych, F. Costa, I. Pikovski, and Č. Brukner, “Quantum interferometric
+    visibility as a witness of general relativistic proper time,” *Nature
+    Communications* **2**, 505 (2011).
+    https://doi.org/10.1038/ncomms1498
+17. I. Pikovski, M. Zych, F. Costa, and Č. Brukner, “Universal decoherence due
+    to gravitational time dilation,” *Nature Physics* **11**, 668–672 (2015).
+    https://doi.org/10.1038/nphys3366
+18. T. Bothwell *et al.*, “Resolving the gravitational redshift across a
+    millimetre-scale atomic sample,” *Nature* **602**, 420–424 (2022).
+    https://doi.org/10.1038/s41586-021-04349-7
+19. P. W. Anderson, “Plasmons, Gauge Invariance, and Mass,” *Physical Review*
+    **130**, 439–442 (1963). https://doi.org/10.1103/PhysRev.130.439
+20. D. C. Mattis and J. Bardeen, “Theory of the Anomalous Skin Effect in
+    Normal and Superconducting Metals,” *Physical Review* **111**, 412–417
+    (1958). https://doi.org/10.1103/PhysRev.111.412
+21. M. J. A. de Jong *et al.*, “Measurement of a strong nonlinear force
+    between superconductors compatible with the Casimir force,” *Nature
+    Communications* **17** (2026).
+    https://doi.org/10.1038/s41467-026-75261-9
+22. D. M. Harber *et al.*, “Measurement of the Casimir–Polder force through
+    center-of-mass oscillations of a Bose–Einstein condensate,” *Physical
+    Review A* **72**, 033610 (2005).
+    https://doi.org/10.1103/PhysRevA.72.033610
+23. P. W. Higgs, “Broken Symmetries and the Masses of Gauge Bosons,” *Physical
+    Review Letters* **13**, 508–509 (1964).
+    https://doi.org/10.1103/PhysRevLett.13.508

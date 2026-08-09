@@ -1966,6 +1966,10 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
     isPaperBackedNumericBindingPhasePrompt(prompt) ||
     hasAffirmativeResearchRetryIntent(prompt)
   );
+  const explicitlyRequestsClaimPortfolio =
+    /\b(?:decompose|separate(?:ly)?|each\s+(?:claim|point|finding)|claim[-\s]+to[-\s]+citation|citation\s+map|source\s+portfolio|paper\s+portfolio)\b/i.test(
+      prompt,
+    );
   // Never send operator instructions such as "claims we just discussed" to a
   // paper API. Prefer bounded resolved claims. If the retained conversation no
   // longer contains a matching answer, an explicit topic named in the current
@@ -1975,6 +1979,17 @@ export const buildPromptDerivedScholarlyResearchGatewayCallRequests = (
     if (!referentDerived && !explicitTopicFallbackDerived && !affirmativeCurrentTurnResearchAction) {
       return [];
     }
+  }
+  if (
+    referentDerived &&
+    !affirmativeCurrentTurnResearchAction &&
+    !explicitlyRequestsClaimPortfolio
+  ) {
+    // A retained answer resolves what the user means, but it does not choose
+    // the best literature query. Leave ordinary semantic follow-ups to the
+    // runtime agent; deterministic expansion remains available for explicit
+    // claim-portfolio workflows.
+    return [];
   }
   const requestedFullTextCount = (() => {
     const match = prompt.match(

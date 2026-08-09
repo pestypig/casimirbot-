@@ -7,6 +7,7 @@ export type FinalAnswerDraftQualityViolation =
   | "missing_required_prompt_parts"
   | "missing_support_refs_for_repo_route"
   | "missing_support_refs_for_scholarly_route"
+  | "missing_visible_citation_for_scholarly_analysis"
   | "missing_support_refs_for_internet_search_route"
   | "missing_support_refs_for_source_route"
   | "contradicts_observed_scholarly_full_text"
@@ -795,6 +796,16 @@ const sourceBackedModelSynthesisRouteFamilies = new Set<FinalAnswerDraftRouteFam
   "situation_room",
 ]);
 
+const analyticalScholarlyCitationRequired = (prompt: string): boolean =>
+  /\b(?:assumptions?|premises?|conditions?|setup|ansatz|approximations?|limitations?|caveats?|applicability|apply|applies|mismatch|compare|contrast|validate|validation|entail|unresolved|claim\s+boundar(?:y|ies))\b/i.test(
+    prompt,
+  );
+
+const hasVisibleScholarlyCitation = (text: string): boolean =>
+  /(?:artifact:\/\/scholarly-pdf|https?:\/\/(?:www\.)?(?:arxiv\.org|doi\.org)|\[[^\]]+\]\([^\s)]+\)|\bp(?:age|\.)\s*\d+)/i.test(
+    text,
+  );
+
 export function evaluateFinalAnswerDraftQualityGate(input: {
   turnId: string;
   finalAnswerDraftRef: string;
@@ -835,9 +846,6 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
     groundedTheoryProcedureLimitation &&
     /\bunsupported_lanyon_case\b/i.test(text) &&
     /\b(?:ineligible|unsupported|not registered|blocked)\b/i.test(text);
-  const groundedBoundedTheoryProcedureOperationRefusal =
-    groundedBoundedTheoryProcedureLimitation &&
-    /\b(?:I (?:can(?:not|'t)|am unable)|I['’]m unable|unable to)\b.{0,160}\b(?:configure|admit|use|improvise|run|execute|treat(?: it| the case)? as eligible|claim support)\b/i.test(text);
   if (!text) violations.push("empty_draft");
   if (
     isFallbackLike(text) &&
@@ -852,7 +860,7 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
   if (
     isRefusalLike(text) &&
     !readString(input.payload?.terminal_error_code) &&
-    !groundedBoundedTheoryProcedureOperationRefusal &&
+    !groundedBoundedTheoryProcedureLimitation &&
     !(isConditionalVisualEvidencePrompt(prompt) && conditionalVisualEvidenceSatisfied)
   ) {
     violations.push("refusal_without_error");
@@ -896,6 +904,14 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
       contradictsObservedScholarlyFullText(text)
     ) {
       violations.push("contradicts_observed_scholarly_full_text");
+    }
+    if (
+      routeFamily === "scholarly_research" &&
+      hasObservedScholarlyFullText(input.artifactLedger) &&
+      analyticalScholarlyCitationRequired(prompt) &&
+      !hasVisibleScholarlyCitation(text)
+    ) {
+      violations.push("missing_visible_citation_for_scholarly_analysis");
     }
   }
   if (

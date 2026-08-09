@@ -137,4 +137,41 @@ describe("scholarly evidence demand", () => {
       derivation_reasons: ["conditional_full_text_allows_metadata_fallback"],
     });
   });
+
+  it("requires full text for a natural analytical comparison of a named paper", () => {
+    expect(deriveScholarlyEvidenceDemand({
+      promptText:
+        "Compare the assumptions in arXiv 2105.03079 with the NHM2 whitepaper and explain which mismatch matters most.",
+    })).toMatchObject({
+      satisfaction: "all_of",
+      required_modes: ["full_text"],
+      optional_modes: [],
+      minimum_satisfying_depth: "full_text",
+      alternatives: [{
+        product: "full_text_summary",
+        minimum_depth: "full_text",
+        exactness: "bounded",
+      }],
+      derivation_reasons: ["analytical_paper_comparison_requires_full_text"],
+    });
+  });
+
+  it("does not execute historical, future, conditional, negated, or quoted paper comparisons", () => {
+    const prompts = [
+      "Previously I compared this paper with NHM2. Just list the paper metadata now.",
+      "Later compare this paper with NHM2. For now, just list the paper metadata.",
+      "If we compare this paper with NHM2, we should inspect its assumptions. Just list metadata now.",
+      "Do not compare this paper with NHM2; only list its metadata.",
+      'The phrase "compare this paper with NHM2" is an example. Just list metadata.',
+    ];
+
+    for (const promptText of prompts) {
+      expect(deriveScholarlyEvidenceDemand({ promptText })).toMatchObject({
+        required_modes: [],
+        optional_modes: [],
+        minimum_satisfying_depth: "metadata_lookup",
+        derivation_reasons: ["metadata_evidence_satisfies_requested_workflow"],
+      });
+    }
+  });
 });

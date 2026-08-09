@@ -16,9 +16,9 @@ import {
   isNhm2FullApparatusSourceTensor,
 } from "../../shared/contracts/nhm2-full-apparatus-source-tensor.v1";
 import {
-  buildNhm2SemiclassicalStateRealizability,
-  isNhm2SemiclassicalStateRealizability,
-} from "../../shared/contracts/nhm2-semiclassical-state-realizability.v1";
+  buildNhm2SemiclassicalStateRealizabilityV2 as buildNhm2SemiclassicalStateRealizability,
+  isNhm2SemiclassicalStateRealizabilityV2 as isNhm2SemiclassicalStateRealizability,
+} from "../../shared/contracts/nhm2-semiclassical-state-realizability.v2";
 import {
   buildNhm2CovariantConservation,
   isNhm2CovariantConservation,

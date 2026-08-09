@@ -30,6 +30,7 @@ describe("Docs Viewer admission for prior document discussion", () => {
     "Tell me more about the NHM2 paper you already summarized.",
     "Continue discussing the document previously described.",
     "How would you expand on the whitepaper we talked about earlier?",
+    "Which assumption mismatch matters most if someone tries to apply that paper directly to NHM2? Use the sources you just inspected, and separate what follows from the paper from what remains unresolved.",
   ])("keeps a conversational continuation out of fresh Docs admission: %s", (prompt) => {
     expect(hasAffirmativeDocsViewerSearchCue(prompt)).toBe(false);
 

@@ -32,14 +32,17 @@ import {
 } from "@shared/contracts/casimir-independent-numerical-verification.v1";
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
 import {
+  bindScholarlyRecoveryLaneRequestToSelectedPaper,
   buildCodexContinuationAffordanceRetryInstruction,
   buildCodexChainedLaneCallPlan,
   buildCodexCapabilityLaneRetryInstruction,
   buildCodexCompoundSubgoalLedger,
+  compoundCapabilityHandoffCandidateFromText,
   buildCodexNormalizedObservationArtifacts,
   buildCodexNormalizedObservationReentryEvidenceLines,
   canonicalizeCodexCapabilityLaneCandidate,
   buildCodexScholarlyEvidenceDecisionCorrectionInstruction,
+  buildCodexScholarlyEvidenceDecisionContractRetryPrompt,
   buildCodexScholarlyEvidenceDecisionInstruction,
   buildCodexRuntimeLaneCapabilityAdmissionCorrection,
   runtimeProviderAdmittedCapabilityIdsForQuestion,
@@ -2356,6 +2359,49 @@ describe("Codex provider capability lane adapter", () => {
     })).toBe(false);
   });
 
+  it("admits an execution-equivalent canonical gateway request for a continuation alias", () => {
+    const state = {
+      next_admissible_affordances: [{
+        admissible: true,
+        tried: false,
+        lane_request: {
+          authority: "hint_only_agent_must_decide",
+          capability_key: "docs-viewer.open_doc_by_path",
+          capability: "docs-viewer.open_doc_by_path",
+          path: "/docs/research/casimir-dp-quantum-foam-study.md",
+          query: "Casimir Dp Quantum Foam Study",
+          selection_reason: "validated_doc_summary_candidate",
+          candidate_validation_status: "strong",
+        },
+      }],
+      allowed_decisions: ["act"],
+      last_attempt: { retryability: "not_applicable" },
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+    const canonicalRequest = {
+      capability: "docs-viewer.open_doc",
+      path: "/docs/research/casimir-dp-quantum-foam-study.md",
+      query: "Casimir Dp Quantum Foam Study",
+      reason: "validated_doc_summary_candidate",
+    };
+
+    expect(continuationStateAdmitsGenericProviderLaneRequest({
+      state,
+      candidate: canonicalRequest,
+      admittedCapabilityIds: ["docs-viewer.open_doc"],
+      providerSelectedExtensionAllowed: false,
+    })).toBe(true);
+    expect(continuationStateAdmitsGenericProviderLaneRequest({
+      state,
+      candidate: {
+        ...canonicalRequest,
+        path: "/docs/research/another-study.md",
+      },
+      admittedCapabilityIds: ["docs-viewer.open_doc"],
+      providerSelectedExtensionAllowed: false,
+    })).toBe(false);
+  });
+
   it("rejects invented capability ids before execution and gives Codex an executable correction", () => {
     const admittedCapabilityIds = [
       "visual_analysis.inspect_image_region",
@@ -2458,6 +2504,23 @@ describe("Codex provider capability lane adapter", () => {
         admittedToolFamilies: ["situation_run"],
       }),
     ).toEqual(["situation-room.describe_visual_capture"]);
+
+    expect(
+      runtimeProviderAdmittedCapabilityIdsForQuestion({
+        question:
+          "Prepare only the registered theory procedure and report its missing closure requirements.",
+        admittedCapabilityIds: [
+          "theory-experiment-procedure.prepare",
+          "theory-experiment-procedure.evaluate_closure",
+          "scholarly-research.lookup_papers",
+        ],
+        admittedToolFamilies: ["theory_locator"],
+        restrictAllCapabilitiesToAdmittedToolFamilies: true,
+      }),
+    ).toEqual([
+      "theory-experiment-procedure.evaluate_closure",
+      "theory-experiment-procedure.prepare",
+    ]);
   });
 
   it("keeps account-wide mutations out of historical and contextual runtime turns", () => {
@@ -2643,6 +2706,87 @@ describe("Codex provider capability lane adapter", () => {
     });
   });
 
+  it("rejects a user question while exact full-text recovery remains available", () => {
+    const gatewayCallResults = [{
+      capability_id: "scholarly-research.lookup_papers",
+      gateway_admission: {
+        requested_capability: "scholarly-research.lookup_papers",
+      },
+      observation: {
+        papers: [{
+          result_id: "arxiv:selected-paper",
+          title: "A selected paper",
+          identifiers: {
+            arxiv_id: "2105.03079",
+            pdf_url: "https://arxiv.org/pdf/2105.03079.pdf",
+          },
+        }],
+      },
+    }] as any;
+    const validation = validateCodexScholarlyEvidenceDecision({
+      text: [
+        'HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:{"decision":"ask_user","selected_result_ids":[],"reason":"Should I fetch the paper?"}',
+        "Should I fetch the full text?",
+      ].join("\n"),
+      phase: "test_premature_ask_user",
+      gatewayCallResults,
+      requiredEvidenceModes: ["full_text"],
+      recoveryAllowed: true,
+    });
+
+    expect(validation.audit).toMatchObject({
+      status: "invalid",
+      decision: "ask_user",
+      validation_error:
+        "scholarly_ask_user_blocked_by_available_full_text_recovery",
+      recovery_allowed: true,
+    });
+    expect(buildCodexScholarlyEvidenceDecisionCorrectionInstruction({
+      audit: validation.audit,
+      requiredEvidenceModes: ["full_text"],
+      gatewayCallResults,
+    })).toContain(
+      "choose recover and request scholarly-research.fetch_full_text",
+    );
+  });
+
+  it("binds a selected lookup paper into its full-text recovery request", () => {
+    expect(bindScholarlyRecoveryLaneRequestToSelectedPaper({
+      candidate: {
+        capability: "scholarly-research.fetch_full_text",
+        query: "arXiv:2105.03079",
+        arxiv_id: "2105.03079",
+        source_url: "https://arxiv.org/abs/2105.03079",
+      },
+      selectedResultIds: ["arxiv:selected-paper"],
+      gatewayCallResults: [{
+        capability_id: "scholarly-research.lookup_papers",
+        gateway_admission: {
+          requested_capability: "scholarly-research.lookup_papers",
+        },
+        observation: {
+          papers: [{
+            result_id: "arxiv:selected-paper",
+            title: "A selected paper",
+            identifiers: {
+              arxiv_id: "2105.03079",
+              pdf_url: "https://arxiv.org/pdf/2105.03079.pdf",
+            },
+          }],
+        },
+      }] as any,
+    })).toMatchObject({
+      capability: "scholarly-research.fetch_full_text",
+      paper_result_id: "arxiv:selected-paper",
+      arxiv_id: "2105.03079",
+      source_url: "https://arxiv.org/abs/2105.03079",
+      selected_full_text_paper_ids: ["arxiv:selected-paper"],
+      papers: [expect.objectContaining({
+        result_id: "arxiv:selected-paper",
+      })],
+    });
+  });
+
   it("binds one exact same-turn full-text observation into numeric extraction", () => {
     const fullTextObservation = {
       schema: "helix.scholarly_full_text_observation.v1",
@@ -2769,6 +2913,152 @@ describe("Codex provider capability lane adapter", () => {
         validation_error: null,
       },
     });
+  });
+
+  it("executes Codex's semantic same-capability scholarly retry after a failed prompt-derived lookup", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    const previousFetch = globalThis.fetch;
+    const title = "Thermodynamics of Spacetime: The Einstein Equation of State";
+    const arxivId = "gr-qc/9504004";
+    const semanticScholarId = "jacobson-1995";
+    const resultId = `semantic_scholar:${crypto
+      .createHash("sha256")
+      .update(
+        JSON.stringify([
+          title,
+          undefined,
+          arxivId,
+          undefined,
+          semanticScholarId,
+          undefined,
+          undefined,
+        ]),
+      )
+      .digest("hex")
+      .slice(0, 16)}`;
+    const recoveryQuery =
+      "Jacobson thermodynamics of spacetime Einstein equation of state primary paper";
+    const answer =
+      "Jacobson's primary paper is the strongest relevant result returned by the corrected search.";
+
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        `HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:{"decision":"recover","selected_result_ids":[],"reason":"The prompt-derived lookup failed before returning a relevant paper, so retry with the precise physical hypothesis.","lane_request":{"capability":"scholarly-research.lookup_papers","query":"${recoveryQuery}","providers":["semantic_scholar"],"limit":5}}`,
+        [
+          `HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:{"decision":"answer","selected_result_ids":["${resultId}"],"reason":"The corrected current-turn lookup returned the primary paper requested by the user."}`,
+          answer,
+        ].join("\n"),
+      ],
+    });
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    globalThis.fetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url.includes(encodeURIComponent(recoveryQuery))) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: [{
+              paperId: semanticScholarId,
+              title,
+              abstract:
+                "The Einstein equation is derived from horizon thermodynamics and the Clausius relation.",
+              authors: [{ name: "Ted Jacobson" }],
+              year: 1995,
+              externalIds: { ArXiv: arxivId },
+              isOpenAccess: true,
+              openAccessPdf: { url: `https://arxiv.org/pdf/${arxivId}.pdf` },
+            }],
+          }),
+          text: async () => "",
+        } as Response;
+      }
+      return {
+        ok: false,
+        status: 429,
+        json: async () => ({}),
+        text: async () => "rate limited",
+      } as Response;
+    }) as typeof fetch;
+
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "ask:test:semantic-scholarly-query-retry",
+          thread_id: "thread:test:semantic-scholarly-query-retry",
+          agent_runtime: "codex",
+          question: [
+            'Search arXiv for "spacetime thermodynamics".',
+            "Return its title, authors, and arXiv ID.",
+            "If the first search fails, correct the search and return the strongest relevant result.",
+          ].join(" "),
+        },
+        headers: {},
+      });
+      const debug = result.debug as Record<string, any>;
+      const fetchedUrls = vi.mocked(globalThis.fetch).mock.calls.map(
+        ([input]) => String(input),
+      );
+
+      expect(
+        result,
+        JSON.stringify(
+          {
+            agent_continuation_state: debug.agent_continuation_state,
+            agent_continuation_states: debug.agent_continuation_states,
+            runtime_lane_request_contract:
+              debug.runtime_lane_request_contract,
+            runtime_lane_request_retry: debug.runtime_lane_request_retry,
+            runtime_lane_request_loop: debug.runtime_lane_request_loop,
+            provider_reasoning_reentry: debug.provider_reasoning_reentry,
+            provider_gateway_debug_summary:
+              debug.provider_gateway_debug_summary,
+          },
+          null,
+          2,
+        ),
+      ).toMatchObject({
+        ok: true,
+        response_type: "final_answer",
+        answer,
+      });
+      expect(
+        fetchedUrls.some((url) =>
+          url.includes(encodeURIComponent(recoveryQuery)),
+        ),
+      ).toBe(true);
+      expect(
+        debug.runtime_lane_request_loop?.continuation_lane_candidate_rejection,
+      ).not.toMatchObject({
+        reason: "runtime_lane_request_not_in_admitted_continuation_affordances",
+      });
+      expect(debug.provider_gateway_debug_summary).toMatchObject({
+        evidence_reentry_status: "completed",
+        terminal_authority_granted: true,
+        terminal_artifact_kind: "scholarly_research_answer",
+      });
+    } finally {
+      globalThis.fetch = previousFetch;
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined)
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else
+        process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined)
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined)
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+    }
   });
 
   it("accepts a known lookup result ID as the binding target for full-text recovery", () => {
@@ -2964,6 +3254,23 @@ describe("Codex provider capability lane adapter", () => {
     expect(instruction).toContain("Do not answer from lookup-only evidence");
     expect(instruction).toContain("scholarly-research.fetch_full_text");
     expect(instruction).toContain("Helix remains responsible for capability and argument admission");
+  });
+
+  it("ends a scholarly contract retry with the required corrected response shape", () => {
+    const retryPrompt = buildCodexScholarlyEvidenceDecisionContractRetryPrompt({
+      basePrompt: "Use the observed full text to answer.",
+      correctionInstruction: "The prior decision was missing.",
+      decisionInstruction: "Select one exact observed artifact ID.",
+      priorResponse: "The paper reports a relationship between energy and width.",
+    });
+
+    expect(retryPrompt).toContain("Prior non-compliant response:");
+    expect(retryPrompt).toContain("Return the corrected response now.");
+    expect(retryPrompt.trimEnd()).toMatch(
+      /Do not repeat the prior response without the required decision line\.$/,
+    );
+    expect(retryPrompt.lastIndexOf("HELIX_SCHOLARLY_EVIDENCE_DECISION_JSON:"))
+      .toBeGreaterThan(retryPrompt.lastIndexOf("Prior non-compliant response:"));
   });
 
   it("admits a model-chosen Image Lens recovery only for an explicit scholarly page workflow", () => {
@@ -3377,6 +3684,291 @@ describe("Codex provider capability lane adapter", () => {
     expect(ledger).toBeNull();
   });
 
+  it("keeps a required but not-yet-run compound capability in the provider ledger", () => {
+    const ledger = buildCodexCompoundSubgoalLedger({
+      turnId: "ask:compound-pending-docs",
+      normalizedArtifacts: [{
+        artifact_id: "obs:scholarly:1",
+        producer_item_id: "call:scholarly:1",
+        capability_key: "scholarly-research.lookup_papers",
+        kind: "scholarly_research_observation",
+        status: "succeeded",
+        payload: { status: "succeeded", evidence_state: "lookup_usable" },
+      }],
+      gatewayCallResults: [{
+        ok: true,
+        capability_id: "scholarly-research.lookup_papers",
+        gateway_admission: { requested_capability: "scholarly-research.lookup_papers" },
+        observation_packet: {
+          call_id: "call:scholarly:1",
+          observation_ref: "obs:scholarly:1",
+        },
+      }] as any,
+      requiredCapabilityIds: [
+        "docs.search",
+        "scholarly-research.lookup_papers",
+      ],
+    });
+
+    expect(ledger?.subgoals).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        requested_capability: "scholarly-research.lookup_papers",
+        satisfaction: "satisfied",
+      }),
+      expect.objectContaining({
+        requested_capability: "docs.search",
+        satisfaction: "pending",
+        rail_failure_code: "subgoal_observation_missing",
+      }),
+    ]));
+    expect(ledger?.rail_status).toBe("missing_observation");
+  });
+
+  it("binds a provider occurrence to its evidence-satisfying artifact instead of the first normalized projection", () => {
+    const docsCallId = "docs-search-with-locator-and-results";
+    const scholarlyCallId = "scholarly-failed";
+    const ledger = buildCodexCompoundSubgoalLedger({
+      turnId: "ask:compound-docs-artifact-order",
+      normalizedArtifacts: [
+        {
+          artifact_id: "obs:docs:locator",
+          producer_item_id: docsCallId,
+          capability_key: "docs.search",
+          kind: "doc_location_matches",
+          status: "succeeded",
+          payload: { status: "succeeded" },
+        },
+        {
+          artifact_id: "obs:docs:results",
+          producer_item_id: docsCallId,
+          capability_key: "docs.search",
+          kind: "doc_search_results",
+          status: "succeeded",
+          payload: {
+            status: "succeeded",
+            results: [{ path: "docs/research/nhm2-current-status-whitepaper.md" }],
+          },
+        },
+        {
+          artifact_id: "obs:scholarly:failed",
+          producer_item_id: scholarlyCallId,
+          capability_key: "scholarly-research.lookup_papers",
+          kind: "scholarly_research_observation",
+          status: "failed",
+          payload: { status: "failed", error: "semantic_scholar_http_429" },
+        },
+      ],
+      gatewayCallResults: [
+        {
+          ok: true,
+          capability_id: "docs.search",
+          gateway_admission: { requested_capability: "docs.search" },
+          observation_packet: {
+            call_id: docsCallId,
+            observation_ref: "packet:docs",
+          },
+        },
+        {
+          ok: false,
+          capability_id: "scholarly-research.lookup_papers",
+          error: "semantic_scholar_http_429",
+          gateway_admission: {
+            requested_capability: "scholarly-research.lookup_papers",
+          },
+          observation_packet: {
+            call_id: scholarlyCallId,
+            observation_ref: "packet:scholarly",
+          },
+        },
+      ] as any,
+    });
+
+    const docsSubgoal = (ledger?.subgoals as any[]).find(
+      (entry) => entry.requested_capability === "docs.search",
+    );
+    expect(docsSubgoal).toMatchObject({
+      observation_kind: "doc_search_results",
+      observation_ref: "obs:docs:results",
+      satisfaction: "satisfied",
+      rail_status: "satisfied",
+    });
+    expect(docsSubgoal.observation_kinds).toEqual(expect.arrayContaining([
+      "doc_location_matches",
+      "doc_search_results",
+    ]));
+    expect(ledger?.first_broken_rail).toMatchObject({
+      requested_capability: "scholarly-research.lookup_papers",
+    });
+  });
+
+  it("preserves an admitted Docs handoff after a scholarly observation", () => {
+    const candidate = compoundCapabilityHandoffCandidateFromText({
+      text: 'HELIX_WORKSTATION_TOOL_REQUEST_JSON:{"capability_id":"docs.search","arguments":{"query":"NHM2"}}',
+      requiredCapabilityIds: [
+        "docs.search",
+        "scholarly-research.lookup_papers",
+      ],
+    });
+
+    expect(candidate).toMatchObject({
+      capability_id: "docs.search",
+      arguments: { query: "NHM2" },
+    });
+  });
+
+  it("does not broaden scholarly-only recovery into a generic handoff", () => {
+    expect(compoundCapabilityHandoffCandidateFromText({
+      text: 'HELIX_WORKSTATION_TOOL_REQUEST_JSON:{"capability_id":"docs.search","arguments":{"query":"NHM2"}}',
+      requiredCapabilityIds: ["scholarly-research.lookup_papers"],
+    })).toBeNull();
+  });
+
+  it("keeps failed retries in evidence without promoting them to compound terminal obligations", () => {
+    const capability = "scholarly-research.lookup_papers";
+    const call = (callId: string, ok: boolean) => ({
+      ok,
+      capability_id: capability,
+      error: ok ? null : "semantic_scholar_http_429",
+      gateway_admission: { requested_capability: capability },
+      observation_packet: {
+        call_id: callId,
+        observation_ref: `packet:${callId}`,
+        produced_artifact_refs: [`gateway:${callId}`],
+      },
+    }) as any;
+    const artifact = (callId: string, ok: boolean) => ({
+      artifact_id: `normalized:${callId}`,
+      producer_item_id: callId,
+      capability_key: capability,
+      kind: "scholarly_research_observation",
+      status: ok ? "succeeded" : "failed",
+      provider_gateway_packet_refs: [`gateway:${callId}`],
+      payload: ok ? { status: "succeeded" } : {
+        status: "failed",
+        scholarly_lookup_recovery_affordance: {
+          next_affordances: [{ capability, query: "corrected query" }],
+        },
+      },
+    });
+
+    const ledger = buildCodexCompoundSubgoalLedger({
+      turnId: "ask:scholarly-retry-ledger",
+      normalizedArtifacts: [
+        artifact("lookup-failed-1", false),
+        artifact("lookup-failed-2", false),
+        artifact("lookup-success", true),
+      ],
+      gatewayCallResults: [
+        call("lookup-failed-1", false),
+        call("lookup-failed-2", false),
+        call("lookup-success", true),
+      ],
+    });
+
+    expect(ledger).toBeNull();
+  });
+
+  it("does not let a corrected exploratory family miss poison the compound terminal rail", () => {
+    const call = (
+      capabilityId: string,
+      callId: string,
+      ok: boolean,
+      error?: string,
+    ) => ({
+      ok,
+      capability_id: capabilityId,
+      error,
+      gateway_admission: { requested_capability: capabilityId },
+      observation_packet: {
+        call_id: callId,
+        observation_ref: `packet:${callId}`,
+        produced_artifact_refs: [`gateway:${callId}`],
+      },
+    }) as any;
+    const artifact = (
+      capabilityId: string,
+      callId: string,
+      kind: string,
+      payload: Record<string, unknown>,
+    ) => ({
+      artifact_id: `normalized:${callId}`,
+      producer_item_id: callId,
+      capability_key: capabilityId,
+      kind,
+      provider_gateway_packet_refs: [`gateway:${callId}`],
+      payload,
+    });
+    const inputs = {
+      turnId: "ask:corrected-scholarly-family",
+      normalizedArtifacts: [
+        artifact(
+          "docs.search",
+          "docs-success",
+          "doc_search_results",
+          { status: "succeeded" },
+        ),
+        artifact(
+          "research-library.read_document",
+          "saved-library-blocked",
+          "research_library_observation",
+          { status: "blocked" },
+        ),
+        artifact(
+          "scholarly-research.lookup_papers",
+          "scholarly-low-relevance",
+          "scholarly_research_observation",
+          {
+            lookup_relevance_gate: {
+              status: "blocked",
+              code: "lookup_weak_match",
+            },
+          },
+        ),
+      ],
+      gatewayCallResults: [
+        call("docs.search", "docs-success", true),
+        call(
+          "research-library.read_document",
+          "saved-library-blocked",
+          false,
+          "profile_session_required",
+        ),
+        call(
+          "scholarly-research.lookup_papers",
+          "scholarly-low-relevance",
+          false,
+          "semantic_scholar_http_429",
+        ),
+      ],
+    };
+
+    const corrected = buildCodexCompoundSubgoalLedger(inputs);
+    expect(corrected).toMatchObject({
+      subgoal_count: 2,
+      first_broken_rail: {
+        requested_capability: "scholarly-research.lookup_papers",
+        rail_failure_code: "lookup_weak_match",
+      },
+    });
+    expect(
+      (corrected?.subgoals as any[]).map(
+        (entry) => entry.requested_capability,
+      ),
+    ).not.toContain("research-library.read_document");
+
+    const explicitlyRequired = buildCodexCompoundSubgoalLedger({
+      ...inputs,
+      requiredCapabilityIds: ["research-library.read_document"],
+    });
+    expect(explicitlyRequired).toMatchObject({
+      subgoal_count: 3,
+      first_broken_rail: {
+        requested_capability: "research-library.read_document",
+        rail_failure_code: "profile_session_required",
+      },
+    });
+  });
+
   it("keeps repeated capability executions distinct by trusted provider call occurrence", () => {
     const capability = "com.casimirbot.minecraft.command";
     const spatialCapability = "com.casimirbot.minecraft.spatial_region.inspect";
@@ -3551,6 +4143,16 @@ describe("Codex provider capability lane adapter", () => {
           source_pdf_ref: sourcePdfRef,
           cache_path: "C:\\cache\\selected-paper.pdf",
           page_text_refs: [{ page: 1, text_ref: `${sourcePdfRef}/page/1#text` }],
+          selected_chunks: [{
+            paper_result_id: "arxiv:selected-paper",
+            title: "A selected paper",
+            page_start: 2,
+            section_hint: "Assumptions",
+            text_excerpt: "The derivation assumes a unit lapse and flat spatial slices.",
+            citation_ref: `${sourcePdfRef}#page=2&char=10-80`,
+            citation_label: "A selected paper, p. 2, Assumptions",
+            source_text_ref: `${sourcePdfRef}#page=2&char=10-80`,
+          }],
         },
         observation_packet: {
           produced_artifact_refs: ["ask:test:runtime-full-text-selection:observation"],
@@ -3566,6 +4168,13 @@ describe("Codex provider capability lane adapter", () => {
       runtime_semantic_selection_status: "matched",
       source_pdf_ref: sourcePdfRef,
       cache_path: "C:\\cache\\selected-paper.pdf",
+      bounded_evidence_passages: [expect.objectContaining({
+        page: 2,
+        section: "Assumptions",
+        text_excerpt:
+          "The derivation assumes a unit lapse and flat spatial slices.",
+        citation_label: "A selected paper, p. 2, Assumptions",
+      })],
     });
     expect(record?.papers).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -3577,6 +4186,59 @@ describe("Codex provider capability lane adapter", () => {
         }),
       }),
     ]));
+  });
+
+  it("accepts an exact full-text observation artifact as the runtime-selected result", () => {
+    const observationRef =
+      "ask:test:runtime-full-text-artifact-selection:scholarly_full_text_observation";
+    const record = scholarlyMemoryRecordFromGatewayResult({
+      body: { session_id: "session-runtime-full-text-artifact-selection" },
+      turnId: "ask:test:runtime-full-text-artifact-selection",
+      selectedResultIds: [observationRef],
+      result: {
+        ok: true,
+        capability_id: "scholarly-research.fetch_full_text",
+        gateway_admission: {
+          requested_capability: "scholarly-research.fetch_full_text",
+        },
+        artifact_refs: [observationRef],
+        observation: {
+          artifact_id: observationRef,
+          evidence_state: "full_text_usable",
+          selected_for_answer: true,
+          paper_result_id: "arxiv:selected-paper",
+          title: "A selected paper",
+          source_url: "https://arxiv.org/pdf/1234.5678.pdf",
+          selected_chunks: [{
+            paper_result_id: "arxiv:selected-paper",
+            title: "A selected paper",
+            page_start: 2,
+            section_hint: "Assumptions",
+            text_excerpt:
+              "The derivation assumes a unit lapse and flat spatial slices.",
+            citation_ref: `${observationRef}#page=2&char=10-80`,
+            citation_label: "A selected paper, p. 2, Assumptions",
+            source_text_ref: `${observationRef}#page=2&char=10-80`,
+          }],
+        },
+        observation_packet: {
+          produced_artifact_refs: [observationRef],
+          state_delta: {},
+        },
+      } as any,
+    });
+
+    expect(record).toMatchObject({
+      selected_for_answer: true,
+      evidence_grade: "answer_grade",
+      runtime_selected_result_ids: [observationRef],
+      runtime_semantic_selection_status: "matched",
+      bounded_evidence_passages: [expect.objectContaining({
+        section: "Assumptions",
+        text_excerpt:
+          "The derivation assumes a unit lapse and flat spatial slices.",
+      })],
+    });
   });
 
   it("binds a deictic full-text lane call to the runtime-selected prior paper", () => {
@@ -3624,6 +4286,23 @@ describe("Codex provider capability lane adapter", () => {
       selected_full_text_paper_ids: ["openalex:rea-2013"],
       source_url: "https://example.test/rea-2013.pdf",
       doi: "10.1088/0004-637X/770/1/65",
+    });
+  });
+
+  it("binds an explicit current-turn arXiv identity into a full-text lane call", () => {
+    const enriched = enrichCapabilityLaneCandidatesFromBody({
+      question:
+        "Compare the assumptions in the primary paper arXiv:2105.03079 with the NHM2 whitepaper.",
+    }, {
+      capability: "scholarly-research.fetch_full_text",
+      query: "arXiv:2105.03079",
+    }) as Record<string, unknown>;
+
+    expect(enriched).toMatchObject({
+      capability: "scholarly-research.fetch_full_text",
+      query: "arXiv:2105.03079",
+      arxiv_id: "2105.03079",
+      source_url: "https://arxiv.org/abs/2105.03079",
     });
   });
 
@@ -10697,6 +11376,15 @@ describe("Codex provider capability lane adapter", () => {
       if (previousCapturePromptPath === undefined) delete process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH;
       else process.env.CODEX_AGENT_FAKE_CAPTURE_PROMPT_PATH = previousCapturePromptPath;
     }
+  });
+
+  it("does not classify a generic prior-answer source correction as Image Lens continuity", () => {
+    expect(
+      asksForScientificImageEvidenceContinuity({
+        question:
+          "That last answer mixed up the quantum-inequality bound with the expansion diagnostic. Please correct it: what does Ford-Roman actually constrain, and what does that mean for NHM2's proposed physical source rather than its geometry classification?",
+      }),
+    ).toBe(false);
   });
 
   it("instructs the model to report missing conversational context instead of guessing", async () => {

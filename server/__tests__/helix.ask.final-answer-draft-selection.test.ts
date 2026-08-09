@@ -294,6 +294,40 @@ const addMoralGraphRuntimeProof = (payload: Record<string, unknown>, observation
 };
 
 describe("final_answer_draft terminal selection", () => {
+  it("requires a visible citation for analytical claims over observed scholarly full text", () => {
+    const turnId = "ask:test:scholarly-analytical-visible-citation";
+    const fullTextArtifact = {
+      artifact_id: `${turnId}:scholarly-full-text`,
+      kind: "scholarly_full_text_observation",
+      payload: {
+        schema: "helix.scholarly_full_text_observation.v1",
+        selected_chunks: [{
+          text_excerpt: "The flow and its derivatives are smooth and bounded.",
+          citation_ref: "artifact://scholarly-pdf/paper.pdf#page=4&char=10-80",
+        }],
+      },
+    } as any;
+    const prompt =
+      "Which assumption mismatch matters most, and what remains unresolved?";
+    const evaluate = (draftText: string) => evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:draft`,
+      draftText,
+      draftPayload: { support_refs: [fullTextArtifact.artifact_id] },
+      promptText: prompt,
+      routeProductContract: scholarlyContract(turnId),
+      payload: { active_prompt: prompt },
+      artifactLedger: [fullTextArtifact],
+    });
+
+    expect(evaluate(
+      "The main mismatch is the smooth and bounded flow assumption.",
+    ).violations).toContain("missing_visible_citation_for_scholarly_analysis");
+    expect(evaluate(
+      "The main mismatch is the smooth and bounded flow assumption [paper, p. 4](artifact://scholarly-pdf/paper.pdf#page=4&char=10-80).",
+    ).violations).not.toContain("missing_visible_citation_for_scholarly_analysis");
+  });
+
   it("rejects abbreviated or mislabeled scholarly page evidence links", () => {
     const turnId = "ask:test:invalid-page-evidence-links";
     const artifact = researchLibraryObservation(turnId);
@@ -3460,6 +3494,43 @@ describe("final_answer_draft terminal selection", () => {
     });
 
     expect(configureGate).toMatchObject({
+      ok: true,
+      route_family: "theory_locator",
+      violations: [],
+    });
+
+    const prepareGate = evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:prepare-draft`,
+      draftText: [
+        "Typed limitation: unsupported_lanyon_case; the requested 2D adaptive-mesh case is ineligible.",
+        "I cannot prepare a valid Lanyon-backed procedure without target_observable_required, coordinate_frame_required, and initial_boundary_conditions_required.",
+        "No code was run and no support was improvised.",
+      ].join("\n"),
+      draftPayload: {
+        schema: "helix.final_answer_draft.v1",
+        grounded_in_observation_refs: [observationRef],
+      },
+      promptText:
+        "Do not improvise support or run code; give the exact typed limitation and missing requirements.",
+      routeProductContract,
+      payload: {
+        active_prompt:
+          "Do not improvise support or run code; give the exact typed limitation and missing requirements.",
+        route_product_contract: routeProductContract,
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          route: { source_target: "theory_locator" },
+          canonical_goal: {
+            goal_kind: "theory_locator",
+            required_terminal_kind: "model_synthesized_answer",
+          },
+        },
+      },
+      artifactLedger,
+    });
+
+    expect(prepareGate).toMatchObject({
       ok: true,
       route_family: "theory_locator",
       violations: [],

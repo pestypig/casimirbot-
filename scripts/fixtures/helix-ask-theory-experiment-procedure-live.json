@@ -152,7 +152,7 @@
       "expected_answer_patterns": [
         "seven|stage|procedure",
         "later|would|not",
-        "evidence|dependency|scale|closure"
+        "evidence|dependenc(?:y|ies)|scale|closure"
       ],
       "expected_minimum_answer_chars": 90
     }

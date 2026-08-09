@@ -290,6 +290,9 @@ describe("Helix Ask doc args extraction boundary", () => {
     expect(resolveAskTurnTitleLikeOpenDocQueryArg("open the NHM2 deeper reformulation decision memo")).toBe(
       "NHM2 deeper reformulation decision memo",
     );
+    expect(resolveAskTurnTitleLikeOpenDocQueryArg(
+      "Open the NHM2 current status whitepaper in the local docs and compare its source-closure caution with the primary paper arXiv:2105.03079.",
+    )).toBe("NHM2 current status whitepaper");
     expect(readers.resolveAskTurnOpenDocSearchQueryArg("show the latest result about Casimir tile load bearing")).toBe(
       "Casimir tile load bearing",
     );

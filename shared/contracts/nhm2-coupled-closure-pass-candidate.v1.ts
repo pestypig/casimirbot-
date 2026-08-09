@@ -1,5 +1,8 @@
 import type { CasimirMaterialReceiptV1 } from "./casimir-material-receipt.v1";
-import type { Nhm2ObserverRobustEnergyConditionArtifactV1 } from "./nhm2-observer-robust-energy-conditions.v1";
+import {
+  NHM2_REQUIRED_OBSERVER_FAMILY_IDS,
+  type Nhm2ObserverRobustEnergyConditionArtifactV1,
+} from "./nhm2-observer-robust-energy-conditions.v1";
 import type { Nhm2QeiWorldlineDossierV1 } from "./nhm2-qei-worldline-dossier.v1";
 import {
   NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS,
@@ -183,15 +186,24 @@ const gate = (input: {
   warnings?: Array<string | null | undefined>;
   primaryMetric?: string | null;
   requiredCorrections?: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> | null;
-}): Nhm2CoupledClosureGateV1 => ({
-  gateId: input.gateId,
-  status: input.status,
-  pass: input.status === "pass",
-  blockers: uniqueText(input.blockers ?? []),
-  warnings: uniqueText(input.warnings ?? []),
-  primaryMetric: asText(input.primaryMetric),
-  requiredCorrections: input.status === "pass" ? {} : correctionRecord(input.requiredCorrections),
-});
+}): Nhm2CoupledClosureGateV1 => {
+  const blockers = uniqueText(input.blockers ?? []);
+  const requiredCorrections = correctionRecord(input.requiredCorrections);
+  const status =
+    input.status === "pass" &&
+    (blockers.length > 0 || Object.keys(requiredCorrections).length > 0)
+      ? "review"
+      : input.status;
+  return {
+    gateId: input.gateId,
+    status,
+    pass: status === "pass",
+    blockers,
+    warnings: uniqueText(input.warnings ?? []),
+    primaryMetric: asText(input.primaryMetric),
+    requiredCorrections: status === "pass" ? {} : requiredCorrections,
+  };
+};
 
 const componentLedgerRegionHasFullSourceAuthority = (
   artifact: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null | undefined,
@@ -630,35 +642,81 @@ const observerGate = (
       blockers: ["observer_robust_energy_conditions_missing"],
     });
   }
-  const status: Nhm2CoupledClosureGateStatus = artifact.summary.anyViolation
-    ? "fail"
-    : artifact.summary.robustCheckComplete && !artifact.summary.eulerianOnly
-      ? "pass"
-      : "review";
-  const blockers = status === "pass" ? [] : uniqueText([
+  const familyCounts = new Map<string, number>();
+  for (const family of artifact.observerFamilies) {
+    familyCounts.set(
+      family.familyId,
+      (familyCounts.get(family.familyId) ?? 0) + 1,
+    );
+  }
+  const identityBlockers = [
+    ...NHM2_REQUIRED_OBSERVER_FAMILY_IDS.flatMap((familyId) =>
+      familyCounts.has(familyId) ? [] : [`${familyId}:observer_family_missing`],
+    ),
+    ...Array.from(familyCounts.entries()).flatMap(([familyId, count]) =>
+      count > 1 ? [`${familyId}:observer_family_duplicate`] : [],
+    ),
+  ];
+  const continuousOptimizer = artifact.observerFamilies.find(
+    (family) => family.familyId === "continuous_optimizer",
+  );
+  const knownContinuousOptimizerLimitation = (
+    family: Nhm2ObserverRobustEnergyConditionArtifactV1["observerFamilies"][number],
+    blocker: string,
+  ): boolean =>
+    family.familyId === "continuous_optimizer" &&
+    family.status === "not_run" &&
+    family.optimizerUsed === false &&
+    blocker === "continuous_optimizer_not_implemented";
+  const familyBlockers: string[] = [];
+  const warnings: string[] = [];
+  for (const family of artifact.observerFamilies) {
+    if (family.blockers.length === 0 && family.status !== "pass") {
+      familyBlockers.push(`${family.familyId}:${family.status}`);
+      continue;
+    }
+    for (const blocker of family.blockers) {
+      const scopedBlocker = `${family.familyId}:${blocker}`;
+      if (knownContinuousOptimizerLimitation(family, blocker)) {
+        warnings.push(scopedBlocker);
+      } else {
+        familyBlockers.push(scopedBlocker);
+      }
+    }
+  }
+  if (
+    continuousOptimizer?.status === "pass" &&
+    continuousOptimizer.optimizerUsed !== true
+  ) {
+    familyBlockers.push("continuous_optimizer:optimizer_used_not_true_for_pass");
+  }
+  const anyFamilyViolation = artifact.observerFamilies.some(
+    (family) => family.status === "fail",
+  );
+  const blockers = uniqueText([
     artifact.summary.robustCheckComplete
       ? null
       : "observer_robust_energy_condition_check_incomplete",
     artifact.summary.eulerianOnly ? "observer_scope_eulerian_only" : null,
-    artifact.summary.anyViolation ? "observer_energy_condition_violation" : null,
-    ...artifact.observerFamilies.flatMap((family) =>
-      family.status === "pass"
-        ? []
-      : family.blockers.map((blocker) => `${family.familyId}:${blocker}`),
-    ),
+    artifact.summary.anyViolation || anyFamilyViolation
+      ? "observer_energy_condition_violation"
+      : null,
+    ...identityBlockers,
+    ...familyBlockers,
   ]);
+  const status: Nhm2CoupledClosureGateStatus =
+    artifact.summary.anyViolation || anyFamilyViolation
+      ? "fail"
+      : artifact.summary.robustCheckComplete &&
+          !artifact.summary.eulerianOnly &&
+          blockers.length === 0
+        ? "pass"
+        : "review";
   return gate({
     gateId: "observer_robust_energy_conditions",
     status,
     blockers,
-    warnings:
-      status === "pass"
-        ? artifact.observerFamilies.flatMap((family) =>
-            family.status === "not_run" || family.status === "missing"
-              ? [`${family.familyId}:${family.status}`]
-              : [],
-          )
-        : [],
+    warnings: uniqueText(warnings),
     primaryMetric: `missedViolationRisk=${artifact.summary.missedViolationRisk}`,
   });
 };
@@ -758,8 +816,6 @@ export const buildNhm2CoupledClosurePassCandidate = (
   const componentLedgerWallAuthority =
     componentLedgerHasWallFullSourceAuthority(input.sourceComponentAuthorityLedger);
   const readiness = input.sourceClosurePassReadiness;
-  const qei = input.qeiWorldlineDossier?.summary;
-  const observer = input.observerRobustEnergyConditions?.summary;
   return {
     contractVersion: NHM2_COUPLED_CLOSURE_PASS_CANDIDATE_CONTRACT_VERSION,
     generatedAt: asText(input.generatedAt) ?? new Date(0).toISOString(),
@@ -797,19 +853,20 @@ export const buildNhm2CoupledClosurePassCandidate = (
           ?.sourceClosurePassReady === true ||
         (componentLedgerWallAuthority && regionalEvidenceResidualsPass(input.regionalEvidence)),
       regionalResidualsPass:
-        input.regionalEvidence?.overallState === "pass" &&
-        input.regionalEvidence.regions.every((region) => region.residuals.pass === true),
-      conservationPass: input.conservation?.overallState === "pass",
+        gates.find((entry) => entry.gateId === "regional_residuals")?.pass ===
+        true,
+      conservationPass:
+        gates.find((entry) => entry.gateId === "conservation")?.pass === true,
       qeiDossierPass:
-        qei?.dossierComplete === true &&
-        qei.hasWallWorldline === true &&
-        qei.allMarginsPass === true &&
-        qei.anyProxy === false,
+        gates.find((entry) => entry.gateId === "qei_worldline_dossier")
+          ?.pass === true,
       observerRobustPass:
-        observer?.robustCheckComplete === true &&
-        observer.eulerianOnly === false &&
-        observer.anyViolation === false,
-      materialReceipted: input.casimirMaterialReceipt?.status === "material_receipted",
+        gates.find(
+          (entry) => entry.gateId === "observer_robust_energy_conditions",
+        )?.pass === true,
+      materialReceipted:
+        gates.find((entry) => entry.gateId === "casimir_material_receipt")
+          ?.pass === true,
       atlasConsumerCongruencePass:
         gates.find((entry) => entry.gateId === "regional_support_function_atlas")
           ?.pass === true,
@@ -849,10 +906,13 @@ const isGate = (value: unknown): value is Nhm2CoupledClosureGateV1 => {
     isGateStatus(record.status) &&
     record.pass === (record.status === "pass") &&
     isStringArray(record.blockers) &&
+    (record.status !== "pass" || record.blockers.length === 0) &&
     isStringArray(record.warnings) &&
     isNullableText(record.primaryMetric) &&
     isRecord(record.requiredCorrections) &&
-    Object.values(record.requiredCorrections).every(isCorrectionValue)
+    Object.values(record.requiredCorrections).every(isCorrectionValue) &&
+    (record.status !== "pass" ||
+      Object.keys(record.requiredCorrections).length === 0)
   );
 };
 
@@ -925,6 +985,22 @@ export const isNhm2CoupledClosurePassCandidateArtifact = (
     if (!gateIds.has(gateId)) return false;
   }
   if (summary.passCandidate !== gates.every((entry) => entry.status === "pass")) {
+    return false;
+  }
+  const gatePass = (gateId: Nhm2CoupledClosureGateId): boolean =>
+    gates.find((entry) => entry.gateId === gateId)?.status === "pass";
+  if (
+    summary.sourceClosurePassSignalAllowed !==
+      gatePass("source_closure_readiness") ||
+    summary.regionalResidualsPass !== gatePass("regional_residuals") ||
+    summary.conservationPass !== gatePass("conservation") ||
+    summary.qeiDossierPass !== gatePass("qei_worldline_dossier") ||
+    summary.observerRobustPass !==
+      gatePass("observer_robust_energy_conditions") ||
+    summary.materialReceipted !== gatePass("casimir_material_receipt") ||
+    summary.atlasConsumerCongruencePass !==
+      gatePass("regional_support_function_atlas")
+  ) {
     return false;
   }
   return true;

@@ -169,6 +169,11 @@ const isAnsweredByText = (requirementText: string, normalizedAnswer: string): bo
   return matches >= Math.min(2, keywords.length);
 };
 
+const requestsNegativeClaimBoundary = (requirementText: string): boolean =>
+  /\b(?:does\s+not|doesn't|cannot|can't|fails?\s+to)\b[^.!?;\n]{0,100}\b(?:validat(?:e|ion)|support|prove|establish|entail|imply|confirm|certify)\b/i.test(
+    requirementText,
+  );
+
 const visibleNonCompletionForRequirement = (
   requirementText: string,
   finalAnswerText: string,
@@ -346,10 +351,17 @@ export const evaluateCompoundPromptCoverageGate = (
       };
     }
 
-    const visibleNonCompletion = visibleNonCompletionForRequirement(
+    const answeredByText = isAnsweredByText(
       requirement.text,
-      finalAnswerText,
+      normalizedAnswer,
     );
+    const visibleNonCompletion =
+      requestsNegativeClaimBoundary(requirement.text) && answeredByText
+        ? null
+        : visibleNonCompletionForRequirement(
+            requirement.text,
+            finalAnswerText,
+          );
     if (visibleNonCompletion) {
       return {
         requirement_id: requirement.id,
@@ -378,7 +390,7 @@ export const evaluateCompoundPromptCoverageGate = (
       };
     }
 
-    if (tagged?.state === "answered" || isAnsweredByText(requirement.text, normalizedAnswer)) {
+    if (tagged?.state === "answered" || answeredByText) {
       return {
         requirement_id: requirement.id,
         status: "answered",

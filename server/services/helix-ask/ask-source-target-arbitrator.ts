@@ -35,7 +35,9 @@ import { isAffirmativeTheoryFormalArtifactInspectionPrompt } from "./theory-form
 import {
   buildToolUseRestatement,
   detectInternetSearchIntent,
+  hasExplicitFreshDocsAccessCue,
   hasAffirmativeDocsViewerSearchCue,
+  hasRetainedEvidenceContinuationCue,
 } from "./internet-search-intent";
 import {
   detectScholarlyResearchIntent,
@@ -244,6 +246,10 @@ const isAffirmativeDocsSourceRequirementPrompt = (prompt: string): boolean =>
 
 const isAffirmativeLocalDocumentEvidencePrompt = (prompt: string): boolean => {
   if (isExplicitDocsPathComparePrompt(prompt) || isExplicitDocsPathLocateSynthesisPrompt(prompt)) return true;
+  if (
+    hasRetainedEvidenceContinuationCue(prompt) &&
+    !hasExplicitFreshDocsAccessCue(prompt)
+  ) return false;
   const documentCue = /\b(?:white\s*paper|whitepaper|paper|document|doc|docs|report|memo)\b/i.test(prompt);
   if (!documentCue) return false;
   const evidenceCue =
@@ -765,6 +771,9 @@ export function arbitrateAskSourceTarget(input: {
   trustedEnvironmentContext?: ExplicitCapabilityExtractionContext | null;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
+  const retainedEvidenceContinuation =
+    hasRetainedEvidenceContinuationCue(prompt) &&
+    !hasExplicitFreshDocsAccessCue(prompt);
   const contextualProcedureRecall =
     isContextualProcedureRecallPrompt(prompt);
   if (isAffirmativeTheoryFormalArtifactInspectionPrompt(prompt)) {
@@ -1120,7 +1129,7 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  if (isDeicticDocsIdentityPrompt(prompt)) {
+  if (isDeicticDocsIdentityPrompt(prompt) && !retainedEvidenceContinuation) {
     const activeWorkspaceResolution = input.activeWorkspaceSourceResolution as Record<string, unknown> | null | undefined;
     const sourceBound =
       typeof activeWorkspaceResolution?.active_doc_path === "string" &&
@@ -1266,6 +1275,7 @@ export function arbitrateAskSourceTarget(input: {
     !isExplicitDocsPathSummaryPrompt(prompt) &&
     !isCurrentOpenDocsViewerSummaryPrompt(prompt) &&
     !isAskTurnDocsTopicSummaryPrompt(prompt) &&
+    selectedEvidenceCandidate?.target_source !== "scholarly_research" &&
     isAffirmativeDocsSearchPrompt(prompt)
   ) {
     return toSourceTargetIntent({
@@ -1361,6 +1371,9 @@ export function arbitrateAskSourceTarget(input: {
     });
   }
   if (selectedEvidenceCandidate?.target_source === "scholarly_research") {
+    const compoundLocalDocsComparison =
+      selectedEvidenceCandidate.candidate_id ===
+      "scholarly_research.local_docs_comparison";
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
@@ -1377,7 +1390,7 @@ export function arbitrateAskSourceTarget(input: {
         "active_doc_identity",
         "active_doc_summary",
         "doc_open_best",
-        "docs_viewer_receipt",
+        ...(compoundLocalDocsComparison ? [] : ["docs_viewer_receipt"]),
         "repo_code_evidence_question",
         "model_only_concept",
         "no_tool_direct",
@@ -1843,7 +1856,7 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  if (isDeicticDocsIdentityPrompt(prompt)) {
+  if (isDeicticDocsIdentityPrompt(prompt) && !retainedEvidenceContinuation) {
     const activeWorkspaceResolution = input.activeWorkspaceSourceResolution as Record<string, unknown> | null | undefined;
     const sourceBound =
       typeof activeWorkspaceResolution?.active_doc_path === "string" &&
@@ -2087,6 +2100,7 @@ export function arbitrateAskSourceTarget(input: {
   }
   const activeWorkspaceResolution = input.activeWorkspaceSourceResolution;
   if (
+    !retainedEvidenceContinuation &&
     activeWorkspaceResolution &&
     typeof activeWorkspaceResolution === "object" &&
     (activeWorkspaceResolution as Record<string, unknown>).schema ===
@@ -2143,7 +2157,7 @@ export function arbitrateAskSourceTarget(input: {
       });
     }
   }
-  if (isDeicticDocsIdentityPrompt(prompt)) {
+  if (isDeicticDocsIdentityPrompt(prompt) && !retainedEvidenceContinuation) {
     const activeDocRule = rules.find((rule: CueRule) => rule.target === "active_doc");
     const explicitCues = activeDocRule ? matches(prompt, activeDocRule.cues) : [];
     return toSourceTargetIntent({
@@ -2332,6 +2346,9 @@ export function arbitrateAskSourceTarget(input: {
       continue;
     }
     if (rule.target === "docs_viewer" && isDocsViewerTopicLabelPrompt(prompt)) {
+      continue;
+    }
+    if (rule.target === "active_doc" && retainedEvidenceContinuation) {
       continue;
     }
     const explicitCues =

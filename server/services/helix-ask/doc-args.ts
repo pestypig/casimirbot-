@@ -466,6 +466,10 @@ export const resolveAskTurnTitleLikeOpenDocQueryArg = (transcript: string): stri
   );
   const rawTopic = match?.[1]
     ?.replace(/\s+\b(?:and\s+then|then|after\s+that|also)\b[\s\S]*$/i, "")
+    .replace(
+      /\s+(?:in\s+(?:the\s+)?(?:local|workspace|project)\s+docs?|and\s+(?:compare|contrast|reconcile|relate))\b[\s\S]*$/i,
+      "",
+    )
     .replace(/\s*,?\s*(?:then\s+)?tell\s+me[\s\S]*$/i, "")
     .replace(/\s+\b(?:to\s+me|aloud|out\s*loud|outloud)\b[\s\S]*$/i, "")
     .replace(/[?!.;,:"'`]+$/g, "")

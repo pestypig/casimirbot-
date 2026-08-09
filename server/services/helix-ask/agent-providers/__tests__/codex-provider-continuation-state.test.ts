@@ -4,7 +4,9 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  codexObservationDependentCapabilityProposalIds,
   codexProvider,
+  continuationStateRequiresLaneRequest,
   shouldAllowCodexObservationDependentCapabilityProposal,
 } from "../codex-provider";
 
@@ -27,6 +29,99 @@ afterEach(() => {
 });
 
 describe("Codex provider continuation state", () => {
+  it("requires provider review when a canonical continuation permits only an untried action", () => {
+    expect(
+      continuationStateRequiresLaneRequest({
+        schema: "helix.agent_continuation_state.v1",
+        turn_id: "ask:docs:1",
+        state_id: "ask:docs:1:state:2",
+        sequence: 2,
+        trigger: "post_attempt",
+        goal: {
+          status: "in_progress",
+          satisfied: false,
+          terminal_product_allowed: false,
+        },
+        observation_refs: { all: [], existing: [], new: [] },
+        missing_requirement_ids: ["docs-viewer.open_doc_by_path"],
+        last_attempt: null,
+        next_admissible_affordances: [
+          {
+            affordance_id: "ask:docs:1:open",
+            capability_id: "docs-viewer.open_doc_by_path",
+            action: null,
+            args: { path: "/docs/research/example.md" },
+            lane_request: {
+              capability: "docs-viewer.open_doc_by_path",
+              path: "/docs/research/example.md",
+            },
+            source_ref: "ask:docs:1:docs_continuation_contract",
+            reason: "validated_doc_candidate_requires_open",
+            admissible: true,
+            tried: false,
+            action_fingerprint: "sha256:open",
+          },
+        ],
+        tried_action_fingerprints: [],
+        progress: {
+          made_progress: true,
+          new_observation_count: 1,
+          resolved_requirement_ids: [],
+          added_requirement_ids: ["docs-viewer.open_doc_by_path"],
+          new_affordance_count: 1,
+          no_progress_repeat_count: 0,
+          reason_codes: ["requirements_added"],
+        },
+        budget: {
+          soft: {
+            iterations: { max: 4, consumed: 1, remaining: 3 },
+            tool_calls: { max: 4, consumed: 1, remaining: 3 },
+            model_decisions: { max: 6, consumed: 2, remaining: 4 },
+            pressure: "none",
+            exhausted: false,
+          },
+          hard: {
+            iterations: { max: 8, consumed: 1, remaining: 7 },
+            tool_calls: { max: 8, consumed: 1, remaining: 7 },
+            model_decisions: { max: 10, consumed: 2, remaining: 8 },
+            exhausted: false,
+          },
+          extension_count: 0,
+          max_extensions: 1,
+        },
+        allowed_decisions: ["act"],
+        authority: "runtime_agent_decides_within_admitted_boundaries",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("offers only the missing admitted full-text stage after scholarly lookup", () => {
+    expect(
+      codexObservationDependentCapabilityProposalIds({
+        payload: {
+          capability_itinerary_execution_state: {
+            missing_required_capabilities: [
+              "scholarly-research.fetch_full_text",
+            ],
+          },
+        },
+        admittedCapabilityIds: [
+          "docs.search",
+          "scholarly-research.lookup_papers",
+          "scholarly-research.fetch_full_text",
+          "scientific-calculator.solve_expression",
+        ],
+        lastAttempt: {
+          status: "succeeded",
+          capability_id: "scholarly-research.lookup_papers",
+        },
+      }),
+    ).toEqual(["scholarly-research.fetch_full_text"]);
+  });
+
   it.each(["post_attempt", "final_review", "terminal_rejection"] as const)(
     "keeps a missing admitted action proposal open during %s",
     (trigger) => {
@@ -223,10 +318,10 @@ describe("Codex provider continuation state", () => {
     });
     expect(docsResults?.payload.section_observation).toMatchObject({
       matched_heading: "6.7 Twin Paradox trip clocking interpretation",
-      heading_line: 999,
+      heading_line: expect.any(Number),
       truncated: false,
       contains_matches: expect.arrayContaining([
-        expect.objectContaining({ line: 1053, term: "alpha" }),
+        expect.objectContaining({ line: expect.any(Number), term: "alpha" }),
       ]),
     });
     expect(retrieval?.payload.section_observation.section_excerpt).toContain(

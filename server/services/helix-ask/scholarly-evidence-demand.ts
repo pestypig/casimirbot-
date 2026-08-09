@@ -32,6 +32,18 @@ const affirmativeScholarlyEvidenceText = (promptText: string): string =>
       /\bif\b[^.!?;\n]{0,100}\b(?:use|render|inspect|extract|transcribe)\b[^.!?;\n]{0,120}\b(?:equations?|formulae?|formulas?|image\s+lens|page\s+images?)\b[^.!?;\n]{0,80}/gi,
       " ",
     )
+    .replace(
+      /\b(?:previously|earlier|historically|in\s+the\s+last\s+turn)\b[^.!?;\n]{0,240}\b(?:compar(?:e|ed|ing|ison)|contrast(?:ed|ing)?|evaluat(?:e|ed|ing|ion)|assess(?:ed|ing|ment)|validat(?:e|ed|ing|ion)|support(?:ed|ing)?|constrain(?:ed|ing)?|differ(?:ed|ing|ence)?|disagree(?:d|ing|ment)?)\b[^.!?;\n]{0,160}\b(?:papers?|stud(?:y|ies)|articles?|sources?|arxiv|doi)\b/gi,
+      " ",
+    )
+    .replace(
+      /\b(?:later|eventually|next\s+time|in\s+(?:a\s+)?future(?:\s+turn)?)\b[^.!?;\n]{0,240}\b(?:compar(?:e|ing|ison)|contrast(?:ing)?|evaluat(?:e|ing|ion)|assess(?:ing|ment)|validat(?:e|ing|ion)|support(?:ing)?|constrain(?:ing)?|differ(?:ing|ence)?|disagree(?:ing|ment)?)\b[^.!?;\n]{0,160}\b(?:papers?|stud(?:y|ies)|articles?|sources?|arxiv|doi)\b/gi,
+      " ",
+    )
+    .replace(
+      /\bif\b[^.!?;\n]{0,160}\b(?:compar(?:e|ing)|contrast|evaluate|assess|validate|test|apply|check)\b[^.!?;\n]{0,160}\b(?:papers?|stud(?:y|ies)|articles?|sources?|arxiv|doi)\b[^.!?;\n]{0,100}/gi,
+      " ",
+    )
     .replace(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -61,6 +73,17 @@ const fullTextRequested = (text: string, workflow?: HelixScholarlyRequestedWorkf
       /\b(?:use|read|search|inspect|scan|check|try)\s+(?:the\s+|this\s+|that\s+|same\s+|selected\s+)(?:fetched\s+text|full[-\s]?text|paper\s+text|text(?:\s+version)?)\b[^.!?;\n]{0,140}\b(?:paragraphs?|passages?|sections?|point|locate|find|show|read)\b/i.test(text) ||
       /^(?:\s*(?:yes|yeah|yep|ok(?:ay)?|please|sure|go\s+ahead|do\s+that)\b[,;:]?\s*)+(?:give|show|find|locate|narrow|mark|identify)?[\s\S]{0,100}\b(?:exact|precise)\b[\s\S]{0,50}\b(?:start|beginning)\b[\s\S]{0,30}\b(?:end|ending)\b/i.test(text) ||
       /\b(?:pull\s+out|extract|summari[sz]e|identify|show|list|walk\s+(?:me\s+)?through)\b[\s\S]{0,100}\b(?:useful|important|key|relevant|main|substantive|scientific)\b[\s\S]{0,50}\b(?:parts?|points?|sections?|passages?|findings?|content|material)\b/i.test(text);
+
+const analyticalPaperComparisonRequested = (text: string): boolean => {
+  const paperIdentityCue =
+    /\b(?:papers?|stud(?:y|ies)|articles?|preprints?|primary\s+sources?|scholarly\s+sources?|arxiv(?:\s*(?:id|paper))?|doi)\b/i.test(text) ||
+    /\barxiv\s*[:#]?\s*\d{4}\.\d{4,5}(?:v\d+)?\b/i.test(text) ||
+    /\b10\.\d{4,9}\/[A-Za-z0-9._;()/:+-]+\b/i.test(text);
+  const analyticalCue =
+    /\b(?:compar(?:e|ing|ison)|contrast|evaluat(?:e|ing|ion)|assess(?:ing|ment)?|validat(?:e|ing|ion)|test|apply|align(?:ment)?|agree(?:ment)?|disagree(?:ment)?|differ(?:ence)?|support|constrain|non[-\s]?entailment)\b/i.test(text) ||
+    /\b(?:assumptions?|limitations?|claim\s+boundar(?:y|ies)|scope|conditions?|caveats?)\b[^.!?;\n]{0,120}\b(?:match|mismatch|matter|apply|hold|differ|compare|support|constrain)\b/i.test(text);
+  return paperIdentityCue && analyticalCue;
+};
 
 const fullTextRequestedOnlyWhenAvailable = (text: string): boolean =>
   /\b(?:fetch|retrieve|get|read|open|parse|use)\b[^.!?;\n]{0,160}\b(?:accessible\s+|available\s+|open[-\s]?access\s+)?(?:full[-\s]?text|pdf|paper\s+text|article\s+text)\b[^,;.!?\n]{0,32}\b(?:if|when)\s+(?:it\s+is\s+)?(?:available|accessible|obtainable)\b/i.test(text) ||
@@ -105,6 +128,7 @@ export const deriveScholarlyEvidenceDemand = (input: {
   const needsEquation = explicitEquationRequested(equationRequiredText);
   const needsPageImage = pageImageRequested(equationRequiredText);
   const needsFullText = fullTextRequested(affirmativeText, input.workflow);
+  const needsAnalyticalPaperComparison = analyticalPaperComparisonRequested(affirmativeText);
   const optionalFullText =
     input.workflow === "full_text_summary" &&
     needsFullText &&
@@ -172,7 +196,7 @@ export const deriveScholarlyEvidenceDemand = (input: {
     });
     optionalModes.push("full_text");
     reasons.push("conditional_full_text_allows_metadata_fallback");
-  } else if (needsFullText) {
+  } else if (needsFullText || needsAnalyticalPaperComparison) {
     alternatives.push({
       product: /\b(?:passage|excerpt|quotation|quote)\b/i.test(affirmativeText)
         ? "page_grounded_passage"
@@ -181,7 +205,11 @@ export const deriveScholarlyEvidenceDemand = (input: {
       exactness: "bounded",
     });
     requiredModes.push("full_text");
-    reasons.push("full_text_output_requested");
+    reasons.push(
+      needsFullText
+        ? "full_text_output_requested"
+        : "analytical_paper_comparison_requires_full_text",
+    );
   } else {
     alternatives.push({
       product: "paper_metadata",

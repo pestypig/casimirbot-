@@ -308,7 +308,7 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
   {
     id: "live_source_identity_missing_environment_source",
     description:
-      "An active Live Answer environment without a visual source binding cannot answer as if capture identity were reconciled; if Ask attaches the fresh source but no SituationRun contains it, that exact run-identity gap remains authoritative.",
+      "An active Live Answer environment without a visual source binding cannot answer as if capture identity were reconciled; after bounded continuation attaches the source and admits its observation into a SituationRun, missing field evaluations become the next authoritative gate.",
     enabled: true,
     seed: "live_source_identity_missing_environment_source",
     prompt: "What is happening right now in the visual screen capture?",
@@ -320,7 +320,7 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
         "process_graph_overview",
         "no_tool_direct",
       ],
-      live_source_identity_diagnosis: "fresh_observation_not_in_situation_run",
+      live_source_identity_diagnosis: "field_evaluations_missing",
       live_source_identity_ok: false,
       solver_completed: false,
     },
@@ -328,7 +328,7 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
   {
     id: "live_source_identity_no_situation_run",
     description:
-      "A bound visual source without a SituationRun is not visual answer authority; the fresh observation must be admitted into a SituationRun before field evaluation availability can become the next gate.",
+      "A bound visual source without a SituationRun is not visual answer authority; bounded continuation admits the fresh observation into a SituationRun before field evaluation availability becomes the next gate.",
     enabled: true,
     seed: "live_source_identity_no_situation_run",
     prompt: "What is happening right now in the visual screen capture?",
@@ -340,7 +340,7 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
         "process_graph_overview",
         "no_tool_direct",
       ],
-      live_source_identity_diagnosis: "fresh_observation_not_in_situation_run",
+      live_source_identity_diagnosis: "field_evaluations_missing",
       live_source_identity_ok: false,
       solver_completed: false,
     },

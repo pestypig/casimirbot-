@@ -43,7 +43,7 @@ import {
   buildNhm2PredictionFalsifierFreeze,
   type Nhm2PredictionFreezeCandidateRegistrationBindingV1,
 } from "../../../../shared/contracts/nhm2-prediction-falsifier-freeze.v1";
-import { buildNhm2SemiclassicalStateRealizability } from "../../../../shared/contracts/nhm2-semiclassical-state-realizability.v1";
+import { buildNhm2SemiclassicalStateRealizabilityV2 as buildNhm2SemiclassicalStateRealizability } from "../../../../shared/contracts/nhm2-semiclassical-state-realizability.v2";
 import { buildNhm2WorldlineQeiCoverage } from "../../../../shared/contracts/nhm2-worldline-qei-coverage.v1";
 import {
   buildTheoryRuntimeReceiptV1,
@@ -71,7 +71,9 @@ import {
 } from "../nhm2-formal-kernel-executor";
 import { writeTheoryRuntimeReceiptArtifact } from "../theory-runtime-receipt-store";
 import {
+  NHM2_SEMICLASSICAL_V2_SERVER_CONTENT_REPLAY_BLOCKER,
   evaluateNhm2ExperimentReadyTheoryClosureFilesystem,
+  nhm2SemiclassicalV2AuthorityBlockers,
   theoryRuntimeReceiptContainsProducerInterval,
 } from "../nhm2-experiment-ready-theory-closure-evaluator";
 import {
@@ -111,6 +113,51 @@ const normalizeRepoPath = (value: string): string => value.replace(/\\/g, "/");
 
 const sha256 = (value: string | Buffer): string =>
   createHash("sha256").update(value).digest("hex");
+
+describe("NHM2 semiclassical v2 evaluator authority", () => {
+  const dynamicEvidence = {
+    artifactPath: "artifacts/run/dynamic-evidence.v1.json",
+    sha256: "a".repeat(64),
+  };
+  const boundReference = {
+    ref: `${dynamicEvidence.artifactPath}#stochastic-response`,
+    sha256: `sha256:${dynamicEvidence.sha256}`,
+  };
+
+  it("binds both stochastic-response references and still requires server content replay", () => {
+    const blockers = nhm2SemiclassicalV2AuthorityBlockers({
+      metricResponseEvidence: boundReference,
+      stabilityEvidence: boundReference,
+      dynamicEvidence,
+    });
+
+    expect(blockers).toEqual([
+      NHM2_SEMICLASSICAL_V2_SERVER_CONTENT_REPLAY_BLOCKER,
+    ]);
+  });
+
+  it("rejects either v2 stochastic-response reference when it is not the registered dynamic evidence", () => {
+    const blockers = nhm2SemiclassicalV2AuthorityBlockers({
+      metricResponseEvidence: {
+        ref: "artifacts/run/unbound-metric-response.json",
+        sha256: "b".repeat(64),
+      },
+      stabilityEvidence: {
+        ref: "artifacts/run/unbound-stability.json",
+        sha256: "c".repeat(64),
+      },
+      dynamicEvidence,
+    });
+
+    expect(blockers).toEqual(
+      expect.arrayContaining([
+        NHM2_SEMICLASSICAL_V2_SERVER_CONTENT_REPLAY_BLOCKER,
+        "semiclassical_state_noise_kernel_metric_response_dynamic_binding_mismatch",
+        "semiclassical_state_noise_kernel_stability_dynamic_binding_mismatch",
+      ]),
+    );
+  });
+});
 
 const populatedForwardReceiptOrOutputHashes = (
   value: unknown,
@@ -1722,6 +1769,9 @@ describe("NHM2 experiment-ready theory-closure filesystem evaluator", () => {
       evidenceAdapterCoverageComplete: false,
     });
     expect(result.blockers.length).toBeGreaterThan(0);
+    expect(result.blockers).toContain(
+      `evidence:semiclassical_state:${NHM2_SEMICLASSICAL_V2_SERVER_CONTENT_REPLAY_BLOCKER}`,
+    );
     expect(
       result.blockers.every(
         (blocker) =>

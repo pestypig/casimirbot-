@@ -1,0 +1,165 @@
+{
+  "schema_version": "casimir_dp_integrated_feasibility_pilot_stage4_2r/1",
+  "campaign_id": "casimir-dp-integrated-feasibility-pilot-stage4-2r-v1",
+  "evidence_class": "empirical_input_readiness_contract_only",
+  "claim_ceiling": "integrated_feasibility_pilot_packet_and_acceptance_contract_only",
+  "promotion_allowed": false,
+  "collapse_bridge_edges_allowed": false,
+  "run_order": [
+    "verify_immutable_stage4_2o_2p_2q_evidence",
+    "freeze_leading_apparatus_and_diosi_comparator",
+    "validate_state_preparation_and_recombination_packet",
+    "validate_as_built_geometry_material_and_green_packet",
+    "validate_worldline_phase_gas_and_covariance_packets",
+    "validate_four_cell_complex_coherence_and_companion_packets",
+    "validate_exact_external_bound_recast",
+    "evaluate_primary_diosi_and_boundary_interaction_estimands_separately",
+    "return_authorized_pilot_or_explicit_empirical_no_go"
+  ],
+  "upstream": {
+    "stage4_2o_campaign_receipt_path": "docs/research/casimir-dp-public-data-component-validation-stage4-2o-campaign-receipt.json",
+    "stage4_2o_campaign_receipt_sha256": "554861b754822cbd3988d75be8b5c9f9d26eae03d53d4b47627dcaf7d3db1c5b",
+    "stage4_2p_campaign_receipt_path": "docs/research/casimir-dp-proper-time-worldline-closure-stage4-2p-campaign-receipt.json",
+    "stage4_2p_campaign_receipt_sha256": "3f82d7632fa7a7b8fca08857cd9c2d927399b3a334ccf319f8895a13f1b365ab",
+    "stage4_2q_campaign_receipt_path": "docs/research/casimir-dp-superconducting-boundary-control-stage4-2q-campaign-receipt.json",
+    "stage4_2q_campaign_receipt_sha256": "ec4a18ff8582186a0f8169e6643cba495f2042e035789bce0d9ba8d4c3d65013",
+    "stage4_2q_verification_receipt_path": "docs/research/casimir-dp-superconducting-boundary-control-stage4-2q-verification-receipt.json",
+    "stage4_2q_verification_receipt_sha256": "f8a8d65213f48b7663b28f7ad8dd090bb30ee8a73bfa03f44ef8692b849769e1"
+  },
+  "leading_design": {
+    "candidate_id": "stage4_2m_candidate_002",
+    "material": "diamond",
+    "radius_m": 2.76302362398029e-7,
+    "mass_kg": 3.0925052683774525e-16,
+    "branch_separation_m": 2.5e-7,
+    "hold_time_s": 0.25,
+    "gap_m": 1e-5,
+    "plate_size_m": 8e-5,
+    "temperature_K": 4,
+    "pressure_Pa": 1e-15
+  },
+  "frozen_diosi": {
+    "model_id": "diosi_1989_gaussian_regularized_nondissipative",
+    "R0_m": 1e-7,
+    "gaussian_exponent_at_hold": 0.029511464722144533,
+    "boundary_state_dependence": false,
+    "modified_by_campaign": false
+  },
+  "pilot_design": {
+    "four_cells": [
+      "active_separated",
+      "active_compact_sham",
+      "reference_separated",
+      "reference_compact_sham"
+    ],
+    "primary_estimand": "heldout_complex_coherence_contraction_following_frozen_mass_separation_time_law",
+    "boundary_estimand": "four_cell_complex_cross_ratio_nonfactorization",
+    "minimum_primary_signal_snr": 5,
+    "maximum_phase_sigma_rad": 0.03464404998245921,
+    "maximum_covariance_relative_drift": 0.1,
+    "require_train_holdout_split": true,
+    "require_blinding_before_confirmatory_analysis": true,
+    "require_zero_cross_apparatus_covariance_fusion": true
+  },
+  "authority_packets": [
+    {
+      "authority_id": "state_preparation_recombination",
+      "status": "absent",
+      "receipt_path": null,
+      "receipt_sha256": null,
+      "independent_custodian": null,
+      "blinded": false,
+      "measured_on_leading_apparatus": false,
+      "covariance_ancestry_frozen": false,
+      "notes": "Requires branch separation, hold, recombination, path-swap, internal-state equivalence, and preparation-fidelity measurements for the leading sphere."
+    },
+    {
+      "authority_id": "as_built_geometry_and_green_response",
+      "status": "absent",
+      "receipt_path": null,
+      "receipt_sha256": null,
+      "independent_custodian": null,
+      "blinded": false,
+      "measured_on_leading_apparatus": false,
+      "covariance_ancestry_frozen": false,
+      "notes": "Requires metrology-bound CAD or mesh, plate edges and apertures, branch vector, tilt, nearby conductors, and independently checked finite-geometry Green or scattering response."
+    },
+    {
+      "authority_id": "measured_material_spectral_response",
+      "status": "absent",
+      "receipt_path": null,
+      "receipt_sha256": null,
+      "independent_custodian": null,
+      "blinded": false,
+      "measured_on_leading_apparatus": false,
+      "covariance_ancestry_frozen": false,
+      "notes": "Requires temperature-dependent complex dielectric or impedance data for the actual sphere, coatings, plates, and contamination state."
+    },
+    {
+      "authority_id": "worldline_and_phase_covariance",
+      "status": "absent",
+      "receipt_path": null,
+      "receipt_sha256": null,
+      "independent_custodian": null,
+      "blinded": false,
+      "measured_on_leading_apparatus": false,
+      "covariance_ancestry_frozen": false,
+      "notes": "Requires three-dimensional branch worldlines and measured gap, tilt, vibration, voltage, patch, thermal, clock, readout, and echo-transfer covariance."
+    },
+    {
+      "authority_id": "quantum_gas_collision_kernel",
+      "status": "absent",
+      "receipt_path": null,
+      "receipt_sha256": null,
+      "independent_custodian": null,
+      "blinded": false,
+      "measured_on_leading_apparatus": false,
+      "covariance_ancestry_frozen": false,
+      "notes": "Requires species-resolved pressure and temperature, differential scattering amplitudes, confinement geometry, momentum-transfer quadrature, and independent pressure calibration."
+    },
+    {
+      "authority_id": "four_cell_complex_coherence",
+      "status": "absent",
+      "receipt_path": null,
+      "receipt_sha256": null,
+      "independent_custodian": null,
+      "blinded": false,
+      "measured_on_leading_apparatus": false,
+      "covariance_ancestry_frozen": false,
+      "notes": "Requires raw I/Q or equivalent complex-coherence records for every active/reference by separated/compact cell, randomized acquisition, witnesses, exclusions, and held-out likelihood ancestry."
+    },
+    {
+      "authority_id": "independent_companion_channel",
+      "status": "absent",
+      "receipt_path": null,
+      "receipt_sha256": null,
+      "independent_custodian": null,
+      "blinded": false,
+      "measured_on_leading_apparatus": false,
+      "covariance_ancestry_frozen": false,
+      "notes": "Requires an instrument-level independently powered companion observable with noise, bandwidth, calibration-transfer, and covariance receipts."
+    },
+    {
+      "authority_id": "exact_registered_model_external_bound_recast",
+      "status": "absent",
+      "receipt_path": null,
+      "receipt_sha256": null,
+      "independent_custodian": null,
+      "blinded": false,
+      "measured_on_leading_apparatus": false,
+      "covariance_ancestry_frozen": false,
+      "notes": "Requires a source-backed recast of current independent bounds onto the exact Gaussian-regularized nondissipative Diósi normalization at R0=100 nm."
+    }
+  ],
+  "standing": {
+    "measured_evidence": "not_ready",
+    "joint_protocol_validation": "not_ready",
+    "ordinary_null_authority": "not_ready",
+    "residual_attribution": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "physical_pilot_authorized": false,
+    "confirmatory_campaign_authorized": false
+  }
+}

@@ -7,7 +7,10 @@ import {
 import type { HelixToolCallAdmissionDecision } from "@shared/helix-tool-call-admission";
 import { HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY } from
   "@shared/helix-environment-connector";
-import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-itinerary";
+import {
+  buildHelixCapabilityItinerary,
+  requiredScholarlyCapabilitiesFromCompoundSubgoals,
+} from "../services/helix-ask/capability-itinerary";
 import { explicitCapabilityContractForCapability } from
   "../services/helix-ask/explicit-capability-contract";
 import {
@@ -56,6 +59,113 @@ const availableCapabilities = (keys: string[]) => ({
 });
 
 describe("Helix Ask capability itinerary", () => {
+  it("preserves a required scholarly full-text stage from a compound provider-call contract", () => {
+    expect(
+      requiredScholarlyCapabilitiesFromCompoundSubgoals([
+        {
+          mandatory: true,
+          requested_capability: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          args: {
+            scholarly_intent: { requires_full_text: true },
+            planned_scholarly_capability_chain: {
+              planned_capabilities: [
+                HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+                HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+              ],
+            },
+          },
+        },
+      ]),
+    ).toEqual([
+      HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+    ]);
+  });
+
+  it("requires full-text observation for a natural analytical paper comparison", () => {
+    const promptText =
+      "Compare the assumptions in arXiv 2105.03079 with the NHM2 whitepaper and explain which mismatch matters most.";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:itinerary-analytical-paper-comparison",
+      promptText,
+      toolCallAdmissionDecision: scholarlyAdmission("ask:itinerary-analytical-paper-comparison"),
+      availableCapabilities: availableCapabilities([
+        HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      ]),
+    });
+
+    expect(itinerary.planned_steps).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        tool_family: "scholarly_research",
+        capability_hint: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        required_observation_kinds: [
+          "scholarly_research_observation",
+          "scholarly_full_text_observation",
+        ],
+      }),
+    ]));
+    expect(itinerary.terminal_success_criteria.required_capabilities).toEqual([
+      HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+    ]);
+  });
+
+  it("keeps full text required in a compound Docs and scholarly comparison", () => {
+    const promptText =
+      "Use docs.search to find the NHM2 current status whitepaper. Then use scholarly-research.lookup_papers for arXiv:2105.03079 and compare their assumptions, explaining where the paper does not validate NHM2.";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:itinerary-compound-doc-scholarly-full-text",
+      promptText,
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission("ask:itinerary-compound-doc-scholarly-full-text"),
+        source_target: "compound_sources",
+        admitted_tool_families: ["docs_viewer", "scholarly_research"],
+      },
+      availableCapabilities: availableCapabilities([
+        "docs.search",
+        HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      ]),
+    });
+
+    expect(itinerary.prompt_shape).toBe("compound_tool");
+    expect(itinerary.relevant_tool_families).toContain("docs_viewer");
+    expect(itinerary.terminal_success_criteria.required_capabilities).toEqual(
+      expect.arrayContaining([
+        HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      ]),
+    );
+  });
+
+  it("derives full-text depth from a natural compound admission list", () => {
+    const promptText =
+      "Open the NHM2 current status whitepaper in the local docs and compare its source-closure caution with the primary paper arXiv:2105.03079. Explain where they agree and where the paper does not validate NHM2, citing both sources.";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:itinerary-natural-compound-admission",
+      promptText,
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission("ask:itinerary-natural-compound-admission"),
+        source_target: "scholarly_research",
+        admitted_tool_families: ["docs_viewer", "scholarly_research"],
+        compound_requested_capabilities: [
+          "docs.search",
+          HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        ],
+      },
+      availableCapabilities: availableCapabilities([
+        "docs.search",
+        HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      ]),
+    });
+
+    expect(itinerary.terminal_success_criteria.required_capabilities).toContain(
+      HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+    );
+  });
+
   it("keeps natural lookup-then-full-text work as two required scholarly capabilities", () => {
     const promptText = [
       'Find one PDF-accessible primary paper for this workflow objective: "Magnetar".',
@@ -374,6 +484,59 @@ describe("Helix Ask capability itinerary", () => {
     });
     expect(state.missing_compound_subgoal_ids).toEqual([calculatorSubgoalId]);
     expect(state.missing_required_capabilities).toEqual(["scientific-calculator.solve_expression"]);
+  });
+
+  it("accepts a concrete location artifact as the observation from docs.search", () => {
+    const turnId = "ask:docs-search-location-observation";
+    const itinerary = {
+      schema: "helix.capability_itinerary.v1",
+      turn_id: turnId,
+      terminal_success_criteria: {
+        required_observation_families: ["docs_viewer"],
+        requires_post_observation_synthesis: true,
+      },
+      compound_capability_contract: {
+        subgoals: [
+          {
+            subgoal_id: `${turnId}:docs-search`,
+            order: 1,
+            requested_capability: "docs.search",
+            runtime_capability: "docs.search",
+            required_observation_kinds: ["doc_search_results"],
+            produced_affordance_kinds: ["doc_search_results"],
+            mandatory: true,
+          },
+        ],
+      },
+    };
+
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: `${turnId}:runtime:docs-search`,
+          kind: "doc_location_matches",
+          capability_key: "docs.search",
+          payload: {
+            status: "located",
+            match_count: 1,
+            matches: [{ path: "docs/research/nhm2-current-status-whitepaper.md" }],
+          },
+        },
+      ],
+    });
+
+    expect(state.compound_subgoal_ledger[0]).toMatchObject({
+      requested_capability: "docs.search",
+      executed_capability: "docs.search",
+      observation_kind: "doc_location_matches",
+      satisfaction: "satisfied",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(state.missing_compound_subgoal_ids).toEqual([]);
+    expect(state.missing_observation_families).toEqual([]);
+    expect(state.complete).toBe(true);
   });
 
   it("keeps research, theory reflection, and calculator subgoals in order", () => {

@@ -514,6 +514,70 @@
         "claimBoundaryNote": "A nonzero corrected cross-ratio identifies boundary--branch nonfactorization, not collapse or a Casimir-to-collapse bridge."
       }],
       "claimBoundaryNotes": ["Boundary-independent Diósi contraction cancels from this ratio.", "Measured cell response and covariance remain not ready."]
+    },
+    {
+      "equationId": "cdp-stage4-2o-public-fringe-coefficient",
+      "label": "Stage-4.2O public sodium-cluster complex fringe coefficient",
+      "aliases": ["C_tilde_1=2 S_1/S_0=V exp(i phi)"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2o-public-fringe-coefficient", "kind": "artifact_backed_theory_run", "label": "Open authenticated public fringe replay",
+        "badgeIds": ["study.casimir_dp.public_data_component_validation_stage4_2o", "study.casimir_dp.complex_coherence_discriminator", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.public_data_component_validation_stage4_2o",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2o", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "The measured sodium fringe-transfer coefficient is not the density-matrix element of the proposed diamond sphere."
+      }],
+      "claimBoundaryNotes": ["The replay validates complex fringe extraction only.", "No cross-apparatus residual or collapse inference is constructed."]
+    },
+    {
+      "equationId": "cdp-stage4-2o-heldout-covariance-residual",
+      "label": "Stage-4.2O held-out multichannel covariance residual",
+      "aliases": ["Sigma_train=Cov(z_train); r_holdout=z1-X beta_train"],
+      "actions": [{
+        "actionId": "open-cdp-stage4-2o-heldout-covariance-residual", "kind": "artifact_backed_theory_run", "label": "Open authenticated multichannel covariance replay",
+        "badgeIds": ["study.casimir_dp.public_data_component_validation_stage4_2o", "study.casimir_dp.complex_coherence_discriminator", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.public_data_component_validation_stage4_2o",
+        "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2o", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
+        "claimBoundaryNote": "LISA Pathfinder validates classical covariance and held-out residual handling, not quantum coherence or collapse."
+      }],
+      "claimBoundaryNotes": ["No covariance is transported into the proposed apparatus.", "Joint-protocol validation remains not ready."]
+    },
+    {
+      "equationId": "cdp-stage4-2p-weak-field-proper-time", "label": "Stage-4.2P weak-field branch proper time", "aliases": ["Delta tau integral of potential and velocity differences"],
+      "actions": [{"actionId":"open-cdp-stage4-2p-weak-field-proper-time","kind":"artifact_backed_theory_run","label":"Open proper-time worldline closure","badgeIds":["study.casimir_dp.proper_time_worldline_closure_stage4_2p","study.casimir_dp.causal_cone_clock_stage4_2e","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.proper_time_worldline_closure_stage4_2p","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2p","openPanels":["theory-badge-graph","scientific-calculator"],"alsoIngestLatex":false,"claimBoundaryNote":"This transfer produces ordinary differential proper time and does not create a collapse rate."}],
+      "claimBoundaryNotes": ["Separation alone is insufficient.", "Measured worldlines remain not ready."]
+    },
+    {
+      "equationId": "cdp-stage4-2p-matter-wave-phase", "label": "Stage-4.2P branch-action matter-wave phase", "aliases": ["Delta phi equals minus m c squared Delta tau over hbar"],
+      "actions": [{"actionId":"open-cdp-stage4-2p-matter-wave-phase","kind":"artifact_backed_theory_run","label":"Open unitary gravitational phase budget","badgeIds":["study.casimir_dp.proper_time_worldline_closure_stage4_2p","study.casimir_dp.complex_coherence_discriminator","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.proper_time_worldline_closure_stage4_2p","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2p","openPanels":["theory-badge-graph","scientific-calculator"],"alsoIngestLatex":false,"claimBoundaryNote":"The branch-action phase is signed and unitary; echo is not applied to the frozen Diósi exponent."}],
+      "claimBoundaryNotes": ["No directly observed Compton clock is asserted.", "No proper-time-to-collapse bridge exists."]
+    },
+    {
+      "equationId": "cdp-stage4-2p-internal-time-dilation-coherence", "label": "Stage-4.2P internal-energy time-dilation coherence bound", "aliases": ["C internal trace rho exp minus i H internal Delta tau over hbar"],
+      "actions": [{"actionId":"open-cdp-stage4-2p-internal-time-dilation-coherence","kind":"artifact_backed_theory_run","label":"Open internal-clock background bound","badgeIds":["study.casimir_dp.proper_time_worldline_closure_stage4_2p","study.casimir_dp.complex_coherence_discriminator","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.proper_time_worldline_closure_stage4_2p","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2p","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"This is an ordinary reduced-state dephasing bound; measured heat capacity and internal spectrum remain absent."}],
+      "claimBoundaryNotes": ["Synthetic recovery only.", "It does not identify objective collapse."]
+    },
+    {
+      "equationId": "cdp-stage4-2q-london-screening", "label": "Stage-4.2Q London screening and in-medium photon mass scale", "aliases": ["lambda L inverse squared equals mu0 ns qstar squared over mstar"],
+      "actions": [{"actionId":"open-cdp-stage4-2q-london-screening","kind":"artifact_backed_theory_run","label":"Open superconducting gauge-response recovery","badgeIds":["study.casimir_dp.superconducting_boundary_control_stage4_2q","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.superconducting_boundary_control_stage4_2q","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2q","openPanels":["theory-badge-graph","scientific-calculator"],"alsoIngestLatex":false,"claimBoundaryNote":"The effective photon mass is an in-medium screening scale, not a vacuum photon mass or Standard-Model Higgs observation."}],
+      "claimBoundaryNotes": ["Synthetic niobium fixture only.", "No Higgs-to-collapse or condensate-to-collapse kernel is registered."]
+    },
+    {
+      "equationId": "cdp-stage4-2q-finite-impedance", "label": "Stage-4.2Q finite-frequency superconducting surface impedance", "aliases": ["Zs equals Rs plus i Xs"],
+      "actions": [{"actionId":"open-cdp-stage4-2q-finite-impedance","kind":"artifact_backed_theory_run","label":"Open finite-impedance control model","badgeIds":["study.casimir_dp.superconducting_boundary_control_stage4_2q","study.casimir_dp.material_thermal_ordinary_null_stage4_2n","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.superconducting_boundary_control_stage4_2q","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2q","openPanels":["theory-badge-graph","scientific-calculator"],"alsoIngestLatex":false,"claimBoundaryNote":"Zero DC resistance is not zero finite-frequency impedance; specimen response remains unmeasured."}],
+      "claimBoundaryNotes": ["The response enters the ordinary Green/phase/loss chain only."]
+    },
+    {
+      "equationId": "cdp-stage4-2q-boundary-ratio", "label": "Stage-4.2Q normal/superconducting coherence ratio", "aliases": ["CS over CN cancels Gamma D"],
+      "actions": [{"actionId":"open-cdp-stage4-2q-boundary-ratio","kind":"artifact_backed_theory_run","label":"Open boundary-state Diósi cancellation","badgeIds":["study.casimir_dp.superconducting_boundary_control_stage4_2q","study.casimir_dp.complex_coherence_discriminator","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.superconducting_boundary_control_stage4_2q","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2q","openPanels":["theory-badge-graph","scientific-calculator"],"alsoIngestLatex":false,"claimBoundaryNote":"The ratio cancels standard boundary-independent Diósi attenuation and diagnoses boundary response, not the primary DP signal."}],
+      "claimBoundaryNotes": ["A nonzero measured ratio must first be compared with ordinary electromagnetic and switching covariances.", "No boundary-to-collapse kernel is registered."]
+    },
+    {
+      "equationId": "cdp-stage4-2r-diosi-precision-target", "label": "Stage-4.2R primary Diósi acquisition precision", "aliases": ["sigma coherence magnitude less than Diósi visibility loss over SNR"],
+      "actions": [{"actionId":"open-cdp-stage4-2r-diosi-precision-target","kind":"artifact_backed_theory_run","label":"Open integrated pilot readiness","badgeIds":["study.casimir_dp.integrated_feasibility_pilot_stage4_2r","study.casimir_dp.complex_coherence_discriminator","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.integrated_feasibility_pilot_stage4_2r","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2r","openPanels":["theory-badge-graph","scientific-calculator"],"alsoIngestLatex":false,"claimBoundaryNote":"This is a conditional acquisition target from the frozen Diósi comparator, not measured sensitivity."}],
+      "claimBoundaryNotes": ["All eight same-apparatus authority packets remain absent.", "No physical pilot is authorized."]
+    },
+    {
+      "equationId": "cdp-stage4-2r-four-cell-cross-ratio", "label": "Stage-4.2R four-cell boundary interaction", "aliases": ["R4 active separated reference compact over active compact reference separated"],
+      "actions": [{"actionId":"open-cdp-stage4-2r-four-cell-cross-ratio","kind":"artifact_backed_theory_run","label":"Open primary-versus-boundary estimator separation","badgeIds":["study.casimir_dp.integrated_feasibility_pilot_stage4_2r","study.casimir_dp.boundary_branch_interaction_stage4_2i","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.integrated_feasibility_pilot_stage4_2r","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2r","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"Standard boundary-independent Diósi loss cancels from R4; it is a boundary-interaction diagnostic, not the primary collapse estimator."}],
+      "claimBoundaryNotes": ["Cross-apparatus covariance fusion is forbidden.", "No Casimir-to-collapse kernel is registered."]
     }
   ]
 }

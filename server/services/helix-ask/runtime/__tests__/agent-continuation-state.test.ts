@@ -523,6 +523,14 @@ describe("agent continuation state", () => {
       expect.arrayContaining(["act", "retry"]),
     );
     expect(state.allowed_decisions).not.toContain("answer");
+    const runtimeText = formatHelixAgentContinuationStateForRuntime(state);
+    expect(runtimeText).toContain("they are not semantic conclusions");
+    expect(runtimeText).toContain(
+      "you may instead propose exactly one different scholarly-research.lookup_papers query",
+    );
+    expect(runtimeText).toContain(
+      "Helix independently validates the proposed query",
+    );
   });
 
   it("preserves the exact normalized Lanyon request reference in the admission lane request", () => {

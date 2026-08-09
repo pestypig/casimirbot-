@@ -79,6 +79,9 @@ const TIMEOUT_MS = Math.max(
   Number(process.env.HELIX_ASK_REALTIME_DOC_TIMEOUT_MS ?? 180_000),
 );
 const RUN_ID = `realtime-doc-conversation-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+const PROBE_THREAD_ID =
+  process.env.HELIX_ASK_REALTIME_DOC_THREAD_ID?.trim() ||
+  `helix-ask:${RUN_ID}`;
 const OUTPUT_PATH = path.resolve(
   process.env.HELIX_ASK_REALTIME_DOC_PROBE_OUT ??
     path.join("artifacts", "helix-ask-live-validation", "realtime-doc-conversation", `${RUN_ID}.json`),
@@ -196,6 +199,44 @@ export const SCIENTIFIC_EVIDENCE_CLOSURE_REALTIME_SCENARIO:
     ],
   };
 
+export const COMPOUND_DOC_SCHOLARLY_REALTIME_SCENARIO:
+  RealtimeDocProbeScenario = {
+    id: "compound-doc-scholarly-comparison",
+    requiresDeveloper: true,
+    focusPanelId: "docs-viewer",
+    turns: [
+      {
+        id: "nhm2-arxiv-source-closure-comparison",
+        prompt:
+          "Open the NHM2 current status whitepaper in the local docs and compare its source-closure caution with the primary paper arXiv:2105.03079. Explain where they agree and where the paper does not validate NHM2, citing both sources.",
+        expectedText: [
+          /NHM2/i,
+          /2105\.03079|arXiv/i,
+          /source|closure|observer|energy/i,
+          /does not validate|not.*validat|cannot.*validat/i,
+        ],
+        expectedCapabilities: [
+          "docs.search",
+          "scholarly-research.lookup_papers",
+          "scholarly-research.fetch_full_text",
+        ],
+        requireGroundedVoiceRelay: true,
+      },
+      {
+        id: "nhm2-arxiv-assumption-mismatch-followup",
+        prompt:
+          "Which assumption mismatch matters most if someone tries to apply that paper directly to NHM2? Use the sources you just inspected, and separate what follows from the paper from what remains unresolved.",
+        expectedText: [
+          /unit lapse|flat[-\s]?slice|flat spatial|spatial 3.?metric|spatial metric|g_?\{?ij\}?\s*=\s*\\delta|standard[-\s]?(?:general relativity|GR)|generic Nat[aá]rio/i,
+          /all timelike|observer|smooth and bounded|subsidiary conditions?/i,
+          /does not|unresolved|cannot|not enough/i,
+          /artifact:\/\/scholarly-pdf|arxiv\.org|\bp(?:age|\.)\s*\d+/i,
+        ],
+        requireGroundedVoiceRelay: true,
+      },
+    ],
+  };
+
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as RecordLike : null;
 
@@ -265,6 +306,8 @@ export const resolveRealtimeDocProbeScenario = (
     ? THEORY_EXPERIMENT_PROCEDURE_REALTIME_SCENARIO
     : scenarioId === SCIENTIFIC_EVIDENCE_CLOSURE_REALTIME_SCENARIO.id
       ? SCIENTIFIC_EVIDENCE_CLOSURE_REALTIME_SCENARIO
+      : scenarioId === COMPOUND_DOC_SCHOLARLY_REALTIME_SCENARIO.id
+        ? COMPOUND_DOC_SCHOLARLY_REALTIME_SCENARIO
     : null;
 
 const establishLocalDeveloperSession = async (): Promise<void> => {
@@ -318,8 +361,8 @@ const sourceBinding = (
   documentRef?: string,
   focusPanelId = "docs-viewer",
 ): RecordLike => ({
-  thread_id: "helix-ask:desktop",
-  source_id: "helix-ask:desktop",
+  thread_id: PROBE_THREAD_ID,
+  source_id: PROBE_THREAD_ID,
   source_kind: "helix_ask_workstation",
   focus_panel_id: focusPanelId,
   ...(documentRef ? { document_ref: documentRef } : {}),
@@ -488,8 +531,8 @@ const runLiveProbe = async (): Promise<void> => {
       body: {
         question: input.prompt,
         prompt: input.prompt,
-        sessionId: "helix-ask:desktop",
-        threadId: "helix-ask:desktop",
+        sessionId: PROBE_THREAD_ID,
+        threadId: PROBE_THREAD_ID,
         turnId,
         turn_id: turnId,
         traceId: turnId,

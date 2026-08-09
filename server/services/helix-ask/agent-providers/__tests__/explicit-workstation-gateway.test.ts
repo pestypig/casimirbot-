@@ -502,8 +502,13 @@ describe("explicit workstation gateway derived calls", () => {
         mode: "doi_lookup",
         allow_scholarly_dependent_chain: true,
         source_target_intent: {
-          doi: "10.1073/pnas.86.20.8152",
-          full_text_requested: true,
+          planned_scholarly_capability_chain: {
+            planned_capabilities: [
+              "scholarly-research.lookup_papers",
+              "scholarly-research.fetch_full_text",
+            ],
+            requested_workflow: "full_text_summary",
+          },
         },
       },
     });
@@ -3968,6 +3973,125 @@ describe("explicit workstation gateway derived calls", () => {
       "observation:claim-3",
       "observation:claim-4",
     ]);
+  });
+
+  it("defers an ordinary deictic paper query to the runtime agent", () => {
+    const body = {
+      agent_runtime: "codex",
+      turn_id: "ask:compound-docs-scholarly-referent",
+      thread_id: "thread:compound-docs-scholarly-referent",
+      question:
+        "Find one accessible primary paper that gives the strongest reality check on that assumption, then compare it with the NHM2 whitepaper and cite both.",
+      workspace_context_snapshot: {
+        chat_referent_context: {
+          schema: "helix.ask.chat_referent_context.v1",
+          previous_assistant_final_answer: {
+            role: "assistant",
+            reply_id: "reply-nhm2-assumption",
+            source_ref:
+              "chat.final_answer.previous:reply-nhm2-assumption",
+            text: [
+              "NHM2 assumes its scalar wall/source proxy can be closed into a conserved same-basis physical stress-energy tensor.",
+              "Quantum-inequality and material gates remain unproven.",
+            ].join(" "),
+          },
+        },
+      },
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: "ask:compound-docs-scholarly-referent",
+      selectedRoute: "/ask",
+    });
+
+    expect(body).toMatchObject({
+      canonical_goal_frame: {
+        goal_kind: "compound_evidence_synthesis",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        allows_workspace_context: true,
+        allows_prior_artifacts: true,
+      },
+      route_product_contract: {
+        source_target: "compound_evidence",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        evidence_reentry_required: true,
+        followup_reasoning_required: true,
+      },
+      tool_call_admission_decision: {
+        admitted_tool_families: expect.arrayContaining([
+          "docs_viewer",
+          "scholarly_research",
+        ]),
+        compound_requested_capabilities: expect.arrayContaining([
+          "docs.search",
+          "scholarly-research.lookup_papers",
+        ]),
+      },
+    });
+
+    const lookups = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body,
+    }).filter(
+      (request) =>
+        request.capability_id === "scholarly-research.lookup_papers",
+    );
+
+    expect(lookups).toEqual([]);
+  });
+
+  it("preserves explicit local Docs plus arXiv comparison authority before gateway execution", () => {
+    const body = {
+      agent_runtime: "codex",
+      turn_id: "ask:compound-docs-explicit-arxiv",
+      thread_id: "thread:compound-docs-explicit-arxiv",
+      question:
+        "Open the NHM2 current status whitepaper in the local docs and compare its source-closure caution with the primary paper arXiv:2105.03079. Explain where they agree and where the paper does not validate NHM2, citing both sources.",
+    };
+
+    ensureCodexPreGatewayRouteAuthority({
+      body,
+      turnId: body.turn_id,
+      selectedRoute: "/ask/turn",
+    });
+
+    expect(body).toMatchObject({
+      source_target_intent: {
+        explicit_cues: expect.arrayContaining([
+          "compound_local_docs_external_scholarly_comparison",
+        ]),
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_evidence_synthesis",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      route_product_contract: {
+        source_target: "compound_evidence",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      tool_call_admission_decision: {
+        admitted_tool_families: expect.arrayContaining([
+          "docs_viewer",
+          "scholarly_research",
+        ]),
+        compound_requested_capabilities: expect.arrayContaining([
+          "docs.search",
+          "scholarly-research.lookup_papers",
+        ]),
+      },
+    });
+
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body,
+    });
+    expect(requests.map((request) => request.capability_id)).toEqual(
+      expect.arrayContaining([
+        "docs.search",
+        "scholarly-research.lookup_papers",
+      ]),
+    );
   });
 
   it("ranks claim-relevant accessible papers ahead of generic quantum-information matches", () => {

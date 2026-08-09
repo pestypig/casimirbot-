@@ -15,12 +15,17 @@ const forbiddenPhrase = (...parts: string[]): RegExp =>
   new RegExp(parts.join(""), "i");
 
 describe("NHM2 full-solve theory badges", () => {
+  const semiclassicalV2BadgeIds = [
+    "nhm2.semiclassical.connected_stress_noise_kernel",
+    "nhm2.semiclassical.constraint_algebra_consistency",
+  ] as const;
   const newClosureStackBadgeIds = [
     "nhm2.tensor.same_chart_full_tensor",
     "nhm2.source.component_authority_ledger",
     "nhm2.source.same_basis_tensor_authority",
     "nhm2.closure.wall_t00_source_residual",
     "nhm2.closure.coupled_pass_candidate",
+    ...semiclassicalV2BadgeIds,
     "nhm2.meta.experiment_ready_theory_closure",
     "nhm2.closure.regional_tensor_pass_path_harness",
     "nhm2.dynamic.switching_covariant_conservation",
@@ -75,8 +80,8 @@ describe("NHM2 full-solve theory badges", () => {
   it("builds NHM2 full-solve badges with no validation or promotion boundary", () => {
     const { badges, edges } = buildNhm2FullSolveTheoryBadgesV1();
 
-    expect(badges.length).toBeGreaterThanOrEqual(15);
-    expect(edges.length).toBeGreaterThanOrEqual(14);
+    expect(badges.length).toBeGreaterThanOrEqual(79);
+    expect(edges.length).toBeGreaterThanOrEqual(152);
 
     for (const badge of badges) {
       expect(badge.claimBoundary.diagnosticOnly).toBe(true);
@@ -105,6 +110,8 @@ describe("NHM2 full-solve theory badges", () => {
     expect(ids).toContain("nhm2.tensor.same_chart_full_tensor");
     expect(ids).toContain("nhm2.closure.same_basis_regional_residual");
     expect(ids).toContain("nhm2.closure.coupled_pass_candidate");
+    expect(ids).toContain("nhm2.semiclassical.connected_stress_noise_kernel");
+    expect(ids).toContain("nhm2.semiclassical.constraint_algebra_consistency");
     expect(ids).toContain("nhm2.meta.experiment_ready_theory_closure");
     expect(ids).toContain("nhm2.closure.regional_tensor_pass_path_harness");
     expect(ids).toContain("nhm2.dynamic.switching_covariant_conservation");
@@ -371,7 +378,13 @@ describe("NHM2 full-solve theory badges", () => {
       /nhm2-experiment-ready-theory-candidate-manifest\.v1\.ts/,
     );
     expect(JSON.stringify(theoryClosure?.sourceRefs)).toMatch(
-      /nhm2-semiclassical-state-realizability\.v1\.ts/,
+      /nhm2-semiclassical-state-realizability\.v2\.ts/,
+    );
+    expect(JSON.stringify(theoryClosure?.sourceRefs)).toMatch(
+      /nhm2_semiclassical_state_realizability\/v2/,
+    );
+    expect(JSON.stringify(theoryClosure?.sourceRefs)).toMatch(
+      /connected stress-noise-kernel.*constraint-algebra/i,
     );
     expect(JSON.stringify(theoryClosure?.sourceRefs)).toMatch(
       /nhm2-prediction-falsifier-freeze\.v1\.ts/,
@@ -412,6 +425,16 @@ describe("NHM2 full-solve theory badges", () => {
     expect(edges).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          from: "nhm2.semiclassical.connected_stress_noise_kernel",
+          to: "nhm2.meta.experiment_ready_theory_closure",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.semiclassical.constraint_algebra_consistency",
+          to: "nhm2.meta.experiment_ready_theory_closure",
+          relation: "requires",
+        }),
+        expect.objectContaining({
           from: "nhm2.closure.coupled_pass_candidate",
           to: "nhm2.meta.experiment_ready_theory_closure",
           relation: "documents",
@@ -435,6 +458,89 @@ describe("NHM2 full-solve theory badges", () => {
     );
   });
 
+  it("exposes both semiclassical v2 replay requirements as distinct blocked non-calculator lamps", () => {
+    const { badges, edges } = buildNhm2FullSolveTheoryBadgesV1();
+    const byId = new Map(
+      badges.map((badge: TheoryBadgeV1) => [badge.id, badge]),
+    );
+    const requiredSourcePaths = [
+      "shared/contracts/nhm2-semiclassical-state-realizability.v2.ts",
+      "tests/nhm2-semiclassical-state-realizability-v2.spec.ts",
+      "server/services/theory/nhm2-experiment-ready-theory-closure-evaluator.ts",
+    ];
+
+    for (const badgeId of semiclassicalV2BadgeIds) {
+      const badge = byId.get(badgeId);
+      expect(badge, badgeId).toMatchObject({
+        level: "diagnostic_gate",
+        status: "blocked",
+        calculatorPayloads: [],
+        claimBoundary: {
+          diagnosticOnly: true,
+          doesValidateNHM2: false,
+          validationClaimAllowed: false,
+          physicalMechanismClaimAllowed: false,
+          promotionAllowed: false,
+        },
+      });
+      expect(
+        badge?.equations.every(
+          (equation) =>
+            equation.computableExpression == null &&
+            equation.operatorKind === "gate_status",
+        ),
+        badgeId,
+      ).toBe(true);
+      expect(badge?.sourceRefs.map((sourceRef) => sourceRef.path)).toEqual(
+        expect.arrayContaining(requiredSourcePaths),
+      );
+      expect(JSON.stringify(badge), badgeId).toMatch(
+        /server-owned raw replay.*is missing/i,
+      );
+      expect(JSON.stringify(badge), badgeId).toMatch(
+        /semiclassical_v2_server_content_replay_missing/,
+      );
+    }
+
+    const noiseKernel = byId.get(
+      "nhm2.semiclassical.connected_stress_noise_kernel",
+    );
+    const constraintAlgebra = byId.get(
+      "nhm2.semiclassical.constraint_algebra_consistency",
+    );
+    expect(noiseKernel?.equations[0]?.displayLatex).toContain("\\mu");
+    expect(constraintAlgebra?.equations[0]?.displayLatex).toContain(
+      "\\mathrm{computed}",
+    );
+    expect(constraintAlgebra?.equations[0]?.displayLatex).toContain(
+      "\\mathrm{constraint}",
+    );
+    expect(
+      byId.get("nhm2.meta.experiment_ready_theory_closure")?.equations[0]
+        ?.inputSymbols,
+    ).toEqual(
+      expect.arrayContaining([
+        "ConnectedStressNoiseKernelStatus",
+        "SemiclassicalConstraintAlgebraConsistencyStatus",
+      ]),
+    );
+
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "nhm2.semiclassical.connected_stress_noise_kernel",
+          to: "nhm2.meta.experiment_ready_theory_closure",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.semiclassical.constraint_algebra_consistency",
+          to: "nhm2.meta.experiment_ready_theory_closure",
+          relation: "requires",
+        }),
+      ]),
+    );
+  });
+
   it("keeps non-scalar full-solve artifacts out of calculator payloads", () => {
     const badges = buildNhm2FullSolveTheoryBadgesV1().badges;
     const nonScalarIds = [
@@ -442,6 +548,8 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.source.component_authority_ledger",
       "nhm2.source.same_basis_tensor_authority",
       "nhm2.closure.coupled_pass_candidate",
+      "nhm2.semiclassical.connected_stress_noise_kernel",
+      "nhm2.semiclassical.constraint_algebra_consistency",
       "nhm2.meta.experiment_ready_theory_closure",
       "nhm2.closure.regional_tensor_pass_path_harness",
       "nhm2.dynamic.switching_covariant_conservation",
@@ -1021,6 +1129,8 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.source.same_basis_tensor_authority",
         "nhm2.closure.same_basis_regional_residual",
         "nhm2.closure.coupled_pass_candidate",
+        "nhm2.semiclassical.connected_stress_noise_kernel",
+        "nhm2.semiclassical.constraint_algebra_consistency",
         "nhm2.closure.regional_tensor_pass_path_harness",
         "nhm2.dynamic.switching_covariant_conservation",
         "nhm2.dynamic.frequency_convergence",
@@ -1098,6 +1208,8 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.source.component_authority_ledger",
       "nhm2.source.same_basis_tensor_authority",
       "nhm2.closure.coupled_pass_candidate",
+      "nhm2.semiclassical.connected_stress_noise_kernel",
+      "nhm2.semiclassical.constraint_algebra_consistency",
       "nhm2.closure.regional_tensor_pass_path_harness",
       "nhm2.metric_required.momentum_remediation_targets",
       "nhm2.campaign.frontier_disposition",

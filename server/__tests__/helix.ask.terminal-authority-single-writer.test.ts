@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  agentContinuationRequiresNonterminalDecision,
   agentContinuationDisallowsAnswer,
   applyHelixTerminalAuthoritySingleWriter,
   applyTerminalProjectionKindGuard,
@@ -32,6 +33,23 @@ const makePostToolObservation = (turnId: string) => ({
   },
 });
 describe("Helix terminal authority single writer", () => {
+  it("keeps provider route products nonterminal while canonical continuation still requires an action", () => {
+    const payload = {
+      agent_continuation_state: {
+        schema: "helix.agent_continuation_state.v1",
+        goal: {
+          status: "in_progress",
+          satisfied: false,
+          terminal_product_allowed: false,
+        },
+        allowed_decisions: ["act"],
+      },
+    };
+
+    expect(agentContinuationRequiresNonterminalDecision(payload)).toBe(true);
+    expect(agentContinuationDisallowsAnswer(payload)).toBe(true);
+  });
+
   it("blocks deterministic compound drafting while authoritative continuation disallows answer", () => {
     expect(
       agentContinuationDisallowsAnswer({

@@ -652,21 +652,32 @@ const readSelectedTheoryExecutionClosureTerminalBinding = (
   const materialization = readRecord(
     payload.provider_route_product_materialization,
   );
-  const selectedKinds = Array.from(
-    new Set(
-      [
-        payload.terminal_artifact_kind,
-        writer?.selected_terminal_artifact_kind,
-        writer?.terminal_artifact_kind,
-        authority?.terminal_artifact_kind,
-        presentation?.terminal_artifact_kind,
-      ]
-        .map(readString)
-        .filter((kind) =>
-          THEORY_EXECUTION_CLOSURE_SYNTHESIS_TERMINAL_KINDS.has(kind),
-        ),
-    ),
+  const materializedKind = readString(
+    materialization?.materialized_terminal_artifact_kind,
   );
+  const materializedRef = readString(
+    materialization?.materialized_terminal_artifact_ref,
+  );
+  const hasExactMaterializedSelection =
+    Boolean(materializedRef) &&
+    THEORY_EXECUTION_CLOSURE_SYNTHESIS_TERMINAL_KINDS.has(materializedKind);
+  const selectedKinds = hasExactMaterializedSelection
+    ? [materializedKind]
+    : Array.from(
+        new Set(
+          [
+            payload.terminal_artifact_kind,
+            writer?.selected_terminal_artifact_kind,
+            writer?.terminal_artifact_kind,
+            authority?.terminal_artifact_kind,
+            presentation?.terminal_artifact_kind,
+          ]
+            .map(readString)
+            .filter((kind) =>
+              THEORY_EXECUTION_CLOSURE_SYNTHESIS_TERMINAL_KINDS.has(kind),
+            ),
+        ),
+      );
   if (selectedKinds.length === 0) {
     return {
       applies: false,
@@ -691,21 +702,22 @@ const readSelectedTheoryExecutionClosureTerminalBinding = (
     payload,
     selectedKind,
   );
-  const authorityRefs = Array.from(
-    new Set(
-      [
-        payload.terminal_artifact_id,
-        writer?.selected_terminal_artifact_ref,
-        writer?.selectedArtifactRef,
-        authority?.terminal_item_id,
-        authority?.terminal_artifact_ref,
-        presentation?.terminal_authority_ref,
-        materialization?.materialized_terminal_artifact_ref,
-      ]
-        .map(readString)
-        .filter(Boolean),
-    ),
-  );
+  const authorityRefs = hasExactMaterializedSelection
+    ? [materializedRef]
+    : Array.from(
+        new Set(
+          [
+            payload.terminal_artifact_id,
+            writer?.selected_terminal_artifact_ref,
+            writer?.selectedArtifactRef,
+            authority?.terminal_item_id,
+            authority?.terminal_artifact_ref,
+            presentation?.terminal_authority_ref,
+          ]
+            .map(readString)
+            .filter(Boolean),
+        ),
+      );
   const recordRefs = terminalRecordIdentityRefs(mappedTerminalRecord);
   const selectedRefs =
     authorityRefs.length > 0 ? authorityRefs : recordRefs;
@@ -828,14 +840,48 @@ const readBoundTheoryExecutionClosureRef = (
         .filter((ref) => ref && terminalSupportRefs.includes(ref)),
     ),
   );
-  if (boundRefs.length !== 1) {
+  if (boundRefs.length === 0) {
     return {
       closureArtifactsPresent: true,
       boundArtifactRef: "",
-      invalidRef:
-        boundRefs.length === 0
-          ? "selected_terminal_does_not_bind_execution_closure"
-          : boundRefs.join("|"),
+      invalidRef: "selected_terminal_does_not_bind_execution_closure",
+    };
+  }
+  if (boundRefs.length > 1) {
+    const supportedClosures = closureArtifacts.filter((artifact) =>
+      boundRefs.includes(readString(artifact.artifact_id)),
+    );
+    const orderedRetries = supportedClosures
+      .map((artifact) => {
+        const observation = readRecord(artifact.payload);
+        const closure = readRecord(observation?.closure);
+        const procedureBinding = readRecord(closure?.procedureBinding);
+        return {
+          artifactRef: readString(artifact.artifact_id),
+          procedureSha256: readString(procedureBinding?.procedureSha256),
+          generatedAtMs: Date.parse(readString(closure?.generatedAt)),
+        };
+      })
+      .sort((left, right) => right.generatedAtMs - left.generatedAtMs);
+    const procedureHashes = new Set(
+      orderedRetries
+        .map((lineage) => lineage.procedureSha256)
+        .filter(Boolean),
+    );
+    const retryLineageIsUnambiguous =
+      procedureHashes.size === 1 &&
+      orderedRetries.every(
+        (lineage) =>
+          Boolean(lineage.procedureSha256) &&
+          Number.isFinite(lineage.generatedAtMs),
+      ) &&
+      orderedRetries[0]?.generatedAtMs !== orderedRetries[1]?.generatedAtMs;
+    return {
+      closureArtifactsPresent: true,
+      boundArtifactRef: retryLineageIsUnambiguous
+        ? orderedRetries[0]?.artifactRef ?? ""
+        : "",
+      invalidRef: retryLineageIsUnambiguous ? "" : boundRefs.join("|"),
     };
   }
   return {
@@ -1070,6 +1116,15 @@ export function evaluateVisibleAnswerPolicyFaithfulnessGate(input: {
           uncoveredOpenRequirementCodes: uncoveredClosureOpenRequirements,
         }
       : null;
+  const exactBlockedClosureStatusReport =
+    closureTerminalReadiness?.modelSynthesisAllowed === false &&
+    closureTerminalReadiness.openRequirementCodes.length > 0 &&
+    closureTerminalReadiness.openRequirementCodes.every((code) =>
+      text.includes(code),
+    ) &&
+    /\b(?:blocked|ineligible|unsupported|not (?:run|executed)|procedure_only)\b/i.test(
+      text,
+    );
   const applies =
     Boolean(text) &&
     (/repo|doc|tool|receipt|voice|dottie|paper|scholarly|doi|journal|citation/i.test(
@@ -1159,7 +1214,8 @@ export function evaluateVisibleAnswerPolicyFaithfulnessGate(input: {
   }
   if (
     closureSynthesisTerminal &&
-    closureTerminalReadiness?.modelSynthesisAllowed === false
+    closureTerminalReadiness?.modelSynthesisAllowed === false &&
+    !exactBlockedClosureStatusReport
   ) {
     violations.push("theory_execution_closure_synthesis_blocked");
   }

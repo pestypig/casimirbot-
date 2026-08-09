@@ -1,0 +1,18 @@
+{
+  "schema_version": "casimir_dp_proper_time_worldline_closure_stage4_2p_campaign_receipt/1",
+  "run_id": "casimir-dp-proper-time-worldline-closure-stage4-2p-v1-20260808T120000000Z",
+  "generated_at": "2026-08-08T12:00:00.000Z",
+  "config_path": "configs/research/casimir-dp-proper-time-worldline-closure-stage4-2p.v1.json",
+  "config_sha256": "67f485838ee71ccdde1559502ff450171f1df66ff88ca0b5464b73b9cc6b9e97",
+  "upstream_stage4_2o_campaign_receipt_sha256": "554861b754822cbd3988d75be8b5c9f9d26eae03d53d4b47627dcaf7d3db1c5b",
+  "report_json_sha256": "bdb4b150442d3912a385b0261c52760f7f9a1b2a3ffc48841b39ea5aa18a5d86",
+  "report_markdown_sha256": "40d5b0db126c26fea13437b58d886180276e9cfa7e2aad86a53b5304d63a38b7",
+  "trace_sha256": "888b3253b48b52935d26a97426561eb6eb094c40953678335531b4b81abd4c4f",
+  "software_closure": "pass",
+  "phase_gate": "pass",
+  "measured_evidence": "not_ready",
+  "collapse_identification": "blocked",
+  "promotion_allowed": false,
+  "frozen_diosi_law_modified": false,
+  "observable_bridge_edges_added": 0
+}

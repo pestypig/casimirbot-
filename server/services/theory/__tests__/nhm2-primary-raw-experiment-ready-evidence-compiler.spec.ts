@@ -6,7 +6,7 @@ import { isNhm2CovariantConservation } from "../../../../shared/contracts/nhm2-c
 import { isNhm2DynamicBackreactionStabilityCausality } from "../../../../shared/contracts/nhm2-dynamic-backreaction-stability-causality.v1";
 import { isNhm2FullApparatusSourceTensor } from "../../../../shared/contracts/nhm2-full-apparatus-source-tensor.v1";
 import { isNhm2MechanicalSupportControlMargin } from "../../../../shared/contracts/nhm2-mechanical-support-control-margin.v1";
-import { isNhm2SemiclassicalStateRealizability } from "../../../../shared/contracts/nhm2-semiclassical-state-realizability.v1";
+import { isNhm2SemiclassicalStateRealizabilityV2 as isNhm2SemiclassicalStateRealizability } from "../../../../shared/contracts/nhm2-semiclassical-state-realizability.v2";
 import { isNhm2WorldlineQeiCoverage } from "../../../../shared/contracts/nhm2-worldline-qei-coverage.v1";
 import {
   NHM2_PRIMARY_RAW_EXPERIMENT_READY_EVIDENCE_IDS,
@@ -102,6 +102,8 @@ describe("NHM2 primary raw experiment-ready evidence compiler", () => {
         "hadamard_state_admissibility_unreplayed",
         "renormalization_counterterm_and_ward_identity_unreplayed",
         "qei_semiclassical_state_identity_binding_unresolved",
+        "connected_stress_noise_kernel_replay_unimplemented",
+        "semiclassical_constraint_algebra_replay_unimplemented",
       ]),
     );
     expect(result.evidence.continuous_observer_optimizer.blockers).toContain(

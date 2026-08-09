@@ -49,6 +49,16 @@
 **Leading Stage-4.2M verification receipt:** `docs/research/casimir-dp-apparatus-search-stage4-2m-verification-receipt.json`
 **Stage-4.2N material/thermal ordinary-null report:** `docs/research/casimir-dp-material-thermal-ordinary-null-stage4-2n-report.md`
 **Stage-4.2N config/runner:** `configs/research/casimir-dp-material-thermal-ordinary-null-stage4-2n.v1.json`; `scripts/research/run-casimir-dp-material-thermal-ordinary-null-stage4-2n.ts`
+**Stage-4.2O public-data component report:** `docs/research/casimir-dp-public-data-component-validation-stage4-2o-report.md`
+**Stage-4.2O config/importer/runner:** `configs/research/casimir-dp-public-data-component-validation-stage4-2o.v1.json`; `scripts/research/import-casimir-dp-public-data-stage4-2o.py`; `scripts/research/run-casimir-dp-public-data-component-validation-stage4-2o.ts`
+**Stage-4.2O verification receipt:** `docs/research/casimir-dp-public-data-component-validation-stage4-2o-verification-receipt.json`
+**Stage-4.2Q superconducting-boundary control report:** `docs/research/casimir-dp-superconducting-boundary-control-stage4-2q-report.md`
+**Stage-4.2Q config/runner:** `configs/research/casimir-dp-superconducting-boundary-control-stage4-2q.v1.json`; `scripts/research/run-casimir-dp-superconducting-boundary-control-stage4-2q.ts`
+**Stage-4.2Q verification receipt:** `docs/research/casimir-dp-superconducting-boundary-control-stage4-2q-verification-receipt.json`
+**Stage-4.2R integrated-pilot readiness report:** `docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-report.md`
+**Stage-4.2R config/runner:** `configs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.json`; `scripts/research/run-casimir-dp-integrated-feasibility-pilot-stage4-2r.ts`
+**Stage-4.2R campaign receipt:** `docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-campaign-receipt.json`
+**Stage-4.2R verification receipt:** `docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-verification-receipt.json`
 
 ## Executive summary
 
@@ -137,6 +147,18 @@ input is synthetic, this closes only the software chain. Specimen-specific
 spectra, as-built CAD/alignment, an independently checked full-Maxwell Green
 solution, and measured intervention covariance are mandatory before the
 ordinary-null prediction can be subtracted from data.
+
+Stage 4.2O tests four constituent analysis operations against authenticated
+public measurements while refusing to merge unrelated apparatuses. It recovers
+complex fringe coefficients from 95 sodium-cluster scans, paired nonlinear
+spectral responses from 108 superconducting-drum traces, a 16-channel
+train/held-out covariance and residual replay from 421,912 active LISA
+Pathfinder rows, and the Gran Sasso source-data workbooks supporting the
+published parameter-free natural-DP constraint. Every bounded component gate
+passes. This increases confidence that the software can operate on real fringe,
+boundary-response, and multichannel records, but it does not supply any of the
+four cells, covariance, transfer functions, or state preparation of the proposed
+apparatus. Joint-protocol validation and measured evidence remain `not_ready`.
 
 ## Scientific premise
 
@@ -1439,6 +1461,29 @@ The identity-bound exported trace SHA-256 is
 `866eec434c58b84cc2fcb5df9bd6a4136fbb0c87d04532e89b9f90b3c5464998`.
 This is software/provenance certification and supplies no measured authority.
 
+### Implemented Stage-4.2O public-data component-validation campaign
+
+Stage 4.2O preserves the Stage-4.2N leading design and runs four independent
+public records through one bounded capability each:
+
+- sodium-cluster scans test recovery of the measured complex fringe
+  coefficient (2S_1/S_0=V e^{i\phi});
+- superconducting-drum up/down sweeps test paired nonlinear boundary-response
+  extraction;
+- LISA Pathfinder thruster telemetry tests train/held-out covariance and
+  residual handling in a real multichannel system;
+- Gran Sasso figure-source workbooks authenticate the external parameter-free
+  Diósi--Penrose bound record.
+
+The replay authenticates all complete-source SHA-256 values and passes every
+registered component gate. It creates no cross-apparatus covariance, shared
+likelihood, transported residual, or Casimir-to-collapse bridge. In particular,
+the Gran Sasso parameter-free exclusion is not silently assigned to the
+registered (R_0=100 {m nm}) comparator; that model point remains
+`not_adjudicated` pending a convention-matched recast. The leading diamond
+design is unchanged, physical viability remains `not_evaluated`, and neither a
+pilot nor a confirmatory campaign is authorized by these external replays.
+
 ## Work plan and milestones
 
 | Work package | Indicative interval | Exit artifact |
@@ -1520,6 +1565,59 @@ design-assumption response/covariance model, but the response, covariance, and
 branch preparation have not been measured. The 542-window forecast therefore
 cannot authorize WP4/WP5 acquisition or a DP exclusion until empirical pilot
 packets reproduce the preregistered gates without confirmatory refitting.
+
+Stage 4.2P adds an explicit relativistic closure to the ordinary phase null.
+For the leading 250 nm horizontal branch, equal branch heights give zero
+nominal linear Earth-redshift phase, but the fully vertical reference is
+\(mgdT/\hbar=1.79736\times10^{12}\) rad. The declared synthetic tilt and echo
+transfer reduce this to a 0.017979 rad covariance contribution; the total
+ordinary phase screen is 0.018007 rad against the frozen 0.034644 rad limit.
+The numerical pass is conditional on measured three-dimensional worldlines,
+local gravity and apparatus-mass geometry, tilt spectra, echo transfer, and
+clock/control covariance. Those authorities remain absent, so the result does
+not authorize a pilot. The weak-field proper-time transfer terminates in a
+signed unitary phase and does not modify the frozen Diósi law or create a
+proper-time-to-collapse, Compton-clock, or Casimir-to-collapse bridge.
+
+Stage 4.2Q then asks whether a normal/superconducting boundary state improves
+the control architecture without being mistaken for a collapse mechanism. In
+the synthetic response/covariance fixture, crossing (T_c) is rejected because
+its thermal nuisance is collinear with the desired boundary contrast, and a
+matched static pair is rejected because of low SNR and fabrication degeneracy.
+A fixed-temperature magnetic toggle is the only bounded synthetic candidate:
+contrast SNR 10.04, maximum nuisance cosine 0.367, and condition number 1.47.
+It is not added to the authoritative apparatus manifest. Specimen impedance,
+the normal/superconducting Green response, magnetic pickup, trap transfer,
+vortex state, sham covariance, and joint coherence cells remain unmeasured.
+The registered impedance-to-Green map is a linearized synthetic recovery
+surrogate, not the missing as-built full-Maxwell response.
+
+The control has a precise limited role. For
+(C_\beta=C(0)\exp[i\Phi_{{\rm EM},\beta}-\chi_{{\rm EM},\beta}-\Gamma_Dt]),
+the ratio (C_S/C_N) cancels the frozen boundary-independent Diósi factor.
+It diagnoses ordinary boundary response or an additional boundary-conditioned
+interaction; it cannot replace the primary mass--separation--time Diósi test.
+The Anderson--Higgs analogy, Standard-Model Higgs field, superconducting
+condensate, and BEC order parameter add no collapse bridge. A BEC remains a
+conditional replication platform only after a many-body mass-density contract
+is registered.
+
+Stage 4.2R closes the *specification* of the integrated empirical pilot, not
+the measurements. It binds the leading apparatus and downstream Stage-4.2O,
+P, and Q receipts, freezes the primary held-out Diósi contraction separately
+from the four-cell boundary-interaction cross-ratio, and refuses to substitute
+public component data for same-apparatus authority. The conditional 2.908%
+visibility loss implies a nominal SNR-5 one-sigma coherence-magnitude target of
+(5.816\times10^{-3}); the phase ceiling remains 0.034644 rad.
+
+The runtime returns `not_authorized` because 0/8 empirical packets are ready:
+state preparation and recombination; as-built geometry/Green response;
+measured material spectra; worldline/phase covariance; quantum gas scattering;
+four-cell complex coherence; an independent companion; and the exact
+registered-model external-bound recast. This is the proposal's present exit
+gate. A pilot may start only after these content-addressed, custodied inputs
+exist and the frozen identifiability calculation is rerun without confirmatory
+refitting.
 
 The OR/phase Stage-2 runtime passes its upstream-hash, DP algebra,
 pairwise/potential equivalence, branch-sampling, fixed-branch null, and

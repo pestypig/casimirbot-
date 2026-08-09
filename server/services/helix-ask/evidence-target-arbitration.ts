@@ -17,9 +17,15 @@ import {
 import {
   detectInternetSearchIntent,
   hasAffirmativeDocsViewerSearchCue,
+  hasExplicitFreshDocsAccessCue,
+  hasRetainedEvidenceContinuationCue,
 } from "./internet-search-intent";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
-import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
+import {
+  detectScholarlyResearchIntent,
+  extractScholarlyArxivId,
+  extractScholarlyDoi,
+} from "./scholarly-research-intent";
 import { isAskTurnCapabilityHelpIntent } from "./capability-catalog-intent";
 import {
   isStagePlayCheckpointRequestPrompt,
@@ -110,6 +116,14 @@ const hasExplicitExternalResearchCommand = (prompt: string): boolean =>
     /\b(?:with|using)\s+(?:citations?|sources?|scholarly\s+sources|external\s+sources)\b/i.test(prompt)
   );
 
+const hasExplicitExternalScholarlyComparisonTarget = (prompt: string): boolean =>
+  !hasNegatedExternalResearchCommand(prompt) &&
+  !/\b(?:do\s+not|don['’]?t|later|eventually|in\s+the\s+future|not\s+now|previously|earlier|historically|the\s+screen\s+says|quoted?|if|unless|when)\b[\s\S]{0,180}\b(?:compare|contrast|reconcile|relate|against|reality\s+check)\b/i.test(
+    prompt,
+  ) &&
+  Boolean(extractScholarlyArxivId(prompt) || extractScholarlyDoi(prompt)) &&
+  /\b(?:compare|contrast|reconcile|relate|against|reality\s+check)\b/i.test(prompt);
+
 const hasExplicitLocalDocsPathSummary = (prompt: string): boolean =>
   isExplicitDocsPathSummaryPrompt(prompt);
 
@@ -117,6 +131,10 @@ const hasAffirmativeLocalDocumentEvidenceRequest = (prompt: string): boolean => 
   if (isExplicitDocsPathDocumentOperation(prompt) || isExplicitDocsPathComparePrompt(prompt) || isExplicitDocsPathLocateSynthesisPrompt(prompt)) {
     return true;
   }
+  if (
+    hasRetainedEvidenceContinuationCue(prompt) &&
+    !hasExplicitFreshDocsAccessCue(prompt)
+  ) return false;
   const documentCue = /\b(?:white\s*paper|whitepaper|paper|document|doc|docs|report|memo)\b/i.test(prompt);
   if (!documentCue) return false;
   const evidenceCue =
@@ -277,6 +295,59 @@ export function buildAskEvidenceTargetArbitration(input: {
   const suppressesScholarlyResearch = contextualToolSuppressionBlocksFamily(contextualSuppression, "scholarly_research");
   const suppressesInternetSearch = contextualToolSuppressionBlocksFamily(contextualSuppression, "internet_search");
   const affirmativeDocsSearch = hasAffirmativeDocsViewerSearchCue(prompt);
+  const scholarlyIntent = detectScholarlyResearchIntent(prompt);
+  const explicitExternalResearchCommand =
+    hasExplicitExternalResearchCommand(prompt) ||
+    hasExplicitExternalScholarlyComparisonTarget(prompt);
+  const compoundDocsScholarlyComparison =
+    scholarlyIntent.researchRequested &&
+    explicitExternalResearchCommand &&
+    !contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer") &&
+    !suppressesScholarlyResearch &&
+    (
+      affirmativeDocsSearch ||
+      isAskTurnDocsTopicSummaryPrompt(prompt) ||
+      hasAffirmativeLocalDocumentEvidenceRequest(prompt)
+    ) &&
+    /\b(?:compare|contrast|reconcile|relate|against|reality\s+check|what\s+(?:does|would)\s+(?:it|that|this)\s+(?:mean|imply))\b/i.test(prompt);
+
+  if (compoundDocsScholarlyComparison) {
+    promptIntentCandidates.push("compound_local_docs_scholarly_comparison");
+    candidates.push(makeCandidate({
+      candidateId: "scholarly_research.local_docs_comparison",
+      targetSource: "scholarly_research",
+      targetKind: "scholarly_research",
+      strength: "hard",
+      score: 0.995,
+      reasonCodes: [
+        "compound_local_docs_external_scholarly_comparison",
+        "docs_and_scholarly_capabilities_must_remain_available",
+        "model_synthesis_requires_both_observation_families",
+      ],
+      requestedOutputs: unique([
+        ...scholarlyIntent.requestedOutputs,
+        "file_path",
+        "line_backed_source",
+        "scholarly_full_text",
+        "paper_pdf_pages",
+        "typed_failure",
+      ]),
+      capabilityKeys: [
+        "docs.search",
+        "docs-viewer.search_docs",
+        "docs-viewer.locate_in_doc",
+        "scholarly_research.lookup",
+        "scholarly_research.fetch_full_text",
+      ],
+      terminalProductConstraints: [
+        "doc_evidence_synthesis_answer",
+        "scholarly_research_answer",
+        "model_synthesized_answer",
+        "typed_failure",
+        "request_user_input",
+      ],
+    }));
+  }
 
   if (
     affirmativeDocsSearch &&
@@ -306,7 +377,6 @@ export function buildAskEvidenceTargetArbitration(input: {
   const suppressesRepoCode = contextualToolSuppressionBlocksFamily(contextualSuppression, "repo_code");
   const suppressesLiveEnvironment = contextualToolSuppressionBlocksFamily(contextualSuppression, "live_environment");
   const repoIntent = detectRepoCodeEvidenceIntent(prompt);
-  const scholarlyIntent = detectScholarlyResearchIntent(prompt);
   const internetSearchIntent = detectInternetSearchIntent(prompt);
   const moralGraphPolicy = decideMoralGraphAgentInvocationPolicyV1({
     inputKind: "user_prompt",
@@ -317,7 +387,6 @@ export function buildAskEvidenceTargetArbitration(input: {
     moralGraphPolicy.eligible && moralGraphPolicy.reasonCodes.includes("living_substrate_reflection_request");
   const theoryIdeologyBridgeCue = hasTheoryIdeologyBridgeCue(prompt);
   const selectedTheoryIdeologyBridgeCue = theoryIdeologyBridgeCue && !moralLivingSubstrateCue;
-  const explicitExternalResearchCommand = hasExplicitExternalResearchCommand(prompt);
   const contextualScholarlyMentionOnly =
     scholarlyIntent.researchRequested &&
     moralGraphReflectionCue &&

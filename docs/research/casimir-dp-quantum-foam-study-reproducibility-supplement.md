@@ -209,6 +209,62 @@ exponents remain a separate comparator and are not added to the ordinary
 Green/FDT exponent. The thermal closure is a recovery cross-check and is not
 double counted. The runtime adds zero observable bridge edges.
 
+### Stage-4.2O authenticated public-data component replay
+
+Stage 4.2O replaces four software-only demonstrations with bounded replays of
+real public measurements. It does not combine the measurements. The source
+archives and roles are:
+
+| Role | Public authority | Complete-source SHA-256 | Recovered quantity |
+|---|---|---|---|
+| complex fringe recovery | Pedalino *et al.* sodium-cluster archive, Zenodo 17502163 | `b92355d06e06f16b3c746020ef7bc6c6eac6a629d36d739aff79e6a894003b9a` | 95 values of (2S_1/S_0=V e^{i\phi}) |
+| measured boundary response | de Jong *et al.* superconducting-drum archive, Zenodo 18682702 | `f79908a4203b623ccb7b3b7c21c19d9538000f419d342dda124583c284b53055` | 108 paired up/down spectral centroids |
+| multichannel covariance | LISA Pathfinder DRS weekly FITS, HEASARC | `66a1a18e93b5cdbbcd67cbcab9a08bcbb8862542ef98b9ba9c72e27ec8de421d` | 16-channel train/held-out covariance and residual |
+| external DP bound | Gran Sasso Figure 3/4 source workbooks | `ef86fe9fac36fcee81c0a762571737950c5cccbc7343178593743199ef6e5e23`; `29a1f3ad10ee59e00bc5feb3a81453b9728ab6113151cb30f1b92cad78d3d6d7` | source-spectrum authentication; registered model not adjudicated |
+
+The importer is
+`scripts/research/import-casimir-dp-public-data-stage4-2o.py`. It verifies the
+complete external files and writes the compact derived fixture
+`configs/research/fixtures/casimir-dp-stage4-2o.public-data.v1.json`. Large
+third-party archives are not copied into the repository. The compact fixture
+SHA-256 is
+`526d910d47d83921fd2eed945fb2f2b551964263e126cf69bb7d60302ecd9f2a`.
+
+The sodium replay follows the deposited finite-period Fourier convention:
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2o-supplement-fringe-coefficient -->
+\[
+S_\ell=N^{-1}\sum_j n_j e^{-2\pi i\ell j/N},
+\qquad \widetilde C_1=2S_1/S_0.
+\]
+
+The LISA replay uses 60 s windows, freezes channel standardization on the first
+half, applies 5% identity shrinkage to each diagnostic covariance, fits one
+linear residual on the training half, and evaluates it on the held-out half.
+Its train and held-out shrunk condition numbers are 3.32333 and 3.33817; relative
+covariance drift is 0.147919; and the held-out/train residual-RMSE ratio is
+0.988499. These are recovery diagnostics, not universal acceptance thresholds.
+
+The four namespaces are disjoint by contract. The evaluator refuses
+cross-apparatus covariance fusion, shared likelihood construction, transported
+residuals, or a joint-protocol edge. A pass therefore means
+`separate_public_dataset_recovery_only`. It does not mean that the proposed
+diamond sphere has been prepared, that its ordinary Casimir response is known,
+or that collapse has been observed.
+
+- **Config:** `configs/research/casimir-dp-public-data-component-validation-stage4-2o.v1.json`
+- **Evaluator:** `shared/casimir-dp-public-data-component-validation-stage4-2o.ts`
+- **Runner:** `scripts/research/run-casimir-dp-public-data-component-validation-stage4-2o.ts`
+- **Report:** `docs/research/casimir-dp-public-data-component-validation-stage4-2o-report.md`
+- **Campaign receipt:** `docs/research/casimir-dp-public-data-component-validation-stage4-2o-campaign-receipt.json`
+- **Verification receipt:** `docs/research/casimir-dp-public-data-component-validation-stage4-2o-verification-receipt.json`
+
+The report JSON SHA-256 is
+`91dab28f56c087aaee8cb1b16d83a218de569215ee6f2ab2cffd7c66a3cc1182`.
+Measured evidence and joint-protocol validation remain `not_ready`; collapse
+identification and manifold dynamics remain `blocked`; physical viability
+remains `not_evaluated`.
+
 ### Projection if the frozen DP model is true
 
 For the registered \(r_0=100\ {\rm nm}\) model point, the leading Stage-4.2M
@@ -5000,3 +5056,131 @@ The exclusive validated trace SHA-256 is
 Focused integration is 62/62, inherited Stage-4.2C-through-M replay is 101/101,
 required GR/WARP replay is 179/179, math validation covers 221 entries, and
 production client/server builds pass with pre-existing warnings.
+
+### B.16 Stage-4.2P ordinary proper-time/worldline closure
+
+Stage 4.2P verifies the immutable Stage-4.2O campaign receipt before binding
+the leading Stage-4.2M apparatus to the weak-field branch-action chain. It
+recovers Minkowski, equal-potential/equal-velocity, coordinate-potential-offset,
+symmetric-gradient, and vertical \(mgdT/\hbar\) limits.
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2p-supplement-proper-time -->
+\[
+\Delta\tau=\int_0^T\left[\frac{\Delta\Phi}{c^2}
+-\frac{\Delta(v^2)}{2c^2}\right]dt,
+\qquad
+\Delta\phi_{\rm prop}=-\frac{mc^2}{\hbar}\Delta\tau.
+\]
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2p-supplement-phase-budget -->
+\[
+\sigma_{\phi,\rm total}^2=
+\sigma_{g,\rm tilt}^2+\sigma_{\nabla g}^2+\sigma_{\rm local}^2
++\sigma_{\rm kin}^2+\sigma_{\Omega}^2+\sigma_{\rm clock}^2
++\sigma_{\rm control}^2+\sigma_{\rm EM}^2.
+\]
+
+For the nominal horizontal 250 nm branch, the linear Earth term is zero. The
+fully vertical reference is \(1.7973596191631953\times10^{12}\) rad. The
+declared synthetic frequency-resolved echo/tilt input gives 0.0179787 rad from
+Earth tilt and 0.0180065 rad total, leaving 0.0166375 rad below the frozen
+0.0346440 rad gate. Removing static echo suppression produces a fail-closed
+no-go. The internal-energy time-dilation screen gives
+\(\chi=2.0921\times10^{-43}\) for the declared synthetic variance and is not
+specimen authority.
+
+The Stage-4.2P config, maintained report, campaign receipt, and immutable report
+JSON have SHA-256 values
+`67f485838ee71ccdde1559502ff450171f1df66ff88ca0b5464b73b9cc6b9e97`,
+`40d5b0db126c26fea13437b58d886180276e9cfa7e2aad86a53b5304d63a38b7`,
+`3f82d7632fa7a7b8fca08857cd9c2d927399b3a334ccf319f8895a13f1b365ab`,
+and
+`bdb4b150442d3912a385b0261c52760f7f9a1b2a3ffc48841b39ea5aa18a5d86`.
+The downstream verification receipt SHA-256 is
+`a41d984cdc591f7c1bcf4a0056bca6be8997751fecc50a1984af841e58992f99`.
+Adapter run `2380` (`adapter:f3cbd258-82d2-4965-8a19-329600427b6a`) is `PASS`
+with no first failure, empty deltas, certificate status `GREEN`, integrity true,
+and certificate SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+
+The Diósi exponents are copied unchanged, signed echo response is not applied
+to collapse loss, the badge is non-promotable, and zero observable bridge edges
+are added. Measured worldlines, gravity gradient, local-mass CAD, tilt spectrum,
+echo transfer, clock/control covariance, and internal-energy variance remain
+not ready; no pilot is authorized.
+
+### B.17 Stage-4.2Q superconducting-boundary control
+
+Stage 4.2Q verifies the Stage-4.2P campaign receipt and preserves the
+Stage-4.2N ordinary-null and Stage-4.2O public-component scope. Its hypothetical
+niobium coating is a synthetic response fixture, not an apparatus-manifest
+material selection.
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2q-supplement-impedance -->
+\[
+\lambda_L^{-2}=\mu_0n_s(q^*)^2/m^*,
+\qquad
+Z_s(\omega)=R_s(\omega)+iX_s(\omega),
+\qquad X_s\simeq\mu_0\omega\lambda_L.
+\]
+
+The London recovery returns (\lambda_L=39\) nm with zero numerical relative
+error while every finite-frequency impedance point remains nonzero. Thus zero
+DC resistance is not represented as zero impedance.
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2q-supplement-boundary-ratio -->
+\[
+\frac{C_S}{C_N}
+=\frac{e^{i\Phi_S-\chi_S-\Gamma_Dt}}
+{e^{i\Phi_N-\chi_N-\Gamma_Dt}}
+=e^{i\Delta\Phi_{EM}-\Delta\chi_{EM}}.
+\]
+
+The maximum numerical cancellation error is
+(2.2205\times10^{-16}). The temperature-crossing and matched-static-pair
+strategies return no-go; the magnetic toggle passes the synthetic gates with
+SNR 10.0425, maximum nuisance cosine 0.367013, and condition number 1.46957.
+No physical control is authorized because specimen impedance, the
+normal/superconducting Green response, magnetic and trap transfer, vortex
+state, sham covariance, and joint coherence cells are not measured.
+
+The coating condensation-energy screen gives
+(2.2667\times10^{-28}\) kg, (7.3296\times10^{-13}) of the probe mass, and
+is not added to the Diósi source. Anderson--Higgs to Standard-Model Higgs is
+registered as a structural analogy only; Higgs, condensate, and BEC order
+parameters have zero transfer edges into (Gamma_D). BEC replication remains
+conditional on a separate many-body mass-density contract.
+
+### B.18 Stage-4.2R integrated feasibility-pilot readiness
+
+Stage 4.2R authenticates the Stage-4.2O, P, and Q receipts, freezes the leading
+Stage-4.2M apparatus and unchanged Gaussian-regularized Diósi comparator, and
+audits eight same-apparatus authority packets. The runtime is a readiness
+contract; it contains no synthetic replacement for an absent measurement.
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2r-supplement-diosi-precision -->
+\[
+V_{\rm D}=e^{-\Gamma_{\rm D}t},\qquad
+\sigma_{|C|}\leq
+\frac{1-e^{-\Gamma_{\rm D}t}}{\mathrm{SNR}_{\min}}.
+\]
+
+For the frozen exponent 0.0295114647 and SNR floor five, the conditional loss
+is 0.0290796 and the maximum one-sigma magnitude uncertainty is approximately
+0.005816. This does not constitute a measured sensitivity.
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2r-supplement-four-cell-ratio -->
+\[
+R_4=\frac{C_{a,s}C_{r,c}}{C_{a,c}C_{r,s}},\qquad
+\frac{e^{-\Gamma_Dt}}{e^{-\Gamma_Dt}}=1.
+\]
+
+The second identity is an estimator-semantics test: standard boundary-
+independent Diósi loss cancels from the cross-ratio. The primary Diósi
+contraction and the boundary-interaction diagnostic remain distinct.
+
+The canonical run reports packet-contract `pass`, empirical pilot
+`not_authorized`, 0/8 ready authorities, measured evidence and joint-protocol
+validation `not_ready`, collapse and manifold identification `blocked`, and
+physical viability `not_evaluated`. Cross-apparatus covariance fusion is
+forbidden and zero observable bridge edges are added.

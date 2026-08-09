@@ -55,7 +55,7 @@ export const NHM2_EXPERIMENT_READY_THEORY_CLOSURE_ASSURANCE_VALUES = [
 
 export const NHM2_EXPERIMENT_READY_THEORY_CLOSURE_EVIDENCE_CONTRACT_VERSIONS = {
   full_apparatus_source_tensor: "nhm2_full_apparatus_source_tensor/v1",
-  semiclassical_state: "nhm2_semiclassical_state_realizability/v1",
+  semiclassical_state: "nhm2_semiclassical_state_realizability/v2",
   covariant_conservation: "nhm2_covariant_conservation/v1",
   continuous_observer_optimizer: "nhm2_continuous_observer_optimizer/v1",
   worldline_qei: "nhm2_worldline_qei_coverage/v1",
@@ -138,6 +138,8 @@ export const NHM2_EXPERIMENT_READY_THEORY_CLOSURE_REQUIRED_CHECKS = {
     "boundary_switching_preparation_compatible",
     "qei_applicability_bound_to_same_state",
     "rset_uncertainty_budget_bounded",
+    "connected_stress_noise_kernel_same_state_renormalized_and_bounded",
+    "semiclassical_constraint_algebra_anomaly_residual_bounded",
   ],
   covariant_conservation: [
     "local_covariant_divergence_all_four_components_computed",
@@ -248,6 +250,8 @@ export const NHM2_EXPERIMENT_READY_THEORY_CLOSURE_NUMERIC_CHECK_POLICIES = {
   uncertainty_aware_absolute_relative_residuals_pass: "lte",
   ward_identity_pass: "lte",
   rset_uncertainty_budget_bounded: "lte",
+  connected_stress_noise_kernel_same_state_renormalized_and_bounded: "lte",
+  semiclassical_constraint_algebra_anomaly_residual_bounded: "lte",
   discrete_global_balance_pass: "lte",
   time_resolved_cycle_energy_ledger_closed: "lte",
   residual_within_frozen_uncertainty_tolerance: "lte",

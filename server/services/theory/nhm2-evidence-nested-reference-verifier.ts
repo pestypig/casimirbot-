@@ -145,7 +145,7 @@ const FULL_APPARATUS_TENSOR_COMPONENT_ARRAY_REFERENCE =
   /^\/(?:sourceTensor\/(?:rawTotalTensorArray|terms\/\d+\/(?:rawTensorArray|couplingCoefficientArray))|metricComparison\/(?:rawMetricTensorArray|rawRequiredSourceTensorArray|rawAbsoluteResidualArray|rawRelativeResidualArray)|evolutionCoupling\/(?:coupledStateArray|couplingResidualArray))$/;
 
 const SEMICLASSICAL_NUMERICAL_ARRAY_REFERENCE =
-  /^\/(?:fieldState\/stateArtifact|admissibility\/twoPointFunction|stressTensor\/(?:tensor|components\/\d+\/evidence)|wardIdentity\/divergenceSamples|preparationSwitching\/dynamicSolution|uncertaintyBudget\/bounds\/\d+\/rawSamples|backreaction\/(?:geometry|sourceTensor))$/;
+  /^\/(?:fieldState\/stateArtifact|admissibility\/twoPointFunction|stressTensor\/(?:tensor|components\/\d+\/evidence)|wardIdentity\/divergenceSamples|preparationSwitching\/dynamicSolution|uncertaintyBudget\/bounds\/\d+\/rawSamples|backreaction\/(?:geometry|sourceTensor)|stressFluctuations\/noiseKernel|constraintConsistency\/(?:bracketResiduals\/\d+\/(?:computedBracket|classicalStructureFunctionTarget|residual)|(?:antisymmetryResidual|jacobiIdentityResidual)\/residual))$/;
 
 const WORLDLINE_QEI_NUMERICAL_ARRAY_REFERENCE =
   /^\/(?:stateBinding\/(?:stateArtifact|renormalizedStressTensor)|worldlines\/\d+\/(?:trajectory|properTimeGrid|fourVelocityArray|accelerationArray|curvatureInvariantArray|renormalizedTmunuUuSamples|samplingFunctionSamples|quadratureSamples)|uncertainty\/covariance)$/;
@@ -239,6 +239,19 @@ export function nhm2EvidenceNestedReferenceProvenanceRule(input: {
           location,
         ) ||
         /^\/preparationSwitching\/(?:protocol|switchingFunction)$/.test(
+          location,
+        ) ||
+        /^\/stressFluctuations\/(?:renormalizationPrescription|renormalizationCounterterms|finiteRenormalization|smearingFunction|samplingBasis|semiclassicalityCriterion)$/.test(
+          location,
+        ) ||
+        /^\/stressFluctuations\/samplingWindow\/definition$/.test(location) ||
+        /^\/constraintConsistency\/(?:renormalizationPrescription|renormalizationCounterterms|finiteRenormalization|formulation|regulator|operatorOrdering|smearingFunctions|countertermEvidence)$/.test(
+          location,
+        ) ||
+        /^\/constraintConsistency\/bracketResiduals\/\d+\/(?:normalizationDefinition|normalizationMethod)$/.test(
+          location,
+        ) ||
+        /^\/constraintConsistency\/(?:antisymmetryResidual|jacobiIdentityResidual)\/definition$/.test(
           location,
         )
       ) {

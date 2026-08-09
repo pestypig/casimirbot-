@@ -45,7 +45,13 @@ const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
 const readEvidenceBackedAnswerTextFromArtifacts = (artifactLedger: ArtifactLike[]): string | null => {
-  for (const preferredKind of ["reasoning_continuation_result", "turn_final_text", "final_answer_draft", "model_synthesized_answer"]) {
+  for (const preferredKind of [
+    "compound_evidence_synthesis_answer",
+    "reasoning_continuation_result",
+    "turn_final_text",
+    "model_synthesized_answer",
+    "final_answer_draft",
+  ]) {
     for (const artifact of [...artifactLedger].reverse()) {
       const kind = readString(artifact.kind);
       if (kind !== preferredKind) continue;

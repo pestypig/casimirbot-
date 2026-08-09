@@ -1,0 +1,107 @@
+{
+  "schema_version": "casimir_dp_proper_time_worldline_closure_stage4_2p/1",
+  "campaign_id": "casimir-dp-proper-time-worldline-closure-stage4-2p-v1",
+  "evidence_class": "synthetic_ordinary_relativistic_phase_closure_only",
+  "claim_ceiling": "ordinary_unitary_proper_time_and_phase_budget_only",
+  "promotion_allowed": false,
+  "observable_bridge_edges_allowed": false,
+  "frozen_diosi_law_modified": false,
+  "run_order": [
+    "verify_immutable_stage4_2o_component_receipt",
+    "bind_leading_stage4_2m_apparatus_without_modification",
+    "recover_minkowski_and_equal_worldline_limits",
+    "integrate_weak_field_branch_proper_time",
+    "propagate_earth_gradient_rotation_local_mass_and_kinematic_phase",
+    "apply_frequency_resolved_echo_and_path_swap_response",
+    "bound_internal_energy_time_dilation_dephasing",
+    "combine_with_ordinary_em_clock_and_control_phase_covariance",
+    "enforce_registered_total_phase_gate",
+    "preserve_frozen_diosi_law_and_zero_bridge_policy"
+  ],
+  "upstream_stage4_2o": {
+    "campaign_receipt_path": "docs/research/casimir-dp-public-data-component-validation-stage4-2o-campaign-receipt.json",
+    "campaign_receipt_sha256": "554861b754822cbd3988d75be8b5c9f9d26eae03d53d4b47627dcaf7d3db1c5b",
+    "run_id": "casimir-dp-public-data-component-validation-stage4-2o-v1-20260807T120000000Z"
+  },
+  "constants": {
+    "c_m_s": 299792458,
+    "hbar_J_s": 1.054571817e-34,
+    "G_m3_kg_s2": 6.6743e-11,
+    "earth_g_m_s2": 9.80665,
+    "earth_rotation_rad_s": 0.00007292115
+  },
+  "apparatus": {
+    "material_id": "diamond",
+    "mass_kg": 3.0925052683774525e-16,
+    "radius_m": 2.76302362398029e-7,
+    "branch_separation_vector_m": [2.5e-7, 0, 0],
+    "branch_midpoint_m": [0, 0, 0],
+    "hold_time_s": 0.25,
+    "gap_m": 0.00001,
+    "nominal_branch_velocity_A_m_s": [0, 0, 0],
+    "nominal_branch_velocity_B_m_s": [0, 0, 0]
+  },
+  "weak_field": {
+    "local_vertical_unit_vector": [0, 0, 1],
+    "gravity_gradient_s2": [[-0.00000154, 0, 0], [0, -0.00000154, 0], [0, 0, 0.00000308]],
+    "branch_tilt_sigma_rad": 1e-10,
+    "branch_midpoint_sigma_m": 1e-9,
+    "local_masses": [
+      { "id": "balanced_support_plus_x", "mass_kg": 0.01, "mass_relative_sigma": 0.0001, "position_m": [0.01, 0, -0.02], "position_sigma_m": 1e-7 },
+      { "id": "balanced_support_minus_x", "mass_kg": 0.01, "mass_relative_sigma": 0.0001, "position_m": [-0.01, 0, -0.02], "position_sigma_m": 1e-7 }
+    ],
+    "differential_v2_integral_sigma_m2_s": 1e-22,
+    "sagnac_area_sigma_m2": 1e-20
+  },
+  "echo_response": {
+    "static_signed_phase_residual_fraction": 0.0001,
+    "path_swap_signed_phase_residual_fraction": 0.0001,
+    "spectral_bins": [
+      { "frequency_Hz": 0.1, "tilt_asd_rad_per_sqrt_Hz": 2e-12, "bandwidth_Hz": 0.05, "echo_transfer_magnitude": 0.0001 },
+      { "frequency_Hz": 1, "tilt_asd_rad_per_sqrt_Hz": 5e-13, "bandwidth_Hz": 0.5, "echo_transfer_magnitude": 0.0002 },
+      { "frequency_Hz": 10, "tilt_asd_rad_per_sqrt_Hz": 1e-13, "bandwidth_Hz": 5, "echo_transfer_magnitude": 0.001 }
+    ]
+  },
+  "ordinary_phase_covariance": {
+    "transported_stage4_2m_em_phase_sigma_rad": 1.1090590462729788e-8,
+    "control_phase_sigma_rad": 0.001,
+    "ordinary_differential_angular_frequency_rad_s": 6.283185307179586,
+    "laboratory_clock_skew_sigma_s": 0.000001
+  },
+  "internal_energy": {
+    "synthetic_energy_std_J": 1e-18,
+    "measured_heat_capacity_ready": false,
+    "measured_internal_spectrum_ready": false
+  },
+  "frozen_diosi_comparator": {
+    "model_id": "diosi_1989_gaussian_regularized_nondissipative",
+    "R0_m": 1e-7,
+    "conservative_exponent": 0.004358516271770489,
+    "gaussian_exponent": 0.029511464722144533
+  },
+  "gates": {
+    "maximum_total_phase_sigma_rad": 0.03464404998245921,
+    "maximum_internal_time_dilation_chi": 0.000001,
+    "require_minkowski_recovery": true,
+    "require_equal_worldline_recovery": true,
+    "require_coordinate_offset_invariance": true,
+    "require_dp_echo_invariance": true
+  },
+  "empirical_authorities": {
+    "measured_worldlines": false,
+    "measured_gravity_gradient": false,
+    "as_built_local_mass_cad": false,
+    "measured_tilt_spectrum": false,
+    "measured_echo_transfer": false,
+    "measured_clock_control_covariance": false,
+    "measured_internal_energy_variance": false
+  },
+  "standing": {
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "physical_pilot_authorized": false,
+    "confirmatory_campaign_authorized": false
+  }
+}

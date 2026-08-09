@@ -1523,6 +1523,31 @@ export const mathStageRegistry: MathStageEntry[] = [
   },
   {
     tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-semiclassical-state-realizability.v2.ts",
+    stage: "diagnostic",
+    notes:
+      "Fail-closed semiclassical state construction, admissibility, renormalized full tensor, Ward identity, same-state QEI, preparation switching, uncertainty, provenance, self-consistent backreaction, bilocal connected stress-noise kernel, and normalized/refined canonical constraint-algebra consistency contract; raw v2 content remains non-promotable until server replay is implemented.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-semiclassical-state-realizability-v2.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      fieldEquationResidualLInf: "1",
+      divergenceResidualLInf: "1",
+      minimumMarginSI: "M L^-1 T^-2",
+      einsteinResidualLInf: "1",
+      constraintResidualLInf: "1",
+      fluctuationToMeanRatioUpper95: "1",
+      normalizedConstraintBracketResidualUpper95: "1",
+      regulatorRemovalConvergenceOrder: "1",
+      semiclassicalStateRealizabilityReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
     module: "shared/contracts/nhm2-prediction-falsifier-freeze.v1.ts",
     stage: "diagnostic",
     notes:
@@ -5477,6 +5502,134 @@ export const mathStageRegistry: MathStageEntry[] = [
       coherence: "1",
       covariance_phase_chi: "1",
       dp_exponent_comparator: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_PUBLIC_DATA_COMPONENT_VALIDATION_STAGE4_2O",
+    module: "shared/casimir-dp-public-data-component-validation-stage4-2o.ts",
+    stage: "diagnostic",
+    notes:
+      "Authenticates and replays four independent public measurement records for complex fringe extraction, paired boundary-response extraction, held-out multichannel covariance/residual handling, and external Diósi-bound provenance without constructing a cross-apparatus estimator.",
+    motivation:
+      "Before commissioning the integrated apparatus, constituent numerical operations should be exercised on real data while preserving the difference between component validation and joint-protocol evidence.",
+    conceptualWaypoints: [
+      "complete external source files are authenticated before compact numerical extraction",
+      "the sodium Fourier coefficient is a measured fringe-transfer observable rather than the proposed sphere density-matrix element",
+      "the superconducting-drum replay is a measured boundary/drive response rather than an apparatus-matched ordinary null",
+      "LISA Pathfinder validates classical train/held-out covariance and residual handling only",
+      "the Gran Sasso parameter-free exclusion record does not adjudicate the registered R0=100 nm comparator without a model-matched recast",
+      "cross-apparatus covariance fusion, a shared likelihood, transported residuals, and observable bridges are forbidden",
+      "joint-protocol evidence, collapse identification, manifold dynamics, and physical viability remain fail closed",
+    ],
+    checks: [
+      { type: "test", path: "tests/casimir-dp-public-data-component-validation-stage4-2o.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-stage4-2o-campaign.spec.ts" },
+    ],
+    units: {
+      fringe_coefficient: "1",
+      visibility: "1",
+      phase_rad: "1",
+      spectral_centroid_Hz: "T^-1",
+      covariance_standardized: "1",
+      residual_standardized: "1",
+      energy_keV: "M L^2 T^-2",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_PROPER_TIME_WORLDLINE_CLOSURE_STAGE4_2P",
+    module: "shared/casimir-dp-proper-time-worldline-closure-stage4-2p.ts",
+    stage: "diagnostic",
+    notes:
+      "Closes the leading apparatus's ordinary relativistic phase budget by integrating weak-field branch proper time and propagating Earth gravity, gradients, local masses, rotation, kinematics, clock/control covariance, frequency-resolved echo response, and internal-energy time-dilation bounds.",
+    motivation:
+      "A gravitationally induced signed unitary phase can mimic or obscure the complex-coherence residual unless the worldlines and phase-cancellation transfer are explicitly derived and empirically commissioned.",
+    conceptualWaypoints: [
+      "differential proper time depends on branch potential and velocity differences rather than separation alone",
+      "the branch action transfers proper time to ordinary signed matter-wave phase",
+      "a horizontal nominal branch has zero linear Earth-redshift term while tilt covariance remains highly amplified",
+      "frequency-resolved echo and path swap act on signed phase, not on the positive frozen Diósi exponent",
+      "internal-energy time-dilation dephasing is bounded as an ordinary reduced-state effect without a Compton-clock claim",
+      "measured worldlines, gravity gradient, local-mass CAD, tilt spectrum, echo response, and clock covariance remain absent",
+      "no proper-time-to-collapse or Casimir-to-collapse bridge is registered",
+    ],
+    checks: [
+      { type: "test", path: "tests/casimir-dp-proper-time-worldline-closure-stage4-2p.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-stage4-2p-campaign.spec.ts" },
+    ],
+    units: {
+      delta_tau_s: "T",
+      potential_m2_s2: "L^2 T^-2",
+      velocity_squared_m2_s2: "L^2 T^-2",
+      phase_rad: "1",
+      tilt_asd_rad_per_sqrt_Hz: "T^1/2",
+      sagnac_area_m2: "L^2",
+      internal_energy_variance_J2: "M^2 L^4 T^-4",
+      coherence_visibility: "1",
+      dios_i_exponent: "1",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_SUPERCONDUCTING_BOUNDARY_CONTROL_STAGE4_2Q",
+    module: "shared/casimir-dp-superconducting-boundary-control-stage4-2q.ts",
+    stage: "diagnostic",
+    notes:
+      "Binds the leading apparatus and prior ordinary-null/component/proper-time evidence to a synthetic normal-versus-superconducting boundary-control assessment without modifying the frozen Diósi generator.",
+    motivation:
+      "A boundary-state contrast can validate and stress the ordinary electromagnetic response chain while providing an axis orthogonal to the primary mass-separation-time collapse discriminator.",
+    conceptualWaypoints: [
+      "zero DC resistance is separated from nonzero finite-frequency surface impedance",
+      "London/Anderson-Higgs screening is an in-medium electromagnetic response rather than the Standard-Model Higgs field",
+      "normal and superconducting responses propagate through ordinary phase and contraction in complex-coherence space",
+      "the unchanged boundary-independent Diósi factor cancels from the superconducting-to-normal ratio",
+      "temperature, magnetic-field, vortex, trap, and matched-specimen confounders are scored before control selection",
+      "the condensation-energy mass equivalent is an ordinary stress-energy upper bound only",
+      "BEC is retained as a conditional replication platform requiring a many-body density contract",
+      "measured authority, collapse identification, manifold dynamics, and physical viability remain fail closed",
+    ],
+    checks: [
+      { type: "test", path: "tests/casimir-dp-superconducting-boundary-control-stage4-2q.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-stage4-2q-campaign.spec.ts" },
+    ],
+    units: {
+      london_penetration_depth_m: "L",
+      surface_impedance_ohm: "M L^2 T^-3 I^-2",
+      effective_photon_mass_kg: "M",
+      phase_rad: "1",
+      chi: "1",
+      boundary_contrast_snr: "1",
+      condensation_energy_J: "M L^2 T^-2",
+      condensation_mass_equivalent_kg: "M",
+    },
+  },
+  {
+    tag: "CASIMIR_DP_INTEGRATED_FEASIBILITY_PILOT_STAGE4_2R",
+    module: "shared/casimir-dp-integrated-feasibility-pilot-stage4-2r.ts",
+    stage: "diagnostic",
+    notes:
+      "Binds the leading apparatus and authenticated Stage-4.2O/P/Q evidence to a fail-closed same-apparatus empirical-input audit, quantitative Diósi acquisition target, and four-cell boundary-interaction nonbridge.",
+    motivation:
+      "The physical pilot must not begin until state preparation, apparatus response, covariance, environment, companion, and exact-bound authorities coexist under one custody and likelihood contract.",
+    conceptualWaypoints: [
+      "the primary held-out contraction follows the unchanged mass-separation-hold-time Diósi comparator",
+      "the four-cell cross-ratio tests boundary-by-superposition nonfactorization and cancels standard boundary-independent Diósi loss",
+      "the conditional visibility loss divided by the registered SNR floor defines an acquisition precision target rather than measured sensitivity",
+      "public component records are not fused into same-apparatus covariance or likelihood",
+      "eight content-addressed and custodied empirical authorities are mandatory before pilot authorization",
+      "train-holdout separation, blinding, covariance-drift control, and uncertainty propagation remain fail closed",
+      "no Casimir-to-collapse kernel or observable bridge is registered",
+    ],
+    checks: [
+      { type: "test", path: "tests/casimir-dp-integrated-feasibility-pilot-stage4-2r.spec.ts" },
+      { type: "stability", path: "tests/casimir-dp-stage4-2r-campaign.spec.ts" },
+    ],
+    units: {
+      gaussian_exponent: "1",
+      visibility: "1",
+      visibility_loss: "1",
+      coherence_magnitude_sigma: "1",
+      phase_sigma_rad: "1",
+      covariance_relative_drift: "1",
+      four_cell_cross_ratio: "1",
     },
   },
 ];

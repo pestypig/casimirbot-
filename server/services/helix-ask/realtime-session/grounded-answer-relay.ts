@@ -19,7 +19,10 @@ import {
 } from "./sideband-control-channel";
 
 const MAX_RELAY_PROJECTION_CHARS = 1_600;
-const RELAY_FRESHNESS_MS = 2 * 60_000;
+// Full-text retrieval and post-tool synthesis can legitimately exceed two
+// minutes. Supersession still cancels obsolete turns; this window only bounds
+// an otherwise-current terminal result waiting to enter the voice plane.
+const RELAY_FRESHNESS_MS = 5 * 60_000;
 const RELAY_ACK_TIMEOUT_MS = 8_000;
 const RELAY_PLAYBACK_START_TIMEOUT_MS = 12_000;
 const RELAY_PLAYBACK_COMPLETION_BASE_MS = 15_000;

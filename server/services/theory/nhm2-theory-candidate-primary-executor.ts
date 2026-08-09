@@ -11,7 +11,7 @@ import { isNhm2DynamicBackreactionStabilityCausality } from "../../../shared/con
 import { isNhm2FullApparatusSourceTensor } from "../../../shared/contracts/nhm2-full-apparatus-source-tensor.v1";
 import { isNhm2MechanicalSupportControlMargin } from "../../../shared/contracts/nhm2-mechanical-support-control-margin.v1";
 import { isNhm2PredictionFalsifierFreeze } from "../../../shared/contracts/nhm2-prediction-falsifier-freeze.v1";
-import { isNhm2SemiclassicalStateRealizability } from "../../../shared/contracts/nhm2-semiclassical-state-realizability.v1";
+import { isNhm2SemiclassicalStateRealizabilityV2 as isNhm2SemiclassicalStateRealizability } from "../../../shared/contracts/nhm2-semiclassical-state-realizability.v2";
 import { isNhm2WorldlineQeiCoverage } from "../../../shared/contracts/nhm2-worldline-qei-coverage.v1";
 import {
   buildTheoryRuntimeReceiptV1,

@@ -368,6 +368,9 @@ describe("NHM2 independent numerical replication contract", () => {
         ...NHM2_INDEPENDENT_NUMERICAL_REPLICATION_SERVER_REPLAY_BLOCKERS,
       ]),
     );
+    expect(fieldCheck?.blockers).toContain(
+      "server_replay_semiclassical_v2_noise_kernel_and_constraint_algebra_not_recomputed",
+    );
     expect(isNhm2IndependentNumericalReplication(artifactValue)).toBe(true);
   });
 

@@ -1,0 +1,47 @@
+{
+  "schema_version": "casimir_dp_integrated_feasibility_pilot_stage4_2r_verification_receipt/1",
+  "campaign_run_id": "casimir-dp-integrated-feasibility-pilot-stage4-2r-v1-20260808T210000000Z",
+  "generated_at": "2026-08-08T21:30:00.000Z",
+  "campaign_receipt_path": "docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-campaign-receipt.json",
+  "campaign_receipt_sha256": "2f2707eb58f0a6e22c8dc91d2dec3046691b3259d05e27b4f56d0a0bc8e8eb02",
+  "verification": {
+    "adapter_endpoint": "http://127.0.0.1:5050/api/agi/adapter/run",
+    "pack": "repo-convergence",
+    "run_id": "2382",
+    "trace_id": "adapter:07bb55ec-067c-4e8f-80a3-b60e9e9b6127",
+    "verdict": "PASS",
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "certificate_sha256": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_status": "GREEN",
+    "integrity_ok": true,
+    "training_trace_path": "artifacts/training-trace-stage4-2r-20260808T213000Z.jsonl",
+    "training_trace_sha256": "5e5f1667b1a2814c614c6bc861afcf998caf028122f97b5f3b282f3ff1d45b6f"
+  },
+  "validation": {
+    "stage4_2o_through_2r_focused_graph_paper_root_tests": "93/93 pass",
+    "required_gr_warp_tests": "179/179 pass",
+    "math_registry": "226 entries valid",
+    "equation_sidecars": "current",
+    "root_to_leaf": "pass",
+    "production_client_build": "pass_with_preexisting_warnings",
+    "production_server_build": "pass_with_preexisting_warnings",
+    "diff_check": "pass_with_line_ending_warnings_only"
+  },
+  "scientific_standing": {
+    "packet_contract": "pass",
+    "empirical_feasibility_pilot": "not_authorized",
+    "ready_authorities": 0,
+    "required_authorities": 8,
+    "measured_evidence": "not_ready",
+    "joint_protocol_validation": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "frozen_diosi_law_modified": false,
+    "observable_bridge_edges_added": 0
+  },
+  "scope_note": "The certificate validates repository convergence and the Stage-4.2R packet schema, primary-versus-boundary estimator semantics, quantitative conditional precision target, immutable ancestry, sidecars, graph, root-to-leaf manifest, builds, and software tests. It supplies no prepared superposition, measured material or geometry response, measured gas kernel, measured four-cell coherence, measured companion, exact bound recast, collapse identification, manifold dynamics, or physical viability."
+}

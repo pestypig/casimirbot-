@@ -450,6 +450,12 @@ describe("NHM2 candidate packager and fail-closed production enrollment gate", (
     expect(metadata.inputClosure.inputs.map((entry) => entry.path)).toEqual(
       [...NHM2_EXPERIMENT_READY_THEORY_PRIMARY_BUNDLE_SOURCE_PATHS].sort(),
     );
+    expect(metadata.inputClosure.inputs.map((entry) => entry.path)).toEqual(
+      expect.arrayContaining([
+        "shared/contracts/nhm2-semiclassical-state-realizability.v1.ts",
+        "shared/contracts/nhm2-semiclassical-state-realizability.v2.ts",
+      ]),
+    );
     for (const source of metadata.inputClosure.inputs) {
       const bytes = await fs.readFile(path.resolve(repoRoot, source.path));
       expect(sha256(bytes)).toBe(source.sha256);

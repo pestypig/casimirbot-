@@ -880,7 +880,7 @@ describe("Realtime grounded answer relay", () => {
     });
     expect(readRealtimeGroundedAnswerRelay(first.handoff_id)?.status).toBe("superseded");
 
-    const stale = enqueueRealtimeGroundedAnswerRelay({
+    const delayedButCurrent = enqueueRealtimeGroundedAnswerRelay({
       handoff: second,
       feedback: buildFeedback(second, nowMs + 120_001),
       workerAdmission: buildAdmission({
@@ -891,8 +891,32 @@ describe("Realtime grounded answer relay", () => {
       answerText: "This result arrived after its voice freshness window.",
       nowMs: nowMs + 120_001,
     });
+    expect(delayedButCurrent.status).toBe("response_requested");
+
+    const thirdAdmission = buildAdmission({
+      handoffId: "handoff:expired",
+      nowMs: nowMs + 120_002,
+    });
+    const third = buildHandoff("expired", thirdAdmission, nowMs + 120_002);
+    startRealtimeGroundedRelayForHandoff({
+      handoff: third,
+      workerAdmission: thirdAdmission,
+      nowMs: nowMs + 120_002,
+    });
+    const sentEventCountBeforeExpiredResult = sentEvents.length;
+    const stale = enqueueRealtimeGroundedAnswerRelay({
+      handoff: third,
+      feedback: buildFeedback(third, nowMs + 420_003),
+      workerAdmission: buildAdmission({
+        handoffId: third.handoff_id,
+        phase: "solver_final",
+        nowMs: nowMs + 420_003,
+      }),
+      answerText: "This result arrived after its voice freshness window.",
+      nowMs: nowMs + 420_003,
+    });
     expect(stale.status).toBe("stale");
-    expect(sentEvents).toEqual([]);
+    expect(sentEvents).toHaveLength(sentEventCountBeforeExpiredResult);
   });
 
   it("cancels an active provider response before superseding it", () => {

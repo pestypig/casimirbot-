@@ -274,6 +274,45 @@ describe("Realtime transcript Stage Play handoff", () => {
       ]));
   });
 
+  it("carries analytical scholarly depth through the Realtime handoff", () => {
+    const transcriptText =
+      "Open the NHM2 current status whitepaper in the local docs and compare its source-closure caution with primary paper arXiv:2105.03079. Explain where they agree and where the paper does not validate NHM2, citing both sources.";
+    const observation = buildRealtimeTranscriptObservation({
+      realtimeSessionId: "realtime:scholarly-full-text-comparison",
+      nowMs: 330,
+      body: {
+        event_type: "transcript.final",
+        event_ref: "provider-event:scholarly-full-text-comparison",
+        transcript_text: transcriptText,
+      },
+    })!;
+    const handoff = bridgeRealtimeTranscriptToStagePlay({
+      realtimeSessionId: "realtime:scholarly-full-text-comparison",
+      threadId: "helix-ask:desktop",
+      providerEventRef: "provider-event:scholarly-full-text-comparison",
+      transcriptText,
+      observation,
+      selectedRuntimeAgentProvider: "codex",
+      sourceBinding: { focus_panel_id: "docs-viewer" },
+      nowMs: 330,
+    });
+
+    expect(handoff.required_grounding_capability_ids).toEqual(
+      expect.arrayContaining([
+        "docs.search",
+        "scholarly-research.lookup_papers",
+        "scholarly-research.fetch_full_text",
+      ]),
+    );
+    expect(handoff.route_metadata).toMatchObject({
+      source_target_intent: {
+        required_grounding_capability_ids: expect.arrayContaining([
+          "scholarly-research.fetch_full_text",
+        ]),
+      },
+    });
+  });
+
   it("requires a document observation for a hard active-doc trip-comparison turn", () => {
     const transcriptText =
       "So can you tell me about the warp profile? Is it a relativistic profile? And how fast does that go, like in terms of saving time? I think we have some comparisons on days that it saves?";

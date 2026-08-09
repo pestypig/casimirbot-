@@ -111,6 +111,14 @@ const hasScholarlyScopeCue = (promptText: string): boolean =>
 const hasSearchActionCue = (promptText: string): boolean =>
   /\b(?:search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify|source|sources)\b/i.test(promptText);
 
+export const hasRetainedEvidenceContinuationCue = (promptText: string): boolean =>
+  /\b(?:use|using|from|based\s+on)\s+(?:the\s+)?(?:sources?|evidence|passages?|materials?)\s+(?:(?:that|which)\s+)?(?:you|we)?\s*(?:just|already|previously|earlier)\s+(?:inspected|retrieved|read|found|used|discussed)\b/i.test(promptText) ||
+  /\b(?:sources?|evidence|passages?|materials?)\s+(?:(?:that|which)\s+)?(?:you|we)?\s*(?:just|already|previously|earlier)\s+(?:inspected|retrieved|read|found|used|discussed)\b/i.test(promptText);
+
+export const hasExplicitFreshDocsAccessCue = (promptText: string): boolean =>
+  /\b(?:search|find|locate|look\s+(?:for|in|at)|retrieve|check|consult|open|show|view|read|inspect|pull\s+from|quote|cite)\b/i.test(promptText) ||
+  /\b(?:exact\s+passage|page|section|line[-\s]?backed|citation|document\s+evidence)\b/i.test(promptText);
+
 export const hasAffirmativeDocsViewerSearchCue = (promptText: string): boolean => {
   const prompt = promptText.trim();
   if (!prompt) return false;
@@ -126,10 +134,13 @@ export const hasAffirmativeDocsViewerSearchCue = (promptText: string): boolean =
   const priorDocumentDiscussionReference =
     /\b(?:just|already|previously|earlier)\b[\s\S]{0,100}\b(?:explained|discussed|described|summari[sz]ed|talked\s+about)\b[\s\S]{0,100}\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?)\b/i.test(prompt) ||
     /\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|docs?)\b[\s\S]{0,100}\b(?:just|already|previously|earlier)\b[\s\S]{0,100}\b(?:explained|discussed|described|summari[sz]ed|talked\s+about)\b/i.test(prompt);
+  const retainedEvidenceReference = hasRetainedEvidenceContinuationCue(prompt);
   const freshDocumentAccessRequest =
     /\b(?:search|find|locate|look\s+(?:for|in|at)|retrieve|check|use|consult|open|show|view|read|inspect|pull\s+from|quote|cite)\b/i.test(prompt) ||
     /\b(?:exact\s+passage|page|section|line[-\s]?backed|citation|document\s+evidence)\b/i.test(prompt);
+  const explicitFreshDocumentAccessRequest = hasExplicitFreshDocsAccessCue(prompt);
   if (priorDocumentDiscussionReference && !freshDocumentAccessRequest) return false;
+  if (retainedEvidenceReference && !explicitFreshDocumentAccessRequest) return false;
   if (
     /\b(?:do\s+not|don't|dont|never|without|no)\b[\s\S]{0,120}\b(?:search|find|locate|look\s+for|look\s+at|use|consult|open|show|view)\b[\s\S]{0,120}\b(?:docs?|documents?|white\s*papers?|papers?|docs?\s+viewer|documents?\s+viewer)\b/i.test(prompt) ||
     /\b(?:do\s+not|don't|dont|never|without|no)\b[\s\S]{0,120}\b(?:docs?|documents?|white\s*papers?|papers?|docs?\s+viewer|documents?\s+viewer)\b[\s\S]{0,120}\b(?:search|find|locate|look\s+for|look\s+at|use|consult|open|show|view)\b/i.test(prompt)

@@ -58,6 +58,29 @@ describe("scholarly research intent", () => {
     expect(intent.explicitCues).toContain("research_lookup_action");
   });
 
+  it("plans lookup and full text for an analytical comparison of a named paper", () => {
+    const intent = detectScholarlyResearchIntent(
+      "Compare the assumptions in arXiv 2105.03079 with the NHM2 whitepaper and explain which mismatch matters most.",
+    );
+
+    expect(intent).toMatchObject({
+      researchRequested: true,
+      scholarlyIntent: {
+        requires_full_text: true,
+        terminal_evidence_requirement: "full_text",
+        evidence_demand: {
+          required_modes: ["full_text"],
+          derivation_reasons: ["analytical_paper_comparison_requires_full_text"],
+        },
+      },
+    });
+    expect(intent.plannedScholarlyCapabilityChain.planned_capabilities).toEqual([
+      "scholarly-research.lookup_papers",
+      "scholarly-research.fetch_full_text",
+    ]);
+    expect(intent.plannedScholarlyCapabilityChain.terminal_evidence_requirement).toBe("full_text");
+  });
+
   it("keeps a citation request scoped to the currently open local document", () => {
     const intent = detectScholarlyResearchIntent(
       "According to the currently open NHM2 status whitepaper, identify the unresolved blockers. Use only the current document and cite section headings.",

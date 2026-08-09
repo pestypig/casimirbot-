@@ -508,6 +508,34 @@ const robustObserver = () =>
     atlasRef,
     atlasHash,
     observerFamilies: [
+      "eulerian",
+      "boosted_timelike_grid",
+      "null_direction_grid",
+      "algebraic_type_i",
+    ].map((familyId) => ({
+        familyId: familyId as
+          | "eulerian"
+          | "boosted_timelike_grid"
+          | "null_direction_grid"
+          | "algebraic_type_i",
+        status: "pass",
+        sampleCount: 16,
+        worstCase: {
+          condition: "WEC",
+          value: 0,
+          locationRef: "wall",
+        },
+      })),
+  });
+
+const singleFiniteFamilyObserver = () =>
+  buildNhm2ObserverRobustEnergyConditionArtifact({
+    generatedAt: "2026-06-12T00:00:00.000Z",
+    selectedProfileId: profile,
+    tensorRef: "tile.json#full",
+    atlasRef,
+    atlasHash,
+    observerFamilies: [
       {
         familyId: "boosted_timelike_grid",
         status: "pass",
@@ -681,6 +709,37 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     expect(artifact.gates.find((gate) => gate.gateId === "observer_robust_energy_conditions")?.blockers).toContain("observer_scope_eulerian_only");
   });
 
+  it("does not promote one passing non-Eulerian family over missing finite families", () => {
+    const artifact = buildNhm2CoupledClosurePassCandidate({
+      regionalSupportFunctionAtlas: atlas(),
+      sourceAuthority: sourceAuthority(),
+      sourceComponentAuthorityLedger: sourceComponentAuthorityLedger(),
+      sourceClosurePassReadiness: readiness(),
+      regionalEvidence: regionalEvidence(),
+      conservation: conservation(),
+      qeiWorldlineDossier: qeiWorldlineDossier(),
+      observerRobustEnergyConditions: singleFiniteFamilyObserver(),
+      casimirMaterialReceipt: materialReceipt(),
+    });
+    const observer = artifact.gates.find(
+      (gate) => gate.gateId === "observer_robust_energy_conditions",
+    );
+
+    expect(observer?.status).toBe("review");
+    expect(observer?.blockers).toEqual(
+      expect.arrayContaining([
+        "eulerian:eulerian_energy_condition_evidence_missing",
+        "null_direction_grid:null_direction_grid_energy_condition_evidence_missing",
+        "algebraic_type_i:algebraic_type_i_energy_condition_evidence_missing",
+      ]),
+    );
+    expect(observer?.warnings).toContain(
+      "continuous_optimizer:continuous_optimizer_not_implemented",
+    );
+    expect(artifact.summary.observerRobustPass).toBe(false);
+    expect(artifact.summary.passCandidate).toBe(false);
+  });
+
   it("does not let scalar or old QEI evidence substitute for the worldline dossier", () => {
     const scalarQeiMargin = 1;
     const artifact = buildNhm2CoupledClosurePassCandidate({
@@ -849,6 +908,56 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     expect(artifact.summary.blockerCount).toBe(0);
     expect(artifact.claimBoundary.physicalViabilityClaimAllowed).toBe(false);
     expect(artifact.claimBoundary.transportClaimAllowed).toBe(false);
+  });
+
+  it("downgrades an asserted passing coupled gate when nested blockers remain", () => {
+    const contradictoryReadiness = readiness();
+    expect(contradictoryReadiness.sourceClosurePassSignalAllowed).toBe(true);
+    contradictoryReadiness.preflightBlockers = [
+      "contradictory_preflight_blocker",
+    ];
+    const artifact = buildNhm2CoupledClosurePassCandidate({
+      regionalSupportFunctionAtlas: atlas(),
+      sourceAuthority: sourceAuthority(),
+      sourceComponentAuthorityLedger: sourceComponentAuthorityLedger(),
+      sourceClosurePassReadiness: contradictoryReadiness,
+      regionalEvidence: regionalEvidence(),
+      conservation: conservation(),
+      qeiWorldlineDossier: qeiWorldlineDossier(),
+      observerRobustEnergyConditions: robustObserver(),
+      casimirMaterialReceipt: materialReceipt(),
+    });
+    const readinessGate = artifact.gates.find(
+      (gate) => gate.gateId === "source_closure_readiness",
+    );
+
+    expect(readinessGate).toMatchObject({
+      status: "review",
+      pass: false,
+      blockers: ["contradictory_preflight_blocker"],
+    });
+    expect(artifact.summary.passCandidate).toBe(false);
+    expect(artifact.summary.firstBlocker).toBe(
+      "contradictory_preflight_blocker",
+    );
+    expect(isNhm2CoupledClosurePassCandidateArtifact(artifact)).toBe(true);
+  });
+
+  it("rejects passing coupled gates carrying blockers or required corrections", () => {
+    const artifact = allPassingArtifact();
+    const passWithBlocker = structuredClone(artifact);
+    passWithBlocker.gates[0].blockers.push("hidden_coupled_blocker");
+    expect(isNhm2CoupledClosurePassCandidateArtifact(passWithBlocker)).toBe(
+      false,
+    );
+
+    const passWithCorrection = structuredClone(artifact);
+    passWithCorrection.gates[0].requiredCorrections = {
+      hiddenCorrection: 1,
+    };
+    expect(isNhm2CoupledClosurePassCandidateArtifact(passWithCorrection)).toBe(
+      false,
+    );
   });
 
   it("blocks diagnostic pass when a consumer carries a stale atlas hash", () => {

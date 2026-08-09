@@ -94,7 +94,9 @@ const NHM2_EXPERIMENT_READY_THEORY_CANDIDATE_MANIFEST_CONTRACT =
 const NHM2_EXPERIMENT_READY_THEORY_CANDIDATE_MANIFEST_TEST =
   "tests/nhm2-experiment-ready-theory-candidate-manifest.spec.ts";
 const NHM2_SEMICLASSICAL_STATE_REALIZABILITY_CONTRACT =
-  "shared/contracts/nhm2-semiclassical-state-realizability.v1.ts";
+  "shared/contracts/nhm2-semiclassical-state-realizability.v2.ts";
+const NHM2_SEMICLASSICAL_STATE_REALIZABILITY_TEST =
+  "tests/nhm2-semiclassical-state-realizability-v2.spec.ts";
 const NHM2_PREDICTION_FALSIFIER_FREEZE_CONTRACT =
   "shared/contracts/nhm2-prediction-falsifier-freeze.v1.ts";
 const NHM2_EXPERIMENT_READY_THEORY_CLOSURE_EVALUATOR =
@@ -3383,6 +3385,208 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.semiclassical.connected_stress_noise_kernel",
+    title: "Connected Stress Noise Kernel",
+    plainMeaning:
+      "Tracks whether same-state, same-renormalization connected stress fluctuations have a server-replayed noise kernel, positivity audit, bounded fluctuation ratio, and dynamic-response bindings.",
+    whyItMatters:
+      "A bounded mean stress tensor is not sufficient for semiclassical authority when connected stress fluctuations or their induced metric response remain unchecked.",
+    subjects: [
+      "nhm2",
+      "semiclassical_gravity",
+      "stress_fluctuations",
+      "noise_kernel",
+      "server_replay",
+    ],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "formal_methods"],
+    equationFamilies: [
+      "semiclassical_stress_fluctuations",
+      "connected_stress_noise_kernel",
+      "experiment_ready_theory_closure",
+    ],
+    tags: [
+      "semiclassical_v2",
+      "connected_noise_kernel",
+      "server_content_replay_missing",
+      "noncomputable_reference",
+      "blocks_theory_closure",
+    ],
+    equations: [
+      {
+        id: "connected_stress_noise_kernel_gate",
+        role: "gate",
+        displayLatex:
+          "N_{\\mu\\nu\\rho\\sigma}(x,x')=\\tfrac{1}{2}\\langle\\{\\hat t_{\\mu\\nu}(x),\\hat t_{\\rho\\sigma}(x')\\}\\rangle_c",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "sameStateRenormalizedNoiseKernel",
+          "noiseKernelPsdReplay",
+          "fluctuationToMeanRatioReplay",
+          "dynamicMetricResponseBinding",
+          "stochasticStabilityBinding",
+        ],
+        outputSymbols: ["ConnectedStressNoiseKernelStatus"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The v2 contract defines a same-state, same-renormalization connected and symmetrized stress-noise-kernel evidence surface.",
+      "Server-owned raw replay of the noise-kernel bytes, positive-semidefinite audit, and fluctuation-to-mean ratio is missing: semiclassical_v2_server_content_replay_missing.",
+      "Producer-declared positivity or ratio metrics cannot authorize this lamp.",
+      "Metric-response and stability references must bind to the registered dynamic backreaction, stability, and causality evidence artifact.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_SEMICLASSICAL_STATE_REALIZABILITY_CONTRACT,
+        "nhm2_semiclassical_state_realizability/v2",
+        "V2 primitive-evidence contract for connected stress fluctuations, their normalization, response bindings, and claim locks.",
+      ),
+      repoRef(
+        NHM2_SEMICLASSICAL_STATE_REALIZABILITY_TEST,
+        "nhm2-semiclassical-state-realizability-v2-tests",
+        "Positive and adversarial fixtures for the connected noise-kernel and semiclassical constraint-consistency gates.",
+      ),
+      repoRef(
+        NHM2_EXPERIMENT_READY_THEORY_CLOSURE_EVALUATOR,
+        "semiclassical-v2-filesystem-authority-evaluator",
+        "Requires dynamic-evidence cross-binding and emits semiclassical_v2_server_content_replay_missing until raw noise-kernel content is independently replayed.",
+      ),
+    ],
+    hintKeys: {
+      subjects: [
+        "nhm2",
+        "semiclassical_gravity",
+        "stress_fluctuations",
+        "noise_kernel",
+        "server_replay",
+      ],
+      symbols: [
+        "N_munurhosigma",
+        "ConnectedStressNoiseKernelStatus",
+        "fluctuationToMeanRatioReplay",
+        "noiseKernelPsdReplay",
+      ],
+      unitSignatures: [],
+      repoPaths: [
+        NHM2_SEMICLASSICAL_STATE_REALIZABILITY_CONTRACT,
+        NHM2_SEMICLASSICAL_STATE_REALIZABILITY_TEST,
+        NHM2_EXPERIMENT_READY_THEORY_CLOSURE_EVALUATOR,
+      ],
+      equationFamilies: [
+        "semiclassical_stress_fluctuations",
+        "connected_stress_noise_kernel",
+        "experiment_ready_theory_closure",
+      ],
+      simulationOwners: ["NHM2", "general_relativity", "formal_methods"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.semiclassical.constraint_algebra_consistency",
+    title: "Semiclassical Constraint-Algebra Consistency",
+    plainMeaning:
+      "Tracks whether the frozen semiclassical formulation reproduces the Hamiltonian and momentum constraint brackets without an unresolved anomaly.",
+    whyItMatters:
+      "Covariant stress-tensor conservation alone cannot establish that a canonical semiclassical evolution has a closed, anomaly-controlled constraint algebra.",
+    subjects: [
+      "nhm2",
+      "semiclassical_gravity",
+      "constraint_algebra",
+      "anomaly_consistency",
+      "server_replay",
+    ],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "formal_methods"],
+    equationFamilies: [
+      "semiclassical_constraint_algebra",
+      "canonical_constraint_consistency",
+      "experiment_ready_theory_closure",
+    ],
+    tags: [
+      "semiclassical_v2",
+      "constraint_algebra",
+      "server_content_replay_missing",
+      "noncomputable_reference",
+      "blocks_theory_closure",
+    ],
+    equations: [
+      {
+        id: "semiclassical_constraint_algebra_consistency_gate",
+        role: "gate",
+        displayLatex:
+          "\\{\\mathcal C_A,\\mathcal C_B\\}_{\\mathrm{computed}}-f_{AB}{}^{C}\\mathcal C_C=\\Delta_{AB}^{\\mathrm{constraint}}",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "computedConstraintBrackets",
+          "classicalStructureFunctionTargets",
+          "constraintBracketResidualReplay",
+          "constraintAlgebraUncertainty",
+          "anomalyDisposition",
+        ],
+        outputSymbols: ["SemiclassicalConstraintAlgebraConsistencyStatus"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The v2 contract freezes formulation, regulator, operator ordering, smearing functions, and renormalization prescription before bracket comparison.",
+      "Server-owned raw replay of computed brackets, classical structure-function targets, residual arrays, and uncertainty bounds is missing: semiclassical_v2_server_content_replay_missing.",
+      "Producer-declared residual maxima or anomaly dispositions cannot authorize this lamp.",
+      "This gate complements covariant conservation and does not grant physical, propulsion, or transport authority.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_SEMICLASSICAL_STATE_REALIZABILITY_CONTRACT,
+        "nhm2_semiclassical_state_realizability/v2",
+        "V2 primitive-evidence contract for frozen constraint formulation, bracket residuals, anomaly disposition, and claim locks.",
+      ),
+      repoRef(
+        NHM2_SEMICLASSICAL_STATE_REALIZABILITY_TEST,
+        "nhm2-semiclassical-state-realizability-v2-tests",
+        "Positive and adversarial fixtures for the connected noise-kernel and semiclassical constraint-consistency gates.",
+      ),
+      repoRef(
+        NHM2_EXPERIMENT_READY_THEORY_CLOSURE_EVALUATOR,
+        "semiclassical-v2-filesystem-authority-evaluator",
+        "Emits semiclassical_v2_server_content_replay_missing until raw constraint-bracket arrays and derived residuals are independently replayed.",
+      ),
+    ],
+    hintKeys: {
+      subjects: [
+        "nhm2",
+        "semiclassical_gravity",
+        "constraint_algebra",
+        "anomaly_consistency",
+        "server_replay",
+      ],
+      symbols: [
+        "C_A",
+        "Delta_AB_constraint",
+        "SemiclassicalConstraintAlgebraConsistencyStatus",
+        "constraintBracketResidualReplay",
+      ],
+      unitSignatures: [],
+      repoPaths: [
+        NHM2_SEMICLASSICAL_STATE_REALIZABILITY_CONTRACT,
+        NHM2_SEMICLASSICAL_STATE_REALIZABILITY_TEST,
+        NHM2_EXPERIMENT_READY_THEORY_CLOSURE_EVALUATOR,
+      ],
+      equationFamilies: [
+        "semiclassical_constraint_algebra",
+        "canonical_constraint_consistency",
+        "experiment_ready_theory_closure",
+      ],
+      simulationOwners: ["NHM2", "general_relativity", "formal_methods"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.meta.experiment_ready_theory_closure",
     title: "Experiment-Ready Theory Closure",
     plainMeaning:
@@ -3433,6 +3637,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
           "runtimeReproducibility",
           "sameChartFullSourceTensor",
           "semiclassicalStateRealizability",
+          "ConnectedStressNoiseKernelStatus",
+          "SemiclassicalConstraintAlgebraConsistencyStatus",
           "covariantConservation",
           "continuousObserverOptimization",
           "worldlineQeiCoverage",
@@ -3493,8 +3699,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
       repoRef(
         NHM2_SEMICLASSICAL_STATE_REALIZABILITY_CONTRACT,
-        "nhm2_semiclassical_state_realizability/v1",
-        "State construction, admissibility, renormalized tensor, Ward identity, QEI, switching, and backreaction evidence contract.",
+        "nhm2_semiclassical_state_realizability/v2",
+        "State construction, admissibility, renormalized tensor, Ward identity, QEI, switching, backreaction, connected stress-noise-kernel, and semiclassical constraint-algebra evidence contract.",
       ),
       repoRef(
         NHM2_PREDICTION_FALSIFIER_FREEZE_CONTRACT,
@@ -8251,6 +8457,26 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
       "Lean diagnostic admissibility documents the policy-scoped campaign result.",
     claimBoundaryNote:
       "The result remains diagnostic/reduced-order evidence only.",
+  },
+  {
+    id: "connected_stress_noise_kernel_feeds_experiment_ready_theory_closure",
+    from: "nhm2.semiclassical.connected_stress_noise_kernel",
+    to: "nhm2.meta.experiment_ready_theory_closure",
+    relation: "requires",
+    label:
+      "Experiment-ready theory closure requires a server-replayed connected stress-noise kernel with bounded fluctuations and dynamic-response bindings.",
+    claimBoundaryNote:
+      "A future diagnostic pass would constrain semiclassical applicability but would not establish physical or transport viability.",
+  },
+  {
+    id: "constraint_algebra_consistency_feeds_experiment_ready_theory_closure",
+    from: "nhm2.semiclassical.constraint_algebra_consistency",
+    to: "nhm2.meta.experiment_ready_theory_closure",
+    relation: "requires",
+    label:
+      "Experiment-ready theory closure requires server-replayed Hamiltonian and momentum constraint brackets with bounded anomaly residuals.",
+    claimBoundaryNote:
+      "Constraint-algebra consistency complements conservation and cannot grant physical, propulsion, or transport authority.",
   },
   {
     id: "coupled_closure_documents_experiment_ready_theory_closure",

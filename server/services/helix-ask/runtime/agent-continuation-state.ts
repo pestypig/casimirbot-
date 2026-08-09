@@ -1552,11 +1552,13 @@ export const formatHelixAgentContinuationStateForRuntime = (
     state.capability_proposal?.allowed === true &&
     state.allowed_decisions.includes("act") &&
     state.capability_proposal.admitted_capability_ids.length > 0;
+  const recoverySelectionInstruction =
+    formatHelixScholarlyRetrySelectionForRuntime(state);
   return [
     "Helix continuation state (non-terminal adapter evidence):",
     JSON.stringify(state, null, 2),
     "The fields missing_requirement_ids and next_admissible_affordances describe only the current turn's Helix control lifecycle. Empty values do not prove that the user's scientific, document, workflow, or conversational subject has no missing requirements or useful next steps. Determine those domain facts from current-turn observations and bounded conversation context, and request an admitted capability when fresh evidence is needed.",
-    "Choose exactly one allowed decision. An untried lane_request in next_admissible_affordances is authoritative: copy it exactly rather than inventing a replacement.",
+    recoverySelectionInstruction,
     mayProposeBoundedRecovery
       ? "Retry is allowed but no concrete lane_request was prescribed. You may propose exactly one bounded recovery capability grounded in the failed observation, its missing requirements, and the same source identity. Helix must independently admit the capability and arguments before execution. Do not broaden the source, invent identifiers, or repeat an unchanged failed request."
       : mayProposeManifestCapability
@@ -1564,4 +1566,24 @@ export const formatHelixAgentContinuationStateForRuntime = (
         : "Tool actions and retries require an untried admitted affordance.",
     "If answer is absent from allowed_decisions, do not produce a terminal answer or bounded failure. Continue with the permitted act/retry, or ask the user only when ask_user is allowed and no bounded recovery can be grounded. Answer when the goal is satisfied or when the admitted recovery surface is exhausted. Budgets are resource boundaries, not conclusions.",
   ].join("\n");
+};
+
+export const formatHelixScholarlyRetrySelectionForRuntime = (
+  state: HelixAgentContinuationState,
+): string => {
+  const modelMayRefineRetryQuery =
+    state.allowed_decisions.includes("retry") &&
+    state.last_attempt?.capability_id ===
+      "scholarly-research.lookup_papers" &&
+    state.last_attempt.retryability === "retryable" &&
+    !state.budget.hard.exhausted;
+  if (!modelMayRefineRetryQuery) {
+    return "Choose exactly one allowed decision. An untried lane_request in next_admissible_affordances is authoritative: copy it exactly rather than inventing a replacement.";
+  }
+  return [
+    "Choose exactly one allowed decision.",
+    "Untried scholarly lookup lane_requests are bounded safe options, but they are not semantic conclusions.",
+    "If a listed query is only a lexical restatement that leaves a conversational referent unresolved or omits the observed scientific subject, you may instead propose exactly one different scholarly-research.lookup_papers query grounded in the current-turn observations and bounded conversation context.",
+    "Keep the same capability and source scope, do not invent identifiers, do not repeat a tried query, and do not broaden beyond the user's research goal. Helix independently validates the proposed query, budget, and duplication before execution.",
+  ].join(" ");
 };

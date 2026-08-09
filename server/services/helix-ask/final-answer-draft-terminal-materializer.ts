@@ -963,6 +963,8 @@ export function materializeFinalAnswerDraftTerminal(input: {
         ? "repo_support_refs_missing"
         : qualityGate.violations.includes("missing_support_refs_for_scholarly_route")
           ? "scholarly_support_refs_missing"
+        : qualityGate.violations.includes("missing_visible_citation_for_scholarly_analysis")
+          ? "scholarly_visible_citation_missing"
         : qualityGate.violations.includes("missing_support_refs_for_internet_search_route")
           ? "internet_search_support_refs_missing"
         : qualityGate.violations.includes("missing_support_refs_for_source_route")

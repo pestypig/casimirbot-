@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildScholarlyAnalyticalEvidencePromptLines,
   buildScholarlyCurrentPromptIdentifierRecoveryBody,
   candidateHasInlineImageLensSource,
   ensureCodexPreGatewayRouteAuthority,
@@ -29,6 +30,24 @@ const recoveryFor = (question: string) => buildScholarlyCurrentPromptIdentifierR
 });
 
 describe("current-prompt exact scholarly recovery", () => {
+  it("requires passage-level conditions for analytical full-text follow-ups", () => {
+    const lines = buildScholarlyAnalyticalEvidencePromptLines({
+      question:
+        "Which assumption mismatch matters most if someone applies that paper directly, and what remains unresolved?",
+      evidenceState: "full_text_usable",
+      passageSelectionSource: "cached_pdf_followup_rerank",
+    });
+
+    expect(lines.join("\n")).toContain("name the concrete assumptions");
+    expect(lines.join("\n")).toContain("Cite their bounded passage references");
+    expect(lines.join("\n")).toContain("unresolved transfer");
+    expect(buildScholarlyAnalyticalEvidencePromptLines({
+      question: "What is this paper called?",
+      evidenceState: "full_text_usable",
+      passageSelectionSource: "cached_pdf_followup_rerank",
+    })).toEqual([]);
+  });
+
   it("admits the recrowned Step 3 QTE prompt after a runtime restart", () => {
     const recovery = recoveryFor(
       "Continue from selected-paper evidence ref `ask:paper:memory`, retained rendered-page evidence ref `pdf-page-render:stale`, and the pinned workflow objective: \"Fetch and parse the full text for arXiv gr-qc/9510071. Return the paper title, parsed page count, and one page-numbered passage or equation supporting a quantum inequality. Do not search for other papers.\". The retained page ref is a provenance anchor; use it as the Image Lens `source_id` only when the active source also carries materializable page-image data. Inspect the already mounted PDF page 2 with Image Lens. If its image bytes are unavailable after a runtime restart, re-materialize page 2 directly from the canonical DOI, arXiv identifier, or canonical paper URL in the typed paper evidence or pinned objective, without a broad lookup or selecting another paper. Then run `visual_analysis.inspect_image_region` on page 2 to extract the first displayed equation as observation-only evidence.",
@@ -181,6 +200,66 @@ describe("current-prompt exact scholarly recovery", () => {
       "Use the Magnetar paper you just fetched.",
       "Open page 2 in Image Lens, but do not analyze it yet.",
     ].join(" ");
+
+    expect(scoreScholarlyMemoryForQuestion(fullTextRecord, question))
+      .toBeGreaterThan(scoreScholarlyMemoryForQuestion(lookupRecord, question));
+  });
+
+  it("prefers full-text memory for an analytical assumption-boundary follow-up", () => {
+    const common = {
+      schema: "helix.scholarly_followup_evidence_memory_record.v1",
+      turn_id: "turn:test",
+      thread_keys: ["thread:test"],
+      stored_at_ms: Date.now(),
+      terminal_artifact_kind: "compound_evidence_synthesis_answer",
+      selected_for_answer: true,
+      selected_for_exploration: false,
+      runtime_selected_result_ids: ["arxiv:selected-paper"],
+      runtime_semantic_selection_status: "matched",
+      evidence_grade: "answer_grade",
+      paper_count: 1,
+      papers: [{
+        result_id: "arxiv:selected-paper",
+        title: "Warp Drive With Zero Expansion",
+        identifiers: { arxiv_id: "gr-qc/0107097" },
+      }],
+      abstract_or_snippet_refs: [],
+      missing_requirements: [],
+      next_affordances: [],
+      observation_refs: [],
+      page_image_affordance_refs: [],
+      page_image_observation_refs: [],
+      equation_evidence_refs: [],
+      scientific_evidence_packet_refs: [],
+      theory_badge_graph_reflection_refs: [],
+      provider_gateway_packet_refs: [],
+      source_result_error: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const lookupRecord = {
+      ...common,
+      memory_id: "memory:lookup",
+      source_capability_id: "scholarly-research.lookup_papers",
+      query: "warp drive zero expansion",
+      evidence_state: "lookup_usable",
+      source_pdf_ref: null,
+      cache_path: null,
+      page_text_refs: [],
+    } as any;
+    const fullTextRecord = {
+      ...common,
+      memory_id: "memory:full-text",
+      source_capability_id: "scholarly-research.fetch_full_text",
+      query: "Warp Drive With Zero Expansion",
+      evidence_state: "full_text_usable",
+      source_pdf_ref: "artifact://scholarly-pdf/selected.pdf",
+      cache_path: "C:\\cache\\selected.pdf",
+      page_text_refs: ["artifact://scholarly-pdf/selected.pdf/page/2#text"],
+    } as any;
+    const question =
+      "Which assumption mismatch matters most if someone applies that paper directly, and what does it not validate?";
 
     expect(scoreScholarlyMemoryForQuestion(fullTextRecord, question))
       .toBeGreaterThan(scoreScholarlyMemoryForQuestion(lookupRecord, question));

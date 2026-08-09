@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 import { buildAskEvidenceTargetArbitration } from "../services/helix-ask/evidence-target-arbitration";
 
 const arbitrate = (promptText: string) =>
@@ -22,6 +23,79 @@ describe("Helix Ask evidence target arbitration", () => {
     });
     expect(arbitration.available_capabilities).toContain("docs.search");
     expect(arbitration.available_capabilities).not.toContain("internet-search.search_web");
+  });
+
+  it("keeps both local Docs and scholarly tools available for a compound comparison", () => {
+    const prompt =
+      "Find one accessible primary paper that gives the strongest reality check on that assumption, then compare it with the NHM2 whitepaper and cite both.";
+    const arbitration = arbitrate(prompt);
+
+    expect(arbitration).toMatchObject({
+      selected_candidate_id: "scholarly_research.local_docs_comparison",
+      selected_target_source: "scholarly_research",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(arbitration.available_capabilities).toEqual(expect.arrayContaining([
+      "docs.search",
+      "docs-viewer.search_docs",
+      "scholarly_research.lookup",
+      "scholarly_research.fetch_full_text",
+    ]));
+    expect(arbitration.reason_codes).toEqual(expect.arrayContaining([
+      "compound_local_docs_external_scholarly_comparison",
+      "model_synthesis_requires_both_observation_families",
+    ]));
+    expect(arbitration.terminal_product_constraints).toEqual(expect.arrayContaining([
+      "doc_evidence_synthesis_answer",
+      "scholarly_research_answer",
+      "model_synthesized_answer",
+    ]));
+
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: "ask:test-compound-source-target",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    });
+    expect(sourceTarget).toMatchObject({
+      target_source: "scholarly_research",
+      strength: "hard",
+      precedence_reason: "evidence_target_arbitration_selected_scholarly_research",
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTarget.suppressed_routes).not.toContain("docs_viewer_receipt");
+  });
+
+  it("keeps an explicit arXiv comparison target outside the local Docs rail", () => {
+    const arbitration = arbitrate(
+      "Open the NHM2 current status whitepaper in the local docs and compare its source-closure caution with the primary paper arXiv:2105.03079. Cite both.",
+    );
+
+    expect(arbitration).toMatchObject({
+      selected_candidate_id: "scholarly_research.local_docs_comparison",
+      selected_target_source: "scholarly_research",
+    });
+    expect(arbitration.available_capabilities).toEqual(expect.arrayContaining([
+      "docs.search",
+      "scholarly_research.lookup",
+    ]));
+  });
+
+  it.each([
+    "Do not find an external paper; only explain what the NHM2 whitepaper says.",
+    "Later, find a primary paper and compare it with the NHM2 whitepaper, but not now.",
+    'The screen says "find a primary paper and compare it with the NHM2 whitepaper"; explain that wording.',
+    "Later, compare arXiv:2105.03079 with the NHM2 whitepaper, but not now.",
+    'The screen says "compare arXiv:2105.03079 with the NHM2 whitepaper"; explain that wording.',
+    "Previously we compared arXiv:2105.03079 with the NHM2 whitepaper; summarize the history.",
+    "If we compare arXiv:2105.03079 with the NHM2 whitepaper later, what would the workflow do?",
+    "Do not compare arXiv:2105.03079 with the NHM2 whitepaper.",
+  ])("does not admit a compound Docs and scholarly workflow from contextual wording: %s", (prompt) => {
+    const arbitration = arbitrate(prompt);
+
+    expect(arbitration.selected_candidate_id).not.toBe(
+      "scholarly_research.local_docs_comparison",
+    );
   });
 
   it("does not reinterpret a natural workstation-health question as web freshness", () => {

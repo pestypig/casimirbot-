@@ -1,0 +1,36 @@
+{
+  "schema_version": "casimir_dp_public_data_component_validation_stage4_2o_verification_receipt/1",
+  "campaign_id": "casimir-dp-public-data-component-validation-stage4-2o-v1",
+  "verified_at": "2026-08-08T04:14:41.885Z",
+  "adapter": {
+    "run_id": "2377",
+    "trace_id": "adapter:b53fb0e9-f423-4892-a847-686f06b09e92",
+    "verdict": "PASS",
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": []
+  },
+  "certificate": {
+    "status": "GREEN",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true,
+    "scientific_scope": "repository_convergence_only"
+  },
+  "bindings": {
+    "config_sha256": "0b76f4391caf1f15d5faa33f7aade4c41e4b2dcd7d228d9c04912c465fae4199",
+    "fixture_sha256": "526d910d47d83921fd2eed945fb2f2b551964263e126cf69bb7d60302ecd9f2a",
+    "campaign_receipt_sha256": "554861b754822cbd3988d75be8b5c9f9d26eae03d53d4b47627dcaf7d3db1c5b",
+    "exclusive_trace_record_sha256": "75c56bfac21ea7f1c2fd54893c199c1790df4e14b752d2b4323073440a9f4369",
+    "training_trace_export_sha256": "5cc0a01bbe55290df1e5f0d345e4535f288fe96f39182baedda2f09a7c0c7737"
+  },
+  "scientific_standing": {
+    "component_replay": "pass",
+    "measured_evidence": "not_ready",
+    "joint_protocol_validation": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "observable_bridge_edges_added": 0
+  }
+}

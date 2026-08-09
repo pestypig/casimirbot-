@@ -7,6 +7,8 @@ import {
   buildCodexGenericContinuationDecisionInstruction,
   continuationStateRequiresCodexModelAuthoredCapabilityProposal,
   continuationStateAdmitsModelAuthoredRetryLaneRequest,
+  continuationStateAdmitsPreparedRuntimeRetryLaneRequest,
+  continuationStateAdmitsRuntimeRetryLaneRequest,
   providerMentionedAdmittedCapabilityIds,
   runtimeProviderRequiredGroundingCapabilityIdsFromBody,
   shouldAllowCodexObservationDependentCapabilityProposal,
@@ -482,6 +484,145 @@ describe("Codex required-grounding correction", () => {
         admittedCapabilityIds: [
           "com.casimirbot.minecraft.actor.status.read",
         ],
+      }),
+    ).toBe(false);
+  });
+
+  it("admits a semantic same-capability retry even when deterministic affordances use different arguments", () => {
+    const state = {
+      allowed_decisions: ["retry", "fail"],
+      capability_proposal: {
+        allowed: true,
+        admitted_capability_ids: ["scholarly-research.lookup_papers"],
+      },
+      last_attempt: {
+        capability_id: "scholarly-research.lookup_papers",
+        failure_code: "semantic_scholar_http_429",
+        retryability: "retryable",
+      },
+      next_admissible_affordances: [
+        {
+          affordance_id: "retry:literal-query",
+          admissible: true,
+          tried: false,
+          reason: "Try the prompt-derived query through another source.",
+          lane_request: {
+            capability: "scholarly-research.lookup_papers",
+            query: "one primary gives strongest reality check assumption",
+          },
+        },
+      ],
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+
+    expect(
+      continuationStateAdmitsRuntimeRetryLaneRequest({
+        state,
+        candidate: {
+          capability: "scholarly-research.lookup_papers",
+          query:
+            "Jacobson thermodynamics of spacetime Einstein equation of state accessible primary paper",
+        },
+        admittedCapabilityIds: ["scholarly-research.lookup_papers"],
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsPreparedRuntimeRetryLaneRequest({
+        state,
+        requestedCandidate: {
+          capability: "scholarly-research.lookup_papers",
+          query:
+            "Jacobson thermodynamics of spacetime Einstein equation of state accessible primary paper",
+        },
+        preparedCandidate: {
+          capability: "scholarly-research.lookup_papers",
+          query:
+            "Jacobson thermodynamics of spacetime Einstein equation of state accessible primary paper",
+          providers: ["semantic_scholar", "arxiv"],
+          limit: 5,
+        },
+        admittedCapabilityIds: ["scholarly-research.lookup_papers"],
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsRuntimeRetryLaneRequest({
+        state,
+        candidate: {
+          capability: "scholarly-research.fetch_full_text",
+          url: "https://example.test/paper.pdf",
+        },
+        admittedCapabilityIds: [
+          "scholarly-research.lookup_papers",
+          "scholarly-research.fetch_full_text",
+        ],
+      }),
+    ).toBe(false);
+    expect(
+      continuationStateAdmitsRuntimeRetryLaneRequest({
+        state: {
+          ...state,
+          budget: { hard: { exhausted: true } },
+        } as unknown as HelixAgentContinuationState,
+        candidate: {
+          capability: "scholarly-research.lookup_papers",
+          query:
+            "Jacobson thermodynamics of spacetime Einstein equation of state accessible primary paper",
+        },
+        admittedCapabilityIds: ["scholarly-research.lookup_papers"],
+      }),
+    ).toBe(false);
+  });
+
+  it("admits a Docs search affordance when only transcript sentence punctuation changes", () => {
+    const prompt =
+      "Find the NHM2 current status whitepaper and explain its least established assumption.";
+    const state = {
+      allowed_decisions: ["act"],
+      capability_proposal: {
+        allowed: false,
+        admitted_capability_ids: ["docs-viewer.search_docs"],
+      },
+      last_attempt: null,
+      next_admissible_affordances: [{
+        affordance_id: "docs-search",
+        admissible: true,
+        tried: false,
+        reason: "doc_evidence_synthesis_requires_doc_search",
+        lane_request: {
+          capability: "docs-viewer.search_docs",
+          authority: "hint_only_agent_must_decide",
+          capability_key: "docs-viewer.search_docs",
+          query: prompt,
+          target_transcript: prompt,
+        },
+      }],
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+
+    expect(
+      continuationStateAdmitsRuntimeRetryLaneRequest({
+        state,
+        candidate: {
+          capability: "docs-viewer.search_docs",
+          authority: "hint_only_agent_must_decide",
+          capability_key: "docs-viewer.search_docs",
+          query: prompt,
+          target_transcript: `${prompt.slice(0, -1)}?`,
+        },
+        admittedCapabilityIds: ["docs-viewer.search_docs"],
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsRuntimeRetryLaneRequest({
+        state,
+        candidate: {
+          capability: "docs-viewer.search_docs",
+          authority: "hint_only_agent_must_decide",
+          capability_key: "docs-viewer.search_docs",
+          query: "Find a different document.",
+          target_transcript: prompt,
+        },
+        admittedCapabilityIds: ["docs-viewer.search_docs"],
       }),
     ).toBe(false);
   });

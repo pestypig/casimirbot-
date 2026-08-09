@@ -42,6 +42,93 @@ const gate = (input: Partial<HelixCompoundPromptCoverageGateInput>) =>
   });
 
 describe("compound prompt coverage gate", () => {
+  it("counts an explicit scientific non-validation boundary as an answer", () => {
+    const contract = contractWith(["R1", "R2"]);
+    contract.requirements = [
+      {
+        ...contract.requirements[0],
+        text: "Compare the NHM2 source-closure caution with arXiv:2105.03079.",
+      },
+      {
+        ...contract.requirements[1],
+        text: "Explain where they agree and where the paper does not validate NHM2, citing both sources.",
+      },
+    ];
+    const result = evaluateCompoundPromptCoverageGate({
+      contract,
+      finalAnswerText: [
+        "The NHM2 whitepaper and arXiv:2105.03079 agree that observer-side calculations do not establish physical viability.",
+        "The paper does not validate NHM2's specific construction; it supplies a general negative constraint, not confirmation. Both sources preserve that claim boundary.",
+      ].join("\n"),
+      terminalArtifactKind: "compound_evidence_synthesis_answer",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.unresolved_requirement_ids).toEqual([]);
+    expect(result.resolutions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ requirement_id: "R2", status: "answered" }),
+      ]),
+    );
+  });
+
+  it("prefers a source-targeted compound synthesis over a generic ledger draft", () => {
+    const turnId = "ask:test:source-compound-answer-priority";
+    const contract = contractWith(["R1", "R2"]);
+    contract.requirements = [
+      {
+        ...contract.requirements[0],
+        text: "Compare the NHM2 source-closure caution with arXiv:2105.03079.",
+      },
+      {
+        ...contract.requirements[1],
+        text: "Explain where they agree and where the paper does not validate NHM2, citing both sources.",
+      },
+    ];
+    const result = evaluateCompoundPromptCoverageGateFromAnswerArtifacts({
+      turnId,
+      payload: {
+        canonical_goal_frame: {
+          goal_kind: "compound_evidence_synthesis",
+          answer_scope: "source_tool_backed",
+          required_terminal_kind: "compound_evidence_synthesis_answer",
+        },
+        source_target_intent: {
+          target_source: "compound_sources",
+          target_kind: "compound_sources",
+          strength: "hard",
+        },
+      },
+      artifactLedger: [
+        {
+          artifact_id: `${turnId}:final_answer_draft`,
+          kind: "final_answer_draft",
+          payload: {
+            text: "The compound tool turn completed all mandatory subgoals.",
+          },
+        },
+        {
+          artifact_id: `${turnId}:compound_evidence_synthesis_answer`,
+          kind: "compound_evidence_synthesis_answer",
+          payload: {
+            text: [
+              "The NHM2 whitepaper and arXiv:2105.03079 agree that limited observer results do not establish physical viability.",
+              "The paper does not validate NHM2's construction; it supplies a general constraint, not confirmation, and both sources are cited.",
+            ].join("\n"),
+          },
+        },
+      ],
+      promptText: "Compare the sources and explain the non-validation boundary.",
+      contract,
+      routeScope: "source_targeted",
+    });
+
+    expect(result.gate.passed).toBe(true);
+    expect(result.gate.unresolved_requirement_ids).toEqual([]);
+    expect(result.selected_answer_source).toBe("provided_final_answer_text");
+  });
+
   it("does not construct a stale execution gate for a canonical capability-help goal", () => {
     const result = evaluateCompoundPromptCoverageGateFromAnswerArtifacts({
       turnId: "ask:test:capability-help-coverage",

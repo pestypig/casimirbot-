@@ -169,6 +169,7 @@ const sourceBackedTargets = new Set([
   "live_source_mailbox",
   "world_event",
   "active_note",
+  "compound_evidence",
 ]);
 
 export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
@@ -710,6 +711,9 @@ export function buildCommittedAskRoute(input: {
   });
   const existingCandidate = readCommittedAskRoute(input.payload);
   const currentSourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const compoundDocsScholarlyRoute = readStringArray(
+    currentSourceTargetIntent?.explicit_cues,
+  ).includes("compound_local_docs_external_scholarly_comparison");
   const currentHardSourceTarget =
     readString(currentSourceTargetIntent?.strength) === "hard"
       ? readString(currentSourceTargetIntent?.target_source)
@@ -758,10 +762,22 @@ export function buildCommittedAskRoute(input: {
         )
       )
   );
+  const staleExistingCompoundRoute = Boolean(
+    compoundDocsScholarlyRoute &&
+      existingCandidate &&
+      (
+        existingCandidate.route.source_target !== "compound_evidence" ||
+        existingCandidate.canonical_goal.goal_kind !== "compound_evidence_synthesis" ||
+        normalizeCommittedRouteTerminalKind(
+          existingCandidate.canonical_goal.required_terminal_kind,
+        ) !== "compound_evidence_synthesis_answer"
+      ),
+  );
   const existing =
     staleExistingLivePipelineRoute ||
     staleExistingHardSourceRoute ||
     staleExistingWorldEventGoal ||
+    staleExistingCompoundRoute ||
     (
       hasReusablePriorEnvironmentEvidence &&
       existingCandidate?.route.source_target === "world_event"
@@ -1092,6 +1108,13 @@ export function buildCommittedAskRoute(input: {
         strength: "hard" as const,
         reason: authoritativeLivePipelineRoute.reason,
       }
+    : compoundDocsScholarlyRoute
+    ? {
+        sourceTarget: "compound_evidence",
+        targetKind: "compound_evidence",
+        strength: "hard" as const,
+        reason: "compound_local_docs_external_scholarly_comparison",
+      }
     : affirmativeScientificImageContinuity
     ? {
         sourceTarget: "scientific_image_evidence",
@@ -1180,6 +1203,11 @@ export function buildCommittedAskRoute(input: {
         goalKind: authoritativeLivePipelineRoute.goalKind,
         requiredTerminalKind: authoritativeLivePipelineRoute.requiredTerminalKind,
       }
+    : compoundDocsScholarlyRoute
+    ? {
+        goalKind: "compound_evidence_synthesis",
+        requiredTerminalKind: "compound_evidence_synthesis_answer",
+      }
     : affirmativeScientificImageContinuity
     ? {
         goalKind: "scientific_image_evidence_continuity",
@@ -1252,6 +1280,9 @@ export function buildCommittedAskRoute(input: {
     ...(affirmativeScholarlyPdfImageLensWorkflow
       ? ["scholarly_research_answer", "typed_failure"]
       : []),
+    ...(compoundDocsScholarlyRoute
+      ? ["compound_evidence_synthesis_answer", "typed_failure"]
+      : []),
     ...(effectiveRoute.sourceTarget === "world_event"
       ? [
           "model_synthesized_answer",
@@ -1262,7 +1293,13 @@ export function buildCommittedAskRoute(input: {
     ...modelOnlyTerminalAliases,
     goal.requiredTerminalKind !== "unknown" ? goal.requiredTerminalKind : "",
   ]);
-  const rawForbiddenTerminalKindsWithGoal = shouldUseModelOnlyGoal
+  const rawForbiddenTerminalKindsWithGoal = compoundDocsScholarlyRoute
+    ? rawForbiddenTerminalKinds.filter(
+        (kind) =>
+          normalizeCommittedRouteTerminalKind(kind) !==
+          "compound_evidence_synthesis_answer",
+      )
+  : shouldUseModelOnlyGoal
     ? unique([
         ...rawForbiddenTerminalKinds.filter((kind) => !MODEL_ONLY_TERMINAL_ALIASES.has(normalizeCommittedRouteTerminalKind(kind))),
         ...MODEL_ONLY_FORBIDDEN_SOURCE_TERMINALS,
@@ -1295,16 +1332,24 @@ export function buildCommittedAskRoute(input: {
     forbidden: rawForbiddenTerminalKindsWithGoal,
     requiredTerminalKind: goal.requiredTerminalKind !== "unknown" ? goal.requiredTerminalKind : null,
   });
-  const allowedTerminalKinds = affirmativeScientificImageContinuity
+  const allowedTerminalKinds = compoundDocsScholarlyRoute
+    ? ["compound_evidence_synthesis_answer", "typed_failure"]
+    : affirmativeScientificImageContinuity
     ? ["scientific_image_evidence_continuity_summary", "typed_failure"]
     : compoundPolicy.allowed;
-  const forbiddenTerminalKinds = affirmativeScientificImageContinuity
+  const forbiddenTerminalKinds = compoundDocsScholarlyRoute
+    ? compoundPolicy.forbidden.filter(
+        (kind) =>
+          normalizeCommittedRouteTerminalKind(kind) !==
+          "compound_evidence_synthesis_answer",
+      )
+    : affirmativeScientificImageContinuity
     ? compoundPolicy.forbidden.filter(
         (kind) =>
           normalizeCommittedRouteTerminalKind(kind) !==
           "scientific_image_evidence_continuity_summary",
       )
-    : compoundPolicy.forbidden;
+      : compoundPolicy.forbidden;
   const rawSuppressedFamilies = suppressedFamiliesFromPayload(input.payload, input.promptInterpretation);
   const suppressedFamilies = affirmativeScholarlyPdfImageLensWorkflow
     ? rawSuppressedFamilies.filter((family) => !["scholarly_research", "visual_analysis"].includes(family))
@@ -1327,10 +1372,15 @@ export function buildCommittedAskRoute(input: {
     ...(admitsMinecraftCommandMechanicsGrounding ? ["docs_viewer"] : []),
     ...toolUseRestatement.requiredToolFamilies,
     ...(affirmativeScholarlyPdfImageLensWorkflow ? ["scholarly_research", "visual_analysis"] : []),
+    ...(compoundDocsScholarlyRoute
+      ? ["docs_viewer", "scholarly_research"]
+      : []),
   ])
     .filter((family) => !suppressedFamilies.includes(family));
   const allowedFamilies = affirmativeScientificImageContinuity
     ? []
+    : compoundDocsScholarlyRoute
+    ? unboundedAllowedFamilies
     : effectiveRoute.strength === "hard" &&
     sourceTargetFamily &&
     !affirmativeScholarlyPdfImageLensWorkflow
@@ -1348,13 +1398,17 @@ export function buildCommittedAskRoute(input: {
       affirmativeScientificImageComparison ||
       sourceTargetIntent?.reuse_retained_scientific_image_sidecar === true
     );
-  const requiredFamily = reusesRetainedScientificImageSidecar
+  const requiredFamily = compoundDocsScholarlyRoute
+    ? ""
+    : reusesRetainedScientificImageSidecar
     ? ""
     : sourceTargetFamily;
   const negativeConstraints = input.promptInterpretation?.negative_constraints ?? [];
   const sourceBacked = sourceBackedTargets.has(effectiveRoute.sourceTarget);
   const requiredTerminalProduct =
-    affirmativeScientificImageContinuity
+    compoundDocsScholarlyRoute
+      ? "compound_evidence_synthesis_answer"
+      : affirmativeScientificImageContinuity
       ? "scientific_image_evidence_continuity_summary"
       : compoundPolicy.requiredTerminalKind ||
         (goal.requiredTerminalKind !== "unknown"
@@ -1420,7 +1474,9 @@ export function buildCommittedAskRoute(input: {
     capability_policy: {
       allowed_tool_families: allowedFamilies,
       suppressed_tool_families: suppressedFamilies,
-      required_capability_families: affirmativeScientificImageContinuity
+      required_capability_families: compoundDocsScholarlyRoute
+        ? ["docs_viewer", "scholarly_research"]
+        : affirmativeScientificImageContinuity
         ? []
         : affirmativeScholarlyPdfImageLensWorkflow
         ? ["scholarly_research", "visual_analysis"]
@@ -1447,6 +1503,8 @@ export function buildCommittedAskRoute(input: {
         normalizeCommittedRouteTerminalKind(requiredTerminalProduct) ===
         "procedure_epoch_replay"
           ? false
+        : compoundDocsScholarlyRoute
+          ? true
         : affirmativeScientificImageContinuity
           ? false
           : affirmativeScientificImageComparison ||

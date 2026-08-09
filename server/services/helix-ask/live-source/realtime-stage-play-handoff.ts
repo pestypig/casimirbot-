@@ -14,6 +14,7 @@ import {
   resolveRealtimeTranscriptSourceTargetIntent,
 } from "../realtime-session/worker-admission";
 import type { HelixRuntimeGoalAccountScope } from "../runtime-goals/runtime-goal-account-binding";
+import { detectScholarlyResearchIntent } from "../scholarly-research-intent";
 import {
   deleteRealtimeStagePlayContextPack,
   resetRealtimeStagePlayContextPacksForTests,
@@ -199,8 +200,20 @@ export const bridgeRealtimeTranscriptToStagePlay = (input: {
           allow_no_tool_direct: false,
         }
       : sourceTargetIntent;
+  const candidateReadonlyCapabilityIds =
+    workerAdmission.candidate_readonly_capability_ids;
+  const admittedScholarlyResearch = candidateReadonlyCapabilityIds.some(
+    (capabilityId) => capabilityId.startsWith("scholarly-research."),
+  );
+  const scholarlyCapabilityChain = admittedScholarlyResearch
+    ? detectScholarlyResearchIntent(transcriptText)
+        .plannedScholarlyCapabilityChain.planned_capabilities
+    : [];
   const requiredGroundingCapabilityIds = workerAdmission.spoken_relay_eligible
-    ? workerAdmission.candidate_readonly_capability_ids
+    ? unique([
+        ...candidateReadonlyCapabilityIds,
+        ...scholarlyCapabilityChain,
+      ])
     : [];
   const mustEnterBackendAsk =
     workerAdmission.dispatch.kind === "ask_runtime" ||

@@ -4,12 +4,16 @@ import {
   applyGatewayFailureAuthorityGuard,
   buildCodexMoralGraphReflectionReceiptAnswer,
   buildMoralGraphObservationFallbackAnswer,
+  committedDocsEvidenceSupersedesScholarlyGuard,
   compactPostToolRecoveryModelValue,
+  currentCompoundCapabilityRailsCompleteForSolver,
   genericCurrentTurnToolRecoveryReadyForSolver,
   missingTheoryReferentGuardApplies,
   mergeUniqueGatewayCallResults,
+  providerCommittedCapabilityRailsIncompleteForSolver,
   providerGatewayEvidenceReadyForSolver,
   settleCompletedItineraryContinuationForPostToolSynthesis,
+  settleReenteredToolContinuationForPostToolSynthesis,
 } from "../codex-provider";
 
 const buildTheoryGraphGatewayResult = (capability: string, ok: boolean) => ({
@@ -190,6 +194,65 @@ const buildCalculatorUnsupportedExpressionResult = () => ({
 });
 
 describe("Codex provider terminal pass-through", () => {
+  it("keeps a hard local Docs observation authoritative over a lexical scholarly cue", () => {
+    const docsResult = {
+      ok: true,
+      capability_id: "docs.search",
+      gateway_admission: {
+        requested_capability: "docs.search",
+        admission_reason: "docs_search_requested",
+      },
+      observation_packet: {
+        status: "succeeded",
+        produced_artifact_refs: ["ask:docs:nhm2"],
+      },
+      observation: {
+        schema: "helix.docs_search_observation.v1",
+        hits: [{
+          path: "docs/research/nhm2-current-status-whitepaper.md",
+          evidence_passages: [{
+            text: "NHM2 is a bounded diagnostic candidate, not a propulsion claim.",
+            citation_ref: "workspace://docs/research/nhm2-current-status-whitepaper.md#line=1-4",
+          }],
+        }],
+      },
+      artifact_refs: ["ask:docs:nhm2"],
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    expect(
+      committedDocsEvidenceSupersedesScholarlyGuard({
+        sourceTargetIntent: {
+          target_source: "docs_viewer",
+          target_kind: "docs_viewer",
+          strength: "hard",
+        },
+        gatewayCallResults: [docsResult as never],
+      }),
+    ).toBe(true);
+    expect(
+      committedDocsEvidenceSupersedesScholarlyGuard({
+        sourceTargetIntent: {
+          target_source: "scholarly_research",
+          strength: "hard",
+        },
+        gatewayCallResults: [docsResult as never],
+      }),
+    ).toBe(false);
+    expect(
+      committedDocsEvidenceSupersedesScholarlyGuard({
+        sourceTargetIntent: {
+          target_source: "docs_viewer",
+          strength: "hard",
+        },
+        gatewayCallResults: [{ ...docsResult, ok: false } as never],
+      }),
+    ).toBe(false);
+  });
+
   it("retains a later successful retry when a gateway reuses the call id", () => {
     const failed = {
       ok: false,
@@ -481,6 +544,44 @@ describe("Codex provider terminal pass-through", () => {
     }
   });
 
+  it("prefers settled current-turn compound rails over a stale pre-execution itinerary", () => {
+    const staleProjection = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      applies: true,
+      complete: false,
+      required_capabilities: ["docs.search", "scholarly-research.lookup_papers"],
+      missing_required_capabilities: ["scholarly-research.lookup_papers"],
+      missing_compound_subgoal_ids: ["R2"],
+    };
+    const settledLedger = {
+      schema: "helix.compound_capability_contract.v1",
+      rail_status: "satisfied",
+      subgoals: [
+        { requested_capability: "docs.search", satisfaction: "satisfied" },
+        {
+          requested_capability: "scholarly-research.lookup_papers",
+          satisfaction: "satisfied",
+        },
+      ],
+    };
+
+    expect(currentCompoundCapabilityRailsCompleteForSolver(settledLedger)).toBe(true);
+    expect(
+      providerCommittedCapabilityRailsIncompleteForSolver({
+        projectedExecutionState: staleProjection,
+        currentCompoundCapabilityLedger: settledLedger,
+      }),
+    ).toBe(false);
+    expect(
+      genericCurrentTurnToolRecoveryReadyForSolver({
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 2,
+        capabilityItineraryExecutionState: staleProjection,
+        currentCompoundCapabilityLedger: settledLedger,
+      }),
+    ).toBe(true);
+  });
+
   it("does not let a stale theory referent guard override a bound procedure request", () => {
     const resolutionBlockReason =
       "referent_resolution_required:missing_previous_assistant_final_answer";
@@ -559,6 +660,96 @@ describe("Codex provider terminal pass-through", () => {
     expect(
       settleCompletedItineraryContinuationForPostToolSynthesis(state, false),
     ).toBe(state);
+  });
+
+  it("allows Codex synthesis immediately after a completed tool itinerary re-enters", () => {
+    const state = {
+      schema: "helix.agent_continuation_state.v1",
+      state_id: "ask:test:continuation:2",
+      turn_id: "ask:test",
+      sequence: 2,
+      trigger: "post_attempt",
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: false,
+      },
+      missing_requirement_ids: ["R2"],
+      next_admissible_affordances: [],
+      progress: {
+        made_progress: true,
+        no_progress_repeat_count: 0,
+        reason_codes: ["new_observation"],
+      },
+      budget: { hard: { exhausted: false } },
+      last_attempt: null,
+      allowed_decisions: ["ask_user"],
+      assistant_answer: false,
+      raw_content_included: false,
+    } as never;
+
+    expect(
+      settleReenteredToolContinuationForPostToolSynthesis({
+        state,
+        trigger: "post_attempt",
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 1,
+        capabilityItineraryExecutionState: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: true,
+        },
+      }),
+    ).toMatchObject({
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: true,
+      },
+      allowed_decisions: ["answer"],
+      progress: {
+        reason_codes: [
+          "new_observation",
+          "current_turn_itinerary_complete_pending_synthesis",
+        ],
+      },
+    });
+
+    expect(
+      settleReenteredToolContinuationForPostToolSynthesis({
+        state,
+        trigger: "initial",
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 1,
+        capabilityItineraryExecutionState: {
+          applies: true,
+          complete: true,
+        },
+      }),
+    ).toBe(state);
+
+    const completedReceiptState = {
+      ...state,
+      goal: {
+        status: "satisfied",
+        satisfied: true,
+        terminal_product_allowed: true,
+      },
+      allowed_decisions: ["answer"],
+    } as never;
+
+    expect(
+      settleReenteredToolContinuationForPostToolSynthesis({
+        state: completedReceiptState,
+        trigger: "post_attempt",
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 1,
+        capabilityItineraryExecutionState: {
+          applies: true,
+          complete: true,
+        },
+      }),
+    ).toBe(completedReceiptState);
   });
 
   it("bounds nested recovery evidence without erasing its top-level structure", () => {

@@ -9,6 +9,7 @@ const supplementPath = path.resolve(
   root,
   "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.md",
 );
+const proposalPath = path.resolve(root, "docs/research/casimir-dp-experiment-proposal.md");
 const mainSourcePath = path.resolve(
   root,
   "docs/research/casimir-dp-quantum-foam-study.equation-actions.source.json",
@@ -36,6 +37,7 @@ const coherenceFigurePath = path.resolve(
 
 const main = readFileSync(mainPath, "utf8");
 const supplement = readFileSync(supplementPath, "utf8");
+const proposal = readFileSync(proposalPath, "utf8");
 const apparatusFigure = readFileSync(apparatusFigurePath, "utf8");
 const coherenceFigure = readFileSync(coherenceFigurePath, "utf8");
 
@@ -178,6 +180,46 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     expect(supplement).toContain("The runtime adds zero observable bridge edges");
   });
 
+  it("integrates Stage-4.2O as separate public-data component validation", () => {
+    expect(main).toContain("### 5.6 Public-data component validation");
+    expect(main).toContain("cdp-stage4-2o-public-fringe-coefficient");
+    expect(main).toContain("cdp-stage4-2o-heldout-covariance-residual");
+    expect(main).toContain("no shared likelihood, cross-apparatus covariance");
+    expect(main).toContain("registered \\(R_0=100\\) nm comparator");
+    expect(main).toContain("`not_adjudicated`");
+    expect(supplement).toContain("### Stage-4.2O authenticated public-data component replay");
+    expect(supplement).toContain("separate_public_dataset_recovery_only");
+    expect(supplement).toContain("cross-apparatus covariance fusion");
+    expect(proposal).toContain("### Implemented Stage-4.2O public-data component-validation campaign");
+    expect(proposal).toContain("Joint-protocol validation and measured evidence remain `not_ready`");
+  });
+
+  it("integrates Stage-4.2Q as an ordinary superconducting control and collapse nonbridge", () => {
+    expect(main).toContain("### 5.8 Superconducting boundary control: bridge and nonbridges");
+    expect(main).toContain("cdp-stage4-2q-london-screening");
+    expect(main).toContain("cdp-stage4-2q-finite-impedance");
+    expect(main).toContain("cdp-stage4-2q-boundary-ratio");
+    expect(main).toContain("The frozen boundary-independent Diósi factor cancels");
+    expect(main).toContain("contrast SNR 10.04");
+    expect(main).toContain("not an apparatus selection");
+    expect(supplement).toContain("### B.17 Stage-4.2Q superconducting-boundary control");
+    expect(supplement).toContain("not represented as zero impedance");
+    expect(proposal).toContain("Stage 4.2Q then asks whether a normal/superconducting boundary state improves");
+    expect(proposal).toContain("cannot replace the primary mass--separation--time Diósi test");
+  });
+
+  it("integrates Stage-4.2R as the fail-closed same-apparatus pilot gate", () => {
+    expect(main).toContain("### 5.9 Integrated empirical-pilot closure");
+    expect(main).toContain("cdp-stage4-2r-diosi-precision-target");
+    expect(main).toContain("cdp-stage4-2r-four-cell-cross-ratio");
+    expect(main).toContain("all eight joint authorities are absent");
+    expect(main).toContain("zero cross-apparatus covariance fusion");
+    expect(supplement).toContain("### B.18 Stage-4.2R integrated feasibility-pilot readiness");
+    expect(supplement).toContain("0/8 ready authorities");
+    expect(proposal).toContain("Stage 4.2R closes the *specification* of the integrated empirical pilot");
+    expect(proposal).toContain("The runtime returns `not_authorized` because 0/8 empirical packets are ready");
+  });
+
   it("integrates Stage-4.2J as a Schrödinger, density, and environment no-go diagnostic", () => {
     for (const id of [
       "cdp-stage4-2j-schrodinger-coherence-factorization",
@@ -304,8 +346,8 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
 
   it("keeps the canonical article connected to the live Theory Badge graph", () => {
     const graph = buildCasimirDpStudyTheoryBadgesV1();
-    expect(graph.badges).toHaveLength(39);
-    expect(graph.edges).toHaveLength(110);
+    expect(graph.badges).toHaveLength(43);
+    expect(graph.edges).toHaveLength(120);
     expect(
       graph.badges.some((badge) =>
         badge.sourceRefs.some((source) =>

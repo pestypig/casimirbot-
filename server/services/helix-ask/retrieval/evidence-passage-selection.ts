@@ -89,7 +89,9 @@ const headingFromLine = (line: string): string | null => {
   if (
     normalized.length >= 3 &&
     normalized.length <= 90 &&
-    /^(?:abstract|introduction|background|methods?|materials(?: and methods)?|results?|discussion|conclusions?|references|\d+(?:\.\d+)*\s+[A-Z])/i.test(normalized)
+    (/^(?:abstract|introduction|background|methods?|materials(?: and methods)?|results?|discussion|conclusions?|references)\.?$/i.test(
+      normalized,
+    ) || /^\d+(?:\.\d+)*\s+[A-Z].+/.test(normalized))
   ) return normalized;
   return null;
 };
@@ -195,9 +197,11 @@ export const selectEvidencePassages = (input: {
   title: string;
   max_passages?: number;
   max_chars?: number;
+  neighbor_radius?: number;
 }): SelectedEvidencePassage[] => {
   const maxPassages = Math.max(1, Math.min(16, input.max_passages ?? 8));
   const maxChars = Math.max(240, Math.min(2400, input.max_chars ?? 1200));
+  const neighborRadius = Math.max(0, Math.min(6, input.neighbor_radius ?? 2));
   const terms = queryTerms(input.query);
   const phrases = quotedPhrases(input.query);
   const summaryIntent = /\b(?:about|explain|main idea|overview|summar(?:y|ize))\b/i.test(input.query);
@@ -216,7 +220,7 @@ export const selectEvidencePassages = (input: {
       .filter((entry) =>
         entry.unit.page === candidate.unit.page &&
         entry.unit.section === candidate.unit.section &&
-        Math.abs(entry.index - candidate.index) <= 2,
+        Math.abs(entry.index - candidate.index) <= neighborRadius,
       )
       .sort((left, right) => left.index - right.index);
     const bounded: typeof neighbors = [];
@@ -250,4 +254,110 @@ export const selectEvidencePassages = (input: {
     });
   }
   return selected;
+};
+
+const analyticalCoverageQueries = (query: string): string[] => {
+  const analytical =
+    /\b(?:agree|compare|comparison|contrast|differ|difference|support|validate|validation|claim|caution|constrain|establish|imply|assumption|limitation|boundary)\b/i.test(
+      query,
+    );
+  if (!analytical) return [];
+  return [
+    "assume assumed assumptions",
+    "premise premises hypotheses conditions setup ansatz approximation simplification scope applicability",
+    "limitations caveats conclusion implications unresolved does not establish validate",
+  ];
+};
+
+const analyticalPassagePriority = (
+  query: string,
+  passage: SelectedEvidencePassage,
+): number => {
+  const haystack = `${passage.section ?? ""} ${passage.text}`.toLowerCase();
+  let priority = 0;
+  if (
+    /\b(?:assumption|assumptions|assume|assumed|premise|premises|setup|ansatz|approximation|simplification)\b/i.test(
+      query,
+    ) &&
+    /\b(?:assumption|assumptions|assume|assumed|premise|premises|setup|ansatz|approximation|simplification)\b/.test(
+      haystack,
+    )
+  ) priority += 3;
+  if (
+    /\b(?:limitation|limitations|caveat|caveats|boundary|boundaries|unresolved)\b/i.test(
+      query,
+    ) &&
+    /\b(?:limitation|limitations|caveat|caveats|boundary|boundaries|unresolved|does not|not establish|not validate)\b/.test(
+      haystack,
+    )
+  ) priority += 2;
+  return priority;
+};
+
+/**
+ * Selects direct query evidence plus bounded analytical coverage. This keeps a
+ * compare/validate answer from seeing only the abstract while assumptions or
+ * claim boundaries are available elsewhere in the same admitted source.
+ */
+export const selectEvidencePassagesWithCoverage = (input: {
+  units: EvidenceTextUnit[];
+  query: string;
+  source_ref: string;
+  title: string;
+  max_passages?: number;
+  max_chars?: number;
+}): SelectedEvidencePassage[] => {
+  const maxPassages = Math.max(1, Math.min(16, input.max_passages ?? 8));
+  const coverageQueries = analyticalCoverageQueries(input.query);
+  if (coverageQueries.length === 0 || maxPassages === 1) {
+    return selectEvidencePassages(input);
+  }
+
+  const baseBudget = Math.max(1, maxPassages - coverageQueries.length);
+  const base = selectEvidencePassages({ ...input, max_passages: baseBudget });
+  const selected = [...base];
+  const selectedRefs = new Set(selected.map((entry) => entry.citation_ref));
+  const selectedSections = new Set(
+    selected.map((entry) => entry.section?.toLowerCase()).filter(Boolean),
+  );
+
+  for (const coverageQuery of coverageQueries) {
+    const candidates = selectEvidencePassages({
+      ...input,
+      query: coverageQuery,
+      max_passages: Math.min(4, maxPassages),
+      neighbor_radius: 5,
+    });
+    const candidate =
+      candidates.find(
+        (entry) =>
+          !selectedRefs.has(entry.citation_ref) &&
+          (!entry.section || !selectedSections.has(entry.section.toLowerCase())),
+      ) ?? candidates.find((entry) => !selectedRefs.has(entry.citation_ref));
+    if (!candidate) continue;
+    selected.push(candidate);
+    selectedRefs.add(candidate.citation_ref);
+    if (candidate.section) selectedSections.add(candidate.section.toLowerCase());
+  }
+
+  if (selected.length < maxPassages) {
+    for (const candidate of selectEvidencePassages({
+      ...input,
+      max_passages: maxPassages,
+    })) {
+      if (selectedRefs.has(candidate.citation_ref)) continue;
+      selected.push(candidate);
+      selectedRefs.add(candidate.citation_ref);
+      if (selected.length >= maxPassages) break;
+    }
+  }
+  return selected
+    .map((entry, index) => ({ entry, index }))
+    .sort((left, right) =>
+      analyticalPassagePriority(input.query, right.entry) -
+        analyticalPassagePriority(input.query, left.entry) ||
+      left.index - right.index,
+    )
+    .map(({ entry }) => entry)
+    .slice(0, maxPassages);
 };

@@ -26,7 +26,7 @@ import {
   type Nhm2ExperimentReadyTheoryClosureEvidenceV1,
 } from "../../../shared/contracts/nhm2-experiment-ready-theory-closure.v1";
 import { isNhm2PredictionFalsifierFreeze } from "../../../shared/contracts/nhm2-prediction-falsifier-freeze.v1";
-import { isNhm2SemiclassicalStateRealizability } from "../../../shared/contracts/nhm2-semiclassical-state-realizability.v1";
+import { isNhm2SemiclassicalStateRealizabilityV2 as isNhm2SemiclassicalStateRealizability } from "../../../shared/contracts/nhm2-semiclassical-state-realizability.v2";
 import { isNhm2ContinuousObserverOptimizer } from "../../../shared/contracts/nhm2-continuous-observer-optimizer.v1";
 import { isNhm2WorldlineQeiCoverage } from "../../../shared/contracts/nhm2-worldline-qei-coverage.v1";
 import { isNhm2CovariantConservation } from "../../../shared/contracts/nhm2-covariant-conservation.v1";
@@ -772,6 +772,67 @@ const hashedArtifactMatches = (
   artifact.sha256 != null &&
   expectedSha256 != null &&
   normalizeSha256(artifact.sha256) === normalizeSha256(expectedSha256);
+
+type NullableRefArtifact = {
+  ref: string | null;
+  sha256: string | null;
+};
+
+const hashedRefArtifactMatches = (
+  artifact: NullableRefArtifact,
+  expectedPath: string | null | undefined,
+  expectedSha256: string | null | undefined,
+): boolean =>
+  artifact.ref != null &&
+  expectedPath != null &&
+  normalizeRepoPath(withoutFragment(artifact.ref)) ===
+    normalizeRepoPath(expectedPath) &&
+  artifact.sha256 != null &&
+  expectedSha256 != null &&
+  normalizeSha256(artifact.sha256) === normalizeSha256(expectedSha256);
+
+export const NHM2_SEMICLASSICAL_V2_SERVER_CONTENT_REPLAY_BLOCKER =
+  "semiclassical_v2_server_content_replay_missing" as const;
+
+/**
+ * V2 producer metrics cannot authorize themselves. Both stochastic-response
+ * references must bind to the registered dynamic evidence artifact, and a
+ * future server-owned replay must recompute the noise-kernel PSD/ratio and
+ * constraint-bracket residuals from the referenced numerical bytes.
+ */
+export function nhm2SemiclassicalV2AuthorityBlockers(input: {
+  metricResponseEvidence: NullableRefArtifact;
+  stabilityEvidence: NullableRefArtifact;
+  dynamicEvidence:
+    { artifactPath: string | null; sha256: string | null } | null | undefined;
+}): string[] {
+  const blockers: string[] = [
+    NHM2_SEMICLASSICAL_V2_SERVER_CONTENT_REPLAY_BLOCKER,
+  ];
+  if (
+    !hashedRefArtifactMatches(
+      input.metricResponseEvidence,
+      input.dynamicEvidence?.artifactPath,
+      input.dynamicEvidence?.sha256,
+    )
+  ) {
+    blockers.push(
+      "semiclassical_state_noise_kernel_metric_response_dynamic_binding_mismatch",
+    );
+  }
+  if (
+    !hashedRefArtifactMatches(
+      input.stabilityEvidence,
+      input.dynamicEvidence?.artifactPath,
+      input.dynamicEvidence?.sha256,
+    )
+  ) {
+    blockers.push(
+      "semiclassical_state_noise_kernel_stability_dynamic_binding_mismatch",
+    );
+  }
+  return blockers;
+}
 
 type RawDescriptorBinding = NullableHashedArtifact & {
   artifactId: string | null;
@@ -2080,6 +2141,10 @@ const SEMICLASSICAL_GATE_BY_CLOSURE_CHECK = {
     "preparation_switching_compatibility",
   qei_applicability_bound_to_same_state: "qei_same_state_worldline_binding",
   rset_uncertainty_budget_bounded: "uncertainty_bounds",
+  connected_stress_noise_kernel_same_state_renormalized_and_bounded:
+    "stress_fluctuation_noise_kernel",
+  semiclassical_constraint_algebra_anomaly_residual_bounded:
+    "constraint_formulation_consistency",
 } as const;
 
 function evidenceArtifactValidation(input: {
@@ -2349,6 +2414,40 @@ function evidenceArtifactValidation(input: {
     ) {
       blockers.push("semiclassical_state_uncertainty_metric_binding_mismatch");
     }
+    const fluctuationCheck =
+      evidence.checks
+        .connected_stress_noise_kernel_same_state_renormalized_and_bounded;
+    if (
+      fluctuationCheck?.metricValue !==
+        data.stressFluctuations.fluctuationToMeanRatioUpper95 ||
+      fluctuationCheck?.tolerance !==
+        data.stressFluctuations.fluctuationToMeanRatioTolerance
+    ) {
+      blockers.push("semiclassical_state_noise_kernel_metric_binding_mismatch");
+    }
+    const constraintAlgebraCheck =
+      evidence.checks.semiclassical_constraint_algebra_anomaly_residual_bounded;
+    if (
+      constraintAlgebraCheck?.metricValue !==
+        data.constraintConsistency.maximumAlgebraResidualUpper95 ||
+      constraintAlgebraCheck?.tolerance !==
+        data.constraintConsistency.algebraTolerance
+    ) {
+      blockers.push(
+        "semiclassical_state_constraint_algebra_metric_binding_mismatch",
+      );
+    }
+    const dynamicEvidence = allEvidence.find(
+      (entry) =>
+        entry.evidenceId === "dynamic_backreaction_stability_causality",
+    );
+    blockers.push(
+      ...nhm2SemiclassicalV2AuthorityBlockers({
+        metricResponseEvidence: data.stressFluctuations.metricResponseEvidence,
+        stabilityEvidence: data.stressFluctuations.stabilityEvidence,
+        dynamicEvidence,
+      }),
+    );
     return { supported: true, valid: blockers.length === 0, blockers };
   }
   if (evidence.evidenceId === "covariant_conservation") {

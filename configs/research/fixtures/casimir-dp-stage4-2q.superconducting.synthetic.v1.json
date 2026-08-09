@@ -1,0 +1,97 @@
+{
+  "schema_version": "casimir_dp_superconducting_boundary_fixture_stage4_2q/1",
+  "evidence_class": "synthetic_superconducting_boundary_response_fixture_only",
+  "boundary_specimen": {
+    "material_id": "niobium_hypothetical_coating",
+    "response_authority": "synthetic_not_specimen_measured",
+    "critical_temperature_K": 9.25,
+    "thermodynamic_critical_field_T": 0.2,
+    "coating_thickness_m": 2e-7,
+    "london_penetration_depth_m": 3.9e-8,
+    "carrier_density_m3": 9.28323050387667e+27,
+    "carrier_charge_C": 3.204353268e-19,
+    "carrier_mass_kg": 1.8218767403e-30,
+    "superconducting_gap_J": 2.403264951e-22,
+    "dc_resistance_superconducting_ohm": 0,
+    "normal_impedance": [
+      { "omega_rad_s": 1000000, "resistance_ohm": 0.0003069980124, "reactance_ohm": 0.0003069980124 },
+      { "omega_rad_s": 100000000, "resistance_ohm": 0.003069980124, "reactance_ohm": 0.003069980124 },
+      { "omega_rad_s": 10000000000, "resistance_ohm": 0.03069980124, "reactance_ohm": 0.03069980124 },
+      { "omega_rad_s": 1000000000000, "resistance_ohm": 0.3069980124, "reactance_ohm": 0.3069980124 }
+    ],
+    "superconducting_impedance": [
+      { "omega_rad_s": 1000000, "resistance_ohm": 1e-10, "reactance_ohm": 4.900884542268e-8 },
+      { "omega_rad_s": 100000000, "resistance_ohm": 1e-8, "reactance_ohm": 0.000004900884542268 },
+      { "omega_rad_s": 10000000000, "resistance_ohm": 0.000001, "reactance_ohm": 0.0004900884542268 },
+      { "omega_rad_s": 1000000000000, "resistance_ohm": 0.001, "reactance_ohm": 0.04900884542268 }
+    ]
+  },
+  "ordinary_response": {
+    "response_kernel_authority": "synthetic_stage4_2n_transport_only",
+    "green_transfer": {
+      "model_id": "linearized_synthetic_impedance_contrast_to_green_phase_loss",
+      "frequency_weights": [0.1, 0.2, 0.3, 0.4],
+      "phase_scale_rad": 0.00420515093783247,
+      "chi_scale": 4.0302419223405e-7
+    },
+    "normal": [
+      { "hold_time_s": 0.05, "phase_rad": 0.004, "chi": 2.683299078810108e-7, "complex_coherence": [0.9999917316829414, 0.003999988260025241] },
+      { "hold_time_s": 0.1, "phase_rad": 0.008, "chi": 5.366598157620216e-7, "complex_coherence": [0.9999674635281676, 0.007999910373708154] },
+      { "hold_time_s": 0.15, "phase_rad": 0.012, "chi": 8.049897236430324e-7, "complex_coherence": [0.9999271959325546, 0.011999702342432634] },
+      { "hold_time_s": 0.25, "phase_rad": 0.02, "chi": 0.0000013416495394050548, "complex_coherence": [0.9997986652862592, 0.019998639862149122] }
+    ],
+    "superconducting": [
+      { "hold_time_s": 0.05, "phase_rad": 0.0032, "chi": 1.8783093551670755e-7, "complex_coherence": [0.9999946921744128, 0.0031999939376115513] },
+      { "hold_time_s": 0.1, "phase_rad": 0.0064, "chi": 3.756618710334151e-7, "complex_coherence": [0.999979144415798, 0.006399953905203702] },
+      { "hold_time_s": 0.15, "phase_rad": 0.0096, "chi": 5.634928065501226e-7, "complex_coherence": [0.9999533568872111, 0.009599847135233146] },
+      { "hold_time_s": 0.25, "phase_rad": 0.016, "chi": 9.391546775835384e-7, "complex_coherence": [0.9998710636966159, 0.01599930231624475] }
+    ]
+  },
+  "toggle_strategies": [
+    {
+      "strategy_id": "temperature_crossing",
+      "description": "Cross Tc and treat the resulting thermal response as an explicit confound rather than a clean state toggle.",
+      "covariance_diagonal": [1.6e-7, 4e-13, 1.6e-7, 4e-13, 1.6e-7, 4e-13, 1.6e-7, 4e-13],
+      "nuisance_vectors": [
+        { "nuisance_id": "temperature_correlated_response", "vector": [-0.0008, -8.049897236430325e-8, -0.0016, -1.609979447286065e-7, -0.0024, -2.414969170929098e-7, -0.004, -4.024948618215164e-7] },
+        { "nuisance_id": "thermal_settling_drift", "vector": [-0.0003, 0, -0.0003, 0, -0.0003, 0, -0.0003, 0] }
+      ],
+      "required_measured_authorities": ["temperature transfer function", "thermal radiation covariance", "transition settling receipt"]
+    },
+    {
+      "strategy_id": "magnetic_field_toggle",
+      "description": "Toggle the boundary at fixed bath temperature while measuring magnetic pickup, vortices, trap response, and readout transfer.",
+      "covariance_diagonal": [2.5e-7, 2.5e-13, 2.5e-7, 2.5e-13, 2.5e-7, 2.5e-13, 2.5e-7, 2.5e-13],
+      "nuisance_vectors": [
+        { "nuisance_id": "magnetic_pickup_phase", "vector": [0.0004, 0, -0.0002, 0, 0.0003, 0, -0.0001, 0] },
+        { "nuisance_id": "vortex_loss", "vector": [0, 2e-7, 0, -1e-7, 0, 2e-7, 0, -2e-7] },
+        { "nuisance_id": "trap_field_transfer", "vector": [0.0002, 1e-7, 0.0002, -1e-7, -0.0002, 1e-7, -0.0002, -1e-7] }
+      ],
+      "required_measured_authorities": ["magnetic field map", "trap transfer function", "vortex-state witness", "field-sham covariance"]
+    },
+    {
+      "strategy_id": "matched_static_pair",
+      "description": "Use separate normal and superconducting specimens without active switching and retain fabrication mismatch as a dominant nuisance.",
+      "covariance_diagonal": [2.25e-6, 2.25e-12, 2.25e-6, 2.25e-12, 2.25e-6, 2.25e-12, 2.25e-6, 2.25e-12],
+      "nuisance_vectors": [
+        { "nuisance_id": "fabrication_response_mismatch", "vector": [-0.0007, -7e-8, -0.0014, -1.4e-7, -0.0021, -2.1e-7, -0.0035, -3.5e-7] },
+        { "nuisance_id": "alignment_offset", "vector": [0.0005, 0, 0.0005, 0, 0.0005, 0, 0.0005, 0] }
+      ],
+      "required_measured_authorities": ["matched specimen metrology", "surface spectrum comparison", "cross-cavity alignment covariance"]
+    }
+  ],
+  "public_component_context": {
+    "superconducting_drum_replay_status": "pass",
+    "apparatus_matched_transfer_allowed": false,
+    "covariance_transport_allowed": false
+  },
+  "empirical_authorities": {
+    "specimen_complex_impedance_measured": false,
+    "normal_superconducting_casimir_contrast_measured": false,
+    "as_built_green_tensor_measured": false,
+    "transition_temperature_covariance_measured": false,
+    "magnetic_switch_transfer_measured": false,
+    "vortex_state_measured": false,
+    "joint_complex_coherence_cells_measured": false
+  }
+}

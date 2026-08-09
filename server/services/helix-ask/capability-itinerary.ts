@@ -198,6 +198,26 @@ const allowedTerminalKindsFor = (families: HelixCapabilityItineraryFamily[]): st
 const compoundTerminalKindsFor = (subgoals: RecordLike[]): string[] =>
   unique(subgoals.map((subgoal) => readString(subgoal.required_terminal_kind)).filter(Boolean));
 
+export const requiredScholarlyCapabilitiesFromCompoundSubgoals = (
+  compoundSubgoals: RecordLike[],
+): string[] =>
+  unique(
+    compoundSubgoals.flatMap((subgoal) => {
+      const args = readRecord(subgoal.args) ?? readRecord(subgoal.args_hint);
+      const scholarlyIntent = readRecord(args?.scholarly_intent);
+      if (
+        subgoal.mandatory === false ||
+        scholarlyIntent?.requires_full_text !== true
+      ) {
+        return [];
+      }
+      const chain = readRecord(args?.planned_scholarly_capability_chain);
+      return Array.isArray(chain?.planned_capabilities)
+        ? chain.planned_capabilities.map(readString).filter(Boolean)
+        : [];
+    }),
+  );
+
 const COMPOUND_FORBIDDEN_RECEIPT_TERMINAL_KINDS = [
   "tool_receipt",
   "calculator_receipt",
@@ -583,7 +603,19 @@ export function buildHelixCapabilityItinerary(input: {
     .filter((subgoal) => subgoal.mandatory !== false)
     .map((subgoal) => readString(subgoal.requested_capability))
     .filter(Boolean);
-  const scholarlyIntent = compoundSubgoals.length === 0 && researchFamilies.includes("scholarly_research")
+  const compoundRequiredScholarlyCapabilities =
+    requiredScholarlyCapabilitiesFromCompoundSubgoals(compoundSubgoals);
+  const admissionRequestsScholarlyCapability = (
+    Array.isArray(admission?.compound_requested_capabilities)
+      ? admission.compound_requested_capabilities
+      : []
+  ).some((capability) =>
+    readString(capability).startsWith("scholarly-research."),
+  );
+  const scholarlyIntent =
+    compoundFamilies.includes("scholarly_research") ||
+    admissionRequestsScholarlyCapability ||
+    (compoundSubgoals.length === 0 && researchFamilies.includes("scholarly_research"))
     ? detectScholarlyResearchIntent(input.promptText)
     : null;
   const requiredScholarlyCapabilities = scholarlyIntent?.scholarlyIntent.evidence_demand.required_modes.includes("full_text")
@@ -662,6 +694,7 @@ export function buildHelixCapabilityItinerary(input: {
       required_observation_families: relevantFamilies,
       required_capabilities: unique([
         ...compoundRequiredCapabilities,
+        ...compoundRequiredScholarlyCapabilities,
         ...requiredScholarlyCapabilities,
       ]),
       allowed_terminal_artifact_kinds: allowedTerminalArtifactKinds,

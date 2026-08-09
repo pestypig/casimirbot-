@@ -135,6 +135,16 @@ export const NHM2_EXPERIMENT_READY_THEORY_CANDIDATE_AUTHORITATIVE_NUMERIC_POLICI
       threshold: 0.1,
       unit: "relative_fraction",
     },
+    connected_stress_noise_kernel_same_state_renormalized_and_bounded: {
+      comparator: "lte",
+      threshold: 1,
+      unit: "fluctuation_to_mean_ratio_upper95",
+    },
+    semiclassical_constraint_algebra_anomaly_residual_bounded: {
+      comparator: "lte",
+      threshold: 0.1,
+      unit: "normalized_constraint_bracket_L_inf",
+    },
     discrete_global_balance_pass: {
       comparator: "lte",
       threshold: 0.1,

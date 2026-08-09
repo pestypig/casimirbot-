@@ -1,0 +1,26 @@
+{
+  "schema_version": "casimir_dp_public_data_component_validation_stage4_2o_campaign_receipt/1",
+  "run_id": "casimir-dp-public-data-component-validation-stage4-2o-v1-20260807T120000000Z",
+  "generated_at": "2026-08-07T12:00:00.000Z",
+  "config_path": "configs/research/casimir-dp-public-data-component-validation-stage4-2o.v1.json",
+  "config_sha256": "0b76f4391caf1f15d5faa33f7aade4c41e4b2dcd7d228d9c04912c465fae4199",
+  "upstream_stage4_2n_campaign_receipt_sha256": "a01dda0e038251f6cceb78d6bf7ba0a848a6dc9d65541e9e89c09f1f3be40cba",
+  "fixture_sha256": "526d910d47d83921fd2eed945fb2f2b551964263e126cf69bb7d60302ecd9f2a",
+  "source_sha256": {
+    "sodium": "b92355d06e06f16b3c746020ef7bc6c6eac6a629d36d739aff79e6a894003b9a",
+    "casimir": "f79908a4203b623ccb7b3b7c21c19d9538000f419d342dda124583c284b53055",
+    "lisa_pathfinder": "66a1a18e93b5cdbbcd67cbcab9a08bcbb8862542ef98b9ba9c72e27ec8de421d",
+    "gran_sasso_fig3": "ef86fe9fac36fcee81c0a762571737950c5cccbc7343178593743199ef6e5e23",
+    "gran_sasso_fig4": "29a1f3ad10ee59e00bc5feb3a81453b9728ab6113151cb30f1b92cad78d3d6d7"
+  },
+  "report_json_sha256": "91dab28f56c087aaee8cb1b16d83a218de569215ee6f2ab2cffd7c66a3cc1182",
+  "report_markdown_sha256": "fb98ce21e8e8b18477a4ae98f28a0ddd1a66040a00c4a2572255390405ccb9d8",
+  "trace_sha256": "9643827b0f867843a553411f0fc181f4413cc3a1a65489c08de20bdb71941421",
+  "component_replay": "pass",
+  "measured_evidence": "not_ready",
+  "joint_protocol_validation": "not_ready",
+  "collapse_identification": "blocked",
+  "promotion_allowed": false,
+  "cross_apparatus_covariance_fusion": false,
+  "observable_bridge_edges_added": 0
+}

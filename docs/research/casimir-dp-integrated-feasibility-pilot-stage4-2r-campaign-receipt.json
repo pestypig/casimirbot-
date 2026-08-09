@@ -1,0 +1,33 @@
+{
+  "schema_version": "casimir_dp_integrated_feasibility_pilot_stage4_2r_campaign_receipt/1",
+  "run_id": "casimir-dp-integrated-feasibility-pilot-stage4-2r-v1-20260808T210000000Z",
+  "generated_at": "2026-08-08T21:00:00.000Z",
+  "config_path": "configs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.json",
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "upstream_stage4_2o_campaign_receipt_sha256": "554861b754822cbd3988d75be8b5c9f9d26eae03d53d4b47627dcaf7d3db1c5b",
+  "upstream_stage4_2p_campaign_receipt_sha256": "3f82d7632fa7a7b8fca08857cd9c2d927399b3a334ccf319f8895a13f1b365ab",
+  "upstream_stage4_2q_campaign_receipt_sha256": "ec4a18ff8582186a0f8169e6643cba495f2042e035789bce0d9ba8d4c3d65013",
+  "upstream_stage4_2q_verification_receipt_sha256": "f8a8d65213f48b7663b28f7ad8dd090bb30ee8a73bfa03f44ef8692b849769e1",
+  "report_json_sha256": "84b201cbed923c34501329c71a12af8be0072889ae49e164a1a5cb3f3ccca8c3",
+  "report_markdown_sha256": "a094482c15557291731e8f39c202246f33da8f4ce72fec8bdbbc1a06ae1d9d00",
+  "trace_sha256": "cab06f6e450e87f92cf9dbab5df6fb3015252c34cd5220de77e770d546f27ebb",
+  "packet_contract": "pass",
+  "empirical_feasibility_pilot": "not_authorized",
+  "ready_authorities": 0,
+  "missing_authorities": [
+    "state_preparation_recombination",
+    "as_built_geometry_and_green_response",
+    "measured_material_spectral_response",
+    "worldline_and_phase_covariance",
+    "quantum_gas_collision_kernel",
+    "four_cell_complex_coherence",
+    "independent_companion_channel",
+    "exact_registered_model_external_bound_recast"
+  ],
+  "measured_evidence": "not_ready",
+  "joint_protocol_validation": "not_ready",
+  "collapse_identification": "blocked",
+  "promotion_allowed": false,
+  "frozen_diosi_law_modified": false,
+  "collapse_bridge_edges_added": 0
+}

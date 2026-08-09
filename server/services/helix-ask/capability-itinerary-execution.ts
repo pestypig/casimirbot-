@@ -411,6 +411,15 @@ const observationKindBelongsToCapability = (
     return /docs[-_]viewer[-_.:]locate[-_]in[-_]doc|doc_location|doc_evidence_location/i.test(text) ||
       /^doc_(?:location|evidence)/i.test(kind);
   }
+  if (
+    capability === "docs.search" ||
+    runtimeCapability === "docs.search" ||
+    capability === "docs-viewer.search_docs" ||
+    runtimeCapability === "docs-viewer.search_docs"
+  ) {
+    return /docs[-_]?(?:viewer[-_.:]?)?search|doc_search_results|doc_location|doc_evidence_location/i.test(text) ||
+      /^doc_(?:search_results|candidate_validation|location|evidence|summary)$/i.test(kind);
+  }
   if (capability === "docs-viewer.open" || runtimeCapability === "docs-viewer.open") {
     return /docs[-_]viewer[-_.:]open|doc_open_receipt|docs_viewer_receipt/i.test(text) ||
       /^(?:doc_open_receipt|docs_viewer_receipt)$/i.test(kind);
@@ -1568,10 +1577,60 @@ export const attachHelixCapabilityItineraryExecutionState = (
       "provider_call_occurrence" ||
     readString(currentProviderContract?.source) ===
       "codex_provider_call_occurrence_normalization";
+  const baseCompoundContract = readRecord(
+    readRecord(baseItinerary)?.compound_capability_contract,
+  );
+  const baseSubgoals = readArray(baseCompoundContract?.subgoals)
+    .map(readRecord)
+    .filter((entry: Record<string, unknown> | null): entry is Record<string, unknown> => Boolean(entry));
+  const currentSubgoals = readArray(currentProviderContract?.subgoals)
+    .map(readRecord)
+    .filter((entry: Record<string, unknown> | null): entry is Record<string, unknown> => Boolean(entry));
+  const capabilityIdentities = (entry: Record<string, unknown>): string[] =>
+    uniqueStrings([
+      readString(entry.requested_capability),
+      readString(entry.runtime_capability),
+      ...readArray(entry.allowed_substitutions).map(readString),
+    ]);
+  const currentCapabilities = new Set(
+    currentSubgoals.flatMap(capabilityIdentities),
+  );
+  const preservedUnrepresentedSubgoals = baseSubgoals.filter((entry) => {
+    const identities = capabilityIdentities(entry);
+    return identities.length > 0 && !identities.some((capability) => currentCapabilities.has(capability));
+  });
+  const mergedOccurrenceSubgoals = [
+    ...currentSubgoals,
+    ...preservedUnrepresentedSubgoals,
+  ].sort((left, right) => (Number(left.order) || 0) - (Number(right.order) || 0));
+  const mergedOccurrenceContract = currentProviderContract
+    ? {
+        ...currentProviderContract,
+        ...(preservedUnrepresentedSubgoals.length > 0
+          ? {
+              subgoals: mergedOccurrenceSubgoals,
+              subgoal_count: mergedOccurrenceSubgoals.length,
+              satisfied_subgoal_count: mergedOccurrenceSubgoals.filter(
+                (entry) => entry.satisfied === true,
+              ).length,
+              first_broken_rail:
+                mergedOccurrenceSubgoals.find((entry) => entry.satisfied !== true) ?? null,
+              rail_status: mergedOccurrenceSubgoals.some((entry) => entry.satisfied !== true)
+                ? "missing_observation"
+                : "satisfied",
+              terminal_candidate_kind: mergedOccurrenceSubgoals.some(
+                (entry) => entry.satisfied !== true,
+              )
+                ? "typed_failure"
+                : "compound_evidence_synthesis_answer",
+            }
+          : {}),
+      }
+    : null;
   const itinerary = baseItinerary && preferCurrentProviderContract
     ? {
         ...baseItinerary,
-        compound_capability_contract: currentProviderContract,
+        compound_capability_contract: mergedOccurrenceContract,
       }
     : baseItinerary;
   const executionState = buildHelixCapabilityItineraryExecutionState({

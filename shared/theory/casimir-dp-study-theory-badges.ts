@@ -4701,6 +4701,175 @@ export const CASIMIR_DP_STUDY_THEORY_BADGES: TheoryBadgeV1[] = [
     hintKeys: { subjects: ["Casimir DP Stage 4.2N", "ordinary complex-coherence null", "four-cell cross ratio", "Green FDT"], symbols: ["C_0_beta", "Phi_EM", "chi_0", "R_4", "epsilon_i_xi"], unitSignatures: ["1", "rad", "s", "m"], repoPaths: ["shared/casimir-dp-material-thermal-ordinary-null-stage4-2n.ts", "shared/contracts/casimir-dp-material-thermal-ordinary-null-stage4-2n.v1.ts", "scripts/research/run-casimir-dp-material-thermal-ordinary-null-stage4-2n.ts", "configs/research/casimir-dp-material-thermal-ordinary-null-stage4-2n.v1.json", "docs/research/casimir-dp-material-thermal-ordinary-null-stage4-2n-report.md", "tests/casimir-dp-material-thermal-ordinary-null-stage4-2n.spec.ts"], equationFamilies: ["kramers_kronig_material_response", "green_fdt_complex_coherence", "four_cell_complex_cross_ratio"], simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"] },
   }),
   studyBadge({
+    id: "study.casimir_dp.public_data_component_validation_stage4_2o",
+    title: "Stage-4.2O Authenticated Public-Data Component Validation",
+    plainMeaning:
+      "Replays complex fringe extraction, measured boundary-response extraction, held-out multichannel covariance, and an external Diósi-bound record on four provenance-bound public datasets without combining their apparatuses.",
+    whyItMatters:
+      "It shows that constituent analysis operations run on real measurements while making explicit that no public archive instantiates the proposed four-cell apparatus or supplies its joint covariance, state preparation, or collapse discriminator.",
+    subjects: ["casimir_dp_study", "casimir_dp_stage4_2o", "public_data", "complex_fringe", "boundary_response", "covariance", "external_dp_bound", "provenance"],
+    level: "diagnostic_gate", status: "diagnostic",
+    simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"],
+    equationFamilies: ["public_fringe_fourier_recovery", "heldout_covariance_residual", "external_bound_provenance"],
+    tags: ["stage_4_2o", "diagnostic", "external_public_component_replay_pass", "source_integrity_pass", "sodium_fringe_recovery_pass", "measured_boundary_response_recovery_pass", "lisa_covariance_recovery_pass", "gran_sasso_bound_record_authenticated", "registered_r0_model_not_adjudicated", "no_cross_apparatus_covariance_fusion", "joint_protocol_validation_not_ready", "measured_evidence_not_ready", "collapse_identification_blocked", "manifold_dynamics_blocked", "physical_viability_not_evaluated", "promotion_blocked", "zero_observable_bridge", "maximum_claim:separate_public_dataset_recovery_only"],
+    equations: [
+      { id: "casimir_dp_stage4_2o_public_fringe_coefficient", role: "transform", displayLatex: "S_\\ell=N^{-1}\\sum_j n_j e^{-2\\pi i\\ell j/N},\\quad \\widetilde C_1=2S_1/S_0=V e^{i\\phi}", computableExpression: null, operatorKind: "noncomputable_reference", inputSymbols: ["n_j", "N"], outputSymbols: ["S_1", "C_tilde_1", "V", "phi"] },
+      { id: "casimir_dp_stage4_2o_heldout_covariance_residual", role: "residual", displayLatex: "\\widehat\\Sigma_{tr}=Cov(\\mathbf z_{tr}),\\quad \\mathbf r_{ho}=\\mathbf z_{1,ho}-\\mathbf X_{ho}\\widehat{\\boldsymbol\\beta}_{tr}", computableExpression: null, operatorKind: "gate_status", inputSymbols: ["z_train", "z_holdout", "X_holdout"], outputSymbols: ["Sigma_train", "r_holdout"] },
+    ],
+    units: [],
+    assumptions: [
+      "Maximum claim: separate_public_dataset_recovery_only.",
+      "The Stage-4.2N leading design and scientific standing remain unchanged.",
+      "Each public dataset is assigned exactly one bounded component role and retains its own apparatus and covariance ancestry.",
+      "No cross-apparatus covariance, likelihood, residual, or physical parameter is transported.",
+      "The sodium fringe coefficient is not the density-matrix element of the proposed sphere.",
+      "The superconducting-drum response is not an apparatus-matched ordinary-null authority.",
+      "The Gran Sasso parameter-free exclusion is not transferred to the registered R0=100 nm comparator without a model-matched recast.",
+      "This badge is non-promotable and has no calculator payload.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      sourceRef("repo_module", "shared/casimir-dp-public-data-component-validation-stage4-2o.ts", "casimir_dp_public_data_component_validation_stage4_2o", "Fail-closed component evaluator and no-fusion gate."),
+      sourceRef("repo_module", "shared/contracts/casimir-dp-public-data-component-validation-stage4-2o.v1.ts", "casimir_dp_public_data_component_validation_stage4_2o_contract", "Frozen run order, source roles, gates, and scientific standing."),
+      sourceRef("repo_module", "scripts/research/import-casimir-dp-public-data-stage4-2o.py", "casimir_dp_public_data_import_stage4_2o", "Complete-source hash authentication and compact numerical extraction."),
+      sourceRef("artifact", "configs/research/casimir-dp-public-data-component-validation-stage4-2o.v1.json", "0b76f4391caf1f15d5faa33f7aade4c41e4b2dcd7d228d9c04912c465fae4199", "Frozen Stage-4.2O configuration."),
+      sourceRef("artifact", "configs/research/fixtures/casimir-dp-stage4-2o.public-data.v1.json", "526d910d47d83921fd2eed945fb2f2b551964263e126cf69bb7d60302ecd9f2a", "Compact provenance-bound component fixture."),
+      sourceRef("artifact", "artifacts/research/casimir-dp-public-data-component-validation-stage4-2o/casimir-dp-public-data-component-validation-stage4-2o-v1-20260807T120000000Z/public-data-component-validation-stage4-2o-report.json", "91dab28f56c087aaee8cb1b16d83a218de569215ee6f2ab2cffd7c66a3cc1182", "Immutable component-validation report."),
+      sourceRef("doc", "docs/research/casimir-dp-public-data-component-validation-stage4-2o-report.md", "fb98ce21e8e8b18477a4ae98f28a0ddd1a66040a00c4a2572255390405ccb9d8", "Maintained Stage-4.2O report."),
+      sourceRef("test", "tests/casimir-dp-public-data-component-validation-stage4-2o.spec.ts", "casimir_dp_public_data_component_validation_stage4_2o_test", "Component recovery, no-fusion, bound-scope, and fail-closed tests."),
+    ],
+    observables: [],
+    hintKeys: { subjects: ["Casimir DP Stage 4.2O", "public data component validation", "complex fringe recovery", "held-out covariance"], symbols: ["S_1", "C_tilde_1", "Sigma_train", "r_holdout"], unitSignatures: ["1", "rad", "Hz"], repoPaths: ["shared/casimir-dp-public-data-component-validation-stage4-2o.ts", "shared/contracts/casimir-dp-public-data-component-validation-stage4-2o.v1.ts", "scripts/research/import-casimir-dp-public-data-stage4-2o.py", "scripts/research/run-casimir-dp-public-data-component-validation-stage4-2o.ts", "configs/research/casimir-dp-public-data-component-validation-stage4-2o.v1.json", "configs/research/fixtures/casimir-dp-stage4-2o.public-data.v1.json", "docs/research/casimir-dp-public-data-component-validation-stage4-2o-report.md", "tests/casimir-dp-public-data-component-validation-stage4-2o.spec.ts"], equationFamilies: ["public_fringe_fourier_recovery", "heldout_covariance_residual"], simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"] },
+  }),
+  studyBadge({
+    id: "study.casimir_dp.proper_time_worldline_closure_stage4_2p",
+    title: "Stage-4.2P Ordinary Proper-Time and Worldline Phase Closure",
+    plainMeaning:
+      "Derives the leading apparatus's ordinary signed branch phase from weak-field proper time and carries Earth gravity, gradients, rotation, local masses, kinematics, clocks, controls, and echo transfer into one fail-closed phase budget.",
+    whyItMatters:
+      "The leading design's electromagnetic-only phase screen was incomplete: an extremely small branch-height error multiplies a very large matter-wave action phase and must be measured and cancelled before an unexplained coherence residual can be interpreted.",
+    subjects: ["casimir_dp_study", "casimir_dp_stage4_2p", "proper_time", "worldline", "weak_field_gravity", "matter_wave_phase", "echo_filter", "ordinary_null"],
+    level: "diagnostic_gate", status: "diagnostic",
+    simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"],
+    equationFamilies: ["weak_field_branch_proper_time", "matter_wave_action_phase", "internal_energy_time_dilation_coherence", "ordinary_phase_covariance"],
+    tags: ["stage_4_2p", "diagnostic", "synthetic_software_closure_pass", "synthetic_phase_budget_pass", "measured_worldlines_not_ready", "measured_gravity_covariance_not_ready", "measured_echo_transfer_not_ready", "internal_energy_authority_not_ready", "measured_evidence_not_ready", "collapse_identification_blocked", "manifold_dynamics_blocked", "physical_viability_not_evaluated", "promotion_blocked", "frozen_diosi_law_unchanged", "zero_observable_bridge", "maximum_claim:ordinary_unitary_proper_time_and_phase_budget_only"],
+    equations: [
+      { id: "casimir_dp_stage4_2p_weak_field_proper_time", role: "transform", displayLatex: "\\Delta\\tau=\\int_0^T[(\\Phi_A-\\Phi_B)/c^2-(v_A^2-v_B^2)/(2c^2)]dt", computableExpression: null, operatorKind: "noncomputable_reference", inputSymbols: ["Phi_A", "Phi_B", "v_A", "v_B", "T"], outputSymbols: ["Delta_tau"] },
+      { id: "casimir_dp_stage4_2p_matter_wave_phase", role: "transform", displayLatex: "\\Delta\\phi_{prop}=-(mc^2/\\hbar)\\Delta\\tau", computableExpression: null, operatorKind: "noncomputable_reference", inputSymbols: ["m", "Delta_tau"], outputSymbols: ["Delta_phi_prop"] },
+      { id: "casimir_dp_stage4_2p_internal_clock_bound", role: "residual", displayLatex: "|C_{int}|\\simeq\\exp[-Var(H_{int})\\Delta\\tau^2/(2\\hbar^2)]", computableExpression: null, operatorKind: "gate_status", inputSymbols: ["Var_H_int", "Delta_tau"], outputSymbols: ["C_int", "chi_time_dilation"] },
+    ],
+    units: [],
+    assumptions: [
+      "Maximum claim: ordinary_unitary_proper_time_and_phase_budget_only.",
+      "The Stage-4.2O receipt, Stage-4.2M leading apparatus, and registered Diósi comparator are immutable upstream evidence.",
+      "Spatial separation alone does not imply differential proper time; branch potential and velocity differences do.",
+      "Echo and path swap act on signed ordinary phase and are not applied to the positive Diósi attenuation exponent.",
+      "The declared worldline, local-mass, tilt, echo, clock, and internal-energy inputs are synthetic screens rather than measured apparatus authority.",
+      "No Compton-clock claim, proper-time-to-collapse kernel, or Casimir-to-collapse kernel is registered.",
+      "This badge is non-promotable and has no calculator payload.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      sourceRef("repo_module", "shared/casimir-dp-proper-time-worldline-closure-stage4-2p.ts", "casimir_dp_proper_time_worldline_closure_stage4_2p", "Weak-field proper-time, phase covariance, echo, and internal-energy evaluator."),
+      sourceRef("repo_module", "shared/contracts/casimir-dp-proper-time-worldline-closure-stage4-2p.v1.ts", "casimir_dp_proper_time_worldline_closure_stage4_2p_contract", "Frozen execution order and fail-closed scientific standing."),
+      sourceRef("artifact", "configs/research/casimir-dp-proper-time-worldline-closure-stage4-2p.v1.json", "67f485838ee71ccdde1559502ff450171f1df66ff88ca0b5464b73b9cc6b9e97", "Frozen Stage-4.2P synthetic configuration."),
+      sourceRef("artifact", "artifacts/research/casimir-dp-proper-time-worldline-closure-stage4-2p/casimir-dp-proper-time-worldline-closure-stage4-2p-v1-20260808T120000000Z/proper-time-worldline-closure-stage4-2p-report.json", "bdb4b150442d3912a385b0261c52760f7f9a1b2a3ffc48841b39ea5aa18a5d86", "Immutable proper-time/worldline report."),
+      sourceRef("doc", "docs/research/casimir-dp-proper-time-worldline-closure-stage4-2p-report.md", "40d5b0db126c26fea13437b58d886180276e9cfa7e2aad86a53b5304d63a38b7", "Maintained Stage-4.2P report."),
+      sourceRef("artifact", "docs/research/casimir-dp-proper-time-worldline-closure-stage4-2p-verification-receipt.json", "a41d984cdc591f7c1bcf4a0056bca6be8997751fecc50a1984af841e58992f99", "Fresh Stage-4.2P regression, build, trace, and adapter-verification receipt."),
+      sourceRef("test", "tests/casimir-dp-proper-time-worldline-closure-stage4-2p.spec.ts", "casimir_dp_proper_time_worldline_closure_stage4_2p_test", "Recovery, sensitivity, fail-closed, internal-clock, and zero-bridge tests."),
+    ],
+    observables: [],
+    hintKeys: { subjects: ["Casimir DP Stage 4.2P", "proper time", "worldline phase", "gravitational redshift", "echo filter"], symbols: ["Delta_tau", "Delta_phi_prop", "Phi_A", "Phi_B", "C_int", "sigma_phi"], unitSignatures: ["s", "rad", "m^2 s^-2", "J"], repoPaths: ["shared/casimir-dp-proper-time-worldline-closure-stage4-2p.ts", "shared/contracts/casimir-dp-proper-time-worldline-closure-stage4-2p.v1.ts", "scripts/research/run-casimir-dp-proper-time-worldline-closure-stage4-2p.ts", "configs/research/casimir-dp-proper-time-worldline-closure-stage4-2p.v1.json", "docs/research/casimir-dp-proper-time-worldline-closure-stage4-2p-report.md", "tests/casimir-dp-proper-time-worldline-closure-stage4-2p.spec.ts"], equationFamilies: ["weak_field_branch_proper_time", "matter_wave_action_phase", "internal_energy_time_dilation_coherence"], simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"] },
+  }),
+  studyBadge({
+    id: "study.casimir_dp.superconducting_boundary_control_stage4_2q",
+    title: "Stage-4.2Q Superconducting-Boundary Control and Nonbridge Gate",
+    plainMeaning:
+      "Tests whether a normal-versus-superconducting boundary state can strengthen the ordinary complex-coherence control while keeping Standard-Model Higgs, condensate, BEC, and Diósi mechanisms separate.",
+    whyItMatters:
+      "The boundary toggle can expose electromagnetic response and switching confounders on an axis distinct from the primary mass-separation-time collapse signature, but only measured finite-frequency impedance and apparatus transfer can make it an authoritative control.",
+    subjects: ["casimir_dp_study", "casimir_dp_stage4_2q", "superconductivity", "anderson_higgs", "surface_impedance", "green_tensor", "complex_coherence", "bec_nonbridge"],
+    level: "diagnostic_gate", status: "diagnostic",
+    simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"],
+    equationFamilies: ["london_screening", "finite_frequency_surface_impedance", "superconducting_boundary_coherence_ratio", "condensation_energy_mass_screen"],
+    tags: ["stage_4_2q", "diagnostic", "synthetic_software_recovery_pass", "synthetic_magnetic_toggle_candidate", "temperature_toggle_no_go", "matched_pair_no_go", "finite_frequency_impedance_nonzero", "standard_diosi_boundary_ratio_cancellation_pass", "specimen_impedance_measured_not_ready", "magnetic_transfer_measured_not_ready", "joint_coherence_cells_not_ready", "measured_evidence_not_ready", "collapse_identification_blocked", "manifold_dynamics_blocked", "physical_viability_not_evaluated", "promotion_blocked", "zero_collapse_bridge", "maximum_claim:ordinary_superconducting_boundary_control_design_only"],
+    equations: [
+      { id: "casimir_dp_stage4_2q_london_screening", role: "transform", displayLatex: "\\lambda_L^{-2}=\\mu_0 n_s(q^*)^2/m^*,\\quad m_{\\gamma,eff}=\\hbar/(\\lambda_L c)", computableExpression: null, operatorKind: "noncomputable_reference", inputSymbols: ["mu_0", "n_s", "q_star", "m_star"], outputSymbols: ["lambda_L", "m_gamma_eff"] },
+      { id: "casimir_dp_stage4_2q_surface_impedance", role: "transform", displayLatex: "Z_s(\\omega)=R_s(\\omega)+iX_s(\\omega),\\quad X_s\\simeq\\mu_0\\omega\\lambda_L", computableExpression: null, operatorKind: "noncomputable_reference", inputSymbols: ["omega", "R_s", "lambda_L"], outputSymbols: ["Z_s", "X_s"] },
+      { id: "casimir_dp_stage4_2q_boundary_ratio", role: "residual", displayLatex: "C_\\beta=C_0e^{i\\Phi_{EM,\\beta}-\\chi_{EM,\\beta}-\\Gamma_Dt},\\quad C_S/C_N=e^{i\\Delta\\Phi_{EM}-\\Delta\\chi_{EM}}", computableExpression: null, operatorKind: "gate_status", inputSymbols: ["C_S", "C_N", "Gamma_D", "Phi_EM", "chi_EM"], outputSymbols: ["boundary_ratio", "dp_cancellation"] },
+      { id: "casimir_dp_stage4_2q_condensation_mass_screen", role: "residual", displayLatex: "u_{cond}=B_c^2/(2\\mu_0),\\quad \\Delta M_{cond}=u_{cond}V/c^2", computableExpression: null, operatorKind: "gate_status", inputSymbols: ["B_c", "V", "c"], outputSymbols: ["u_cond", "Delta_M_cond"] },
+    ],
+    units: [],
+    assumptions: [
+      "Maximum claim: ordinary_superconducting_boundary_control_design_only.",
+      "The Stage-4.2N ordinary-null, Stage-4.2O component replay, Stage-4.2P proper-time budget, leading apparatus, and frozen Diósi law remain immutable upstream evidence.",
+      "Zero DC resistance is not zero finite-frequency impedance.",
+      "The Anderson-Higgs mechanism in a charged condensate is a structural and in-medium electromagnetic analogue, not the Standard-Model Higgs field.",
+      "The superconducting-drum measurement supplies component context only; its response and covariance are not transported into the proposed apparatus.",
+      "The normal/superconducting ratio cancels standard boundary-independent Diósi attenuation and therefore cannot replace the primary mass-separation-time discriminator.",
+      "BEC coherence is a conditional replication-platform relation only; a many-body mass-density contract is required before a Diósi prediction can be made.",
+      "No superconducting-state-to-collapse, Higgs-to-collapse, or BEC-order-parameter-to-collapse kernel is registered.",
+      "This badge is non-promotable and has no calculator payload.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      sourceRef("repo_module", "shared/casimir-dp-superconducting-boundary-control-stage4-2q.ts", "casimir_dp_superconducting_boundary_control_stage4_2q", "London/impedance recovery, boundary ratio, Diósi cancellation, toggle scoring, and claim-boundary evaluator."),
+      sourceRef("repo_module", "shared/contracts/casimir-dp-superconducting-boundary-control-stage4-2q.v1.ts", "casimir_dp_superconducting_boundary_control_stage4_2q_contract", "Frozen run order, evidence class, sources, gates, and fail-closed standing."),
+      sourceRef("artifact", "configs/research/casimir-dp-superconducting-boundary-control-stage4-2q.v1.json", "14b4f3bbdee20e9fa01ca0f0a4c2bb55d0775abaa06f41fe0f7d30e12d805410", "Frozen Stage-4.2Q configuration."),
+      sourceRef("artifact", "configs/research/fixtures/casimir-dp-stage4-2q.superconducting.synthetic.v1.json", "889eb0df45c6032751f64e4a9b16aa51eea90c0761a9a75a1ba45d52065e080d", "Synthetic normal/superconducting response and toggle-control fixture."),
+      sourceRef("artifact", "artifacts/research/casimir-dp-superconducting-boundary-control-stage4-2q/casimir-dp-superconducting-boundary-control-stage4-2q-v1-20260808T180000000Z/superconducting-boundary-control-stage4-2q-report.json", "ea2b76795b3ea4480dfa4f61c5ed5b18083cd4b926df2b3dfbc8d471f4eda218", "Immutable Stage-4.2Q synthetic control report."),
+      sourceRef("doc", "docs/research/casimir-dp-superconducting-boundary-control-stage4-2q-report.md", "bd68e10d74c57b46d4e41b56dd1a029709a0c1a9ac2da84017ee4b6e8aa6b052", "Maintained Stage-4.2Q report."),
+      sourceRef("artifact", "docs/research/casimir-dp-superconducting-boundary-control-stage4-2q-campaign-receipt.json", "ec4a18ff8582186a0f8169e6643cba495f2042e035789bce0d9ba8d4c3d65013", "Content-addressed Stage-4.2Q campaign receipt."),
+      sourceRef("artifact", "docs/research/casimir-dp-superconducting-boundary-control-stage4-2q-verification-receipt.json", "f8a8d65213f48b7663b28f7ad8dd090bb30ee8a73bfa03f44ef8692b849769e1", "Fresh Stage-4.2Q repository-verification receipt; it certifies software closure, not physical evidence."),
+      sourceRef("test", "tests/casimir-dp-superconducting-boundary-control-stage4-2q.spec.ts", "casimir_dp_superconducting_boundary_control_stage4_2q_test", "Gauge/impedance recovery, DP cancellation, strategy, fail-closed, and nonbridge tests."),
+      sourceRef("test", "tests/casimir-dp-stage4-2q-campaign.spec.ts", "casimir_dp_stage4_2q_campaign_test", "Immutable upstream and canonical campaign replay."),
+    ],
+    observables: [],
+    hintKeys: { subjects: ["Casimir DP Stage 4.2Q", "superconducting boundary", "Anderson Higgs", "finite-frequency impedance", "BEC replication"], symbols: ["lambda_L", "Z_s", "m_gamma_eff", "C_S", "C_N", "Delta_M_cond"], unitSignatures: ["m", "ohm", "kg", "rad"], repoPaths: ["shared/casimir-dp-superconducting-boundary-control-stage4-2q.ts", "shared/contracts/casimir-dp-superconducting-boundary-control-stage4-2q.v1.ts", "scripts/research/run-casimir-dp-superconducting-boundary-control-stage4-2q.ts", "configs/research/casimir-dp-superconducting-boundary-control-stage4-2q.v1.json", "docs/research/casimir-dp-superconducting-boundary-control-stage4-2q-report.md", "tests/casimir-dp-superconducting-boundary-control-stage4-2q.spec.ts"], equationFamilies: ["london_screening", "finite_frequency_surface_impedance", "superconducting_boundary_coherence_ratio", "condensation_energy_mass_screen"], simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"] },
+  }),
+  studyBadge({
+    id: "study.casimir_dp.integrated_feasibility_pilot_stage4_2r",
+    title: "Stage-4.2R Integrated Empirical-Pilot Readiness Gate",
+    plainMeaning:
+      "Defines exactly which same-apparatus measurements must coexist before the leading Casimir-Diósi feasibility pilot may begin and keeps the primary collapse comparator separate from the four-cell boundary interaction.",
+    whyItMatters:
+      "It converts the remaining empirical gaps into content-addressed acquisition authorities and prevents independent public component datasets or synthetic forecasts from being fused into a false joint experiment.",
+    subjects: ["casimir_dp_study", "casimir_dp_stage4_2r", "empirical_pilot", "complex_coherence", "four_cell_cross_ratio", "diosi_precision", "custody", "covariance"],
+    level: "diagnostic_gate", status: "blocked",
+    simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"],
+    equationFamilies: ["diosi_visibility_precision_target", "four_cell_complex_cross_ratio", "empirical_authority_packet_gate"],
+    tags: ["stage_4_2r", "diagnostic", "packet_contract_pass", "empirical_pilot_not_authorized", "zero_of_eight_authorities_ready", "primary_diosi_estimand_separate", "four_cell_standard_diosi_cancellation", "cross_apparatus_covariance_fusion_forbidden", "measured_evidence_not_ready", "joint_protocol_validation_not_ready", "collapse_identification_blocked", "manifold_dynamics_blocked", "physical_viability_not_evaluated", "promotion_blocked", "zero_collapse_bridge", "maximum_claim:integrated_feasibility_pilot_packet_and_acceptance_contract_only"],
+    equations: [
+      { id: "casimir_dp_stage4_2r_diosi_precision_target", role: "residual", displayLatex: "V_D=e^{-\\Gamma_Dt},\\quad \\sigma_{|C|}\\le(1-e^{-\\Gamma_Dt})/\\mathrm{SNR}_{min}", computableExpression: null, operatorKind: "gate_status", inputSymbols: ["Gamma_D", "t", "SNR_min"], outputSymbols: ["V_D", "sigma_C_max"] },
+      { id: "casimir_dp_stage4_2r_four_cell_ratio", role: "residual", displayLatex: "R_4=(C_{a,s}C_{r,c})/(C_{a,c}C_{r,s}),\\quad e^{-\\Gamma_Dt}/e^{-\\Gamma_Dt}=1", computableExpression: null, operatorKind: "gate_status", inputSymbols: ["C_a_s", "C_a_c", "C_r_s", "C_r_c", "Gamma_D"], outputSymbols: ["R_4", "standard_diosi_cancellation"] },
+    ],
+    units: [],
+    assumptions: [
+      "Maximum claim: integrated_feasibility_pilot_packet_and_acceptance_contract_only.",
+      "The leading Stage-4.2M apparatus and Stage-4.2O/P/Q receipts remain immutable upstream evidence.",
+      "The primary Diósi estimator is held-out mass-separation-hold-time contraction; the four-cell ratio is a boundary-interaction estimator in which standard boundary-independent Diósi loss cancels.",
+      "Every non-external authority must be measured on the leading apparatus and content-addressed under independent custody.",
+      "Public component datasets cannot be fused into the proposed apparatus covariance, likelihood, or residual.",
+      "Measured state preparation, finite-geometry response, material spectra, phase covariance, gas scattering, four-cell coherence, companion response, and an exact external-bound recast are all absent.",
+      "No Casimir-to-collapse transfer kernel is registered and the frozen Diósi law is unchanged.",
+      "This badge is non-promotable and has no calculator payload.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      sourceRef("repo_module", "shared/casimir-dp-integrated-feasibility-pilot-stage4-2r.ts", "casimir_dp_integrated_feasibility_pilot_stage4_2r", "Same-apparatus authority audit, precision target, estimator separation, and no-go evaluator."),
+      sourceRef("repo_module", "shared/contracts/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.ts", "casimir_dp_integrated_feasibility_pilot_stage4_2r_contract", "Frozen packet schema, run order, apparatus identity, and fail-closed standing."),
+      sourceRef("artifact", "configs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.json", "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11", "Frozen Stage-4.2R empirical-readiness configuration."),
+      sourceRef("artifact", "artifacts/research/casimir-dp-integrated-feasibility-pilot-stage4-2r/casimir-dp-integrated-feasibility-pilot-stage4-2r-v1-20260808T210000000Z/integrated-feasibility-pilot-stage4-2r-report.json", "84b201cbed923c34501329c71a12af8be0072889ae49e164a1a5cb3f3ccca8c3", "Immutable Stage-4.2R readiness report."),
+      sourceRef("doc", "docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-report.md", "a094482c15557291731e8f39c202246f33da8f4ce72fec8bdbbc1a06ae1d9d00", "Maintained integrated-pilot readiness report."),
+      sourceRef("artifact", "docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-campaign-receipt.json", "2f2707eb58f0a6e22c8dc91d2dec3046691b3259d05e27b4f56d0a0bc8e8eb02", "Content-addressed Stage-4.2R campaign receipt."),
+      sourceRef("artifact", "docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-verification-receipt.json", "92fcbf2c5a96aae98a430a6502a877a104c9bb700325c60d2fd04a71e8c84e96", "Fresh Stage-4.2R regression, build, trace, and adapter-verification receipt; it certifies software closure, not empirical readiness."),
+      sourceRef("test", "tests/casimir-dp-integrated-feasibility-pilot-stage4-2r.spec.ts", "casimir_dp_integrated_feasibility_pilot_stage4_2r_test", "Precision, estimator separation, empirical no-go, custody, and no-fusion tests."),
+      sourceRef("test", "tests/casimir-dp-stage4-2r-campaign.spec.ts", "casimir_dp_stage4_2r_campaign_test", "Immutable upstream and canonical campaign replay."),
+    ],
+    observables: [],
+    hintKeys: { subjects: ["Casimir DP Stage 4.2R", "integrated empirical pilot", "Diósi precision target", "four-cell cross ratio"], symbols: ["V_D", "Gamma_D", "sigma_C", "R_4"], unitSignatures: ["1", "rad"], repoPaths: ["shared/casimir-dp-integrated-feasibility-pilot-stage4-2r.ts", "shared/contracts/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.ts", "scripts/research/run-casimir-dp-integrated-feasibility-pilot-stage4-2r.ts", "configs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.json", "docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-report.md", "tests/casimir-dp-integrated-feasibility-pilot-stage4-2r.spec.ts"], equationFamilies: ["diosi_visibility_precision_target", "four_cell_complex_cross_ratio", "empirical_authority_packet_gate"], simulationOwners: ["casimir_dp_study", "casimir", "curvature_collapse"] },
+  }),
+  studyBadge({
     id: "study.casimir_dp.claim_boundary",
     title: "Casimir / DP Quantum-Foam Study Claim Boundary",
     plainMeaning:
@@ -5716,6 +5885,106 @@ export const CASIMIR_DP_STUDY_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
       "Absent specimen spectra, as-built geometry, independently checked full-Maxwell response, and measured intervention covariance block residual attribution and promotion.",
     claimBoundaryNote:
       "The runtime adds zero observable bridge edges; measured evidence and ordinary-null authority remain not ready.",
+  },
+  {
+    id: "casimir_dp_stage4_2n_requires_stage4_2o_public_component_validation",
+    from: "study.casimir_dp.material_thermal_ordinary_null_stage4_2n",
+    to: "study.casimir_dp.public_data_component_validation_stage4_2o",
+    relation: "requires",
+    label:
+      "Stage 4.2O consumes the immutable Stage-4.2N standing before testing separate analysis components on authenticated public measurements.",
+    claimBoundaryNote:
+      "A passing component replay supplies no joint-protocol, state-preparation, apparatus-covariance, collapse, or manifold authority.",
+  },
+  {
+    id: "casimir_dp_stage4_2o_joint_protocol_gap_blocks_claim_boundary",
+    from: "study.casimir_dp.public_data_component_validation_stage4_2o",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "blocks",
+    label:
+      "Different apparatuses, transfer functions, and covariance ancestry prevent the public component replays from becoming a joint Casimir-Diósi measurement.",
+    claimBoundaryNote:
+      "No shared likelihood, transported residual, cross-apparatus covariance, or observable bridge is registered; the selected R0 point also remains unadjudicated.",
+  },
+  {
+    id: "casimir_dp_stage4_2o_requires_stage4_2p_proper_time_closure",
+    from: "study.casimir_dp.public_data_component_validation_stage4_2o",
+    to: "study.casimir_dp.proper_time_worldline_closure_stage4_2p",
+    relation: "requires",
+    label:
+      "Stage 4.2P preserves the authenticated public-component standing while closing the leading apparatus's missing ordinary relativistic phase terms.",
+    claimBoundaryNote:
+      "The proper-time transfer terminates in ordinary unitary phase; it creates no proper-time-to-collapse or Casimir-to-collapse observable bridge.",
+  },
+  {
+    id: "casimir_dp_stage4_2p_empirical_worldline_gap_blocks_claim_boundary",
+    from: "study.casimir_dp.proper_time_worldline_closure_stage4_2p",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "blocks",
+    label:
+      "Unmeasured worldlines, gravity gradients, local-mass geometry, tilt spectra, echo transfer, clock covariance, and internal-energy variance block empirical residual attribution.",
+    claimBoundaryNote:
+      "A passing synthetic 0.018 rad phase budget is not measured evidence and leaves collapse, manifold dynamics, and physical viability unresolved.",
+  },
+  {
+    id: "casimir_dp_stage4_2p_requires_stage4_2q_superconducting_control",
+    from: "study.casimir_dp.proper_time_worldline_closure_stage4_2p",
+    to: "study.casimir_dp.superconducting_boundary_control_stage4_2q",
+    relation: "requires",
+    label:
+      "Stage 4.2Q preserves the leading apparatus, proper-time phase budget, frozen Diósi law, and fail-closed standing before evaluating a superconducting boundary control.",
+    claimBoundaryNote:
+      "A boundary-state control cannot rewrite the proper-time budget or create a collapse mechanism.",
+  },
+  {
+    id: "casimir_dp_stage4_2n_checks_stage4_2q_ordinary_response",
+    from: "study.casimir_dp.material_thermal_ordinary_null_stage4_2n",
+    to: "study.casimir_dp.superconducting_boundary_control_stage4_2q",
+    relation: "diagnostic_checks",
+    label:
+      "The material/Green/FDT lane defines the ordinary response chain into which measured normal and superconducting impedance would enter.",
+    claimBoundaryNote:
+      "The Stage-4.2Q response is synthetic and cannot satisfy Stage-4.2N specimen or Green-tensor authority.",
+  },
+  {
+    id: "casimir_dp_stage4_2o_checks_stage4_2q_component_scope",
+    from: "study.casimir_dp.public_data_component_validation_stage4_2o",
+    to: "study.casimir_dp.superconducting_boundary_control_stage4_2q",
+    relation: "diagnostic_checks",
+    label:
+      "The measured superconducting-drum replay demonstrates boundary-response extraction while remaining isolated from the proposed apparatus and covariance.",
+    claimBoundaryNote:
+      "No response, covariance, residual, or likelihood is transported across apparatuses.",
+  },
+  {
+    id: "casimir_dp_stage4_2q_empirical_control_gap_blocks_claim_boundary",
+    from: "study.casimir_dp.superconducting_boundary_control_stage4_2q",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "blocks",
+    label:
+      "Missing specimen impedance, state-conditioned Casimir response, full Green tensor, switching covariance, vortex witness, and joint coherence cells block control authority and promotion.",
+    claimBoundaryNote:
+      "The bounded magnetic-toggle result is synthetic only; Higgs, condensate, BEC, collapse, manifold, and physical-viability claims remain closed.",
+  },
+  {
+    id: "casimir_dp_stage4_2q_requires_stage4_2r_integrated_pilot",
+    from: "study.casimir_dp.superconducting_boundary_control_stage4_2q",
+    to: "study.casimir_dp.integrated_feasibility_pilot_stage4_2r",
+    relation: "requires",
+    label:
+      "Stage 4.2R preserves the superconducting control, proper-time budget, public-component isolation, leading apparatus, and frozen Diósi law before auditing the joint physical pilot.",
+    claimBoundaryNote:
+      "A passing packet schema is not an executed pilot and supplies no measured authority.",
+  },
+  {
+    id: "casimir_dp_stage4_2r_empirical_authority_gap_blocks_claim_boundary",
+    from: "study.casimir_dp.integrated_feasibility_pilot_stage4_2r",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "blocks",
+    label:
+      "Eight absent same-apparatus authorities block the feasibility pilot, ordinary-null closure, residual attribution, and every collapse or manifold claim.",
+    claimBoundaryNote:
+      "The 2.908% loss and 0.005816 precision target are conditional model forecasts; the four-cell ratio cancels standard Diósi loss and adds no Casimir-to-collapse bridge.",
   },
   {
     id: "casimir_dp_stage4_2m_synthetic_region_blocks_claim_boundary",

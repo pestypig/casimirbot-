@@ -674,6 +674,88 @@ covariance remain `not_ready`; zero observable bridge edges are added. The
 canonical report is
 `docs/research/casimir-dp-material-thermal-ordinary-null-stage4-2n-report.md`.
 
+## Stage-4.2O authenticated public-data component validation
+
+Run `npm run casimir:dp:stage4-2o` to replay the compact, provenance-bound
+public-data fixture. The source importer is
+`scripts/research/import-casimir-dp-public-data-stage4-2o.py`; it authenticates
+the external sodium-cluster, superconducting-drum, LISA Pathfinder, and Gran
+Sasso source files and emits only a compact derived fixture, not the large
+third-party archives.
+
+The runtime recovers complex matter-wave fringes, paired boundary-response
+features, held-out multichannel covariance/residual handling, and an external
+Diósi-bound source record in four separate apparatus lanes. All component and
+provenance gates pass. Cross-apparatus covariance fusion and shared-likelihood
+construction are forbidden, the Stage-4.2M leading design is unchanged, and
+`measured_evidence`, `joint_protocol_validation`, collapse identification, and
+manifold dynamics remain closed. The canonical report is
+`docs/research/casimir-dp-public-data-component-validation-stage4-2o-report.md`.
+
+## Stage-4.2P ordinary proper-time/worldline closure
+
+Run `npm run casimir:dp:stage4-2p` to bind the leading Stage-4.2M apparatus to
+an explicit weak-field worldline and ordinary phase budget. The runtime
+recovers the Minkowski, equal-worldline, coordinate-offset, symmetric-gradient,
+and vertical \(mgdT/\hbar\) limits; propagates Earth gravity, gradients,
+rotation, balanced local masses, kinematics, laboratory timing, control phase,
+and the transported electromagnetic term; and applies a frequency-resolved
+echo/path-swap screen.
+
+For the nominal horizontal branch, the linear Earth-redshift term is zero. A
+fully vertical 250 nm separation would instead accumulate
+`1.7973596191631953e12 rad` over 250 ms. Under the declared synthetic
+`1e-10 rad` tilt sigma and `1e-4` echo residual, the total ordinary phase sigma
+is `0.01800650829491001 rad`, below the frozen `0.03464404998245921 rad`
+limit. This is a narrow synthetic pass, not apparatus evidence. Measured
+worldlines, local gravity and mass geometry, tilt spectra, echo transfer,
+clock/control covariance, and internal-energy variance remain `not_ready`.
+The frozen Diósi exponents are unchanged and zero collapse-bridge edges are
+added. The canonical report is
+`docs/research/casimir-dp-proper-time-worldline-closure-stage4-2p-report.md`.
+Fresh adapter run `2380` (`adapter:f3cbd258-82d2-4965-8a19-329600427b6a`)
+returns `PASS`, no first failure, empty deltas, certificate status `GREEN`,
+integrity true, and certificate SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+The downstream verification receipt is
+`docs/research/casimir-dp-proper-time-worldline-closure-stage4-2p-verification-receipt.json`.
+
+## Stage-4.2Q superconducting-boundary control
+
+Run `npm run casimir:dp:stage4-2q` to replay the bounded normal-versus-
+superconducting boundary-control assessment. The diagnostic recovers London
+screening while enforcing nonzero finite-frequency surface impedance,
+constructs the ordinary complex-coherence ratio, verifies that the unchanged
+standard Diósi factor cancels to numerical precision, scores temperature,
+magnetic, and matched-specimen controls, and bounds the coating condensation
+energy as ordinary stress energy only.
+
+The synthetic fixture rejects crossing (T_c) because of thermal-signature
+collinearity and rejects a matched static pair because of low SNR and
+fabrication degeneracy. A magnetic toggle is the only bounded synthetic
+candidate (SNR `10.042454540104556`, maximum nuisance cosine
+`0.3670128108497832`, condition number `1.4695651082298706`). It is not a
+physical apparatus selection. Measured specimen impedance, state-conditioned
+Green response, magnetic/trap transfer, vortex state, sham covariance, and
+joint complex-coherence cells remain absent.
+
+The Theory Badge documents one ordinary response edge--surface impedance to
+the electromagnetic Green/phase/loss chain--and zero collapse-bridge edges.
+Standard-Model Higgs, Anderson--Higgs, superconducting-condensate, and BEC
+relations remain structural, calibration, or platform nonbridges to the frozen
+Diósi generator. The canonical report is
+`docs/research/casimir-dp-superconducting-boundary-control-stage4-2q-report.md`.
+
+Fresh adapter run `2381`
+(`adapter:6d1b7163-e47e-446c-88a5-4bba0925da9d`) is `PASS`, with no first
+failure or deltas, certificate status `GREEN`, integrity true, and certificate
+SHA-256
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
+The verification receipt is
+`docs/research/casimir-dp-superconducting-boundary-control-stage4-2q-verification-receipt.json`.
+This certifies repository execution only; all empirical and physical-viability
+ceilings remain unchanged.
+
 The earlier Stage-4.2J Schrödinger/mass-density campaign recovers the frozen
 effective-Gaussian prediction, proves that a Hamiltonian
 branch-energy difference rotates phase rather than generating DP contraction,
@@ -771,6 +853,23 @@ calibration-only claim ceiling.
 
 Use `study-full-solve-template.md` when starting another whitepaper-backed,
 artifact-producing study.
+
+## Stage-4.2R integrated feasibility-pilot readiness
+
+Run `npm run casimir:dp:stage4-2r` to replay the content-addressed empirical-
+input audit for the leading apparatus. The runtime separates the primary
+mass--separation--time Diósi contraction from the four-cell boundary-
+interaction cross-ratio, computes the conditional acquisition precision, and
+returns an explicit pilot authorization or no-go.
+
+The current report is
+`docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-report.md`.
+It returns `not_authorized` because all eight required same-apparatus authority
+packets are absent. This is a passing fail-closed software contract, not a
+failed physics result and not measured collapse evidence.
+
+Fresh repository verification is recorded in
+`docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-verification-receipt.json`.
 
 ## Boundary
 

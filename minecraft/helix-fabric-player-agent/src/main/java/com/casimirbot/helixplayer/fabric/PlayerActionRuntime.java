@@ -50,6 +50,7 @@ final class PlayerActionRuntime implements AutoCloseable {
     private final AtomicBoolean cyclePending = new AtomicBoolean(false);
     private final AtomicBoolean manifestPending = new AtomicBoolean(false);
     private volatile boolean manifestReady;
+    private volatile boolean heartbeatReady;
     private volatile boolean emergencyStopLatched;
     private volatile boolean manualInputDetected;
     private volatile long latestEventSequence = -1;
@@ -105,7 +106,11 @@ final class PlayerActionRuntime implements AutoCloseable {
         if (ticks % HEARTBEAT_INTERVAL_TICKS == 0) {
             if (manifestReady) network.execute(this::publishHeartbeat);
         }
-        if (manifestReady && ticks % POLL_INTERVAL_TICKS == 0 && cyclePending.compareAndSet(false, true)) {
+        if (
+            actionPollingReady(manifestReady, heartbeatReady) &&
+            ticks % POLL_INTERVAL_TICKS == 0 &&
+            cyclePending.compareAndSet(false, true)
+        ) {
             network.execute(() -> {
                 try {
                     pollControlsThenActions();
@@ -117,13 +122,14 @@ final class PlayerActionRuntime implements AutoCloseable {
     }
 
     boolean ready() {
-        return config.ready() && manifestReady && !emergencyStopLatched;
+        return config.ready() && manifestReady && heartbeatReady && !emergencyStopLatched;
     }
 
     String statusText() {
         if (!config.ready()) return "Helix player embodiment is not paired.";
         if (emergencyStopLatched) return "Helix player embodiment is emergency-stopped; pair a fresh authority to resume.";
         if (!manifestReady) return "Helix player embodiment is paired and waiting for manifest admission.";
+        if (!heartbeatReady) return "Helix player embodiment is paired and waiting for its first admitted heartbeat.";
         String workflow = controller.activeWorkflowId();
         return workflow == null
             ? "Helix player embodiment is active and idle."
@@ -151,10 +157,19 @@ final class PlayerActionRuntime implements AutoCloseable {
         try {
             PlayerActionHttpClient.Response response = http.post("/manifest", manifest());
             manifestReady = response.ok();
-            if (!response.ok()) recordTransportError(response.error());
-            else clearTransportError();
+            if (!response.ok()) {
+                heartbeatReady = false;
+                recordTransportError(response.error());
+            } else {
+                clearTransportError();
+                // Establish a fresh active heartbeat before the first work poll.
+                // Otherwise the broker correctly rejects the poll as stale and
+                // the transient bootstrap error can become self-sustaining.
+                publishHeartbeat();
+            }
         } catch (Exception error) {
             manifestReady = false;
+            heartbeatReady = false;
             recordTransportError("manifest_unreachable");
             if (error instanceof InterruptedException) Thread.currentThread().interrupt();
         }
@@ -163,9 +178,11 @@ final class PlayerActionRuntime implements AutoCloseable {
     private void publishHeartbeat() {
         try {
             PlayerActionHttpClient.Response response = http.post("/heartbeat", heartbeat());
+            heartbeatReady = response.ok();
             if (!response.ok()) recordTransportError(response.error());
             else clearTransportError();
         } catch (Exception error) {
+            heartbeatReady = false;
             recordTransportError("heartbeat_unreachable");
             if (error instanceof InterruptedException) Thread.currentThread().interrupt();
         }
@@ -650,7 +667,10 @@ final class PlayerActionRuntime implements AutoCloseable {
         heartbeat.put("world_id", config.worldId());
         heartbeat.put("participant_id", config.participantId());
         heartbeat.put("subject_binding_id", config.subjectBindingId());
-        heartbeat.put("status", emergencyStopLatched ? "paused" : lastTransportError.isBlank() ? "active" : "degraded");
+        heartbeat.put(
+            "status",
+            connectorHeartbeatStatus(emergencyStopLatched, lastTransportError)
+        );
         heartbeat.put("active_workflow_ids", workflow == null ? List.of() : List.of(workflow));
         heartbeat.put("controls_asserted", running && !emergencyStopLatched);
         heartbeat.put("manual_input_detected", manualInputDetected);
@@ -764,6 +784,24 @@ final class PlayerActionRuntime implements AutoCloseable {
 
     private void clearTransportError() {
         lastTransportError = "";
+    }
+
+    static boolean actionPollingReady(
+        boolean manifestReady,
+        boolean heartbeatReady
+    ) {
+        return manifestReady && heartbeatReady;
+    }
+
+    static String connectorHeartbeatStatus(
+        boolean emergencyStopLatched,
+        String previousTransportError
+    ) {
+        // Reaching the heartbeat endpoint is itself the recovery probe. A
+        // previous poll/transport error remains diagnostic engine metadata but
+        // must not make the recovery heartbeat fail the broker's active-status
+        // gate forever.
+        return emergencyStopLatched ? "paused" : "active";
     }
 
     private static String wireState(State state) {

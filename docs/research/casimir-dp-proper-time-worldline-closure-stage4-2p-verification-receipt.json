@@ -1,0 +1,44 @@
+{
+  "schema_version": "casimir_dp_proper_time_worldline_closure_stage4_2p_verification_receipt/1",
+  "campaign_run_id": "casimir-dp-proper-time-worldline-closure-stage4-2p-v1-20260808T120000000Z",
+  "generated_at": "2026-08-08T05:15:03.000Z",
+  "campaign_receipt_path": "docs/research/casimir-dp-proper-time-worldline-closure-stage4-2p-campaign-receipt.json",
+  "campaign_receipt_sha256": "3f82d7632fa7a7b8fca08857cd9c2d927399b3a334ccf319f8895a13f1b365ab",
+  "verification": {
+    "adapter_endpoint": "http://127.0.0.1:5050/api/agi/adapter/run",
+    "pack": "repo-convergence",
+    "run_id": "2380",
+    "trace_id": "adapter:f3cbd258-82d2-4965-8a19-329600427b6a",
+    "verdict": "PASS",
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "certificate_sha256": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_status": "GREEN",
+    "integrity_ok": true,
+    "training_trace_path": "artifacts/training-trace.jsonl",
+    "training_trace_sha256": "747bba66f997ef759051f107f2ef83998214c71632d1ca1db4d0519aee66ccb7"
+  },
+  "validation": {
+    "stage4_2p_focused_and_graph_tests": "69/69 pass",
+    "stage4_2e_2m_2n_2o_2p_inherited_chain": "35/35 pass",
+    "required_gr_warp_tests": "179/179 pass",
+    "math_registry": "224 entries valid",
+    "equation_sidecars": "current",
+    "root_to_leaf": "pass",
+    "production_client_build": "pass_with_preexisting_warnings",
+    "production_server_build": "pass_with_preexisting_warnings"
+  },
+  "scientific_standing": {
+    "software_closure": "pass",
+    "synthetic_total_phase_gate": "pass",
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "physical_pilot_authorized": false,
+    "frozen_diosi_law_modified": false,
+    "observable_bridge_edges_added": 0
+  }
+}

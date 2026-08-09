@@ -1,0 +1,106 @@
+{
+  "schema_version": "casimir_dp_superconducting_boundary_control_stage4_2q/1",
+  "campaign_id": "casimir-dp-superconducting-boundary-control-stage4-2q-v1",
+  "evidence_class": "synthetic_superconducting_control_identifiability_only",
+  "claim_ceiling": "ordinary_superconducting_boundary_control_design_only",
+  "promotion_allowed": false,
+  "collapse_bridge_edges_allowed": false,
+  "run_order": [
+    "verify_immutable_stage4_2p_and_component_evidence",
+    "recover_london_and_finite_frequency_impedance_relations",
+    "construct_normal_and_superconducting_ordinary_coherence",
+    "prove_boundary_ratio_cancels_frozen_standard_diosi",
+    "score_temperature_field_and_matched_pair_controls",
+    "bound_condensation_energy_mass_equivalent",
+    "separate_higgs_anderson_higgs_bec_and_diosi_claims",
+    "return_synthetic_control_candidate_or_explicit_no_go"
+  ],
+  "upstream": {
+    "stage4_2p_campaign_receipt_path": "docs/research/casimir-dp-proper-time-worldline-closure-stage4-2p-campaign-receipt.json",
+    "stage4_2p_campaign_receipt_sha256": "3f82d7632fa7a7b8fca08857cd9c2d927399b3a334ccf319f8895a13f1b365ab",
+    "stage4_2o_verification_receipt_path": "docs/research/casimir-dp-public-data-component-validation-stage4-2o-verification-receipt.json",
+    "stage4_2o_verification_receipt_sha256": "838b22b9338c9958a8353009c42d02effd1e3b183f10fec582c0131bad368417",
+    "stage4_2n_verification_receipt_path": "docs/research/casimir-dp-material-thermal-ordinary-null-stage4-2n-verification-receipt.json",
+    "stage4_2n_verification_receipt_sha256": "4595d48178d720cf716981f240e88859a37b47a2b43b5e94ab2fa0fd1aa6d3f2"
+  },
+  "fixture_path": "configs/research/fixtures/casimir-dp-stage4-2q.superconducting.synthetic.v1.json",
+  "fixture_sha256": "889eb0df45c6032751f64e4a9b16aa51eea90c0761a9a75a1ba45d52065e080d",
+  "leading_design": {
+    "candidate_id": "stage4_2m_candidate_002",
+    "radius_m": 2.76302362398029e-7,
+    "mass_kg": 3.0925052683774525e-16,
+    "branch_separation_m": 2.5e-7,
+    "hold_time_s": 0.25,
+    "gap_m": 1e-5,
+    "plate_size_m": 8e-5,
+    "temperature_K": 4
+  },
+  "frozen_diosi": {
+    "model_id": "diosi_1989_gaussian_regularized_nondissipative",
+    "R0_m": 1e-7,
+    "gaussian_exponent_at_hold": 0.029511464722144533,
+    "boundary_state_dependence": false,
+    "modified_by_campaign": false
+  },
+  "constants": {
+    "mu0_N_A2": 0.00000125663706212,
+    "hbar_J_s": 1.054571817e-34,
+    "c_m_s": 299792458
+  },
+  "gates": {
+    "london_relative_tolerance": 1e-10,
+    "maximum_signature_cosine": 0.97,
+    "maximum_augmented_condition_number": 100,
+    "minimum_boundary_contrast_snr": 5,
+    "maximum_dp_cancellation_error": 1e-12,
+    "maximum_green_transfer_absolute_error": 1e-15,
+    "require_nonzero_finite_frequency_impedance": true
+  },
+  "sources": [
+    {
+      "source_id": "anderson-1963-gauge-mass",
+      "citation": "P. W. Anderson, Plasmons, Gauge Invariance, and Mass, Physical Review 130, 439 (1963).",
+      "url": "https://doi.org/10.1103/PhysRev.130.439",
+      "supports": "The charged-condensate gauge-field mass/screening analogy underlying the Anderson-Higgs description.",
+      "does_not_support": "Identity between a superconducting order parameter and the Standard-Model Higgs field, or a collapse mechanism."
+    },
+    {
+      "source_id": "mattis-bardeen-1958",
+      "citation": "D. C. Mattis and J. Bardeen, Theory of the Anomalous Skin Effect in Normal and Superconducting Metals, Physical Review 111, 412 (1958).",
+      "url": "https://doi.org/10.1103/PhysRev.111.412",
+      "supports": "Frequency-dependent electromagnetic response and finite surface impedance in superconductors.",
+      "does_not_support": "Zero impedance at all frequencies or a boundary-to-collapse transfer."
+    },
+    {
+      "source_id": "dejong-2026-superconducting-force",
+      "citation": "M. J. A. de Jong et al., Measurement of a strong nonlinear force between superconductors compatible with the Casimir force, Nature Communications 17 (2026).",
+      "url": "https://doi.org/10.1038/s41467-026-75261-9",
+      "supports": "A measured superconducting boundary-force response and a public component-replay benchmark.",
+      "does_not_support": "The proposed cavity response, transported covariance, DP collapse, or a Higgs-to-Casimir mechanism."
+    },
+    {
+      "source_id": "harber-2005-bec-casimir-polder",
+      "citation": "D. M. Harber et al., Measurement of the Casimir-Polder Force through Center-of-Mass Oscillations of a Bose-Einstein Condensate, Physical Review A 72, 033610 (2005).",
+      "url": "https://doi.org/10.1103/PhysRevA.72.033610",
+      "supports": "BEC center-of-mass coherence as a surface-force sensing platform.",
+      "does_not_support": "Reuse of the effective Gaussian sphere DP source or a condensate-to-collapse transfer law."
+    },
+    {
+      "source_id": "higgs-1964",
+      "citation": "P. W. Higgs, Broken Symmetries and the Masses of Gauge Bosons, Physical Review Letters 13, 508 (1964).",
+      "url": "https://doi.org/10.1103/PhysRevLett.13.508",
+      "supports": "The relativistic gauge-theory mass mechanism used for the Standard-Model Higgs sector.",
+      "does_not_support": "A superconducting material response, Casimir modifier, or Diósi collapse kernel."
+    }
+  ],
+  "standing": {
+    "measured_evidence": "not_ready",
+    "ordinary_null_authority": "not_ready",
+    "residual_attribution": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "physical_pilot_authorized": false,
+    "confirmatory_campaign_authorized": false
+  }
+}

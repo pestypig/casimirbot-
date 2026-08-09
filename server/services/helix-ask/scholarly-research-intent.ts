@@ -560,6 +560,9 @@ export const buildScholarlyCapabilityChainPlan = (
         ? "scholarly-research.lookup_papers"
         : "scholarly-research.fetch_full_text"
     ));
+    if (intent.requires_full_text && !planned.includes("scholarly-research.fetch_full_text")) {
+      planned.push("scholarly-research.fetch_full_text");
+    }
     return {
       schema: "helix.scholarly_capability_chain_plan.v1",
       requested_workflow: intent.requested_workflow,
@@ -580,6 +583,7 @@ export const buildScholarlyCapabilityChainPlan = (
     ? ["scholarly-research.fetch_full_text"]
     : ["scholarly-research.lookup_papers"];
   if (!directFullTextSource && (
+    intent.requires_full_text ||
     intent.requested_workflow === "full_text_summary" ||
     intent.requested_workflow === "numeric_extraction" ||
     intent.requested_workflow === "numeric_calculation"
@@ -642,19 +646,20 @@ export const extractScholarlyIntent = (promptText: string): HelixScholarlyIntent
     promptText: originalPrompt,
     workflow,
   });
-  const requiresFullText = requestsFullText && evidenceDemand.required_modes.includes("full_text");
+  const requiresFullText = evidenceDemand.required_modes.includes("full_text");
   const requiresNumericExtraction =
     workflow === "numeric_extraction" || workflow === "numeric_calculation";
   const requiresCalculation = workflow === "numeric_calculation";
   const requestedOutputs = uniqueStrings([
     workflow === "doi_lookup" ? "doi_metadata" : "paper_metadata",
-    requestsFullText ? "full_text" : "",
+    requiresFullText ? "full_text" : "",
     requiresNumericExtraction ? "numeric_parameters" : "",
     requiresCalculation ? "calculation" : "",
     workflow === "bibliography_repair" ? "bibliography" : "",
   ]);
-  const terminalEvidenceRequirement =
-    workflow === "full_text_summary" && !requiresFullText
+  const terminalEvidenceRequirement = requiresFullText
+    ? "full_text"
+    : workflow === "full_text_summary"
       ? "metadata"
       : terminalRequirementForWorkflow(workflow);
   return {

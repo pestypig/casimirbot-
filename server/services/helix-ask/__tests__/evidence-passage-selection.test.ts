@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildEvidenceUnitsFromText,
   selectEvidencePassages,
+  selectEvidencePassagesWithCoverage,
 } from "../retrieval/evidence-passage-selection";
 
 describe("evidence passage selection", () => {
@@ -56,5 +57,82 @@ describe("evidence passage selection", () => {
 
     expect(passages[0]).toMatchObject({ section: "Abstract" });
     expect(passages[0]?.text).toContain("withholds a physical viability claim");
+  });
+
+  it("keeps content after an inline section label", () => {
+    const units = buildEvidenceUnitsFromText({
+      page: 3,
+      text: "Results. The model reports constraints and caveats for the proposed field.",
+    });
+
+    expect(units).toEqual([
+      expect.objectContaining({
+        page: 3,
+        section: "Results",
+        text: "The model reports constraints and caveats for the proposed field.",
+      }),
+    ]);
+  });
+
+  it("covers assumptions and limitations for analytical comparison prompts", () => {
+    const units = buildEvidenceUnitsFromText({
+      text: [
+        "# Abstract",
+        "The paper reports a generic energy-condition result for warp geometries.",
+        "",
+        "# Assumptions",
+        "The derivation assumes unit lapse and a flat spatial three-metric.",
+        "",
+        "# Limitations",
+        "The result does not validate a particular engineered source or a lapse-extended construction.",
+      ].join("\n"),
+    });
+
+    const passages = selectEvidencePassagesWithCoverage({
+      units,
+      query:
+        "Compare this paper with NHM2 and explain what it supports and what it does not validate.",
+      source_ref: "artifact://scholarly-pdf/warp.pdf",
+      title: "Generic Warp Drives",
+      max_passages: 3,
+    });
+
+    expect(passages).toHaveLength(3);
+    expect(passages.map((entry) => entry.section)).toEqual(
+      expect.arrayContaining(["Abstract", "Assumptions", "Limitations"]),
+    );
+    expect(passages.map((entry) => entry.text).join(" ")).toContain(
+      "unit lapse and a flat spatial three-metric",
+    );
+    expect(passages.map((entry) => entry.text).join(" ")).toContain(
+      "does not validate a particular engineered source",
+    );
+  });
+
+  it("covers prose-declared setup assumptions without an assumptions heading", () => {
+    const units = buildEvidenceUnitsFromText({
+      page: 4,
+      text: [
+        "The flow vector and its derivatives are assumed to be smooth and bounded.",
+        "This ADM-like decomposition has unit lapse and a flat spatial three-metric.",
+        "The weak energy condition must hold for all timelike observers.",
+      ].join(" "),
+    });
+
+    const passages = selectEvidencePassagesWithCoverage({
+      units,
+      query:
+        "Which assumption mismatch matters most when applying this paper to another model?",
+      source_ref: "artifact://scholarly-pdf/warp.pdf",
+      title: "Generic Warp Drives",
+      max_passages: 3,
+    });
+
+    const evidence = passages.map((entry) => entry.text).join(" ");
+    expect(passages[0]?.text).toContain(
+      "flow vector and its derivatives are assumed",
+    );
+    expect(evidence).toContain("unit lapse and a flat spatial three-metric");
+    expect(evidence).toContain("all timelike observers");
   });
 });

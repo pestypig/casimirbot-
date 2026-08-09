@@ -16,7 +16,7 @@ import {
 import { runScholarlyResearchLookup } from "./scholarly-research-lookup";
 import {
   buildEvidenceUnitsFromText,
-  selectEvidencePassages,
+  selectEvidencePassagesWithCoverage,
 } from "./evidence-passage-selection";
 import { saveResearchLibraryExtraction } from "../../helix-account/research-library-store";
 import { normalizeScholarlyFullTextSourceUrl } from "../scholarly-research-intent";
@@ -478,26 +478,29 @@ const scoreChunk = (
 const selectChunks = (input: {
   pages: ScholarlyPdfTextPage[];
   paper: HelixScholarlyPaperResult | null;
+  paperResultId?: string;
+  title?: string;
   query: string;
   maxChunks: number;
   sourcePdfRef?: string;
 }): HelixScholarlyFullTextChunk[] => {
   const sourceRef = input.sourcePdfRef ?? "artifact://scholarly-source";
-  const passages = selectEvidencePassages({
+  const title = input.paper?.title ?? input.title ?? "Research paper";
+  const passages = selectEvidencePassagesWithCoverage({
     units: input.pages.flatMap((page) =>
       buildEvidenceUnitsFromText({ text: page.text, page: page.page })
     ),
     query: input.query,
     source_ref: sourceRef,
-    title: input.paper?.title ?? "Research paper",
+    title,
     max_passages: input.maxChunks,
     max_chars: 1400,
   });
   return passages.map((passage) => {
     return {
       chunk_id: passage.passage_id,
-      ...(input.paper?.result_id ? { paper_result_id: input.paper.result_id } : {}),
-      ...(input.paper?.title ? { title: input.paper.title } : {}),
+      ...(input.paperResultId ? { paper_result_id: input.paperResultId } : {}),
+      ...(title ? { title } : {}),
       page_start: passage.page ?? 1,
       page_end: passage.page ?? 1,
       ...(passage.section ? { section_hint: passage.section } : {}),
@@ -514,6 +517,63 @@ const selectChunks = (input: {
     };
   });
 };
+
+export type RerankCachedScholarlyFullTextInput = {
+  cachePath: string;
+  query: string;
+  paperResultId?: string | null;
+  title?: string | null;
+  sourcePdfRef?: string | null;
+  maxPages?: number | null;
+  maxChunks?: number | null;
+  cacheRoot?: string | null;
+  extractPdfTextImpl?: ScholarlyPdfTextExtractor;
+};
+
+export async function rerankCachedScholarlyFullTextPassages(
+  input: RerankCachedScholarlyFullTextInput,
+): Promise<HelixScholarlyFullTextChunk[]> {
+  const cacheRoot = path.resolve(
+    input.cacheRoot?.trim() ||
+      path.join(process.cwd(), "artifacts", "helix", "scholarly-pdfs"),
+  );
+  const cachePath = path.resolve(input.cachePath);
+  const relative = path.relative(cacheRoot, cachePath);
+  if (
+    !relative ||
+    relative.startsWith("..") ||
+    path.isAbsolute(relative) ||
+    path.extname(cachePath).toLowerCase() !== ".pdf"
+  ) {
+    return [];
+  }
+  try {
+    const bytes = new Uint8Array(await fs.readFile(cachePath));
+    if (!isLikelyPdfBytes(bytes)) return [];
+    const maxPages = Math.max(
+      1,
+      Math.min(Number(input.maxPages) || DEFAULT_MAX_PAGES, MAX_PAGES),
+    );
+    const maxChunks = Math.max(
+      1,
+      Math.min(Number(input.maxChunks) || DEFAULT_MAX_CHUNKS, MAX_CHUNKS),
+    );
+    const extraction = await (
+      input.extractPdfTextImpl ?? extractPdfTextWithPdfJs
+    )(bytes, { maxPages });
+    return selectChunks({
+      pages: extraction.pages.slice(0, maxPages),
+      paper: null,
+      paperResultId: input.paperResultId?.trim() || undefined,
+      title: input.title?.trim() || undefined,
+      query: input.query,
+      maxChunks,
+      sourcePdfRef: input.sourcePdfRef?.trim() || undefined,
+    }).filter((chunk) => chunk.text_excerpt.length > 0);
+  } catch {
+    return [];
+  }
+}
 
 const buildVisualCandidates = (input: {
   pages: ScholarlyPdfTextPage[];
@@ -740,6 +800,7 @@ export async function runScholarlyFullTextFetch(
 
   const query = input.query.trim();
   const paper = selectPaper(input);
+  const paperResultId = paper?.result_id ?? input.paperResultId?.trim() ?? undefined;
   const sourceUrl = normalizeScholarlyFullTextSourceUrl(
     input.sourceUrl?.trim() || resolveScholarlyFullTextUrl(paper),
   );
@@ -899,6 +960,7 @@ export async function runScholarlyFullTextFetch(
   const selectedChunks = selectChunks({
     pages,
     paper,
+    paperResultId,
     query,
     maxChunks,
     sourcePdfRef,
@@ -920,7 +982,7 @@ export async function runScholarlyFullTextFetch(
   }
   const nextAffordances = buildFullTextNextAffordances({
     sourceRef: sourcePdfRef,
-    paperResultId: paper?.result_id,
+    paperResultId,
     visualCandidates,
     query,
     reason: evidenceState === "page_image_parse_required" ? "page_image_parse_required" : "full_text_unavailable",
@@ -945,7 +1007,7 @@ export async function runScholarlyFullTextFetch(
         source_kind: sourceKind,
         source_pdf_ref: sourcePdfRef,
         source_integrity_hash: cacheIntegrityHash,
-        paper_result_id: paper?.result_id,
+        paper_result_id: paperResultId,
         query,
         extraction_status: evidenceState,
         pages: pages.map((page) => ({
@@ -970,7 +1032,7 @@ export async function runScholarlyFullTextFetch(
     turn_id: input.turnId,
     capability: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
     query,
-    ...(paper?.result_id ? { paper_result_id: paper.result_id } : {}),
+    ...(paperResultId ? { paper_result_id: paperResultId } : {}),
     ...(paper?.title ? { title: paper.title } : {}),
     ...(sourceUrl ? { source_url: sourceUrl } : {}),
     source_kind: sourceKind,
@@ -986,7 +1048,7 @@ export async function runScholarlyFullTextFetch(
       source: {
         ...(paper?.title ? { title: paper.title } : {}),
         ...(sourceUrl ? { url: sourceUrl } : {}),
-        ...(paper?.result_id ? { paper_result_id: paper.result_id } : {}),
+        ...(paperResultId ? { paper_result_id: paperResultId } : {}),
         ...(cacheIntegrityHash ? { integrity_hash: cacheIntegrityHash } : {}),
       },
       passages: selectedChunks.map((chunk) => ({

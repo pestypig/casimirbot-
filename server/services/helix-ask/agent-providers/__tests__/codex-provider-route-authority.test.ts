@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   attachCodexProviderExactCapabilityItinerary,
   ensureCodexPreGatewayRouteAuthority,
+  reconcileCodexProviderScholarlyItineraryRequirements,
   runtimeProviderRequiredGroundingCapabilityIdsFromBody,
 } from "../codex-provider";
 import { readWorkstationGatewayCallRequestsForTurn } from "../explicit-workstation-gateway";
@@ -577,6 +578,111 @@ describe("Codex provider pre-gateway route authority", () => {
           ],
         }),
       ],
+    });
+  });
+
+  it("reconciles an enriched scholarly full-text chain into terminal criteria", () => {
+    const turnId = "ask:scholarly-full-text-exact-itinerary";
+    const promptText =
+      "Compare the assumptions in primary paper arXiv:2105.03079 with the NHM2 whitepaper and explain where the paper does not validate NHM2.";
+    const body: Record<string, unknown> = {
+      question: promptText,
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: turnId,
+        source_target: "scholarly_research",
+        requested_capability: "scholarly-research.lookup_papers",
+        selected_capability: "scholarly-research.lookup_papers",
+        admitted_capability: "scholarly-research.lookup_papers",
+        admitted_tool_families: ["docs_viewer", "scholarly_research"],
+      },
+      runtime_intent_packet: {
+        schema: "helix.runtime_intent_packet.v1",
+        turn_id: turnId,
+      },
+    };
+
+    expect(
+      attachCodexProviderExactCapabilityItinerary({
+        body,
+        turnId,
+        promptText,
+        availableCapabilities: {
+          capabilities: [
+            { capability_id: "docs.search" },
+            { capability_id: "scholarly-research.lookup_papers" },
+            { capability_id: "scholarly-research.fetch_full_text" },
+          ],
+        },
+      }),
+    ).toBe(true);
+
+    expect(body.capability_itinerary).toMatchObject({
+      terminal_success_criteria: {
+        required_capabilities: expect.arrayContaining([
+          "scholarly-research.lookup_papers",
+          "scholarly-research.fetch_full_text",
+        ]),
+      },
+    });
+    expect(body.runtime_intent_packet).toMatchObject({
+      capability_itinerary: {
+        terminal_success_criteria: {
+          required_capabilities: expect.arrayContaining([
+            "scholarly-research.fetch_full_text",
+          ]),
+        },
+      },
+    });
+  });
+
+  it("reconciles natural compound scholarly depth before the provider loop", () => {
+    const promptText =
+      "Open the NHM2 current status whitepaper and compare it with primary paper arXiv:2105.03079, explaining where the paper does not validate NHM2.";
+    const body: Record<string, unknown> = {
+      question: promptText,
+      tool_call_admission_decision: {
+        admitted_tool_families: ["docs_viewer", "scholarly_research"],
+        compound_requested_capabilities: [
+          "docs.search",
+          "scholarly-research.lookup_papers",
+        ],
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        terminal_success_criteria: {
+          required_capabilities: [
+            "docs.search",
+            "scholarly-research.lookup_papers",
+          ],
+        },
+      },
+      runtime_intent_packet: {
+        schema: "helix.runtime_intent_packet.v1",
+      },
+    };
+
+    expect(
+      reconcileCodexProviderScholarlyItineraryRequirements({
+        body,
+        promptText,
+      }),
+    ).toBe(true);
+    expect(runtimeProviderRequiredGroundingCapabilityIdsFromBody(body)).toEqual(
+      expect.arrayContaining([
+        "docs.search",
+        "scholarly-research.lookup_papers",
+        "scholarly-research.fetch_full_text",
+      ]),
+    );
+    expect(body.runtime_intent_packet).toMatchObject({
+      capability_itinerary: {
+        terminal_success_criteria: {
+          required_capabilities: expect.arrayContaining([
+            "scholarly-research.fetch_full_text",
+          ]),
+        },
+      },
     });
   });
 

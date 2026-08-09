@@ -2709,6 +2709,237 @@
       "claimBoundaryNotes": [
         "Zero observable bridge edges are preserved."
       ]
+    },
+    {
+      "equationId": "cdp-stage4-2o-supplement-fringe-coefficient",
+      "label": "Stage-4.2O deposited-data fringe coefficient",
+      "sectionAnchor": "stage-42o-authenticated-public-data-component-replay",
+      "latex": "S_\\ell=N^{-1}\\sum_j n_j e^{-2\\pi i\\ell j/N}, \\qquad \\widetilde C_1=2S_1/S_0.",
+      "aliases": [
+        "C_tilde_1=2S_1/S_0"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2o-supplement-fringe-coefficient",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open public-data component replay",
+          "badgeIds": [
+            "study.casimir_dp.public_data_component_validation_stage4_2o",
+            "study.casimir_dp.complex_coherence_discriminator",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.public_data_component_validation_stage4_2o",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2o",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The sodium coefficient validates a public matter-wave fringe extraction, not the proposed sphere coherence."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The four public apparatuses remain statistically and physically separate."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2p-supplement-proper-time",
+      "label": "Stage-4.2P proper-time and action chain",
+      "sectionAnchor": "b16-stage-42p-ordinary-proper-timeworldline-closure",
+      "latex": "\\Delta\\tau=\\int_0^T\\left[\\frac{\\Delta\\Phi}{c^2} -\\frac{\\Delta(v^2)}{2c^2}\\right]dt, \\qquad \\Delta\\phi_{\\rm prop}=-\\frac{mc^2}{\\hbar}\\Delta\\tau.",
+      "aliases": [
+        "weak-field Delta tau and propagation phase"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2p-supplement-proper-time",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-4.2P runtime evidence",
+          "badgeIds": [
+            "study.casimir_dp.proper_time_worldline_closure_stage4_2p",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.proper_time_worldline_closure_stage4_2p",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2p",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Ordinary unitary phase only; no collapse bridge."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Measured worldlines remain not ready."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2p-supplement-phase-budget",
+      "label": "Stage-4.2P ordinary phase covariance budget",
+      "sectionAnchor": "b16-stage-42p-ordinary-proper-timeworldline-closure",
+      "latex": "\\sigma_{\\phi,\\rm total}^2= \\sigma_{g,\\rm tilt}^2+\\sigma_{\\nabla g}^2+\\sigma_{\\rm local}^2 +\\sigma_{\\rm kin}^2+\\sigma_{\\Omega}^2+\\sigma_{\\rm clock}^2 +\\sigma_{\\rm control}^2+\\sigma_{\\rm EM}^2.",
+      "aliases": [
+        "sum of gravitational electromagnetic clock and control phase variances"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2p-supplement-phase-budget",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-4.2P phase gate",
+          "badgeIds": [
+            "study.casimir_dp.proper_time_worldline_closure_stage4_2p",
+            "study.casimir_dp.complex_coherence_discriminator",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.proper_time_worldline_closure_stage4_2p",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2p",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The 0.018 rad pass is synthetic and conditional on measured echo transfer."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The frozen Diósi exponent is excluded from the phase sum."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2q-supplement-impedance",
+      "label": "Stage-4.2Q London and surface-impedance recovery",
+      "sectionAnchor": "b17-stage-42q-superconducting-boundary-control",
+      "latex": "\\lambda_L^{-2}=\\mu_0n_s(q^*)^2/m^*, \\qquad Z_s(\\omega)=R_s(\\omega)+iX_s(\\omega), \\qquad X_s\\simeq\\mu_0\\omega\\lambda_L.",
+      "aliases": [
+        "London depth and finite Zs"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2q-supplement-impedance",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open superconducting-boundary runtime evidence",
+          "badgeIds": [
+            "study.casimir_dp.superconducting_boundary_control_stage4_2q",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.superconducting_boundary_control_stage4_2q",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2q",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Synthetic response fixture only; zero DC resistance does not erase finite-frequency impedance."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "No Standard-Model Higgs or collapse inference is admitted."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2q-supplement-boundary-ratio",
+      "label": "Stage-4.2Q boundary-ratio Diósi cancellation",
+      "sectionAnchor": "b17-stage-42q-superconducting-boundary-control",
+      "latex": "\\frac{C_S}{C_N} =\\frac{e^{i\\Phi_S-\\chi_S-\\Gamma_Dt}} {e^{i\\Phi_N-\\chi_N-\\Gamma_Dt}} =e^{i\\Delta\\Phi_{EM}-\\Delta\\chi_{EM}}.",
+      "aliases": [
+        "CS over CN ordinary boundary contrast"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2q-supplement-boundary-ratio",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open boundary-ratio control gate",
+          "badgeIds": [
+            "study.casimir_dp.superconducting_boundary_control_stage4_2q",
+            "study.casimir_dp.complex_coherence_discriminator",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.superconducting_boundary_control_stage4_2q",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2q",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Standard boundary-independent Diósi attenuation cancels; the statistic does not detect DP by itself."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Measured joint coherence cells remain not ready."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2r-supplement-diosi-precision",
+      "label": "Stage-4.2R conditional Diósi precision",
+      "sectionAnchor": "b18-stage-42r-integrated-feasibility-pilot-readiness",
+      "latex": "V_{\\rm D}=e^{-\\Gamma_{\\rm D}t},\\qquad \\sigma_{|C|}\\leq \\frac{1-e^{-\\Gamma_{\\rm D}t}}{\\mathrm{SNR}_{\\min}}.",
+      "aliases": [
+        "visibility loss divided by minimum SNR"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2r-supplement-diosi-precision",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-4.2R pilot packet audit",
+          "badgeIds": [
+            "study.casimir_dp.integrated_feasibility_pilot_stage4_2r",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.integrated_feasibility_pilot_stage4_2r",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2r",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Conditional model precision only; measured evidence is not ready."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The pilot remains unauthorized."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2r-supplement-four-cell-ratio",
+      "label": "Stage-4.2R four-cell Diósi cancellation",
+      "sectionAnchor": "b18-stage-42r-integrated-feasibility-pilot-readiness",
+      "latex": "R_4=\\frac{C_{a,s}C_{r,c}}{C_{a,c}C_{r,s}},\\qquad \\frac{e^{-\\Gamma_Dt}}{e^{-\\Gamma_Dt}}=1.",
+      "aliases": [
+        "boundary independent loss cancels from R4"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2r-supplement-four-cell-ratio",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-4.2R estimator semantics",
+          "badgeIds": [
+            "study.casimir_dp.integrated_feasibility_pilot_stage4_2r",
+            "study.casimir_dp.boundary_branch_interaction_stage4_2i",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.integrated_feasibility_pilot_stage4_2r",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2r",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The cross-ratio tests boundary interaction and cannot replace the primary Diósi contraction."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "No boundary-to-collapse bridge is registered."
+      ]
     }
   ]
 }

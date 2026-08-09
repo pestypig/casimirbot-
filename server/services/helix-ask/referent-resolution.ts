@@ -373,6 +373,17 @@ const conversationalReferentPhrase = (prompt: string): string | null => {
     return null;
   }
   if (
+    /\b(?:do\s+not|don't|dont|without|avoid|ignore|disregard)\b[\s\S]{0,120}\b(?:this|that|the\s+same|same|selected)\s+(?:assumption|hypothesis|premise|claim|idea|point|issue|constraint|mechanism|result|finding)\b/i.test(unquoted) ||
+    /^\s*(?:if|when|later|eventually|next\s+time|in\s+the\s+future|previously|earlier|historically)\b[\s\S]{0,180}\b(?:this|that|the\s+same|same|selected)\s+(?:assumption|hypothesis|premise|claim|idea|point|issue|constraint|mechanism|result|finding)\b/i.test(unquoted)
+  ) {
+    return null;
+  }
+  if (
+    /\b(?:this|that|the\s+same|same|selected)\s+(?:assumption|hypothesis|premise|claim|idea|point|issue|constraint|mechanism|result|finding)\b/i.test(unquoted)
+  ) {
+    return "deictic_previous_assistant_answer";
+  }
+  if (
     /\b(?:what\s+does|what\s+did|explain|clarify|summari[sz]e|interpret|expand\s+on)\s+(?:this|that|the|same|selected)\s+(?:paragraph|passage|section|excerpt|quote|finding|result|claim|argument|point)\b/i.test(unquoted) ||
     /\b(?:this|that|the|same|selected)\s+(?:paragraph|passage|section|excerpt|quote|finding|result|claim|argument|point)\b[\s\S]{0,100}\b(?:mean|means|establish|establishes|show|shows|demonstrate|demonstrates|imply|implies|support|supports|argue|argues|say|says)\b/i.test(unquoted)
   ) {

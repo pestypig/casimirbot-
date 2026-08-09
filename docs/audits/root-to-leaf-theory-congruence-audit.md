@@ -253,6 +253,21 @@ not only as retrieval metadata.
   reason `ROOT_LEAF_CASIMIR_DP_ORDINARY_GRAVITY_FAIL`.
 - A schema-complete manifold kernel is merely registered. It cannot validate a
   mechanism or remove the graph-wide diagnostic claim ceiling.
+- Stage 4.2O adds five dependency labels for authenticated public-data component
+  recovery: sodium complex fringes, superconducting-drum paired response, LISA
+  Pathfinder held-out covariance, Gran Sasso external-bound scope, and the
+  no-fusion claim boundary. These are root-to-leaf dependency labels, not
+  observable-bridge edges.
+- The public apparatuses remain physically and statistically disjoint. The
+  root-to-leaf readiness rule requires the bounded component replay, but it also
+  keeps joint-protocol validation and exact variant-matched external-bound
+  mapping closed. A public-data component pass cannot substitute for the
+  proposed sphere state, its four cells, its response/covariance ancestry, or a
+  companion observable.
+- Stage 4.2O preserves `measured_evidence: not_ready`,
+  `collapse_identification: blocked`, `manifold_dynamics: blocked`, and
+  `physical_viability: not_evaluated`. It adds zero observable bridges and
+  cannot promote the Casimir-DP/OR path beyond diagnostic maturity.
 
 ## Implementation artifacts
 - Manifest: `configs/physics-root-leaf-manifest.v1.json`
@@ -269,6 +284,23 @@ not only as retrieval metadata.
   `docs/research/casimir-dp-apparatus-coherence-residual-stage4-2b-verification-receipt.json`
 - Stage-4.2B authoritative artifact directory:
   `artifacts/research/casimir-dp-apparatus-coherence-residual-stage4-2b/casimir-dp-apparatus-coherence-residual-stage4-2b-v1-20260726T123523358Z/`
+- Stage-4.2O config:
+  `configs/research/casimir-dp-public-data-component-validation-stage4-2o.v1.json`
+- Stage-4.2O importer and runner:
+  `scripts/research/import-casimir-dp-public-data-stage4-2o.py`;
+  `scripts/research/run-casimir-dp-public-data-component-validation-stage4-2o.ts`
+- Stage-4.2O maintained report:
+  `docs/research/casimir-dp-public-data-component-validation-stage4-2o-report.md`
+- Stage-4.2R integrated feasibility-pilot runtime:
+  `scripts/research/run-casimir-dp-integrated-feasibility-pilot-stage4-2r.ts`
+- Stage-4.2R maintained report and receipt:
+  `docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-report.md`;
+  `docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-campaign-receipt.json`
+- Stage 4.2R separates the primary held-out Diósi contraction from the
+  four-cell boundary interaction, forbids cross-apparatus covariance fusion,
+  and blocks the pilot while 0/8 same-apparatus authority packets are ready.
+  Its 2.908% visibility loss and 0.005816 one-sigma magnitude target are
+  conditional forecasts, not measured sensitivity or collapse evidence.
 
 ## Agent workflow
 1. Update root/leaf paths in the manifest for new theory lanes.

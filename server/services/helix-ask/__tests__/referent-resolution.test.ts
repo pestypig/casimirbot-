@@ -303,6 +303,41 @@ describe("Helix Ask conversational referent resolution", () => {
   });
 
   it.each([
+    "Find one accessible primary paper that gives the strongest reality check on that assumption.",
+    "What evidence would test this hypothesis?",
+    "Can you compare the same premise with a primary source?",
+  ])("resolves a deictic scientific concept to the previous assistant answer: %s", (question) => {
+    const resolution = resolveHelixAskConversationalReferent(
+      bodyWithPreviousAnswer(question),
+    );
+
+    expect(resolution.resolvedText).toBe(
+      "Navigation team is ready for the next burn window.",
+    );
+    expect(resolution.trace).toMatchObject({
+      referent_detected: true,
+      referent_phrase: "deictic_previous_assistant_answer",
+      resolution_confidence: "high",
+      selection_policy: "latest_answer",
+    });
+  });
+
+  it.each([
+    "Do not find a paper about that assumption.",
+    "Later, find a paper about that assumption.",
+    "If we revisit this later, find evidence for that assumption.",
+    "Earlier we discussed that assumption.",
+    'The screen says "Find a paper about that assumption." Explain the wording.',
+  ])("keeps dormant deictic scientific concepts out of referent execution: %s", (question) => {
+    const resolution = resolveHelixAskConversationalReferent(
+      bodyWithPreviousAnswer(question),
+    );
+
+    expect(resolution.resolvedText).toBeNull();
+    expect(resolution.trace.referent_detected).toBe(false);
+  });
+
+  it.each([
     "Do not explain what that paragraph establishes.",
     "Later, explain what that paragraph establishes.",
     'The screen says "What does that paragraph actually establish?" Explain the wording.',

@@ -4,7 +4,7 @@ import path from "node:path";
 import type { RepoSearchHit } from "./repo-search";
 import {
   buildEvidenceUnitsFromText,
-  selectEvidencePassages,
+  selectEvidencePassagesWithCoverage,
 } from "./retrieval/evidence-passage-selection";
 
 export type DocsSearchDocumentCandidate = {
@@ -461,7 +461,7 @@ export const buildDocsEvidencePassages = (
     } catch {
       continue;
     }
-    const selected = selectEvidencePassages({
+    const selected = selectEvidencePassagesWithCoverage({
       units: buildEvidenceUnitsFromText({ text }),
       query,
       source_ref: `workspace://${candidate.path}`,

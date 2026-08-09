@@ -142,7 +142,10 @@ import {
 import { resolveAskTurnNamedDocSummaryQueryArg } from "../doc-args";
 import { arbitrateAskSourceTarget } from "../ask-source-target-arbitrator";
 import { buildToolCallAdmissionDecision } from "../tool-call-admission";
-import { buildHelixCapabilityItinerary } from "../capability-itinerary";
+import {
+  buildHelixCapabilityItinerary,
+  requiredScholarlyCapabilitiesFromCompoundSubgoals,
+} from "../capability-itinerary";
 import { attachHelixCapabilityItineraryExecutionState } from "../capability-itinerary-execution";
 import { isAskTurnCapabilityHelpIntent } from "../capability-catalog-intent";
 import {
@@ -207,6 +210,7 @@ import {
   buildHelixAgentContinuationState,
   buildHelixTerminalRejectionObservation,
   formatHelixAgentContinuationStateForRuntime,
+  formatHelixScholarlyRetrySelectionForRuntime,
 } from "../runtime/agent-continuation-state";
 import { buildHelixDomainContinuationDecision } from "../domain-continuation-decision";
 import { buildPriorDocumentContinuationHint } from "../prior-document-continuation";
@@ -226,6 +230,7 @@ import {
   type HelixScholarlyEvidenceDemand,
 } from "@shared/helix-scholarly-research-observation";
 import { deriveScholarlyEvidenceDemand } from "../scholarly-evidence-demand";
+import { rerankCachedScholarlyFullTextPassages } from "../retrieval/scholarly-full-text-fetch";
 import { resolveProviderGatewayCapabilityId } from "../provider-agent-capability-contract";
 import { researchLibraryPrivateAccountToken } from "../../helix-account/research-library-store";
 import { readHelixSessionCookie } from "../../helix-account/session-cookie";
@@ -1202,6 +1207,9 @@ export const asksForScientificImageEvidenceContinuity = (
       question,
     );
   const refersToScientificVisualChain =
+    /\b(?:promoted|exact\s+row|equation\s+row|page\s+\d+|crop\s+ref|image\s+lens|sidecar|page\s+evidence|scientific\s+image|visual\s+evidence|source\s+image\s+hash|active\s+promoted\s+row\s+blockers|historical\s+non-promoted\s+row\s+blockers)\b/i.test(
+      question,
+    ) &&
     /\b(?:prior\s+steps?|previous|last|earlier|latest|just\s+found|promoted|exact\s+row|equation\s+row|page\s+\d+|crop\s+ref|image\s+lens|sidecar|page\s+evidence|scientific\s+image|visual\s+evidence|source\s+image\s+hash|active\s+promoted\s+row\s+blockers|historical\s+non-promoted\s+row\s+blockers)\b/i.test(
       question,
     );
@@ -1359,6 +1367,11 @@ type ScholarlyFollowupEvidenceMemoryRecord = {
   source_pdf_ref: string | null;
   cache_path: string | null;
   page_text_refs: string[];
+  bounded_evidence_passages?: Array<Record<string, unknown>>;
+  passage_selection_query?: string | null;
+  passage_selection_source?:
+    | "original_observation"
+    | "cached_pdf_followup_rerank";
   page_image_affordance_refs: string[];
   page_image_observation_refs: string[];
   equation_evidence_refs: string[];
@@ -1504,6 +1517,11 @@ export const isScholarlyFollowupReferencePrompt = (
     /^(?:\s*(?:yes|yeah|yep|ok(?:ay)?|please|sure|go\s+ahead|do\s+that)\b[,;:]?\s*)+(?:give|show|find|locate|narrow|mark|identify)?[\s\S]{0,100}\b(?:exact|precise)\b[\s\S]{0,50}\b(?:start|beginning)\b[\s\S]{0,30}\b(?:end|ending)\b/i.test(
       unquoted,
     );
+  const namedScholarlyResultFollowup =
+    hasPriorScholarlyContext &&
+    /\bwhat\s+does\s+[A-Z][A-Za-z.'’\-]*(?:(?:\s+|[–—-])[A-Z][A-Za-z.'’\-]*){0,4}\s+(?:actually\s+)?(?:constrain|show|find|demonstrate|imply|mean|establish|rule\s+out)\b/.test(
+      unquoted,
+    );
   const contextualScholarlyResultReferentSuppressed =
     /\b(?:do\s+not|don't|dont|without|avoid|ignore|disregard)\b[\s\S]{0,100}\b(?:that|this|the|prior|previous|earlier)\s+(?:same\s+)?result\b/i.test(
       unquoted,
@@ -1528,13 +1546,15 @@ export const isScholarlyFollowupReferencePrompt = (
     contextualScholarlyResultReferent ||
     naturalScholarlySelection ||
     naturalScholarlyTextReferent ||
-    naturalScholarlyOfferAcceptance;
+    naturalScholarlyOfferAcceptance ||
+    namedScholarlyResultFollowup;
   const hasPageFollowupCue = SCHOLARLY_PAGE_FOLLOWUP_PATTERN.test(unquoted);
   const scholarlyResearchRequested =
     detectScholarlyResearchIntent(unquoted).researchRequested;
   const hasPriorPaperReferent =
     naturalScholarlySelection ||
     naturalScholarlyOfferAcceptance ||
+    namedScholarlyResultFollowup ||
     contextualScholarlyResultReferent ||
     /\b(?:what\s+you\s+found|you\s+found|paper\s+you\s+found|papers?\s+you\s+found|same\s+(?:paper|pdf|doc(?:ument)?)|selected\s+(?:paper|pdf|doc(?:ument)?)(?:\s+from\s+the\s+prior\s+step)?|the\s+(?:paper|pdf|doc(?:ument)?)|this\s+(?:paper|pdf|doc(?:ument)?)|that\s+(?:paper|pdf|doc(?:ument)?)|those\s+papers|prior\s+(?:paper|record|step)|previous\s+(?:paper|record|step)|earlier\s+(?:paper|record|step)|again|follow-?up|resolved?\s+(?:that|the)\s+follow-?up)\b/i.test(
       unquoted,
@@ -1569,7 +1589,8 @@ export const isScholarlyFollowupReferencePrompt = (
   if (
     naturalScholarlySelection ||
     naturalScholarlyTextReferent ||
-    naturalScholarlyOfferAcceptance
+    naturalScholarlyOfferAcceptance ||
+    namedScholarlyResultFollowup
   )
     return true;
   return /\b(?:doc(?:ument)?|paper|papers|pdf|page|pages?|paragraphs?|passages?|sections?|record|research|scholarly|casimir|doi|arxiv|found|result|resolve|resolved|follow-?up|prior|measure|measured|numbers?|effect|it|those|same|again|relevance|equations?|formulas?|formulae?|theory\s+badge\s+graph|scientific\s+evidence\s+packet|image\s+lens)\b/i.test(
@@ -1681,6 +1702,46 @@ const pageTextRefsFromObservation = (
         .map((entry) => readString(entry.source_text_ref)),
     ].filter((entry): entry is string => Boolean(entry)),
   );
+
+const boundedScholarlyEvidencePassagesFromObservation = (
+  observation: Record<string, unknown> | null,
+): Array<Record<string, unknown>> => {
+  const compact = (value: unknown): string | null => {
+    const text = readString(value)?.replace(/\s+/g, " ").trim();
+    return text ? text.slice(0, 1_600) : null;
+  };
+  const passages = [
+    ...readArray(observation?.selected_chunks),
+    ...readArray(observation?.selected_pages),
+  ]
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((entry) => ({
+      paper_result_id: readString(entry.paper_result_id),
+      title: readString(entry.title),
+      page:
+        readNumber(entry.page_start) ??
+        readNumber(entry.page_number) ??
+        readNumber(entry.page),
+      section: readString(entry.section_hint) ?? readString(entry.section),
+      text_excerpt: compact(entry.text_excerpt ?? entry.text),
+      citation_ref:
+        readString(entry.citation_ref) ??
+        readString(entry.source_text_ref),
+      citation_label: readString(entry.citation_label),
+      source_text_ref:
+        readString(entry.source_text_ref) ??
+        readString(entry.citation_ref),
+    }))
+    .filter(
+      (entry) => Boolean(entry.text_excerpt && entry.source_text_ref),
+    );
+  return passages.filter((entry, index, all) =>
+    all.findIndex(
+      (candidate) => candidate.source_text_ref === entry.source_text_ref,
+    ) === index,
+  ).slice(0, 8);
+};
 
 const equationEvidenceRefsFromObservation = (
   observation: Record<string, unknown> | null,
@@ -1823,16 +1884,30 @@ export const scholarlyMemoryRecordFromGatewayResult = (input: {
       ) === index
     );
   });
+  const observationRefs =
+    input.result.artifact_refs.length > 0
+      ? input.result.artifact_refs
+      : input.result.observation_packet.produced_artifact_refs;
   const runtimeSelectedResultIds = uniqueStrings(input.selectedResultIds ?? []);
   const runtimeSelectedResultIdSet = new Set(runtimeSelectedResultIds);
   const runtimeSelectedPapers = observedPapers.filter((paper) => {
     const resultId = readString(paper.result_id);
     return Boolean(resultId && runtimeSelectedResultIdSet.has(resultId));
   });
+  const exactObservedResultIds = new Set(
+    uniqueStrings([
+      ...observedPapers.map((paper) => readString(paper.result_id)),
+      ...observationRefs,
+      readString(observation.artifact_id),
+    ]),
+  );
+  const runtimeSelectionMatched = runtimeSelectedResultIds.some((resultId) =>
+    exactObservedResultIds.has(resultId),
+  );
   const runtimeSemanticSelectionStatus: ScholarlyFollowupEvidenceMemoryRecord["runtime_semantic_selection_status"] =
     runtimeSelectedResultIds.length === 0
       ? "not_available"
-      : runtimeSelectedPapers.length > 0
+      : runtimeSelectionMatched
         ? "matched"
         : "not_matched";
   const papers =
@@ -1864,10 +1939,6 @@ export const scholarlyMemoryRecordFromGatewayResult = (input: {
   const selectedForExploration =
     readBoolean(stateDelta?.selected_for_exploration) === true ||
     selectedResponseMode === "scholarly_exploratory_candidates";
-  const observationRefs =
-    input.result.artifact_refs.length > 0
-      ? input.result.artifact_refs
-      : input.result.observation_packet.produced_artifact_refs;
   const keys = scholarlyEvidenceMemoryKeysForBody(input.body);
   if (keys.length === 0) return null;
   const sourceCapabilityId =
@@ -1946,6 +2017,10 @@ export const scholarlyMemoryRecordFromGatewayResult = (input: {
       readString(observation.cache_path) ??
       researchLibraryPdfCachePathFromDocument(researchLibraryDocument),
     page_text_refs: pageTextRefsFromObservation(observation),
+    bounded_evidence_passages:
+      boundedScholarlyEvidencePassagesFromObservation(observation),
+    passage_selection_query: readString(observation.query),
+    passage_selection_source: "original_observation",
     page_image_affordance_refs: pageImageAffordanceRefs,
     page_image_observation_refs: pageImageObservationRefs,
     equation_evidence_refs: equationEvidenceRefs,
@@ -2151,7 +2226,7 @@ export const scoreScholarlyMemoryForQuestion = (
         ? 3
         : 1;
   const asksForDeepPaperEvidence =
-    /\b(?:equations?|formulae?|formulas?|numeric|numerical|parameters?|values?|full[-\s]?text|pdf|page\s+(?:images?|\d+)|image\s+lens|figures?|tables?|scientific\s+evidence\s+packet)\b/i.test(
+    /\b(?:equations?|formulae?|formulas?|numeric|numerical|parameters?|values?|full[-\s]?text|pdf|page\s+(?:images?|\d+)|image\s+lens|figures?|tables?|scientific\s+evidence\s+packet|assumptions?|compar(?:e|es|ed|ing|ison|isons)|validat(?:e|es|ed|ing|ion)|claim\s+boundar(?:y|ies)|appl(?:y|ies|ied|ication)|entail(?:s|ed|ment)?|unresolved)\b/i.test(
       question,
     );
   const depthBoost = asksForDeepPaperEvidence
@@ -2187,6 +2262,28 @@ export const scoreScholarlyMemoryForQuestion = (
     runtimeSelectionBoost +
     recencyBoost
   );
+};
+
+export const buildScholarlyAnalyticalEvidencePromptLines = (input: {
+  question: string;
+  evidenceState?: string | null;
+  passageSelectionSource?: string | null;
+}): string[] => {
+  const analyticalFollowup =
+    /\b(?:assumptions?|premises?|conditions?|setup|ansatz|approximations?|limitations?|caveats?|applicability|apply|applies|mismatch|compare|contrast|validate|validation|entail|unresolved|claim\s+boundar(?:y|ies))\b/i.test(
+      input.question,
+    );
+  if (
+    !analyticalFollowup ||
+    input.evidenceState !== "full_text_usable" ||
+    input.passageSelectionSource !== "cached_pdf_followup_rerank"
+  ) {
+    return [];
+  }
+  return [
+    "This is an analytical follow-up over verified full text reranked for the current question.",
+    "Before generalizing, name the concrete assumptions, conditions, limitations, or claim boundaries stated in the highest-ranked bounded passages. Cite their bounded passage references or page labels, distinguish what those passages support from what remains an unresolved transfer to the user's target system, and do not replace passage-level conditions with only a broad model-class label.",
+  ];
 };
 
 const lookupScholarlyFollowupEvidence = (
@@ -2292,6 +2389,64 @@ const lookupScholarlyFollowupEvidence = (
   };
 };
 
+const rerankScholarlyMemoryPassagesForFollowup = async (input: {
+  record: ScholarlyFollowupEvidenceMemoryRecord | null;
+  question: string;
+}): Promise<ScholarlyFollowupEvidenceMemoryRecord | null> => {
+  const record = input.record;
+  if (
+    !record?.cache_path ||
+    record.evidence_state !== "full_text_usable" ||
+    !input.question.trim()
+  ) {
+    return record;
+  }
+  const selectedPaper = record.papers.find((paper) => {
+    const resultId = readString(paper.result_id);
+    return Boolean(
+      resultId && record.runtime_selected_result_ids.includes(resultId),
+    );
+  }) ?? record.papers[0] ?? null;
+  const paperResultId =
+    readString(selectedPaper?.result_id) ??
+    record.runtime_selected_result_ids[0] ??
+    null;
+  const passages = await rerankCachedScholarlyFullTextPassages({
+    cachePath: record.cache_path,
+    query: input.question,
+    paperResultId,
+    title: readString(selectedPaper?.title),
+    sourcePdfRef: record.source_pdf_ref,
+  });
+  if (passages.length === 0) return record;
+  return {
+    ...record,
+    bounded_evidence_passages: passages.map((passage) => ({
+      passage_id: passage.chunk_id,
+      ...(passage.paper_result_id
+        ? { paper_result_id: passage.paper_result_id }
+        : {}),
+      ...(passage.title ? { title: passage.title } : {}),
+      page_start: passage.page_start,
+      page_end: passage.page_end,
+      ...(passage.section_hint ? { section: passage.section_hint } : {}),
+      text_excerpt: passage.text_excerpt,
+      quote: passage.text_excerpt,
+      relevance_score: passage.relevance_score,
+      citation_ref: passage.citation_ref,
+      citation_label: passage.citation_label,
+      source_text_ref: passage.source_text_ref,
+      char_start: passage.char_start,
+      char_end: passage.char_end,
+      ...(passage.line_start ? { line_start: passage.line_start } : {}),
+      ...(passage.line_end ? { line_end: passage.line_end } : {}),
+      matched_terms: passage.matched_terms,
+    })),
+    passage_selection_query: input.question,
+    passage_selection_source: "cached_pdf_followup_rerank",
+  };
+};
+
 const buildScholarlyFollowupMemoryArtifact = (input: {
   turnId: string;
   record: ScholarlyFollowupEvidenceMemoryRecord;
@@ -2339,6 +2494,25 @@ const buildScholarlyFollowupMemoryArtifact = (input: {
     terminal_artifact_kind: input.record.terminal_artifact_kind,
     papers: input.record.papers,
     paper_count: input.record.paper_count,
+    source_identity: {
+      kind:
+        input.record.evidence_state === "full_text_usable"
+          ? "scholarly_paper_full_text"
+          : "scholarly_paper_evidence",
+      paper_result_ids: uniqueStrings([
+        ...input.record.runtime_selected_result_ids,
+        ...input.record.papers.map((paper) => readString(paper.result_id)),
+      ]),
+      titles: uniqueStrings(
+        input.record.papers.map((paper) => readString(paper.title)),
+      ),
+      source_pdf_ref: input.record.source_pdf_ref,
+      full_text_observation_status:
+        input.record.evidence_state === "full_text_usable"
+          ? "verified_reentered"
+          : "not_verified_full_text",
+      distinct_from_local_document_evidence: true,
+    },
     abstract_or_snippet_refs: input.record.abstract_or_snippet_refs,
     missing_requirements: input.record.missing_requirements,
     next_affordances: input.record.next_affordances,
@@ -2346,6 +2520,10 @@ const buildScholarlyFollowupMemoryArtifact = (input: {
     source_pdf_ref: input.record.source_pdf_ref,
     cache_path: input.record.cache_path,
     page_text_refs: input.record.page_text_refs,
+    bounded_evidence_passages: input.record.bounded_evidence_passages ?? [],
+    passage_selection_query: input.record.passage_selection_query ?? null,
+    passage_selection_source:
+      input.record.passage_selection_source ?? "original_observation",
     page_image_affordance_refs: input.record.page_image_affordance_refs,
     page_image_observation_refs: input.record.page_image_observation_refs,
     equation_evidence_refs: input.record.equation_evidence_refs,
@@ -6365,6 +6543,25 @@ export const validateCodexScholarlyEvidenceDecision = (input: {
   const availableResultIds = scholarlyObservedResultIdsFromGatewayResults(
     input.gatewayCallResults,
   );
+  const recoverableFullTextIdentityAvailable = input.gatewayCallResults.some(
+    (result) => {
+      const observation = readGatewayObservationRecord(result);
+      return readArray(observation?.papers)
+        .map(readRecord)
+        .filter((paper): paper is Record<string, unknown> => Boolean(paper))
+        .some((paper) => {
+          const identifiers = readRecord(paper.identifiers);
+          return Boolean(
+            readString(paper.result_id) &&
+              (readString(identifiers?.doi) ||
+                readString(identifiers?.arxiv_id) ||
+                readString(identifiers?.pdf_url) ||
+                readString(identifiers?.full_text_url) ||
+                readString(identifiers?.url)),
+          );
+        });
+    },
+  );
   const availableResultIdSet = new Set(availableResultIds);
   const unknownResultIds =
     decision?.selected_result_ids.filter(
@@ -6400,6 +6597,15 @@ export const validateCodexScholarlyEvidenceDecision = (input: {
     validationError = "scholarly_answer_requires_full_text_observation";
   } else if (decision.decision === "answer" && decision.lane_request) {
     validationError = "scholarly_answer_cannot_include_lane_request";
+  } else if (
+    decision.decision === "ask_user" &&
+    recoveryAllowed &&
+    input.requiredEvidenceModes?.includes("full_text") &&
+    scholarlyFullTextGatewayResults(input.gatewayCallResults).length === 0 &&
+    recoverableFullTextIdentityAvailable
+  ) {
+    validationError =
+      "scholarly_ask_user_blocked_by_available_full_text_recovery";
   } else if (
     ["answer", "ask_user", "fail"].includes(decision.decision) &&
     !userFacingText
@@ -6531,13 +6737,92 @@ export const buildCodexScholarlyEvidenceDecisionCorrectionInstruction =
     ].join("\n");
   };
 
+export const buildCodexScholarlyEvidenceDecisionContractRetryPrompt = (input: {
+  basePrompt: string;
+  correctionInstruction: string;
+  decisionInstruction: string;
+  priorResponse: string;
+}): string =>
+  [
+    input.basePrompt,
+    "",
+    input.correctionInstruction,
+    "",
+    input.decisionInstruction,
+    "",
+    "Prior non-compliant response:",
+    input.priorResponse.slice(0, 6000),
+    "",
+    "Return the corrected response now.",
+    `The first non-empty line must start with ${CODEX_SCHOLARLY_EVIDENCE_DECISION_MARKER} followed by valid compact JSON.`,
+    "For answer, ask_user, or fail, write the user-facing text after that decision line. For recover, emit no terminal answer prose.",
+    "Do not repeat the prior response without the required decision line.",
+  ].join("\n");
+
+export const bindScholarlyRecoveryLaneRequestToSelectedPaper = (input: {
+  candidate: Record<string, unknown>;
+  selectedResultIds: string[];
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): Record<string, unknown> => {
+  if (
+    capabilityLaneCandidateCapability(input.candidate) !==
+      SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY ||
+    input.selectedResultIds.length !== 1
+  ) {
+    return input.candidate;
+  }
+  const selectedResultId = input.selectedResultIds[0];
+  const selectedPaper = input.gatewayCallResults
+    .flatMap((result) =>
+      readArray(readGatewayObservationRecord(result)?.papers)
+        .map(readRecord)
+        .filter((paper): paper is Record<string, unknown> => Boolean(paper)),
+    )
+    .find((paper) => readString(paper.result_id) === selectedResultId);
+  if (!selectedPaper) return input.candidate;
+
+  const nestedArguments = readRecord(input.candidate.arguments);
+  const nestedArgs = nestedArguments ? null : readRecord(input.candidate.args);
+  const argumentsRecord = {
+    ...(nestedArguments ?? nestedArgs ?? input.candidate),
+    paper_result_id: selectedResultId,
+    papers: [selectedPaper],
+    selected_full_text_paper_ids: [selectedResultId],
+  };
+  if (nestedArguments)
+    return { ...input.candidate, arguments: argumentsRecord };
+  if (nestedArgs) return { ...input.candidate, args: argumentsRecord };
+  return argumentsRecord;
+};
+
 const scholarlyRecoveryLaneRequestFromDecision = (
   decision: CodexScholarlyEvidenceDecision | null,
   audit: CodexScholarlyEvidenceDecisionAudit | null,
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
 ): Record<string, unknown> | null =>
   audit?.status === "valid" && decision?.decision === "recover"
     ? decision.lane_request
+      ? bindScholarlyRecoveryLaneRequestToSelectedPaper({
+          candidate: decision.lane_request,
+          selectedResultIds: decision.selected_result_ids,
+          gatewayCallResults,
+        })
+      : null
     : null;
+
+export const compoundCapabilityHandoffCandidateFromText = (input: {
+  text: string;
+  requiredCapabilityIds: string[];
+}): Record<string, unknown> | null => {
+  const candidate = extractCodexCapabilityLaneRequestCandidate(input.text);
+  const capability = capabilityLaneCandidateCapability(candidate);
+  return capability &&
+    input.requiredCapabilityIds.includes(capability) &&
+    !isScholarlyGatewayCapabilityId(capability) &&
+    capability !== VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY
+    ? candidate
+    : null;
+};
 
 const applyRuntimeAgentScholarlyEvidenceDecisionToProjection = (input: {
   providerText: string;
@@ -8783,10 +9068,53 @@ const enrichScholarlyFullTextCandidateFromBody = (
         : initialNestedArgs
           ? { ...candidate, args: coherentArguments }
           : { ...candidate, ...coherentArguments };
+  const coherentNestedArguments = readRecord(coherentCandidate.arguments);
+  const coherentNestedArgs = coherentNestedArguments
+    ? null
+    : readRecord(coherentCandidate.args);
+  const coherentArgumentRecord = {
+    ...(coherentNestedArguments ?? coherentNestedArgs ?? coherentCandidate),
+  };
+  const hasBoundPaperSource = [
+    "paper_result_id",
+    "paper_id",
+    "result_id",
+    "doi",
+    "arxiv_id",
+    "arxivId",
+    "source_url",
+    "pdf_url",
+    "full_text_url",
+    "url",
+  ].some((field) => Boolean(readString(coherentArgumentRecord[field])));
+  if (hasBoundPaperSource) return coherentCandidate;
+  const intent = detectScholarlyResearchIntent(question);
+  const explicitSourceTarget = intent.sourceTargets.find((target) =>
+    target.kind === "arxiv" ||
+    target.kind === "pdf" ||
+    target.retrieval_strategy === "direct_full_text"
+  );
+  const explicitSourceUrl = readString(
+    explicitSourceTarget?.canonical_url ?? explicitSourceTarget?.source_url,
+  );
+  if (intent.doi || intent.arxivId || explicitSourceUrl) {
+    const boundArguments = {
+      ...coherentArgumentRecord,
+      ...(intent.doi ? { doi: intent.doi } : {}),
+      ...(intent.arxivId ? { arxiv_id: intent.arxivId } : {}),
+      ...(explicitSourceUrl ? { source_url: explicitSourceUrl } : {}),
+    };
+    if (coherentNestedArguments) {
+      return { ...coherentCandidate, arguments: boundArguments };
+    }
+    if (coherentNestedArgs) {
+      return { ...coherentCandidate, args: boundArguments };
+    }
+    return { ...coherentCandidate, ...boundArguments };
+  }
   const referent = resolveHelixAskConversationalReferent(body);
   if (referent.trace.referent_phrase !== "deictic_previous_evidence_source")
     return coherentCandidate;
-  const intent = detectScholarlyResearchIntent(question);
   if (
     intent.doi ||
     intent.arxivId ||
@@ -9921,9 +10249,21 @@ const capabilityLaneRequestFingerprint = (
     ),
   );
   const selectedArguments = nestedArguments ?? nestedArgs ?? topLevelArguments;
+  const fingerprintArguments = (() => {
+    if (capability !== "docs-viewer.search_docs") return selectedArguments;
+    const record = readRecord(selectedArguments);
+    const targetTranscript = readString(record?.target_transcript);
+    if (!record || !targetTranscript) return selectedArguments;
+    return {
+      ...record,
+      target_transcript: targetTranscript
+        .replace(/\s+/g, " ")
+        .replace(/[.!?]+$/g, ""),
+    };
+  })();
   const normalized = {
     capability,
-    arguments: selectedArguments,
+    arguments: fingerprintArguments,
     // A nested request and its flat admitted affordance are equivalent only
     // when the nested envelope carries no additional executable fields. Keep
     // unexpected top-level values or competing argument aliases visible to the
@@ -9938,6 +10278,70 @@ const capabilityLaneRequestFingerprint = (
       : {}),
   };
   return JSON.stringify(canonicalCapabilityLaneValue(normalized));
+};
+
+const CONTINUATION_ALIAS_METADATA_KEYS = new Set([
+  "authority",
+  "capability_key",
+  "reason",
+  "selection_reason",
+  "candidate_validation_status",
+]);
+
+const canonicalContinuationAliasRequest = (
+  request: Record<string, unknown>,
+): { capability: string | null; arguments: Record<string, unknown> } => {
+  const requestedCapability = capabilityLaneCandidateCapability(request);
+  const capability =
+    resolveProviderGatewayCapabilityId(requestedCapability) ??
+    requestedCapability;
+  const nestedArguments = readRecord(request.arguments);
+  const nestedArgs = readRecord(request.args);
+  const selectedArguments =
+    nestedArguments ??
+    nestedArgs ??
+    Object.fromEntries(
+      Object.entries(request).filter(
+        ([key]) =>
+          key !== "capability" &&
+          key !== "capability_id" &&
+          key !== "capabilityId" &&
+          key !== "arguments" &&
+          key !== "args",
+      ),
+    );
+  return {
+    capability,
+    arguments: Object.fromEntries(
+      Object.entries(selectedArguments).filter(
+        ([key]) => !CONTINUATION_ALIAS_METADATA_KEYS.has(key),
+      ),
+    ),
+  };
+};
+
+const continuationAliasRequestsAreExecutionEquivalent = (
+  affordanceRequest: Record<string, unknown>,
+  candidate: Record<string, unknown>,
+): boolean => {
+  const affordanceCapability = capabilityLaneCandidateCapability(
+    affordanceRequest,
+  );
+  const candidateCapability = capabilityLaneCandidateCapability(candidate);
+  if (
+    !affordanceCapability ||
+    !candidateCapability ||
+    affordanceCapability === candidateCapability
+  ) {
+    return false;
+  }
+  const affordance = canonicalContinuationAliasRequest(affordanceRequest);
+  const proposed = canonicalContinuationAliasRequest(candidate);
+  return (
+    affordance.capability === proposed.capability &&
+    JSON.stringify(canonicalCapabilityLaneValue(affordance.arguments)) ===
+      JSON.stringify(canonicalCapabilityLaneValue(proposed.arguments))
+  );
 };
 
 const mutationEpochCapabilityLaneRequestFingerprint = (input: {
@@ -10015,7 +10419,7 @@ const untriedContinuationLaneRequests = (
       lane_request: affordance.lane_request as Record<string, unknown>,
     }));
 
-const continuationStateRequiresLaneRequest = (
+export const continuationStateRequiresLaneRequest = (
   state: HelixAgentContinuationState,
 ): boolean =>
   !state.allowed_decisions.includes("answer") &&
@@ -10046,7 +10450,11 @@ const continuationStateAdmitsLaneRequest = (
   if (untriedContinuationLaneRequests(state).some(
     (entry) =>
       capabilityLaneRequestFingerprint(entry.lane_request) ===
-      candidateFingerprint,
+        candidateFingerprint ||
+      continuationAliasRequestsAreExecutionEquivalent(
+        entry.lane_request,
+        candidate,
+      ),
   )) {
     return true;
   }
@@ -10143,6 +10551,43 @@ export const continuationStateAdmitsModelAuthoredRetryLaneRequest = (input: {
   }
   return runtimeLaneRequestCandidateUsesAdmittedCapabilities({
     candidate: input.candidate,
+    admittedCapabilityIds: input.admittedCapabilityIds,
+  });
+};
+
+export const continuationStateAdmitsRuntimeRetryLaneRequest = (input: {
+  state: HelixAgentContinuationState;
+  candidate: Record<string, unknown> | null;
+  admittedCapabilityIds: string[];
+}): boolean =>
+  continuationStateAdmitsLaneRequest(input.state, input.candidate) ||
+  continuationStateAdmitsModelAuthoredRetryLaneRequest(input);
+
+export const continuationStateAdmitsPreparedRuntimeRetryLaneRequest = (input: {
+  state: HelixAgentContinuationState;
+  requestedCandidate: Record<string, unknown> | null;
+  preparedCandidate: Record<string, unknown> | null;
+  admittedCapabilityIds: string[];
+}): boolean => {
+  const { requestedCandidate, preparedCandidate } = input;
+  if (!requestedCandidate || !preparedCandidate) return false;
+  if (
+    !preparedRecoveryPreservesRequestedFields(
+      requestedCandidate,
+      preparedCandidate,
+    )
+  ) {
+    return false;
+  }
+  if (
+    capabilityLaneCandidateCapability(requestedCandidate) !==
+    capabilityLaneCandidateCapability(preparedCandidate)
+  ) {
+    return false;
+  }
+  return continuationStateAdmitsRuntimeRetryLaneRequest({
+    state: input.state,
+    candidate: requestedCandidate,
     admittedCapabilityIds: input.admittedCapabilityIds,
   });
 };
@@ -10337,29 +10782,36 @@ export const runtimeProviderRequiredGroundingCapabilityIdsFromBody = (
       routeMetadata?.realtime_grounded_feedback_binding,
   );
   const capabilityItinerary = readRecord(body.capability_itinerary);
-  const compoundCapabilityContract = readRecord(
-    body.compound_capability_contract ??
-      capabilityItinerary?.compound_capability_contract,
+  const itineraryTerminalSuccessCriteria = readRecord(
+    capabilityItinerary?.terminal_success_criteria,
   );
-  const mandatoryItineraryCapabilities = readArray(
-    compoundCapabilityContract?.subgoals,
-  )
-    .map(readRecord)
-    .filter(
-      (subgoal): subgoal is Record<string, unknown> =>
-        Boolean(subgoal) && subgoal?.mandatory !== false,
-    )
-    .map(
-      (subgoal) =>
-        readString(subgoal.runtime_capability) ??
-        readString(subgoal.requested_capability),
-    )
-    .filter((capability): capability is string => Boolean(capability));
+  const compoundCapabilityContracts = [
+    readRecord(body.compound_capability_contract),
+    readRecord(capabilityItinerary?.compound_capability_contract),
+  ].filter(
+    (contract): contract is Record<string, unknown> => Boolean(contract),
+  );
+  const mandatoryItineraryCapabilities = compoundCapabilityContracts.flatMap(
+    (contract) =>
+      readArray(contract.subgoals)
+        .map(readRecord)
+        .filter(
+          (subgoal): subgoal is Record<string, unknown> =>
+            Boolean(subgoal) && subgoal?.mandatory !== false,
+        )
+        .map(
+          (subgoal) =>
+            readString(subgoal.runtime_capability) ??
+            readString(subgoal.requested_capability),
+        )
+        .filter((capability): capability is string => Boolean(capability)),
+  );
   return uniqueStrings([
     ...readStringArray(routeMetadata?.requiredGroundingCapabilityIds),
     ...readStringArray(routeMetadata?.required_grounding_capability_ids),
     ...readStringArray(sourceTargetIntent?.required_grounding_capability_ids),
     ...readStringArray(feedbackBinding?.required_grounding_capability_ids),
+    ...readStringArray(itineraryTerminalSuccessCriteria?.required_capabilities),
     ...mandatoryItineraryCapabilities,
   ]).sort();
 };
@@ -13997,6 +14449,30 @@ export const shouldAllowCodexObservationDependentCapabilityProposal = (input: {
   );
 };
 
+export const codexObservationDependentCapabilityProposalIds = (input: {
+  payload: Record<string, unknown>;
+  admittedCapabilityIds: string[];
+  lastAttempt: Record<string, unknown> | null | undefined;
+}): string[] => {
+  const executionState = readRecord(
+    input.payload.capability_itinerary_execution_state,
+  );
+  const attemptedCapability = readString(
+    readRecord(input.lastAttempt)?.capability_id,
+  );
+  const admitted = new Set(uniqueStrings(input.admittedCapabilityIds));
+  return uniqueStrings(
+    readArray(executionState?.missing_required_capabilities)
+      .map(readString)
+      .filter(
+        (capabilityId): capabilityId is string =>
+          Boolean(capabilityId) &&
+          capabilityId !== attemptedCapability &&
+          admitted.has(capabilityId),
+      ),
+  );
+};
+
 export const shouldExtractCodexInitialCapabilityLaneRequest = (input: {
   observationPacketCount: number;
   continuationState: HelixAgentContinuationState;
@@ -14687,6 +15163,7 @@ export const buildCodexCompoundSubgoalLedger = (input: {
   turnId: string;
   normalizedArtifacts: Array<Record<string, unknown>>;
   gatewayCallResults: HelixWorkstationGatewayCallResult[];
+  requiredCapabilityIds?: string[];
 }): Record<string, unknown> | null => {
   const evidenceArtifacts = input.normalizedArtifacts.filter((artifact) => {
     const artifactPayload = readRecord(artifact.payload);
@@ -14708,7 +15185,6 @@ export const buildCodexCompoundSubgoalLedger = (input: {
       sourceResults.some((result) => !isWorkstationActionReceipt(result))
     );
   });
-  if (evidenceArtifacts.length < 2) return null;
   const artifactsByExecution = new Map<
     string,
     {
@@ -14732,30 +15208,169 @@ export const buildCodexCompoundSubgoalLedger = (input: {
     artifactsByExecution.set(executionKey, execution);
   }
   // Multiple artifacts from one provider call are supporting evidence for one
-  // subgoal. Repeated executions of the same capability are distinct causal
-  // steps only when the trusted provider call identity proves that distinction.
-  if (artifactsByExecution.size < 2) return null;
-  const capabilityOccurrenceCounts = new Map<string, number>();
-  const subgoals = Array.from(artifactsByExecution.values()).map(
-    ({ capability, providerCallId, artifacts }, index) => {
-      const capabilityOccurrence =
-        (capabilityOccurrenceCounts.get(capability) ?? 0) + 1;
-      capabilityOccurrenceCounts.set(capability, capabilityOccurrence);
+  // subgoal. Failed attempts remain in the evidence ledger, but a later
+  // successful execution of the same capability supersedes them as terminal
+  // obligations. Successful repeated executions remain distinct causal steps.
+  const executions = Array.from(artifactsByExecution.values()).map(
+    (execution) => {
       const sourceResult =
-        (providerCallId
+        (execution.providerCallId
           ? input.gatewayCallResults.find(
               (result) =>
                 readString(result.observation_packet?.call_id) ===
-                providerCallId,
+                execution.providerCallId,
             )
           : null) ??
         input.gatewayCallResults.find(
-          (result) => result.capability_id === capability && result.ok === true,
+          (result) =>
+            result.capability_id === execution.capability && result.ok === true,
         ) ??
         input.gatewayCallResults.find(
-          (result) => result.capability_id === capability,
+          (result) => result.capability_id === execution.capability,
         );
+      const evidenceQualities = execution.artifacts.map((artifact) =>
+        normalizedArtifactEvidenceQuality({ artifact, sourceResult }),
+      );
+      const evidenceSatisfied = evidenceQualities.some(
+        (quality) => quality.evidenceSatisfied,
+      );
+      const evidenceGathered = evidenceQualities.some(
+        (quality) => quality.evidenceGathered,
+      );
+      return {
+        ...execution,
+        sourceResult,
+        evidenceSatisfied,
+        evidenceGathered,
+        capabilityFamily:
+          explicitCapabilityContractForCapability(execution.capability)
+            ?.capability_family ?? null,
+      };
+    },
+  );
+  const requiredCapabilityIds = new Set(input.requiredCapabilityIds ?? []);
+  const capabilitiesWithSatisfiedExecution = new Set(
+    executions
+      .filter((execution) => execution.evidenceSatisfied)
+      .map((execution) => execution.capability),
+  );
+  const representedCapabilities = new Set(
+    executions.map((execution) => execution.capability),
+  );
+  const pendingRequiredExecutions = Array.from(requiredCapabilityIds)
+    .filter((capability) => !representedCapabilities.has(capability))
+    .map((capability) => ({
+      capability,
+      providerCallId: null,
+      artifacts: [] as Array<Record<string, unknown>>,
+      sourceResult: null,
+      evidenceSatisfied: false,
+      evidenceGathered: false,
+      capabilityFamily:
+        explicitCapabilityContractForCapability(capability)?.capability_family ?? null,
+    }));
+  const terminalExecutions = executions.filter((execution, index) => {
+    if (execution.evidenceSatisfied) return true;
+    if (capabilitiesWithSatisfiedExecution.has(execution.capability)) {
+      return false;
+    }
+    if (
+      requiredCapabilityIds.has(execution.capability) ||
+      execution.evidenceGathered ||
+      !execution.capabilityFamily
+    ) {
+      return true;
+    }
+    // Runtime agents may probe an unsuitable capability and then correct to a
+    // different capability in the same family. Preserve the failed receipt in
+    // the evidence ledger, but do not make that exploratory miss a permanent
+    // compound obligation once a later family attempt gathers evidence.
+    return !executions.slice(index + 1).some(
+      (candidate) =>
+        candidate.capabilityFamily === execution.capabilityFamily &&
+        candidate.evidenceGathered,
+    );
+  });
+  const allTerminalExecutions = [
+    ...terminalExecutions,
+    ...pendingRequiredExecutions,
+  ];
+  if (allTerminalExecutions.length < 2) return null;
+  const capabilityOccurrenceCounts = new Map<string, number>();
+  const subgoals = allTerminalExecutions.map(
+    ({ capability, providerCallId, artifacts, sourceResult }, index) => {
+      const capabilityOccurrence =
+        (capabilityOccurrenceCounts.get(capability) ?? 0) + 1;
+      capabilityOccurrenceCounts.set(capability, capabilityOccurrence);
+      if (artifacts.length === 0 && !sourceResult) {
+        const explicitContract =
+          explicitCapabilityContractForCapability(capability);
+        const requiredObservationKinds = uniqueStrings(
+          explicitContract?.required_observation_kinds ??
+            (capability === "docs.search"
+              ? ["doc_search_results"]
+              : [`${capability}_observation`]),
+        );
+        return {
+          schema: "helix.compound_capability_subgoal.v1",
+          subgoal_id: `${input.turnId}:codex_compound_subgoal:${index + 1}`,
+          ordinal: index + 1,
+          order: index + 1,
+          subgoal_identity_policy: "capability_fallback",
+          provider_call_id: null,
+          capability_occurrence: capabilityOccurrence,
+          requested_capability: capability,
+          runtime_capability: capability,
+          selected_capability: null,
+          executed_capability: null,
+          args: null,
+          required_observation_kinds: requiredObservationKinds,
+          required_terminal_kind: explicitContract?.required_terminal_kind ?? null,
+          terminal_contribution_kind: explicitContract?.required_terminal_kind ?? null,
+          contribution_role:
+            explicitContract?.capability_family === "scholarly_research"
+              ? "retrieved_evidence"
+              : "tool_observation",
+          allowed_substitutions: explicitContract?.allowed_substitutions ?? [],
+          forbidden_nearby_capabilities:
+            explicitContract?.forbidden_nearby_capabilities ?? [],
+          observation_kind: null,
+          observation_ref: null,
+          observation_kinds: [],
+          observation_refs: [],
+          observation_provenance: null,
+          provider_gateway_packet_refs: [],
+          support_refs: [],
+          bound_input_refs: [],
+          unresolved_input_bindings: [],
+          evidence_gathered: false,
+          evidence_quality: "missing_or_failed",
+          evidence_quality_satisfied: false,
+          next_affordances: [],
+          satisfaction: "pending",
+          satisfied: false,
+          rail_status: "pending",
+          first_broken_rail: "observation_artifact",
+          rail_failure_code: "subgoal_observation_missing",
+          repair_target: "observation_materializer",
+          assistant_answer: false,
+          raw_content_included: false,
+        };
+      }
+      const explicitContract =
+        explicitCapabilityContractForCapability(capability);
+      const requiredObservationKinds = new Set(
+        explicitContract?.required_observation_kinds ?? [],
+      );
       const artifact =
+        artifacts.find((candidate) => {
+          const kind = readString(candidate.kind);
+          return Boolean(kind && requiredObservationKinds.has(kind)) &&
+            normalizedArtifactEvidenceQuality({
+              artifact: candidate,
+              sourceResult,
+            }).evidenceSatisfied;
+        }) ??
         artifacts.find(
           (candidate) =>
             normalizedArtifactEvidenceQuality({
@@ -14784,10 +15399,12 @@ export const buildCodexCompoundSubgoalLedger = (input: {
           ),
         ].filter((ref): ref is string => Boolean(ref)),
       );
-      const observationKind = observationKinds[0] ?? "unknown";
-      const observationRef = observationRefs[0] ?? null;
-      const explicitContract =
-        explicitCapabilityContractForCapability(capability);
+      // Bind the occurrence to the artifact that actually satisfied evidence
+      // quality. A single provider call may normalize locator and result
+      // artifacts; binding to the first artifact can make a completed call look
+      // incomplete when the required observation is emitted later.
+      const observationKind = readString(artifact.kind) ?? observationKinds[0] ?? "unknown";
+      const observationRef = readString(artifact.artifact_id) ?? observationRefs[0] ?? null;
       const toolRan = Boolean(sourceResult);
       const evidenceQuality = normalizedArtifactEvidenceQuality({
         artifact,
@@ -16150,6 +16767,21 @@ const hasDocsContentObservation = (
       readArray(observation?.section_observations).length > 0
     );
   });
+
+export const committedDocsEvidenceSupersedesScholarlyGuard = (input: {
+  sourceTargetIntent: unknown;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): boolean => {
+  const sourceTargetIntent = readRecord(input.sourceTargetIntent);
+  return (
+    readString(sourceTargetIntent?.strength) === "hard" &&
+    [
+      readString(sourceTargetIntent?.target_source),
+      readString(sourceTargetIntent?.target_kind),
+    ].some((target) => target === "docs_viewer") &&
+    hasDocsContentObservation(input.gatewayCallResults)
+  );
+};
 
 const applyDocumentObservationAuthorityGuard = (input: {
   question: string;
@@ -18660,11 +19292,58 @@ export const genericCurrentTurnToolRecoveryReadyForSolver = (input: {
   providerGatewayEvidenceReady: boolean;
   normalizedObservationArtifactCount: number;
   capabilityItineraryExecutionState?: Record<string, unknown> | null;
+  currentCompoundCapabilityLedger?: Record<string, unknown> | null;
 }): boolean =>
   input.providerGatewayEvidenceReady &&
   input.normalizedObservationArtifactCount > 0 &&
-  input.capabilityItineraryExecutionState?.applies === true &&
-  input.capabilityItineraryExecutionState.complete === true;
+  (currentCompoundCapabilityRailsCompleteForSolver(
+    input.currentCompoundCapabilityLedger,
+  ) ||
+    (input.capabilityItineraryExecutionState?.applies === true &&
+      input.capabilityItineraryExecutionState.complete === true));
+
+export const currentCompoundCapabilityRailsCompleteForSolver = (
+  ledger?: Record<string, unknown> | null,
+): boolean => {
+  const subgoals = readArray(ledger?.subgoals)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  return (
+    subgoals.length > 1 &&
+    readString(ledger?.rail_status) === "satisfied" &&
+    subgoals.every(
+      (subgoal) =>
+        subgoal.satisfied === true ||
+        readString(subgoal.satisfaction) === "satisfied" ||
+        readString(subgoal.rail_status) === "complete",
+    )
+  );
+};
+
+export const providerCommittedCapabilityRailsIncompleteForSolver = (input: {
+  projectedExecutionState?: Record<string, unknown> | null;
+  currentCompoundCapabilityLedger?: Record<string, unknown> | null;
+}): boolean => {
+  const currentSubgoals = readArray(input.currentCompoundCapabilityLedger?.subgoals);
+  if (currentSubgoals.length > 1) {
+    return !currentCompoundCapabilityRailsCompleteForSolver(
+      input.currentCompoundCapabilityLedger,
+    );
+  }
+  const projectedRailCount = Math.max(
+    readArray(input.projectedExecutionState?.compound_subgoal_ledger).length,
+    readArray(input.projectedExecutionState?.required_capabilities).length,
+  );
+  return Boolean(
+    input.projectedExecutionState?.applies === true &&
+      projectedRailCount > 1 &&
+      (input.projectedExecutionState.complete !== true ||
+        readArray(input.projectedExecutionState.missing_required_capabilities)
+          .length > 0 ||
+        readArray(input.projectedExecutionState.missing_compound_subgoal_ids)
+          .length > 0),
+  );
+};
 
 export const settleCompletedItineraryContinuationForPostToolSynthesis = (
   state: HelixAgentContinuationState,
@@ -18700,6 +19379,28 @@ export const settleCompletedItineraryContinuationForPostToolSynthesis = (
     allowed_decisions: ["answer"],
   };
 };
+
+export const settleReenteredToolContinuationForPostToolSynthesis = (input: {
+  state: HelixAgentContinuationState;
+  trigger: HelixAgentContinuationState["trigger"];
+  providerGatewayEvidenceReady: boolean;
+  normalizedObservationArtifactCount: number;
+  capabilityItineraryExecutionState?: Record<string, unknown> | null;
+}): HelixAgentContinuationState =>
+  settleCompletedItineraryContinuationForPostToolSynthesis(
+    input.state,
+    input.trigger === "post_attempt" &&
+      input.state.goal.status === "in_progress" &&
+      input.state.goal.satisfied === false &&
+      input.state.goal.terminal_product_allowed === false &&
+      genericCurrentTurnToolRecoveryReadyForSolver({
+        providerGatewayEvidenceReady: input.providerGatewayEvidenceReady,
+        normalizedObservationArtifactCount:
+          input.normalizedObservationArtifactCount,
+        capabilityItineraryExecutionState:
+          input.capabilityItineraryExecutionState,
+      }),
+  );
 
 export const compactPostToolRecoveryModelValue = (
   value: unknown,
@@ -19162,6 +19863,15 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
     hasAuthoritativeTopLevelSourceTargetIntent
       ? topLevelSourceTargetIntent
       : existingSourceTargetIntent;
+  const currentPromptSourceTargetIntent = arbitrateAskSourceTarget({
+    turnId: input.turnId,
+    threadId: readThreadId(input.body),
+    promptText,
+    trustedEnvironmentContext: input.trustedEnvironmentContext,
+  });
+  const currentPromptRequestsCompoundDocsScholarlyComparison = readStringArray(
+    currentPromptSourceTargetIntent?.explicit_cues,
+  ).includes("compound_local_docs_external_scholarly_comparison");
   const authoritativeSource = readString(
     authoritativeSourceTargetIntent?.target_source,
   );
@@ -19193,6 +19903,7 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
   const scholarlyFollowupReference =
     !retainedScientificEvidenceContinuity &&
     !hasCurrentExplicitNonScholarlyOperator &&
+    !currentPromptRequestsCompoundDocsScholarlyComparison &&
     !hasAuthoritativeLocalDocumentSource &&
     !hasAuthoritativeRetainedScientificImageSource &&
     isScholarlyFollowupReferencePrompt(promptText, input.body);
@@ -19232,6 +19943,7 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
   };
   if (
     retainedScientificEvidenceContinuity ||
+    currentPromptRequestsCompoundDocsScholarlyComparison ||
     scholarlyFollowupReference ||
     !hasAuthoritativeTopLevelSourceTargetIntent
   ) {
@@ -19242,6 +19954,8 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
           promptText,
           trustedEnvironmentContext: input.trustedEnvironmentContext,
         })
+      : currentPromptRequestsCompoundDocsScholarlyComparison
+      ? currentPromptSourceTargetIntent
       : scholarlyFollowupReference
       ? {
           schema: "helix.ask_source_target_intent.v1",
@@ -19268,13 +19982,7 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
           assistant_answer: false,
           raw_content_included: false,
         }
-      : (existingSourceTargetIntent ??
-        arbitrateAskSourceTarget({
-          turnId: input.turnId,
-          threadId: readThreadId(input.body),
-          promptText,
-          trustedEnvironmentContext: input.trustedEnvironmentContext,
-        }));
+      : (existingSourceTargetIntent ?? currentPromptSourceTargetIntent);
   }
   if (routeAllowsNamedImageLensReceiptEvaluation(input.body)) {
     alignNamedImageLensReceiptRouteAuthority(input.body);
@@ -19337,6 +20045,9 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
   const inferredRequestedOutputs = readStringArray(
     inferredSourceTargetIntent?.requested_outputs,
   );
+  const compoundDocsScholarlySourceContract = readStringArray(
+    inferredSourceTargetIntent?.explicit_cues,
+  ).includes("compound_local_docs_external_scholarly_comparison");
   const existingCanonicalGoalFrame = readRecord(
     input.body.canonical_goal_frame,
   );
@@ -19784,10 +20495,13 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
     (contract) => contract.capability,
   );
   const explicitMultiCapabilityRoute =
+    compoundDocsScholarlySourceContract ||
     explicitPreGatewayRequests.length > 1 ||
     contextualExplicitCapabilityIds.length > 1;
   const compoundRouteCapabilities =
-    preGatewayDerivedCapabilities.length > 1
+    compoundDocsScholarlySourceContract
+      ? ["docs.search", SCHOLARLY_RESEARCH_SEARCH_CAPABILITY]
+      : preGatewayDerivedCapabilities.length > 1
       ? preGatewayDerivedCapabilities
       : contextualExplicitCapabilityIds;
   const priorAdmission =
@@ -19837,21 +20551,37 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
               schema: "helix.canonical_goal_frame.v1",
               turn_id: input.turnId,
               goal_kind: "compound_evidence_synthesis",
+              answer_scope: "local_docs_and_external_scholarly_research",
               required_terminal_kind: "compound_evidence_synthesis_answer",
               allowed_terminal_artifact_kinds: [
                 "compound_evidence_synthesis_answer",
                 "typed_failure",
               ],
+              allows_workspace_context: true,
+              allows_prior_artifacts: true,
+              classifier_reasons: compoundDocsScholarlySourceContract
+                ? [
+                    "compound_local_docs_external_scholarly_comparison",
+                    "both_observation_families_required_before_synthesis",
+                  ]
+                : ["explicit_multi_capability_route"],
             },
             route_product_contract: {
               schema: "helix.route_product_contract.v1",
               source_target: "compound_evidence",
               goal_kind: "compound_evidence_synthesis",
               required_terminal_kind: "compound_evidence_synthesis_answer",
+              required_terminal_artifact_kind:
+                "compound_evidence_synthesis_answer",
               allowed_terminal_artifact_kinds: [
                 "compound_evidence_synthesis_answer",
                 "typed_failure",
               ],
+              evidence_reentry_required: true,
+              followup_reasoning_required: true,
+              precedence_reason: compoundDocsScholarlySourceContract
+                ? "compound_local_docs_external_scholarly_comparison"
+                : "explicit_multi_capability_route",
             },
             tool_call_admission_decision: {
               ...priorAdmission,
@@ -19901,6 +20631,157 @@ export const ensureCodexPreGatewayRouteAuthority = (input: {
     payload: routeSeedBody,
   });
   input.body.committed_ask_route = committedRoute;
+  if (explicitMultiCapabilityRoute) {
+    const existingCanonicalGoalFrame = readRecord(
+      input.body.canonical_goal_frame,
+    );
+    input.body.canonical_goal_frame = {
+      ...existingCanonicalGoalFrame,
+      schema: "helix.canonical_goal_frame.v1",
+      turn_id: input.turnId,
+      goal_kind: committedRoute.canonical_goal.goal_kind,
+      answer_scope: "local_docs_and_external_scholarly_research",
+      required_terminal_kind: committedRoute.canonical_goal.required_terminal_kind,
+      allowed_terminal_artifact_kinds:
+        committedRoute.canonical_goal.allowed_terminal_artifact_kinds,
+      forbidden_terminal_artifact_kinds:
+        committedRoute.canonical_goal.forbidden_terminal_artifact_kinds,
+      allows_workspace_context: true,
+      allows_prior_artifacts: true,
+      classifier_reasons: compoundDocsScholarlySourceContract
+        ? [
+            "compound_local_docs_external_scholarly_comparison",
+            "both_observation_families_required_before_synthesis",
+          ]
+        : ["explicit_multi_capability_route"],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.body.tool_call_admission_decision = {
+      ...readRecord(input.body.tool_call_admission_decision),
+      required: true,
+      admitted_tool_families: Array.from(
+        new Set([
+          ...readStringArray(
+            readRecord(input.body.tool_call_admission_decision)
+              ?.admitted_tool_families,
+          ),
+          ...compoundRouteCapabilities.map(inferCommittedRouteToolFamily),
+        ]),
+      ),
+      compound_requested_capabilities: compoundRouteCapabilities,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    if (compoundDocsScholarlySourceContract) {
+      const compoundSubgoals = [
+        {
+          subgoal_id: `${input.turnId}:compound_subgoal:docs.search`,
+          order: 1,
+          requested_capability: "docs.search",
+          runtime_capability: "docs.search",
+          capability_family: "docs_viewer",
+          plan_family: "docs",
+          source_target: "docs_viewer",
+          admission_families: ["docs_viewer"],
+          required_args: [],
+          optional_args: ["query", "max_hits"],
+          args_hint: {},
+          required_observation_kinds: ["doc_search_results"],
+          produced_affordance_kinds: ["doc_search_results"],
+          consumed_affordance_kinds: [],
+          missing_affordance_kinds: [],
+          required_terminal_kind: "compound_evidence_synthesis_answer",
+          contribution_role: "local_docs_evidence",
+          terminal_contribution_kind: "compound_evidence_synthesis_answer",
+          allowed_substitutions: ["docs-viewer.search_docs"],
+          forbidden_nearby_capabilities: [],
+          depends_on_subgoal_ids: [],
+          input_bindings: [],
+          status: "pending",
+          mandatory: true,
+        },
+        {
+          subgoal_id: `${input.turnId}:compound_subgoal:scholarly-research.lookup_papers`,
+          order: 2,
+          requested_capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+          runtime_capability: SCHOLARLY_RESEARCH_SEARCH_CAPABILITY,
+          capability_family: "scholarly_research",
+          plan_family: "scholarly_research",
+          source_target: "scholarly_research",
+          admission_families: ["scholarly_research"],
+          required_args: ["query"],
+          optional_args: ["limit", "providers", "mode"],
+          args_hint: {},
+          required_observation_kinds: ["scholarly_research_observation"],
+          produced_affordance_kinds: ["scholarly_research_observation"],
+          consumed_affordance_kinds: [],
+          missing_affordance_kinds: [],
+          required_terminal_kind: "compound_evidence_synthesis_answer",
+          contribution_role: "external_scholarly_evidence",
+          terminal_contribution_kind: "compound_evidence_synthesis_answer",
+          allowed_substitutions: [],
+          forbidden_nearby_capabilities: [],
+          depends_on_subgoal_ids: [],
+          input_bindings: [],
+          status: "pending",
+          mandatory: true,
+        },
+      ];
+      input.body.compound_capability_contract = {
+        schema: "helix.compound_capability_contract.v1",
+        turn_id: input.turnId,
+        prompt_shape: "compound_capability",
+        subgoals: compoundSubgoals,
+        required_capabilities: compoundRouteCapabilities,
+        requires_all_subgoals: true,
+        terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+        source: "committed_route_compound_projection",
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      input.body.capability_itinerary = {
+        schema: "helix.capability_itinerary.v1",
+        turn_id: input.turnId,
+        planning_stage: "pre_execution",
+        prompt_shape: "compound_tool",
+        relevant_tool_families: ["docs_viewer", "scholarly_research"],
+        admitted_tool_families: ["docs_viewer", "scholarly_research"],
+        forbidden_tool_families: [],
+        missing_tool_families: [],
+        planned_steps: compoundSubgoals.map((subgoal) => ({
+          step_id: subgoal.subgoal_id,
+          tool_family: subgoal.capability_family,
+          requested_capability: subgoal.requested_capability,
+          runtime_capability: subgoal.runtime_capability,
+          compound_subgoal_id: subgoal.subgoal_id,
+          status: "admitted",
+          required_observation_kinds: subgoal.required_observation_kinds,
+          args_hint: {},
+        })),
+        terminal_success_criteria: {
+          required_observation_families: [
+            "docs_viewer",
+            "scholarly_research",
+          ],
+          required_capabilities: compoundRouteCapabilities,
+          allowed_terminal_artifact_kinds: [
+            "compound_evidence_synthesis_answer",
+            "typed_failure",
+          ],
+          forbidden_terminal_artifact_kinds: [],
+          compound_terminal_policy:
+            "synthesize_from_satisfied_subgoal_observations",
+          requires_post_observation_synthesis: true,
+        },
+        compound_capability_contract: input.body.compound_capability_contract,
+        authority: "planning_only",
+        not_terminal: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+  }
   if (scholarlyFollowupReference) {
     input.body.canonical_goal_frame = {
       ...committedRoute.canonical_goal,
@@ -20080,6 +20961,28 @@ export const attachCodexProviderExactCapabilityItinerary = (input: {
     );
   if (!candidateCompoundContract || !preservesExactAdmission) return false;
 
+  const enrichedCompoundSubgoals = readArray(candidateCompoundContract.subgoals)
+    .map(readRecord)
+    .filter((subgoal): subgoal is Record<string, unknown> => Boolean(subgoal));
+  const enrichedScholarlyRequirements =
+    requiredScholarlyCapabilitiesFromCompoundSubgoals(
+      enrichedCompoundSubgoals,
+    );
+  const candidateTerminalSuccessCriteria = readRecord(
+    candidateItinerary.terminal_success_criteria,
+  );
+  const projectedTerminalSuccessCriteria = candidateTerminalSuccessCriteria
+    ? {
+        ...candidateTerminalSuccessCriteria,
+        required_capabilities: Array.from(new Set([
+          ...readArray(candidateTerminalSuccessCriteria.required_capabilities)
+            .map(readString)
+            .filter((capability): capability is string => Boolean(capability)),
+          ...enrichedScholarlyRequirements,
+        ])),
+      }
+    : candidateItinerary.terminal_success_criteria;
+
   const projectedItinerary = {
     ...candidateItinerary,
     planned_steps: readArray(candidateItinerary.planned_steps).map((entry) => {
@@ -20097,6 +21000,7 @@ export const attachCodexProviderExactCapabilityItinerary = (input: {
         args_hint: exactCallArguments,
       };
     }),
+    terminal_success_criteria: projectedTerminalSuccessCriteria,
     compound_capability_contract: candidateCompoundContract,
     source: "codex_provider_pre_gateway_exact_admission",
   };
@@ -20108,6 +21012,64 @@ export const attachCodexProviderExactCapabilityItinerary = (input: {
       ...runtimeIntentPacket,
       capability_itinerary: projectedItinerary,
       compound_capability_contract: candidateCompoundContract,
+    };
+  }
+  return true;
+};
+
+export const reconcileCodexProviderScholarlyItineraryRequirements = (input: {
+  body: Record<string, unknown>;
+  promptText: string;
+}): boolean => {
+  const itinerary = readRecord(input.body.capability_itinerary);
+  const terminalSuccessCriteria = readRecord(
+    itinerary?.terminal_success_criteria,
+  );
+  const admission = readRecord(input.body.tool_call_admission_decision);
+  const admittedToolFamilies = readStringArray(admission?.admitted_tool_families);
+  const compoundRequestedCapabilities = readStringArray(
+    admission?.compound_requested_capabilities,
+  );
+  const scholarlyAdmitted =
+    admittedToolFamilies.includes("scholarly_research") ||
+    compoundRequestedCapabilities.some((capability) =>
+      capability.startsWith("scholarly-research."),
+    );
+  if (!itinerary || !terminalSuccessCriteria || !scholarlyAdmitted) {
+    return false;
+  }
+
+  const scholarly = detectScholarlyResearchIntent(input.promptText);
+  if (!scholarly.scholarlyIntent.requires_full_text) return false;
+  const requiredCapabilities = uniqueStrings([
+    ...readStringArray(terminalSuccessCriteria.required_capabilities),
+    ...scholarly.plannedScholarlyCapabilityChain.planned_capabilities,
+  ]);
+  const existingCapabilities = readStringArray(
+    terminalSuccessCriteria.required_capabilities,
+  );
+  if (
+    requiredCapabilities.length === existingCapabilities.length &&
+    requiredCapabilities.every((capability, index) =>
+      capability === existingCapabilities[index],
+    )
+  ) {
+    return false;
+  }
+
+  const reconciledItinerary = {
+    ...itinerary,
+    terminal_success_criteria: {
+      ...terminalSuccessCriteria,
+      required_capabilities: requiredCapabilities,
+    },
+  };
+  input.body.capability_itinerary = reconciledItinerary;
+  const runtimeIntentPacket = readRecord(input.body.runtime_intent_packet);
+  if (runtimeIntentPacket) {
+    input.body.runtime_intent_packet = {
+      ...runtimeIntentPacket,
+      capability_itinerary: reconciledItinerary,
     };
   }
   return true;
@@ -21044,6 +22006,10 @@ export const codexProvider: HelixAgentProvider = {
       availableCapabilities: accountAuthorizedGatewayManifest,
       trustedEnvironmentContext: trustedRoomEnvironmentIntentContext,
     });
+    reconcileCodexProviderScholarlyItineraryRequirements({
+      body: request.body,
+      promptText: question,
+    });
     const adapterContract = buildHelixAgentRuntimeAdapterContract({
       route: request.route,
       requestedRuntime: request.runtime,
@@ -21057,17 +22023,8 @@ export const codexProvider: HelixAgentProvider = {
     const runtimeSourceTargetIntent =
       readRecord(request.body.source_target_intent) ??
       readRecord(runtimeRouteMetadata?.source_target_intent);
-    const hardRuntimeToolSurfaceSourceRoute = Boolean(
-      readString(runtimeSourceTargetIntent?.strength) === "hard" &&
-        [
-          readString(runtimeSourceTargetIntent?.target_source),
-          readString(runtimeSourceTargetIntent?.target_kind),
-        ].some((sourceTarget) =>
-          ["live_environment", "visual_capture"].includes(
-            sourceTarget ?? "",
-          ),
-        ),
-    );
+    const hardRuntimeSourceRoute =
+      readString(runtimeSourceTargetIntent?.strength) === "hard";
     const runtimeToolCallAdmission = readRecord(
       request.body.tool_call_admission_decision,
     );
@@ -21102,7 +22059,7 @@ export const codexProvider: HelixAgentProvider = {
         ],
         admittedToolFamilies: runtimeAdmittedToolFamilies,
         restrictAllCapabilitiesToAdmittedToolFamilies:
-          hardRuntimeToolSurfaceSourceRoute,
+          hardRuntimeSourceRoute,
         mutatingCapabilityIds: gatewayManifest.capabilities
           .filter((capability) => capability.mutating)
           .map((capability) => capability.capability_id),
@@ -21362,17 +22319,21 @@ export const codexProvider: HelixAgentProvider = {
     ) {
       const scholarlyFollowup = lookupScholarlyFollowupEvidence(request.body);
       scholarlyFollowupEvidenceLookup = scholarlyFollowup.lookup;
-      priorScholarlyEvidenceMemoryRecord = scholarlyFollowup.record;
-      if (scholarlyFollowup.record) {
+      priorScholarlyEvidenceMemoryRecord =
+        await rerankScholarlyMemoryPassagesForFollowup({
+          record: scholarlyFollowup.record,
+          question,
+        });
+      if (priorScholarlyEvidenceMemoryRecord) {
         priorScholarlyEvidenceArtifact = buildScholarlyFollowupMemoryArtifact({
           turnId,
-          record: scholarlyFollowup.record,
+          record: priorScholarlyEvidenceMemoryRecord,
           lookup: scholarlyFollowup.lookup,
         });
         priorScholarlyEvidencePacket = buildScholarlyFollowupObservationPacket({
           turnId,
           artifact: priorScholarlyEvidenceArtifact,
-          record: scholarlyFollowup.record,
+          record: priorScholarlyEvidenceMemoryRecord,
         });
       }
       const currentPromptRecovery =
@@ -21521,17 +22482,21 @@ export const codexProvider: HelixAgentProvider = {
     ) {
       const scholarlyFollowup = lookupScholarlyFollowupEvidence(request.body);
       scholarlyFollowupEvidenceLookup = scholarlyFollowup.lookup;
-      priorScholarlyEvidenceMemoryRecord = scholarlyFollowup.record;
-      if (scholarlyFollowup.record) {
+      priorScholarlyEvidenceMemoryRecord =
+        await rerankScholarlyMemoryPassagesForFollowup({
+          record: scholarlyFollowup.record,
+          question,
+        });
+      if (priorScholarlyEvidenceMemoryRecord) {
         priorScholarlyEvidenceArtifact = buildScholarlyFollowupMemoryArtifact({
           turnId,
-          record: scholarlyFollowup.record,
+          record: priorScholarlyEvidenceMemoryRecord,
           lookup: scholarlyFollowup.lookup,
         });
         priorScholarlyEvidencePacket = buildScholarlyFollowupObservationPacket({
           turnId,
           artifact: priorScholarlyEvidenceArtifact,
-          record: scholarlyFollowup.record,
+          record: priorScholarlyEvidenceMemoryRecord,
         });
       }
     }
@@ -22391,21 +23356,46 @@ export const codexProvider: HelixAgentProvider = {
           admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
           lastAttempt: providerLastAttempt,
         });
-      const builtState = buildHelixAgentContinuationState({
-        payload: request.body,
-        turnId,
-        trigger,
-        previousState,
-        lastAttempt: providerLastAttempt,
-        capabilityProposal: {
-          allowed:
-            trigger === "initial" ||
-            trigger === "pre_decision" ||
-            options.allowBoundedCapabilityProposal === true ||
-            allowObservationDependentCapabilityProposal,
-          admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
-        },
-      });
+      const observationDependentCapabilityProposalIds =
+        allowObservationDependentCapabilityProposal
+          ? codexObservationDependentCapabilityProposalIds({
+              payload: request.body,
+              admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
+              lastAttempt: providerLastAttempt,
+            })
+          : [];
+      const builtState =
+        settleReenteredToolContinuationForPostToolSynthesis({
+          state: buildHelixAgentContinuationState({
+            payload: request.body,
+            turnId,
+            trigger,
+            previousState,
+            lastAttempt: providerLastAttempt,
+            capabilityProposal: {
+              allowed:
+                trigger === "initial" ||
+                trigger === "pre_decision" ||
+                options.allowBoundedCapabilityProposal === true ||
+                allowObservationDependentCapabilityProposal,
+              admittedCapabilityIds:
+                observationDependentCapabilityProposalIds.length > 0
+                  ? observationDependentCapabilityProposalIds
+                  : runtimeProviderAdmittedCapabilityIds,
+            },
+          }),
+          trigger,
+          providerGatewayEvidenceReady:
+            (gatewayCallResults.length > 0 &&
+              gatewayCallsSucceeded(gatewayCallResults)) ||
+            (capabilityLaneContext.calls_succeeded &&
+              capabilityLaneContext.observation_packets.length > 0),
+          normalizedObservationArtifactCount:
+            normalizedObservationArtifacts.length,
+          capabilityItineraryExecutionState: readRecord(
+            request.body.capability_itinerary_execution_state,
+          ),
+        });
       const scholarlyRecoveryBoundaryReason =
         options.scholarlyRecoveryBoundaryReason ?? null;
       const state = scholarlyRecoveryBoundaryReason
@@ -22462,6 +23452,7 @@ export const codexProvider: HelixAgentProvider = {
       turnId,
       normalizedArtifacts: normalizedObservationArtifacts,
       gatewayCallResults: evidenceGatewayCallResults,
+      requiredCapabilityIds: preferredContinuationCapabilityIds,
     });
     let gatewayLifecycleTraces = gatewayCallResults.map(
       (result) => result.tool_lifecycle_trace,
@@ -23502,6 +24493,14 @@ export const codexProvider: HelixAgentProvider = {
           : [];
     const modelVisibleWorkspaceSnapshot =
       buildCodexModelVisibleWorkspaceSnapshot(request.body);
+    const scholarlyAnalyticalEvidencePromptLines =
+      buildScholarlyAnalyticalEvidencePromptLines({
+        question,
+        evidenceState:
+          priorScholarlyEvidenceMemoryRecord?.evidence_state ?? null,
+        passageSelectionSource:
+          priorScholarlyEvidenceMemoryRecord?.passage_selection_source ?? null,
+      });
     const prompt = modelOnlyDirectAnswerForPrompt
       ? [
           "You are running inside Helix Codex Workstation Mode.",
@@ -23602,13 +24601,58 @@ export const codexProvider: HelixAgentProvider = {
                   {
                     followup_referent_resolution:
                       scholarlyFollowupEvidenceLookup,
-                    observation_packet: priorScholarlyEvidencePacket,
-                    evidence_artifact: priorScholarlyEvidenceArtifact,
+                    source_identity: {
+                      kind: "scholarly_paper_evidence",
+                      paper_result_ids: uniqueStrings([
+                        ...priorScholarlyEvidenceMemoryRecord!
+                          .runtime_selected_result_ids,
+                        ...priorScholarlyEvidenceMemoryRecord!.papers.map(
+                          (paper) => readString(paper.result_id),
+                        ),
+                      ]),
+                      titles: uniqueStrings(
+                        priorScholarlyEvidenceMemoryRecord!.papers.map((paper) =>
+                          readString(paper.title),
+                        ),
+                      ),
+                      source_pdf_ref:
+                        priorScholarlyEvidenceMemoryRecord!.source_pdf_ref,
+                      distinct_from_local_document_evidence: true,
+                    },
+                    evidence_state:
+                      priorScholarlyEvidenceMemoryRecord!.evidence_state,
+                    evidence_grade:
+                      priorScholarlyEvidenceMemoryRecord!.evidence_grade,
+                    passage_selection_source:
+                      priorScholarlyEvidenceMemoryRecord!
+                        .passage_selection_source,
+                    passage_selection_query:
+                      priorScholarlyEvidenceMemoryRecord!.passage_selection_query,
+                    bounded_evidence_passages:
+                      priorScholarlyEvidenceMemoryRecord!
+                        .bounded_evidence_passages ?? [],
+                    observation_refs:
+                      priorScholarlyEvidenceMemoryRecord!.observation_refs,
+                    missing_requirements:
+                      priorScholarlyEvidenceMemoryRecord!.missing_requirements,
                   },
                   null,
                   2,
                 ),
                 "Use this prior scholarly evidence only with its evidence-state caveats. If it is exploratory, rejected, metadata-only, full-text unavailable, or numeric-missing, say so before making claims about the specific paper.",
+                ...(priorScholarlyEvidenceMemoryRecord?.evidence_state ===
+                "full_text_usable"
+                  ? [
+                      "This packet is verified extracted full text from the identified scholarly paper, distinct from any local Docs observation in this turn. Its bounded passages are available for direct paper claims; do not report that the scholarly full text was unavailable or uninspected.",
+                      ...(priorScholarlyEvidenceMemoryRecord.passage_selection_source ===
+                      "cached_pdf_followup_rerank"
+                        ? [
+                            "The bounded paper passages were reranked from the trusted cached PDF for the current follow-up question. Keep the scholarly-paper identity and local-document identity separate when comparing them.",
+                          ]
+                        : []),
+                      ...scholarlyAnalyticalEvidencePromptLines,
+                    ]
+                  : []),
                 "",
               ]
             : scholarlyFollowupEvidenceLookup?.status === "missing"
@@ -23660,6 +24704,10 @@ export const codexProvider: HelixAgentProvider = {
           "For Image Lens, attached-image, or visible-image requests that ask to crop, inspect a region, read an equation, OCR, or report bbox coordinates, request visual_analysis.inspect_image_region before answering. Required fields are source_id when known, bbox_px, question, reason_for_crop, assistant_answer:false, and terminal_eligible:false. For explicit separate/multiple region requests, request one visual_analysis.inspect_image_region call per region.",
           "If workspace_context_snapshot.active_doc_visible_translation_context is present and the user asks to translate the visible/current document, first request workstation.visible_text.collect_translation_targets and pass active_doc_visible_translation_context: workspace_context_snapshot.active_doc_visible_translation_context when available. The legacy equivalent is workstation_tool_reference.collect_visible_translation_targets. If the user names a target language, include that requested target_language on the collector request even when the visible context has a different default target_language. After Helix returns that collector observation, request live_translation.translate_text for admitted collected chunks; preserve doc_path, source_id, panel_id, region_id, bbox, source_hash, source_text_hash, source_text_char_count, source_event_id, source_event_ms, chunk_id, chunk_index, dedupe_key, projection_target, account_locale, existing_observation_ref, existing_receipt_ref, existing_projection_status, existing_freshness_status, existing_terminal_authority_status, existing_source_event_ms, and existing_observed_at_ms when available. If the collected target has observed_at_ms, pass it as now_ms on live_translation.translate_text so projection receipts keep the collector observation time. Preserve target_language from the collected target unless the user explicitly requested a different target language; in that case use the user-requested target_language.",
           "",
+          ...scholarlyAnalyticalEvidencePromptLines,
+          ...(scholarlyAnalyticalEvidencePromptLines.length > 0
+            ? [""]
+            : []),
           "User request:",
           question,
           "",
@@ -23854,6 +24902,7 @@ export const codexProvider: HelixAgentProvider = {
         turnId,
         normalizedArtifacts: normalizedObservationArtifacts,
         gatewayCallResults: evidenceGatewayCallResults,
+        requiredCapabilityIds: preferredContinuationCapabilityIds,
       });
       gatewayLifecycleTraces = gatewayCallResults.map(
         (gatewayResult) => gatewayResult.tool_lifecycle_trace,
@@ -23973,6 +25022,19 @@ export const codexProvider: HelixAgentProvider = {
         input.currentResult.stdout.trim() ||
         input.currentResult.stderr.trim() ||
         "";
+      // Compound turns may leave an admitted non-scholarly rail pending after
+      // a scholarly observation. Preserve that Codex-authored handoff instead
+      // of forcing it through the scholarly decision envelope.
+      if (
+        compoundCapabilityHandoffCandidateFromText({
+          text: currentText,
+          requiredCapabilityIds: preferredContinuationCapabilityIds,
+        })
+      ) {
+        latestScholarlyEvidenceDecision = null;
+        latestScholarlyEvidenceDecisionAudit = null;
+        return input.currentResult;
+      }
       let validation = validateCodexScholarlyEvidenceDecision({
         text: currentText,
         phase: input.phase,
@@ -23986,44 +25048,47 @@ export const codexProvider: HelixAgentProvider = {
       latestScholarlyEvidenceDecision = validation.decision;
       latestScholarlyEvidenceDecisionAudit = validation.audit;
       if (validation.audit.status === "valid") return input.currentResult;
-      const retryPrompt = [
-        input.basePrompt,
-        "",
-        buildCodexScholarlyEvidenceDecisionCorrectionInstruction({
-          audit: validation.audit,
-          requiredEvidenceModes: requiredScholarlyEvidenceModes,
+      let retryResult = input.currentResult;
+      let rejectedText = currentText;
+      for (let contractRetry = 1; contractRetry <= 2; contractRetry += 1) {
+        const retryPrompt =
+          buildCodexScholarlyEvidenceDecisionContractRetryPrompt({
+          basePrompt: input.basePrompt,
+          correctionInstruction:
+            buildCodexScholarlyEvidenceDecisionCorrectionInstruction({
+              audit: validation.audit,
+              requiredEvidenceModes: requiredScholarlyEvidenceModes,
+              gatewayCallResults,
+            }),
+          decisionInstruction: buildCodexScholarlyEvidenceDecisionInstruction({
+            allowRecovery: input.recoveryAllowed,
+            allowImageLensRecovery: scholarlyImageLensRecoveryAllowed,
+            recoveryBoundaryReason: input.recoveryBoundaryReason,
+          }),
+          priorResponse: rejectedText,
+        });
+        retryResult = await runTurnCodexProcess({
+          prompt: retryPrompt,
+          signal: request.signal,
+          turnId,
+          onNativeEvent: emitCodexNativeRuntimeEvent,
+        });
+        rejectedText =
+          retryResult.stdout.trim() || retryResult.stderr.trim() || "";
+        validation = validateCodexScholarlyEvidenceDecision({
+          text: rejectedText,
+          phase: `${input.phase}_contract_retry_${contractRetry}`,
           gatewayCallResults,
-        }),
-        "",
-        buildCodexScholarlyEvidenceDecisionInstruction({
-          allowRecovery: input.recoveryAllowed,
+          requiredEvidenceModes: requiredScholarlyEvidenceModes,
+          recoveryAllowed: input.recoveryAllowed,
           allowImageLensRecovery: scholarlyImageLensRecoveryAllowed,
           recoveryBoundaryReason: input.recoveryBoundaryReason,
-        }),
-        "",
-        "Prior non-compliant response:",
-        currentText.slice(0, 6000),
-      ].join("\n");
-      const retryResult = await runTurnCodexProcess({
-        prompt: retryPrompt,
-        signal: request.signal,
-        turnId,
-        onNativeEvent: emitCodexNativeRuntimeEvent,
-      });
-      const retryText =
-        retryResult.stdout.trim() || retryResult.stderr.trim() || "";
-      validation = validateCodexScholarlyEvidenceDecision({
-        text: retryText,
-        phase: `${input.phase}_contract_retry`,
-        gatewayCallResults,
-        requiredEvidenceModes: requiredScholarlyEvidenceModes,
-        recoveryAllowed: input.recoveryAllowed,
-        allowImageLensRecovery: scholarlyImageLensRecoveryAllowed,
-        recoveryBoundaryReason: input.recoveryBoundaryReason,
-      });
-      scholarlyEvidenceDecisionAudits.push(validation.audit);
-      latestScholarlyEvidenceDecision = validation.decision;
-      latestScholarlyEvidenceDecisionAudit = validation.audit;
+        });
+        scholarlyEvidenceDecisionAudits.push(validation.audit);
+        latestScholarlyEvidenceDecision = validation.decision;
+        latestScholarlyEvidenceDecisionAudit = validation.audit;
+        if (validation.audit.status === "valid") break;
+      }
       return retryResult;
     };
     result = await ensureScholarlyEvidenceDecision({
@@ -24051,6 +25116,7 @@ export const codexProvider: HelixAgentProvider = {
           scholarlyRecoveryLaneRequestFromDecision(
             latestScholarlyEvidenceDecision,
             latestScholarlyEvidenceDecisionAudit,
+            gatewayCallResults,
           ))
         : null;
     const continuationAffordanceRetryCandidate =
@@ -24097,10 +25163,11 @@ export const codexProvider: HelixAgentProvider = {
       runtimeLaneRequestCandidate &&
       continuationAffordanceRetryInstruction &&
       !Array.isArray(runtimeLaneRequestCandidate) &&
-      !continuationStateAdmitsLaneRequest(
-        providerContinuationState,
-        runtimeLaneRequestCandidate,
-      )
+      !continuationStateAdmitsRuntimeRetryLaneRequest({
+        state: providerContinuationState,
+        candidate: runtimeLaneRequestCandidate,
+        admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
+      })
     ) {
       continuationLaneCandidateRejection = {
         schema: "helix.runtime_agent_lane_request_admission_rejection.v1",
@@ -24207,10 +25274,11 @@ export const codexProvider: HelixAgentProvider = {
       const retryCandidateAdmitted =
         retryCandidateUsesAdmittedCapability &&
         (!continuationAffordanceRetryInstruction ||
-          continuationStateAdmitsLaneRequest(
-            providerContinuationState,
-            parsedRetryCandidate,
-          ));
+          continuationStateAdmitsRuntimeRetryLaneRequest({
+            state: providerContinuationState,
+            candidate: parsedRetryCandidate,
+            admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
+          }));
       runtimeLaneRequestCandidate = retryCandidateAdmitted
         ? parsedRetryCandidate
         : null;
@@ -24457,10 +25525,11 @@ export const codexProvider: HelixAgentProvider = {
         requestedContinuationCandidates.length ===
           preparedContinuationCandidates.length &&
         preparedContinuationCandidates.every((candidate, index) =>
-          continuationStateAdmitsPreparedLaneRequest({
+          continuationStateAdmitsPreparedRuntimeRetryLaneRequest({
             state: providerContinuationState,
             requestedCandidate: requestedContinuationCandidates[index] ?? null,
             preparedCandidate: candidate,
+            admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
           }),
         );
       if (!allCandidatesAdmitted) {
@@ -24787,6 +25856,7 @@ export const codexProvider: HelixAgentProvider = {
           turnId,
           normalizedArtifacts: normalizedObservationArtifacts,
           gatewayCallResults: evidenceGatewayCallResults,
+          requiredCapabilityIds: preferredContinuationCapabilityIds,
         });
         gatewayLifecycleTraces = gatewayCallResults.map(
           (result) => result.tool_lifecycle_trace,
@@ -25075,6 +26145,66 @@ export const codexProvider: HelixAgentProvider = {
           onNativeEvent: emitCodexNativeRuntimeEvent,
         });
       };
+      const runRequiredContinuationReview = async (input: {
+        currentResult: CodexProcessResult;
+        executedLaneCalls: Array<Record<string, unknown>>;
+      }): Promise<CodexProcessResult> => {
+        providerContinuationState = publishProviderContinuationState(
+          "post_attempt",
+          { allowBoundedCapabilityProposal: true },
+        );
+        if (!continuationStateRequiresLaneRequest(providerContinuationState)) {
+          return input.currentResult;
+        }
+        const currentCandidateText =
+          input.currentResult.stdout.trim() ||
+          input.currentResult.stderr.trim() ||
+          "";
+        const reviewPrompt = [
+          ...buildCodexCapabilityLaneReentryPrefix(question),
+          "",
+          "The prior post-tool model step attempted to stop while the canonical current-turn continuation still requires an admitted action.",
+          "Treat the incomplete terminal candidate as a rejected proposal, not as the user-facing answer.",
+          buildCodexGenericContinuationDecisionInstruction(
+            providerContinuationState,
+          ),
+          `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by one compact JSON request copied from an untried next_admissible_affordance.lane_request.`,
+          "Do not invent an observation, repeat a tried request, or answer until the continuation state permits answer.",
+          "Helix independently validates the selected capability and arguments before execution.",
+          "",
+          "Provider-selected requests already executed this turn:",
+          JSON.stringify(
+            compactCapabilityLaneModelValue(input.executedLaneCalls),
+            null,
+            2,
+          ),
+          "",
+          "Accumulated normalized current-turn observation evidence:",
+          ...buildCodexNormalizedObservationReentryEvidenceLines(
+            normalizedObservationArtifacts,
+          ),
+          "",
+          "Premature terminal candidate under review:",
+          currentCandidateText.slice(0, 6000),
+          "",
+          formatHelixAgentContinuationStateForRuntime(
+            providerContinuationState,
+          ),
+          "",
+          ...buildCodexContinuationCapabilityInputContractLines({
+            continuationState: providerContinuationState,
+            availableCapabilities: gatewayManifest.capabilities,
+            admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
+            preferredCapabilityIds: preferredContinuationCapabilityIds,
+          }),
+        ].join("\n");
+        return runTurnCodexProcess({
+          prompt: reviewPrompt,
+          signal: request.signal,
+          turnId,
+          onNativeEvent: emitCodexNativeRuntimeEvent,
+        });
+      };
       providerContinuationState =
         publishProviderContinuationState("post_attempt");
       const firstReentryPrompt = [
@@ -25113,7 +26243,9 @@ export const codexProvider: HelixAgentProvider = {
                     buildCodexScholarlyEvidenceDecisionInstruction({
                       allowImageLensRecovery: scholarlyImageLensRecoveryAllowed,
                     }),
-                    "When Helix lists admitted untried recovery affordances, select one of those exact requests. When it lists none, you may choose a new bounded scholarly recovery query; Helix will still validate its capability and arguments before execution.",
+                    formatHelixScholarlyRetrySelectionForRuntime(
+                      providerContinuationState,
+                    ),
                   ].join("\n")
                 : firstLaneWasImageLens
                   ? [
@@ -25362,6 +26494,12 @@ export const codexProvider: HelixAgentProvider = {
               state: providerContinuationState,
               requestedCandidate: requestedRecoveryCandidate,
               preparedCandidate: retainedRecovery,
+            }) ||
+            continuationStateAdmitsPreparedRuntimeRetryLaneRequest({
+              state: providerContinuationState,
+              requestedCandidate: requestedRecoveryCandidate,
+              preparedCandidate: retainedRecovery,
+              admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
             });
           if (retainedRecovery && continuationAdmitsRecovery) {
             chainedRuntimeLaneRequestCandidate = retainedRecovery;
@@ -25390,6 +26528,7 @@ export const codexProvider: HelixAgentProvider = {
           scholarlyRecoveryLaneRequestFromDecision(
             latestScholarlyEvidenceDecision,
             latestScholarlyEvidenceDecisionAudit,
+            gatewayCallResults,
           );
         const preparedRecoveryCandidate =
           prepareScholarlyOrImageLensRecoveryCandidate(
@@ -25404,11 +26543,17 @@ export const codexProvider: HelixAgentProvider = {
           : suppressedRecovery.candidate;
         if (
           candidate &&
-          continuationStateAdmitsPreparedRecoveryLaneRequest({
-            state: providerContinuationState,
-            requestedCandidate: requestedRecoveryCandidate,
-            preparedCandidate: candidate,
-          })
+          (continuationStateAdmitsPreparedRecoveryLaneRequest({
+              state: providerContinuationState,
+              requestedCandidate: requestedRecoveryCandidate,
+              preparedCandidate: candidate,
+            }) ||
+            continuationStateAdmitsPreparedRuntimeRetryLaneRequest({
+              state: providerContinuationState,
+              requestedCandidate: requestedRecoveryCandidate,
+              preparedCandidate: candidate,
+              admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
+            }))
         ) {
           chainedRuntimeLaneRequestCandidate = candidate;
         } else if (requestedRecoveryCandidate) {
@@ -25667,6 +26812,7 @@ export const codexProvider: HelixAgentProvider = {
             turnId,
             normalizedArtifacts: normalizedObservationArtifacts,
             gatewayCallResults: evidenceGatewayCallResults,
+            requiredCapabilityIds: preferredContinuationCapabilityIds,
           });
           gatewayLifecycleTraces = gatewayCallResults.map(
             (gatewayResult) => gatewayResult.tool_lifecycle_trace,
@@ -26057,7 +27203,9 @@ export const codexProvider: HelixAgentProvider = {
                   buildCodexScholarlyEvidenceDecisionInstruction({
                     allowImageLensRecovery: scholarlyImageLensRecoveryAllowed,
                   }),
-                  "When Helix lists admitted untried recovery affordances, select one of those exact requests. When it lists none, you may choose a new bounded scholarly recovery query; Helix will still validate its capability and arguments before execution.",
+                  formatHelixScholarlyRetrySelectionForRuntime(
+                    providerContinuationState,
+                  ),
                 ].join("\n")
               : firstLaneNeedsSpeechFollowup
                 ? "Now produce the final answer using only the translation observation and text-to-speech receipt. Report playback as played only if the receipt proves it; otherwise report the exact pending, blocked, or failed status."
@@ -26189,10 +27337,17 @@ export const codexProvider: HelixAgentProvider = {
             scholarlyLaneCallHistory.length <
             CODEX_PROVIDER_CONTINUATION_HARD_MAX_STEPS
           ) {
+            const latestDecisionText =
+              result.stdout.trim() || result.stderr.trim() || "";
             const requestedNextCandidate =
+              compoundCapabilityHandoffCandidateFromText({
+                text: latestDecisionText,
+                requiredCapabilityIds: preferredContinuationCapabilityIds,
+              }) ??
               scholarlyRecoveryLaneRequestFromDecision(
                 latestScholarlyEvidenceDecision,
                 latestScholarlyEvidenceDecisionAudit,
+                gatewayCallResults,
               );
             if (!requestedNextCandidate) {
               scholarlyRecoveryStopReason =
@@ -26227,7 +27382,9 @@ export const codexProvider: HelixAgentProvider = {
               isScholarlyGatewayCapabilityId(nextCapability ?? "") ||
               (scholarlyImageLensRecoveryAllowed &&
                 nextCapability ===
-                  VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY);
+                  VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY) ||
+              (nextCapability !== null &&
+                preferredContinuationCapabilityIds.includes(nextCapability));
             if (!nextCandidate || !nextCapabilityAllowed) {
               scholarlyRecoveryStopReason = suppressedNextCandidate.suppression
                 ? "runtime_agent_recovery_suppressed_by_negative_evidence_constraint"
@@ -26236,12 +27393,32 @@ export const codexProvider: HelixAgentProvider = {
               scholarlyRecoveryBoundaryCandidate = requestedNextCandidate;
               break;
             }
-            if (
-              !continuationStateAdmitsPreparedRecoveryLaneRequest({
+            const normalCompoundHandoffAdmitted =
+              nextCapability !== null &&
+              !isScholarlyGatewayCapabilityId(nextCapability) &&
+              nextCapability !== VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY &&
+              continuationStateAdmitsGenericProviderLaneRequest({
                 state: providerContinuationState,
-                requestedCandidate: requestedNextCandidate,
-                preparedCandidate: nextCandidate,
-              })
+                candidate: nextCandidate,
+                admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
+                providerSelectedExtensionAllowed: false,
+              });
+            if (
+              !(
+                continuationStateAdmitsPreparedRecoveryLaneRequest({
+                  state: providerContinuationState,
+                  requestedCandidate: requestedNextCandidate,
+                  preparedCandidate: nextCandidate,
+                }) ||
+                continuationStateAdmitsPreparedRuntimeRetryLaneRequest({
+                  state: providerContinuationState,
+                  requestedCandidate: requestedNextCandidate,
+                  preparedCandidate: nextCandidate,
+                  admittedCapabilityIds:
+                    runtimeProviderAdmittedCapabilityIds,
+                }) ||
+                normalCompoundHandoffAdmitted
+              )
             ) {
               continuationLaneCandidateRejection = {
                 schema:
@@ -26353,6 +27530,7 @@ export const codexProvider: HelixAgentProvider = {
                 turnId,
                 normalizedArtifacts: normalizedObservationArtifacts,
                 gatewayCallResults: evidenceGatewayCallResults,
+                requiredCapabilityIds: preferredContinuationCapabilityIds,
               });
               gatewayLifecycleTraces = gatewayCallResults.map(
                 (gatewayResult) => gatewayResult.tool_lifecycle_trace,
@@ -26472,11 +27650,18 @@ export const codexProvider: HelixAgentProvider = {
               turnId,
               onNativeEvent: emitCodexNativeRuntimeEvent,
             });
-            result = await ensureScholarlyEvidenceDecision({
-              basePrompt: nextReentryPrompt,
-              currentResult: result,
-              phase: `scholarly_lane_reentry_${scholarlyLaneCallHistory.length}`,
-            });
+            if (
+              !compoundCapabilityHandoffCandidateFromText({
+                text: result.stdout.trim() || result.stderr.trim() || "",
+                requiredCapabilityIds: preferredContinuationCapabilityIds,
+              })
+            ) {
+              result = await ensureScholarlyEvidenceDecision({
+                basePrompt: nextReentryPrompt,
+                currentResult: result,
+                phase: `scholarly_lane_reentry_${scholarlyLaneCallHistory.length}`,
+              });
+            }
             scholarlyRecoveryStopReason = continuationStateRequiresLaneRequest(
               providerContinuationState,
             )
@@ -26495,6 +27680,7 @@ export const codexProvider: HelixAgentProvider = {
               scholarlyRecoveryLaneRequestFromDecision(
                 latestScholarlyEvidenceDecision,
                 latestScholarlyEvidenceDecisionAudit,
+                gatewayCallResults,
               );
           }
           let scholarlyRecoveryFinalizationAttempted = false;
@@ -27072,6 +28258,7 @@ export const codexProvider: HelixAgentProvider = {
                       turnId,
                       normalizedArtifacts: normalizedObservationArtifacts,
                       gatewayCallResults: evidenceGatewayCallResults,
+                      requiredCapabilityIds: preferredContinuationCapabilityIds,
                     });
                   gatewayLifecycleTraces = gatewayCallResults.map(
                     (gatewayResult) =>
@@ -27264,11 +28451,25 @@ export const codexProvider: HelixAgentProvider = {
                   onNativeEvent: emitCodexNativeRuntimeEvent,
                 });
               },
-              maxTerminalReviews: genericCompoundTerminalReviewEnabled ? 2 : 1,
+              maxTerminalReviews:
+                genericCompoundTerminalReviewEnabled ||
+                continuationStateRequiresLaneRequest(providerContinuationState)
+                  ? 2
+                  : 1,
               reviewTerminalCandidate: async (
                 currentResult: CodexProcessResult,
-              ) =>
-                genericCompoundTerminalReviewEnabled
+              ) => {
+                if (
+                  continuationStateRequiresLaneRequest(
+                    providerContinuationState,
+                  )
+                ) {
+                  return runRequiredContinuationReview({
+                    currentResult,
+                    executedLaneCalls: chainedLaneCalls,
+                  });
+                }
+                return genericCompoundTerminalReviewEnabled
                   ? runGenericCompoundTerminalReview({
                       currentResult,
                       executedLaneCalls: chainedLaneCalls,
@@ -27278,7 +28479,8 @@ export const codexProvider: HelixAgentProvider = {
                   : runGenericEmptyPostToolReview({
                       currentResult,
                       executedLaneCalls: chainedLaneCalls,
-                    }),
+                    });
+              },
             });
           result = genericContinuation.result;
           runtimeLaneRequestLoop = {
@@ -27558,8 +28760,14 @@ export const codexProvider: HelixAgentProvider = {
         : null;
     const currentEnvironmentMechanicsDocsOperator =
       isMinecraftMechanicsDocsPrompt(question);
+    const currentCommittedDocsEvidence =
+      committedDocsEvidenceSupersedesScholarlyGuard({
+        sourceTargetIntent: request.body.source_target_intent,
+        gatewayCallResults,
+      });
     const currentExplicitNonScholarlyOperator = Boolean(
       currentEnvironmentMechanicsDocsOperator ||
+      currentCommittedDocsEvidence ||
       buildPromptDerivedCalculatorSolveGatewayCallRequests(request.body)
         .length > 0 ||
       buildPromptDerivedTheoryReflectionGatewayCallRequests(request.body)
@@ -27832,21 +29040,11 @@ export const codexProvider: HelixAgentProvider = {
     const providerCommittedExecutionState = readRecord(
       request.body.capability_itinerary_execution_state,
     );
-    const providerCommittedCapabilityRailCount = Math.max(
-      readArray(providerCommittedExecutionState?.compound_subgoal_ledger).length,
-      readArray(providerCommittedExecutionState?.required_capabilities).length,
-    );
-    const providerCommittedCapabilityRailsIncomplete = Boolean(
-      providerCommittedExecutionState?.applies === true &&
-        providerCommittedCapabilityRailCount > 1 &&
-        (providerCommittedExecutionState.complete !== true ||
-          readArray(
-            providerCommittedExecutionState.missing_required_capabilities,
-          ).length > 0 ||
-          readArray(
-            providerCommittedExecutionState.missing_compound_subgoal_ids,
-          ).length > 0),
-    );
+    const providerCommittedCapabilityRailsIncomplete =
+      providerCommittedCapabilityRailsIncompleteForSolver({
+        projectedExecutionState: providerCommittedExecutionState,
+        currentCompoundCapabilityLedger: codexCompoundSubgoalLedger,
+      });
     const providerGoalSatisfied =
       providerSolverPathCompleted &&
       !providerCommittedCapabilityRailsIncomplete;
@@ -29598,6 +30796,7 @@ export const codexProvider: HelixAgentProvider = {
           capabilityItineraryExecutionState: readRecord(
             responseRecord.capability_itinerary_execution_state,
           ),
+          currentCompoundCapabilityLedger: codexCompoundSubgoalLedger,
         });
       const visiblePolicyTerminalRetryRequest =
         recoverableWriterRejection.rejection_reason ===
@@ -29617,7 +30816,7 @@ export const codexProvider: HelixAgentProvider = {
             previousState: providerContinuationState,
             lastAttempt: recoverableWriterRejection,
           }),
-          genericCurrentTurnToolRecoveryReady,
+          docsContentEvidenceSatisfied || genericCurrentTurnToolRecoveryReady,
         );
       appendHelixAgentContinuationStateToPayload({
         payload: responseRecord,

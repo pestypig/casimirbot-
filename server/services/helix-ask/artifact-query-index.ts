@@ -1102,6 +1102,8 @@ const explicitObservationCoverageMode = (capability: string | null): "all" | "an
   if (
     normalized === "image_lens_inspect" ||
     normalized === "situation_room_describe_visual_capture" ||
+    normalized === "docs_search" ||
+    normalized === "docs_viewer_search_docs" ||
     normalized === "docs_viewer_locate_in_doc" ||
     normalized === "repo_code_search_concept" ||
     normalized === "repo_search" ||

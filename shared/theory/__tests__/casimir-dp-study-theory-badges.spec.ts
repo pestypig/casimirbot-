@@ -50,11 +50,15 @@ describe("Casimir / DP quantum-foam study badges", () => {
         "study.casimir_dp.empirical_authority_stage4_2l",
         "study.casimir_dp.apparatus_search_stage4_2m",
         "study.casimir_dp.material_thermal_ordinary_null_stage4_2n",
+        "study.casimir_dp.public_data_component_validation_stage4_2o",
+        "study.casimir_dp.proper_time_worldline_closure_stage4_2p",
+        "study.casimir_dp.superconducting_boundary_control_stage4_2q",
+        "study.casimir_dp.integrated_feasibility_pilot_stage4_2r",
         "study.casimir_dp.claim_boundary",
       ]),
     );
-    expect(branch.badges).toHaveLength(39);
-    expect(branch.edges).toHaveLength(110);
+    expect(branch.badges).toHaveLength(43);
+    expect(branch.edges).toHaveLength(120);
     expect(branch.badges.every((badge) => badge.claimBoundary.diagnosticOnly)).toBe(true);
     expect(branch.badges.every((badge) => badge.claimBoundary.promotionAllowed === false)).toBe(true);
   });
@@ -1265,10 +1269,126 @@ describe("Casimir / DP quantum-foam study badges", () => {
     expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
       "casimir_dp_stage4_2m_requires_stage4_2n_ordinary_null",
       "casimir_dp_stage4_2n_empirical_gaps_block_claim_boundary",
+      "casimir_dp_stage4_2n_requires_stage4_2o_public_component_validation",
+    ]));
+    expect(incidentEdges).toHaveLength(4);
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
+  });
+
+  it("registers Stage-4.2O as a non-promotable, no-fusion public-data replay", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find((candidate) =>
+      candidate.id === "study.casimir_dp.public_data_component_validation_stage4_2o");
+    const incidentEdges = branch.edges.filter(
+      (edge) => edge.from === badge?.id || edge.to === badge?.id,
+    );
+
+    expect(badge?.status).toBe("diagnostic");
+    expect(badge?.calculatorPayloads).toEqual([]);
+    expect(badge?.equations).toHaveLength(2);
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "external_public_component_replay_pass",
+      "no_cross_apparatus_covariance_fusion",
+      "joint_protocol_validation_not_ready",
+      "measured_evidence_not_ready",
+      "zero_observable_bridge",
+    ]));
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_stage4_2n_requires_stage4_2o_public_component_validation",
+      "casimir_dp_stage4_2o_joint_protocol_gap_blocks_claim_boundary",
+    ]));
+    expect(incidentEdges).toHaveLength(4);
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
+  });
+
+  it("registers Stage-4.2P as an ordinary phase closure with no collapse bridge", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find((candidate) =>
+      candidate.id === "study.casimir_dp.proper_time_worldline_closure_stage4_2p");
+    const incidentEdges = branch.edges.filter(
+      (edge) => edge.from === badge?.id || edge.to === badge?.id,
+    );
+    expect(badge?.status).toBe("diagnostic");
+    expect(badge?.calculatorPayloads).toEqual([]);
+    expect(badge?.equations).toHaveLength(3);
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "synthetic_phase_budget_pass",
+      "measured_worldlines_not_ready",
+      "frozen_diosi_law_unchanged",
+      "zero_observable_bridge",
+    ]));
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_stage4_2o_requires_stage4_2p_proper_time_closure",
+      "casimir_dp_stage4_2p_empirical_worldline_gap_blocks_claim_boundary",
+    ]));
+    expect(incidentEdges).toHaveLength(3);
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
+  });
+
+  it("registers Stage-4.2Q as an ordinary superconducting control with explicit nonbridges", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find((candidate) =>
+      candidate.id === "study.casimir_dp.superconducting_boundary_control_stage4_2q");
+    const incidentEdges = branch.edges.filter((edge) =>
+      edge.from === badge?.id || edge.to === badge?.id);
+
+    expect(badge).toEqual(expect.objectContaining({
+      level: "diagnostic_gate",
+      status: "diagnostic",
+      calculatorPayloads: [],
+    }));
+    expect(badge?.equations).toHaveLength(4);
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "synthetic_magnetic_toggle_candidate",
+      "temperature_toggle_no_go",
+      "finite_frequency_impedance_nonzero",
+      "standard_diosi_boundary_ratio_cancellation_pass",
+      "zero_collapse_bridge",
+    ]));
+    expect(badge?.assumptions.join(" ")).toContain("Zero DC resistance is not zero finite-frequency impedance");
+    expect(badge?.assumptions.join(" ")).toContain("not the Standard-Model Higgs field");
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_stage4_2p_requires_stage4_2q_superconducting_control",
+      "casimir_dp_stage4_2n_checks_stage4_2q_ordinary_response",
+      "casimir_dp_stage4_2o_checks_stage4_2q_component_scope",
+      "casimir_dp_stage4_2q_empirical_control_gap_blocks_claim_boundary",
+      "casimir_dp_stage4_2q_requires_stage4_2r_integrated_pilot",
+    ]));
+    expect(incidentEdges).toHaveLength(5);
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+  });
+
+  it("registers Stage-4.2R as a blocked same-apparatus empirical-pilot gate", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find((candidate) =>
+      candidate.id === "study.casimir_dp.integrated_feasibility_pilot_stage4_2r");
+    const incidentEdges = branch.edges.filter((edge) =>
+      edge.from === badge?.id || edge.to === badge?.id);
+
+    expect(badge).toEqual(expect.objectContaining({
+      level: "diagnostic_gate",
+      status: "blocked",
+      calculatorPayloads: [],
+    }));
+    expect(badge?.equations).toHaveLength(2);
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "packet_contract_pass",
+      "empirical_pilot_not_authorized",
+      "zero_of_eight_authorities_ready",
+      "four_cell_standard_diosi_cancellation",
+      "cross_apparatus_covariance_fusion_forbidden",
+      "zero_collapse_bridge",
+    ]));
+    expect(badge?.assumptions.join(" ")).toContain("Public component datasets cannot be fused");
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_stage4_2q_requires_stage4_2r_integrated_pilot",
+      "casimir_dp_stage4_2r_empirical_authority_gap_blocks_claim_boundary",
     ]));
     expect(incidentEdges).toHaveLength(2);
     expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
-    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
   });
 
   it("keeps Compton, DP, and cavity frequencies separate until a transfer kernel exists", () => {

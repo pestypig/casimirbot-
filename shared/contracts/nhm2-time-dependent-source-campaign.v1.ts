@@ -6,7 +6,10 @@ import type { Nhm2MetricMomentumRemediationTargetsV1 } from "./nhm2-metric-momen
 import type { Nhm2MetricRequiredMomentumDemandAuditV1 } from "./nhm2-metric-required-momentum-demand-audit.v1";
 import type { Nhm2NatarioInvariantAuditV1 } from "./nhm2-natario-invariant-audit.v1";
 import type { Nhm2MomentumFrameProjectionReceiptV1 } from "./nhm2-momentum-frame-projection-receipt.v1";
-import type { Nhm2ObserverRobustEnergyConditionArtifactV1 } from "./nhm2-observer-robust-energy-conditions.v1";
+import {
+  NHM2_REQUIRED_OBSERVER_FAMILY_IDS,
+  type Nhm2ObserverRobustEnergyConditionArtifactV1,
+} from "./nhm2-observer-robust-energy-conditions.v1";
 import type { Nhm2QeiWorldlineDossierV1 } from "./nhm2-qei-worldline-dossier.v1";
 import type { Nhm2RegionalFullTensorResidualArtifactV1 } from "./nhm2-regional-full-tensor-residual.v1";
 import type { Nhm2RegionalSupportFunctionAtlasV1 } from "./nhm2-regional-support-function-atlas.v1";
@@ -384,8 +387,10 @@ const coupledClosureRequiredCorrections = (
 ): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
   if (artifact == null) return {};
   const corrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> = {};
-  for (const gate of artifact.gates.filter((entry) => entry.status !== "pass")) {
-    for (const [key, value] of Object.entries(correctionRecord(gate.requiredCorrections))) {
+  for (const gate of artifact.gates) {
+    for (const [key, value] of Object.entries(
+      correctionRecord(gate.requiredCorrections),
+    )) {
       corrections[`${gate.gateId}.${key}`] = value;
     }
   }
@@ -632,15 +637,24 @@ const gate = (input: {
   warnings?: Array<string | null | undefined>;
   primaryMetric?: string | null;
   requiredCorrections?: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> | null;
-}): Nhm2TimeDependentSourceCampaignGateV1 => ({
-  gateId: input.gateId,
-  status: input.status,
-  pass: input.status === "pass",
-  blockers: uniqueText(input.blockers ?? []),
-  warnings: uniqueText(input.warnings ?? []),
-  primaryMetric: asText(input.primaryMetric),
-  requiredCorrections: input.status === "pass" ? {} : correctionRecord(input.requiredCorrections),
-});
+}): Nhm2TimeDependentSourceCampaignGateV1 => {
+  const blockers = uniqueText(input.blockers ?? []);
+  const requiredCorrections = correctionRecord(input.requiredCorrections);
+  const status =
+    input.status === "pass" &&
+    (blockers.length > 0 || Object.keys(requiredCorrections).length > 0)
+      ? "review"
+      : input.status;
+  return {
+    gateId: input.gateId,
+    status,
+    pass: status === "pass",
+    blockers,
+    warnings: uniqueText(input.warnings ?? []),
+    primaryMetric: asText(input.primaryMetric),
+    requiredCorrections: status === "pass" ? {} : requiredCorrections,
+  };
+};
 
 const firstNonPassingGateBlocker = (
   gates: Nhm2TimeDependentSourceCampaignGateV1[],
@@ -714,7 +728,11 @@ const coupledEvidenceForCampaignGate = (
       "casimir_material_receipt",
     ],
     switching_covariant_conservation: ["conservation"],
-    full_regional_tensor_closure: ["regional_residuals"],
+    full_regional_tensor_closure: [
+      "regional_support_function_atlas",
+      "source_closure_readiness",
+      "regional_residuals",
+    ],
     observer_family_energy_conditions: ["observer_robust_energy_conditions"],
     qei_worldline_receipts: ["qei_worldline_dossier"],
   };
@@ -723,17 +741,28 @@ const coupledEvidenceForCampaignGate = (
   const blockers: string[] = [];
   const warnings: string[] = [];
   let status: Nhm2TimeDependentSourceCampaignStatus | null = null;
-  for (const gate of artifact.gates.filter(
-    (entry) => entry.status !== "pass" && coupledGateIds.includes(entry.gateId),
+  for (const gate of artifact.gates.filter((entry) =>
+    coupledGateIds.includes(entry.gateId),
   )) {
-    status = status == null ? gate.status : strongerStatus(status, gate.status);
-    blockers.push(
-      ...(gate.blockers.length > 0
-        ? gate.blockers.map((blocker) => `${gate.gateId}:${blocker}`)
-        : [`${gate.gateId}:non_pass`]),
-    );
+    const gateCorrections = correctionRecord(gate.requiredCorrections);
+    const hasBlockingSurface =
+      gate.status !== "pass" ||
+      gate.blockers.length > 0 ||
+      Object.keys(gateCorrections).length > 0;
+    if (hasBlockingSurface) {
+      const effectiveStatus = gate.status === "pass" ? "review" : gate.status;
+      status =
+        status == null ? effectiveStatus : strongerStatus(status, effectiveStatus);
+      blockers.push(
+        ...(gate.blockers.length > 0
+          ? gate.blockers.map((blocker) => `${gate.gateId}:${blocker}`)
+          : Object.keys(gateCorrections).length > 0
+            ? [`${gate.gateId}:required_corrections_present`]
+            : [`${gate.gateId}:non_pass`]),
+      );
+    }
     warnings.push(...gate.warnings.map((warning) => `${gate.gateId}:${warning}`));
-    for (const [key, value] of Object.entries(correctionRecord(gate.requiredCorrections))) {
+    for (const [key, value] of Object.entries(gateCorrections)) {
       corrections[`${gate.gateId}.${key}`] = value;
     }
   }
@@ -1107,28 +1136,89 @@ const observerGate = (
       blockers: ["observer_robust_energy_conditions_missing"],
     });
   }
+  const continuousOptimizer = observer.observerFamilies.find(
+    (family) => family.familyId === "continuous_optimizer",
+  );
+  const familyCounts = new Map<string, number>();
+  for (const family of observer.observerFamilies) {
+    familyCounts.set(
+      family.familyId,
+      (familyCounts.get(family.familyId) ?? 0) + 1,
+    );
+  }
+  const familyIdentityBlockers = [
+    ...NHM2_REQUIRED_OBSERVER_FAMILY_IDS.flatMap((familyId) =>
+      familyCounts.has(familyId) ? [] : [`${familyId}:observer_family_missing`],
+    ),
+    ...Array.from(familyCounts.entries()).flatMap(([familyId, count]) =>
+      count > 1 ? [`${familyId}:observer_family_duplicate`] : [],
+    ),
+  ];
+  const knownContinuousOptimizerLimitation = (
+    family: Nhm2ObserverRobustEnergyConditionArtifactV1["observerFamilies"][number],
+    blocker: string,
+  ): boolean =>
+    family.familyId === "continuous_optimizer" &&
+    family.status === "not_run" &&
+    family.optimizerUsed === false &&
+    blocker === "continuous_optimizer_not_implemented";
+  const familyBlockers: string[] = [];
+  const warnings: string[] = [];
+  for (const family of observer.observerFamilies) {
+    if (family.blockers.length === 0 && family.status !== "pass") {
+      familyBlockers.push(`${family.familyId}:${family.status}`);
+      continue;
+    }
+    for (const blocker of family.blockers) {
+      const scopedBlocker = `${family.familyId}:${blocker}`;
+      if (knownContinuousOptimizerLimitation(family, blocker)) {
+        warnings.push(scopedBlocker);
+      } else {
+        familyBlockers.push(scopedBlocker);
+      }
+    }
+  }
+  if (
+    continuousOptimizer != null &&
+    continuousOptimizer.status === "pass" &&
+    continuousOptimizer.optimizerUsed !== true
+  ) {
+    familyBlockers.push("continuous_optimizer:optimizer_used_not_true_for_pass");
+  }
+  const anyFamilyViolation = observer.observerFamilies.some(
+    (family) => family.status === "fail",
+  );
   const blockers = uniqueText([
     observer.summary.robustCheckComplete ? null : "observer_robust_check_incomplete",
     observer.summary.eulerianOnly ? "observer_check_eulerian_only" : null,
-    observer.summary.anyViolation ? "observer_family_energy_condition_violation" : null,
-    ...observer.observerFamilies.flatMap((family) =>
-      family.status === "pass"
-        ? []
-        : family.blockers.length > 0
-          ? family.blockers.map((blocker) => `${family.familyId}:${blocker}`)
-          : [`${family.familyId}:${family.status}`],
-    ),
+    observer.summary.anyViolation || anyFamilyViolation
+      ? "observer_family_energy_condition_violation"
+      : null,
+    ...familyIdentityBlockers,
+    ...familyBlockers,
   ]);
+  const continuousOptimizerImplemented =
+    continuousOptimizer?.status === "pass" &&
+    continuousOptimizer.optimizerUsed === true;
   return gate({
     gateId: "observer_family_energy_conditions",
     status:
-      observer.summary.anyViolation
+      observer.summary.anyViolation || anyFamilyViolation
         ? "fail"
-        : observer.summary.robustCheckComplete && !observer.summary.eulerianOnly
+        : observer.summary.robustCheckComplete &&
+            !observer.summary.eulerianOnly &&
+            blockers.length === 0
           ? "pass"
           : "review",
     blockers,
-    primaryMetric: `robustCheckComplete=${observer.summary.robustCheckComplete}`,
+    warnings,
+    primaryMetric: [
+      `robustCheckComplete=${observer.summary.robustCheckComplete}`,
+      `observerScope=${continuousOptimizerImplemented ? "finite_family_plus_continuous_optimizer" : "finite_family"}`,
+      `continuousOptimizerStatus=${continuousOptimizer?.status ?? "missing"}`,
+      `continuousOptimizerUsed=${continuousOptimizer?.optimizerUsed === true}`,
+      `missedViolationRisk=${observer.summary.missedViolationRisk}`,
+    ].join(";"),
   });
 };
 
@@ -1414,10 +1504,53 @@ const isGate = (value: unknown): value is Nhm2TimeDependentSourceCampaignGateV1 
     typeof record.pass === "boolean" &&
     record.pass === (record.status === "pass") &&
     isStringArray(record.blockers) &&
+    (record.status !== "pass" || record.blockers.length === 0) &&
     isStringArray(record.warnings) &&
     isNullableText(record.primaryMetric) &&
     isRecord(record.requiredCorrections) &&
-    Object.values(record.requiredCorrections).every(isCorrectionValue)
+    Object.values(record.requiredCorrections).every(isCorrectionValue) &&
+    (record.status !== "pass" ||
+      Object.keys(record.requiredCorrections).length === 0)
+  );
+};
+
+const correctionRecordsEqual = (left: unknown, right: unknown): boolean => {
+  const canonical = (value: unknown): string =>
+    JSON.stringify(
+      Object.entries(correctionRecord(value)).sort(([leftKey], [rightKey]) =>
+        leftKey.localeCompare(rightKey),
+      ),
+    );
+  return canonical(left) === canonical(right);
+};
+
+const summaryMatchesDerivedGates = (
+  gates: Nhm2TimeDependentSourceCampaignGateV1[],
+  summary: Record<string, unknown>,
+): boolean => {
+  const byId = new Map(gates.map((entry) => [entry.gateId, entry]));
+  const pass = (gateId: Nhm2TimeDependentSourceCampaignGateId): boolean =>
+    byId.get(gateId)?.pass === true;
+  return (
+    summary.campaignPass === gates.every((entry) => entry.pass) &&
+    summary.sourceIndependencePass === pass("source_independence") &&
+    summary.switchingConservationPass ===
+      pass("switching_covariant_conservation") &&
+    summary.frequencyConvergencePass === pass("frequency_convergence") &&
+    summary.dynamicGeometryAgreementPass ===
+      pass("dynamic_effective_geometry_agreement") &&
+    summary.fullRegionalTensorClosurePass ===
+      pass("full_regional_tensor_closure") &&
+    summary.observerFamilyPass === pass("observer_family_energy_conditions") &&
+    summary.qeiReceiptsPass === pass("qei_worldline_receipts") &&
+    summary.stabilityPass === pass("horizon_blueshift_particle_stability") &&
+    summary.firstBlocker === firstNonPassingGateBlocker(gates) &&
+    correctionRecordsEqual(
+      summary.firstRequiredCorrections,
+      firstNonPassingGateCorrections(gates),
+    ) &&
+    summary.blockerCount ===
+      gates.reduce((sum, entry) => sum + entry.blockers.length, 0)
   );
 };
 
@@ -1703,6 +1836,10 @@ export const isNhm2TimeDependentSourceCampaignArtifact = (
     Object.values(summary.coupledClosureRequiredCorrections).every(isCorrectionValue) &&
     typeof summary.blockerCount === "number" &&
     Number.isFinite(summary.blockerCount) &&
+    summaryMatchesDerivedGates(
+      record.gates as Nhm2TimeDependentSourceCampaignGateV1[],
+      summary,
+    ) &&
     claimBoundary?.diagnosticOnly === true &&
     claimBoundary.physicalViabilityClaimAllowed === false &&
     claimBoundary.transportClaimAllowed === false &&

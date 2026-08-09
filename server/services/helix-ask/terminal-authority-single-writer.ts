@@ -102,7 +102,7 @@ const readConcreteTerminalKind = (value: unknown): string | null => {
 const readArray = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : [];
 
-const agentContinuationRequiresNonterminalDecision = (
+export const agentContinuationRequiresNonterminalDecision = (
   payload: Record<string, unknown>,
 ): boolean => {
   const debug = readRecord(payload.debug);
@@ -7085,6 +7085,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
     : null;
   const providerRouteProductCanSurface =
     Boolean(selectedProviderRouteProduct) &&
+    !agentContinuationDecisionPending &&
+    !agentContinuationAnswerBlocked &&
     itineraryObservationCriteriaSatisfied &&
     !providerRouteProductCompoundSupportMissing &&
     providerRouteProductQualityGate?.ok !== false;

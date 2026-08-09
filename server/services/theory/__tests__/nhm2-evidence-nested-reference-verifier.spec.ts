@@ -824,6 +824,47 @@ describe("NHM2 evidence nested-reference verifier", () => {
       provenanceClass: "frozen_solver",
       requiredScope: "immutable_input",
     });
+    for (const location of [
+      "/stressFluctuations/renormalizationPrescription",
+      "/stressFluctuations/renormalizationCounterterms",
+      "/stressFluctuations/finiteRenormalization",
+      "/stressFluctuations/smearingFunction",
+      "/stressFluctuations/samplingBasis",
+      "/stressFluctuations/semiclassicalityCriterion",
+      "/stressFluctuations/samplingWindow/definition",
+      "/constraintConsistency/renormalizationPrescription",
+      "/constraintConsistency/renormalizationCounterterms",
+      "/constraintConsistency/finiteRenormalization",
+      "/constraintConsistency/formulation",
+      "/constraintConsistency/regulator",
+      "/constraintConsistency/operatorOrdering",
+      "/constraintConsistency/smearingFunctions",
+      "/constraintConsistency/countertermEvidence",
+      "/constraintConsistency/bracketResiduals/0/normalizationDefinition",
+      "/constraintConsistency/bracketResiduals/0/normalizationMethod",
+      "/constraintConsistency/antisymmetryResidual/definition",
+      "/constraintConsistency/jacobiIdentityResidual/definition",
+    ]) {
+      expect(
+        nhm2EvidenceNestedReferenceProvenanceRule({
+          evidenceId: "semiclassical_state",
+          location,
+        }),
+        location,
+      ).toEqual({
+        provenanceClass: "frozen_configuration",
+        requiredScope: "immutable_input",
+      });
+    }
+    expect(
+      nhm2EvidenceNestedReferenceProvenanceRule({
+        evidenceId: "semiclassical_state",
+        location: "/stressFluctuations/psdAnalysis",
+      }),
+    ).toEqual({
+      provenanceClass: "computed_output",
+      requiredScope: "owning_run_output",
+    });
     expect(
       nhm2EvidenceNestedReferenceProvenanceRule({
         evidenceId: "finite_temperature_finite_geometry_maxwell_stress",
@@ -1367,6 +1408,89 @@ describe("NHM2 evidence nested-reference verifier", () => {
         expect.stringContaining("float64_little_endian_required"),
         expect.stringContaining("float64_shape_byte_length_mismatch"),
         expect.stringContaining("float64_declared_size_byte_length_mismatch"),
+      ]),
+    );
+  });
+
+  it("requires strict float64 encoding for v2 noise-kernel and constraint-bracket arrays", async () => {
+    const value = await fixture();
+    const reference = {
+      ref: value.tensorRepoPath,
+      sha256: sha256(value.tensorBytes),
+      dtype: "float64",
+      binaryEncoding: "raw_ieee754",
+      endianness: "little",
+      shape: [1, 4],
+      sizeBytes: value.tensorBytes.length,
+      storageOrder: "row-major",
+      componentOrder: ["hamiltonian", "momentum_x", "momentum_y", "momentum_z"],
+      unit: "constraint_density",
+    };
+    const copyReference = () => ({
+      ...reference,
+      shape: [...reference.shape],
+      componentOrder: [...reference.componentOrder],
+    });
+    const copyNoiseReference = () => ({
+      ...copyReference(),
+      shape: [1, 1, 4],
+    });
+    const pass = await verifyNhm2EvidenceNestedReferences({
+      projectRoot: value.projectRoot,
+      evidenceId: "semiclassical_state",
+      planOutputDirectory: value.outputDirectory,
+      allowedImmutableInputPaths: [],
+      receiptManifestEntries: [value.manifestEntry],
+      evidence: {
+        stressFluctuations: { noiseKernel: copyNoiseReference() },
+        constraintConsistency: {
+          bracketResiduals: [
+            {
+              computedBracket: copyReference(),
+              classicalStructureFunctionTarget: copyReference(),
+              residual: copyReference(),
+            },
+          ],
+          antisymmetryResidual: { residual: copyReference() },
+          jacobiIdentityResidual: { residual: copyReference() },
+        },
+      },
+    });
+    expect(pass.status, JSON.stringify(pass.blockers)).toBe("pass");
+
+    const fail = await verifyNhm2EvidenceNestedReferences({
+      projectRoot: value.projectRoot,
+      evidenceId: "semiclassical_state",
+      planOutputDirectory: value.outputDirectory,
+      allowedImmutableInputPaths: [],
+      receiptManifestEntries: [value.manifestEntry],
+      evidence: {
+        stressFluctuations: {
+          noiseKernel: {
+            ...copyNoiseReference(),
+            binaryEncoding: null,
+            endianness: null,
+          },
+        },
+        constraintConsistency: {
+          bracketResiduals: [{ residual: { ...copyReference(), dtype: null } }],
+          antisymmetryResidual: {
+            residual: { ...copyReference(), binaryEncoding: null },
+          },
+          jacobiIdentityResidual: {
+            residual: { ...copyReference(), endianness: null },
+          },
+        },
+      },
+    });
+    expect(fail.status).toBe("fail");
+    expect(fail.blockers).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("float64_raw_ieee754_encoding_required"),
+        expect.stringContaining("float64_little_endian_required"),
+        expect.stringContaining("float64_dtype_required"),
+        expect.stringContaining("float64_raw_ieee754_encoding_required"),
+        expect.stringContaining("float64_little_endian_required"),
       ]),
     );
   });

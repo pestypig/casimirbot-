@@ -149,6 +149,129 @@ describe("Helix capability itinerary execution", () => {
     )).toEqual(["obs:checkpoint", "obs:fill"]);
   });
 
+  it("preserves an unrepresented mandatory compound subgoal across provider-call normalization", () => {
+    const payload: Record<string, unknown> = {
+      capability_itinerary: {
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["docs_viewer", "scholarly_research"],
+          required_capabilities: ["docs.search", "scholarly-research.lookup_papers"],
+        },
+        compound_capability_contract: {
+          source: "committed_route_compound_projection",
+          subgoals: [
+            {
+              subgoal_id: "planned:docs",
+              order: 1,
+              requested_capability: "docs.search",
+              runtime_capability: "docs.search",
+              required_observation_kinds: ["doc_search_results"],
+              mandatory: true,
+              satisfaction: "pending",
+            },
+            {
+              subgoal_id: "planned:scholarly",
+              order: 2,
+              requested_capability: "scholarly-research.lookup_papers",
+              runtime_capability: "scholarly-research.lookup_papers",
+              required_observation_kinds: ["scholarly_research_observation"],
+              mandatory: true,
+              satisfaction: "pending",
+            },
+          ],
+        },
+      },
+      compound_capability_contract: {
+        source: "codex_provider_call_occurrence_normalization",
+        subgoal_identity_policy: "provider_call_occurrence",
+        subgoals: [{
+          subgoal_id: "current:scholarly:1",
+          order: 1,
+          requested_capability: "scholarly-research.lookup_papers",
+          runtime_capability: "scholarly-research.lookup_papers",
+          provider_call_id: "call:scholarly:1",
+          capability_occurrence: 1,
+          observation_ref: "obs:scholarly:1",
+          required_observation_kinds: ["scholarly_research_observation"],
+          satisfied: true,
+        }],
+      },
+    };
+
+    attachHelixCapabilityItineraryExecutionState(payload, [{
+      artifact_id: "obs:scholarly:1",
+      kind: "scholarly_research_observation",
+      capability_key: "scholarly-research.lookup_papers",
+      payload: { status: "succeeded" },
+    }]);
+
+    const contract = (payload.capability_itinerary as any).compound_capability_contract;
+    expect(contract.subgoals.map((entry: any) => entry.requested_capability)).toEqual([
+      "scholarly-research.lookup_papers",
+      "docs.search",
+    ]);
+    expect((payload.capability_itinerary_execution_state as any)).toMatchObject({
+      missing_compound_subgoal_ids: ["planned:docs"],
+      missing_required_capabilities: ["docs.search"],
+      complete: false,
+    });
+  });
+
+  it("does not preserve a planned capability alias already represented by a provider occurrence", () => {
+    const payload: Record<string, unknown> = {
+      capability_itinerary: {
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["docs_viewer"],
+          required_capabilities: ["docs.search"],
+        },
+        compound_capability_contract: {
+          source: "committed_route_compound_projection",
+          subgoals: [{
+            subgoal_id: "planned:docs-search",
+            order: 1,
+            requested_capability: "docs-viewer.search_docs",
+            runtime_capability: "docs.search",
+            required_observation_kinds: ["doc_search_results"],
+            mandatory: true,
+          }],
+        },
+      },
+      compound_capability_contract: {
+        source: "codex_provider_call_occurrence_normalization",
+        subgoal_identity_policy: "provider_call_occurrence",
+        subgoals: [{
+          subgoal_id: "current:docs-search:1",
+          order: 1,
+          requested_capability: "docs.search",
+          runtime_capability: "docs.search",
+          provider_call_id: "call:docs-search:1",
+          capability_occurrence: 1,
+          observation_ref: "obs:docs-search:1",
+          required_observation_kinds: ["doc_search_results"],
+          satisfied: true,
+        }],
+      },
+    };
+
+    expect(attachHelixCapabilityItineraryExecutionState(payload, [{
+      artifact_id: "obs:docs-search:1",
+      kind: "doc_search_results",
+      capability_key: "docs.search",
+      payload: { status: "succeeded" },
+    }])).toEqual([]);
+
+    const contract = (payload.capability_itinerary as any).compound_capability_contract;
+    expect(contract.subgoals.map((entry: any) => entry.subgoal_id)).toEqual([
+      "current:docs-search:1",
+    ]);
+    expect(payload.capability_itinerary_execution_state).toMatchObject({
+      missing_compound_subgoal_ids: [],
+      missing_required_capabilities: [],
+      complete: true,
+    });
+  });
+
   it("counts only a successful exact live-pipeline cadence observation", () => {
     const capability = "situation-room.live-source.set_rate";
     const artifact = {

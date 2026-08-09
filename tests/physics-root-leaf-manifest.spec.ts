@@ -981,6 +981,17 @@ describe("validatePhysicsRootLeafManifest", () => {
     expect(readinessBlockRule).toContain("stage4_2nMeasuredCovarianceReady != true");
     expect(readinessBlockRule).toContain("stage4_2nOrdinaryNullAuthorityReady != true");
     expect(readinessBlockRule).toContain("stage4_2nZeroBridgePreserved != true");
+    expect(readinessBlockRule).toContain("stage4_2oComponentReplayReady != true");
+    expect(readinessBlockRule).toContain("stage4_2oJointProtocolValidationReady != true");
+    expect(readinessBlockRule).toContain("stage4_2oCrossApparatusIsolationReady != true");
+    expect(readinessBlockRule).toContain("stage4_2oExactExternalBoundMappingReady != true");
+    expect(readinessBlockRule).toContain("stage4_2oZeroBridgePreserved != true");
+    expect(readinessBlockRule).toContain("stage4_2qSoftwareRecoveryReady != true");
+    expect(readinessBlockRule).toContain("stage4_2qSpecimenImpedanceReady != true");
+    expect(readinessBlockRule).toContain("stage4_2qGreenResponseReady != true");
+    expect(readinessBlockRule).toContain("stage4_2qSwitchCovarianceReady != true");
+    expect(readinessBlockRule).toContain("stage4_2qJointCoherenceReady != true");
+    expect(readinessBlockRule).toContain("stage4_2qZeroCollapseBridgePreserved != true");
     const rejectRule = pathEntry?.falsifier?.reject_rule ?? "";
     expect(rejectRule).toContain("heldOutReplicationReady == true");
     expect(rejectRule).toContain("apparatusDpPowerReady == true");
@@ -1016,6 +1027,19 @@ describe("validatePhysicsRootLeafManifest", () => {
         "bridge-stage4-2n-green-fdt-to-ordinary-complex-coherence",
         "bridge-stage4-2n-four-cell-ratio-to-boundary-superposition-control",
         "bridge-stage4-2n-zero-bridge-to-claim-boundary",
+        "bridge-stage4-2o-public-fringe-to-component-recovery",
+        "bridge-stage4-2o-boundary-response-to-component-recovery",
+        "bridge-stage4-2o-heldout-covariance-to-component-recovery",
+        "bridge-stage4-2o-external-bound-to-model-scope",
+        "bridge-stage4-2o-no-fusion-to-claim-boundary",
+        "bridge-stage4-2q-superconducting-impedance-to-ordinary-green-response",
+        "bridge-stage4-2q-boundary-ratio-to-standard-diosi-cancellation",
+        "bridge-stage4-2q-toggle-confounders-to-control-no-go",
+        "bridge-stage4-2q-higgs-condensate-bec-to-collapse-nonbridge",
+        "bridge-stage4-2r-diosi-precision-to-primary-estimand",
+        "bridge-stage4-2r-four-cell-to-boundary-interaction",
+        "bridge-stage4-2r-authority-packets-to-pilot-no-go",
+        "bridge-stage4-2r-zero-bridge-to-claim-boundary",
         "bridge-stage4-2l-authoritative-geometry-to-finite-em-model",
         "bridge-stage4-2l-material-and-geometry-to-phase-covariance",
         "bridge-stage4-2l-qlbe-and-state-preparation-to-redesign-no-go",
@@ -1093,6 +1117,14 @@ describe("validatePhysicsRootLeafManifest", () => {
         "tests/casimir-dp-stage4-2k-campaign.spec.ts",
         "tests/casimir-dp-empirical-authority-stage4-2l.spec.ts",
         "tests/casimir-dp-stage4-2l-campaign.spec.ts",
+        "tests/casimir-dp-material-thermal-ordinary-null-stage4-2n.spec.ts",
+        "tests/casimir-dp-stage4-2n-campaign.spec.ts",
+        "tests/casimir-dp-public-data-component-validation-stage4-2o.spec.ts",
+        "tests/casimir-dp-stage4-2o-campaign.spec.ts",
+        "tests/casimir-dp-superconducting-boundary-control-stage4-2q.spec.ts",
+        "tests/casimir-dp-stage4-2q-campaign.spec.ts",
+        "tests/casimir-dp-integrated-feasibility-pilot-stage4-2r.spec.ts",
+        "tests/casimir-dp-stage4-2r-campaign.spec.ts",
       ]),
     );
 

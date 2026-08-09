@@ -164,6 +164,7 @@ export const NHM2_EXPERIMENT_READY_THEORY_PRIMARY_BUNDLE_SOURCE_PATHS = [
   "shared/contracts/nhm2-mechanical-support-control-margin.v1.ts",
   "shared/contracts/nhm2-prediction-falsifier-freeze.v1.ts",
   "shared/contracts/nhm2-semiclassical-state-realizability.v1.ts",
+  "shared/contracts/nhm2-semiclassical-state-realizability.v2.ts",
   "shared/contracts/nhm2-worldline-qei-coverage.v1.ts",
   "shared/contracts/scientific-calculator-step-schema.v1.ts",
   "shared/contracts/theory-runtime-entrypoint.v1.ts",

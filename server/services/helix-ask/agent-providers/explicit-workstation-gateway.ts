@@ -1185,12 +1185,24 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   // lexical capability names or active-panel context append a competing source.
   // For example, a repo-code query about where `workspace_os.status` is
   // implemented must remain a repo search rather than executing workspace status.
-  const hasPrimaryStructuredAdmission = Boolean(
-    readRecord(
-      input.body.source_target_intent ?? input.body.sourceTargetIntent,
-    ),
+  const primaryStructuredSourceTarget = readRecord(
+    input.body.source_target_intent ?? input.body.sourceTargetIntent,
+  );
+  const hasPrimaryStructuredAdmission = Boolean(primaryStructuredSourceTarget);
+  const preservesCompoundDocsScholarlyEvidence = readArray(
+    primaryStructuredSourceTarget?.explicit_cues ??
+      primaryStructuredSourceTarget?.explicitCues,
+  ).some(
+    (cue) =>
+      readString(cue) ===
+      "compound_local_docs_external_scholarly_comparison",
   );
   if (hasPrimaryStructuredAdmission && structured.length > 0) {
+    if (preservesCompoundDocsScholarlyEvidence) {
+      appendPromptDerivedDedupe(
+        buildActiveDocsContextWorkstationGatewayCallRequests(input.body),
+      );
+    }
     appendPromptDerivedDedupe(
       buildActiveTheoryBadgeGraphContextWorkstationGatewayCallRequests(
         input.body,
