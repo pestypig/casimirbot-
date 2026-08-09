@@ -854,8 +854,24 @@ describe("NHM2 independent numerical execution lane", () => {
         ],
       }),
     ).toEqual([
-      "independent_output_copies_primary_artifact:independent_replay_bundle",
+      "independent_content_lineage_not_established:exact_output_hash_match:independent_replay_bundle",
     ]);
+  });
+
+  it("allows exact agreement only after server-verified OS isolation and audited lineage", () => {
+    expect(
+      nhm2IndependentNumericalOutputCopyBlockers({
+        primarySha256: [sha("6")],
+        outputs: [
+          { role: "independent_replay_bundle", sha256: sha("6") },
+        ],
+        verifiedIndependenceAuthority: {
+          authority: "server_verified_os_isolation_and_audited_lineage",
+          operatingSystemPrimaryOutputIsolationVerified: true,
+          auditedIndependentImplementationLineageVerified: true,
+        },
+      }),
+    ).toEqual([]);
   });
 
   it("fails closed before admission when no pre-primary v2 preseal store is installed", async () => {
@@ -870,7 +886,10 @@ describe("NHM2 independent numerical execution lane", () => {
       independentNumericalReplicationReady: false,
       kernelObservation: null,
       failedProcessObservation: null,
-      blockers: ["independent_preprimary_candidate_preseal_not_configured"],
+      blockers: [
+        "independent_preprimary_candidate_preseal_not_configured",
+        "independent_semiclassical_v2_scientific_input_closure_not_integrated",
+      ],
       claimBoundary: {
         passingIndependentReplicationArtifactMayBeEmitted: false,
         syntheticFallbackForbidden: true,
@@ -911,6 +930,7 @@ describe("NHM2 independent numerical execution lane", () => {
 
     expect(result.blockers).toEqual([
       "independent_preprimary_candidate_preseal_not_configured",
+      "independent_semiclassical_v2_scientific_input_closure_not_integrated",
     ]);
     expect(result.approvedPolicy).toEqual({
       policyId: null,
@@ -1124,7 +1144,7 @@ describe("NHM2 independent numerical execution lane", () => {
     expect(result.status).toBe("not_ready");
     expect(result.kernelObservation).not.toBeNull();
     expect(result.blockers).toEqual([
-      "independent_output_copies_primary_artifact:independent_replay_bundle",
+      "independent_content_lineage_not_established:exact_output_hash_match:independent_replay_bundle",
     ]);
     expect(result.independentReplicationArtifact).toBeNull();
   });
@@ -1270,4 +1290,13 @@ describe("NHM2 independent numerical execution lane", () => {
       kernelInputLedgerCandidateOnlyVerified: true,
       presealPredatesPrimaryExecutionVerified: true,
       primaryOutputPathsGrantedToChild: false,
-      primaryOutpu
+      primaryOutputHashesGrantedToChild: false,
+      primaryOutputBytesGrantedToChild: false,
+      serverPostRunComparisonAccessVerified: true,
+      operatingSystemPrimaryOutputIsolationAsserted: false,
+    });
+    expect(result.blockers).toContain(
+      "independent_operating_system_primary_output_isolation_not_established",
+    );
+  });
+});
