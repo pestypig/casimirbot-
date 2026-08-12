@@ -157,6 +157,21 @@ export const helixMinecraftPlayerActionArgumentsSchema = z.discriminatedUnion(
             target_kind: z.literal("current_focus"),
           }).strict(),
           z.object({
+            target_kind: z.literal("relative_rotation"),
+            yaw_delta_degrees: z
+              .number()
+              .finite()
+              .min(-180)
+              .max(180)
+              .describe("Positive values turn right; negative values turn left."),
+            pitch_delta_degrees: z
+              .number()
+              .finite()
+              .min(-180)
+              .max(180)
+              .describe("Positive values look down; negative values look up."),
+          }).strict(),
+          z.object({
             target_kind: z.literal("environment_subject"),
             subject_ref: subjectRefSchema,
           }).strict(),

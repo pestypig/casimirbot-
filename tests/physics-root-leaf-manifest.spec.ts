@@ -1186,6 +1186,178 @@ describe("validatePhysicsRootLeafManifest", () => {
     );
   });
 
+  it("keeps the Penrose branch-geometry candidate fail closed in its separate theory bundle", () => {
+    const manifestPath = path.join(
+      process.cwd(),
+      "configs",
+      "physics-root-leaf-manifest.v1.json",
+    );
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
+      leaves?: Array<{ id: string; statement?: string }>;
+      paths?: Array<{
+        id: string;
+        root_id?: string;
+        leaf_id?: string;
+        bundle_id?: string;
+        dag_bridges?: string[];
+        falsifier?: {
+          readiness_block_rule?: string;
+          reject_rule?: string;
+          test_refs?: string[];
+        };
+        maturity_gate?: {
+          max_claim_tier?: string;
+          strict_fail_reason?: string;
+          required_evidence_types?: string[];
+        };
+      }>;
+      bridge_bundles?: Array<{ id: string; path_ids?: string[] }>;
+    };
+    const candidatePath = manifest.paths?.find(
+      (entry) =>
+        entry.id ===
+        "path_spacetime_equivalence_to_penrose_branch_geometry_coherence",
+    );
+
+    expect(
+      manifest.leaves?.find(
+        (entry) =>
+          entry.id === "leaf_penrose_branch_geometry_to_coherence_candidate",
+      )?.statement,
+    ).toContain("tau approximately hbar over E_G alone is insufficient");
+    expect(candidatePath).toEqual(
+      expect.objectContaining({
+        root_id: "physics_spacetime_gr",
+        leaf_id: "leaf_penrose_branch_geometry_to_coherence_candidate",
+        bundle_id: "penrose.branch-geometry-coherence-candidate",
+      }),
+    );
+    expect(candidatePath?.dag_bridges).toEqual(
+      expect.arrayContaining([
+        "bridge-equivalence-principle-to-relational-branch-comparison",
+        "bridge-incompatibility-functional-to-objective-reduction-dynamics",
+        "bridge-boundary-independent-candidate-to-casimir-nonbridge",
+      ]),
+    );
+    expect(candidatePath?.falsifier?.readiness_block_rule).toContain(
+      "relationalCorrespondenceStage0_1Ready != true",
+    );
+    expect(candidatePath?.falsifier?.readiness_block_rule).toContain(
+      "branchIdentificationDefined != true",
+    );
+    expect(candidatePath?.falsifier?.readiness_block_rule).toContain(
+      "numericalCalculatorRegistered != true",
+    );
+    expect(candidatePath?.falsifier?.readiness_block_rule).toContain(
+      "boundaryDependenceClaimed == true AND boundaryExtensionKernelRegistered != true",
+    );
+    expect(candidatePath?.falsifier?.reject_rule).toContain(
+      "poweredHeldOutDataReady == true",
+    );
+    expect(candidatePath?.falsifier?.test_refs).toContain(
+      "tests/casimir-dp-penrose-candidate-theory-stage0.spec.ts",
+    );
+    expect(candidatePath?.falsifier?.test_refs).toContain(
+      "tests/casimir-dp-penrose-relational-correspondence-stage0-1.spec.ts",
+    );
+    expect(candidatePath?.maturity_gate).toEqual(
+      expect.objectContaining({
+        max_claim_tier: "diagnostic",
+        strict_fail_reason:
+          "ROOT_LEAF_PENROSE_BRANCH_GEOMETRY_CANDIDATE_FAIL",
+      }),
+    );
+    expect(candidatePath?.maturity_gate?.required_evidence_types).toEqual(
+      expect.arrayContaining(["measured", "proxy", "inferred"]),
+    );
+    expect(
+      manifest.bridge_bundles?.find(
+        (entry) => entry.id === "penrose.branch-geometry-coherence-candidate",
+      )?.path_ids,
+    ).toEqual([
+      "path_spacetime_equivalence_constraints_to_penrose_relational_correspondence_stage0_1",
+      "path_spacetime_equivalence_to_penrose_branch_geometry_coherence",
+    ]);
+  });
+
+  it("registers Stage-0.1 as a correspondence-only intermediate leaf", () => {
+    const manifest = JSON.parse(
+      fs.readFileSync(
+        path.join(process.cwd(), "configs", "physics-root-leaf-manifest.v1.json"),
+        "utf8",
+      ),
+    ) as {
+      roots?: Array<{ id: string; equation_refs?: string[] }>;
+      leaves?: Array<{ id: string; statement?: string }>;
+      paths?: Array<{
+        id: string;
+        bundle_id?: string;
+        root_id?: string;
+        leaf_id?: string;
+        dag_bridges?: string[];
+        falsifier?: {
+          readiness_block_rule?: string;
+          reject_rule?: string;
+          uncertainty_model?: string;
+          test_refs?: string[];
+        };
+        maturity_gate?: {
+          max_claim_tier?: string;
+          strict_fail_reason?: string;
+        };
+      }>;
+    };
+    const stage01 = manifest.paths?.find(
+      (entry) =>
+        entry.id ===
+        "path_spacetime_equivalence_constraints_to_penrose_relational_correspondence_stage0_1",
+    );
+    expect(
+      manifest.leaves?.find(
+        (entry) =>
+          entry.id === "leaf_penrose_relational_branch_correspondence_stage0_1",
+      )?.statement,
+    ).toContain("does not establish a covariant incompatibility functional");
+    expect(stage01).toEqual(
+      expect.objectContaining({
+        bundle_id: "penrose.branch-geometry-coherence-candidate",
+        root_id: "physics_spacetime_gr",
+        leaf_id: "leaf_penrose_relational_branch_correspondence_stage0_1",
+      }),
+    );
+    expect(stage01?.dag_bridges).toEqual(
+      expect.arrayContaining([
+        "bridge-relational-anchors-to-branch-embeddings",
+        "bridge-independent-rigid-coordinate-relabeling-to-correspondence-gate",
+        "bridge-correspondence-nonuniqueness-to-uncertainty-envelope",
+      ]),
+    );
+    expect(stage01?.falsifier?.readiness_block_rule).toContain(
+      "physicalReferenceReceiptsReady != true",
+    );
+    expect(stage01?.falsifier?.reject_rule).toContain(
+      "knownSourcePerturbationPreserved != true",
+    );
+    expect(stage01?.falsifier?.uncertainty_model).toBe(
+      "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true,replay_window=session)",
+    );
+    expect(stage01?.maturity_gate?.strict_fail_reason).toBe(
+      "ROOT_LEAF_PENROSE_RELATIONAL_CORRESPONDENCE_STAGE0_1_FAIL",
+    );
+    expect(
+      manifest.roots?.find(
+        (entry) => entry.id === "physics_quantum_semiclassical",
+      )?.equation_refs,
+    ).toEqual(
+      expect.arrayContaining([
+        "casimir_dp_penrose_relational_branch_state",
+        "casimir_dp_penrose_relational_pullback_stress_difference",
+        "casimir_dp_penrose_correspondence_covariance_gate",
+        "casimir_dp_penrose_newtonian_target_limit",
+      ]),
+    );
+  });
+
   it("declares the stellar radiation null-model lane in the repo manifest", () => {
     const manifestPath = path.join(process.cwd(), "configs", "physics-root-leaf-manifest.v1.json");
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {

@@ -361,6 +361,7 @@ export const callAccountAuthorizedWorkstationGatewayCapability = async (input: {
   providerExecutionId?: string | null;
   iteration?: number | null;
   authoritativeEvidenceArtifacts?: unknown[];
+  signal?: AbortSignal;
 }): Promise<HelixGovernedWorkstationGatewayCallResult> => {
   const requestedMode = cleanString(input.requestedMode);
   const requestedRuntime = cleanString(input.requestedRuntime);
@@ -395,6 +396,7 @@ export const callAccountAuthorizedWorkstationGatewayCapability = async (input: {
     profileId: input.accountContext.profile_id,
     accountContext: input.accountContext,
     authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
+    signal: input.signal,
   });
   return {
     status_code: result.ok ? 200 : 400,

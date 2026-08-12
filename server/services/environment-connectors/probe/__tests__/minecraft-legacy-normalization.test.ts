@@ -56,6 +56,8 @@ describe("Minecraft legacy probe normalization", () => {
           game_mode: "survival",
           world: "minecraft:overworld",
           position: { x: 1.5, y: 64, z: -2.25 },
+          yaw: 149.03,
+          pitch: 10.95,
           status_flags: ["sprinting"],
           active_effects: [
             {
@@ -87,6 +89,8 @@ describe("Minecraft legacy probe normalization", () => {
         game_mode: "survival",
         world: "minecraft:overworld",
         position: { x: 1.5, y: 64, z: -2.25 },
+        yaw: 149.03,
+        pitch: 10.95,
         status_flags: ["sprinting"],
           active_effects: [
           {

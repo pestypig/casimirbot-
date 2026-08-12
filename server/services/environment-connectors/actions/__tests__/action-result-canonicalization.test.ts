@@ -119,6 +119,28 @@ const result = helixEnvironmentActionResultSchema.parse({
 });
 
 describe("environment action result canonicalization", () => {
+  it("admits only bounded typed manual-override causes", () => {
+    const canceled = helixEnvironmentActionResultSchema.parse({
+      ...result,
+      outcome: "request_canceled",
+      summary: "Manual player input canceled the workflow (reason: screen_open).",
+      postconditions: result.postconditions.map((condition) => ({
+        ...condition,
+        status: "not_checked" as const,
+      })),
+      side_effects_performed: false,
+      player_motion_performed: false,
+      manual_override_detected: true,
+      manual_override_reason: "screen_open",
+    });
+
+    expect(canceled.manual_override_reason).toBe("screen_open");
+    expect(() => helixEnvironmentActionResultSchema.parse({
+      ...canceled,
+      manual_override_reason: "untrusted_free_text",
+    })).toThrow();
+  });
+
   const measurementScenarios = [
     {
       actionKind: "navigate_to",
@@ -140,7 +162,39 @@ describe("environment action result canonicalization", () => {
         target: { target_kind: "current_focus" },
         max_turn_degrees_per_tick: 15,
       },
-      measurements: { target_kind: "current_focus", view_retained: true },
+      measurements: {
+        target_kind: "current_focus",
+        view_retained: true,
+        final_yaw: 15,
+        final_pitch: -4,
+      },
+    },
+    {
+      actionKind: "look_at",
+      arguments: {
+        action_kind: "look_at",
+        target: {
+          target_kind: "relative_rotation",
+          yaw_delta_degrees: 20,
+          pitch_delta_degrees: 5,
+        },
+        max_turn_degrees_per_tick: 15,
+      },
+      measurements: {
+        target_kind: "relative_rotation",
+        requested_yaw_delta_degrees: 20,
+        requested_pitch_delta_degrees: 5,
+        initial_yaw: 10,
+        initial_pitch: -5,
+        target_yaw: 30,
+        target_pitch: 0,
+        final_yaw: 30,
+        final_pitch: 0,
+        applied_yaw_delta_degrees: 20,
+        applied_pitch_delta_degrees: 5,
+        yaw_error_degrees: 0,
+        pitch_error_degrees: 0,
+      },
     },
     {
       actionKind: "walk",
@@ -327,7 +381,20 @@ describe("environment action result canonicalization", () => {
       envelopeValid: true,
       currentTurn: true,
       workflowEvidenceValid: true,
-    }).outcome).toBe("succeeded");
+      verifiedTerminalMeasurements: {
+        distance_blocks: 0.5,
+        arrival_radius: 1,
+        final_x: 8,
+        final_y: 64,
+        final_z: 3,
+      },
+    })).toMatchObject({
+      outcome: "succeeded",
+      verified_terminal_measurements: {
+        distance_blocks: 0.5,
+        final_x: 8,
+      },
+    });
   });
 
   it("turns a connector success with substituted postcondition identity into a typed failure", () => {

@@ -1,12 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   CircleAlert,
+  ExternalLink,
   Link2,
   LoaderCircle,
   RefreshCw,
   Unlink,
   UserRoundX,
 } from "lucide-react";
+import {
+  DESKTOP_AUTH0_ACCOUNT_LINK_START_PATH,
+  parseDesktopAuth0AccountLinkCompletion,
+  parseDesktopAuth0AccountLinkStartReceipt,
+} from "@shared/desktop-auth0-account-link";
 
 export const AGENT_ACCOUNT_BINDINGS_ENDPOINT =
   "/api/account/session/agent-bindings";
@@ -200,6 +206,8 @@ export function AgentAccountBindingReadiness() {
     kind: "loading",
     bindings: EMPTY_BINDINGS,
   });
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
 
   const refresh = useCallback((): void => {
@@ -254,8 +262,72 @@ export function AgentAccountBindingReadiness() {
     };
   }, [refresh]);
 
+  useEffect(() => {
+    const subscribe = window.casimirDesktop?.onAuth0AccountLinkCompletion;
+    if (!subscribe) return;
+    return subscribe((candidate) => {
+      const completion = parseDesktopAuth0AccountLinkCompletion(candidate);
+      setLinkBusy(false);
+      if (!completion) {
+        setLinkError("The desktop host returned an invalid account-link receipt.");
+        return;
+      }
+      if (!completion.ok) {
+        const message =
+          completion.error === "signed_tenant_claim_missing"
+            ? "Auth0 signed in, but its access token is missing the CasimirBot tenant claim. Check the Auth0 post-login Action and try again."
+            : completion.error === "verified_identity_mismatch"
+              ? "Auth0 signed in, but CasimirBot could not verify the issued access token for this profile."
+              : completion.error === "token_exchange_failed"
+                ? "Auth0 authorized the link, but its token exchange failed. Try again."
+                : completion.error === "link_intent_expired"
+                  ? "The Auth0 link request expired. Start a new link."
+                  : "Auth0 account linking did not complete. You can try again.";
+        setLinkError(message);
+        return;
+      }
+      setLinkError(null);
+      refresh();
+    });
+  }, [refresh]);
+
+  const startAccountLink = useCallback(async (): Promise<void> => {
+    const open = window.casimirDesktop?.openAuth0AccountLink;
+    if (!open) return;
+    setLinkBusy(true);
+    setLinkError(null);
+    try {
+      const response = await fetch(DESKTOP_AUTH0_ACCOUNT_LINK_START_PATH, {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error("start failed");
+      }
+      const receipt = parseDesktopAuth0AccountLinkStartReceipt(body);
+      if (!receipt) throw new Error("invalid receipt");
+      await open(receipt.authorization_url);
+      // Remain busy until the protocol callback is completed or the user
+      // explicitly retries. No OAuth credential is returned to this renderer.
+    } catch {
+      setLinkBusy(false);
+      setLinkError(
+        "Auth0 account linking is unavailable or not configured in this desktop build.",
+      );
+    }
+  }, []);
+
   const copy = stateCopy(state);
   const StateIcon = copy.icon;
+  const canStartLink =
+    state.kind === "not_linked" &&
+    typeof window.casimirDesktop?.openAuth0AccountLink === "function";
+  const body = canStartLink
+    ? "This signed-in profile has no active OAuth agent binding. Link Auth0 in the native app before Codex can receive an authorized Device Check identity."
+    : copy.body;
 
   return (
     <section
@@ -306,6 +378,21 @@ export function AgentAccountBindingReadiness() {
             />
             Refresh
           </button>
+          {canStartLink ? (
+            <button
+              type="button"
+              onClick={() => void startAccountLink()}
+              disabled={linkBusy}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-2.5 py-1.5 text-[11px] font-medium text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-wait disabled:opacity-50"
+            >
+              {linkBusy ? (
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              )}
+              {linkBusy ? "Waiting for Auth0" : "Link Auth0"}
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -314,8 +401,14 @@ export function AgentAccountBindingReadiness() {
         role="status"
         aria-live="polite"
       >
-        {copy.body}
+        {body}
       </p>
+
+      {linkError ? (
+        <p className="mt-2 text-xs text-rose-200" role="alert">
+          {linkError}
+        </p>
+      ) : null}
 
       {state.bindings.length > 0 ? (
         <div className="mt-4 space-y-2" aria-label="Sanitized agent bindings">
@@ -352,8 +445,9 @@ export function AgentAccountBindingReadiness() {
       ) : null}
 
       <p className="mt-3 text-[10px] leading-4 text-slate-500">
-        Read-only status. This surface does not install an MCP connection, start
-        OAuth, or expose account subjects or credentials.
+        Status remains read-only on the website. The native app may start a
+        public-client PKCE link; account subjects and credentials are never
+        exposed here.
       </p>
     </section>
   );

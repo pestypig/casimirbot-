@@ -296,6 +296,39 @@ describe("validatePhysicsEquationBackbone", () => {
     expect(deathLine?.symbols?.some((entry) => entry.symbol === "status")).toBe(true);
   });
 
+  it("registers the exploratory Penrose relational-correspondence definition equations", () => {
+    const backbone = JSON.parse(
+      fs.readFileSync(
+        path.join(process.cwd(), "configs", "physics-equation-backbone.v1.json"),
+        "utf8",
+      ),
+    ) as {
+      equations: Array<{
+        id: string;
+        category?: string;
+        claim_tier?: string;
+        maturity_label?: string;
+        root_lane?: string;
+      }>;
+    };
+    const requiredIds = [
+      "casimir_dp_penrose_relational_branch_state",
+      "casimir_dp_penrose_relational_pullback_stress_difference",
+      "casimir_dp_penrose_relational_pullback_metric_difference",
+      "casimir_dp_penrose_correspondence_covariance_gate",
+      "casimir_dp_penrose_correspondence_identity_swap_gate",
+      "casimir_dp_penrose_newtonian_target_limit",
+    ];
+    for (const id of requiredIds) {
+      const equation = backbone.equations.find((entry) => entry.id === id);
+      expect(equation).toBeDefined();
+      expect(equation?.category).toBe("stage0_candidate_definition");
+      expect(equation?.claim_tier).toBe("diagnostic");
+      expect(equation?.maturity_label).toBe("exploratory");
+      expect(equation?.root_lane).toBe("physics_quantum_semiclassical");
+    }
+  });
+
   it("fails when manifest/equation claim tier is invalid", () => {
     const repoRoot = makeFixture((manifest) => {
       manifest.claim_tier = "exploratory";

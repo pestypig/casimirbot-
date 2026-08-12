@@ -1,0 +1,276 @@
+{
+  "schema_version": "casimir_dp_penrose_relational_correspondence_stage0_1/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-penrose-relational-correspondence-stage0-1-v1",
+  "benchmark_id": "operational_relational_landmarks_weak_field_v0",
+  "benchmark_version": "0.1.0",
+  "canonical_generated_at": "2026-08-11T20:30:00.000Z",
+  "maturity": "stage0_exploratory",
+  "evidence_class": "synthetic_theory_correspondence_benchmark",
+  "claim_ceiling": "formal_synthetic_correspondence_recovery_only",
+  "physical_prediction_allowed": false,
+  "collapse_dynamics_allowed": false,
+  "model_comparison_admission": false,
+  "sources": [
+    {
+      "source_id": "penrose-1996-gravity-state-reduction",
+      "citation": "R. Penrose, On Gravity's Role in Quantum State Reduction, General Relativity and Gravitation 28, 581-600 (1996).",
+      "url": "https://doi.org/10.1007/BF02105068",
+      "supports": "The branch-geometry comparison problem and its stationary Newtonian gravitational self-energy target.",
+      "does_not_support": "A unique event correspondence, covariant incompatibility functional, stochastic dynamics, or Casimir modifier."
+    },
+    {
+      "source_id": "dittrich-2006-complete-observables",
+      "citation": "B. Dittrich, Partial and Complete Observables for Canonical General Relativity, Classical and Quantum Gravity 23, 6155-6184 (2006).",
+      "url": "https://doi.org/10.1088/0264-9381/23/22/006",
+      "supports": "Construction of gauge-invariant observables through physical reference quantities.",
+      "does_not_support": "A unique correspondence between arbitrary quantum spacetime branches or an objective-reduction law."
+    },
+    {
+      "source_id": "tambornino-2012-relational-observables-review",
+      "citation": "J. Tambornino, Relational Observables in Gravity: a Review, SIGMA 8, 017 (2012).",
+      "url": "https://doi.org/10.3842/SIGMA.2012.017",
+      "supports": "The need for relational observables in diffeomorphism-invariant gravity and the limitations of available constructions.",
+      "does_not_support": "Global uniqueness, a preferred physical clock, or collapse from relational observables."
+    },
+    {
+      "source_id": "brown-kuchar-1995-dust-reference",
+      "citation": "J. D. Brown and K. V. Kuchar, Dust as a Standard of Space and Time in Canonical Quantum Gravity, Physical Review D 51, 5600-5629 (1995).",
+      "url": "https://doi.org/10.1103/PhysRevD.51.5600",
+      "supports": "Matter clocks and spatial labels as an operational reference-system construction.",
+      "does_not_support": "Adding literal dust to this apparatus, ignoring reference-system backreaction, or objective reduction."
+    },
+    {
+      "source_id": "giesel-thiemann-2015-scalar-reference-systems",
+      "citation": "K. Giesel and T. Thiemann, Scalar Material Reference Systems and Loop Quantum Gravity, Classical and Quantum Gravity 32, 135015 (2015).",
+      "url": "https://doi.org/10.1088/0264-9381/32/13/135015",
+      "supports": "Material reference systems for gauge-invariant observables and physical Hamiltonians.",
+      "does_not_support": "The affine laboratory proxy as a unique covariant construction or a collapse generator."
+    },
+    {
+      "source_id": "giacomini-brukner-2022-quantum-equivalence",
+      "citation": "F. Giacomini and C. Brukner, Quantum superposition of spacetimes obeys Einstein's equivalence principle, AVS Quantum Science 4, 015601 (2022).",
+      "url": "https://doi.org/10.1116/5.0070018",
+      "supports": "Quantum-reference-frame covariance as a competing consistency check for superposed gravitational fields.",
+      "does_not_support": "Objective reduction or the claim that equivalence plus superposition uniquely implies collapse."
+    }
+  ],
+  "upstream_authorities": [
+    {
+      "role": "stage0_candidate_receipt_authority",
+      "path": "docs/research/casimir-dp-penrose-candidate-theory-stage0-receipt.json",
+      "sha256": "b1e926ddcbfeb7791230b531f8213c4b05cbfb327dffa4feb7c7b2752c753067"
+    },
+    {
+      "role": "gaussian_energy_authority",
+      "path": "shared/casimir-dp-dp-companion.ts",
+      "sha256": "45c8838be8e0e196aab65e2871c282a127a26304afdd0532ae46ed94c858ffe8"
+    },
+    {
+      "role": "ordinary_worldline_authority",
+      "path": "configs/research/casimir-dp-proper-time-worldline-closure-stage4-2p.v1.json",
+      "sha256": "67f485838ee71ccdde1559502ff450171f1df66ff88ca0b5464b73b9cc6b9e97"
+    }
+  ],
+  "formal_definition": {
+    "common_relational_base": "B_lab=(tau,xi1,xi2,xi3)_within_registered_local_domain",
+    "branch_embeddings": "X_A:B_lab_to_M_A_and_X_B:B_lab_to_M_B",
+    "correspondence": "varphi_corr_A_to_B=X_B_after_X_A_inverse_on_X_A_of_B_lab",
+    "pullback_stress_difference": "Delta_B_T=X_A_pullback_T_A-X_B_pullback_T_B",
+    "pullback_metric_difference": "Delta_B_g=X_A_pullback_g_A-X_B_pullback_g_B",
+    "admissible_gauge_group": "independent_branch_rigid_coordinate_relabelings_within_static_weak_field_fixture",
+    "covariance_rule": "independent_rigid_coordinate_relabeling_fixture_preserves_relational_probe_centers",
+    "regularity_assumptions": [
+      "common_topology_local_domain",
+      "differentiable_one_to_one_maps",
+      "nonzero_jacobian",
+      "matched_time_orientation",
+      "complete_declared_density_support"
+    ],
+    "nonuniqueness_policy": "freeze_at_least_two_branch_blind_reference_sets_before_coherence_and_block_if_spread_exceeds_threshold",
+    "source_ids": [
+      "dittrich-2006-complete-observables",
+      "tambornino-2012-relational-observables-review",
+      "brown-kuchar-1995-dust-reference",
+      "giesel-thiemann-2015-scalar-reference-systems",
+      "giacomini-brukner-2022-quantum-equivalence"
+    ],
+    "equation_ids": [
+      "casimir_dp_penrose_relational_branch_state",
+      "casimir_dp_penrose_relational_pullback_stress_difference",
+      "casimir_dp_penrose_relational_pullback_metric_difference",
+      "casimir_dp_penrose_correspondence_covariance_gate",
+      "casimir_dp_penrose_correspondence_identity_swap_gate",
+      "casimir_dp_penrose_newtonian_target_limit"
+    ]
+  },
+  "reference_contract": {
+    "scope": "static_weak_field_laboratory_domain",
+    "construction": "branch_blind_apparatus_landmarks_local_affine_material_reference_proxy",
+    "event_pairing_rule": "varphi_corr_A_to_B=X_B_after_X_A_inverse_on_X_A_of_B_lab",
+    "time_label": "registered_pulse_and_apparatus_clock_labels",
+    "spatial_labels": "origin_and_three_oriented_apparatus_fiducials",
+    "prohibit_probe_centered_alignment": true,
+    "require_complete_density_support": true,
+    "density_support_sigma": 6,
+    "physical_authority_packets": [
+      {
+        "packet_id": "same_apparatus_worldline_packet",
+        "status": "not_ready",
+        "sha256": null,
+        "missing_fields": ["measured branch trajectories", "worldline covariance"]
+      },
+      {
+        "packet_id": "clock_and_pulse_dictionary_packet",
+        "status": "not_ready",
+        "sha256": null,
+        "missing_fields": ["measured clock synchronization", "pulse event dictionary"]
+      },
+      {
+        "packet_id": "apparatus_landmark_and_tetrad_packet",
+        "status": "not_ready",
+        "sha256": null,
+        "missing_fields": ["as-built fiducial survey", "tetrad and orientation covariance"]
+      },
+      {
+        "packet_id": "selected_specimen_density_support_packet",
+        "status": "not_ready",
+        "sha256": null,
+        "missing_fields": ["selected-specimen mass-density map", "support-coverage receipt"]
+      },
+      {
+        "packet_id": "reference_choice_covariance_packet",
+        "status": "not_ready",
+        "sha256": null,
+        "missing_fields": ["alternate landmark construction", "reference-choice covariance"]
+      }
+    ]
+  },
+  "primary_fixture": {
+    "pair_id": "primary_support_trap_plate_fixture",
+    "branch_a": {
+      "frame_id": "primary_branch_a",
+      "reference_system_id": "support_trap_plate_reference_v0",
+      "anchor_role": "support_trap_and_plate_fiducials",
+      "branch_blind": true,
+      "anchor_ids": ["support_clock", "trap_x_fiducial", "trap_y_fiducial", "plate_normal_fiducial"],
+      "origin_m": [0.000001, -0.000002, 0.0000005],
+      "x_axis_landmark_m": [0.000002, -0.000002, 0.0000005],
+      "y_axis_landmark_m": [0.000001, -0.000001, 0.0000005],
+      "z_axis_landmark_m": [0.000001, -0.000002, 0.0000015],
+      "clock_labels": {
+        "preparation_s": 0,
+        "hold_start_s": 0.01,
+        "hold_end_s": 0.26,
+        "recombination_s": 0.27
+      },
+      "time_orientation": 1,
+      "domain_radius_m": 0.000002
+    },
+    "branch_b": {
+      "frame_id": "primary_branch_b",
+      "reference_system_id": "support_trap_plate_reference_v0",
+      "anchor_role": "support_trap_and_plate_fiducials",
+      "branch_blind": true,
+      "anchor_ids": ["support_clock", "trap_x_fiducial", "trap_y_fiducial", "plate_normal_fiducial"],
+      "origin_m": [-0.0000005, 0.0000015, -0.0000003],
+      "x_axis_landmark_m": [-0.0000005, 0.0000025, -0.0000003],
+      "y_axis_landmark_m": [-0.0000015, 0.0000015, -0.0000003],
+      "z_axis_landmark_m": [-0.0000005, 0.0000015, 0.0000007],
+      "clock_labels": {
+        "preparation_s": 0,
+        "hold_start_s": 0.01,
+        "hold_end_s": 0.26,
+        "recombination_s": 0.27
+      },
+      "time_orientation": 1,
+      "domain_radius_m": 0.000002
+    },
+    "branch_a_probe_center_coordinate_m": [0.000000875, -0.000002, 0.0000005],
+    "branch_b_probe_center_coordinate_m": [-0.0000005, 0.000001625, -0.0000003],
+    "expected_relational_separation_m": 0.00000025
+  },
+  "alternate_reference_fixture": {
+    "pair_id": "alternate_apparatus_fiducial_fixture",
+    "branch_a": {
+      "frame_id": "alternate_branch_a",
+      "reference_system_id": "independent_apparatus_reference_v0",
+      "anchor_role": "independent_apparatus_fiducials",
+      "branch_blind": true,
+      "anchor_ids": ["secondary_clock", "support_edge_x", "support_edge_y", "independent_vertical_fiducial"],
+      "origin_m": [0.0000003, 0.0000004, -0.0000002],
+      "x_axis_landmark_m": [0.0000010071067811865475, 0.0000011071067811865476, -0.0000002],
+      "y_axis_landmark_m": [-0.0000004071067811865476, 0.0000011071067811865476, -0.0000002],
+      "z_axis_landmark_m": [0.0000003, 0.0000004, 0.0000008],
+      "clock_labels": {
+        "preparation_s": 0,
+        "hold_start_s": 0.01,
+        "hold_end_s": 0.26,
+        "recombination_s": 0.27
+      },
+      "time_orientation": 1,
+      "domain_radius_m": 0.000002
+    },
+    "branch_b": {
+      "frame_id": "alternate_branch_b",
+      "reference_system_id": "independent_apparatus_reference_v0",
+      "anchor_role": "independent_apparatus_fiducials",
+      "branch_blind": true,
+      "anchor_ids": ["secondary_clock", "support_edge_x", "support_edge_y", "independent_vertical_fiducial"],
+      "origin_m": [-0.0000009, -0.0000006, 0.0000002],
+      "x_axis_landmark_m": [-0.0000009, -0.0000016, 0.0000002],
+      "y_axis_landmark_m": [0.0000001, -0.0000006, 0.0000002],
+      "z_axis_landmark_m": [-0.0000009, -0.0000006, 0.0000012],
+      "clock_labels": {
+        "preparation_s": 0,
+        "hold_start_s": 0.01,
+        "hold_end_s": 0.26,
+        "recombination_s": 0.27
+      },
+      "time_orientation": 1,
+      "domain_radius_m": 0.000002
+    },
+    "branch_a_probe_center_coordinate_m": [0.00000021161165235168156, 0.00000031161165235168156, -0.0000002],
+    "branch_b_probe_center_coordinate_m": [-0.0000009, -0.000000725, 0.0000002],
+    "expected_relational_separation_m": 0.00000025
+  },
+  "weak_field_target": {
+    "model_id": "gaussian_regularized_newtonian_E_G",
+    "mass_kg": 3.0925053e-16,
+    "R0_m": 1e-7,
+    "formula": "E_G=G*m^2*(1/(sqrt(pi)*R0)-erf(d/(2*R0))/d)",
+    "integration_upper_u": 8,
+    "even_intervals": 4096
+  },
+  "common_context": {
+    "branch_a_uniform_acceleration_m_s2": [0, 0, -9.80665],
+    "branch_b_uniform_acceleration_m_s2": [0, 0, -9.80665],
+    "branch_a_potential_offset_m2_s2": 0,
+    "branch_b_potential_offset_m2_s2": 0,
+    "boundary_policy": "fixed_branch_source_boundary_null",
+    "proper_time_channel": "separate_signed_unitary_phase_control"
+  },
+  "thresholds": {
+    "frame_orthogonality_max": 1e-12,
+    "landmark_geometry_relative_max": 1e-12,
+    "map_roundtrip_m_max": 1e-18,
+    "jacobian_determinant_error_max": 1e-12,
+    "separation_relative_error_max": 1e-12,
+    "coordinate_relabel_residual_m_max": 1e-18,
+    "reference_choice_energy_relative_max": 1e-12,
+    "weak_field_E_G_relative_max": 0.000002,
+    "common_acceleration_null_max_m_s2": 1e-12,
+    "common_potential_null_max_m2_s2": 1e-12
+  },
+  "output_policy": {
+    "synthetic_gate_may_pass": true,
+    "physical_correspondence_status": "blocked_pending_same_apparatus_reference_receipts",
+    "stage0_candidate_first_failure_remains": "PCT_BRANCH_CORRESPONDENCE_MISSING",
+    "invariant_functional_status": "not_supplied",
+    "collapse_rate": null,
+    "lifetime_distribution": null,
+    "coherence_prediction": null,
+    "casimir_modifier": null,
+    "empirical_validation": false
+  }
+}

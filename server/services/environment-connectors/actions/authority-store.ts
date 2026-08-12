@@ -95,6 +95,7 @@ type ConnectorReadinessManifestRow = {
 type ConnectorReadinessHeartbeatRow = {
   status: "active" | "degraded" | "paused" | "stale" | "error";
   active_workflow_ids: unknown;
+  control_engines: unknown;
   controls_asserted: boolean;
   manual_input_detected: boolean;
   emergency_stop_latched: boolean;
@@ -148,6 +149,22 @@ const parseJsonValue = (value: unknown): unknown => {
 const countJsonArray = (value: unknown, maximum: number): number => {
   const parsed = parseJsonValue(value);
   return Array.isArray(parsed) ? Math.min(parsed.length, maximum) : 0;
+};
+
+const EVENT_STREAM_RESYNC_TRANSPORT_ERROR =
+  "action_delivery_environment_event_batch_http_409_action_event_conflict";
+
+const readConnectorBlockingReason = (value: unknown): string | null => {
+  const parsed = parseJsonValue(value);
+  if (!Array.isArray(parsed)) return null;
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== "object") continue;
+    const lastError = (entry as Record<string, unknown>).last_error;
+    if (lastError === EVENT_STREAM_RESYNC_TRANSPORT_ERROR) {
+      return "event_stream_resync_required";
+    }
+  }
+  return null;
 };
 
 const parseAvailableControlEngines = (
@@ -222,6 +239,7 @@ export const projectEnvironmentActionConnectorReadiness = (input: {
     controlsAsserted: boolean;
     manualInputDetected: boolean;
     emergencyStopLatched: boolean;
+    blockingReason: string | null;
   } | null;
   nowMs?: number;
 }): HelixEnvironmentActionConnectorReadiness => {
@@ -273,6 +291,7 @@ export const projectEnvironmentActionConnectorReadiness = (input: {
     controls_asserted: heartbeat?.controlsAsserted ?? false,
     manual_input_detected: heartbeat?.manualInputDetected ?? false,
     emergency_stop_latched: heartbeat?.emergencyStopLatched ?? false,
+    blocking_reason: heartbeat?.blockingReason ?? null,
     credential_included: false,
     content_role:
       "environment_action_connector_readiness_not_assistant_answer",
@@ -445,7 +464,7 @@ export const readEnvironmentActionConnectorReadiness = async (input: {
     const manifest = manifestResult.rows[0] ?? null;
     const heartbeatResult = manifest
       ? await db.query<ConnectorReadinessHeartbeatRow>(
-        `SELECT status, active_workflow_ids, controls_asserted,
+        `SELECT status, active_workflow_ids, control_engines, controls_asserted,
                 manual_input_detected, emergency_stop_latched, received_at
          FROM helix_environment_action_connector_heartbeats
          WHERE action_authority_id = $1 AND manifest_id = $2
@@ -478,6 +497,7 @@ export const readEnvironmentActionConnectorReadiness = async (input: {
           controlsAsserted: heartbeat.controls_asserted,
           manualInputDetected: heartbeat.manual_input_detected,
           emergencyStopLatched: heartbeat.emergency_stop_latched,
+          blockingReason: readConnectorBlockingReason(heartbeat.control_engines),
         }
         : null,
     });

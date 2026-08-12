@@ -9,6 +9,8 @@ import com.casimirbot.helixsensor.pairing.ConnectorPairingClient;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,6 +107,63 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
         message(runtime == null ? "Helix player embodiment is not initialized." : runtime.statusText());
     }
 
+    void showDiagnosticStatus() {
+        message(runtime == null
+            ? "Helix player embodiment is not initialized."
+            : runtime.localDiagnosticStatusText());
+    }
+
+    void startDiagnosticWalk(String direction, int durationMs, boolean sprint) {
+        if (!List.of("forward", "back", "left", "right").contains(direction)) {
+            message("Diagnostic walk direction must be forward, back, left, or right.");
+            return;
+        }
+        message(runtime == null
+            ? "Helix player embodiment is not initialized."
+            : runtime.startLocalDiagnostic(
+                "walk",
+                Map.of(
+                    "direction", direction,
+                    "duration_ms", durationMs,
+                    "sprint", sprint
+                ),
+                Math.max(20, (durationMs + 49L) / 50L + 20L)
+            ));
+    }
+
+    void startDiagnosticJump(int count) {
+        message(runtime == null
+            ? "Helix player embodiment is not initialized."
+            : runtime.startLocalDiagnostic(
+                "jump",
+                Map.of("count", count),
+                Math.max(40, count * 30L)
+            ));
+    }
+
+    void startDiagnosticRelativeLook(double yawDelta, double pitchDelta) {
+        message(runtime == null
+            ? "Helix player embodiment is not initialized."
+            : runtime.startLocalDiagnostic(
+                "look_at",
+                Map.of(
+                    "target", Map.of(
+                        "target_kind", "relative_rotation",
+                        "yaw_delta_degrees", yawDelta,
+                        "pitch_delta_degrees", pitchDelta
+                    ),
+                    "max_turn_degrees_per_tick", 18.0
+                ),
+                100
+            ));
+    }
+
+    void cancelDiagnostic() {
+        message(runtime == null
+            ? "Helix player embodiment is not initialized."
+            : runtime.cancelLocalDiagnostic());
+    }
+
     void emergencyStop() {
         if (runtime != null) runtime.localEmergencyStop("The player invoked the local emergency stop.");
         message("Helix released every client control and latched the local emergency stop.");
@@ -142,7 +201,7 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
     private void replaceRuntime(PlayerActionConfig config) {
         PlayerActionRuntime prior = runtime;
         if (prior != null) prior.close();
-        runtime = new PlayerActionRuntime(config, minecraft, LOGGER);
+        runtime = new PlayerActionRuntime(config, minecraft, LOGGER, this::message);
         runtime.start();
     }
 

@@ -50,7 +50,10 @@ The model supplies only semantic action fields plus an optional
 
 - navigate: `destination`, `arrival_radius`, `allow_sprint`, `allow_dig`,
   `allow_place`, `engine_preference`;
-- look: `target_kind`, target-specific fields, `max_turn_degrees_per_tick`;
+- look: `target_kind`, target-specific fields, `max_turn_degrees_per_tick`.
+  `relative_rotation` accepts `yaw_delta_degrees` and
+  `pitch_delta_degrees` in `[-180, 180]`; positive yaw turns right and positive
+  pitch turns down;
 - walk: `direction`, `duration_ms`, `sprint`;
 - jump: `count`;
 - interact: `target`, `hand`, `interaction`;
@@ -112,6 +115,16 @@ with exact request/workflow/execution identity, outcome, bounded result,
 progress references, postcondition evidence references, freshness, provenance,
 and current-turn re-entry eligibility.
 
+Minecraft workflow heartbeats and events may also carry a typed
+`helix.environment_clock_snapshot.v1`. The Fabric client records a monotonic
+client `tick_index`, the nominal `20` TPS rate, and the synchronized
+`world_tick_index` when it is connected. Settled results expose the exact
+`started_clock`, `completed_clock`, and `duration_ticks`; the shared schema
+requires the duration to equal the completed/start tick delta on the same
+clock. Helix preserves those fields in the action observation so Codex can
+reason about local sequencing without treating nominal TPS as measured wall
+time.
+
 `completed` means the action-specific postcondition was measured and satisfied;
 dispatch acceptance alone is not completion. A missing, stale, contradictory,
 or unsatisfied check yields `postcondition_failed` or
@@ -124,6 +137,14 @@ selected equipment, follow interval, item delta, removed blocks, exact placed
 positions, crafted output or transfer delta—and enforces the admitted mutation
 and inventory ceilings. A generic `workflow.succeeded` marker without those
 measurements is insufficient.
+
+The public action observation exposes `verified_terminal_measurements` only
+after Helix has found the exact terminal workflow event for the same action,
+workflow, execution, connector epoch and provenance envelope. For relative
+look, this contains requested deltas, initial/target/final yaw and pitch,
+applied deltas and angular error. This field is derived from the accepted event
+ledger; the client result body cannot independently promote measurements into
+model-visible evidence.
 
 ## Bounded implementation notes
 

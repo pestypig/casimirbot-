@@ -577,7 +577,8 @@ export const buildCapabilityLaneProviderTimeline = (input: {
       lane_visible: false,
       lane_requested: true,
       lane_executed:
-        event.stage === "lane_observation" &&
+        (event.stage === "lane_observation" ||
+          event.stage === "lane_reentered") &&
         event.execution_status === "executed_observation_only",
       observation_reentered:
         event.stage === "lane_reentered" && event.status === "completed",

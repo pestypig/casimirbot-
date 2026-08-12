@@ -162,6 +162,8 @@ public final class ProbeExecutor {
                     "y", round(location.getY()),
                     "z", round(location.getZ())
                 )),
+                Map.entry("yaw", round(location.getYaw())),
+                Map.entry("pitch", round(location.getPitch())),
                 Map.entry("status_flags", List.copyOf(statusFlags)),
                 Map.entry("active_effects", activeEffects)
             )

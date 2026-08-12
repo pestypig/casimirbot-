@@ -4023,6 +4023,15 @@ describe("HelixAskPill mic helper behavior", () => {
         hasTerminalText: true,
       }),
     ).toBe(false);
+    expect(
+      shouldPreserveAuthoritativeTerminalOverEvidenceGate({
+        evidenceGateBlocked: true,
+        finalAnswerSource: "typed_failure",
+        terminalArtifactKind: "typed_failure",
+        hasTerminalText: true,
+        serverAuthoritativeTerminal: true,
+      }),
+    ).toBe(true);
   });
 
   it("suppresses voice playback for pending and failed terminal states", () => {

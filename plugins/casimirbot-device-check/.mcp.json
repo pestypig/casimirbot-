@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "casimirbot-device-check": {
+      "type": "http",
+      "url": "https://casimirbot.com/mcp/device-check"
+    }
+  }
+}

@@ -1,9 +1,12 @@
 import fs from "node:fs";
+import { once } from "node:events";
 import path from "node:path";
 import pg from "pg";
 import { newDb } from "pg-mem";
 import type { Pool as PgPool } from "pg";
 import { LocalPersistenceScheduler } from "./local-persistence-scheduler";
+import { compactLocalEnvironmentSituationDigestRows } from
+  "./local-persistence-compaction";
 
 const { Pool } = pg;
 import { runMigrations } from "./migrator";
@@ -152,9 +155,12 @@ type LocalSnapshot = {
 };
 
 const ROOM_SOURCE_REQUEST_TABLE = "helix_room_source_ingress_requests";
+const ENVIRONMENT_SITUATION_DIGEST_TABLE =
+  "helix_environment_situation_digests";
 const ROOM_SOURCE_REQUEST_RETENTION_MS = 24 * 60 * 60 * 1000;
 const ROOM_SOURCE_REQUEST_REFRESH_OVERLAP_MS = 10 * 60 * 1000;
 const LOCAL_ROOM_SOURCE_REQUEST_MAX_ROWS_PER_BINDING = 2_048;
+const LOCAL_SITUATION_DIGEST_MAX_ROWS_PER_SUBJECT = 128;
 const LOCAL_RESTORE_BATCH_MAX_ROWS = 500;
 const LOCAL_RESTORE_BATCH_MAX_PARAMETERS = 5_000;
 
@@ -205,6 +211,16 @@ const localRoomSourceRequestMaxRowsPerBinding = (): number => {
     : LOCAL_ROOM_SOURCE_REQUEST_MAX_ROWS_PER_BINDING;
 };
 
+const localSituationDigestMaxRowsPerSubject = (): number => {
+  const value = Number(
+    process.env.HELIX_LOCAL_PG_MEM_SITUATION_DIGEST_MAX_ROWS_PER_SUBJECT ??
+      LOCAL_SITUATION_DIGEST_MAX_ROWS_PER_SUBJECT,
+  );
+  return Number.isFinite(value)
+    ? Math.max(8, Math.min(4_096, Math.floor(value)))
+    : LOCAL_SITUATION_DIGEST_MAX_ROWS_PER_SUBJECT;
+};
+
 const compactLocalRoomSourceRequestRows = (
   rows: Array<Record<string, unknown>>,
   nowMs = Date.now(),
@@ -229,6 +245,50 @@ const compactLocalRoomSourceRequestRows = (
       )
       .slice(0, maxRows),
   );
+};
+
+const writeLocalSnapshotAtomically = async (
+  snapshotPath: string,
+  snapshot: LocalSnapshot,
+): Promise<void> => {
+  await fs.promises.mkdir(path.dirname(snapshotPath), { recursive: true });
+  const tempPath = `${snapshotPath}.${process.pid}.tmp`;
+  const stream = fs.createWriteStream(tempPath, {
+    encoding: "utf8",
+    flags: "w",
+  });
+  const write = async (chunk: string): Promise<void> => {
+    if (stream.write(chunk)) return;
+    await once(stream, "drain");
+  };
+
+  try {
+    await write(
+      `{"schema":${JSON.stringify(snapshot.schema)},"saved_at":${JSON.stringify(snapshot.saved_at)},"tables":{`,
+    );
+    let firstTable = true;
+    for (const [table, rows] of Object.entries(snapshot.tables)) {
+      if (!firstTable) await write(",");
+      firstTable = false;
+      await write(`${JSON.stringify(table)}:[`);
+      for (let index = 0; index < rows.length; index += 1) {
+        if (index > 0) await write(",");
+        // Serialize one row at a time. The previous whole-snapshot stringify
+        // temporarily duplicated a 200+ MiB local database on the V8 heap and
+        // could cross the keyed server's fixed low-memory heap limit.
+        await write(JSON.stringify(rows[index]));
+      }
+      await write("]");
+    }
+    await write("}}");
+    stream.end();
+    await once(stream, "close");
+    await fs.promises.rename(tempPath, snapshotPath);
+  } catch (error) {
+    stream.destroy();
+    await fs.promises.rm(tempPath, { force: true }).catch(() => undefined);
+    throw error;
+  }
 };
 
 const queryText = (input: unknown): string =>
@@ -427,10 +487,7 @@ async function persistLocalSnapshot(activePool: PgPool): Promise<void> {
     saved_at: savedAt,
     tables,
   };
-  await fs.promises.mkdir(path.dirname(localPersistencePath), { recursive: true });
-  const tempPath = `${localPersistencePath}.${process.pid}.tmp`;
-  await fs.promises.writeFile(tempPath, JSON.stringify(snapshot), "utf8");
-  await fs.promises.rename(tempPath, localPersistencePath);
+  await writeLocalSnapshotAtomically(localPersistencePath, snapshot);
   localPersistenceSnapshotCache = snapshot;
   for (const [table, version] of capturedVersions) {
     if (localPersistenceMutationVersions.get(table) === version) {
@@ -524,10 +581,19 @@ async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
       const snapshotRows = Array.isArray(snapshot.tables[table])
         ? snapshot.tables[table]
         : [];
-      const rows = table === ROOM_SOURCE_REQUEST_TABLE
-        ? compactLocalRoomSourceRequestRows(snapshotRows)
-        : snapshotRows;
+      const rows =
+        table === ROOM_SOURCE_REQUEST_TABLE
+          ? compactLocalRoomSourceRequestRows(snapshotRows)
+          : table === ENVIRONMENT_SITUATION_DIGEST_TABLE
+            ? compactLocalEnvironmentSituationDigestRows(
+                snapshotRows,
+                localSituationDigestMaxRowsPerSubject(),
+              )
+            : snapshotRows;
       discardedRowCount += snapshotRows.length - rows.length;
+      if (snapshotRows.length !== rows.length) {
+        markLocalPersistenceTablesDirty([table]);
+      }
       const restoredRows: Array<Record<string, unknown>> = [];
       let invalidRowCount = 0;
 
@@ -611,7 +677,7 @@ async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
     const restoreElapsedMs = Date.now() - restoreStartedAtMs;
     if (restoreElapsedMs >= 250 || discardedRowCount > 0) {
       console.warn(
-        `[db] local pg-mem restore took ${restoreElapsedMs}ms (restored ${restoredRowCount} rows; discarded ${discardedRowCount} expired rows)`,
+        `[db] local pg-mem restore took ${restoreElapsedMs}ms (restored ${restoredRowCount} rows; discarded ${discardedRowCount} compacted or invalid rows)`,
       );
     }
   } catch (err) {

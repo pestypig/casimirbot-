@@ -103,6 +103,12 @@ may identify `adapter_projection_contradiction`, `hard_evidence_boundary`, or
 `hard_policy_boundary`, but it must never approve, rewrite, reject, or replace
 an answer.
 
+Successful lifecycle facts are monotonic across projections. In particular, a
+successful lane observation that later re-enters provider reasoning must remain
+`lane_executed=true` at the re-entry stage. A regression to false is
+`capability_lane_execution_regressed_at_reentry`, an adapter projection defect;
+it is not evidence that Codex failed to execute the tool.
+
 Use a direct Codex reference run when it is possible to give Codex the same
 prompt, capability descriptions, observations, and permission boundary. Record
 its proposed actions, retries, and final synthesis, then compare that trace with
@@ -110,6 +116,33 @@ the Helix run. Direct success is evidence that the adapter introduced the
 divergence; it is not permission to bypass identity, authorization, provenance,
 freshness, scientific-units/claim-maturity, route-product, or terminal-eligibility
 gates.
+
+For a new environment capability, this comparison is the required development
+order rather than an optional final diagnostic:
+
+1. Let reference Codex operate the consented test environment directly and
+   establish whether the requested game/program operation is practically
+   possible. Record public actions, observations, preconditions,
+   postconditions, retries, and bounded failure modes; do not export hidden
+   reasoning or credentials.
+2. Convert the successful procedure into provider-neutral capability arguments,
+   observation schemas, verification criteria, cancellation behavior, and
+   authority requirements. Do not encode the example prompt or one successful
+   command sequence as adapter reasoning.
+3. Expose that capability to the runtime agent, then repeat the same natural
+   prompt and equivalent starting state through Helix.
+4. Attribute the first divergence. Direct failure is a mechanics, connector,
+   capability-documentation, or environment-access problem. Direct success
+   followed by Helix failure is an affordance-exposure, admission, execution,
+   normalization, re-entry, continuation, terminal-projection, or presentation
+   problem.
+
+Helix terminal eligibility is a policy/evidence gate, not the final semantic
+reasoner. It may pass through the exact supported Codex candidate, re-enter a
+repairable rejection into Codex, or fail closed at a genuine hard boundary. It
+must not silently rewrite the candidate, invent a different goal, or let a
+stale deterministic projection overrule verified current-turn execution and
+re-entry facts.
 
 Failed attempts stay in immutable provenance and debug history. A prior failed
 read/observe/verify attempt stops blocking only when strictly later current-turn
@@ -317,6 +350,15 @@ public pages. It does not install, authorize, or invoke the MCP tools. A user,
 application developer, ChatGPT plugin, Codex configuration, Gemini
 configuration, or surrounding agent harness must explicitly add the endpoint
 and complete OAuth before tool use.
+
+The bundled Codex Device Check plugin intentionally uses the narrower
+`https://casimirbot.com/mcp/device-check` endpoint and
+[`https://casimirbot.com/.well-known/oauth-protected-resource/mcp/device-check`](https://casimirbot.com/.well-known/oauth-protected-resource/mcp/device-check).
+That endpoint publishes only the read-only
+`helix_environment_device_check` tool. Installing the desktop application can
+provide all local software and open the Codex installation flow, but Codex must
+still receive the user's explicit plugin-install and Auth0 consent. Broader
+runtime controls require a separate capability profile and consent grant.
 
 For ChatGPT development testing, enable Developer mode and add the public
 `/mcp` URL under Settings → Plugins. Broad ChatGPT distribution still requires

@@ -3467,6 +3467,21 @@ describe("explicit workstation gateway derived calls", () => {
     ).toBeUndefined();
   });
 
+  it.each([
+    "What is the current NHM2 research position? Explain it in plain English.",
+    "What is the current Casimir-DP quantum foam study actually claiming?",
+  ])("keeps soft current project-research wording from executing web search: %s", (question) => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question,
+      },
+    });
+
+    expect(capabilities(requests)).not.toContain("internet-search.search_web");
+  });
+
   it("does not admit internet search from scientific Image Lens exact-row retry wording", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,

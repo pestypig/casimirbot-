@@ -4182,9 +4182,23 @@ describe("Helix workstation tool gateway", () => {
         doc_class?: string;
         bundle_kind?: string;
         canonical?: boolean;
+        retrieval_status?: string;
+        retrieval_admission_reason?: string;
+        topic_id?: string;
+        authority_rank?: number;
         sidecars?: string[];
         tool_hints?: Record<string, unknown>;
       }>;
+      retrieval_policy?: {
+        requested_scope?: string;
+        suppressed_document_count?: number;
+        suppressed_candidates?: Array<{
+          path?: string;
+          retrieval_status?: string;
+          reason?: string;
+          superseded_by?: string;
+        }>;
+      };
       unique_document_count?: number;
       terms?: string[];
     };
@@ -4212,6 +4226,10 @@ describe("Helix workstation tool gateway", () => {
       doc_class: "canonical-research",
       bundle_kind: "equation-action-whitepaper",
       canonical: true,
+      retrieval_status: "primary",
+      retrieval_admission_reason: "default_primary",
+      topic_id: "nhm2",
+      authority_rank: 100,
       sidecars: [
         "docs/research/nhm2-current-status-whitepaper.equation-actions.json",
         "docs/research/nhm2-current-status-whitepaper.equation-actions.source.json",
@@ -4221,6 +4239,91 @@ describe("Helix workstation tool gateway", () => {
         contentAuthority: "bounded_docs_observation_required",
       },
     });
+    expect(observation.retrieval_policy).toMatchObject({
+      requested_scope: "default",
+    });
+    expect(observation.retrieval_policy?.suppressed_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "docs/research/nhm2-current-status-whitepaper-2026-04-03.md",
+          retrieval_status: "archive",
+          reason: "archive_not_requested",
+          superseded_by: "docs/research/nhm2-current-status-whitepaper.md",
+        }),
+      ]),
+    );
+  });
+
+  it("retrieves one exact archived NHM2 paper without admitting sibling archives", async () => {
+    const archivedPath =
+      "docs/research/nhm2-current-status-whitepaper-2026-04-03.md";
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "NHM2 current status whitepaper 2026 04 03",
+        paths: [archivedPath],
+        max_hits: 5,
+      },
+      turnId: "ask:test:gateway-docs-search-exact-archived-nhm2-whitepaper",
+      iteration: 4,
+    });
+
+    const observation = result.observation as {
+      document_candidates?: Array<{
+        path?: string;
+        retrieval_status?: string;
+        retrieval_admission_reason?: string;
+        superseded_by?: string;
+      }>;
+      retrieval_policy?: {
+        requested_scope?: string;
+        admitted_document_count?: number;
+        suppressed_document_count?: number;
+      };
+    };
+    expect(result.ok).toBe(true);
+    expect(observation.document_candidates?.[0]).toMatchObject({
+      path: archivedPath,
+      retrieval_status: "archive",
+      retrieval_admission_reason: "exact_path_requested",
+      superseded_by: "docs/research/nhm2-current-status-whitepaper.md",
+    });
+    expect(observation.retrieval_policy).toMatchObject({
+      requested_scope: "default",
+      admitted_document_count: 1,
+      suppressed_document_count: 0,
+    });
+  });
+
+  it("admits NHM2 archive generations only through an explicit archive scope", async () => {
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: DOCS_SEARCH_CAPABILITY,
+      arguments: {
+        query: "Compare historical NHM2 current status versions",
+        paths: ["docs/research"],
+        retrieval_scope: "archive_only",
+        max_hits: 8,
+      },
+      turnId: "ask:test:gateway-docs-search-nhm2-archive-scope",
+      iteration: 4,
+    });
+
+    const observation = result.observation as {
+      document_candidates?: Array<{ retrieval_status?: string }>;
+      retrieval_policy?: { requested_scope?: string };
+    };
+    expect(result.ok).toBe(true);
+    expect(observation.retrieval_policy?.requested_scope).toBe("archive_only");
+    expect(observation.document_candidates?.length).toBeGreaterThan(0);
+    expect(
+      observation.document_candidates?.every(
+        (candidate) => candidate.retrieval_status === "archive",
+      ),
+    ).toBe(true);
   });
 
   it("returns every exact docs occurrence with its enclosing sentence and nearest heading", async () => {

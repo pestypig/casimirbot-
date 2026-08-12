@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyGatewayFailureAuthorityGuard,
+  buildCodexGenericContinuationDecisionInstruction,
   buildCodexMoralGraphReflectionReceiptAnswer,
   buildMoralGraphObservationFallbackAnswer,
   committedDocsEvidenceSupersedesScholarlyGuard,
   compactPostToolRecoveryModelValue,
+  codexProviderOutputHasUnresolvedCapabilityLaneRequest,
   currentCompoundCapabilityRailsCompleteForSolver,
   genericCurrentTurnToolRecoveryReadyForSolver,
   missingTheoryReferentGuardApplies,
@@ -15,6 +17,24 @@ import {
   settleCompletedItineraryContinuationForPostToolSynthesis,
   settleReenteredToolContinuationForPostToolSynthesis,
 } from "../codex-provider";
+
+const completedStatusReadPacket = {
+  schema: "helix.agent_step_observation_packet.v1",
+  turn_id: "ask:test:status-read",
+  call_id: "ask:test:status-read:call",
+  capability_key: "com.casimirbot.minecraft.actor.status.read",
+  status: "succeeded",
+  observation_summary: "Actor status read-only probe completed.",
+  produced_artifact_refs: ["ask:test:status-read:observation"],
+  state_delta: {},
+  missing_requirements: [],
+  suggested_next_steps: [],
+  retryability: "not_applicable",
+  terminal_eligible: false,
+  post_tool_model_step_required: true,
+  assistant_answer: false,
+  raw_content_included: false,
+} as never;
 
 const buildTheoryGraphGatewayResult = (capability: string, ok: boolean) => ({
   ok,
@@ -194,6 +214,80 @@ const buildCalculatorUnsupportedExpressionResult = () => ({
 });
 
 describe("Codex provider terminal pass-through", () => {
+  it("does not treat a completed read request repeated beside the grounded answer as unresolved", () => {
+    const request = {
+      capability: "com.casimirbot.minecraft.actor.status.read",
+      arguments: { target: "current_actor" },
+    };
+    const output = [
+      `HELIX_CAPABILITY_LANE_REQUEST_JSON:${JSON.stringify(request)}`,
+      "DatDamPig is online with 20/20 health at x -46.7, y 67, z -1.34.",
+    ].join("\n");
+
+    expect(
+      codexProviderOutputHasUnresolvedCapabilityLaneRequest({
+        text: output,
+        executedLaneRequests: [request],
+        capabilityLaneObservationPackets: [completedStatusReadPacket],
+      }),
+    ).toBe(false);
+
+    expect(
+      codexProviderOutputHasUnresolvedCapabilityLaneRequest({
+        text: `HELIX_CAPABILITY_LANE_REQUEST_JSON:${JSON.stringify(request)}`,
+        executedLaneRequests: [request],
+        capabilityLaneObservationPackets: [completedStatusReadPacket],
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps new or mutating capability requests unresolved", () => {
+    const completedRequest = {
+      capability: "com.casimirbot.minecraft.actor.status.read",
+      arguments: { target: "current_actor" },
+    };
+    const newRequest = {
+      capability: "com.casimirbot.minecraft.inventory.read",
+      arguments: { target: "current_actor" },
+    };
+    const mutatingRequest = {
+      capability: "com.casimirbot.minecraft.command",
+      arguments: {
+        command: "summon minecraft:pig ~ ~ ~",
+        category: "entity_control",
+        effect: "world_mutation",
+      },
+    };
+
+    expect(
+      codexProviderOutputHasUnresolvedCapabilityLaneRequest({
+        text: [
+          `HELIX_CAPABILITY_LANE_REQUEST_JSON:${JSON.stringify(newRequest)}`,
+          "DatDamPig is online.",
+        ].join("\n"),
+        executedLaneRequests: [completedRequest],
+        capabilityLaneObservationPackets: [completedStatusReadPacket],
+      }),
+    ).toBe(true);
+
+    expect(
+      codexProviderOutputHasUnresolvedCapabilityLaneRequest({
+        text: [
+          `HELIX_CAPABILITY_LANE_REQUEST_JSON:${JSON.stringify(mutatingRequest)}`,
+          "The pig was summoned.",
+        ].join("\n"),
+        executedLaneRequests: [mutatingRequest],
+        capabilityLaneObservationPackets: [
+          {
+            ...completedStatusReadPacket,
+            capability_key: "com.casimirbot.minecraft.command",
+          } as never,
+        ],
+        mutatingCapabilityIds: ["com.casimirbot.minecraft.command"],
+      }),
+    ).toBe(true);
+  });
+
   it("keeps a hard local Docs observation authoritative over a lexical scholarly cue", () => {
     const docsResult = {
       ok: true,
@@ -499,7 +593,7 @@ describe("Codex provider terminal pass-through", () => {
     })).toBe("The observed search found a relevant magnetar review.");
   });
 
-  it("admits bounded post-tool recovery only for a completed current-turn itinerary", () => {
+  it("admits bounded post-tool recovery for settled current-turn rails", () => {
     const completedItinerary = {
       schema: "helix.capability_itinerary_execution_state.v1",
       applies: true,
@@ -510,6 +604,19 @@ describe("Codex provider terminal pass-through", () => {
       providerGatewayEvidenceReady: true,
       normalizedObservationArtifactCount: 1,
       capabilityItineraryExecutionState: completedItinerary,
+    })).toBe(true);
+    expect(genericCurrentTurnToolRecoveryReadyForSolver({
+      providerGatewayEvidenceReady: true,
+      normalizedObservationArtifactCount: 1,
+    })).toBe(true);
+    expect(genericCurrentTurnToolRecoveryReadyForSolver({
+      providerGatewayEvidenceReady: true,
+      normalizedObservationArtifactCount: 1,
+      capabilityItineraryExecutionState: {
+        ...completedItinerary,
+        applies: false,
+        complete: false,
+      },
     })).toBe(true);
 
     for (const input of [
@@ -531,17 +638,23 @@ describe("Codex provider terminal pass-through", () => {
           complete: false,
         },
       },
-      {
-        providerGatewayEvidenceReady: true,
-        normalizedObservationArtifactCount: 1,
-        capabilityItineraryExecutionState: {
-          ...completedItinerary,
-          applies: false,
-        },
-      },
     ]) {
       expect(genericCurrentTurnToolRecoveryReadyForSolver(input)).toBe(false);
     }
+
+    expect(genericCurrentTurnToolRecoveryReadyForSolver({
+      providerGatewayEvidenceReady: true,
+      normalizedObservationArtifactCount: 1,
+      capabilityItineraryExecutionState: completedItinerary,
+      currentCompoundCapabilityLedger: {
+        schema: "helix.compound_capability_contract.v1",
+        rail_status: "pending",
+        subgoals: [
+          { requested_capability: "minecraft.actor.status.read" },
+          { requested_capability: "minecraft.inventory.read" },
+        ],
+      },
+    })).toBe(false);
   });
 
   it("prefers settled current-turn compound rails over a stale pre-execution itinerary", () => {
@@ -578,6 +691,116 @@ describe("Codex provider terminal pass-through", () => {
         normalizedObservationArtifactCount: 2,
         capabilityItineraryExecutionState: staleProjection,
         currentCompoundCapabilityLedger: settledLedger,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not let completed read rails erase a pending semantic any-of action", () => {
+    const pendingSemanticAction = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      applies: true,
+      complete: false,
+      missing_required_capability_any_of_groups: [
+        {
+          group_id: "minecraft.player_embodiment.action",
+          capability_ids: [
+            "com.casimirbot.minecraft.player.navigate",
+            "com.casimirbot.minecraft.player.walk",
+          ],
+        },
+      ],
+    };
+    const settledReadLedger = {
+      schema: "helix.compound_capability_contract.v1",
+      rail_status: "satisfied",
+      subgoals: [
+        {
+          requested_capability:
+            "com.casimirbot.minecraft.spatial_region.inspect",
+          satisfaction: "satisfied",
+        },
+        {
+          requested_capability:
+            "com.casimirbot.minecraft.actor.status.read",
+          satisfaction: "satisfied",
+        },
+      ],
+    };
+
+    expect(
+      providerCommittedCapabilityRailsIncompleteForSolver({
+        projectedExecutionState: pendingSemanticAction,
+        currentCompoundCapabilityLedger: settledReadLedger,
+      }),
+    ).toBe(true);
+    expect(
+      genericCurrentTurnToolRecoveryReadyForSolver({
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 2,
+        capabilityItineraryExecutionState: pendingSemanticAction,
+        currentCompoundCapabilityLedger: settledReadLedger,
+      }),
+    ).toBe(false);
+
+    const continuationState = {
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: false,
+      },
+      missing_requirement_ids: ["minecraft.player_embodiment.action"],
+      allowed_decisions: ["act"],
+    } as never;
+    expect(
+      settleReenteredToolContinuationForPostToolSynthesis({
+        state: continuationState,
+        trigger: "post_attempt",
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 2,
+        capabilityItineraryExecutionState: pendingSemanticAction,
+        currentCompoundCapabilityLedger: settledReadLedger,
+      }),
+    ).toBe(continuationState);
+  });
+
+  it("prefers a current single-tool rail over contradictory stale itinerary fields", () => {
+    const staleProjection = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      applies: true,
+      complete: true,
+      required_capabilities: [
+        "com.casimirbot.minecraft.actor.status.read",
+        "com.casimirbot.minecraft.inventory.read",
+      ],
+      missing_required_capabilities: [
+        "com.casimirbot.minecraft.inventory.read",
+      ],
+      missing_compound_subgoal_ids: ["stale:R2"],
+    };
+    const currentSingleToolLedger = {
+      schema: "helix.compound_capability_contract.v1",
+      rail_status: "satisfied",
+      subgoals: [
+        {
+          requested_capability:
+            "com.casimirbot.minecraft.actor.status.read",
+          satisfaction: "satisfied",
+        },
+      ],
+    };
+
+    expect(
+      providerCommittedCapabilityRailsIncompleteForSolver({
+        projectedExecutionState: staleProjection,
+        currentCompoundCapabilityLedger: currentSingleToolLedger,
+      }),
+    ).toBe(false);
+    expect(
+      genericCurrentTurnToolRecoveryReadyForSolver({
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 1,
+        capabilityItineraryExecutionState: staleProjection,
+        currentCompoundCapabilityLedger: currentSingleToolLedger,
       }),
     ).toBe(true);
   });
@@ -715,6 +938,110 @@ describe("Codex provider terminal pass-through", () => {
       },
     });
 
+    const unknownButAnswerEligibleState = {
+      ...state,
+      goal: {
+        status: "unknown",
+        satisfied: false,
+        terminal_product_allowed: true,
+      },
+      allowed_decisions: ["answer"],
+    } as never;
+
+    expect(
+      settleReenteredToolContinuationForPostToolSynthesis({
+        state: unknownButAnswerEligibleState,
+        trigger: "post_attempt",
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 1,
+        currentCompoundCapabilityLedger: {
+          schema: "helix.compound_capability_contract.v1",
+          rail_status: "satisfied",
+          subgoals: [
+            {
+              requested_capability: "minecraft.actor.status.read",
+              satisfied: true,
+            },
+          ],
+        },
+      }),
+    ).toMatchObject({
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: true,
+      },
+      allowed_decisions: ["answer"],
+      progress: {
+        reason_codes: [
+          "new_observation",
+          "current_turn_itinerary_complete_pending_synthesis",
+        ],
+      },
+    });
+
+    for (const status of ["blocked", "needs_user_input"] as const) {
+      const boundaryState = {
+        ...unknownButAnswerEligibleState,
+        goal: {
+          status,
+          satisfied: false,
+          terminal_product_allowed: status === "needs_user_input" ? false : true,
+        },
+      } as never;
+      expect(
+        settleReenteredToolContinuationForPostToolSynthesis({
+          state: boundaryState,
+          trigger: "post_attempt",
+          providerGatewayEvidenceReady: true,
+          normalizedObservationArtifactCount: 1,
+          currentCompoundCapabilityLedger: {
+            schema: "helix.compound_capability_contract.v1",
+            rail_status: "satisfied",
+            subgoals: [
+              {
+                requested_capability: "minecraft.actor.status.read",
+                satisfied: true,
+              },
+            ],
+          },
+        }),
+      ).toBe(boundaryState);
+    }
+
+    expect(
+      settleReenteredToolContinuationForPostToolSynthesis({
+        state,
+        trigger: "post_attempt",
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 1,
+      }),
+    ).toMatchObject({
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: true,
+      },
+      allowed_decisions: ["answer"],
+    });
+
+    expect(
+      settleReenteredToolContinuationForPostToolSynthesis({
+        state,
+        trigger: "post_attempt",
+        providerGatewayEvidenceReady: true,
+        normalizedObservationArtifactCount: 1,
+        currentCompoundCapabilityLedger: {
+          schema: "helix.compound_capability_contract.v1",
+          rail_status: "pending",
+          subgoals: [
+            { requested_capability: "minecraft.actor.status.read" },
+            { requested_capability: "minecraft.inventory.read" },
+          ],
+        },
+      }),
+    ).toBe(state);
+
     expect(
       settleReenteredToolContinuationForPostToolSynthesis({
         state,
@@ -750,6 +1077,114 @@ describe("Codex provider terminal pass-through", () => {
         },
       }),
     ).toBe(completedReceiptState);
+  });
+
+  it("preserves a typed external-change boundary for Codex-authored user input", () => {
+    const state = {
+      schema: "helix.agent_continuation_state.v1",
+      state_id: "ask:test:continuation:user-input",
+      turn_id: "ask:test",
+      sequence: 3,
+      trigger: "post_attempt",
+      goal: {
+        status: "needs_user_input",
+        satisfied: false,
+        terminal_product_allowed: false,
+      },
+      observation_refs: {
+        all: ["ask:test:look:blocked"],
+        existing: [],
+        new: ["ask:test:look:blocked"],
+      },
+      missing_requirement_ids: ["manual_override_detected"],
+      next_admissible_affordances: [],
+      tried_action_fingerprints: [],
+      progress: {
+        made_progress: true,
+        new_observation_count: 1,
+        resolved_requirement_ids: [],
+        added_requirement_ids: ["manual_override_detected"],
+        new_affordance_count: 0,
+        no_progress_repeat_count: 0,
+        reason_codes: ["new_observation"],
+      },
+      budget: { hard: { exhausted: false } },
+      last_attempt: {
+        capability_id: "com.casimirbot.minecraft.player.look",
+        failure_code: "request_canceled",
+        failure_message: "Manual input canceled the client action.",
+        retryability: "requires_user_input",
+      },
+      allowed_decisions: ["ask_user"],
+      assistant_answer: false,
+      raw_content_included: false,
+    } as never;
+
+    expect(buildCodexGenericContinuationDecisionInstruction(state)).toContain(
+      "Produce one concise user-facing request",
+    );
+    expect(buildCodexGenericContinuationDecisionInstruction(state)).toContain(
+      "request_canceled",
+    );
+    expect(
+      settleCompletedItineraryContinuationForPostToolSynthesis(state, true),
+    ).toMatchObject({
+      goal: {
+        status: "needs_user_input",
+        satisfied: false,
+        terminal_product_allowed: true,
+      },
+      allowed_decisions: ["ask_user"],
+      progress: {
+        reason_codes: [
+          "new_observation",
+          "current_turn_user_input_boundary_pending_provider_synthesis",
+        ],
+      },
+    });
+
+    const providerText =
+      "The client stopped with request_canceled because manual input was detected. Please release the mouse and tell me when to try again.";
+    expect(
+      applyGatewayFailureAuthorityGuard({
+        text: providerText,
+        providerTerminalIntent: "request_user_input",
+        turnId: "ask:test",
+        gatewayCallResults: [
+          {
+            ok: false,
+            capability_id: "com.casimirbot.minecraft.player.look",
+            mode: "act",
+            gateway_admission: {
+              requested_capability:
+                "com.casimirbot.minecraft.player.look",
+              admission_status: "admitted",
+            },
+            observation_packet: {
+              schema: "helix.agent_step_observation_packet.v1",
+              turn_id: "ask:test",
+              status: "failed",
+              produced_artifact_refs: ["ask:test:look:blocked"],
+              missing_requirements: [
+                {
+                  code: "request_canceled",
+                  message: "Release manual controls before retrying.",
+                  repair_action: "ask_user",
+                },
+              ],
+            },
+            tool_lifecycle_trace: { retry_recommendation: "ask_user" },
+            tool_followup_decision: {
+              next_action: "ask_user",
+              external_change_required: true,
+            },
+            observation: { error_code: "request_canceled" },
+            artifact_refs: ["ask:test:look:blocked"],
+            error: "request_canceled",
+          } as never,
+        ],
+      }),
+    ).toBe(providerText);
   });
 
   it("bounds nested recovery evidence without erasing its top-level structure", () => {

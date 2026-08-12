@@ -462,6 +462,160 @@ describe("final_answer_draft terminal selection", () => {
     expect(missingSection.violations).toContain("invalid_conditional_visual_evidence_answer");
   });
 
+  it("preserves an actionable Codex limitation grounded in a successful current-turn observation", () => {
+    const turnId = "ask:test:grounded-evidence-limitation";
+    const observationRef = `${turnId}:codex_normalized:live_environment_observation:1`;
+    const observation = {
+      artifact_id: observationRef,
+      turn_id: turnId,
+      kind: "live_environment_observation",
+      status: "succeeded",
+      payload: {
+        schema: "helix.live_environment_observation.v1",
+        turn_id: turnId,
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    const draftText = [
+      "I cannot truthfully choose an exact wall coordinate from the admitted evidence alone.",
+      "The current-turn observation only confirms the floor sample; the block-level shell geometry is missing.",
+      "A fresh bounded spatial probe is required before I can proceed with a safe placement plan.",
+    ].join("\n\n");
+    const evaluate = (input: {
+      supportRefs?: string[];
+      artifacts?: typeof observation[];
+      text?: string;
+    }) =>
+      evaluateFinalAnswerDraftQualityGate({
+        turnId,
+        finalAnswerDraftRef: `${turnId}:draft`,
+        draftText: input.text ?? draftText,
+        draftPayload: {
+          grounded_in_observation_refs: input.supportRefs ?? [observationRef],
+        },
+        promptText:
+          "Inspect the house shell and select one exact safe wall coordinate.",
+        routeProductContract: modelOnlyContract(turnId),
+        payload: { active_prompt: "Inspect the house shell." },
+        artifactLedger: input.artifacts ?? [observation],
+      });
+
+    expect(evaluate({}).violations).not.toContain("refusal_without_error");
+    expect(
+      evaluate({ supportRefs: [`${turnId}:missing-observation`] }).violations,
+    ).toContain("refusal_without_error");
+    expect(
+      evaluate({
+        artifacts: [
+          {
+            ...observation,
+            status: "failed",
+            payload: { ...observation.payload, status: "failed" },
+          },
+        ],
+      }).violations,
+    ).toContain("refusal_without_error");
+    expect(
+      evaluate({
+        artifacts: [
+          {
+            ...observation,
+            turn_id: "ask:test:stale-turn",
+            payload: {
+              ...observation.payload,
+              turn_id: "ask:test:stale-turn",
+            },
+          },
+        ],
+      }).violations,
+    ).toContain("refusal_without_error");
+    expect(
+      evaluate({
+        text: "I cannot answer this request. Please try again.",
+      }).violations,
+    ).toContain("refusal_without_error");
+  });
+
+  it("preserves a substantive Codex limitation structurally grounded in every completed compound rail", () => {
+    const turnId = "ask:test:grounded-compound-limitation";
+    const observationRefs = ["spatial", "walk", "status"].map(
+      (suffix) => `${turnId}:observation:${suffix}`,
+    );
+    const artifacts = observationRefs.map((artifactId) => ({
+      artifact_id: artifactId,
+      turn_id: turnId,
+      kind: "live_environment_observation",
+      status: "succeeded",
+      payload: {
+        schema: "helix.live_environment_observation.v1",
+        turn_id: turnId,
+        status: "succeeded",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    }));
+    const executionState = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      complete: true,
+      compound_subgoal_ledger: observationRefs.map((observationRef) => ({
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        observation_ref: observationRef,
+      })),
+    };
+    const draftText = [
+      "A single bounded step was taken and the measured movement completed successfully.",
+      "The fresh status observation confirms the player remained healthy and no forbidden mutation was reported.",
+      "What I cannot fully verify from the compacted evidence is the exact cardinal direction and ideal headroom for the landing cell.",
+    ].join("\n\n");
+    const evaluate = (input?: {
+      text?: string;
+      supportRefs?: string[];
+      artifacts?: typeof artifacts;
+    }) =>
+      evaluateFinalAnswerDraftQualityGate({
+        turnId,
+        finalAnswerDraftRef: `${turnId}:draft`,
+        draftText: input?.text ?? draftText,
+        draftPayload: {
+          support_refs: input?.supportRefs ?? observationRefs,
+        },
+        promptText: "Inspect, walk one safe step, then check status.",
+        routeProductContract: modelOnlyContract(turnId),
+        payload: {
+          active_prompt: "Inspect, walk one safe step, then check status.",
+          capability_itinerary_execution_state: executionState,
+        },
+        artifactLedger: input?.artifacts ?? artifacts,
+      });
+
+    expect(evaluate().violations).not.toContain("refusal_without_error");
+    expect(
+      evaluate({ supportRefs: observationRefs.slice(0, 2) }).violations,
+    ).toContain("refusal_without_error");
+    expect(
+      evaluate({
+        artifacts: artifacts.map((artifact, index) =>
+          index === 1
+            ? {
+                ...artifact,
+                status: "failed",
+                payload: { ...artifact.payload, status: "failed" },
+              }
+            : artifact,
+        ),
+      }).violations,
+    ).toContain("refusal_without_error");
+    expect(
+      evaluate({ text: "I cannot answer this request. Please try again." })
+        .violations,
+    ).toContain("refusal_without_error");
+  });
+
   it("enforces explicit per-bullet page reference counts and identities", () => {
     const turnId = "ask:test:per-bullet-page-evidence-links";
     const artifact = researchLibraryObservation(turnId);

@@ -33,6 +33,7 @@ import {
 } from "./authority-policy";
 import { readEnvironmentCommandAuthority } from "./authority-store";
 import { commandRequiresSelectedSubjectSource } from "./command-subject-policy";
+import { createCredentialUseTouchThrottle } from "../credential-use-throttle";
 
 const DEFAULT_COMMAND_CREDENTIAL_TTL_MS = 24 * 60 * 60 * 1_000;
 const MAX_COMMAND_CREDENTIAL_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -40,6 +41,7 @@ const DEFAULT_COMMAND_DEADLINE_MS = 15_000;
 const MAX_COMMAND_DEADLINE_MS = 5 * 60_000;
 const DEFAULT_LEASE_MS = 10_000;
 const WAIT_POLL_MS = 40;
+const touchCommandCredentialUse = createCredentialUseTouchThrottle();
 
 export type EnvironmentCommandBrokerErrorCode =
   | "command_authority_not_found"
@@ -326,11 +328,13 @@ export const authenticateEnvironmentCommandConnector = async (input: {
       "The command credential does not allow this connector operation.",
     );
   }
-  await db.query(
-    `UPDATE helix_environment_command_connector_credentials
-     SET last_used_at = now() WHERE command_credential_id = $1;`,
-    [row.credential_id],
-  );
+  await touchCommandCredentialUse(row.credential_id, async () => {
+    await db.query(
+      `UPDATE helix_environment_command_connector_credentials
+       SET last_used_at = now() WHERE command_credential_id = $1;`,
+      [row.credential_id],
+    );
+  });
   return {
     authorityId: row.command_authority_id,
     credentialId: row.credential_id,
@@ -982,8 +986,22 @@ export const enqueueEnvironmentCommand = async (input: {
 export const leasePendingEnvironmentCommands = async (input: {
   claim: EnvironmentCommandConnectorClaim;
   limit?: number;
-}): Promise<HelixEnvironmentCommandRequest[]> =>
-  withSharedRealtimeRoomTransaction(async (db) => {
+}): Promise<HelixEnvironmentCommandRequest[]> => {
+  const readDb = await readSharedRealtimeRoomDatabase();
+  const work = await readDb.query<{ present: number }>(
+    `SELECT 1 AS present
+     FROM helix_environment_command_requests
+     WHERE command_authority_id = $1
+       AND (
+         status = 'pending'
+         OR (status = 'leased' AND lease_expires_at <= now())
+       )
+     LIMIT 1;`,
+    [input.claim.authorityId],
+  );
+  if (!work.rows[0]) return [];
+
+  return withSharedRealtimeRoomTransaction(async (db) => {
     const limit = Math.min(8, Math.max(1, Math.floor(input.limit ?? 4)));
     const now = new Date();
     await db.query(
@@ -1029,6 +1047,7 @@ export const leasePendingEnvironmentCommands = async (input: {
     }
     return leased;
   });
+};
 
 const observationFromRows = (
   request: RequestRow,

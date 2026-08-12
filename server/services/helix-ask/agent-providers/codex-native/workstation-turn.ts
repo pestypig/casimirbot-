@@ -474,6 +474,7 @@ export const runCodexNativeWorkstationTurn = async (input: {
       iteration,
       callId,
       providerExecutionId,
+      signal,
     }) => {
       if (!goalVisibleSet.has(capabilityId)) {
         return {
@@ -681,6 +682,7 @@ export const runCodexNativeWorkstationTurn = async (input: {
         providerExecutionId,
         iteration,
         authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
+        signal,
       });
       if (isGatewayCallResult(governed.body))
         gatewayCallResults.push(governed.body);

@@ -4,7 +4,10 @@ import { z } from "zod";
 import multer from "multer";
 import { runSolarVideoCoherenceJob } from "../services/essence/solar-video-coherence";
 import { runSolarCurvatureFromSunpy } from "../services/essence/solar-energy-adapter";
+import { compareSolarKhiReconstructions, measureSolarKhiBoundary } from "../services/essence/solar-khi-analysis";
+import { routeSolarModel } from "../services/vision/solar-model-registry";
 import { CurvatureBoundaryCondition2D } from "@shared/essence-physics";
+import { SolarKhiMeasurementInputV1Schema } from "@shared/contracts/solar-khi-observation.v1";
 import { fetchHekEventsForWindow, refineEventsWithSunpy } from "../services/essence/solar-events-hek";
 import { ingestSunpyCoherenceBridge, type SunpyExportPayload } from "../services/essence/sunpy-coherence-bridge";
 import { runPythonScript } from "../utils/run-python";
@@ -91,6 +94,11 @@ const SolarCurvatureRequestSchema = z.object({
   calibrationVersion: z.preprocess(coerceQueryString, z.string().optional()),
   boundary: CurvatureBoundaryCondition2D.optional(),
   persist: z.preprocess(coerceQueryString, z.string().optional()),
+});
+
+const SolarKhiAnalysisRequestSchema = z.object({
+  mfbd: SolarKhiMeasurementInputV1Schema,
+  speckle: SolarKhiMeasurementInputV1Schema.optional(),
 });
 
 const clamp = (val: number, min: number, max: number) => {
@@ -845,6 +853,39 @@ starWatcherRouter.post("/solar-curvature", async (req, res) => {
     console.error("[star-watcher] solar-curvature failed", error);
     const message = error instanceof Error ? error.message : String(error);
     res.status(500).json({ error: "solar_curvature_failed", message });
+  }
+});
+
+starWatcherRouter.post("/dkist-fastcam/analyze", (req, res) => {
+  const parsed = SolarKhiAnalysisRequestSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: "invalid_solar_khi_request", details: parsed.error.flatten() });
+  }
+  try {
+    const mfbd = measureSolarKhiBoundary(parsed.data.mfbd);
+    const speckle = parsed.data.speckle ? measureSolarKhiBoundary(parsed.data.speckle) : null;
+    const agreement = speckle ? compareSolarKhiReconstructions(mfbd, speckle) : null;
+    const modelRoute = routeSolarModel({
+      task: "dkist_416_khi_tracking",
+      instrument: "DKIST_FastCam",
+      passbandCenterNm: 416,
+      spatialResolutionKm: parsed.data.mfbd.effective_resolution_km,
+      cadenceSeconds: parsed.data.mfbd.cadence_s,
+      fieldOfViewClass: "fastcam_patch",
+      requiresWorldCoordinates: true,
+      requiredOutputSchema: "solar_khi_measurement/v1",
+    });
+    return res.json({
+      ok: true,
+      measurements: [mfbd, ...(speckle ? [speckle] : [])],
+      reconstruction_agreement: agreement,
+      model_route: modelRoute,
+      authority: "deterministic_numerical_measurement",
+      claim_tier: "diagnostic",
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return res.status(422).json({ error: "solar_khi_analysis_failed", message });
   }
 });
 

@@ -32,6 +32,8 @@ export const HELIX_ENVIRONMENT_ACTION_DIFFERENTIAL_TRACE_SCHEMA =
   "helix.environment_action.differential_trace.v1" as const;
 export const HELIX_ENVIRONMENT_ACTION_DIFFERENTIAL_AUDIT_SCHEMA =
   "helix.environment_action.differential_audit.v1" as const;
+export const HELIX_ENVIRONMENT_CLOCK_SNAPSHOT_SCHEMA =
+  "helix.environment_clock_snapshot.v1" as const;
 
 export const HELIX_ENVIRONMENT_ACTION_AUTONOMY_MODES = [
   "approve_each",
@@ -133,6 +135,40 @@ const environmentMeasurementsSchema = environmentArgumentsSchema.superRefine(
     }
   },
 );
+
+export const helixEnvironmentClockSnapshotSchema = z
+  .object({
+    schema: z.literal(HELIX_ENVIRONMENT_CLOCK_SNAPSHOT_SCHEMA),
+    clock_id: identifierSchema,
+    clock_kind: z.enum(["minecraft_game_tick", "environment_tick"]),
+    tick_rate_hz: z.number().finite().positive().max(1_000),
+    tick_index: z.number().int().nonnegative(),
+    world_tick_index: z.number().int().nonnegative().nullable(),
+    synchronization: z.enum([
+      "server_synchronized",
+      "client_local",
+      "unknown",
+    ]),
+    observed_at: timestampSchema,
+  })
+  .strict()
+  .superRefine((clock, context) => {
+    if (
+      clock.synchronization === "server_synchronized" &&
+      clock.world_tick_index === null
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["world_tick_index"],
+        message:
+          "A server-synchronized environment clock requires the measured world tick.",
+      });
+    }
+  });
+
+export type HelixEnvironmentClockSnapshot = z.infer<
+  typeof helixEnvironmentClockSnapshotSchema
+>;
 
 export const helixEnvironmentActionAutonomyModeSchema = z.enum(
   HELIX_ENVIRONMENT_ACTION_AUTONOMY_MODES,
@@ -391,6 +427,7 @@ export const helixEnvironmentActionConnectorHeartbeatSchema = z
       .min(1)
       .max(2),
     latest_event_sequence: z.number().int().nonnegative().nullable(),
+    clock: helixEnvironmentClockSnapshotSchema.nullable().optional(),
     evidence_refs: z.array(identifierSchema).max(128),
     created_at: timestampSchema,
     credential_included: z.literal(false),
@@ -456,6 +493,7 @@ export const helixEnvironmentActionConnectorReadinessSchema = z
     controls_asserted: z.boolean(),
     manual_input_detected: z.boolean(),
     emergency_stop_latched: z.boolean(),
+    blocking_reason: z.string().trim().min(1).max(160).nullable().default(null),
     credential_included: z.literal(false),
     content_role: z.literal(
       "environment_action_connector_readiness_not_assistant_answer",
@@ -472,6 +510,13 @@ export const helixEnvironmentActionConnectorReadinessSchema = z
         code: z.ZodIssueCode.custom,
         path: ["ready_for_actions"],
         message: "Only a ready connector may be projected as action-ready.",
+      });
+    }
+    if (readiness.ready_for_actions && readiness.blocking_reason !== null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["blocking_reason"],
+        message: "An action-ready connector cannot retain a blocking reason.",
       });
     }
     if (!readiness.manifest_admitted) {
@@ -709,6 +754,7 @@ export const helixEnvironmentActionWorkflowEventSchema = z
     summary: boundedSummarySchema,
     control_engine: z.enum(["native_fabric", "baritone", "none"]),
     measurements: environmentMeasurementsSchema.default({}),
+    clock: helixEnvironmentClockSnapshotSchema.optional(),
     evidence_refs: z.array(identifierSchema).max(128),
     manual_override_detected: z.boolean(),
     controls_released: z.boolean(),
@@ -806,12 +852,33 @@ export const helixEnvironmentActionResultSchema = z
     progress_event_refs: z.array(identifierSchema).max(1_024),
     postconditions: z.array(helixEnvironmentActionPostconditionResultSchema).min(1).max(64),
     evidence_refs: z.array(identifierSchema).max(256),
+    verified_terminal_measurements: environmentMeasurementsSchema.default({}),
+    started_clock: helixEnvironmentClockSnapshotSchema.nullable().optional(),
+    completed_clock: helixEnvironmentClockSnapshotSchema.optional(),
+    duration_ticks: z.number().int().nonnegative().nullable().optional(),
     side_effects_performed: z.boolean(),
     player_motion_performed: z.boolean(),
     player_interaction_performed: z.boolean(),
     inventory_mutation_performed: z.boolean(),
     world_mutation_performed: z.boolean(),
     manual_override_detected: z.boolean(),
+    manual_override_reason: z
+      .enum([
+        "screen_open",
+        "left_mouse_pressed",
+        "middle_mouse_pressed",
+        "right_mouse_pressed",
+        "forward_key_pressed",
+        "back_key_pressed",
+        "left_key_pressed",
+        "right_key_pressed",
+        "jump_key_pressed",
+        "sprint_key_pressed",
+        "unexpected_view_change",
+        "unspecified_manual_input",
+      ])
+      .nullable()
+      .optional(),
     controls_released: z.boolean(),
     host_access_performed: z.literal(false),
     automatic_replay_performed: z.literal(false),
@@ -845,6 +912,32 @@ export const helixEnvironmentActionResultSchema = z
           message: "A successful workflow must prove that execution started.",
         });
       }
+    }
+    if (result.started_clock && result.completed_clock) {
+      if (result.started_clock.clock_id !== result.completed_clock.clock_id) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["completed_clock", "clock_id"],
+          message: "Workflow timing must use one continuous environment clock.",
+        });
+      }
+      const measuredDuration =
+        result.completed_clock.tick_index - result.started_clock.tick_index;
+      if (measuredDuration < 0 || result.duration_ticks !== measuredDuration) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["duration_ticks"],
+          message:
+            "Workflow duration ticks must equal the measured completed/start tick delta.",
+        });
+      }
+    } else if (result.duration_ticks != null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["duration_ticks"],
+        message:
+          "Workflow duration ticks require both started and completed clock snapshots.",
+      });
     }
   });
 

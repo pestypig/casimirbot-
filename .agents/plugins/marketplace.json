@@ -1,0 +1,20 @@
+{
+  "name": "casimirbot-local",
+  "interface": {
+    "displayName": "CasimirBot Local"
+  },
+  "plugins": [
+    {
+      "name": "casimirbot-device-check",
+      "source": {
+        "source": "local",
+        "path": "./plugins/casimirbot-device-check"
+      },
+      "policy": {
+        "installation": "NOT_AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

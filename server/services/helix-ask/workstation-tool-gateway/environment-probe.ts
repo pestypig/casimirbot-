@@ -582,6 +582,7 @@ const buildEnvironmentProbeSchemaRepair = (input: {
   >;
   arguments: Record<string, unknown>;
   issues: EnvironmentConnectorSchemaIssue[];
+  admittedCapabilityIds: readonly string[];
   dropPositionForCurrentFocusConflict?: boolean;
 }): EnvironmentProbeSchemaRepair => {
   const properties = input.descriptor.input_schema.properties ?? {};
@@ -620,7 +621,87 @@ const buildEnvironmentProbeSchemaRepair = (input: {
     "environment_probe_schema_repair",
     `${input.turnId}\n${input.capabilityId}\n${JSON.stringify(proposedArguments)}`,
   );
-  const nextAffordances = proposedIsValid
+  const admitted = new Set(input.admittedCapabilityIds);
+  const rejectedFields = Array.from(
+    new Set([
+      ...Object.keys(input.arguments).filter((key) => !allowed.has(key)),
+      ...semanticConflictFields,
+    ]),
+  ).sort();
+  const migratedAffordances = listEnvironmentConnectorCapabilityDescriptors()
+    .filter(
+      (candidate) =>
+        candidate.capability_id !== input.capabilityId &&
+        candidate.domain === input.descriptor.domain &&
+        candidate.capability_class === "probe" &&
+        candidate.read_only === true &&
+        candidate.side_effects_allowed === false &&
+        admitted.has(candidate.capability_id),
+    )
+    .map((candidate) => {
+      const candidateAllowed = new Set(
+        Object.keys(candidate.input_schema.properties ?? {}),
+      );
+      const candidateArguments = Object.fromEntries(
+        Object.entries(input.arguments).filter(([key]) =>
+          candidateAllowed.has(key),
+        ),
+      );
+      const preservedRejectedFields = rejectedFields.filter(
+        (field) =>
+          candidateAllowed.has(field) &&
+          Object.prototype.hasOwnProperty.call(candidateArguments, field),
+      );
+      const candidateIssues = [
+        ...validateEnvironmentConnectorSchemaValue(
+          candidate.input_schema,
+          candidateArguments,
+        ),
+        ...environmentProbeSemanticArgumentIssues({
+          capabilityId: candidate.capability_id,
+          arguments: candidateArguments,
+        }),
+      ];
+      return {
+        descriptor: candidate,
+        arguments: candidateArguments,
+        preservedRejectedFields,
+        candidateIssues,
+      };
+    })
+    .filter(
+      (candidate) =>
+        candidate.preservedRejectedFields.length > 0 &&
+        candidate.candidateIssues.length === 0,
+    )
+    .sort(
+      (left, right) =>
+        right.preservedRejectedFields.length -
+          left.preservedRejectedFields.length ||
+        Object.keys(right.arguments).length -
+          Object.keys(left.arguments).length ||
+        left.descriptor.capability_id.localeCompare(
+          right.descriptor.capability_id,
+        ),
+    )
+    .slice(0, 3)
+    .map((candidate) => ({
+      affordance_id: syntheticRef(
+        "environment_probe_schema_migration",
+        `${input.turnId}\n${input.capabilityId}\n${candidate.descriptor.capability_id}\n${JSON.stringify(candidate.arguments)}`,
+      ),
+      capability_id: candidate.descriptor.capability_id,
+      args: candidate.arguments,
+      lane_request: {
+        capability: candidate.descriptor.capability_id,
+        ...candidate.arguments,
+      },
+      admissible: true as const,
+      reason:
+        `The rejected fields ${candidate.preservedRejectedFields.join(", ")} belong to this already-admitted read-only capability. ` +
+        "Use it instead of discarding the user's requested scope; Helix will validate it again before execution.",
+    }));
+  const sameCapabilityAffordance = proposedIsValid
     ? [
         {
           affordance_id: affordanceId,
@@ -636,18 +717,17 @@ const buildEnvironmentProbeSchemaRepair = (input: {
         },
       ]
     : [];
+  const nextAffordances = [
+    ...migratedAffordances,
+    ...sameCapabilityAffordance,
+  ];
   return {
     schema: "helix.environment_probe_schema_repair.v1",
     capability_id: input.capabilityId,
     failure_class: "invalid_args",
     retryability: "retryable",
     issues: input.issues.slice(0, 12),
-    rejected_fields: Array.from(
-      new Set([
-        ...Object.keys(input.arguments).filter((key) => !allowed.has(key)),
-        ...semanticConflictFields,
-      ]),
-    ).sort(),
+    rejected_fields: rejectedFields,
     allowed_fields: allowedFields,
     required_fields: [...(input.descriptor.input_schema.required ?? [])].sort(),
     trusted_input_schema: input.descriptor.input_schema,
@@ -861,6 +941,9 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       descriptor,
       arguments: args,
       issues: repairIssues,
+      admittedCapabilityIds:
+        policy?.allowedCapabilities ??
+        accountPolicy.allowed_workstation_capabilities,
       dropPositionForCurrentFocusConflict: currentFocusConflict,
     });
     return fail({

@@ -302,6 +302,32 @@ not only as retrieval metadata.
   Its 2.908% visibility loss and 0.005816 one-sigma magnitude target are
   conditional forecasts, not measured sensitivity or collapse evidence.
 
+9. Penrose branch-geometry candidate:
+- The boundary-independent missing-theory lane is separated into the
+  `penrose.branch-geometry-coherence-candidate` bundle rather than being
+  treated as a Casimir-boundary mechanism.
+- `path_spacetime_equivalence_constraints_to_penrose_relational_correspondence_stage0_1`
+  terminates at `leaf_penrose_relational_branch_correspondence_stage0_1` and
+  remains exploratory/diagnostic.
+- Stage-0.1 may pass frozen synthetic identity, inverse, branch-swap,
+  independent-rigid-coordinate-relabeling, common-input-equality,
+  physical-sensitivity, reference-choice, declared-(6R_0)-support, and
+  weak-field recovery fixtures, while the path remains blocked until
+  same-apparatus worldline, clock, landmark, density-support, and covariance
+  packets exist.
+- That pass registers one local operational convention only. It does not
+  select a unique physical correspondence, establish a covariant
+  incompatibility functional, define reduction dynamics, or admit a
+  coherence prediction.
+- `relationalCorrespondenceStage0_1Ready` remains false in the parent path.
+  The frozen v1 benchmark cannot set it: a versioned successor must bind
+  same-apparatus packet paths, hashes, custody, calibration, and uncertainty
+  validation before the parent preflight may consume that authority.
+- The parent path
+  `path_spacetime_equivalence_to_penrose_branch_geometry_coherence` retains
+  every later functional, dynamics, probability, causal, energy-balance,
+  observable, companion, calculator, and empirical gate.
+
 ## Agent workflow
 1. Update root/leaf paths in the manifest for new theory lanes.
 2. If touching the curvature-collapse family, update the
@@ -311,9 +337,12 @@ not only as retrieval metadata.
    Stage-2/Stage-3/Stage-4 authority, evidence, identifiability, polarization,
    thermal, congruence, model, and bridge
    condition.
-4. Run `npm run validate:physics:root-leaf`.
-5. Run `npm run audit:toe:preflight`.
-6. Attach receipt evidence under `docs/audits/ticket-results/` when ticket-scoped.
+4. If touching the Penrose relational candidate, update
+   `penrose.branch-geometry-coherence-candidate` without importing Casimir
+   boundary authority or promoting synthetic correspondence recovery.
+5. Run `npm run validate:physics:root-leaf`.
+6. Run `npm run audit:toe:preflight`.
+7. Attach receipt evidence under `docs/audits/ticket-results/` when ticket-scoped.
 
 ## Notes
 - This audit does not certify physical truth by itself.

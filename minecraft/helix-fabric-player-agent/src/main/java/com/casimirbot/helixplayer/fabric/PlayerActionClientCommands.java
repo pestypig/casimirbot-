@@ -4,6 +4,8 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.arg
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 
 final class PlayerActionClientCommands {
@@ -40,6 +42,85 @@ final class PlayerActionClientCommands {
                         agent.showStatus();
                         return 1;
                     }))
+                    .then(
+                        literal("diagnostic")
+                            .then(literal("status").executes(context -> {
+                                agent.showDiagnosticStatus();
+                                return 1;
+                            }))
+                            .then(literal("cancel").executes(context -> {
+                                agent.cancelDiagnostic();
+                                return 1;
+                            }))
+                            .then(
+                                literal("walk")
+                                    .then(
+                                        argument("direction", StringArgumentType.word())
+                                            .then(
+                                                argument(
+                                                    "duration_ms",
+                                                    IntegerArgumentType.integer(50, 10_000)
+                                                )
+                                                    .executes(context -> {
+                                                        agent.startDiagnosticWalk(
+                                                            StringArgumentType.getString(context, "direction"),
+                                                            IntegerArgumentType.getInteger(context, "duration_ms"),
+                                                            false
+                                                        );
+                                                        return 1;
+                                                    })
+                                                    .then(literal("sprint").executes(context -> {
+                                                        agent.startDiagnosticWalk(
+                                                            StringArgumentType.getString(context, "direction"),
+                                                            IntegerArgumentType.getInteger(context, "duration_ms"),
+                                                            true
+                                                        );
+                                                        return 1;
+                                                    }))
+                                            )
+                                    )
+                            )
+                            .then(
+                                literal("jump")
+                                    .then(
+                                        argument("count", IntegerArgumentType.integer(1, 10))
+                                            .executes(context -> {
+                                                agent.startDiagnosticJump(
+                                                    IntegerArgumentType.getInteger(context, "count")
+                                                );
+                                                return 1;
+                                            })
+                                    )
+                            )
+                            .then(
+                                literal("look-relative")
+                                    .then(
+                                        argument(
+                                            "yaw_delta_degrees",
+                                            DoubleArgumentType.doubleArg(-180.0, 180.0)
+                                        )
+                                            .then(
+                                                argument(
+                                                    "pitch_delta_degrees",
+                                                    DoubleArgumentType.doubleArg(-180.0, 180.0)
+                                                )
+                                                    .executes(context -> {
+                                                        agent.startDiagnosticRelativeLook(
+                                                            DoubleArgumentType.getDouble(
+                                                                context,
+                                                                "yaw_delta_degrees"
+                                                            ),
+                                                            DoubleArgumentType.getDouble(
+                                                                context,
+                                                                "pitch_delta_degrees"
+                                                            )
+                                                        );
+                                                        return 1;
+                                                    })
+                                            )
+                                    )
+                            )
+                    )
                     .then(literal("emergency-stop").executes(context -> {
                         agent.emergencyStop();
                         return 1;

@@ -72,7 +72,7 @@
       "equationId": "cdp-observable-separation-gate",
       "label": "Observable-separation gate",
       "sectionAnchor": "9-observable-separation-gate",
-      "latex": "\\text{observable A}\\rightarrow\\text{observable B} \\quad\\Longrightarrow\\quad \\{\\text{transfer law, units, source, parameters, test}\\}. \\tag{34}",
+      "latex": "\\text{observable A}\\rightarrow\\text{observable B} \\quad\\Longrightarrow\\quad \\{\\text{transfer law, units, source, parameters, test}\\}. \\tag{37}",
       "aliases": [
         "observable A to observable B requires a transfer law"
       ],
@@ -246,7 +246,7 @@
       "equationId": "cdp-stage4-2g-companion-threshold",
       "label": "Companion detector uncertainty requirement",
       "sectionAnchor": "71-companion-observable-and-interpretation-ceiling",
-      "latex": "\\sigma_{\\dot E,\\mathrm{one\\ shot}} \\le \\frac{\\dot E\\sqrt{100}}{5} =6.14027\\times10^{-40}\\ {\\rm W}. \\tag{32}",
+      "latex": "\\sigma_{\\dot E,\\mathrm{one\\ shot}} \\le \\frac{\\dot E\\sqrt{100}}{5} =6.14027\\times10^{-40}\\ {\\rm W}. \\tag{35}",
       "aliases": [
         "sigma_one_shot<=Edot sqrt(N)/SNR"
       ],
@@ -280,7 +280,7 @@
       "equationId": "cdp-stage4-2g-whitened-pilot-gates",
       "label": "Measured pilot conjunction",
       "sectionAnchor": "82-integrated-feasibility-pilot-admission-rule",
-      "latex": "\\mathcal G_{\\rm pilot}= \\mathcal G_{\\rm preparation}\\land \\mathcal G_{\\rm response}\\land \\mathcal G_{\\rm covariance}\\land \\mathcal G_{\\rm identifiability}\\land \\mathcal G_{\\rm power}\\land \\mathcal G_{\\rm custody}. \\tag{33}",
+      "latex": "\\mathcal G_{\\rm pilot}= \\mathcal G_{\\rm preparation}\\land \\mathcal G_{\\rm response}\\land \\mathcal G_{\\rm covariance}\\land \\mathcal G_{\\rm identifiability}\\land \\mathcal G_{\\rm power}\\land \\mathcal G_{\\rm custody}. \\tag{36}",
       "aliases": [
         "preparation and response and covariance and identifiability and power and custody"
       ],
@@ -1294,6 +1294,141 @@
       "claimBoundaryNotes": [
         "Cross-apparatus covariance fusion is forbidden.",
         "No Casimir-to-collapse kernel is registered."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2s-retarded-radiation-field",
+      "label": "Stage-4.2S retarded transverse radiation field",
+      "sectionAnchor": "510-retarded-source-propagation-closes-a-missing-ordinary-physics-lane",
+      "latex": "\\mathbf E_{\\rm rad}(\\mathbf r,t)= \\frac{q}{4\\pi\\epsilon_0c^2R}\\, \\hat{\\mathbf n}\\times \\left[\\hat{\\mathbf n}\\times\\mathbf a(t-R/c)\\right]. \\tag{30}",
+      "aliases": [
+        "E radiation acceleration field at retarded time"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2s-retarded-radiation-field",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open causal radiation recovery",
+          "badgeIds": [
+            "study.casimir_dp.retarded_source_propagation_stage4_2s",
+            "study.casimir_dp.maxwell_macroscopic_qed_closure_stage4_2f",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.retarded_source_propagation_stage4_2s",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2s",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "This is an analytic point-charge software recovery, not a measured apparatus radiation field."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Field-line kinks are visualization only.",
+        "The frozen Diósi law is unchanged."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2s-propagation-scale",
+      "label": "Stage-4.2S propagation-scale classifier",
+      "sectionAnchor": "510-retarded-source-propagation-closes-a-missing-ordinary-physics-lane",
+      "latex": "kL=\\frac{2\\pi fL}{c}. \\tag{31}",
+      "aliases": [
+        "kL equals two pi f L over c"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2s-propagation-scale",
+          "kind": "artifact_backed_theory_run",
+          "label": "Calculate source propagation regime",
+          "badgeIds": [
+            "study.casimir_dp.retarded_source_propagation_stage4_2s",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.retarded_source_propagation_stage4_2s",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2s",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Small kL is a geometric regime screen and does not establish measured quasistatic apparatus authority."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Switching edges and material relaxation require measured spectra."
+      ]
+    },
+    {
+      "equationId": "cdp-stage4-2s-green-to-coherence",
+      "label": "Stage-4.2S retarded Green response to ordinary complex coherence",
+      "sectionAnchor": "510-retarded-source-propagation-closes-a-missing-ordinary-physics-lane",
+      "latex": "E_i(\\mathbf r,\\omega) =i\\mu_0\\omega\\int d^3r'\\, G^{\\rm ret}_{ij}(\\mathbf r,\\mathbf r',\\omega)J_j(\\mathbf r',\\omega), \\qquad C_{0,\\beta}=C(0)e^{i\\Phi_{{\\rm EM},\\beta}-\\chi_{{\\rm EM},\\beta}}. \\tag{32}",
+      "aliases": [
+        "E equals retarded Green tensor times current; C0 ordinary phase and loss"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-stage4-2s-green-to-coherence",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open ordinary retarded-source nuisance chain",
+          "badgeIds": [
+            "study.casimir_dp.retarded_source_propagation_stage4_2s",
+            "study.casimir_dp.complex_coherence_discriminator",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.retarded_source_propagation_stage4_2s",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.stage4_2s",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The current fixture is synthetic algebraic recovery and cannot be subtracted from measured coherence."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Seven same-apparatus propagation authorities remain absent.",
+        "No Green-tensor-to-collapse kernel is registered."
+      ]
+    },
+    {
+      "equationId": "cdp-penrose-stage0-1-correspondence-gate",
+      "label": "Stage-0.1 relational correspondence benchmark gate",
+      "sectionAnchor": "222-stage-01-relational-correspondence-benchmark",
+      "latex": "\\mathcal G_{\\rm corr} =\\mathcal G_{\\rm id}\\wedge\\mathcal G_{\\rm inv} \\wedge\\mathcal G_{\\rm swap}\\wedge\\mathcal G_{\\rm coord} \\wedge\\mathcal G_{\\rm sensitivity}\\wedge\\mathcal G_{\\rm common} \\wedge\\mathcal G_{\\rm ref}\\wedge\\mathcal G_{E_G}.",
+      "aliases": [
+        "Grouped mnemonic for the authoritative content-addressed Stage-0.1 gate ledger"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-penrose-stage0-1-correspondence-gate",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Stage-0.1 relational correspondence benchmark",
+          "badgeIds": [
+            "study.casimir_dp.penrose_relational_candidate_stage0",
+            "study.casimir_dp.penrose_relational_correspondence_stage0_1",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.penrose_relational_correspondence_stage0_1",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.penrose_stage0_1",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "Synthetic local correspondence recovery does not select a unique physical map, define an invariant incompatibility functional, or generate collapse."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Five same-apparatus reference packets remain absent.",
+        "The parent candidate remains blocked at PCT_BRANCH_CORRESPONDENCE_MISSING."
       ]
     }
   ]

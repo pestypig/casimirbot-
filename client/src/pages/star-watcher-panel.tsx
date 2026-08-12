@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useMutation } from "@tanstack/react-query";
 import { SolarDiskCanvas, DiskGeom, DiskEventGlyph } from "@/components/SolarDiskCanvas";
+import { SolarKhiNativeOverlay } from "@/components/SolarKhiNativeOverlay";
 
 type Source = { url: string; name: string };
 type Metrics = {
@@ -1775,6 +1776,7 @@ export default function StarWatcherPanel() {
               </div>
             </CardContent>
           </Card>
+          <SolarKhiNativeOverlay />
         </div>
 
         <div className="space-y-4">

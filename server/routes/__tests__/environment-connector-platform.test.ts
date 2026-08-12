@@ -7,6 +7,7 @@ import {
   environmentConnectorBrowserRouter,
   environmentConnectorPublicRouter,
 } from "../environment-connector-platform";
+import { accountSessionRouter } from "../account-session";
 
 describe("environment connector REST boundary", () => {
   beforeEach(async () => {
@@ -26,6 +27,7 @@ describe("environment connector REST boundary", () => {
   const app = () => {
     const instance = express();
     instance.use(environmentConnectorPublicRouter);
+    instance.use("/api/account", express.json(), accountSessionRouter);
     instance.use("/api/agi", environmentConnectorBrowserRouter);
     return instance;
   };
@@ -133,5 +135,36 @@ describe("environment connector REST boundary", () => {
     expect(response.body.error).toBe(
       "environment_connector_browser_cross_origin_forbidden",
     );
+  });
+
+  it("preserves typed account admission failures for Device Check", async () => {
+    const missingSession = await request(app())
+      .get("/api/agi/environment-connectors/devices")
+      .expect(401);
+    expect(missingSession.body).toMatchObject({
+      error: "shared_realtime_room_auth_required",
+      credential_included: false,
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+
+    const owner = request.agent(app());
+    await owner
+      .post("/api/account/session/sign-in")
+      .send({
+        profile_id: "profile:desktop-public-owner",
+        display_name: "Desktop Public Owner",
+        account_type: "user",
+      })
+      .expect(200);
+    const lockedUser = await owner
+      .get("/api/agi/environment-connectors/devices")
+      .expect(403);
+    expect(lockedUser.body).toMatchObject({
+      error: "shared_realtime_room_locked_by_account_policy",
+      credential_included: false,
+      answer_authority: false,
+      terminal_eligible: false,
+    });
   });
 });

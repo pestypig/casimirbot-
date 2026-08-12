@@ -164,6 +164,16 @@ admitted arguments, mutation limits and inventory-transfer ceiling before the
 result can become a current-turn observation. The final action observation then
 re-enters Codex before any user-facing success claim.
 
+For `player.look`, `target_kind: relative_rotation` accepts semantic
+`yaw_delta_degrees` and `pitch_delta_degrees`; positive yaw means right and
+positive pitch means down. The client resolves one absolute target from the
+initial view, turns toward that target without accumulating the delta on each
+tick, and records initial, target and final yaw/pitch plus applied deltas and
+angular errors. The broker validates those values against the admitted request
+and copies only the measurements from the exact accepted terminal workflow
+event into `verified_terminal_measurements`. A client-authored result summary
+cannot manufacture the terminal pose.
+
 Mutating or ambiguous operations are never automatically replayed. A new user
 request is a new action identity.
 
@@ -193,6 +203,25 @@ player. The authority chooses `pause` or `cancel`; it may not choose to ignore
 manual input. On pause, cancel, timeout, disconnect, authority loss, settlement
 or emergency stop, the companion releases every key and continuous-use state it
 owns.
+
+Manual override is typed evidence, not a generic boolean-only failure. The
+client reports one bounded cause from `screen_open`, mouse-button input,
+movement/jump/sprint input, or `unexpected_view_change`, together with the
+number of action ticks completed before override. A zero-tick cancellation
+must not claim that player motion or another side effect occurred. A
+`request_canceled` observation with `manual_override_detected` is a
+human-intervention boundary for that turn: it re-enters Codex, which reports
+the exact cause or asks the user to clear it. It is not automatically retried
+as a new physical action in the same turn.
+
+Admission and execution outcome remain separate lifecycle facts. Once the
+gateway has admitted and queued a player action, a later manual cancellation
+does not retroactively turn admission into `blocked`. The failed observation
+retains the executed capability and exact evidence refs, while its typed
+`repair_action: ask_user` projects to `retry_recommendation: ask_user`,
+`next_action: ask_user`, and `external_change_required: true`. This projection
+does not answer for Codex; it prevents a deterministic adapter rail from
+silently replaying physical control after the client has yielded to the human.
 
 Emergency stop is a first-class, idempotent capability. It may target one
 workflow or every active workflow for the bound client. It remains available
@@ -270,6 +299,14 @@ direct Codex/reference actuator
   versus
 natural prompt -> Helix admission -> companion -> observation re-entry -> Codex
 ```
+
+The client companion's local `/helix-player diagnostic` lane is the canonical
+reference actuator for bounded walk, jump and relative-look comparisons. It
+uses the production controller and postcondition measurement code but bypasses
+Helix Ask and room admission. Its public JSON events explicitly carry
+`helix_terminal_authority_status=not_applicable`; they must never be promoted
+to room evidence or an assistant answer. This makes controller success useful
+for locating an adapter divergence without weakening the governed path.
 
 Record proposed/admitted calls, ordered progress, final observation refs,
 postconditions, candidate hash, route-product hash, terminal-writer hash and

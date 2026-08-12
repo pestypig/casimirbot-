@@ -19,6 +19,8 @@ import {
 } from "../helix-agent-api";
 import { createHelixMcpRouter } from "../helix-mcp";
 import { createHelixRunMcpServer } from "../../mcp/helix-run-mcp-server";
+import { HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH } from
+  "../../mcp/helix-mcp-server";
 import {
   HelixAgentApiServiceError,
   type HelixAgentApiService,
@@ -148,6 +150,8 @@ const mcpHeaders = <T extends request.Test>(test: T): T =>
 
 const originalNodeEnv = process.env.NODE_ENV;
 const originalPublicBaseUrl = process.env.CASIMIR_PUBLIC_BASE_URL;
+const originalDesktopHost = process.env.CASIMIR_DESKTOP_HOST;
+const originalDesktopSecret = process.env.CASIMIR_DESKTOP_SESSION_SECRET;
 
 afterEach(() => {
   process.env.NODE_ENV = originalNodeEnv;
@@ -155,6 +159,13 @@ afterEach(() => {
     delete process.env.CASIMIR_PUBLIC_BASE_URL;
   } else {
     process.env.CASIMIR_PUBLIC_BASE_URL = originalPublicBaseUrl;
+  }
+  if (originalDesktopHost === undefined) delete process.env.CASIMIR_DESKTOP_HOST;
+  else process.env.CASIMIR_DESKTOP_HOST = originalDesktopHost;
+  if (originalDesktopSecret === undefined) {
+    delete process.env.CASIMIR_DESKTOP_SESSION_SECRET;
+  } else {
+    process.env.CASIMIR_DESKTOP_SESSION_SECRET = originalDesktopSecret;
   }
   vi.restoreAllMocks();
 });
@@ -457,6 +468,36 @@ describe("Helix agent REST transport", () => {
     }
   });
 
+  it("publishes a least-privilege Device Check resource profile", async () => {
+    process.env.CASIMIR_PUBLIC_BASE_URL = "https://agent.example";
+    const verifier = {
+      verify: vi.fn(),
+      authorizationServer: () => "https://tenant.auth0.com/",
+      audience: () => "https://agent.example/mcp",
+      providerAlias: () => "auth0",
+    };
+    const app = express();
+    app.use(
+      createHelixAgentProtectedResourceMetadataRouter({
+        verifier,
+        resourcePaths: [HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH],
+        scopes: [HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      }),
+    );
+
+    const response = await request(app)
+      .get(HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH)
+      .expect(200);
+    expect(response.body).toEqual({
+      resource: "https://agent.example/mcp",
+      authorization_servers: ["https://tenant.auth0.com/"],
+      scopes_supported: [HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      bearer_methods_supported: ["header"],
+      resource_documentation:
+        "https://agent.example/docs/architecture/helix-agent-api-v1.md",
+    });
+  });
+
   it("requires HTTPS and an admitted host in production", async () => {
     process.env.NODE_ENV = "production";
     process.env.CASIMIR_PUBLIC_BASE_URL = "https://agent.example";
@@ -479,6 +520,33 @@ describe("Helix agent REST transport", () => {
       .expect(403);
     expect(insecure.body.error).toBe("https_required");
     expect(service.inspectRun).not.toHaveBeenCalled();
+  });
+
+  it("admits production loopback only with the exact desktop session secret", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.CASIMIR_PUBLIC_BASE_URL = "https://agent.example";
+    process.env.CASIMIR_DESKTOP_HOST = "1";
+    process.env.CASIMIR_DESKTOP_SESSION_SECRET =
+      "desktop-session-secret-that-is-at-least-32-characters";
+    const service = serviceDouble();
+    const app = createRestApp({ service, enforceTransportSecurity: true });
+
+    await request(app)
+      .get(`/api/v1/agent-runs/${RUN_ID}`)
+      .set("Host", "127.0.0.1:43123")
+      .set(
+        "X-Casimir-Desktop-Session",
+        process.env.CASIMIR_DESKTOP_SESSION_SECRET,
+      )
+      .expect(200);
+    expect(service.inspectRun).toHaveBeenCalledOnce();
+
+    await request(app)
+      .get(`/api/v1/agent-runs/${RUN_ID}`)
+      .set("Host", "127.0.0.1:43123")
+      .set("X-Casimir-Desktop-Session", "wrong-secret")
+      .expect(403);
+    expect(service.inspectRun).toHaveBeenCalledOnce();
   });
 });
 
@@ -664,6 +732,7 @@ describe("Helix MCP HTTP transport", () => {
   const createMcpApp = (input?: {
     service?: ServiceDouble;
     authenticate?: () => Promise<HelixAgentApiPrincipal>;
+    resourceMetadataPath?: string;
   }): express.Express => {
     const app = express();
     app.use(
@@ -673,6 +742,7 @@ describe("Helix MCP HTTP transport", () => {
         authenticate: input?.authenticate ?? (async () => principal()),
         rateLimit: false,
         enforceTransportSecurity: false,
+        resourceMetadataPath: input?.resourceMetadataPath,
       }),
     );
     return app;
@@ -843,6 +913,7 @@ describe("Helix MCP HTTP transport", () => {
   it("preserves typed OAuth failures on the protected MCP resource", async () => {
     process.env.CASIMIR_PUBLIC_BASE_URL = "https://agent.example";
     const app = createMcpApp({
+      resourceMetadataPath: HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH,
       authenticate: async () => {
         throw new HelixAgentApiServiceError(
           401,
@@ -866,6 +937,9 @@ describe("Helix MCP HTTP transport", () => {
     });
     expect(response.headers["www-authenticate"]).toContain(
       'error="invalid_token"',
+    );
+    expect(response.headers["www-authenticate"]).toContain(
+      `resource_metadata="https://agent.example${HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH}"`,
     );
   });
 });

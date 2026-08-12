@@ -37,6 +37,9 @@ describe("Minecraft mechanics docs intent", () => {
     "Move my selected Minecraft player with the built-in spreadplayers command, then read the exact position from fresh live evidence and report the command receipt.",
     "Check the paired Minecraft server's live command capabilities, then tell me the current daytime without changing the world.",
     "What is the current daytime value in our Minecraft world? Please read it directly from the live Fabric server before you answer.",
+    "Using only the paired Minecraft Player Embodiment client, first read fresh actor status, rotate my view 15 degrees to the right, and then read fresh actor status again to report the measured yaw delta. Do not use any World Authority or server commands.",
+    "Read my Minecraft yaw and pitch, look 15 degrees right with the paired player client, then read them again without using server commands.",
+    "Using the active Minecraft Fabric environment connected to this room, make one fresh read-only check and tell me whether any player is currently online, along with the active source and world status. Do not move anything, use server commands, or change the world.",
   ])("does not reinterpret a live environment read as mechanics retrieval: %s", (prompt) => {
     expect(isMinecraftMechanicsDocsPrompt(prompt)).toBe(false);
   });

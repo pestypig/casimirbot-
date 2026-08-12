@@ -908,8 +908,6 @@ async function loadPrimaryBundleLineage(input: {
       implementationId: primaryPlan.solver.implementationId,
       solverDescriptorSha256: primaryPlan.solver.sha256,
       environmentLockSha256: primaryPlan.environmentLock.sha256,
-      producerBundleSha256: lineage.producerBundle.sha256,
-      sourceClosureSha256: lineage.buildMetadata.sourceSnapshotSha256,
     },
     producerBundle: {
       path: candidateBundleRef.path,
@@ -1144,6 +1142,8 @@ function assertExternalDescriptor(input: {
       implementationId: primaryPlan.solver.implementationId,
       solverDescriptorSha256: primaryPlan.solver.sha256,
       environmentLockSha256: primaryPlan.environmentLock.sha256,
+      producerBundleSha256: lineage.producerBundle.sha256,
+      sourceClosureSha256: lineage.buildMetadata.sourceSnapshotSha256,
     },
     independent: {
       solverId: plan.solver.solverId,
@@ -1214,10 +1214,7 @@ export function nhm2IndependentNumericalFingerprintBlockers(input: {
     ["primary_source_closure", input.primary.sourceClosureSha256],
   ] as const;
   const independentContentFingerprints = [
-    [
-      "source_closure",
-      input.independent.implementationSourceClosureSha256,
-    ],
+    ["source_closure", input.independent.implementationSourceClosureSha256],
     ["toolchain", input.independent.toolchainLedgerSha256],
     ["executable", input.independent.executableSha256],
   ] as const;

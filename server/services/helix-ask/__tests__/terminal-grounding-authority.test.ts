@@ -188,6 +188,64 @@ describe("terminal grounding authority", () => {
     });
   });
 
+  it("uses the exact route-product contract when route evidence is an unresolved projection", () => {
+    const evidenceRef = "ask:grounding:1:observation:scientific-closure:1";
+    const payload = terminalPayload({
+      groundingRequired: true,
+      evidenceRefs: [evidenceRef],
+    }) as ReturnType<typeof terminalPayload> & Record<string, unknown>;
+    payload.route_product_contract = {
+      schema: "helix.route_product_contract.v1",
+      turn_id: payload.turn_id,
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_terminal_artifact_kinds: [
+        "model_synthesized_answer",
+        "typed_failure",
+      ],
+    };
+    payload.ask_turn_solver_trace.route_evidence_authority = {
+      ...payload.ask_turn_solver_trace.route_evidence_authority,
+      required_terminal_kind: "unknown",
+      allowed_terminal_artifact_kinds: [],
+      forbidden_terminal_artifact_kinds: [],
+      terminal_product_allowed: false,
+    };
+
+    const authority = buildHelixTerminalGroundingAuthority({ payload });
+
+    expect(authority).toMatchObject({
+      status: "validated",
+      route_authority_ok: true,
+      failure_code: null,
+    });
+  });
+
+  it("preserves an explicit route-evidence rejection over the route-product contract", () => {
+    const evidenceRef = "ask:grounding:1:observation:scientific-closure:1";
+    const payload = terminalPayload({
+      groundingRequired: true,
+      evidenceRefs: [evidenceRef],
+    }) as ReturnType<typeof terminalPayload> & Record<string, unknown>;
+    payload.route_product_contract = {
+      schema: "helix.route_product_contract.v1",
+      turn_id: payload.turn_id,
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+    };
+    payload.ask_turn_solver_trace.route_evidence_authority = {
+      ...payload.ask_turn_solver_trace.route_evidence_authority,
+      required_terminal_kind: "typed_failure",
+      allowed_terminal_artifact_kinds: ["typed_failure"],
+      forbidden_terminal_artifact_kinds: ["model_synthesized_answer"],
+      terminal_product_allowed: false,
+    };
+
+    const authority = buildHelixTerminalGroundingAuthority({ payload });
+
+    expect(authority.status).toBe("rejected");
+    expect(authority.failure_codes).toContain("route_authority_rejected");
+  });
+
   it("validates current-turn evidence proven by the provider terminal bridge", () => {
     const turnId = "ask:grounding:provider-bridge";
     const evidenceRef = `${turnId}:workstation_gateway:scholarly-research.lookup_papers:1`;

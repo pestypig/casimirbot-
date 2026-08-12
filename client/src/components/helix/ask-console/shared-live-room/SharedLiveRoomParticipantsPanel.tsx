@@ -4,6 +4,8 @@ import type { HelixSharedRealtimeRoom } from "@shared/helix-shared-realtime-room
 import { formatSharedLiveRoomTimestamp } from "./SharedLiveRoomFormatting";
 import type { HelixSharedLiveRoomController } from "./useHelixSharedLiveRoom";
 import { SharedLiveRoomSourceBindingsPanel } from "./SharedLiveRoomSourceBindingsPanel";
+import { SharedLiveRoomBrokerageBindingsPanel } from
+  "./SharedLiveRoomBrokerageBindingsPanel";
 
 export function SharedLiveRoomParticipantsPanel({
   room,
@@ -96,6 +98,11 @@ export function SharedLiveRoomParticipantsPanel({
         isOwner={isOwner}
         selfParticipantId={room.self_participant_id}
         participants={room.participants}
+      />
+      <SharedLiveRoomBrokerageBindingsPanel
+        roomId={room.room_id}
+        roomClosed={room.status === "closed"}
+        isOwner={isOwner}
       />
     </section>
   );

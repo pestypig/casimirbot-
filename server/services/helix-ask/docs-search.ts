@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import {
+  isHelixDocsRetrievalScope,
+  isHelixDocsRetrievalStatus,
+  type HelixDocsRetrievalScope,
+  type HelixDocsRetrievalStatus,
+} from "@shared/helix-docs-retrieval-authority";
 import type { RepoSearchHit } from "./repo-search";
 import {
   buildEvidenceUnitsFromText,
@@ -14,6 +20,11 @@ export type DocsSearchDocumentCandidate = {
   doc_class?: string;
   bundle_kind?: string;
   canonical?: boolean;
+  retrieval_status: HelixDocsRetrievalStatus;
+  retrieval_admission_reason: string;
+  topic_id?: string;
+  authority_rank?: number;
+  superseded_by?: string;
   sidecars?: string[];
   tool_hints?: Record<string, unknown>;
   best_snippets: Array<{
@@ -24,6 +35,22 @@ export type DocsSearchDocumentCandidate = {
   }>;
   line_hit_count: number;
   matched_terms: string[];
+};
+
+export type DocsRetrievalSuppression = {
+  path: string;
+  retrieval_status: HelixDocsRetrievalStatus;
+  reason: "archive_not_requested" | "excluded_from_runtime_retrieval" | "outside_requested_scope";
+  topic_id?: string;
+  superseded_by?: string;
+};
+
+export type DocsRetrievalAuthorityResult = {
+  scope: HelixDocsRetrievalScope;
+  admitted_hits: RepoSearchHit[];
+  admitted_document_count: number;
+  suppressed_document_count: number;
+  suppressed: DocsRetrievalSuppression[];
 };
 
 export type DocsEvidencePassage = {
@@ -38,6 +65,13 @@ export type DocsEvidencePassage = {
   matched_terms: string[];
   citation_ref: string;
   citation_label: string;
+};
+
+export type AuthoritativeDocsTopicMatch = {
+  topic_id: string;
+  primary_path: string;
+  primary_title: string;
+  matched_terms: string[];
 };
 
 const DOCS_SEARCH_QUERY_STOP_WORDS = new Set([
@@ -85,11 +119,16 @@ const DOCS_TAXONOMY_PATH = path.resolve(process.cwd(), "docs", "doc-taxonomy.v1.
 
 type DocsTaxonomyDocumentEntry = {
   path: string;
+  title?: string;
   docClass?: string;
   bundleKind?: string;
   canonical?: boolean;
   sidecars?: string[];
   toolHints?: Record<string, unknown>;
+  retrievalStatus?: HelixDocsRetrievalStatus;
+  topicId?: string;
+  authorityRank?: number;
+  supersededBy?: string;
 };
 
 type DocsTaxonomyFolderRule = {
@@ -97,8 +136,17 @@ type DocsTaxonomyFolderRule = {
   docClass: string;
 };
 
+type DocsTaxonomyRetrievalRule = {
+  pathPrefix: string;
+  retrievalStatus: HelixDocsRetrievalStatus;
+  topicId?: string;
+  authorityRank?: number;
+  supersededBy?: string;
+};
+
 let docsTaxonomyByPath: Map<string, DocsTaxonomyDocumentEntry> | null = null;
 let docsTaxonomyFolderRules: DocsTaxonomyFolderRule[] | null = null;
+let docsTaxonomyRetrievalRules: DocsTaxonomyRetrievalRule[] | null = null;
 
 export const normalizeDocsSearchText = (value: string): string =>
   value
@@ -182,6 +230,7 @@ const readDocsTaxonomyByPath = (): Map<string, DocsTaxonomyDocumentEntry> => {
       if (!filePath) continue;
       entries.set(filePath, {
         path: filePath,
+        title: typeof candidate.title === "string" ? candidate.title : undefined,
         docClass: typeof candidate.docClass === "string" ? candidate.docClass : undefined,
         bundleKind: typeof candidate.bundleKind === "string" ? candidate.bundleKind : undefined,
         canonical: typeof candidate.canonical === "boolean" ? candidate.canonical : undefined,
@@ -191,6 +240,16 @@ const readDocsTaxonomyByPath = (): Map<string, DocsTaxonomyDocumentEntry> => {
         toolHints: candidate.toolHints && typeof candidate.toolHints === "object" && !Array.isArray(candidate.toolHints)
           ? candidate.toolHints as Record<string, unknown>
           : undefined,
+        retrievalStatus: isHelixDocsRetrievalStatus(candidate.retrievalStatus)
+          ? candidate.retrievalStatus
+          : undefined,
+        topicId: typeof candidate.topicId === "string" ? candidate.topicId : undefined,
+        authorityRank: typeof candidate.authorityRank === "number" && Number.isFinite(candidate.authorityRank)
+          ? candidate.authorityRank
+          : undefined,
+        supersededBy: typeof candidate.supersededBy === "string"
+          ? normalizeDocsPath(candidate.supersededBy)
+          : undefined,
       });
     }
   } catch {
@@ -198,6 +257,41 @@ const readDocsTaxonomyByPath = (): Map<string, DocsTaxonomyDocumentEntry> => {
   }
   docsTaxonomyByPath = entries;
   return entries;
+};
+
+const readDocsTaxonomyRetrievalRules = (): DocsTaxonomyRetrievalRule[] => {
+  if (docsTaxonomyRetrievalRules) return docsTaxonomyRetrievalRules;
+  const rules: DocsTaxonomyRetrievalRule[] = [];
+  try {
+    const raw = fs.readFileSync(DOCS_TAXONOMY_PATH, "utf8");
+    const parsed = JSON.parse(raw) as { retrievalRules?: unknown };
+    const retrievalRules = Array.isArray(parsed.retrievalRules) ? parsed.retrievalRules : [];
+    for (const rule of retrievalRules) {
+      if (!rule || typeof rule !== "object") continue;
+      const candidate = rule as Record<string, unknown>;
+      if (
+        typeof candidate.pathPrefix !== "string" ||
+        !isHelixDocsRetrievalStatus(candidate.retrievalStatus)
+      ) continue;
+      rules.push({
+        pathPrefix: normalizeDocsPath(candidate.pathPrefix),
+        retrievalStatus: candidate.retrievalStatus,
+        ...(typeof candidate.topicId === "string" ? { topicId: candidate.topicId } : {}),
+        ...(typeof candidate.authorityRank === "number" && Number.isFinite(candidate.authorityRank)
+          ? { authorityRank: candidate.authorityRank }
+          : {}),
+        ...(typeof candidate.supersededBy === "string"
+          ? { supersededBy: normalizeDocsPath(candidate.supersededBy) }
+          : {}),
+      });
+    }
+  } catch {
+    // Retrieval metadata is optional; the conservative class fallback still applies.
+  }
+  docsTaxonomyRetrievalRules = rules
+    .filter((rule) => rule.pathPrefix.length > 0)
+    .sort((left, right) => right.pathPrefix.length - left.pathPrefix.length);
+  return docsTaxonomyRetrievalRules;
 };
 
 const readDocsTaxonomyFolderRules = (): DocsTaxonomyFolderRule[] => {
@@ -246,8 +340,201 @@ const inferDocsTaxonomyClass = (filePath: string): string | undefined => {
 const readDocsTaxonomyEntry = (filePath: string): DocsTaxonomyDocumentEntry | null =>
   readDocsTaxonomyByPath().get(normalizeDocsPath(filePath)) ?? null;
 
+const authoritativeDocsTopicTerms = (entry: DocsTaxonomyDocumentEntry): string[] => {
+  const topicTerms = normalizeDocsSearchText(entry.topicId ?? "")
+    .split(/\s+/)
+    .filter((term) => term.length >= 2);
+  if (topicTerms.length > 0) return topicTerms;
+  return docsSearchQueryTokens(entry.title ?? docsPathTitle(entry.path))
+    .filter((term) => !DOCS_SEARCH_LOW_VALUE_TOKENS.has(term))
+    .slice(0, 3);
+};
+
+export const resolveAuthoritativeDocsTopicMatch = (
+  promptText: string,
+): AuthoritativeDocsTopicMatch | null => {
+  const normalizedPrompt = normalizeDocsSearchText(promptText);
+  if (!normalizedPrompt) return null;
+  const promptTerms = new Set(normalizedPrompt.split(/\s+/).filter(Boolean));
+  const matches = Array.from(readDocsTaxonomyByPath().values())
+    .filter(
+      (entry) =>
+        entry.retrievalStatus === "primary" &&
+        typeof entry.topicId === "string" &&
+        entry.topicId.trim().length > 0,
+    )
+    .flatMap((entry) => {
+      const topicTerms = authoritativeDocsTopicTerms(entry);
+      if (topicTerms.length === 0 || !topicTerms.every((term) => promptTerms.has(term))) {
+        return [];
+      }
+      return [{
+        topic_id: entry.topicId as string,
+        primary_path: entry.path,
+        primary_title: entry.title ?? docsPathTitle(entry.path),
+        matched_terms: topicTerms,
+        authority_rank: entry.authorityRank ?? 0,
+      }];
+    })
+    .sort((left, right) =>
+      right.matched_terms.length - left.matched_terms.length ||
+      right.authority_rank - left.authority_rank ||
+      left.primary_path.localeCompare(right.primary_path),
+    );
+  const selected = matches[0];
+  if (!selected) return null;
+  const { authority_rank: _authorityRank, ...match } = selected;
+  return match;
+};
+
+const docsAuthorityTitle = (filePath: string): string =>
+  readDocsTaxonomyEntry(filePath)?.title ?? docsPathTitle(filePath);
+
+const readDocsTaxonomyRetrievalRule = (filePath: string): DocsTaxonomyRetrievalRule | null => {
+  const normalized = normalizeDocsPath(filePath);
+  for (const rule of readDocsTaxonomyRetrievalRules()) {
+    if (normalized === rule.pathPrefix || normalized.startsWith(rule.pathPrefix)) return rule;
+  }
+  return null;
+};
+
+export const normalizeDocsRetrievalScope = (value: unknown): HelixDocsRetrievalScope =>
+  isHelixDocsRetrievalScope(value) ? value : "default";
+
+export const resolveDocsRetrievalAuthority = (filePath: string): {
+  retrieval_status: HelixDocsRetrievalStatus;
+  topic_id?: string;
+  authority_rank?: number;
+  superseded_by?: string;
+} => {
+  const taxonomyEntry = readDocsTaxonomyEntry(filePath);
+  const retrievalRule = readDocsTaxonomyRetrievalRule(filePath);
+  const inheritedRetrievalRule = taxonomyEntry?.retrievalStatus
+    ? null
+    : retrievalRule;
+  const docClass = taxonomyEntry?.docClass ?? inferDocsTaxonomyClass(filePath);
+  const retrievalStatus = taxonomyEntry?.retrievalStatus ??
+    inheritedRetrievalRule?.retrievalStatus ??
+    (taxonomyEntry?.canonical === true
+      ? "primary"
+      : docClass === "synthetic-research" || docClass === "legacy-development"
+        ? "archive"
+        : "supporting");
+  const topicId = taxonomyEntry?.topicId ?? inheritedRetrievalRule?.topicId;
+  const authorityRank = taxonomyEntry?.authorityRank ?? inheritedRetrievalRule?.authorityRank;
+  const supersededBy = taxonomyEntry?.supersededBy ?? inheritedRetrievalRule?.supersededBy;
+  return {
+    retrieval_status: retrievalStatus,
+    ...(topicId ? { topic_id: topicId } : {}),
+    ...(authorityRank !== undefined ? { authority_rank: authorityRank } : {}),
+    ...(supersededBy ? { superseded_by: supersededBy } : {}),
+  };
+};
+
+const docsQueryExplicitlyNamesPath = (query: string, filePath: string): boolean => {
+  const normalizedQuery = normalizeDocsSearchText(query);
+  const normalizedTitle = normalizeDocsSearchText(docsAuthorityTitle(filePath));
+  if (normalizedTitle.length < 8) return false;
+  if (normalizedQuery.includes(normalizedTitle)) return true;
+  const queryTokens = new Set(docsSearchQueryTokens(query));
+  const titleTokens = docsSearchQueryTokens(docsAuthorityTitle(filePath));
+  return titleTokens.length >= 3 && titleTokens.every((token) => queryTokens.has(token));
+};
+
+const docsSearchPathsExplicitlyIncludeFile = (
+  searchPaths: string[],
+  filePath: string,
+): boolean => {
+  const normalizedFilePath = normalizeDocsPath(filePath).toLowerCase();
+  return searchPaths.some((searchPath) => {
+    const normalizedSearchPath = normalizeDocsPath(searchPath).toLowerCase();
+    return /\.md$/i.test(normalizedSearchPath) && normalizedSearchPath === normalizedFilePath;
+  });
+};
+
+const resolveDocsRetrievalAdmission = (input: {
+  filePath: string;
+  query: string;
+  searchPaths?: string[];
+  scope?: HelixDocsRetrievalScope;
+}): {
+  admitted: boolean;
+  reason: string;
+  authority: ReturnType<typeof resolveDocsRetrievalAuthority>;
+} => {
+  const authority = resolveDocsRetrievalAuthority(input.filePath);
+  const scope = input.scope ?? "default";
+  if (authority.retrieval_status === "excluded") {
+    return { admitted: false, reason: "excluded_from_runtime_retrieval", authority };
+  }
+  if (scope === "archive_only") {
+    return authority.retrieval_status === "archive"
+      ? { admitted: true, reason: "archive_scope_requested", authority }
+      : { admitted: false, reason: "outside_requested_scope", authority };
+  }
+  if (scope === "include_archive") {
+    return { admitted: true, reason: "archive_scope_requested", authority };
+  }
+  if (authority.retrieval_status !== "archive") {
+    return {
+      admitted: true,
+      reason: authority.retrieval_status === "primary"
+        ? "default_primary"
+        : "default_supporting",
+      authority,
+    };
+  }
+  if (docsSearchPathsExplicitlyIncludeFile(input.searchPaths ?? [], input.filePath)) {
+    return { admitted: true, reason: "exact_path_requested", authority };
+  }
+  if (docsQueryExplicitlyNamesPath(input.query, input.filePath)) {
+    return { admitted: true, reason: "exact_title_requested", authority };
+  }
+  return { admitted: false, reason: "archive_not_requested", authority };
+};
+
+export const applyDocsRetrievalAuthority = (input: {
+  hits: RepoSearchHit[];
+  query: string;
+  searchPaths?: string[];
+  scope?: HelixDocsRetrievalScope;
+}): DocsRetrievalAuthorityResult => {
+  const scope = input.scope ?? "default";
+  const decisions = new Map<string, ReturnType<typeof resolveDocsRetrievalAdmission>>();
+  const admittedHits: RepoSearchHit[] = [];
+  for (const hit of input.hits) {
+    const normalizedPath = normalizeDocsPath(hit.filePath);
+    const decision = decisions.get(normalizedPath) ?? resolveDocsRetrievalAdmission({
+      filePath: normalizedPath,
+      query: input.query,
+      searchPaths: input.searchPaths,
+      scope,
+    });
+    decisions.set(normalizedPath, decision);
+    if (decision.admitted) admittedHits.push({ ...hit, filePath: normalizedPath });
+  }
+  const suppressed = Array.from(decisions.entries()).flatMap(([filePath, decision]) =>
+    decision.admitted
+      ? []
+      : [{
+          path: filePath,
+          retrieval_status: decision.authority.retrieval_status,
+          reason: decision.reason as DocsRetrievalSuppression["reason"],
+          ...(decision.authority.topic_id ? { topic_id: decision.authority.topic_id } : {}),
+          ...(decision.authority.superseded_by ? { superseded_by: decision.authority.superseded_by } : {}),
+        }],
+  );
+  return {
+    scope,
+    admitted_hits: admittedHits,
+    admitted_document_count: Array.from(decisions.values()).filter((decision) => decision.admitted).length,
+    suppressed_document_count: suppressed.length,
+    suppressed,
+  };
+};
+
 const docsPathTitleScore = (filePath: string, query: string): number => {
-  const normalizedPathTitle = normalizeDocsSearchText(`${filePath} ${docsPathTitle(filePath)}`);
+  const normalizedPathTitle = normalizeDocsSearchText(`${filePath} ${docsAuthorityTitle(filePath)}`);
   const compactPathTitle = normalizedPathTitle.replace(/\s+/g, "");
   const normalizedQuery = normalizeDocsSearchText(query);
   const compactQuery = normalizedQuery.replace(/\s+/g, "");
@@ -271,7 +558,7 @@ const docsSearchHitScore = (hit: RepoSearchHit, query: string, latestPathDateSco
   const normalizedNeedle = normalizeDocsSearchText(query);
   const compactNeedle = normalizedNeedle.replace(/\s+/g, "");
   const tokens = docsSearchQueryTokens(query);
-  const normalizedHaystack = normalizeDocsSearchText(`${hit.filePath} ${docsPathTitle(hit.filePath)} ${hit.text}`);
+  const normalizedHaystack = normalizeDocsSearchText(`${hit.filePath} ${docsAuthorityTitle(hit.filePath)} ${hit.text}`);
   const compactHaystack = normalizedHaystack.replace(/\s+/g, "");
   let score = 0;
   if (normalizedNeedle && normalizedHaystack.includes(normalizedNeedle)) score += 1000;
@@ -314,6 +601,10 @@ export const buildDocsSearchDocumentCandidates = (
   hits: RepoSearchHit[],
   query: string,
   limit = 8,
+  options: {
+    searchPaths?: string[];
+    retrievalScope?: HelixDocsRetrievalScope;
+  } = {},
 ): DocsSearchDocumentCandidate[] => {
   const latestPathDateScore = Math.max(0, ...hits.map((hit) => docsSearchPathDateScore(hit.filePath)));
   const byPath = new Map<string, RepoSearchHit[]>();
@@ -326,7 +617,14 @@ export const buildDocsSearchDocumentCandidates = (
     .map(([filePath, pathHits]) => {
       const taxonomyEntry = readDocsTaxonomyEntry(filePath);
       const docClass = taxonomyEntry?.docClass ?? inferDocsTaxonomyClass(filePath);
-      const normalizedPathTitle = normalizeDocsSearchText(`${filePath} ${docsPathTitle(filePath)}`);
+      const retrievalAdmission = resolveDocsRetrievalAdmission({
+        filePath,
+        query,
+        searchPaths: options.searchPaths,
+        scope: options.retrievalScope,
+      });
+      const retrievalAuthority = retrievalAdmission.authority;
+      const normalizedPathTitle = normalizeDocsSearchText(`${filePath} ${docsAuthorityTitle(filePath)}`);
       const compactPathTitle = normalizedPathTitle.replace(/\s+/g, "");
       const scoredHits = pathHits
         .map((hit) => ({ hit, score: docsSearchHitScore(hit, query, latestPathDateScore) }))
@@ -347,16 +645,26 @@ export const buildDocsSearchDocumentCandidates = (
       const pathTitleScore = docsPathTitleScore(filePath, query);
       const coverageBonus = matchedTerms.length * 30 + Math.min(pathHits.length, 8) * 5;
       const mdBonus = /\.md$/i.test(filePath) ? 100 : 0;
-      const canonicalBonus = taxonomyEntry?.canonical === true ? 5000 : 0;
+      const canonicalBonus = taxonomyEntry?.canonical === true || retrievalAuthority.retrieval_status === "primary"
+        ? 5000
+        : 0;
+      const authorityBonus = Math.max(0, Math.min(1000, retrievalAuthority.authority_rank ?? 0)) * 10;
       const latestDateBonus = latestPathDateScore > 0 && docsSearchPathDateScore(filePath) === latestPathDateScore ? 500 : 0;
       const sidecarPenalty = /\.(?:json|source)$/i.test(filePath) ? 5000 : 0;
       return {
         path: filePath,
-        title: docsPathTitle(filePath),
-        score: pathTitleScore + bestHitScore + coverageBonus + mdBonus + canonicalBonus + latestDateBonus - sidecarPenalty,
+        title: docsAuthorityTitle(filePath),
+        score: pathTitleScore + bestHitScore + coverageBonus + mdBonus + canonicalBonus + authorityBonus + latestDateBonus - sidecarPenalty,
         ...(docClass ? { doc_class: docClass } : {}),
         ...(taxonomyEntry?.bundleKind ? { bundle_kind: taxonomyEntry.bundleKind } : {}),
         ...(typeof taxonomyEntry?.canonical === "boolean" ? { canonical: taxonomyEntry.canonical } : {}),
+        retrieval_status: retrievalAuthority.retrieval_status,
+        retrieval_admission_reason: retrievalAdmission.reason,
+        ...(retrievalAuthority.topic_id ? { topic_id: retrievalAuthority.topic_id } : {}),
+        ...(retrievalAuthority.authority_rank !== undefined
+          ? { authority_rank: retrievalAuthority.authority_rank }
+          : {}),
+        ...(retrievalAuthority.superseded_by ? { superseded_by: retrievalAuthority.superseded_by } : {}),
         ...(taxonomyEntry?.sidecars?.length ? { sidecars: taxonomyEntry.sidecars } : {}),
         ...(taxonomyEntry?.toolHints ? { tool_hints: taxonomyEntry.toolHints } : {}),
         best_snippets: scoredHits.slice(0, 3).map(({ hit, score }) => ({
@@ -419,7 +727,7 @@ const collectDocsPathCandidates = (searchPaths: string[], query: string): RepoSe
     hits.push({
       filePath: relativePath,
       line: 1,
-      text: `Document title/path match: ${docsPathTitle(relativePath)}`,
+      text: `Document title/path match: ${docsAuthorityTitle(relativePath)}`,
       term: "document_path_title",
     });
   }

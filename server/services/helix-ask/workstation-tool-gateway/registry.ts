@@ -21,10 +21,12 @@ import {
   type RepoSearchHit,
 } from "../repo-search";
 import {
+  applyDocsRetrievalAuthority,
   buildDocsEvidencePassages,
   buildDocsSearchDocumentCandidates,
   buildDocsSearchTerms,
   mergeDocsSearchPathCandidates,
+  normalizeDocsRetrievalScope,
   rankDocsSearchHits,
 } from "../docs-search";
 import {
@@ -154,9 +156,11 @@ import {
 } from "./environment-command";
 import {
   environmentActionFailureRepairAction,
+  environmentActionGatewayAdmissionStatus,
   environmentActionMinecraftManifests,
   executeEnvironmentActionGatewayCapability,
 } from "./environment-action";
+import { resolveWorkstationGatewayFollowupPolicy } from "./gateway-followup-policy";
 import {
   environmentActionControlFailureRepairAction,
   environmentActionControlMinecraftManifests,
@@ -3427,18 +3431,12 @@ const buildGatewayTrace = (input: {
   const terminalEligible = input.terminalEligible === true && completed;
   const traceRef = `${input.turnId}:workstation_gateway:${input.capabilityId}:tool_lifecycle_trace`;
   const observationRefs = input.observationPacket.produced_artifact_refs;
-  const retryRecommendation = blocked
-    ? "ask_user"
-    : failed
-      ? "retry_same_tool"
-      : "allow_terminal";
-  const nextAction = terminalEligible
-    ? "terminal_answer"
-    : blocked
-      ? "ask_user"
-      : failed
-        ? "retry"
-        : "continue_reasoning";
+  const followupPolicy = resolveWorkstationGatewayFollowupPolicy({
+    observationPacket: input.observationPacket,
+    blocked,
+    failed,
+    terminalEligible,
+  });
   const lifecycleTrace: HelixToolLifecycleTrace = {
     schema: HELIX_TOOL_LIFECYCLE_TRACE_SCHEMA,
     turn_id: input.turnId,
@@ -3470,7 +3468,7 @@ const buildGatewayTrace = (input: {
     receipt_refs: [],
     evidence_refs: observationRefs,
     failure_reason: input.error ?? input.admission.blocked_reason ?? null,
-    retry_recommendation: retryRecommendation,
+    retry_recommendation: followupPolicy.retryRecommendation,
     fallback_used: false,
     fallback_equivalent: false,
     terminal_eligible: terminalEligible,
@@ -3482,15 +3480,17 @@ const buildGatewayTrace = (input: {
     turn_id: input.turnId,
     prior_tool_trace_ref: traceRef,
     observation_summary: input.observationPacket.observation_summary,
-    next_action: nextAction,
+    next_action: followupPolicy.nextAction,
     reason: terminalEligible
       ? "gateway_receipt_satisfies_control_action"
-      : blocked
-        ? (input.admission.blocked_reason ?? "gateway_call_blocked")
-        : failed
-          ? (input.error ?? "gateway_call_failed")
-          : "gateway_observation_requires_provider_reasoning_reentry",
-    external_change_required: false,
+      : followupPolicy.nextAction === "ask_user"
+        ? (input.error ?? input.admission.blocked_reason ?? "gateway_call_requires_user_intervention")
+        : blocked
+          ? (input.admission.blocked_reason ?? "gateway_call_blocked")
+          : failed
+            ? (input.error ?? "gateway_call_failed")
+            : "gateway_observation_requires_provider_reasoning_reentry",
+    external_change_required: followupPolicy.externalChangeRequired,
     terminal_blockers: terminalEligible
       ? []
       : ["post_tool_model_step_required", "terminal_authority_not_evaluated"],
@@ -4411,6 +4411,12 @@ const docsSearchManifest: HelixWorkstationCapabilityManifest = {
         items: { type: "string" },
         description:
           "Optional bounded docs paths. Do not combine arbitrary paths with active_room_environment mechanics scope.",
+      },
+      retrieval_scope: {
+        type: "string",
+        enum: ["default", "include_archive", "archive_only"],
+        description:
+          "Defaults to current retrieval authority. Use include_archive or archive_only only for explicit historical, superseded, or version-comparison requests; exact document paths remain readable without widening the scope.",
       },
       environment_scope: {
         type: "string",
@@ -6320,6 +6326,7 @@ export const callWorkstationGatewayCapability = async (
       arguments: readArguments(input.arguments),
       accountContext: input.accountContext,
       conversationThreadId: input.conversationThreadId,
+      signal: input.signal,
     });
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
@@ -6479,15 +6486,20 @@ export const callWorkstationGatewayCapability = async (
       accountContext: input.accountContext,
       conversationThreadId: input.conversationThreadId,
     });
+    const environmentActionAdmissionStatus =
+      environmentActionGatewayAdmissionStatus(gatewayResult.status);
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,
       agentRuntime,
       permissionProfile: manifest.permission_profile_required,
-      status: gatewayResult.ok ? "admitted" : "blocked",
-      reason: gatewayResult.ok
+      status: environmentActionAdmissionStatus,
+      reason: environmentActionAdmissionStatus === "admitted"
         ? "authenticated_environment_player_action_admitted"
         : "authenticated_environment_player_action_blocked",
-      blockedReason: gatewayResult.error,
+      blockedReason:
+        environmentActionAdmissionStatus === "blocked"
+          ? gatewayResult.error
+          : undefined,
     });
     const observationPacket = buildWorkstationGatewayObservationPacket({
       turnId,
@@ -9506,6 +9518,9 @@ export const callWorkstationGatewayCapability = async (
     const paths = mechanicsScope
       ? mechanicsScope.documentPaths
       : readDocsSearchPaths(args.paths);
+    const retrievalScope = mechanicsScope
+      ? "default"
+      : normalizeDocsRetrievalScope(args.retrieval_scope ?? args.retrievalScope);
     const exactTerms = readDocsExactTerms(args.exact_terms ?? args.exactTerms);
     const sectionHeading = clipObservationText(
       args.section_heading ?? args.sectionHeading,
@@ -9645,12 +9660,19 @@ export const callWorkstationGatewayCapability = async (
       topicTags: [],
     });
     const docsHits = mergeDocsSearchPathCandidates(result.hits, paths, query);
-    const rankedHits = rankDocsSearchHits(docsHits, query);
+    const retrievalAuthority = applyDocsRetrievalAuthority({
+      hits: docsHits,
+      query,
+      searchPaths: paths,
+      scope: retrievalScope,
+    });
+    const rankedHits = rankDocsSearchHits(retrievalAuthority.admitted_hits, query);
     const hits = rankedHits.slice(0, maxHits).map(clipRepoSearchHit);
     const documentCandidates = buildDocsSearchDocumentCandidates(
       rankedHits,
       query,
       maxHits,
+      { searchPaths: paths, retrievalScope },
     );
     const evidencePassages = buildDocsEvidencePassages(
       documentCandidates,
@@ -9735,6 +9757,18 @@ export const callWorkstationGatewayCapability = async (
           }
         : null,
       mechanics_retrieval_plan: mechanicsRetrievalPlan,
+      retrieval_policy: {
+        schema: "helix.docs_retrieval_policy.v1",
+        requested_scope: retrievalScope,
+        effective_scope: retrievalAuthority.scope,
+        admitted_document_count: retrievalAuthority.admitted_document_count,
+        suppressed_document_count: retrievalAuthority.suppressed_document_count,
+        suppressed_candidates: retrievalAuthority.suppressed.slice(0, 50),
+        suppression_truncated: retrievalAuthority.suppressed.length > 50,
+        policy_role: "source_admission_not_answer_authority",
+        terminal_eligible: false,
+        assistant_answer: false,
+      },
       hits,
       hit_count: hits.length,
       document_candidates: documentCandidates,

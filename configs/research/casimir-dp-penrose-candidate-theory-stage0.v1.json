@@ -1,0 +1,443 @@
+{
+  "schema_version": "casimir_dp_penrose_candidate_theory_stage0/1",
+  "study_id": "casimir-dp-quantum-foam-study",
+  "campaign_id": "casimir-dp-penrose-candidate-theory-stage0-v1",
+  "candidate_id": "penrose_relational_branch_incompatibility_v0",
+  "candidate_version": "0.1.0",
+  "canonical_generated_at": "2026-08-11T18:20:00.000Z",
+  "maturity": "stage0_exploratory",
+  "evidence_class": "theory_definition_preflight",
+  "claim_ceiling": "formal_candidate_definition_only",
+  "promotion_allowed": false,
+  "numerical_prediction_allowed": false,
+  "sources": [
+    {
+      "source_id": "penrose-1996-gravity-state-reduction",
+      "citation": "R. Penrose, On Gravity's Role in Quantum State Reduction, General Relativity and Gravitation 28, 581-600 (1996).",
+      "url": "https://doi.org/10.1007/BF02105068",
+      "supports": "The time-translation ambiguity for superposed stationary mass distributions and its Newtonian gravitational self-energy scale.",
+      "does_not_support": "A unique stochastic dynamics, survival distribution, relativistic completion, or Casimir modifier."
+    },
+    {
+      "source_id": "penrose-2014-gravitization",
+      "citation": "R. Penrose, On the Gravitization of Quantum Mechanics 1: Quantum State Reduction, Foundations of Physics 44, 557-575 (2014).",
+      "url": "https://doi.org/10.1007/s10701-013-9770-0",
+      "supports": "The equivalence-principle motivation for modifying quantum theory and the Diósi-Penrose lifetime context.",
+      "does_not_support": "A completed covariant branch-comparison rule, density-matrix generator, or boundary-conditioned collapse law."
+    },
+    {
+      "source_id": "diosi-1987-master-equation",
+      "citation": "L. Diósi, A universal master equation for the gravitational violation of quantum mechanics, Physics Letters A 120, 377-381 (1987).",
+      "url": "https://doi.org/10.1016/0375-9601(87)90681-5",
+      "supports": "A distinct executable stochastic master-equation lineage with mass-distribution-dependent coherence damping.",
+      "does_not_support": "Equivalence to every Penrose objective-reduction completion or a Casimir boundary coupling."
+    },
+    {
+      "source_id": "giacomini-brukner-2022-quantum-equivalence",
+      "citation": "F. Giacomini and C. Brukner, Quantum superposition of spacetimes obeys Einstein's equivalence principle, AVS Quantum Science 4, 015601 (2022).",
+      "url": "https://doi.org/10.1116/5.0070018",
+      "supports": "A competing quantum-reference-frame route in which an equivalence principle can be formulated for superposed spacetimes.",
+      "does_not_support": "Objective reduction or the claim that equivalence plus superposition uniquely implies collapse."
+    },
+    {
+      "source_id": "hu-verdaguer-2008-stochastic-gravity",
+      "citation": "B. L. Hu and E. Verdaguer, Stochastic Gravity: Theory and Applications, Living Reviews in Relativity 11, 3 (2008).",
+      "url": "https://doi.org/10.12942/lrr-2008-3",
+      "supports": "The separation of renormalized mean stress, the connected tensor noise kernel, and induced metric fluctuations.",
+      "does_not_support": "An ontic single-outcome collapse law or identification of environmental decoherence with objective reduction."
+    },
+    {
+      "source_id": "myrvold-2017-relativistic-collapse",
+      "citation": "W. C. Myrvold, Relativistically invariant Markovian dynamical collapse theories must employ nonstandard degrees of freedom, Physical Review A 96, 062116 (2017).",
+      "url": "https://doi.org/10.1103/PhysRevA.96.062116",
+      "supports": "Relativistic causality and vacuum stability are substantive constraints on Markovian collapse dynamics.",
+      "does_not_support": "A specific Penrose or Casimir collapse kernel."
+    },
+    {
+      "source_id": "juarez-aubry-kay-sudarsky-2018",
+      "citation": "B. A. Juárez-Aubry, B. S. Kay, and D. Sudarsky, Generally covariant dynamical reduction models and the Hadamard condition, Physical Review D 97, 025010 (2018).",
+      "url": "https://doi.org/10.1103/PhysRevD.97.025010",
+      "supports": "Hadamard-state preservation, covariance, and energy-momentum bookkeeping as requirements for curved-spacetime reduction models.",
+      "does_not_support": "A complete semiclassical gravity theory with collapse or this candidate's dynamics."
+    }
+  ],
+  "upstream_authorities": [
+    {
+      "role": "or_phase_authority",
+      "path": "configs/research/casimir-dp-or-phase-stage2.v1.json",
+      "sha256": "b517e8fbf002303258a5269e7f37c6b16d4bc3c45c609072bdb2a9e5184e596d"
+    },
+    {
+      "role": "stage3_outcome_authority",
+      "path": "configs/research/casimir-dp-evidence-map-stage3.v1.json",
+      "sha256": "231cb26e9c9bb523e2dda40a6178d8a484ec099f1868a74b995d8153337d29c2"
+    },
+    {
+      "role": "manifold_registry_authority",
+      "path": "shared/casimir-dp-manifold-kernel-registry.ts",
+      "sha256": "10eaa369ea35ac7c82871a915c12947292b1f946c4b0a71e10e12991d4faac33"
+    }
+  ],
+  "theory_definition": {
+    "scope": "A weak-field laboratory candidate for converting relational incompatibility between two matter-geometry branches into objective-reduction dynamics; it is not a complete quantum-gravity theory.",
+    "branch_state_contract": {
+      "status": "supplied",
+      "specification": "Each prepared branch r is represented by (M_r, g_r, omega_r, <T_munu^r>_ren, X_r), including the object, trap, plates, supports, controls, fields, surface terms, registered worldline, and readout map.",
+      "source_ids": [
+        "penrose-1996-gravity-state-reduction",
+        "hu-verdaguer-2008-stochastic-gravity"
+      ],
+      "equation_ids": ["casimir_dp_penrose_relational_branch_state", "casimir_dp_penrose_relational_pullback_stress_difference"],
+      "evidence_receipt_sha256": null
+    },
+    "branch_correspondence": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": [
+        "penrose-1996-gravity-state-reduction",
+        "giacomini-brukner-2022-quantum-equivalence"
+      ],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "invariant_incompatibility_functional": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": ["penrose-1996-gravity-state-reduction"],
+      "equation_ids": ["casimir_dp_penrose_newtonian_target_limit"],
+      "evidence_receipt_sha256": null
+    },
+    "equivalence_principle_recovery": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": [
+        "penrose-2014-gravitization",
+        "giacomini-brukner-2022-quantum-equivalence"
+      ],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "proper_time_is_unitary_phase_not_reduction": true
+  },
+  "dynamics": {
+    "kind": "unspecified",
+    "reduction_law": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": ["penrose-1996-gravity-state-reduction"],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "lifetime_distribution": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": ["penrose-1996-gravity-state-reduction"],
+      "equation_ids": ["casimir_dp_penrose_newtonian_target_limit"],
+      "evidence_receipt_sha256": null
+    },
+    "stochastic_unravelling": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": ["diosi-1987-master-equation"],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "born_probability_law": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": ["penrose-2014-gravitization"],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "normalization_contract": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": ["myrvold-2017-relativistic-collapse"],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "phase_and_contraction_separated": true,
+    "markovian_cptp_contract": {
+      "status": "justified_null",
+      "specification": "Not applicable until a Markovian dynamics is proposed; selecting that dynamics activates this requirement.",
+      "source_ids": ["myrvold-2017-relativistic-collapse"],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "non_markovian_consistency_contract": {
+      "status": "justified_null",
+      "specification": "Not applicable until a non-Markovian dynamics is proposed; selecting that dynamics activates this requirement.",
+      "source_ids": ["myrvold-2017-relativistic-collapse"],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    }
+  },
+  "consistency": {
+    "causal_support_and_no_signalling": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": [
+        "myrvold-2017-relativistic-collapse",
+        "juarez-aubry-kay-sudarsky-2018"
+      ],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "energy_momentum_balance": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": ["juarez-aubry-kay-sudarsky-2018"],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "gauge_and_diffeomorphism_robustness": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": [
+        "penrose-1996-gravity-state-reduction",
+        "giacomini-brukner-2022-quantum-equivalence"
+      ],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "vacuum_stability_or_hadamard_contract": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": [
+        "myrvold-2017-relativistic-collapse",
+        "juarez-aubry-kay-sudarsky-2018"
+      ],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "recovery_limits": {
+      "identical_branches": false,
+      "zero_gravitational_coupling": false,
+      "deterministic_metric_phase_only": true,
+      "newtonian_penrose_energy": false,
+      "ordinary_qm_qed": false,
+      "ordinary_gr_proper_time": true,
+      "gaussian_diosi_limit_if_claimed": false,
+      "no_boundary_contrast": true
+    }
+  },
+  "observable_contract": {
+    "complex_coherence_projection": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": ["diosi-1987-master-equation"],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "companion_prediction_or_justified_null": {
+      "status": "missing",
+      "specification": null,
+      "source_ids": ["diosi-1987-master-equation"],
+      "equation_ids": [],
+      "evidence_receipt_sha256": null
+    },
+    "required_axes": [
+      "mass_density",
+      "branch_separation",
+      "hold_time",
+      "density_profile",
+      "trajectory",
+      "path_swap",
+      "echo",
+      "boundary_state"
+    ]
+  },
+  "boundary_policy": {
+    "mode": "boundary_independent",
+    "fixed_branch_difference_null": true,
+    "extension_model_id": null,
+    "manifold_registry_fixture_path": null,
+    "manifold_registry_fixture_sha256": null,
+    "interpretation": "The intrinsic candidate has no Casimir modifier. A boundary-dependent extension is a different model and must pass the existing manifold-kernel registry before it can supply any prediction."
+  },
+  "falsifiers": [
+    {
+      "falsifier_id": "powered_lifetime_envelope_null",
+      "class": "experiment_internal",
+      "observable_or_check": "held-out complex coherence over the frozen mass-density, separation, and hold-time region",
+      "rejection_criterion": "A powered null disfavors only the frozen operationalized candidate region and survival-law commitment.",
+      "requires_power_or_receipt": true
+    },
+    {
+      "falsifier_id": "wrong_scale_or_time_shape",
+      "class": "experiment_internal",
+      "observable_or_check": "mass, separation, density-profile, trajectory, and full hold-time dependence",
+      "rejection_criterion": "Reject the frozen candidate when its preregistered joint signature fails in the powered region.",
+      "requires_power_or_receipt": true
+    },
+    {
+      "falsifier_id": "signed_phase_reversal",
+      "class": "experiment_internal",
+      "observable_or_check": "path-swap and echo response of both coherence quadratures",
+      "rejection_criterion": "A contraction assigned to objective reduction must not reverse or recover as an ordinary signed phase when branch histories are matched.",
+      "requires_power_or_receipt": true
+    },
+    {
+      "falsifier_id": "ordinary_control_alignment",
+      "class": "experiment_internal",
+      "observable_or_check": "Green/FDT, gas, thermal, patch, vibration, readout, and worldline control channels",
+      "rejection_criterion": "A residual explained by measured ordinary response is not candidate evidence.",
+      "requires_power_or_receipt": true
+    },
+    {
+      "falsifier_id": "common_mode_boundary_null",
+      "class": "experiment_internal",
+      "observable_or_check": "corrected four-cell boundary-by-branch interaction",
+      "rejection_criterion": "The boundary-independent candidate predicts no interaction when complete branch differences and trajectories are matched.",
+      "requires_power_or_receipt": true
+    },
+    {
+      "falsifier_id": "gauge_or_coordinate_dependence",
+      "class": "theory_internal",
+      "observable_or_check": "relational branch correspondence and invariant functional",
+      "rejection_criterion": "Reject a definition whose prediction changes under gauge or simultaneous diffeomorphism transformations.",
+      "requires_power_or_receipt": true
+    },
+    {
+      "falsifier_id": "causality_normalization_energy_failure",
+      "class": "theory_internal",
+      "observable_or_check": "causality, no-signalling, normalization, vacuum stability, and energy-momentum checks",
+      "rejection_criterion": "Reject a definition that violates any registered consistency gate.",
+      "requires_power_or_receipt": true
+    },
+    {
+      "falsifier_id": "identical_parameter_companion_failure",
+      "class": "independent",
+      "observable_or_check": "registered heating, diffusion, force-noise, radiation, or justified-null companion",
+      "rejection_criterion": "Reject the frozen generator when its independently powered companion fails with the same parameter manifest.",
+      "requires_power_or_receipt": true
+    },
+    {
+      "falsifier_id": "external_bounds_and_replication",
+      "class": "independent",
+      "observable_or_check": "exact model recasts and independently replicated matter-wave data",
+      "rejection_criterion": "Exclude only the parameter region covered by the exact registered model mapping and achieved sensitivity.",
+      "requires_power_or_receipt": true
+    }
+  ],
+  "outcome_map": [
+    {
+      "outcome_id": "ordinary_phase_recovered_no_invariant_contraction",
+      "observation": "Proper-time or electromagnetic phase follows its signed controls and no invariant contraction remains.",
+      "establishes": "The ordinary phase-control chain works in the tested region.",
+      "disfavors": "An intrinsic contraction at the achieved sensitivity.",
+      "does_not_establish": "Objective reduction or branch-dependent manifold dynamics.",
+      "maximum_claim": "apparatus_or_ordinary_physics_only"
+    },
+    {
+      "outcome_id": "powered_null_frozen_candidate",
+      "observation": "Held-out coherence is inconsistent with the frozen candidate in a powered identifiable region.",
+      "establishes": "Exclusion of that candidate and parameter region.",
+      "disfavors": "The frozen dynamics, time law, and parameter manifest.",
+      "does_not_establish": "That every future Penrose-inspired completion is false.",
+      "maximum_claim": "candidate_parameter_region_excluded"
+    },
+    {
+      "outcome_id": "diosi_shape_without_companion",
+      "observation": "Boundary-independent loss follows the registered Diósi mass-separation-time shape but lacks a powered companion.",
+      "establishes": "Unexplained model-consistent phenomenology after ordinary closure.",
+      "disfavors": "Ordinary models already excluded by the held-out comparison.",
+      "does_not_establish": "Generator identity, Penrose geometry, or objective single outcomes.",
+      "maximum_claim": "candidate_compatible_not_validated"
+    },
+    {
+      "outcome_id": "named_generator_joint_signature",
+      "observation": "The same frozen parameters predict replicated coherence and an independent powered companion.",
+      "establishes": "Support for that named generator among registered alternatives.",
+      "disfavors": "Registered alternatives that fail the joint signature.",
+      "does_not_establish": "Complete quantum gravity or Penrose's spacetime ontology.",
+      "maximum_claim": "named_generator_supported_among_registered_alternatives"
+    },
+    {
+      "outcome_id": "penrose_specific_time_shape_with_companion",
+      "observation": "A separately registered non-Markovian or threshold time law and its companion are recovered.",
+      "establishes": "Support for that frozen Penrose-inspired dynamics.",
+      "disfavors": "Powered alternatives with different time or companion signatures.",
+      "does_not_establish": "Universal objective reduction or a unique quantum-gravity completion.",
+      "maximum_claim": "candidate_compatible_not_validated"
+    },
+    {
+      "outcome_id": "four_cell_interaction_null",
+      "observation": "The corrected four-cell interaction is unity within powered uncertainty.",
+      "establishes": "No resolved boundary-by-superposition interaction in the tested region.",
+      "disfavors": "Registered boundary extensions predicting a detectable interaction there.",
+      "does_not_establish": "That a boundary-independent intrinsic model is false.",
+      "maximum_claim": "candidate_parameter_region_excluded"
+    },
+    {
+      "outcome_id": "boundary_excess_closes_with_ordinary_response",
+      "observation": "A boundary contrast follows measured Green/FDT, thermal, magnetic, or control response.",
+      "establishes": "An ordinary-null correction or calibration response.",
+      "disfavors": "Attribution of that contrast to the intrinsic candidate.",
+      "does_not_establish": "A gravitational collapse mechanism.",
+      "maximum_claim": "apparatus_or_ordinary_physics_only"
+    },
+    {
+      "outcome_id": "unregistered_boundary_anomaly",
+      "observation": "A corrected boundary interaction survives ordinary closure but no registered kernel predicts it.",
+      "establishes": "A boundary-superposition anomaly requiring replication and model construction.",
+      "disfavors": "The closed ordinary factorization model in the powered region.",
+      "does_not_establish": "Casimir-induced collapse, quantum foam, or manifold dynamics.",
+      "maximum_claim": "boundary_interaction_anomaly_only"
+    }
+  ],
+  "nonbridges": [
+    {
+      "nonbridge_id": "compton_frequency_to_cavity_mode",
+      "statement": "Rest-mass or Compton frequency is not connected to a cavity mode or collapse clock without a sourced transfer kernel.",
+      "status": "null"
+    },
+    {
+      "nonbridge_id": "casimir_pressure_or_energy_to_E_G",
+      "statement": "Scalar Casimir pressure or reference-subtracted energy cannot replace the complete branch stress tensor or Penrose incompatibility functional.",
+      "status": "blocked"
+    },
+    {
+      "nonbridge_id": "negative_casimir_energy_to_negative_mass",
+      "statement": "Negative reference-subtracted field energy is not negative apparatus mass or curvature proof.",
+      "status": "blocked"
+    },
+    {
+      "nonbridge_id": "virtual_particle_annihilation_to_collapse_clock",
+      "statement": "Virtual-particle language supplies no prepared branch object, hazard law, or collapse clock.",
+      "status": "blocked"
+    },
+    {
+      "nonbridge_id": "gravitational_wave_existence_to_quantum_geometry_interference",
+      "statement": "The existence of classical gravitational waves does not derive quantum-geometry interference or objective reduction.",
+      "status": "blocked"
+    },
+    {
+      "nonbridge_id": "superconductivity_higgs_bec_to_collapse_source",
+      "statement": "Superconductivity, Anderson-Higgs physics, the Standard Model Higgs field, and BEC relations are calibration or platform physics, not collapse generators.",
+      "status": "null"
+    },
+    {
+      "nonbridge_id": "nhm2_force_amplification_proxy_import",
+      "statement": "NHM2 force, amplification, and car-weight proxy values are not imported as gravitational mass or a Penrose source.",
+      "status": "not_imported"
+    },
+    {
+      "nonbridge_id": "mean_semiclassical_metric_to_nonunitary_reduction",
+      "statement": "A retarded mean metric response produces ordinary signed phase, not nonunitary reduction by itself.",
+      "status": "blocked"
+    },
+    {
+      "nonbridge_id": "stochastic_gravity_decoherence_to_single_outcome",
+      "statement": "Noise-induced open-system decoherence does not establish ontic single outcomes without a physical stochastic unravelling.",
+      "status": "blocked"
+    }
+  ],
+  "final_status_policy": {
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "integrated_pilot": "not_authorized"
+  }
+}

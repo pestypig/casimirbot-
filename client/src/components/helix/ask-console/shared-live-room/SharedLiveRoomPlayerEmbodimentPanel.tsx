@@ -32,6 +32,7 @@ import type { HelixRoomSourceBinding } from "@shared/helix-room-source-ingress";
 
 const PLAYER_ACTION_ADAPTER = "minecraft.fabric_client.v1";
 const DEFAULT_LEASE_MS = 2 * 60 * 60_000;
+const PLAYER_AUTHORITY_REFRESH_INTERVAL_MS = 10_000;
 
 const actionAuthoritiesPath = (
   roomId: string,
@@ -161,10 +162,10 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
   );
   const [stopArmed, setStopArmed] = useState(false);
 
-  const load = useCallback(async (): Promise<void> => {
+  const load = useCallback(async (signal?: AbortSignal): Promise<void> => {
     try {
       const receipt = await readActionReceipt(
-        await fetch(authorityPath, { credentials: "include" }),
+        await fetch(authorityPath, { signal, credentials: "include" }),
       );
       const next = receipt.authority ?? null;
       setAuthority(next);
@@ -182,6 +183,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
         setManualOverridePolicy(next.manual_override_policy);
       }
     } catch (error) {
+      if (signal?.aborted) return;
       setMessage(
         error instanceof Error
           ? error.message
@@ -191,6 +193,9 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
   }, [authorityPath]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    let disposed = false;
+    let refreshTimer: number | null = null;
     setAuthority(null);
     setReadiness(null);
     setPairingCommand(null);
@@ -198,9 +203,20 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
     setPairingExpiresAt(null);
     setCopyState("idle");
     setStopArmed(false);
-    void load();
-    const refresh = window.setInterval(() => void load(), 5_000);
-    return () => window.clearInterval(refresh);
+    const refresh = async (): Promise<void> => {
+      await load(controller.signal);
+      if (disposed) return;
+      refreshTimer = window.setTimeout(
+        () => void refresh(),
+        PLAYER_AUTHORITY_REFRESH_INTERVAL_MS,
+      );
+    };
+    void refresh();
+    return () => {
+      disposed = true;
+      controller.abort();
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+    };
   }, [load]);
 
   const mutationSelected = selectedCapabilities.some(
@@ -563,6 +579,8 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
                   ? "Client manifest admitted; waiting for its first heartbeat."
                   : readiness.ready_for_actions
                     ? `Client ready: ${readiness.declared_capability_count} declared capabilities via ${readiness.available_control_engines.join(", ") || "its admitted engine"}.`
+                    : readiness.blocking_reason === "event_stream_resync_required"
+                      ? "Client controls were released because its evidence stream no longer matches the restarted server. Pair the player client again to establish a fresh evidence epoch."
                     : readiness.state === "stale"
                       ? "Client heartbeat is stale; Helix will not lease player actions."
                       : readiness.state === "emergency_stopped"

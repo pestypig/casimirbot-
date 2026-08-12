@@ -6,6 +6,487 @@ import {
 } from "../capability-itinerary-execution";
 
 describe("Helix capability itinerary execution", () => {
+  it("requires a successful runtime-selected Player Embodiment action instead of accepting a read-only probe", () => {
+    const playerLook = "com.casimirbot.minecraft.player.look";
+    const playerWalk = "com.casimirbot.minecraft.player.walk";
+    const actorStatus = "com.casimirbot.minecraft.actor_status.read";
+    const itinerary = {
+      turn_id: "ask:test:player-action-any-of",
+      admitted_tool_families: ["live_environment"],
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        required_observation_families: ["live_environment"],
+        required_capability_any_of_groups: [
+          {
+            group_id: "minecraft.player_embodiment.action",
+            semantic_requirement:
+              "one_successful_player_embodiment_action_selected_by_runtime",
+            capability_ids: [playerLook, playerWalk],
+          },
+        ],
+      },
+    };
+    const observation = (capability: string, ref: string) => ({
+      artifact_id: ref,
+      kind: "live_environment_tool_observation",
+      capability_key: capability,
+      status: "succeeded",
+      payload: {
+        status: "succeeded",
+        capability_id: capability,
+      },
+    });
+
+    const readOnlyState = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [observation(actorStatus, "obs:actor-status")],
+    });
+    expect(readOnlyState).toMatchObject({
+      complete: false,
+      observed_families: ["live_environment"],
+      missing_required_capability_any_of_groups: [
+        {
+          group_id: "minecraft.player_embodiment.action",
+          satisfied: false,
+        },
+      ],
+    });
+
+    const actionState = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        observation(actorStatus, "obs:actor-status"),
+        observation(playerLook, "obs:player-look"),
+      ],
+    });
+    expect(actionState).toMatchObject({
+      complete: true,
+      missing_required_capability_any_of_groups: [],
+      required_capability_any_of_groups: [
+        {
+          group_id: "minecraft.player_embodiment.action",
+          satisfied: true,
+          satisfied_capability_id: playerLook,
+          observation_ref: "obs:player-look",
+        },
+      ],
+    });
+  });
+
+  it("requires a fresh post-action observation instead of reusing a pre-action read", () => {
+    const action = "com.casimirbot.minecraft.player.navigate";
+    const status = "com.casimirbot.minecraft.actor.status.read";
+    const observation = (capability: string, ref: string) => ({
+      artifact_id: ref,
+      kind: "live_environment_observation",
+      capability_key: capability,
+      status: "succeeded",
+      payload: { status: "succeeded", capability_id: capability },
+    });
+    const itinerary = {
+      turn_id: "ask:test:post-action-status",
+      admitted_tool_families: ["live_environment"],
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        required_observation_families: ["live_environment"],
+        required_capabilities: [status],
+        required_capability_any_of_groups: [
+          {
+            group_id: "minecraft.player_embodiment.action",
+            semantic_requirement:
+              "one_successful_player_embodiment_action_selected_by_runtime",
+            capability_ids: [action],
+          },
+        ],
+      },
+      compound_capability_contract: {
+        subgoals: [
+          {
+            subgoal_id: "subgoal:post-status",
+            order: 1,
+            requested_capability: status,
+            runtime_capability: status,
+            required_observation_kinds: ["live_environment_observation"],
+            observation_after_capability_any_of_group_ids: [
+              "minecraft.player_embodiment.action",
+            ],
+            mandatory: true,
+          },
+        ],
+      },
+    };
+
+    const beforeAction = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [observation(status, "obs:status:before")],
+    });
+    expect(beforeAction).toMatchObject({
+      complete: false,
+      missing_required_capabilities: [status],
+      blocked_required_capabilities: [status],
+      missing_temporal_postconditions: [
+        expect.objectContaining({
+          capability_id: status,
+          temporal_dependencies_satisfied: false,
+          rail_failure_code: "temporal_dependency_missing",
+        }),
+      ],
+    });
+
+    const actionWithoutFreshStatus =
+      buildHelixCapabilityItineraryExecutionState({
+        capabilityItinerary: itinerary,
+        artifacts: [
+          observation(status, "obs:status:before"),
+          observation(action, "obs:navigate"),
+        ],
+      });
+    expect(actionWithoutFreshStatus).toMatchObject({
+      complete: false,
+      missing_required_capabilities: [status],
+      blocked_required_capabilities: [],
+      missing_required_capability_any_of_groups: [],
+      missing_temporal_postconditions: [
+        expect.objectContaining({
+          capability_id: status,
+          temporal_dependencies_satisfied: true,
+          rail_failure_code: "post_dependency_observation_missing",
+        }),
+      ],
+    });
+
+    const verifiedAfterAction = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        observation(status, "obs:status:before"),
+        observation(action, "obs:navigate"),
+        observation(status, "obs:status:after"),
+      ],
+    });
+    expect(verifiedAfterAction).toMatchObject({
+      complete: true,
+      missing_required_capabilities: [],
+      blocked_required_capabilities: [],
+      missing_temporal_postconditions: [],
+      compound_subgoal_ledger: [
+        expect.objectContaining({
+          subgoal_id: "subgoal:post-status",
+          observation_ref: "obs:status:after",
+          satisfaction: "satisfied",
+        }),
+      ],
+    });
+  });
+
+  it("does not mistake admission, stale, or contradictory evidence for a current-turn Player Embodiment action", () => {
+    const turnId = "ask:test:strict-player-action-observation";
+    const priorTurnId = "ask:test:prior-player-action";
+    const spatial = "com.casimirbot.minecraft.spatial_region.inspect";
+    const action = "com.casimirbot.minecraft.player.navigate";
+    const status = "com.casimirbot.minecraft.actor.status.read";
+    const observation = (
+      capability: string,
+      ref: string,
+      artifactTurnId = turnId,
+    ) => ({
+      artifact_id: ref,
+      turn_id: artifactTurnId,
+      kind: "provider_gateway_observation_packet",
+      capability_key: capability,
+      source_capability_id: capability,
+      status: "succeeded",
+      payload: {
+        status: "succeeded",
+        capability_key: capability,
+        source_capability_id: capability,
+      },
+    });
+    const itinerary = {
+      turn_id: turnId,
+      admitted_tool_families: ["live_environment"],
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        required_observation_families: ["live_environment"],
+        required_capabilities: [status],
+        required_capability_any_of_groups: [
+          {
+            group_id: "minecraft.player_embodiment.action",
+            capability_ids: [action],
+          },
+        ],
+      },
+      compound_capability_contract: {
+        subgoals: [
+          {
+            subgoal_id: "subgoal:post-action-status",
+            requested_capability: status,
+            runtime_capability: status,
+            required_observation_kinds: [
+              "provider_gateway_observation_packet",
+            ],
+            observation_after_capability_any_of_group_ids: [
+              "minecraft.player_embodiment.action",
+            ],
+            mandatory: true,
+          },
+        ],
+      },
+    };
+    const admissionOnly = {
+      artifact_id: "evaluation:navigate",
+      turn_id: turnId,
+      kind: "workstation_tool_evaluation",
+      capability_key: action,
+      status: "completed",
+      payload: {
+        status: "completed",
+        capability_key: action,
+        supports_goal: true,
+        authority: "agent_runtime_loop",
+      },
+    };
+    const staleAction = {
+      ...observation(action, "obs:navigate:prior", priorTurnId),
+      source_scope: "prior_turn_context",
+    };
+    const contradictoryAction = {
+      ...observation(action, "obs:navigate:contradictory"),
+      payload: {
+        status: "succeeded",
+        capability_key: spatial,
+        source_capability_id: spatial,
+      },
+    };
+
+    const beforeAction = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        observation(spatial, "obs:spatial"),
+        admissionOnly,
+        staleAction,
+        contradictoryAction,
+      ],
+    });
+    expect(beforeAction).toMatchObject({
+      complete: false,
+      blocked_required_capabilities: [status],
+      missing_required_capability_any_of_groups: [
+        {
+          group_id: "minecraft.player_embodiment.action",
+          satisfied: false,
+        },
+      ],
+      missing_temporal_postconditions: [
+        expect.objectContaining({
+          capability_id: status,
+          temporal_dependencies_satisfied: false,
+          rail_failure_code: "temporal_dependency_missing",
+        }),
+      ],
+    });
+
+    const afterAction = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        observation(spatial, "obs:spatial"),
+        admissionOnly,
+        observation(action, "obs:navigate:current"),
+      ],
+    });
+    expect(afterAction).toMatchObject({
+      complete: false,
+      blocked_required_capabilities: [],
+      missing_required_capability_any_of_groups: [],
+      missing_temporal_postconditions: [
+        expect.objectContaining({
+          capability_id: status,
+          temporal_dependencies_satisfied: true,
+          rail_failure_code: "post_dependency_observation_missing",
+        }),
+      ],
+    });
+
+    const afterVerification = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        observation(spatial, "obs:spatial"),
+        observation(action, "obs:navigate:current"),
+        observation(status, "obs:status:after"),
+      ],
+    });
+    expect(afterVerification).toMatchObject({
+      complete: true,
+      blocked_required_capabilities: [],
+      missing_required_capability_any_of_groups: [],
+      missing_temporal_postconditions: [],
+    });
+  });
+
+  it("preserves a source-identified post-navigation status observation after an earlier failed attempt", () => {
+    const turnId = "ask:test:source-identified-post-navigation-status";
+    const spatial = "com.casimirbot.minecraft.spatial_region.inspect";
+    const navigate = "com.casimirbot.minecraft.player.navigate";
+    const status = "com.casimirbot.minecraft.actor.status.read";
+    const observation = (
+      capability: string,
+      ref: string,
+      outcome: "succeeded" | "failed" = "succeeded",
+    ) => ({
+      artifact_id: ref,
+      turn_id: turnId,
+      kind: "provider_gateway_observation_packet",
+      source_capability_id: capability,
+      source_scope: "current_turn_context",
+      status: outcome,
+      payload: {
+        schema: "helix.live_environment_observation.v1",
+        source_capability_id: capability,
+        source_scope: "current_turn_context",
+        status: outcome,
+        observation_role: "evidence_not_assistant_answer",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
+    const itinerary = {
+      turn_id: turnId,
+      admitted_tool_families: ["live_environment"],
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        required_observation_families: ["live_environment"],
+        required_capabilities: [status],
+        required_capability_any_of_groups: [{
+          group_id: "minecraft.player_embodiment.action",
+          capability_ids: [navigate],
+        }],
+      },
+      compound_capability_contract: {
+        subgoals: [{
+          subgoal_id: "subgoal:spatial",
+          order: 1,
+          requested_capability: spatial,
+          runtime_capability: spatial,
+          required_observation_kinds: ["provider_gateway_observation_packet"],
+          mandatory: true,
+        }, {
+          subgoal_id: "subgoal:navigate",
+          order: 2,
+          requested_capability: navigate,
+          runtime_capability: navigate,
+          required_observation_kinds: ["provider_gateway_observation_packet"],
+          mandatory: true,
+        }, {
+          subgoal_id: "subgoal:post-status",
+          order: 3,
+          requested_capability: status,
+          runtime_capability: status,
+          required_observation_kinds: ["provider_gateway_observation_packet"],
+          observation_after_capability_any_of_group_ids: [
+            "minecraft.player_embodiment.action",
+          ],
+          mandatory: true,
+        }],
+      },
+    };
+
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        observation(spatial, "obs:spatial"),
+        observation(navigate, "obs:navigate:failed", "failed"),
+        observation(navigate, "obs:navigate:succeeded"),
+        observation(status, "obs:status:after"),
+      ],
+    });
+
+    expect(state).toMatchObject({
+      complete: true,
+      observed_families: ["live_environment"],
+      missing_required_capabilities: [],
+      missing_required_capability_any_of_groups: [],
+      missing_temporal_postconditions: [],
+      compound_subgoal_ledger: [
+        expect.objectContaining({
+          requested_capability: spatial,
+          satisfaction: "satisfied",
+        }),
+        expect.objectContaining({
+          requested_capability: navigate,
+          observation_ref: "obs:navigate:succeeded",
+          satisfaction: "satisfied",
+        }),
+        expect.objectContaining({
+          requested_capability: status,
+          observation_ref: "obs:status:after",
+          satisfaction: "satisfied",
+        }),
+      ],
+    });
+  });
+
+  it("reconciles a successful Minecraft action observation with its committed arguments", () => {
+    const capability = "com.casimirbot.minecraft.player.walk";
+    const itinerary = {
+      turn_id: "ask:test:player-walk-argument-reconciliation",
+      admitted_tool_families: ["live_environment"],
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        required_observation_families: ["live_environment"],
+        required_capabilities: [capability],
+      },
+      compound_capability_contract: {
+        source: "committed_route_compound_projection",
+        subgoals: [{
+          subgoal_id: "planned:walk",
+          order: 1,
+          requested_capability: capability,
+          runtime_capability: capability,
+          args_hint: {
+            direction: "forward",
+            duration_ms: 250,
+            sprint: false,
+          },
+          required_args: ["direction", "duration_ms", "sprint"],
+          required_observation_kinds: ["live_environment_observation"],
+          mandatory: true,
+        }],
+      },
+    };
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [{
+        artifact_id: "obs:walk",
+        kind: "live_environment_observation",
+        capability_key: capability,
+        status: "succeeded",
+        executed_args: {
+          direction: "forward",
+          duration_ms: 250,
+          sprint: false,
+          idempotent_replay: false,
+          physical_execution_performed: true,
+        },
+        payload: { status: "succeeded" },
+      }],
+    });
+    expect(state).toMatchObject({
+      complete: true,
+      missing_compound_subgoal_ids: [],
+      missing_required_capabilities: [],
+      compound_subgoal_ledger: [{
+        subgoal_id: "planned:walk",
+        satisfaction: "satisfied",
+        args_source: "contract_hint_reconciled_with_observation",
+        selected_args: {
+          direction: "forward",
+          duration_ms: 250,
+          sprint: false,
+        },
+      }],
+    });
+  });
+
   it("binds repeated capability subgoals to their exact provider-call observation refs", () => {
     const capability = "com.casimirbot.minecraft.command";
     const observation = (ref: string, callId: string) => ({
@@ -214,6 +695,178 @@ describe("Helix capability itinerary execution", () => {
       missing_compound_subgoal_ids: ["planned:docs"],
       missing_required_capabilities: ["docs.search"],
       complete: false,
+    });
+  });
+
+  it("preserves a later repeated committed occurrence until the provider executes it", () => {
+    const capability = "com.casimirbot.minecraft.actor.status.read";
+    const payload: Record<string, unknown> = {
+      capability_itinerary: {
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["live_environment"],
+          required_capabilities: [capability],
+        },
+        compound_capability_contract: {
+          source: "committed_route_compound_projection",
+          subgoal_identity_policy: "provider_call_occurrence",
+          subgoals: [
+            {
+              subgoal_id: "planned:actor-status:1",
+              order: 1,
+              requested_capability: capability,
+              runtime_capability: capability,
+              subgoal_identity_policy: "provider_call_occurrence",
+              capability_occurrence: 1,
+              required_observation_kinds: ["provider_gateway_observation_packet"],
+              mandatory: true,
+            },
+            {
+              subgoal_id: "planned:actor-status:2",
+              order: 2,
+              requested_capability: capability,
+              runtime_capability: capability,
+              subgoal_identity_policy: "provider_call_occurrence",
+              capability_occurrence: 2,
+              required_observation_kinds: ["provider_gateway_observation_packet"],
+              mandatory: true,
+            },
+          ],
+        },
+      },
+      compound_capability_contract: {
+        source: "codex_provider_call_occurrence_normalization",
+        subgoal_identity_policy: "provider_call_occurrence",
+        subgoals: [{
+          subgoal_id: "current:actor-status:1",
+          order: 1,
+          requested_capability: capability,
+          runtime_capability: capability,
+          provider_call_id: "call:actor-status:1",
+          capability_occurrence: 1,
+          observation_ref: "obs:actor-status:1",
+          required_observation_kinds: ["provider_gateway_observation_packet"],
+          satisfied: true,
+        }],
+      },
+    };
+
+    attachHelixCapabilityItineraryExecutionState(payload, [{
+      artifact_id: "obs:actor-status:1",
+      producer_item_id: "call:actor-status:1",
+      kind: "provider_gateway_observation_packet",
+      capability_key: capability,
+      status: "succeeded",
+      payload: { status: "succeeded" },
+    }]);
+
+    const contract = (payload.capability_itinerary as any).compound_capability_contract;
+    expect(contract.subgoals.map((entry: any) => entry.subgoal_id)).toEqual([
+      "current:actor-status:1",
+      "planned:actor-status:2",
+    ]);
+    expect(payload.capability_itinerary_execution_state).toMatchObject({
+      missing_compound_subgoal_ids: ["planned:actor-status:2"],
+      complete: false,
+    });
+  });
+
+  it("preserves a committed post-action constraint across provider-call normalization", () => {
+    const status = "com.casimirbot.minecraft.actor.status.read";
+    const action = "com.casimirbot.minecraft.player.navigate";
+    const payload: Record<string, unknown> = {
+      capability_itinerary: {
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["live_environment"],
+          required_capabilities: [status],
+          required_capability_any_of_groups: [
+            {
+              group_id: "minecraft.player_embodiment.action",
+              capability_ids: [action],
+            },
+          ],
+        },
+        compound_capability_contract: {
+          subgoals: [
+            {
+              subgoal_id: "planned:post-status",
+              order: 1,
+              requested_capability: status,
+              runtime_capability: status,
+              required_observation_kinds: [
+                "live_environment_observation",
+              ],
+              observation_after_capability_any_of_group_ids: [
+                "minecraft.player_embodiment.action",
+              ],
+              mandatory: true,
+            },
+          ],
+        },
+      },
+      compound_capability_contract: {
+        source: "codex_provider_call_occurrence_normalization",
+        subgoal_identity_policy: "provider_call_occurrence",
+        subgoals: [
+          {
+            subgoal_id: "current:status:before",
+            order: 1,
+            requested_capability: status,
+            runtime_capability: status,
+            provider_call_id: "call:status:before",
+            observation_ref: "obs:status:before",
+            required_observation_kinds: [
+              "live_environment_observation",
+            ],
+            satisfied: true,
+          },
+          {
+            subgoal_id: "current:navigate",
+            order: 2,
+            requested_capability: action,
+            runtime_capability: action,
+            provider_call_id: "call:navigate",
+            observation_ref: "obs:navigate",
+            required_observation_kinds: [
+              "live_environment_observation",
+            ],
+            satisfied: true,
+          },
+        ],
+      },
+    };
+    const observation = (capability: string, ref: string) => ({
+      artifact_id: ref,
+      kind: "live_environment_observation",
+      capability_key: capability,
+      status: "succeeded",
+      payload: { status: "succeeded" },
+    });
+
+    attachHelixCapabilityItineraryExecutionState(payload, [
+      observation(status, "obs:status:before"),
+      observation(action, "obs:navigate"),
+    ]);
+
+    expect(payload.capability_itinerary_execution_state).toMatchObject({
+      complete: false,
+      missing_required_capabilities: [status],
+      missing_temporal_postconditions: [
+        expect.objectContaining({
+          capability_id: status,
+          temporal_dependencies_satisfied: true,
+          rail_failure_code: "post_dependency_observation_missing",
+        }),
+      ],
+    });
+    expect(
+      (payload.capability_itinerary as any).compound_capability_contract
+        .subgoals[0],
+    ).toMatchObject({
+      observation_after_capability_any_of_group_ids: [
+        "minecraft.player_embodiment.action",
+      ],
     });
   });
 
@@ -990,6 +1643,81 @@ describe("Helix capability itinerary execution", () => {
       );
       expect(state.complete, rejected.name).toBe(false);
     }
+
+    const walkCapability = "com.casimirbot.minecraft.player.walk";
+    const movementArtifact = {
+      ...spatialArtifact,
+      payload: {
+        ...spatialArtifact.payload,
+        result: {
+          purpose: "movement_safety",
+          walk_step_candidates: [],
+          walk_step_candidates_complete: true,
+          retained_walk_step_candidate_count: 0,
+          omitted_walk_step_candidate_count: 0,
+        },
+      },
+    };
+    const movementItinerary = {
+      ...capabilityItinerary,
+      terminal_success_criteria: {
+        ...capabilityItinerary.terminal_success_criteria,
+        required_capabilities: [spatialCapability, walkCapability],
+      },
+      compound_capability_contract: {
+        subgoals: [
+          capabilityItinerary.compound_capability_contract.subgoals[0],
+          {
+            subgoal_id: "subgoal:minecraft-walk",
+            requested_capability: walkCapability,
+            runtime_capability: walkCapability,
+            required_args: [
+              "action_kind",
+              "direction",
+              "duration_ms",
+              "sprint",
+            ],
+            args_hint: { duration_ms: 250, sprint: false },
+            required_observation_kinds: [
+              "helix.minecraft.player_action.observation.v1",
+            ],
+            guarded_noop_policy: {
+              schema: "helix.compound_capability_guarded_noop.v1",
+              mode: "no_verified_safe_candidate",
+              guard_subgoal_id: spatialSubgoalId,
+              guard_capability: spatialCapability,
+              required_purpose: "movement_safety",
+              accepted_observation_purposes: ["movement_safety"],
+              candidate_field: "walk_step_candidates",
+              completeness_field: "walk_step_candidates_complete",
+              omitted_count_field: "omitted_walk_step_candidate_count",
+              current_turn_only: true,
+              requires_successful_observation: true,
+              user_directed_noop_guard: true,
+            },
+          },
+        ],
+      },
+    };
+    expect(
+      buildHelixCapabilityItineraryExecutionState({
+        capabilityItinerary: movementItinerary,
+        artifacts: [movementArtifact],
+      }),
+    ).toMatchObject({
+      complete: true,
+      missing_required_capabilities: [],
+      compound_subgoal_ledger: [
+        { satisfaction: "satisfied" },
+        {
+          requested_capability: walkCapability,
+          satisfaction: "satisfied",
+          satisfaction_reason: "no_verified_safe_candidate",
+          satisfied_without_execution: true,
+          mutation_performed: false,
+        },
+      ],
+    });
   });
 
   it("allows a model-decided conditional command to remain unexecuted after its mandatory inspection", () => {

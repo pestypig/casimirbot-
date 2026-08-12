@@ -128,6 +128,7 @@ apparatus specifications.
 | Test or gate | Experimental contrast | Observable or frozen expectation | Defensible inference | Present authority |
 |---|---|---|---|---|
 | state feasibility | compact versus verified separated packet | packet centers, covariance, overlap, momentum difference, fidelity, and recombination | failure is an apparatus no-go, not a collapse-model result | no preparation at the registered mass, separation, and hold time has been demonstrated |
+| Penrose missing-theory candidate | formal branch objects under one proposed correspondence versus ordinary unitary evolution | Stage-0.1 diagnostic correspondence residuals and weak-field recovery only; no physical rate or prediction vector | a powered test could constrain only a separately completed and frozen candidate | the synthetic correspondence benchmark passes, but 0 of 5 physical reference packets are ready; the parent remains blocked at the scientific branch-correspondence rule |
 | primary Diósi test, \(H_{\rm D}\) | prospectively frozen mass, separation, and hold-time cells | \(C=Ve^{i\phi}\); 2.908% named-model loss and 0.435% transported diagnostic benchmark at the leading point | a sensitive null constrains the registered region; a replicated matching contraction is model-consistent phenomenology | complete \(m,d,t\) allocation, complex coherence, nuisance responses, and covariance remain unmeasured |
 | boundary interaction | active/reference boundary × separated/compact branches | four-cell ratio \(R_4\); standard boundary-independent Diósi loss cancels for matched mass-density and separation histories | corrected \(R_4\neq1\) establishes a boundary--superposition anomaly, not Casimir-induced collapse | measured Green/FDT response and the four same-apparatus coherence cells are absent |
 | ordinary electromagnetic null, \(H_0\) | gap, material, polarization, temperature, sham, and normal/superconducting state | signed phase and contraction from measured material response and a finite-geometry Green tensor | agreement validates the boundary calibration chain; disagreement repairs \(H_0\) first | current values are software fixtures; specimen spectra and the as-built Maxwell solution are absent |
@@ -195,6 +196,9 @@ This draft is intended to elicit bounded decisions from specialists:
   the registered mass, separation, hold, and recombination;
 - **collapse theory:** assess the \(R_0\) choice, composite mass-density map,
   external-bound recast, and companion relation;
+- **quantum-gravity foundations:** assess the relational branch-state and
+  equivalence-principle preflight, identify a defensible branch-correspondence
+  construction, or explain why no such invariant construction is possible;
 - **Casimir and macroscopic QED:** specify the selected specimen, measured
   spectra, as-built Green response, force-noise spectrum, and uncertainty;
 - **relativistic phase and metrology:** close three-dimensional worldlines,
@@ -426,6 +430,130 @@ are not the same theory object:
 Consequently, an exclusion of Eq. (2) is not an exclusion of every
 Penrose-motivated theory. A match to Eq. (2) is not direct evidence for
 spacetime “snapping” or manifold instability.
+
+#### 2.2.1 A registered missing-theory program, not a new prediction
+
+The equivalence-principle argument can be made more precise without pretending
+that it is already complete. Penrose's concern is not merely that a
+gravitational potential appears in a quantum Hamiltonian. Each superposed mass
+distribution would define a different freely falling or spacetime description,
+and general relativity supplies no automatic point-by-point identification of
+the events, clocks, and time translations belonging to those alternatives
+[4,34]. Competing quantum-reference-frame work also shows why equivalence plus
+superposition should not be presented as a theorem that uniquely implies
+collapse [35].
+
+We have therefore registered a Stage-0 **relational branch-incompatibility
+candidate**. A branch is formally represented by its manifold, metric, quantum
+state, complete renormalized stress tensor, and physical reference system. The
+candidate then asks for four structures that Penrose's lifetime notation alone
+does not supply:
+
+1. a relational rule identifying physical events and clocks across the two
+   branches;
+2. a gauge-independent incompatibility functional with energy units that
+   recovers the Newtonian \(E_G\) expression;
+3. a causal reduction dynamics with a survival distribution, Born
+   probabilities, normalization, no-signalling, vacuum stability, and
+   energy--momentum bookkeeping; and
+4. a projection into both quadratures of measured complex coherence plus an
+   independently testable companion or a sourced reason that none occurs.
+
+In this program, \(E_I\) names the not-yet-supplied covariant branch-
+incompatibility functional. Its required stationary Newtonian recovery is
+\(E_I^{N}\rightarrow E_G\), where \(E_G\) is the weak-field mass-density energy
+used in Eq. (2). Recovering \(E_G\) therefore checks a limit; it does not define
+\(E_I\).
+
+These requirements reflect known difficulties in relativistic reduction and
+semiclassical/stochastic-gravity programs [36--38]. The maintained preflight
+stops deterministically at
+`PCT_BRANCH_CORRESPONDENCE_MISSING`. It records
+\(\tau_{\rm OR}\sim\hbar/E_G\) only as a heuristic scale, returns no numerical
+collapse rate, admits no held-out prediction vector, and makes no empirical
+validation claim. A schema-complete future definition would still remain
+Stage 0 until a separate source-backed calculator, recovery tests, and
+preregistration passed.
+
+#### 2.2.2 Stage-0.1 relational-correspondence benchmark
+
+The first missing step now has an executable benchmark without being declared
+solved. In a static weak-field laboratory domain, a branch-blind apparatus
+clock and three apparatus fiducials define a shared relational label space
+\(B_{\rm lab}\). Two embeddings, \(X_A:B_{\rm lab}\rightarrow\mathcal M_A\)
+and \(X_B:B_{\rm lab}\rightarrow\mathcal M_B\), give the proposed local event
+correspondence
+\(\varphi^{\rm corr}_{A\rightarrow B}=X_B\circ X_A^{-1}:
+X_A(B_{\rm lab})\rightarrow X_B(B_{\rm lab})\). The superposed probe is not
+allowed to be the sole anchor because that could align away the displacement
+being tested. This is a local affine material-reference proxy, not a computed
+Fermi/radar chart or a preferred global map between arbitrary spacetimes
+[35,39--42].
+
+The frozen benchmark requires identity recovery, an invertible map and inverse,
+branch-swap symmetry, invariance under independent rigid coordinate
+redescriptions, preservation of a known branch displacement, equality of the
+declared common-acceleration and common-potential inputs, agreement between two
+independently named reference sets, coverage of the declared \(6R_0\) Gaussian
+finite-support proxy in every primary and alternate chart, and recovery of the
+Gaussian Newtonian target in Eq. (2). The exact named gate ledger in the
+content-addressed Stage-0.1 report is authoritative:
+
+<!-- helix-doc-equation-action/v1 id=cdp-penrose-stage0-1-correspondence-gate -->
+\[
+\mathcal G_{\rm corr}
+=\mathcal G_{\rm id}\wedge\mathcal G_{\rm inv}
+\wedge\mathcal G_{\rm swap}\wedge\mathcal G_{\rm coord}
+\wedge\mathcal G_{\rm sensitivity}\wedge\mathcal G_{\rm common}
+\wedge\mathcal G_{\rm ref}\wedge\mathcal G_{E_G}.
+\]
+
+The displayed conjunction is a grouped mnemonic, not an alternate gate list:
+`G_ref` expands to the reference-subsystem, branch-map, declared-support,
+causal-order, alternate-reference, and reference-spread rows; `G_inv` expands
+to Jacobian and inverse-map rows; `G_coord` is rigid relabeling only;
+`G_common` is common-input equality only; and the authoritative ledger also
+contains its explicit output-policy row.
+
+All synthetic gates pass. The pulled-back branch-center separation is
+\(2.5000\times10^{-7}\) m; the registered analytic target is
+\(1.2448784\times10^{-35}\) J; and the independently integrated Fourier value
+is \(1.2448786\times10^{-35}\) J, a relative discrepancy of
+\(1.88\times10^{-7}\). The identity target and branch-swap residual are zero,
+and the independent coordinate-relabel residual is
+\(3.56\times10^{-22}\) m.
+
+That is a software/theory recovery result. All five physical authority packets:
+measured worldlines, clock/pulse dictionary, as-built landmarks and tetrads,
+selected-specimen density support, and reference-choice covariance, remain
+`not_ready`. The scientific standing therefore stops at
+`PRC_REFERENCE_RECEIPTS_MISSING`, and the parent Stage-0 candidate remains at
+`PCT_BRANCH_CORRESPONDENCE_MISSING`.
+The frozen v1 schema cannot be filled in place to claim readiness; measured
+packet admission requires a versioned successor with path, hash, custody,
+calibration, and uncertainty validation.
+
+Passing Stage-0.1 shows that one proposed local correspondence survives frozen
+local affine and rigid-relabeling tests;
+it does not select a unique physical correspondence, establish a covariant
+incompatibility functional, or generate a lifetime, collapse rate, coherence
+law, Casimir modifier, or model-comparison row. The content-addressed gate ledger is in the
+[Stage-0.1 report](./casimir-dp-penrose-relational-correspondence-stage0-1-report.md).
+The rigid-relabeling pass is not arbitrary diffeomorphism covariance, and
+common-input equality is not the still-blocked full equivalence-principle
+recovery obligation.
+
+The boundary policy is deliberately independent. At matched branch mass-density
+and trajectory histories, changing the Casimir boundary does not modify this
+intrinsic candidate. Any proposed boundary modifier is a different model and
+must pass the existing tensor/noise/retarded-response manifold registry. Thus
+the experiment remains two-axis: the mass-separation-time campaign tests the
+registered Diósi model today and could later test a completed Penrose candidate;
+the four-cell estimator separately tests boundary-superposition
+nonfactorization.
+
+The full obligation, nonbridge, falsifier, and outcome ledger is preserved in
+the [Stage-0 candidate preflight report](./casimir-dp-penrose-candidate-theory-stage0-report.md).
 
 ### 2.3 Mass-density representation is part of the hypothesis
 
@@ -1087,6 +1215,8 @@ Measured evidence remains `not_ready`; collapse identification and manifold
 dynamics remain `blocked`; physical viability remains `not_evaluated`; and no
 proper-time-to-collapse or Casimir-to-collapse bridge is registered.
 
+<!-- docs-print-page-break -->
+
 ### 5.8 Superconducting boundary control: bridge and nonbridges
 
 A superconducting boundary is useful here as an **ordinary-response control**,
@@ -1233,7 +1363,163 @@ provisional engineering convention; covariance uncertainty must be propagated
 and the threshold justified before confirmatory use. Blinding, train/holdout
 separation, custody, and zero cross-apparatus covariance fusion are mandatory.
 
-### 5.10 Why the selected power is still conditional
+<!-- legacy-corrupted-stage4-2s-block
+
+The leading design does not treat the boundary label as a magical switch.
+Every time-dependent voltage, current, trap field, compensation channel, and
+readout field can propagate to the two branches with a delay, polarization,
+phase, and dissipative response. Those responses belong to the ordinary null
+before any remaining contraction is compared with the frozen Diósi law.
+
+The familiar kinked-field-line construction is useful intuition, but field
+lines are not the dynamical derivation. In the nonrelativistic radiation limit,
+Maxwell's equations with a conserved source and retarded boundary condition
+give
+
+legacy-corrupted-equation-marker cdp-stage4-2s-retarded-radiation-field
+[
+mathbf E_{m rad}(mathbf r,t)=
+rac{q}{4piepsilon_0c^2R},
+hat{mathbf n}	imes
+left[hat{mathbf n}	imesmathbf a(t-R/c)ight].
+	ag{30}
+]
+
+The Stage-4.2S analytic benchmark recovers the transverse field, zero-
+acceleration limit, (1/R) amplitude law, retarded delay, circular-
+polarization projector, current conservation, and Larmor power. Numerical
+angular integration agrees with the analytic radiated power to relative error
+(2.57	imes10^{-16}). This establishes software and equation recovery, not a
+measured radiation background.
+
+The dimensionless propagation screen is
+
+legacy-corrupted-equation-marker cdp-stage4-2s-propagation-scale
+[
+kL=rac{2pi fL}{c}.
+	ag{31}
+]
+
+For the frozen (f=0.5) Hz boundary label and (L=80,mu{m m}),
+(kL=8.38	imes10^{-13}): geometric electromagnetic retardation at the
+fundamental is negligible. A synthetic 1550-nm optical benchmark gives
+(kL=324.29), so optical response requires a wave calculation. The registered
+1-kHz switching-edge and 1-MHz RF rows are scale demonstrations only; they do
+not assert the final rise time, trap frequency, or readout wavelength. A slow
+fundamental also does not bound unmeasured switching harmonics, ringing,
+material relaxation, mechanical sidebands, or optical backaction.
+
+The apparatus calculation must therefore use the measured source spectrum and
+the as-built retarded dyadic Green response:
+
+legacy-corrupted-equation-marker cdp-stage4-2s-green-to-coherence
+[
+E_i(mathbf r,omega)
+=imu_0omegaint d^3r',
+G^{m ret}_{ij}(mathbf r,mathbf r',omega)J_j(mathbf r',omega),
+qquad
+C_{0,eta}=C(0)e^{iPhi_{{m EM},eta}-chi_{{m EM},eta}}.
+	ag{32}
+]
+
+Stage 4.2S verifies, with a polarization-retaining synthetic Green matrix, the
+algebraic map from branch fields into differential energy and phase, absorption
+and heating, photon recoil, ordinary contraction, and the complex-coherence
+nuisance vector ((-chi_{m EM},Phi_{m EM})). Its numerical phase and
+loss are deliberately synthetic and are not apparatus forecasts.
+
+Ordinary-null integration remains unauthorized because 0/7 authorities are
+ready: measured source current maps and waveforms; the as-built retarded Green
+tensor; measured complex material response; branch geometry and polarization
+transfer; switching-edge spectral coverage; joint phase/loss/recoil/heating
+covariance; and independent full-wave plus energy-balance verification.
+Consequently measured evidence and retarded-source covariance remain
+`not_ready), residual attribution and collapse identification remain
+`blocked), physical viability remains `not_evaluated), and the physical
+pilot remains unauthorized. The frozen Diósi generator is unchanged and no
+radiation-, polarization-, Green-tensor-, frequency-, or Casimir-to-collapse
+edge is registered.
+
+-->
+
+### 5.10 Retarded-source propagation closes a missing ordinary-physics lane
+
+The leading design does not treat the boundary label as a magical switch.
+Every time-dependent voltage, current, trap field, compensation channel, and
+readout field can propagate to the two branches with a delay, polarization,
+phase, and dissipative response. Those responses belong to the ordinary null
+before any remaining contraction is compared with the frozen Diósi law.
+
+The familiar kinked-field-line construction is useful intuition, but field
+lines are not the dynamical derivation. In the nonrelativistic radiation limit,
+Maxwell's equations with a conserved source and retarded boundary condition
+give
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2s-retarded-radiation-field -->
+\[
+\mathbf E_{\rm rad}(\mathbf r,t)=
+\frac{q}{4\pi\epsilon_0c^2R}\,
+\hat{\mathbf n}\times
+\left[\hat{\mathbf n}\times\mathbf a(t-R/c)\right].
+\tag{30}
+\]
+
+The Stage-4.2S analytic benchmark recovers the transverse field, zero-
+acceleration limit, \(1/R\) amplitude law, retarded delay, circular-
+polarization projector, current conservation, and Larmor power. Numerical
+angular integration agrees with the analytic radiated power to relative error
+\(2.57\times10^{-16}\). This establishes software and equation recovery, not a
+measured radiation background.
+
+The dimensionless propagation screen is
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2s-propagation-scale -->
+\[
+kL=\frac{2\pi fL}{c}.
+\tag{31}
+\]
+
+For the frozen \(f=0.5\) Hz boundary label and \(L=80\,\mu{\rm m}\),
+\(kL=8.38\times10^{-13}\): geometric electromagnetic retardation at the
+fundamental is negligible. A synthetic 1550-nm optical benchmark gives
+\(kL=324.29\), so optical response requires a wave calculation. The registered
+1-kHz switching-edge and 1-MHz RF rows are scale demonstrations only; they do
+not assert the final rise time, trap frequency, or readout wavelength. A slow
+fundamental also does not bound unmeasured switching harmonics, ringing,
+material relaxation, mechanical sidebands, or optical backaction.
+
+The apparatus calculation must therefore use the measured source spectrum and
+the as-built retarded dyadic Green response:
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2s-green-to-coherence -->
+\[
+E_i(\mathbf r,\omega)
+=i\mu_0\omega\int d^3r'\,
+G^{\rm ret}_{ij}(\mathbf r,\mathbf r',\omega)J_j(\mathbf r',\omega),
+\qquad
+C_{0,\beta}=C(0)e^{i\Phi_{{\rm EM},\beta}-\chi_{{\rm EM},\beta}}.
+\tag{32}
+\]
+
+Stage 4.2S verifies, with a polarization-retaining synthetic Green matrix, the
+algebraic map from branch fields into differential energy and phase, absorption
+and heating, photon recoil, ordinary contraction, and the complex-coherence
+nuisance vector \((-\chi_{\rm EM},\Phi_{\rm EM})\). Its numerical phase and
+loss are deliberately synthetic and are not apparatus forecasts.
+
+Ordinary-null integration remains unauthorized because 0/7 authorities are
+ready: measured source current maps and waveforms; the as-built retarded Green
+tensor; measured complex material response; branch geometry and polarization
+transfer; switching-edge spectral coverage; joint phase/loss/recoil/heating
+covariance; and independent full-wave plus energy-balance verification.
+Consequently measured evidence and retarded-source covariance remain
+`not_ready`, residual attribution and collapse identification remain
+`blocked`, physical viability remains `not_evaluated`, and the physical
+pilot remains unauthorized. The frozen Diósi generator is unchanged and no
+radiation-, polarization-, Green-tensor-, frequency-, or Casimir-to-collapse
+edge is registered.
+
+### 5.11 Why the selected power is still conditional
 
 The response/covariance geometry used by the bounded search was transported from the
 same synthetic world used to establish the parent candidate family.
@@ -1262,7 +1548,7 @@ family, power ranged from X to Y and all design gates survived in Z% of worlds.�
 Until X, Y, and Z are computed, the acquisition-power claim remains
 provisional.
 
-### 5.11 Confirmatory analysis plan still to be frozen
+### 5.12 Confirmatory analysis plan still to be frozen
 
 The primary confirmatory comparison will score the frozen \(M_0\) and
 \(M_0+{\rm D}\) predictions in joint complex-coherence space with the
@@ -1347,7 +1633,7 @@ The same nondissipative generator predicts momentum diffusion [1--3,10]
 
 \[
 D_{pp}=\frac{G\hbar m^2}{12\sqrt{\pi}R_0^3}
-\tag{30}
+\tag{33}
 \]
 
 and a center-of-mass energy increase
@@ -1355,7 +1641,7 @@ and a center-of-mass energy increase
 \[
 \dot E=\frac{3D_{pp}}{m}
 =\frac{G\hbar m}{4\sqrt{\pi}R_0^3}.
-\tag{31}
+\tag{34}
 \]
 
 For the leading manifest,
@@ -1367,10 +1653,10 @@ were demanded, the algebraic maximum one-shot standard uncertainty would be
 \sigma_{\dot E,\mathrm{one\ shot}}
 \le \frac{\dot E\sqrt{100}}{5}
 =6.14027\times10^{-40}\ {\rm W}.
-\tag{32}
+\tag{35}
 \]
 
-Equation (32) is not an instrument model. No registered detector demonstrates
+Equation (35) is not an instrument model. No registered detector demonstrates
 this bandwidth, calibration, independence, or noise floor. The companion
 observable is therefore presently a structural no-go for the paper's strongest
 positive interpretation.
@@ -1422,7 +1708,7 @@ reported as a collapse null or excess.
 \mathcal G_{\rm identifiability}\land
 \mathcal G_{\rm power}\land
 \mathcal G_{\rm custody}.
-\tag{33}
+\tag{36}
 \]
 
 The integrated feasibility pilot is authorized only after all eight authority
@@ -1459,6 +1745,8 @@ pass. An independent replication is required for any positive interpretation.
 | boundary-correlated residual without transfer kernel | anomaly eligible for a new bridge study | Casimir-induced collapse |
 | replicated Diósi-shaped coherence residual, no companion | unexplained model-consistent phenomenology | generator identified |
 | replicated shape plus independent companion | tested generator gains support within registered alternatives | manifold dynamics or universal objective collapse |
+| powered null against a separately completed and frozen Penrose candidate | that candidate and powered parameter region excluded | every Penrose-inspired completion false |
+| frozen Penrose-specific time shape plus same-kernel companion | that registered candidate gains support among tested alternatives | a unique quantum-gravity theory or direct observation of two manifolds |
 
 ### 8.5 Expert collaboration work packages
 
@@ -1497,7 +1785,7 @@ parameters, provenance, and falsifiers. The governing gate is:
 \text{observable A}\rightarrow\text{observable B}
 \quad\Longrightarrow\quad
 \{\text{transfer law, units, source, parameters, test}\}.
-\tag{34}
+\tag{37}
 \]
 
 Equation similarity, shared use of Planck's constant, or a common
@@ -1795,6 +2083,11 @@ This paper establishes:
   contraction from the four-cell boundary interaction and records a fail-closed
   readiness no-go while all eight same-apparatus authorities are absent;
 - a fail-closed pilot and confirmatory decision structure;
+- a Stage-0.1 synthetic relational-correspondence benchmark that preserves the
+  known branch displacement, survives the frozen local invariance tests, and
+  recovers the registered Gaussian Newtonian target to a relative discrepancy
+  of \(1.88\times10^{-7}\), while remaining blocked with 0 of 5 physical
+  reference packets ready;
 - the empirical and computational work still required.
 
 This paper does not establish:
@@ -1808,6 +2101,8 @@ This paper does not establish:
 - that the synthetic magnetic-toggle candidate is apparatus-ready;
 - that objective collapse occurs;
 - that Penrose's geometric interpretation is observed;
+- that the Stage-0.1 local affine prescription is a unique or measured physical
+  correspondence, a covariant incompatibility functional, or a reduction law;
 - that spacetime manifold dynamics have been measured or simulated.
 
 ## 13. Conclusion
@@ -1843,6 +2138,17 @@ density, external-bound mapping, and companion detector are transported or
 unmeasured. It therefore authorizes measured subsystem commissioning only, not
 an integrated feasibility pilot, confirmatory campaign, collapse claim, or
 manifold claim.
+
+The Penrose candidate preflight and its new Stage-0.1 benchmark sharpen the
+theoretical destination without changing that standing. Stage-0.1 shows that
+one branch-blind local prescription survives the registered synthetic
+correspondence tests and recovers the existing Newtonian target. Because its
+five physical reference packets are absent, it does not clear the parent
+scientific correspondence blocker. Until that and the subsequent invariant-
+functional, causal-dynamics, probability, conservation, recovery, coherence,
+and companion gates close, the experiment supplies constraints that a missing
+theory must satisfy rather than evidence that the missing theory has been
+found.
 
 The maintained runtime receipts record passing software, contract, equation-
 sidecar, theory-graph, and adapter checks for the design ancestry. Detailed test
@@ -1986,3 +2292,29 @@ submission.
 33. NASA High Energy Astrophysics Science Archive Research Center,
     “LPFFILES--LISA Pathfinder Archive Data Summary.”
     https://heasarc.gsfc.nasa.gov/w3browse/all/lpffiles.html
+34. R. Penrose, “On the Gravitization of Quantum Mechanics 1: Quantum State
+    Reduction,” *Foundations of Physics* **44**, 557--575 (2014).
+    https://doi.org/10.1007/s10701-013-9770-0
+35. F. Giacomini and Č. Brukner, “Quantum superposition of spacetimes obeys
+    Einstein's equivalence principle,” *AVS Quantum Science* **4**, 015601
+    (2022). https://doi.org/10.1116/5.0070018
+36. W. C. Myrvold, “Relativistically invariant Markovian dynamical collapse
+    theories must employ nonstandard degrees of freedom,” *Physical Review A*
+    **96**, 062116 (2017). https://doi.org/10.1103/PhysRevA.96.062116
+37. B. A. Juárez-Aubry, B. S. Kay, and D. Sudarsky, “Generally covariant
+    dynamical reduction models and the Hadamard condition,” *Physical Review D*
+    **97**, 025010 (2018). https://doi.org/10.1103/PhysRevD.97.025010
+38. B. L. Hu and E. Verdaguer, “Stochastic Gravity: Theory and Applications,”
+    *Living Reviews in Relativity* **11**, 3 (2008).
+    https://doi.org/10.12942/lrr-2008-3
+39. B. Dittrich, "Partial and Complete Observables for Canonical General
+    Relativity," *Classical and Quantum Gravity* **23**, 6155--6184 (2006).
+    https://doi.org/10.1088/0264-9381/23/22/006
+40. J. Tambornino, "Relational Observables in Gravity: a Review," *SIGMA* **8**,
+    017 (2012). https://doi.org/10.3842/SIGMA.2012.017
+41. J. D. Brown and K. V. Kuchar, "Dust as a Standard of Space and Time in
+    Canonical Quantum Gravity," *Physical Review D* **51**, 5600--5629 (1995).
+    https://doi.org/10.1103/PhysRevD.51.5600
+42. K. Giesel and T. Thiemann, "Scalar Material Reference Systems and Loop
+    Quantum Gravity," *Classical and Quantum Gravity* **32**, 135015 (2015).
+    https://doi.org/10.1088/0264-9381/32/13/135015

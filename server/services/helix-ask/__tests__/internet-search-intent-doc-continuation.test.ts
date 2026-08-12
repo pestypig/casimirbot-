@@ -9,6 +9,7 @@ import {
   isHardDocsEvidenceSourceTargetIntent,
 } from "../ask-source-target-arbitrator";
 import { buildToolCallAdmissionDecision } from "../tool-call-admission";
+import { buildActiveWorkspaceSourceResolution } from "../active-workspace-source-resolution";
 import {
   buildRealtimeTranscriptWorkerAdmission,
   resolveRealtimeTranscriptSourceTargetIntent,
@@ -25,6 +26,63 @@ const resolveSourceTarget = (promptText: string) =>
   });
 
 describe("Docs Viewer admission for prior document discussion", () => {
+  it("admits the read-only Docs family for an active-document evidence follow-up", () => {
+    const promptText = "Can you explain what this paper is about?";
+    const activeWorkspaceSourceResolution = {
+      schema: "helix.active_workspace_source_resolution.v1" as const,
+      resolved_source_target: "active_doc" as const,
+      reason: "active_doc_evidence_followup" as const,
+      confidence: 0.97,
+    };
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:test:active-doc-explanation",
+      threadId: "thread:test",
+      promptText,
+      activeWorkspaceSourceResolution,
+    });
+
+    expect(activeWorkspaceSourceResolution).toMatchObject({
+      resolved_source_target: "active_doc",
+      reason: "active_doc_evidence_followup",
+    });
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "active_doc",
+      strength: "hard",
+      precedence_reason: "active_doc_evidence_followup_source_target",
+      allow_no_tool_direct: false,
+    });
+    expect(buildToolCallAdmissionDecision({
+      turnId: "ask:test:active-doc-explanation",
+      promptText,
+      sourceTargetIntent,
+    })).toMatchObject({
+      source_target: "active_doc",
+      required: true,
+      admitted_tool_families: ["docs_viewer"],
+      reason: "docs_viewer_requires_document_tool_path",
+    });
+  });
+
+  it.each([
+    "Do not explain this paper; discuss the earlier answer instead.",
+    "Later, explain this paper, but not now.",
+    'The screen says "Explain this paper"; describe that label without reading the paper.',
+  ])("does not create active-document evidence admission from contextual language: %s", (promptText) => {
+    const activeWorkspaceSourceResolution = buildActiveWorkspaceSourceResolution({
+      turnId: "ask:test:contextual-active-doc",
+      promptText,
+      workspaceSnapshot: {
+        activePanel: "docs-viewer",
+        activeDocPath: "docs/research/nhm2-current-status-whitepaper.md",
+        docContextValid: true,
+      },
+    });
+
+    expect(activeWorkspaceSourceResolution.reason, promptText).not.toBe(
+      "active_doc_evidence_followup",
+    );
+  });
+
   it.each([
     "Can you talk about the NHM2 document just explained?",
     "Tell me more about the NHM2 paper you already summarized.",
@@ -127,6 +185,51 @@ describe("Docs Viewer admission for prior document discussion", () => {
     expect(restatement.requiredToolFamilies).not.toContain("internet_search");
     expect(restatement.freshnessRequired).toBe(false);
     expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
+  });
+
+  it.each([
+    "What is the current NHM2 research position?",
+    "What is the current Casimir-DP quantum foam study actually claiming?",
+  ])("anchors a primary taxonomy topic to local Docs instead of soft web or repo inference: %s", (prompt) => {
+    const restatement = buildToolUseRestatement(prompt);
+    const sourceTarget = resolveSourceTarget(prompt);
+
+    expect(restatement.requiredToolFamilies).toContain("docs_viewer");
+    expect(restatement.requiredToolFamilies).not.toContain("internet_search");
+    expect(restatement.freshnessRequired).toBe(false);
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
+    expect(sourceTarget).toMatchObject({
+      target_source: "docs_viewer",
+      strength: "hard",
+      precedence_reason: "authoritative_docs_topic_source_target",
+      allow_no_tool_direct: false,
+    });
+  });
+
+  it("preserves an explicit web request for an authoritative Docs topic", () => {
+    const prompt = "Search the web for the latest evidence about NHM2.";
+    const restatement = buildToolUseRestatement(prompt);
+
+    expect(restatement.requiredToolFamilies).toContain("internet_search");
+    expect(detectInternetSearchIntent(prompt)).toMatchObject({
+      searchRequested: true,
+      strength: "hard",
+    });
+    expect(resolveSourceTarget(prompt).target_source).toBe("internet_search");
+  });
+
+  it("preserves an explicit repository request for an authoritative Docs topic", () => {
+    const prompt = "Where in the repository is NHM2 implemented?";
+
+    expect(buildToolUseRestatement(prompt).requiredToolFamilies).not.toContain("docs_viewer");
+    expect(resolveSourceTarget(prompt).target_source).toBe("repo_code");
+  });
+
+  it("preserves an explicit scholarly request for an authoritative Docs topic", () => {
+    const prompt = "Find peer-reviewed research papers about NHM2.";
+
+    expect(buildToolUseRestatement(prompt).requiredToolFamilies).not.toContain("docs_viewer");
+    expect(resolveSourceTarget(prompt).target_source).toBe("scholarly_research");
   });
 
   it("treats an exact whitepaper locator command as local Docs evidence", () => {

@@ -6,6 +6,7 @@ export type HelixAskLegacyFinalTextTranscriptRow = {
 export type HelixAskLegacyFinalTextSelectionInput = {
   turnTranscriptRows: readonly HelixAskLegacyFinalTextTranscriptRow[];
   chosenVisibleFinalText: string;
+  backendTerminalText?: string | null;
   primaryTerminalLabel: string;
   primarySourceLabel: string;
   isInvalidTerminalAnswerText: (value: string) => boolean;
@@ -32,6 +33,7 @@ export type HelixAskLegacyFinalSourceLabelInput = {
 export function selectHelixAskLegacyFinalAnswerText({
   turnTranscriptRows,
   chosenVisibleFinalText,
+  backendTerminalText,
   primaryTerminalLabel,
   primarySourceLabel,
   isInvalidTerminalAnswerText,
@@ -46,6 +48,7 @@ export function selectHelixAskLegacyFinalAnswerText({
     ) || /^I looked for an NHM2 paper\/document with equation-bearing snippets/i.test(chosenVisibleFinalText);
   const usedTranscriptFinalRow =
     Boolean(transcriptFinalRowText) &&
+    !backendTerminalText?.trim() &&
     (chosenVisibleFinalIsTypedFailureBoundary ||
       primaryTerminalLabel === "final_failure" ||
       primarySourceLabel.replace(/\s+/g, "_") === "typed_failure");

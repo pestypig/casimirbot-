@@ -79,6 +79,24 @@ describe("Codex native compatibility fallback", () => {
     });
   });
 
+  it("does not launch a compatibility process for an already-aborted turn", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      runCodexProcess({
+        prompt: "Do not launch after this turn has ended.",
+        signal: controller.signal,
+      }),
+    ).resolves.toMatchObject({
+      exitCode: null,
+      timedOut: false,
+      killed: false,
+      failReason: "codex_process_aborted",
+      bin: null,
+    });
+  });
+
   it("keeps workspace status fields visible while bounding the model prompt", () => {
     const [artifact] = buildCodexModelVisibleObservationArtifacts([{
       schema: "helix.current_turn_artifact.v1",
@@ -163,8 +181,28 @@ describe("Codex native compatibility fallback", () => {
             path: "docs/research/conformed-study.md",
             score: 100 - index,
             canonical: true,
+            retrieval_status: "primary",
+            retrieval_admission_reason: "default_primary",
+            topic_id: "conformed-study",
+            authority_rank: 100,
             best_snippets: [{ sentence: repeatedLedger }],
           })),
+          retrieval_policy: {
+            schema: "helix.docs_retrieval_policy.v1",
+            requested_scope: "default",
+            effective_scope: "default",
+            admitted_document_count: 1,
+            suppressed_document_count: 1,
+            suppressed_candidates: [{
+              path: "docs/legacy-development/conformed-study-draft.md",
+              retrieval_status: "archive",
+              reason: "archive_not_requested",
+              topic_id: "conformed-study",
+              superseded_by: "docs/research/conformed-study.md",
+            }],
+            suppression_truncated: false,
+            policy_role: "source_admission_not_answer_authority",
+          },
           section_observations: Array.from({ length: 20 }, () => ({
             path: "docs/research/conformed-study.md",
             heading: "Model registration",
@@ -213,6 +251,26 @@ describe("Codex native compatibility fallback", () => {
     expect(
       (artifacts[0].payload as Record<string, any>).document_candidates,
     ).toHaveLength(8);
+    expect(
+      (artifacts[0].payload as Record<string, any>).document_candidates[0],
+    ).toMatchObject({
+      retrieval_status: "primary",
+      retrieval_admission_reason: "default_primary",
+      topic_id: "conformed-study",
+      authority_rank: 100,
+    });
+    expect(
+      (artifacts[0].payload as Record<string, any>).retrieval_policy,
+    ).toMatchObject({
+      requested_scope: "default",
+      suppressed_document_count: 1,
+      suppressed_candidates: [{
+        path: "docs/legacy-development/conformed-study-draft.md",
+        retrieval_status: "archive",
+        reason: "archive_not_requested",
+        superseded_by: "docs/research/conformed-study.md",
+      }],
+    });
     expect(artifacts[0]).toMatchObject({
       artifact_id: "ask:test:docs-search",
       capability_key: "docs.search",

@@ -84,6 +84,71 @@ provider selected
 -> visible/debug projection
 ```
 
+## Capability-First Adapter Development Order
+
+Do not develop a new environment operation while both its practical mechanics
+and its Helix lifecycle are unknown. Use two deliberately separate passes.
+
+### Pass 1: reference Codex capability proof
+
+Give reference Codex direct, consented access to the disposable or checkpointed
+test environment. Hold the real user objective and permission boundary, but do
+not require the operation to traverse Helix yet. Let Codex discover whether the
+task can actually be accomplished with the available game/program commands,
+connector calls, observations, and retries.
+
+Record only public execution facts:
+
+```txt
+starting environment identity and checkpoint
+capabilities or command surface exposed
+requested and executed operations
+settled observations and visible effects
+preconditions and postconditions
+retries, cancellation, and bounded failures
+final user-facing synthesis
+```
+
+Do not record hidden reasoning, credentials, pairing material, or host access.
+Direct access must remain inside the user's consent and environment boundary.
+The result of this pass is a mechanics/capability specification, not Helix
+acceptance and not a prompt-specific script.
+
+### Pass 2: Helix parity and governance
+
+Translate the proven mechanics into provider-neutral capability arguments,
+observation schemas, postcondition checks, authority leases, cancellation, and
+typed failures. Then give the runtime agent those affordances and repeat the
+same natural prompt from an equivalent starting state through the keyed Helix
+API or UI.
+
+Classify the first divergence:
+
+```txt
+reference Codex fails
+  -> mechanics, connector, documentation, or environment-access defect
+
+reference Codex succeeds; runtime never proposes the capability
+  -> affordance exposure or model-visible capability-documentation defect
+
+runtime proposes it; Helix blocks before execution
+  -> admission, identity, permission, lease, or policy defect/boundary
+
+execution settles; Codex does not receive the observation
+  -> normalization or evidence re-entry defect
+
+Codex produces a supported candidate; a later rail changes or drops it
+  -> adapter projection contradiction
+```
+
+Do not compensate for an unknown mechanics problem with adapter classifiers,
+and do not compensate for an adapter contradiction by narrowing the natural
+prompt. Helix terminal eligibility is allowed to reject unsupported or
+unauthorized claims, but it is not semantic step-choice or answer-writing
+authority. A repairable rejection returns to Codex as a typed observation; a
+hard boundary returns the exact typed failure; a passing terminal rail projects
+the supported Codex candidate unchanged.
+
 ## Conversational Continuity Is Context, Not Authority
 
 Ordinary follow-up reasoning must not depend on a finite dictionary of phrases

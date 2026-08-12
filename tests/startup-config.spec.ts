@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolveStartupConfig } from "../server/startup-config";
+import {
+  resolveStartupConfig,
+  shouldLoadLocalEnvFile,
+} from "../server/startup-config";
 import { validateManifest } from "../scripts/validate-agent-context-checklist";
 
 describe("resolveStartupConfig", () => {
@@ -77,6 +80,32 @@ describe("resolveStartupConfig", () => {
     expect(prod.port).toBe(5000);
     expect(dev.port).toBe(5173);
     expect(dev.host).toBe("0.0.0.0");
+  });
+
+  it("forces native desktop host mode onto IPv4 loopback", () => {
+    const configured = resolveStartupConfig(
+      {
+        CASIMIR_DESKTOP_HOST: "1",
+        HOST: "0.0.0.0",
+        PORT: "4312",
+      },
+      "production",
+    );
+
+    expect(configured.desktopHostMode).toBe(true);
+    expect(configured.host).toBe("127.0.0.1");
+    expect(configured.port).toBe(4312);
+    expect(configured.sourceHost).toBe("0.0.0.0");
+  });
+
+  it("lets an isolated desktop child disable repository env-file loading", () => {
+    expect(shouldLoadLocalEnvFile({})).toBe(true);
+    expect(
+      shouldLoadLocalEnvFile({ CASIMIR_SKIP_LOCAL_ENV_FILE: "1" }),
+    ).toBe(false);
+    expect(
+      shouldLoadLocalEnvFile({ CASIMIR_SKIP_LOCAL_ENV_FILE: "true" }),
+    ).toBe(false);
   });
 });
 

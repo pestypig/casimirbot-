@@ -7,6 +7,7 @@ import {
   Calculator,
   Circle,
   ClipboardList,
+  DownloadCloud,
   Equal,
   Flame,
   Gauge,
@@ -86,7 +87,8 @@ const API = {
   auditTree: "GET /api/helix/audit/tree",
   warpCalculator: "POST /api/physics/warp/calculator",
   tokamakState: "GET /api/physics/tokamak/sim",
-  tokamakCommand: "POST /api/physics/tokamak/command"
+  tokamakCommand: "POST /api/physics/tokamak/command",
+  environmentDevices: "GET /api/agi/environment-connectors/devices"
 } as const;
 
 const PANEL_KEYWORDS: Record<string, string[]> = {
@@ -94,6 +96,8 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "energy-flux": ["flux monitor", "stability histogram", "|T_ab|", "phi_A", "R = (phi_A)/(I3 + |T|)"],
   "helix-phoenix": ["phoenix averaging", "needle hull", "light-crossing", "kappa_drive", "casimir tile", "hann window"],
   "microscopy": ["microscopy mode", "microprobe", "phase contrast", "nm scale", "Coulomb sweep"],
+  "device-check": ["device check", "connector health", "paired device", "probe readiness", "last contact"],
+  "desktop-updates": ["desktop update", "installer", "signed update", "download update", "app version"],
   "electron-orbital": ["orbital density", "Bohr k/q/g", "toroidal packets", "Coulomb probe", "iso-surface"],
   "drive-guards": ["I3_geo", "I3_VdB", "Q_cavity", "guard bands", "sector strobing"],
   "mass-provenance": [
@@ -357,6 +361,26 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 960, h: 660 },
     defaultPosition: { x: 360, y: 220 },
     endpoints: [API.pipelineGet, API.helixMetrics]
+  },
+  {
+    id: "device-check",
+    title: "Device Check",
+    icon: RadioTower,
+    loader: lazyPanel(() => import("@/components/DeviceCheckPanel")),
+    defaultSize: { w: 920, h: 680 },
+    defaultPosition: { x: 180, y: 100 },
+    mobileReady: true,
+    endpoints: [API.environmentDevices],
+    keywords: PANEL_KEYWORDS["device-check"]
+  },
+  {
+    id: "desktop-updates",
+    title: "Desktop Updates",
+    icon: DownloadCloud,
+    loader: lazyPanel(() => import("@/components/DesktopUpdatePanel")),
+    defaultSize: { w: 760, h: 560 },
+    defaultPosition: { x: 220, y: 140 },
+    keywords: PANEL_KEYWORDS["desktop-updates"]
   },
   {
     id: "needle-ipeak-worksheet",

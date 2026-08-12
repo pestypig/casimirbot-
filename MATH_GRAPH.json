@@ -165,6 +165,27 @@
       "reason": "The fail-closed registry versions, but does not loosen, the null Stage-2 bridge requirements."
     },
     {
+      "from": "shared/casimir-dp-penrose-candidate-preflight.ts",
+      "to": "shared/casimir-dp-penrose-candidate-theory-stage0.ts",
+      "reason": "The diagnostic preflight checks completeness of the frozen exploratory Penrose candidate without supplying or promoting its missing dynamics.",
+      "waiver": "The diagnostic consumer preserves the exploratory dependency's claim ceiling and cannot promote it into a physical mechanism."
+    },
+    {
+      "from": "shared/casimir-dp-penrose-candidate-preflight.ts",
+      "to": "shared/casimir-dp-manifold-kernel-registry.ts",
+      "reason": "Only an explicitly separate boundary-extension policy delegates to the existing tensor/noise/retarded-response registry; the intrinsic candidate remains boundary independent."
+    },
+    {
+      "from": "shared/casimir-dp-penrose-relational-correspondence-stage0-1.ts",
+      "to": "shared/casimir-dp-penrose-candidate-theory-stage0.ts",
+      "reason": "The Stage-0.1 benchmark operationalizes one local branch-correspondence prescription while preserving the parent Stage-0 candidate's missing physical-authority and no-dynamics claim ceiling."
+    },
+    {
+      "from": "shared/casimir-dp-penrose-relational-correspondence-stage0-1.ts",
+      "to": "shared/casimir-dp-dp-companion.ts",
+      "reason": "The exploratory correspondence benchmark consumes only the registered Gaussian Newtonian E_G formula and Fourier recovery helper as a diagnostic target; it does not inherit the Diósi generator, rate, heating, or model-comparison authority."
+    },
+    {
       "from": "shared/casimir-dp-model-comparison.ts",
       "to": "shared/casimir-dp-complex-coherence.ts",
       "reason": "Held-out comparison consumes complex-coherence, conditioning, path-swap, and echo signatures."

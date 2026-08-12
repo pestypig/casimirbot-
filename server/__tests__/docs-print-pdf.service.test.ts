@@ -29,6 +29,8 @@ Inline energy is \(E=mc^2\).
 | Energy | 1.25 | J |
 | Time | 2.00 | s |
 
+<!-- docs-print-page-break -->
+
 [unsafe](javascript:alert(1))
 
 <script>window.__docs_pdf_injection = true</script>
@@ -58,6 +60,7 @@ describe("Docs Viewer print PDF service", () => {
     expect(built.html).toContain("class=\"math-inline\"");
     expect(built.html).toContain("class=\"math-display\"");
     expect(built.html).toContain("<table>");
+    expect(built.html).toContain('class="docs-print-page-break"');
     expect(built.html).toContain("Image omitted from offline export");
     expect(built.html).not.toContain('href="javascript:');
     expect(built.html).not.toContain("<script>window.__docs_pdf_injection");

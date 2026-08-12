@@ -68,6 +68,12 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     expect(main).toContain(
       "not a representation-independent test of the broader collapse-model family",
     );
+    expect(main).toContain("#### 2.2.2 Stage-0.1 relational-correspondence benchmark");
+    expect(main).toContain("PRC_REFERENCE_RECEIPTS_MISSING");
+    expect(supplement).toContain(
+      "### 2.5 Stage-0 candidate and Stage-0.1 relational-correspondence benchmark",
+    );
+    expect(supplement).toContain("0/5 same-apparatus reference packets");
   });
 
   it("leads with one synthetic commissioning design and demotes older geometries", () => {
@@ -228,6 +234,23 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     expect(proposal).toContain("The runtime returns `not_authorized` because 0/8 empirical packets are ready");
   });
 
+  it("integrates Stage-4.2S as a causal ordinary-EM propagation closure", () => {
+    expect(main).toContain("### 5.10 Retarded-source propagation closes a missing ordinary-physics lane");
+    expect(main).toContain("cdp-stage4-2s-retarded-radiation-field");
+    expect(main).toContain("cdp-stage4-2s-propagation-scale");
+    expect(main).toContain("cdp-stage4-2s-green-to-coherence");
+    expect(main).toContain("\\(kL=8.38\\times10^{-13}\\)");
+    expect(main).toContain("\\(kL=324.29\\)");
+    expect(main).toContain("0/7 authorities");
+    expect(main).toMatch(/no\s+radiation-, polarization-, Green-tensor-, frequency-, or Casimir-to-collapse/);
+    expect(supplement).toContain("### B.19 Stage-4.2S retarded-source and switching-radiation closure");
+    expect(supplement).toContain("cdp-stage4-2s-supplement-radiation");
+    expect(supplement).toContain("cdp-stage4-2s-supplement-scale");
+    expect(supplement).toContain("cdp-stage4-2s-supplement-green-coherence");
+    expect(proposal).toContain("Stage 4.2S sharpens one of those missing packets");
+    expect(proposal).toContain("ordinary-null integration and the physical pilot remain unauthorized");
+  });
+
   it("integrates Stage-4.2J as a Schrödinger, density, and environment no-go diagnostic", () => {
     for (const id of [
       "cdp-stage4-2j-schrodinger-coherence-factorization",
@@ -264,7 +287,7 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
   it("downgrades positive interpretation while the companion is infeasible", () => {
     expect(main).toContain("3.07013\\times10^{-40}");
     expect(main).toContain("6.14027\\times10^{-40}");
-    expect(main).toContain("Equation (32) is not an instrument model");
+    expect(main).toContain("Equation (35) is not an instrument model");
     expect(main).toContain(
       "replicated Diósi-shaped coherence residual may be reported as unexplained",
     );
@@ -354,12 +377,31 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
 
   it("keeps the canonical article connected to the live Theory Badge graph", () => {
     const graph = buildCasimirDpStudyTheoryBadgesV1();
-    expect(graph.badges).toHaveLength(43);
-    expect(graph.edges).toHaveLength(120);
+    expect(graph.badges).toHaveLength(46);
+    expect(graph.edges).toHaveLength(132);
     expect(
       graph.badges.some((badge) =>
         badge.sourceRefs.some((source) =>
           source.path === "docs/research/casimir-dp-quantum-foam-study.md"
+        )
+      ),
+    ).toBe(true);
+    expect(
+      graph.badges.some((badge) =>
+        badge.id === "study.casimir_dp.penrose_relational_candidate_stage0" &&
+        badge.sourceRefs.some((source) =>
+          source.path ===
+          "docs/research/casimir-dp-penrose-candidate-theory-stage0-report.md"
+        )
+      ),
+    ).toBe(true);
+    expect(
+      graph.badges.some((badge) =>
+        badge.id ===
+          "study.casimir_dp.penrose_relational_correspondence_stage0_1" &&
+        badge.sourceRefs.some((source) =>
+          source.path ===
+          "docs/research/casimir-dp-penrose-relational-correspondence-stage0-1-report.md"
         )
       ),
     ).toBe(true);

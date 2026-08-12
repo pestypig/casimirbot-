@@ -99,6 +99,7 @@ import {
   buildHelixAskTurnAdmissionPayload,
   reserveHelixAskTurnAdmission,
 } from "../services/helix-ask/ask-turn-admission";
+import { createHelixAskTurnStreamAbortBoundary } from "../services/helix-ask/ask-turn-stream-abort";
 import { resolveHelixAgentProvider } from "../services/helix-ask/agent-providers/registry";
 import { selectHelixAgentRuntime } from "../services/helix-ask/agent-providers/runtime-select";
 import { buildHelixAgentRuntimeSelectionTrace } from "../services/helix-ask/agent-providers/runtime-debug";
@@ -172269,6 +172270,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     Connection: "keep-alive",
     "X-Accel-Buffering": "no",
   });
+  const streamAbortBoundary = createHelixAskTurnStreamAbortBoundary({
+    request: req,
+    response: res,
+  });
   const startedAtMs = Date.now();
   const question =
     typeof req.body?.raw_user_prompt === "string"
@@ -172617,6 +172622,7 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
           route: "/ask/turn/stream",
           body: streamProviderBody,
           headers: req.headers,
+          signal: streamAbortBoundary.signal,
           onTranscriptEvent: (event) => {
             const record =
               event && typeof event === "object" && !Array.isArray(event)
@@ -175367,6 +175373,10 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     });
     writeAskTurnSse(res, "turn_final", streamFinalPayload);
   } catch (error) {
+    if (streamAbortBoundary.signal.aborted) {
+      runtimeReleaseOutcome = "aborted";
+      return;
+    }
     runtimeReleaseOutcome = "failed";
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : null;
@@ -176487,6 +176497,7 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
     });
     writeAskTurnSse(res, "turn_final", streamFailurePayload);
   } finally {
+    streamAbortBoundary.dispose();
     if (askTurnAdmission.status === "admitted") {
       askTurnAdmission.release(runtimeReleaseOutcome);
     }

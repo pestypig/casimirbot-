@@ -150,12 +150,64 @@
       "reason": "Explicit legacy development notes promoted from the docs audit."
     }
   ],
+  "retrievalRules": [
+    {
+      "pathPrefix": "docs/research/nhm2-",
+      "retrievalStatus": "archive",
+      "topicId": "nhm2",
+      "authorityRank": 10,
+      "supersededBy": "docs/research/nhm2-current-status-whitepaper.md",
+      "reason": "NHM2 research generations are explicit-only unless individually promoted as current authority."
+    },
+    {
+      "pathPrefix": "docs/nhm2-",
+      "retrievalStatus": "archive",
+      "topicId": "nhm2",
+      "authorityRank": 5,
+      "supersededBy": "docs/research/nhm2-current-status-whitepaper.md",
+      "reason": "Top-level NHM2 development notes are retained as historical provenance."
+    },
+    {
+      "pathPrefix": "docs/needle-hull-",
+      "retrievalStatus": "archive",
+      "topicId": "nhm2",
+      "authorityRank": 5,
+      "supersededBy": "docs/research/nhm2-current-status-whitepaper.md",
+      "reason": "Earlier Needle Hull notes are explicit-only historical context."
+    },
+    {
+      "pathPrefix": "docs/research/casimir-dp-",
+      "retrievalStatus": "supporting",
+      "topicId": "casimir-dp",
+      "authorityRank": 50,
+      "reason": "Current Casimir-DP reports support the canonical study without replacing it."
+    },
+    {
+      "pathPrefix": "docs/casimir-tile-",
+      "retrievalStatus": "archive",
+      "topicId": "casimir-dp",
+      "authorityRank": 5,
+      "supersededBy": "docs/research/casimir-dp-quantum-foam-study.md",
+      "reason": "Earlier tile-development notes are retained for explicit historical retrieval only."
+    },
+    {
+      "pathPrefix": "docs/guarded-casimir-tile-",
+      "retrievalStatus": "archive",
+      "topicId": "casimir-dp",
+      "authorityRank": 5,
+      "supersededBy": "docs/research/casimir-dp-quantum-foam-study.md",
+      "reason": "Earlier guarded tile notes are retained for explicit historical retrieval only."
+    }
+  ],
   "documents": [
     {
       "path": "docs/research/nhm2-current-status-whitepaper.md",
       "docClass": "canonical-research",
       "bundleKind": "equation-action-whitepaper",
       "canonical": true,
+      "retrievalStatus": "primary",
+      "topicId": "nhm2",
+      "authorityRank": 100,
       "title": "NHM2 as a 3+1 Same-Chart Lapse-Shift Warp Metric Evaluation Framework",
       "sidecars": [
         "docs/research/nhm2-current-status-whitepaper.equation-actions.json",
@@ -168,10 +220,23 @@
       }
     },
     {
+      "path": "docs/research/nhm2-current-status-whitepaper-2026-04-03.md",
+      "docClass": "canonical-research",
+      "canonical": false,
+      "retrievalStatus": "archive",
+      "topicId": "nhm2",
+      "authorityRank": 10,
+      "supersededBy": "docs/research/nhm2-current-status-whitepaper.md",
+      "title": "NHM2 Current Status Whitepaper, 2026-04-03"
+    },
+    {
       "path": "docs/research/casimir-dp-quantum-foam-study.md",
       "docClass": "canonical-research",
       "bundleKind": "equation-action-whitepaper",
       "canonical": true,
+      "retrievalStatus": "primary",
+      "topicId": "casimir-dp",
+      "authorityRank": 100,
       "title": "An Identifiability-First Feasibility Protocol for a Gaussian-Regularized Diósi Collapse Test with a Casimir-Boundary Control",
       "sidecars": [
         "docs/research/casimir-dp-quantum-foam-study.equation-actions.json",
@@ -188,6 +253,9 @@
       "docClass": "canonical-research",
       "bundleKind": "equation-action-whitepaper",
       "canonical": false,
+      "retrievalStatus": "supporting",
+      "topicId": "casimir-dp",
+      "authorityRank": 80,
       "title": "Reproducibility Supplement: Casimir–Diósi Coherence Feasibility Program",
       "sidecars": [
         "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.equation-actions.json",
@@ -198,6 +266,16 @@
         "calculatorReady": true,
         "contentAuthority": "bounded_docs_observation_required"
       }
+    },
+    {
+      "path": "docs/research/casimir-dp-experiment-proposal.md",
+      "docClass": "canonical-research",
+      "canonical": false,
+      "retrievalStatus": "archive",
+      "topicId": "casimir-dp",
+      "authorityRank": 10,
+      "supersededBy": "docs/research/casimir-dp-quantum-foam-study.md",
+      "title": "Casimir-DP Experiment Proposal"
     }
   ]
 }

@@ -152,6 +152,7 @@ export type HelixTurnLifecycleProjectionMismatchCode =
   | "provider_observation_reentry_disagrees_with_runtime"
   | "capability_lane_reentry_disagrees_with_provider"
   | "capability_lane_reentry_disagrees_with_runtime"
+  | "capability_lane_execution_regressed_at_reentry"
   | "continuation_pending_after_runtime_completion"
   | "terminal_rejection_after_eligible_runtime_completion"
   | "pending_lane_request_projected_as_terminal_candidate"
@@ -203,6 +204,7 @@ export type HelixTurnLifecycleContinuityCheck = {
   check:
     | "runtime_observation_reentry"
     | "capability_lane_observation_reentry"
+    | "capability_lane_execution_continuity"
     | "provider_observation_reentry"
     | "requested_tool_cardinality"
     | "forbidden_other_tools_absent"

@@ -49,6 +49,7 @@ const bindingsBody = (
 
 afterEach(() => {
   cleanup();
+  delete window.casimirDesktop;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -221,6 +222,103 @@ describe("AgentAccountBindingReadiness", () => {
         }),
       );
     }
+  });
+
+  it("starts the narrow Auth0 PKCE link only through the native bridge", async () => {
+    let completion: ((state: unknown) => void) | null = null;
+    const authorizationUrl =
+      "https://tenant.auth0.com/authorize?response_type=code&client_id=nativeClientId_123456&redirect_uri=casimirbot%3A%2F%2Foauth%2Fcallback&scope=openid+profile&audience=https%3A%2F%2Fcasimirbot.com%2Fmcp&state=sssssssssssssssssssssssssssssssssssssssssss&code_challenge=ccccccccccccccccccccccccccccccccccccccccccc&code_challenge_method=S256";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response(bindingsBody({ oauth_ready: false, bindings: [] })),
+      )
+      .mockResolvedValueOnce(
+        response({
+          schema: "casimir_desktop_auth0_account_link_start/1",
+          ok: true,
+          authorization_url: authorizationUrl,
+          expires_at: "2026-08-11T20:10:00.000Z",
+          provider: "auth0",
+          pkce: "S256",
+          client_secret_used: false,
+          bearer_included: false,
+          subject_included: false,
+        }),
+      )
+      .mockResolvedValueOnce(response(bindingsBody()));
+    vi.stubGlobal("fetch", fetchMock);
+    const openAuth0AccountLink = vi.fn(async () => ({ opened: true }));
+    window.casimirDesktop = Object.freeze({
+      getRuntimeSnapshot: vi.fn(async () => null),
+      openAuth0AccountLink,
+      onAuth0AccountLinkCompletion: (listener) => {
+        completion = listener;
+        return () => {
+          completion = null;
+        };
+      },
+    });
+
+    render(<AgentAccountBindingReadiness />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Link Auth0" }),
+    );
+    await waitFor(() =>
+      expect(openAuth0AccountLink).toHaveBeenCalledWith(authorizationUrl),
+    );
+    expect(fetchMock.mock.calls[1]).toEqual([
+      "/api/account/session/agent-bindings/auth0/start",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "same-origin",
+      }),
+    ]);
+
+    completion?.({
+      schema: "casimir_desktop_auth0_account_link_completion/1",
+      ok: true,
+      bearer_included: false,
+      subject_included: false,
+    });
+    expect(
+      await screen.findByText("Linked for agent access"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a safe actionable error when Auth0 omits the signed tenant claim", async () => {
+    let completion: ((state: unknown) => void) | null = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        response(bindingsBody({ oauth_ready: false, bindings: [] })),
+      ),
+    );
+    window.casimirDesktop = Object.freeze({
+      getRuntimeSnapshot: vi.fn(async () => null),
+      openAuth0AccountLink: vi.fn(async () => ({ opened: true })),
+      onAuth0AccountLinkCompletion: (listener) => {
+        completion = listener;
+        return () => {
+          completion = null;
+        };
+      },
+    });
+
+    render(<AgentAccountBindingReadiness />);
+    await screen.findByText("No active agent binding");
+    completion?.({
+      schema: "casimir_desktop_auth0_account_link_completion/1",
+      ok: false,
+      error: "signed_tenant_claim_missing",
+      bearer_included: false,
+      subject_included: false,
+    });
+
+    expect(
+      await screen.findByText(/missing the CasimirBot tenant claim/i),
+    ).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Bearer|auth0\|/);
   });
 });
 

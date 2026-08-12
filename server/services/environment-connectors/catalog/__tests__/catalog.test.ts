@@ -153,4 +153,19 @@ describe("environment connector capability catalog", () => {
       ),
     ).toBe("reachability");
   });
+
+  it("advertises measured actor yaw and pitch as read-only status evidence", () => {
+    const descriptor = readEnvironmentConnectorCapabilityDescriptor(
+      HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+    );
+    expect(descriptor?.trusted_model_description).toContain("yaw/pitch");
+    expect(descriptor?.output_schema.properties).toMatchObject({
+      yaw: expect.objectContaining({ type: "number" }),
+      pitch: expect.objectContaining({
+        type: "number",
+        minimum: -90,
+        maximum: 90,
+      }),
+    });
+  });
 });

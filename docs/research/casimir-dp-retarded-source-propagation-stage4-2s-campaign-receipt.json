@@ -1,0 +1,30 @@
+{
+  "schema_version": "casimir_dp_retarded_source_propagation_stage4_2s_campaign_receipt/1",
+  "run_id": "casimir-dp-retarded-source-propagation-stage4-2s-v1-20260810T180000000Z",
+  "generated_at": "2026-08-10T18:00:00.000Z",
+  "config_path": "configs/research/casimir-dp-retarded-source-propagation-stage4-2s.v1.json",
+  "config_sha256": "ea8660be2da5f4d876c5fd1357a1db8ad7c7f42db8bbc28194705cdcd8087141",
+  "upstream_stage4_2r_campaign_receipt_sha256": "2f2707eb58f0a6e22c8dc91d2dec3046691b3259d05e27b4f56d0a0bc8e8eb02",
+  "upstream_stage4_2r_verification_receipt_sha256": "92fcbf2c5a96aae98a430a6502a877a104c9bb700325c60d2fd04a71e8c84e96",
+  "report_json_sha256": "ebe83a051a3f07153cee9a08096f5712dccfc13dcb73c466834d04eeb0605f06",
+  "report_markdown_sha256": "789844b0196ebb717281a3787ebf948d086323e3e5ec0f764d6398b07735f7c9",
+  "trace_sha256": "6e229586885fbddc59345dcbb824d252089bc83774173bcc49011f64668b4ddb",
+  "software_contract": "pass",
+  "ordinary_null_integration": "not_authorized",
+  "analytic_recovery": "pass",
+  "ready_authorities": 0,
+  "missing_authorities": [
+    "measured_source_current_maps_and_waveforms",
+    "as_built_retarded_green_tensor",
+    "measured_complex_material_response",
+    "branch_geometry_and_polarization_transfer",
+    "switching_edge_spectral_coverage",
+    "phase_loss_recoil_heating_covariance",
+    "independent_solver_and_energy_balance"
+  ],
+  "measured_evidence": "not_ready",
+  "collapse_identification": "blocked",
+  "promotion_allowed": false,
+  "frozen_diosi_law_modified": false,
+  "collapse_bridge_edges_added": 0
+}

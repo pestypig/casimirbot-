@@ -2042,6 +2042,59 @@
       "equationId": "cdp-stage4-2r-supplement-four-cell-ratio", "label": "Stage-4.2R four-cell Diósi cancellation", "aliases": ["boundary independent loss cancels from R4"],
       "actions": [{"actionId":"open-cdp-stage4-2r-supplement-four-cell-ratio","kind":"artifact_backed_theory_run","label":"Open Stage-4.2R estimator semantics","badgeIds":["study.casimir_dp.integrated_feasibility_pilot_stage4_2r","study.casimir_dp.boundary_branch_interaction_stage4_2i","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.integrated_feasibility_pilot_stage4_2r","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2r","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"The cross-ratio tests boundary interaction and cannot replace the primary Diósi contraction."}],
       "claimBoundaryNotes": ["No boundary-to-collapse bridge is registered."]
+    },
+    {
+      "equationId": "cdp-stage4-2s-supplement-radiation", "label": "Stage-4.2S retarded field and Larmor-power recovery", "aliases": ["retarded acceleration field and Larmor power"],
+      "actions": [{"actionId":"open-cdp-stage4-2s-supplement-radiation","kind":"artifact_backed_theory_run","label":"Open analytic radiation receipt","badgeIds":["study.casimir_dp.retarded_source_propagation_stage4_2s","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.retarded_source_propagation_stage4_2s","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2s","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"Software recovery only; the benchmark point charge is not the neutral apparatus probe."}],
+      "claimBoundaryNotes": ["No measured source field is claimed."]
+    },
+    {
+      "equationId": "cdp-stage4-2s-supplement-scale", "label": "Stage-4.2S boundary and optical kL comparison", "aliases": ["boundary kL versus optical kL"],
+      "actions": [{"actionId":"open-cdp-stage4-2s-supplement-scale","kind":"artifact_backed_theory_run","label":"Compare propagation scales","badgeIds":["study.casimir_dp.retarded_source_propagation_stage4_2s","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.retarded_source_propagation_stage4_2s","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2s","openPanels":["theory-badge-graph","scientific-calculator"],"alsoIngestLatex":false,"claimBoundaryNote":"The 1550-nm row is a synthetic benchmark and does not select the final readout."}],
+      "claimBoundaryNotes": ["The boundary fundamental is quasistatic only by geometric retardation."]
+    },
+    {
+      "equationId": "cdp-stage4-2s-supplement-green-coherence", "label": "Stage-4.2S Green response, phase, and coherence chain", "aliases": ["retarded Green current branch phase ordinary coherence"],
+      "actions": [{"actionId":"open-cdp-stage4-2s-supplement-green-coherence","kind":"artifact_backed_theory_run","label":"Open synthetic branch-transfer output","badgeIds":["study.casimir_dp.retarded_source_propagation_stage4_2s","study.casimir_dp.complex_coherence_discriminator","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.retarded_source_propagation_stage4_2s","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2s","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"Phase, loss, recoil, and heating outputs are synthetic interface tests, not apparatus forecasts."}],
+      "claimBoundaryNotes": ["Ordinary-null integration remains unauthorized.", "Zero collapse bridge edges are added."]
+    },
+    {
+      "equationId": "cdp-penrose-stage0-1-supplement-pullbacks",
+      "label": "Stage-0.1 relational pullback definitions",
+      "aliases": ["Delta B T and Delta B g on the common local material-reference base"],
+      "actions": [{
+        "actionId": "open-cdp-penrose-stage0-1-supplement-pullbacks",
+        "kind": "artifact_backed_theory_run",
+        "label": "Open Stage-0.1 relational correspondence benchmark",
+        "badgeIds": ["study.casimir_dp.penrose_relational_candidate_stage0", "study.casimir_dp.penrose_relational_correspondence_stage0_1", "study.casimir_dp.claim_boundary"],
+        "preferredBadgeId": "study.casimir_dp.penrose_relational_correspondence_stage0_1",
+        "compoundRunMode": "dependency_path",
+        "atlasLensId": "casimir_dp_quantum_foam",
+        "atlasGroupId": "casimir_dp.penrose_stage0_1",
+        "openPanels": ["theory-badge-graph"],
+        "alsoIngestLatex": false,
+        "claimBoundaryNote": "These are formal local pullback definitions, not measured stress or metric differences and not a collapse generator."
+      }],
+      "claimBoundaryNotes": ["Arbitrary diffeomorphism covariance remains blocked.", "Five same-apparatus reference packets remain absent."]
+    },
+    {
+      "equationId": "cdp-penrose-stage0-1-supplement-gate",
+      "label": "Stage-0.1 grouped synthetic correspondence gate",
+      "aliases": ["Grouped mnemonic for the authoritative content-addressed gate ledger"],
+      "actions": [{
+        "actionId": "open-cdp-penrose-stage0-1-supplement-gate",
+        "kind": "artifact_backed_theory_run",
+        "label": "Open the authoritative Stage-0.1 gate ledger",
+        "badgeIds": ["study.casimir_dp.penrose_relational_correspondence_stage0_1", "study.casimir_dp.claim_boundary"],
+        "preferredBadgeId": "study.casimir_dp.penrose_relational_correspondence_stage0_1",
+        "compoundRunMode": "dependency_path",
+        "atlasLensId": "casimir_dp_quantum_foam",
+        "atlasGroupId": "casimir_dp.penrose_stage0_1",
+        "openPanels": ["theory-badge-graph"],
+        "alsoIngestLatex": false,
+        "claimBoundaryNote": "The displayed conjunction is a mnemonic; the content-addressed report's named gate rows are authoritative."
+      }],
+      "claimBoundaryNotes": ["Common-input equality is not full equivalence-principle recovery.", "No collapse output is emitted."]
     }
   ]
 }

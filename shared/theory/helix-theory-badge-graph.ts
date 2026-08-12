@@ -25,6 +25,9 @@ import {
   buildSolarStellarReferenceTheoryBadgesV1,
 } from "./solar-stellar-reference-theory-badges";
 import {
+  buildSolarKhiNanoflareTheoryBadgesV1,
+} from "./solar-khi-nanoflare-theory-badges";
+import {
   buildAstrochemistryPrebioticTheoryBadgesV1,
 } from "./astrochemistry-prebiotic-theory-badges";
 import {
@@ -949,6 +952,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   const nhm2FullSolve = buildNhm2FullSolveTheoryBadgesV1();
   const solar = buildSolarSpectrumTheoryBadgesV1();
   const solarStellar = buildSolarStellarReferenceTheoryBadgesV1();
+  const solarKhiNanoflare = buildSolarKhiNanoflareTheoryBadgesV1();
   const astroPrebiotic = buildAstrochemistryPrebioticTheoryBadgesV1();
   const evolutionaryBiophysics = buildEvolutionaryBiophysicsTheoryBadgesV1();
   const preboundaryBioenergetics = buildPreboundaryBioenergeticsTheoryBadgesV1();
@@ -977,7 +981,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
     graphId: "nhm2-theory-badge-graph",
     title: "Helix Theory Badge Graph",
     description:
-      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, NHM2 full-solve tensor/observer/closure provenance, and claim boundaries for relativity history, NHM2, StarSim, cosmic distance ladder, solar spectrum, solar/stellar reference, stellar spectroscopy, astrochemistry/prebiotic, pre-boundary bioenergetics, viability regulation, low-temperature quantum bounds, evolutionary biophysics, Casimir cavity, tokamak plasma, galactic dynamics, and curvature/collapse contexts.",
+      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, NHM2 full-solve tensor/observer/closure provenance, and claim boundaries for relativity history, NHM2, StarSim, cosmic distance ladder, solar spectrum, solar/stellar reference, native-resolution solar KHI and nanoflare diagnostics, stellar spectroscopy, astrochemistry/prebiotic, pre-boundary bioenergetics, viability regulation, low-temperature quantum bounds, evolutionary biophysics, Casimir cavity, tokamak plasma, galactic dynamics, and curvature/collapse contexts.",
     badges: [
       ...FIRST_PRINCIPLES_THEORY_BADGES,
       ...relativityHistory.badges,
@@ -987,6 +991,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...COSMIC_DISTANCE_LADDER_BADGES,
       ...solar.badges,
       ...solarStellar.badges,
+      ...solarKhiNanoflare.badges,
       ...astroPrebiotic.badges,
       ...evolutionaryBiophysics.badges,
       ...preboundaryBioenergetics.badges,
@@ -1019,6 +1024,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...COSMIC_DISTANCE_LADDER_EDGES,
       ...solar.edges,
       ...solarStellar.edges,
+      ...solarKhiNanoflare.edges,
       ...astroPrebiotic.edges,
       ...evolutionaryBiophysics.edges,
       ...preboundaryBioenergetics.edges,

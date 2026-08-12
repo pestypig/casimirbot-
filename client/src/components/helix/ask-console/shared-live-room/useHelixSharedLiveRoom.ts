@@ -81,6 +81,7 @@ export type UseHelixSharedLiveRoomOptions = {
   realtimeSessionId: string | null;
   runtimeActive: boolean;
   realtimeModel: string;
+  foreground?: boolean;
   api?: HelixSharedLiveRoomApi;
 };
 
@@ -146,6 +147,7 @@ export function useHelixSharedLiveRoom(
   useSharedLiveRoomSync({
     api,
     activeRoomId,
+    foreground: options.foreground === true,
     onInitialRooms: handleInitialRooms,
     onRoom: applyRoom,
     onFrames: setFrames,

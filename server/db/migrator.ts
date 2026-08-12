@@ -47,6 +47,14 @@ import { migration045 } from "./migrations/045_connector_command_pairing";
 import { migration046 } from "./migrations/046_environment_action_plane";
 import { migration047 } from "./migrations/047_environment_action_result_replay_identity";
 import { migration048 } from "./migrations/048_environment_event_ledger_identity";
+import { migration049 } from "./migrations/049_brokerage_environment_connections";
+import { migration050 } from "./migrations/050_brokerage_read_audit";
+import { migration051 } from "./migrations/051_paper_trading_risk_journal";
+import { migration052 } from "./migrations/052_paper_execution_lifecycle";
+import { migration053 } from "./migrations/053_live_equity_order_previews";
+import { migration054 } from "./migrations/054_live_equity_execution";
+import { migration055 } from "./migrations/055_live_protective_exits";
+import { migration056 } from "./migrations/056_live_trading_supervisor";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -98,6 +106,14 @@ const MIGRATIONS = [
   migration046,
   migration047,
   migration048,
+  migration049,
+  migration050,
+  migration051,
+  migration052,
+  migration053,
+  migration054,
+  migration055,
+  migration056,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

@@ -3,12 +3,124 @@ import { describe, expect, it } from "vitest";
 import {
   attachCodexProviderExactCapabilityItinerary,
   ensureCodexPreGatewayRouteAuthority,
+  internetSearchObservationAuthorityGuardApplies,
   reconcileCodexProviderScholarlyItineraryRequirements,
   runtimeProviderRequiredGroundingCapabilityIdsFromBody,
+  sourceObservationAuthorityGuardApplies,
 } from "../codex-provider";
 import { readWorkstationGatewayCallRequestsForTurn } from "../explicit-workstation-gateway";
 
 describe("Codex provider pre-gateway route authority", () => {
+  it("does not let the internet evidence guard reinterpret a committed live-environment route", () => {
+    const question =
+      "Using the active Minecraft Fabric environment in this room, make a fresh read-only check of my current player status. Tell me whether DatDamPig is online and report health, food, dimension, and position. Do not move me or change the world.";
+
+    expect(
+      internetSearchObservationAuthorityGuardApplies({
+        question,
+        body: {
+          source_target_intent: {
+            target_source: "live_environment",
+            target_kind: "live_environment",
+            strength: "hard",
+          },
+          committed_ask_route: {
+            route: {
+              source_target: "live_environment",
+              target_kind: "live_environment",
+            },
+          },
+        },
+      }),
+    ).toBe(false);
+
+    // Provider-only legacy calls without a committed source route retain the
+    // lexical fallback. Route authority, rather than a Minecraft exception,
+    // is what prevents "check ... online" from becoming a web requirement.
+    expect(
+      internetSearchObservationAuthorityGuardApplies({
+        question,
+        body: {},
+      }),
+    ).toBe(true);
+
+    expect(
+      internetSearchObservationAuthorityGuardApplies({
+        question:
+          "Search the current web sources and tell me what they report.",
+        body: {
+          committed_ask_route: {
+            route: {
+              source_target: "internet_search",
+              target_kind: "internet_search",
+            },
+          },
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("binds every lexical missing-source guard to the authoritative route", () => {
+    const liveEnvironmentBody = {
+      source_target_intent: {
+        target_source: "live_environment",
+        target_kind: "live_environment",
+        strength: "hard",
+      },
+      committed_ask_route: {
+        route: {
+          source_target: "live_environment",
+          target_kind: "live_environment",
+        },
+      },
+    };
+
+    for (const authoritativeTargets of [
+      ["docs_viewer", "active_doc"],
+      ["repo_code", "runtime_evidence"],
+      ["internet_search"],
+      ["scholarly_research", "research_library"],
+    ]) {
+      expect(
+        sourceObservationAuthorityGuardApplies({
+          body: liveEnvironmentBody,
+          authoritativeTargets,
+          legacyQuestionMatch: true,
+        }),
+      ).toBe(false);
+    }
+
+    expect(
+      sourceObservationAuthorityGuardApplies({
+        body: {
+          committed_ask_route: {
+            route: { source_target: "docs_viewer" },
+          },
+        },
+        authoritativeTargets: ["docs_viewer", "active_doc"],
+        legacyQuestionMatch: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      sourceObservationAuthorityGuardApplies({
+        body: {
+          source_target_intent: { target_source: "internet" },
+        },
+        authoritativeTargets: ["internet_search", "internet"],
+        legacyQuestionMatch: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      sourceObservationAuthorityGuardApplies({
+        body: {},
+        authoritativeTargets: ["docs_viewer", "active_doc"],
+        legacyQuestionMatch: true,
+      }),
+    ).toBe(true);
+  });
+
   it("commits an affirmative cadence command to the concrete control capability", () => {
     const body: Record<string, unknown> = {
       question: "Set the visual capture interval to 10 seconds.",
@@ -199,9 +311,7 @@ describe("Codex provider pre-gateway route authority", () => {
         schema: "helix.canonical_goal_frame.v1",
         goal_kind: "theory_context_reflection",
         required_terminal_kind: "workstation_tool_evaluation",
-        classifier_reasons: [
-          "workstation_tool_plan:theory_context_reflection",
-        ],
+        classifier_reasons: ["workstation_tool_plan:theory_context_reflection"],
       },
     };
 
@@ -290,7 +400,11 @@ describe("Codex provider pre-gateway route authority", () => {
           target_kind: "active_doc",
           strength: "hard",
           active_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
-          requested_outputs: ["file_path", "grounded_runtime_agent_answer", "typed_failure"],
+          requested_outputs: [
+            "file_path",
+            "grounded_runtime_agent_answer",
+            "typed_failure",
+          ],
           must_enter_backend_ask: true,
           allow_no_tool_direct: false,
         },
@@ -301,7 +415,11 @@ describe("Codex provider pre-gateway route authority", () => {
         target_kind: "active_doc",
         strength: "hard",
         active_doc_path: "docs/research/nhm2-current-status-whitepaper.md",
-        requested_outputs: ["file_path", "grounded_runtime_agent_answer", "typed_failure"],
+        requested_outputs: [
+          "file_path",
+          "grounded_runtime_agent_answer",
+          "typed_failure",
+        ],
         must_enter_backend_ask: true,
         allow_no_tool_direct: false,
       },
@@ -401,8 +519,7 @@ describe("Codex provider pre-gateway route authority", () => {
       },
       canonical_goal: {
         goal_kind: "scientific_image_evidence_continuity",
-        required_terminal_kind:
-          "scientific_image_evidence_continuity_summary",
+        required_terminal_kind: "scientific_image_evidence_continuity_summary",
       },
       capability_policy: {
         required_capability_families: [],
@@ -509,12 +626,15 @@ describe("Codex provider pre-gateway route authority", () => {
         admitted_tool_families: ["theory_locator"],
       },
     };
-    expect(attachCodexProviderExactCapabilityItinerary({
-      body: blockedBody,
-      turnId,
-      promptText: "Continue that same comparison and re-prepare the procedure.",
-      availableCapabilities: { capabilities: [] },
-    })).toBe(false);
+    expect(
+      attachCodexProviderExactCapabilityItinerary({
+        body: blockedBody,
+        turnId,
+        promptText:
+          "Continue that same comparison and re-prepare the procedure.",
+        availableCapabilities: { capabilities: [] },
+      }),
+    ).toBe(false);
     expect(blockedBody).not.toHaveProperty("capability_itinerary");
   });
 
@@ -761,8 +881,7 @@ describe("Codex provider pre-gateway route authority", () => {
       {
         capability_id: "scientific-evidence-closure.evaluate",
         arguments: {
-          manifest_id:
-            "scientific-evidence:advection-diffusion-dxx:v1",
+          manifest_id: "scientific-evidence:advection-diffusion-dxx:v1",
         },
       },
     ]);
@@ -946,12 +1065,9 @@ describe("Codex provider pre-gateway route authority", () => {
         schema: "helix.tool_call_admission_decision.v1",
         turn_id: turnId,
         source_target: "live_environment",
-        requested_capability:
-          "com.casimirbot.minecraft.spatial_region.inspect",
-        selected_capability:
-          "com.casimirbot.minecraft.spatial_region.inspect",
-        admitted_capability:
-          "com.casimirbot.minecraft.spatial_region.inspect",
+        requested_capability: "com.casimirbot.minecraft.spatial_region.inspect",
+        selected_capability: "com.casimirbot.minecraft.spatial_region.inspect",
+        admitted_capability: "com.casimirbot.minecraft.spatial_region.inspect",
         admitted_tool_families: ["live_environment", "docs_viewer"],
       },
     };
@@ -966,8 +1082,7 @@ describe("Codex provider pre-gateway route authority", () => {
           capabilities: [
             { capability_id: "docs.search" },
             {
-              capability_id:
-                "com.casimirbot.minecraft.spatial_region.inspect",
+              capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
             },
             { capability_id: "com.casimirbot.minecraft.command.catalog" },
             { capability_id: "com.casimirbot.minecraft.command" },
@@ -999,9 +1114,7 @@ describe("Codex provider pre-gateway route authority", () => {
     for (const subgoal of subgoals.slice(1)) {
       expect(subgoal.depends_on_subgoal_ids).toContain(subgoals[0].subgoal_id);
     }
-    expect(
-      runtimeProviderRequiredGroundingCapabilityIdsFromBody(body),
-    ).toEqual(
+    expect(runtimeProviderRequiredGroundingCapabilityIdsFromBody(body)).toEqual(
       expect.arrayContaining([
         "docs.search",
         "com.casimirbot.minecraft.spatial_region.inspect",

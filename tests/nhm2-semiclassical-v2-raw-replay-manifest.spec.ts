@@ -24,6 +24,7 @@ import {
   type Nhm2SemiclassicalV2RawReplayArrayV1,
   type Nhm2SemiclassicalV2RawReplayImplementationRole,
   type Nhm2SemiclassicalV2RawReplayInputEntryV1,
+  type Nhm2SemiclassicalV2RawReplayMetricDemandInputFileV1,
   type Nhm2SemiclassicalV2RawReplayManifestV1,
 } from "../shared/contracts/nhm2-semiclassical-v2-raw-replay-manifest.v1";
 import {
@@ -37,10 +38,17 @@ const hash = (value: string): string =>
   createHash("sha256").update(value, "utf8").digest("hex");
 
 const FROZEN_AT = "2026-08-09T12:00:00.000Z";
+const SEALED_AT = "2026-08-09T12:00:30.000Z";
+const INPUT_OBSERVED_AT = "2026-08-09T12:00:45.000Z";
 const STARTED_AT = "2026-08-09T12:01:00.000Z";
 const COMPLETED_AT = "2026-08-09T12:01:02.000Z";
 const GENERATED_AT = "2026-08-09T12:01:03.000Z";
 const SAMPLE_COUNT = 64;
+const CANDIDATE_ID = "nhm2-semiclassical-v2-candidate-001";
+const sealKey = (candidateId: string): string =>
+  hash(
+    `nhm2-semiclassical-v2-deterministic-seal-key/v2\n${candidateId.toLocaleLowerCase("en-US")}`,
+  );
 
 const inputEntries = (
   role: Nhm2SemiclassicalV2RawReplayImplementationRole,
@@ -63,7 +71,7 @@ const inputEntries = (
         ? "application/octet-stream"
         : "application/json",
       freshness: "preexisting_unchanged" as const,
-      observedAt: FROZEN_AT,
+      observedAt: INPUT_OBSERVED_AT,
     };
     if (inputId === "tolerance_policy") {
       return {
@@ -74,7 +82,8 @@ const inputEntries = (
         mediaType: "application/json",
       };
     }
-    return inputId === "metric_demand_tensor"
+    return inputId === "metric_demand_tensor" ||
+      inputId === "metric_demand_absolute_error_bound"
       ? {
           ...base,
           inputId,
@@ -133,12 +142,11 @@ const completeManifest = (
 
   return {
     artifactId: NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MANIFEST_ARTIFACT_ID,
-    contractVersion:
-      NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MANIFEST_CONTRACT_VERSION,
+    contractVersion: NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MANIFEST_CONTRACT_VERSION,
     manifestFrozenAt: FROZEN_AT,
     generatedAt: GENERATED_AT,
     candidate: {
-      candidateId: "nhm2-semiclassical-v2-candidate-001",
+      candidateId: CANDIDATE_ID,
       candidateManifestId: "nhm2-candidate-manifest-001",
       selectedProfileId: "nhm2-profile-nondegenerate-001",
       candidateKind: "frozen_nondegenerate_nhm2_semiclassical_candidate",
@@ -151,8 +159,12 @@ const completeManifest = (
       samplingBasisId: "bilocal-sampling-basis-001",
       nondegeneracyCriterionId: "positive-metric-demand-frobenius-001",
       metricDemandInputId: "metric_demand_tensor",
+      metricDemandErrorBoundInputId: "metric_demand_absolute_error_bound",
+      metricDemandDerivationWitnessInputId: "metric_demand_derivation_receipt",
       minimumMetricDemandFrobeniusSI:
         NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY.minimumMetricDemandFrobeniusSI,
+      requiredMetricDemandSampleFraction:
+        NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY.requiredMetricDemandSampleFraction,
       sampleCount: SAMPLE_COUNT,
       frozenAt: FROZEN_AT,
     },
@@ -170,11 +182,15 @@ const completeManifest = (
       units: {
         noiseKernel: "(J/m^3)^2",
         meanRset: "J/m^3",
+        meanRsetAbsoluteUncertainty95: "J/m^3",
+        metricDemandAbsoluteErrorBound: "J/m^3",
         smearingWeights: "dimensionless",
         normalizedConstraints: "dimensionless",
         regulatorScale: "dimensionless",
       },
-      tolerances: { ...NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY.tolerances },
+      tolerances: {
+        ...NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY.tolerances,
+      },
     },
     implementation: {
       comparisonPairId: "nhm2-semiclassical-v2-pair-001",
@@ -219,11 +235,21 @@ const completeManifest = (
       terminationSignal: null,
     },
     inputClosure: {
-      frozenBeforeExecution: true,
+      manifestDeclaresFrozenBeforeExecution: true,
+      scientificPresealBinding: {
+        artifactId: "nhm2.semiclassical_v2_scientific_preseal",
+        contractVersion: "nhm2_semiclassical_v2_scientific_preseal/v2",
+        sealKey: sealKey(CANDIDATE_ID),
+        candidateManifestSha256: entries.find(
+          (entry) => entry.inputId === "candidate_manifest",
+        )!.sha256,
+        scientificContentSha256: hash("scientific-content"),
+        sealedInventorySha256: hash("sealed-inventory"),
+        sealedAt: SEALED_AT,
+      },
       scientificRootDirectory: "inputs/frozen",
       implementationRootDirectory: `inputs/${role}`,
-      algorithm:
-        NHM2_SEMICLASSICAL_V2_RAW_REPLAY_INPUT_CLOSURE_ALGORITHM,
+      algorithm: NHM2_SEMICLASSICAL_V2_RAW_REPLAY_INPUT_CLOSURE_ALGORITHM,
       ordering: NHM2_SEMICLASSICAL_V2_RAW_REPLAY_INPUT_ORDERING,
       entries,
       excludedInputIds: [
@@ -275,23 +301,27 @@ const completeManifest = (
         NHM2_SEMICLASSICAL_TENSOR_COMPONENTS,
         "J/m^3",
       ),
+      meanRsetAbsoluteUncertainty95: array(
+        "mean_rset_absolute_uncertainty95",
+        [SAMPLE_COUNT, NHM2_SEMICLASSICAL_TENSOR_COMPONENTS.length],
+        NHM2_SEMICLASSICAL_TENSOR_COMPONENTS,
+        "J/m^3",
+      ),
       smearingWeights: array(
         "smearing_weights",
         [SAMPLE_COUNT],
         ["weight"],
         "dimensionless",
       ),
-      brackets: NHM2_SEMICLASSICAL_CONSTRAINT_BRACKET_IDS.map(
-        (bracketId) => ({
-          bracketId,
-          computed: constraintArray(`constraint_bracket.${bracketId}.computed`),
-          target: constraintArray(`constraint_bracket.${bracketId}.target`),
-          residual: constraintArray(`constraint_bracket.${bracketId}.residual`),
-          absoluteUncertainty95: constraintArray(
-            `constraint_bracket.${bracketId}.absolute_uncertainty95`,
-          ),
-        }),
-      ),
+      brackets: NHM2_SEMICLASSICAL_CONSTRAINT_BRACKET_IDS.map((bracketId) => ({
+        bracketId,
+        computed: constraintArray(`constraint_bracket.${bracketId}.computed`),
+        target: constraintArray(`constraint_bracket.${bracketId}.target`),
+        residual: constraintArray(`constraint_bracket.${bracketId}.residual`),
+        absoluteUncertainty95: constraintArray(
+          `constraint_bracket.${bracketId}.absolute_uncertainty95`,
+        ),
+      })),
       antisymmetry: {
         forward: constraintArray("antisymmetry.forward"),
         reverse: constraintArray("antisymmetry.reverse"),
@@ -305,9 +335,7 @@ const completeManifest = (
         term2: constraintArray("jacobi.term_2"),
         term3: constraintArray("jacobi.term_3"),
         residual: constraintArray("jacobi.residual"),
-        absoluteUncertainty95: constraintArray(
-          "jacobi.absolute_uncertainty95",
-        ),
+        absoluteUncertainty95: constraintArray("jacobi.absolute_uncertainty95"),
       },
       regulatorLevels: [1, 0.5, 0.25].map((scale, ordinal) => ({
         ordinal,
@@ -395,13 +423,36 @@ const rebaseOutputRoot = (
   nextRoot: string,
 ): void => {
   const priorRoot = manifest.execution.outputDirectory;
-  for (const array of collectNhm2SemiclassicalV2RawReplayOutputArrays(manifest)) {
+  for (const array of collectNhm2SemiclassicalV2RawReplayOutputArrays(
+    manifest,
+  )) {
     array.path = `${nextRoot}${array.path.slice(priorRoot.length)}`;
   }
   manifest.execution.outputDirectory = nextRoot;
 };
 
 describe("NHM2 semiclassical-v2 raw replay manifest", () => {
+  it("rejects the superseded v1 manifest and scientific-preseal identities", () => {
+    const oldManifest = completeManifest() as unknown as {
+      contractVersion: string;
+    };
+    oldManifest.contractVersion =
+      "nhm2_semiclassical_v2_raw_replay_manifest/v1";
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestViolations(oldManifest),
+    ).toContain("manifest_identity_invalid");
+
+    const oldPreseal = completeManifest() as unknown as {
+      inputClosure: {
+        scientificPresealBinding: { contractVersion: string };
+      };
+    };
+    oldPreseal.inputClosure.scientificPresealBinding.contractVersion =
+      "nhm2_semiclassical_v2_scientific_preseal/v1";
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestViolations(oldPreseal),
+    ).toContain("scientific_preseal_binding_invalid");
+  });
   it("accepts exact primary and independent raw manifests and their isolated pair", () => {
     const primary = completeManifest("primary");
     const independent = completeManifest("independent");
@@ -414,9 +465,9 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
     expect(
       nhm2SemiclassicalV2RawReplayManifestPairViolations(primary, independent),
     ).toEqual([]);
-    expect(collectNhm2SemiclassicalV2RawReplayOutputArrays(primary)).toHaveLength(
-      31,
-    );
+    expect(
+      collectNhm2SemiclassicalV2RawReplayOutputArrays(primary),
+    ).toHaveLength(32);
     expect(Object.keys(primary)).not.toEqual(
       expect.arrayContaining(["status", "verdict", "replayPass"]),
     );
@@ -434,15 +485,40 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
         "utf8",
       ),
     ).toBe(NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_SIZE_BYTES);
-    expect(hash(NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_CANONICAL_JSON)).toBe(
-      NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_SHA256,
-    );
+    expect(
+      hash(NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_CANONICAL_JSON),
+    ).toBe(NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_SHA256);
     expect(Object.isFrozen(NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY)).toBe(
       true,
     );
     expect(
       Object.isFrozen(NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY.tolerances),
     ).toBe(true);
+    expect(
+      NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORMULAS.maximumEigenvalueUpper95,
+    ).toContain("*d_i*d_j");
+    expect(
+      NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORMULAS.maximumEigenvalueUpper95,
+    ).not.toContain("*S[i,j]");
+    expect(NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORMULAS.psd).toContain(
+      "max_i(sum_j(abs(R[i,j])))",
+    );
+    expect(
+      NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORMULAS.metricDemandNondegeneracy,
+    ).toContain("required_metric_demand_sample_fraction");
+    expect(
+      NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORMULAS.meanMetricDemandClosure,
+    ).toContain("mean_rset_absolute_uncertainty95");
+    expect(
+      NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY.tolerances
+        .meanMetricDemandPointwiseRelativeUpper95,
+    ).toBe(0.1);
+    expect(
+      NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORMULAS.regulatorConvergence,
+    ).toContain("q_(k+1)");
+    expect(
+      NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORMULAS.regulatorConvergence,
+    ).toContain("scale_(k+1)");
     expect(NHM2_SEMICLASSICAL_V2_RAW_REPLAY_REQUIRED_INPUT_IDS).toEqual(
       expect.arrayContaining([
         "field_model",
@@ -481,15 +557,21 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
       arrays: { noiseKernel: Record<string, unknown> };
     };
     rawArray.arrays.noiseKernel.psdPass = true;
-    expect(
-      nhm2SemiclassicalV2RawReplayManifestViolations(rawArray),
-    ).toContain("array_shape_invalid:/arrays/noiseKernel");
+    expect(nhm2SemiclassicalV2RawReplayManifestViolations(rawArray)).toContain(
+      "array_shape_invalid:/arrays/noiseKernel",
+    );
   });
 
-  it("requires N>=64 and exact float64 raw byte layouts, axes, components, and units", () => {
+  it("freezes N=64 and exact float64 raw byte layouts, axes, components, and units", () => {
     const tooSmall = completeManifest();
     tooSmall.candidate.sampleCount = 63;
     expect(nhm2SemiclassicalV2RawReplayManifestViolations(tooSmall)).toContain(
+      "candidate_freeze_invalid",
+    );
+
+    const tooLarge = completeManifest();
+    tooLarge.candidate.sampleCount = 65;
+    expect(nhm2SemiclassicalV2RawReplayManifestViolations(tooLarge)).toContain(
       "candidate_freeze_invalid",
     );
 
@@ -508,9 +590,9 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
 
     const components = completeManifest();
     components.arrays.meanRset.componentOrder.reverse();
-    expect(nhm2SemiclassicalV2RawReplayManifestViolations(components)).toContain(
-      "array_component_order_invalid:/arrays/meanRset",
-    );
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestViolations(components),
+    ).toContain("array_component_order_invalid:/arrays/meanRset");
 
     const unit = completeManifest();
     unit.arrays.brackets[0].computed.unit = "constraint_density_SI";
@@ -580,9 +662,8 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
     ).toContain("input_binding_invalid:/inputClosure/entries/0");
 
     const outputFreshness = completeManifest();
-    (
-      outputFreshness.arrays.meanRset as { freshness: string }
-    ).freshness = "preexisting_unchanged";
+    (outputFreshness.arrays.meanRset as { freshness: string }).freshness =
+      "preexisting_unchanged";
     expect(
       nhm2SemiclassicalV2RawReplayManifestViolations(outputFreshness),
     ).toContain("array_file_binding_invalid:/arrays/meanRset");
@@ -606,18 +687,13 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
       "inputs/frozen/executable.bin";
     recomputeClosures(escapedImplementationRoot);
     expect(
-      nhm2SemiclassicalV2RawReplayManifestViolations(
-        escapedImplementationRoot,
-      ),
-    ).toContain("input_binding_invalid:/inputClosure/entries/23");
+      nhm2SemiclassicalV2RawReplayManifestViolations(escapedImplementationRoot),
+    ).toContain("input_binding_invalid:/inputClosure/entries/25");
 
     const metricDemand = completeManifest();
     const descriptor = metricDemand.inputClosure.entries.find(
       (entry) => entry.inputId === "metric_demand_tensor",
-    )! as Extract<
-      Nhm2SemiclassicalV2RawReplayInputEntryV1,
-      { inputId: "metric_demand_tensor" }
-    >;
+    )! as Nhm2SemiclassicalV2RawReplayMetricDemandInputFileV1;
     descriptor.shape = [SAMPLE_COUNT, 9] as unknown as [number, 10];
     descriptor.sizeBytes = SAMPLE_COUNT * 9 * 8;
     recomputeClosures(metricDemand);
@@ -630,10 +706,7 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
     const representationClosure = completeManifest();
     const representedMetric = representationClosure.inputClosure.entries.find(
       (entry) => entry.inputId === "metric_demand_tensor",
-    )! as Extract<
-      Nhm2SemiclassicalV2RawReplayInputEntryV1,
-      { inputId: "metric_demand_tensor" }
-    >;
+    )! as Nhm2SemiclassicalV2RawReplayMetricDemandInputFileV1;
     representedMetric.componentOrder.reverse();
     expect(
       nhm2SemiclassicalV2RawReplayManifestViolations(representationClosure),
@@ -643,6 +716,74 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
         "scientific_input_closure_sha256_mismatch",
         "complete_input_closure_sha256_mismatch",
       ]),
+    );
+  });
+
+  it("requires an exact non-authoritative scientific-preseal echo and pre-start staged observations", () => {
+    const stagedAfterCandidateFreeze = completeManifest();
+    expect(
+      stagedAfterCandidateFreeze.inputClosure.entries.every(
+        (entry) =>
+          Date.parse(entry.observedAt) >
+            Date.parse(stagedAfterCandidateFreeze.candidate.frozenAt) &&
+          Date.parse(entry.observedAt) <
+            Date.parse(stagedAfterCandidateFreeze.execution.startedAt),
+      ),
+    ).toBe(true);
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestViolations(
+        stagedAfterCandidateFreeze,
+      ),
+    ).toEqual([]);
+
+    const missing = completeManifest() as unknown as {
+      inputClosure: Record<string, unknown>;
+    };
+    delete missing.inputClosure.scientificPresealBinding;
+    expect(nhm2SemiclassicalV2RawReplayManifestViolations(missing)).toContain(
+      "input_closure_shape_invalid",
+    );
+
+    const producerClaimsAuthority = completeManifest() as unknown as {
+      inputClosure: {
+        scientificPresealBinding: Record<string, unknown>;
+      };
+    };
+    producerClaimsAuthority.inputClosure.scientificPresealBinding.preexecutionScientificInputSealVerified = true;
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestViolations(producerClaimsAuthority),
+    ).toContain("scientific_preseal_binding_invalid");
+
+    const retunedKey = completeManifest();
+    retunedKey.inputClosure.scientificPresealBinding.sealKey = hash(
+      "producer-retuned-seal-key",
+    );
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestViolations(retunedKey),
+    ).toContain("scientific_preseal_binding_invalid");
+
+    const retunedCandidateManifestHash = completeManifest();
+    retunedCandidateManifestHash.inputClosure.scientificPresealBinding.candidateManifestSha256 =
+      hash("producer-retuned-candidate-manifest");
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestViolations(
+        retunedCandidateManifestHash,
+      ),
+    ).toContain("scientific_preseal_candidate_manifest_binding_mismatch");
+
+    for (const observedAt of [STARTED_AT, "2026-08-09T12:01:00.001Z"]) {
+      const lateObservation = completeManifest();
+      lateObservation.inputClosure.entries[0].observedAt = observedAt;
+      recomputeClosures(lateObservation);
+      expect(
+        nhm2SemiclassicalV2RawReplayManifestViolations(lateObservation),
+      ).toContain("input_freshness_interval_invalid:/inputClosure/entries/0");
+    }
+
+    const lateSeal = completeManifest();
+    lateSeal.inputClosure.scientificPresealBinding.sealedAt = STARTED_AT;
+    expect(nhm2SemiclassicalV2RawReplayManifestViolations(lateSeal)).toContain(
+      "scientific_preseal_binding_invalid",
     );
   });
 
@@ -674,9 +815,7 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
     const outputBelowImplementation = completeManifest();
     rebaseOutputRoot(outputBelowImplementation, "inputs/primary/output");
     expect(
-      nhm2SemiclassicalV2RawReplayManifestViolations(
-        outputBelowImplementation,
-      ),
+      nhm2SemiclassicalV2RawReplayManifestViolations(outputBelowImplementation),
     ).toContain("root_topology_invalid");
 
     const scientificBelowOutput = completeManifest();
@@ -684,6 +823,43 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
     expect(
       nhm2SemiclassicalV2RawReplayManifestViolations(scientificBelowOutput),
     ).toContain("root_topology_invalid");
+
+    const caseAliasedRoot = completeManifest();
+    rebaseInputRoot(caseAliasedRoot, "implementation", "INPUTS/FROZEN");
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestViolations(caseAliasedRoot),
+    ).toContain("root_topology_invalid");
+  });
+
+  it("rejects case-fold aliases in input and output file inventories", () => {
+    const inputAlias = completeManifest();
+    const firstInputPath = inputAlias.inputClosure.entries[0].path;
+    const firstInputDirectory = firstInputPath.slice(
+      0,
+      firstInputPath.lastIndexOf("/") + 1,
+    );
+    inputAlias.inputClosure.entries[1].path =
+      firstInputDirectory +
+      firstInputPath.slice(firstInputDirectory.length).toUpperCase();
+    recomputeClosures(inputAlias);
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestViolations(inputAlias),
+    ).toContain("input_paths_not_unique");
+
+    const outputAlias = completeManifest();
+    const outputs =
+      collectNhm2SemiclassicalV2RawReplayOutputArrays(outputAlias);
+    const firstOutputPath = outputs[0].path;
+    const firstOutputDirectory = firstOutputPath.slice(
+      0,
+      firstOutputPath.lastIndexOf("/") + 1,
+    );
+    outputs[1].path =
+      firstOutputDirectory +
+      firstOutputPath.slice(firstOutputDirectory.length).toUpperCase();
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestViolations(outputAlias),
+    ).toContain("output_paths_not_unique");
   });
 
   it("freezes formulas and positive tolerances before a self-consistent run interval", () => {
@@ -732,9 +908,16 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
       nhm2SemiclassicalV2RawReplayManifestViolations(tinyMetricFloor),
     ).toContain("candidate_freeze_invalid");
 
+    const sparseMetricCoverage = completeManifest();
+    sparseMetricCoverage.candidate.requiredMetricDemandSampleFraction = 0.01;
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestViolations(sparseMetricCoverage),
+    ).toContain("candidate_freeze_invalid");
+
     const policyIdMismatch = completeManifest();
-    (policyIdMismatch.candidate as { tolerancePolicyId: string }).tolerancePolicyId =
-      "producer-policy/v999";
+    (
+      policyIdMismatch.candidate as { tolerancePolicyId: string }
+    ).tolerancePolicyId = "producer-policy/v999";
     expect(
       nhm2SemiclassicalV2RawReplayManifestViolations(policyIdMismatch),
     ).toContain("candidate_freeze_invalid");
@@ -761,9 +944,9 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
     lateFreeze.manifestFrozenAt = "2026-08-09T12:02:00.000Z";
     lateFreeze.candidate.frozenAt = lateFreeze.manifestFrozenAt;
     lateFreeze.numericalPolicy.frozenAt = lateFreeze.manifestFrozenAt;
-    expect(nhm2SemiclassicalV2RawReplayManifestViolations(lateFreeze)).toContain(
-      "execution_interval_invalid",
-    );
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestViolations(lateFreeze),
+    ).toContain("execution_interval_invalid");
 
     const falseDuration = completeManifest();
     falseDuration.execution.durationMs = 1999;
@@ -819,8 +1002,7 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
     const regulatorUncertainty = completeManifest() as unknown as {
       arrays: { regulatorLevels: Array<Record<string, unknown>> };
     };
-    delete regulatorUncertainty.arrays.regulatorLevels[0]
-      .absoluteUncertainty95;
+    delete regulatorUncertainty.arrays.regulatorLevels[0].absoluteUncertainty95;
     expect(
       nhm2SemiclassicalV2RawReplayManifestViolations(regulatorUncertainty),
     ).toContain("regulator_level_shape_invalid:/arrays/regulatorLevels/0");
@@ -843,6 +1025,16 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
       ]),
     );
 
+    const retunedPresealHash = completeManifest("independent");
+    retunedPresealHash.inputClosure.scientificPresealBinding.sealedInventorySha256 =
+      hash("retuned-independent-sealed-inventory");
+    expect(
+      nhm2SemiclassicalV2RawReplayManifestPairViolations(
+        primary,
+        retunedPresealHash,
+      ),
+    ).toContain("frozen_scientific_inputs_mismatch");
+
     const copiedImplementation = completeManifest("independent");
     copiedImplementation.implementation.implementationId =
       primary.implementation.implementationId;
@@ -864,7 +1056,9 @@ describe("NHM2 semiclassical-v2 raw replay manifest", () => {
     const reusedImplementationRoot = completeManifest("independent");
     reusedImplementationRoot.inputClosure.implementationRootDirectory =
       primary.inputClosure.implementationRootDirectory;
-    for (const entry of reusedImplementationRoot.inputClosure.entries.slice(-3)) {
+    for (const entry of reusedImplementationRoot.inputClosure.entries.slice(
+      -3,
+    )) {
       entry.path = entry.path.replace("inputs/independent/", "inputs/primary/");
     }
     recomputeClosures(reusedImplementationRoot);

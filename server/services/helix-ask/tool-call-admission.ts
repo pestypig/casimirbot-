@@ -15,8 +15,7 @@ import { buildTurnOperationalConstraints } from "./operational-constraints";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import {
-  extractExplicitCapabilityContract,
-  extractExplicitCapabilityContracts,
+  extractPlannerBindingCapabilityContracts,
   type ExplicitCapabilityContract,
   type ExplicitCapabilityExtractionContext,
   explicitCapabilityContractForCapability,
@@ -426,17 +425,15 @@ export function buildToolCallAdmissionDecision(input: {
     );
   const calculatorSolveIntent = calculatorSolveRequested(promptText, input.sourceTargetIntent);
   const mandatoryToolName = readMandatoryToolName(mandatoryNextToolRecord);
-  const promptExplicitCapabilityMatches = extractExplicitCapabilityContracts(
+  const promptExplicitCapabilityMatches = extractPlannerBindingCapabilityContracts(
     promptText,
     input.trustedEnvironmentContext,
   );
   const promptExplicitCapabilityContracts = uniqueExplicitCapabilityContracts(
     promptExplicitCapabilityMatches.map((match) => match.contract),
   );
-  const promptExplicitCapabilityContract = extractExplicitCapabilityContract(
-    promptText,
-    input.trustedEnvironmentContext,
-  );
+  const promptExplicitCapabilityContract =
+    promptExplicitCapabilityMatches[0]?.contract ?? null;
   const hardVisualCaptureSource =
     sourceTarget === "visual_capture" &&
     readString(sourceTargetIntentRecord?.strength) === "hard";
@@ -622,7 +619,10 @@ export function buildToolCallAdmissionDecision(input: {
       isStagePlayReflectionPrompt(promptText)
     );
 
-  if (effectiveSourceTarget === "docs_viewer") {
+  if (
+    effectiveSourceTarget === "docs_viewer" ||
+    effectiveSourceTarget === "active_doc"
+  ) {
     admittedToolFamilies = ["docs_viewer"];
     extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_card_projection", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "visual_deictic"];

@@ -1,0 +1,162 @@
+{
+  "schema": "casimir_desktop_release_slice/1",
+  "ownedTrees": [
+    "apps/desktop",
+    "plugins/casimirbot-device-check"
+  ],
+  "ownedFiles": [
+    ".agents/plugins/marketplace.json",
+    ".github/workflows/desktop-release.yml",
+    "client/src/components/agent-access/AgentAccountBindingReadiness.tsx",
+    "client/src/components/agent-access/__tests__/AgentAccountBindingReadiness.spec.tsx",
+    "client/src/components/DesktopUpdatePanel.tsx",
+    "client/src/components/DeviceCheckPanel.tsx",
+    "client/src/components/__tests__/DesktopUpdatePanel.spec.tsx",
+    "client/src/components/__tests__/DeviceCheckPanel.spec.tsx",
+    "client/src/lib/runtime/RuntimeSurfaceProvider.tsx",
+    "client/src/lib/runtime/__tests__/RuntimeSurfaceProvider.spec.tsx",
+    "client/src/pages/__tests__/download.spec.tsx",
+    "client/src/pages/download.tsx",
+    "docs/audits/casimirbot-desktop-app-readiness-2026-08-11.md",
+    "docs/runbooks/auth0-codex-device-check.md",
+    "docs/runbooks/desktop-release-and-update.md",
+    "scripts/vite-lucide-direct-imports.ts",
+    "scripts/vite-production-runtime-vendors.ts",
+    "server/__tests__/desktop-release-status.test.ts",
+    "server/auth/__tests__/helix-agent-principal.test.ts",
+    "server/auth/helix-agent-principal.ts",
+    "server/mcp/__tests__/helix-mcp-device-check.test.ts",
+    "server/routes/__tests__/environment-connector-platform.test.ts",
+    "server/routes/__tests__/desktop-auth0-account-link.test.ts",
+    "server/routes/__tests__/helix-agent-account-bindings.test.ts",
+    "server/routes/__tests__/helix-agent-transports.test.ts",
+    "server/routes/desktop-auth0-account-link.ts",
+    "server/routes/desktop-release.ts",
+    "server/routes/helix-agent-account-bindings.ts",
+    "server/security/__tests__/desktop-session.test.ts",
+    "server/security/desktop-session.ts",
+    "server/services/desktop-release.ts",
+    "server/services/environment-connectors/devices/__tests__/device-check.test.ts",
+    "server/services/environment-connectors/devices/device-check.ts",
+    "server/services/helix-account/__tests__/agent-account-link-store.test.ts",
+    "server/services/helix-account/__tests__/auth0-native-account-link.test.ts",
+    "server/services/helix-account/agent-account-link-store.ts",
+    "server/services/helix-account/auth0-native-account-link.ts",
+    "shared/__tests__/desktop-update.spec.ts",
+    "shared/__tests__/runtime-surface.spec.ts",
+    "shared/desktop-release.ts",
+    "shared/desktop-update.ts",
+    "shared/helix-environment-device-check.ts",
+    "shared/runtime-surface.ts",
+    "shared/codex-plugin.ts",
+    "shared/desktop-mcp-tunnel.ts",
+    "shared/desktop-auth0-account-link.ts",
+    "tests/desktop-auth0-account-link.spec.ts",
+    "tests/desktop-codex-plugin.spec.ts",
+    "tests/desktop-mcp-tunnel.spec.ts",
+    "tests/desktop-casimir-gate-receipt.spec.ts",
+    "tests/desktop-host-security.spec.ts",
+    "tests/desktop-release-slice.spec.ts",
+    "tests/desktop-service-environment.spec.ts",
+    "tests/desktop-site-release-metadata.spec.ts",
+    "tests/vite-lucide-direct-imports.spec.ts",
+    "tests/vite-production-runtime-vendors.spec.ts"
+  ],
+  "sharedFiles": [
+    {
+      "path": ".gitignore",
+      "purpose": "Keep checksum-verified tunnel-client build payloads out of Git",
+      "requiredMarkers": ["/apps/desktop/vendor/tunnel-client/"]
+    },
+    {
+      "path": ".env.example",
+      "purpose": "Fail-closed public desktop release configuration",
+      "requiredMarkers": ["DESKTOP_RELEASE_APPROVED=0"]
+    },
+    {
+      "path": "client/src/App.tsx",
+      "purpose": "Shared runtime-surface provider and download route",
+      "requiredMarkers": ["RuntimeSurfaceProvider", "path=\"/download\""]
+    },
+    {
+      "path": "client/src/components/desktop/DesktopTaskbar.tsx",
+      "purpose": "Production graph direct Lucide imports",
+      "requiredMarkers": ["import { AppWindow, ChevronUp } from \"lucide-react\""]
+    },
+    {
+      "path": "client/src/components/desktop/TaskbarPanel.tsx",
+      "purpose": "Production graph direct Lucide imports",
+      "requiredMarkers": ["import { AppWindow, Settings2 } from \"lucide-react\""]
+    },
+    {
+      "path": "client/src/pages/helix-core.panels.ts",
+      "purpose": "Developer Device Check and Desktop Updates panel registration",
+      "requiredMarkers": ["id: \"device-check\"", "id: \"desktop-updates\""]
+    },
+    {
+      "path": "client/src/pages/start.tsx",
+      "purpose": "Website download entry point",
+      "requiredMarkers": ["setLocation(\"/download\")"]
+    },
+    {
+      "path": "package.json",
+      "purpose": "Measured memory-bounded production client build",
+      "requiredMarkers": ["--max-old-space-size=2304 ./node_modules/vite/bin/vite.js build"]
+    },
+    {
+      "path": "server/index.ts",
+      "purpose": "Loopback child env isolation and HTTP session guard",
+      "requiredMarkers": ["shouldLoadLocalEnvFile", "createDesktopSessionGuard"]
+    },
+    {
+      "path": "server/mcp/helix-mcp-server.ts",
+      "purpose": "OAuth-protected read-only Codex Device Check tool",
+      "requiredMarkers": ["helix_environment_device_check"]
+    },
+    {
+      "path": "server/routes.ts",
+      "purpose": "Public release route and desktop WebSocket session guard",
+      "requiredMarkers": ["desktopReleaseRouter", "isDesktopSessionAuthorized"]
+    },
+    {
+      "path": "server/routes/environment-connector-platform.ts",
+      "purpose": "Owner-scoped browser Device Check route",
+      "requiredMarkers": ["/environment-connectors/devices", "buildEnvironmentConnectorDeviceCheckList"]
+    },
+    {
+      "path": "server/services/environment-connectors/devices/index.ts",
+      "purpose": "Shared Device Check service export",
+      "requiredMarkers": ["buildEnvironmentConnectorDeviceCheckList"]
+    },
+    {
+      "path": "server/startup-config.ts",
+      "purpose": "Forced IPv4 loopback desktop host mode",
+      "requiredMarkers": ["CASIMIR_DESKTOP_HOST", "CASIMIR_SKIP_LOCAL_ENV_FILE"]
+    },
+    {
+      "path": "tests/startup-config.spec.ts",
+      "purpose": "Desktop loopback and env-isolation regression coverage",
+      "requiredMarkers": ["forces native desktop host mode onto IPv4 loopback", "isolated desktop child"]
+    },
+    {
+      "path": "vite.config.ts",
+      "purpose": "Measured production dependency-graph convergence",
+      "requiredMarkers": ["lucideDirectImports", "productionRuntimeVendors"]
+    }
+  ],
+  "forbiddenTrackedTrees": [
+    "apps/desktop/build",
+    "apps/desktop/dist",
+    "apps/desktop/node_modules",
+    "apps/desktop/release",
+    "apps/desktop/runtime"
+  ],
+  "forbiddenOwnedExtensions": [
+    ".cer",
+    ".crt",
+    ".key",
+    ".p12",
+    ".pem",
+    ".pfx"
+  ]
+}

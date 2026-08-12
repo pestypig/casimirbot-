@@ -227,6 +227,14 @@ const buildProviderProjectionFields = (input: {
     capability_lane_goal_dispatch_admissions: goalDispatchAdmissions,
     capability_lane_goal_dispatch_readiness: goalDispatchReadiness,
     capability_lane_reentry_status: input.providerDebug.capability_lane_reentry_status ?? null,
+    runtime_lane_request_contract:
+      input.providerDebug.runtime_lane_request_contract ??
+      input.providerResult.runtime_lane_request_contract ??
+      null,
+    provider_solver_completion_audit:
+      input.providerDebug.provider_solver_completion_audit ??
+      input.providerResult.provider_solver_completion_audit ??
+      null,
     workstation_gateway_reentry_status:
       input.providerDebug.workstation_gateway_reentry_status ?? input.runtimeSelectionTrace.evidence_reentry_status,
     terminal_authority_status:

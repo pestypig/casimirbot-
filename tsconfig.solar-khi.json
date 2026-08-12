@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "types/**/*.d.ts",
+    "shared/contracts/solar-khi-observation.v1.ts",
+    "shared/theory/solar-khi-nanoflare-theory-badges.ts",
+    "shared/theory/helix-theory-badge-graph.ts",
+    "shared/math-stage.ts",
+    "server/services/essence/solar-khi-analysis.ts",
+    "server/services/essence/solar-energy-adapter.ts",
+    "server/services/vision/solar-model-registry.ts",
+    "server/routes/star-watcher.ts",
+    "client/src/components/SolarKhiNativeOverlay.tsx",
+    "client/src/pages/star-watcher-panel.tsx"
+  ],
+  "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "**/*.spec.ts", "**/*.spec.tsx"],
+  "compilerOptions": {
+    "incremental": false,
+    "noEmit": true
+  }
+}

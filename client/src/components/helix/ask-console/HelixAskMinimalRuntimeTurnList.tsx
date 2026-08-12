@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import type { HelixAgentRuntimeDescriptor } from "@shared/helix-agent-runtime";
 import {
   DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
@@ -22,6 +22,12 @@ import { HelixAskReplyCard } from "./HelixAskReplyCard";
 import { mergeHelixAskRuntimeGoalDebugFields } from "./HelixAskRuntimeGoalDebugContext";
 import { HelixAskTurnList } from "./HelixAskTurnList";
 import { HelixAskTurnControls } from "./HelixAskTurnControls";
+import {
+  HELIX_ASK_DEFAULT_RENDERED_TURN_COUNT,
+  HELIX_ASK_RENDERED_TURN_REVEAL_STEP,
+  HelixAskTurnHistoryWindowControl,
+  selectHelixAskTurnHistoryWindow,
+} from "./HelixAskTurnHistoryWindow";
 import { selectHelixAskConsoleWorkstationTraceRows } from "./HelixAskWorkstationTraceRows";
 
 export type HelixAskMinimalRuntimeTurnView = {
@@ -109,7 +115,15 @@ export function HelixAskMinimalRuntimeTurnList({
   providers = DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS,
   controlActions = HELIX_ASK_MINIMAL_RUNTIME_BROWSER_CONTROL_ACTIONS,
 }: HelixAskMinimalRuntimeTurnListProps) {
-  const views = buildHelixAskMinimalRuntimeTurnViews({ replies, providers });
+  const [renderedTurnLimit, setRenderedTurnLimit] = useState(HELIX_ASK_DEFAULT_RENDERED_TURN_COUNT);
+  const renderedTurnWindow = selectHelixAskTurnHistoryWindow({
+    replies,
+    requestedVisibleCount: renderedTurnLimit,
+  });
+  const views = buildHelixAskMinimalRuntimeTurnViews({
+    replies: renderedTurnWindow.visibleReplies,
+    providers,
+  });
   if (views.length === 0) return null;
   const postulateEvidenceText = views
     .slice(-8)
@@ -118,8 +132,16 @@ export function HelixAskMinimalRuntimeTurnList({
 
   return (
     <HelixAskTurnList className={className}>
+      <HelixAskTurnHistoryWindowControl
+        hiddenCount={renderedTurnWindow.hiddenCount}
+        visibleCount={renderedTurnWindow.visibleCount}
+        totalCount={renderedTurnWindow.totalCount}
+        onRevealOlder={() =>
+          setRenderedTurnLimit((current) => current + HELIX_ASK_RENDERED_TURN_REVEAL_STEP)
+        }
+      />
       {views.map((view, index) => {
-        const reply = replies[index];
+        const reply = renderedTurnWindow.visibleReplies[index];
         if (!reply) return null;
         const payload = buildHelixAskMinimalRuntimeControlPayload({ reply, view });
         return (

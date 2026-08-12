@@ -283,6 +283,12 @@ export const compactDocsEvidenceArtifactForModel = (input: {
         ...documentCandidates.map((entry, index) => compactText([
           readString(entry.title) ?? `Document candidate ${index + 1}`,
           readString(entry.path),
+          readString(entry.retrieval_status)
+            ? `retrieval status: ${readString(entry.retrieval_status)}`
+            : null,
+          readString(entry.superseded_by)
+            ? `superseded by: ${readString(entry.superseded_by)}`
+            : null,
         ].filter(Boolean).join(" - "), 260)),
       ].filter(Boolean).slice(0, cfg.observationMaxFindings)
     : [

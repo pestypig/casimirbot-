@@ -11,6 +11,7 @@ import {
   continuationStateAdmitsRuntimeRetryLaneRequest,
   providerMentionedAdmittedCapabilityIds,
   runtimeProviderRequiredGroundingCapabilityIdsFromBody,
+  runtimeProviderRequiredObservationFamiliesFromBody,
   shouldAllowCodexObservationDependentCapabilityProposal,
   shouldEnterCodexPostObservationContinuation,
   shouldExtractCodexInitialCapabilityLaneRequest,
@@ -18,6 +19,7 @@ import {
   shouldRetryCodexPostObservationContinuationAffordance,
 } from "../codex-provider";
 import { environmentCommandMinecraftManifest } from "../../workstation-tool-gateway/environment-command";
+import { environmentActionMinecraftManifests } from "../../workstation-tool-gateway/environment-action";
 import { environmentProbeMinecraftManifests } from "../../workstation-tool-gateway/environment-probe";
 import type { HelixAgentContinuationState } from "../../runtime/agent-continuation-state";
 
@@ -143,6 +145,30 @@ describe("Codex required-grounding correction", () => {
     })).toEqual(["docs.search"]);
   });
 
+  it("reads required observation families from the committed itinerary and execution state", () => {
+    expect(runtimeProviderRequiredObservationFamiliesFromBody({
+      capability_itinerary: {
+        terminal_success_criteria: {
+          required_observation_families: ["live_environment"],
+        },
+      },
+      capability_itinerary_execution_state: {
+        required_observation_families: ["live_environment"],
+      },
+    })).toEqual(["live_environment"]);
+  });
+
+  it("reads required observation families from the authoritative committed route before an itinerary exists", () => {
+    expect(runtimeProviderRequiredObservationFamiliesFromBody({
+      committed_ask_route: {
+        route_id: "world_event",
+        capability_policy: {
+          required_capability_families: ["live_environment"],
+        },
+      },
+    })).toEqual(["live_environment"]);
+  });
+
   it("retries a direct locator answer when the required Docs observation is absent", () => {
     expect(shouldRetryCodexCapabilityLaneRequest({
       question: "Find the NHM2 current status whitepaper.",
@@ -159,6 +185,40 @@ describe("Codex required-grounding correction", () => {
       providerText: "The document is available.",
       existingObservationPacketCount: 1,
       requiredCapabilityIds: ["docs.search"],
+    })).toBe(false);
+  });
+
+  it("retries capability-neutrally when a committed live-environment family is still unobserved", () => {
+    expect(shouldRetryCodexCapabilityLaneRequest({
+      question:
+        "Read fresh current-turn actor status for my selected Minecraft player and report yaw and pitch.",
+      providerText:
+        "I cannot report the pose because no fresh actor-status observation is available.",
+      existingObservationPacketCount: 0,
+      requiredObservationFamilies: ["live_environment"],
+    })).toBe(true);
+
+    const instruction = buildCodexCapabilityLaneRetryInstruction(
+      "Read fresh current-turn actor status for my selected Minecraft player and report yaw and pitch.",
+      [],
+      [],
+      ["live_environment"],
+    );
+    expect(instruction).toContain("live_environment");
+    expect(instruction).toContain("Choose the capability semantically");
+    expect(instruction).not.toContain(
+      "com.casimirbot.minecraft.actor.status.read",
+    );
+  });
+
+  it("does not infer a retry from contextual or negated environment words without a committed family", () => {
+    expect(shouldRetryCodexCapabilityLaneRequest({
+      question:
+        "Explain why the screen says actor status; do not read or change my Minecraft environment.",
+      providerText:
+        "The label describes a read-only status capability.",
+      existingObservationPacketCount: 0,
+      requiredObservationFamilies: [],
     })).toBe(false);
   });
 
@@ -629,6 +689,11 @@ describe("Codex required-grounding correction", () => {
 
   it("teaches Codex to repair installed command category and effect metadata", () => {
     const state = {
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: false,
+      },
       allowed_decisions: ["retry"],
       last_attempt: {
         capability_id: "com.casimirbot.minecraft.command",
@@ -917,6 +982,47 @@ describe("Codex required-grounding correction", () => {
     expect(text).toContain('"capability_id": "com.casimirbot.minecraft.command"');
     expect(text).toContain('"required": [\n          "command"');
     expect(text).not.toContain('"capability_id": "docs.search"');
+  });
+
+  it("preserves every capability in an already-bounded semantic action proposal", () => {
+    const actionCapabilityIds = environmentActionMinecraftManifests
+      .filter(
+        (manifest) =>
+          !manifest.capability_id.endsWith("workflow.status") &&
+          !manifest.capability_id.endsWith("workflow.cancel") &&
+          !manifest.capability_id.endsWith("workflow.resume") &&
+          !manifest.capability_id.endsWith("emergency_stop"),
+      )
+      .map((manifest) => manifest.capability_id)
+      .sort();
+    expect(actionCapabilityIds.length).toBeGreaterThan(8);
+
+    const lines = buildCodexContinuationCapabilityInputContractLines({
+      continuationState: {
+        missing_requirement_ids: ["minecraft.player_embodiment.action"],
+        next_admissible_affordances: [],
+        capability_proposal: {
+          allowed: true,
+          admitted_capability_ids: actionCapabilityIds,
+          authority: "helix_policy_admits_runtime_proposal",
+        },
+        allowed_decisions: ["act"],
+        last_attempt: {
+          capability_id: "com.casimirbot.minecraft.actor.status.read",
+          status: "succeeded",
+        },
+      } as unknown as HelixAgentContinuationState,
+      availableCapabilities: environmentActionMinecraftManifests,
+      admittedCapabilityIds: actionCapabilityIds,
+    });
+    const text = lines.join("\n");
+
+    for (const capabilityId of actionCapabilityIds) {
+      expect(text).toContain(`"capability_id": "${capabilityId}"`);
+    }
+    expect(text).toContain(
+      '"capability_id": "com.casimirbot.minecraft.player.navigate"',
+    );
   });
 
   it("drops a consumed repair schema and prioritizes the still-requested action contract", () => {

@@ -15,12 +15,19 @@ export const resolveCasimirPublicBaseUrl = (): string => {
   } catch {
     throw new Error("invalid_casimir_public_base_url");
   }
+  const isGuardedDesktopLoopback =
+    process.env.CASIMIR_DESKTOP_HOST === "1" &&
+    parsed.protocol === "http:" &&
+    parsed.hostname === "127.0.0.1" &&
+    parsed.port.length > 0;
   if (
     parsed.username ||
     parsed.password ||
     parsed.search ||
     parsed.hash ||
-    (process.env.NODE_ENV === "production" && parsed.protocol !== "https:")
+    (process.env.NODE_ENV === "production" &&
+      parsed.protocol !== "https:" &&
+      !isGuardedDesktopLoopback)
   ) {
     throw new Error("invalid_casimir_public_base_url");
   }

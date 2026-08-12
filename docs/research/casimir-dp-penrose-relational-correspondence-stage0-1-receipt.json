@@ -1,0 +1,68 @@
+{
+  "schema_version": "casimir_dp_penrose_relational_correspondence_stage0_1_receipt/1",
+  "generated_at": "2026-08-11T20:30:00.000Z",
+  "campaign_id": "casimir-dp-penrose-relational-correspondence-stage0-1-v1",
+  "benchmark_id": "operational_relational_landmarks_weak_field_v0",
+  "benchmark_version": "0.1.0",
+  "input": {
+    "path": "configs/research/casimir-dp-penrose-relational-correspondence-stage0-1.v1.json",
+    "sha256": "2f581e8b1ae4c0df9857f02e550b91d1a1e7c2328bdf11f69c0c3039a809340c"
+  },
+  "output": {
+    "path": "docs/research/casimir-dp-penrose-relational-correspondence-stage0-1-report.md",
+    "sha256": "62d473b48a2b6e17d3fbb19bfc9a9d604b19178315cd1589684cde41673dbc2b"
+  },
+  "overall_status": "blocked",
+  "synthetic_benchmark_status": "pass",
+  "scientific_correspondence_status": "blocked_pending_same_apparatus_reference_receipts",
+  "first_failure_code": "PRC_REFERENCE_RECEIPTS_MISSING",
+  "synthetic_first_failure_code": null,
+  "physical_reference_authority": {
+    "ready_packets": 0,
+    "required_packets": 5,
+    "status": "not_ready"
+  },
+  "weak_field_recovery": {
+    "target_model": "gaussian_regularized_newtonian_E_G",
+    "analytic_target_E_G_J": 1.2448783851964107e-35,
+    "relational_fourier_E_G_J": 1.244878619291315e-35,
+    "relative_error": 1.8804636908426705e-7,
+    "identity_E_G_J": 0,
+    "branch_swap_relative_error": 0
+  },
+  "stage0_candidate_first_failure_remains": "PCT_BRANCH_CORRESPONDENCE_MISSING",
+  "invariant_functional_status": "not_supplied",
+  "proposed_collapse_rate_s": null,
+  "proposed_lifetime_distribution": null,
+  "proposed_coherence_prediction": null,
+  "proposed_casimir_modifier": null,
+  "model_comparison_admission": false,
+  "empirically_validated": false,
+  "claim_ceiling": "formal_synthetic_correspondence_recovery_only",
+  "authority_integrity": [
+    {
+      "role": "stage0_candidate_receipt_authority",
+      "path": "docs/research/casimir-dp-penrose-candidate-theory-stage0-receipt.json",
+      "expected_sha256": "b1e926ddcbfeb7791230b531f8213c4b05cbfb327dffa4feb7c7b2752c753067",
+      "actual_sha256": "b1e926ddcbfeb7791230b531f8213c4b05cbfb327dffa4feb7c7b2752c753067",
+      "gate": "pass",
+      "semantic_candidate_status": "blocked",
+      "semantic_first_failure_code": "PCT_BRANCH_CORRESPONDENCE_MISSING",
+      "semantic_nonpromotion_gate": "pass"
+    },
+    {
+      "role": "gaussian_energy_authority",
+      "path": "shared/casimir-dp-dp-companion.ts",
+      "expected_sha256": "45c8838be8e0e196aab65e2871c282a127a26304afdd0532ae46ed94c858ffe8",
+      "actual_sha256": "45c8838be8e0e196aab65e2871c282a127a26304afdd0532ae46ed94c858ffe8",
+      "gate": "pass"
+    },
+    {
+      "role": "ordinary_worldline_authority",
+      "path": "configs/research/casimir-dp-proper-time-worldline-closure-stage4-2p.v1.json",
+      "expected_sha256": "67f485838ee71ccdde1559502ff450171f1df66ff88ca0b5464b73b9cc6b9e97",
+      "actual_sha256": "67f485838ee71ccdde1559502ff450171f1df66ff88ca0b5464b73b9cc6b9e97",
+      "gate": "pass"
+    }
+  ]
+}

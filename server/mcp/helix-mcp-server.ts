@@ -52,6 +52,10 @@ import {
   type HelixSharedLiveRoomRunBindingRevokeRequest,
   type HelixSharedLiveRoomSourceCreateRequest,
 } from "@shared/contracts/helix-shared-live-room-agent.v1";
+import {
+  helixEnvironmentDeviceCheckListSchema,
+  type HelixEnvironmentDeviceCheckList,
+} from "@shared/helix-environment-device-check";
 import { requireHelixAgentApiScope } from "../auth/helix-agent-principal";
 import {
   buildHelixAgentApiError,
@@ -78,6 +82,8 @@ import {
   projectSharedLiveRoomRunUnbindReceipt,
 } from "../services/shared-live-room-control/external-projections";
 import { resolveCasimirPublicBaseUrl } from "../services/public-base-url";
+import { buildEnvironmentConnectorDeviceCheckList } from
+  "../services/environment-connectors/devices";
 
 type RecordLike = Record<string, unknown>;
 
@@ -121,6 +127,15 @@ type HelixRoomIdToolArguments = {
   room_id: string;
 };
 
+type HelixEnvironmentDeviceCheckToolArguments = {
+  room_id?: string;
+};
+
+export type HelixEnvironmentDeviceCheckServicePort = (input: {
+  ownerProfileId: string;
+  roomId?: string;
+}) => Promise<HelixEnvironmentDeviceCheckList>;
+
 type HelixRoomSourceCreateToolArguments = HelixRoomIdToolArguments & {
   idempotency_key: string;
   request: HelixSharedLiveRoomSourceCreateRequest;
@@ -150,6 +165,12 @@ type McpOAuthSecurityScheme = {
 };
 
 type RequiredOAuthScopes = string | readonly string[];
+
+const DEFAULT_MCP_RESOURCE_METADATA_PATH =
+  "/.well-known/oauth-protected-resource/mcp";
+export const HELIX_DEVICE_CHECK_MCP_PATH = "/mcp/device-check";
+export const HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH =
+  "/.well-known/oauth-protected-resource/mcp/device-check";
 
 type McpToolDefinitionLike = RecordLike & {
   name: string;
@@ -401,12 +422,13 @@ const challengeScopesForError = (
 
 const insufficientScopeChallenge = (
   requiredScopes: RequiredOAuthScopes,
+  resourceMetadataPath = DEFAULT_MCP_RESOURCE_METADATA_PATH,
 ): string => {
   const scopes = normalizeRequiredScopes(requiredScopes);
   const scopeValue = scopes.join(" ");
   const resourceMetadataUrl =
     `${resolveCasimirPublicBaseUrl()}` +
-    "/.well-known/oauth-protected-resource/mcp";
+    resourceMetadataPath;
   return [
     "Bearer",
     `resource_metadata="${quoteAuthenticateParameter(resourceMetadataUrl)}"`,
@@ -465,7 +487,11 @@ const toolSuccess = (value: RecordLike) => ({
   structuredContent: value,
 });
 
-const toolError = (error: unknown, requiredScopes: RequiredOAuthScopes) => {
+const toolError = (
+  error: unknown,
+  requiredScopes: RequiredOAuthScopes,
+  resourceMetadataPath = DEFAULT_MCP_RESOURCE_METADATA_PATH,
+) => {
   const normalized =
     error instanceof HelixAgentApiServiceError
       ? error
@@ -494,6 +520,7 @@ const toolError = (error: unknown, requiredScopes: RequiredOAuthScopes) => {
             "mcp/www_authenticate": [
               insufficientScopeChallenge(
                 challengeScopesForError(normalized, requiredScopes),
+                resourceMetadataPath,
               ),
             ],
           },
@@ -531,12 +558,108 @@ const roomToolError = (error: unknown, requiredScopes: RequiredOAuthScopes) => {
 const callTool = async (
   requiredScopes: RequiredOAuthScopes,
   operation: () => Promise<RecordLike>,
+  resourceMetadataPath = DEFAULT_MCP_RESOURCE_METADATA_PATH,
 ) => {
   try {
     return toolSuccess(await operation());
   } catch (error) {
-    return toolError(error, requiredScopes);
+    return toolError(error, requiredScopes, resourceMetadataPath);
   }
+};
+
+const requireSharedLiveRoomFeature = (
+  principal: HelixAgentApiPrincipal,
+): void => {
+  const policy = principal.accountContext.account_policy;
+  if (
+    !policy ||
+    !policy.feature_flags.includes("shared_realtime_rooms") ||
+    policy.locked_features.includes("shared_realtime_rooms")
+  ) {
+    throw new SharedLiveRoomControlError(
+      403,
+      "account_policy_blocked",
+      "Shared Live Rooms are locked by the active account policy.",
+    );
+  }
+};
+
+const registerEnvironmentDeviceCheckTool = (input: {
+  server: McpServer;
+  principal: HelixAgentApiPrincipal;
+  deviceCheckService: HelixEnvironmentDeviceCheckServicePort;
+  resourceMetadataPath?: string;
+}): void => {
+  input.server.registerTool(
+    "helix_environment_device_check",
+    {
+      title: "Check environment connector devices",
+      description:
+        "Returns current, owner-scoped connector identity, freshness, and probe-readiness observations. It never returns credentials, raw observations, device public keys, or an assistant answer.",
+      inputSchema: z
+        .object({
+          room_id: helixSharedLiveRoomIdSchema.optional(),
+        })
+        .strict(),
+      outputSchema: helixEnvironmentDeviceCheckListSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+    },
+    async ({ room_id }: HelixEnvironmentDeviceCheckToolArguments) =>
+      callTool(
+        HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        async () => {
+          requireHelixAgentApiScope(
+            input.principal,
+            HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+          );
+          requireSharedLiveRoomFeature(input.principal);
+          return await input.deviceCheckService({
+            ownerProfileId: input.principal.accountProfileId,
+            roomId: room_id,
+          });
+        },
+        input.resourceMetadataPath,
+      ),
+  );
+};
+
+export const createHelixDeviceCheckMcpServer = (input: {
+  principal: HelixAgentApiPrincipal;
+  deviceCheckService?: HelixEnvironmentDeviceCheckServicePort;
+}): McpServer => {
+  const server = new McpServer(
+    {
+      name: "casimirbot-device-check",
+      version: "1.0.0",
+    },
+    {
+      instructions: [
+        "This MCP resource exposes only owner-scoped, read-only environment connector observations.",
+        "Tool output is evidence, not an assistant answer, and is never terminal-eligible.",
+        "Credentials, device public keys, and raw observations are never returned.",
+      ].join(" "),
+    },
+  );
+  registerEnvironmentDeviceCheckTool({
+    server,
+    principal: input.principal,
+    deviceCheckService:
+      input.deviceCheckService ?? buildEnvironmentConnectorDeviceCheckList,
+    resourceMetadataPath: HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH,
+  });
+  installOAuthToolCatalogAugmentation(
+    server,
+    new Map<string, RequiredOAuthScopes>([
+      ["helix_environment_device_check", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+    ]),
+  );
+  return server;
 };
 
 const callRoomTool = async (
@@ -576,6 +699,7 @@ export const createHelixMcpServer = (input: {
     | "revokeRunRoomBindingForOwner"
     | "revokeClaimedRunChatBindingForOwner"
   >;
+  deviceCheckService?: HelixEnvironmentDeviceCheckServicePort;
 }): McpServer => {
   const service = input.service ?? sharedLiveRoomAgentApiService;
   const roomControlService =
@@ -585,26 +709,16 @@ export const createHelixMcpServer = (input: {
   const roomActor = buildSharedLiveRoomControlActorFromAgentPrincipal(
     input.principal,
   );
+  const deviceCheckService =
+    input.deviceCheckService ?? buildEnvironmentConnectorDeviceCheckList;
   const roomOwner = {
     tenantId: input.principal.tenantId,
     issuer: input.principal.issuer,
     subjectId: input.principal.subjectId,
     accountProfileId: input.principal.accountProfileId,
   };
-  const requireCurrentRoomFeature = (): void => {
-    const policy = input.principal.accountContext.account_policy;
-    if (
-      !policy ||
-      !policy.feature_flags.includes("shared_realtime_rooms") ||
-      policy.locked_features.includes("shared_realtime_rooms")
-    ) {
-      throw new SharedLiveRoomControlError(
-        403,
-        "account_policy_blocked",
-        "Shared Live Rooms are locked by the active account policy.",
-      );
-    }
-  };
+  const requireCurrentRoomFeature = (): void =>
+    requireSharedLiveRoomFeature(input.principal);
   const requireAllAgentScopes = (requiredScopes: readonly string[]): void => {
     const missing = Array.from(
       new Set(
@@ -857,6 +971,12 @@ export const createHelixMcpServer = (input: {
         };
       }),
   );
+
+  registerEnvironmentDeviceCheckTool({
+    server,
+    principal: input.principal,
+    deviceCheckService,
+  });
 
   server.registerTool(
     "helix_room_list",
@@ -1220,6 +1340,7 @@ export const createHelixMcpServer = (input: {
       ["helix_run_inspect", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_run_fetch_evidence", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_run_list_events", HELIX_AGENT_RUN_READ_SCOPE],
+      ["helix_environment_device_check", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_room_list", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_room_inspect", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_room_create", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],

@@ -1,0 +1,52 @@
+{
+  "schema_version": "casimir_dp_retarded_source_propagation_stage4_2s_verification_receipt/1",
+  "campaign_run_id": "casimir-dp-retarded-source-propagation-stage4-2s-v1-20260810T180000000Z",
+  "generated_at": "2026-08-10T22:01:00.000Z",
+  "campaign_receipt_path": "docs/research/casimir-dp-retarded-source-propagation-stage4-2s-campaign-receipt.json",
+  "campaign_receipt_sha256": "4f4b8a8eac803e4bc9464292281f629cb07a914546f9444d77788923c55cd548",
+  "verification": {
+    "adapter_endpoint": "http://127.0.0.1:5050/api/agi/adapter/run",
+    "pack": "repo-convergence",
+    "run_id": "2388",
+    "trace_id": "adapter:fc3cffe6-d0bd-400f-b4ed-f1cf2132a6bf",
+    "verdict": "PASS",
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "certificate_sha256": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_status": "GREEN",
+    "integrity_ok": true,
+    "training_trace_path": "artifacts/training-trace-stage4-2s-20260810.jsonl",
+    "training_trace_sha256": "f684da02c81d28975ed702258d1e57291298eab0cbab317a7854754fb2588ca6"
+  },
+  "validation": {
+    "stage4_2s_focused_graph_paper_root_tests": "74/74 pass",
+    "stage4_2f_and_stage4_2r_predecessor_replay": "16/16 pass",
+    "required_gr_warp_tests": "179/179 pass",
+    "math_registry": "234 entries valid",
+    "equation_sidecars": "current",
+    "root_to_leaf": "pass",
+    "production_client_build": "pass_with_preexisting_warnings",
+    "production_server_build": "pass_with_preexisting_warnings",
+    "diff_check": "pass"
+  },
+  "scientific_standing": {
+    "software_contract": "pass",
+    "analytic_recovery": "pass",
+    "ordinary_null_integration": "not_authorized",
+    "physical_pilot": "not_authorized",
+    "ready_authorities": 0,
+    "required_authorities": 7,
+    "measured_evidence": "not_ready",
+    "ordinary_null_authority": "not_ready",
+    "retarded_source_covariance": "not_ready",
+    "residual_attribution": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "frozen_diosi_law_modified": false,
+    "observable_bridge_edges_added": 0
+  },
+  "scope_note": "The certificate validates repository convergence and the Stage-4.2S retarded-source contract, analytic radiation recovery, polarization-retaining synthetic Green-to-coherence mapping, immutable ancestry, sidecars, graph, root-to-leaf manifest, builds, and software tests. It supplies no measured apparatus source spectrum, as-built Green tensor, measured material response, measured covariance, prepared superposition, residual attribution, collapse identification, manifold dynamics, or physical viability."
+}

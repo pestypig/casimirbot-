@@ -126,6 +126,9 @@ const readRecord = (value: unknown): RecordLike | null =>
     ? (value as RecordLike)
     : null;
 
+const readArray = (value: unknown): unknown[] =>
+  Array.isArray(value) ? value : [];
+
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
@@ -257,6 +260,9 @@ const collectMissingRequirementIds = (payload: RecordLike): string[] => {
       record.unsatisfied_requirement_ids,
       record.missing_required_capabilities,
       record.missing_compound_subgoal_ids,
+      readArray(record.missing_required_capability_any_of_groups)
+        .map(readRecord)
+        .map((group) => readString(group?.group_id)),
     );
   }
   const reviews = Array.isArray(payload.post_tool_observation_reviews)
@@ -324,6 +330,7 @@ const normalizeGoalStatus = (
       itinerary.required_observation_families,
       itinerary.required_observation_kinds,
       itinerary.required_capabilities,
+      itinerary.required_capability_any_of_groups,
       itinerary.compound_subgoal_ledger,
     ].some((value) => Array.isArray(value) && value.length > 0),
   );
@@ -1131,6 +1138,16 @@ export const buildHelixAgentContinuationState = (
   const affordances = authoritativeTypedFailureSettled
     ? []
     : collectedAffordances;
+  // A successful schema repair may carry a runtime-normalized attempt
+  // fingerprint that differs from the affordance fingerprint Helix issued.
+  // Persist every retired affordance fingerprint in the canonical tried set so
+  // a later, unrelated observation cannot resurrect the consumed repair.
+  const persistedTriedFingerprints = uniqueStrings([
+    triedFingerprints,
+    affordances
+      .filter((affordance) => affordance.tried)
+      .map((affordance) => affordance.action_fingerprint),
+  ]);
   const previousAffordanceIds = new Set(
     previousState?.next_admissible_affordances?.map(
       (entry: HelixAgentContinuationAffordance) => entry.affordance_id,
@@ -1257,7 +1274,7 @@ export const buildHelixAgentContinuationState = (
     last_attempt: lastAttempt,
     next_admissible_affordances: affordances,
     capability_proposal: capabilityProposal,
-    tried_action_fingerprints: triedFingerprints,
+    tried_action_fingerprints: persistedTriedFingerprints,
     progress: {
       made_progress: madeProgress,
       new_observation_count: newObservations.length,

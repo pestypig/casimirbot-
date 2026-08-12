@@ -719,16 +719,19 @@ The same configured audience protects REST and MCP. Discovery is available at:
 ```text
 /.well-known/oauth-protected-resource
 /.well-known/oauth-protected-resource/mcp
+/.well-known/oauth-protected-resource/mcp/device-check
 /.well-known/oauth-protected-resource/api/v1/agent-runs
 /.well-known/oauth-protected-resource/api/v1/rooms
 ```
 
-All four paths advertise the same canonical `resource`, authorization server,
-bearer-header method, run read/write/developer scopes, room read/manage/source
-manage scopes, and every code-owned logical data scope. The supported-scope
-list is deduplicated even when a logical data scope reuses a room scope.
-Advertising a scope does not enable its logical data scope; deployment
-admission still uses `HELIX_AGENT_DATABASE_SCOPES`.
+The Device Check path advertises the same canonical `resource` and authorization
+server but only the `helix.rooms.read` scope. Its corresponding
+`/mcp/device-check` server publishes only
+`helix_environment_device_check`; the read-only plugin cannot discover the full
+run, room, source, or command catalog. The other paths advertise the full run,
+room, and code-owned logical data scopes. Advertising a scope does not enable
+its logical data scope; deployment admission still uses
+`HELIX_AGENT_DATABASE_SCOPES`.
 
 CasimirBot is the OAuth protected resource, not the authorization server. A
 production connection therefore also needs an authorization server that:
@@ -750,6 +753,30 @@ linking flow cannot pass until that server is selected and configured. Gemini
 Interactions and Gemini Code Assist can send an already-issued bearer token,
 but the surrounding application or credential workflow still has to obtain
 that token safely.
+
+### Auth0 profile for Codex and ChatGPT
+
+Auth0 is the selected authorization server for the first production profile.
+CasimirBot remains the resource server and continues to enforce account policy,
+owner/tenant isolation, scopes, and its internal agent binding after Auth0 has
+validated the user.
+
+Configure an Auth0 API whose identifier exactly matches
+`HELIX_AGENT_OAUTH_AUDIENCE` (`https://casimirbot.com/mcp` for production), use
+RS256 access tokens, define `helix.rooms.read`, enable manual Client ID Metadata
+Document registration, import the OpenAI-hosted CIMD URL presented for the MCP
+client, and grant only user-delegated Device Check access. Populate
+`HELIX_AGENT_OAUTH_ISSUER`, `HELIX_AGENT_OAUTH_JWKS_URL`,
+`HELIX_AGENT_OAUTH_PROVIDER=auth0`, and `HELIX_AGENT_OAUTH_ALGORITHMS=RS256`
+from the deployed tenant. Never package Auth0 administrative credentials,
+client secrets, authorization codes, or bearer tokens in the desktop app or
+plugin.
+
+Auth0 configuration alone does not create a CasimirBot account binding. A
+trusted Auth0 adapter must verify the callback identity and signed tenant before
+calling the existing internal single-use account-link service. The public MCP
+resource must continue to reject an otherwise valid Auth0 subject until that
+exact binding exists and remains active.
 
 Production verification uses a remote JWKS and validates the configured issuer,
 audience, admitted asymmetric algorithm, subject, expiration, and a signed

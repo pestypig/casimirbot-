@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Settings } from "lucide-react";
+import { Download, Settings } from "lucide-react";
 import { useLocation } from "wouter";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogContent";
@@ -179,6 +179,13 @@ export default function StartPortal() {
             onClick={() => requestPanelWindow("helix-phoenix")}
           >
             Phoenix Panel
+          </button>
+          <button
+            className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-primary/25 bg-card/65 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground transition hover:border-primary/45 hover:bg-card/82 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/65 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            onClick={() => setLocation("/download")}
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Get desktop app</span>
           </button>
           <DialogTrigger asChild>
             <button

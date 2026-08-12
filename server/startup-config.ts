@@ -9,6 +9,7 @@ export type VoiceGovernanceConfig = {
 export type StartupConfig = {
   port: number;
   host: string;
+  desktopHostMode: boolean;
   isDeploy: boolean;
   fallbackPort: number;
   sourcePort: string | undefined;
@@ -38,6 +39,9 @@ const parseBooleanFlag = (value: string | undefined, defaultValue: boolean): boo
   return defaultValue;
 };
 
+export const shouldLoadLocalEnvFile = (env: NodeJS.ProcessEnv): boolean =>
+  !parseBooleanFlag(env.CASIMIR_SKIP_LOCAL_ENV_FILE, false);
+
 const parsePositivePort = (value: string | undefined): number | null => {
   if (!value) return null;
   const parsed = Number.parseInt(value, 10);
@@ -54,7 +58,12 @@ export const resolveStartupConfig = (env: NodeJS.ProcessEnv, appEnv: string): St
     env.DEPLOYMENT === "true";
 
   const port = parsePositivePort(env.PORT) ?? fallbackPort;
-  const host = env.HOST?.trim() ? env.HOST.trim() : "0.0.0.0";
+  const desktopHostMode = parseBooleanFlag(env.CASIMIR_DESKTOP_HOST, false);
+  const host = desktopHostMode
+    ? "127.0.0.1"
+    : env.HOST?.trim()
+      ? env.HOST.trim()
+      : "0.0.0.0";
   const providerMode = parseProviderMode(env.VOICE_PROVIDER_MODE);
   const managedProvidersEnabled = parseBooleanFlag(env.VOICE_MANAGED_PROVIDERS_ENABLED, true);
   const localOnlyMissionMode = parseBooleanFlag(env.VOICE_LOCAL_ONLY_MISSION_MODE, true);
@@ -62,6 +71,7 @@ export const resolveStartupConfig = (env: NodeJS.ProcessEnv, appEnv: string): St
   return {
     port,
     host,
+    desktopHostMode,
     isDeploy,
     fallbackPort,
     sourcePort: env.PORT,

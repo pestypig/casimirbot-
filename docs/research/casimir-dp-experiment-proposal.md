@@ -59,6 +59,10 @@
 **Stage-4.2R config/runner:** `configs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.json`; `scripts/research/run-casimir-dp-integrated-feasibility-pilot-stage4-2r.ts`
 **Stage-4.2R campaign receipt:** `docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-campaign-receipt.json`
 **Stage-4.2R verification receipt:** `docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-verification-receipt.json`
+**Stage-4.2S retarded-source report:** `docs/research/casimir-dp-retarded-source-propagation-stage4-2s-report.md`
+**Stage-4.2S config/runner:** `configs/research/casimir-dp-retarded-source-propagation-stage4-2s.v1.json`; `scripts/research/run-casimir-dp-retarded-source-propagation-stage4-2s.ts`
+**Stage-4.2S campaign receipt:** `docs/research/casimir-dp-retarded-source-propagation-stage4-2s-campaign-receipt.json`
+**Stage-4.2S verification receipt:** `docs/research/casimir-dp-retarded-source-propagation-stage4-2s-verification-receipt.json`
 
 ## Executive summary
 
@@ -1618,6 +1622,37 @@ registered-model external-bound recast. This is the proposal's present exit
 gate. A pilot may start only after these content-addressed, custodied inputs
 exist and the frozen identifiability calculation is rerun without confirmatory
 refitting.
+
+<!-- legacy-corrupted-stage4-2s-proposal-paragraph
+Stage 4.2S sharpens one of those missing packets: time-dependent source
+propagation. It recovers the causal transverse acceleration field, Larmor
+energy flux, current conservation, circular-polarization completeness, and
+the standard (1/R), zero-acceleration, and retarded-time limits. For the
+leading (80,mu{m m}) scale, the 0.5-Hz boundary label has
+(kL=8.38	imes10^{-13}), whereas a synthetic 1550-nm optical benchmark has
+(kL=324.29). The proposal must therefore measure the complete source and
+edge spectrum and propagate it through an as-built retarded Green tensor into
+branch phase, contraction, recoil, heating, and covariance. The software
+contract passes, but 0/7 same-apparatus propagation authorities are ready, so
+ordinary-null integration and the physical pilot remain unauthorized. This
+ordinary electromagnetic closure does not modify the frozen Diósi law or add
+a Casimir-to-collapse bridge.
+
+-->
+
+Stage 4.2S sharpens one of those missing packets: time-dependent source
+propagation. It recovers the causal transverse acceleration field, Larmor
+energy flux, current conservation, circular-polarization completeness, and
+the standard \(1/R\), zero-acceleration, and retarded-time limits. For the
+leading \(80\,\mu{\rm m}\) scale, the 0.5-Hz boundary label has
+\(kL=8.38\times10^{-13}\), whereas a synthetic 1550-nm optical benchmark has
+\(kL=324.29\). The proposal must therefore measure the complete source and
+edge spectrum and propagate it through an as-built retarded Green tensor into
+branch phase, contraction, recoil, heating, and covariance. The software
+contract passes, but 0/7 same-apparatus propagation authorities are ready, so
+ordinary-null integration and the physical pilot remain unauthorized. This
+ordinary electromagnetic closure does not modify the frozen Diósi law or add
+a Casimir-to-collapse bridge.
 
 The OR/phase Stage-2 runtime passes its upstream-hash, DP algebra,
 pairwise/potential equivalence, branch-sampling, fixed-branch null, and

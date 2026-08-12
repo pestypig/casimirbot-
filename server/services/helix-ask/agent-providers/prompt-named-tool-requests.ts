@@ -1815,7 +1815,10 @@ export const buildPromptDerivedInternetSearchGatewayCallRequests = (
   if (isScientificImageEvidenceRefRevisionPrompt(prompt)) return [];
   if (isScientificImageExactRowRetryPrompt(prompt)) return [];
   const intent = detectInternetSearchIntent(prompt);
-  if (!intent.searchRequested) return [];
+  // A soft freshness cue is a routing hypothesis, not execution authority.
+  // Codex may still choose an advertised web capability, but Helix only
+  // materializes a web call directly when the user expressed hard web intent.
+  if (!intent.searchRequested || intent.strength !== "hard") return [];
   return [{
     schema: "helix.workstation_gateway.prompt_derived_internet_search_call_request.v1",
     derivation_source: "helix_prompt_derived_internet_search",

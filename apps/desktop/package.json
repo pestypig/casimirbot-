@@ -1,0 +1,37 @@
+{
+  "name": "@casimirbot/desktop",
+  "version": "0.1.0-alpha.8",
+  "private": true,
+  "author": "CasimirBot",
+  "type": "module",
+  "description": "Windows-first native host for CasimirBot",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "prepare:assets": "node scripts/prepare-brand-assets.mjs",
+    "prepare:tunnel-client": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-tunnel-client.ps1",
+    "build:host": "npm run prepare:assets && npm run prepare:tunnel-client && node scripts/build-host.mjs",
+    "stage:runtime": "node scripts/stage-runtime.mjs",
+    "release:preflight": "node scripts/release-preflight.mjs",
+    "release:audit-slice": "node scripts/audit-release-slice.mjs",
+    "release:verify-artifacts": "node scripts/verify-release-artifacts.mjs",
+    "release:site-metadata": "node scripts/create-site-release-metadata.mjs",
+    "verify:runtime-tree": "node scripts/verify-runtime-tree.mjs",
+    "smoke:service-boundary": "node scripts/smoke-service-boundary.mjs",
+    "smoke:packaged-launch": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-packaged-launch.ps1",
+    "build": "npm run build:host",
+    "pack:dir": "npm run build:host && npm run stage:runtime && electron-builder --config electron-builder.config.cjs --dir",
+    "dist:win": "npm run build:host && npm run stage:runtime && electron-builder --config electron-builder.config.cjs --win nsis"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9",
+    "sharp": "0.34.3"
+  },
+  "devDependencies": {
+    "@types/semver": "7.8.0",
+    "electron": "43.4.0",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.27.2",
+    "typescript": "5.6.3",
+    "yaml": "2.9.0"
+  }
+}

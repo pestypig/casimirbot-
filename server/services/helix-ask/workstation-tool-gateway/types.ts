@@ -98,6 +98,7 @@ export type HelixWorkstationGatewayCallInput = {
    */
   accountContext?: HelixWorkstationGatewayAccountContext | null;
   authoritativeEvidenceArtifacts?: unknown[];
+  signal?: AbortSignal;
 };
 
 export type HelixWorkstationGatewayAdmissionRecord = {

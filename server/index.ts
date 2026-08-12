@@ -23,7 +23,10 @@ import {
   validateIdeologyVerifierPackAgainstNodeIds,
 } from "@shared/ideology/ideology-verifiers";
 import { collectIdeologyNodeIdsFromTree } from "../scripts/collect-ideology-node-ids";
-import { resolveStartupConfig } from "./startup-config";
+import {
+  resolveStartupConfig,
+  shouldLoadLocalEnvFile,
+} from "./startup-config";
 import { scheduleStartupMemorySettle } from "./services/runtime/startup-memory-settle";
 import {
   initializeHostCommitMemoryMonitor,
@@ -45,6 +48,11 @@ import {
 import { createAgentAccessDiscoveryRouter } from
   "./routes/agent-access-discovery";
 import { createHelixMcpRouter } from "./routes/helix-mcp";
+import {
+  createHelixDeviceCheckMcpServer,
+  HELIX_DEVICE_CHECK_MCP_PATH,
+  HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH,
+} from "./mcp/helix-mcp-server";
 import { createHelixSharedLiveRoomRouter } from
   "./routes/helix-shared-live-rooms";
 import {
@@ -55,6 +63,8 @@ import {
 import { agentRunObserverRouter } from "./routes/agent-run-observer";
 import { createHelixAgentAccountBindingsRouter } from
   "./routes/helix-agent-account-bindings";
+import { createDesktopAuth0AccountLinkRouter } from
+  "./routes/desktop-auth0-account-link";
 import {
   sharedRealtimeRoomSourceCredentialClaimRouter,
   sharedRealtimeRoomSourceLinkRouter,
@@ -64,10 +74,16 @@ import {
   environmentConnectorBrowserRouter,
   environmentConnectorPublicRouter,
 } from "./routes/environment-connector-platform";
+import { brokerageConnectionsRouter } from
+  "./routes/brokerage-connections";
 import {
   installRuntimeToolConfirmationVerifierFromEnvironmentV1,
 } from
   "./services/theory/runtime-tool-confirmation-server-bootstrap";
+import {
+  createDesktopSessionGuard,
+  resolveDesktopSessionConfig,
+} from "./security/desktop-session";
 
 type LatticeWatcherHandle = {
   close(): Promise<void>;
@@ -81,6 +97,7 @@ type HealthCheckRequest = {
 };
 
 function loadLocalEnvFile(): void {
+  if (!shouldLoadLocalEnvFile(process.env)) return;
   const envPath = path.resolve(process.cwd(), ".env");
   if (!fs.existsSync(envPath)) return;
   const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
@@ -108,6 +125,8 @@ const runtimeApprovalVerifierStatus =
   installRuntimeToolConfirmationVerifierFromEnvironmentV1();
 patchExpressAsyncHandlers();
 const app = express();
+const desktopSessionConfig = resolveDesktopSessionConfig(process.env);
+app.use(createDesktopSessionGuard(desktopSessionConfig));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -495,6 +514,10 @@ registerMetricsEndpoint(app);
 app.use(otelMiddleware);
 app.use(createAgentAccessDiscoveryRouter());
 app.use(createHelixAgentProtectedResourceMetadataRouter({
+  resourcePaths: [HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH],
+  scopes: [HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+}));
+app.use(createHelixAgentProtectedResourceMetadataRouter({
   additionalResourcePaths: [
     "/.well-known/oauth-protected-resource/api/v1/rooms",
   ],
@@ -506,6 +529,14 @@ app.use(createHelixAgentProtectedResourceMetadataRouter({
 }));
 app.use("/api/v1/agent-runs", createHelixAgentApiRouter());
 app.use("/api/v1/rooms", createHelixSharedLiveRoomRouter());
+app.use(
+  HELIX_DEVICE_CHECK_MCP_PATH,
+  createHelixMcpRouter({
+    createServer: ({ principal }) =>
+      createHelixDeviceCheckMcpServer({ principal }),
+    resourceMetadataPath: HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH,
+  }),
+);
 app.use("/mcp", createHelixMcpRouter());
 // First-party browser observation is deliberately cookie-authenticated and
 // remains separate from both external OAuth and the optional global bearer
@@ -524,10 +555,17 @@ app.use("/api/agi", sharedRealtimeRoomSourceCredentialClaimRouter);
 // the optional legacy JWT middleware; neither route admits action execution.
 app.use(environmentConnectorPublicRouter);
 app.use("/api/agi", environmentConnectorBrowserRouter);
+app.use("/api/agi", brokerageConnectionsRouter);
 // Agent-binding readiness and revocation are first-party account-session
 // operations. Mount them before the optional legacy bearer middleware so
 // ENABLE_AUTH does not silently replace their documented cookie boundary.
 app.use("/api/account", createHelixAgentAccountBindingsRouter());
+// Native Auth0 PKCE linking is a separate app-only admission lane. It never
+// accepts a client secret or a public callback and is guarded by the exact
+// per-launch desktop session secret before it can create or complete a link.
+app.use("/api/account", createDesktopAuth0AccountLinkRouter({
+  desktopSession: desktopSessionConfig,
+}));
 app.use(express.json({
   limit: jsonBodyLimit,
   verify: (req, _res, buf) => {

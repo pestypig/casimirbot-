@@ -35,6 +35,10 @@ import {
   containsSharedLiveRoomSensitiveText,
   containsSharedLiveRoomSensitiveValue,
 } from "../services/shared-live-room-control/sensitive-text";
+import {
+  isDesktopSessionAuthorized,
+  resolveDesktopSessionConfig,
+} from "../security/desktop-session";
 
 type Authenticate = (req: Request) => Promise<HelixAgentApiPrincipal>;
 
@@ -127,15 +131,35 @@ const isDevelopmentLoopbackOrigin = (origin: string): boolean => {
   }
 };
 
+const isLoopbackHost = (host: string): boolean => {
+  try {
+    const hostname = new URL(`http://${host}`).hostname.toLowerCase();
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "[::1]"
+    );
+  } catch {
+    return false;
+  }
+};
+
 export const enforceHelixAgentTransportSecurity = (
   req: Request,
   _res: Response,
   next: NextFunction,
 ): void => {
   const host = normalize(req.get("host")).toLowerCase();
+  const desktopSession = resolveDesktopSessionConfig(process.env);
+  const authorizedDesktopLoopback =
+    desktopSession.enabled &&
+    isLoopbackHost(host) &&
+    isDesktopSessionAuthorized(req.headers, desktopSession);
   if (
     !host ||
-    (!allowedHosts().has(host) && !isDevelopmentLoopbackHost(host))
+    (!allowedHosts().has(host) &&
+      !isDevelopmentLoopbackHost(host) &&
+      !authorizedDesktopLoopback)
   ) {
     next(
       new HelixAgentApiServiceError(
@@ -150,7 +174,17 @@ export const enforceHelixAgentTransportSecurity = (
   if (
     origin &&
     !allowedOrigins().has(origin) &&
-    !isDevelopmentLoopbackOrigin(origin)
+    !isDevelopmentLoopbackOrigin(origin) &&
+    !(
+      authorizedDesktopLoopback &&
+      (() => {
+        try {
+          return new URL(origin).host.toLowerCase() === host;
+        } catch {
+          return false;
+        }
+      })()
+    )
   ) {
     next(
       new HelixAgentApiServiceError(
@@ -161,7 +195,11 @@ export const enforceHelixAgentTransportSecurity = (
     );
     return;
   }
-  if (process.env.NODE_ENV === "production" && !req.secure) {
+  if (
+    process.env.NODE_ENV === "production" &&
+    !req.secure &&
+    !authorizedDesktopLoopback
+  ) {
     next(
       new HelixAgentApiServiceError(
         403,
@@ -227,8 +265,12 @@ const responseHeaders = (res: Response, version?: number): void => {
   if (version) res.setHeader("ETag", `W/"agent-run-${version}"`);
 };
 
-const resourceMetadataUrl = (): string =>
-  `${resolveCasimirPublicBaseUrl()}/.well-known/oauth-protected-resource`;
+const DEFAULT_RESOURCE_METADATA_PATH =
+  "/.well-known/oauth-protected-resource";
+
+const resourceMetadataUrl = (
+  resourceMetadataPath = DEFAULT_RESOURCE_METADATA_PATH,
+): string => `${resolveCasimirPublicBaseUrl()}${resourceMetadataPath}`;
 
 const bearerAuthParam = (name: string, value: string): string => {
   const safeValue = value
@@ -262,6 +304,7 @@ const requiredOAuthScopes = (error: HelixAgentApiServiceError): string[] => {
 
 const bearerChallengeFor = (
   error: HelixAgentApiServiceError,
+  resourceMetadataPath = DEFAULT_RESOURCE_METADATA_PATH,
 ): string | null => {
   const isAuthenticationFailure = error.status === 401;
   const isScopeFailure =
@@ -270,7 +313,12 @@ const bearerChallengeFor = (
 
   const params: string[] = [];
   try {
-    params.push(bearerAuthParam("resource_metadata", resourceMetadataUrl()));
+    params.push(
+      bearerAuthParam(
+        "resource_metadata",
+        resourceMetadataUrl(resourceMetadataPath),
+      ),
+    );
   } catch {
     // Preserve the primary authentication/configuration error.
   }
@@ -290,12 +338,14 @@ const bearerChallengeFor = (
   return `Bearer ${params.join(", ")}`;
 };
 
-export const handleHelixAgentApiError = (
-  error: unknown,
-  _req: Request,
-  res: Response,
-  _next: NextFunction,
-): void => {
+export const createHelixAgentApiErrorHandler = (options: {
+  resourceMetadataPath?: string;
+} = {}) => (
+    error: unknown,
+    _req: Request,
+    res: Response,
+    _next: NextFunction,
+  ): void => {
   const locals = res.locals as AgentResponseLocals;
   let normalized: HelixAgentApiServiceError;
   if (error instanceof HelixAgentApiServiceError) {
@@ -339,7 +389,10 @@ export const handleHelixAgentApiError = (
     );
   }
   responseHeaders(res);
-  const bearerChallenge = bearerChallengeFor(normalized);
+  const bearerChallenge = bearerChallengeFor(
+    normalized,
+    options.resourceMetadataPath,
+  );
   if (bearerChallenge) res.setHeader("WWW-Authenticate", bearerChallenge);
   res.status(normalized.status).json(
     buildHelixAgentApiError({
@@ -348,6 +401,8 @@ export const handleHelixAgentApiError = (
     }),
   );
 };
+
+export const handleHelixAgentApiError = createHelixAgentApiErrorHandler();
 
 export const createHelixAgentApiRouter = (
   dependencies: RouterDependencies = {},
@@ -574,6 +629,8 @@ export const createHelixAgentApiRouter = (
 
 export const createHelixAgentProtectedResourceMetadataRouter = (
   dependencies: Pick<RouterDependencies, "verifier"> & {
+    resourcePaths?: readonly string[];
+    scopes?: readonly string[];
     additionalResourcePaths?: readonly string[];
     additionalScopes?: readonly string[];
   } = {},
@@ -581,13 +638,23 @@ export const createHelixAgentProtectedResourceMetadataRouter = (
   const router = Router();
   const verifier =
     dependencies.verifier ?? new DefaultHelixAgentAccessTokenVerifier();
+  const resourcePaths = dependencies.resourcePaths
+    ? Array.from(dependencies.resourcePaths)
+    : [
+        "/.well-known/oauth-protected-resource",
+        "/.well-known/oauth-protected-resource/mcp",
+        "/.well-known/oauth-protected-resource/api/v1/agent-runs",
+        ...(dependencies.additionalResourcePaths ?? []),
+      ];
+  const scopes = dependencies.scopes ?? [
+    HELIX_AGENT_RUN_READ_SCOPE,
+    HELIX_AGENT_RUN_WRITE_SCOPE,
+    HELIX_AGENT_RUN_DEVELOPER_SCOPE,
+    ...HELIX_AGENT_DATABASE_OAUTH_SCOPES,
+    ...(dependencies.additionalScopes ?? []),
+  ];
   router.get(
-    [
-      "/.well-known/oauth-protected-resource",
-      "/.well-known/oauth-protected-resource/mcp",
-      "/.well-known/oauth-protected-resource/api/v1/agent-runs",
-      ...(dependencies.additionalResourcePaths ?? []),
-    ],
+    resourcePaths,
     (_req: Request, res: Response, next: NextFunction): void => {
       try {
         const base = resolveCasimirPublicBaseUrl();
@@ -595,15 +662,7 @@ export const createHelixAgentProtectedResourceMetadataRouter = (
         res.json({
           resource: verifier.audience(),
           authorization_servers: [verifier.authorizationServer()],
-          scopes_supported: Array.from(
-            new Set([
-              HELIX_AGENT_RUN_READ_SCOPE,
-              HELIX_AGENT_RUN_WRITE_SCOPE,
-              HELIX_AGENT_RUN_DEVELOPER_SCOPE,
-              ...HELIX_AGENT_DATABASE_OAUTH_SCOPES,
-              ...(dependencies.additionalScopes ?? []),
-            ]),
-          ),
+          scopes_supported: Array.from(new Set(scopes)),
           bearer_methods_supported: ["header"],
           resource_documentation: `${base}/docs/architecture/helix-agent-api-v1.md`,
         });

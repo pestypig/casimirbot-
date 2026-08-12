@@ -18,6 +18,8 @@ import {
 } from "@shared/helix-account-session";
 import type { HelixProfileIngressTokenSummary } from "@shared/helix-profile-ingress";
 import { cacheAccountCapabilityPolicy } from "@/lib/workstation/accountCapabilityPolicy";
+import { BrokerageConnectionsCard } from
+  "@/components/workstation/BrokerageConnectionsCard";
 import {
   getProfileStorageSyncStatus,
   grantProfileStorageAttachConsent,
@@ -606,6 +608,12 @@ export default function AccountSessionPanel() {
     status.account_policy?.account_type === "developer";
   const sharedRoomsDeveloperIncluded =
     status.account_policy?.account_type === "developer";
+  const brokerageEnvironmentEnabled = Boolean(
+    session &&
+    status.account_policy?.account_type === "developer" &&
+    status.account_policy.feature_flags.includes("brokerage_environment") &&
+    !status.account_policy.locked_features.includes("brokerage_environment"),
+  );
 
   const setSharedRoomsExperiment = React.useCallback(async (enabled: boolean) => {
     setExperimentalRoomsBusy(true);
@@ -961,6 +969,8 @@ export default function AccountSessionPanel() {
             )}
           </div>
         </section>
+
+        {brokerageEnvironmentEnabled ? <BrokerageConnectionsCard /> : null}
 
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">

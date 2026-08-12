@@ -67,9 +67,8 @@ const committedSubgoalsAreSatisfied = (value: unknown): boolean => {
 const committedSubgoalContractApplies = (value: unknown): boolean => {
   const contract = readRecord(value);
   return Boolean(
-    readString(contract?.schema) ===
-      "helix.compound_capability_contract.v1" &&
-      readArray(contract?.subgoals).length > 1,
+    readString(contract?.schema) === "helix.compound_capability_contract.v1" &&
+    readArray(contract?.subgoals).length > 1,
   );
 };
 
@@ -157,6 +156,10 @@ export const hasSuccessfulLaterRetryForFailedGatewayCapability = (
   const supersedableCurrentTurnReadFailure =
     failureCode === "current_turn_reentry_ineligible" &&
     ["read", "observe", "verify"].includes(failed.mode);
+  const supersedableEnvironmentSelectionFailure = [
+    "wrong_environment",
+    "wrong_world",
+  ].includes(failureCode);
   if (
     failureCode === "current_turn_reentry_ineligible" &&
     !supersedableCurrentTurnReadFailure
@@ -169,7 +172,8 @@ export const hasSuccessfulLaterRetryForFailedGatewayCapability = (
     retryRecommendation !== "retry_same_tool" &&
     retryRecommendation !== "try_alternate_probe" &&
     !retryableInvalidArguments &&
-    !supersedableCurrentTurnReadFailure
+    !supersedableCurrentTurnReadFailure &&
+    !supersedableEnvironmentSelectionFailure
   ) {
     return false;
   }
@@ -186,6 +190,21 @@ export const hasSuccessfulLaterRetryForFailedGatewayCapability = (
           observationStatus,
         ));
     if (!successfulSameCapability) return false;
+    if (supersedableEnvironmentSelectionFailure) {
+      const failedTurnId = readString(failed.observation_packet?.turn_id);
+      const candidateTurnId = readString(candidate.observation_packet?.turn_id);
+      // `wrong_environment` is an admission/selection diagnosis, not durable
+      // proof that the requested subgoal can never succeed. Preserve it in the
+      // evidence ledger, but do not let it overwrite a later successful
+      // synthesis when the same current turn and capability produced a fresh,
+      // admitted observation. Cross-turn evidence and permission/provenance
+      // failures remain fail-closed.
+      return (
+        index > failedIndex &&
+        Boolean(failedTurnId) &&
+        failedTurnId === candidateTurnId
+      );
+    }
     if (supersedableCurrentTurnReadFailure) {
       return (
         index > failedIndex &&
@@ -472,6 +491,72 @@ const providerTextClaimsVoicePlaybackCompleted = (text: string): boolean =>
     text,
   ) || /\byou\s+(?:heard|should\s+have\s+heard)\b/i.test(text);
 
+export type HelixProviderTerminalIntent = "answer" | "request_user_input";
+
+export const providerRequestUserInputBoundaryObservationRefs = (input: {
+  turnId: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+  normalizedObservationPackets?: HelixAgentStepObservationPacket[];
+}): string[] => {
+  const normalizedPackets =
+    input.normalizedObservationPackets ??
+    input.gatewayCallResults.map((result) => result.observation_packet);
+  const normalizedRefs = new Set(
+    normalizedPackets
+      .filter(
+        (packet) =>
+          packet.schema === "helix.agent_step_observation_packet.v1" &&
+          packet.turn_id === input.turnId,
+      )
+      .flatMap((packet) => packet.produced_artifact_refs)
+      .filter(Boolean),
+  );
+  return Array.from(
+    new Set(
+      input.gatewayCallResults.flatMap((result) => {
+        const packet = result.observation_packet;
+        const status = readString(packet.status).toLowerCase();
+        const refs = Array.from(
+          new Set(
+            [...result.artifact_refs, ...packet.produced_artifact_refs].filter(
+              Boolean,
+            ),
+          ),
+        );
+        const typedUserRepair = readArray(packet.missing_requirements)
+          .map(readRecord)
+          .filter((requirement): requirement is Record<string, unknown> =>
+            Boolean(requirement),
+          )
+          .some(
+            (requirement) =>
+              readString(requirement.repair_action).toLowerCase() ===
+                "ask_user" &&
+              Boolean(readString(requirement.code)) &&
+              Boolean(readString(requirement.message)),
+          );
+        const exactTypedBoundary =
+          result.ok !== true &&
+          packet.turn_id === input.turnId &&
+          ["blocked", "failed", "missing_input", "needs_confirmation"].includes(
+            status,
+          ) &&
+          readString(result.tool_followup_decision?.next_action) ===
+            "ask_user" &&
+          readBoolean(
+            result.tool_followup_decision?.external_change_required,
+          ) === true &&
+          readString(result.tool_lifecycle_trace?.retry_recommendation) ===
+            "ask_user" &&
+          typedUserRepair &&
+          refs.length > 0 &&
+          refs.every((ref) => normalizedRefs.has(ref));
+        return exactTypedBoundary ? refs : [];
+      }),
+    ),
+  );
+};
+
 export const buildHelixProviderReasoningReentry = (input: {
   runtime: HelixAgentRuntimeId;
   providerLabel: string;
@@ -492,6 +577,8 @@ export const buildHelixProviderReasoningReentry = (input: {
   selectedScholarlyResultIds?: string[];
   structuredNumericEvidenceRequired?: boolean;
   committedSubgoalContract?: Record<string, unknown> | null;
+  providerTerminalIntent?: HelixProviderTerminalIntent;
+  solverCompletionAudit?: Record<string, unknown> | null;
 }) => {
   const gatewayObservationRefs = input.gatewayCallResults.flatMap(
     (result) => result.artifact_refs,
@@ -656,11 +743,11 @@ export const buildHelixProviderReasoningReentry = (input: {
   const observationReentered = Boolean(
     (input.providerObservationReentryCompleted ?? input.ok) &&
     evidenceReentryRequired &&
-      normalizedObservationPackets.length >= evidenceSourceCount &&
-      transportObservationRefs.length > 0 &&
-      transportObservationRefs.every((ref) =>
-        normalizedObservationRefs.includes(ref),
-      ),
+    normalizedObservationPackets.length >= evidenceSourceCount &&
+    transportObservationRefs.length > 0 &&
+    transportObservationRefs.every((ref) =>
+      normalizedObservationRefs.includes(ref),
+    ),
   );
   const evidenceReentered = Boolean(
     noEvidenceDirectAnswerReady ||
@@ -677,8 +764,7 @@ export const buildHelixProviderReasoningReentry = (input: {
     input.gatewayCallResults.length > 0 ||
     capabilityLaneObservationPackets.length > 0;
   const currentTurnEvidenceSatisfied =
-    input.currentTurnEvidenceRequired !== true ||
-    currentTurnObservationPresent;
+    input.currentTurnEvidenceRequired !== true || currentTurnObservationPresent;
   const pendingVoiceHandoffOverclaim = Boolean(
     candidateId &&
     capabilityLaneObservationPackets.some(
@@ -686,46 +772,66 @@ export const buildHelixProviderReasoningReentry = (input: {
     ) &&
     providerTextClaimsVoicePlaybackCompleted(input.providerText),
   );
-  const terminalAuthorityMayUseProviderText = Boolean(
+  const requestUserInputBoundaryObservationRefs =
+    providerRequestUserInputBoundaryObservationRefs({
+      turnId: input.turnId,
+      gatewayCallResults: input.gatewayCallResults,
+      normalizedObservationPackets,
+    });
+  const providerRequestUserInputReady = Boolean(
+    input.providerTerminalIntent === "request_user_input" &&
     candidateId &&
-    evidenceReentered &&
-    solverAuthoritySatisfied &&
+    observationReentered &&
     currentTurnEvidenceSatisfied &&
+    requestUserInputBoundaryObservationRefs.length > 0 &&
     !pendingVoiceHandoffOverclaim,
   );
+  const terminalAuthorityMayUseProviderText = Boolean(
+    providerRequestUserInputReady ||
+    (candidateId &&
+      evidenceReentered &&
+      solverAuthoritySatisfied &&
+      currentTurnEvidenceSatisfied &&
+      !pendingVoiceHandoffOverclaim),
+  );
   const terminalAuthorityStatus = terminalAuthorityMayUseProviderText
-    ? noEvidenceDirectAnswerReady
-      ? "authorized_by_model_only_direct_answer_contract"
-      : "authorized_by_helix_provider_candidate_bridge"
+    ? providerRequestUserInputReady
+      ? "authorized_by_provider_request_user_input_bridge"
+      : noEvidenceDirectAnswerReady
+        ? "authorized_by_model_only_direct_answer_contract"
+        : "authorized_by_helix_provider_candidate_bridge"
     : candidateId && pendingVoiceHandoffOverclaim
       ? "blocked_by_voice_playback_overclaim"
       : candidateId && !currentTurnEvidenceSatisfied
         ? "blocked_by_current_turn_observation_required"
-      : candidateId && !allEvidenceReentryCompatible
-        ? "blocked_by_observation_state"
-        : candidateId && !normalizedObservationsReady
-          ? "blocked_by_missing_normalized_observations"
-          : candidateId
-            ? "blocked_pending_helix_solver_completion"
-            : input.modelOnlyDirectAnswerAllowed === true
-              ? "provider_terminal_candidate_missing_for_model_only_direct_answer"
-              : "not_evaluated_provider_text_mode";
+        : candidateId && !allEvidenceReentryCompatible
+          ? "blocked_by_observation_state"
+          : candidateId && !normalizedObservationsReady
+            ? "blocked_by_missing_normalized_observations"
+            : candidateId
+              ? "blocked_pending_helix_solver_completion"
+              : input.modelOnlyDirectAnswerAllowed === true
+                ? "provider_terminal_candidate_missing_for_model_only_direct_answer"
+                : "not_evaluated_provider_text_mode";
   const terminalAuthorityBlockers = candidateId
     ? terminalAuthorityMayUseProviderText
       ? []
-      : pendingVoiceHandoffOverclaim
-        ? ["voice_playback_completion_not_observed"]
-        : !currentTurnEvidenceSatisfied
-          ? ["current_turn_observation_required"]
-        : !allGatewayCallsSucceeded
-          ? ["gateway_observation_missing_or_failed"]
-        : !allCapabilityLaneObservationsReentryCompatible
-            ? ["capability_lane_observation_missing_or_failed"]
-            : !normalizedObservationsReady
-              ? ["normalized_observation_packet_missing"]
-              : !committedSubgoalsCompatible
-                ? ["committed_subgoal_observation_missing"]
-              : ["helix_solver_completion_required"]
+      : input.providerTerminalIntent === "request_user_input" &&
+          requestUserInputBoundaryObservationRefs.length === 0
+        ? ["typed_request_user_input_boundary_missing"]
+        : pendingVoiceHandoffOverclaim
+          ? ["voice_playback_completion_not_observed"]
+          : !currentTurnEvidenceSatisfied
+            ? ["current_turn_observation_required"]
+            : !allGatewayCallsSucceeded
+              ? ["gateway_observation_missing_or_failed"]
+              : !allCapabilityLaneObservationsReentryCompatible
+                ? ["capability_lane_observation_missing_or_failed"]
+                : !normalizedObservationsReady
+                  ? ["normalized_observation_packet_missing"]
+                  : !committedSubgoalsCompatible
+                    ? ["committed_subgoal_observation_missing"]
+                    : ["helix_solver_completion_required"]
     : ["provider_terminal_candidate_missing"];
   const providerTerminalCandidate = candidateId
     ? {
@@ -736,6 +842,7 @@ export const buildHelixProviderReasoningReentry = (input: {
         selected_agent_provider: input.runtime,
         provider_label: input.providerLabel,
         source: "agent_provider_text_mode_adapter",
+        terminal_intent: input.providerTerminalIntent ?? "answer",
         candidate_text_hash: sha256(input.providerText),
         candidate_text_length: input.providerText.length,
         candidate_text_preview: input.providerText.slice(0, 4000),
@@ -774,12 +881,14 @@ export const buildHelixProviderReasoningReentry = (input: {
     required_committed_subgoals_satisfied: requiredCommittedSubgoalsSatisfied,
     actionable_blocked_capability_lane_observation_refs:
       actionableBlockedCapabilityLaneObservationRefs,
+    request_user_input_boundary_observation_refs:
+      requestUserInputBoundaryObservationRefs,
+    provider_terminal_intent: input.providerTerminalIntent ?? "answer",
     reentered_capability_lane_observation_refs:
       reenteredCapabilityLaneObservationRefs,
     model_only_direct_answer_allowed:
       input.modelOnlyDirectAnswerAllowed === true,
-    current_turn_evidence_required:
-      input.currentTurnEvidenceRequired === true,
+    current_turn_evidence_required: input.currentTurnEvidenceRequired === true,
     current_turn_observation_present: currentTurnObservationPresent,
     runtime_selected_scholarly_result_ids:
       input.selectedScholarlyResultIds ?? [],
@@ -808,6 +917,7 @@ export const buildHelixProviderReasoningReentry = (input: {
     solver_completed: input.solverCompleted === true,
     goal_satisfaction_compatible:
       input.goalSatisfied === true && committedSubgoalsCompatible,
+    solver_completion_audit: input.solverCompletionAudit ?? null,
     committed_subgoals_required: committedSubgoalsRequired,
     committed_subgoals_compatible: committedSubgoalsCompatible,
     assistant_answer: false,
@@ -825,14 +935,23 @@ export const buildHelixProviderReasoningReentry = (input: {
     terminal_authority_granted: terminalAuthorityMayUseProviderText,
     final_visible_answer_authorized: terminalAuthorityMayUseProviderText,
     blockers: terminalAuthorityBlockers,
-    selected_observation_refs: selectedObservationRefs,
+    selected_observation_refs: Array.from(
+      new Set([
+        ...selectedObservationRefs,
+        ...(providerRequestUserInputReady
+          ? requestUserInputBoundaryObservationRefs
+          : []),
+      ]),
+    ),
     normalized_observation_refs: normalizedObservationRefs,
     capability_lane_observation_refs: reenteredCapabilityLaneObservationRefs,
     actionable_blocked_capability_lane_observation_refs:
       actionableBlockedCapabilityLaneObservationRefs,
+    request_user_input_boundary_observation_refs:
+      requestUserInputBoundaryObservationRefs,
+    provider_terminal_intent: input.providerTerminalIntent ?? "answer",
     prior_evidence_observation_refs: priorEvidenceObservationRefs,
-    current_turn_evidence_required:
-      input.currentTurnEvidenceRequired === true,
+    current_turn_evidence_required: input.currentTurnEvidenceRequired === true,
     current_turn_observation_present: currentTurnObservationPresent,
     assistant_answer: false,
     terminal_eligible: false,
@@ -848,8 +967,12 @@ export const buildHelixProviderReasoningReentry = (input: {
           terminal_artifact_kind: "agent_provider_terminal_candidate",
           terminal_text: input.providerText,
           terminal_item_id: candidateId,
-          terminal_kind: "answer",
-          authority_origin: "selected_final_answer",
+          terminal_kind: providerRequestUserInputReady
+            ? "request_user_input"
+            : "answer",
+          authority_origin: providerRequestUserInputReady
+            ? "request_user_input"
+            : "selected_final_answer",
           server_authoritative: true,
           terminal_eligible: true,
           assistant_answer: false,
@@ -863,7 +986,14 @@ export const buildHelixProviderReasoningReentry = (input: {
         terminal_artifact_kind: "agent_provider_terminal_candidate",
         final_answer_source: "agent_provider_terminal_candidate",
         terminal_authority_ref: candidateId,
-        selected_observation_refs: selectedObservationRefs,
+        selected_observation_refs: Array.from(
+          new Set([
+            ...selectedObservationRefs,
+            ...(providerRequestUserInputReady
+              ? requestUserInputBoundaryObservationRefs
+              : []),
+          ]),
+        ),
         presentation_policy: "preserve_provider_text",
         helix_style_rewrite_applied: false,
         assistant_answer: false,
@@ -884,6 +1014,9 @@ export const buildHelixProviderReasoningReentry = (input: {
       successfulCapabilityLaneObservationRefs,
     actionable_blocked_capability_lane_observation_refs:
       actionableBlockedCapabilityLaneObservationRefs,
+    request_user_input_boundary_observation_refs:
+      requestUserInputBoundaryObservationRefs,
+    provider_terminal_intent: input.providerTerminalIntent ?? "answer",
     reentered_capability_lane_observation_refs:
       reenteredCapabilityLaneObservationRefs,
     prior_evidence_observation_refs: priorEvidenceObservationRefs,
@@ -907,14 +1040,16 @@ export const buildHelixProviderReasoningReentry = (input: {
     evidence_reentry_required: evidenceReentryRequired,
     model_only_direct_answer_allowed:
       input.modelOnlyDirectAnswerAllowed === true,
-    current_turn_evidence_required:
-      input.currentTurnEvidenceRequired === true,
+    current_turn_evidence_required: input.currentTurnEvidenceRequired === true,
     current_turn_observation_present: currentTurnObservationPresent,
     solver_completed: input.solverCompleted === true,
     goal_satisfaction_compatible:
       input.goalSatisfied === true && committedSubgoalsCompatible,
+    solver_completion_audit: input.solverCompletionAudit ?? null,
     route_authority_status: terminalAnswerAuthority
-      ? "provider_gateway_read_observe_contract_satisfied"
+      ? providerRequestUserInputReady
+        ? "provider_typed_user_input_boundary_satisfied"
+        : "provider_gateway_read_observe_contract_satisfied"
       : "not_authorized",
     terminal_authority_status:
       terminalAuthorityCandidateReview.terminal_authority_status,

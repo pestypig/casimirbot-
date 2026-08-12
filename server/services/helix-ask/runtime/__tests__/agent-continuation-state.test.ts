@@ -1240,6 +1240,30 @@ describe("agent continuation state", () => {
         (affordance) => affordance.admissible && !affordance.tried,
       ),
     ).toBe(false);
+
+    const laterState = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      previousState: state,
+      lastAttempt: {
+        attempt_id: "attempt:later-spatial-read",
+        capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+        action_fingerprint: "later-spatial-read-fingerprint",
+        status: "succeeded",
+        observation_refs: ["observation:spatial:later"],
+      },
+    });
+
+    expect(laterState.next_admissible_affordances).toEqual([
+      expect.objectContaining({
+        capability_id: capability,
+        tried: true,
+      }),
+    ]);
+    expect(laterState.tried_action_fingerprints).toContain(
+      state.next_admissible_affordances[0]?.action_fingerprint,
+    );
   });
 
   it("treats tool-policy rejection as non-retryable bookkeeping rather than progress", () => {

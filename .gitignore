@@ -163,3 +163,7 @@ external/openai-codex-compare/
 # Local Codex app metadata/secrets
 .codex/
 .codex-tools/
+
+# Pinned third-party desktop runtime payloads are fetched and checksum-verified
+# during the Windows build. Keep the binary/archive cache out of Git.
+/apps/desktop/vendor/tunnel-client/

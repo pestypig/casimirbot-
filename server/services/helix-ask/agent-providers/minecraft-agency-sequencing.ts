@@ -3,12 +3,22 @@ import {
   HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
 } from "@shared/helix-environment-command";
 import { HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY } from "@shared/helix-environment-connector";
-import { HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS } from "@shared/helix-minecraft-player-capabilities";
+import {
+  HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+} from "@shared/helix-minecraft-player-capabilities";
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
 import { classifyKnownMinecraftCommand } from "../workstation-tool-gateway/minecraft-command-risk";
-import { resolveMinecraftExecutionPlaneConstraint } from "../minecraft-execution-plane-intent";
+import {
+  isAffirmativeMinecraftPlayerEmbodimentActionPrompt,
+  resolveMinecraftExecutionPlaneConstraint,
+} from "../minecraft-execution-plane-intent";
 
-export { resolveMinecraftExecutionPlaneConstraint } from "../minecraft-execution-plane-intent";
+export {
+  isAffirmativeMinecraftPlayerEmbodimentActionPrompt,
+  minecraftPlayerEmbodimentActionPromptMatch,
+  resolveMinecraftExecutionPlaneConstraint,
+} from "../minecraft-execution-plane-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -531,6 +541,238 @@ const MINECRAFT_PLAYER_ACTION_CAPABILITY_SET = new Set<string>(
   HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
 );
 
+const promptDeclaresOrderedMinecraftPlayerProcedure = (
+  prompt: string,
+): boolean => {
+  const operativePrompt = prompt.replace(
+    /"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/gu,
+    " ",
+  );
+  return (
+    isAffirmativeMinecraftPlayerEmbodimentActionPrompt(prompt) &&
+    /\b(?:first|next|then|before|after|finally|followed\s+by)\b/iu.test(
+      operativePrompt,
+    )
+  );
+};
+
+const orderedMandatoryPlayerSubgoals = (
+  contract: RecordLike | null | undefined,
+): RecordLike[] =>
+  readArray(contract?.subgoals)
+    .map(readRecord)
+    .filter(
+      (subgoal): subgoal is RecordLike =>
+        Boolean(subgoal) && subgoal.mandatory !== false,
+    )
+    .sort((left, right) => Number(left.order) - Number(right.order));
+
+const nextUnsatisfiedOrderedPlayerSubgoal = (input: {
+  contract: RecordLike | null | undefined;
+  priorRequests: RecordLike[];
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): RecordLike | null => {
+  const ordered = orderedMandatoryPlayerSubgoals(input.contract);
+  if (ordered.length < 2) return null;
+  const executed = alignMinecraftAgencyExecutedSteps({
+    priorRequests: input.priorRequests,
+    gatewayCallResults: input.gatewayCallResults,
+  }).filter((step) => step.result.ok === true);
+  let cursor = 0;
+  for (const step of executed) {
+    const expected = ordered[cursor];
+    if (!expected) break;
+    const expectedCapability = readString(
+      expected.requested_capability ?? expected.runtime_capability,
+    );
+    if (
+      expectedCapability &&
+      requestCapability(step.request) === expectedCapability
+    ) {
+      cursor += 1;
+    }
+  }
+  return ordered[cursor] ?? null;
+};
+
+const evaluateOrderedMinecraftPlayerProcedure = (input: {
+  prompt: string;
+  candidate: RecordLike;
+  priorRequests: RecordLike[];
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+  compoundCapabilityContract?: RecordLike | null;
+}): MinecraftAgencySequenceDecision | null => {
+  const candidateCapability = requestCapability(input.candidate);
+  if (
+    !candidateCapability ||
+    !MINECRAFT_PLAYER_ACTION_CAPABILITY_SET.has(candidateCapability) ||
+    !promptDeclaresOrderedMinecraftPlayerProcedure(input.prompt)
+  ) {
+    return null;
+  }
+  const ordered = orderedMandatoryPlayerSubgoals(
+    input.compoundCapabilityContract,
+  );
+  const next = nextUnsatisfiedOrderedPlayerSubgoal({
+    contract: input.compoundCapabilityContract,
+    priorRequests: input.priorRequests,
+    gatewayCallResults: input.gatewayCallResults,
+  });
+  const nextCapability = readString(
+    next?.requested_capability ?? next?.runtime_capability,
+  );
+  if (!next || !nextCapability || nextCapability === candidateCapability) {
+    return null;
+  }
+  const nextIndex = ordered.indexOf(next);
+  const proposedLaterIndex = ordered.findIndex(
+    (subgoal, index) =>
+      index > nextIndex &&
+      readString(
+        subgoal.requested_capability ?? subgoal.runtime_capability,
+      ) === candidateCapability,
+  );
+  if (proposedLaterIndex < 0) return null;
+  const nextSubgoalId =
+    readString(next.subgoal_id) ?? `ordered_subgoal:${nextIndex + 1}`;
+  return {
+    admitted: false,
+    reason:
+      `minecraft_ordered_procedure_mismatch: the original request declares an ordered Player Embodiment procedure. ` +
+      `The next unsatisfied ordered step is ${nextCapability} (${nextSubgoalId}), but Codex proposed later step ${candidateCapability} first. ` +
+      "No tool ran. Re-enter this exact failed invariant to Codex so it can select a different admitted capability request that preserves the user-declared order, or return an accurate typed failure.",
+    recovery_lane_request: null,
+  };
+};
+
+const guardedMovementPolicyForCandidate = (input: {
+  contract?: RecordLike | null;
+  capability: string | null;
+}): RecordLike | null => {
+  if (input.capability !== HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY) return null;
+  const subgoal = readArray(input.contract?.subgoals)
+    .map(readRecord)
+    .find(
+      (entry) =>
+        readString(
+          entry?.requested_capability ?? entry?.runtime_capability,
+        ) === input.capability,
+    );
+  const policy = readRecord(subgoal?.guarded_noop_policy);
+  return readString(policy?.required_purpose) === "movement_safety" &&
+    readString(policy?.candidate_field) === "walk_step_candidates"
+    ? policy
+    : null;
+};
+
+const minecraftObservationResult = (
+  gatewayResult: HelixWorkstationGatewayCallResult,
+): RecordLike | null => {
+  const observation = readRecord(gatewayResult.observation);
+  const result = readRecord(observation?.result);
+  const nestedObservation = readRecord(observation?.observation);
+  return (
+    readRecord(result?.details) ??
+    result ??
+    readRecord(readRecord(nestedObservation?.result)?.details) ??
+    readRecord(nestedObservation?.result)
+  );
+};
+
+const evaluateGuardedMinecraftWalk = (input: {
+  candidate: RecordLike;
+  priorRequests: RecordLike[];
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+  policy: RecordLike;
+}): MinecraftAgencySequenceDecision | null => {
+  const acceptedPurposes = readArray(input.policy.accepted_observation_purposes)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const completenessField = readString(input.policy.completeness_field);
+  const omittedCountField = readString(input.policy.omitted_count_field);
+  const candidateField = readString(input.policy.candidate_field);
+  if (
+    acceptedPurposes.length !== 1 ||
+    acceptedPurposes[0] !== "movement_safety" ||
+    completenessField !== "walk_step_candidates_complete" ||
+    omittedCountField !== "omitted_walk_step_candidate_count" ||
+    candidateField !== "walk_step_candidates"
+  ) {
+    return null;
+  }
+  const spatialStep = [...alignMinecraftAgencyExecutedSteps(input)]
+    .reverse()
+    .find(
+      (step) =>
+        step.result.ok === true &&
+        requestCapability(step.request) ===
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY &&
+        readString(requestArguments(step.request).purpose) ===
+          "movement_safety",
+    );
+  const result = spatialStep
+    ? minecraftObservationResult(spatialStep.result)
+    : null;
+  if (
+    !result ||
+    readString(result.purpose) !== "movement_safety" ||
+    result.walk_step_candidates_complete !== true ||
+    Number(result.omitted_walk_step_candidate_count) !== 0 ||
+    !Array.isArray(result.walk_step_candidates)
+  ) {
+    return {
+      admitted: false,
+      reason:
+        "minecraft_movement_safety_evidence_missing: the user made movement conditional on fresh geometry, but no complete current-turn movement_safety candidate set has re-entered. No player action ran. Inspect movement_safety next, then let Codex choose only from a verified safe relative direction.",
+      recovery_lane_request: {
+        capability: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        arguments: {
+          target: "current_actor",
+          horizontal_radius: 3,
+          vertical_radius: 3,
+          purpose: "movement_safety",
+          freshness_requirement_ms: 5_000,
+        },
+      },
+    };
+  }
+  const safeCandidates = readArray(result.walk_step_candidates)
+    .map(readRecord)
+    .filter(
+      (entry): entry is RecordLike =>
+        Boolean(
+          entry?.safe_candidate === true &&
+            entry.evidence_complete === true &&
+            readString(entry.relative_direction),
+        ),
+    );
+  if (safeCandidates.length === 0) {
+    return {
+      admitted: false,
+      reason:
+        "minecraft_guarded_noop_satisfied:no_verified_safe_movement_candidate. The complete current-turn movement survey contains no safe one-block direction, so the user's explicit do-not-move condition applies. No player action ran; Codex should explain the unsafe or missing candidate evidence.",
+      recovery_lane_request: null,
+    };
+  }
+  const requestedDirection = readString(
+    requestArguments(input.candidate).direction,
+  );
+  if (
+    !requestedDirection ||
+    !safeCandidates.some(
+      (entry) => readString(entry.relative_direction) === requestedDirection,
+    )
+  ) {
+    return {
+      admitted: false,
+      reason:
+        "minecraft_movement_direction_not_evidenced_safe: the proposed Player Embodiment walk direction does not match any safe relative_direction in the complete current-turn movement_safety observation. No player action ran. Codex must choose one exact evidenced safe relative direction or answer without moving.",
+      recovery_lane_request: null,
+    };
+  }
+  return null;
+};
+
 export type MinecraftAgencySequenceDecision = {
   admitted: boolean;
   reason: string | null;
@@ -577,6 +819,24 @@ export const evaluateMinecraftAgencySequence = (input: {
         "minecraft_execution_plane_mismatch: the user explicitly required the World Authority plane, but the proposed capability belongs to the Player Embodiment plane. Player simulation is not equivalent to executing the requested server command. No tool ran. Codex must choose an admitted World Authority capability or return an accurate typed capability-unavailable reason.",
       recovery_lane_request: null,
     };
+  }
+  const orderedPlayerProcedureDecision =
+    evaluateOrderedMinecraftPlayerProcedure(input);
+  if (orderedPlayerProcedureDecision) {
+    return orderedPlayerProcedureDecision;
+  }
+  const guardedMovementPolicy = guardedMovementPolicyForCandidate({
+    contract: input.compoundCapabilityContract,
+    capability: candidateCapability,
+  });
+  if (guardedMovementPolicy) {
+    const guardedMovementDecision = evaluateGuardedMinecraftWalk({
+      candidate: input.candidate,
+      priorRequests: input.priorRequests,
+      gatewayCallResults: input.gatewayCallResults,
+      policy: guardedMovementPolicy,
+    });
+    if (guardedMovementDecision) return guardedMovementDecision;
   }
   const candidateCommand = minecraftCommandText(input.candidate);
   if (

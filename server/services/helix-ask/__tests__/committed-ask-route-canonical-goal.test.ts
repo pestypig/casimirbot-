@@ -98,9 +98,10 @@ describe("committed route canonical goal reconciliation", () => {
       },
     });
     expect(result.frame?.classifier_reasons).toEqual([
-      "provider_preflight_scope_contract_model_only",
       "committed_source_route_overrode_stale_model_only_goal",
     ]);
+    expect(result.frame?.concept_tokens).toEqual([]);
+    expect(result.frame?.corpus_anchors).toEqual([]);
   });
 
   it("does not let an incompatible committed route override the canonical goal", () => {
@@ -252,6 +253,67 @@ describe("committed route canonical goal reconciliation", () => {
         required_terminal_artifact_kind: "model_synthesized_answer",
         evidence_reentry_required: true,
         followup_reasoning_required: true,
+      },
+    });
+  });
+
+  it("does not carry an incompatible internet-search projection into a committed live-environment goal", () => {
+    const turnId = "ask:test:live-environment-stale-internet-goal";
+    const route = scholarlyRoute(turnId);
+    route.route.source_target = "live_environment";
+    route.route.target_kind = "live_environment";
+    route.canonical_goal = {
+      goal_kind: "environment_evidence_synthesis",
+      required_terminal_kind: "model_synthesized_answer",
+      allowed_terminal_artifact_kinds: [
+        "model_synthesized_answer",
+        "agent_provider_terminal_candidate",
+        "typed_failure",
+      ],
+      forbidden_terminal_artifact_kinds: [],
+    };
+    route.capability_policy.allowed_tool_families = ["live_environment"];
+    route.capability_policy.required_capability_families = [
+      "live_environment",
+    ];
+    route.terminal_product.required_terminal_product =
+      "model_synthesized_answer";
+
+    const result = reconcileCanonicalGoalFrameToCommittedRoute({
+      turnId,
+      canonicalGoalFrame: {
+        turn_id: turnId,
+        goal_kind: "internet_search_lookup",
+        answer_scope: "external_internet_search",
+        required_terminal_kind: "internet_search_answer",
+        corpus_anchors: ["web"],
+        concept_tokens: [
+          "internet_search",
+          "search_action",
+          "current_or_web_source",
+        ],
+        classifier_reasons: [
+          "evidence_target_arbitration_selected_internet_search",
+          "external_internet_search_source_target",
+          "search_action",
+          "current_or_web_source",
+        ],
+      },
+      committedRoute: route,
+    });
+
+    expect(result).toMatchObject({
+      reconciled: true,
+      reason: "committed_source_route_overrode_stale_incompatible_goal",
+      frame: {
+        goal_kind: "environment_evidence_synthesis",
+        answer_scope: "live_environment",
+        required_terminal_kind: "model_synthesized_answer",
+        corpus_anchors: [],
+        concept_tokens: [],
+        classifier_reasons: [
+          "committed_source_route_overrode_stale_incompatible_goal",
+        ],
       },
     });
   });

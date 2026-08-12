@@ -8,6 +8,7 @@ import { HELIX_MINECRAFT_FABRIC_PLAYER_ACTION_PROFILE_ID } from "@shared/helix-e
 import {
   listEnvironmentConnectorCapabilityDescriptors,
 } from "../../environment-connectors/catalog";
+import { validateEnvironmentConnectorSchemaValue } from "../../environment-connectors/conformance";
 import {
   awaitEnvironmentActionObservation,
   enqueueEnvironmentAction,
@@ -15,6 +16,7 @@ import {
   resolveEnvironmentActionExecutionContext,
   type EnvironmentActionExecutionContext,
 } from "../../environment-connectors/actions";
+import { requestEnvironmentActionWorkflowControl } from "../../environment-connectors/actions/authority-store";
 import {
   isRoomEnvironmentSubjectError,
   listRoomEnvironmentProjections,
@@ -58,7 +60,7 @@ export const environmentActionMinecraftManifests: HelixWorkstationCapabilityMani
     capability_id: descriptor.capability_id,
     label: descriptor.trusted_model_label,
     description:
-      `Player Embodiment plane: ${descriptor.trusted_model_description} Use this plane when the user asks the paired client to play through normal player controls or requires manual-input override semantics. A World Authority server command, including teleport, is not an equivalent substitute unless the user explicitly authorizes changing execution planes. Helix resolves the exact room, active speaker/player binding, authority, world, live client manifest, and catalog snapshot server-side. The connector releases controls on manual input, disconnect, cancellation, or emergency stop. This tool returns evidence for Codex re-entry; it is never the final answer.`,
+      `Player Embodiment plane: ${descriptor.trusted_model_description} Use this plane when the user asks the paired client to play through normal player controls or requires manual-input override semantics. A World Authority server command, including teleport, is not an equivalent substitute unless the user explicitly authorizes changing execution planes. Helix resolves the exact room, active speaker/player binding, authority, world, live client manifest, and catalog snapshot server-side. The connector releases controls on manual input, disconnect, cancellation, or emergency stop. A request_canceled observation with manual_override_detected is a non-retryable human-intervention boundary for the current turn: preserve its exact typed reason and ask the user to clear that state instead of issuing another player action automatically. This tool returns evidence for Codex re-entry; it is never the final answer.`,
     panel_id: null,
     action_id: HELIX_ENVIRONMENT_ACTION_GATEWAY_ACTION,
     mode: "act",
@@ -78,6 +80,7 @@ export const environmentActionMinecraftManifests: HelixWorkstationCapabilityMani
       "exact_room_player_world_authority",
       "fresh_manifest_and_heartbeat_required",
       "manual_override_required",
+      "manual_override_non_retryable_same_turn",
       "postcondition_verification_required",
       "emergency_stop_required",
       "one_shot_no_automatic_replay",
@@ -108,6 +111,7 @@ export type EnvironmentActionGatewayDependencies = {
   resolveContext: typeof resolveEnvironmentActionExecutionContext;
   enqueueAction: typeof enqueueEnvironmentAction;
   awaitObservation: typeof awaitEnvironmentActionObservation;
+  requestControl: typeof requestEnvironmentActionWorkflowControl;
   resolveTargetSubject: typeof resolveActiveRoomEnvironmentSubjectByRef;
 };
 
@@ -122,6 +126,8 @@ const dependencies = (
   enqueueAction: overrides.enqueueAction ?? enqueueEnvironmentAction,
   awaitObservation:
     overrides.awaitObservation ?? awaitEnvironmentActionObservation,
+  requestControl:
+    overrides.requestControl ?? requestEnvironmentActionWorkflowControl,
   resolveTargetSubject:
     overrides.resolveTargetSubject ?? resolveActiveRoomEnvironmentSubjectByRef,
 });
@@ -198,6 +204,10 @@ export const environmentActionFailureRepairAction = (
   return "ask_user";
 };
 
+export const environmentActionGatewayAdmissionStatus = (
+  status: EnvironmentActionGatewayExecution["status"],
+): "admitted" | "blocked" => status === "blocked" ? "blocked" : "admitted";
+
 const failed = (input: {
   turnId: string;
   capabilityId: string;
@@ -247,12 +257,24 @@ const normalizeActionArguments = (
   if (actionKind === "look_at") {
     const targetKind = typeof clean.target_kind === "string"
       ? clean.target_kind
-      : "current_focus";
+      : "";
     const target = targetKind === "position"
       ? { target_kind: "position", position: clean.position }
-      : { target_kind: "current_focus" };
+      : targetKind === "relative_rotation"
+        ? {
+            target_kind: "relative_rotation",
+            // The model-facing schema deliberately permits a single-axis
+            // rotation. Materialize the unchanged axis as zero before the
+            // stricter connector protocol is parsed so a yaw-only request
+            // never becomes a needless user-input interruption.
+            yaw_delta_degrees: clean.yaw_delta_degrees ?? 0,
+            pitch_delta_degrees: clean.pitch_delta_degrees ?? 0,
+          }
+        : { target_kind: "current_focus" };
     delete clean.target_kind;
     delete clean.position;
+    delete clean.yaw_delta_degrees;
+    delete clean.pitch_delta_degrees;
     return { ...clean, action_kind: actionKind, target };
   }
   return { ...clean, action_kind: actionKind };
@@ -330,6 +352,7 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
   arguments?: Record<string, unknown>;
   accountContext?: HelixWorkstationGatewayAccountContext | null;
   conversationThreadId?: string | null;
+  signal?: AbortSignal;
   dependencies?: Partial<EnvironmentActionGatewayDependencies>;
 }): Promise<EnvironmentActionGatewayExecution> => {
   const deps = dependencies(input.dependencies);
@@ -349,6 +372,7 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
       summary: "The requested Minecraft player capability is not registered.",
     });
   }
+  const args = input.arguments ?? {};
   const account = input.accountContext;
   const profileId = account?.profile_id?.trim() ?? "";
   const roomId = roomIdFromThread(input.conversationThreadId);
@@ -373,6 +397,25 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
         "Minecraft player actions require an exact signed-in room turn and provider tool-call identity.",
     });
   }
+  const argumentIssues = validateEnvironmentConnectorSchemaValue(
+    modelInputSchema(descriptor),
+    args,
+  );
+  if (argumentIssues.length > 0) {
+    const issueSummary = argumentIssues
+      .slice(0, 4)
+      .map((issue) => `${issue.path}: ${issue.message}`)
+      .join("; ");
+    return failed({
+      turnId: input.turnId,
+      capabilityId: input.capabilityId,
+      actionKind,
+      outcome: "precondition_failed",
+      summary:
+        `Minecraft player-action arguments did not satisfy the admitted input schema${issueSummary ? `: ${issueSummary}` : "."}`,
+    });
+  }
+  let actionAdmissionReached = false;
   try {
     const participantId = await selectedParticipantId({
       deps,
@@ -390,7 +433,6 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
           "The current text author or GPT Live speaker could not be resolved to an active room participant.",
       });
     }
-    const args = input.arguments ?? {};
     const requestedLabel = typeof args.environment_label === "string"
       ? args.environment_label.trim().toLowerCase()
       : "";
@@ -570,15 +612,41 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
       terminal_eligible: false,
       raw_content_included: false,
     });
+    actionAdmissionReached = true;
     const queued = await deps.enqueueAction({
       profileId,
       requestingParticipantId: participantId,
       request,
     });
-    const observation = await deps.awaitObservation({
-      requestId: queued.action_request_id,
-      deadlineAt: queued.deadline_at,
-    });
+    let abortCancellation: Promise<unknown> | null = null;
+    const cancelOnAbort = (): void => {
+      if (abortCancellation) return;
+      abortCancellation = deps.requestControl({
+        roomId,
+        profileId,
+        environmentBindingId: context.environmentBindingId,
+        actionAuthorityId: context.actionAuthorityId,
+        workflowId: queued.workflow_id,
+        controlKind: "cancel",
+        reason:
+          "The owning Helix Ask turn ended before the player-action observation returned.",
+      }).catch(() => null);
+    };
+    input.signal?.addEventListener("abort", cancelOnAbort, { once: true });
+    if (input.signal?.aborted) cancelOnAbort();
+    let observation: HelixEnvironmentActionObservation;
+    try {
+      observation = await deps.awaitObservation({
+        requestId: queued.action_request_id,
+        deadlineAt: queued.deadline_at,
+        signal: input.signal,
+      });
+    } catch (error) {
+      if (abortCancellation) await abortCancellation;
+      throw error;
+    } finally {
+      input.signal?.removeEventListener("abort", cancelOnAbort);
+    }
     const idempotentReplay = queued.tool_call_id !== toolCallId;
     const ok =
       observation.outcome === "succeeded" &&
@@ -626,7 +694,7 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
         error instanceof Error
           ? error.message
           : "The Minecraft player-action lane failed before trustworthy observation re-entry.",
-      status: "failed",
+      status: actionAdmissionReached ? "failed" : "blocked",
     });
   }
 };

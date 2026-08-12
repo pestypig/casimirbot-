@@ -21,6 +21,7 @@ type SimulatorMode =
   | "normal"
   | "docs"
   | "compound"
+  | "stall_initialize"
   | "tool_before_route"
   | "forbidden_item"
   | "provider_auth_failure";
@@ -46,6 +47,7 @@ class FakeCodexAppServer implements CodexAppServerTransport {
   send(message: CodexAppServerJsonRpcMessage): void {
     this.received.push(message);
     if (message.method === "initialize") {
+      if (this.mode === "stall_initialize") return;
       this.emit({ id: message.id, result: { userAgent: "fake-codex" } });
       return;
     }
@@ -415,6 +417,7 @@ describe("Codex native app-server turn", () => {
       iteration: 1,
       callId: "call:capability",
       providerExecutionId: "turn:fake",
+      signal: expect.any(AbortSignal),
     });
     const lifecycle = result.debug.turn_lifecycle;
     const lifecycleKinds = lifecycle.events.map((event) => event.kind);
@@ -554,6 +557,7 @@ describe("Codex native app-server turn", () => {
       iteration: 1,
       callId: "call:capability",
       providerExecutionId: "turn:fake",
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -707,6 +711,84 @@ describe("Codex native app-server turn", () => {
       capability_id: "workspace_os.status",
       terminal_eligible: false,
     });
+  });
+
+  it("bounds a native app-server stall before initialization completes", async () => {
+    const transport = new FakeCodexAppServer("stall_initialize");
+
+    const result = await runCodexNativeAppServerTurnWithTransport(
+      {
+        prompt: "Check status.",
+        turnId: "ask:test:native:initialize-stall",
+        cwd: process.cwd(),
+        capabilities: [workspaceStatusManifest()],
+        validateRouteProposal: validateRoute,
+        executeCapability: vi.fn(),
+        timeoutMs: 2_000,
+        bootstrapTimeoutMs: 20,
+      },
+      transport,
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      answer: "",
+      failReason: "native_initialize_timeout",
+      debug: {
+        native_thread_id: null,
+        native_turn_id: null,
+        terminal_candidate_present: false,
+      },
+    });
+  });
+
+  it("aborts an in-flight capability when the native turn deadline expires", async () => {
+    const transport = new FakeCodexAppServer("normal");
+    let observedSignal: AbortSignal | null = null;
+    const executeCapability = vi.fn(
+      async ({ signal }: { signal: AbortSignal }) =>
+        await new Promise<{
+          ok: boolean;
+          content: Record<string, unknown>;
+          observationRef: null;
+        }>((resolve) => {
+          observedSignal = signal;
+          signal.addEventListener(
+            "abort",
+            () =>
+              resolve({
+                ok: false,
+                content: {
+                  error: "action_outcome_unknown",
+                  terminal_eligible: false,
+                },
+                observationRef: null,
+              }),
+            { once: true },
+          );
+        }),
+    );
+
+    const result = await runCodexNativeAppServerTurnWithTransport(
+      {
+        prompt: "Check the current workstation status.",
+        turnId: "ask:test:native:capability-timeout",
+        cwd: process.cwd(),
+        capabilities: [workspaceStatusManifest()],
+        validateRouteProposal: validateRoute,
+        executeCapability,
+        timeoutMs: 30,
+      },
+      transport,
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      answer: "",
+      failReason: "native_turn_timeout",
+    });
+    expect(executeCapability).toHaveBeenCalledTimes(1);
+    expect(observedSignal?.aborted).toBe(true);
   });
 
   it("fails closed if the native runtime emits a built-in tool item", async () => {

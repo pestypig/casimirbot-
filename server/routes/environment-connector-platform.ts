@@ -41,6 +41,9 @@ import {
   isRoomSourceIngressError,
 } from "../services/helix-ask/realtime-room/source-link-store";
 import {
+  isSharedRealtimeRoomDomainError,
+} from "../services/helix-ask/realtime-room/room-store";
+import {
   readMembership,
   requireOwner,
   requireSharedRoomAccount,
@@ -55,6 +58,9 @@ import {
 import {
   listPublicEnvironmentConnectorDirectory,
 } from "../services/environment-connectors/directory";
+import {
+  buildEnvironmentConnectorDeviceCheckList,
+} from "../services/environment-connectors/devices";
 
 const identifier = z
   .string()
@@ -97,6 +103,12 @@ const pairingApprovalSchema = z
 const deviceManagementSchema = z
   .object({
     room_id: identifier,
+  })
+  .strict();
+
+const deviceCheckListQuerySchema = z
+  .object({
+    room_id: identifier.optional(),
   })
   .strict();
 
@@ -182,6 +194,12 @@ const sendError = (res: Response, error: unknown): void => {
         String(Math.max(1, Math.ceil(error.retryAfterMs / 1_000))),
       );
     }
+    res
+      .status(error.statusCode)
+      .json(errorPayload({ code: error.code, message: error.message }));
+    return;
+  }
+  if (isSharedRealtimeRoomDomainError(error)) {
     res
       .status(error.statusCode)
       .json(errorPayload({ code: error.code, message: error.message }));
@@ -546,6 +564,28 @@ environmentConnectorBrowserRouter.use(
   browserBoundary.enforceIpRateLimit,
   browserBoundary.enforceSameOrigin,
   json({ limit: "32kb" }),
+);
+
+environmentConnectorBrowserRouter.get(
+  "/environment-connectors/devices",
+  route(async (req, res) => {
+    const parsed = deviceCheckListQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      invalid(res, "The device-check query is invalid.");
+      return;
+    }
+    const account = await requireSharedRoomAccount(req);
+    browserBoundary.enforceAccountRateLimit(res, account.profileId);
+    if (parsed.data.room_id) {
+      const membership = await readMembership(parsed.data.room_id, account);
+      requireOwner(membership);
+    }
+    const deviceCheck = await buildEnvironmentConnectorDeviceCheckList({
+      ownerProfileId: account.profileId,
+      roomId: parsed.data.room_id,
+    });
+    res.json(deviceCheck);
+  }),
 );
 
 environmentConnectorBrowserRouter.post(

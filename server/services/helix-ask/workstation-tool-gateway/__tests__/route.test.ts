@@ -19,6 +19,7 @@ const SET_INTERFACE_LANGUAGE_CAPABILITY = "account_session.set_interface_languag
 const createApp = (): express.Express => {
   const app = express();
   app.use(express.json({ limit: "256kb" }));
+  app.use(express.urlencoded({ extended: false }));
   app.use("/api/account", accountSessionRouter);
   app.use("/api/agi", workstationToolGatewayRouter);
   app.use("/api/agi", agentProvidersRouter);
@@ -174,6 +175,42 @@ describe("AGI workstation tool gateway route", () => {
         status: "succeeded",
       },
     });
+  });
+
+  it("preserves direct caller room and provider identities for environment tools", async () => {
+    const agent = await createDeveloperAgent();
+    const response = await agent
+      .post("/api/agi/workstation-tool-gateway/call")
+      .type("form")
+      .send({
+        agent_runtime: "codex",
+        mode: "read",
+        capability_id: "com.casimirbot.minecraft.actor.status.read",
+        arguments: JSON.stringify({
+          target: "current_actor",
+          freshness_requirement_ms: 10_000,
+        }),
+        turn_id: "direct-codex-differential:route-contract",
+        tool_call_id: "direct-tool-call:route-contract",
+        provider_execution_id: "direct-provider-execution:route-contract",
+        conversation_thread_id:
+          "helix-ask:room:shared_realtime_room:route-contract",
+        iteration: "0",
+      })
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      ok: false,
+      capability_id: "com.casimirbot.minecraft.actor.status.read",
+      observation: {
+        outcome: "permission_revoked",
+        summary:
+          "The room membership or consent that authorized this run binding changed.",
+      },
+    });
+    expect(response.body.observation.summary).not.toContain(
+      "requires the exact server-scoped room conversation thread",
+    );
   });
 
   it("keeps preview interface languages available to developer accounts", async () => {

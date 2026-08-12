@@ -572,6 +572,143 @@ const isReceiptLike = (text: string): boolean =>
 const isRefusalLike = (text: string): boolean =>
   /\b(?:I can't|I cannot|I’m unable|I am unable|cannot answer|can't answer)\b/i.test(text);
 
+const isGroundedCurrentTurnEvidenceLimitation = (input: {
+  turnId: string;
+  text: string;
+  draftPayload?: Record<string, unknown> | null;
+  artifactLedger?: ArtifactLike[] | null;
+}): boolean => {
+  if (!isRefusalLike(input.text)) return false;
+  if (
+    !/\b(?:admitted|current[- ]turn|observed|available|returned|retrieved)\s+(?:evidence|observations?|results?)\b/i.test(
+      input.text,
+    ) ||
+    !/\b(?:missing|insufficient|does not (?:show|contain|include|establish|identify)|only (?:confirms|shows|contains)|cannot truthfully)\b/i.test(
+      input.text,
+    ) ||
+    !/\b(?:need|requires?|once|recheck|fresh|next (?:probe|step)|proceed)\b/i.test(
+      input.text,
+    )
+  ) {
+    return false;
+  }
+  const explicitSupportRefs = new Set(
+    collectExplicitDraftSupportRefs(input.draftPayload),
+  );
+  if (explicitSupportRefs.size === 0) return false;
+  return (input.artifactLedger ?? []).some((artifact) => {
+    const payload = readRecord(artifact.payload);
+    const ref =
+      readString(artifact.artifact_id) ?? readString(payload?.artifact_id);
+    const artifactTurnId =
+      readString((artifact as Record<string, unknown>).turn_id) ??
+      readString(payload?.turn_id) ??
+      (ref?.startsWith(`${input.turnId}:`) ? input.turnId : null);
+    const status =
+      readString((artifact as Record<string, unknown>).status) ??
+      readString(payload?.status);
+    const observationIdentity = [
+      artifactKind(artifact),
+      readString(payload?.schema),
+      readString(payload?.kind),
+    ].join(" ");
+    return (
+      Boolean(ref && explicitSupportRefs.has(ref)) &&
+      artifactTurnId === input.turnId &&
+      status === "succeeded" &&
+      /(?:observation|provider_gateway_observation_packet)/i.test(
+        observationIdentity,
+      ) &&
+      payload?.terminal_eligible !== true &&
+      payload?.assistant_answer !== true
+    );
+  });
+};
+
+const isGroundedCompleteCompoundSynthesisLimitation = (input: {
+  turnId: string;
+  text: string;
+  payload?: Record<string, unknown> | null;
+  draftPayload?: Record<string, unknown> | null;
+  artifactLedger?: ArtifactLike[] | null;
+}): boolean => {
+  if (
+    !isRefusalLike(input.text) ||
+    input.text.trim().length < 120 ||
+    !/\b(?:confirm(?:ed)?|observ(?:ed|ation)|complete(?:d)?|execut(?:ed|ion)|measur(?:ed|ement)|report(?:ed)?|shows?|result|evidence|position|status|support)\b/i.test(
+      input.text,
+    ) ||
+    !hasCompleteMultiSubgoalExecutionLedger(
+      input.payload,
+      input.artifactLedger,
+    )
+  ) {
+    return false;
+  }
+
+  const executionState =
+    readRecord(input.payload?.capability_itinerary_execution_state) ??
+    artifactPayloadByKind(
+      input.artifactLedger,
+      "capability_itinerary_execution_state",
+    );
+  const ledger = readArray(executionState?.compound_subgoal_ledger)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const explicitSupportRefs = new Set(
+    collectExplicitDraftSupportRefs(input.draftPayload),
+  );
+  if (ledger.length < 2 || explicitSupportRefs.size === 0) return false;
+
+  const artifactByRef = new Map(
+    (input.artifactLedger ?? [])
+      .map((artifact) => {
+        const payload = readRecord(artifact.payload);
+        const ref =
+          readString(artifact.artifact_id) ??
+          readString(payload?.artifact_id);
+        return ref ? [ref, artifact] as const : null;
+      })
+      .filter(
+        (entry): entry is readonly [string, ArtifactLike] => Boolean(entry),
+      ),
+  );
+
+  return ledger.every((entry) => {
+    if (!compoundLedgerEntryHasSatisfiedObservation(entry)) return false;
+    const observationRef = readString(entry.observation_ref);
+    if (!observationRef || !explicitSupportRefs.has(observationRef)) {
+      return false;
+    }
+    const artifact = artifactByRef.get(observationRef);
+    if (!artifact) return false;
+    const artifactRecord = artifact as Record<string, unknown>;
+    const payload = readRecord(artifact.payload);
+    const artifactTurnId =
+      readString(artifactRecord.turn_id) ??
+      readString(payload?.turn_id) ??
+      (observationRef.startsWith(`${input.turnId}:`)
+        ? input.turnId
+        : null);
+    const status =
+      readString(artifactRecord.status) ?? readString(payload?.status);
+    const observationIdentity = [
+      artifactKind(artifact),
+      readString(payload?.schema),
+      readString(payload?.kind),
+    ].join(" ");
+    return (
+      artifactTurnId === input.turnId &&
+      status === "succeeded" &&
+      /(?:observation|provider_gateway_observation_packet)/i.test(
+        observationIdentity,
+      ) &&
+      payload?.terminal_eligible !== true &&
+      payload?.assistant_answer !== true
+    );
+  });
+};
+
 const isScholarlyFullTextObservation = (artifact: ArtifactLike): boolean => {
   const payload = readRecord(artifact.payload);
   return /scholarly_full_text_observation|research_library_observation/i.test([
@@ -846,6 +983,20 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
     groundedTheoryProcedureLimitation &&
     /\bunsupported_lanyon_case\b/i.test(text) &&
     /\b(?:ineligible|unsupported|not registered|blocked)\b/i.test(text);
+  const groundedCurrentTurnEvidenceLimitation =
+    isGroundedCurrentTurnEvidenceLimitation({
+      turnId: input.turnId,
+      text,
+      draftPayload: input.draftPayload,
+      artifactLedger: input.artifactLedger,
+    }) ||
+    isGroundedCompleteCompoundSynthesisLimitation({
+      turnId: input.turnId,
+      text,
+      payload: input.payload,
+      draftPayload: input.draftPayload,
+      artifactLedger: input.artifactLedger,
+    });
   if (!text) violations.push("empty_draft");
   if (
     isFallbackLike(text) &&
@@ -861,6 +1012,7 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
     isRefusalLike(text) &&
     !readString(input.payload?.terminal_error_code) &&
     !groundedBoundedTheoryProcedureLimitation &&
+    !groundedCurrentTurnEvidenceLimitation &&
     !(isConditionalVisualEvidencePrompt(prompt) && conditionalVisualEvidenceSatisfied)
   ) {
     violations.push("refusal_without_error");

@@ -93,9 +93,11 @@ export type RunCodexNativeAppServerTurnInput = {
     iteration: number;
     callId: string;
     providerExecutionId: string;
+    signal: AbortSignal;
   }) => Promise<CodexNativeCapabilityExecutionResult>;
   signal?: AbortSignal;
   timeoutMs?: number;
+  bootstrapTimeoutMs?: number;
   onNativeEvent?: (method: string, params: unknown) => void;
 };
 
@@ -198,6 +200,19 @@ const timeoutForTurn = (input: RunCodexNativeAppServerTurnInput): number => {
   if (typeof input.timeoutMs === "number" && input.timeoutMs > 0) return input.timeoutMs;
   const configured = Number(process.env.HELIX_CODEX_NATIVE_TIMEOUT_MS);
   return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 120_000;
+};
+
+const timeoutForBootstrapStage = (
+  input: RunCodexNativeAppServerTurnInput,
+  turnTimeoutMs: number,
+): number => {
+  if (typeof input.bootstrapTimeoutMs === "number" && input.bootstrapTimeoutMs > 0) {
+    return Math.min(Math.floor(input.bootstrapTimeoutMs), turnTimeoutMs);
+  }
+  const configured = Number(process.env.HELIX_CODEX_NATIVE_BOOTSTRAP_TIMEOUT_MS);
+  const configuredTimeout =
+    Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 45_000;
+  return Math.min(configuredTimeout, turnTimeoutMs);
 };
 
 const forbiddenItemTypes = new Set([
@@ -318,6 +333,9 @@ export const runCodexNativeAppServerTurnWithTransport = async (
     const params = readRecord(rawParams);
     const toolName = readString(params.tool) ?? "";
     const args = readRecord(params.arguments);
+    const requestNativeTurnId =
+      readString(params.turnId) ?? readString(params.turn_id);
+    if (requestNativeTurnId && !nativeTurnId) nativeTurnId = requestNativeTurnId;
     const callId =
       readString(params.callId) ??
       readString(params.call_id) ??
@@ -475,7 +493,11 @@ export const runCodexNativeAppServerTurnWithTransport = async (
       iteration: executedTools.length + 1,
       callId,
       providerExecutionId:
-        nativeTurnId ?? nativeThreadId ?? `codex_native_execution:${input.turnId}`,
+        requestNativeTurnId ??
+        nativeTurnId ??
+        nativeThreadId ??
+        `codex_native_execution:${input.turnId}`,
+      signal: capabilityAbortController.signal,
     });
     executedTools.push(capabilityId);
     if (execution.ok) successfulTools.push(capabilityId);
@@ -494,29 +516,59 @@ export const runCodexNativeAppServerTurnWithTransport = async (
   });
 
   let resolveCompleted: (value: void) => void = () => undefined;
-  let rejectCompleted: (error: Error) => void = () => undefined;
-  const completed = new Promise<void>((
-    resolve: (value: void | PromiseLike<void>) => void,
-    reject: (reason?: unknown) => void,
-  ) => {
+  const completed = new Promise<void>((resolve) => {
     resolveCompleted = resolve;
-    rejectCompleted = reject;
   });
+  let rejectTurnGuard: (error: Error) => void = () => undefined;
+  let turnGuardSettled = false;
+  const capabilityAbortController = new AbortController();
+  const turnGuard = new Promise<never>((_resolve, reject) => {
+    rejectTurnGuard = reject;
+  });
+  const failTurnGuard = (error: CodexAppServerProtocolError): void => {
+    if (turnGuardSettled) return;
+    turnGuardSettled = true;
+    capabilityAbortController.abort(error);
+    rejectTurnGuard(error);
+  };
+  const awaitWithinTurnGuard = <T>(operation: Promise<T>): Promise<T> =>
+    Promise.race([operation, turnGuard]);
+  const turnTimeoutMs = timeoutForTurn(input);
+  const bootstrapTimeoutMs = timeoutForBootstrapStage(input, turnTimeoutMs);
+  const awaitBootstrapStage = <T>(
+    stage: "initialize" | "thread_start" | "turn_start",
+    operation: Promise<T>,
+  ): Promise<T> => {
+    let stageTimeout: NodeJS.Timeout | null = null;
+    const stageGuard = new Promise<never>((_resolve, reject) => {
+      stageTimeout = setTimeout(() => {
+        reject(
+          new CodexAppServerProtocolError(
+            `native_${stage}_timeout`,
+            `Codex native ${stage.replaceAll("_", "/")} exceeded ${bootstrapTimeoutMs}ms.`,
+          ),
+        );
+      }, bootstrapTimeoutMs);
+    });
+    return Promise.race([operation, turnGuard, stageGuard]).finally(() => {
+      if (stageTimeout) clearTimeout(stageTimeout);
+    });
+  };
   const timeout = setTimeout(() => {
-    rejectCompleted(
+    failTurnGuard(
       new CodexAppServerProtocolError(
         "native_turn_timeout",
-        `Codex native turn exceeded ${timeoutForTurn(input)}ms.`,
+        `Codex native turn exceeded ${turnTimeoutMs}ms.`,
       ),
     );
-  }, timeoutForTurn(input));
+  }, turnTimeoutMs);
   const abort = () => {
-    rejectCompleted(
+    failTurnGuard(
       new CodexAppServerProtocolError("native_turn_aborted", "Codex native turn was aborted."),
     );
-    client.close();
   };
   input.signal?.addEventListener("abort", abort, { once: true });
+  if (input.signal?.aborted) abort();
 
   client.onNotification((method: string, rawParams: unknown) => {
     input.onNativeEvent?.(method, rawParams);
@@ -575,7 +627,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
 
   let failReason: string | null = null;
   try {
-    await client.request("initialize", {
+    await awaitBootstrapStage("initialize", client.request("initialize", {
       clientInfo: {
         name: "casimirbot_helix",
         title: "CasimirBot Helix",
@@ -585,11 +637,11 @@ export const runCodexNativeAppServerTurnWithTransport = async (
         experimentalApi: true,
         requestAttestation: false,
       },
-    });
+    }));
     client.notify("initialized");
 
     const threadResponse = readRecord(
-      await client.request("thread/start", {
+      await awaitBootstrapStage("thread_start", client.request("thread/start", {
         model: input.model ?? undefined,
         cwd: input.cwd,
         approvalPolicy: "never",
@@ -598,7 +650,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
         baseInstructions: NATIVE_BASE_INSTRUCTIONS,
         ephemeral: true,
         dynamicTools: catalog.specs,
-      }),
+      })),
     );
     nativeThreadId = readString(readRecord(threadResponse.thread).id);
     if (!nativeThreadId) {
@@ -610,7 +662,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
     }
 
     const turnResponse = readRecord(
-      await client.request("turn/start", {
+      await awaitBootstrapStage("turn_start", client.request("turn/start", {
         threadId: nativeThreadId,
         input: [{ type: "text", text: input.prompt, text_elements: [] }],
         cwd: input.cwd,
@@ -618,10 +670,10 @@ export const runCodexNativeAppServerTurnWithTransport = async (
         sandboxPolicy: { type: "readOnly", networkAccess: false },
         model: input.model ?? undefined,
         effort: input.reasoningEffort ?? undefined,
-      }),
+      })),
     );
     nativeTurnId = readString(readRecord(turnResponse.turn).id);
-    await completed;
+    await awaitWithinTurnGuard(completed);
     const observedToolSet = new Set(executedTools);
     const routeUnobservedTools = routeAdmission?.admittedCapabilityIds.filter(
       (capabilityId: string) => !observedToolSet.has(capabilityId),

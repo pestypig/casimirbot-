@@ -1,0 +1,49 @@
+{
+  "schema_version": "casimir_dp_penrose_candidate_theory_stage0_receipt/1",
+  "generated_at": "2026-08-11T18:20:00.000Z",
+  "input": {
+    "path": "configs/research/casimir-dp-penrose-candidate-theory-stage0.v1.json",
+    "sha256": "b919df6c8bc126a28920176918cd2972f9ef9c1725e9c3f2e83e19979254c846"
+  },
+  "output": {
+    "path": "docs/research/casimir-dp-penrose-candidate-theory-stage0-report.md",
+    "sha256": "5379bd82290a08a708adb5333f9bec217aef90b0282e69b8ac61cb8f8ff5e84a"
+  },
+  "authority_integrity": [
+    {
+      "role": "or_phase_authority",
+      "path": "configs/research/casimir-dp-or-phase-stage2.v1.json",
+      "expected_sha256": "b517e8fbf002303258a5269e7f37c6b16d4bc3c45c609072bdb2a9e5184e596d",
+      "actual_sha256": "b517e8fbf002303258a5269e7f37c6b16d4bc3c45c609072bdb2a9e5184e596d",
+      "gate": "pass"
+    },
+    {
+      "role": "stage3_outcome_authority",
+      "path": "configs/research/casimir-dp-evidence-map-stage3.v1.json",
+      "expected_sha256": "231cb26e9c9bb523e2dda40a6178d8a484ec099f1868a74b995d8153337d29c2",
+      "actual_sha256": "231cb26e9c9bb523e2dda40a6178d8a484ec099f1868a74b995d8153337d29c2",
+      "gate": "pass"
+    },
+    {
+      "role": "manifold_registry_authority",
+      "path": "shared/casimir-dp-manifold-kernel-registry.ts",
+      "expected_sha256": "10eaa369ea35ac7c82871a915c12947292b1f946c4b0a71e10e12991d4faac33",
+      "actual_sha256": "10eaa369ea35ac7c82871a915c12947292b1f946c4b0a71e10e12991d4faac33",
+      "gate": "pass"
+    }
+  ],
+  "candidate_status": "blocked",
+  "first_failure_code": "PCT_BRANCH_CORRESPONDENCE_MISSING",
+  "maturity": "stage0_exploratory",
+  "numerical_output": null,
+  "model_comparison_admission": false,
+  "empirically_validated": false,
+  "final_gates": {
+    "measured_evidence": "not_ready",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated",
+    "integrated_pilot": "not_authorized"
+  },
+  "claim_ceiling": "formal_candidate_definition_only"
+}

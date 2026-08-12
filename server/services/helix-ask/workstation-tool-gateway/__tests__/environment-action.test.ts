@@ -4,9 +4,12 @@ import {
   type HelixEnvironmentActionObservation,
 } from "@shared/helix-environment-action";
 import { describe, expect, it, vi } from "vitest";
+import { EnvironmentActionBrokerError } from "../../../environment-connectors/actions/action-broker";
 import type { HelixWorkstationGatewayAccountContext } from "../account-policy";
 import {
   environmentActionMinecraftManifests,
+  environmentActionFailureRepairAction,
+  environmentActionGatewayAdmissionStatus,
   executeEnvironmentActionGatewayCapability,
   type EnvironmentActionGatewayDependencies,
 } from "../environment-action";
@@ -115,10 +118,23 @@ const deps = (
   resolveContext: vi.fn(async () => context() as never),
   enqueueAction: vi.fn(async ({ request }) => request as never),
   awaitObservation: vi.fn(async () => observation),
+  requestControl: vi.fn(async () => ({}) as never),
   ...overrides,
 });
 
 describe("Minecraft player-action workstation gateway", () => {
+  it("treats manual cancellation as a same-turn human intervention boundary", () => {
+    expect(environmentActionFailureRepairAction("request_canceled")).toBe("ask_user");
+    expect(environmentActionGatewayAdmissionStatus("failed")).toBe("admitted");
+    expect(environmentActionGatewayAdmissionStatus("blocked")).toBe("blocked");
+    expect(environmentActionMinecraftManifests[0]?.description).toContain(
+      "non-retryable human-intervention boundary",
+    );
+    expect(environmentActionMinecraftManifests[0]?.safety_tags).toContain(
+      "manual_override_non_retryable_same_turn",
+    );
+  });
+
   it("publishes the baseline and reusable bounded, nonterminal, host-free player tools", () => {
     expect(environmentActionMinecraftManifests).toHaveLength(13);
     expect(environmentActionMinecraftManifests).toEqual(
@@ -165,6 +181,102 @@ describe("Minecraft player-action workstation gateway", () => {
         (manifest.input_schema as { properties: Record<string, unknown> }).properties,
       ).not.toHaveProperty("action_kind");
     }
+    const look = environmentActionMinecraftManifests.find(
+      (manifest) =>
+        manifest.capability_id === "com.casimirbot.minecraft.player.look",
+    )!;
+    expect(
+      (look.input_schema as { properties: Record<string, unknown> }).properties,
+    ).toMatchObject({
+      target_kind: expect.objectContaining({
+        enum: expect.arrayContaining(["relative_rotation"]),
+      }),
+      yaw_delta_degrees: expect.any(Object),
+      pitch_delta_degrees: expect.any(Object),
+    });
+  });
+
+  it("normalizes a model-authored yaw-only relative look without asking for an unchanged pitch", async () => {
+    const capabilityId = "com.casimirbot.minecraft.player.look";
+    const enqueueAction = vi.fn(async ({ request }) => request as never);
+    const lookObservation = {
+      ...observation,
+      capability_id: capabilityId,
+      action_kind: "look_at",
+      result: {
+        verified_terminal_measurements: {
+          final_yaw: 30,
+          final_pitch: 0,
+        },
+      },
+    } satisfies HelixEnvironmentActionObservation;
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId,
+      turnId: "ask:player-action:relative-look",
+      toolCallId: "tool_call:player-action-relative-look",
+      providerExecutionId: "provider_execution:player-action-relative-look",
+      arguments: {
+        target_kind: "relative_rotation",
+        yaw_delta_degrees: 20,
+        max_turn_degrees_per_tick: 10,
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        enqueueAction,
+        resolveContext: vi.fn(async () => ({
+          ...context(),
+          capability: {
+            capabilityId,
+            capabilityVersion: 1,
+            actionKind: "look_at",
+            effectClass: "player_motion",
+            workflowModes: ["single_action"],
+            controlEngines: ["native_fabric"],
+          },
+        }) as never),
+        awaitObservation: vi.fn(async () => lookObservation),
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(enqueueAction.mock.calls[0]?.[0]?.request.arguments).toMatchObject({
+      action_kind: "look_at",
+      target: {
+        target_kind: "relative_rotation",
+        yaw_delta_degrees: 20,
+        pitch_delta_degrees: 0,
+      },
+    });
+  });
+
+  it("fails closed instead of converting an incomplete look request into current-focus success", async () => {
+    const capabilityId = "com.casimirbot.minecraft.player.look";
+    const enqueueAction = vi.fn();
+
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId,
+      turnId: "ask:player-action:incomplete-relative-look",
+      toolCallId: "tool_call:player-action-incomplete-relative-look",
+      providerExecutionId:
+        "provider_execution:player-action-incomplete-relative-look",
+      arguments: {
+        max_turn_degrees_per_tick: 15,
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({ enqueueAction }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "blocked",
+      error: "precondition_failed",
+      repairAction: "repair",
+    });
+    expect(result.summary).toContain("did not satisfy the admitted input schema");
+    expect(result.summary).toContain("target_kind");
+    expect(enqueueAction).not.toHaveBeenCalled();
   });
 
   it("resolves a follow target server-side without returning its native identity to Codex", async () => {
@@ -284,6 +396,109 @@ describe("Minecraft player-action workstation gateway", () => {
     });
     expect(JSON.stringify(result.executedArgs)).not.toContain("subject_binding");
     expect(JSON.stringify(result.executedArgs)).not.toContain("action_authority");
+  });
+
+  it("queues exact workflow cancellation when the owning provider turn aborts", async () => {
+    const abortController = new AbortController();
+    const requestControl = vi.fn(async () => ({}) as never);
+    const enqueueAction = vi.fn(async ({ request }) => {
+      abortController.abort();
+      return request as never;
+    });
+    const awaitObservation = vi.fn(async ({ signal }: { signal?: AbortSignal }) => {
+      expect(signal?.aborted).toBe(true);
+      throw new EnvironmentActionBrokerError(
+        "action_request_expired",
+        499,
+        "The action wait was canceled; the workflow was not replayed.",
+      );
+    });
+
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId: CAPABILITY_ID,
+      turnId: "ask:player-action:aborted",
+      toolCallId: "tool_call:player-action-aborted",
+      providerExecutionId: "provider_execution:player-action-aborted",
+      arguments: {
+        destination: { x: 2, y: 64, z: 0 },
+        arrival_radius: 0.5,
+        allow_sprint: false,
+        allow_dig: false,
+        allow_place: false,
+        engine_preference: "native_fabric",
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      signal: abortController.signal,
+      dependencies: deps({
+        enqueueAction,
+        awaitObservation: awaitObservation as never,
+        requestControl,
+      }),
+    });
+
+    expect(requestControl).toHaveBeenCalledWith(expect.objectContaining({
+      controlKind: "cancel",
+      workflowId: expect.stringContaining("environment_action_workflow:"),
+      roomId: ROOM_ID,
+      environmentBindingId: ENVIRONMENT_ID,
+    }));
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      error: "action_outcome_unknown",
+    });
+  });
+
+  it("keeps an executed manual cancellation admitted while requiring user repair", async () => {
+    const canceledObservation = {
+      ...observation,
+      outcome: "request_canceled" as const,
+      summary: "Manual player input canceled the workflow and released controls.",
+      result: {
+        manual_override_detected: true,
+        manual_override_reason: "screen_open" as const,
+        controls_released: true,
+      },
+    } satisfies HelixEnvironmentActionObservation;
+    const enqueueAction = vi.fn(async ({ request }) => request as never);
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId: CAPABILITY_ID,
+      turnId: "ask:player-action:manual-cancel",
+      toolCallId: "tool_call:player-action-manual-cancel",
+      providerExecutionId: "provider_execution:player-action-manual-cancel",
+      arguments: {
+        destination: { x: 10, y: 64, z: 20 },
+        arrival_radius: 1,
+        allow_sprint: false,
+        allow_dig: false,
+        allow_place: false,
+        engine_preference: "native_fabric",
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        enqueueAction,
+        awaitObservation: vi.fn(async () => canceledObservation),
+      }),
+    });
+
+    expect(enqueueAction).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      error: "request_canceled",
+      repairAction: "ask_user",
+      observation: {
+        outcome: "request_canceled",
+        result: {
+          manual_override_detected: true,
+          manual_override_reason: "screen_open",
+          controls_released: true,
+        },
+      },
+    });
+    expect(environmentActionGatewayAdmissionStatus(result.status)).toBe("admitted");
   });
 
   it("fails before environment lookup without trusted room and provider identities", async () => {

@@ -62,6 +62,7 @@ export type HelixToolOutputRole =
   | "candidate_next_step";
 
 const HELIX_SELF_TERMINAL_ARTIFACT_KINDS = new Set([
+  "live_environment_binding_diagnosis",
   "image_lens_observation_report",
   "image_lens_named_receipt_evaluation",
   "scientific_image_evidence_continuity_summary",

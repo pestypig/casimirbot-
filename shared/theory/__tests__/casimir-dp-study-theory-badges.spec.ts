@@ -54,13 +54,124 @@ describe("Casimir / DP quantum-foam study badges", () => {
         "study.casimir_dp.proper_time_worldline_closure_stage4_2p",
         "study.casimir_dp.superconducting_boundary_control_stage4_2q",
         "study.casimir_dp.integrated_feasibility_pilot_stage4_2r",
+        "study.casimir_dp.penrose_relational_candidate_stage0",
+        "study.casimir_dp.penrose_relational_correspondence_stage0_1",
         "study.casimir_dp.claim_boundary",
       ]),
     );
-    expect(branch.badges).toHaveLength(43);
-    expect(branch.edges).toHaveLength(120);
+    expect(branch.badges).toHaveLength(46);
+    expect(branch.edges).toHaveLength(132);
     expect(branch.badges.every((badge) => badge.claimBoundary.diagnosticOnly)).toBe(true);
     expect(branch.badges.every((badge) => badge.claimBoundary.promotionAllowed === false)).toBe(true);
+  });
+
+  it("registers the Penrose candidate as a blocked Stage-0 definition with no observable bridge", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const candidate = branch.badges.find(
+      (badge) =>
+        badge.id === "study.casimir_dp.penrose_relational_candidate_stage0",
+    );
+    const candidateEdges = branch.edges.filter(
+      (edge) => edge.from === candidate?.id || edge.to === candidate?.id,
+    );
+
+    expect(candidate).toEqual(
+      expect.objectContaining({
+        level: "model",
+        status: "blocked",
+        calculatorPayloads: [],
+        claimBoundary: expect.objectContaining({
+          diagnosticOnly: true,
+          physicalMechanismClaimAllowed: false,
+          promotionAllowed: false,
+        }),
+      }),
+    );
+    expect(candidate?.tags).toEqual(
+      expect.arrayContaining([
+        "stage_0_exploratory",
+        "boundary_independent",
+        "first_failure:PCT_BRANCH_CORRESPONDENCE_MISSING",
+        "numerical_output_null",
+        "registration_not_validation",
+      ]),
+    );
+    expect(candidate?.assumptions.join(" ")).toContain(
+      "Penrose relation tau",
+    );
+    expect(candidate?.assumptions.join(" ")).toContain(
+      "different Stage-0 model",
+    );
+    expect(candidate?.sourceRefs.map((ref) => ref.path)).toEqual(
+      expect.arrayContaining([
+        "shared/casimir-dp-penrose-candidate-theory-stage0.ts",
+        "shared/casimir-dp-penrose-candidate-preflight.ts",
+        "configs/research/casimir-dp-penrose-candidate-theory-stage0.v1.json",
+        "docs/research/casimir-dp-penrose-candidate-theory-stage0-report.md",
+      ]),
+    );
+    expect(candidateEdges).toHaveLength(5);
+    expect(candidateEdges.some((edge) => edge.relation === "derives")).toBe(
+      false,
+    );
+    expect(candidateEdges.some((edge) => edge.observableBridge != null)).toBe(
+      false,
+    );
+  });
+
+  it("registers Stage-0.1 as a blocked synthetic correspondence benchmark", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const benchmark = branch.badges.find(
+      (badge) =>
+        badge.id ===
+        "study.casimir_dp.penrose_relational_correspondence_stage0_1",
+    );
+    const edges = branch.edges.filter(
+      (edge) => edge.from === benchmark?.id || edge.to === benchmark?.id,
+    );
+
+    expect(benchmark).toEqual(
+      expect.objectContaining({
+        level: "model",
+        status: "blocked",
+        calculatorPayloads: [],
+        claimBoundary: expect.objectContaining({
+          diagnosticOnly: true,
+          physicalMechanismClaimAllowed: false,
+          promotionAllowed: false,
+        }),
+      }),
+    );
+    expect(benchmark?.tags).toEqual(
+      expect.arrayContaining([
+        "stage_0_1_exploratory",
+        "synthetic_benchmark_pass",
+        "first_failure:PRC_REFERENCE_RECEIPTS_MISSING",
+        "parent_first_failure:PCT_BRANCH_CORRESPONDENCE_MISSING",
+        "no_invariant_functional",
+        "no_reduction_dynamics",
+        "no_coherence_prediction",
+        "no_calculator",
+      ]),
+    );
+    expect(benchmark?.equations.map((equation) => equation.id)).toEqual(
+      expect.arrayContaining([
+        "casimir_dp_penrose_relational_pullback_stress_difference",
+        "casimir_dp_penrose_relational_pullback_metric_difference",
+        "casimir_dp_penrose_correspondence_covariance_gate",
+        "casimir_dp_penrose_correspondence_identity_swap_gate",
+      ]),
+    );
+    expect(benchmark?.sourceRefs.map((ref) => ref.path)).toEqual(
+      expect.arrayContaining([
+        "shared/casimir-dp-penrose-relational-correspondence-stage0-1.ts",
+        "configs/research/casimir-dp-penrose-relational-correspondence-stage0-1.v1.json",
+        "docs/research/casimir-dp-penrose-relational-correspondence-stage0-1-report.md",
+      ]),
+    );
+    expect(edges).toHaveLength(5);
+    expect(edges.some((edge) => edge.relation === "derives")).toBe(false);
+    expect(edges.some((edge) => edge.observableBridge != null)).toBe(false);
   });
 
   it("connects Stage-4 polarization, thermal, and congruence controls without inventing a bridge", () => {
@@ -509,7 +620,7 @@ describe("Casimir / DP quantum-foam study badges", () => {
       "penrose_or_timescale_notation_context",
     ]);
     expect(context?.assumptions.join(" ")).toContain("does not validate Orch OR");
-    expect(branch.edges.filter((edge) => edge.from === context?.id || edge.to === context?.id)).toHaveLength(7);
+    expect(branch.edges.filter((edge) => edge.from === context?.id || edge.to === context?.id)).toHaveLength(8);
     expect(branch.edges.some((edge) =>
       edge.from === context?.id &&
       edge.to === "orch_or.claim_boundary.exploratory_only" &&
@@ -947,7 +1058,7 @@ describe("Casimir / DP quantum-foam study badges", () => {
         "casimir_dp_stage4_2f_requires_stage4_2g_empirical_handoff",
       ]),
     );
-    expect(incidentEdges).toHaveLength(5);
+    expect(incidentEdges).toHaveLength(6);
     expect(
       incidentEdges.some((edge) => edge.observableBridge != null),
     ).toBe(false);
@@ -1321,9 +1432,10 @@ describe("Casimir / DP quantum-foam study badges", () => {
     ]));
     expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
       "casimir_dp_stage4_2o_requires_stage4_2p_proper_time_closure",
+      "casimir_dp_proper_time_documents_stage0_1_phase_boundary",
       "casimir_dp_stage4_2p_empirical_worldline_gap_blocks_claim_boundary",
     ]));
-    expect(incidentEdges).toHaveLength(3);
+    expect(incidentEdges).toHaveLength(4);
     expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
     expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
   });
@@ -1386,9 +1498,44 @@ describe("Casimir / DP quantum-foam study badges", () => {
     expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
       "casimir_dp_stage4_2q_requires_stage4_2r_integrated_pilot",
       "casimir_dp_stage4_2r_empirical_authority_gap_blocks_claim_boundary",
+      "casimir_dp_stage4_2r_requires_stage4_2s_retarded_source_closure",
     ]));
-    expect(incidentEdges).toHaveLength(2);
+    expect(incidentEdges).toHaveLength(3);
     expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+  });
+
+  it("registers Stage-4.2S as an ordinary retarded-source closure with no collapse bridge", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find((candidate) =>
+      candidate.id === "study.casimir_dp.retarded_source_propagation_stage4_2s");
+    const incidentEdges = branch.edges.filter((edge) =>
+      edge.from === badge?.id || edge.to === badge?.id);
+
+    expect(badge).toEqual(expect.objectContaining({
+      level: "diagnostic_gate",
+      status: "blocked",
+    }));
+    expect(badge?.calculatorPayloads).toHaveLength(1);
+    expect(badge?.equations).toHaveLength(3);
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "analytic_radiation_recovery_pass",
+      "polarization_projector_pass",
+      "boundary_fundamental_quasistatic_candidate",
+      "optical_benchmark_retarded",
+      "zero_of_seven_authorities_ready",
+      "ordinary_null_integration_not_authorized",
+      "zero_collapse_bridge",
+    ]));
+    expect(badge?.assumptions.join(" ")).toContain("Field-line kinks are a visualization");
+    expect(badge?.assumptions.join(" ")).toContain("synthetic scale benchmarks");
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_stage4_2r_requires_stage4_2s_retarded_source_closure",
+      "casimir_dp_stage4_2f_requires_stage4_2s_switching_radiation_closure",
+      "casimir_dp_stage4_2s_empirical_propagation_gap_blocks_claim_boundary",
+    ]));
+    expect(incidentEdges).toHaveLength(3);
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
   });
 
   it("keeps Compton, DP, and cavity frequencies separate until a transfer kernel exists", () => {

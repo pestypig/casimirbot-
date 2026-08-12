@@ -526,6 +526,18 @@ describe("agent provider response projection", () => {
         workstation_gateway_observation_packets: [{ observation_ref: "obs:calculator" }],
         tool_lifecycle_traces: [{ capability_id: "scientific-calculator.solve_expression" }],
         tool_followup_decisions: [{ decision: "reenter_observation" }],
+        runtime_lane_request_contract: {
+          schema: "helix.runtime_agent_lane_request_contract.v1",
+          pending_capability_lane_request: false,
+        },
+        provider_solver_completion_audit: {
+          schema: "helix.provider_solver_completion_audit.v1",
+          provider_solver_path_completed: true,
+          provider_goal_satisfied: true,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
         provider_terminal_candidate: { text: "calculator result" },
         provider_reasoning_reentry: { status: "complete" },
         terminal_authority_candidate_review: { status: "accepted" },
@@ -907,6 +919,18 @@ describe("agent provider response projection", () => {
       payload.capability_lane_goal_dispatch_readiness,
     );
     expect(debug.workstation_gateway_call_results).toEqual(payload.workstation_gateway_call_results);
+    expect(payload.runtime_lane_request_contract).toMatchObject({
+      schema: "helix.runtime_agent_lane_request_contract.v1",
+      pending_capability_lane_request: false,
+    });
+    expect(payload.provider_solver_completion_audit).toMatchObject({
+      schema: "helix.provider_solver_completion_audit.v1",
+      provider_solver_path_completed: true,
+      provider_goal_satisfied: true,
+    });
+    expect(debug.provider_solver_completion_audit).toEqual(
+      payload.provider_solver_completion_audit,
+    );
     expect(debug.provider_terminal_candidate).toEqual(payload.provider_terminal_candidate);
     expect(debug.codex_runtime_status).toEqual({ launchable: true });
   });

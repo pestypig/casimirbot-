@@ -20,6 +20,12 @@ public final class PlayerActionController {
     private Double actionStartX;
     private Double actionStartY;
     private Double actionStartZ;
+    private Float lookStartYaw;
+    private Float lookStartPitch;
+    private Float lookTargetYaw;
+    private Float lookTargetPitch;
+    private double navigationClosestDistance;
+    private int navigationNoProgressTicks;
     private boolean oneShotAttempted;
     private Map<String, Object> lastMeasurements = Map.of();
 
@@ -43,6 +49,12 @@ public final class PlayerActionController {
         actionStartX = null;
         actionStartY = null;
         actionStartZ = null;
+        lookStartYaw = null;
+        lookStartPitch = null;
+        lookTargetYaw = null;
+        lookTargetPitch = null;
+        navigationClosestDistance = Double.POSITIVE_INFINITY;
+        navigationNoProgressTicks = 0;
         oneShotAttempted = false;
         lastMeasurements = Map.of();
         bridge.beginWorkflow(request.actionKind(), request.arguments(), request.controlEngine());
@@ -62,13 +74,19 @@ public final class PlayerActionController {
             return;
         }
         if (snapshot.manualInputDetected()) {
+            String manualInputReason = snapshot.manualInputReason();
+            lastMeasurements = Map.of(
+                "manual_input_reason", manualInputReason,
+                "action_ticks_before_override", actionTicks
+            );
             bridge.releaseAll();
             if (active.manualOverridePolicy() == ManualOverridePolicy.PAUSE) {
                 state = State.PAUSED_MANUAL_OVERRIDE;
                 emit(
                     "workflow.manual_override_detected",
                     progress(),
-                    "Manual player input paused the workflow and released controls.",
+                    "Manual player input paused the workflow and released controls (reason: " +
+                        manualInputReason + ").",
                     true,
                     true
                 );
@@ -76,7 +94,8 @@ public final class PlayerActionController {
                 settle(
                     State.CANCELED,
                     "workflow.canceled",
-                    "Manual player input canceled the workflow and released controls.",
+                    "Manual player input canceled the workflow and released controls (reason: " +
+                        manualInputReason + ").",
                     true
                 );
             }
@@ -138,6 +157,19 @@ public final class PlayerActionController {
         return true;
     }
 
+    public synchronized boolean connectorOffline(String reason) {
+        if (active == null || terminal(state)) return false;
+        settle(
+            State.CONNECTOR_OFFLINE,
+            "workflow.failed",
+            boundedReason(
+                reason,
+                "The Helix control plane became unreachable; the client released every control."
+            )
+        );
+        return true;
+    }
+
     public synchronized State state() {
         return state;
     }
@@ -190,15 +222,45 @@ public final class PlayerActionController {
             );
             return;
         }
+        if (distance + 0.02 < navigationClosestDistance) {
+            navigationClosestDistance = distance;
+            navigationNoProgressTicks = 0;
+        } else {
+            navigationNoProgressTicks++;
+        }
+        if (actionTicks > 20 && navigationNoProgressTicks >= 40) {
+            lastMeasurements = Map.of(
+                "distance_blocks", distance,
+                "closest_distance_blocks", navigationClosestDistance,
+                "arrival_radius", radius,
+                "no_progress_ticks", navigationNoProgressTicks,
+                "final_x", snapshot.x(),
+                "final_y", snapshot.y(),
+                "final_z", snapshot.z()
+            );
+            settle(
+                State.FAILED,
+                "workflow.failed",
+                "Native Fabric navigation stopped after measured non-progress instead of continuing to circle the destination."
+            );
+            return;
+        }
+        double horizontalDistance = Math.sqrt(dx * dx + dz * dz);
+        float desiredYaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        float yawError = Math.abs(wrapDegrees(desiredYaw - snapshot.yaw()));
         bridge.lookAt(x, y, z, 18.0F);
-        bridge.applyMovement(new MovementInput(
-            true,
-            false,
-            false,
-            false,
-            snapshot.horizontalCollision() && snapshot.onGround(),
-            bool(active.arguments(), "allow_sprint")
-        ));
+        if (yawError > 12.0F || horizontalDistance <= radius) {
+            bridge.applyMovement(MovementInput.released());
+        } else {
+            bridge.applyMovement(new MovementInput(
+                true,
+                false,
+                false,
+                false,
+                snapshot.horizontalCollision() && snapshot.onGround(),
+                bool(active.arguments(), "allow_sprint") && distance > Math.max(3.0, radius + 1.5)
+            ));
+        }
         if (actionTicks == 1 || actionTicks % 20 == 0) {
             double initialBound = Math.max(radius + 1.0, numberOr(active.arguments(), "initial_distance", distance));
             emit(
@@ -217,9 +279,15 @@ public final class PlayerActionController {
         if ("current_focus".equals(targetKind)) {
             lastMeasurements = Map.of(
                 "target_kind", "current_focus",
-                "view_retained", true
+                "view_retained", true,
+                "final_yaw", (double) snapshot.yaw(),
+                "final_pitch", (double) snapshot.pitch()
             );
             settle(State.SUCCEEDED, "workflow.succeeded", "The current player focus was retained.");
+            return;
+        }
+        if ("relative_rotation".equals(targetKind)) {
+            relativeLook(snapshot, target);
             return;
         }
         if (!"position".equals(targetKind)) {
@@ -243,7 +311,11 @@ public final class PlayerActionController {
             lastMeasurements = Map.of(
                 "target_kind", "position",
                 "yaw_error_degrees", yawError,
-                "pitch_error_degrees", pitchError
+                "pitch_error_degrees", pitchError,
+                "target_yaw", desiredYaw,
+                "target_pitch", desiredPitch,
+                "final_yaw", (double) snapshot.yaw(),
+                "final_pitch", (double) snapshot.pitch()
             );
             settle(
                 State.SUCCEEDED,
@@ -268,6 +340,67 @@ public final class PlayerActionController {
                 "workflow.progress",
                 null,
                 "The player view is turning toward the admitted position.",
+                false,
+                false
+            );
+        }
+    }
+
+    private void relativeLook(PlayerSnapshot snapshot, Map<String, Object> target) {
+        double requestedYawDelta = number(target, "yaw_delta_degrees");
+        double requestedPitchDelta = number(target, "pitch_delta_degrees");
+        if (lookTargetYaw == null || lookTargetPitch == null) {
+            lookStartYaw = snapshot.yaw();
+            lookStartPitch = snapshot.pitch();
+            lookTargetYaw = (float) wrapDegrees(snapshot.yaw() + requestedYawDelta);
+            lookTargetPitch = (float) clamp(
+                snapshot.pitch() + requestedPitchDelta,
+                -90.0,
+                90.0
+            );
+        }
+        double yawError = Math.abs(wrapDegrees(lookTargetYaw - snapshot.yaw()));
+        double pitchError = Math.abs(lookTargetPitch - snapshot.pitch());
+        if (yawError <= 0.5 && pitchError <= 0.5) {
+            double appliedYawDelta = wrapDegrees(snapshot.yaw() - lookStartYaw);
+            double appliedPitchDelta = snapshot.pitch() - lookStartPitch;
+            lastMeasurements = Map.ofEntries(
+                Map.entry("target_kind", "relative_rotation"),
+                Map.entry("requested_yaw_delta_degrees", requestedYawDelta),
+                Map.entry("requested_pitch_delta_degrees", requestedPitchDelta),
+                Map.entry("initial_yaw", (double) lookStartYaw),
+                Map.entry("initial_pitch", (double) lookStartPitch),
+                Map.entry("target_yaw", (double) lookTargetYaw),
+                Map.entry("target_pitch", (double) lookTargetPitch),
+                Map.entry("final_yaw", (double) snapshot.yaw()),
+                Map.entry("final_pitch", (double) snapshot.pitch()),
+                Map.entry("applied_yaw_delta_degrees", appliedYawDelta),
+                Map.entry("applied_pitch_delta_degrees", appliedPitchDelta),
+                Map.entry("yaw_error_degrees", yawError),
+                Map.entry("pitch_error_degrees", pitchError)
+            );
+            settle(
+                State.SUCCEEDED,
+                "workflow.succeeded",
+                String.format(
+                    java.util.Locale.ROOT,
+                    "The player view completed the admitted relative rotation (yaw %.2f degrees, pitch %.2f degrees).",
+                    appliedYawDelta,
+                    appliedPitchDelta
+                )
+            );
+            return;
+        }
+        bridge.lookTo(
+            lookTargetYaw,
+            lookTargetPitch,
+            (float) number(active.arguments(), "max_turn_degrees_per_tick")
+        );
+        if (actionTicks == 1 || actionTicks % 5 == 0) {
+            emit(
+                "workflow.progress",
+                null,
+                "The player view is applying the admitted relative rotation.",
                 false,
                 false
             );
@@ -541,10 +674,21 @@ public final class PlayerActionController {
         return reason.length() <= 1_000 ? reason : reason.substring(0, 1_000);
     }
 
+    private static float wrapDegrees(float value) {
+        float wrapped = value % 360.0F;
+        if (wrapped >= 180.0F) wrapped -= 360.0F;
+        if (wrapped < -180.0F) wrapped += 360.0F;
+        return wrapped;
+    }
+
     private static double wrapDegrees(double value) {
         double wrapped = value % 360.0;
         if (wrapped >= 180.0) wrapped -= 360.0;
         if (wrapped < -180.0) wrapped += 360.0;
         return wrapped;
+    }
+
+    private static double clamp(double value, double minimum, double maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
     }
 }

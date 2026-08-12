@@ -67,7 +67,7 @@ const isProjectionKind = (value: string): boolean =>
   /projection|panel_generated_answer|client_projection|live_card_projection|no_tool_direct/i.test(value);
 
 const isObservationTerminalKind = (value: string): boolean =>
-  /observation_report|source_observation|evidence_observation|named_receipt_evaluation/i.test(value);
+  /observation_report|source_observation|evidence_observation|named_receipt_evaluation|live_environment_binding_diagnosis/i.test(value);
 
 const readTerminalGoalFrame = (payload: RecordLike): { goalKind: string; requiredTerminalKind: string } => {
   const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);

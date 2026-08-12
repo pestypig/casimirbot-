@@ -66,8 +66,16 @@ public final class PlayerActionWorkflow {
         float health,
         boolean onGround,
         boolean horizontalCollision,
-        boolean manualInputDetected
-    ) {}
+        boolean manualInputDetected,
+        String manualInputReason
+    ) {
+        public PlayerSnapshot {
+            if (!manualInputDetected) manualInputReason = null;
+            if (manualInputDetected && (manualInputReason == null || manualInputReason.isBlank())) {
+                manualInputReason = "unspecified_manual_input";
+            }
+        }
+    }
 
     public record MovementInput(
         boolean forward,
@@ -149,6 +157,8 @@ public final class PlayerActionWorkflow {
         void applyMovement(MovementInput movement);
 
         void lookAt(double x, double y, double z, float maxDegreesPerTick);
+
+        void lookTo(float yaw, float pitch, float maxDegreesPerTick);
 
         void pulseJump();
 

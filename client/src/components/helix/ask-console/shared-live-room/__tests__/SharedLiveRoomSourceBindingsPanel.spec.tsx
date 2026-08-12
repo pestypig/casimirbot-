@@ -414,7 +414,7 @@ describe("Shared Live Room environment panel", () => {
     await act(async () => {
       resolveInitial?.(jsonResponse(environmentReceipt([])));
       await Promise.resolve();
-      await vi.advanceTimersByTimeAsync(2_999);
+      await vi.advanceTimersByTimeAsync(9_999);
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 

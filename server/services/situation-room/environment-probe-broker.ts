@@ -153,6 +153,26 @@ export function listPendingEnvironmentProbeRequests(input: {
   return (pendingBySource.get(input.sourceId) ?? []).slice(0, input.limit ?? 8);
 }
 
+/**
+ * Read-only queue presence check used to keep empty connector polls out of the
+ * durable ingress receipt ledger. Exact source admission is still enforced by
+ * the authenticated poll itself before any request can be returned.
+ */
+export function hasPendingEnvironmentProbeRequestsForSource(input: {
+  sourceId: string;
+  now?: string;
+}): boolean {
+  const now = Date.parse(input.now ?? new Date().toISOString());
+  const pending = pendingBySource.get(input.sourceId) ?? [];
+  const active = pending.filter(
+    (request) => Date.parse(request.expires_at) > now,
+  );
+  if (active.length !== pending.length) {
+    pendingBySource.set(input.sourceId, active);
+  }
+  return active.length > 0;
+}
+
 export function recordEnvironmentProbeResult(
   result: HelixEnvironmentProbeResult,
   options: {

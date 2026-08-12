@@ -30,6 +30,8 @@ import {
   contextualToolSuppressionBlocksFamily,
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
+import { sourceTargetIntentRequiresMinecraftPlayerEmbodimentAction } from "./minecraft-execution-plane-intent";
+import { HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS } from "@shared/helix-minecraft-player-capabilities";
 
 type RecordLike = Record<string, unknown>;
 
@@ -570,10 +572,14 @@ export function reconcileCanonicalGoalFrameToCommittedRoute(input: {
       : committedSourceTarget === "internet_search"
         ? "external_internet_search"
         : committedSourceTarget || "source_backed";
-  const reconciledClassifierReasons = unique([
-    ...classifierReasons,
-    reconciliationReason,
-  ]);
+  // A reconciliation is authoritative only if the incompatible classifier's
+  // source projection stops participating in the model-visible goal. Keeping
+  // tokens such as `internet_search` after committing a live-environment route
+  // gives Codex two contradictory goals even though the lifecycle metadata
+  // says the stale one was superseded. The original frame remains available in
+  // the pre-reconciliation debug/audit path; the active frame carries only the
+  // reason that Helix replaced it.
+  const reconciledClassifierReasons = [reconciliationReason];
 
   return {
     reconciled: true,
@@ -596,6 +602,8 @@ export function reconcileCanonicalGoalFrameToCommittedRoute(input: {
       allows_prior_artifacts:
         committedSourceTarget === "world_event" ||
         committedSourceTarget === "conversation_memory",
+      corpus_anchors: [],
+      concept_tokens: [],
       confidence: readString(current.confidence) === "high" ? "high" : "medium",
       classifier_reasons: reconciledClassifierReasons,
       source: "committed_route_canonical_goal_reconciliation",
@@ -711,6 +719,10 @@ export function buildCommittedAskRoute(input: {
   });
   const existingCandidate = readCommittedAskRoute(input.payload);
   const currentSourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const semanticPlayerEmbodimentAction =
+    sourceTargetIntentRequiresMinecraftPlayerEmbodimentAction(
+      currentSourceTargetIntent,
+    );
   const compoundDocsScholarlyRoute = readStringArray(
     currentSourceTargetIntent?.explicit_cues,
   ).includes("compound_local_docs_external_scholarly_comparison");
@@ -762,6 +774,23 @@ export function buildCommittedAskRoute(input: {
         )
       )
   );
+  const expectedLiveEnvironmentGoalKind = semanticPlayerEmbodimentAction
+    ? "environment_action_workflow"
+    : "environment_evidence_synthesis";
+  const staleExistingLiveEnvironmentGoal = Boolean(
+    existingCandidate?.route.source_target === "live_environment" &&
+      currentHardSourceTarget === "live_environment" &&
+      (existingCandidate.canonical_goal.goal_kind !==
+        expectedLiveEnvironmentGoalKind ||
+        normalizeCommittedRouteTerminalKind(
+          existingCandidate.canonical_goal.required_terminal_kind,
+        ) !== "model_synthesized_answer" ||
+        !existingCandidate.canonical_goal.allowed_terminal_artifact_kinds.some(
+          (kind) =>
+            normalizeCommittedRouteTerminalKind(kind) ===
+            "model_synthesized_answer",
+        )),
+  );
   const staleExistingCompoundRoute = Boolean(
     compoundDocsScholarlyRoute &&
       existingCandidate &&
@@ -777,6 +806,7 @@ export function buildCommittedAskRoute(input: {
     staleExistingLivePipelineRoute ||
     staleExistingHardSourceRoute ||
     staleExistingWorldEventGoal ||
+    staleExistingLiveEnvironmentGoal ||
     staleExistingCompoundRoute ||
     (
       hasReusablePriorEnvironmentEvidence &&
@@ -1223,9 +1253,11 @@ export function buildCommittedAskRoute(input: {
           goalKind: "environment_evidence_synthesis",
           requiredTerminalKind: "model_synthesized_answer",
         }
-    : shouldUseModelOnlyGoal
-    ? { goalKind: "model_only_concept", requiredTerminalKind: "direct_answer_text" }
-    : explicitCapabilityContract
+    : explicitCapabilityContract &&
+        (!semanticPlayerEmbodimentAction ||
+          HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS.includes(
+            explicitCapabilityContract.capability as (typeof HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS)[number],
+          ))
       ? {
           goalKind:
             canonicalGoalKindForCommittedExplicitCapability(
@@ -1233,6 +1265,18 @@ export function buildCommittedAskRoute(input: {
             ),
           requiredTerminalKind: explicitCapabilityContract.required_terminal_kind,
         }
+    : semanticPlayerEmbodimentAction
+      ? {
+          goalKind: "environment_action_workflow",
+          requiredTerminalKind: "model_synthesized_answer",
+        }
+    : effectiveRoute.sourceTarget === "live_environment"
+      ? {
+          goalKind: "environment_evidence_synthesis",
+          requiredTerminalKind: "model_synthesized_answer",
+        }
+    : shouldUseModelOnlyGoal
+    ? { goalKind: "model_only_concept", requiredTerminalKind: "direct_answer_text" }
     : inferredLivePipelineTerminalKind
       ? {
           goalKind:
@@ -1283,7 +1327,9 @@ export function buildCommittedAskRoute(input: {
     ...(compoundDocsScholarlyRoute
       ? ["compound_evidence_synthesis_answer", "typed_failure"]
       : []),
-    ...(effectiveRoute.sourceTarget === "world_event"
+    ...(["world_event", "live_environment"].includes(
+      effectiveRoute.sourceTarget,
+    )
       ? [
           "model_synthesized_answer",
           "agent_provider_terminal_candidate",
@@ -1298,6 +1344,16 @@ export function buildCommittedAskRoute(input: {
         (kind) =>
           normalizeCommittedRouteTerminalKind(kind) !==
           "compound_evidence_synthesis_answer",
+      )
+  : ["world_event", "live_environment"].includes(
+        effectiveRoute.sourceTarget,
+      )
+    ? rawForbiddenTerminalKinds.filter(
+        (kind) =>
+          ![
+            "model_synthesized_answer",
+            "agent_provider_terminal_candidate",
+          ].includes(normalizeCommittedRouteTerminalKind(kind)),
       )
   : shouldUseModelOnlyGoal
     ? unique([
@@ -1318,15 +1374,7 @@ export function buildCommittedAskRoute(input: {
             "model_synthesized_answer",
           ].includes(normalizeCommittedRouteTerminalKind(kind)),
         )
-      : effectiveRoute.sourceTarget === "world_event"
-        ? rawForbiddenTerminalKinds.filter(
-            (kind) =>
-              ![
-                "model_synthesized_answer",
-                "agent_provider_terminal_candidate",
-              ].includes(normalizeCommittedRouteTerminalKind(kind)),
-          )
-        : rawForbiddenTerminalKinds;
+      : rawForbiddenTerminalKinds;
   const compoundPolicy = applyCompoundTerminalPolicy(input.payload, {
     allowed: rawAllowedTerminalKindsWithGoal,
     forbidden: rawForbiddenTerminalKindsWithGoal,
@@ -1466,7 +1514,14 @@ export function buildCommittedAskRoute(input: {
     },
     canonical_goal: {
       goal_kind: goal.goalKind,
-      requested_capability: explicitCapabilityContract?.capability ?? null,
+      requested_capability:
+        semanticPlayerEmbodimentAction &&
+        explicitCapabilityContract &&
+        !HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS.includes(
+          explicitCapabilityContract.capability as (typeof HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS)[number],
+        )
+          ? null
+          : explicitCapabilityContract?.capability ?? null,
       required_terminal_kind: goal.requiredTerminalKind,
       allowed_terminal_artifact_kinds: allowedTerminalKinds,
       forbidden_terminal_artifact_kinds: forbiddenTerminalKinds,

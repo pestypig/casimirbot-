@@ -733,6 +733,14 @@ describe("provider terminal authority for capability lanes", () => {
       solverCompleted: true,
       goalSatisfied: true,
       currentTurnEvidenceRequired: true,
+      solverCompletionAudit: {
+        schema: "helix.provider_solver_completion_audit.v1",
+        provider_solver_path_completed: true,
+        provider_goal_satisfied: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
     });
 
     expect(result.providerReasoningReentry).toMatchObject({
@@ -745,6 +753,11 @@ describe("provider terminal authority for capability lanes", () => {
       all_observations_reentry_compatible: true,
       normalized_observations_ready: true,
       terminal_authority_granted: true,
+      solver_completion_audit: {
+        schema: "helix.provider_solver_completion_audit.v1",
+        provider_solver_path_completed: true,
+        provider_goal_satisfied: true,
+      },
     });
     expect(result.terminalAnswerAuthority).toMatchObject({
       terminal_kind: "answer",
@@ -777,14 +790,14 @@ describe("provider terminal authority for capability lanes", () => {
       evidence_reentered: true,
       capability_lane_observation_packet_count: 0,
     });
-    expect(reverseProjectedResult.providerTerminalAuthorityBridge).toMatchObject(
-      {
-        all_gateway_calls_succeeded: true,
-        all_capability_lane_observations_reentry_compatible: true,
-        all_observations_reentry_compatible: true,
-        terminal_authority_granted: true,
-      },
-    );
+    expect(
+      reverseProjectedResult.providerTerminalAuthorityBridge,
+    ).toMatchObject({
+      all_gateway_calls_succeeded: true,
+      all_capability_lane_observations_reentry_compatible: true,
+      all_observations_reentry_compatible: true,
+      terminal_authority_granted: true,
+    });
   });
 
   it("authorizes a verified later read after an ineligible earlier observation without weakening write failures", () => {
@@ -840,10 +853,7 @@ describe("provider terminal authority for capability lanes", () => {
       ),
     ).toBe(true);
     expect(
-      hasSuccessfulLaterRetryForFailedGatewayCapability(
-        [failed as never],
-        0,
-      ),
+      hasSuccessfulLaterRetryForFailedGatewayCapability([failed as never], 0),
     ).toBe(false);
     expect(
       hasSuccessfulLaterRetryForFailedGatewayCapability(
@@ -891,6 +901,125 @@ describe("provider terminal authority for capability lanes", () => {
       ],
       providerText:
         "Fresh verification confirmed the one requested cell is minecraft:fire.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+      currentTurnEvidenceRequired: true,
+    });
+
+    expect(authority.providerTerminalAuthorityBridge).toMatchObject({
+      all_gateway_calls_succeeded: true,
+      terminal_authority_granted: true,
+    });
+    expect(authority.terminalAnswerAuthority).toMatchObject({
+      terminal_kind: "answer",
+      final_answer_source: "agent_provider_terminal_candidate",
+    });
+  });
+
+  it("authorizes a same-turn action after wrong-environment selection is repaired without superseding permission failures", () => {
+    const turnId = "turn-minecraft-wrong-environment-repaired";
+    const capability = "com.casimirbot.minecraft.player.walk";
+    const failed = {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: "test",
+      ok: false,
+      agent_runtime: "codex",
+      capability_id: capability,
+      mode: "act",
+      gateway_admission: {
+        requested_capability: capability,
+        admission_status: "blocked",
+        blocked_reason: "wrong_environment",
+      },
+      observation_packet: {
+        ...buildLanePacket(),
+        turn_id: turnId,
+        call_id: `${turnId}:walk:failed`,
+        capability_key: capability,
+        status: "failed",
+        produced_artifact_refs: [],
+        observation_summary: "The requested player environment did not match.",
+      },
+      observation: { error_code: "wrong_environment" },
+      artifact_refs: [],
+      tool_followup_decision: { next_action: "ask_user" },
+      error: "wrong_environment",
+    };
+    const succeeded = {
+      ...failed,
+      ok: true,
+      gateway_admission: {
+        requested_capability: capability,
+        admission_status: "admitted",
+        blocked_reason: null,
+      },
+      observation_packet: {
+        ...failed.observation_packet,
+        call_id: `${turnId}:walk:succeeded`,
+        status: "succeeded",
+        produced_artifact_refs: [`${turnId}:walk:observation`],
+        observation_summary:
+          "The bounded walk completed with measured current-turn motion.",
+      },
+      observation: { status: "succeeded", distance_blocks: 0.289 },
+      artifact_refs: [`${turnId}:walk:observation`],
+      tool_followup_decision: { next_action: "finish" },
+      error: undefined,
+    };
+
+    expect(
+      hasSuccessfulLaterRetryForFailedGatewayCapability(
+        [failed as never, succeeded as never],
+        0,
+      ),
+    ).toBe(true);
+    expect(
+      hasSuccessfulLaterRetryForFailedGatewayCapability(
+        [
+          failed as never,
+          {
+            ...succeeded,
+            observation_packet: {
+              ...succeeded.observation_packet,
+              turn_id: "turn-minecraft-other",
+            },
+          } as never,
+        ],
+        0,
+      ),
+    ).toBe(false);
+    expect(
+      hasSuccessfulLaterRetryForFailedGatewayCapability(
+        [
+          {
+            ...failed,
+            gateway_admission: {
+              ...failed.gateway_admission,
+              blocked_reason: "permission_revoked",
+            },
+            observation: { error_code: "permission_revoked" },
+            error: "permission_revoked",
+          } as never,
+          succeeded as never,
+        ],
+        0,
+      ),
+    ).toBe(false);
+
+    const authority = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId,
+      threadId: "thread-minecraft-wrong-environment-repaired",
+      route: "/ask/turn",
+      gatewayCallResults: [failed as never, succeeded as never],
+      normalizedObservationPackets: [
+        failed.observation_packet as never,
+        succeeded.observation_packet as never,
+      ],
+      providerText:
+        "The corrected same-turn walk completed with 0.289 blocks of measured motion.",
       ok: true,
       solverCompleted: true,
       goalSatisfied: true,
@@ -1069,13 +1198,10 @@ describe("provider terminal authority for capability lanes", () => {
       current_turn_observation_present: false,
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
-      terminal_authority_status:
-        "blocked_by_current_turn_observation_required",
+      terminal_authority_status: "blocked_by_current_turn_observation_required",
       terminal_authority_granted: false,
       blockers: ["current_turn_observation_required"],
-      prior_evidence_observation_refs: [
-        "ask:lane:utility:authority-obs",
-      ],
+      prior_evidence_observation_refs: ["ask:lane:utility:authority-obs"],
       current_turn_evidence_required: true,
       current_turn_observation_present: false,
     });
@@ -1494,9 +1620,7 @@ describe("provider terminal authority for capability lanes", () => {
     expect(result.providerReasoningReentry).toMatchObject({
       status: "completed_not_terminal",
       observation_reentered: true,
-      reentered_observation_refs: [
-        "ask:scholarly:numeric:missing-vars",
-      ],
+      reentered_observation_refs: ["ask:scholarly:numeric:missing-vars"],
       evidence_reentered: false,
       post_tool_model_step_required: false,
       terminal_eligible: false,
@@ -1544,9 +1668,7 @@ describe("provider terminal authority for capability lanes", () => {
       status: "not_run",
       provider_terminal_candidate_present: false,
       observation_reentered: true,
-      reentered_observation_refs: [
-        "ask:scholarly:numeric:missing-vars",
-      ],
+      reentered_observation_refs: ["ask:scholarly:numeric:missing-vars"],
       evidence_reentered: false,
     });
     expect(result.terminalAuthorityCandidateReview).toMatchObject({
@@ -1641,9 +1763,7 @@ describe("provider terminal authority for capability lanes", () => {
     expect(result.providerReasoningReentry).toMatchObject({
       status: "completed_not_terminal",
       observation_reentered: true,
-      reentered_observation_refs: [
-        "ask:scholarly:full-text:recovery",
-      ],
+      reentered_observation_refs: ["ask:scholarly:full-text:recovery"],
       evidence_reentered: false,
       post_tool_model_step_required: false,
     });
@@ -1820,6 +1940,125 @@ describe("provider terminal authority for capability lanes", () => {
       all_gateway_calls_succeeded: true,
       terminal_authority_granted: true,
       final_answer_source: "agent_provider_terminal_candidate",
+    });
+  });
+
+  it("authorizes only a Codex-authored request_user_input at an exact typed external-change boundary", () => {
+    const turnId = "turn-player-look-manual-boundary";
+    const observationRef = `${turnId}:player-look:blocked`;
+    const gatewayResult = {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: "test",
+      ok: false,
+      agent_runtime: "codex",
+      capability_id: "com.casimirbot.minecraft.player.look",
+      mode: "act",
+      gateway_admission: {
+        schema: "helix.workstation_tool_gateway.admission.v1",
+        requested_capability: "com.casimirbot.minecraft.player.look",
+        selected_agent_provider: "codex",
+        permission_profile: "act",
+        admission_status: "admitted",
+        admission_reason: "environment_action_admitted",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      observation_packet: {
+        schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
+        turn_id: turnId,
+        iteration: 1,
+        call_id: `${turnId}:look:call`,
+        decision_id: `${turnId}:look:decision`,
+        capability_key: "com.casimirbot.minecraft.player.look",
+        panel_id: "environment",
+        action: "look",
+        status: "failed",
+        produced_artifact_refs: [observationRef],
+        observation_summary: "Player look canceled: manual input detected.",
+        receipts: [],
+        missing_requirements: [
+          {
+            code: "request_canceled",
+            message: "Release manual controls and ask me to try again.",
+            repair_action: "ask_user",
+          },
+        ],
+        state_delta: {
+          manual_override_detected: true,
+          manual_override_reason: "mouse_delta_detected",
+        },
+        suggested_next_steps: ["ask_user"],
+        produced_affordances: [],
+        consumed_affordances: [],
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_lifecycle_trace: {
+        retry_recommendation: "ask_user",
+      },
+      tool_followup_decision: {
+        next_action: "ask_user",
+        external_change_required: true,
+      },
+      observation: {
+        error_code: "request_canceled",
+        manual_override_detected: true,
+        manual_override_reason: "mouse_delta_detected",
+      },
+      artifact_refs: [observationRef],
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      error: "request_canceled",
+    };
+    const baseInput = {
+      runtime: "codex" as const,
+      providerLabel: "Codex Workstation Mode",
+      turnId,
+      threadId: "thread-player-look-manual-boundary",
+      route: "/ask/turn",
+      gatewayCallResults: [gatewayResult as never],
+      normalizedObservationPackets: [gatewayResult.observation_packet as never],
+      providerText:
+        "The look action stopped with request_canceled because mouse_delta_detected. Please release the mouse and tell me when to try again.",
+      ok: true,
+      solverCompleted: false,
+      goalSatisfied: false,
+      currentTurnEvidenceRequired: true,
+    };
+
+    const requestUserInput = buildHelixProviderReasoningReentry({
+      ...baseInput,
+      providerTerminalIntent: "request_user_input",
+    });
+    expect(requestUserInput.providerReasoningReentry).toMatchObject({
+      status: "completed",
+      observation_reentered: true,
+      provider_terminal_intent: "request_user_input",
+      request_user_input_boundary_observation_refs: [observationRef],
+    });
+    expect(requestUserInput.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_status:
+        "authorized_by_provider_request_user_input_bridge",
+      terminal_authority_granted: true,
+      selected_observation_refs: [observationRef],
+    });
+    expect(requestUserInput.terminalAnswerAuthority).toMatchObject({
+      terminal_kind: "request_user_input",
+      authority_origin: "request_user_input",
+      terminal_eligible: true,
+    });
+
+    const ordinaryAnswer = buildHelixProviderReasoningReentry({
+      ...baseInput,
+      providerTerminalIntent: "answer",
+    });
+    expect(ordinaryAnswer.terminalAnswerAuthority).toBeNull();
+    expect(ordinaryAnswer.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_granted: false,
     });
   });
 });

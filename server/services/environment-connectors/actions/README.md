@@ -55,3 +55,11 @@ operator example lives at
 `docs/runbooks/fixtures/helix-minecraft-player-differential-capture.example.json`;
 its placeholder refs/text are never acceptance evidence and must be replaced
 from the exact turn without backfilling a missing stage from a later one.
+
+For the Fabric client's local reference controller, first run the bounded
+`/helix-player diagnostic ...` action, then use
+`npm run helix:minecraft:player-direct-capture -- --log <latest.log> --prompt
+<semantic-request> --out <public-capture.json>`. The parser selects one exact
+diagnostic workflow, requires its terminal controller event, retains starting
+state plus normalized progress, and labels admission and terminal authority as
+`not_applicable`. It does not write a Helix observation or assistant answer.

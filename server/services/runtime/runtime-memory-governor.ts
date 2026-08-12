@@ -75,6 +75,7 @@ export type RuntimeAdmissionDecision = {
     maxRssMiB: number;
     resumeHeapUsedMiB: number;
     resumeRssMiB: number;
+    estimatedBurstMiB?: number;
     processHeapLimitMiB?: number;
     heapSafetyReserveMiB?: number;
   };
@@ -176,6 +177,7 @@ const DEFAULT_TASK_BUDGETS: Record<RuntimeTaskClass, RuntimeTaskBudget> = {
     pausable: false,
     maxHeapUsedMiB: DEFAULT_ACTIVE_USER_TURN_MAX_HEAP_USED_MIB,
     maxRssMiB: DEFAULT_ACTIVE_USER_TURN_MAX_RSS_MIB,
+    estimatedBurstMiB: 1536,
     maxConcurrent: 4,
     burstLimit: 24,
   },
@@ -333,11 +335,16 @@ const readLimits = (taskClass: RuntimeTaskClass): RuntimeAdmissionDecision["limi
       Math.floor(maxRssMiB * 0.85),
     ),
   );
+  const estimatedBurstMiB = readPositiveNumberEnv(
+    `${taskPrefix}_ESTIMATED_BURST_MB`,
+    budget.estimatedBurstMiB ?? 0,
+  );
   return {
     maxHeapUsedMiB,
     maxRssMiB,
     resumeHeapUsedMiB,
     resumeRssMiB,
+    estimatedBurstMiB,
     processHeapLimitMiB,
     heapSafetyReserveMiB,
   };
@@ -402,7 +409,56 @@ const classifyPressure = (
   return { level: "normal", reason: "ok" };
 };
 
-const recoverForegroundHostMemoryPressure = (
+const classifyProjectedTaskBurstPressure = (
+  host: RuntimeAdmissionDecision["host"],
+  limits: RuntimeAdmissionDecision["limits"],
+  current: { level: RuntimePressureLevel; reason: RuntimeAdmissionDecision["reason"] },
+): { level: RuntimePressureLevel; reason: RuntimeAdmissionDecision["reason"] } => {
+  if (current.level === "hard_pressure") return current;
+  const estimatedBurstMiB = limits.estimatedBurstMiB ?? 0;
+  if (!host || estimatedBurstMiB <= 0) return current;
+  const lowMemoryDevelopmentMode = lowMemoryDevelopmentModeEnabled();
+  const hostFreeRatioMin = readPositiveNumberEnv(
+    "RUNTIME_MEMORY_HOST_FREE_RATIO_MIN",
+    lowMemoryDevelopmentMode ? 0.04 : 0.08,
+  );
+  const hostCommitFreeMinMiB = readPositiveNumberEnv(
+    "RUNTIME_MEMORY_HOST_COMMIT_FREE_MIN_MB",
+    2048,
+  );
+  const hostCommitRatioMax = readPositiveNumberEnv(
+    "RUNTIME_MEMORY_HOST_COMMIT_RATIO_MAX",
+    0.92,
+  );
+  const projectedHostFreeMiB = Math.max(0, host.freeMiB - estimatedBurstMiB);
+  const projectedHostFreeRatio =
+    host.totalMiB > 0 ? projectedHostFreeMiB / host.totalMiB : 0;
+  const commit = host.commit;
+  if (commit?.status === "available") {
+    const projectedCommitFreeMiB =
+      commit.freeMiB === undefined
+        ? undefined
+        : Math.max(0, commit.freeMiB - estimatedBurstMiB);
+    const projectedCommitRatio =
+      projectedCommitFreeMiB === undefined || !commit.limitMiB
+        ? undefined
+        : (commit.limitMiB - projectedCommitFreeMiB) / commit.limitMiB;
+    if (
+      (projectedCommitFreeMiB !== undefined &&
+        projectedCommitFreeMiB < hostCommitFreeMinMiB) ||
+      (projectedCommitRatio !== undefined &&
+        projectedCommitRatio >= hostCommitRatioMax)
+    ) {
+      return { level: "hard_pressure", reason: "host_commit_pressure" };
+    }
+  }
+  if (projectedHostFreeRatio < hostFreeRatioMin) {
+    return { level: "hard_pressure", reason: "host_memory_limit" };
+  }
+  return current;
+};
+
+const recoverForegroundMemoryPressure = (
   input: RuntimeAdmissionInput,
   memory: RuntimeAdmissionDecision["memory"],
   host: RuntimeAdmissionDecision["host"],
@@ -416,7 +472,9 @@ const recoverForegroundHostMemoryPressure = (
   if (
     input.taskClass !== "active_user_turn" ||
     pressure.level !== "hard_pressure" ||
-    pressure.reason !== "host_memory_limit" ||
+    !["host_memory_limit", "heap_used_limit", "rss_limit"].includes(
+      pressure.reason,
+    ) ||
     !lowMemoryDevelopmentModeEnabled() ||
     !envEnabled("HELIX_HOST_COMMIT_REQUIRED") ||
     host?.commit?.status !== "available"
@@ -778,13 +836,14 @@ export const admitRuntimeTask = (
   let host = hostMemoryReader();
   const limits = readLimits(input.taskClass);
   let pressure = classifyPressure(memory, host, limits);
-  ({ memory, host, pressure } = recoverForegroundHostMemoryPressure(
+  ({ memory, host, pressure } = recoverForegroundMemoryPressure(
     input,
     memory,
     host,
     limits,
     pressure,
   ));
+  pressure = classifyProjectedTaskBurstPressure(host, limits, pressure);
   const budget = DEFAULT_TASK_BUDGETS[input.taskClass];
 
   if (readGuardDisabled(input.taskClass)) {
@@ -820,7 +879,11 @@ export const admitRuntimeTask = (
     const paused = pauseLowerPriorityTasks(input.taskClass, "runtime_memory_soft_pressure");
     const recheckMemory = toMemorySnapshot(memoryReader());
     const recheckHost = hostMemoryReader();
-    const recheckPressure = classifyPressure(recheckMemory, recheckHost, limits);
+    const recheckPressure = classifyProjectedTaskBurstPressure(
+      recheckHost,
+      limits,
+      classifyPressure(recheckMemory, recheckHost, limits),
+    );
     if (recheckPressure.level !== "hard_pressure") {
       const lease = buildLease(input.taskClass);
       return makeDecision(
@@ -907,7 +970,7 @@ export const recheckRuntimeTask = (
   let host = hostMemoryReader();
   const limits = readLimits(input.taskClass);
   let pressure = classifyPressure(memory, host, limits);
-  ({ memory, host, pressure } = recoverForegroundHostMemoryPressure(
+  ({ memory, host, pressure } = recoverForegroundMemoryPressure(
     input,
     memory,
     host,

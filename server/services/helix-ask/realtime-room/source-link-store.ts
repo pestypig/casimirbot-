@@ -978,6 +978,8 @@ export type RoomSourceIngressRequestClaim = {
   sequence: number;
   routeKey: string;
   bodyDigest: string;
+  /** Empty queue polls authenticate fully but do not create receipt rows. */
+  durableReceipt?: boolean;
   replay: {
     statusCode: number;
     receipt: HelixRoomSourceIngressReceipt;
@@ -997,6 +999,7 @@ export const claimRoomSourceIngressRequest = async (input: {
   digest?: string | null;
   computedBodyDigest: string;
   payloadForSecretScan?: unknown;
+  durableReceipt?: boolean;
 }): Promise<RoomSourceIngressRequestClaim> => {
   if (normalize(input.ingressVersion) !== "1") {
     throw new RoomSourceIngressError(
@@ -1046,16 +1049,19 @@ export const claimRoomSourceIngressRequest = async (input: {
     }
   };
   let outcome: RoomSourceIngressRequestClaim | null;
+  const durableReceipt = input.durableReceipt !== false;
   try {
     outcome = await withBindingClaimLock(input.bindingId, () =>
-      withSharedRealtimeRoomTransaction<RoomSourceIngressRequestClaim | null>(
-        async (db: Queryable) => {
+      {
+        const runClaim = async (
+          db: Queryable,
+        ): Promise<RoomSourceIngressRequestClaim | null> => {
           const { rows: lockRows } = await db.query<{ binding_id: string }>(
             `
             SELECT binding_id
             FROM helix_room_source_bindings
             WHERE binding_id = $1
-            FOR UPDATE;
+            ${durableReceipt ? "FOR UPDATE" : ""};
           `,
             [input.bindingId],
           );
@@ -1239,6 +1245,20 @@ export const claimRoomSourceIngressRequest = async (input: {
             );
           }
 
+          if (!durableReceipt) {
+            return {
+              binding,
+              credentialId: credential.credential_id,
+              requestProjectionId,
+              producerEpoch,
+              sequence,
+              routeKey: input.routeKey,
+              bodyDigest,
+              durableReceipt: false,
+              replay: null,
+            };
+          }
+
           const { rows: existingRows } = await db.query<RequestRow>(
             `
         SELECT *
@@ -1407,8 +1427,12 @@ export const claimRoomSourceIngressRequest = async (input: {
             bodyDigest,
             replay: null,
           };
-        },
-      ),
+        };
+        if (durableReceipt) {
+          return withSharedRealtimeRoomTransaction(runClaim);
+        }
+        return readSharedRealtimeRoomDatabase().then(runClaim);
+      },
     );
   } catch (error) {
     applyRuntimeInvalidation();
@@ -1444,7 +1468,7 @@ export const completeRoomSourceIngressRequest = async (input: {
   statusCode: number;
   receipt: HelixRoomSourceIngressReceipt;
 }): Promise<void> => {
-  if (input.claim.replay) return;
+  if (input.claim.replay || input.claim.durableReceipt === false) return;
   const db = await readSharedRealtimeRoomDatabase();
   const { rows } = await db.query<{ request_id: string }>(
     `

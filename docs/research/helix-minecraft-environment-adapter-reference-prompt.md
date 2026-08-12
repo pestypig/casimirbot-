@@ -33,6 +33,24 @@ Additional server-authority reference:
   - Typed actions and server-command fallback: `GptActions.java` and
     `GenerateCommands.java`
 
+## Required development order
+
+For every new Minecraft objective family, run two separate validations:
+
+1. **Reference capability proof:** let Codex use the consented local Minecraft
+   command/capability surface directly, discover a practical procedure, and
+   record executed calls, observations, preconditions, postconditions,
+   cancellation, retries, and bounded failures.
+2. **Governed Helix parity:** convert the proven behavior into provider-neutral
+   capabilities and observation contracts, restore an equivalent starting
+   state, and submit the same natural prompt through Helix.
+
+If the reference run fails, improve Minecraft mechanics access, sensors,
+documentation, or the connector before changing Helix. If the reference run
+succeeds and Helix fails, locate the first adapter divergence. Never encode the
+reference prompt or its one successful command sequence as deterministic
+adapter reasoning.
+
 ## Copyable goal prompt
 
 > Before editing, read
@@ -46,6 +64,12 @@ Additional server-authority reference:
 > the reference for model-owned tool selection, execution-result re-entry,
 > retries, and completion. Preserve Helix ownership of identity, permission,
 > provenance, evidence quality, route authority, and terminal eligibility.
+> Prove each new practical operation with direct reference Codex first, freeze
+> the public execution trace as a capability benchmark, then run the same
+> natural prompt and equivalent starting state through Helix. Helix may admit,
+> normalize, verify, re-enter repairable rejection, or fail closed at a genuine
+> hard boundary; it must not replace Codex semantic step choice or supported
+> final synthesis with deterministic adapter prose.
 > Maintain separate World Authority and Player Embodiment planes behind one
 > provider-neutral environment capability catalog. Do not generate or execute
 > host code, do not copy Pathmind source, do not grow the retired

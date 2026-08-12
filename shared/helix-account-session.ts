@@ -89,6 +89,7 @@ export const HELIX_DEVELOPER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
   locked_workstation_capabilities: [],
   feature_flags: [
     "advanced_helix_ask_controls",
+    "brokerage_environment",
     "developer_workstation_panels",
     "docs_viewer_print_pdf_export",
     "experimental_panels",
@@ -113,6 +114,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
   locked_panels: [...HELIX_LOCKED_WORKSTATION_PANEL_IDS],
   locked_features: [
     "advanced_helix_ask_controls",
+    "brokerage_environment",
     "developer_workstation_panels",
     "experimental_panels",
     "live_answer_visual_capture_controls",

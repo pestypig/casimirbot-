@@ -108,6 +108,15 @@ describe("solar energy adapter", () => {
     expect(a.information_boundary.features_hash).toBe(b.information_boundary.features_hash);
   });
 
+  it("refuses to apply the AIA energy proxy to DKIST 416 nm photospheric continuum", () => {
+    const payload = basePayload();
+    payload.instrument = "DKIST_FastCam";
+    payload.wavelength_A = 4160;
+    expect(() => buildEnergyFieldFromSunpy(payload)).toThrow(
+      "solar_energy_calibration_incompatible_photospheric_continuum",
+    );
+  });
+
 
   it("marks strict non-measured provenance with deterministic fail_reason", () => {
     const payload = basePayload();

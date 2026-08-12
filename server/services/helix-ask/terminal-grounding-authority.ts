@@ -226,10 +226,61 @@ export const buildHelixTerminalGroundingAuthority = (input: {
       readString(finalArbitration?.final_answer_source),
     ]).length <= 1;
   const completedSolverPath = solverTrace?.completed_solver_path === true;
+  const routeProductContract = readRecord(payload.route_product_contract);
+  const routeProductAllowedKinds = readStringArray(
+    routeProductContract?.allowed_terminal_artifact_kinds,
+  );
+  const routeProductForbiddenKinds = readStringArray(
+    routeProductContract?.forbidden_terminal_artifact_kinds,
+  );
+  const routeProductRequiredKind =
+    readString(routeProductContract?.required_terminal_artifact_kind) ??
+    readString(routeProductContract?.required_terminal_kind);
+  const normalizedTerminalArtifactKind = terminalArtifactKind?.toLowerCase() ?? null;
+  const routeProductContractAllowsTerminal = Boolean(
+    normalizedTerminalArtifactKind &&
+      readString(routeProductContract?.schema) ===
+        "helix.route_product_contract.v1" &&
+      (!readString(routeProductContract?.turn_id) ||
+        readString(routeProductContract?.turn_id) === turnId) &&
+      (
+        routeProductRequiredKind?.toLowerCase() ===
+          normalizedTerminalArtifactKind ||
+        routeProductAllowedKinds.some(
+          (kind) => kind.toLowerCase() === normalizedTerminalArtifactKind,
+        )
+      ) &&
+      !routeProductForbiddenKinds.some(
+        (kind) => kind.toLowerCase() === normalizedTerminalArtifactKind,
+      ),
+  );
+  const routeEvidenceAllowedKinds = readStringArray(
+    routeEvidenceAuthority?.allowed_terminal_artifact_kinds,
+  );
+  const routeEvidenceForbiddenKinds = readStringArray(
+    routeEvidenceAuthority?.forbidden_terminal_artifact_kinds,
+  );
+  const routeEvidenceRequiredKind = readString(
+    routeEvidenceAuthority?.required_terminal_kind,
+  );
+  const unresolvedRouteEvidenceProjection = Boolean(
+    routeEvidenceAuthority?.terminal_product_allowed === false &&
+      routeEvidenceAllowedKinds.length === 0 &&
+      routeEvidenceForbiddenKinds.length === 0 &&
+      (!routeEvidenceRequiredKind ||
+        routeEvidenceRequiredKind.toLowerCase() === "unknown"),
+  );
+  const routeEvidenceTerminalProductRejected = Boolean(
+    routeEvidenceAuthority?.terminal_product_allowed === false &&
+      !(
+        unresolvedRouteEvidenceProjection &&
+        routeProductContractAllowsTerminal
+      ),
+  );
   const routeAuthorityOk =
     solverTrace?.route_authority_ok === true &&
     selectedTerminalProduct?.allowed_by_route !== false &&
-    routeEvidenceAuthority?.terminal_product_allowed !== false;
+    !routeEvidenceTerminalProductRejected;
   const poisonAuditOk =
     solverTrace?.poison_audit_ok === true && poisonAudit?.ok !== false;
   const terminalAuthorityOk =
@@ -358,7 +409,7 @@ export const buildHelixTerminalGroundingAuthority = (input: {
         ? "terminal_text_hash_mismatch"
         : null,
       selectedTerminalProduct?.allowed_by_route === false ||
-      routeEvidenceAuthority?.terminal_product_allowed === false
+      routeEvidenceTerminalProductRejected
         ? "terminal_product_not_allowed_by_route"
         : null,
       groundingRequired && !evidenceReentryCompleted

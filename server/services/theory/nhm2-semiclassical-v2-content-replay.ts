@@ -2,9 +2,10 @@ import {
   NHM2_SEMICLASSICAL_CONSTRAINT_BRACKET_IDS,
   type Nhm2SemiclassicalConstraintBracketId,
 } from "../../../shared/contracts/nhm2-semiclassical-state-realizability.v2";
+import { NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_ID } from "../../../shared/contracts/nhm2-semiclassical-v2-raw-replay-manifest.v1";
 
 export const NHM2_SEMICLASSICAL_V2_CONTENT_REPLAY_CONTRACT_VERSION =
-  "nhm2_semiclassical_v2_content_replay/v1" as const;
+  "nhm2_semiclassical_v2_content_replay/v2" as const;
 
 export const NHM2_SEMICLASSICAL_V2_CONTENT_REPLAY_COMPONENT_COUNTS =
   Object.freeze({
@@ -15,14 +16,14 @@ export const NHM2_SEMICLASSICAL_V2_CONTENT_REPLAY_COMPONENT_COUNTS =
 
 export const NHM2_SEMICLASSICAL_V2_CONTENT_REPLAY_MINIMUM_SAMPLE_COUNT =
   64 as const;
+export const NHM2_SEMICLASSICAL_V2_CONTENT_REPLAY_MAXIMUM_SAMPLE_COUNT =
+  64 as const;
 
 export type Nhm2SemiclassicalV2ContentReplayStatus =
-  | "pass"
-  | "fail"
-  | "blocked";
+  "pass" | "fail" | "blocked";
 
 export type Nhm2SemiclassicalV2ContentReplayPolicy = Readonly<{
-  policyId: string;
+  policyId: typeof NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_ID;
   candidateId: string;
   geometrySha256: string;
   quantumStateSha256: string;
@@ -32,14 +33,19 @@ export type Nhm2SemiclassicalV2ContentReplayPolicy = Readonly<{
   normalizationSha256: string;
   sourceTensorProvenance: "state_derived_not_declared_lever";
   declaredLeverTensorUsed: false;
-  frozenBeforeExecution: true;
+  manifestDeclaresFrozenBeforeExecution: true;
   sampleCount: number;
   regulatorLevelCount: number;
   noisePsdToleranceSI: number;
   noiseExchangeToleranceSI: number;
   fluctuationRatioTolerance: number;
   meanNormalizationFloorSI: number;
+  meanMetricDemandRelativeUpper95Tolerance: number;
+  maximumMetricDemandRelativeErrorBound: number;
+  metricDemandDerivationStatus: "metric_demand_derivation_executor_provenance_unverified";
+  metricDemandIntervalTraceStatus: "interval_trace_not_server_replayed";
   minimumMetricDemandFrobeniusSI: number;
+  requiredMetricDemandSampleFraction: number;
   smearingWeightNormalizationTolerance: number;
   bracketResidualTolerance: number;
   antisymmetryResidualTolerance: number;
@@ -68,7 +74,9 @@ export type Nhm2SemiclassicalV2ContentReplayInput = Readonly<{
     noiseKernel: Float64Array;
     noiseAbsoluteUncertainty95: Float64Array;
     meanStressTensor: Float64Array;
+    meanStressAbsoluteUncertainty95: Float64Array;
     metricDemandRset: Float64Array;
+    metricDemandAbsoluteErrorBound: Float64Array;
     meanSmearingWeights: Float64Array;
     brackets: Readonly<
       Record<
@@ -97,15 +105,14 @@ export type Nhm2SemiclassicalV2ContentReplayInput = Readonly<{
   }>;
 }>;
 
-type BracketIssue =
-  `bracket_${Nhm2SemiclassicalConstraintBracketId}_${
-    | "computed_shape_invalid"
-    | "target_shape_invalid"
-    | "producer_residual_shape_invalid"
-    | "uncertainty_shape_invalid"
-    | "target_echo"
-    | "producer_residual_mismatch"
-    | "residual_upper95_exceeds_tolerance"}`;
+type BracketIssue = `bracket_${Nhm2SemiclassicalConstraintBracketId}_${
+  | "computed_shape_invalid"
+  | "target_shape_invalid"
+  | "producer_residual_shape_invalid"
+  | "uncertainty_shape_invalid"
+  | "target_echo"
+  | "producer_residual_mismatch"
+  | "residual_upper95_exceeds_tolerance"}`;
 
 export type Nhm2SemiclassicalV2ContentReplayIssueCode =
   | "input_not_object"
@@ -115,7 +122,7 @@ export type Nhm2SemiclassicalV2ContentReplayIssueCode =
   | "policy_not_frozen"
   | "policy_identity_invalid"
   | "policy_hash_invalid"
-  | "policy_candidate_not_frozen_before_execution"
+  | "policy_manifest_freeze_declaration_invalid"
   | "policy_declared_lever_tensor_forbidden"
   | "policy_sample_count_invalid"
   | "policy_regulator_level_count_invalid"
@@ -129,7 +136,13 @@ export type Nhm2SemiclassicalV2ContentReplayIssueCode =
   | "noise_kernel_shape_invalid"
   | "noise_uncertainty_shape_invalid"
   | "mean_stress_tensor_shape_invalid"
+  | "mean_stress_uncertainty_shape_invalid"
   | "metric_demand_rset_shape_invalid"
+  | "metric_demand_error_bound_shape_invalid"
+  | "metric_demand_error_bound_unjustified_zero"
+  | "metric_demand_error_bound_exceeds_frozen_relative_target"
+  | "metric_demand_derivation_executor_provenance_unverified"
+  | "interval_trace_not_server_replayed"
   | "mean_smearing_weights_shape_invalid"
   | "antisymmetry_forward_shape_invalid"
   | "antisymmetry_reverse_shape_invalid"
@@ -155,6 +168,7 @@ export type Nhm2SemiclassicalV2ContentReplayIssueCode =
   | "noise_psd_numerically_inconclusive"
   | "fluctuation_ratio_exceeds_tolerance"
   | "metric_demand_degenerate"
+  | "mean_metric_demand_closure_exceeds_tolerance"
   | "antisymmetry_producer_residual_mismatch"
   | "antisymmetry_residual_upper95_exceeds_tolerance"
   | "jacobi_producer_residual_mismatch"
@@ -177,25 +191,24 @@ export type Nhm2SemiclassicalV2NoiseMetrics = Readonly<{
   covarianceDimension: number;
   exchangeResidualUpper95SI: number;
   exchangeToleranceSI: number;
-  symmetricTensorBasis:
-    "orthonormal_symmetric_tensor_sqrt_component_multiplicity";
-  covarianceSmearingMethod:
-    "diag_sqrt_point_weights_tensor_sqrt_component_multiplicity_bilateral";
-  psdCertificateMethod:
-    "central_symmetric_covariance_semidefinite_ldlt_zero_pivot_checked";
+  exchangeSymmetryBasis: "raw_bilocal_component_pair_storage";
+  symmetricTensorBasis: "orthonormal_symmetric_tensor_sqrt_component_multiplicity";
+  covarianceSmearingMethod: "diag_sqrt_point_weights_tensor_sqrt_component_multiplicity_bilateral";
+  psdCertificateMethod: "shifted_semidefinite_cholesky_with_residual_spectral_bound";
   psdInput: "central_symmetric_weighted_covariance";
   psdCertificationDisposition:
-    | "certified"
-    | "negative_witness"
-    | "numerically_inconclusive";
-  minimumLdltPivotSI: number;
+    "tolerance_certified" | "negative_witness" | "numerically_inconclusive";
+  psdDiagonalShiftSI: number;
+  psdResidualAllowanceSI: number;
+  minimumShiftedCholeskyPivotSI: number | null;
   psdToleranceSI: number;
-  factorizationResidualLInfSI: number | null;
-  maximumZeroPivotRowResidualSI: number;
+  factorizationResidualInfinityNormUpperSI: number | null;
+  factorizationRoundoffModel: "ieee754_gamma_n_absolute_bound";
+  maximumZeroPivotCouplingResidualSI: number;
   negativeWitnessRayleighQuotientSI: number | null;
   maximumGershgorinRadiusUpper95SI: number;
   maximumEigenvalueUpper95SI: number;
-  covariancePositiveSemidefiniteCertified: boolean;
+  covarianceTolerancePositiveSemidefiniteCertified: boolean;
 }>;
 
 export type Nhm2SemiclassicalV2MeanMetrics = Readonly<{
@@ -210,10 +223,35 @@ export type Nhm2SemiclassicalV2MeanMetrics = Readonly<{
 }>;
 
 export type Nhm2SemiclassicalV2MetricDemandMetrics = Readonly<{
+  minimumPointwiseSymmetricTensorFrobeniusSI: number;
+  argminPointIndex: number;
   maximumPointwiseSymmetricTensorFrobeniusSI: number;
   argmaxPointIndex: number;
+  minimumPointwiseSymmetricTensorFrobeniusLowerBoundSI: number;
+  argminLowerBoundPointIndex: number;
+  maximumPointwiseDeterministicErrorFrobeniusSI: number;
+  argmaxDeterministicErrorPointIndex: number;
   minimumRequiredFrobeniusSI: number;
+  qualifyingSampleCount: number;
+  qualifyingSampleFraction: number;
+  requiredSampleFraction: number;
   strictlyNondegenerate: boolean;
+}>;
+
+export type Nhm2SemiclassicalV2MeanMetricDemandClosureMetrics = Readonly<{
+  sampleCount: number;
+  relativeUpper95Tolerance: number;
+  requiredPassingSampleCount: number;
+  passingSampleCount: number;
+  maximumPointwiseRelativeUpper95: number;
+  argmaxPointIndex: number;
+  residualFrobeniusUpper95AtWorstPointSI: number;
+  metricDemandDeterministicErrorFrobeniusAtWorstPointSI: number;
+  metricDemandFrobeniusLowerBoundAtWorstPointSI: number;
+  denominatorAtWorstPointSI: number;
+  argmaxComponentIndex: number;
+  argmaxComponentContributionRelativeUpper95: number;
+  allSamplesWithinTolerance: boolean;
 }>;
 
 export type Nhm2SemiclassicalV2InputContentMetrics = Readonly<{
@@ -250,7 +288,7 @@ export type Nhm2SemiclassicalV2ContentReplayResult = Readonly<{
   calculationOnly: true;
   serverOwned: true;
   status: Nhm2SemiclassicalV2ContentReplayStatus;
-  frozenBindings: Readonly<{
+  inputBindings: Readonly<{
     policyId: string | null;
     candidateId: string | null;
     geometrySha256: string | null;
@@ -261,13 +299,15 @@ export type Nhm2SemiclassicalV2ContentReplayResult = Readonly<{
     normalizationSha256: string | null;
     sourceTensorProvenance: "state_derived_not_declared_lever" | null;
     declaredLeverTensorUsed: false;
-    frozenBeforeExecution: boolean;
+    manifestDeclaresFrozenBeforeExecution: boolean;
+    preexecutionFreezeVerified: false;
   }>;
   metrics: Readonly<{
     inputContent: Nhm2SemiclassicalV2InputContentMetrics | null;
     noise: Nhm2SemiclassicalV2NoiseMetrics | null;
     mean: Nhm2SemiclassicalV2MeanMetrics | null;
     metricDemand: Nhm2SemiclassicalV2MetricDemandMetrics | null;
+    meanMetricDemandClosure: Nhm2SemiclassicalV2MeanMetricDemandClosureMetrics | null;
     brackets: Readonly<
       Partial<
         Record<
@@ -300,6 +340,7 @@ type MutableReplayMetrics = {
   noise: Nhm2SemiclassicalV2NoiseMetrics | null;
   mean: Nhm2SemiclassicalV2MeanMetrics | null;
   metricDemand: Nhm2SemiclassicalV2MetricDemandMetrics | null;
+  meanMetricDemandClosure: Nhm2SemiclassicalV2MeanMetricDemandClosureMetrics | null;
   brackets: Partial<
     Record<
       Nhm2SemiclassicalConstraintBracketId,
@@ -335,14 +376,19 @@ const POLICY_KEYS = [
   "normalizationSha256",
   "sourceTensorProvenance",
   "declaredLeverTensorUsed",
-  "frozenBeforeExecution",
+  "manifestDeclaresFrozenBeforeExecution",
   "sampleCount",
   "regulatorLevelCount",
   "noisePsdToleranceSI",
   "noiseExchangeToleranceSI",
   "fluctuationRatioTolerance",
   "meanNormalizationFloorSI",
+  "meanMetricDemandRelativeUpper95Tolerance",
+  "maximumMetricDemandRelativeErrorBound",
+  "metricDemandDerivationStatus",
+  "metricDemandIntervalTraceStatus",
   "minimumMetricDemandFrobeniusSI",
+  "requiredMetricDemandSampleFraction",
   "smearingWeightNormalizationTolerance",
   "bracketResidualTolerance",
   "antisymmetryResidualTolerance",
@@ -356,7 +402,9 @@ const ARRAY_KEYS = [
   "noiseKernel",
   "noiseAbsoluteUncertainty95",
   "meanStressTensor",
+  "meanStressAbsoluteUncertainty95",
   "metricDemandRset",
+  "metricDemandAbsoluteErrorBound",
   "meanSmearingWeights",
   "brackets",
   "antisymmetry",
@@ -400,9 +448,7 @@ const hasExactKeys = (
   const expected = [...keys].sort();
   return (
     actual.length === expected.length &&
-    actual.every(
-      (entry: string, index: number) => entry === expected[index],
-    )
+    actual.every((entry: string, index: number) => entry === expected[index])
   );
 };
 
@@ -442,10 +488,7 @@ const maxAbsPlusPointwiseUncertainty = (
 ): number => {
   let maximum = 0;
   for (let index = 0; index < values.length; index += 1) {
-    maximum = Math.max(
-      maximum,
-      Math.abs(values[index]) + uncertainty[index],
-    );
+    maximum = Math.max(maximum, Math.abs(values[index]) + uncertainty[index]);
   }
   return maximum;
 };
@@ -462,33 +505,51 @@ const arraysExactlyEqual = (
   return true;
 };
 
-const nullableBindings = (): Nhm2SemiclassicalV2ContentReplayResult["frozenBindings"] => ({
-  policyId: null,
-  candidateId: null,
-  geometrySha256: null,
-  quantumStateSha256: null,
-  chartId: null,
-  chartSha256: null,
-  normalizationId: null,
-  normalizationSha256: null,
-  sourceTensorProvenance: null,
-  declaredLeverTensorUsed: false,
-  frozenBeforeExecution: false,
-});
+const nullableBindings =
+  (): Nhm2SemiclassicalV2ContentReplayResult["inputBindings"] => ({
+    policyId: null,
+    candidateId: null,
+    geometrySha256: null,
+    quantumStateSha256: null,
+    chartId: null,
+    chartSha256: null,
+    normalizationId: null,
+    normalizationSha256: null,
+    sourceTensorProvenance: null,
+    declaredLeverTensorUsed: false,
+    manifestDeclaresFrozenBeforeExecution: false,
+    preexecutionFreezeVerified: false,
+  });
 
 const emptyMetrics = (): MutableReplayMetrics => ({
   inputContent: null,
   noise: null,
   mean: null,
   metricDemand: null,
+  meanMetricDemandClosure: null,
   brackets: {},
   antisymmetry: null,
   jacobi: null,
   regulator: null,
 });
 
+const deepFreeze = <T>(value: T): T => {
+  if (
+    value == null ||
+    typeof value !== "object" ||
+    ArrayBuffer.isView(value) ||
+    Object.isFrozen(value)
+  ) {
+    return value;
+  }
+  for (const key of Reflect.ownKeys(value as object)) {
+    deepFreeze((value as Record<PropertyKey, unknown>)[key]);
+  }
+  return Object.freeze(value);
+};
+
 const buildResult = (
-  bindings: Nhm2SemiclassicalV2ContentReplayResult["frozenBindings"],
+  bindings: Nhm2SemiclassicalV2ContentReplayResult["inputBindings"],
   metrics: Nhm2SemiclassicalV2ContentReplayResult["metrics"],
   issues: Nhm2SemiclassicalV2ContentReplayIssue[],
 ): Nhm2SemiclassicalV2ContentReplayResult => {
@@ -500,19 +561,19 @@ const buildResult = (
     : issues.length > 0
       ? "fail"
       : "pass";
-  return {
+  return deepFreeze({
     contractVersion: NHM2_SEMICLASSICAL_V2_CONTENT_REPLAY_CONTRACT_VERSION,
     calculationOnly: true,
     serverOwned: true,
     status,
-    frozenBindings: bindings,
+    inputBindings: bindings,
     metrics,
     issues,
     blockers: issues.map(
       (issue: Nhm2SemiclassicalV2ContentReplayIssue) => issue.code,
     ),
     claimLocks: CLAIM_LOCKS,
-  };
+  });
 };
 
 type ArrayEntry = {
@@ -549,7 +610,10 @@ const validateArrayEntries = (
       });
       valid = false;
     }
-    if (array.byteOffset !== 0 || array.byteLength !== array.buffer.byteLength) {
+    if (
+      array.byteOffset !== 0 ||
+      array.byteLength !== array.buffer.byteLength
+    ) {
       issues.push({
         code: "array_partial_view_forbidden",
         disposition: "blocked",
@@ -632,47 +696,154 @@ const addIssue = (
   }
 };
 
-type LdltFactorEntry = Readonly<{
-  index: number;
-  value: number;
-}>;
-
 type CentralPsdCertification = Readonly<{
   disposition:
-    | "certified"
-    | "negative_witness"
-    | "numerically_inconclusive";
-  minimumPivot: number;
-  factorizationResidualLInf: number | null;
-  maximumZeroPivotRowResidual: number;
+    "tolerance_certified" | "negative_witness" | "numerically_inconclusive";
+  diagonalShift: number;
+  residualAllowance: number;
+  minimumShiftedPivot: number | null;
+  factorizationResidualInfinityNormUpper: number | null;
+  maximumZeroPivotCouplingResidual: number;
   negativeWitnessRayleighQuotient: number | null;
 }>;
 
-const factorDot = (
-  left: readonly LdltFactorEntry[],
-  right: readonly LdltFactorEntry[],
-  diagonal: Float64Array,
-): number => {
-  let leftIndex = 0;
-  let rightIndex = 0;
-  let sum = 0;
-  while (leftIndex < left.length && rightIndex < right.length) {
-    const leftEntry = left[leftIndex];
-    const rightEntry = right[rightIndex];
-    if (leftEntry.index === rightEntry.index) {
-      sum +=
-        leftEntry.value *
-        diagonal[leftEntry.index] *
-        rightEntry.value;
-      leftIndex += 1;
-      rightIndex += 1;
-    } else if (leftEntry.index < rightEntry.index) {
-      leftIndex += 1;
-    } else {
-      rightIndex += 1;
+const ieee754Gamma = (operationCount: number): number => {
+  const product = operationCount * Number.EPSILON;
+  return product < 1 ? product / (1 - product) : Number.POSITIVE_INFINITY;
+};
+
+const findNegativeRayleighWitness = (
+  dimension: number,
+  centralValue: (row: number, column: number) => number,
+  tolerance: number,
+): number | null => {
+  let minimum: number | null = null;
+  const consider = (
+    quotient: number,
+    absoluteScale: number,
+    operationCount: number,
+  ): void => {
+    const roundingUpper =
+      ieee754Gamma(operationCount) * (Math.abs(quotient) + absoluteScale);
+    if (
+      Number.isFinite(quotient) &&
+      Number.isFinite(roundingUpper) &&
+      quotient + roundingUpper < -tolerance
+    ) {
+      minimum = minimum == null ? quotient : Math.min(minimum, quotient);
+    }
+  };
+  for (let index = 0; index < dimension; index += 1) {
+    const diagonal = centralValue(index, index);
+    consider(diagonal, Math.abs(diagonal), 4);
+  }
+
+  // Every negative 2x2 principal mode supplies an explicit Rayleigh witness.
+  // Recompute the quotient from its eigenvector instead of trusting the
+  // closed-form eigenvalue as the final failure authority.
+  for (let left = 0; left < dimension; left += 1) {
+    const diagonalLeft = centralValue(left, left);
+    for (let right = left + 1; right < dimension; right += 1) {
+      const diagonalRight = centralValue(right, right);
+      const coupling = centralValue(left, right);
+      const eigenvalue =
+        0.5 *
+        (diagonalLeft +
+          diagonalRight -
+          Math.hypot(diagonalLeft - diagonalRight, 2 * coupling));
+      if (!(eigenvalue < -tolerance) || coupling === 0) continue;
+      let leftComponent = coupling;
+      let rightComponent = eigenvalue - diagonalLeft;
+      if (leftComponent === 0 && rightComponent === 0) {
+        leftComponent = eigenvalue - diagonalRight;
+        rightComponent = coupling;
+      }
+      const normSquared =
+        leftComponent * leftComponent + rightComponent * rightComponent;
+      if (!(normSquared > 0) || !Number.isFinite(normSquared)) continue;
+      const quotient =
+        (diagonalLeft * leftComponent * leftComponent +
+          2 * coupling * leftComponent * rightComponent +
+          diagonalRight * rightComponent * rightComponent) /
+        normSquared;
+      const absoluteNumeratorScale =
+        (Math.abs(diagonalLeft * leftComponent * leftComponent) +
+          Math.abs(2 * coupling * leftComponent * rightComponent) +
+          Math.abs(diagonalRight * rightComponent * rightComponent)) /
+        normSquared;
+      consider(quotient, absoluteNumeratorScale, 32);
     }
   }
-  return sum;
+
+  let strongestCouplingRow = -1;
+  let strongestCouplingNorm = 0;
+  for (let row = 0; row < dimension; row += 1) {
+    let scale = 0;
+    let scaledSquares = 1;
+    for (let column = 0; column < dimension; column += 1) {
+      if (column === row) continue;
+      const magnitude = Math.abs(centralValue(row, column));
+      if (magnitude === 0) continue;
+      if (scale < magnitude) {
+        const ratio = scale / magnitude;
+        scaledSquares = 1 + scaledSquares * ratio * ratio;
+        scale = magnitude;
+      } else {
+        const ratio = magnitude / scale;
+        scaledSquares += ratio * ratio;
+      }
+    }
+    const norm = scale === 0 ? 0 : scale * Math.sqrt(scaledSquares);
+    if (Number.isFinite(norm) && norm > strongestCouplingNorm) {
+      strongestCouplingNorm = norm;
+      strongestCouplingRow = row;
+    }
+  }
+  if (strongestCouplingRow >= 0 && strongestCouplingNorm > 0) {
+    const witness = new Float64Array(dimension);
+    const inverseSqrtTwo = 1 / Math.sqrt(2);
+    witness[strongestCouplingRow] = inverseSqrtTwo;
+    for (let column = 0; column < dimension; column += 1) {
+      if (column === strongestCouplingRow) continue;
+      witness[column] =
+        (-centralValue(strongestCouplingRow, column) / strongestCouplingNorm) *
+        inverseSqrtTwo;
+    }
+    let quadratic = 0;
+    let absoluteQuadraticSum = 0;
+    for (let row = 0; row < dimension; row += 1) {
+      for (let column = 0; column < dimension; column += 1) {
+        const term = witness[row] * centralValue(row, column) * witness[column];
+        quadratic += term;
+        absoluteQuadraticSum += Math.abs(term);
+      }
+    }
+    consider(quadratic, absoluteQuadraticSum, 5 * dimension * dimension + 8);
+  }
+
+  // Coherent modes catch distributed negative covariance that is invisible to
+  // every entrywise or 2x2 tolerance (the failure mode that motivated this
+  // certificate revision). These are witnesses only; absence is not a pass.
+  for (const alternating of [false, true]) {
+    let quadratic = 0;
+    let absoluteQuadraticSum = 0;
+    for (let row = 0; row < dimension; row += 1) {
+      const rowSign = alternating && row % 2 === 1 ? -1 : 1;
+      for (let column = 0; column < dimension; column += 1) {
+        const columnSign = alternating && column % 2 === 1 ? -1 : 1;
+        const value = centralValue(row, column);
+        quadratic += rowSign * value * columnSign;
+        absoluteQuadraticSum += Math.abs(value);
+      }
+    }
+    const quotient = quadratic / dimension;
+    consider(
+      quotient,
+      absoluteQuadraticSum / dimension,
+      3 * dimension * dimension + 4,
+    );
+  }
+  return minimum;
 };
 
 const certifyCentralCovariancePsd = (
@@ -680,150 +851,138 @@ const certifyCentralCovariancePsd = (
   centralValue: (row: number, column: number) => number,
   tolerance: number,
 ): CentralPsdCertification => {
-  const diagonal = new Float64Array(dimension);
-  const factorRows: LdltFactorEntry[][] = Array.from(
-    { length: dimension },
-    () => [],
+  const diagonalShift = tolerance / 2;
+  const residualAllowance = tolerance - diagonalShift;
+  const negativeWitnessRayleighQuotient = findNegativeRayleighWitness(
+    dimension,
+    centralValue,
+    tolerance,
   );
-  const factorMaps: Array<Map<number, number>> = Array.from(
-    { length: dimension },
-    () => new Map<number, number>(),
-  );
-  let minimumPivot = Number.POSITIVE_INFINITY;
-  let maximumZeroPivotRowResidual = 0;
+  if (negativeWitnessRayleighQuotient != null) {
+    return {
+      disposition: "negative_witness",
+      diagonalShift,
+      residualAllowance,
+      minimumShiftedPivot: null,
+      factorizationResidualInfinityNormUpper: null,
+      maximumZeroPivotCouplingResidual: 0,
+      negativeWitnessRayleighQuotient,
+    };
+  }
 
-  for (let pivotIndex = 0; pivotIndex < dimension; pivotIndex += 1) {
-    const pivot =
-      centralValue(pivotIndex, pivotIndex) -
-      factorDot(
-        factorRows[pivotIndex],
-        factorRows[pivotIndex],
-        diagonal,
-      );
-    if (!Number.isFinite(pivot)) {
-      return {
-        disposition: "numerically_inconclusive",
-        minimumPivot,
-        factorizationResidualLInf: null,
-        maximumZeroPivotRowResidual,
-        negativeWitnessRayleighQuotient: null,
-      };
-    }
-    minimumPivot = Math.min(minimumPivot, pivot);
-
-    if (pivot < -tolerance) {
-      const witness = new Float64Array(pivotIndex + 1);
-      witness[pivotIndex] = 1;
-      for (let column = pivotIndex - 1; column >= 0; column -= 1) {
-        let upperProduct = 0;
-        for (let row = column + 1; row <= pivotIndex; row += 1) {
-          upperProduct +=
-            (factorMaps[row].get(column) ?? 0) * witness[row];
-        }
-        witness[column] = -upperProduct;
+  const lower = new Float64Array(dimension * dimension);
+  let minimumShiftedPivot = Number.POSITIVE_INFINITY;
+  let maximumZeroPivotCouplingResidual = 0;
+  for (let row = 0; row < dimension; row += 1) {
+    for (let column = 0; column <= row; column += 1) {
+      let reduced =
+        centralValue(row, column) + (row === column ? diagonalShift : 0);
+      for (let inner = 0; inner < column; inner += 1) {
+        reduced -=
+          lower[row * dimension + inner] * lower[column * dimension + inner];
       }
-      let quadratic = 0;
-      let normSquared = 0;
-      for (let row = 0; row <= pivotIndex; row += 1) {
-        normSquared += witness[row] * witness[row];
-        for (let column = 0; column <= pivotIndex; column += 1) {
-          quadratic +=
-            witness[row] *
-            centralValue(row, column) *
-            witness[column];
-        }
-      }
-      const rayleigh = quadratic / normSquared;
-      return {
-        disposition:
-          Number.isFinite(rayleigh) && rayleigh < -tolerance
-            ? "negative_witness"
-            : "numerically_inconclusive",
-        minimumPivot,
-        factorizationResidualLInf: null,
-        maximumZeroPivotRowResidual,
-        negativeWitnessRayleighQuotient: Number.isFinite(rayleigh)
-          ? rayleigh
-          : null,
-      };
-    }
-
-    if (Math.abs(pivot) <= tolerance) {
-      diagonal[pivotIndex] = 0;
-      let zeroPivotRowResidual = 0;
-      for (let row = pivotIndex + 1; row < dimension; row += 1) {
-        const residual =
-          centralValue(row, pivotIndex) -
-          factorDot(factorRows[row], factorRows[pivotIndex], diagonal);
-        zeroPivotRowResidual = Math.max(
-          zeroPivotRowResidual,
-          Math.abs(residual),
-        );
-      }
-      maximumZeroPivotRowResidual = Math.max(
-        maximumZeroPivotRowResidual,
-        zeroPivotRowResidual,
-      );
-      factorRows[pivotIndex].push({ index: pivotIndex, value: 1 });
-      factorMaps[pivotIndex].set(pivotIndex, 1);
-      if (zeroPivotRowResidual > tolerance) {
+      if (!Number.isFinite(reduced)) {
         return {
           disposition: "numerically_inconclusive",
-          minimumPivot,
-          factorizationResidualLInf: zeroPivotRowResidual,
-          maximumZeroPivotRowResidual,
+          diagonalShift,
+          residualAllowance,
+          minimumShiftedPivot,
+          factorizationResidualInfinityNormUpper: null,
+          maximumZeroPivotCouplingResidual,
           negativeWitnessRayleighQuotient: null,
         };
       }
-      continue;
-    }
-
-    diagonal[pivotIndex] = pivot;
-    for (let row = pivotIndex + 1; row < dimension; row += 1) {
-      const residual =
-        centralValue(row, pivotIndex) -
-        factorDot(factorRows[row], factorRows[pivotIndex], diagonal);
-      const factor = residual / pivot;
+      if (row === column) {
+        minimumShiftedPivot = Math.min(minimumShiftedPivot, reduced);
+        if (reduced < 0) {
+          return {
+            disposition: "numerically_inconclusive",
+            diagonalShift,
+            residualAllowance,
+            minimumShiftedPivot,
+            factorizationResidualInfinityNormUpper: null,
+            maximumZeroPivotCouplingResidual,
+            negativeWitnessRayleighQuotient: null,
+          };
+        }
+        lower[row * dimension + column] = Math.sqrt(reduced);
+        continue;
+      }
+      const pivotRoot = lower[column * dimension + column];
+      if (pivotRoot === 0) {
+        maximumZeroPivotCouplingResidual = Math.max(
+          maximumZeroPivotCouplingResidual,
+          Math.abs(reduced),
+        );
+        if (reduced !== 0) {
+          return {
+            disposition: "numerically_inconclusive",
+            diagonalShift,
+            residualAllowance,
+            minimumShiftedPivot,
+            factorizationResidualInfinityNormUpper: null,
+            maximumZeroPivotCouplingResidual,
+            negativeWitnessRayleighQuotient: null,
+          };
+        }
+        continue;
+      }
+      const factor = reduced / pivotRoot;
       if (!Number.isFinite(factor)) {
         return {
           disposition: "numerically_inconclusive",
-          minimumPivot,
-          factorizationResidualLInf: null,
-          maximumZeroPivotRowResidual,
+          diagonalShift,
+          residualAllowance,
+          minimumShiftedPivot,
+          factorizationResidualInfinityNormUpper: null,
+          maximumZeroPivotCouplingResidual,
           negativeWitnessRayleighQuotient: null,
         };
       }
-      if (factor !== 0) {
-        const entry = { index: pivotIndex, value: factor };
-        factorRows[row].push(entry);
-        factorMaps[row].set(pivotIndex, factor);
-      }
+      lower[row * dimension + column] = factor;
     }
-    factorRows[pivotIndex].push({ index: pivotIndex, value: 1 });
-    factorMaps[pivotIndex].set(pivotIndex, 1);
   }
 
-  let factorizationResidualLInf = 0;
+  let factorizationResidualInfinityNormUpper = 0;
   for (let row = 0; row < dimension; row += 1) {
-    for (let column = 0; column <= row; column += 1) {
-      factorizationResidualLInf = Math.max(
-        factorizationResidualLInf,
-        Math.abs(
-          centralValue(row, column) -
-            factorDot(factorRows[row], factorRows[column], diagonal),
-        ),
-      );
+    let rowResidualUpper = 0;
+    for (let column = 0; column < dimension; column += 1) {
+      const termCount = Math.min(row, column) + 1;
+      let reconstructed = 0;
+      let absoluteProductSum = 0;
+      for (let inner = 0; inner < termCount; inner += 1) {
+        const product =
+          lower[row * dimension + inner] * lower[column * dimension + inner];
+        reconstructed += product;
+        absoluteProductSum += Math.abs(product);
+      }
+      const central = centralValue(row, column);
+      const shifted = central + (row === column ? diagonalShift : 0);
+      const roundingUpper =
+        ieee754Gamma(2 * termCount + 4) *
+        (Math.abs(central) +
+          (row === column ? diagonalShift : 0) +
+          absoluteProductSum);
+      rowResidualUpper += Math.abs(shifted - reconstructed) + roundingUpper;
     }
+    const rowSummationInflation = ieee754Gamma(dimension + 1);
+    const inflatedRowResidual = rowResidualUpper * (1 + rowSummationInflation);
+    factorizationResidualInfinityNormUpper = Math.max(
+      factorizationResidualInfinityNormUpper,
+      inflatedRowResidual,
+    );
   }
   return {
     disposition:
-      Number.isFinite(factorizationResidualLInf) &&
-      factorizationResidualLInf <= tolerance
-        ? "certified"
+      Number.isFinite(factorizationResidualInfinityNormUpper) &&
+      factorizationResidualInfinityNormUpper <= residualAllowance
+        ? "tolerance_certified"
         : "numerically_inconclusive",
-    minimumPivot,
-    factorizationResidualLInf,
-    maximumZeroPivotRowResidual,
+    diagonalShift,
+    residualAllowance,
+    minimumShiftedPivot,
+    factorizationResidualInfinityNormUpper,
+    maximumZeroPivotCouplingResidual,
     negativeWitnessRayleighQuotient: null,
   };
 };
@@ -866,7 +1025,10 @@ export const replayNhm2SemiclassicalV2Content = (
     rawPolicy.chartId,
     rawPolicy.normalizationId,
   ];
-  if (!textIdentities.every(isNonEmptyText)) {
+  if (
+    !textIdentities.every(isNonEmptyText) ||
+    rawPolicy.policyId !== NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_ID
+  ) {
     addIssue(issues, "policy_identity_invalid", "blocked");
   }
   const hashes = [
@@ -878,16 +1040,11 @@ export const replayNhm2SemiclassicalV2Content = (
   if (!hashes.every(isSha256)) {
     addIssue(issues, "policy_hash_invalid", "blocked");
   }
-  if (rawPolicy.frozenBeforeExecution !== true) {
-    addIssue(
-      issues,
-      "policy_candidate_not_frozen_before_execution",
-      "blocked",
-    );
+  if (rawPolicy.manifestDeclaresFrozenBeforeExecution !== true) {
+    addIssue(issues, "policy_manifest_freeze_declaration_invalid", "blocked");
   }
   if (
-    rawPolicy.sourceTensorProvenance !==
-      "state_derived_not_declared_lever" ||
+    rawPolicy.sourceTensorProvenance !== "state_derived_not_declared_lever" ||
     rawPolicy.declaredLeverTensorUsed !== false
   ) {
     addIssue(issues, "policy_declared_lever_tensor_forbidden", "blocked");
@@ -895,7 +1052,9 @@ export const replayNhm2SemiclassicalV2Content = (
   if (
     !Number.isSafeInteger(rawPolicy.sampleCount) ||
     (rawPolicy.sampleCount as number) <
-      NHM2_SEMICLASSICAL_V2_CONTENT_REPLAY_MINIMUM_SAMPLE_COUNT
+      NHM2_SEMICLASSICAL_V2_CONTENT_REPLAY_MINIMUM_SAMPLE_COUNT ||
+    (rawPolicy.sampleCount as number) >
+      NHM2_SEMICLASSICAL_V2_CONTENT_REPLAY_MAXIMUM_SAMPLE_COUNT
   ) {
     addIssue(issues, "policy_sample_count_invalid", "blocked");
   }
@@ -906,16 +1065,19 @@ export const replayNhm2SemiclassicalV2Content = (
     addIssue(issues, "policy_regulator_level_count_invalid", "blocked");
   }
   const nonnegativeTolerances = [
-    rawPolicy.noisePsdToleranceSI,
     rawPolicy.smearingWeightNormalizationTolerance,
     rawPolicy.producerResidualConsistencyTolerance,
     rawPolicy.regulatorMonotonicityTolerance,
   ];
   const positiveTolerances = [
+    rawPolicy.noisePsdToleranceSI,
     rawPolicy.noiseExchangeToleranceSI,
     rawPolicy.fluctuationRatioTolerance,
     rawPolicy.meanNormalizationFloorSI,
+    rawPolicy.meanMetricDemandRelativeUpper95Tolerance,
+    rawPolicy.maximumMetricDemandRelativeErrorBound,
     rawPolicy.minimumMetricDemandFrobeniusSI,
+    rawPolicy.requiredMetricDemandSampleFraction,
     rawPolicy.bracketResidualTolerance,
     rawPolicy.antisymmetryResidualTolerance,
     rawPolicy.jacobiResidualTolerance,
@@ -924,7 +1086,14 @@ export const replayNhm2SemiclassicalV2Content = (
   ];
   if (
     !nonnegativeTolerances.every(isFiniteNonnegative) ||
-    !positiveTolerances.every(isFinitePositive)
+    !positiveTolerances.every(isFinitePositive) ||
+    (rawPolicy.requiredMetricDemandSampleFraction as number) > 1 ||
+    (rawPolicy.maximumMetricDemandRelativeErrorBound as number) > 1 ||
+    rawPolicy.maximumMetricDemandRelativeErrorBound !== 0.01 ||
+    rawPolicy.metricDemandDerivationStatus !==
+      "metric_demand_derivation_executor_provenance_unverified" ||
+    rawPolicy.metricDemandIntervalTraceStatus !==
+      "interval_trace_not_server_replayed"
   ) {
     addIssue(issues, "policy_tolerance_invalid", "blocked");
   }
@@ -941,9 +1110,7 @@ export const replayNhm2SemiclassicalV2Content = (
       ? rawPolicy.quantumStateSha256
       : null,
     chartId: isNonEmptyText(rawPolicy.chartId) ? rawPolicy.chartId : null,
-    chartSha256: isSha256(rawPolicy.chartSha256)
-      ? rawPolicy.chartSha256
-      : null,
+    chartSha256: isSha256(rawPolicy.chartSha256) ? rawPolicy.chartSha256 : null,
     normalizationId: isNonEmptyText(rawPolicy.normalizationId)
       ? rawPolicy.normalizationId
       : null,
@@ -951,12 +1118,13 @@ export const replayNhm2SemiclassicalV2Content = (
       ? rawPolicy.normalizationSha256
       : null,
     sourceTensorProvenance:
-      rawPolicy.sourceTensorProvenance ===
-      "state_derived_not_declared_lever"
+      rawPolicy.sourceTensorProvenance === "state_derived_not_declared_lever"
         ? rawPolicy.sourceTensorProvenance
         : null,
     declaredLeverTensorUsed: false,
-    frozenBeforeExecution: rawPolicy.frozenBeforeExecution === true,
+    manifestDeclaresFrozenBeforeExecution:
+      rawPolicy.manifestDeclaresFrozenBeforeExecution === true,
+    preexecutionFreezeVerified: false,
   };
 
   if (issues.length > 0) return buildResult(bindings, metrics, issues);
@@ -976,10 +1144,7 @@ export const replayNhm2SemiclassicalV2Content = (
     return buildResult(bindings, metrics, issues);
   }
   if (
-    !hasExactKeys(
-      rawArrays.brackets,
-      NHM2_SEMICLASSICAL_CONSTRAINT_BRACKET_IDS,
-    )
+    !hasExactKeys(rawArrays.brackets, NHM2_SEMICLASSICAL_CONSTRAINT_BRACKET_IDS)
   ) {
     addIssue(issues, "brackets_keys_invalid", "blocked");
     return buildResult(bindings, metrics, issues);
@@ -1055,11 +1220,25 @@ export const replayNhm2SemiclassicalV2Content = (
       uncertainty: false,
     },
     {
+      id: "meanStressAbsoluteUncertainty95",
+      value: rawArrays.meanStressAbsoluteUncertainty95,
+      expectedLength: meanLength,
+      shapeIssue: "mean_stress_uncertainty_shape_invalid",
+      uncertainty: true,
+    },
+    {
       id: "metricDemandRset",
       value: rawArrays.metricDemandRset,
       expectedLength: meanLength,
       shapeIssue: "metric_demand_rset_shape_invalid",
       uncertainty: false,
+    },
+    {
+      id: "metricDemandAbsoluteErrorBound",
+      value: rawArrays.metricDemandAbsoluteErrorBound,
+      expectedLength: meanLength,
+      shapeIssue: "metric_demand_error_bound_shape_invalid",
+      uncertainty: true,
     },
     {
       id: "meanSmearingWeights",
@@ -1201,6 +1380,14 @@ export const replayNhm2SemiclassicalV2Content = (
   if (!validateArrayEntries(entries, issues)) {
     return buildResult(bindings, metrics, issues);
   }
+  if (
+    Array.from(rawArrays.metricDemandAbsoluteErrorBound as Float64Array).some(
+      (value) => value === 0,
+    )
+  ) {
+    addIssue(issues, "metric_demand_error_bound_unjustified_zero", "blocked");
+    return buildResult(bindings, metrics, issues);
+  }
   metrics.inputContent = {
     float64ArrayCount: entries.length,
     float64ValueCount: entries.reduce(
@@ -1213,24 +1400,38 @@ export const replayNhm2SemiclassicalV2Content = (
     buffersUniqueAndNonShared: true,
     arraysAreFullBufferViews: true,
   };
-  const arrays = rawArrays as unknown as Nhm2SemiclassicalV2ContentReplayInput["arrays"];
+  const arrays =
+    rawArrays as unknown as Nhm2SemiclassicalV2ContentReplayInput["arrays"];
 
   for (const weight of arrays.meanSmearingWeights) {
     if (weight < 0) addIssue(issues, "smearing_weight_negative", "blocked");
   }
   const weightSum = kahanSum(arrays.meanSmearingWeights);
-  if (
-    Math.abs(weightSum - 1) > policy.smearingWeightNormalizationTolerance
-  ) {
+  if (Math.abs(weightSum - 1) > policy.smearingWeightNormalizationTolerance) {
     addIssue(issues, "smearing_weights_not_normalized", "blocked");
   }
   if (issues.length > 0) return buildResult(bindings, metrics, issues);
+  addIssue(
+    issues,
+    "metric_demand_derivation_executor_provenance_unverified",
+    "blocked",
+  );
+  addIssue(issues, "interval_trace_not_server_replayed", "blocked");
 
   const tensorComponents =
     NHM2_SEMICLASSICAL_V2_CONTENT_REPLAY_COMPONENT_COUNTS.stressTensor;
   const multiplicities = [1, 2, 2, 2, 1, 2, 2, 1, 2, 1] as const;
+  let minimumPointwiseSymmetricTensorFrobeniusSI = Number.POSITIVE_INFINITY;
+  let metricDemandArgminPointIndex = 0;
   let maximumPointwiseSymmetricTensorFrobeniusSI = 0;
   let metricDemandArgmaxPointIndex = 0;
+  let minimumPointwiseSymmetricTensorFrobeniusLowerBoundSI =
+    Number.POSITIVE_INFINITY;
+  let metricDemandArgminLowerBoundPointIndex = 0;
+  let maximumPointwiseDeterministicErrorFrobeniusSI = 0;
+  let metricDemandArgmaxDeterministicErrorPointIndex = 0;
+  let maximumMetricDemandRelativeErrorBound = Number.NEGATIVE_INFINITY;
+  let metricDemandQualifyingSampleCount = 0;
   for (let point = 0; point < sampleCount; point += 1) {
     const pointwiseFrobenius = Math.hypot(
       ...multiplicities.map(
@@ -1239,7 +1440,29 @@ export const replayNhm2SemiclassicalV2Content = (
           Math.sqrt(multiplicity),
       ),
     );
-    if (!Number.isFinite(pointwiseFrobenius)) {
+    const pointwiseErrorFrobenius = Math.hypot(
+      ...multiplicities.map(
+        (multiplicity: number, component: number) =>
+          arrays.metricDemandAbsoluteErrorBound[
+            point * tensorComponents + component
+          ] * Math.sqrt(multiplicity),
+      ),
+    );
+    const pointwiseFrobeniusLowerBound = Math.max(
+      0,
+      pointwiseFrobenius - pointwiseErrorFrobenius,
+    );
+    const pointwiseRelativeErrorBound =
+      pointwiseFrobenius > 0
+        ? pointwiseErrorFrobenius / pointwiseFrobenius
+        : Number.POSITIVE_INFINITY;
+    if (
+      ![
+        pointwiseFrobenius,
+        pointwiseErrorFrobenius,
+        pointwiseFrobeniusLowerBound,
+      ].every(Number.isFinite)
+    ) {
       addIssue(issues, "numeric_replay_overflow", "blocked");
       return buildResult(bindings, metrics, issues);
     }
@@ -1247,19 +1470,183 @@ export const replayNhm2SemiclassicalV2Content = (
       maximumPointwiseSymmetricTensorFrobeniusSI = pointwiseFrobenius;
       metricDemandArgmaxPointIndex = point;
     }
+    if (pointwiseFrobenius < minimumPointwiseSymmetricTensorFrobeniusSI) {
+      minimumPointwiseSymmetricTensorFrobeniusSI = pointwiseFrobenius;
+      metricDemandArgminPointIndex = point;
+    }
+    if (
+      pointwiseFrobeniusLowerBound <
+      minimumPointwiseSymmetricTensorFrobeniusLowerBoundSI
+    ) {
+      minimumPointwiseSymmetricTensorFrobeniusLowerBoundSI =
+        pointwiseFrobeniusLowerBound;
+      metricDemandArgminLowerBoundPointIndex = point;
+    }
+    if (
+      pointwiseErrorFrobenius > maximumPointwiseDeterministicErrorFrobeniusSI
+    ) {
+      maximumPointwiseDeterministicErrorFrobeniusSI = pointwiseErrorFrobenius;
+      metricDemandArgmaxDeterministicErrorPointIndex = point;
+    }
+    if (pointwiseRelativeErrorBound > maximumMetricDemandRelativeErrorBound) {
+      maximumMetricDemandRelativeErrorBound = pointwiseRelativeErrorBound;
+    }
+    if (pointwiseFrobeniusLowerBound > policy.minimumMetricDemandFrobeniusSI) {
+      metricDemandQualifyingSampleCount += 1;
+    }
   }
+  const metricDemandQualifyingSampleFraction =
+    metricDemandQualifyingSampleCount / sampleCount;
   const metricDemandStrictlyNondegenerate =
-    maximumPointwiseSymmetricTensorFrobeniusSI >
-    policy.minimumMetricDemandFrobeniusSI;
+    minimumPointwiseSymmetricTensorFrobeniusLowerBoundSI >
+      policy.minimumMetricDemandFrobeniusSI &&
+    metricDemandQualifyingSampleFraction >=
+      policy.requiredMetricDemandSampleFraction;
   metrics.metricDemand = {
+    minimumPointwiseSymmetricTensorFrobeniusSI,
+    argminPointIndex: metricDemandArgminPointIndex,
     maximumPointwiseSymmetricTensorFrobeniusSI,
     argmaxPointIndex: metricDemandArgmaxPointIndex,
+    minimumPointwiseSymmetricTensorFrobeniusLowerBoundSI,
+    argminLowerBoundPointIndex: metricDemandArgminLowerBoundPointIndex,
+    maximumPointwiseDeterministicErrorFrobeniusSI,
+    argmaxDeterministicErrorPointIndex:
+      metricDemandArgmaxDeterministicErrorPointIndex,
     minimumRequiredFrobeniusSI: policy.minimumMetricDemandFrobeniusSI,
+    qualifyingSampleCount: metricDemandQualifyingSampleCount,
+    qualifyingSampleFraction: metricDemandQualifyingSampleFraction,
+    requiredSampleFraction: policy.requiredMetricDemandSampleFraction,
     strictlyNondegenerate: metricDemandStrictlyNondegenerate,
   };
   if (!metricDemandStrictlyNondegenerate) {
     addIssue(issues, "metric_demand_degenerate", "fail");
   }
+  if (
+    !Number.isFinite(maximumMetricDemandRelativeErrorBound) ||
+    maximumMetricDemandRelativeErrorBound >
+      policy.maximumMetricDemandRelativeErrorBound
+  ) {
+    addIssue(
+      issues,
+      "metric_demand_error_bound_exceeds_frozen_relative_target",
+      "fail",
+    );
+  }
+
+  let closurePassingSampleCount = 0;
+  let maximumPointwiseRelativeUpper95 = Number.NEGATIVE_INFINITY;
+  let closureArgmaxPointIndex = 0;
+  let residualFrobeniusUpper95AtWorstPointSI = 0;
+  let denominatorAtWorstPointSI = policy.meanNormalizationFloorSI;
+  let metricDemandDeterministicErrorFrobeniusAtWorstPointSI = 0;
+  let metricDemandFrobeniusLowerBoundAtWorstPointSI = 0;
+  let closureArgmaxComponentIndex = 0;
+  let argmaxComponentContributionRelativeUpper95 = 0;
+  for (let point = 0; point < sampleCount; point += 1) {
+    const componentContributionsUpper95: number[] = [];
+    const demandContributions: number[] = [];
+    const demandErrorContributions: number[] = [];
+    let pointWorstComponentIndex = 0;
+    let pointWorstComponentContributionUpper95 = 0;
+    for (let component = 0; component < tensorComponents; component += 1) {
+      const offset = point * tensorComponents + component;
+      const residualUpper95 =
+        Math.abs(
+          arrays.meanStressTensor[offset] - arrays.metricDemandRset[offset],
+        ) +
+        arrays.meanStressAbsoluteUncertainty95[offset] +
+        arrays.metricDemandAbsoluteErrorBound[offset];
+      const basisMultiplicitySqrt = Math.sqrt(multiplicities[component]);
+      const contributionUpper95 = residualUpper95 * basisMultiplicitySqrt;
+      const demandContribution =
+        arrays.metricDemandRset[offset] * basisMultiplicitySqrt;
+      const demandErrorContribution =
+        arrays.metricDemandAbsoluteErrorBound[offset] * basisMultiplicitySqrt;
+      if (
+        !Number.isFinite(residualUpper95) ||
+        !Number.isFinite(contributionUpper95) ||
+        !Number.isFinite(demandContribution) ||
+        !Number.isFinite(demandErrorContribution)
+      ) {
+        addIssue(issues, "numeric_replay_overflow", "blocked");
+        return buildResult(bindings, metrics, issues);
+      }
+      componentContributionsUpper95.push(contributionUpper95);
+      demandContributions.push(demandContribution);
+      demandErrorContributions.push(demandErrorContribution);
+      if (contributionUpper95 > pointWorstComponentContributionUpper95) {
+        pointWorstComponentContributionUpper95 = contributionUpper95;
+        pointWorstComponentIndex = component;
+      }
+    }
+    const residualFrobeniusUpper95SI = Math.hypot(
+      ...componentContributionsUpper95,
+    );
+    const demandFrobeniusSI = Math.hypot(...demandContributions);
+    const demandErrorFrobeniusSI = Math.hypot(...demandErrorContributions);
+    const demandFrobeniusLowerBoundSI = Math.max(
+      0,
+      demandFrobeniusSI - demandErrorFrobeniusSI,
+    );
+    const denominatorSI = Math.max(
+      demandFrobeniusLowerBoundSI,
+      policy.meanNormalizationFloorSI,
+    );
+    const relativeUpper95 = residualFrobeniusUpper95SI / denominatorSI;
+    const worstComponentContributionRelativeUpper95 =
+      pointWorstComponentContributionUpper95 / denominatorSI;
+    if (
+      ![
+        residualFrobeniusUpper95SI,
+        demandFrobeniusSI,
+        demandErrorFrobeniusSI,
+        demandFrobeniusLowerBoundSI,
+        denominatorSI,
+        relativeUpper95,
+        worstComponentContributionRelativeUpper95,
+      ].every(Number.isFinite)
+    ) {
+      addIssue(issues, "numeric_replay_overflow", "blocked");
+      return buildResult(bindings, metrics, issues);
+    }
+    if (relativeUpper95 <= policy.meanMetricDemandRelativeUpper95Tolerance) {
+      closurePassingSampleCount += 1;
+    }
+    if (relativeUpper95 > maximumPointwiseRelativeUpper95) {
+      maximumPointwiseRelativeUpper95 = relativeUpper95;
+      closureArgmaxPointIndex = point;
+      residualFrobeniusUpper95AtWorstPointSI = residualFrobeniusUpper95SI;
+      denominatorAtWorstPointSI = denominatorSI;
+      metricDemandDeterministicErrorFrobeniusAtWorstPointSI =
+        demandErrorFrobeniusSI;
+      metricDemandFrobeniusLowerBoundAtWorstPointSI =
+        demandFrobeniusLowerBoundSI;
+      closureArgmaxComponentIndex = pointWorstComponentIndex;
+      argmaxComponentContributionRelativeUpper95 =
+        worstComponentContributionRelativeUpper95;
+    }
+  }
+  const closureAllSamplesWithinTolerance =
+    closurePassingSampleCount === sampleCount;
+  metrics.meanMetricDemandClosure = {
+    sampleCount,
+    relativeUpper95Tolerance: policy.meanMetricDemandRelativeUpper95Tolerance,
+    requiredPassingSampleCount: sampleCount,
+    passingSampleCount: closurePassingSampleCount,
+    maximumPointwiseRelativeUpper95,
+    argmaxPointIndex: closureArgmaxPointIndex,
+    residualFrobeniusUpper95AtWorstPointSI,
+    metricDemandDeterministicErrorFrobeniusAtWorstPointSI,
+    metricDemandFrobeniusLowerBoundAtWorstPointSI,
+    denominatorAtWorstPointSI,
+    argmaxComponentIndex: closureArgmaxComponentIndex,
+    argmaxComponentContributionRelativeUpper95,
+    allSamplesWithinTolerance: closureAllSamplesWithinTolerance,
+  };
+  if (!closureAllSamplesWithinTolerance) {
+    addIssue(issues, "mean_metric_demand_closure_exceeds_tolerance", "fail");
+  }
+
   const covarianceDimension = sampleCount * tensorComponents;
   const noiseOffset = (matrixRow: number, matrixColumn: number): number => {
     const leftPoint = Math.floor(matrixRow / tensorComponents);
@@ -1278,20 +1665,22 @@ export const replayNhm2SemiclassicalV2Content = (
     Math.floor(matrixIndex / tensorComponents);
   const matrixComponent = (matrixIndex: number): number =>
     matrixIndex % tensorComponents;
+  const diagonalBasisScales = Float64Array.from(
+    { length: covarianceDimension },
+    (_unused: unknown, matrixIndex: number) =>
+      Math.sqrt(
+        arrays.meanSmearingWeights[matrixPoint(matrixIndex)] *
+          multiplicities[matrixComponent(matrixIndex)],
+      ),
+  );
   const basisScale = (row: number, column: number): number =>
-    Math.sqrt(
-      arrays.meanSmearingWeights[matrixPoint(row)] *
-        multiplicities[matrixComponent(row)] *
-        arrays.meanSmearingWeights[matrixPoint(column)] *
-        multiplicities[matrixComponent(column)],
-    );
+    diagonalBasisScales[row] * diagonalBasisScales[column];
   const centralCovarianceValue = (row: number, column: number): number => {
     const offset = noiseOffset(row, column);
     const transposeOffset = noiseOffset(column, row);
     return (
       0.5 *
-      (arrays.noiseKernel[offset] +
-        arrays.noiseKernel[transposeOffset]) *
+      (arrays.noiseKernel[offset] + arrays.noiseKernel[transposeOffset]) *
       basisScale(row, column)
     );
   };
@@ -1302,8 +1691,7 @@ export const replayNhm2SemiclassicalV2Content = (
   for (let row = 0; row < covarianceDimension; row += 1) {
     const diagonalOffset = noiseOffset(row, row);
     const diagonalScale = basisScale(row, row);
-    const diagonal =
-      arrays.noiseKernel[diagonalOffset] * diagonalScale;
+    const diagonal = arrays.noiseKernel[diagonalOffset] * diagonalScale;
     const diagonalUncertainty =
       arrays.noiseAbsoluteUncertainty95[diagonalOffset] * diagonalScale;
     let offDiagonalRadiusUpper95 = 0;
@@ -1319,36 +1707,29 @@ export const replayNhm2SemiclassicalV2Content = (
       const exchangeUpper95 =
         offset === transposeOffset
           ? 0
-          : (Math.abs(value - transposeValue) +
-              uncertainty +
-              transposeUncertainty) *
-            pairBasisScale;
+          : Math.abs(value - transposeValue) +
+            uncertainty +
+            transposeUncertainty;
       exchangeResidualUpper95SI = Math.max(
         exchangeResidualUpper95SI,
         exchangeUpper95,
       );
       if (column === row) continue;
-      const symmetricMidpoint =
-        0.5 * (value + transposeValue) * pairBasisScale;
+      const symmetricMidpoint = 0.5 * (value + transposeValue) * pairBasisScale;
       const intervalRadius =
         0.5 *
         (uncertainty +
           transposeUncertainty +
           Math.abs(value - transposeValue)) *
         pairBasisScale;
-      offDiagonalRadiusUpper95 +=
-        Math.abs(symmetricMidpoint) + intervalRadius;
+      offDiagonalRadiusUpper95 += Math.abs(symmetricMidpoint) + intervalRadius;
     }
-    const upper =
-      diagonal + diagonalUncertainty + offDiagonalRadiusUpper95;
+    const upper = diagonal + diagonalUncertainty + offDiagonalRadiusUpper95;
     maximumGershgorinRadiusUpper95SI = Math.max(
       maximumGershgorinRadiusUpper95SI,
       offDiagonalRadiusUpper95,
     );
-    maximumEigenvalueUpper95SI = Math.max(
-      maximumEigenvalueUpper95SI,
-      upper,
-    );
+    maximumEigenvalueUpper95SI = Math.max(maximumEigenvalueUpper95SI, upper);
   }
   if (
     ![
@@ -1365,49 +1746,47 @@ export const replayNhm2SemiclassicalV2Content = (
     centralCovarianceValue,
     policy.noisePsdToleranceSI,
   );
-  const covariancePositiveSemidefiniteCertified =
-    psdCertification.disposition === "certified";
+  const covarianceTolerancePositiveSemidefiniteCertified =
+    psdCertification.disposition === "tolerance_certified";
   metrics.noise = {
     sampleCount,
     covarianceDimension,
     exchangeResidualUpper95SI,
     exchangeToleranceSI: policy.noiseExchangeToleranceSI,
+    exchangeSymmetryBasis: "raw_bilocal_component_pair_storage",
     symmetricTensorBasis:
       "orthonormal_symmetric_tensor_sqrt_component_multiplicity",
     covarianceSmearingMethod:
       "diag_sqrt_point_weights_tensor_sqrt_component_multiplicity_bilateral",
     psdCertificateMethod:
-      "central_symmetric_covariance_semidefinite_ldlt_zero_pivot_checked",
+      "shifted_semidefinite_cholesky_with_residual_spectral_bound",
     psdInput: "central_symmetric_weighted_covariance",
     psdCertificationDisposition: psdCertification.disposition,
-    minimumLdltPivotSI: psdCertification.minimumPivot,
+    psdDiagonalShiftSI: psdCertification.diagonalShift,
+    psdResidualAllowanceSI: psdCertification.residualAllowance,
+    minimumShiftedCholeskyPivotSI: psdCertification.minimumShiftedPivot,
     psdToleranceSI: policy.noisePsdToleranceSI,
-    factorizationResidualLInfSI:
-      psdCertification.factorizationResidualLInf,
-    maximumZeroPivotRowResidualSI:
-      psdCertification.maximumZeroPivotRowResidual,
+    factorizationResidualInfinityNormUpperSI:
+      psdCertification.factorizationResidualInfinityNormUpper,
+    factorizationRoundoffModel: "ieee754_gamma_n_absolute_bound",
+    maximumZeroPivotCouplingResidualSI:
+      psdCertification.maximumZeroPivotCouplingResidual,
     negativeWitnessRayleighQuotientSI:
       psdCertification.negativeWitnessRayleighQuotient,
     maximumGershgorinRadiusUpper95SI,
     maximumEigenvalueUpper95SI: Math.max(0, maximumEigenvalueUpper95SI),
-    covariancePositiveSemidefiniteCertified,
+    covarianceTolerancePositiveSemidefiniteCertified,
   };
   if (exchangeResidualUpper95SI > policy.noiseExchangeToleranceSI) {
-    addIssue(
-      issues,
-      "noise_exchange_symmetry_exceeds_tolerance",
-      "fail",
-    );
+    addIssue(issues, "noise_exchange_symmetry_exceeds_tolerance", "fail");
   }
-  if (!covariancePositiveSemidefiniteCertified) {
+  if (!covarianceTolerancePositiveSemidefiniteCertified) {
     addIssue(
       issues,
       psdCertification.disposition === "negative_witness"
         ? "noise_psd_negative_witness"
         : "noise_psd_numerically_inconclusive",
-      psdCertification.disposition === "negative_witness"
-        ? "fail"
-        : "blocked",
+      psdCertification.disposition === "negative_witness" ? "fail" : "blocked",
     );
   }
 
@@ -1420,8 +1799,7 @@ export const replayNhm2SemiclassicalV2Content = (
         weight * arrays.meanStressTensor[point * tensorComponents + component];
       const adjusted = product - compensations[component];
       const next = smearedComponents[component] + adjusted;
-      compensations[component] =
-        next - smearedComponents[component] - adjusted;
+      compensations[component] = next - smearedComponents[component] - adjusted;
       smearedComponents[component] = next;
     }
   }
@@ -1492,9 +1870,7 @@ export const replayNhm2SemiclassicalV2Content = (
         "fail",
       );
     }
-    if (
-      bracketMetrics.residualUpper95 > policy.bracketResidualTolerance
-    ) {
+    if (bracketMetrics.residualUpper95 > policy.bracketResidualTolerance) {
       addIssue(
         issues,
         `bracket_${bracketId}_residual_upper95_exceeds_tolerance`,
@@ -1513,21 +1889,12 @@ export const replayNhm2SemiclassicalV2Content = (
     metrics.antisymmetry.producerResidualMismatchLInf >
     policy.producerResidualConsistencyTolerance
   ) {
-    addIssue(
-      issues,
-      "antisymmetry_producer_residual_mismatch",
-      "fail",
-    );
+    addIssue(issues, "antisymmetry_producer_residual_mismatch", "fail");
   }
   if (
-    metrics.antisymmetry.residualUpper95 >
-    policy.antisymmetryResidualTolerance
+    metrics.antisymmetry.residualUpper95 > policy.antisymmetryResidualTolerance
   ) {
-    addIssue(
-      issues,
-      "antisymmetry_residual_upper95_exceeds_tolerance",
-      "fail",
-    );
+    addIssue(issues, "antisymmetry_residual_upper95_exceeds_tolerance", "fail");
   }
 
   metrics.jacobi = computeResidualMetrics(
@@ -1542,22 +1909,19 @@ export const replayNhm2SemiclassicalV2Content = (
   ) {
     addIssue(issues, "jacobi_producer_residual_mismatch", "fail");
   }
-  if (
-    metrics.jacobi.residualUpper95 > policy.jacobiResidualTolerance
-  ) {
-    addIssue(
-      issues,
-      "jacobi_residual_upper95_exceeds_tolerance",
-      "fail",
-    );
+  if (metrics.jacobi.residualUpper95 > policy.jacobiResidualTolerance) {
+    addIssue(issues, "jacobi_residual_upper95_exceeds_tolerance", "fail");
   }
 
   const spacing = arrays.regulator.levels.map(
-    (level: Nhm2SemiclassicalV2ContentReplayInput["arrays"]["regulator"]["levels"][number]) =>
-      level.scale,
+    (
+      level: Nhm2SemiclassicalV2ContentReplayInput["arrays"]["regulator"]["levels"][number],
+    ) => level.scale,
   );
   const residualUpper95ByLevel = arrays.regulator.levels.map(
-    (level: Nhm2SemiclassicalV2ContentReplayInput["arrays"]["regulator"]["levels"][number]) =>
+    (
+      level: Nhm2SemiclassicalV2ContentReplayInput["arrays"]["regulator"]["levels"][number],
+    ) =>
       maxAbsPlusPointwiseUncertainty(
         level.residual,
         level.absoluteUncertainty95,
@@ -1574,11 +1938,7 @@ export const replayNhm2SemiclassicalV2Content = (
       regulatorInputValid = false;
     }
     if (!(residualUpper95ByLevel[index] > 0)) {
-      addIssue(
-        issues,
-        "regulator_convergence_order_undefined",
-        "blocked",
-      );
+      addIssue(issues, "regulator_convergence_order_undefined", "blocked");
       regulatorInputValid = false;
     }
   }
@@ -1594,17 +1954,12 @@ export const replayNhm2SemiclassicalV2Content = (
       }
       observedOrders.push(
         Math.log(
-          residualUpper95ByLevel[index] /
-            residualUpper95ByLevel[index + 1],
+          residualUpper95ByLevel[index] / residualUpper95ByLevel[index + 1],
         ) / Math.log(spacing[index] / spacing[index + 1]),
       );
     }
     if (!observedOrders.every(Number.isFinite)) {
-      addIssue(
-        issues,
-        "regulator_convergence_order_undefined",
-        "blocked",
-      );
+      addIssue(issues, "regulator_convergence_order_undefined", "blocked");
     } else {
       const minimumObservedOrder = Math.min(...observedOrders);
       const finalResidualUpper95 =
@@ -1621,23 +1976,11 @@ export const replayNhm2SemiclassicalV2Content = (
         tolerance: policy.regulatorFinalResidualTolerance,
       };
       if (!monotone) addIssue(issues, "regulator_not_monotone", "fail");
-      if (
-        minimumObservedOrder < policy.minimumRegulatorConvergenceOrder
-      ) {
-        addIssue(
-          issues,
-          "regulator_convergence_order_below_minimum",
-          "fail",
-        );
+      if (minimumObservedOrder < policy.minimumRegulatorConvergenceOrder) {
+        addIssue(issues, "regulator_convergence_order_below_minimum", "fail");
       }
-      if (
-        finalResidualUpper95 > policy.regulatorFinalResidualTolerance
-      ) {
-        addIssue(
-          issues,
-          "regulator_final_residual_exceeds_tolerance",
-          "fail",
-        );
+      if (finalResidualUpper95 > policy.regulatorFinalResidualTolerance) {
+        addIssue(issues, "regulator_final_residual_exceeds_tolerance", "fail");
       }
     }
   }

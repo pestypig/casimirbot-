@@ -414,6 +414,59 @@ export const buildHelixTurnLifecycleDifferentialAudit = (input: {
         .filter((ref): ref is string => Boolean(ref)),
     ),
   );
+  const executedLaneObservationRefs = new Set(
+    capabilityLaneTimeline
+      .filter(
+        (event) =>
+          readString(event.stage) === "lane_observation" &&
+          readBoolean(event.lane_executed) === true,
+      )
+      .map((event) => readString(event.observation_ref))
+      .filter((ref): ref is string => Boolean(ref)),
+  );
+  const successfulLaneReentryRows = capabilityLaneTimeline.filter((event) => {
+    const observationRef = readString(event.observation_ref);
+    return (
+      readString(event.stage) === "lane_reentered" &&
+      readBoolean(event.observation_reentered) === true &&
+      Boolean(observationRef && executedLaneObservationRefs.has(observationRef))
+    );
+  });
+  const executionRegressedAtReentry = successfulLaneReentryRows.filter(
+    (event) => readBoolean(event.lane_executed) !== true,
+  );
+  if (successfulLaneReentryRows.length > 0) {
+    checks.push({
+      stage: "evidence_reentry",
+      check: "capability_lane_execution_continuity",
+      status:
+        executionRegressedAtReentry.length === 0 ? "passed" : "failed",
+      disposition:
+        executionRegressedAtReentry.length === 0
+          ? "informational"
+          : "adapter_projection_contradiction",
+      source_ref:
+        readString(successfulLaneReentryRows[0]?.observation_ref) ?? null,
+      expected_support_ref_count: successfulLaneReentryRows.length,
+      observed_support_ref_count:
+        successfulLaneReentryRows.length - executionRegressedAtReentry.length,
+      missing_support_refs: executionRegressedAtReentry
+        .map((event) => readString(event.observation_ref))
+        .filter((ref): ref is string => Boolean(ref)),
+    });
+  }
+  executionRegressedAtReentry.forEach((event) => {
+    mismatches.push(
+      mismatch({
+        code: "capability_lane_execution_regressed_at_reentry",
+        lifecycleEventId: null,
+        projectionPath: "capability_lane_turn_timeline.lane_reentered.lane_executed",
+        lifecycleValue: true,
+        projectionValue: readBoolean(event.lane_executed),
+        stage: "evidence_reentry",
+      }),
+    );
+  });
   if (capabilityLaneReenteredRefs.length > 0) {
     const runtimeReenteredRefs =
       lifecycle?.reduction.observation_reentry_refs ?? [];

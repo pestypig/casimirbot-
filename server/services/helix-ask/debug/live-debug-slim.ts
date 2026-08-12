@@ -754,6 +754,8 @@ export const createHelixAskLiveDebugSlimBuilder = (
         payload.capability_lane_reentry_status ?? debug.capability_lane_reentry_status ?? null,
       runtime_lane_request_contract:
         payload.runtime_lane_request_contract ?? debug.runtime_lane_request_contract ?? null,
+      provider_solver_completion_audit:
+        payload.provider_solver_completion_audit ?? debug.provider_solver_completion_audit ?? null,
       runtime_lane_request_loop:
         payload.runtime_lane_request_loop ?? debug.runtime_lane_request_loop ?? null,
       runtime_lane_request_retry:

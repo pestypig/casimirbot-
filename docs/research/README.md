@@ -871,6 +871,26 @@ failed physics result and not measured collapse evidence.
 Fresh repository verification is recorded in
 `docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-verification-receipt.json`.
 
+## Stage-4.2S retarded-source and switching-radiation closure
+
+Run `npm run casimir:dp:stage4-2s` to replay the causal ordinary-
+electromagnetic source audit. The runtime recovers transverse retarded
+radiation, Larmor energy flux, current conservation, circular-polarization
+completeness, and standard limiting cases; classifies source scales by
+(kL=2pi fL/c); and maps a synthetic branch Green response into ordinary
+phase, contraction, recoil, heating, and complex-coherence nuisance output.
+
+The current report is
+`docs/research/casimir-dp-retarded-source-propagation-stage4-2s-report.md`.
+Its software and analytic gates pass, while ordinary-null integration remains
+`not_authorized` because 0/7 measured same-apparatus propagation authorities
+are ready. The synthetic source rows and Green matrices are interface
+recoveries, not apparatus forecasts. The frozen Diósi generator is unchanged
+and no collapse bridge is registered.
+
+Fresh repository verification is recorded in
+`docs/research/casimir-dp-retarded-source-propagation-stage4-2s-verification-receipt.json`.
+
 ## Boundary
 
 Generated research-style notes that are useful but not canonical should move to

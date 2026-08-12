@@ -69,6 +69,7 @@ import {
   resolveAskTurnNamedDocSummaryQueryArg,
   resolveAskTurnTopicDocQueryArg,
 } from "./doc-args";
+import { resolveAuthoritativeDocsTopicMatch } from "./docs-search";
 import {
   isAffirmativeTheoryBadgeGraphReflectionPrompt,
   isTheoryBadgeGraphCurrentContextPrompt,
@@ -83,6 +84,7 @@ import {
   extractExplicitCapabilityContracts,
   type ExplicitCapabilityExtractionContext,
 } from "./explicit-capability-contract";
+import { isAffirmativeMinecraftPlayerEmbodimentActionPrompt } from "./minecraft-execution-plane-intent";
 
 export {
   isStagePlayCheckpointRequestPrompt,
@@ -819,7 +821,14 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  if (isMinecraftMechanicsDocsPrompt(prompt)) {
+  // An operative Player Embodiment request owns the primary source target even
+  // when a negative safety clause mentions Minecraft commands. Mechanics docs
+  // may still be admitted later as non-terminal grounding for a genuinely
+  // mixed request; they must not replace the environment action itself.
+  if (
+    isMinecraftMechanicsDocsPrompt(prompt) &&
+    !isAffirmativeMinecraftPlayerEmbodimentActionPrompt(prompt)
+  ) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
@@ -848,6 +857,37 @@ export function arbitrateAskSourceTarget(input: {
         "no_tool_direct",
       ],
       precedenceReason: "minecraft_environment_mechanics_docs_source_target",
+      confidence: 0.99,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isAffirmativeMinecraftPlayerEmbodimentActionPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "live_environment",
+      targetKind: "live_environment",
+      strength: "hard",
+      explicitCues: ["operative_minecraft_player_embodiment_action"],
+      reasons: [
+        "explicit_minecraft_player_embodiment_source_target",
+        "player_action_capability_selection_owned_by_runtime",
+      ],
+      requestedOutputs: [
+        "field_evaluation_refs",
+        "interpretation_refs",
+        "tool_call_eligibility",
+        "typed_failure",
+      ],
+      suppressedRoutes: [
+        "world_event_current_state",
+        "internet_search_lookup",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason:
+        "explicit_minecraft_player_embodiment_source_target",
       confidence: 0.99,
       allowClientShortcut: false,
       allowNoToolDirect: false,
@@ -903,6 +943,38 @@ export function arbitrateAskSourceTarget(input: {
       precedenceReason:
         "explicit_minecraft_environment_capability_source_target",
       confidence: 0.99,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (
+    isAffirmativeImmediateMinecraftSituationPrompt(prompt) &&
+    (input.trustedEnvironmentContext?.trusted_environment_domain ===
+      "minecraft" ||
+      /\b(?:minecraft|fabric|minehut|mine\s*hut)\b/i.test(prompt))
+  ) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "live_environment",
+      targetKind: "live_environment",
+      strength: "hard",
+      explicitCues: ["affirmative_minecraft_situation_observation"],
+      reasons: ["affirmative_minecraft_situation_source_target"],
+      requestedOutputs: [
+        "field_evaluation_refs",
+        "interpretation_refs",
+        "tool_call_eligibility",
+        "typed_failure",
+      ],
+      suppressedRoutes: [
+        "world_event_current_state",
+        "internet_search_lookup",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "affirmative_minecraft_situation_source_target",
+      confidence: 0.98,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });
@@ -1167,6 +1239,7 @@ export function arbitrateAskSourceTarget(input: {
   const namedDocSummaryQuery = resolveAskTurnNamedDocSummaryQueryArg(prompt);
   const topicDocSummaryQuery = namedDocSummaryQuery ? null : resolveAskTurnTopicDocQueryArg(prompt);
   const namedDocRelationPrompt = isAskTurnNamedDocRelationPrompt(prompt);
+  const authoritativeDocsTopic = resolveAuthoritativeDocsTopicMatch(prompt);
   if (namedDocSummaryQuery) {
     return toSourceTargetIntent({
       turnId: input.turnId,
@@ -1220,6 +1293,52 @@ export function arbitrateAskSourceTarget(input: {
       ],
       precedenceReason: "natural_local_document_lookup_source_target",
       confidence: 0.97,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (
+    authoritativeDocsTopic &&
+    buildToolUseRestatement(prompt).requiredToolFamilies.includes("docs_viewer") &&
+    !(
+      selectedEvidenceCandidate?.strength === "hard" &&
+      selectedEvidenceCandidate.target_source !== "docs_viewer"
+    )
+  ) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: [
+        "authoritative_docs_topic",
+        authoritativeDocsTopic.topic_id,
+        authoritativeDocsTopic.primary_path,
+      ],
+      reasons: [
+        "authoritative_docs_topic_source_target",
+        "taxonomy_primary_suppresses_soft_repo_and_freshness_inference",
+      ],
+      requestedOutputs: [
+        "file_path",
+        "line_backed_source",
+        "tool_call_eligibility",
+        "typed_failure",
+      ],
+      suppressedRoutes: [
+        "repo_code_evidence_question",
+        "internet_search_lookup",
+        "scholarly_research_lookup",
+        "situation_context_question",
+        "visual_deictic",
+        "visual_frame_evidence",
+        "active_doc_identity",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "authoritative_docs_topic_source_target",
+      confidence: 0.98,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });

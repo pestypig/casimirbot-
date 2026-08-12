@@ -41,6 +41,7 @@ type AuthConfig =
       providerAlias: string;
       jwksUrl: string;
       algorithms: string[];
+      tenantClaim: string | null;
     }
   | {
       mode: "local_hs256";
@@ -49,6 +50,7 @@ type AuthConfig =
       providerAlias: string;
       secret: Uint8Array;
       algorithms: ["HS256"];
+      tenantClaim: string | null;
     };
 
 const normalize = (value: unknown): string =>
@@ -72,6 +74,19 @@ const parseAlgorithms = (value: string | undefined): string[] => {
     );
   }
   return admitted;
+};
+
+const parseTenantClaim = (value: string | undefined): string | null => {
+  const claim = normalize(value);
+  if (!claim) return null;
+  if (claim.length > 512 || /[\s\x00-\x1f\x7f]/u.test(claim)) {
+    throw new HelixAgentApiServiceError(
+      503,
+      "auth_not_configured",
+      "HELIX_AGENT_OAUTH_TENANT_CLAIM must name one exact signed JWT claim.",
+    );
+  }
+  return claim;
 };
 
 const requireUrl = (value: string, name: string): URL => {
@@ -115,6 +130,9 @@ const resolveAuthConfig = (): AuthConfig => {
       providerAlias,
       jwksUrl: requireUrl(jwksUrl, "HELIX_AGENT_OAUTH_JWKS_URL").toString(),
       algorithms: parseAlgorithms(process.env.HELIX_AGENT_OAUTH_ALGORITHMS),
+      tenantClaim: parseTenantClaim(
+        process.env.HELIX_AGENT_OAUTH_TENANT_CLAIM,
+      ),
     };
   }
 
@@ -138,6 +156,9 @@ const resolveAuthConfig = (): AuthConfig => {
       providerAlias,
       secret: new TextEncoder().encode(localSecret),
       algorithms: ["HS256"],
+      tenantClaim: parseTenantClaim(
+        process.env.HELIX_AGENT_OAUTH_TENANT_CLAIM,
+      ),
     };
   }
   throw new HelixAgentApiServiceError(
@@ -176,15 +197,21 @@ const scopesFromPayload = (payload: JWTPayload): ReadonlySet<string> => {
   );
 };
 
-const tenantFromPayload = (payload: JWTPayload): string => {
-  for (const key of [
+const tenantFromPayload = (
+  payload: JWTPayload,
+  configuredClaim: string | null,
+): string => {
+  const claims = configuredClaim
+    ? [configuredClaim]
+    : [
     "tenantId",
     "tenant_id",
     "customerId",
     "customer_id",
     "orgId",
     "org_id",
-  ]) {
+      ];
+  for (const key of claims) {
     const value = payload[key];
     if (typeof value === "string" && value.trim()) return value.trim();
   }
@@ -256,7 +283,7 @@ export class DefaultHelixAgentAccessTokenVerifier implements HelixAgentAccessTok
     return {
       issuer: normalize(payload.iss) || config.issuer,
       subject,
-      tenantId: tenantFromPayload(payload),
+      tenantId: tenantFromPayload(payload, config.tenantClaim),
       scopes: scopesFromPayload(payload),
       expiresAt: new Date(payload.exp * 1_000).toISOString(),
       claims: payload,

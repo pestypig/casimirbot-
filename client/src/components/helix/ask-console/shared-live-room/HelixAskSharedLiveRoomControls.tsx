@@ -24,12 +24,13 @@ export function HelixAskSharedLiveRoomControls({
   onHostTransportInvalidated,
   onOwnerRoomClosed,
 }: HelixAskSharedLiveRoomControlsProps) {
+  const [dialogOpen, setDialogOpen] = useState(false);
   const controller = useHelixSharedLiveRoom({
     realtimeSessionId,
     runtimeActive,
     realtimeModel,
+    foreground: dialogOpen,
   });
-  const [dialogOpen, setDialogOpen] = useState(false);
   const titleId = useId();
   const descriptionId = useId();
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);

@@ -96,6 +96,45 @@ const providerBridgeAuthorizesCurrentTurnCandidate = (
   bridge?.terminal_authority_granted === true &&
   bridge?.final_visible_answer_authorized === true;
 
+const providerRequestUserInputAuthorityShapeValid = (input: {
+  bridge: Record<string, unknown> | null;
+  candidate: Record<string, unknown> | null;
+  authority: Record<string, unknown> | null;
+  presentation: Record<string, unknown> | null;
+  turnId: string;
+}): boolean => {
+  const boundaryRefs = uniqueStrings(
+    readArray(input.bridge?.request_user_input_boundary_observation_refs).map(
+      readString,
+    ),
+  );
+  const selectedRefs = uniqueStrings(
+    readArray(input.presentation?.selected_observation_refs).map(readString),
+  );
+  return Boolean(
+    readString(input.bridge?.terminal_authority_status) ===
+      "authorized_by_provider_request_user_input_bridge" &&
+      readString(input.bridge?.route_authority_status) ===
+        "provider_typed_user_input_boundary_satisfied" &&
+      readString(input.bridge?.provider_terminal_intent) ===
+        "request_user_input" &&
+      readString(input.candidate?.terminal_intent) === "request_user_input" &&
+      readString(input.authority?.turn_id) === input.turnId &&
+      readString(input.authority?.terminal_kind) === "request_user_input" &&
+      readString(input.authority?.authority_origin) === "request_user_input" &&
+      readString(input.authority?.terminal_artifact_kind) ===
+        "agent_provider_terminal_candidate" &&
+      readString(input.authority?.final_answer_source) ===
+        "agent_provider_terminal_candidate" &&
+      input.authority?.server_authoritative === true &&
+      input.authority?.terminal_eligible === true &&
+      boundaryRefs.length > 0 &&
+      boundaryRefs.every(
+        (ref) => ref.startsWith(`${input.turnId}:`) && selectedRefs.includes(ref),
+      ),
+  );
+};
+
 const withOutputRole = (
   result: HelixTerminalProductMaterializerResult,
 ): HelixTerminalProductMaterializerResult => ({
@@ -294,11 +333,20 @@ export const inspectAgentProviderRouteProductEligibility = (input: {
     readString(candidate?.candidate_id);
   const authorityMatchesCurrentTurn = readString(authority?.turn_id) === input.turnId;
   const presentationMatchesCurrentTurn = readString(presentation?.turn_id) === input.turnId;
+  const requestUserInputAuthorityShapeValid =
+    providerRequestUserInputAuthorityShapeValid({
+      bridge: providerBridge,
+      candidate,
+      authority,
+      presentation,
+      turnId: input.turnId,
+    });
   const authorityShapeValid =
-    readString(authority?.terminal_kind) === "answer" &&
-    readString(authority?.terminal_artifact_kind) === "agent_provider_terminal_candidate" &&
-    readString(authority?.final_answer_source) === "agent_provider_terminal_candidate" &&
-    authority?.server_authoritative === true;
+    requestUserInputAuthorityShapeValid ||
+    (readString(authority?.terminal_kind) === "answer" &&
+      readString(authority?.terminal_artifact_kind) === "agent_provider_terminal_candidate" &&
+      readString(authority?.final_answer_source) === "agent_provider_terminal_candidate" &&
+      authority?.server_authoritative === true);
   const presentationShapeValid =
     readString(presentation?.final_answer_source) === "agent_provider_terminal_candidate";
   const authorityRefCurrentTurnScoped = Boolean(authorityRef?.startsWith(`${input.turnId}:`));
@@ -854,10 +902,19 @@ export const materializeAgentProviderRouteProductTerminal = (input: {
     readString(authority?.terminal_item_id) ??
     readString(authority?.terminal_artifact_ref) ??
     readString(candidate?.candidate_id);
+  const requestUserInputAuthorityShapeValid =
+    providerRequestUserInputAuthorityShapeValid({
+      bridge: providerBridge,
+      candidate,
+      authority,
+      presentation,
+      turnId: input.turnId,
+    });
   if (
     readString(authority?.turn_id) !== input.turnId ||
     readString(presentation?.turn_id) !== input.turnId ||
-    readString(authority?.terminal_kind) !== "answer" ||
+    (readString(authority?.terminal_kind) !== "answer" &&
+      !requestUserInputAuthorityShapeValid) ||
     readString(authority?.terminal_artifact_kind) !== "agent_provider_terminal_candidate" ||
     readString(authority?.final_answer_source) !== "agent_provider_terminal_candidate" ||
     readString(presentation?.final_answer_source) !== "agent_provider_terminal_candidate" ||
@@ -893,8 +950,13 @@ export const materializeAgentProviderRouteProductTerminal = (input: {
   if (providerTerminalSupportRefsRequired(providerBridge, candidate) && supportRefs.length === 0) return null;
 
   const rejectedSupportRefs = requestedSupportRefs.filter((ref) => !currentTurnArtifactRefs.has(ref));
-  const artifactRef = `${authorityRef}:route_product:${targetKind}`;
-  const targetSchema = targetKind === "direct_answer_text"
+  const materializedKind = requestUserInputAuthorityShapeValid
+    ? "request_user_input"
+    : targetKind;
+  const artifactRef = `${authorityRef}:route_product:${materializedKind}`;
+  const targetSchema = materializedKind === "request_user_input"
+    ? "helix.request_user_input.v1"
+    : targetKind === "direct_answer_text"
     ? "helix.direct_answer_text.v1"
     : targetKind === "doc_summary"
       ? "helix.doc_summary.v1"
@@ -923,27 +985,34 @@ export const materializeAgentProviderRouteProductTerminal = (input: {
     schema: targetSchema,
     artifact_id: artifactRef,
     turn_id: input.turnId,
-    kind: targetKind,
-    terminal_artifact_kind: targetKind,
+    kind: materializedKind,
+    terminal_artifact_kind: materializedKind,
+    terminal_intent: requestUserInputAuthorityShapeValid
+      ? "request_user_input"
+      : "answer",
+    request_kind: requestUserInputAuthorityShapeValid
+      ? "request_user_input"
+      : undefined,
+    prompt: requestUserInputAuthorityShapeValid ? text : undefined,
     answer_text: text,
     text,
     support_refs: supportRefs,
     selected_observation_refs: supportRefs,
     provider_terminal_candidate_ref: authorityRef,
     provider_terminal_candidate_kind: "agent_provider_terminal_candidate",
-    terminal_eligible: true,
+    terminal_eligible: !requestUserInputAuthorityShapeValid,
     assistant_answer: false,
     raw_content_included: false,
   };
   return {
-    kind: targetKind,
+    kind: materializedKind,
     text,
     ref: artifactRef,
     supportRefs,
     rejectedSupportRefs,
     artifact: {
       artifact_id: artifactRef,
-      kind: targetKind,
+        kind: materializedKind,
       payload: artifactPayloadRecord,
     },
   };

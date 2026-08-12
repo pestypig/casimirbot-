@@ -824,6 +824,58 @@ describe("Helix turn lifecycle differential audit", () => {
     );
   });
 
+  it("finds the first adapter contradiction when execution regresses at observation re-entry", () => {
+    const fixture = buildProviderProjectionPayload();
+    fixture.payload.capability_lane_turn_timeline = [
+      {
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_observation",
+        lane_executed: true,
+        observation_reentered: false,
+        observation_ref: fixture.observationRef,
+      },
+      {
+        schema: "helix.capability_lane.provider_timeline_event.v1",
+        stage: "lane_reentered",
+        lane_executed: false,
+        observation_reentered: true,
+        observation_ref: fixture.observationRef,
+      },
+    ];
+    fixture.payload.provider_reasoning_reentry = {
+      schema: "helix.provider_reasoning_reentry.v1",
+      observation_reentered: true,
+      reentered_observation_refs: [fixture.observationRef],
+      evidence_reentered: true,
+      provider_terminal_candidate_ref: fixture.candidateRef,
+    };
+
+    const audit = buildHelixTurnLifecycleDifferentialAudit({
+      payload: fixture.payload,
+      turnId: fixture.turnId,
+    });
+
+    expect(audit.ok).toBe(false);
+    expect(audit.first_divergence_stage).toBe("evidence_reentry");
+    expect(audit.mismatches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "capability_lane_execution_regressed_at_reentry",
+          projection_value: false,
+        }),
+      ]),
+    );
+    expect(audit.continuity_checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          check: "capability_lane_execution_continuity",
+          status: "failed",
+          missing_support_refs: [fixture.observationRef],
+        }),
+      ]),
+    );
+  });
+
   it("refreshes an early writer audit after the canonical runtime lifecycle is attached", () => {
     const fixture = buildProviderProjectionPayload();
     const lifecycle = fixture.payload.turn_lifecycle;

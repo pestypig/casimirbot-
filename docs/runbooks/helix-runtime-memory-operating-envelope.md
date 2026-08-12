@@ -61,18 +61,39 @@ This is not a guard bypass. A turn still fails closed at either hard boundary,
 and the reduced V8 ceiling prevents the local server from treating the general
 2 GiB heap budget as available on a 16 GiB combined Minecraft workstation.
 
+Active user-turn admission also reserves a measured 1536 MiB provider-launch
+burst before starting Codex. The governor subtracts that estimate from both
+current physical headroom and available Windows commit headroom, then compares
+the projected state with the same hard floors. This is a pre-launch reserve,
+not a second lifecycle check after a turn has begun; later rechecks use actual
+memory so the estimate is not double-counted. Override
+`RUNTIME_TASK_ACTIVE_USER_TURN_ESTIMATED_BURST_MB` only when a new measured
+provider envelope justifies a different value.
+
 The same profile coalesces local pg-mem persistence for 60 seconds, with a
 five-minute maximum delay and a graceful-shutdown flush. Mutations to tables
-outside the durable local snapshot no longer dirty all snapshot tables. This
-keeps the 50+ MiB development snapshot from blocking connector heartbeats or
-Ask streams while still retaining room/source/identity state on an orderly
-server restart.
+outside the durable local snapshot no longer dirty all snapshot tables. Empty
+connector queue polls authenticate on every request but do not create durable
+receipt rows, and connector credential `last_used_at` writes are coalesced.
+This keeps high-frequency command, action and probe polling from continuously
+dirtying the snapshot while retaining the same credential, scope, freshness
+and authority checks.
+
+Local snapshot output must be streamed table-by-table and row-by-row to a
+temporary file before the atomic rename. Do not replace that path with a
+whole-snapshot `JSON.stringify`: a 200+ MiB pg-mem snapshot can then exist both
+as objects and as one giant V8 string, crossing the keyed server's 1536 MiB
+heap ceiling even when host memory admission is otherwise green. Acceptance
+must include both a real maximum-delay flush and a clean restore of the newly
+written snapshot, not merely a unit test with a small fixture.
 
 A low-memory Windows server also requires current commit telemetry. Missing or
 stale telemetry fails closed rather than allowing a turn based only on free
 physical RAM.
 
-Hard commit pressure returns a non-authoritative Ask admission artifact with:
+Hard projected physical or commit pressure returns a non-authoritative Ask
+admission artifact with `host_memory_limit` or `host_commit_pressure`, for
+example:
 
 ```txt
 reason: host_commit_pressure
@@ -133,6 +154,11 @@ setting.
    request, indefinite pending state, or silent restart fails acceptance.
 8. Retain peak heap, RSS, commit ratio, commit headroom, exit evidence, and turn
    outcomes in the audit artifact.
+
+For connector-heavy tests, also retain the process age at every flush and
+verify the server remains alive beyond the prior crash interval. A periodic
+failure at nearly the same process age is a persistence-scheduler clue, not
+proof that the model turn or connector payload itself exhausted memory.
 
 The profile is not release-ready until repeated representative turns survive
 this combined workload without Node termination or soft locks.

@@ -1,0 +1,34 @@
+{
+  "name": "casimirbot-device-check",
+  "version": "0.1.0+codex.20260812021553",
+  "description": "Read paired CasimirBot environment connector health and probe readiness from Codex.",
+  "author": {
+    "name": "CasimirBot",
+    "url": "https://casimirbot.com/"
+  },
+  "homepage": "https://casimirbot.com/",
+  "repository": "https://github.com/pestypig/casimirbot-",
+  "keywords": [
+    "casimirbot",
+    "device-check",
+    "environment-connector",
+    "read-only"
+  ],
+  "interface": {
+    "displayName": "CasimirBot Device Check",
+    "shortDescription": "Check paired connector health from Codex",
+    "longDescription": "Connects Codex to CasimirBot's dedicated OAuth-protected Device Check endpoint for owner-scoped, read-only device identity, freshness, and probe-readiness observations.",
+    "developerName": "CasimirBot",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read"
+    ],
+    "websiteURL": "https://casimirbot.com/",
+    "defaultPrompt": [
+      "Check the health and probe readiness of my paired CasimirBot devices",
+      "Explain which paired CasimirBot devices are blocked and why"
+    ],
+    "brandColor": "#0891B2"
+  },
+  "mcpServers": "./.mcp.json"
+}

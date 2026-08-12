@@ -136,4 +136,58 @@ describe("Ask API admission continuation", () => {
       resumed_after_queue: true,
     });
   });
+
+  it("preserves a stream error event as non-authoritative debug evidence when a terminal failure follows", async () => {
+    const turnId = "ask:stream-error-observation";
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(streamResponse([
+      {
+        event: "turn_error",
+        data: {
+          ok: false,
+          error: "ask_turn_stream_failed",
+          message: "native_initialize_timeout",
+          error_name: "CodexAppServerProtocolError",
+          stream_duration_ms: 45_012,
+        },
+      },
+      {
+        event: "turn_final",
+        data: {
+          ok: false,
+          turn_id: turnId,
+          selected_final_answer: "The stream failed closed.",
+          text: "The stream failed closed.",
+          response_type: "final_failure",
+          final_status: "final_failure",
+          terminal_artifact_kind: "typed_failure",
+          final_answer_source: "typed_failure",
+          terminal_error_code: "ask_turn_stream_failed",
+          debug: { stream_error_terminalized: true },
+        },
+      },
+    ]));
+
+    const result = await runAskTurnStream({
+      question: "Inspect the active environment.",
+      agentRuntime: "codex",
+      turnId,
+    });
+
+    expect(result.text).toBe("The stream failed closed.");
+    expect(result.debug).toMatchObject({
+      backend_ask_call_error: "native_initialize_timeout",
+      first_broken_rail: "ask_turn_stream_runtime",
+      repair_target: "server_stream_failure",
+      stream_error_event: {
+        schema: "helix.ask.turn_stream_error_observation.v1",
+        error_code: "ask_turn_stream_failed",
+        error_name: "CodexAppServerProtocolError",
+        message: "native_initialize_timeout",
+        stream_duration_ms: 45_012,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
+  });
 });

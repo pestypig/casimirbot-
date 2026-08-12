@@ -1,5 +1,6 @@
 import { DOC_FILE_METADATA } from "@/lib/docs/docMetadata.generated";
 import { DOC_MODULES } from "@/lib/docs/docModules";
+import type { HelixDocsRetrievalStatus } from "@shared/helix-docs-retrieval-authority";
 import docTaxonomy from "../../../../docs/doc-taxonomy.v1.json";
 
 type DocModuleLoader = () => Promise<string>;
@@ -19,6 +20,10 @@ export type DocManifestEntry = {
   docClass: string | null;
   bundleKind: string | null;
   canonical: boolean;
+  retrievalStatus: HelixDocsRetrievalStatus;
+  topicId: string | null;
+  authorityRank: number | null;
+  supersededBy: string | null;
   sidecars: string[];
   toolHints: Record<string, unknown> | null;
   title: string;
@@ -28,11 +33,16 @@ export type DocManifestEntry = {
 
 type DocTaxonomyDocumentEntry = {
   path?: string;
+  title?: string;
   docClass?: string;
   bundleKind?: string;
   canonical?: boolean;
   sidecars?: string[];
   toolHints?: Record<string, unknown>;
+  retrievalStatus?: HelixDocsRetrievalStatus;
+  topicId?: string;
+  authorityRank?: number;
+  supersededBy?: string;
 };
 
 type DocTaxonomyClassEntry = {
@@ -43,6 +53,14 @@ type DocTaxonomyClassEntry = {
 type DocTaxonomyFolderRule = {
   path?: string;
   docClass?: string;
+};
+
+type DocTaxonomyRetrievalRule = {
+  pathPrefix?: string;
+  retrievalStatus?: HelixDocsRetrievalStatus;
+  topicId?: string;
+  authorityRank?: number;
+  supersededBy?: string;
 };
 
 const DOC_TAXONOMY_DOCUMENTS: unknown[] = Array.isArray((docTaxonomy as { documents?: unknown }).documents)
@@ -57,6 +75,19 @@ const DOC_TAXONOMY_BY_PATH = new Map<string, DocTaxonomyDocumentEntry>(
     return [[normalizeDocPath(taxonomyEntry.path), taxonomyEntry]];
   }),
 );
+
+const DOC_TAXONOMY_RETRIEVAL_RULES = (
+  Array.isArray((docTaxonomy as { retrievalRules?: unknown }).retrievalRules)
+    ? (docTaxonomy as { retrievalRules: unknown[] }).retrievalRules
+    : []
+)
+  .flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const rule = entry as DocTaxonomyRetrievalRule;
+    if (typeof rule.pathPrefix !== "string" || typeof rule.retrievalStatus !== "string") return [];
+    return [{ ...rule, pathPrefix: normalizeDocPath(rule.pathPrefix) }];
+  })
+  .sort((left, right) => (right.pathPrefix?.length ?? 0) - (left.pathPrefix?.length ?? 0));
 
 const DOC_TAXONOMY_FOLDER_RULES = [
   ...Object.entries((docTaxonomy.classes as Record<string, DocTaxonomyClassEntry> | undefined) ?? {}).flatMap(
@@ -143,11 +174,22 @@ const manifest: DocManifestEntry[] = Object.entries(docModules).map(([key, loade
   const folderChain = segments.slice(1, -1);
   const folderLabel = folderChain.length ? folderChain.join(" / ") : "root";
   const fileName = segments.at(-1) ?? relative;
-  const title = formatDocTitle(fileName);
+  const taxonomyEntry = DOC_TAXONOMY_BY_PATH.get(relative);
+  const title = typeof taxonomyEntry?.title === "string"
+    ? taxonomyEntry.title
+    : formatDocTitle(fileName);
   const fileMetadata = DOC_FILE_METADATA[relative];
   const catalogDate = inferDocCatalogDate(title, relative, fileMetadata?.mtimeIso);
-  const taxonomyEntry = DOC_TAXONOMY_BY_PATH.get(relative);
   const inferredDocClass = inferTaxonomyDocClass(relative);
+  const retrievalRule = inferTaxonomyRetrievalRule(relative);
+  const inheritedRetrievalRule = taxonomyEntry?.retrievalStatus ? null : retrievalRule;
+  const retrievalStatus = taxonomyEntry?.retrievalStatus ??
+    inheritedRetrievalRule?.retrievalStatus ??
+    (taxonomyEntry?.canonical === true
+      ? "primary"
+      : inferredDocClass === "synthetic-research" || inferredDocClass === "legacy-development"
+        ? "archive"
+        : "supporting");
   const searchText = `${title} ${relative}`.toLowerCase();
 
   return {
@@ -165,6 +207,10 @@ const manifest: DocManifestEntry[] = Object.entries(docModules).map(([key, loade
     docClass: typeof taxonomyEntry?.docClass === "string" ? taxonomyEntry.docClass : inferredDocClass,
     bundleKind: typeof taxonomyEntry?.bundleKind === "string" ? taxonomyEntry.bundleKind : null,
     canonical: Boolean(taxonomyEntry?.canonical),
+    retrievalStatus,
+    topicId: taxonomyEntry?.topicId ?? inheritedRetrievalRule?.topicId ?? null,
+    authorityRank: taxonomyEntry?.authorityRank ?? inheritedRetrievalRule?.authorityRank ?? null,
+    supersededBy: taxonomyEntry?.supersededBy ?? inheritedRetrievalRule?.supersededBy ?? null,
     sidecars: Array.isArray(taxonomyEntry?.sidecars) ? taxonomyEntry.sidecars.map(normalizeDocPath) : [],
     toolHints: taxonomyEntry?.toolHints && typeof taxonomyEntry.toolHints === "object" ? taxonomyEntry.toolHints : null,
     title,
@@ -217,6 +263,16 @@ function inferTaxonomyDocClass(relativePath: string): string | null {
   for (const entry of DOC_TAXONOMY_FOLDER_RULES) {
     if (normalized === entry.path || normalized.startsWith(`${entry.path}/`)) {
       return entry.docClass;
+    }
+  }
+  return null;
+}
+
+function inferTaxonomyRetrievalRule(relativePath: string): DocTaxonomyRetrievalRule | null {
+  const normalized = normalizeDocPath(relativePath);
+  for (const rule of DOC_TAXONOMY_RETRIEVAL_RULES) {
+    if (rule.pathPrefix && (normalized === rule.pathPrefix || normalized.startsWith(rule.pathPrefix))) {
+      return rule;
     }
   }
   return null;

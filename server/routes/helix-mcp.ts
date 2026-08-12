@@ -22,8 +22,8 @@ import {
   containsSharedLiveRoomSensitiveValue,
 } from "../services/shared-live-room-control/sensitive-text";
 import {
+  createHelixAgentApiErrorHandler,
   enforceHelixAgentTransportSecurity,
-  handleHelixAgentApiError,
 } from "./helix-agent-api";
 
 type McpLocals = {
@@ -43,6 +43,7 @@ type McpRouterDependencies = {
   verifier?: HelixAgentAccessTokenVerifier;
   rateLimit?: boolean;
   enforceTransportSecurity?: boolean;
+  resourceMetadataPath?: string;
 };
 
 const jsonRpcMethodNotAllowed = (res: Response): void => {
@@ -265,6 +266,10 @@ export const createHelixMcpRouter = (
   router.all("/", (_req: Request, res: Response): void =>
     jsonRpcMethodNotAllowed(res),
   );
-  router.use(handleHelixAgentApiError);
+  router.use(
+    createHelixAgentApiErrorHandler({
+      resourceMetadataPath: dependencies.resourceMetadataPath,
+    }),
+  );
   return router;
 };

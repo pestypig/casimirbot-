@@ -2063,6 +2063,20 @@ describe("Helix Ask Console recrown boundary", () => {
       transcriptFinalRowText: "Transcript answer",
       usedTranscriptFinalRow: false,
     });
+    expect(
+      selectHelixAskLegacyFinalAnswerText({
+        turnTranscriptRows: [{ label: "Final", text: "Discarded provider failure" }],
+        chosenVisibleFinalText: "Authoritative typed failure",
+        backendTerminalText: "Authoritative typed failure",
+        primaryTerminalLabel: "final_failure",
+        primarySourceLabel: "typed_failure",
+        isInvalidTerminalAnswerText: isInvalid,
+      }),
+    ).toEqual({
+      finalAnswerRawText: "Authoritative typed failure",
+      transcriptFinalRowText: "Discarded provider failure",
+      usedTranscriptFinalRow: false,
+    });
     expect(legacyPill).toContain("selectHelixAskLegacyFinalAnswerText({");
     expect(legacyPill).not.toContain("chosenVisibleFinalIsTypedFailureBoundary");
     expect(helper).toContain("export function selectHelixAskLegacyFinalAnswerText");

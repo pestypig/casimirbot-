@@ -1,0 +1,237 @@
+name: Desktop Release
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-verify:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/desktop/package-lock.json
+
+      - name: Install locked dependencies
+        shell: pwsh
+        run: |
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm --prefix apps/desktop ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Record memory envelope
+        shell: pwsh
+        run: |
+          $os = Get-CimInstance Win32_OperatingSystem
+          $freeGiB = [math]::Round($os.FreePhysicalMemory / 1MB, 2)
+          $commitPct = [math]::Round((Get-Counter '\Memory\% Committed Bytes In Use').CounterSamples[0].CookedValue, 1)
+          Write-Output "[desktop-release-memory] freeGiB=$freeGiB commitPct=$commitPct"
+          if ($freeGiB -lt 4) { throw 'Desktop release requires at least 4 GiB physical headroom before the client build' }
+
+      - name: Audit desktop release slice
+        shell: pwsh
+        run: npm --prefix apps/desktop run release:audit-slice
+
+      - name: Build memory-bounded client
+        shell: pwsh
+        run: |
+          npm run docs:metadata:generate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --max-old-space-size=2304 ./node_modules/vite/bin/vite.js build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build and stage desktop runtime
+        shell: pwsh
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+        run: |
+          npm --prefix apps/desktop run build:host
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm --prefix apps/desktop run stage:runtime
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Type-check desktop host
+        shell: pwsh
+        run: >-
+          node --max-old-space-size=512
+          apps/desktop/node_modules/typescript/bin/tsc
+          -p apps/desktop/tsconfig.json --noEmit
+
+      - name: Run focused desktop contract tests
+        shell: pwsh
+        run: >-
+          node --max-old-space-size=768 ./node_modules/vitest/vitest.mjs run
+          tests/vite-lucide-direct-imports.spec.ts
+          tests/vite-production-runtime-vendors.spec.ts
+          tests/desktop-host-security.spec.ts
+          tests/desktop-release-slice.spec.ts
+          tests/desktop-service-environment.spec.ts
+          tests/desktop-casimir-gate-receipt.spec.ts
+          tests/desktop-site-release-metadata.spec.ts
+          server/__tests__/desktop-release-status.test.ts
+          server/routes/__tests__/environment-connector-platform.test.ts
+          server/security/__tests__/desktop-session.test.ts
+          server/services/environment-connectors/devices/__tests__/device-check.test.ts
+          server/mcp/__tests__/helix-mcp-device-check.test.ts
+          tests/startup-config.spec.ts
+          shared/__tests__/runtime-surface.spec.ts
+          shared/__tests__/desktop-update.spec.ts
+          client/src/lib/runtime/__tests__/RuntimeSurfaceProvider.spec.tsx
+          client/src/components/__tests__/DeviceCheckPanel.spec.tsx
+          client/src/components/__tests__/DesktopUpdatePanel.spec.tsx
+          client/src/pages/__tests__/download.spec.tsx
+          --pool=forks --maxWorkers=1
+
+      - name: Release preflight
+        shell: pwsh
+        env:
+          CASIMIR_DESKTOP_RELEASE: "1"
+          RELEASE_TAG: ${{ github.ref_name }}
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+          WINDOWS_PUBLISHER_NAME: ${{ secrets.WINDOWS_PUBLISHER_NAME }}
+          CASIMIR_ADAPTER_VERIFY_URL: ${{ secrets.CASIMIR_ADAPTER_VERIFY_URL }}
+        run: npm --prefix apps/desktop run release:preflight
+
+      - name: Build signed NSIS installer
+        shell: pwsh
+        env:
+          CASIMIR_DESKTOP_RELEASE: "1"
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+          WINDOWS_PUBLISHER_NAME: ${{ secrets.WINDOWS_PUBLISHER_NAME }}
+        run: >-
+          npm --prefix apps/desktop exec electron-builder --
+          --config electron-builder.config.cjs
+          --win nsis --x64 --publish never
+
+      - name: Verify packaged renderer identity
+        shell: pwsh
+        run: npm --prefix apps/desktop run verify:runtime-tree
+
+      - name: Smoke packaged loopback and user-data containment
+        shell: pwsh
+        run: npm --prefix apps/desktop run smoke:packaged-launch
+
+      - name: Verify Authenticode signatures
+        shell: pwsh
+        env:
+          WINDOWS_PUBLISHER_NAME: ${{ secrets.WINDOWS_PUBLISHER_NAME }}
+        run: >-
+          & apps/desktop/scripts/verify-authenticode.ps1
+          -ReleaseDirectory apps/desktop/release
+          -PublisherName $env:WINDOWS_PUBLISHER_NAME
+          -ReceiptPath apps/desktop/release/authenticode-receipt.json
+
+      - name: Verify updater metadata and hashes
+        shell: pwsh
+        env:
+          WINDOWS_PUBLISHER_NAME: ${{ secrets.WINDOWS_PUBLISHER_NAME }}
+        run: npm --prefix apps/desktop run release:verify-artifacts
+
+      - name: Casimir adapter release gate
+        shell: pwsh
+        env:
+          ADAPTER_VERIFY_URL: ${{ secrets.CASIMIR_ADAPTER_VERIFY_URL }}
+          TRACE_EXPORT_URL: ${{ secrets.CASIMIR_TRACE_EXPORT_URL }}
+          CASIMIR_TOKEN: ${{ secrets.CASIMIR_VERIFY_TOKEN }}
+          CASIMIR_TENANT: ${{ secrets.CASIMIR_VERIFY_TENANT }}
+        run: |
+          if (-not $env:ADAPTER_VERIFY_URL) { throw 'CASIMIR_ADAPTER_VERIFY_URL is required' }
+          $exportUrl = $env:TRACE_EXPORT_URL
+          if (-not $exportUrl) {
+            $exportUrl = $env:ADAPTER_VERIFY_URL -replace '/api/agi/adapter/run$', '/api/agi/training-trace/export'
+          }
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          $args = @('run','--silent','casimir:verify','--','--ci','--url',$env:ADAPTER_VERIFY_URL,'--export-url',$exportUrl,'--trace-out','artifacts/desktop-release-training-trace.jsonl','--trace-limit','200')
+          if ($env:CASIMIR_TOKEN) { $args += @('--token', $env:CASIMIR_TOKEN) }
+          if ($env:CASIMIR_TENANT) { $args += @('--tenant', $env:CASIMIR_TENANT) }
+          & npm @args 1> artifacts/desktop-release-casimir-response.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node apps/desktop/scripts/verify-casimir-gate.mjs artifacts/desktop-release-casimir-response.json artifacts/casimir-gate-receipt.json artifacts/desktop-release-training-trace.jsonl
+
+      - name: Collect release evidence
+        shell: pwsh
+        run: |
+          Copy-Item -LiteralPath artifacts/casimir-gate-receipt.json -Destination apps/desktop/release/
+
+      - name: Generate verified website release metadata
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: npm --prefix apps/desktop run release:site-metadata
+
+      - name: Prepare publish allowlist
+        id: publish-bundle
+        shell: pwsh
+        run: |
+          $bundle = Join-Path $env:RUNNER_TEMP 'casimirbot-desktop-release'
+          New-Item -ItemType Directory -Path $bundle -Force | Out-Null
+          $installer = @(Get-ChildItem -LiteralPath apps/desktop/release -File -Filter 'CasimirBot-*-x64-setup.exe')
+          if ($installer.Count -ne 1) { throw "Expected exactly one x64 installer, found $($installer.Count)" }
+          $files = @(
+            $installer[0].FullName,
+            "$($installer[0].FullName).blockmap",
+            (Join-Path $installer[0].DirectoryName 'latest.yml'),
+            (Join-Path $installer[0].DirectoryName 'release-manifest.json'),
+            (Join-Path $installer[0].DirectoryName 'authenticode-receipt.json'),
+            (Join-Path $installer[0].DirectoryName 'casimir-gate-receipt.json'),
+            (Join-Path $installer[0].DirectoryName 'site-release-metadata.json')
+          )
+          foreach ($file in $files) {
+            if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing publish artifact: $file" }
+            Copy-Item -LiteralPath $file -Destination $bundle
+          }
+          Write-Output "path=$bundle" >> $env:GITHUB_OUTPUT
+
+      - name: Upload verified release bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: casimirbot-desktop-${{ github.ref_name }}
+          path: ${{ steps.publish-bundle.outputs.path }}
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: build-verify
+    runs-on: ubuntu-latest
+    environment: desktop-production
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: casimirbot-desktop-${{ github.ref_name }}
+          path: release
+
+      - name: Publish immutable versioned release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e release/.git
+          gh release create "$RELEASE_TAG" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "CasimirBot Desktop ${RELEASE_TAG#desktop-v}" \
+            --notes "Signed Windows desktop release. See release-manifest.json and the sanitized Casimir gate receipt in the attached assets."

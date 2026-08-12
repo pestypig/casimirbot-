@@ -14,19 +14,20 @@ import { NHM2_SEMICLASSICAL_TENSOR_COMPONENTS } from "./nhm2-semiclassical-state
 export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MANIFEST_ARTIFACT_ID =
   "nhm2.semiclassical_v2_raw_replay_manifest" as const;
 export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MANIFEST_CONTRACT_VERSION =
-  "nhm2_semiclassical_v2_raw_replay_manifest/v1" as const;
+  "nhm2_semiclassical_v2_raw_replay_manifest/v2" as const;
 export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MINIMUM_SAMPLE_COUNT = 64;
+export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MAXIMUM_SAMPLE_COUNT = 64;
 export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MINIMUM_REGULATOR_LEVELS = 3;
 export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_INPUT_CLOSURE_ALGORITHM =
-  "sha256_canonical_semiclassical_v2_input_inventory_v1" as const;
+  "sha256_canonical_semiclassical_v2_input_inventory_v2" as const;
 export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_INPUT_ORDERING =
-  "frozen_input_id_order_v1" as const;
+  "frozen_input_id_order_v2" as const;
 export const NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_ARTIFACT_ID =
   "nhm2.semiclassical_v2_approved_replay_policy" as const;
 export const NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_CONTRACT_VERSION =
-  "nhm2_semiclassical_v2_approved_replay_policy/v1" as const;
+  "nhm2_semiclassical_v2_approved_replay_policy/v2" as const;
 export const NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_ID =
-  "nhm2.server_owned.semiclassical_v2.diagnostic_replay/v1" as const;
+  "nhm2.server_owned.semiclassical_v2.diagnostic_replay/v2" as const;
 
 export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_SCIENTIFIC_INPUT_IDS = [
   "candidate_manifest",
@@ -50,6 +51,8 @@ export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_SCIENTIFIC_INPUT_IDS = [
   "operator_ordering",
   "classical_structure_functions",
   "metric_demand_tensor",
+  "metric_demand_absolute_error_bound",
+  "metric_demand_derivation_receipt",
 ] as const;
 export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_IMPLEMENTATION_INPUT_IDS = [
   "implementation_source",
@@ -67,13 +70,18 @@ export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORBIDDEN_INPUT_IDS = [
 
 export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORMULAS = Object.freeze({
   finiteness: "every_decoded_float64_value_is_finite",
+  metricDemandNondegeneracy:
+    "for_each_i:demand_lower_i=max(0,symmetric_tensor_frobenius(metric_demand_i)-symmetric_tensor_frobenius(metric_demand_absolute_error_bound_i));count_i(demand_lower_i>minimum_metric_demand_frobenius)/N>=required_metric_demand_sample_fraction",
+  meanMetricDemandClosure:
+    "for_every_sample_i:relative_upper95_i=symmetric_tensor_frobenius(abs(mean_rset_i-metric_demand_i)+mean_rset_absolute_uncertainty95_i+metric_demand_absolute_error_bound_i)/max(max(0,symmetric_tensor_frobenius(metric_demand_i)-symmetric_tensor_frobenius(metric_demand_absolute_error_bound_i)),mean_normalization_floor)<=mean_metric_demand_pointwise_relative_upper95_tolerance",
+  metricDemandErrorEnclosure:
+    "for_every_sample_i:symmetric_tensor_frobenius(metric_demand_absolute_error_bound_i)/symmetric_tensor_frobenius(metric_demand_i)<=metric_demand_relative_error_bound_tolerance",
   smearingNormalization:
     "all_weights_nonnegative_and_abs(sum(weights)-1)<=smearing_weight_sum_tolerance",
   exchangeSymmetry: NHM2_SEMICLASSICAL_NOISE_KERNEL_EXCHANGE_SYMMETRY,
-  psd:
-    "S=diag(sqrt(point_weights))tensor_diag(sqrt([1,2,2,2,1,2,2,1,2,1]));C_sym=0.5*(S*connected_noise*S+(S*connected_noise*S)^T);certify_C_sym+psd_tolerance_SI*I_is_PSD_by_symmetric_semidefinite_cholesky_or_pivoted_LDLT",
+  psd: "d_i=sqrt(point_weight_i*component_multiplicity_i);C_sym[i,j]=0.5*(N[i,j]+N[j,i])*d_i*d_j;shift=psd_tolerance/2;A=C_sym+shift*I;compute_zero_pivot_checked_semidefinite_Cholesky_A_approximately_L*L^T;R=A-L*L^T;residual_upper=roundoff_inflated_max_i(sum_j(abs(R[i,j])));certify_C_sym+psd_tolerance*I_is_PSD_only_if_residual_upper<=psd_tolerance-shift;negative_witness_requires_roundoff_upper_bounded_recomputed_Rayleigh_quotient_below_minus_psd_tolerance;otherwise_numerically_inconclusive",
   maximumEigenvalueUpper95:
-    "U_w=abs(S)*noise_absolute_uncertainty95*abs(S);lambda_max_upper95=max_i(C_sym[i,i]+U_w[i,i]+sum_j_ne_i(abs(C_sym[i,j])+U_w[i,j]))",
+    "d_i=sqrt(point_weight_i*component_multiplicity_i);U_sym[i,j]=0.5*(u[i,j]+u[j,i]+abs(N[i,j]-N[j,i]))*d_i*d_j;lambda_max_upper95=max_i(C_sym[i,i]+U_sym[i,i]+sum_j_ne_i(abs(C_sym[i,j])+U_sym[i,j]))",
   symmetricTensorBasis:
     "orthonormal_symmetric_tensor_component_multiplicities=[1,2,2,2,1,2,2,1,2,1]",
   fluctuationRatio: NHM2_SEMICLASSICAL_FLUCTUATION_RATIO_FORMULA,
@@ -84,10 +92,9 @@ export const NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORMULAS = Object.freeze({
     "normalized_antisymmetry_residual=normalized_forward+normalized_reverse",
   jacobi:
     "normalized_jacobi_residual=normalized_term_1+normalized_term_2+normalized_term_3",
-  upper95:
-    "upper95=linf(abs(residual)+abs(pointwise_absolute_uncertainty95))",
+  upper95: "upper95=linf(abs(residual)+abs(pointwise_absolute_uncertainty95))",
   regulatorConvergence:
-    "q_k=max_i(abs(residual_k[i])+absolute_uncertainty95_k[i]);p_k=log(q_k/q_k+1)/log(scale_k/scale_k+1);observed_p=min(p_k)",
+    "q_k=max_i(abs(residual_k[i])+absolute_uncertainty95_k[i]);p_k=log(q_k/q_(k+1))/log(scale_k/scale_(k+1));observed_p=min_k(p_k)",
 } as const);
 
 export const NHM2_SEMICLASSICAL_V2_ORTHONORMAL_SYMMETRIC_TENSOR_MULTIPLICITIES =
@@ -100,14 +107,17 @@ export const NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY = Object.freeze({
   policyId: NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_ID,
   authority: "server_owned" as const,
   maturity: "diagnostic_only" as const,
-  minimumSampleCount:
-    NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MINIMUM_SAMPLE_COUNT,
+  minimumSampleCount: NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MINIMUM_SAMPLE_COUNT,
+  maximumSampleCount: NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MAXIMUM_SAMPLE_COUNT,
   minimumRegulatorLevelCount:
     NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MINIMUM_REGULATOR_LEVELS,
   minimumMetricDemandFrobeniusSI: 1e-12,
+  requiredMetricDemandSampleFraction: 1,
   units: Object.freeze({
     noiseKernel: "(J/m^3)^2" as const,
     meanRset: "J/m^3" as const,
+    meanRsetAbsoluteUncertainty95: "J/m^3" as const,
+    metricDemandAbsoluteErrorBound: "J/m^3" as const,
     smearingWeights: "dimensionless" as const,
     normalizedConstraints: "dimensionless" as const,
     regulatorScale: "dimensionless" as const,
@@ -121,6 +131,8 @@ export const NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY = Object.freeze({
     psdNegativeEigenvalueSI: 1e-12,
     meanNormalizationFloorSI: 1e-12,
     fluctuationToMeanRatioUpper95: 1,
+    meanMetricDemandPointwiseRelativeUpper95: 0.1,
+    metricDemandRelativeErrorBound: 0.01,
     bracketResidualUpper95: 0.1,
     antisymmetryResidualUpper95: 0.1,
     jacobiResidualUpper95: 0.1,
@@ -144,7 +156,9 @@ const canonicalizeJson = (value: unknown): unknown => {
 };
 
 export const NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_CANONICAL_JSON =
-  JSON.stringify(canonicalizeJson(NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY));
+  JSON.stringify(
+    canonicalizeJson(NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY),
+  );
 export const NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_SHA256 = createHash(
   "sha256",
 )
@@ -167,15 +181,14 @@ export const NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_RAW_BINDING =
   });
 
 export type Nhm2SemiclassicalV2RawReplayImplementationRole =
-  | "primary"
-  | "independent";
+  "primary" | "independent";
 export type Nhm2SemiclassicalV2RawReplayInputId =
   (typeof NHM2_SEMICLASSICAL_V2_RAW_REPLAY_REQUIRED_INPUT_IDS)[number];
 
 export type Nhm2SemiclassicalV2RawReplayInputFileV1 = {
   inputId: Exclude<
     Nhm2SemiclassicalV2RawReplayInputId,
-    "metric_demand_tensor"
+    "metric_demand_tensor" | "metric_demand_absolute_error_bound"
   >;
   path: string;
   sha256: string;
@@ -189,7 +202,7 @@ export type Nhm2SemiclassicalV2RawReplayMetricDemandInputFileV1 = Omit<
   Nhm2SemiclassicalV2RawReplayInputFileV1,
   "inputId"
 > & {
-  inputId: "metric_demand_tensor";
+  inputId: "metric_demand_tensor" | "metric_demand_absolute_error_bound";
   dtype: "float64";
   binaryEncoding: "raw_ieee754";
   endianness: "little";
@@ -206,6 +219,21 @@ export type Nhm2SemiclassicalV2RawReplayInputEntryV1 =
 export type Nhm2SemiclassicalV2RawReplayInputRootsV1 = {
   scientificRootDirectory: string;
   implementationRootDirectory: string;
+};
+
+/**
+ * Producer-authored echo of the server-owned scientific preseal identity.
+ * This exact binding is useful for later trusted cross-checks, but the echo is
+ * not a persistence receipt and grants the producer no preseal authority.
+ */
+export type Nhm2SemiclassicalV2RawReplayScientificPresealBindingV1 = {
+  artifactId: "nhm2.semiclassical_v2_scientific_preseal";
+  contractVersion: "nhm2_semiclassical_v2_scientific_preseal/v2";
+  sealKey: string;
+  candidateManifestSha256: string;
+  scientificContentSha256: string;
+  sealedInventorySha256: string;
+  sealedAt: string;
 };
 
 export type Nhm2SemiclassicalV2RawReplayArrayV1 = {
@@ -243,7 +271,10 @@ export type Nhm2SemiclassicalV2RawReplayManifestV1 = {
     samplingBasisId: string;
     nondegeneracyCriterionId: string;
     metricDemandInputId: "metric_demand_tensor";
+    metricDemandErrorBoundInputId: "metric_demand_absolute_error_bound";
+    metricDemandDerivationWitnessInputId: "metric_demand_derivation_receipt";
     minimumMetricDemandFrobeniusSI: number;
+    requiredMetricDemandSampleFraction: number;
     sampleCount: number;
     frozenAt: string;
   };
@@ -260,6 +291,8 @@ export type Nhm2SemiclassicalV2RawReplayManifestV1 = {
     units: {
       noiseKernel: "(J/m^3)^2";
       meanRset: "J/m^3";
+      meanRsetAbsoluteUncertainty95: "J/m^3";
+      metricDemandAbsoluteErrorBound: "J/m^3";
       smearingWeights: "dimensionless";
       normalizedConstraints: "dimensionless";
       regulatorScale: "dimensionless";
@@ -270,6 +303,8 @@ export type Nhm2SemiclassicalV2RawReplayManifestV1 = {
       psdNegativeEigenvalueSI: number;
       meanNormalizationFloorSI: number;
       fluctuationToMeanRatioUpper95: number;
+      meanMetricDemandPointwiseRelativeUpper95: number;
+      metricDemandRelativeErrorBound: number;
       bracketResidualUpper95: number;
       antisymmetryResidualUpper95: number;
       jacobiResidualUpper95: number;
@@ -319,7 +354,8 @@ export type Nhm2SemiclassicalV2RawReplayManifestV1 = {
     terminationSignal: null;
   };
   inputClosure: {
-    frozenBeforeExecution: true;
+    manifestDeclaresFrozenBeforeExecution: true;
+    scientificPresealBinding: Nhm2SemiclassicalV2RawReplayScientificPresealBindingV1;
     scientificRootDirectory: string;
     implementationRootDirectory: string;
     algorithm: typeof NHM2_SEMICLASSICAL_V2_RAW_REPLAY_INPUT_CLOSURE_ALGORITHM;
@@ -333,6 +369,7 @@ export type Nhm2SemiclassicalV2RawReplayManifestV1 = {
     noiseKernel: Nhm2SemiclassicalV2RawReplayArrayV1;
     noiseKernelAbsoluteUncertainty95: Nhm2SemiclassicalV2RawReplayArrayV1;
     meanRset: Nhm2SemiclassicalV2RawReplayArrayV1;
+    meanRsetAbsoluteUncertainty95: Nhm2SemiclassicalV2RawReplayArrayV1;
     smearingWeights: Nhm2SemiclassicalV2RawReplayArrayV1;
     brackets: Array<{
       bracketId: Nhm2SemiclassicalConstraintBracketId;
@@ -404,7 +441,10 @@ const CANDIDATE_KEYS = [
   "samplingBasisId",
   "nondegeneracyCriterionId",
   "metricDemandInputId",
+  "metricDemandErrorBoundInputId",
+  "metricDemandDerivationWitnessInputId",
   "minimumMetricDemandFrobeniusSI",
+  "requiredMetricDemandSampleFraction",
   "sampleCount",
   "frozenAt",
 ] as const;
@@ -415,11 +455,18 @@ const SOURCE_PROVENANCE_KEYS = [
   "declaredLeverTensorUsed",
   "inputClosureExcludesDeclaredLeverTensor",
 ] as const;
-const NUMERICAL_POLICY_KEYS = ["frozenAt", "formulas", "units", "tolerances"] as const;
+const NUMERICAL_POLICY_KEYS = [
+  "frozenAt",
+  "formulas",
+  "units",
+  "tolerances",
+] as const;
 const FORMULA_KEYS = Object.keys(NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORMULAS);
 const UNIT_KEYS = [
   "noiseKernel",
   "meanRset",
+  "meanRsetAbsoluteUncertainty95",
+  "metricDemandAbsoluteErrorBound",
   "smearingWeights",
   "normalizedConstraints",
   "regulatorScale",
@@ -430,6 +477,8 @@ const TOLERANCE_KEYS = [
   "psdNegativeEigenvalueSI",
   "meanNormalizationFloorSI",
   "fluctuationToMeanRatioUpper95",
+  "meanMetricDemandPointwiseRelativeUpper95",
+  "metricDemandRelativeErrorBound",
   "bracketResidualUpper95",
   "antisymmetryResidualUpper95",
   "jacobiResidualUpper95",
@@ -448,7 +497,11 @@ const IMPLEMENTATION_KEYS = [
   "executableIdentity",
   "inputExposure",
 ] as const;
-const IMPLEMENTATION_IDENTITY_KEYS = ["identityId", "inputId", "sha256"] as const;
+const IMPLEMENTATION_IDENTITY_KEYS = [
+  "identityId",
+  "inputId",
+  "sha256",
+] as const;
 const INPUT_EXPOSURE_KEYS = [
   "scientificRoot",
   "implementationRoot",
@@ -468,7 +521,8 @@ const EXECUTION_KEYS = [
   "terminationSignal",
 ] as const;
 const INPUT_CLOSURE_KEYS = [
-  "frozenBeforeExecution",
+  "manifestDeclaresFrozenBeforeExecution",
+  "scientificPresealBinding",
   "scientificRootDirectory",
   "implementationRootDirectory",
   "algorithm",
@@ -477,6 +531,15 @@ const INPUT_CLOSURE_KEYS = [
   "excludedInputIds",
   "scientificClosureSha256",
   "completeClosureSha256",
+] as const;
+const SCIENTIFIC_PRESEAL_BINDING_KEYS = [
+  "artifactId",
+  "contractVersion",
+  "sealKey",
+  "candidateManifestSha256",
+  "scientificContentSha256",
+  "sealedInventorySha256",
+  "sealedAt",
 ] as const;
 const INPUT_KEYS = [
   "inputId",
@@ -501,6 +564,7 @@ const ARRAYS_KEYS = [
   "noiseKernel",
   "noiseKernelAbsoluteUncertainty95",
   "meanRset",
+  "meanRsetAbsoluteUncertainty95",
   "smearingWeights",
   "brackets",
   "antisymmetry",
@@ -573,7 +637,10 @@ const hasExactKeys = (
   expected: readonly string[],
 ): boolean => {
   const keys = Object.keys(value);
-  return keys.length === expected.length && keys.every((key) => expected.includes(key));
+  return (
+    keys.length === expected.length &&
+    keys.every((key) => expected.includes(key))
+  );
 };
 const isIdentifier = (value: unknown): value is string =>
   typeof value === "string" &&
@@ -589,7 +656,9 @@ const isGitSha = (value: unknown): value is string =>
 const isIsoTimestamp = (value: unknown): value is string => {
   if (typeof value !== "string") return false;
   const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value;
+  return (
+    Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value
+  );
 };
 const isPortableRelativePath = (value: unknown): value is string =>
   typeof value === "string" &&
@@ -604,10 +673,16 @@ const isPortableRelativePath = (value: unknown): value is string =>
   value
     .split("/")
     .every((segment) => segment !== "" && segment !== "." && segment !== "..");
-const portableRootsOverlap = (left: string, right: string): boolean =>
-  left === right ||
-  left.startsWith(`${right}/`) ||
-  right.startsWith(`${left}/`);
+const portablePathIdentityKey = (value: string): string => value.toLowerCase();
+const portableRootsOverlap = (left: string, right: string): boolean => {
+  const leftKey = portablePathIdentityKey(left);
+  const rightKey = portablePathIdentityKey(right);
+  return (
+    leftKey === rightKey ||
+    leftKey.startsWith(`${rightKey}/`) ||
+    rightKey.startsWith(`${leftKey}/`)
+  );
+};
 const isPositiveFinite = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
 const sameStrings = (value: unknown, expected: readonly string[]): boolean =>
@@ -618,7 +693,16 @@ const sameJson = (left: unknown, right: unknown): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 const unique = (values: string[]): string[] => [...new Set(values)];
 
-const INPUT_CLOSURE_DOMAIN = "nhm2-semiclassical-v2-raw-replay-input-closure/v1\n";
+const INPUT_CLOSURE_DOMAIN =
+  "nhm2-semiclassical-v2-raw-replay-input-closure/v2\n";
+const SCIENTIFIC_PRESEAL_SEAL_KEY_DOMAIN =
+  "nhm2-semiclassical-v2-deterministic-seal-key/v2\n";
+
+const expectedScientificPresealSealKey = (candidateId: string): string =>
+  createHash("sha256")
+    .update(SCIENTIFIC_PRESEAL_SEAL_KEY_DOMAIN, "utf8")
+    .update(candidateId.toLocaleLowerCase("en-US"), "utf8")
+    .digest("hex");
 
 export const computeNhm2SemiclassicalV2RawReplayInputClosureSha256 = (
   entries: readonly Nhm2SemiclassicalV2RawReplayInputEntryV1[],
@@ -628,14 +712,15 @@ export const computeNhm2SemiclassicalV2RawReplayInputClosureSha256 = (
   const included =
     scope === "scientific"
       ? entries.filter((entry) =>
-          (NHM2_SEMICLASSICAL_V2_RAW_REPLAY_SCIENTIFIC_INPUT_IDS as readonly string[]).includes(
-            entry.inputId,
-          ),
+          (
+            NHM2_SEMICLASSICAL_V2_RAW_REPLAY_SCIENTIFIC_INPUT_IDS as readonly string[]
+          ).includes(entry.inputId),
         )
       : [...entries];
   const payload = included.map((entry) => {
     const metricDemand =
-      entry.inputId === "metric_demand_tensor"
+      entry.inputId === "metric_demand_tensor" ||
+      entry.inputId === "metric_demand_absolute_error_bound"
         ? (entry as Nhm2SemiclassicalV2RawReplayMetricDemandInputFileV1)
         : null;
     return [
@@ -689,7 +774,8 @@ const rawArrayViolations = (
     return [`array_shape_invalid:${pointer}`];
   }
   const violations: string[] = [];
-  const expectedSize = expected.shape.reduce((product, axis) => product * axis, 1) * 8;
+  const expectedSize =
+    expected.shape.reduce((product, axis) => product * axis, 1) * 8;
   if (
     value.role !== expected.role ||
     !isPortableRelativePath(value.path) ||
@@ -765,7 +851,8 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
     }
     const violations: string[] = [];
     if (
-      value.artifactId !== NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MANIFEST_ARTIFACT_ID ||
+      value.artifactId !==
+        NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MANIFEST_ARTIFACT_ID ||
       value.contractVersion !==
         NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MANIFEST_CONTRACT_VERSION
     ) {
@@ -796,18 +883,28 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         "samplingBasisId",
         "nondegeneracyCriterionId",
       ]) {
-        if (!isIdentifier(candidate[key])) violations.push(`candidate_identity_invalid:/${key}`);
+        if (!isIdentifier(candidate[key]))
+          violations.push(`candidate_identity_invalid:/${key}`);
       }
       if (
         candidate.candidateKind !==
           "frozen_nondegenerate_nhm2_semiclassical_candidate" ||
         candidate.metricDemandInputId !== "metric_demand_tensor" ||
+        candidate.metricDemandErrorBoundInputId !==
+          "metric_demand_absolute_error_bound" ||
+        candidate.metricDemandDerivationWitnessInputId !==
+          "metric_demand_derivation_receipt" ||
         candidate.tolerancePolicyId !==
           NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_ID ||
         candidate.minimumMetricDemandFrobeniusSI !==
           NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY.minimumMetricDemandFrobeniusSI ||
+        candidate.requiredMetricDemandSampleFraction !==
+          NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY.requiredMetricDemandSampleFraction ||
         !Number.isSafeInteger(candidate.sampleCount) ||
-        Number(candidate.sampleCount) < NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MINIMUM_SAMPLE_COUNT ||
+        Number(candidate.sampleCount) <
+          NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MINIMUM_SAMPLE_COUNT ||
+        Number(candidate.sampleCount) >
+          NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MAXIMUM_SAMPLE_COUNT ||
         candidate.frozenAt !== value.manifestFrozenAt
       ) {
         violations.push("candidate_freeze_invalid");
@@ -843,7 +940,9 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
       const formulas = isRecord(numericalPolicy.formulas)
         ? numericalPolicy.formulas
         : null;
-      const units = isRecord(numericalPolicy.units) ? numericalPolicy.units : null;
+      const units = isRecord(numericalPolicy.units)
+        ? numericalPolicy.units
+        : null;
       const tolerances = isRecord(numericalPolicy.tolerances)
         ? numericalPolicy.tolerances
         : null;
@@ -911,7 +1010,9 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         execution.argv.length === 0 ||
         !execution.argv.every(
           (entry) =>
-            typeof entry === "string" && entry.length > 0 && entry.length <= 4096,
+            typeof entry === "string" &&
+            entry.length > 0 &&
+            entry.length <= 4096,
         ) ||
         !(
           execution.workingDirectory === "." ||
@@ -938,9 +1039,17 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
       }
     }
 
-    const inputClosure = isRecord(value.inputClosure) ? value.inputClosure : null;
-    const entriesById = new Map<string, Nhm2SemiclassicalV2RawReplayInputEntryV1>();
-    if (inputClosure == null || !hasExactKeys(inputClosure, INPUT_CLOSURE_KEYS)) {
+    const inputClosure = isRecord(value.inputClosure)
+      ? value.inputClosure
+      : null;
+    const entriesById = new Map<
+      string,
+      Nhm2SemiclassicalV2RawReplayInputEntryV1
+    >();
+    if (
+      inputClosure == null ||
+      !hasExactKeys(inputClosure, INPUT_CLOSURE_KEYS)
+    ) {
       violations.push("input_closure_shape_invalid");
     } else {
       const entries = Array.isArray(inputClosure.entries)
@@ -954,18 +1063,56 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         typeof inputClosure.implementationRootDirectory === "string"
           ? inputClosure.implementationRootDirectory
           : "__invalid_implementation_input_root__";
+      const scientificPresealBinding = isRecord(
+        inputClosure.scientificPresealBinding,
+      )
+        ? inputClosure.scientificPresealBinding
+        : null;
       if (
-        inputClosure.frozenBeforeExecution !== true ||
+        inputClosure.manifestDeclaresFrozenBeforeExecution !== true ||
         !isPortableRelativePath(inputClosure.scientificRootDirectory) ||
         !isPortableRelativePath(inputClosure.implementationRootDirectory) ||
         inputClosure.scientificRootDirectory ===
           inputClosure.implementationRootDirectory ||
         inputClosure.algorithm !==
           NHM2_SEMICLASSICAL_V2_RAW_REPLAY_INPUT_CLOSURE_ALGORITHM ||
-        inputClosure.ordering !== NHM2_SEMICLASSICAL_V2_RAW_REPLAY_INPUT_ORDERING ||
-        entries.length !== NHM2_SEMICLASSICAL_V2_RAW_REPLAY_REQUIRED_INPUT_IDS.length
+        inputClosure.ordering !==
+          NHM2_SEMICLASSICAL_V2_RAW_REPLAY_INPUT_ORDERING ||
+        entries.length !==
+          NHM2_SEMICLASSICAL_V2_RAW_REPLAY_REQUIRED_INPUT_IDS.length
       ) {
         violations.push("input_closure_policy_invalid");
+      }
+      const sealedAtMs =
+        scientificPresealBinding != null &&
+        isIsoTimestamp(scientificPresealBinding.sealedAt)
+          ? Date.parse(scientificPresealBinding.sealedAt)
+          : Number.NaN;
+      if (
+        scientificPresealBinding == null ||
+        !hasExactKeys(
+          scientificPresealBinding,
+          SCIENTIFIC_PRESEAL_BINDING_KEYS,
+        ) ||
+        scientificPresealBinding.artifactId !==
+          "nhm2.semiclassical_v2_scientific_preseal" ||
+        scientificPresealBinding.contractVersion !==
+          "nhm2_semiclassical_v2_scientific_preseal/v2" ||
+        !isSha256(scientificPresealBinding.sealKey) ||
+        !isSha256(scientificPresealBinding.candidateManifestSha256) ||
+        !isSha256(scientificPresealBinding.scientificContentSha256) ||
+        !isSha256(scientificPresealBinding.sealedInventorySha256) ||
+        candidate == null ||
+        typeof candidate.candidateId !== "string" ||
+        scientificPresealBinding.sealKey !==
+          expectedScientificPresealSealKey(candidate.candidateId) ||
+        !Number.isFinite(sealedAtMs) ||
+        !Number.isFinite(frozenAtMs) ||
+        !(frozenAtMs < sealedAtMs) ||
+        !Number.isFinite(startedAtMs) ||
+        !(sealedAtMs < startedAtMs)
+      ) {
+        violations.push("scientific_preseal_binding_invalid");
       }
       if (
         !isPortableRelativePath(scientificRootDirectory) ||
@@ -982,14 +1129,16 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
       }
       entries.forEach((entry, index) => {
         const pointer = `/inputClosure/entries/${index}`;
-        const expectedId = NHM2_SEMICLASSICAL_V2_RAW_REPLAY_REQUIRED_INPUT_IDS[index];
+        const expectedId =
+          NHM2_SEMICLASSICAL_V2_RAW_REPLAY_REQUIRED_INPUT_IDS[index];
         const expectedRoot = (
           NHM2_SEMICLASSICAL_V2_RAW_REPLAY_SCIENTIFIC_INPUT_IDS as readonly string[]
         ).includes(String(expectedId))
           ? scientificRootDirectory
           : implementationRootDirectory;
         const expectedKeys =
-          expectedId === "metric_demand_tensor"
+          expectedId === "metric_demand_tensor" ||
+          expectedId === "metric_demand_absolute_error_bound"
             ? METRIC_DEMAND_INPUT_KEYS
             : INPUT_KEYS;
         if (!isRecord(entry) || !hasExactKeys(entry, expectedKeys)) {
@@ -1013,11 +1162,12 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         ) {
           violations.push(`input_binding_invalid:${pointer}`);
         }
-        if (!Number.isFinite(observedAtMs) || observedAtMs > frozenAtMs) {
+        if (!Number.isFinite(observedAtMs) || !(observedAtMs < startedAtMs)) {
           violations.push(`input_freshness_interval_invalid:${pointer}`);
         }
         if (
-          expectedId === "metric_demand_tensor" &&
+          (expectedId === "metric_demand_tensor" ||
+            expectedId === "metric_demand_absolute_error_bound") &&
           (entry.dtype !== "float64" ||
             entry.binaryEncoding !== "raw_ieee754" ||
             entry.endianness !== "little" ||
@@ -1026,7 +1176,10 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
             entry.shape.length !== 2 ||
             entry.shape[0] !== (candidate?.sampleCount ?? Number.NaN) ||
             entry.shape[1] !== NHM2_SEMICLASSICAL_TENSOR_COMPONENTS.length ||
-            !sameStrings(entry.componentOrder, NHM2_SEMICLASSICAL_TENSOR_COMPONENTS) ||
+            !sameStrings(
+              entry.componentOrder,
+              NHM2_SEMICLASSICAL_TENSOR_COMPONENTS,
+            ) ||
             entry.unit !== "J/m^3" ||
             entry.sizeBytes !==
               Number(candidate?.sampleCount ?? 0) *
@@ -1043,11 +1196,33 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         }
       });
       if (
-        entriesById.size !== NHM2_SEMICLASSICAL_V2_RAW_REPLAY_REQUIRED_INPUT_IDS.length
+        entriesById.size !==
+        NHM2_SEMICLASSICAL_V2_RAW_REPLAY_REQUIRED_INPUT_IDS.length
       ) {
         violations.push("input_ids_not_exact_unique");
       }
+      const inputPathKeys = entries
+        .filter((entry): entry is Record<string, unknown> => isRecord(entry))
+        .map((entry) =>
+          typeof entry.path === "string"
+            ? portablePathIdentityKey(entry.path)
+            : "__invalid_input_path__",
+        );
+      if (new Set(inputPathKeys).size !== inputPathKeys.length) {
+        violations.push("input_paths_not_unique");
+      }
       const tolerancePolicyInput = entriesById.get("tolerance_policy");
+      const candidateManifestInput = entriesById.get("candidate_manifest");
+      if (
+        scientificPresealBinding == null ||
+        candidateManifestInput == null ||
+        scientificPresealBinding.candidateManifestSha256 !==
+          candidateManifestInput.sha256
+      ) {
+        violations.push(
+          "scientific_preseal_candidate_manifest_binding_mismatch",
+        );
+      }
       if (
         tolerancePolicyInput == null ||
         tolerancePolicyInput.sha256 !==
@@ -1059,7 +1234,8 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         violations.push("approved_tolerance_policy_input_binding_invalid");
       }
       if (
-        entries.length === NHM2_SEMICLASSICAL_V2_RAW_REPLAY_REQUIRED_INPUT_IDS.length &&
+        entries.length ===
+          NHM2_SEMICLASSICAL_V2_RAW_REPLAY_REQUIRED_INPUT_IDS.length &&
         inputClosure.scientificClosureSha256 !==
           computeNhm2SemiclassicalV2RawReplayInputClosureSha256(
             entries as Nhm2SemiclassicalV2RawReplayInputEntryV1[],
@@ -1070,7 +1246,8 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         violations.push("scientific_input_closure_sha256_mismatch");
       }
       if (
-        entries.length === NHM2_SEMICLASSICAL_V2_RAW_REPLAY_REQUIRED_INPUT_IDS.length &&
+        entries.length ===
+          NHM2_SEMICLASSICAL_V2_RAW_REPLAY_REQUIRED_INPUT_IDS.length &&
         inputClosure.completeClosureSha256 !==
           computeNhm2SemiclassicalV2RawReplayInputClosureSha256(
             entries as Nhm2SemiclassicalV2RawReplayInputEntryV1[],
@@ -1088,9 +1265,9 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         entries.some(
           (entry) =>
             isRecord(entry) &&
-            (NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORBIDDEN_INPUT_IDS as readonly string[]).includes(
-              String(entry.inputId),
-            ),
+            (
+              NHM2_SEMICLASSICAL_V2_RAW_REPLAY_FORBIDDEN_INPUT_IDS as readonly string[]
+            ).includes(String(entry.inputId)),
         )
       ) {
         violations.push("declared_lever_input_exclusion_invalid");
@@ -1108,7 +1285,8 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
     } else {
       if (
         !isIdentifier(implementation.comparisonPairId) ||
-        (implementation.role !== "primary" && implementation.role !== "independent") ||
+        (implementation.role !== "primary" &&
+          implementation.role !== "independent") ||
         !isIdentifier(implementation.implementationId) ||
         !isIdentifier(implementation.implementationVersion)
       ) {
@@ -1171,7 +1349,10 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
           ? implementation.executableIdentity.sha256
           : null,
       ];
-      if (new Set(identities).size !== identities.length || new Set(hashes).size !== hashes.length) {
+      if (
+        new Set(identities).size !== identities.length ||
+        new Set(hashes).size !== hashes.length
+      ) {
         violations.push("implementation_internal_identities_not_distinct");
       }
     }
@@ -1197,11 +1378,15 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
           generatedAtMs,
         ),
       );
-      if (isRecord(array) && typeof array.path === "string") outputPaths.push(array.path);
+      if (isRecord(array) && typeof array.path === "string")
+        outputPaths.push(array.path);
     };
     const constraintExpectation = (role: string): ArrayExpectation => ({
       role,
-      shape: [sampleCount, NHM2_SEMICLASSICAL_CONSTRAINT_COMPONENT_ORDER.length],
+      shape: [
+        sampleCount,
+        NHM2_SEMICLASSICAL_CONSTRAINT_COMPONENT_ORDER.length,
+      ],
       componentOrder: NHM2_SEMICLASSICAL_CONSTRAINT_COMPONENT_ORDER,
       unit: "dimensionless",
     });
@@ -1210,7 +1395,11 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
     } else {
       addArray(arrays.noiseKernel, "/arrays/noiseKernel", {
         role: "noise_kernel",
-        shape: [sampleCount, sampleCount, NHM2_SEMICLASSICAL_NOISE_KERNEL_COMPONENT_PAIR_ORDER.length],
+        shape: [
+          sampleCount,
+          sampleCount,
+          NHM2_SEMICLASSICAL_NOISE_KERNEL_COMPONENT_PAIR_ORDER.length,
+        ],
         componentOrder: NHM2_SEMICLASSICAL_NOISE_KERNEL_COMPONENT_PAIR_ORDER,
         unit: "(J/m^3)^2",
       });
@@ -1234,6 +1423,16 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         componentOrder: NHM2_SEMICLASSICAL_TENSOR_COMPONENTS,
         unit: "J/m^3",
       });
+      addArray(
+        arrays.meanRsetAbsoluteUncertainty95,
+        "/arrays/meanRsetAbsoluteUncertainty95",
+        {
+          role: "mean_rset_absolute_uncertainty95",
+          shape: [sampleCount, NHM2_SEMICLASSICAL_TENSOR_COMPONENTS.length],
+          componentOrder: NHM2_SEMICLASSICAL_TENSOR_COMPONENTS,
+          unit: "J/m^3",
+        },
+      );
       addArray(arrays.smearingWeights, "/arrays/smearingWeights", {
         role: "smearing_weights",
         shape: [sampleCount],
@@ -1242,7 +1441,9 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
       });
 
       const brackets = Array.isArray(arrays.brackets) ? arrays.brackets : [];
-      if (brackets.length !== NHM2_SEMICLASSICAL_CONSTRAINT_BRACKET_IDS.length) {
+      if (
+        brackets.length !== NHM2_SEMICLASSICAL_CONSTRAINT_BRACKET_IDS.length
+      ) {
         violations.push("bracket_set_not_exact");
       }
       brackets.forEach((entry, index) => {
@@ -1255,22 +1456,41 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         if (entry.bracketId !== bracketId) {
           violations.push(`bracket_id_order_invalid:${pointer}`);
         }
-        for (const slot of ["computed", "target", "residual", "absoluteUncertainty95"] as const) {
-          const roleSlot = slot === "absoluteUncertainty95" ? "absolute_uncertainty95" : slot;
+        for (const slot of [
+          "computed",
+          "target",
+          "residual",
+          "absoluteUncertainty95",
+        ] as const) {
+          const roleSlot =
+            slot === "absoluteUncertainty95" ? "absolute_uncertainty95" : slot;
           addArray(
             entry[slot],
             `${pointer}/${slot}`,
-            constraintExpectation(`constraint_bracket.${bracketId}.${roleSlot}`),
+            constraintExpectation(
+              `constraint_bracket.${bracketId}.${roleSlot}`,
+            ),
           );
         }
       });
 
-      const antisymmetry = isRecord(arrays.antisymmetry) ? arrays.antisymmetry : null;
-      if (antisymmetry == null || !hasExactKeys(antisymmetry, ANTISYMMETRY_KEYS)) {
+      const antisymmetry = isRecord(arrays.antisymmetry)
+        ? arrays.antisymmetry
+        : null;
+      if (
+        antisymmetry == null ||
+        !hasExactKeys(antisymmetry, ANTISYMMETRY_KEYS)
+      ) {
         violations.push("antisymmetry_shape_invalid");
       } else {
-        for (const slot of ["forward", "reverse", "residual", "absoluteUncertainty95"] as const) {
-          const roleSlot = slot === "absoluteUncertainty95" ? "absolute_uncertainty95" : slot;
+        for (const slot of [
+          "forward",
+          "reverse",
+          "residual",
+          "absoluteUncertainty95",
+        ] as const) {
+          const roleSlot =
+            slot === "absoluteUncertainty95" ? "absolute_uncertainty95" : slot;
           addArray(
             antisymmetry[slot],
             `/arrays/antisymmetry/${slot}`,
@@ -1283,7 +1503,13 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
       if (jacobi == null || !hasExactKeys(jacobi, JACOBI_KEYS)) {
         violations.push("jacobi_shape_invalid");
       } else {
-        for (const slot of ["term1", "term2", "term3", "residual", "absoluteUncertainty95"] as const) {
+        for (const slot of [
+          "term1",
+          "term2",
+          "term3",
+          "residual",
+          "absoluteUncertainty95",
+        ] as const) {
           const roleSlot =
             slot === "absoluteUncertainty95"
               ? "absolute_uncertainty95"
@@ -1300,7 +1526,8 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         ? arrays.regulatorLevels
         : [];
       if (
-        regulatorLevels.length < NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MINIMUM_REGULATOR_LEVELS
+        regulatorLevels.length <
+        NHM2_SEMICLASSICAL_V2_RAW_REPLAY_MINIMUM_REGULATOR_LEVELS
       ) {
         violations.push("regulator_level_count_invalid");
       }
@@ -1337,11 +1564,15 @@ export const nhm2SemiclassicalV2RawReplayManifestViolations = (
         );
       });
     }
-    if (new Set(outputPaths).size !== outputPaths.length) {
+    const outputPathKeys = outputPaths.map(portablePathIdentityKey);
+    if (new Set(outputPathKeys).size !== outputPathKeys.length) {
       violations.push("output_paths_not_unique");
     }
+    const outputPathKeySet = new Set(outputPathKeys);
     for (const entry of entriesById.values()) {
-      if (outputPaths.includes(entry.path)) violations.push("input_output_path_overlap");
+      if (outputPathKeySet.has(portablePathIdentityKey(entry.path))) {
+        violations.push("input_output_path_overlap");
+      }
     }
 
     const claimLocks = isRecord(value.claimLocks) ? value.claimLocks : null;
@@ -1371,7 +1602,8 @@ export const nhm2SemiclassicalV2RawReplayManifestPairViolations = (
   primaryValue: unknown,
   independentValue: unknown,
 ): string[] => {
-  const primaryViolations = nhm2SemiclassicalV2RawReplayManifestViolations(primaryValue);
+  const primaryViolations =
+    nhm2SemiclassicalV2RawReplayManifestViolations(primaryValue);
   const independentViolations =
     nhm2SemiclassicalV2RawReplayManifestViolations(independentValue);
   const violations = [
@@ -1387,17 +1619,28 @@ export const nhm2SemiclassicalV2RawReplayManifestPairViolations = (
     return unique(violations);
   }
   const primary = primaryValue as Nhm2SemiclassicalV2RawReplayManifestV1;
-  const independent = independentValue as Nhm2SemiclassicalV2RawReplayManifestV1;
-  if (primary.implementation.role !== "primary" || independent.implementation.role !== "independent") {
+  const independent =
+    independentValue as Nhm2SemiclassicalV2RawReplayManifestV1;
+  if (
+    primary.implementation.role !== "primary" ||
+    independent.implementation.role !== "independent"
+  ) {
     violations.push("implementation_roles_invalid");
   }
-  if (primary.implementation.comparisonPairId !== independent.implementation.comparisonPairId) {
+  if (
+    primary.implementation.comparisonPairId !==
+    independent.implementation.comparisonPairId
+  ) {
     violations.push("comparison_pair_id_mismatch");
   }
   if (
     primary.manifestFrozenAt !== independent.manifestFrozenAt ||
     !sameJson(primary.candidate, independent.candidate) ||
     !sameJson(primary.numericalPolicy, independent.numericalPolicy) ||
+    !sameJson(
+      primary.inputClosure.scientificPresealBinding,
+      independent.inputClosure.scientificPresealBinding,
+    ) ||
     primary.inputClosure.scientificClosureSha256 !==
       independent.inputClosure.scientificClosureSha256
   ) {
@@ -1445,14 +1688,38 @@ export const nhm2SemiclassicalV2RawReplayManifestPairViolations = (
     violations.push("pair_root_topology_invalid");
   }
   const distinctPairs: Array<[unknown, unknown]> = [
-    [primary.implementation.implementationId, independent.implementation.implementationId],
-    [primary.implementation.sourceIdentity.identityId, independent.implementation.sourceIdentity.identityId],
-    [primary.implementation.sourceIdentity.sha256, independent.implementation.sourceIdentity.sha256],
-    [primary.implementation.dependencyIdentity.identityId, independent.implementation.dependencyIdentity.identityId],
-    [primary.implementation.dependencyIdentity.sha256, independent.implementation.dependencyIdentity.sha256],
-    [primary.implementation.executableIdentity.identityId, independent.implementation.executableIdentity.identityId],
-    [primary.implementation.executableIdentity.sha256, independent.implementation.executableIdentity.sha256],
-    [primary.inputClosure.completeClosureSha256, independent.inputClosure.completeClosureSha256],
+    [
+      primary.implementation.implementationId,
+      independent.implementation.implementationId,
+    ],
+    [
+      primary.implementation.sourceIdentity.identityId,
+      independent.implementation.sourceIdentity.identityId,
+    ],
+    [
+      primary.implementation.sourceIdentity.sha256,
+      independent.implementation.sourceIdentity.sha256,
+    ],
+    [
+      primary.implementation.dependencyIdentity.identityId,
+      independent.implementation.dependencyIdentity.identityId,
+    ],
+    [
+      primary.implementation.dependencyIdentity.sha256,
+      independent.implementation.dependencyIdentity.sha256,
+    ],
+    [
+      primary.implementation.executableIdentity.identityId,
+      independent.implementation.executableIdentity.identityId,
+    ],
+    [
+      primary.implementation.executableIdentity.sha256,
+      independent.implementation.executableIdentity.sha256,
+    ],
+    [
+      primary.inputClosure.completeClosureSha256,
+      independent.inputClosure.completeClosureSha256,
+    ],
     [
       primary.inputClosure.implementationRootDirectory,
       independent.inputClosure.implementationRootDirectory,
@@ -1463,11 +1730,13 @@ export const nhm2SemiclassicalV2RawReplayManifestPairViolations = (
     violations.push("implementations_not_genuinely_distinct");
   }
   const primaryOutputPaths = new Set(
-    collectNhm2SemiclassicalV2RawReplayOutputArrays(primary).map((entry) => entry.path),
+    collectNhm2SemiclassicalV2RawReplayOutputArrays(primary).map((entry) =>
+      portablePathIdentityKey(entry.path),
+    ),
   );
   if (
     collectNhm2SemiclassicalV2RawReplayOutputArrays(independent).some((entry) =>
-      primaryOutputPaths.has(entry.path),
+      primaryOutputPaths.has(portablePathIdentityKey(entry.path)),
     )
   ) {
     violations.push("implementation_output_paths_overlap");
@@ -1481,6 +1750,7 @@ export const collectNhm2SemiclassicalV2RawReplayOutputArrays = (
   manifest.arrays.noiseKernel,
   manifest.arrays.noiseKernelAbsoluteUncertainty95,
   manifest.arrays.meanRset,
+  manifest.arrays.meanRsetAbsoluteUncertainty95,
   manifest.arrays.smearingWeights,
   ...manifest.arrays.brackets.flatMap((entry) => [
     entry.computed,

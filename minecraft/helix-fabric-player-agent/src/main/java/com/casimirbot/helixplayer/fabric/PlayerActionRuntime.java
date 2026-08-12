@@ -4,10 +4,12 @@ import com.casimirbot.helixsensor.HelixJson;
 import com.casimirbot.helixsensor.snapshot.SectionHasher;
 import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.ActionRequest;
 import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.ManualOverridePolicy;
+import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.PlayerSnapshot;
 import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.State;
 import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.WorkflowEvent;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 
@@ -31,8 +34,19 @@ final class PlayerActionRuntime implements AutoCloseable {
         Map<String, Object> wire,
         String actionExecutionId,
         String startedAt,
+        Map<String, Object> startedClock,
         String controlEngine,
         List<String> progressEventRefs
+    ) {}
+
+    private record LocalDiagnosticEnvelope(
+        String actionRequestId,
+        String workflowId,
+        String actionKind,
+        Map<String, Object> arguments,
+        Map<String, Object> startingState,
+        String startedAt,
+        Map<String, Object> startedClock
     ) {}
 
     private final PlayerActionConfig config;
@@ -42,30 +56,37 @@ final class PlayerActionRuntime implements AutoCloseable {
     private final PlayerActionController controller;
     private final ExecutorService network;
     private final PlayerActionHttpClient http;
+    private final Consumer<String> localDiagnosticMessage;
     private final String producerEpochRef = id("environment_action_epoch");
     private final String manifestId = id("environment_action_manifest");
+    private final String executionClockId = id("minecraft_client_tick_clock");
     private final AtomicBoolean cyclePending = new AtomicBoolean(false);
     private final AtomicBoolean manifestPending = new AtomicBoolean(false);
     private final AtomicBoolean deliveryFlushPending = new AtomicBoolean(false);
     private volatile boolean manifestReady;
     private volatile boolean heartbeatReady;
     private volatile boolean emergencyStopLatched;
+    private volatile boolean eventStreamResyncRequired;
     private volatile boolean manualInputDetected;
     private volatile long latestEventSequence = -1;
     private volatile String lastTransportError = "";
     private volatile ActiveEnvelope activeEnvelope;
+    private volatile LocalDiagnosticEnvelope localDiagnosticEnvelope;
     private final PlayerActionDeliveryOutbox deliveryOutbox =
         new PlayerActionDeliveryOutbox(MAX_PENDING_DELIVERIES);
+    private volatile Map<String, Object> latestClockSnapshot = Map.of();
     private long ticks;
 
     PlayerActionRuntime(
         PlayerActionConfig config,
         Minecraft minecraft,
-        Logger logger
+        Logger logger,
+        Consumer<String> localDiagnosticMessage
     ) {
         this.config = config;
         this.minecraft = minecraft;
         this.logger = logger;
+        this.localDiagnosticMessage = localDiagnosticMessage;
         this.bridge = new NativeFabricControlBridge(minecraft);
         this.controller = new PlayerActionController(bridge, this::onWorkflowEvent);
         this.network = Executors.newSingleThreadExecutor(runnable -> {
@@ -82,9 +103,25 @@ final class PlayerActionRuntime implements AutoCloseable {
     }
 
     void tick() {
-        controller.tick();
-        if (!config.ready() || http == null) return;
+        if (eventStreamResyncRequired) {
+            // The server can no longer admit the immutable evidence sequence
+            // for this producer epoch. Never continue acting while terminal
+            // evidence is stranded behind that boundary.
+            bridge.releaseAll();
+        } else if (activeControlPlaneFailureRequiresStop(
+            controller.activeWorkflowId(),
+            lastTransportError
+        )) {
+            controller.connectorOffline(
+                "The Helix action transport became unreachable; the client released every control and retained the terminal event for later delivery."
+            );
+            bridge.releaseAll();
+        } else {
+            controller.tick();
+        }
         ticks++;
+        latestClockSnapshot = captureClockSnapshot(ticks);
+        if (!config.ready() || http == null) return;
         if (!connectedIdentityMatches()) {
             if (controller.activeWorkflowId() != null) {
                 controller.emergencyStop("The exact paired Minecraft player is no longer connected.");
@@ -104,6 +141,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         if (ticks % HEARTBEAT_INTERVAL_TICKS == 0) {
             if (manifestReady) network.execute(this::publishHeartbeat);
         }
+        if (eventStreamResyncRequired) return;
         if (
             actionPollingReady(manifestReady, heartbeatReady) &&
             ticks % POLL_INTERVAL_TICKS == 0 &&
@@ -120,18 +158,102 @@ final class PlayerActionRuntime implements AutoCloseable {
     }
 
     boolean ready() {
-        return config.ready() && manifestReady && heartbeatReady && !emergencyStopLatched;
+        return config.ready() && manifestReady && heartbeatReady &&
+            !emergencyStopLatched && !eventStreamResyncRequired;
     }
 
     String statusText() {
         if (!config.ready()) return "Helix player embodiment is not paired.";
         if (emergencyStopLatched) return "Helix player embodiment is emergency-stopped; pair a fresh authority to resume.";
+        if (eventStreamResyncRequired) {
+            return "Helix player embodiment needs a fresh pairing because its evidence stream no longer matches the server epoch.";
+        }
         if (!manifestReady) return "Helix player embodiment is paired and waiting for manifest admission.";
         if (!heartbeatReady) return "Helix player embodiment is paired and waiting for its first admitted heartbeat.";
         String workflow = controller.activeWorkflowId();
         return workflow == null
             ? "Helix player embodiment is active and idle."
             : "Helix player embodiment is running workflow " + workflow + ".";
+    }
+
+    String localDiagnosticStatusText() {
+        LocalDiagnosticEnvelope diagnostic = localDiagnosticEnvelope;
+        if (diagnostic == null) return "Helix direct diagnostics are idle.";
+        return "Helix direct diagnostic workflow " + diagnostic.workflowId() +
+            " is running action " + diagnostic.actionKind() + ".";
+    }
+
+    String startLocalDiagnostic(
+        String actionKind,
+        Map<String, Object> arguments,
+        long maxDurationTicks
+    ) {
+        if (minecraft.player == null || minecraft.getConnection() == null) {
+            return "Helix direct diagnostics require an active Minecraft world connection.";
+        }
+        if (emergencyStopLatched) {
+            return "Helix direct diagnostics are unavailable while the local emergency stop is latched.";
+        }
+        if (activeEnvelope != null || localDiagnosticEnvelope != null ||
+            controller.activeWorkflowId() != null) {
+            return "Helix cannot start a direct diagnostic while another player workflow is active.";
+        }
+        if (!List.of("walk", "jump", "look_at").contains(actionKind)) {
+            return "Helix direct diagnostics do not expose that action kind.";
+        }
+        String actionRequestId = id("direct_player_action_request");
+        String workflowId = id("direct_player_action_workflow");
+        PlayerSnapshot initialSnapshot = bridge.snapshot();
+        Map<String, Object> startingState = new LinkedHashMap<>();
+        startingState.put("connected", initialSnapshot.connected());
+        startingState.put("x", initialSnapshot.x());
+        startingState.put("y", initialSnapshot.y());
+        startingState.put("z", initialSnapshot.z());
+        startingState.put("yaw", initialSnapshot.yaw());
+        startingState.put("pitch", initialSnapshot.pitch());
+        startingState.put("health", initialSnapshot.health());
+        startingState.put("on_ground", initialSnapshot.onGround());
+        LocalDiagnosticEnvelope diagnostic = new LocalDiagnosticEnvelope(
+            actionRequestId,
+            workflowId,
+            actionKind,
+            Map.copyOf(arguments),
+            Map.copyOf(startingState),
+            Instant.now().toString(),
+            clockSnapshot()
+        );
+        localDiagnosticEnvelope = diagnostic;
+        ActionRequest request = new ActionRequest(
+            actionRequestId,
+            workflowId,
+            actionKind,
+            arguments,
+            Math.max(1, Math.min(36_000, maxDurationTicks)),
+            ManualOverridePolicy.CANCEL,
+            "native_fabric"
+        );
+        if (!controller.start(request)) {
+            localDiagnosticEnvelope = null;
+            return "Helix could not start the direct diagnostic because the player controller is busy.";
+        }
+        Map<String, Object> record = localDiagnosticBase(diagnostic);
+        record.put("schema", "helix.minecraft.player.direct_diagnostic_request.v1");
+        record.put("event_type", "diagnostic.requested");
+        record.put("max_duration_ticks", request.maxDurationTicks());
+        logger.info("HELIX_PLAYER_DIRECT_DIAGNOSTIC {}", HelixJson.stringify(record));
+        return "Helix started direct diagnostic " + workflowId + " for " + actionKind + ".";
+    }
+
+    String cancelLocalDiagnostic() {
+        LocalDiagnosticEnvelope diagnostic = localDiagnosticEnvelope;
+        if (diagnostic == null) return "No Helix direct diagnostic is running.";
+        if (!controller.cancel(
+            diagnostic.workflowId(),
+            "The local operator canceled the direct diagnostic."
+        )) {
+            return "The Helix direct diagnostic was no longer running.";
+        }
+        return "Helix canceled the direct diagnostic and released every asserted control.";
     }
 
     void localEmergencyStop(String reason) {
@@ -206,6 +328,7 @@ final class PlayerActionRuntime implements AutoCloseable {
             if (
                 emergencyStopLatched ||
                 activeEnvelope != null ||
+                localDiagnosticEnvelope != null ||
                 !deliveryOutbox.isEmpty()
             ) return;
             PlayerActionHttpClient.Response actions = http.get("/requests/pending?limit=1");
@@ -216,6 +339,10 @@ final class PlayerActionRuntime implements AutoCloseable {
             List<Object> requests = HelixJson.asList(actions.body().get("action_requests"));
             if (!requests.isEmpty()) {
                 Map<String, Object> request = HelixJson.asObject(requests.get(0));
+                // A successful leased-work poll is the control-plane contact
+                // that authorizes this exact local action to begin. Do not let
+                // an older, already-recovered transport error cancel it.
+                clearTransportError();
                 runOnClient(() -> {
                     accept(request);
                     return Boolean.TRUE;
@@ -253,6 +380,7 @@ final class PlayerActionRuntime implements AutoCloseable {
                 new LinkedHashMap<>(wire),
                 id("environment_action_execution"),
                 Instant.now().toString(),
+                clockSnapshot(),
                 resolvedEngine,
                 new ArrayList<>()
             );
@@ -307,6 +435,14 @@ final class PlayerActionRuntime implements AutoCloseable {
     }
 
     private void onWorkflowEvent(WorkflowEvent event) {
+        LocalDiagnosticEnvelope diagnostic = localDiagnosticEnvelope;
+        if (
+            diagnostic != null &&
+            event.workflowId().equals(diagnostic.workflowId())
+        ) {
+            onLocalDiagnosticEvent(diagnostic, event);
+            return;
+        }
         ActiveEnvelope envelope = activeEnvelope;
         if (envelope == null || !event.workflowId().equals(text(envelope.wire(), "workflow_id"))) return;
         String eventId = id("environment_action_event");
@@ -325,6 +461,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         payload.put("summary", event.summary());
         payload.put("control_engine", envelope.controlEngine());
         payload.put("measurements", event.measurements());
+        payload.put("clock", clockSnapshot());
         payload.put("evidence_refs", List.of());
         payload.put("manual_override_detected", event.manualOverrideDetected());
         payload.put("controls_released", event.controlsReleased());
@@ -343,6 +480,7 @@ final class PlayerActionRuntime implements AutoCloseable {
                 envelope.wire(),
                 envelope.actionExecutionId(),
                 envelope.startedAt(),
+                envelope.startedClock(),
                 outcome(event.state()),
                 event.summary(),
                 envelope.progressEventRefs(),
@@ -384,6 +522,54 @@ final class PlayerActionRuntime implements AutoCloseable {
         scheduleDeliveryFlush();
     }
 
+    private void onLocalDiagnosticEvent(
+        LocalDiagnosticEnvelope diagnostic,
+        WorkflowEvent event
+    ) {
+        Map<String, Object> record = localDiagnosticBase(diagnostic);
+        record.put("schema", "helix.minecraft.player.direct_diagnostic_event.v1");
+        record.put("event_type", event.eventType());
+        record.put("sequence", event.sequence());
+        record.put("workflow_state", wireState(event.state()));
+        record.put("progress_fraction", event.progressFraction());
+        record.put("summary", event.summary());
+        record.put("measurements", event.measurements());
+        record.put("clock", clockSnapshot());
+        record.put("manual_override_detected", event.manualOverrideDetected());
+        record.put("controls_released", event.controlsReleased());
+        record.put("created_at", Instant.now().toString());
+        logger.info("HELIX_PLAYER_DIRECT_DIAGNOSTIC {}", HelixJson.stringifyIncludingNulls(record));
+        if (terminal(event.state())) {
+            localDiagnosticEnvelope = null;
+            localDiagnosticMessage.accept(
+                "Helix direct diagnostic " + wireState(event.state()) +
+                ": " + event.summary() + " Measurements: " +
+                HelixJson.stringify(event.measurements())
+            );
+        }
+    }
+
+    private Map<String, Object> localDiagnosticBase(
+        LocalDiagnosticEnvelope diagnostic
+    ) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("lane", "direct_codex_reference");
+        record.put("action_request_id", diagnostic.actionRequestId());
+        record.put("workflow_id", diagnostic.workflowId());
+        record.put("action_kind", diagnostic.actionKind());
+        record.put("arguments", diagnostic.arguments());
+        record.put("starting_state", diagnostic.startingState());
+        record.put("started_at", diagnostic.startedAt());
+        record.put("started_clock", diagnostic.startedClock());
+        record.put("control_engine", "native_fabric");
+        record.put("admission_status", "local_operator_diagnostic");
+        record.put("helix_terminal_authority_status", "not_applicable");
+        record.put("assistant_answer", false);
+        record.put("terminal_eligible", false);
+        record.put("raw_content_included", false);
+        return record;
+    }
+
     private void scheduleDeliveryFlush() {
         if (!deliveryFlushPending.compareAndSet(false, true)) return;
         network.execute(() -> {
@@ -404,11 +590,20 @@ final class PlayerActionRuntime implements AutoCloseable {
                     delivery.payload()
                 );
                 if (!receipt.ok()) {
-                    recordTransportError(PlayerActionDeliveryOutbox.transportErrorCode(
+                    String transportError = PlayerActionDeliveryOutbox.transportErrorCode(
                         delivery.stage(),
                         receipt.statusCode(),
                         receipt.error()
-                    ));
+                    );
+                    recordTransportError(transportError);
+                    if (requiresFreshProducerEpoch(transportError)) {
+                        eventStreamResyncRequired = true;
+                        bridge.releaseAll();
+                        logger.error(
+                            "Helix player-action evidence stream requires a fresh pairing; controls were released and no further actions will be polled."
+                        );
+                        network.execute(this::publishHeartbeat);
+                    }
                     return false;
                 }
                 deliveryOutbox.acknowledge(delivery);
@@ -464,6 +659,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         attributes.put("actor", actor);
         attributes.put("active_workflow", activeWorkflow);
         attributes.put("workflow_measurements", workflowEvent.measurements());
+        attributes.put("clock", clockSnapshot());
         attributes.put("action_event_ref", actionEventId);
 
         String streamEventId = id("environment_event");
@@ -512,6 +708,7 @@ final class PlayerActionRuntime implements AutoCloseable {
             wire,
             id("environment_action_execution"),
             null,
+            null,
             outcome,
             summary,
             List.of(),
@@ -535,6 +732,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         Map<String, Object> wire,
         String executionId,
         String startedAt,
+        Map<String, Object> startedClock,
         String outcome,
         String summary,
         List<String> eventRefs,
@@ -578,6 +776,19 @@ final class PlayerActionRuntime implements AutoCloseable {
         result.put("progress_event_refs", List.copyOf(eventRefs));
         result.put("postconditions", postconditions);
         result.put("evidence_refs", List.copyOf(eventRefs));
+        Map<String, Object> completedClock = clockSnapshot();
+        result.put("started_clock", startedClock);
+        result.put("completed_clock", completedClock);
+        result.put(
+            "duration_ticks",
+            startedClock == null
+                ? null
+                : Math.max(
+                    0,
+                    longNumber(completedClock, "tick_index") -
+                        longNumber(startedClock, "tick_index")
+                )
+        );
         boolean motionKind = List.of(
             "navigate_to", "look_at", "walk", "jump", "follow", "collect", "mine", "place"
         ).contains(actionKind);
@@ -594,23 +805,33 @@ final class PlayerActionRuntime implements AutoCloseable {
             "world_mutations_performed"
         );
         boolean executionStarted = startedAt != null;
+        boolean actionAppliedBeforeManualOverride =
+            !manualOverride || positiveMeasurement(
+                measurements,
+                "action_ticks_before_override"
+            );
+        boolean executionPerformed = executionStarted && actionAppliedBeforeManualOverride;
         result.put(
             "side_effects_performed",
-            executionStarted && (
+            executionPerformed && (
                 motionKind || interactionKind || directInventoryKind ||
                 measuredInventoryMutation || measuredWorldMutation
             )
         );
-        result.put("player_motion_performed", motionKind && executionStarted);
-        result.put("player_interaction_performed", interactionKind && executionStarted);
+        result.put("player_motion_performed", motionKind && executionPerformed);
+        result.put("player_interaction_performed", interactionKind && executionPerformed);
         result.put(
             "inventory_mutation_performed",
-            executionStarted && (
+            executionPerformed && (
                 directInventoryKind || measuredInventoryMutation
             )
         );
-        result.put("world_mutation_performed", executionStarted && measuredWorldMutation);
+        result.put("world_mutation_performed", executionPerformed && measuredWorldMutation);
         result.put("manual_override_detected", manualOverride);
+        result.put(
+            "manual_override_reason",
+            manualOverride ? measurements.get("manual_input_reason") : null
+        );
         result.put("controls_released", true);
         result.put("host_access_performed", false);
         result.put("automatic_replay_performed", false);
@@ -689,10 +910,17 @@ final class PlayerActionRuntime implements AutoCloseable {
         heartbeat.put("subject_binding_id", config.subjectBindingId());
         heartbeat.put(
             "status",
-            connectorHeartbeatStatus(emergencyStopLatched, lastTransportError)
+            connectorHeartbeatStatus(
+                emergencyStopLatched,
+                eventStreamResyncRequired,
+                lastTransportError
+            )
         );
         heartbeat.put("active_workflow_ids", workflow == null ? List.of() : List.of(workflow));
-        heartbeat.put("controls_asserted", running && !emergencyStopLatched);
+        heartbeat.put(
+            "controls_asserted",
+            running && !emergencyStopLatched && !eventStreamResyncRequired
+        );
         heartbeat.put("manual_input_detected", manualInputDetected);
         heartbeat.put("emergency_stop_latched", emergencyStopLatched);
         List<Map<String, Object>> engineStates = new ArrayList<>();
@@ -713,6 +941,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         }
         heartbeat.put("control_engines", engineStates);
         heartbeat.put("latest_event_sequence", latestEventSequence < 0 ? null : latestEventSequence);
+        heartbeat.put("clock", clockSnapshot());
         heartbeat.put("evidence_refs", List.of());
         heartbeat.put("created_at", Instant.now().toString());
         heartbeat.put("credential_included", false);
@@ -795,6 +1024,32 @@ final class PlayerActionRuntime implements AutoCloseable {
         return future.get();
     }
 
+    private Map<String, Object> captureClockSnapshot(long clientTick) {
+        Long worldTick = minecraft.level == null
+            ? null
+            : Math.max(0L, minecraft.level.getGameTime());
+        Map<String, Object> clock = new LinkedHashMap<>();
+        clock.put("schema", "helix.environment_clock_snapshot.v1");
+        clock.put("clock_id", executionClockId);
+        clock.put("clock_kind", "minecraft_game_tick");
+        clock.put("tick_rate_hz", 20);
+        clock.put("tick_index", Math.max(0L, clientTick));
+        clock.put("world_tick_index", worldTick);
+        clock.put(
+            "synchronization",
+            worldTick == null ? "client_local" : "server_synchronized"
+        );
+        clock.put("observed_at", Instant.now().toString());
+        return Collections.unmodifiableMap(clock);
+    }
+
+    private Map<String, Object> clockSnapshot() {
+        Map<String, Object> snapshot = latestClockSnapshot;
+        return snapshot.isEmpty()
+            ? captureClockSnapshot(Math.max(0L, ticks))
+            : new LinkedHashMap<>(snapshot);
+    }
+
     private void recordTransportError(String error) {
         if (!error.equals(lastTransportError)) {
             logger.warn("Helix player-action connector degraded: {}", error);
@@ -817,15 +1072,35 @@ final class PlayerActionRuntime implements AutoCloseable {
         return manifestReady && heartbeatReady;
     }
 
+    static boolean activeControlPlaneFailureRequiresStop(
+        String activeWorkflowId,
+        String transportError
+    ) {
+        return activeWorkflowId != null &&
+            transportError != null &&
+            !transportError.isBlank();
+    }
+
     static String connectorHeartbeatStatus(
         boolean emergencyStopLatched,
+        boolean eventStreamResyncRequired,
         String previousTransportError
     ) {
         // Reaching the heartbeat endpoint is itself the recovery probe. A
         // previous poll/transport error remains diagnostic engine metadata but
         // must not make the recovery heartbeat fail the broker's active-status
         // gate forever.
-        return emergencyStopLatched ? "paused" : "active";
+        if (emergencyStopLatched) return "paused";
+        if (eventStreamResyncRequired || requiresFreshProducerEpoch(previousTransportError)) {
+            return "error";
+        }
+        return "active";
+    }
+
+    static boolean requiresFreshProducerEpoch(String transportError) {
+        return transportError != null && transportError.equals(
+            "action_delivery_environment_event_batch_http_409_action_event_conflict"
+        );
     }
 
     private static String wireState(State state) {
@@ -894,6 +1169,10 @@ final class PlayerActionRuntime implements AutoCloseable {
         Object value = map.get(key);
         if (!(value instanceof Number number)) throw new IllegalArgumentException("Missing " + key);
         return number;
+    }
+
+    private static long longNumber(Map<String, Object> map, String key) {
+        return number(map, key).longValue();
     }
 
     private static boolean positiveMeasurement(Map<String, Object> map, String key) {

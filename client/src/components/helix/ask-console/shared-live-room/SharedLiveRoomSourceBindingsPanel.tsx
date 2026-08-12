@@ -56,7 +56,7 @@ const commandMemberGrantPath = (
   participantId: string,
 ): string =>
   `${environmentsPath(roomId)}/${encodeURIComponent(environmentBindingId)}/participants/${encodeURIComponent(participantId)}/command-grant`;
-const ENVIRONMENT_REFRESH_INTERVAL_MS = 3_000;
+const ENVIRONMENT_REFRESH_INTERVAL_MS = 10_000;
 const ENVIRONMENT_REFRESH_MAX_BACKOFF_MS = 30_000;
 
 type SafeCredentialDelivery = {

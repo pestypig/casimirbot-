@@ -1,0 +1,126 @@
+{
+  "schema_version": "casimir_dp_retarded_source_propagation_stage4_2s/1",
+  "campaign_id": "casimir-dp-retarded-source-propagation-stage4-2s-v1",
+  "evidence_class": "analytic_and_synthetic_ordinary_em_recovery_only",
+  "claim_ceiling": "retarded_source_ordinary_null_contract_and_software_recovery_only",
+  "promotion_allowed": false,
+  "collapse_bridge_edges_allowed": false,
+  "run_order": [
+    "verify_immutable_stage4_2r_evidence",
+    "freeze_source_spectrum_and_geometry_contract",
+    "recover_retarded_point_charge_radiation",
+    "recover_current_conservation_transversality_and_polarization",
+    "classify_quasistatic_transition_and_retarded_source_scales",
+    "propagate_synthetic_source_through_branch_green_response",
+    "map_ordinary_response_to_phase_loss_recoil_heating_and_complex_coherence",
+    "audit_same_apparatus_empirical_authorities",
+    "return_ordinary_null_input_or_explicit_no_go"
+  ],
+  "upstream": {
+    "stage4_2r_campaign_receipt_path": "docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-campaign-receipt.json",
+    "stage4_2r_campaign_receipt_sha256": "2f2707eb58f0a6e22c8dc91d2dec3046691b3259d05e27b4f56d0a0bc8e8eb02",
+    "stage4_2r_verification_receipt_path": "docs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r-verification-receipt.json",
+    "stage4_2r_verification_receipt_sha256": "92fcbf2c5a96aae98a430a6502a877a104c9bb700325c60d2fd04a71e8c84e96"
+  },
+  "constants": {
+    "c_m_s": 299792458,
+    "epsilon0_F_m": 8.8541878128e-12,
+    "hbar_J_s": 1.054571817e-34
+  },
+  "apparatus": {
+    "characteristic_length_m": 0.00008,
+    "branch_separation_m": 2.5e-7,
+    "hold_time_s": 0.25,
+    "boundary_modulation_Hz": 0.5,
+    "frozen_diosi_model_id": "diosi_1989_gaussian_regularized_nondissipative",
+    "frozen_diosi_modified": false
+  },
+  "analytic_benchmark": {
+    "point_charge_C": 1.602176634e-19,
+    "acceleration_m_s2": 1e15,
+    "observation_distance_m": 0.1,
+    "observation_angle_rad": 1.5707963267948966,
+    "angular_quadrature_points": 10000,
+    "maximum_relative_error": 1e-7,
+    "maximum_absolute_transversality_error": 1e-15,
+    "maximum_current_conservation_residual": 1e-15,
+    "maximum_polarization_projector_error": 1e-15
+  },
+  "source_spectrum": [
+    {
+      "source_id": "boundary_modulation_fundamental",
+      "evidence_class": "frozen_design_frequency_only",
+      "frequency_Hz": 0.5,
+      "wavelength_m": null,
+      "current_map_receipt_available": false,
+      "measured_waveform_receipt_available": false,
+      "notes": "The 0.5-Hz design label is frozen; no source amplitude, edge spectrum, or measured transfer is asserted."
+    },
+    {
+      "source_id": "boundary_switching_edge_benchmark",
+      "evidence_class": "synthetic_recovery_benchmark",
+      "frequency_Hz": 1000,
+      "wavelength_m": null,
+      "current_map_receipt_available": false,
+      "measured_waveform_receipt_available": false,
+      "notes": "A 1-kHz scale is used only to demonstrate that switching edges require their own spectrum; it is not an apparatus rise-time claim."
+    },
+    {
+      "source_id": "rf_control_benchmark",
+      "evidence_class": "synthetic_recovery_benchmark",
+      "frequency_Hz": 1000000,
+      "wavelength_m": null,
+      "current_map_receipt_available": false,
+      "measured_waveform_receipt_available": false,
+      "notes": "Representative algebraic RF benchmark only; the actual trap/control spectrum remains an empirical authority."
+    },
+    {
+      "source_id": "optical_readout_benchmark_1550nm",
+      "evidence_class": "synthetic_recovery_benchmark",
+      "frequency_Hz": 193414489032258.06,
+      "wavelength_m": 0.00000155,
+      "current_map_receipt_available": false,
+      "measured_waveform_receipt_available": false,
+      "notes": "The 1550-nm row is a propagation-scale benchmark and does not select the final readout wavelength."
+    }
+  ],
+  "synthetic_green_fixture": {
+    "source_id": "optical_readout_benchmark_1550nm",
+    "field_scale_V_m": 1,
+    "source_jones": [
+      { "re": 0.7071067811865475, "im": 0 },
+      { "re": 0, "im": 0.7071067811865475 },
+      { "re": 0, "im": 0 }
+    ],
+    "branch_a_green": [
+      [{ "re": 1, "im": 0 }, { "re": 0, "im": 0 }, { "re": 0, "im": 0 }],
+      [{ "re": 0, "im": 0 }, { "re": 1, "im": 0 }, { "re": 0, "im": 0 }],
+      [{ "re": 0, "im": 0 }, { "re": 0, "im": 0 }, { "re": 0, "im": 0 }]
+    ],
+    "branch_b_green": [
+      [{ "re": 0.999, "im": 0.001 }, { "re": 0.002, "im": 0 }, { "re": 0, "im": 0 }],
+      [{ "re": -0.002, "im": 0 }, { "re": 0.999, "im": -0.001 }, { "re": 0, "im": 0 }],
+      [{ "re": 0, "im": 0 }, { "re": 0, "im": 0 }, { "re": 0, "im": 0 }]
+    ],
+    "polarizability_re_SI": 1e-38,
+    "polarizability_im_SI": 1e-42
+  },
+  "authority_packets": [
+    { "authority_id": "measured_source_current_maps_and_waveforms", "status": "absent", "receipt_path": null, "receipt_sha256": null, "independent_custodian": null, "measured_on_leading_apparatus": false, "covariance_ancestry_frozen": false, "notes": "Requires synchronized current, voltage, optical, RF, compensation, and switching waveforms including edge spectra." },
+    { "authority_id": "as_built_retarded_green_tensor", "status": "absent", "receipt_path": null, "receipt_sha256": null, "independent_custodian": null, "measured_on_leading_apparatus": false, "covariance_ancestry_frozen": false, "notes": "Requires metrology-bound CAD/mesh response from every source to both branches and detector channels." },
+    { "authority_id": "measured_complex_material_response", "status": "absent", "receipt_path": null, "receipt_sha256": null, "independent_custodian": null, "measured_on_leading_apparatus": false, "covariance_ancestry_frozen": false, "notes": "Requires temperature-matched complex dielectric, impedance, coating, and contamination response across the source spectrum." },
+    { "authority_id": "branch_geometry_and_polarization_transfer", "status": "absent", "receipt_path": null, "receipt_sha256": null, "independent_custodian": null, "measured_on_leading_apparatus": false, "covariance_ancestry_frozen": false, "notes": "Requires three-dimensional branch vectors, plate normals, apertures, polarization states, and measured basis transfer." },
+    { "authority_id": "switching_edge_spectral_coverage", "status": "absent", "receipt_path": null, "receipt_sha256": null, "independent_custodian": null, "measured_on_leading_apparatus": false, "covariance_ancestry_frozen": false, "notes": "Requires a measured bandwidth proving that switching harmonics and ringing are contained in the propagated model." },
+    { "authority_id": "phase_loss_recoil_heating_covariance", "status": "absent", "receipt_path": null, "receipt_sha256": null, "independent_custodian": null, "measured_on_leading_apparatus": false, "covariance_ancestry_frozen": false, "notes": "Requires joint response and covariance from propagated fields into complex coherence, recoil, heating, and witnesses." },
+    { "authority_id": "independent_solver_and_energy_balance", "status": "absent", "receipt_path": null, "receipt_sha256": null, "independent_custodian": null, "measured_on_leading_apparatus": false, "covariance_ancestry_frozen": false, "notes": "Requires independent full-wave agreement plus Poynting/source-work and passivity checks on the as-built geometry." }
+  ],
+  "standing": {
+    "measured_evidence": "not_ready",
+    "ordinary_null_authority": "not_ready",
+    "retarded_source_covariance": "not_ready",
+    "residual_attribution": "blocked",
+    "collapse_identification": "blocked",
+    "manifold_dynamics": "blocked",
+    "physical_viability": "not_evaluated"
+  }
+}

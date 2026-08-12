@@ -3,6 +3,11 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { viteStaticCopy } from "vite-plugin-static-copy";
+import { lucideDirectImports } from "./scripts/vite-lucide-direct-imports";
+import {
+  isProductionRuntimeExternal,
+  productionRuntimeVendors,
+} from "./scripts/vite-production-runtime-vendors";
 
 const repoRoot = import.meta.dirname;
 const clientRoot = path.resolve(repoRoot, "client");
@@ -14,6 +19,20 @@ const treeSitterSources = [
   "node_modules/tree-sitter-typescript/tree-sitter-typescript.wasm",
   "node_modules/tree-sitter-typescript/tree-sitter-tsx.wasm",
   "node_modules/tree-sitter-javascript/tree-sitter-javascript.wasm",
+];
+const productionVendorTargets = [
+  {
+    src: toClientRelative("node_modules/plotly.js/dist/plotly.min.js"),
+    dest: "vendor/plotly",
+  },
+  {
+    src: toClientRelative("node_modules/mermaid/dist/mermaid.esm.min.mjs"),
+    dest: "vendor/mermaid",
+  },
+  {
+    src: `${toClientRelative("node_modules/mermaid/dist/chunks/mermaid.esm.min")}/*.mjs`,
+    dest: "vendor/mermaid/chunks/mermaid.esm.min",
+  },
 ];
 
 const WEB_TREE_SITTER_ENTRY = "node_modules/web-tree-sitter/tree-sitter.js";
@@ -122,13 +141,18 @@ export default defineConfig({
     react(),
     runtimeErrorOverlay(),
     viteStaticCopy({
-      targets: treeSitterSources.map((source: string) => ({
-        src: toClientRelative(source),
-        dest: "treesitter",
-      })),
+      targets: [
+        ...treeSitterSources.map((source: string) => ({
+          src: toClientRelative(source),
+          dest: "treesitter",
+        })),
+        ...productionVendorTargets,
+      ],
     }),
     webTreeSitterNodeShim(),
     productionRawContentModuleStub(),
+    lucideDirectImports(repoRoot),
+    productionRuntimeVendors(repoRoot),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -160,6 +184,9 @@ export default defineConfig({
     emptyOutDir: true,
     modulePreload: false,
     reportCompressedSize: false,
+    rollupOptions: {
+      external: isProductionRuntimeExternal,
+    },
   },
   optimizeDeps: {
     exclude: ["web-tree-sitter"],

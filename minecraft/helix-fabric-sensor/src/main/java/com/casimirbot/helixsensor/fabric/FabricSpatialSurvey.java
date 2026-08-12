@@ -30,6 +30,7 @@ final class FabricSpatialSurvey {
     private static final int MAX_ANCHORS = 32;
     private static final int MAX_FIREPLACE_CANDIDATES = 16;
     private static final int MAX_BUILD_LINE_CANDIDATES = 16;
+    private static final int MAX_WALK_STEP_CANDIDATES = 4;
     private static final int MAX_TARGET_MISMATCH_SAMPLES = 32;
     private static final int MAX_TARGET_VERIFICATION_CELLS = 4_096;
     private static final int MIN_BUILD_LINE_LENGTH = 3;
@@ -47,7 +48,8 @@ final class FabricSpatialSurvey {
         "build_planning",
         "structure_verification",
         "fire_safety",
-        "landing_safety"
+        "landing_safety",
+        "movement_safety"
     );
     private static final Set<String> HEARTH_BASES = Set.of(
         "minecraft:netherrack",
@@ -83,6 +85,7 @@ final class FabricSpatialSurvey {
         Integer requestedHeight,
         String requestedOrientation,
         String requestedRelativeSide,
+        float requestedActorYawDegrees,
         BlockPos requestedVerificationFrom,
         BlockPos requestedVerificationTo,
         String requestedExpectedBlock
@@ -332,6 +335,14 @@ final class FabricSpatialSurvey {
                 .limit(MAX_BUILD_LINE_CANDIDATES)
                 .toList()
         );
+        List<Map<String, Object>> walkStepCandidates =
+            purpose.equals("movement_safety")
+                ? walkStepCandidates(
+                    cells,
+                    center,
+                    requestedActorYawDegrees
+                )
+                : List.of();
         Map<String, Object> targetGeometryVerification =
             purpose.equals("structure_verification")
                 ? verifyTargetGeometry(
@@ -403,6 +414,13 @@ final class FabricSpatialSurvey {
             "omitted_build_line_candidate_count",
             allBuildLineCandidates.size() - buildLineCandidates.size()
         );
+        details.put("walk_step_candidates", walkStepCandidates);
+        details.put("walk_step_candidates_complete", true);
+        details.put(
+            "retained_walk_step_candidate_count",
+            walkStepCandidates.size()
+        );
+        details.put("omitted_walk_step_candidate_count", 0);
         if (targetGeometryVerification != null) {
             details.put(
                 "target_geometry_verification",
@@ -833,6 +851,110 @@ final class FabricSpatialSurvey {
         if (dx == 0 && dz == 0) return "overlap";
         if (Math.abs(dx) >= Math.abs(dz)) return dx < 0 ? "west" : "east";
         return dz < 0 ? "north" : "south";
+    }
+
+    /**
+     * Produces four conservative, actor-relative one-block movement
+     * affordances.  These are evidence, not a movement decision: the runtime
+     * model still chooses whether to act, while Helix can prove that the
+     * chosen relative direction was actually represented by fresh geometry.
+     */
+    private static List<Map<String, Object>> walkStepCandidates(
+        Map<BlockPos, Cell> cells,
+        BlockPos center,
+        float actorYawDegrees
+    ) {
+        String[] cardinalDirections = {"south", "west", "north", "east"};
+        int[] deltaX = {0, -1, 0, 1};
+        int[] deltaZ = {1, 0, -1, 0};
+        int facingIndex = Math.floorMod(
+            Math.round(actorYawDegrees / 90.0F),
+            cardinalDirections.length
+        );
+        List<Map<String, Object>> candidates = new ArrayList<>(
+            MAX_WALK_STEP_CANDIDATES
+        );
+        for (int index = 0; index < cardinalDirections.length; index++) {
+            BlockPos targetFeet = center.offset(deltaX[index], 0, deltaZ[index]);
+            BlockPos targetHead = targetFeet.above();
+            BlockPos supportPosition = targetFeet.below();
+            Cell feet = cells.get(targetFeet);
+            Cell head = cells.get(targetHead);
+            Cell support = cells.get(supportPosition);
+            boolean evidenceComplete = feet != null && head != null && support != null;
+            boolean feetClear = isStrictMovementClearance(feet);
+            boolean headClear = isStrictMovementClearance(head);
+            boolean supportSolidNonhazardous =
+                support != null &&
+                support.has("solid") &&
+                !support.has("fluid") &&
+                !support.has("hazard");
+            int nearbyHazardCount = 0;
+            int nearbyFluidCount = 0;
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 2; dy++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        Cell nearby = cells.get(targetFeet.offset(dx, dy, dz));
+                        if (nearby == null) {
+                            evidenceComplete = false;
+                            continue;
+                        }
+                        if (nearby.has("hazard")) nearbyHazardCount++;
+                        if (nearby.has("fluid")) nearbyFluidCount++;
+                    }
+                }
+            }
+            boolean safe =
+                evidenceComplete &&
+                feetClear &&
+                headClear &&
+                supportSolidNonhazardous &&
+                nearbyHazardCount == 0 &&
+                nearbyFluidCount == 0;
+            int relativeOffset = Math.floorMod(index - facingIndex, 4);
+            String relativeDirection = switch (relativeOffset) {
+                case 0 -> "forward";
+                case 1 -> "right";
+                case 2 -> "back";
+                default -> "left";
+            };
+            Map<String, Object> candidate = new LinkedHashMap<>();
+            candidate.put("cardinal_direction", cardinalDirections[index]);
+            candidate.put("relative_direction", relativeDirection);
+            candidate.put("target_feet_position", position(targetFeet));
+            candidate.put("target_head_position", position(targetHead));
+            candidate.put("support_position", position(supportPosition));
+            candidate.put(
+                "support_block",
+                support == null ? "helix:unobserved" : support.block()
+            );
+            candidate.put("evidence_complete", evidenceComplete);
+            candidate.put("feet_clear", feetClear);
+            candidate.put("head_clear", headClear);
+            candidate.put(
+                "support_solid_nonhazardous",
+                supportSolidNonhazardous
+            );
+            candidate.put("nearby_hazard_count", nearbyHazardCount);
+            candidate.put("nearby_fluid_count", nearbyFluidCount);
+            candidate.put("safe_candidate", safe);
+            candidates.add(candidate);
+        }
+        return List.copyOf(candidates);
+    }
+
+    private static boolean isStrictMovementClearance(Cell cell) {
+        if (cell == null) return false;
+        return (
+            cell.has("air") ||
+            (
+                cell.has("replaceable") &&
+                !cell.has("solid") &&
+                !cell.has("block_entity")
+            )
+        ) &&
+            !cell.has("fluid") &&
+            !cell.has("hazard");
     }
 
     static void enforceWireSize(

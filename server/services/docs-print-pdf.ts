@@ -207,6 +207,9 @@ function buildMarkdownRenderer(input: DocsPrintPdfRequest): {
     renderer: {
       html(token) {
         const raw = token.text.trim();
+        if (/^<!--\s*docs-print-page-break\s*-->$/i.test(raw)) {
+          return '<div class="docs-print-page-break" aria-hidden="true"></div>';
+        }
         if (/^<!--[\s\S]*-->$/.test(raw)) return "";
         if (/^<br\s*\/?>$/i.test(raw)) return "<br>";
         if (/^<\/?details(?:\s+open)?>$/i.test(raw)) return "";
@@ -270,7 +273,7 @@ p{margin:.075in 0 .11in;orphans:3;widows:3}
 strong{color:#142d49}
 a{color:#174f88;text-decoration:none;overflow-wrap:anywhere}
 ul,ol{margin:.06in 0 .13in .26in;padding-left:.18in}
-li{margin:.025in 0;orphans:2;widows:2}
+li{break-inside:avoid-page;margin:.025in 0;orphans:2;page-break-inside:avoid;widows:2}
 blockquote{background:#f3f6f8;border-left:3px solid #8399b0;color:#33465a;margin:.14in 0;padding:.08in .16in}
 blockquote p{margin:.03in 0}
 hr{border:0;border-top:1px solid #b9c2ce;margin:.23in 0}
@@ -287,8 +290,10 @@ table.cols-4{font-size:7.25pt}
 table.cols-5,table.cols-6{font-size:6.65pt;line-height:1.22}
 table.cols-7,table.cols-8,table.cols-9,table.cols-many{font-size:5.95pt;line-height:1.17}
 .math-inline{white-space:nowrap}
-.math-display{break-inside:avoid-page;margin:.12in 0 .16in;max-width:100%;text-align:center}
-.math-display .katex-display{margin:0;max-width:100%}
+.math-display{break-inside:avoid-page;page-break-inside:avoid;margin:.12in 0 .16in;max-width:100%;text-align:center}
+.math-display .katex-display{break-inside:avoid-page;page-break-inside:avoid;margin:0;max-width:100%}
+.docs-print-page-break{break-before:page;page-break-before:always;height:.38in;margin:0;padding:0}
+.docs-print-page-break+ol{margin-top:.55in}
 .math-display .katex{font-size:1em}
 .katex-error{color:#821b1b!important;font-family:Consolas,"Courier New",monospace;font-size:7pt;white-space:pre-wrap}
 img{display:block;height:auto;margin:.15in auto;max-height:8in;max-width:100%}

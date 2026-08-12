@@ -862,9 +862,7 @@ describe("NHM2 independent numerical execution lane", () => {
     expect(
       nhm2IndependentNumericalOutputCopyBlockers({
         primarySha256: [sha("6")],
-        outputs: [
-          { role: "independent_replay_bundle", sha256: sha("6") },
-        ],
+        outputs: [{ role: "independent_replay_bundle", sha256: sha("6") }],
         verifiedIndependenceAuthority: {
           authority: "server_verified_os_isolation_and_audited_lineage",
           operatingSystemPrimaryOutputIsolationVerified: true,
@@ -1001,6 +999,48 @@ describe("NHM2 independent numerical execution lane", () => {
     expect(result.primaryReceipt.receiptId).toBeNull();
     expect(result.persistedPreseal.path).toBeNull();
   });
+
+  it.each([
+    [
+      "securely reopened producer bundle",
+      (fixture: ReturnType<typeof executionFixture>) =>
+        fixture.primaryBundleLineage.producerBundle.sha256,
+    ],
+    [
+      "securely reopened source closure",
+      (fixture: ReturnType<typeof executionFixture>) =>
+        fixture.primaryBundleLineage.buildMetadata.sourceSnapshotSha256,
+    ],
+  ])(
+    "rejects an independent source hash aliasing the %s",
+    async (_label, primaryDigest) => {
+      const fixture = executionFixture();
+      fixture.policy.solver.implementationSourceClosureSha256 =
+        primaryDigest(fixture);
+      const { semanticSha256: _oldPolicyDigest, ...policySemantic } =
+        fixture.policy;
+      fixture.policy.semanticSha256 =
+        computeNhm2IndependentNumericalApprovedToolchainPolicySemanticSha256(
+          policySemantic,
+        );
+      fixture.context.independentDescriptor.approvedPolicy.semanticSha256 =
+        fixture.policy.semanticSha256;
+      fixture.context.independentDescriptor.implementationSourceClosure.closureSha256 =
+        fixture.policy.solver.implementationSourceClosureSha256;
+      resealDescriptor(fixture.context.independentDescriptor);
+
+      const result = await executeNhm2IndependentNumericalReplicationForTest(
+        fixture.input,
+        fixture.dependencies,
+      );
+
+      expect(result.blockers).toEqual([
+        "independent_solver_descriptor_invalid",
+      ]);
+      expect(result.primaryReceipt.receiptId).toBeNull();
+      expect(result.kernelObservation).toBeNull();
+    },
+  );
 
   it("rejects a certified or promoting primary receipt before reading its preseal", async () => {
     const fixture = executionFixture();
@@ -1253,6 +1293,90 @@ describe("NHM2 independent numerical execution lane", () => {
       "independent_kernel_input_not_candidate_closure_only",
     ]);
     expect(launched).toBe(false);
+  });
+
+  it.each([
+    [
+      "toolchain root contains the primary output root",
+      (fixture: ReturnType<typeof executionFixture>) => {
+        fixture.presealedRunSpec.kernel.ledgers.toolchain.rootPath =
+          path.dirname(
+            path.resolve(fixture.input.projectRoot, fixture.primaryOutputPath),
+          );
+      },
+    ],
+    [
+      "toolchain ledger digest aliases a primary output",
+      (fixture: ReturnType<typeof executionFixture>) => {
+        fixture.presealedRunSpec.kernel.ledgers.toolchain.ledgerSha256 =
+          fixture.primaryOutputSha256;
+      },
+    ],
+    [
+      "toolchain file digest aliases a primary output",
+      (fixture: ReturnType<typeof executionFixture>) => {
+        fixture.presealedRunSpec.kernel.ledgers.toolchain.entries.push({
+          relativePath: "payload.bin",
+          sha256: fixture.primaryOutputSha256,
+          sizeBytes: 8,
+        });
+      },
+    ],
+    [
+      "executable path is contained by the primary output root",
+      (fixture: ReturnType<typeof executionFixture>) => {
+        fixture.presealedRunSpec.kernel.executable.absolutePath = path.resolve(
+          fixture.input.projectRoot,
+          fixture.primaryOutputPath,
+        );
+      },
+    ],
+    [
+      "executable digest aliases a primary output",
+      (fixture: ReturnType<typeof executionFixture>) => {
+        fixture.presealedRunSpec.kernel.executable.sha256 =
+          fixture.primaryOutputSha256;
+      },
+    ],
+  ])("rejects before launch when the %s", async (_label, mutate) => {
+    const fixture = executionFixture();
+    mutate(fixture);
+    let launched = false;
+    const result = await executeNhm2IndependentNumericalReplicationForTest(
+      fixture.input,
+      {
+        ...fixture.dependencies,
+        executeKernel: async () => {
+          launched = true;
+          return fixture.dependencies.executeKernel();
+        },
+      },
+    );
+
+    expect(result.blockers).toEqual([
+      "independent_primary_output_disclosure_detected",
+    ]);
+    expect(result.kernelObservation).toBeNull();
+    expect(launched).toBe(false);
+  });
+
+  it("allows a primary provenance output to echo a pre-frozen candidate input hash", async () => {
+    const fixture = executionFixture({ primaryOutputSha: sha("4") });
+    const result = await executeNhm2IndependentNumericalReplicationForTest(
+      fixture.input,
+      fixture.dependencies,
+    );
+
+    expect(
+      fixture.presealedRunSpec.candidateInputClosure.entries.some(
+        (entry) => entry.sha256 === fixture.primaryOutputSha256,
+      ),
+    ).toBe(true);
+    expect(result.status).toBe("execution_observed_scientific_replay_required");
+    expect(result.kernelObservation).not.toBeNull();
+    expect(result.blockers).not.toContain(
+      "independent_primary_output_disclosure_detected",
+    );
   });
 
   it("keeps primary receipt and output inventory server-side only", async () => {

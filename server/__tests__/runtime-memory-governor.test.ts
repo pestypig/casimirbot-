@@ -58,6 +58,7 @@ describe("runtime memory governor", () => {
     delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_RSS_MB;
     delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_RESUME_HEAP_USED_MB;
     delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_RESUME_RSS_MB;
+    delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_ESTIMATED_BURST_MB;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
       memoryReader: memoryReader({ heapUsed: 100 * mib, rss: 200 * mib }),
       hostMemoryReader: hostReader(),
@@ -100,6 +101,7 @@ describe("runtime memory governor", () => {
     delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_RSS_MB;
     delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_RESUME_HEAP_USED_MB;
     delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_RESUME_RSS_MB;
+    delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_ESTIMATED_BURST_MB;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
   });
 
@@ -549,9 +551,12 @@ describe("runtime memory governor", () => {
   it("classifies low host free ratio as soft pressure before the hard host limit", () => {
     process.env.RUNTIME_MEMORY_HOST_FREE_RATIO_SOFT_MIN = "0.18";
     process.env.RUNTIME_MEMORY_HOST_FREE_RATIO_MIN = "0.14";
+    // Isolate the underlying pressure classifier from the separately tested
+    // active-turn provider-burst reserve.
+    process.env.RUNTIME_TASK_ACTIVE_USER_TURN_ESTIMATED_BURST_MB = "1";
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
       memoryReader: memoryReader({ heapUsed: 100 * mib, rss: 200 * mib }),
-      hostMemoryReader: hostReader(0.14),
+      hostMemoryReader: hostReader(0.141),
     });
 
     const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "active_user_turn" });
@@ -673,7 +678,7 @@ describe("runtime memory governor", () => {
     decision.lease?.release("completed");
   });
 
-  it("aligns the low-memory development physical floor with an explicit healthy commit reserve", () => {
+  it("rejects a low-memory active turn when its projected provider burst crosses the physical floor", () => {
     const previousNodeEnv = process.env.NODE_ENV;
     try {
       process.env.NODE_ENV = "development";
@@ -693,10 +698,52 @@ describe("runtime memory governor", () => {
             status: "available",
             source: "windows_wmic",
             platform: "win32",
-            committedMiB: 23_900,
+            committedMiB: 20_300,
             limitMiB: 25_300,
-            freeMiB: 1_400,
-            ratio: 0.9447,
+            freeMiB: 5_000,
+            ratio: 0.8024,
+          },
+        }),
+      });
+
+      const decision = runtimeMemoryGovernor.admitRuntimeTask({
+        taskClass: "active_user_turn",
+      });
+
+      expect(decision.admitted).toBe(false);
+      expect(decision.pressureLevel).toBe("hard_pressure");
+      expect(decision.reason).toBe("host_memory_limit");
+      expect(decision.limits.estimatedBurstMiB).toBe(1536);
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it("admits a low-memory active turn when the projected provider burst retains both hard reserves", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "development";
+      process.env.HELIX_LOW_MEMORY_IDLE_GC = "1";
+      process.env.HELIX_HOST_COMMIT_REQUIRED = "1";
+      process.env.RUNTIME_MEMORY_HOST_COMMIT_FREE_MIN_MB = "1024";
+      process.env.RUNTIME_MEMORY_HOST_COMMIT_FREE_SOFT_MIN_MB = "2048";
+      process.env.RUNTIME_MEMORY_HOST_COMMIT_RATIO_MAX = "0.96";
+      process.env.RUNTIME_MEMORY_HOST_COMMIT_RATIO_SOFT_MAX = "0.90";
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+        memoryReader: memoryReader({ heapUsed: 450 * mib, rss: 1_100 * mib }),
+        hostMemoryReader: () => ({
+          freeMiB: 2_800,
+          totalMiB: 16_143,
+          freeRatio: 2_800 / 16_143,
+          commit: {
+            status: "available",
+            source: "windows_wmic",
+            platform: "win32",
+            committedMiB: 22_000,
+            limitMiB: 26_000,
+            freeMiB: 4_000,
+            ratio: 22_000 / 26_000,
           },
         }),
       });
@@ -707,7 +754,7 @@ describe("runtime memory governor", () => {
 
       expect(decision.admitted).toBe(true);
       expect(decision.pressureLevel).toBe("soft_pressure");
-      expect(decision.reason).toBe("ok");
+      expect(decision.limits.estimatedBurstMiB).toBe(1536);
       decision.lease?.release("completed");
     } finally {
       if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
@@ -725,7 +772,7 @@ describe("runtime memory governor", () => {
       process.env.RUNTIME_MEMORY_HOST_COMMIT_FREE_SOFT_MIN_MB = "2048";
       process.env.RUNTIME_MEMORY_HOST_COMMIT_RATIO_MAX = "0.96";
       process.env.RUNTIME_MEMORY_HOST_COMMIT_RATIO_SOFT_MAX = "0.90";
-      let freeRatio = 0.05;
+      let freeRatio = 0.15;
       let recoveryCount = 0;
       runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
         memoryReader: memoryReader({ heapUsed: 650 * mib, rss: 1_100 * mib }),
@@ -737,10 +784,10 @@ describe("runtime memory governor", () => {
             status: "available",
             source: "windows_wmic",
             platform: "win32",
-            committedMiB: 23_900,
+            committedMiB: 21_300,
             limitMiB: 25_300,
-            freeMiB: 1_400,
-            ratio: 0.9447,
+            freeMiB: 4_000,
+            ratio: 0.8419,
           },
         }),
         foregroundMemoryRecovery: () => {
@@ -762,6 +809,64 @@ describe("runtime memory governor", () => {
       expect(recheck.admitted).toBe(true);
       expect(recheck.pressureLevel).toBe("soft_pressure");
       recheck.lease?.release("completed");
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it("recovers one transient active-turn heap spike before rejecting in low-memory development", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "development";
+      process.env.HELIX_LOW_MEMORY_IDLE_GC = "1";
+      process.env.HELIX_HOST_COMMIT_REQUIRED = "1";
+      process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_HEAP_USED_MB = "1344";
+      process.env.RUNTIME_MEMORY_HOST_COMMIT_FREE_MIN_MB = "1024";
+      process.env.RUNTIME_MEMORY_HOST_COMMIT_FREE_SOFT_MIN_MB = "2048";
+      process.env.RUNTIME_MEMORY_HOST_COMMIT_RATIO_MAX = "0.96";
+      process.env.RUNTIME_MEMORY_HOST_COMMIT_RATIO_SOFT_MAX = "0.90";
+      let heapUsedMiB = 1_413;
+      let recoveryCount = 0;
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+        memoryReader: () => ({
+          rss: 1_660 * mib,
+          heapTotal: 1_523 * mib,
+          heapUsed: heapUsedMiB * mib,
+          external: 8 * mib,
+          arrayBuffers: 1 * mib,
+        }),
+        hostMemoryReader: () => ({
+          freeMiB: 3_200,
+          totalMiB: 16_143,
+          freeRatio: 0.1982,
+          commit: {
+            status: "available",
+            source: "windows_wmic",
+            platform: "win32",
+            committedMiB: 21_300,
+            limitMiB: 25_300,
+            freeMiB: 4_000,
+            ratio: 0.8419,
+          },
+        }),
+        foregroundMemoryRecovery: () => {
+          recoveryCount += 1;
+          heapUsedMiB = 1_310;
+        },
+      });
+
+      const decision = runtimeMemoryGovernor.admitRuntimeTask({
+        taskClass: "active_user_turn",
+        source: "helix_ask_turn_stream",
+        requestBytes: 40_200,
+      });
+
+      expect(recoveryCount).toBe(1);
+      expect(decision.admitted).toBe(true);
+      expect(decision.pressureLevel).toBe("soft_pressure");
+      expect(decision.memory.heapUsedMiB).toBe(1_310);
+      decision.lease?.release("completed");
     } finally {
       if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = previousNodeEnv;

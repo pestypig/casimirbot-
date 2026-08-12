@@ -2305,6 +2305,147 @@
         }
       ],
       "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "casimir_dp_penrose_relational_branch_state",
+      "name": "Penrose-candidate relational branch state",
+      "category": "stage0_candidate_definition",
+      "expression": "B_r = (M_r, g_r, omega_r, <T_r>_ren, X_r), r in {A,B}",
+      "claim_tier": "diagnostic",
+      "maturity_label": "exploratory",
+      "symbols": [
+        {
+          "symbol": "B_r",
+          "quantity": "formal matter-geometry-reference branch object",
+          "units": "structured object"
+        },
+        {
+          "symbol": "<T_r>_ren",
+          "quantity": "renormalized branch stress-energy expectation",
+          "units": "Pa"
+        },
+        {
+          "symbol": "X_r",
+          "quantity": "branch embedding from the shared relational label space",
+          "units": "map"
+        }
+      ],
+      "root_lane": "physics_quantum_semiclassical"
+    },
+    {
+      "id": "casimir_dp_penrose_relational_pullback_stress_difference",
+      "name": "Relational pullback stress difference",
+      "category": "stage0_candidate_definition",
+      "expression": "Delta_B_T = X_A^* T_A - X_B^* T_B",
+      "claim_tier": "diagnostic",
+      "maturity_label": "exploratory",
+      "symbols": [
+        {
+          "symbol": "Delta_B_T",
+          "quantity": "formal stress-energy difference on the common relational base",
+          "units": "Pa"
+        },
+        {
+          "symbol": "X_r^*",
+          "quantity": "pullback by branch embedding",
+          "units": "map"
+        }
+      ],
+      "root_lane": "physics_quantum_semiclassical"
+    },
+    {
+      "id": "casimir_dp_penrose_relational_pullback_metric_difference",
+      "name": "Relational pullback metric difference",
+      "category": "stage0_candidate_definition",
+      "expression": "Delta_B_g = X_A^* g_A - X_B^* g_B",
+      "claim_tier": "diagnostic",
+      "maturity_label": "exploratory",
+      "symbols": [
+        {
+          "symbol": "Delta_B_g",
+          "quantity": "formal metric difference on the common relational base",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "g_r",
+          "quantity": "branch metric",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_quantum_semiclassical"
+    },
+    {
+      "id": "casimir_dp_penrose_correspondence_covariance_gate",
+      "name": "Relational correspondence independent rigid-coordinate-relabeling gate",
+      "category": "stage0_candidate_definition",
+      "expression": "G_rigid = max_r norm(xi_r'(R_r x_r + t_r) - xi_r(x_r)) <= epsilon_rigid, with R_r^T R_r = I",
+      "claim_tier": "diagnostic",
+      "maturity_label": "exploratory",
+      "symbols": [
+        {
+          "symbol": "G_rigid",
+          "quantity": "synthetic independent rigid-coordinate-relabeling gate",
+          "units": "boolean"
+        },
+        {
+          "symbol": "epsilon_rigid",
+          "quantity": "frozen coordinate-relabeling tolerance",
+          "units": "observable-dependent"
+        }
+      ],
+      "root_lane": "physics_quantum_semiclassical"
+    },
+    {
+      "id": "casimir_dp_penrose_correspondence_identity_swap_gate",
+      "name": "Relational identity and branch-swap gate",
+      "category": "stage0_candidate_definition",
+      "expression": "G_id_swap = (E_rel[A,A] = 0) AND (E_rel[A,B] = E_rel[B,A])",
+      "claim_tier": "diagnostic",
+      "maturity_label": "exploratory",
+      "symbols": [
+        {
+          "symbol": "G_id_swap",
+          "quantity": "identity and branch-exchange recovery gate",
+          "units": "boolean"
+        },
+        {
+          "symbol": "E_rel",
+          "quantity": "diagnostic weak-field recovery target after relational pullback",
+          "units": "J"
+        }
+      ],
+      "root_lane": "physics_quantum_semiclassical"
+    },
+    {
+      "id": "casimir_dp_penrose_newtonian_target_limit",
+      "name": "Penrose-candidate Newtonian Gaussian recovery target",
+      "category": "stage0_candidate_definition",
+      "expression": "E_G = G*m^2*(1/(sqrt(pi)*R0) - erf(d/(2*R0))/d)",
+      "claim_tier": "diagnostic",
+      "maturity_label": "exploratory",
+      "symbols": [
+        {
+          "symbol": "E_G",
+          "quantity": "registered Gaussian Newtonian incompatibility-energy target",
+          "units": "J"
+        },
+        {
+          "symbol": "m",
+          "quantity": "effective branch mass",
+          "units": "kg"
+        },
+        {
+          "symbol": "R0",
+          "quantity": "Gaussian smearing length",
+          "units": "m"
+        },
+        {
+          "symbol": "d",
+          "quantity": "relational branch-center separation",
+          "units": "m"
+        }
+      ],
+      "root_lane": "physics_quantum_semiclassical"
     }
   ]
 }

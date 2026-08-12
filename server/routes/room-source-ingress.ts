@@ -37,6 +37,7 @@ import {
 import { recordEnvironmentSourceHeartbeat } from "../services/situation-room/environment-source-heartbeat-store";
 import { projectEnvironmentSourceAvailability } from "../services/situation-room/environment-source-availability-projector";
 import {
+  hasPendingEnvironmentProbeRequestsForSource,
   listPendingEnvironmentProbeRequests,
   recordEnvironmentProbeResult,
 } from "../services/situation-room/environment-probe-broker";
@@ -67,6 +68,7 @@ import {
 } from "../services/situation-room/environment-adapter-registry";
 import {
   DurableEnvironmentProbeError,
+  inspectEnvironmentProbePollWork,
   leaseDurableEnvironmentProbesForClaim,
   submitDurableEnvironmentProbeResult,
 } from "../services/environment-connectors/probe";
@@ -234,13 +236,26 @@ const payloadForSecretScan = (
   ];
 };
 
-const claim = (
+const claim = async (
   req: RequestWithRawBody,
   kind: HelixRoomSourceIngressKind,
   requiredScope: HelixRoomSourceIngressScope,
   routeKey: string,
-) =>
-  claimRoomSourceIngressRequest({
+) => {
+  let durableReceipt = true;
+  if (kind === "probe_requests") {
+    const work = await inspectEnvironmentProbePollWork({
+      roomSourceBindingId: req.params.bindingId,
+    });
+    durableReceipt = Boolean(
+      work &&
+        (work.durableWorkPending ||
+          hasPendingEnvironmentProbeRequestsForSource({
+            sourceId: work.sourceId,
+          })),
+    );
+  }
+  return claimRoomSourceIngressRequest({
     bindingId: req.params.bindingId,
     requiredScope,
     routeKey,
@@ -253,7 +268,9 @@ const claim = (
     digest: header(req, "digest"),
     computedBodyDigest: bodyDigest(req),
     payloadForSecretScan: payloadForSecretScan(req, kind),
+    durableReceipt,
   });
+};
 
 const payloadError = (
   code: ConstructorParameters<typeof RoomSourceIngressError>[0],

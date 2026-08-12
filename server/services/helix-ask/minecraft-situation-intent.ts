@@ -1,5 +1,5 @@
 const immediateGameSituationSubject =
-  /\b(?:nearby\s+(?:hostile\s+)?mobs?|hostile\s+mobs?|mobs?\s+(?:nearby|near\s+me|around\s+me)|nearby\s+entities|entities\s+(?:nearby|near\s+me|around\s+me)|immediate\s+(?:hazards?|threats?)|hazards?\s+(?:nearby|near\s+me|around\s+me)|current\s+actor\s+status|health\s*(?:,|and)\s*hunger|local\s+(?:floor|terrain)|(?:wheat|crop)\s+(?:state|maturity)|line\s+of\s+sight|straight-line\s+(?:geometric\s+)?reachability)\b/i;
+  /\b(?:nearby\s+(?:hostile\s+)?mobs?|hostile\s+mobs?|mobs?\s+(?:nearby|near\s+me|around\s+me)|nearby\s+entities|entities\s+(?:nearby|near\s+me|around\s+me)|immediate\s+(?:hazards?|threats?)|hazards?\s+(?:nearby|near\s+me|around\s+me)|current\s+actor\s+status|health\s*(?:,|and)\s*hunger|local\s+(?:floor|terrain)|(?:wheat|crop)\s+(?:state|maturity)|line\s+of\s+sight|straight-line\s+(?:geometric\s+)?reachability|players?\s+(?:currently\s+)?online|active\s+(?:source|world)\s+status|world\s+status)\b/i;
 
 const affirmativeObservationVerb =
   /\b(?:recheck|check|scan|inspect|list|read|show)\b/i;

@@ -38,11 +38,13 @@ import {
 } from "../../helix-ask/realtime-room/room-store/database";
 import { readSharedRealtimeRoomMembership } from "../../helix-ask/realtime-room/room-store";
 import type { Queryable } from "../../helix-ask/realtime-room/room-store/types";
+import { createCredentialUseTouchThrottle } from "../credential-use-throttle";
 
 const DEFAULT_CREDENTIAL_TTL_MS = 24 * 60 * 60_000;
 const MAX_CREDENTIAL_TTL_MS = 7 * 24 * 60 * 60_000;
 const DEFAULT_LEASE_MS = 10_000;
 const WAIT_POLL_MS = 40;
+const touchActionCredentialUse = createCredentialUseTouchThrottle();
 
 export type EnvironmentActionBrokerErrorCode =
   | "action_authority_not_found"
@@ -54,6 +56,7 @@ export type EnvironmentActionBrokerErrorCode =
   | "action_manifest_required"
   | "action_heartbeat_invalid"
   | "action_connector_stale"
+  | "action_event_stream_resync_required"
   | "action_request_invalid"
   | "action_request_conflict"
   | "action_request_not_found"
@@ -446,11 +449,13 @@ export const authenticateEnvironmentActionConnector = async (input: {
       "The player-action credential does not allow this connector operation.",
     );
   }
-  await db.query(
-    `UPDATE helix_environment_action_connector_credentials
-     SET last_used_at = now() WHERE action_credential_id = $1;`,
-    [row.credential_id],
-  );
+  await touchActionCredentialUse(row.credential_id, async () => {
+    await db.query(
+      `UPDATE helix_environment_action_connector_credentials
+       SET last_used_at = now() WHERE action_credential_id = $1;`,
+      [row.credential_id],
+    );
+  });
   return {
     authorityId: row.action_authority_id,
     credentialId: row.credential_id,
@@ -963,14 +968,31 @@ const assertFreshConnector = async (
     status: string;
     received_at: Date | string;
     emergency_stop_latched: boolean;
+    control_engines: unknown;
   }>(
-    `SELECT status, received_at, emergency_stop_latched
+    `SELECT status, received_at, emergency_stop_latched, control_engines
      FROM helix_environment_action_connector_heartbeats
      WHERE action_authority_id = $1 AND manifest_id = $2
      ORDER BY received_at DESC LIMIT 1;`,
     [claim.authorityId, manifest.manifest_id],
   );
   const row = heartbeat.rows[0];
+  const controlEngines = parseJson<Array<Record<string, unknown>>>(
+    row?.control_engines,
+    [],
+  );
+  const eventStreamResyncRequired = controlEngines.some(
+    (engine) =>
+      engine?.last_error ===
+      "action_delivery_environment_event_batch_http_409_action_event_conflict",
+  );
+  if (eventStreamResyncRequired) {
+    throw new EnvironmentActionBrokerError(
+      "action_event_stream_resync_required",
+      409,
+      "The player client released controls because its evidence stream no longer matches the server epoch. Pair the Player Embodiment client again before requesting another action.",
+    );
+  }
   if (
     !row ||
     row.status !== "active" ||
@@ -1148,17 +1170,59 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
     case "look_at": {
       const target = args.target;
       if (!target || typeof target !== "object" || Array.isArray(target)) return false;
-      const targetKind = (target as Record<string, unknown>).target_kind;
+      const targetRecord = target as Record<string, unknown>;
+      const targetKind = targetRecord.target_kind;
+      const finalYaw = finiteMeasurement(measurements, "final_yaw");
+      const finalPitch = finiteMeasurement(measurements, "final_pitch");
+      if (finalYaw === null || finalPitch === null || finalPitch < -90 || finalPitch > 90) {
+        return false;
+      }
       if (targetKind === "current_focus") {
         return measurements.target_kind === "current_focus" &&
           measurements.view_retained === true;
       }
       const yawError = finiteMeasurement(measurements, "yaw_error_degrees");
       const pitchError = finiteMeasurement(measurements, "pitch_error_degrees");
-      return targetKind === "position" &&
-        measurements.target_kind === "position" &&
-        yawError !== null && pitchError !== null &&
-        yawError <= 2 && pitchError <= 2;
+      if (yawError === null || pitchError === null) return false;
+      if (targetKind === "position") {
+        return measurements.target_kind === "position" &&
+          yawError <= 2 && pitchError <= 2;
+      }
+      if (targetKind !== "relative_rotation") return false;
+      const requestedYaw = finiteArgument(targetRecord, "yaw_delta_degrees");
+      const requestedPitch = finiteArgument(targetRecord, "pitch_delta_degrees");
+      const measuredRequestedYaw = finiteMeasurement(
+        measurements,
+        "requested_yaw_delta_degrees",
+      );
+      const measuredRequestedPitch = finiteMeasurement(
+        measurements,
+        "requested_pitch_delta_degrees",
+      );
+      const appliedYaw = finiteMeasurement(
+        measurements,
+        "applied_yaw_delta_degrees",
+      );
+      const appliedPitch = finiteMeasurement(
+        measurements,
+        "applied_pitch_delta_degrees",
+      );
+      const initialPitch = finiteMeasurement(measurements, "initial_pitch");
+      if (
+        requestedYaw === null || requestedPitch === null ||
+        measuredRequestedYaw === null || measuredRequestedPitch === null ||
+        appliedYaw === null || appliedPitch === null || initialPitch === null
+      ) return false;
+      const expectedAppliedPitch = Math.max(
+        -90,
+        Math.min(90, initialPitch + requestedPitch),
+      ) - initialPitch;
+      return measurements.target_kind === "relative_rotation" &&
+        Math.abs(measuredRequestedYaw - requestedYaw) <= 1e-6 &&
+        Math.abs(measuredRequestedPitch - requestedPitch) <= 1e-6 &&
+        Math.abs(appliedYaw - requestedYaw) <= 0.5 &&
+        Math.abs(appliedPitch - expectedAppliedPitch) <= 0.5 &&
+        yawError <= 0.5 && pitchError <= 0.5;
     }
     case "walk": {
       const distance = finiteMeasurement(measurements, "distance_blocks");
@@ -1239,6 +1303,7 @@ export const canonicalizeEnvironmentActionResult = (input: {
   envelopeValid: boolean;
   currentTurn: boolean;
   workflowEvidenceValid: boolean;
+  verifiedTerminalMeasurements?: Record<string, unknown>;
 }): HelixEnvironmentActionResult => {
   let outcome: HelixEnvironmentActionOutcome = input.result.outcome;
   let summary = input.result.summary;
@@ -1270,15 +1335,22 @@ export const canonicalizeEnvironmentActionResult = (input: {
     ...input.result,
     outcome,
     summary,
+    verified_terminal_measurements:
+      input.verifiedTerminalMeasurements ?? {},
   });
 };
 
-const recordedWorkflowEvidenceIsValid = async (input: {
+const readRecordedWorkflowEvidence = async (input: {
   db: Queryable;
   request: HelixEnvironmentActionRequest;
   result: HelixEnvironmentActionResult;
-}): Promise<boolean> => {
-  if (input.result.outcome !== "succeeded") return true;
+}): Promise<{
+  valid: boolean;
+  terminalMeasurements: Record<string, unknown>;
+}> => {
+  if (input.result.outcome !== "succeeded") {
+    return { valid: true, terminalMeasurements: {} };
+  }
   const selected = await input.db.query<{
     event_id: string;
     event_payload: unknown;
@@ -1303,13 +1375,13 @@ const recordedWorkflowEvidenceIsValid = async (input: {
     ),
   ]);
   if (referenced.size === 0 || [...referenced].some((ref) => !byId.has(ref))) {
-    return false;
+    return { valid: false, terminalMeasurements: {} };
   }
   const startedAt = input.result.started_at
     ? Date.parse(input.result.started_at)
     : Number.NaN;
   const completedAt = Date.parse(input.result.completed_at);
-  return events.some(({ eventId, event }) => {
+  const terminal = events.find(({ eventId, event }) => {
     const createdAt = Date.parse(event.created_at);
     return (
       referenced.has(eventId) &&
@@ -1322,14 +1394,18 @@ const recordedWorkflowEvidenceIsValid = async (input: {
       Number.isFinite(completedAt) &&
       Number.isFinite(createdAt) &&
       createdAt >= startedAt &&
-      createdAt <= completedAt &&
-      environmentActionWorkflowMeasurementsValid({
-        request: input.request,
-        result: input.result,
-        measurements: event.measurements,
-      })
+      createdAt <= completedAt
     );
   });
+  if (!terminal) return { valid: false, terminalMeasurements: {} };
+  return {
+    valid: environmentActionWorkflowMeasurementsValid({
+      request: input.request,
+      result: input.result,
+      measurements: terminal.event.measurements,
+    }),
+    terminalMeasurements: terminal.event.measurements,
+  };
 };
 
 export type EnvironmentActionExecutionContext = {
@@ -1775,8 +1851,23 @@ export const enqueueEnvironmentAction = async (input: {
 export const leasePendingEnvironmentActions = async (input: {
   claim: EnvironmentActionConnectorClaim;
   limit?: number;
-}): Promise<HelixEnvironmentActionRequest[]> =>
-  withSharedRealtimeRoomTransaction(async (db) => {
+}): Promise<HelixEnvironmentActionRequest[]> => {
+  const readDb = await readSharedRealtimeRoomDatabase();
+  await assertFreshConnector(readDb, input.claim);
+  const work = await readDb.query<{ present: number }>(
+    `SELECT 1 AS present
+     FROM helix_environment_action_requests
+     WHERE action_authority_id = $1
+       AND (
+         status = 'admitted'
+         OR (status = 'leased' AND lease_expires_at <= now())
+       )
+     LIMIT 1;`,
+    [input.claim.authorityId],
+  );
+  if (!work.rows[0]) return [];
+
+  return withSharedRealtimeRoomTransaction(async (db) => {
     await assertFreshConnector(db, input.claim);
     const limit = Math.min(8, Math.max(1, Math.floor(input.limit ?? 4)));
     const now = new Date();
@@ -1821,12 +1912,27 @@ export const leasePendingEnvironmentActions = async (input: {
     }
     return leased;
   });
+};
 
 export const leasePendingEnvironmentActionControls = async (input: {
   claim: EnvironmentActionConnectorClaim;
   limit?: number;
-}): Promise<HelixEnvironmentActionControlRequest[]> =>
-  withSharedRealtimeRoomTransaction(async (db) => {
+}): Promise<HelixEnvironmentActionControlRequest[]> => {
+  const readDb = await readSharedRealtimeRoomDatabase();
+  const work = await readDb.query<{ present: number }>(
+    `SELECT 1 AS present
+     FROM helix_environment_action_control_requests
+     WHERE action_authority_id = $1
+       AND (
+         status = 'pending'
+         OR (status = 'leased' AND deadline_at <= now())
+       )
+     LIMIT 1;`,
+    [input.claim.authorityId],
+  );
+  if (!work.rows[0]) return [];
+
+  return withSharedRealtimeRoomTransaction(async (db) => {
     const limit = Math.min(8, Math.max(1, Math.floor(input.limit ?? 4)));
     const now = new Date();
     await db.query(
@@ -1870,6 +1976,7 @@ export const leasePendingEnvironmentActionControls = async (input: {
     }
     return controls;
   });
+};
 
 export const submitEnvironmentActionWorkflowEvent = async (input: {
   claim: EnvironmentActionConnectorClaim;
@@ -1994,13 +2101,18 @@ const observationFromRows = (
     summary: result.summary,
     result: {
       control_engine: result.control_engine,
+      started_clock: result.started_clock ?? null,
+      completed_clock: result.completed_clock ?? null,
+      duration_ticks: result.duration_ticks ?? null,
       postconditions: result.postconditions,
+      verified_terminal_measurements: result.verified_terminal_measurements,
       side_effects_performed: result.side_effects_performed,
       player_motion_performed: result.player_motion_performed,
       player_interaction_performed: result.player_interaction_performed,
       inventory_mutation_performed: result.inventory_mutation_performed,
       world_mutation_performed: result.world_mutation_performed,
       manual_override_detected: result.manual_override_detected,
+      manual_override_reason: result.manual_override_reason ?? null,
       controls_released: result.controls_released,
       host_access_performed: false,
       automatic_replay_performed: false,
@@ -2138,17 +2250,22 @@ export const submitEnvironmentActionResult = async (input: {
       !["timed_out", "authority_stale"].includes(request.status);
     const provenanceValid = identityValid && envelopeValid;
     const eligibleForReentry = provenanceValid && currentTurn;
+    const recordedWorkflowEvidence = await readRecordedWorkflowEvidence({
+      db,
+      request: requestProjection(request),
+      result: raw,
+    });
     const canonical = canonicalizeEnvironmentActionResult({
       request: requestProjection(request),
       result: raw,
       identityValid,
       envelopeValid,
       currentTurn,
-      workflowEvidenceValid: await recordedWorkflowEvidenceIsValid({
-        db,
-        request: requestProjection(request),
-        result: raw,
-      }),
+      workflowEvidenceValid: recordedWorkflowEvidence.valid,
+      verifiedTerminalMeasurements:
+        provenanceValid
+          ? recordedWorkflowEvidence.terminalMeasurements
+          : {},
     });
     const canonicalHash = environmentConnectorSha256(canonical);
     const resultId = `environment_action_result:${crypto.randomUUID()}`;

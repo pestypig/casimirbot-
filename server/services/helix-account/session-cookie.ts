@@ -1,4 +1,5 @@
 import type { Response } from "express";
+import { CASIMIR_DESKTOP_HOST_ENV } from "../../security/desktop-session";
 
 export const HELIX_SESSION_COOKIE = "helix_session";
 
@@ -25,6 +26,22 @@ export function readHelixSessionCookie(cookieHeader: string | undefined): string
   return readCookie(cookieHeader, HELIX_SESSION_COOKIE);
 }
 
+const enabledFlag = (value: string | undefined): boolean => {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "1" || normalized === "true";
+};
+
+export function shouldUseSecureHelixSessionCookie(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const production = env.NODE_ENV?.trim().toLowerCase() === "production";
+  // The packaged host is bound to loopback and protected by the native
+  // per-launch desktop session header. Secure cookies cannot be retained over
+  // that intentional HTTP loopback lane. All other production lanes stay
+  // HTTPS-only.
+  return production && !enabledFlag(env[CASIMIR_DESKTOP_HOST_ENV]);
+}
+
 export function setHelixSessionCookie(
   res: Response,
   sessionId: string,
@@ -33,7 +50,7 @@ export function setHelixSessionCookie(
   res.cookie(HELIX_SESSION_COOKIE, sessionId, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureHelixSessionCookie(),
     path: "/",
     maxAge: options?.maxAgeMs ?? 1000 * 60 * 60 * 24 * 7,
   });

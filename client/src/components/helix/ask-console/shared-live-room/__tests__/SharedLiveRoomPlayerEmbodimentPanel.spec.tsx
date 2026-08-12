@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS } from
   "@shared/helix-minecraft-player-capabilities";
@@ -69,6 +69,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("Shared Live Room Player Embodiment controls", () => {
@@ -257,6 +258,7 @@ describe("Shared Live Room Player Embodiment controls", () => {
       controls_asserted: false,
       manual_input_detected: false,
       emergency_stop_latched: false,
+      blocking_reason: null,
       credential_included: false,
       content_role:
         "environment_action_connector_readiness_not_assistant_answer",
@@ -289,5 +291,44 @@ describe("Shared Live Room Player Embodiment controls", () => {
     expect(screen.getByText("authority active")).toBeTruthy();
     expect(JSON.stringify(connectorReadiness)).not.toContain("credential_id");
     expect(JSON.stringify(connectorReadiness)).not.toContain("manifest_id");
+  });
+
+  it("does not overlap authority refreshes while an earlier request remains pending", async () => {
+    vi.useFakeTimers();
+    let resolveInitial: ((response: Response) => void) | null = null;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => {
+        resolveInitial = resolve;
+      }))
+      .mockResolvedValue(jsonResponse(authorityReceipt()));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <SharedLiveRoomPlayerEmbodimentPanel
+        roomId={roomId}
+        environment={environment}
+        selfParticipantId={participantId}
+        sourceBinding={sourceBinding}
+        isOwner
+      />,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveInitial?.(jsonResponse(authorityReceipt()));
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(9_999);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

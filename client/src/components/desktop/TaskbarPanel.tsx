@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import * as Lucide from "lucide-react";
+import { AppWindow, Settings2 } from "lucide-react";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { panelRegistry } from "@/lib/desktop/panelRegistry";
 import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
@@ -105,7 +105,7 @@ export function TaskbarShelf({
   const renderIcon = (panel: (typeof panelRegistry)[number]) => {
     const panelId = panel.id;
     const win = windows[panelId];
-    const Icon = panel.icon ?? Lucide.AppWindow;
+    const Icon = panel.icon ?? AppWindow;
     const panelTitle = getInterfacePanelTitle(t, String(panel.id), panel.title);
     const isPinned = Boolean(pinned[panelId]);
     const isOpen = Boolean(win?.isOpen);
@@ -207,7 +207,7 @@ function TaskbarSettings({
           className="text-slate-300 hover:bg-slate-800/60 hover:text-white"
           title="Taskbar settings"
         >
-          <Lucide.Settings2 className="h-4 w-4" />
+          <Settings2 className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[220px]">

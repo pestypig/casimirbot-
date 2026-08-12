@@ -328,6 +328,13 @@ export function buildEnergyFieldFromSunpy(
   if (!payload || !Array.isArray(payload.frames) || payload.frames.length === 0) {
     throw new Error("sunpy_energy_proxy_missing_frames");
   }
+  const instrument = String(payload.instrument ?? payload.meta?.instrument ?? "").toLowerCase();
+  const wavelengthAngstrom = Number(payload.wavelength_A ?? payload.meta?.wavelength ?? NaN);
+  if (instrument.includes("dkist") || (wavelengthAngstrom >= 4_153 && wavelengthAngstrom <= 4_167)) {
+    throw new Error(
+      "solar_energy_calibration_incompatible_photospheric_continuum: use the DKIST 416 nm radiative-MHD forward-model lane",
+    );
+  }
   const calibration = loadSolarEnergyCalibration(opts?.calibrationVersion);
   const mode = opts?.mode ?? "observables";
   const lastFrame = [...payload.frames].reverse().find((f) => typeof (f as any)?.map_b64 === "string");

@@ -272,6 +272,120 @@
       "uncertainty_model_id": "atomic_energy_density_proxy_uq_v1"
     },
     {
+      "id": "physics_quantum_semiclassical__casimir_dp_penrose_correspondence_covariance_gate",
+      "root_id": "physics_quantum_semiclassical",
+      "equation_id": "casimir_dp_penrose_correspondence_covariance_gate",
+      "binding": {
+        "operator": "equals",
+        "lhs": "casimir_dp_penrose_correspondence_covariance_gate",
+        "rhs": "casimir_dp_penrose_correspondence_covariance_gate"
+      },
+      "residual": {
+        "metric": "casimir_dp_penrose_correspondence_covariance_gate_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "casimir_dp_penrose_correspondence_covariance_gate_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_quantum_semiclassical__casimir_dp_penrose_correspondence_identity_swap_gate",
+      "root_id": "physics_quantum_semiclassical",
+      "equation_id": "casimir_dp_penrose_correspondence_identity_swap_gate",
+      "binding": {
+        "operator": "equals",
+        "lhs": "casimir_dp_penrose_correspondence_identity_swap_gate",
+        "rhs": "casimir_dp_penrose_correspondence_identity_swap_gate"
+      },
+      "residual": {
+        "metric": "casimir_dp_penrose_correspondence_identity_swap_gate_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "casimir_dp_penrose_correspondence_identity_swap_gate_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_quantum_semiclassical__casimir_dp_penrose_newtonian_target_limit",
+      "root_id": "physics_quantum_semiclassical",
+      "equation_id": "casimir_dp_penrose_newtonian_target_limit",
+      "binding": {
+        "operator": "equals",
+        "lhs": "casimir_dp_penrose_newtonian_target_limit",
+        "rhs": "casimir_dp_penrose_newtonian_target_limit"
+      },
+      "residual": {
+        "metric": "casimir_dp_penrose_newtonian_target_limit_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "casimir_dp_penrose_newtonian_target_limit_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_quantum_semiclassical__casimir_dp_penrose_relational_branch_state",
+      "root_id": "physics_quantum_semiclassical",
+      "equation_id": "casimir_dp_penrose_relational_branch_state",
+      "binding": {
+        "operator": "equals",
+        "lhs": "casimir_dp_penrose_relational_branch_state",
+        "rhs": "casimir_dp_penrose_relational_branch_state"
+      },
+      "residual": {
+        "metric": "casimir_dp_penrose_relational_branch_state_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "casimir_dp_penrose_relational_branch_state_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_quantum_semiclassical__casimir_dp_penrose_relational_pullback_metric_difference",
+      "root_id": "physics_quantum_semiclassical",
+      "equation_id": "casimir_dp_penrose_relational_pullback_metric_difference",
+      "binding": {
+        "operator": "equals",
+        "lhs": "casimir_dp_penrose_relational_pullback_metric_difference",
+        "rhs": "casimir_dp_penrose_relational_pullback_metric_difference"
+      },
+      "residual": {
+        "metric": "casimir_dp_penrose_relational_pullback_metric_difference_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "casimir_dp_penrose_relational_pullback_metric_difference_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_quantum_semiclassical__casimir_dp_penrose_relational_pullback_stress_difference",
+      "root_id": "physics_quantum_semiclassical",
+      "equation_id": "casimir_dp_penrose_relational_pullback_stress_difference",
+      "binding": {
+        "operator": "equals",
+        "lhs": "casimir_dp_penrose_relational_pullback_stress_difference",
+        "rhs": "casimir_dp_penrose_relational_pullback_stress_difference"
+      },
+      "residual": {
+        "metric": "casimir_dp_penrose_relational_pullback_stress_difference_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "casimir_dp_penrose_relational_pullback_stress_difference_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
       "id": "physics_quantum_semiclassical__semiclassical_coupling",
       "root_id": "physics_quantum_semiclassical",
       "equation_id": "semiclassical_coupling",

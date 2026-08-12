@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "casimir_desktop_tunnel_client_artifact/1",
+  "version": "0.0.11",
+  "source": "https://github.com/openai/tunnel-client/releases/tag/v0.0.11",
+  "assetName": "tunnel-client-v0.0.11-windows-amd64.zip",
+  "downloadUrl": "https://github.com/openai/tunnel-client/releases/download/v0.0.11/tunnel-client-v0.0.11-windows-amd64.zip",
+  "archiveSha256": "eb912c86c6ccde90cda805cb17009507176a656725cf86c36fabe1901a12e29b",
+  "executableSha256": "7d3c7d492ce84b52835e11865a835a8a5bcd4a669dee84e169aa11b314dc952a",
+  "licenseSha256": "f4c1d7ba32ef5bcf5cf03e2eefec5825ebafedf50fa330a36700a49c605c1ef4",
+  "license": "Apache-2.0"
+}

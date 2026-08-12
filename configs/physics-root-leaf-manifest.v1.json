@@ -18,7 +18,13 @@
       "name": "Semiclassical quantum coupling baseline",
       "equation_refs": [
         "semiclassical_coupling",
-        "atomic_energy_to_energy_density_proxy"
+        "atomic_energy_to_energy_density_proxy",
+        "casimir_dp_penrose_relational_branch_state",
+        "casimir_dp_penrose_relational_pullback_stress_difference",
+        "casimir_dp_penrose_relational_pullback_metric_difference",
+        "casimir_dp_penrose_correspondence_covariance_gate",
+        "casimir_dp_penrose_correspondence_identity_swap_gate",
+        "casimir_dp_penrose_newtonian_target_limit"
       ],
       "tree_lane": "physics_quantum_semiclassical",
       "tree_path": "docs/knowledge/physics/physics-quantum-semiclassical-tree.json"
@@ -186,7 +192,17 @@
     {
       "id": "leaf_casimir_dp_boundary_coherence_or_test",
       "prompt_family": "Casimir boundary coherence test of Penrose OR and Diósi-Penrose diagnostics",
-      "statement": "Casimir-boundary coherence claims must fail closed unless measured evidence, ordinary-decoherence closure, replayable phase residuals, a collapse discriminator, and a sourced boundary-to-coherence transfer kernel are all present."
+      "statement": "Any Casimir-boundary-conditioned collapse or manifold claim must fail closed unless measured evidence, ordinary-decoherence closure, replayable phase residuals, a collapse discriminator, and a sourced boundary-to-coherence transfer kernel are all present; ordinary QED boundary phase and decoherence remain independently testable controls."
+    },
+    {
+      "id": "leaf_penrose_branch_geometry_to_coherence_candidate",
+      "prompt_family": "equivalence principle and branch geometry to a Penrose-inspired coherence candidate",
+      "statement": "A Penrose-inspired branch-geometry-to-coherence claim remains exploratory until relational branch identification, complete conserved sources, gauge and coordinate treatment, an invariant energy functional, causal reduction dynamics, probability and energy consistency, standard-theory limits, a coherence projection, a companion prediction, and preregistered falsifiers are supplied; agreement with tau approximately hbar over E_G alone is insufficient."
+    },
+    {
+      "id": "leaf_penrose_relational_branch_correspondence_stage0_1",
+      "prompt_family": "operational relational correspondence between weak-field laboratory branches",
+      "statement": "Stage-0.1 registers one branch-blind apparatus-landmark convention and synthetic recovery benchmark; it is not uniquely derived from the equivalence principle or Penrose, does not establish a covariant incompatibility functional, and cannot emit collapse or coherence predictions."
     },
     {
       "id": "leaf_casimir_dp_complete_apparatus_gravity_control",
@@ -197,6 +213,11 @@
       "id": "leaf_solar_collapse_hypothesis",
       "prompt_family": "solar coherence to collapse hypothesis",
       "statement": "Solar coherence narratives stay hypothesis-scoped and subordinate to the measured Casimir to collapse benchmark family."
+    },
+    {
+      "id": "leaf_solar_khi_nanoflare_predictive_gate",
+      "prompt_family": "photospheric KHI to flux braiding and later nanoflare prediction",
+      "statement": "The solar KHI chain must preserve native measurement authority, reconstruction agreement, label separation, held-out active-region prediction, displaced and time-shuffled controls, and a classical-only flux-rope branch boundary."
     },
     {
       "id": "leaf_stellar_spectral_viability",
@@ -743,7 +764,11 @@
         "bridge-stage4-2r-diosi-precision-to-primary-estimand",
         "bridge-stage4-2r-four-cell-to-boundary-interaction",
         "bridge-stage4-2r-authority-packets-to-pilot-no-go",
-        "bridge-stage4-2r-zero-bridge-to-claim-boundary"
+        "bridge-stage4-2r-zero-bridge-to-claim-boundary",
+        "bridge-stage4-2s-retarded-source-to-transverse-field",
+        "bridge-stage4-2s-kL-to-propagation-regime",
+        "bridge-stage4-2s-green-response-to-ordinary-complex-coherence",
+        "bridge-stage4-2s-zero-collapse-bridge-to-claim-boundary"
       ],
       "falsifier": {
         "observable": "preregistered complex boundary-conditioned coherence and companion-observable signature with immutable authority, measured-preparation-class complete joint-system branch equivalence, response-corrected apparatus spectral thermometry, sensor-self-noise-separated ordinary-physics covariance, Stage-4.2C empirical control-response and covariance receipts reproducing the bounded redesign gates, Stage-4.2D selected Stark/Zeeman/polarization/blackbody witness response and covariance receipts, conventional-gravity recovery and spinor-semantic nonbridge, Stage-4.2E ADM causal recovery with measured optical-path and endpoint-clock controls, Stage-4.2F finite-geometry Maxwell/Green/FDT/stress authority with measured material response, exact candidate transport identity, a companion regenerated from that same identity, a companion detector noise receipt, measured state preparation, quasistatic modulation validation, and a complete conserved apparatus stress tensor, explicit QED/GR/DP signature separation, an authentic selected-candidate state-preparation receipt, a measured witness-to-complex-coherence transfer, a pilot-frozen likelihood and prediction vector, measured Stage-4.2P three-dimensional worldlines, local gravity gradient and apparatus-mass geometry, frequency-resolved tilt/echo transfer, and clock/control covariance closing the ordinary proper-time phase budget, a measured Stage-4.2Q normal/superconducting specimen impedance and Green response with transition, magnetic, vortex, trap, sham, and joint-coherence covariance, a Stage-4.2R same-apparatus packet set joining measured preparation, geometry/Green response, material spectra, phase covariance, gas kernel, four-cell complex coherence, companion channel, and exact registered-model bound recast without cross-apparatus covariance fusion, Stage-4 polarization and thermal/FDT closure, tensor/dimensional/semantic congruence, source-backed electron-mass/Higgs-tree and solar-radiometric calibration with explicit dependency nonbridges, a verified custodian receipt and authorized powered measured comparison for the confirmatory lane, held-out model discrimination, and a separately registered numerical boundary-to-coherence kernel for any bridge claim",
@@ -813,6 +838,8 @@
           "tests/casimir-dp-stage4-2q-campaign.spec.ts",
           "tests/casimir-dp-integrated-feasibility-pilot-stage4-2r.spec.ts",
           "tests/casimir-dp-stage4-2r-campaign.spec.ts",
+          "tests/casimir-dp-retarded-source-propagation-stage4-2s.spec.ts",
+          "tests/casimir-dp-stage4-2s-campaign.spec.ts",
           "tests/physics-root-leaf-manifest.spec.ts"
         ]
       },
@@ -824,6 +851,90 @@
           "inferred"
         ],
         "strict_fail_reason": "ROOT_LEAF_CASIMIR_DP_OR_BRIDGE_FAIL"
+      }
+    },
+    {
+      "id": "path_spacetime_equivalence_constraints_to_penrose_relational_correspondence_stage0_1",
+      "bundle_id": "penrose.branch-geometry-coherence-candidate",
+      "root_id": "physics_spacetime_gr",
+      "leaf_id": "leaf_penrose_relational_branch_correspondence_stage0_1",
+      "nodes": [
+        "physics_spacetime_gr",
+        "physics_quantum_semiclassical",
+        "leaf_penrose_relational_branch_correspondence_stage0_1"
+      ],
+      "dag_bridges": [
+        "bridge-equivalence-principle-constrains-relational-comparison",
+        "bridge-relational-anchors-to-branch-embeddings",
+        "bridge-branch-pullbacks-to-comparable-source-difference",
+        "bridge-independent-rigid-coordinate-relabeling-to-correspondence-gate",
+        "bridge-correspondence-nonuniqueness-to-uncertainty-envelope"
+      ],
+      "falsifier": {
+        "observable": "content-addressed synthetic identity, inverse, branch-swap, independent-rigid-coordinate-relabeling, physical-sensitivity, common-input-equality, alternate-reference, declared-6R0-support, and weak-field Gaussian recovery residuals followed by same-apparatus worldline, clock, landmark, density-support, and covariance packets",
+        "readiness_block_rule": "candidateStage0MaturityPreserved != true OR relationalBaseDefined != true OR branchMapsDefined != true OR relationalAnchorsDefined != true OR admissibleGaugeGroupDefined != true OR pullbackStressDifferenceDefined != true OR correspondenceRegularityDefined != true OR correspondenceNonuniquenessPolicyFrozen != true OR coordinateRelabelCovarianceReady != true OR correspondenceUncertaintyModelRegistered != true OR canonicalEquationIdentityReady != true OR correspondenceDefinitionReceiptReady != true OR authorityIntegrityReady != true OR physicalReferenceReceiptsReady != true",
+        "reject_rule": "definitionReplayReady == true AND (identityBranchResidual != 0 OR branchSwapResidual > tolerance OR coordinateRelabelResidual > tolerance OR knownSourcePerturbationPreserved != true OR referenceChoiceSpread > tolerance OR weakFieldRecoveryError > tolerance)",
+        "uncertainty_model": "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true,replay_window=session)",
+        "test_refs": [
+          "tests/casimir-dp-penrose-relational-correspondence-stage0-1.spec.ts",
+          "tests/casimir-dp-penrose-relational-correspondence-stage0-1-campaign.spec.ts",
+          "tests/physics-equation-backbone.spec.ts",
+          "tests/physics-root-leaf-manifest.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_PENROSE_RELATIONAL_CORRESPONDENCE_STAGE0_1_FAIL"
+      }
+    },
+    {
+      "id": "path_spacetime_equivalence_to_penrose_branch_geometry_coherence",
+      "bundle_id": "penrose.branch-geometry-coherence-candidate",
+      "root_id": "physics_spacetime_gr",
+      "leaf_id": "leaf_penrose_branch_geometry_to_coherence_candidate",
+      "nodes": [
+        "physics_spacetime_gr",
+        "physics_quantum_semiclassical",
+        "physics_collapse_benchmark",
+        "physics_information_dynamics",
+        "leaf_penrose_branch_geometry_to_coherence_candidate"
+      ],
+      "dag_bridges": [
+        "bridge-equivalence-principle-to-relational-branch-comparison",
+        "bridge-relational-branch-comparison-to-incompatibility-functional",
+        "bridge-incompatibility-functional-to-objective-reduction-dynamics",
+        "bridge-candidate-preflight-to-experimental-outcome-map",
+        "bridge-boundary-independent-candidate-to-casimir-nonbridge"
+      ],
+      "falsifier": {
+        "observable": "held-out complex coherence and a same-parameter independent companion across preregistered mass-density, branch-separation, hold-time, trajectory, path-swap, echo, and boundary-control cells after complete ordinary-physics closure",
+        "readiness_block_rule": "relationalCorrespondenceStage0_1Ready != true OR branchSourcesConserved != true OR branchIdentificationDefined != true OR gaugeRobustnessReady != true OR invariantIncompatibilityFunctionalReady != true OR equivalenceRecoveryReady != true OR causalReductionDynamicsRegistered != true OR probabilityAndNormalizationReady != true OR noSignallingReady != true OR energyMomentumBalanceReady != true OR recoveryLimitsReady != true OR complexCoherenceProjectionReady != true OR companionPredictionFrozen != true OR falsifiersFrozen != true OR numericalCalculatorRegistered != true OR (boundaryDependenceClaimed == true AND boundaryExtensionKernelRegistered != true)",
+        "reject_rule": "poweredHeldOutDataReady == true AND ordinaryNullClosed == true AND (predictedComplexCoherenceMatch != true OR predictedScaleLawMatch != true OR predictedCompanionMatch != true)",
+        "uncertainty_model": "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true,replay_window=session)",
+        "test_refs": [
+          "tests/casimir-dp-penrose-candidate-theory-stage0.spec.ts",
+          "tests/casimir-dp-penrose-candidate-theory-stage0-campaign.spec.ts",
+          "tests/casimir-dp-penrose-relational-correspondence-stage0-1.spec.ts",
+          "tests/casimir-dp-penrose-relational-correspondence-stage0-1-campaign.spec.ts",
+          "tests/casimir-dp-manifold-kernel-registry.spec.ts",
+          "tests/casimir-dp-complex-coherence.spec.ts",
+          "tests/casimir-dp-or-phase-stage2.spec.ts",
+          "tests/physics-root-leaf-manifest.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_PENROSE_BRANCH_GEOMETRY_CANDIDATE_FAIL"
       }
     },
     {
@@ -891,6 +1002,49 @@
           "inferred"
         ],
         "strict_fail_reason": "ROOT_LEAF_STELLAR_SPECTRAL_VIABILITY_FAIL"
+      }
+    },
+    {
+      "id": "path_stellar_transport_to_solar_khi_nanoflare_gate",
+      "bundle_id": "solar.khi-nanoflare.audit",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "leaf_id": "leaf_solar_khi_nanoflare_predictive_gate",
+      "nodes": [
+        "physics_stellar_structure_nucleosynthesis",
+        "stellar.energy.surface_transport_balance",
+        "solar.photosphere.magnetic_boundary_shear",
+        "solar.photosphere.khi_growth_observable",
+        "solar.mhd.flux_braiding_proxy",
+        "solar.nanoflare.event_population",
+        "solar.cross_scale.khi_nanoflare_gate",
+        "leaf_solar_khi_nanoflare_predictive_gate"
+      ],
+      "dag_bridges": [
+        "bridge-stellar-luminosity-to-surface-transport",
+        "bridge-surface-shear-to-native-khi-measurement",
+        "bridge-khi-to-braiding-hypothesis",
+        "bridge-khi-features-to-heldout-nanoflare-gate",
+        "bridge-classical-topology-to-quantum-nonclaim"
+      ],
+      "falsifier": {
+        "observable": "native-resolution MFBD/speckle KHI measurements and leakage-safe held-out nanoflare skill gain over magnetic controls",
+        "reject_rule": "nativeResolutionPreserved != true OR mfbdSpeckleAgreement != true OR numericalMeasurementAuthority != true OR labelsUsedAsFeatures == true OR heldOutActiveRegionGain != true OR timeShuffleGainLost != true OR spatialDisplacementGainLost != true OR simulationReproduction != true OR quantumRopePromotionRequested == true",
+        "uncertainty_model": "registered_measurement_covariance_plus_heldout_calibration_with_negative_controls",
+        "test_refs": [
+          "tests/solar-khi-analysis.spec.ts",
+          "tests/solar-model-registry.spec.ts",
+          "shared/theory/__tests__/solar-khi-nanoflare-theory-badges.spec.ts",
+          "tests/physics-root-leaf-manifest.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_SOLAR_KHI_NANOFLARE_GATE_FAIL"
       }
     },
     {
@@ -977,12 +1131,22 @@
     },
     {
       "id": "casimir-dp.or-boundary-coherence",
-      "summary": "Diagnostic Casimir-boundary coherence test that keeps ordinary QED phase and decoherence, Stage-4 polarization and thermal/FDT controls, Stage-4.2B apparatus scale transport, response-corrected thermometry, sensor-noise-separated covariance, frozen Diósi-Penrose scale forecasts, complex-residual identifiability and power, Stage-4.2C bounded synthetic redesign, empirical-input readiness, and blinded acquisition packets, Stage-4.2D Stark/Zeeman/polarization/blackbody witness metrology, conventional-gravity recovery, and spinor semantic nonbridge, tensor/dimensional/semantic congruence, Penrose/Diósi-Penrose branch-instability diagnostics, and the unregistered numerical boundary-to-coherence bridge as separately gated lanes.",
+      "summary": "Diagnostic Casimir-boundary coherence test that keeps ordinary QED phase and decoherence, polarization and thermal/FDT controls, apparatus-scale transport, response-corrected thermometry, sensor-noise-separated covariance, the frozen regularized Diósi comparator, complex-residual identifiability and power, empirical-input readiness, blinded acquisition packets, conventional-gravity recovery, and any unregistered boundary-to-coherence bridge as separately gated lanes.",
       "claim_scope": "cross_domain",
       "max_claim_tier": "diagnostic",
       "path_ids": [
         "path_quantum_semiclassical_to_casimir_dp_or_test",
         "path_complete_casimir_apparatus_to_ordinary_gravity_control"
+      ]
+    },
+    {
+      "id": "penrose.branch-geometry-coherence-candidate",
+      "summary": "Exploratory Penrose-inspired missing-theory lane separated from the Casimir boundary experiment: first register and test a relational branch correspondence, then independently require an incompatibility functional, reduction dynamics, probability and causal consistency, observable projection, companion, and falsifiers.",
+      "claim_scope": "cross_domain",
+      "max_claim_tier": "diagnostic",
+      "path_ids": [
+        "path_spacetime_equivalence_constraints_to_penrose_relational_correspondence_stage0_1",
+        "path_spacetime_equivalence_to_penrose_branch_geometry_coherence"
       ]
     },
     {
@@ -1001,6 +1165,15 @@
       "max_claim_tier": "diagnostic",
       "path_ids": [
         "path_stellar_structure_to_spectral_viability"
+      ]
+    },
+    {
+      "id": "solar.khi-nanoflare.audit",
+      "summary": "Diagnostic native-resolution solar KHI lane that gates flux-braiding and nanoflare prediction while preserving label separation and the classical-only flux-rope branch boundary.",
+      "claim_scope": "physics_observables",
+      "max_claim_tier": "diagnostic",
+      "path_ids": [
+        "path_stellar_transport_to_solar_khi_nanoflare_gate"
       ]
     }
   ]

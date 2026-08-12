@@ -8,6 +8,10 @@ import { storage } from "./sim-storage";
 import { fileManager } from "./services/fileManager";
 import { simulationParametersSchema, sweepSpecSchema } from "@shared/schema";
 import { WebSocket, WebSocketServer } from "ws";
+import {
+  isDesktopSessionAuthorized,
+  resolveDesktopSessionConfig,
+} from "./security/desktop-session";
 import targetValidationRoutes from "./routes/target-validation.js";
 import { lumaRouter } from "./routes/luma";
 import { lumaHceRouter } from "./routes/luma-hce";
@@ -70,6 +74,8 @@ import { clientErrorRouter } from "./routes/observability.client-error";
 import { createRateLimiter } from "./middleware/rate-limit";
 import { createConcurrencyGuard } from "./middleware/concurrency-guard";
 import { startStagePlayLiveSourceMailWakeService } from "./services/stage-play/stage-play-live-source-mail-wake-service";
+import { startLiveTradingSupervisor } from
+  "./services/trading/live-trading-supervisor";
 
 const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean => {
   if (value === "1") return true;
@@ -211,6 +217,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   const { discordLinkRouter } = await import("./routes/discord-link");
   app.use(discordLinkRouter);
   const { accountSessionRouter } = await import("./routes/account-session");
+  const { desktopReleaseRouter } = await import("./routes/desktop-release");
   const { docsPrintPdfRouter } = await import("./routes/docs-print-pdf");
   const { docsTranslationRouter } = await import("./routes/docs-translation");
   const { researchLibraryRouter } = await import("./routes/research-library");
@@ -221,6 +228,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   const { environmentActionRouter } = await import("./routes/environment-action-routes");
   app.use("/api/auth", googleAuthRouter);
   app.use("/api/account", accountSessionRouter);
+  app.use("/api", desktopReleaseRouter);
   app.use("/api/docs", docsPrintPdfRouter);
   app.use("/api/docs", docsTranslationRouter);
   app.use("/api/research-library", researchLibraryRouter);
@@ -454,9 +462,19 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   };
 
   if (process.env.NODE_ENV === "production" || process.env.ENABLE_WS === "true") {
+    const desktopSessionConfig = resolveDesktopSessionConfig(process.env);
     wss = new WebSocketServer({ 
       server: httpServer,
-      path: "/ws"
+      path: "/ws",
+      verifyClient: ({ req }, done) => {
+        if (isDesktopSessionAuthorized(req.headers, desktopSessionConfig)) {
+          done(true);
+          return;
+        }
+        done(false, 401, "Desktop session required", {
+          "Cache-Control": "no-store",
+        });
+      },
     });
 
     // Optional keepalive/ping to clean up dead sockets
@@ -1298,6 +1316,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/helix", trainingTraceRouter);
   app.use("/api/helix", constraintPacksRouter);
   startStagePlayLiveSourceMailWakeService();
+  startLiveTradingSupervisor();
 
   app.get("/api/qisnap/stream", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");

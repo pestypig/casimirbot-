@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import { minecraftPlayerEmbodimentActionPromptMatch } from "./minecraft-execution-plane-intent";
 
 export type HelixContextualToolMentionReason =
   | "negated"
@@ -405,13 +406,37 @@ const isCompoundRequirementCandidate = (text: string): boolean => {
   return compoundActionCuePattern.test(cleaned) || /[?ï¼Ÿ]\s*$/.test(cleaned);
 };
 
+const isCoordinatedNegativeContinuation = (
+  prompt: string,
+  requirement: string,
+): boolean => {
+  const start = prompt.indexOf(requirement);
+  if (start <= 0) return false;
+  const before = prompt.slice(0, start);
+  const boundary = Math.max(
+    before.lastIndexOf("."),
+    before.lastIndexOf("!"),
+    before.lastIndexOf("?"),
+    before.lastIndexOf(";"),
+    before.lastIndexOf("\n"),
+  );
+  const clausePrefix = before.slice(boundary + 1);
+  return /\b(?:do\s+not|don't|dont|never|avoid)\b[^.!?;\n]{0,220}(?:,\s*|\b(?:and|or)\s+)$/i.test(
+    clausePrefix,
+  );
+};
+
 const extractCoordinatedCompoundClauses = (prompt: string): string[] => {
   const clauses = prompt
     .split(
       /\s*(?:;|\.\s+|,\s*(?:and\s+)?|\band\s+|\bthen\s+)\s*(?=(?:use|find|locate|build|create|inspect|capture|avoid|execute|run|check|read|restore|start|stop|remove|ignite|light|extinguish|summon|teleport|give|set|fill|break|clear|observe|report|leave|place|synthesi[sz]e|explain|compare|identify|include|propose|write|implement|test|diagnose|analy[sz]e|research|cite|verify|summari[sz]e|map)\b)/i,
     )
     .map(cleanCompoundRequirementText)
-    .filter(isCompoundRequirementCandidate);
+    .filter(
+      (entry) =>
+        isCompoundRequirementCandidate(entry) &&
+        !isCoordinatedNegativeContinuation(prompt, entry),
+    );
   return uniqueBy(clauses, (entry) => entry.toLowerCase());
 };
 
@@ -420,7 +445,8 @@ const extractCompoundRequirementTexts = (prompt: string): string[] => {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
-  const coordinatedRequirements = extractCoordinatedCompoundClauses(prompt);
+  const coordinatedRequirements =
+    lines.length > 1 ? [] : extractCoordinatedCompoundClauses(prompt);
   if (coordinatedRequirements.length > 1) return coordinatedRequirements;
   const lineRequirements = lines
     .map((line) => {
@@ -472,12 +498,15 @@ export const buildHelixCompoundPromptContract = (
     const start = prompt.indexOf(text);
     const precedingText =
       start > 0 ? prompt.slice(Math.max(0, start - 32), start) : "";
+    const kind = classifyCompoundRequirementKind(text);
     return {
       id: `R${index + 1}`,
       text,
       ...(start >= 0 ? { span: { start, end: start + text.length } } : {}),
-      kind: classifyCompoundRequirementKind(text),
-      required: !/\b(?:optional|if useful|if needed|if relevant)\b/i.test(text),
+      kind,
+      required:
+        kind !== "constraint" &&
+        !/\b(?:optional|if useful|if needed|if relevant)\b/i.test(text),
       depends_on:
         index > 0 &&
         (/\b(?:then|after|based on|from that|therefore)\b/i.test(text) ||
@@ -584,9 +613,11 @@ export function interpretHelixAskPrompt(
     matchTexts(prompt, negativeConstraintPatterns),
     (entry) => entry.toLowerCase(),
   );
+  const playerEmbodimentActionMatch =
+    minecraftPlayerEmbodimentActionPromptMatch(prompt);
   const executableCommands = uniqueBy(
-    commandRules
-      .map((rule) => {
+    [
+      ...commandRules.map((rule) => {
         const text = prompt.match(rule.pattern)?.[0]?.trim();
         return text
           ? {
@@ -596,7 +627,17 @@ export function interpretHelixAskPrompt(
               reason: rule.reason,
             }
           : null;
-      })
+      }),
+      playerEmbodimentActionMatch
+        ? {
+            text: playerEmbodimentActionMatch.matched_text,
+            action_family: "minecraft.player_embodiment",
+            confidence: 0.95,
+            reason:
+              "affirmative action request on the explicitly selected Minecraft Player Embodiment plane",
+          }
+        : null,
+    ]
       .filter(
         (
           entry,

@@ -13,7 +13,7 @@
 
 This work reports an identifiability-first theoretical design, not evidence for
 objective collapse and not a derivation of collapse from the Casimir effect. Its
-central result is that a frozen, regularized mass-density Diósi–Penrose (DP)
+central result is that a frozen, Gaussian-regularized mass-density Diósi
 prediction can be converted into an apparatus-level, falsifiable pattern test
 in raw complex coherence. One bounded synthetic apparatus region separates that
 registered pattern from the modeled thermal, electromagnetic, gas, vibration,
@@ -98,7 +98,8 @@ requires an independently sourced and registered transfer law.
 | Apparatus identifiability | Stage 4.2B rejected the original nearly collinear design; Stage 4.2C established the parent whitened geometry; Stage 4.2M found three of 200 configurations passing the transported multigate screen | Synthetic design result; must be re-evaluated with measured pilot inputs |
 | Cross-scale equation audit | Stage 4.2D recovers the Stark, Zeeman, polarization, blackbody, compactness, material-yield, Jeans, and spinor-representation benchmarks with zero new collapse-rate bridges | Calibration, dimensional-consistency, and regime-recovery result only |
 | Causal geometry audit | Stage 4.2E reconstructs ADM null cones and timelike clock rates, recovers Schwarzschild radial-null propagation, and separates an ideal Casimir curvature screen from the QED propagation lane | Causal-notation recovery and scale separation only; no measured apparatus metric or collapse bridge |
-| Experimental warrant | The frozen DP projection reaches percent-scale additional attenuation in the strongest registered cells and is no longer synthetically degenerate with the registered controls | Sufficient reason to attempt the feasibility pilot; insufficient reason to claim physical readiness |
+| Penrose relational correspondence | Stage 0.1 makes branch-event identification explicit and passes its frozen local affine, identity, inverse, rigid-relabeling, common-input-equality, alternate-reference, declared-support, and weak-field recovery fixtures | Synthetic correspondence benchmark only; 0/5 same-apparatus reference packets are ready, and the parent candidate remains blocked at `PCT_BRANCH_CORRESPONDENCE_MISSING` |
+| Experimental warrant | The frozen DP projection reaches percent-scale additional attenuation in the strongest registered cells and is no longer synthetically degenerate with the registered controls | Sufficient reason to attempt measured subsystem commissioning; insufficient reason to authorize the integrated feasibility pilot or claim physical readiness |
 | Casimir-to-collapse mechanism | No sourced boundary-to-collapse transfer kernel has been registered | Open speculative hypothesis; not part of the primary DP likelihood |
 | Manifold dynamics | No covariant dynamical solution maps the boundary stress change into branch selection or collapse | `blocked`; the experiment cannot presently identify such dynamics |
 
@@ -116,7 +117,8 @@ pattern is not support for DP.
 | \(H_0\): ordinary apparatus physics | Complex coherence closes under measured thermal, electromagnetic/patch, vibration/tilt, residual-gas, readout, sensor, sham, and detuned-boundary responses with propagated covariance | No anomaly; if achieved sensitivity covers the frozen point, that registered DP point can be disfavored |
 | \(H_{\rm DP}\): registered mass-density DP | A replicated residual follows the frozen mass–separation–hold-time transport law and independently passes the companion-observable gate | Support for the tested DP phenomenology; not proof of Penrose's spacetime interpretation |
 | \(H_{\rm B}\): boundary-conditioned residual | An active/reference difference remains after \(H_0\) closure but does not obtain its amplitude by fitting the frozen DP law | A boundary anomaly eligible for a new preregistered mechanism study; not DP, OR, quantum-foam, or negative-curvature evidence by itself |
-| \(H_{\rm OR/QF}\): manifold or quantum-foam interpretation | No executable likelihood exists until a sourced transfer kernel predicts an observable beyond \(H_0\), \(H_{\rm DP}\), and \(H_{\rm B}\) | Not directly tested by the present campaign |
+| \(H_{\rm OR}\): Penrose branch-incompatibility candidate | Stage 0.1 first tests one local operational correspondence for comparing the branches; the invariant functional, reduction dynamics, lifetime distribution, and observable law remain absent | Formal-definition research program only; no executable likelihood and no direct OR test yet |
+| \(H_{\rm QF}\): boundary-conditioned manifold or quantum-foam interpretation | No executable likelihood exists until a sourced transfer kernel predicts an observable beyond \(H_0\), \(H_{\rm DP}\), and \(H_{\rm B}\) | Not directly tested by the present campaign |
 
 This separation is essential: the Casimir arm does not make a DP-like residual
 more persuasive merely because both descriptions use vacuum, energy, frequency,
@@ -780,7 +782,7 @@ calculation; it is no longer presented as this apparatus.
 \qquad
 \mathcal V(t)=\mathcal V_0e^{-\Gamma_{\rm DP}t},
 \qquad
-\dot E_{\rm DP}=\frac{3D_{pp}}{2m}.
+\dot E_{\rm DP}=\frac{3D_{pp}}{m}.
 \]
 
 At the declared \(r_0=100\ {\rm nm}\) sensitivity point, the frozen object
@@ -1242,8 +1244,9 @@ rate.
   collapse and environmental models.
 
 `H0`, `HDP`, `HN`, and `HB` are executable as apparatus hypotheses once
-empirical pilot inputs exist. `HQF` and `HOR` remain non-executable at the
-mechanism level because no quantitative Casimir-to-collapse kernel or unique
+empirical pilot inputs exist. `HOR` now has a fail-closed definition and local
+correspondence benchmark but no physical prediction; `HQF` remains
+non-executable because no quantitative Casimir-to-collapse kernel or unique
 manifold-dynamics discriminator has been admitted.
 
 ### 2.3 Prompt-derived manifold-response hypothesis
@@ -1327,6 +1330,100 @@ microtubules, neuronal orchestration, anesthetic response, and conscious
 events. `CDP-QF-1` contains none of those preparations or endpoints. It can at
 most constrain the OR ingredient under a named mass-density and regularization
 model; it cannot validate or falsify Orch OR as a complete biological theory.
+
+### 2.5 Stage-0 candidate and Stage-0.1 relational-correspondence benchmark
+
+The Stage-0 Penrose candidate turns the missing-theory question into an ordered,
+fail-closed definition program. Its first obligation is not a lifetime formula
+but a rule for comparing events and tensors belonging to the two branch
+descriptions. Stage 0 denotes exploratory theory maturity; "Stage 0.1" names
+this particular correspondence benchmark and is not a claim of scientific
+promotion.
+
+Here \(E_I\) denotes the prospective covariant incompatibility functional that
+has not been supplied. Its required stationary Newtonian recovery is
+\(E_I^N\rightarrow E_G\); Stage 0.1 checks that weak-field target without
+defining \(E_I\) or a reduction law.
+
+The construction is motivated by relational-observable and material-reference
+programs, while retaining their limits
+([Dittrich 2006](https://doi.org/10.1088/0264-9381/23/22/006);
+[Tambornino 2012](https://doi.org/10.3842/SIGMA.2012.017);
+[Brown and Kuchar 1995](https://doi.org/10.1103/PhysRevD.51.5600);
+[Giesel and Thiemann 2015](https://doi.org/10.1088/0264-9381/32/13/135015)).
+Quantum-reference-frame work is retained as a competing consistency test, not
+as support for collapse
+([Giacomini and Brukner 2022](https://doi.org/10.1116/5.0070018)).
+
+The benchmark declares a local relational label space \(B_{\rm lab}\), one
+branch-blind apparatus embedding \(X_A:B_{\rm lab}\rightarrow\mathcal M_A\) and
+\(X_B:B_{\rm lab}\rightarrow\mathcal M_B\), and the induced correspondence
+\(\varphi^{\rm corr}_{A\rightarrow B}=X_B\circ X_A^{-1}:
+X_A(B_{\rm lab})\rightarrow X_B(B_{\rm lab})\). Stress and metric quantities are compared
+only after pullback to that common operational label space:
+
+<!-- helix-doc-equation-action/v1 id=cdp-penrose-stage0-1-supplement-pullbacks -->
+\[
+\Delta_B T=X_A^*T_A-X_B^*T_B,
+\qquad
+\Delta_B g=X_A^*g_A-X_B^*g_B.
+\]
+
+The frozen synthetic gate is represented compactly below. The exact named
+gate ledger in the content-addressed report is authoritative.
+
+<!-- helix-doc-equation-action/v1 id=cdp-penrose-stage0-1-supplement-gate -->
+\[
+\mathcal G_{\rm corr}
+=\mathcal G_{\rm id}\wedge\mathcal G_{\rm inv}
+\wedge\mathcal G_{\rm swap}\wedge\mathcal G_{\rm coord}
+\wedge\mathcal G_{\rm sensitivity}\wedge\mathcal G_{\rm common}
+\wedge\mathcal G_{\rm ref}\wedge\mathcal G_{E_G}.
+\]
+
+As in the main paper, this is a grouped mnemonic rather than a second gate
+definition. `G_ref` expands to the reference-subsystem, branch-map,
+declared-support, causal-order, alternate-reference, and reference-spread rows;
+`G_inv` expands to Jacobian and inverse-map rows; `G_coord` is rigid relabeling
+only; `G_common` is common-input equality only; and the authoritative ledger
+also contains its explicit output-policy row.
+
+It tests identity, inverse and branch-swap recovery, independent rigid
+coordinate relabeling, equality of common-acceleration and common-potential
+inputs, preservation of a known source displacement, alternate branch-blind
+reference sets, coverage of the declared \(6R_0\) Gaussian finite-support proxy
+in all primary and alternate charts, and the registered Gaussian weak-field
+\(E_G\) target. The maintained
+fixture passes: its analytic target is \(1.2448783852\times10^{-35}\ {\rm J}\),
+the independent relational Fourier result is
+\(1.2448786193\times10^{-35}\ {\rm J}\), and the relative recovery error is
+\(1.88046\times10^{-7}\). The independent-coordinate relabeling residual is
+\(3.56\times10^{-22}\ {\rm m}\).
+
+Those are software residuals, not observed geometry. All five physical
+authority packets remain `not_ready`: measured branch trajectories and
+covariance; clock synchronization and pulse-event dictionary; as-built
+landmarks, tetrad, and orientation covariance; the selected-specimen density
+support; and alternate-reference covariance. The campaign therefore returns
+`PRC_REFERENCE_RECEIPTS_MISSING`, while the parent candidate deliberately
+remains at `PCT_BRANCH_CORRESPONDENCE_MISSING`.
+
+The frozen v1 schema admits only `not_ready` records. A measured successor must
+add path, hash, custody, calibration, and uncertainty validation rather than
+editing the maintained v1 packet in place.
+
+A Stage-0.1 synthetic pass establishes only that one local prescription
+survives its frozen weak-field fixtures. It does not select a unique physical
+correspondence, cover arbitrary spacetime branches, define a covariant positive
+incompatibility functional, specify reduction dynamics, or generate a collapse
+rate, lifetime distribution, coherence law, Casimir modifier, or likelihood
+vector. The next theoretical obligation remains the invariant incompatibility
+functional after a same-apparatus correspondence is physically authorized.
+The rigid-relabeling pass is not arbitrary diffeomorphism covariance, and the
+common-input equality rows are not the still-blocked full equivalence-principle
+recovery obligation.
+The maintained [Stage-0.1 report](./casimir-dp-penrose-relational-correspondence-stage0-1-report.md)
+contains the complete gate and packet ledger.
 
 ## 3. Lane A — Casimir reference and observation
 
@@ -3573,6 +3670,7 @@ not a single maintained measurement run.
 
 | Run id | Revision | Input hash | Stage | Status | Key result | Uncertainty | Artifact | Claim effect |
 |---|---|---|---|---|---|---|---|---|
+| `casimir-dp-penrose-relational-correspondence-stage0-1-v1` | `0.1.0` | `2f581e8b1ae4c0df9857f02e550b91d1a1e7c2328bdf11f69c0c3039a809340c` | Stage-0.1 local relational-correspondence benchmark | synthetic gates pass / scientific correspondence blocked | branch-blind local landmark maps recover the registered Gaussian weak-field target with relative error `1.88046e-7`; coordinate-relabel residual `3.56e-22 m`; no physical rate emitted | 0/5 same-apparatus reference packets ready; global uniqueness, invariant functional, and reduction dynamics absent | [report](./casimir-dp-penrose-relational-correspondence-stage0-1-report.md) `62d473b48a2b6e17d3fbb19bfc9a9d604b19178315cd1589684cde41673dbc2b`; receipt `a85cd07091dbabb0cf9760772af6a6861bc25c2e86d98f9733773e3a964e868e` | establishes one frozen synthetic local correspondence recovery only; parent remains `PCT_BRANCH_CORRESPONDENCE_MISSING`, with no collapse, manifold, or empirical claim |
 | `diagnostic-smoke-v1-<timestamp>` | local diagnostic | `56ab76ca85f4ef4da7ce1ac9da3e87d2eb4e898b02cbc09aca0ad301e0a3f2d2` | protocol scaffold | completed / downstream gates not ready or blocked | ideal Casimir reference plus synthetic DP solver smoke path | synthetic branches; material, metrology, and bridge absent | timestamped `study-run-receipt.json` and two hashed outputs | confirms runnable separation only |
 | boundary-coherence-platform-screen-v1 | local diagnostic | `bd5528824d70de65e8b181dc18a78c3a287b2fd9c2cdd66bb5a9a79a3c97fe84` | experiment design | completed / promotion blocked | corrected centered-grid integrated proxy `Gamma_DP/Gamma_env=4.47e-7`; no candidate promoted | design assumptions dominate | maintained design report; receipt `002256c567e0897f2e0f93c29ec1d50652e1337b3c9175147f8928827c6667e0` | defines rate gap and next computations only |
 | casimir-dp-gated-computations-stage1-v1 | local diagnostic | `5b12c758228dc68865f4a91d3ae1aa9ade698932546c686aab5cb9e5773b5e93` | five gated computation lanes | completed / promotion blocked | Lifshitz ideal validation pass; DP mass/symmetry/containment pass; corrected spatial convergence not ready; rate-only power not ready | material and sidecar receipts absent; branch convergence and provenance open; manifold dynamics unregistered | corrected gated-computations report; receipt `d9f42cb1e025bcfa56484b05919797dda8ed2cec383ea927d0972fd7e652c887` | repairs false convergence pass and preserves promotion block |
@@ -3595,6 +3693,12 @@ not a single maintained measurement run.
 
 This paper does not claim:
 
+- that the Stage-0.1 synthetic pass selects a unique physical correspondence
+  between arbitrary branch geometries, supplies measured apparatus landmarks,
+  or clears the parent `PCT_BRANCH_CORRESPONDENCE_MISSING` blocker;
+- that relational pullback recovery defines a covariant positive
+  incompatibility functional, a collapse rate, a survival law, a complex-
+  coherence prediction, or a model-comparison vector;
 - that the Casimir effect proves zero-point energy as a unique ontology;
 - that quantum foam is the accepted explanation of the Casimir effect;
 - that measured Casimir force equals DP gravitational self-energy;
@@ -3666,6 +3770,22 @@ This paper does not claim:
   gravity control, or physical viability.
 
 ## 13. Source register
+
+- B. Dittrich, "Partial and Complete Observables for Canonical General
+  Relativity," *Classical and Quantum Gravity* 23, 6155--6184 (2006), DOI
+  `10.1088/0264-9381/23/22/006`; motivates relational complete observables,
+  not a unique branch correspondence or collapse law.
+- J. Tambornino, "Relational Observables in Gravity: a Review," *SIGMA* 8,
+  017 (2012), DOI `10.3842/SIGMA.2012.017`; reviews relational-observable
+  constructions and their limits.
+- J. D. Brown and K. V. Kuchar, "Dust as a Standard of Space and Time in
+  Canonical Quantum Gravity," *Physical Review D* 51, 5600--5629 (1995), DOI
+  `10.1103/PhysRevD.51.5600`; supports material reference labels, not adding
+  literal dust to this apparatus.
+- K. Giesel and T. Thiemann, "Scalar Material Reference Systems and Loop
+  Quantum Gravity," *Classical and Quantum Gravity* 32, 135015 (2015), DOI
+  `10.1088/0264-9381/32/13/135015`; supports scalar material-reference
+  constructions, not a unique covariant incompatibility functional.
 
 - H. B. G. Casimir, “On the Attraction Between Two Perfectly Conducting
   Plates” (1948), original ideal-plate calculation.
@@ -5184,3 +5304,98 @@ The canonical run reports packet-contract `pass`, empirical pilot
 validation `not_ready`, collapse and manifold identification `blocked`, and
 physical viability `not_evaluated`. Cross-apparatus covariance fusion is
 forbidden and zero observable bridge edges are added.
+
+<!-- legacy-corrupted-stage4-2s-supplement-block
+
+Stage 4.2S authenticates the Stage-4.2R campaign and verification receipts and
+adds a causal ordinary-electromagnetic source lane. The analytic benchmark is
+a point-charge software recovery, not a model of the neutral diamond probe.
+
+legacy-corrupted-equation-marker cdp-stage4-2s-supplement-radiation
+[
+mathbf E_{m rad}=
+rac{q}{4piepsilon_0c^2R}
+hat{mathbf n}	imes
+left[hat{mathbf n}	imesmathbf a(t-R/c)ight],
+qquad
+P_{m Larmor}=rac{q^2a^2}{6piepsilon_0c^3}.
+]
+
+The canonical quadrature recovers Larmor power with relative error
+(2.57408	imes10^{-16}), zero transverse and current-continuity residuals,
+and circular-projector error (2.22045	imes10^{-16}). Doubling distance
+halves the radiation amplitude and zero acceleration returns zero radiation.
+
+legacy-corrupted-equation-marker cdp-stage4-2s-supplement-scale
+[
+kL=2pi fL/c,qquad
+kL_{m boundary}=8.38338	imes10^{-13},qquad
+kL_{1550{m nm}}=324.293.
+]
+
+This is a regime classifier, not quasistatic authority. The boundary
+fundamental's source amplitude, edge spectrum, material response, and transfer
+are absent, while the optical wavelength is only a synthetic benchmark.
+
+legacy-corrupted-equation-marker cdp-stage4-2s-supplement-green-coherence
+[
+E_i=imu_0omegaint d^3r',G^{m ret}_{ij}J_j,qquad
+Phi_{m EM}=-hbar^{-1}intDelta U_{m EM},dt,qquad
+C_0=C(0)e^{iPhi_{m EM}-chi_{m EM}}.
+]
+
+The synthetic fixture retains circular polarization and emits branch field,
+energy, phase, absorption, photon-rate, recoil-diffusion, heating, and
+((-chi,Phi)) outputs. It verifies interface dimensionality only. The
+canonical decision is software-contract `pass`, analytic-recovery `pass`,
+ordinary-null integration `not_authorized`, and 0/7 empirical authorities
+ready. The frozen Diósi generator is unchanged and zero collapse-bridge edges
+are added.
+-->
+
+### B.19 Stage-4.2S retarded-source and switching-radiation closure
+
+Stage 4.2S authenticates the Stage-4.2R campaign and verification receipts and
+adds a causal ordinary-electromagnetic source lane. The analytic benchmark is
+a point-charge software recovery, not a model of the neutral diamond probe.
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2s-supplement-radiation -->
+\[
+\mathbf E_{\rm rad}=
+\frac{q}{4\pi\epsilon_0c^2R}
+\hat{\mathbf n}\times
+\left[\hat{\mathbf n}\times\mathbf a(t-R/c)\right],
+\qquad
+P_{\rm Larmor}=\frac{q^2a^2}{6\pi\epsilon_0c^3}.
+\]
+
+The canonical quadrature recovers Larmor power with relative error
+\(2.57408\times10^{-16}\), zero transverse and current-continuity residuals,
+and circular-projector error \(2.22045\times10^{-16}\). Doubling distance
+halves the radiation amplitude and zero acceleration returns zero radiation.
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2s-supplement-scale -->
+\[
+kL=2\pi fL/c,\qquad
+kL_{\rm boundary}=8.38338\times10^{-13},\qquad
+kL_{1550{\rm nm}}=324.293.
+\]
+
+This is a regime classifier, not quasistatic authority. The boundary
+fundamental's source amplitude, edge spectrum, material response, and transfer
+are absent, while the optical wavelength is only a synthetic benchmark.
+
+<!-- helix-doc-equation-action/v1 id=cdp-stage4-2s-supplement-green-coherence -->
+\[
+E_i=i\mu_0\omega\int d^3r'\,G^{\rm ret}_{ij}J_j,\qquad
+\Phi_{\rm EM}=-\hbar^{-1}\int\Delta U_{\rm EM}\,dt,\qquad
+C_0=C(0)e^{i\Phi_{\rm EM}-\chi_{\rm EM}}.
+\]
+
+The synthetic fixture retains circular polarization and emits branch field,
+energy, phase, absorption, photon-rate, recoil-diffusion, heating, and
+\((-\chi,\Phi)\) outputs. It verifies interface dimensionality only. The
+canonical decision is software-contract `pass`, analytic-recovery `pass`,
+ordinary-null integration `not_authorized`, and 0/7 empirical authorities
+ready. The frozen Diósi generator is unchanged and zero collapse-bridge edges
+are added.

@@ -10,6 +10,7 @@ import {
   HELIX_ENVIRONMENT_PROBE_OBSERVATION_SCHEMA,
   HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
   HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
   HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
   HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
   helixEnvironmentCatalogSnapshotSchema,
@@ -628,6 +629,109 @@ describe("environment probe workstation gateway", () => {
         }),
       },
     });
+    expect(dispatchProbe).not.toHaveBeenCalled();
+  });
+
+  it("returns first-party schema repair from trusted account capabilities without requiring an external policy", async () => {
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const accountContext = firstPartyAccountContext();
+    accountContext.account_policy.allowed_workstation_capabilities = Array.from(
+      new Set([
+        ...accountContext.account_policy.allowed_workstation_capabilities,
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      ]),
+    );
+    accountContext.account_session.account_policy = accountContext.account_policy;
+
+    const result = await executeEnvironmentProbeGatewayCapability({
+      capabilityId: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:first-party-schema-repair`,
+      arguments: {
+        scope: { radius: 7 },
+        purpose: "build_planning",
+      },
+      policy: null,
+      accountContext,
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: dependencies({ dispatchProbe }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      error: "schema_validation_failed",
+      schemaRepair: {
+        capability_id: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        failure_class: "invalid_args",
+        retryability: "retryable",
+        rejected_fields: ["scope"],
+        proposed_arguments: {
+          purpose: "build_planning",
+          target: "current_actor",
+        },
+      },
+    });
+    expect(dispatchProbe).not.toHaveBeenCalled();
+  });
+
+  it("offers an admitted sibling probe before dropping scope fields that belong to it", async () => {
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      capabilityId: HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
+      turnId: TURN_ID,
+      toolCallId: `${TOOL_CALL_ID}:schema-migration`,
+      arguments: {
+        target: "current_actor",
+        center: "selected_player",
+        horizontal_radius: 7,
+        vertical_radius: 6,
+        scope: "house_shell",
+        filters: ["strict_air", "solid_support"],
+      },
+      policy: {
+        ...policy(),
+        allowedCapabilities: [
+          HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        ],
+      },
+      dependencies: dependencies({ dispatchProbe }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "schema_validation_failed",
+      schemaRepair: {
+        capability_id: HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
+        next_affordances: [
+          {
+            capability_id: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+            args: {
+              target: "current_actor",
+              horizontal_radius: 7,
+              vertical_radius: 6,
+            },
+            lane_request: {
+              capability:
+                HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+              target: "current_actor",
+              horizontal_radius: 7,
+              vertical_radius: 6,
+            },
+            admissible: true,
+          },
+          {
+            capability_id: HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
+            args: { target: "current_actor" },
+            admissible: true,
+          },
+        ],
+      },
+    });
+    expect(result.schemaRepair?.next_affordances[0]?.reason).toContain(
+      "instead of discarding the user's requested scope",
+    );
     expect(dispatchProbe).not.toHaveBeenCalled();
   });
 

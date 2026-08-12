@@ -1,5 +1,5 @@
 import {
-  extractExplicitCapabilityContracts,
+  extractPlannerBindingCapabilityContracts,
   type ExplicitCapabilityContract,
   type ExplicitCapabilityExtractionContext,
   type ExtractedExplicitCapabilityContract,
@@ -108,22 +108,34 @@ export type HelixCompoundCapabilitySubgoal = {
     required: boolean;
     status: "pending";
   }>;
+  subgoal_identity_policy?: "provider_call_occurrence";
+  provider_call_id?: string | null;
+  capability_occurrence?: number;
   guarded_noop_policy?: {
     schema: "helix.compound_capability_guarded_noop.v1";
     mode: "no_verified_safe_candidate";
     guard_subgoal_id: string;
     guard_capability: typeof HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY;
-    required_purpose: "structure_planning" | "fire_safety";
+    required_purpose:
+      | "structure_planning"
+      | "fire_safety"
+      | "movement_safety";
     accepted_observation_purposes:
       | ["structure_planning", "build_planning"]
-      | ["fire_safety"];
-    candidate_field: "build_line_candidates" | "fireplace_candidates";
+      | ["fire_safety"]
+      | ["movement_safety"];
+    candidate_field:
+      | "build_line_candidates"
+      | "fireplace_candidates"
+      | "walk_step_candidates";
     completeness_field:
       | "build_line_candidates_complete"
-      | "fireplace_candidates_complete";
+      | "fireplace_candidates_complete"
+      | "walk_step_candidates_complete";
     omitted_count_field:
       | "omitted_build_line_candidate_count"
-      | "omitted_fireplace_candidate_count";
+      | "omitted_fireplace_candidate_count"
+      | "omitted_walk_step_candidate_count";
     current_turn_only: true;
     requires_successful_observation: true;
     user_directed_noop_guard: true;
@@ -139,6 +151,7 @@ export type HelixCompoundCapabilityContract = {
   subgoals: HelixCompoundCapabilitySubgoal[];
   required_capabilities: string[];
   requires_all_subgoals: boolean;
+  subgoal_identity_policy?: "provider_call_occurrence";
   terminal_policy: "synthesize_from_satisfied_subgoal_observations";
   assistant_answer: false;
   raw_content_included: false;
@@ -562,9 +575,61 @@ const minecraftBuildDimensionFromPrompt = (
   return Number.isInteger(numeric) ? Number(numeric) : null;
 };
 
+const minecraftSpatialInspectionPurposeFromPrompt = (
+  promptText: string,
+):
+  | "fire_safety"
+  | "landing_safety"
+  | "movement_safety"
+  | "structure_planning"
+  | "general" => {
+  // `fire_safety` is the hearth/fireplace candidate projection. A generic
+  // movement-safety clause such as "no nearby fire" still needs the complete
+  // bounded geometry, not a fireplace-only candidate list. Keep this selector
+  // tied to an affirmative hearth/ignition objective rather than the mere
+  // presence of a hazard word.
+  const fireObjectiveMatch = promptText.match(
+    /\b(?:inspect|describe|find|check|locate|verify)\b[^.!?]{0,160}\b(?:fireplace|hearth)\b|\b(?:ignite|light|start)\b[^.!?]{0,50}\b(?:a\s+)?(?:fire|fireplace|hearth)\b/i,
+  );
+  const fireObjectivePrefix = fireObjectiveMatch?.index === undefined
+    ? ""
+    : promptText.slice(
+        Math.max(0, fireObjectiveMatch.index - 70),
+        fireObjectiveMatch.index,
+      );
+  const affirmativeFireObjective = Boolean(fireObjectiveMatch) &&
+    !/\b(?:do\s+not|don['â€™]t|never|later|might|may|previously|earlier|screen\s+says|display\s+says|quoted?)\b/i.test(
+      fireObjectivePrefix,
+  );
+  if (affirmativeFireObjective) return "fire_safety";
+  if (
+    /\b(?:walk|move|movement|step)\b/i.test(promptText) &&
+    /\b(?:safe|walkable|headroom|solid\s+(?:ground|support)|cardinal\s+direction|no\s+(?:nearby\s+)?(?:fire|drop|hazard))\b/i.test(
+      promptText,
+    )
+  ) {
+    return "movement_safety";
+  }
+  if (/\b(?:fall|landing|rescue)\b/i.test(promptText)) {
+    return "landing_safety";
+  }
+  if (
+    /\b(?:build|construct|structure|wall|house|base|surround|enclose)\b/i.test(
+      promptText,
+    )
+  ) {
+    return "structure_planning";
+  }
+  return "general";
+};
+
 const minecraftGuardedNoopFamilyFromPrompt = (
   promptText: string,
-): "structure_planning" | "fire_safety" | null => {
+): "structure_planning" | "fire_safety" | "movement_safety" | null => {
+  const guardedMovementNoopClause = promptText.match(
+    /\bif\s+(?:no\s+safe\s+(?:direction|step|path)(?:\s+(?:is|can\s+be))?\s+(?:evidenced|verified|found|available|identified)|a\s+safe\s+(?:direction|step|path)\s+(?:is|can\s+be)\s+not\s+(?:evidenced|verified|found|available|identified))\s*[,]?[^.!?]{0,120}\b(?:do\s+not|don['’]t|must\s+not)\s+(?:move|walk|step)\b/i,
+  );
+  if (guardedMovementNoopClause) return "movement_safety";
   const guardedNoopClause = promptText.match(
     /\bif\s+(?:no\s+safe\s+(?:site|location|spot|place|candidate|build(?:ing)?\s+line|fireplace|hearth)(?:\s+(?:is|can\s+be))?\s+(?:verified|found|available|identified)|a\s+safe\s+(?:site|location|spot|place|candidate|build(?:ing)?\s+line|fireplace|hearth)\s+(?:is|can\s+be)\s+not\s+(?:verified|found|available|identified))\s*[,]?[^.!?]{0,100}\b(?:do\s+not|don['’]t|must\s+not)\s+(?:build|construct|place|fill|set|change|modify|mutate|light|ignite|start)\b/i,
   );
@@ -588,7 +653,10 @@ const minecraftGuardedNoopPolicyForSubgoal = (input: {
   match: ExtractedExplicitCapabilityContract;
   ordered: ExtractedExplicitCapabilityContract[];
 }): HelixCompoundCapabilitySubgoal["guarded_noop_policy"] => {
-  if (input.match.contract.capability !== HELIX_MINECRAFT_COMMAND_CAPABILITY) {
+  if (
+    input.match.contract.capability !== HELIX_MINECRAFT_COMMAND_CAPABILITY &&
+    input.match.contract.capability !== HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY
+  ) {
     return undefined;
   }
   const family = minecraftGuardedNoopFamilyFromPrompt(input.promptText);
@@ -612,18 +680,26 @@ const minecraftGuardedNoopPolicyForSubgoal = (input: {
     accepted_observation_purposes:
       family === "fire_safety"
         ? ["fire_safety"]
+        : family === "movement_safety"
+          ? ["movement_safety"]
         : ["structure_planning", "build_planning"],
     candidate_field:
       family === "fire_safety"
         ? "fireplace_candidates"
+        : family === "movement_safety"
+          ? "walk_step_candidates"
         : "build_line_candidates",
     completeness_field:
       family === "fire_safety"
         ? "fireplace_candidates_complete"
+        : family === "movement_safety"
+          ? "walk_step_candidates_complete"
         : "build_line_candidates_complete",
     omitted_count_field:
       family === "fire_safety"
         ? "omitted_fireplace_candidate_count"
+        : family === "movement_safety"
+          ? "omitted_walk_step_candidate_count"
         : "omitted_build_line_candidate_count",
     current_turn_only: true,
     requires_successful_observation: true,
@@ -709,17 +785,9 @@ const argsHintForSubgoal = (input: {
             : {}),
         };
       }
-      const purpose = /\b(?:fire|fireplace|hearth|ignite|light)\b/i.test(
+      const purpose = minecraftSpatialInspectionPurposeFromPrompt(
         input.promptText,
-      )
-        ? "fire_safety"
-        : /\b(?:fall|landing|rescue)\b/i.test(input.promptText)
-          ? "landing_safety"
-          : /\b(?:build|construct|structure|wall|house|base|surround|enclose)\b/i.test(
-                input.promptText,
-              )
-            ? "structure_planning"
-            : "general";
+      );
       const requestedLength = minecraftBuildDimensionFromPrompt(
         input.promptText,
         "long",
@@ -775,6 +843,9 @@ const argsHintForSubgoal = (input: {
     return { target: "current_actor" };
   }
   if (capability === HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY) {
+    const evidenceSelectedDirection =
+      minecraftSpatialInspectionPurposeFromPrompt(input.promptText) ===
+      "movement_safety";
     const direction = /\b(?:backward|back)\b/iu.test(input.promptText)
       ? "back"
       : /\bleft\b/iu.test(input.promptText)
@@ -787,7 +858,7 @@ const argsHintForSubgoal = (input: {
     );
     const durationMs = Number(explicitDuration?.[1]);
     return {
-      direction,
+      ...(evidenceSelectedDirection ? {} : { direction }),
       duration_ms:
         Number.isInteger(durationMs) && durationMs >= 50 && durationMs <= 10_000
           ? durationMs
@@ -1465,14 +1536,32 @@ export const buildHelixCompoundCapabilityContract = (input: {
   promptText: string;
   trustedEnvironmentContext?: ExplicitCapabilityExtractionContext | null;
 }): HelixCompoundCapabilityContract | null => {
-  const ordered = extractExplicitCapabilityContracts(
+  const ordered = extractPlannerBindingCapabilityContracts(
     input.promptText,
     input.trustedEnvironmentContext,
   );
   if (ordered.length === 0) return null;
+  const capabilityTotals = new Map<string, number>();
+  for (const match of ordered) {
+    const capability = match.contract.capability;
+    capabilityTotals.set(
+      capability,
+      (capabilityTotals.get(capability) ?? 0) + 1,
+    );
+  }
+  const occurrenceAwareSubgoals = Array.from(capabilityTotals.values()).some(
+    (count) => count > 1,
+  );
+  const capabilityOccurrenceCounts = new Map<string, number>();
   const subgoals = ordered.map((match: ExtractedExplicitCapabilityContract, index: number): HelixCompoundCapabilitySubgoal => {
     const contract = match.contract;
     const requestedCapability = contract.capability;
+    const capabilityOccurrence =
+      (capabilityOccurrenceCounts.get(requestedCapability) ?? 0) + 1;
+    capabilityOccurrenceCounts.set(
+      requestedCapability,
+      capabilityOccurrence,
+    );
     const subgoalId = subgoalIdFor(input.turnId, index + 1, requestedCapability);
     const inputBindings = inputBindingsForSubgoal({
       turnId: input.turnId,
@@ -1520,6 +1609,13 @@ export const buildHelixCompoundCapabilityContract = (input: {
       forbidden_nearby_capabilities: [...contract.forbidden_nearby_capabilities],
       depends_on_subgoal_ids: inputBindings.map((binding) => binding.from_subgoal_id),
       input_bindings: inputBindings,
+      ...(occurrenceAwareSubgoals
+        ? {
+            subgoal_identity_policy: "provider_call_occurrence" as const,
+            provider_call_id: null,
+            capability_occurrence: capabilityOccurrence,
+          }
+        : {}),
       ...(guardedNoopPolicy
         ? { guarded_noop_policy: guardedNoopPolicy }
         : {}),
@@ -1541,6 +1637,9 @@ export const buildHelixCompoundCapabilityContract = (input: {
           subgoal.requested_capability,
       ),
     ),
+    ...(occurrenceAwareSubgoals
+      ? { subgoal_identity_policy: "provider_call_occurrence" as const }
+      : {}),
     requires_all_subgoals:
       subgoals.length > 1 &&
       subgoals.every((subgoal) => subgoal.mandatory !== false),

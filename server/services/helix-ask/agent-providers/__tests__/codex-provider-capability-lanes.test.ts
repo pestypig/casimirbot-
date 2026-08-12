@@ -45,7 +45,12 @@ import {
   buildCodexScholarlyEvidenceDecisionContractRetryPrompt,
   buildCodexScholarlyEvidenceDecisionInstruction,
   buildCodexRuntimeLaneCapabilityAdmissionCorrection,
+  attachCodexMinecraftPlayerEmbodimentActionRequirement,
+  codexObservationDependentCapabilityProposalIds,
   runtimeProviderAdmittedCapabilityIdsForQuestion,
+  runtimeProviderMissingCapabilityAnyOfGroupIdsFromBody,
+  selectCodexRuntimeCapabilityProposalIds,
+  shouldAllowCodexObservationDependentCapabilityProposal,
   buildImageLensObservationFallbackAnswer,
   buildScholarlyCapabilityLaneReentryEvidenceLines,
   buildScholarlyResearchResponseModeProjection,
@@ -60,6 +65,8 @@ import {
   codexProvider,
   continuationStateAdmitsPreparedLaneRequest,
   continuationStateAdmitsGenericProviderLaneRequest,
+  continuationStateAdmitsSchemaCompletedReadOnlyLaneRequest,
+  continuationStateAdmitsEvidenceBoundMinecraftWalkLaneRequest,
   continuationStateAdmitsPreparedRecoveryLaneRequest,
   detectProviderPromptLeakMarkers,
   enrichCapabilityLaneCandidatesFromBody,
@@ -91,6 +98,7 @@ import {
   stripCodexScholarlyEvidenceDecisionMarkers,
   validateCodexScholarlyEvidenceDecision,
 } from "../codex-provider";
+import { attachHelixCapabilityItineraryExecutionState } from "../../capability-itinerary-execution";
 
 const buildIntegrityValidLanyonReceipt = async (input: {
   request: CasimirArtifactGenerationRequestV1;
@@ -683,6 +691,58 @@ describe("Codex provider capability lane adapter", () => {
     expect(reentry).toContain('"x": -38');
     expect(reentry).toContain('"block_id": "minecraft:chest"');
     expect(reentry).toContain('"fireplace_candidates": []');
+  });
+
+  it("preserves admitted Minecraft action arguments in normalized evidence identity", () => {
+    const result = buildCodexNormalizedObservationArtifacts({
+      turnId: "ask:test:minecraft-action-argument-normalization",
+      gatewayCallResults: [{
+        capability_id: "com.casimirbot.minecraft.player.walk",
+        ok: true,
+        observation: {
+          schema: "helix.environment_action.observation.v1",
+          status: "succeeded",
+          outcome: "succeeded",
+          summary: "The bounded walk completed with measured motion.",
+          provenance_valid: true,
+          eligible_for_current_turn_reentry: true,
+        },
+        observation_packet: {
+          call_id:
+            "ask:test:minecraft-action-argument-normalization:walk:call",
+          produced_artifact_refs: [
+            "ask:test:minecraft-action-argument-normalization:walk:observation",
+          ],
+          executed_args: {
+            direction: "forward",
+            duration_ms: 250,
+            sprint: false,
+            idempotent_replay: false,
+            physical_execution_performed: true,
+          },
+        },
+      } as never],
+    });
+
+    expect(result.missingNormalizationFailures).toEqual([]);
+    expect(result.artifacts).toHaveLength(1);
+    expect(result.artifacts[0]).toMatchObject({
+      kind: "live_environment_observation",
+      capability_key: "com.casimirbot.minecraft.player.walk",
+      status: "succeeded",
+      executed_args: {
+        direction: "forward",
+        duration_ms: 250,
+        sprint: false,
+        idempotent_replay: false,
+        physical_execution_performed: true,
+      },
+      payload: {
+        summary: "The bounded walk completed with measured motion.",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+    });
   });
 
   it("keeps verified Minecraft build endpoints visible while omitting dense raw columns", () => {
@@ -2180,6 +2240,217 @@ describe("Codex provider capability lane adapter", () => {
     })).toBe(false);
   });
 
+  it("lets Codex complete missing schema fields for an exact read-only continuation without weakening mutating affordances", () => {
+    const capability = "com.casimirbot.minecraft.actor.status.read";
+    const manifest = {
+      capability_id: capability,
+      label: "Read current Minecraft actor status",
+      mode: "read",
+      mutating: false,
+      input_schema: {
+        type: "object",
+        properties: {
+          target: { type: "string", enum: ["current_actor"] },
+          freshness_requirement_ms: {
+            type: "integer",
+            minimum: 1_000,
+            maximum: 120_000,
+          },
+        },
+        required: ["target"],
+        additionalProperties: false,
+      },
+    } as any;
+    const state = {
+      next_admissible_affordances: [{
+        admissible: true,
+        tried: false,
+        affordance_id: "minecraft:status:post-action",
+        capability_id: capability,
+        lane_request: { capability },
+      }],
+      capability_proposal: null,
+      allowed_decisions: ["act"],
+      last_attempt: {
+        capability_id: "com.casimirbot.minecraft.player.walk",
+        status: "succeeded",
+      },
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+    const completedRequest = {
+      capability_id: capability,
+      arguments: { target: "current_actor" },
+    };
+
+    const instruction = buildCodexContinuationAffordanceRetryInstruction(
+      state,
+      [manifest],
+    );
+    expect(instruction).toContain(
+      "author only those missing fields from the exact input contract",
+    );
+    expect(instruction).toContain('"missing_required_fields":["target"]');
+    expect(
+      continuationStateAdmitsSchemaCompletedReadOnlyLaneRequest({
+        state,
+        candidate: completedRequest,
+        availableCapabilities: [manifest],
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsGenericProviderLaneRequest({
+        state,
+        candidate: completedRequest,
+        admittedCapabilityIds: [capability],
+        availableCapabilities: [manifest],
+        providerSelectedExtensionAllowed: false,
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsSchemaCompletedReadOnlyLaneRequest({
+        state,
+        candidate: { capability_id: capability, arguments: {} },
+        availableCapabilities: [manifest],
+      }),
+    ).toBe(false);
+    expect(
+      continuationStateAdmitsSchemaCompletedReadOnlyLaneRequest({
+        state,
+        candidate: completedRequest,
+        availableCapabilities: [{ ...manifest, mutating: true }],
+      }),
+    ).toBe(false);
+  });
+
+  it("does not let schema completion overwrite a prefilled read-only affordance argument", () => {
+    const capability = "com.casimirbot.minecraft.actor.status.read";
+    const manifest = {
+      capability_id: capability,
+      mutating: false,
+      input_schema: {
+        type: "object",
+        properties: {
+          target: { type: "string", enum: ["current_actor"] },
+          freshness_requirement_ms: { type: "integer" },
+        },
+        required: ["target"],
+        additionalProperties: false,
+      },
+    } as any;
+    const state = {
+      next_admissible_affordances: [{
+        admissible: true,
+        tried: false,
+        affordance_id: "minecraft:status:bounded-freshness",
+        capability_id: capability,
+        lane_request: {
+          capability,
+          freshness_requirement_ms: 30_000,
+        },
+      }],
+      allowed_decisions: ["act"],
+      last_attempt: null,
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+
+    expect(
+      continuationStateAdmitsSchemaCompletedReadOnlyLaneRequest({
+        state,
+        candidate: {
+          capability_id: capability,
+          arguments: {
+            target: "current_actor",
+            freshness_requirement_ms: 60_000,
+          },
+        },
+        availableCapabilities: [manifest],
+      }),
+    ).toBe(false);
+  });
+
+  it("lets Codex select only the missing direction for an evidence-bound walk affordance", () => {
+    const capability = "com.casimirbot.minecraft.player.walk";
+    const manifest = {
+      capability_id: capability,
+      mutating: true,
+      input_schema: {
+        type: "object",
+        properties: {
+          action_kind: { type: "string", enum: ["walk"] },
+          direction: {
+            type: "string",
+            enum: ["forward", "back", "left", "right"],
+          },
+          duration_ms: { type: "integer" },
+          sprint: { type: "boolean" },
+        },
+        required: ["action_kind", "direction", "duration_ms", "sprint"],
+        additionalProperties: false,
+      },
+    } as any;
+    const state = {
+      next_admissible_affordances: [{
+        admissible: true,
+        tried: false,
+        affordance_id: "minecraft:walk:evidence-bound",
+        capability_id: capability,
+        lane_request: {
+          capability,
+          duration_ms: 250,
+          sprint: false,
+        },
+      }],
+      allowed_decisions: ["act"],
+      last_attempt: {
+        capability_id: "com.casimirbot.minecraft.spatial_region.inspect",
+        status: "succeeded",
+      },
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+    const candidate = {
+      capability_id: capability,
+      arguments: {
+        action_kind: "walk",
+        direction: "right",
+        duration_ms: 250,
+        sprint: false,
+      },
+    };
+
+    expect(
+      buildCodexContinuationAffordanceRetryInstruction(state, [manifest]),
+    ).toContain("walk_step_candidates");
+    expect(
+      continuationStateAdmitsEvidenceBoundMinecraftWalkLaneRequest({
+        state,
+        candidate,
+        availableCapabilities: [manifest],
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsGenericProviderLaneRequest({
+        state,
+        candidate,
+        admittedCapabilityIds: [capability],
+        availableCapabilities: [manifest],
+        providerSelectedExtensionAllowed: false,
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsEvidenceBoundMinecraftWalkLaneRequest({
+        state,
+        candidate: {
+          ...candidate,
+          arguments: {
+            ...candidate.arguments,
+            duration_ms: 1_000,
+          },
+        },
+        availableCapabilities: [manifest],
+      }),
+    ).toBe(false);
+  });
+
   it("keeps a provider-selected generic next step available after a successful first observation", () => {
     const capability = "room.environment.command";
     const state = {
@@ -2508,6 +2779,19 @@ describe("Codex provider capability lane adapter", () => {
     expect(
       runtimeProviderAdmittedCapabilityIdsForQuestion({
         question:
+          "Read fresh current-turn actor status for my selected Minecraft player.",
+        admittedCapabilityIds: [
+          "docs.search",
+          "com.casimirbot.minecraft.actor.status.read",
+        ],
+        admittedToolFamilies: ["world_event"],
+        restrictAllCapabilitiesToAdmittedToolFamilies: true,
+      }),
+    ).toEqual(["com.casimirbot.minecraft.actor.status.read"]);
+
+    expect(
+      runtimeProviderAdmittedCapabilityIdsForQuestion({
+        question:
           "Prepare only the registered theory procedure and report its missing closure requirements.",
         admittedCapabilityIds: [
           "theory-experiment-procedure.prepare",
@@ -2577,6 +2861,415 @@ describe("Codex provider capability lane adapter", () => {
       "com.casimirbot.minecraft.command",
       "debug.inspect_current_turn",
     ]);
+  });
+
+  it("exposes the authorized Player Embodiment affordance set while keeping World Authority mutation out", () => {
+    const question =
+      "Using only my paired Minecraft Player Embodiment client, rotate my view about 20 degrees to the right without moving, changing inventory, or using server commands.";
+    const playerLook = "com.casimirbot.minecraft.player.look";
+    const playerWalk = "com.casimirbot.minecraft.player.walk";
+    const worldCommand = "com.casimirbot.minecraft.command";
+    const actorStatus = "com.casimirbot.minecraft.actor_status.read";
+
+    expect(
+      runtimeProviderAdmittedCapabilityIdsForQuestion({
+        question,
+        admittedCapabilityIds: [
+          worldCommand,
+          playerWalk,
+          actorStatus,
+          playerLook,
+        ],
+        admittedToolFamilies: ["live_environment"],
+        mutatingCapabilityIds: [worldCommand, playerWalk, playerLook],
+        explicitlyAdmittedMutatingCapabilityIds: [],
+        operatorCommandAdmitted: true,
+      }),
+    ).toEqual([actorStatus, playerLook, playerWalk]);
+  });
+
+  it("carries the semantic Player Embodiment action obligation without selecting the concrete tool", () => {
+    const body: Record<string, unknown> = {
+      source_target_intent: {
+        target_source: "live_environment",
+        strength: "hard",
+        explicit_cues: ["operative_minecraft_player_embodiment_action"],
+        reasons: ["player_action_capability_selection_owned_by_runtime"],
+      },
+      canonical_goal_frame: {
+        goal_kind: "environment_action_workflow",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      runtime_intent_packet: {
+        canonical_goal_frame: {
+          goal_kind: "model_only_concept",
+        },
+        terminal_contract: { required_actions: [] },
+        required_actions: [],
+      },
+    };
+
+    expect(
+      attachCodexMinecraftPlayerEmbodimentActionRequirement({
+        body,
+        turnId: "ask:test:semantic-player-action",
+      }),
+    ).toBe(true);
+    expect(body).toMatchObject({
+      canonical_goal_frame: {
+        required_actions: ["minecraft.player_embodiment.action"],
+      },
+      capability_itinerary: {
+        terminal_success_criteria: {
+          required_observation_families: ["live_environment"],
+          required_capability_any_of_groups: [
+            {
+              group_id: "minecraft.player_embodiment.action",
+              semantic_requirement:
+                "one_successful_player_embodiment_action_selected_by_runtime",
+            },
+          ],
+        },
+      },
+      runtime_intent_packet: {
+        required_actions: ["minecraft.player_embodiment.action"],
+        terminal_contract: {
+          required_actions: ["minecraft.player_embodiment.action"],
+        },
+      },
+      minecraft_player_embodiment_action_contract: {
+        capability_selection_authority: "codex_runtime",
+        exact_capability_preselected: false,
+      },
+    });
+
+    body.capability_itinerary_execution_state = {
+      missing_required_capability_any_of_groups: [
+        {
+          group_id: "minecraft.player_embodiment.action",
+          capability_ids: [
+            "com.casimirbot.minecraft.player.look",
+            "com.casimirbot.minecraft.player.walk",
+          ],
+        },
+      ],
+    };
+    expect(
+      runtimeProviderMissingCapabilityAnyOfGroupIdsFromBody(
+        body,
+        "minecraft.player_embodiment.action",
+      ),
+    ).toEqual([
+      "com.casimirbot.minecraft.player.look",
+      "com.casimirbot.minecraft.player.walk",
+    ]);
+
+    body.capability_itinerary_execution_state = {
+      missing_required_capability_any_of_groups: [],
+    };
+    expect(
+      runtimeProviderMissingCapabilityAnyOfGroupIdsFromBody(
+        body,
+        "minecraft.player_embodiment.action",
+      ),
+    ).toEqual([]);
+  });
+
+  it("marks an explicitly later Minecraft observation as a post-action requirement", () => {
+    const prompt =
+      "Using the active Minecraft Fabric world and the paired Player Embodiment client, first inspect a small bounded region around me and choose a reachable coordinate within two blocks that has solid support and safe headroom. Then use native player navigation to move me to that coordinate. Afterward make a fresh player-status check and report the final position.";
+    const spatial = "com.casimirbot.minecraft.spatial_region.inspect";
+    const actorStatus = "com.casimirbot.minecraft.actor.status.read";
+    const body: Record<string, unknown> = {
+      source_target_intent: {
+        target_source: "live_environment",
+        strength: "hard",
+        explicit_cues: ["operative_minecraft_player_embodiment_action"],
+        reasons: ["player_action_capability_selection_owned_by_runtime"],
+      },
+      capability_itinerary: {
+        planned_steps: [
+          {
+            step_id: "step:spatial",
+            compound_subgoal_id: "subgoal:spatial",
+          },
+          {
+            step_id: "step:status",
+            compound_subgoal_id: "subgoal:status",
+          },
+        ],
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["live_environment"],
+        },
+        compound_capability_contract: {
+          subgoals: [
+            {
+              subgoal_id: "subgoal:spatial",
+              order: 1,
+              requested_capability: spatial,
+              runtime_capability: spatial,
+            },
+            {
+              subgoal_id: "subgoal:status",
+              order: 2,
+              requested_capability: actorStatus,
+              runtime_capability: actorStatus,
+            },
+          ],
+        },
+      },
+    };
+
+    expect(
+      attachCodexMinecraftPlayerEmbodimentActionRequirement({
+        body,
+        turnId: "ask:test:post-action-status",
+        promptText: prompt,
+        trustedEnvironmentContext: {
+          trusted_environment_domain: "minecraft",
+        } as never,
+      }),
+    ).toBe(true);
+
+    const itinerary = body.capability_itinerary as any;
+    expect(itinerary.compound_capability_contract.subgoals).toEqual([
+      expect.objectContaining({
+        subgoal_id: "subgoal:spatial",
+      }),
+      expect.objectContaining({
+        subgoal_id: "subgoal:status",
+        observation_after_capability_any_of_group_ids: [
+          "minecraft.player_embodiment.action",
+        ],
+        temporal_requirement_source:
+          "user_declared_post_action_observation",
+      }),
+    ]);
+    expect(itinerary.planned_steps[1]).toMatchObject({
+      observation_after_capability_any_of_group_ids: [
+        "minecraft.player_embodiment.action",
+      ],
+    });
+    expect(body.minecraft_player_embodiment_action_contract).toMatchObject({
+      post_action_observation_capabilities: [actorStatus],
+    });
+  });
+
+  it("proposes the missing Player Embodiment action before its temporally blocked status check", () => {
+    const turnId = "ask:test:ordered-player-action-proposal";
+    const prompt =
+      "Using the active Minecraft Fabric world and the paired Player Embodiment client, first inspect a small bounded region around me and choose a reachable coordinate within two blocks that has solid support and safe headroom. Then use native player navigation to move me to that coordinate. Afterward make a fresh player-status check and report the final position.";
+    const spatial = "com.casimirbot.minecraft.spatial_region.inspect";
+    const navigate = "com.casimirbot.minecraft.player.navigate";
+    const actorStatus = "com.casimirbot.minecraft.actor.status.read";
+    const admitted = [spatial, navigate, actorStatus];
+    const body: Record<string, unknown> = {
+      source_target_intent: {
+        target_source: "live_environment",
+        strength: "hard",
+        explicit_cues: ["operative_minecraft_player_embodiment_action"],
+        reasons: ["player_action_capability_selection_owned_by_runtime"],
+      },
+      capability_itinerary: {
+        turn_id: turnId,
+        admitted_tool_families: ["live_environment"],
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["live_environment"],
+          required_capabilities: [spatial, actorStatus],
+        },
+        compound_capability_contract: {
+          subgoals: [
+            {
+              subgoal_id: "subgoal:spatial",
+              order: 1,
+              requested_capability: spatial,
+              runtime_capability: spatial,
+              required_observation_kinds: ["live_environment_observation"],
+            },
+            {
+              subgoal_id: "subgoal:status",
+              order: 2,
+              requested_capability: actorStatus,
+              runtime_capability: actorStatus,
+              required_observation_kinds: ["live_environment_observation"],
+            },
+          ],
+        },
+      },
+    };
+    expect(
+      attachCodexMinecraftPlayerEmbodimentActionRequirement({
+        body,
+        turnId,
+        promptText: prompt,
+        trustedEnvironmentContext: {
+          trusted_environment_domain: "minecraft",
+        } as never,
+      }),
+    ).toBe(true);
+    const observation = (capability: string, ref: string) => ({
+      artifact_id: ref,
+      turn_id: turnId,
+      kind: "live_environment_observation",
+      capability_key: capability,
+      source_capability_id: capability,
+      status: "succeeded",
+      payload: {
+        status: "succeeded",
+        capability_key: capability,
+        source_capability_id: capability,
+      },
+    });
+
+    const providerOccurrence = (
+      capability: string,
+      order: number,
+      ref: string,
+    ) => ({
+      subgoal_id: `current:${order}:${capability}`,
+      order,
+      requested_capability: capability,
+      runtime_capability: capability,
+      provider_call_id: `call:${order}:${capability}`,
+      capability_occurrence: 1,
+      observation_ref: ref,
+      required_observation_kinds: ["live_environment_observation"],
+      satisfied: true,
+    });
+
+    // Mirror the real provider lifecycle: every successful call republishes an
+    // occurrence-normalized contract. Reconciliation must retain the committed
+    // post-action dependency while this projection grows across attempts.
+    body.compound_capability_contract = {
+      source: "codex_provider_call_occurrence_normalization",
+      subgoal_identity_policy: "provider_call_occurrence",
+      subgoals: [providerOccurrence(spatial, 1, "obs:spatial")],
+    };
+
+    attachHelixCapabilityItineraryExecutionState(body, [
+      observation(spatial, "obs:spatial"),
+    ]);
+    const missingActionIds =
+      runtimeProviderMissingCapabilityAnyOfGroupIdsFromBody(
+        body,
+        "minecraft.player_embodiment.action",
+      ).filter((capabilityId) => admitted.includes(capabilityId));
+    expect(missingActionIds).toEqual([navigate]);
+    const afterSpatialAttempt = {
+      capability_id: spatial,
+      status: "succeeded",
+    };
+    expect(
+      shouldAllowCodexObservationDependentCapabilityProposal({
+        trigger: "post_attempt",
+        payload: body,
+        admittedCapabilityIds: admitted,
+        lastAttempt: afterSpatialAttempt,
+      }),
+    ).toBe(true);
+    const afterSpatialProposalIds =
+      codexObservationDependentCapabilityProposalIds({
+        payload: body,
+        admittedCapabilityIds: admitted,
+        lastAttempt: afterSpatialAttempt,
+      });
+    expect(afterSpatialProposalIds).toEqual([navigate]);
+    expect(
+      selectCodexRuntimeCapabilityProposalIds({
+        trigger: "post_attempt",
+        currentTurnObservationCount: 1,
+        observationDependentCapabilityProposalIds: afterSpatialProposalIds,
+        missingSemanticPlayerActionCapabilityIds: missingActionIds,
+        runtimeProviderAdmittedCapabilityIds: admitted,
+      }),
+    ).toEqual([navigate]);
+
+    body.compound_capability_contract = {
+      source: "codex_provider_call_occurrence_normalization",
+      subgoal_identity_policy: "provider_call_occurrence",
+      subgoals: [
+        providerOccurrence(spatial, 1, "obs:spatial"),
+        providerOccurrence(navigate, 2, "obs:navigate"),
+      ],
+    };
+    attachHelixCapabilityItineraryExecutionState(body, [
+      observation(spatial, "obs:spatial"),
+      observation(navigate, "obs:navigate"),
+    ]);
+    const afterActionProposalIds =
+      codexObservationDependentCapabilityProposalIds({
+        payload: body,
+        admittedCapabilityIds: admitted,
+        lastAttempt: {
+          capability_id: navigate,
+          status: "succeeded",
+        },
+      });
+    expect(afterActionProposalIds).toEqual([actorStatus]);
+
+    body.compound_capability_contract = {
+      source: "codex_provider_call_occurrence_normalization",
+      subgoal_identity_policy: "provider_call_occurrence",
+      subgoals: [
+        providerOccurrence(spatial, 1, "obs:spatial"),
+        providerOccurrence(navigate, 2, "obs:navigate"),
+        providerOccurrence(actorStatus, 3, "obs:status:after"),
+      ],
+    };
+    attachHelixCapabilityItineraryExecutionState(body, [
+      observation(spatial, "obs:spatial"),
+      observation(navigate, "obs:navigate"),
+      observation(actorStatus, "obs:status:after"),
+    ]);
+    expect(
+      codexObservationDependentCapabilityProposalIds({
+        payload: body,
+        admittedCapabilityIds: admitted,
+        lastAttempt: {
+          capability_id: actorStatus,
+          status: "succeeded",
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it("keeps baseline probes available before a required Player Embodiment action, then narrows to the missing action", () => {
+    const actorStatus = "com.casimirbot.minecraft.actor.status.read";
+    const playerLook = "com.casimirbot.minecraft.player.look";
+    const playerWalk = "com.casimirbot.minecraft.player.walk";
+    const admitted = [actorStatus, playerLook, playerWalk];
+
+    expect(
+      selectCodexRuntimeCapabilityProposalIds({
+        trigger: "initial",
+        currentTurnObservationCount: 0,
+        observationDependentCapabilityProposalIds: [],
+        missingSemanticPlayerActionCapabilityIds: [playerLook, playerWalk],
+        runtimeProviderAdmittedCapabilityIds: admitted,
+      }),
+    ).toEqual(admitted);
+
+    expect(
+      selectCodexRuntimeCapabilityProposalIds({
+        trigger: "post_attempt",
+        currentTurnObservationCount: 1,
+        observationDependentCapabilityProposalIds: [],
+        missingSemanticPlayerActionCapabilityIds: [playerLook, playerWalk],
+        runtimeProviderAdmittedCapabilityIds: admitted,
+      }),
+    ).toEqual([playerLook, playerWalk]);
+
+    expect(
+      selectCodexRuntimeCapabilityProposalIds({
+        trigger: "post_attempt",
+        currentTurnObservationCount: 2,
+        observationDependentCapabilityProposalIds: [actorStatus],
+        missingSemanticPlayerActionCapabilityIds: [playerLook, playerWalk],
+        runtimeProviderAdmittedCapabilityIds: admitted,
+      }),
+    ).toEqual([actorStatus]);
   });
 
   it("does not reopen continuation affordances after a validated runtime terminal decision", () => {
@@ -7016,7 +7709,7 @@ describe("Codex provider capability lane adapter", () => {
           capability_id: "live_translation.translate_text",
           lane_visible: false,
           lane_requested: true,
-          lane_executed: false,
+          lane_executed: true,
           observation_reentered: true,
           observation_ref: expect.any(String),
         }),

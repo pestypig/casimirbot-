@@ -51,6 +51,7 @@ const heartbeat = {
   controlsAsserted: false,
   manualInputDetected: false,
   emergencyStopLatched: false,
+  blockingReason: null,
 };
 
 describe("environment action connector readiness projection", () => {
@@ -133,5 +134,29 @@ describe("environment action connector readiness projection", () => {
     expect(serialized).not.toContain("token");
     expect(serialized).not.toContain("connector_installation_id");
     expect(serialized).not.toContain("manifest_id");
+  });
+
+  it("projects an evidence-stream conflict as an actionable re-pair boundary", () => {
+    const faulted = projectEnvironmentActionConnectorReadiness({
+      authority,
+      heartbeatMaxAgeMs: 30_000,
+      manifest: {
+        ...manifest,
+        availableControlEngines: [...manifest.availableControlEngines],
+      },
+      heartbeat: {
+        ...heartbeat,
+        status: "error",
+        blockingReason: "event_stream_resync_required",
+      },
+      nowMs: Date.parse(now),
+    });
+    expect(faulted).toMatchObject({
+      state: "error",
+      ready_for_actions: false,
+      heartbeat_fresh: true,
+      blocking_reason: "event_stream_resync_required",
+      controls_asserted: false,
+    });
   });
 });

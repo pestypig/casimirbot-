@@ -561,6 +561,75 @@ export type DurableEnvironmentProbeLease = {
   request: HelixEnvironmentProbeRequest | null;
 };
 
+export type EnvironmentProbePollWork = {
+  sourceId: string;
+  durableWorkPending: boolean;
+};
+
+/**
+ * Cheap read-only preflight for connector queue polling. A false result may
+ * delay a request that races this check until the next bounded poll, but it can
+ * never admit or lease work; the authoritative lease transaction remains
+ * below.
+ */
+export const inspectEnvironmentProbePollWork = async (input: {
+  roomSourceBindingId: string;
+  now?: Date;
+}): Promise<EnvironmentProbePollWork | null> => {
+  const db = await readSharedRealtimeRoomDatabase();
+  const binding = await db.query<{ source_id: string }>(
+    `SELECT source_id
+     FROM helix_room_source_bindings
+     WHERE binding_id = $1
+     LIMIT 1;`,
+    [input.roomSourceBindingId],
+  );
+  const sourceId = binding.rows[0]?.source_id;
+  if (!sourceId) return null;
+
+  const now = (input.now ?? new Date()).toISOString();
+  const work = await db.query<{
+    probe_request_id: string;
+    status: string;
+    deadline_at: Date | string;
+  }>(
+    `SELECT r.probe_request_id, r.status, r.deadline_at
+     FROM helix_environment_probe_requests r
+     JOIN helix_environment_connector_bindings b
+       ON b.environment_binding_id = r.environment_binding_id
+     WHERE b.room_source_binding_id = $1
+       AND r.status IN ('pending', 'leased');`,
+    [input.roomSourceBindingId],
+  );
+  let durableWorkPending = false;
+  for (const request of work.rows) {
+    if (
+      request.status === "pending" ||
+      new Date(request.deadline_at).getTime() <= Date.parse(now)
+    ) {
+      durableWorkPending = true;
+      break;
+    }
+    const activeAttempt = await db.query<{ present: number }>(
+      `SELECT 1 AS present
+       FROM helix_environment_probe_attempts
+       WHERE probe_request_id = $1
+         AND status = 'leased'
+         AND lease_expires_at > $2
+       LIMIT 1;`,
+      [request.probe_request_id, now],
+    );
+    if (!activeAttempt.rows[0]) {
+      durableWorkPending = true;
+      break;
+    }
+  }
+  return {
+    sourceId,
+    durableWorkPending,
+  };
+};
+
 export const leaseDurableEnvironmentProbesForClaim = async (input: {
   claim: RoomSourceIngressRequestClaim;
   adapterAdmission: HelixEnvironmentAdapterAdmissionProjection;
@@ -959,6 +1028,8 @@ const normalizeLegacyResult = (
     "health",
     "max_health",
     "saturation",
+    "yaw",
+    "pitch",
     "nearest_hostile_distance_blocks",
     "nearest_environmental_hazard_distance_blocks",
   ]) {
@@ -1008,6 +1079,7 @@ const normalizeLegacyResult = (
     "structure_verification",
     "fire_safety",
     "landing_safety",
+    "movement_safety",
   ]);
   const spatialFlagOrder = [
     "air",
@@ -1217,8 +1289,15 @@ const normalizeLegacyResult = (
     )
       ? details.build_line_candidates
       : [];
+    const rawWalkStepCandidates = Array.isArray(
+      details.walk_step_candidates,
+    )
+      ? details.walk_step_candidates
+      : [];
     normalized.build_line_candidates_complete =
       details.build_line_candidates_complete !== false;
+    normalized.walk_step_candidates_complete =
+      details.walk_step_candidates_complete === true;
     for (const countField of [
       "retained_column_count",
       "omitted_column_count",
@@ -1230,6 +1309,8 @@ const normalizeLegacyResult = (
       "omitted_fireplace_candidate_count",
       "retained_build_line_candidate_count",
       "omitted_build_line_candidate_count",
+      "retained_walk_step_candidate_count",
+      "omitted_walk_step_candidate_count",
       "wire_details_json_bytes",
     ] as const) {
       if (Number.isInteger(details[countField]) && Number(details[countField]) >= 0) {
@@ -1359,6 +1440,63 @@ const normalizeLegacyResult = (
     }
     if (!Number.isInteger(details.omitted_build_line_candidate_count)) {
       normalized.omitted_build_line_candidate_count = 0;
+    }
+    normalized.walk_step_candidates = rawWalkStepCandidates
+      .slice(0, 4)
+      .map(asRecord)
+      .map((candidate) => ({
+        candidate,
+        targetFeet: spatialPosition(candidate.target_feet_position),
+        targetHead: spatialPosition(candidate.target_head_position),
+        support: spatialPosition(candidate.support_position),
+      }))
+      .filter(({ candidate, targetFeet, targetHead, support }) =>
+        targetFeet !== null &&
+        targetHead !== null &&
+        support !== null &&
+        ["north", "south", "east", "west"].includes(
+          String(candidate.cardinal_direction),
+        ) &&
+        ["forward", "back", "left", "right"].includes(
+          String(candidate.relative_direction),
+        ) &&
+        typeof candidate.support_block === "string" &&
+        candidate.support_block.trim().length > 0 &&
+        candidate.support_block.trim().length <= 160 &&
+        typeof candidate.evidence_complete === "boolean" &&
+        typeof candidate.feet_clear === "boolean" &&
+        typeof candidate.head_clear === "boolean" &&
+        typeof candidate.support_solid_nonhazardous === "boolean" &&
+        Number.isInteger(candidate.nearby_hazard_count) &&
+        Number(candidate.nearby_hazard_count) >= 0 &&
+        Number.isInteger(candidate.nearby_fluid_count) &&
+        Number(candidate.nearby_fluid_count) >= 0 &&
+        typeof candidate.safe_candidate === "boolean",
+      )
+      .map(({ candidate, targetFeet, targetHead, support }) => ({
+        cardinal_direction: String(candidate.cardinal_direction),
+        relative_direction: String(candidate.relative_direction),
+        target_feet_position: targetFeet!,
+        target_head_position: targetHead!,
+        support_position: support!,
+        support_block: String(candidate.support_block).trim(),
+        evidence_complete: Boolean(candidate.evidence_complete),
+        feet_clear: Boolean(candidate.feet_clear),
+        head_clear: Boolean(candidate.head_clear),
+        support_solid_nonhazardous: Boolean(
+          candidate.support_solid_nonhazardous,
+        ),
+        nearby_hazard_count: Number(candidate.nearby_hazard_count),
+        nearby_fluid_count: Number(candidate.nearby_fluid_count),
+        safe_candidate: Boolean(candidate.safe_candidate),
+      }));
+    if (!Number.isInteger(details.retained_walk_step_candidate_count)) {
+      normalized.retained_walk_step_candidate_count = (
+        normalized.walk_step_candidates as unknown[]
+      ).length;
+    }
+    if (!Number.isInteger(details.omitted_walk_step_candidate_count)) {
+      normalized.omitted_walk_step_candidate_count = 0;
     }
     const rawTargetVerification = asRecord(
       details.target_geometry_verification,

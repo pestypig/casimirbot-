@@ -205,7 +205,7 @@ function erfApprox(x: number): number {
   return sign * (1 - polynomial * Math.exp(-absolute * absolute));
 }
 
-function gaussianDpEnergyAnalytic(
+export function gaussianDpEnergyAnalytic(
   mass_kg: number,
   separation_m: number,
   R0_m: number,
@@ -243,7 +243,7 @@ function sinc(value: number): number {
   return Math.sin(value) / value;
 }
 
-function gaussianDpEnergyFourierCrosscheck(args: {
+export function gaussianDpEnergyFourierCrosscheck(args: {
   mass_kg: number;
   separation_m: number;
   R0_m: number;

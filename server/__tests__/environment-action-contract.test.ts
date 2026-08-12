@@ -6,6 +6,7 @@ import {
   HELIX_ENVIRONMENT_ACTION_REQUEST_SCHEMA,
   HELIX_ENVIRONMENT_ACTION_RESULT_SCHEMA,
   HELIX_ENVIRONMENT_ACTION_WORKFLOW_EVENT_SCHEMA,
+  HELIX_ENVIRONMENT_CLOCK_SNAPSHOT_SCHEMA,
   helixEnvironmentActionControlRequestSchema,
   helixEnvironmentActionConnectorHeartbeatSchema,
   helixEnvironmentActionConnectorManifestSchema,
@@ -35,6 +36,17 @@ import {
 const now = "2026-08-05T12:00:00.000Z";
 const later = "2026-08-05T12:01:00.000Z";
 const hash = `sha256:${"a".repeat(64)}`;
+
+const environmentClock = (tickIndex: number, worldTickIndex: number) => ({
+  schema: HELIX_ENVIRONMENT_CLOCK_SNAPSHOT_SCHEMA,
+  clock_id: "minecraft_client_tick_clock:test",
+  clock_kind: "minecraft_game_tick" as const,
+  tick_rate_hz: 20,
+  tick_index: tickIndex,
+  world_tick_index: worldTickIndex,
+  synchronization: "server_synchronized" as const,
+  observed_at: now,
+});
 
 const baseActionRequest = () => ({
   schema: HELIX_ENVIRONMENT_ACTION_REQUEST_SCHEMA,
@@ -126,6 +138,9 @@ const settledResult = () => ({
     },
   ],
   evidence_refs: ["evidence:position-before", "evidence:position-after"],
+  started_clock: environmentClock(120, 84_020),
+  completed_clock: environmentClock(140, 84_040),
+  duration_ticks: 20,
   side_effects_performed: true,
   player_motion_performed: true,
   player_interaction_performed: false,
@@ -245,6 +260,29 @@ describe("provider-neutral environment player-action contract", () => {
     ).toBe(false);
   });
 
+  it("preserves the 20 TPS Minecraft clock and rejects inconsistent duration receipts", () => {
+    expect(helixEnvironmentActionResultSchema.parse(settledResult())).toMatchObject({
+      started_clock: { tick_index: 120, world_tick_index: 84_020 },
+      completed_clock: { tick_index: 140, world_tick_index: 84_040 },
+      duration_ticks: 20,
+    });
+    expect(
+      helixEnvironmentActionResultSchema.safeParse({
+        ...settledResult(),
+        duration_ticks: 19,
+      }).success,
+    ).toBe(false);
+    expect(
+      helixEnvironmentActionResultSchema.safeParse({
+        ...settledResult(),
+        completed_clock: {
+          ...settledResult().completed_clock,
+          world_tick_index: null,
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it("does not permit success with an unverified required postcondition", () => {
     const result = settledResult();
     expect(
@@ -272,6 +310,7 @@ describe("provider-neutral environment player-action contract", () => {
       progress_fraction: 1,
       summary: "Workflow completed and controls were released.",
       control_engine: "native_fabric",
+      clock: environmentClock(140, 84_040),
       evidence_refs: ["evidence:position-after"],
       manual_override_detected: false,
       controls_released: true,
@@ -433,6 +472,7 @@ describe("provider-neutral environment player-action contract", () => {
         },
       ],
       latest_event_sequence: 4,
+      clock: environmentClock(140, 84_040),
       evidence_refs: ["evidence:heartbeat"],
       created_at: now,
       credential_included: false,

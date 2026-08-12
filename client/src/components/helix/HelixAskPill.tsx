@@ -300,6 +300,12 @@ import {
 } from "@/components/helix/ask-console/HelixAskActiveTurnDisplayViewModel";
 import { buildHelixAskActiveTurnListState } from "@/components/helix/ask-console/HelixAskActiveTurnListState";
 import {
+  HELIX_ASK_DEFAULT_RENDERED_TURN_COUNT,
+  HELIX_ASK_RENDERED_TURN_REVEAL_STEP,
+  HelixAskTurnHistoryWindowControl,
+  selectHelixAskTurnHistoryWindow,
+} from "@/components/helix/ask-console/HelixAskTurnHistoryWindow";
+import {
   appendHelixAskLiveTurnDisplayEvent,
   createHelixAskLiveTurnDisplayState,
   type HelixAskLiveTurnDisplayState,
@@ -6562,6 +6568,10 @@ export function HelixAskPill({
   }, [askReplies]);
   const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
   const [debugExportDrawer, setDebugExportDrawer] = useState<HelixAskDebugExportDrawerState>(null);
+  const [renderedTurnLimit, setRenderedTurnLimit] = useState(HELIX_ASK_DEFAULT_RENDERED_TURN_COUNT);
+  useEffect(() => {
+    setRenderedTurnLimit(HELIX_ASK_DEFAULT_RENDERED_TURN_COUNT);
+  }, [contextId]);
   const chronologicalAskRepliesForState = useMemo(
     () => sortHelixAskRepliesChronologically(askReplies),
     [askReplies],
@@ -21162,6 +21172,15 @@ export function HelixAskPill({
               : typeof responseDebugPayload?.final_answer_source === "string" && responseDebugPayload.final_answer_source.trim()
                 ? responseDebugPayload.final_answer_source.trim()
                 : null;
+          const terminalAuthorityForEvidenceGate =
+            readAgentLoopAuditRecord(localResponseRecord.terminal_answer_authority) ??
+            readAgentLoopAuditRecord(responseDebugPayload?.terminal_answer_authority);
+          const terminalSingleWriterForEvidenceGate =
+            readAgentLoopAuditRecord(localResponseRecord.terminal_authority_single_writer) ??
+            readAgentLoopAuditRecord(responseDebugPayload?.terminal_authority_single_writer);
+          const terminalSingleWriterIntegrityForEvidenceGate = readAgentLoopAuditRecord(
+            terminalSingleWriterForEvidenceGate?.integrity,
+          );
           const preserveAuthoritativeTerminal = shouldPreserveAuthoritativeTerminalOverEvidenceGate({
             evidenceGateBlocked: evidenceGateDecision.blocked,
             dispatchPolicy: localDispatchPolicy,
@@ -21171,6 +21190,9 @@ export function HelixAskPill({
             hasCompletedWorkspaceTool,
             hasTerminalText: Boolean(terminalResolutionForFinal.backendTerminalText || terminalResolutionForFinal.text),
             hasPendingRequest: hasPendingRequestForTerminal,
+            serverAuthoritativeTerminal:
+              terminalAuthorityForEvidenceGate?.server_authoritative === true ||
+              terminalSingleWriterIntegrityForEvidenceGate?.single_writer_applied === true,
           });
           const terminalArtifactForVoice = readAgentLoopAuditRecord(
             localResponseRecord.terminal_artifact ?? localResponseRecord.latest_result_artifact,
@@ -22736,9 +22758,13 @@ export function HelixAskPill({
     (layoutVariant === "dock"
       ? "relative z-10 mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-2"
       : "relative z-10 mt-4 max-h-[52vh] space-y-5 overflow-y-auto pr-2");
-  const chronologicalAskReplies = chronologicalAskRepliesForTranscript;
+  const renderedTurnWindow = selectHelixAskTurnHistoryWindow({
+    replies: chronologicalAskRepliesForTranscript,
+    requestedVisibleCount: renderedTurnLimit,
+  });
+  const chronologicalAskReplies = renderedTurnWindow.visibleReplies;
   const turnListState = buildHelixAskActiveTurnListState({
-    completedReplyCount: chronologicalAskReplies.length,
+    completedReplyCount: chronologicalAskRepliesForTranscript.length,
     className: replyListClassNameResolved,
     onScroll: handleAskReplyListScroll,
     consoleDebugSnapshot: userSettings.showHelixAskConsoleDebug ? helixAskConsoleDebugSnapshot : null,
@@ -23537,6 +23563,14 @@ export function HelixAskPill({
       turnListRef={askReplyListRef}
       turnListContent={
         <>
+          <HelixAskTurnHistoryWindowControl
+            hiddenCount={renderedTurnWindow.hiddenCount}
+            visibleCount={renderedTurnWindow.visibleCount}
+            totalCount={renderedTurnWindow.totalCount}
+            onRevealOlder={() =>
+              setRenderedTurnLimit((current) => current + HELIX_ASK_RENDERED_TURN_REVEAL_STEP)
+            }
+          />
           {chronologicalAskReplies.map((reply) => {
             const replyEvents = resolveReplyEvents(reply);
             const replyEventsChronological = sortHelixAskLegacyReplyEventsChronologically(
@@ -23617,6 +23651,7 @@ export function HelixAskPill({
             const { finalAnswerRawText } = selectHelixAskLegacyFinalAnswerText({
               turnTranscriptRows,
               chosenVisibleFinalText,
+              backendTerminalText: transcriptTerminal.backendTerminalText,
               primaryTerminalLabel: visibleResolvedTurn.primary_terminal_label,
               primarySourceLabel: visibleResolvedTurn.primary_source_label,
               isInvalidTerminalAnswerText,

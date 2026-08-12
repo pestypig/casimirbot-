@@ -15,7 +15,8 @@ function makeEntry(
     Pick<
       DocManifestEntry,
       "subjectLabel" | "catalogDate" | "catalogDateSource" | "fileMtimeIso" | "fileMtimeMs" | "sizeBytes"
-      | "docClass" | "bundleKind" | "canonical" | "sidecars" | "toolHints"
+      | "docClass" | "bundleKind" | "canonical" | "retrievalStatus" | "topicId" | "authorityRank"
+      | "supersededBy" | "sidecars" | "toolHints"
     >
   > = {},
 ): DocManifestEntry {
@@ -34,6 +35,10 @@ function makeEntry(
     docClass: overrides.docClass ?? null,
     bundleKind: overrides.bundleKind ?? null,
     canonical: overrides.canonical ?? false,
+    retrievalStatus: overrides.retrievalStatus ?? "supporting",
+    topicId: overrides.topicId ?? null,
+    authorityRank: overrides.authorityRank ?? null,
+    supersededBy: overrides.supersededBy ?? null,
     sidecars: overrides.sidecars ?? [],
     toolHints: overrides.toolHints ?? null,
     title,
@@ -138,6 +143,11 @@ describe("filterDocManifestEntries", () => {
       docClass: "canonical-research",
       bundleKind: "equation-action-whitepaper",
       canonical: true,
+      retrievalStatus: "primary",
+      topicId: "nhm2",
+      authorityRank: 100,
+      supersededBy: null,
+      title: "NHM2 as a 3+1 Same-Chart Lapse-Shift Warp Metric Evaluation Framework",
       sidecars: [
         "docs/research/nhm2-current-status-whitepaper.equation-actions.json",
         "docs/research/nhm2-current-status-whitepaper.equation-actions.source.json",
@@ -146,6 +156,20 @@ describe("filterDocManifestEntries", () => {
         calculatorReady: true,
         contentAuthority: "bounded_docs_observation_required",
       },
+    });
+  });
+
+  it("keeps superseded NHM2 generations visible in the catalog but marked archival", () => {
+    const entry = DOC_MANIFEST.find(
+      (candidate) =>
+        candidate.relativePath === "docs/research/nhm2-current-status-whitepaper-2026-04-03.md",
+    );
+
+    expect(entry).toMatchObject({
+      retrievalStatus: "archive",
+      topicId: "nhm2",
+      authorityRank: 10,
+      supersededBy: "docs/research/nhm2-current-status-whitepaper.md",
     });
   });
 

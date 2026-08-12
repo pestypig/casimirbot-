@@ -28,6 +28,7 @@ Optional:
 - `max_hits`
 - `doc_class`
 - `bundle_kind`
+- `retrieval_scope`: `default`, `include_archive`, or `archive_only`
 - `mechanics_collection_ids`
 - `adapter_profile_id`
 
@@ -36,6 +37,15 @@ The gateway resolves the collection IDs through the trusted environment
 adapter registry and replaces caller-supplied paths with that collection's
 allowlisted document paths. Unknown or cross-profile collections fail closed.
 This keeps versioned rules retrieval separate from fresh room telemetry.
+
+The default retrieval scope admits `primary` and `supporting` documents. It
+suppresses `archive` documents unless the request names an exact archived
+title/path. Exact-title admission compares significant normalized title tokens,
+so natural modifiers such as "dated" do not hide an otherwise exact versioned
+title. A runtime may request `include_archive` or `archive_only` for an
+explicit historical, superseded-version, or provenance comparison. Documents
+marked `excluded` never enter runtime retrieval. This policy changes source
+admission only; it does not turn taxonomy metadata into answer evidence.
 
 Explicit route aliases:
 
@@ -67,7 +77,11 @@ Required observation fields:
 - `query`
 - `hits` or equivalent bounded evidence list
 - `document_candidates` with optional `doc_class`, `bundle_kind`, `canonical`,
-  `sidecars`, and `tool_hints` from `docs/doc-taxonomy.v1.json`
+  `retrieval_status`, `retrieval_admission_reason`, `topic_id`,
+  `authority_rank`, `superseded_by`, `sidecars`, and `tool_hints` from
+  `docs/doc-taxonomy.v1.json`
+- `retrieval_policy` with requested/effective scope, admitted and suppressed
+  document counts, and bounded suppression reasons
 - `evidence_refs`
 - optional `mechanics_scope` with the compatible adapter profile, collection
   versions, and bounded document paths
@@ -123,3 +137,8 @@ Required stable tests:
 - unknown and cross-profile mechanics collections are blocked
 - docs+repo compound executes only requested capabilities unless another
   capability is required by an explicit route contract
+- broad current-topic queries suppress superseded generations
+- exact archived titles and paths remain retrievable without widening the
+  entire candidate pool
+- explicit archive comparison admits archival candidates while preserving
+  their non-current status and supersession metadata

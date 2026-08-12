@@ -29,6 +29,10 @@ export type HelixCapabilityItineraryExecutionState = {
   next_missing_required_observation_kind: string | null;
   missing_compound_subgoal_ids: string[];
   missing_required_capabilities: string[];
+  blocked_required_capabilities: string[];
+  missing_temporal_postconditions: Array<Record<string, unknown>>;
+  required_capability_any_of_groups: Array<Record<string, unknown>>;
+  missing_required_capability_any_of_groups: Array<Record<string, unknown>>;
   compound_subgoal_ledger: Array<Record<string, unknown>>;
   next_missing_subgoal_id: string | null;
   complete: boolean;
@@ -95,6 +99,10 @@ const subgoalFirstBrokenRailFor = (failureCode: string | null, satisfaction: str
   if (failureCode.startsWith("invalid_arg:") || failureCode.startsWith("missing_required_arg:")) return "capability_execution";
   if (failureCode === "input_binding_missing") return "evidence_reentry";
   if (failureCode === "weak_evidence_repair_loop") return "evidence_reentry";
+  if (
+    failureCode === "temporal_dependency_missing" ||
+    failureCode === "post_dependency_observation_missing"
+  ) return "evidence_reentry";
   if (failureCode === "subgoal_observation_missing") return "observation_artifact";
   return "capability_execution";
 };
@@ -106,6 +114,8 @@ const subgoalRepairTargetFor = (failureCode: string | null, satisfaction: string
   if (failureCode.startsWith("missing_required_arg:")) return "subgoal_argument_extraction";
   if (failureCode === "input_binding_missing") return "reentry_gate";
   if (failureCode === "weak_evidence_repair_loop") return "repo_retrieval_repair_policy";
+  if (failureCode === "temporal_dependency_missing") return "ordered_capability_continuation";
+  if (failureCode === "post_dependency_observation_missing") return "postcondition_observation";
   if (failureCode === "subgoal_observation_missing") return "observation_materializer";
   return "tool_execution";
 };
@@ -152,25 +162,34 @@ const guardedNoopSatisfactionForSubgoal = (input: {
   if (
     guardCapability !==
       "com.casimirbot.minecraft.spatial_region.inspect" ||
-    !["structure_planning", "fire_safety"].includes(
+    !["structure_planning", "fire_safety", "movement_safety"].includes(
       requiredPurpose ?? "",
     ) ||
     (requiredPurpose === "structure_planning"
       ? acceptedObservationPurposes.length !== 2 ||
         !acceptedObservationPurposes.includes("structure_planning") ||
         !acceptedObservationPurposes.includes("build_planning")
+      : requiredPurpose === "movement_safety"
+        ? acceptedObservationPurposes.length !== 1 ||
+          acceptedObservationPurposes[0] !== "movement_safety"
       : acceptedObservationPurposes.length !== 1 ||
         acceptedObservationPurposes[0] !== "fire_safety") ||
-    !["build_line_candidates", "fireplace_candidates"].includes(
+    ![
+      "build_line_candidates",
+      "fireplace_candidates",
+      "walk_step_candidates",
+    ].includes(
       candidateField ?? "",
     ) ||
     ![
       "build_line_candidates_complete",
       "fireplace_candidates_complete",
+      "walk_step_candidates_complete",
     ].includes(completenessField ?? "") ||
     ![
       "omitted_build_line_candidate_count",
       "omitted_fireplace_candidate_count",
+      "omitted_walk_step_candidate_count",
     ].includes(omittedCountField ?? "")
   ) {
     return null;
@@ -307,17 +326,22 @@ const artifactCapability = (artifact: HelixCapabilityItineraryArtifactLike): str
   const action = readRecord(payload?.action);
   return (
     readString((artifact as Record<string, unknown>).capability_key) ??
+    readString((artifact as Record<string, unknown>).source_capability_id) ??
     readString(payload?.capability_key) ??
+    readString(payload?.source_capability_id) ??
     readString(payload?.selected_capability) ??
     readString(payload?.requested_capability) ??
     readString(payload?.tool_key) ??
     readString(payload?.tool_name) ??
     readString(payload?.trace_source) ??
     readString(observation?.capability_key) ??
+    readString(observation?.source_capability_id) ??
     readString(observation?.tool_key) ??
     readString(result?.capability_key) ??
+    readString(result?.source_capability_id) ??
     readString(result?.tool_key) ??
     readString(action?.capability_key) ??
+    readString(action?.source_capability_id) ??
     null
   );
 };
@@ -647,6 +671,39 @@ const artifactMatchesRequiredObservationKind = (
   return observationKindBelongsToCapability(artifact, capability, runtimeCapability);
 };
 
+const artifactHasExplicitFailureOutcome = (
+  artifact: HelixCapabilityItineraryArtifactLike,
+): boolean => {
+  const payload = artifactPayload(artifact);
+  const observation = readRecord(payload?.observation);
+  const result = readRecord(payload?.result);
+  const action = readRecord(payload?.action);
+  const statuses = uniqueStrings([
+    readString(artifact.status),
+    readString(artifact.source_observation_status),
+    readString(payload?.status),
+    readString(payload?.outcome),
+    readString(observation?.status),
+    readString(observation?.outcome),
+    readString(result?.status),
+    readString(result?.outcome),
+    readString(action?.status),
+    readString(action?.outcome),
+  ]);
+  return (
+    (artifact as Record<string, unknown>).ok === false ||
+    payload?.ok === false ||
+    observation?.ok === false ||
+    result?.ok === false ||
+    action?.ok === false ||
+    statuses.some((status) =>
+      /^(?:failed|rejected|error|blocked|cancelled|canceled|denied|timed_out|timeout)$/i.test(
+        status,
+      ),
+    )
+  );
+};
+
 const artifactSupportsSubgoalObservation = (
   artifact: HelixCapabilityItineraryArtifactLike,
   subgoalId: string | null,
@@ -656,6 +713,7 @@ const artifactSupportsSubgoalObservation = (
   requiredObservationKinds: string[],
   argsHint: Record<string, unknown> | null,
 ): boolean => {
+  if (artifactHasExplicitFailureOutcome(artifact)) return false;
   if (!artifactMatchesRequiredObservationKind(artifact, requiredObservationKinds, capability, runtimeCapability)) {
     return false;
   }
@@ -708,7 +766,11 @@ const artifactArgs = (artifact: HelixCapabilityItineraryArtifactLike): Record<st
 const argValuePresent = (value: unknown): boolean => {
   if (typeof value === "string") return value.trim().length > 0;
   if (typeof value === "number") return Number.isFinite(value);
-  if (typeof value === "boolean") return value;
+  // Required-argument validation checks whether the caller supplied a typed
+  // value, not whether that value is truthy. `false` is a meaningful admitted
+  // argument for controls such as Minecraft `sprint`; treating it as absent
+  // makes a successful observation contradict its committed itinerary.
+  if (typeof value === "boolean") return true;
   if (Array.isArray(value)) return value.length > 0;
   if (value && typeof value === "object") return Object.keys(value).length > 0;
   return false;
@@ -827,6 +889,7 @@ const artifactProvesCompletedCapability = (
   requiredObservationKinds: string[] = [],
   subgoalId: string | null = null,
 ): boolean => {
+  if (artifactHasExplicitFailureOutcome(artifact)) return false;
   if (artifactCompletedRuntimeObservation(artifact, capability, runtimeCapability, substitutions)) return true;
   const artifactSubgoalId = artifactCompoundSubgoalId(artifact);
   const hasCapabilityProof =
@@ -870,6 +933,67 @@ const artifactProvesCompletedCapability = (
       (payload?.supports_goal === true || readString(payload?.authority) === "agent_runtime_loop");
   }
   return false;
+};
+
+const artifactProvesSuccessfulCapabilityObservation = (
+  artifact: HelixCapabilityItineraryArtifactLike,
+  capability: string,
+  requiredTurnId: string | null = null,
+): boolean => {
+  const payload = artifactPayload(artifact);
+  const observation = readRecord(payload?.observation);
+  const result = readRecord(payload?.result);
+  const action = readRecord(payload?.action);
+  const sourceScope =
+    readString(artifact.source_scope) ?? readString(payload?.source_scope);
+  if (/^(?:prior_turn_context|conversation_memory|historical_context)$/i.test(sourceScope ?? "")) {
+    return false;
+  }
+  const artifactTurnId =
+    readString(artifact.turn_id) ?? readString(payload?.turn_id);
+  if (requiredTurnId && artifactTurnId && artifactTurnId !== requiredTurnId) {
+    return false;
+  }
+  const authoritativeCapabilityIds = uniqueStrings([
+    readString(artifact.capability_key),
+    readString(artifact.source_capability_id),
+    readString(payload?.capability_key),
+    readString(payload?.source_capability_id),
+    readString(observation?.capability_key),
+    readString(observation?.source_capability_id),
+    readString(result?.capability_key),
+    readString(result?.source_capability_id),
+    readString(action?.capability_key),
+    readString(action?.source_capability_id),
+  ]);
+  if (
+    authoritativeCapabilityIds.length === 0 ||
+    authoritativeCapabilityIds.some(
+      (capabilityId) => capabilityId !== capability,
+    )
+  ) {
+    return false;
+  }
+  const kind = artifactKind(artifact);
+  if (!/(?:^|_)observation(?:_packet)?$/i.test(kind)) return false;
+  if (
+    artifactProvesCompletedCapability(
+      artifact,
+      capability,
+      capability,
+      [],
+    )
+  ) {
+    return true;
+  }
+  const status =
+    readString(payload?.status) ??
+    readString(artifact.source_observation_status) ??
+    readString(artifact.status);
+  return (
+    /^(?:succeeded|completed|success|ok)$/i.test(status ?? "") &&
+    artifactMatchesCapability(artifact, capability, capability, [])
+  );
 };
 
 export const isHelixCapabilityItineraryFamilyObserved = (
@@ -1146,6 +1270,23 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
   const requiredCapabilities = readArray(terminalCriteria?.required_capabilities)
     .map(readString)
     .filter((entry: string | null): entry is string => Boolean(entry));
+  const requiredCapabilityAnyOfGroups = readArray(
+    terminalCriteria?.required_capability_any_of_groups,
+  )
+    .map(readRecord)
+    .filter(
+      (entry: Record<string, unknown> | null): entry is Record<string, unknown> =>
+        Boolean(entry),
+    )
+    .map((entry: Record<string, unknown>, index: number) => ({
+      group_id:
+        readString(entry.group_id) ?? `required_capability_any_of:${index + 1}`,
+      semantic_requirement: readString(entry.semantic_requirement),
+      capability_ids: uniqueStrings(
+        readArray(entry.capability_ids).map(readString),
+      ),
+    }))
+    .filter((entry) => entry.capability_ids.length > 0);
   const admittedFamilies = readArray(itinerary?.admitted_tool_families)
     .map(readString)
     .filter((entry: string | null): entry is string => Boolean(entry));
@@ -1153,6 +1294,46 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     .map(readRecord)
     .filter((entry: Record<string, unknown> | null): entry is Record<string, unknown> => Boolean(entry));
   const artifacts = args.artifacts ?? [];
+  const requiredCapabilityAnyOfGroupSatisfaction =
+    requiredCapabilityAnyOfGroups.map((group) => {
+      let satisfiedCapabilityId: string | null = null;
+      let observationArtifact: HelixCapabilityItineraryArtifactLike | null =
+        null;
+      for (const capabilityId of group.capability_ids) {
+        const observation = artifacts.find((artifact) =>
+          artifactProvesSuccessfulCapabilityObservation(
+            artifact,
+            capabilityId,
+            turnId,
+          ),
+        );
+        if (!observation) continue;
+        satisfiedCapabilityId = capabilityId;
+        observationArtifact = observation;
+        break;
+      }
+      return {
+        group,
+        satisfiedCapabilityId,
+        observationArtifact,
+        artifactIndex: observationArtifact
+          ? artifacts.indexOf(observationArtifact)
+          : -1,
+      };
+    });
+  const requiredCapabilityAnyOfGroupLedger =
+    requiredCapabilityAnyOfGroupSatisfaction.map((entry) => ({
+      ...entry.group,
+      satisfied: Boolean(entry.satisfiedCapabilityId),
+      satisfied_capability_id: entry.satisfiedCapabilityId,
+      observation_ref: entry.observationArtifact
+        ? artifactId(entry.observationArtifact)
+        : null,
+    }));
+  const missingRequiredCapabilityAnyOfGroups =
+    requiredCapabilityAnyOfGroupLedger.filter(
+      (group) => group.satisfied !== true,
+    );
   const observedFamilies = requiredFamilies.filter((family: string) =>
     isHelixCapabilityItineraryFamilyObserved(family, artifacts),
   );
@@ -1204,21 +1385,97 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       .map(readString)
       .filter((entry: string | null): entry is string => Boolean(entry));
     const argsHint = readRecord(subgoal.args_hint);
+    const observationAfterCapabilityIds = uniqueStrings(
+      readArray(subgoal.observation_after_capability_ids).map(readString),
+    );
+    const observationAfterCapabilityAnyOfGroupIds = uniqueStrings(
+      readArray(
+        subgoal.observation_after_capability_any_of_group_ids,
+      ).map(readString),
+    );
+    const temporalDependencyIndexes: number[] = [];
+    const missingTemporalDependencyIds: string[] = [];
+    for (const dependencyCapabilityId of observationAfterCapabilityIds) {
+      let latestSuccessfulIndex = -1;
+      artifacts.forEach((artifact, artifactIndex) => {
+        if (
+          artifactProvesSuccessfulCapabilityObservation(
+            artifact,
+            dependencyCapabilityId,
+            turnId,
+          )
+        ) {
+          latestSuccessfulIndex = Math.max(
+            latestSuccessfulIndex,
+            artifactIndex,
+          );
+        }
+      });
+      if (latestSuccessfulIndex < 0) {
+        missingTemporalDependencyIds.push(dependencyCapabilityId);
+      } else {
+        temporalDependencyIndexes.push(latestSuccessfulIndex);
+      }
+    }
+    for (const groupId of observationAfterCapabilityAnyOfGroupIds) {
+      const group = requiredCapabilityAnyOfGroups.find(
+        (candidate) => candidate.group_id === groupId,
+      );
+      let latestSuccessfulIndex = -1;
+      for (const dependencyCapabilityId of group?.capability_ids ?? []) {
+        artifacts.forEach((artifact, artifactIndex) => {
+          if (
+            artifactProvesSuccessfulCapabilityObservation(
+              artifact,
+              dependencyCapabilityId,
+              turnId,
+            )
+          ) {
+            latestSuccessfulIndex = Math.max(
+              latestSuccessfulIndex,
+              artifactIndex,
+            );
+          }
+        });
+      }
+      if (!group || latestSuccessfulIndex < 0) {
+        missingTemporalDependencyIds.push(groupId);
+      } else {
+        temporalDependencyIndexes.push(latestSuccessfulIndex);
+      }
+    }
+    const temporalConstraintApplies =
+      observationAfterCapabilityIds.length > 0 ||
+      observationAfterCapabilityAnyOfGroupIds.length > 0;
+    const temporalDependenciesSatisfied =
+      missingTemporalDependencyIds.length === 0;
+    const temporalObservationLowerBound =
+      temporalDependencyIndexes.length > 0
+        ? Math.max(...temporalDependencyIndexes)
+        : -1;
+    const temporallyEligibleArtifacts = temporalConstraintApplies
+      ? temporalDependenciesSatisfied
+        ? artifacts.filter(
+            (_artifact, artifactIndex) =>
+              artifactIndex > temporalObservationLowerBound,
+          )
+        : []
+      : artifacts;
     const guardedNoopCandidate = guardedNoopSatisfactionForSubgoal({
       turnId,
       subgoal,
-      artifacts,
+      artifacts: temporallyEligibleArtifacts,
     });
-    const runtimeCalls = artifacts.filter((artifact: HelixCapabilityItineraryArtifactLike) =>
+    const runtimeCalls = temporallyEligibleArtifacts.filter((artifact: HelixCapabilityItineraryArtifactLike) =>
       artifactKind(artifact) === "runtime_tool_call" &&
       artifactMatchesCapability(artifact, requestedCapability, runtimeCapability, substitutions)
     );
-    const validations = artifacts.filter((artifact: HelixCapabilityItineraryArtifactLike) =>
+    const validations = temporallyEligibleArtifacts.filter((artifact: HelixCapabilityItineraryArtifactLike) =>
       artifactKind(artifact) === "runtime_tool_call_validation" &&
       artifactMatchesCapability(artifact, requestedCapability, runtimeCapability, substitutions)
     );
     const preboundObservationArtifact = preboundObservationRef
-      ? artifacts.find(
+      ? temporallyEligibleArtifacts.find(
           (artifact: HelixCapabilityItineraryArtifactLike) =>
             artifactId(artifact) === preboundObservationRef,
         ) ?? null
@@ -1236,9 +1493,9 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
         )
         ? preboundObservationArtifact
         : null
-      : occurrenceAwareSubgoals
+      : occurrenceAwareSubgoals && !temporalConstraintApplies
         ? null
-        : artifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
+        : temporallyEligibleArtifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
             artifactSupportsSubgoalObservation(
               artifact,
               subgoalId,
@@ -1279,11 +1536,13 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     );
     const validationErrors = validations.flatMap(artifactValidationErrors);
     const executionCandidateArtifacts =
-      occurrenceAwareSubgoals && preboundObservationRef
+      temporalConstraintApplies
+        ? temporallyEligibleArtifacts
+        : occurrenceAwareSubgoals && preboundObservationRef
         ? preboundObservationArtifact
           ? [preboundObservationArtifact]
           : []
-        : artifacts;
+        : temporallyEligibleArtifacts;
     const executedArtifact =
       executionCandidateArtifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
         artifactProvesCompletedCapability(
@@ -1354,6 +1613,11 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
           ? "failed"
           : "pending";
     const railFailureCode = railErrors[0] ??
+      (temporalConstraintApplies && !temporalDependenciesSatisfied
+        ? "temporal_dependency_missing"
+        : temporalConstraintApplies && !countedObservationArtifact
+          ? "post_dependency_observation_missing"
+          : null) ??
       (observationMissingAfterAttempt || satisfaction === "pending"
         ? "subgoal_observation_missing"
         : null);
@@ -1405,6 +1669,13 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
         (occurrenceAwareSubgoals ? "provider_call_occurrence" : null),
       provider_call_id: readString(subgoal.provider_call_id),
       capability_occurrence: Number(subgoal.capability_occurrence) || null,
+      observation_after_capability_ids: observationAfterCapabilityIds,
+      observation_after_capability_any_of_group_ids:
+        observationAfterCapabilityAnyOfGroupIds,
+      temporal_constraint_applies: temporalConstraintApplies,
+      temporal_dependencies_satisfied: temporalDependenciesSatisfied,
+      missing_temporal_dependency_ids: missingTemporalDependencyIds,
+      temporal_observation_lower_bound: temporalObservationLowerBound,
       observation_provenance: observationProvenance,
       support_refs: supportRefs,
       satisfaction,
@@ -1514,8 +1785,38 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
   const missingRequiredCapabilities = missingSubgoals
     .map((entry: Record<string, unknown>) => readString(entry.requested_capability))
     .filter((entry: string | null): entry is string => Boolean(entry));
+  const missingTemporalPostconditions = missingSubgoals
+    .filter((entry: Record<string, unknown>) =>
+      entry.temporal_constraint_applies === true,
+    )
+    .map((entry: Record<string, unknown>) => ({
+      subgoal_id: readString(entry.subgoal_id),
+      capability_id:
+        readString(entry.runtime_capability) ??
+        readString(entry.requested_capability),
+      observation_after_capability_ids: readArray(
+        entry.observation_after_capability_ids,
+      ).map(readString).filter(Boolean),
+      observation_after_capability_any_of_group_ids: readArray(
+        entry.observation_after_capability_any_of_group_ids,
+      ).map(readString).filter(Boolean),
+      temporal_dependencies_satisfied:
+        entry.temporal_dependencies_satisfied === true,
+      missing_temporal_dependency_ids: readArray(
+        entry.missing_temporal_dependency_ids,
+      ).map(readString).filter(Boolean),
+      rail_failure_code: readString(entry.rail_failure_code),
+    }));
+  const blockedRequiredCapabilities = uniqueStrings(
+    missingTemporalPostconditions
+      .filter(
+        (entry) => entry.temporal_dependencies_satisfied !== true,
+      )
+      .map((entry) => readString(entry.capability_id)),
+  );
   const complete = (!applies || missingFamilies.length === 0) &&
     missingRequiredObservationKinds.length === 0 &&
+    missingRequiredCapabilityAnyOfGroups.length === 0 &&
     missingSubgoals.length === 0;
   return {
     schema: "helix.capability_itinerary_execution_state.v1",
@@ -1531,6 +1832,12 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     next_missing_required_observation_kind: missingRequiredObservationKinds[0] ?? null,
     missing_compound_subgoal_ids: missingSubgoalIds,
     missing_required_capabilities: missingRequiredCapabilities,
+    blocked_required_capabilities: blockedRequiredCapabilities,
+    missing_temporal_postconditions: missingTemporalPostconditions,
+    required_capability_any_of_groups:
+      requiredCapabilityAnyOfGroupLedger,
+    missing_required_capability_any_of_groups:
+      missingRequiredCapabilityAnyOfGroups,
     compound_subgoal_ledger: compoundSubgoalLedger,
     next_missing_subgoal_id: readString(missingSubgoals[0]?.subgoal_id),
     complete,
@@ -1592,23 +1899,82 @@ export const attachHelixCapabilityItineraryExecutionState = (
       readString(entry.runtime_capability),
       ...readArray(entry.allowed_substitutions).map(readString),
     ]);
-  const currentCapabilities = new Set(
-    currentSubgoals.flatMap(capabilityIdentities),
-  );
+  const baseSubgoalsByIdentity = new Map<
+    string,
+    Array<Record<string, unknown>>
+  >();
+  for (const entry of baseSubgoals) {
+    const identityKey = [...capabilityIdentities(entry)].sort().join("|");
+    if (!identityKey) continue;
+    baseSubgoalsByIdentity.set(identityKey, [
+      ...(baseSubgoalsByIdentity.get(identityKey) ?? []),
+      entry,
+    ]);
+  }
+  const currentCapabilityOccurrenceCounts = new Map<string, number>();
+  const enrichedCurrentSubgoals = currentSubgoals.map((entry) => {
+    const identityKey = [...capabilityIdentities(entry)].sort().join("|");
+    if (!identityKey) return entry;
+    const occurrence =
+      (currentCapabilityOccurrenceCounts.get(identityKey) ?? 0) + 1;
+    currentCapabilityOccurrenceCounts.set(identityKey, occurrence);
+    const committedOccurrence =
+      baseSubgoalsByIdentity.get(identityKey)?.[occurrence - 1] ??
+      baseSubgoalsByIdentity.get(identityKey)?.[0];
+    if (!committedOccurrence) return entry;
+    const observationAfterCapabilityIds = readArray(
+      committedOccurrence.observation_after_capability_ids,
+    ).map(readString).filter(Boolean);
+    const observationAfterCapabilityAnyOfGroupIds = readArray(
+      committedOccurrence.observation_after_capability_any_of_group_ids,
+    ).map(readString).filter(Boolean);
+    if (
+      observationAfterCapabilityIds.length === 0 &&
+      observationAfterCapabilityAnyOfGroupIds.length === 0
+    ) {
+      return entry;
+    }
+    // Provider-call normalization may replace the committed subgoal identity,
+    // but it must not erase the user's before/after evidence invariant.
+    return {
+      ...entry,
+      observation_after_capability_ids: observationAfterCapabilityIds,
+      observation_after_capability_any_of_group_ids:
+        observationAfterCapabilityAnyOfGroupIds,
+      temporal_requirement_source:
+        readString(committedOccurrence.temporal_requirement_source) ??
+        "committed_capability_itinerary",
+    };
+  });
+  const baseCapabilityOccurrenceCounts = new Map<string, number>();
   const preservedUnrepresentedSubgoals = baseSubgoals.filter((entry) => {
     const identities = capabilityIdentities(entry);
-    return identities.length > 0 && !identities.some((capability) => currentCapabilities.has(capability));
+    if (identities.length === 0) return false;
+    const identityKey = [...identities].sort().join("|");
+    const baseOccurrence =
+      (baseCapabilityOccurrenceCounts.get(identityKey) ?? 0) + 1;
+    baseCapabilityOccurrenceCounts.set(identityKey, baseOccurrence);
+    const representedOccurrenceCount = enrichedCurrentSubgoals.filter((candidate) => {
+      const candidateIdentities = capabilityIdentities(candidate);
+      return candidateIdentities.some((capability) =>
+        identities.includes(capability),
+      );
+    }).length;
+    // A provider-call contract describes only occurrences that have already
+    // been attempted. Preserve any later committed occurrence of the same
+    // capability so one observation cannot satisfy a read-act-read itinerary.
+    return baseOccurrence > representedOccurrenceCount;
   });
   const mergedOccurrenceSubgoals = [
-    ...currentSubgoals,
+    ...enrichedCurrentSubgoals,
     ...preservedUnrepresentedSubgoals,
   ].sort((left, right) => (Number(left.order) || 0) - (Number(right.order) || 0));
   const mergedOccurrenceContract = currentProviderContract
     ? {
         ...currentProviderContract,
+        subgoals: mergedOccurrenceSubgoals,
         ...(preservedUnrepresentedSubgoals.length > 0
           ? {
-              subgoals: mergedOccurrenceSubgoals,
               subgoal_count: mergedOccurrenceSubgoals.length,
               satisfied_subgoal_count: mergedOccurrenceSubgoals.filter(
                 (entry) => entry.satisfied === true,
@@ -1653,6 +2019,14 @@ export const attachHelixCapabilityItineraryExecutionState = (
       next_missing_required_observation_kind: executionState.next_missing_required_observation_kind,
       missing_compound_subgoal_ids: executionState.missing_compound_subgoal_ids,
       missing_required_capabilities: executionState.missing_required_capabilities,
+      blocked_required_capabilities:
+        executionState.blocked_required_capabilities,
+      missing_temporal_postconditions:
+        executionState.missing_temporal_postconditions,
+      required_capability_any_of_groups:
+        executionState.required_capability_any_of_groups,
+      missing_required_capability_any_of_groups:
+        executionState.missing_required_capability_any_of_groups,
       compound_subgoal_ledger: executionState.compound_subgoal_ledger,
       next_missing_subgoal_id: executionState.next_missing_subgoal_id,
       complete: executionState.complete,
@@ -1666,5 +2040,8 @@ export const attachHelixCapabilityItineraryExecutionState = (
   return Array.from(new Set([
     ...executionState.missing_observation_families,
     ...executionState.missing_required_capabilities,
+    ...executionState.missing_required_capability_any_of_groups
+      .map((group) => readString(group.group_id))
+      .filter((entry): entry is string => Boolean(entry)),
   ]));
 };

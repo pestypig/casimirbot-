@@ -133,6 +133,37 @@ const verifiedLifecycle = (input: {
 };
 
 describe("Helix Ask evidence re-entry and follow-up gates", () => {
+  it("accepts a current-turn binding diagnosis as a deterministic observation terminal", () => {
+    const observationRef = "turn:binding-diagnosis:diagnosis:1";
+    const gate = buildEvidenceReentryGate({
+      turnId: "turn:binding-diagnosis",
+      payload: {},
+      loopTrace: {
+        evidence_selected_for_answer: [observationRef],
+        evidence_rejected_for_answer: [],
+      },
+      primaryIntent: "status_question",
+      terminalArtifactKind: "live_environment_binding_diagnosis",
+      finalAnswerSource: "live_environment_binding_diagnosis",
+      finalArbitrationRan: true,
+      runtimeLifecycleVerified: false,
+      runtimeObservationReentryRefs: [],
+      postEvidenceReasoningCompleted: false,
+      sourceEvidenceRequired: true,
+      allowedTerminalProducts: [
+        "live_environment_binding_diagnosis",
+        "typed_failure",
+      ],
+    });
+
+    expect(gate).toMatchObject({
+      required: true,
+      completed: true,
+      selected_evidence_refs: [observationRef],
+      violation_codes: [],
+    });
+  });
+
   it("uses factual post-observation completion ahead of inferred finalization", () => {
     const observationRef = "turn:factual-reentry:observation:1";
     const baseInput = {

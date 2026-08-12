@@ -89,6 +89,7 @@ it("reconciles capability-lane re-entry only for the exact returned observation"
     reenteredObservationRefs: ["observation:image-region:expected"],
   })[0]).toMatchObject({
     status: "completed",
+    lane_executed: false,
     observation_reentered: true,
   });
 });

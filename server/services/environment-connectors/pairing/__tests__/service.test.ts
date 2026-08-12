@@ -434,9 +434,10 @@ describe("environment connector public-key pairing", () => {
 
   it("publishes immutable package trust without installations, devices, rooms, or evidence", async () => {
     const directory = await listPublicEnvironmentConnectorDirectory();
-    expect(directory).toHaveLength(4);
+    expect(directory).toHaveLength(5);
     expect(directory.map((entry) => entry.package_id)).toEqual([
       "com.casimirbot.minecraft.fabric",
+      "com.casimirbot.minecraft.fabric-player",
       "com.casimirbot.minecraft.paper",
       "com.casimirbot.synthetic.fixture",
       "com.casimirbot.system.clock",
@@ -446,13 +447,19 @@ describe("environment connector public-key pairing", () => {
     expect(projection).not.toContain(ROOM_ID);
     expect(projection).not.toContain(BINDING_ID);
     expect(projection).not.toContain(CREDENTIAL_ID);
-    expect(directory[0]).toMatchObject({
-      private_installation_data_included: false,
-      user_evidence_included: false,
-      trust: {
-        runtime_connection_health: "not_a_directory_claim",
-        observation_quality: "not_a_directory_claim",
-      },
-    });
+    for (const entry of directory) {
+      expect(entry).toMatchObject({
+        private_installation_data_included: false,
+        user_evidence_included: false,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        trust: {
+          runtime_connection_health: "not_a_directory_claim",
+          observation_quality: "not_a_directory_claim",
+        },
+      });
+    }
   });
 });

@@ -65,9 +65,11 @@ export const shouldPreserveAuthoritativeTerminalOverEvidenceGate = (args: {
   hasCompletedWorkspaceTool?: boolean;
   hasTerminalText?: boolean;
   hasPendingRequest?: boolean;
+  serverAuthoritativeTerminal?: boolean;
 }): boolean => {
   if (!args.evidenceGateBlocked) return false;
   if (!args.hasTerminalText) return false;
+  if (args.serverAuthoritativeTerminal) return true;
   if (
     args.finalAnswerSource &&
     !["unknown", "typed_failure", "legacy_fallback"].includes(args.finalAnswerSource) &&

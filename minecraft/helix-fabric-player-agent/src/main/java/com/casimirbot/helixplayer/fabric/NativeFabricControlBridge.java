@@ -52,21 +52,11 @@ final class NativeFabricControlBridge implements ControlBridge {
                 0,
                 false,
                 false,
-                false
+                false,
+                null
             );
         }
-        boolean manualInput =
-            (minecraft.screen != null && !workflowEngine.screenAutomationAllowed()) ||
-            minecraft.mouseHandler.isLeftPressed() ||
-            minecraft.mouseHandler.isMiddlePressed() ||
-            minecraft.mouseHandler.isRightPressed() ||
-            unexpectedDown(minecraft.options.keyUp, asserted.forward()) ||
-            unexpectedDown(minecraft.options.keyDown, asserted.back()) ||
-            unexpectedDown(minecraft.options.keyLeft, asserted.left()) ||
-            unexpectedDown(minecraft.options.keyRight, asserted.right()) ||
-            unexpectedDown(minecraft.options.keyJump, asserted.jump()) ||
-            unexpectedDown(minecraft.options.keySprint, asserted.sprint()) ||
-            viewWasManuallyChanged(player);
+        String manualInputReason = manualInputReason(player);
         return new PlayerSnapshot(
             true,
             player.getX(),
@@ -78,7 +68,8 @@ final class NativeFabricControlBridge implements ControlBridge {
             player.getHealth(),
             player.onGround(),
             player.horizontalCollision,
-            manualInput
+            manualInputReason != null,
+            manualInputReason
         );
     }
 
@@ -102,6 +93,12 @@ final class NativeFabricControlBridge implements ControlBridge {
         double horizontal = Math.sqrt(dx * dx + dz * dz);
         float targetYaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         float targetPitch = (float) -Math.toDegrees(Math.atan2(dy, horizontal));
+        lookTo(targetYaw, targetPitch, maxDegreesPerTick);
+    }
+
+    @Override
+    public void lookTo(float targetYaw, float targetPitch, float maxDegreesPerTick) {
+        LocalPlayer player = requirePlayer();
         float yaw = approachAngle(player.getYRot(), targetYaw, maxDegreesPerTick);
         float pitch = Mth.clamp(
             approachAngle(player.getXRot(), targetPitch, maxDegreesPerTick),
@@ -279,6 +276,34 @@ final class NativeFabricControlBridge implements ControlBridge {
         controlledYaw = null;
         controlledPitch = null;
         return changed;
+    }
+
+    private String manualInputReason(LocalPlayer player) {
+        if (minecraft.screen != null && !workflowEngine.screenAutomationAllowed()) {
+            return "screen_open";
+        }
+        if (minecraft.mouseHandler.isLeftPressed()) return "left_mouse_pressed";
+        if (minecraft.mouseHandler.isMiddlePressed()) return "middle_mouse_pressed";
+        if (minecraft.mouseHandler.isRightPressed()) return "right_mouse_pressed";
+        if (unexpectedDown(minecraft.options.keyUp, asserted.forward())) {
+            return "forward_key_pressed";
+        }
+        if (unexpectedDown(minecraft.options.keyDown, asserted.back())) {
+            return "back_key_pressed";
+        }
+        if (unexpectedDown(minecraft.options.keyLeft, asserted.left())) {
+            return "left_key_pressed";
+        }
+        if (unexpectedDown(minecraft.options.keyRight, asserted.right())) {
+            return "right_key_pressed";
+        }
+        if (unexpectedDown(minecraft.options.keyJump, asserted.jump())) {
+            return "jump_key_pressed";
+        }
+        if (unexpectedDown(minecraft.options.keySprint, asserted.sprint())) {
+            return "sprint_key_pressed";
+        }
+        return viewWasManuallyChanged(player) ? "unexpected_view_change" : null;
     }
 
     private void releaseOneTickPulses() {

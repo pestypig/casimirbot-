@@ -302,4 +302,44 @@ describe("Helix Ask prompt interpretation", () => {
       "synthesize the uncertainty with citations.",
     ]);
   });
+
+  it("does not promote coordinated verbs under one prohibition into positive requirements", () => {
+    const interpretation = interpretHelixAskPrompt(
+      "Using the active Minecraft Fabric environment, make one fresh read-only check and report the world status. Do not move anything, use server commands, or change the world.",
+    );
+
+    expect(interpretation.negative_constraints).toEqual(
+      expect.arrayContaining([expect.stringMatching(/do not move/i)]),
+    );
+    expect(
+      interpretation.compound_contract?.requirements.some((entry) =>
+        /^use server commands/i.test(entry.text),
+      ) ?? false,
+    ).toBe(false);
+  });
+
+  it("keeps inspect-only operational constraints out of terminal answer coverage", () => {
+    const interpretation = interpretHelixAskPrompt(
+      "Inspect the conformed scientific-evidence enrollment and show the maximum claim ceiling. Inspect only; do not prepare, evaluate, or start any runtime.",
+    );
+    const requirements = interpretation.compound_contract?.requirements ?? [];
+    const operationalConstraint = requirements.find((entry) =>
+      /do not prepare, evaluate, or start any runtime/i.test(entry.text),
+    );
+
+    expect(operationalConstraint).toMatchObject({
+      kind: "constraint",
+      required: false,
+    });
+    expect(interpretation.compound_contract?.global_constraints).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/do not prepare, evaluate, or start any runtime/i),
+      ]),
+    );
+    expect(interpretation.negative_constraints).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/do not prepare/i),
+      ]),
+    );
+  });
 });

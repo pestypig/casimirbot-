@@ -254,6 +254,18 @@ const minecraftActorStatusOutputSchema: HelixEnvironmentConstrainedJsonSchema =
       game_mode: { type: "string", maxLength: 64 },
       world: { type: "string", maxLength: 160 },
       position: minecraftPositionSchema,
+      yaw: {
+        type: "number",
+        description:
+          "Measured Minecraft view yaw in degrees; increasing values turn right.",
+      },
+      pitch: {
+        type: "number",
+        minimum: -90,
+        maximum: 90,
+        description:
+          "Measured Minecraft view pitch in degrees; increasing values look down.",
+      },
       status_flags: {
         type: "array",
         maxItems: 32,
@@ -429,6 +441,7 @@ const minecraftSpatialRegionInputSchema: HelixEnvironmentConstrainedJsonSchema =
         "structure_verification",
         "fire_safety",
         "landing_safety",
+        "movement_safety",
       ],
       description:
         "The bounded survey purpose. Use structure_verification only with exact verification endpoints and an expected block.",
@@ -498,6 +511,7 @@ const minecraftSpatialRegionOutputSchema: HelixEnvironmentConstrainedJsonSchema 
         "structure_verification",
         "fire_safety",
         "landing_safety",
+        "movement_safety",
       ],
     },
     center: minecraftPositionSchema,
@@ -743,6 +757,69 @@ const minecraftSpatialRegionOutputSchema: HelixEnvironmentConstrainedJsonSchema 
       minimum: 0,
       maximum: 10_000,
     },
+    walk_step_candidates: {
+      type: "array",
+      maxItems: 4,
+      items: {
+        type: "object",
+        properties: {
+          cardinal_direction: {
+            type: "string",
+            enum: ["north", "south", "east", "west"],
+          },
+          relative_direction: {
+            type: "string",
+            enum: ["forward", "back", "left", "right"],
+          },
+          target_feet_position: minecraftPositionSchema,
+          target_head_position: minecraftPositionSchema,
+          support_position: minecraftPositionSchema,
+          support_block: { type: "string", minLength: 1, maxLength: 160 },
+          evidence_complete: { type: "boolean" },
+          feet_clear: { type: "boolean" },
+          head_clear: { type: "boolean" },
+          support_solid_nonhazardous: { type: "boolean" },
+          nearby_hazard_count: {
+            type: "integer",
+            minimum: 0,
+            maximum: 10_000,
+          },
+          nearby_fluid_count: {
+            type: "integer",
+            minimum: 0,
+            maximum: 10_000,
+          },
+          safe_candidate: { type: "boolean" },
+        },
+        required: [
+          "cardinal_direction",
+          "relative_direction",
+          "target_feet_position",
+          "target_head_position",
+          "support_position",
+          "support_block",
+          "evidence_complete",
+          "feet_clear",
+          "head_clear",
+          "support_solid_nonhazardous",
+          "nearby_hazard_count",
+          "nearby_fluid_count",
+          "safe_candidate",
+        ],
+        additionalProperties: false,
+      },
+    },
+    walk_step_candidates_complete: { type: "boolean" },
+    retained_walk_step_candidate_count: {
+      type: "integer",
+      minimum: 0,
+      maximum: 4,
+    },
+    omitted_walk_step_candidate_count: {
+      type: "integer",
+      minimum: 0,
+      maximum: 4,
+    },
     target_geometry_verification: {
       type: "object",
       properties: {
@@ -962,8 +1039,27 @@ const minecraftLookInputSchema: HelixEnvironmentConstrainedJsonSchema = {
   type: "object",
   properties: {
     action_kind: { type: "string", enum: ["look_at"] },
-    target_kind: { type: "string", enum: ["position", "current_focus"] },
+    target_kind: {
+      type: "string",
+      enum: ["position", "current_focus", "relative_rotation"],
+      description:
+        "Look at an exact position, retain the current focus, or rotate relative to the current measured view.",
+    },
     position: minecraftPositionSchema,
+    yaw_delta_degrees: {
+      type: "number",
+      minimum: -180,
+      maximum: 180,
+      description:
+        "For relative_rotation, positive degrees turn right and negative degrees turn left. Omit this axis to keep its current angle.",
+    },
+    pitch_delta_degrees: {
+      type: "number",
+      minimum: -180,
+      maximum: 180,
+      description:
+        "For relative_rotation, positive degrees look down and negative degrees look up. Omit this axis to keep its current angle.",
+    },
     max_turn_degrees_per_tick: { type: "number", minimum: 0.1, maximum: 180 },
   },
   required: ["action_kind", "target_kind", "max_turn_degrees_per_tick"],
@@ -1152,7 +1248,7 @@ const descriptors: HelixEnvironmentCapabilityDescriptor[] = [
     adapterProfileIds: [HELIX_MINECRAFT_ADAPTER_PROFILE_ID],
     label: "Read current Minecraft actor status",
     description:
-      "Read health, hunger, active effects, game mode, status flags, world, position, and an admitted allowlisted mod-mechanics state for the current bound Minecraft actor without changing the world.",
+      "Read health, hunger, active effects, game mode, status flags, world, position, measured yaw/pitch, and an admitted allowlisted mod-mechanics state for the current bound Minecraft actor without changing the world.",
     inputSchema: semanticTargetSchema,
     outputSchema: minecraftActorStatusOutputSchema,
     freshnessCeilingMs: 120_000,
@@ -1291,7 +1387,7 @@ const descriptors: HelixEnvironmentCapabilityDescriptor[] = [
     capabilityId: HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY,
     label: "Turn the paired Minecraft player's view",
     description:
-      "Turn the paired player's view toward a resolved position or retain the current focus, with manual input taking precedence.",
+      "Turn the paired player's view toward a resolved position, rotate by an exact relative yaw/pitch delta, or retain the current focus, with manual input taking precedence. Positive relative yaw turns right; positive relative pitch looks down.",
     inputSchema: minecraftLookInputSchema,
     timeoutCeilingMs: 15_000,
   }),

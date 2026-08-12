@@ -236,6 +236,8 @@ public final class FabricProbeExecutor {
                 round(player.getZ())
             )
         );
+        details.put("yaw", round(player.getYRot()));
+        details.put("pitch", round(player.getXRot()));
         details.put("status_flags", List.copyOf(flags));
         details.put("active_effects", effects);
         Map<String, Object> mechanicsState =
@@ -694,6 +696,7 @@ public final class FabricProbeExecutor {
             requestedHeight,
             requestedOrientation,
             requestedRelativeSide,
+            player.getYRot(),
             verificationFrom,
             verificationTo,
             expectedBlock
@@ -710,6 +713,28 @@ public final class FabricProbeExecutor {
         String purpose,
         Map<String, Object> details
     ) {
+        if ("movement_safety".equals(purpose)) {
+            Object rawCandidates = details.get("walk_step_candidates");
+            int safeCandidateCount = rawCandidates instanceof List<?> candidates
+                ? (int) candidates
+                    .stream()
+                    .filter(candidate ->
+                        candidate instanceof Map<?, ?> row &&
+                        Boolean.TRUE.equals(row.get("safe_candidate"))
+                    )
+                    .count()
+                : 0;
+            if (safeCandidateCount == 0) {
+                return "No conservative one-block movement candidate was " +
+                    "verified in this bounded spatial survey. Do not move; " +
+                    "report the missing or unsafe evidence.";
+            }
+            return "Bounded spatial-region read-only probe verified " +
+                safeCandidateCount +
+                " conservative one-block movement candidate(s). Use only a " +
+                "walk_step_candidates relative_direction whose " +
+                "safe_candidate value is true.";
+        }
         if ("structure_verification".equals(purpose)) {
             Object rawVerification = details.get("target_geometry_verification");
             if (!(rawVerification instanceof Map<?, ?> verification)) {

@@ -3,6 +3,8 @@ import {
   buildMinecraftAgencyCompoundCoverageResolutions,
   buildMinecraftPostMutationVerificationRequest,
   evaluateMinecraftAgencySequence,
+  isAffirmativeMinecraftPlayerEmbodimentActionPrompt,
+  minecraftPlayerEmbodimentActionPromptMatch,
   resolveMinecraftExecutionPlaneConstraint,
   requiresCurrentTurnCheckpointBeforeMinecraftMutation,
 } from "../minecraft-agency-sequencing";
@@ -42,6 +44,17 @@ const observedResult = (
   }) as any;
 
 describe("Minecraft agency sequencing", () => {
+  it("detects a semantic player-plane action without choosing the action capability", () => {
+    const prompt =
+      "Using only my paired Minecraft Player Embodiment client, rotate my view about 20 degrees to the right without moving or using server commands.";
+    expect(isAffirmativeMinecraftPlayerEmbodimentActionPrompt(prompt)).toBe(
+      true,
+    );
+    expect(minecraftPlayerEmbodimentActionPromptMatch(prompt)).toMatchObject({
+      matched_text: "rotate",
+    });
+  });
+
   it("keeps an explicit paired-client request on the Player Embodiment plane", () => {
     const prompt =
       "Using the paired Minecraft player client, take one careful step forward, jump once, stop, and verify my final position.";
@@ -50,10 +63,7 @@ describe("Minecraft agency sequencing", () => {
     );
     const decision = evaluateMinecraftAgencySequence({
       prompt,
-      candidate: command(
-        "tp DatDamPig -47.8 68.2 -1.3",
-        "player_mutation",
-      ),
+      candidate: command("tp DatDamPig -47.8 68.2 -1.3", "player_mutation"),
       priorRequests: [],
       gatewayCallResults: [],
     });
@@ -63,6 +73,147 @@ describe("Minecraft agency sequencing", () => {
     });
     expect(decision.reason).toContain("minecraft_execution_plane_mismatch");
     expect(decision.reason).toContain("Player Embodiment");
+  });
+
+  it("keeps an immediate geometry safety condition on the Player Embodiment plane", () => {
+    const prompt =
+      "First inspect the local geometry. If a cardinal direction has solid walkable support, safe headroom, and no nearby fire or drop, use the paired Player Embodiment client to walk no more than one block in that direction. Do not issue a server command.";
+
+    expect(resolveMinecraftExecutionPlaneConstraint(prompt)).toBe(
+      "player_embodiment",
+    );
+    expect(minecraftPlayerEmbodimentActionPromptMatch(prompt)).toMatchObject({
+      matched_text: "walk",
+    });
+  });
+
+  it("admits a guarded walk only when its exact relative direction is freshly evidenced safe", () => {
+    const prompt =
+      "First inspect around me. If a cardinal direction has safe support and headroom, walk one step in that direction. If no safe direction is evidenced, do not move.";
+    const inspection = {
+      capability: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      arguments: {
+        target: "current_actor",
+        purpose: "movement_safety",
+      },
+    };
+    const walk = (direction: string) => ({
+      capability: "com.casimirbot.minecraft.player.walk",
+      arguments: {
+        action_kind: "walk",
+        direction,
+        duration_ms: 250,
+        sprint: false,
+      },
+    });
+    const compoundCapabilityContract = {
+      subgoals: [
+        {
+          order: 1,
+          requested_capability:
+            HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          mandatory: true,
+        },
+        {
+          order: 2,
+          requested_capability: "com.casimirbot.minecraft.player.walk",
+          mandatory: true,
+          guarded_noop_policy: {
+            schema: "helix.compound_capability_guarded_noop.v1",
+            mode: "no_verified_safe_candidate",
+            guard_capability:
+              HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+            required_purpose: "movement_safety",
+            accepted_observation_purposes: ["movement_safety"],
+            candidate_field: "walk_step_candidates",
+            completeness_field: "walk_step_candidates_complete",
+            omitted_count_field: "omitted_walk_step_candidate_count",
+            current_turn_only: true,
+            requires_successful_observation: true,
+            user_directed_noop_guard: true,
+          },
+        },
+      ],
+    };
+    const spatialResult = (candidates: Array<Record<string, unknown>>) =>
+      observedResult(
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        "movement-safety",
+        true,
+        {
+          result: {
+            purpose: "movement_safety",
+            walk_step_candidates: candidates,
+            walk_step_candidates_complete: true,
+            omitted_walk_step_candidate_count: 0,
+          },
+        },
+      );
+
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt,
+        candidate: walk("forward"),
+        priorRequests: [inspection],
+        gatewayCallResults: [
+          spatialResult([
+            {
+              relative_direction: "forward",
+              evidence_complete: true,
+              safe_candidate: true,
+            },
+          ]),
+        ],
+        compoundCapabilityContract,
+      }).admitted,
+    ).toBe(true);
+
+    const wrongDirection = evaluateMinecraftAgencySequence({
+      prompt,
+      candidate: walk("left"),
+      priorRequests: [inspection],
+      gatewayCallResults: [
+        spatialResult([
+          {
+            relative_direction: "forward",
+            evidence_complete: true,
+            safe_candidate: true,
+          },
+        ]),
+      ],
+      compoundCapabilityContract,
+    });
+    expect(wrongDirection.admitted).toBe(false);
+    expect(wrongDirection.reason).toContain(
+      "minecraft_movement_direction_not_evidenced_safe",
+    );
+
+    const noCandidate = evaluateMinecraftAgencySequence({
+      prompt,
+      candidate: walk("forward"),
+      priorRequests: [inspection],
+      gatewayCallResults: [spatialResult([])],
+      compoundCapabilityContract,
+    });
+    expect(noCandidate.admitted).toBe(false);
+    expect(noCandidate.reason).toContain(
+      "minecraft_guarded_noop_satisfied",
+    );
+
+    const missingEvidence = evaluateMinecraftAgencySequence({
+      prompt,
+      candidate: walk("forward"),
+      priorRequests: [],
+      gatewayCallResults: [],
+      compoundCapabilityContract,
+    });
+    expect(missingEvidence).toMatchObject({
+      admitted: false,
+      recovery_lane_request: {
+        capability: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        arguments: { purpose: "movement_safety" },
+      },
+    });
   });
 
   it("admits Codex-selected player actions and neutral evidence under a Player Embodiment constraint", () => {
@@ -92,6 +243,156 @@ describe("Minecraft agency sequencing", () => {
         }).admitted,
       ).toBe(true);
     }
+  });
+
+  it("re-enters an explicit Player Embodiment ordering mismatch before a later action runs", () => {
+    const actorStatus = {
+      capability: "com.casimirbot.minecraft.actor.status.read",
+      arguments: { target: "current_actor" },
+    };
+    const walk = {
+      capability: "com.casimirbot.minecraft.player.walk",
+      arguments: { direction: "forward", duration_ms: 250, sprint: false },
+    };
+    const jump = {
+      capability: "com.casimirbot.minecraft.player.jump",
+      arguments: { count: 1 },
+    };
+    const compoundCapabilityContract = {
+      subgoals: [
+        {
+          subgoal_id: "ordered:walk",
+          order: 1,
+          requested_capability: walk.capability,
+          mandatory: true,
+        },
+        {
+          subgoal_id: "ordered:jump",
+          order: 2,
+          requested_capability: jump.capability,
+          mandatory: true,
+        },
+        {
+          subgoal_id: "ordered:final-status",
+          order: 3,
+          requested_capability: actorStatus.capability,
+          mandatory: true,
+        },
+      ],
+    };
+    const prompt =
+      "Using only my paired Minecraft Player Embodiment client, if the controls are idle, walk forward for 250 milliseconds, then jump exactly once, stop, and finally read my position.";
+
+    const blocked = evaluateMinecraftAgencySequence({
+      prompt,
+      candidate: jump,
+      priorRequests: [actorStatus],
+      gatewayCallResults: [
+        observedResult(actorStatus.capability, "preflight-status"),
+      ],
+      compoundCapabilityContract,
+    });
+    expect(blocked).toMatchObject({
+      admitted: false,
+      recovery_lane_request: null,
+    });
+    expect(blocked.reason).toContain("minecraft_ordered_procedure_mismatch");
+    expect(blocked.reason).toContain("ordered:walk");
+    expect(blocked.reason).toContain(jump.capability);
+
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt,
+        candidate: walk,
+        priorRequests: [actorStatus],
+        gatewayCallResults: [
+          observedResult(actorStatus.capability, "preflight-status"),
+        ],
+        compoundCapabilityContract,
+      }).admitted,
+    ).toBe(true);
+
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt,
+        candidate: jump,
+        priorRequests: [actorStatus, walk],
+        gatewayCallResults: [
+          observedResult(actorStatus.capability, "preflight-status"),
+          observedResult(walk.capability, "walk"),
+        ],
+        compoundCapabilityContract,
+      }).admitted,
+    ).toBe(true);
+  });
+
+  it("does not let a failed earlier player action satisfy ordered procedure progress", () => {
+    const walk = {
+      capability: "com.casimirbot.minecraft.player.walk",
+      arguments: { direction: "forward", duration_ms: 250, sprint: false },
+    };
+    const jump = {
+      capability: "com.casimirbot.minecraft.player.jump",
+      arguments: { count: 1 },
+    };
+    const decision = evaluateMinecraftAgencySequence({
+      prompt:
+        "Use my paired Minecraft Player Embodiment client: first walk forward, then jump once.",
+      candidate: jump,
+      priorRequests: [walk],
+      gatewayCallResults: [
+        observedResult(walk.capability, "failed-walk", false),
+      ],
+      compoundCapabilityContract: {
+        subgoals: [
+          {
+            subgoal_id: "ordered:walk",
+            order: 1,
+            requested_capability: walk.capability,
+            mandatory: true,
+          },
+          {
+            subgoal_id: "ordered:jump",
+            order: 2,
+            requested_capability: jump.capability,
+            mandatory: true,
+          },
+        ],
+      },
+    });
+    expect(decision.admitted).toBe(false);
+    expect(decision.reason).toContain("ordered:walk");
+  });
+
+  it("leaves unordered multi-action prompts under Codex sequencing authority", () => {
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt:
+          "Use my paired Minecraft Player Embodiment client to walk forward and jump while the controls are idle.",
+        candidate: {
+          capability: "com.casimirbot.minecraft.player.jump",
+          arguments: { count: 1 },
+        },
+        priorRequests: [],
+        gatewayCallResults: [],
+        compoundCapabilityContract: {
+          subgoals: [
+            {
+              subgoal_id: "planned:walk",
+              order: 1,
+              requested_capability: "com.casimirbot.minecraft.player.walk",
+              mandatory: true,
+            },
+            {
+              subgoal_id: "planned:jump",
+              order: 2,
+              requested_capability: "com.casimirbot.minecraft.player.jump",
+              mandatory: true,
+            },
+          ],
+        },
+      }).admitted,
+    ).toBe(true);
   });
 
   it("symmetrically preserves an explicit World Authority command request", () => {
@@ -130,9 +431,25 @@ describe("Minecraft agency sequencing", () => {
     "Previously I used the Player Embodiment plane to jump.",
     "The screen says use the paired Minecraft player client.",
     "Do not use the paired Minecraft player client; teleport me with a Minecraft server command.",
-  ])("does not mistake contextual player-plane text for current authority: %s", (prompt) => {
-    expect(resolveMinecraftExecutionPlaneConstraint(prompt)).not.toBe(
-      "player_embodiment",
+  ])(
+    "does not mistake contextual player-plane text for current authority: %s",
+    (prompt) => {
+      expect(resolveMinecraftExecutionPlaneConstraint(prompt)).not.toBe(
+        "player_embodiment",
+      );
+    },
+  );
+
+  it.each([
+    'Explain the example "use the paired Minecraft player client to rotate right" without acting.',
+    "Later, use the paired Minecraft player client to rotate right.",
+    "Previously I used the Player Embodiment plane to rotate right.",
+    "The screen says use the paired Minecraft player client to rotate right.",
+    "Do not use the paired Minecraft player client to rotate right.",
+    "Can the Minecraft player client rotate right?",
+  ])("does not admit a contextual player action affordance: %s", (prompt) => {
+    expect(isAffirmativeMinecraftPlayerEmbodimentActionPrompt(prompt)).toBe(
+      false,
     );
   });
 
@@ -192,9 +509,9 @@ describe("Minecraft agency sequencing", () => {
     "Inspect the site. Capture a rollback checkpoint before changing blocks. Build the wall, then verify it.";
 
   it("recognizes affirmative and fail-closed checkpoint ordering", () => {
-    expect(
-      requiresCurrentTurnCheckpointBeforeMinecraftMutation(prompt),
-    ).toBe(true);
+    expect(requiresCurrentTurnCheckpointBeforeMinecraftMutation(prompt)).toBe(
+      true,
+    );
     expect(
       requiresCurrentTurnCheckpointBeforeMinecraftMutation(
         "Never build the wall without a checkpoint.",
@@ -462,19 +779,22 @@ describe("Minecraft agency sequencing", () => {
     "Earlier we inspected before arming fall rescue; summarize the prior plan.",
     "Later we might inspect before arming fall rescue, but do nothing now.",
     "Do not inspect or arm fall rescue; just explain the feature.",
-  ])("does not invent an inspect-order rail from contextual text: %s", (text) => {
-    expect(
-      evaluateMinecraftAgencySequence({
-        prompt: text,
-        candidate: command(
-          "helixgame fall_rescue arm 300",
-          "server_administration",
-        ),
-        priorRequests: [],
-        gatewayCallResults: [],
-      }).admitted,
-    ).toBe(true);
-  });
+  ])(
+    "does not invent an inspect-order rail from contextual text: %s",
+    (text) => {
+      expect(
+        evaluateMinecraftAgencySequence({
+          prompt: text,
+          candidate: command(
+            "helixgame fall_rescue arm 300",
+            "server_administration",
+          ),
+          priorRequests: [],
+          gatewayCallResults: [],
+        }).admitted,
+      ).toBe(true);
+    },
+  );
 
   it("proves inspect-first and checkpoint-before-mutation from ordered observations", () => {
     const inspect = {
@@ -494,12 +814,18 @@ describe("Minecraft agency sequencing", () => {
         requirements: [
           { id: "R2", text: "Inspect first." },
           { id: "R4", text: "Capture a rollback checkpoint before changes." },
-          { id: "R5", text: "Re-inspect the same footprint after changing it." },
+          {
+            id: "R5",
+            text: "Re-inspect the same footprint after changing it.",
+          },
         ],
       },
       priorRequests: [inspect, checkpoint, mutation],
       gatewayCallResults: [
-        observedResult(HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY, "inspect"),
+        observedResult(
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          "inspect",
+        ),
         observedResult("com.casimirbot.minecraft.command", "checkpoint"),
         observedResult("com.casimirbot.minecraft.command", "mutation"),
       ],
@@ -513,7 +839,9 @@ describe("Minecraft agency sequencing", () => {
       expect.arrayContaining(["artifact:inspect", "artifact:mutation"]),
     );
     expect(resolutions).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ requirement_id: "R5" })]),
+      expect.arrayContaining([
+        expect.objectContaining({ requirement_id: "R5" }),
+      ]),
     );
   });
 
@@ -533,7 +861,10 @@ describe("Minecraft agency sequencing", () => {
       priorRequests: [mutation, inspect],
       gatewayCallResults: [
         observedResult("com.casimirbot.minecraft.command", "mutation"),
-        observedResult(HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY, "inspect"),
+        observedResult(
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          "inspect",
+        ),
       ],
     });
 
@@ -668,7 +999,8 @@ describe("Minecraft agency sequencing", () => {
       "fill 1 64 1 5 66 1 minecraft:stone_bricks",
       "world_mutation",
     );
-    const verification = buildMinecraftPostMutationVerificationRequest(mutation)!;
+    const verification =
+      buildMinecraftPostMutationVerificationRequest(mutation)!;
     const requirements = {
       requirements: [
         { id: "R2", text: "Inspect first." },
@@ -676,7 +1008,10 @@ describe("Minecraft agency sequencing", () => {
       ],
     };
     const gatewayResults = (allMatch: boolean) => [
-      observedResult(HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY, "inspect"),
+      observedResult(
+        HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+        "inspect",
+      ),
       observedResult("com.casimirbot.minecraft.command", "mutation"),
       observedResult(
         HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
@@ -718,7 +1053,8 @@ describe("Minecraft agency sequencing", () => {
       "setblock -40 69 -12 minecraft:fire",
       "world_mutation",
     );
-    const fireVerification = buildMinecraftPostMutationVerificationRequest(fire)!;
+    const fireVerification =
+      buildMinecraftPostMutationVerificationRequest(fire)!;
     const decision = evaluateMinecraftAgencySequence({
       prompt: "Build the hearth, ignite it, then verify the finished result.",
       candidate: {
@@ -760,8 +1096,10 @@ describe("Minecraft agency sequencing", () => {
       "setblock -40 69 -12 minecraft:fire",
       "world_mutation",
     );
-    const wallVerification = buildMinecraftPostMutationVerificationRequest(wall)!;
-    const fireVerification = buildMinecraftPostMutationVerificationRequest(fire)!;
+    const wallVerification =
+      buildMinecraftPostMutationVerificationRequest(wall)!;
+    const fireVerification =
+      buildMinecraftPostMutationVerificationRequest(fire)!;
     const requirements = {
       requirements: [
         { id: "R5", text: "Verify the finished result after changing it." },

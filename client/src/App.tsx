@@ -12,6 +12,7 @@ import { LumaWhispersProvider } from "@/lib/luma-whispers";
 import { useIsMobileViewport } from "@/hooks/useIsMobileViewport";
 import RouteBootSplash from "@/components/RouteBootSplash";
 import { buildWorkstationShellHandoff } from "@/lib/workstation/workstationEntryRoute";
+import { RuntimeSurfaceProvider } from "@/lib/runtime/RuntimeSurfaceProvider";
 
 const Home = lazy(() => import("@/pages/home"));
 const Simulation = lazy(() => import("@/pages/simulation"));
@@ -20,6 +21,7 @@ const AgentAccessPage = lazy(() => import("@/pages/agent-access"));
 const NoiseGenAlias = lazy(() => import("@/pages/noisegen"));
 const Why = lazy(() => import("@/pages/why"));
 const StartPortal = lazy(() => import("@/pages/start"));
+const DownloadPage = lazy(() => import("@/pages/download"));
 const StationPage = lazy(() => import("@/pages/station"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const PotatoThresholdLab = lazy(() => import("@/pages/potato-threshold-lab"));
@@ -177,6 +179,7 @@ function Router() {
         <Route path="/" component={AdaptiveWorkstationRoute} />
         <Route path="/open" component={AdaptiveWorkstationRoute} />
         <Route path="/start" component={StartRoute} />
+        <Route path="/download" component={DownloadPage} />
         <Route path="/mobile" component={MobileRoute} />
         <Route path="/bridge" component={Home} />
         <Route path="/simulation" component={Simulation} />
@@ -214,23 +217,25 @@ function Router() {
 function App() {
   useQiStream(true, { hz: 10 });
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        {/* Background behind everything, once */}
-        <LumaBackgroundPortal>
-          <BackgroundLuma opacity={0.12} blurPx={8} />
-        </LumaBackgroundPortal>
+    <RuntimeSurfaceProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          {/* Background behind everything, once */}
+          <LumaBackgroundPortal>
+            <BackgroundLuma opacity={0.12} blurPx={8} />
+          </LumaBackgroundPortal>
 
-        {/* Your entire app (router, pages, etc.) */}
-        <div className="relative z-10 min-h-screen">
-          <Toaster />
-          <Router />
-        </div>
+          {/* Your entire app (router, pages, etc.) */}
+          <div className="relative z-10 min-h-screen">
+            <Toaster />
+            <Router />
+          </div>
 
-        {/* Whispers host once, on top */}
-        <LumaOverlayHost />
-      </TooltipProvider>
-    </QueryClientProvider>
+          {/* Whispers host once, on top */}
+          <LumaOverlayHost />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </RuntimeSurfaceProvider>
   );
 }
 

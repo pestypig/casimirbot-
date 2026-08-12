@@ -1825,6 +1825,30 @@ describe("Shared Realtime room source ingress", () => {
       .send(manifest)
       .expect(200);
 
+    for (let poll = 0; poll < 3; poll += 1) {
+      const emptyPoll = await request(app)
+        .get(
+          `${sourcePath(created.binding.binding_id, "probes/pending")}?limit=8`,
+        )
+        .set(nextHeaders(""))
+        .expect(200);
+      expect(emptyPoll.body).toMatchObject({
+        ok: true,
+        kind: "probe_requests",
+        probe_requests: [],
+      });
+    }
+    await ensureDatabase();
+    const emptyPollReceipts = await getPool().query<{
+      request_count: number | string;
+    }>(
+      `SELECT COUNT(*) AS request_count
+       FROM helix_room_source_ingress_requests
+       WHERE binding_id = $1 AND route_key LIKE 'probes/pending%';`,
+      [created.binding.binding_id],
+    );
+    expect(Number(emptyPollReceipts.rows[0]?.request_count ?? 0)).toBe(0);
+
     const pending = createEnvironmentProbeRequest({
       sourceId: created.binding.source_id,
       roomId: created.binding.room_id,

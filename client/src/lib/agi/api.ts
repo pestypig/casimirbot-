@@ -2841,10 +2841,37 @@ const runAskTurnStreamAttempt = async (
     throw new Error(errorCode ? `ask_turn_stream_missing_final:${errorCode}` : "ask_turn_stream_missing_final");
   }
   const normalized = normalizeLocalAskResponse(finalPayload);
+  const streamError = readAskTurnStreamRecord(lastErrorPayload);
+  const streamErrorCode = readAskTurnStreamText(streamError?.error);
+  const streamErrorMessage = readAskTurnStreamText(streamError?.message);
+  const streamErrorName = readAskTurnStreamText(streamError?.error_name);
+  const streamErrorDurationMs =
+    typeof streamError?.stream_duration_ms === "number" &&
+    Number.isFinite(streamError.stream_duration_ms)
+      ? streamError.stream_duration_ms
+      : null;
   normalized.debug = {
     ...(normalized.debug ?? {}),
     stream_used: true,
     stream_fallback_reason: null,
+    ...(streamError
+      ? {
+          backend_ask_call_error:
+            streamErrorMessage || streamErrorCode || "ask_turn_stream_failed",
+          first_broken_rail: "ask_turn_stream_runtime",
+          repair_target: "server_stream_failure",
+          stream_error_event: {
+            schema: "helix.ask.turn_stream_error_observation.v1",
+            error_code: streamErrorCode || null,
+            error_name: streamErrorName || null,
+            message: streamErrorMessage || null,
+            stream_duration_ms: streamErrorDurationMs,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        }
+      : {}),
   };
   const retryableFailureCode = askTurnStreamRetryableFailureCode(normalized);
   if (retryableFailureCode) {

@@ -48,6 +48,29 @@ Invoke-WebRequest -UseBasicParsing http://localhost:1522/api/agi/agent-providers
 3. Static and deterministic unit tests may run without the keyed server. Do not
    present a mock, fallback, unkeyed, or ad hoc server as live-provider parity.
 
+## Environment Capability Development Preflight
+
+Before extending an environment connector or adding adapter rules, separate the
+two unknowns: whether the environment can perform the operation and whether
+Helix can carry a capable agent through it.
+
+1. Checkpoint a consented test environment.
+2. Run the natural objective through direct reference Codex access. Let Codex
+   use the available environment command/capability surface and record public
+   calls, observations, retries, postconditions, and final synthesis.
+3. If direct Codex cannot complete the task, work on environment access,
+   mechanics documentation, connector observations, or the capability itself.
+   Do not add Helix routing or terminal exceptions yet.
+4. If direct Codex succeeds, freeze that trace as the practical reference and
+   express it as provider-neutral affordances and evidence contracts rather
+   than a scripted solution.
+5. Restore an equivalent environment state and run the same prompt through the
+   keyed Helix API or UI. Use Loop A0 to find the first divergence.
+
+The reference run proves feasibility and supplies a capability benchmark. The
+Helix run proves governed end-to-end parity. Neither result substitutes for the
+other.
+
 ## Single-Prompt Success Checklist (Current)
 
 Use this checklist when validating one UI prompt quickly after a local patch.
@@ -189,6 +212,12 @@ Direct console, server, or game commands are valuable for preflight and for
 proving the environment can satisfy a request. They bypass Helix admission,
 re-entry, and terminal projection, so they are not end-to-end acceptance by
 themselves.
+
+For newly developed environment capabilities, perform the direct run first.
+Do not wait for a Helix failure to discover basic mechanics, required sensors,
+or a workable command sequence. After feasibility is established, the Helix
+run should preserve Codex's semantic choices while adding identity, permission,
+provenance, evidence-quality, and terminal-eligibility checks.
 
 Keep security and scientific evidence boundaries. Remove or repair only
 adapter-owned logic that duplicates model step choice, invents goals, retries

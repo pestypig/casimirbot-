@@ -1,5 +1,5 @@
 import React from "react";
-import * as Lucide from "lucide-react";
+import { AppWindow, ChevronUp } from "lucide-react";
 import { TaskbarShelf } from "@/components/desktop/TaskbarPanel";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import HelixMarkIcon from "@/components/icons/HelixMarkIcon";
@@ -131,7 +131,7 @@ function HelixStartLauncher({ onOpenPanel }: { onOpenPanel?: (panelId: string) =
         >
           <HelixMarkIcon className="h-4 w-4 text-primary" strokeWidth={40} aria-label="Helix mark" />
           Start
-          <Lucide.ChevronUp className="h-3.5 w-3.5 text-primary/80" />
+          <ChevronUp className="h-3.5 w-3.5 text-primary/80" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -161,7 +161,7 @@ function HelixStartLauncher({ onOpenPanel }: { onOpenPanel?: (panelId: string) =
               <CommandEmpty>No Helix panels match that search.</CommandEmpty>
               <CommandGroup heading="Helix Core Panels">
                 {helixPanels.map((panel) => {
-                  const Icon = panel.icon ?? Lucide.AppWindow;
+                  const Icon = panel.icon ?? AppWindow;
                   const win = windows[panel.id];
                   const isRunning = Boolean(win?.isOpen);
                   const statusLabel = !isRunning

@@ -5,8 +5,10 @@ import type {
 } from "@shared/helix-shared-realtime-room";
 import type { HelixSharedLiveRoomApi } from "./SharedLiveRoomApi";
 
-const ROOM_REFRESH_INTERVAL_MS = 750;
-const FRAME_REFRESH_INTERVAL_MS = 3_000;
+const ROOM_FOREGROUND_REFRESH_INTERVAL_MS = 3_000;
+const ROOM_BACKGROUND_REFRESH_INTERVAL_MS = 15_000;
+const FRAME_FOREGROUND_REFRESH_INTERVAL_MS = 5_000;
+const FRAME_BACKGROUND_REFRESH_INTERVAL_MS = 30_000;
 const ROOM_PRESENCE_INTERVAL_MS = 15_000;
 const ROOM_REFRESH_MAX_BACKOFF_MS = 12_000;
 const FRAME_REFRESH_MAX_BACKOFF_MS = 30_000;
@@ -23,6 +25,7 @@ export const sortHelixSharedLiveRooms = (
 export function useSharedLiveRoomSync(input: {
   api: HelixSharedLiveRoomApi;
   activeRoomId: string | null;
+  foreground: boolean;
   onInitialRooms(rooms: HelixSharedRealtimeRoom[]): void;
   onRoom(room: HelixSharedRealtimeRoom): void;
   onFrames(frames: HelixSharedRealtimeRoomVisualFrame[]): void;
@@ -56,8 +59,14 @@ export function useSharedLiveRoomSync(input: {
     let disposed = false;
     let roomTimer: number | null = null;
     let frameTimer: number | null = null;
-    let roomDelayMs = ROOM_REFRESH_INTERVAL_MS;
-    let frameDelayMs = FRAME_REFRESH_INTERVAL_MS;
+    const roomBaseDelayMs = input.foreground
+      ? ROOM_FOREGROUND_REFRESH_INTERVAL_MS
+      : ROOM_BACKGROUND_REFRESH_INTERVAL_MS;
+    const frameBaseDelayMs = input.foreground
+      ? FRAME_FOREGROUND_REFRESH_INTERVAL_MS
+      : FRAME_BACKGROUND_REFRESH_INTERVAL_MS;
+    let roomDelayMs = roomBaseDelayMs;
+    let frameDelayMs = frameBaseDelayMs;
 
     const scheduleRoomRefresh = (delayMs: number): void => {
       if (disposed) return;
@@ -77,7 +86,7 @@ export function useSharedLiveRoomSync(input: {
       try {
         const room = await input.api.getRoom(input.activeRoomId as string);
         if (disposed) return;
-        roomDelayMs = ROOM_REFRESH_INTERVAL_MS;
+        roomDelayMs = roomBaseDelayMs;
         input.onRoom(room);
       } catch (error) {
         if (disposed) return;
@@ -91,7 +100,7 @@ export function useSharedLiveRoomSync(input: {
       try {
         const frames = await input.api.listVisualFrames(input.activeRoomId as string);
         if (disposed) return;
-        frameDelayMs = FRAME_REFRESH_INTERVAL_MS;
+        frameDelayMs = frameBaseDelayMs;
         input.onFrames(frames);
       } catch (error) {
         if (disposed) return;
@@ -112,6 +121,7 @@ export function useSharedLiveRoomSync(input: {
   }, [
     input.activeRoomId,
     input.api,
+    input.foreground,
     input.onClearRoomArtifacts,
     input.onError,
     input.onFrames,

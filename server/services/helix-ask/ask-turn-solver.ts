@@ -1702,6 +1702,11 @@ export function evaluateAskTurnSolverHardGate(input: {
   if (
     hardSourceTarget &&
     !nonAnswerTerminal &&
+    !(
+      traceTerminalArtifactKind === "live_environment_binding_diagnosis" ||
+      readString(input.payload.terminal_artifact_kind) ===
+        "live_environment_binding_diagnosis"
+    ) &&
     readString(liveSourceIdentityAudit?.schema) ===
       "helix.live_source_identity_audit.v1" &&
     liveSourceIdentityAudit?.identity_ok === false
@@ -2604,7 +2609,9 @@ export function buildAskTurnSolverTrace(input: {
     (routeAuthorityOk || canonicalTerminalAllowed) &&
     poisonAuditOk &&
     terminalAuthorityOk &&
-    liveSourceIdentityOk &&
+    (liveSourceIdentityOk ||
+      terminalArtifactKind === "live_environment_binding_diagnosis" ||
+      finalAnswerSource === "live_environment_binding_diagnosis") &&
     effectiveEvidenceReentryGate.completed &&
     effectiveFollowupReasoningGate.completed &&
     solverRiskFlags.length === 0;

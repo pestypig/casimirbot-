@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyDocsRetrievalAuthority,
   buildDocsEvidencePassages,
   buildDocsSearchDocumentCandidates,
   buildDocsSearchTerms,
   rankDocsSearchHits,
+  resolveAuthoritativeDocsTopicMatch,
+  resolveDocsRetrievalAuthority,
 } from "../docs-search";
 import type { RepoSearchHit } from "../repo-search";
 
@@ -15,6 +18,142 @@ const hit = (filePath: string, text: string, term = "nhm2"): RepoSearchHit => ({
 });
 
 describe("docs search taxonomy metadata", () => {
+  it.each([
+    [
+      "What is the current NHM2 research position?",
+      "nhm2",
+      "docs/research/nhm2-current-status-whitepaper.md",
+    ],
+    [
+      "What is the current Casimir-DP quantum foam study actually claiming?",
+      "casimir-dp",
+      "docs/research/casimir-dp-quantum-foam-study.md",
+    ],
+  ])("recognizes a primary taxonomy topic from a natural prompt: %s", (prompt, topicId, primaryPath) => {
+    expect(resolveAuthoritativeDocsTopicMatch(prompt)).toMatchObject({
+      topic_id: topicId,
+      primary_path: primaryPath,
+    });
+  });
+
+  it("does not overmatch a partial compound topic", () => {
+    expect(resolveAuthoritativeDocsTopicMatch("Explain the Casimir effect generally.")).toBeNull();
+  });
+
+  it("assigns independent retrieval authority to canonical and superseded NHM2 papers", () => {
+    expect(resolveDocsRetrievalAuthority(
+      "docs/research/nhm2-current-status-whitepaper.md",
+    )).toEqual({
+      retrieval_status: "primary",
+      topic_id: "nhm2",
+      authority_rank: 100,
+    });
+    expect(resolveDocsRetrievalAuthority(
+      "docs/research/nhm2-current-status-whitepaper-2026-04-03.md",
+    )).toEqual({
+      retrieval_status: "archive",
+      topic_id: "nhm2",
+      authority_rank: 10,
+      superseded_by: "docs/research/nhm2-current-status-whitepaper.md",
+    });
+  });
+
+  it("suppresses archival generations from default retrieval without deleting them", () => {
+    const result = applyDocsRetrievalAuthority({
+      hits: [
+        hit(
+          "docs/research/nhm2-current-status-whitepaper.md",
+          "The maintained NHM2 status and claim boundary.",
+        ),
+        hit(
+          "docs/research/nhm2-current-status-memo-2026-04-03.md",
+          "An earlier NHM2 development status generation.",
+        ),
+        hit(
+          "docs/audits/research/needle-hull-mark2/needle-hull-mark2-compact-note-2026-03-22.md",
+          "Historical compact note for Needle Hull Mark 2.",
+        ),
+      ],
+      query: "What is the current NHM2 research position?",
+      searchPaths: ["docs"],
+    });
+
+    expect(result.admitted_hits.map((entry) => entry.filePath)).toEqual([
+      "docs/research/nhm2-current-status-whitepaper.md",
+    ]);
+    expect(result.suppressed).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: "docs/research/nhm2-current-status-memo-2026-04-03.md",
+        retrieval_status: "archive",
+        reason: "archive_not_requested",
+        superseded_by: "docs/research/nhm2-current-status-whitepaper.md",
+      }),
+      expect.objectContaining({
+        path: "docs/audits/research/needle-hull-mark2/needle-hull-mark2-compact-note-2026-03-22.md",
+        retrieval_status: "archive",
+        reason: "archive_not_requested",
+      }),
+    ]));
+  });
+
+  it("admits an exact archived title without widening the whole search", () => {
+    const result = applyDocsRetrievalAuthority({
+      hits: [
+        hit(
+          "docs/research/nhm2-current-status-whitepaper-2026-04-03.md",
+          "Dated NHM2 whitepaper text.",
+        ),
+        hit(
+          "docs/research/nhm2-current-status-memo-2026-04-03.md",
+          "Separate dated memo text.",
+        ),
+      ],
+      query: "Find the NHM2 current status whitepaper 2026 04 03",
+      searchPaths: ["docs/research"],
+    });
+
+    expect(result.admitted_hits.map((entry) => entry.filePath)).toEqual([
+      "docs/research/nhm2-current-status-whitepaper-2026-04-03.md",
+    ]);
+    expect(result.suppressed).toEqual([
+      expect.objectContaining({
+        path: "docs/research/nhm2-current-status-memo-2026-04-03.md",
+        reason: "archive_not_requested",
+      }),
+    ]);
+  });
+
+  it("admits an exact dated archive title when natural wording inserts 'dated'", () => {
+    const result = applyDocsRetrievalAuthority({
+      hits: [
+        hit(
+          "docs/research/nhm2-current-status-whitepaper-2026-04-03.md",
+          "Dated NHM2 whitepaper text.",
+        ),
+      ],
+      query: "NHM2 current status whitepaper dated 2026-04-03",
+      searchPaths: ["docs"],
+    });
+
+    expect(result.admitted_hits).toHaveLength(1);
+    expect(result.suppressed).toEqual([]);
+  });
+
+  it("allows an explicit archive scope for historical comparisons", () => {
+    const result = applyDocsRetrievalAuthority({
+      hits: [
+        hit("docs/research/nhm2-current-status-whitepaper.md", "Current paper."),
+        hit("docs/research/nhm2-current-status-memo-2026-04-03.md", "Historical memo."),
+      ],
+      query: "Compare the historical NHM2 versions",
+      searchPaths: ["docs/research"],
+      scope: "include_archive",
+    });
+
+    expect(result.admitted_document_count).toBe(2);
+    expect(result.suppressed).toEqual([]);
+  });
+
   it("ranks a numeric mechanics example for a natural number-word goal", () => {
     const query = "Can you make me glow for ten seconds in the connected Minecraft world?";
     const terms = buildDocsSearchTerms(query);
@@ -98,6 +237,10 @@ describe("docs search taxonomy metadata", () => {
       doc_class: "canonical-research",
       bundle_kind: "equation-action-whitepaper",
       canonical: true,
+      retrieval_status: "primary",
+      retrieval_admission_reason: "default_primary",
+      topic_id: "nhm2",
+      authority_rank: 100,
       tool_hints: {
         calculatorReady: true,
       },

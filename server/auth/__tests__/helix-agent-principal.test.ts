@@ -35,6 +35,7 @@ const relevantEnvironmentKeys = [
   "HELIX_AGENT_OAUTH_PROVIDER",
   "HELIX_AGENT_OAUTH_JWKS_URL",
   "HELIX_AGENT_OAUTH_ALGORITHMS",
+  "HELIX_AGENT_OAUTH_TENANT_CLAIM",
   "HELIX_AGENT_ALLOW_LOCAL_HS256",
   "HELIX_AGENT_LOCAL_JWT_SECRET",
   "HELIX_DEVELOPER_PROFILE_IDS",
@@ -207,6 +208,30 @@ describe("DefaultHelixAgentAccessTokenVerifier", () => {
 
     const missingTenant = await signToken(config);
     await expect(verifier.verify(missingTenant)).rejects.toMatchObject({
+      status: 401,
+      code: "tenant_required",
+    });
+  });
+
+  it("uses only the exact configured namespaced tenant claim", async () => {
+    const config = configureLocalVerifier();
+    const tenantClaim = "https://casimirbot.com/tenant_id";
+    process.env.HELIX_AGENT_OAUTH_TENANT_CLAIM = tenantClaim;
+    const verifier = new DefaultHelixAgentAccessTokenVerifier();
+    const admitted = await signToken({
+      ...config,
+      tenantId: "legacy-tenant-must-not-win",
+      extra: { [tenantClaim]: "tenant-namespaced" },
+    });
+    await expect(verifier.verify(admitted)).resolves.toMatchObject({
+      tenantId: "tenant-namespaced",
+    });
+
+    const missingExactClaim = await signToken({
+      ...config,
+      tenantId: "legacy-tenant-must-not-fallback",
+    });
+    await expect(verifier.verify(missingExactClaim)).rejects.toMatchObject({
       status: 401,
       code: "tenant_required",
     });

@@ -14,10 +14,38 @@ const MECHANICS_EVIDENCE_PATTERN =
   /\b(?:mechanics|commands?|syntax|documentation|docs?|guide|playbook|citations?|references?)\b|\b(?:source|evidence)\s+lines?\b/i;
 
 const LIVE_ENVIRONMENT_STATE_PATTERN =
-  /\b(?:paired\s+(?:minecraft\s+)?(?:fabric\s+)?environment|selected\s+(?:minecraft\s+)?player|current\s+(?:player\s+)?(?:exact\s+)?position|exact\s+position|current\s+(?:minecraft\s+)?(?:daytime|time|weather|difficulty|game\s*rules?|world\s*border|tick(?:ing)?\s+state)|health|food|dimension|game\s+mode|inventory|line\s+of\s+sight|nearby\s+(?:entities|hazards|blocks)|fresh\s+(?:live\s+)?(?:state|evidence|observation)|post[-\s]?action\s+verification|right\s+now)\b/i;
+  /\b(?:paired\s+(?:minecraft\s+)?(?:fabric\s+)?environment|selected\s+(?:minecraft\s+)?player|current\s+(?:player\s+)?(?:exact\s+)?position|exact\s+position|current\s+(?:minecraft\s+)?(?:daytime|time|weather|difficulty|game\s*rules?|world\s*border|tick(?:ing)?\s+state)|actor[-\s]?status|yaw|pitch|health|food|dimension|game\s*mode|inventory|line\s+of\s+sight|nearby\s+(?:entities|hazards|blocks)|fresh\s+(?:live\s+)?(?:state|evidence|observation)|post[-\s]?action\s+verification|right\s+now)\b/i;
 
 const EXPLICIT_MECHANICS_DOCUMENT_TARGET_PATTERN =
   /\b(?:mechanics|syntax|documentation|docs?|guide|playbook|citations?|references?)\b|\b(?:source|evidence)\s+lines?\b/i;
+
+const mechanicsEvidenceMatchIsNonExecutableAt = (
+  prompt: string,
+  matchIndex: number,
+): boolean => {
+  const before = prompt.slice(Math.max(0, matchIndex - 220), matchIndex);
+  const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
+  return (
+    /\b(?:do\s+not|don['’]?t|dont|never|avoid|without|no\s+need\s+to|not\s+asking\s+to)\b[^.!?;\n]{0,180}$/i.test(
+      clausePrefix,
+    ) ||
+    /\b(?:later|eventually|tomorrow|someday|not\s+now|if|when|unless|once|may|might)\b[^.!?;\n]{0,180}$/i.test(
+      clausePrefix,
+    ) ||
+    /\b(?:earlier|previously|historically|last\s+turn|last\s+time)\b[^.!?;\n]{0,180}$/i.test(
+      clausePrefix,
+    )
+  );
+};
+
+const affirmativeMechanicsEvidenceMatches = (prompt: string): RegExpMatchArray[] =>
+  Array.from(
+    prompt.matchAll(new RegExp(MECHANICS_EVIDENCE_PATTERN.source, "gi")),
+  ).filter(
+    (match): match is RegExpMatchArray & { index: number } =>
+      typeof match.index === "number" &&
+      !mechanicsEvidenceMatchIsNonExecutableAt(prompt, match.index),
+  );
 
 /**
  * Recognizes an immediate request to retrieve Minecraft mechanics guidance.
@@ -28,10 +56,11 @@ export const minecraftMechanicsDocsPromptMatch = (
   promptText: string | null | undefined,
 ): MinecraftMechanicsDocsPromptMatch | null => {
   const prompt = String(promptText ?? "").trim();
+  const mechanicsEvidenceMatches = affirmativeMechanicsEvidenceMatches(prompt);
   if (
     !prompt ||
     !MINECRAFT_SCOPE_PATTERN.test(prompt) ||
-    !MECHANICS_EVIDENCE_PATTERN.test(prompt)
+    mechanicsEvidenceMatches.length === 0
   ) {
     return null;
   }

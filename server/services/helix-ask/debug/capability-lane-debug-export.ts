@@ -985,6 +985,7 @@ export const buildCapabilityLaneDebugExportFields = (
     ),
     capability_lane_reentry_status: read("capability_lane_reentry_status", null),
     runtime_lane_request_contract: read("runtime_lane_request_contract", null),
+    provider_solver_completion_audit: read("provider_solver_completion_audit", null),
     runtime_lane_request_loop: read("runtime_lane_request_loop", null),
     runtime_lane_request_retry: read("runtime_lane_request_retry", null),
   };
